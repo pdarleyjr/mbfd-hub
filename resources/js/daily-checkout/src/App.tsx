@@ -25,19 +25,19 @@ const PageLoading = () => (
   </div>
 );
 
-const HomeNav = ({ standard }: { standard: boolean }) => (
-  <header className={`sticky top-0 z-50 border-b h-16 flex items-center justify-between px-4 lg:px-6 ${standard ? 'bg-hub-header border-hub-border-strong/30' : 'bg-neutral-900 border-neutral-700/50'}`} style={{ paddingTop: 'max(0px, env(safe-area-inset-top, 0px))' }}>
-    <div className="flex items-center gap-3">
-      <img src="/images/mbfd_logo_new.png" alt="MBFD Logo" className="h-10 w-10 object-contain" />
-      <div>
-        <h1 className="text-white font-bold text-sm sm:text-base leading-tight font-heading">MBFD Support Hub</h1>
-        <p className={`hidden sm:block text-xs ${standard ? 'text-white/80' : 'text-neutral-400'}`}>Enterprise Command Portal</p>
+const HomeNav = () => (
+  <header className="daily-home-nav sticky top-0 z-50 border-b min-h-16 flex items-center justify-between gap-3 px-4 py-2 lg:px-6 bg-hub-header border-hub-border-strong/30" style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0px))' }}>
+    <div className="flex min-w-0 items-center gap-3">
+      <img src="/images/mbfd_logo-256.png" alt="" width="40" height="40" className="h-10 w-10 shrink-0 object-contain" />
+      <div className="min-w-0">
+        <p className="text-white font-bold text-sm sm:text-base leading-tight font-heading">MBFD Support Hub</p>
+        <p className="hidden sm:block text-xs text-white/80">Daily Checkout</p>
       </div>
     </div>
     <div className="flex items-center gap-2">
       <a
         href="/"
-        className={`min-h-[44px] px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors flex items-center gap-2 ${standard ? 'bg-hub-blue hover:bg-hub-blue-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white' : 'bg-red-600 hover:bg-red-700'}`}
+        className="min-h-[44px] shrink-0 px-3 py-2 text-sm font-medium text-white rounded-md transition-colors flex items-center gap-2 border border-white/25 hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
         aria-label="Return to MBFD Hub home page"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -64,12 +64,12 @@ function DailyShell() {
   const { pathname } = useLocation();
   const standard = !isActiveInspectionPath(pathname);
   return (
-      <div className={standard ? 'daily-standard min-h-screen bg-hub-canvas font-hub text-hub-ink' : 'min-h-screen bg-neutral-50'}>
+      <div className={standard ? 'daily-shell daily-standard min-h-screen bg-hub-canvas font-hub text-hub-ink' : 'daily-shell min-h-screen bg-hub-canvas font-hub text-hub-ink'}>
         {/* Phase 8.1: Skip Navigation */}
-        <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:bg-red-600 focus:text-white focus:px-4 focus:py-2 focus:rounded-lg focus:shadow-lg">
+        <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:bg-hub-blue focus:text-white focus:px-4 focus:py-2 focus:rounded-lg focus:shadow-lg">
           Skip to main content
         </a>
-        <HomeNav standard={standard} />
+        <HomeNav />
         <OfflineIndicator />
         <DailyCheckoutQueueProcessor />
         <IOSInstallPrompt />

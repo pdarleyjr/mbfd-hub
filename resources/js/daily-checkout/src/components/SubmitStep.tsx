@@ -171,7 +171,7 @@ export default function SubmitStep({
 
       {/* Officer Signature */}
       <div className="inspection-signature">
-        <h3 className="text-lg font-medium text-gray-900 mb-2">Member Signature</h3>
+        <h3 id="inspection-signature-label" className="text-lg font-medium text-gray-900 mb-2">Member Signature</h3>
         <p className="text-sm text-gray-600 mb-3">Sign below to certify this inspection is accurate.</p>
         <div className={`border-2 rounded-lg bg-white ${sigError ? 'border-red-500' : 'border-gray-300'}`}>
           <SignatureCanvas
@@ -184,7 +184,10 @@ export default function SubmitStep({
             }}
             canvasProps={{
               className: 'w-full',
-              style: { width: '100%', height: '150px' }
+              style: { width: '100%', height: '150px' },
+              role: 'img',
+              'aria-labelledby': 'inspection-signature-label',
+              'aria-description': 'Draw your signature using a mouse, finger, or stylus.'
             }}
           />
         </div>

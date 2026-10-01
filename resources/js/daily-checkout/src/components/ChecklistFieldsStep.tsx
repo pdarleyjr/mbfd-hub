@@ -235,7 +235,7 @@ export default function ChecklistFieldsStep({
         </button>
         <button
           type="submit"
-          className="min-h-12 flex-1 rounded-lg bg-red-600 px-4 py-3 font-semibold text-white hover:bg-red-700"
+          className="min-h-12 flex-1 rounded-lg bg-hub-blue px-4 py-3 font-semibold text-white hover:bg-hub-blue-strong"
         >
           {continueLabel}
         </button>

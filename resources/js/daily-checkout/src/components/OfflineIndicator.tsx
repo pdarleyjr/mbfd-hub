@@ -88,7 +88,7 @@ export default function OfflineIndicator() {
           <span className="inline-block mr-2" aria-hidden="true">⚠️</span>
           Offline Mode - Submissions wait for a connection
           {queueCount > 0 && (
-            <span className="ml-2 inline-block bg-yellow-600 px-2 py-0.5 rounded-full text-xs">
+            <span className="ml-2 inline-block border border-amber-800/30 bg-white/70 text-amber-950 px-2 py-0.5 rounded text-xs">
               {queueCount} pending
             </span>
           )}

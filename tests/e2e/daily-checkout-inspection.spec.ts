@@ -270,7 +270,7 @@ async function mockInspectionApi(
   let abortNextSubmit = options.abortFirstSubmit ?? false;
   let currentIdentity = { userId: 101, securityVersion: 1 };
 
-  await page.route('**/images/mbfd_logo_new.png', (route) => route.fulfill({ path: 'public/images/mbfd_logo_new.png' }));
+  await page.route('**/images/mbfd_logo-256.png', (route) => route.fulfill({ path: 'public/images/mbfd_logo-256.png' }));
   await page.route('**/api/**', async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
@@ -411,7 +411,7 @@ async function mockFireBoatInspectionApi(
       }
     : fireBoatApparatus;
 
-  await page.route('**/images/mbfd_logo_new.png', (route) => route.fulfill({ path: 'public/images/mbfd_logo_new.png' }));
+  await page.route('**/images/mbfd_logo-256.png', (route) => route.fulfill({ path: 'public/images/mbfd_logo-256.png' }));
   await page.route('**/api/**', async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
@@ -727,7 +727,7 @@ async function genericQueuedSubmissions(page: Page): Promise<GenericQueuedSubmis
 }
 
 async function createVersionThreeQueue(page: Page, record: Omit<SeededQueuedInspection, 'checklistVersion'>): Promise<void> {
-  await page.goto('/images/mbfd_logo_new.png');
+  await page.goto('/images/mbfd_logo-256.png');
   await page.evaluate(async (queuedRecord) => {
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
       // Dexie stores semantic schema version 3 as native IndexedDB version 30.

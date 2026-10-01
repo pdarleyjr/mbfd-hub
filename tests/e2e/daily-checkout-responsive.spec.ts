@@ -38,9 +38,9 @@ const unknownApparatus = {
 
 async function mockDailySelectorApi(page: Page): Promise<void> {
   await page.route('**/images/**', (route) => {
-    if (new URL(route.request().url()).pathname === '/images/mbfd_logo_new.png') {
+    if (new URL(route.request().url()).pathname === '/images/mbfd_logo-256.png') {
       return route.fulfill({
-        path: resolve('public/images/mbfd_logo_new.png'),
+        path: resolve('public/images/mbfd_logo-256.png'),
         contentType: 'image/png',
       });
     }

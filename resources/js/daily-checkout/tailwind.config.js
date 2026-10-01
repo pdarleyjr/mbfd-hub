@@ -49,7 +49,7 @@ export default {
             fontFamily: {
                 sans: ['"Source Sans 3"', '"DM Sans"', 'system-ui', 'sans-serif'],
                 hub: ['var(--hub-font-sans)'],
-                heading: ['"Plus Jakarta Sans"', '"Outfit"', 'system-ui', 'sans-serif'],
+                heading: ['var(--hub-font-sans)'],
                 mono: ['"JetBrains Mono"', 'monospace'],
             },
             fontSize: {

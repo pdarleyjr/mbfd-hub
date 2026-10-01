@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 import { readFileSync } from 'node:fs';
 import { readDrafts, replaceDrafts } from './support/daily-checkout-drafts';
 import { resolveBlueprint } from '../../resources/js/daily-checkout/src/data/apparatusBlueprints';
@@ -41,7 +42,8 @@ async function fixture(page: Page, options: { checklist?: typeof sourceChecklist
   const submissions: InspectionSubmission[] = [];
   const revisions: Array<{ reason: string; value?: number }> = [];
   let userId = 401;
-  await page.route('**/images/mbfd_logo_new.png', route => route.fulfill({ path: 'public/images/mbfd_logo_new.png' }));
+  await page.route('**/images/mbfd_logo-256.png', route => route.fulfill({ path: 'public/images/mbfd_logo-256.png' }));
+  await page.route('**/images/mbfd_app_icon_192.png', route => route.fulfill({ path: 'public/images/mbfd_app_icon_192.png' }));
   await page.route('**/api/**', route => {
     const path = new URL(route.request().url()).pathname;
     if (path === '/api/me/context') return route.fulfill({ json: { identity: { user_id: userId, has_personnel_profile: true }, personnel: { employee_profile_id: userId + 100, employee_number: `TEST-${userId + 100}`, name: userId === 401 ? 'Browser Member' : 'Other Browser Member', rank: 'Captain' }, offline: { security_version: 1 } } });
@@ -83,6 +85,43 @@ async function showOptionalDetails(page: Page) {
   const details = page.locator('details').filter({ has: page.locator('summary', { hasText: /^Additional details/ }) });
   if (await details.count() && !(await details.evaluate(element => (element as HTMLDetailsElement).open))) await details.locator('summary').click();
 }
+
+test('Daily presentation supports zoom, one page heading, local typography and visible save state', async ({ page }, testInfo) => {
+  const requests: string[] = [];
+  const consoleErrors: string[] = [];
+  page.on('request', request => requests.push(request.url()));
+  page.on('console', message => {
+    if (message.type() === 'error') consoleErrors.push(`${message.location().url}: ${message.text()}`);
+  });
+  page.on('pageerror', error => consoleErrors.push(error.message));
+  await fixture(page);
+  await expect(page.locator('h1')).toHaveCount(1);
+  await expect(page.locator('meta[name="viewport"]')).not.toHaveAttribute('content', /user-scalable\s*=\s*no|maximum-scale\s*=\s*1(?:\.0)?(?:,|$)/);
+  await expect(page.locator('.inspection-save')).toHaveAttribute('data-save-state', 'saved');
+  await expect(page.getByRole('status').filter({ hasText: 'Changes saved on this device' })).toBeVisible();
+
+  const presentation = await page.evaluate(async () => {
+    await document.fonts.ready;
+    const logo = document.querySelector<HTMLImageElement>('.daily-home-nav img');
+    return {
+      font: getComputedStyle(document.body).fontFamily,
+      loadedLocalFont: [...document.fonts].some(font => font.family.includes('Plus Jakarta Sans Variable') && font.status === 'loaded'),
+      logoLoaded: !!logo && logo.complete && logo.naturalWidth > 0,
+      overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    };
+  });
+  expect(presentation.font).toContain('Plus Jakarta Sans Variable');
+  expect(presentation.loadedLocalFont).toBe(true);
+  expect(presentation.logoLoaded).toBe(true);
+  expect(presentation.overflow).toBeLessThanOrEqual(1);
+  expect(requests.filter(url => /fonts\.(googleapis|gstatic|bunny)\./.test(url))).toEqual([]);
+  const accessibility = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+    .analyze();
+  expect(accessibility.violations.filter(violation => ['serious', 'critical'].includes(violation.impact ?? ''))).toEqual([]);
+  expect(consoleErrors).toEqual([]);
+  await page.screenshot({ path: testInfo.outputPath('daily-presentation.png'), fullPage: true });
+});
 
 for (const [designation, name, slug, file] of [
   ['E1', 'Engine 1', 'engine-1', 'engine'],

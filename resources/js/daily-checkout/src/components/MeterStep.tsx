@@ -235,7 +235,7 @@ export default function MeterStep({
           </button>
           <button
             type="submit"
-            className="flex-1 min-h-[48px] px-4 py-3 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 active:bg-red-800 transition-colors shadow-sm touch-manipulation"
+            className="flex-1 min-h-[48px] px-4 py-3 rounded-lg bg-hub-blue text-white font-semibold hover:bg-hub-blue-strong active:bg-hub-header transition-colors shadow-sm touch-manipulation"
           >
             {continueLabel}
           </button>
