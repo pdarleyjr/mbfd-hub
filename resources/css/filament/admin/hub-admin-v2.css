@@ -1,0 +1,512 @@
+/*
+ * MBFD Hub design system v2 — native Filament panel presentation.
+ *
+ * Native primitives are scoped to the four named Hub panel body classes.
+ * Admin operational components keep their own panel scope.
+ * Rollback: remove the import of this file from theme.css. Plain CSS (no @apply).
+ */
+
+.fi-body:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) {
+    --hub2-header: 16 42 67;
+    --hub2-action: 30 78 140;
+    --hub2-action-hover: 26 67 120;
+    --hub2-action-tint: 238 243 250;
+    --hub2-focus: 29 78 216;
+    --hub2-red: 220 38 38;
+    --hub2-n-0: 255 255 255;
+    --hub2-n-25: 250 251 252;
+    --hub2-n-50: 243 245 248;
+    --hub2-n-100: 232 236 241;
+    --hub2-n-200: 220 226 232;
+    --hub2-n-400: 133 147 163;
+    --hub2-n-500: 100 116 139;
+    --hub2-n-600: 71 85 105;
+    --hub2-n-800: 30 41 59;
+    --hub2-n-900: 15 23 42;
+    --hub2-elevation-1: 0 1px 2px rgb(16 42 67 / 0.06);
+    --hub2-elevation-2: 0 8px 24px -8px rgb(16 42 67 / 0.18);
+    --hub2-elevation-3: 0 24px 48px -12px rgb(16 42 67 / 0.28);
+    --hub2-ease-enter: cubic-bezier(0.2, 0, 0, 1);
+
+    background-color: rgb(var(--hub2-n-0));
+    color: rgb(var(--hub2-n-900));
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---------- App bar ---------- */
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-topbar {
+    border-bottom: 0;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-topbar > nav {
+    min-height: 56px;
+}
+
+@media (max-height: 800px) and (min-width: 1024px) {
+    :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-topbar > nav { min-height: 48px; height: 48px; }
+}
+
+/* Notification counts are one of red's sanctioned meanings. */
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-topbar .fi-badge {
+    border-radius: 9999px;
+}
+
+/* ---------- Sidebar ---------- */
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-sidebar {
+    background-color: rgb(var(--hub2-n-0));
+    border-right: 1px solid rgb(var(--hub2-n-200));
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) :is(.fi-sidebar-nav-group-label, .fi-sidebar-group-label) {
+    color: rgb(var(--hub2-n-500));
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-sidebar-group-button .fi-sidebar-group-icon,
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-sidebar-item-icon {
+    color: rgb(var(--hub2-n-500));
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-sidebar-item-button {
+    border-radius: 6px;
+    color: rgb(var(--hub2-n-800));
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-sidebar-item-label {
+    color: rgb(var(--hub2-n-800));
+    font-size: 14px;
+    line-height: 20px;
+    font-weight: 500;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-sidebar-item-button:hover {
+    background-color: rgb(var(--hub2-n-50));
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-sidebar-item-active > .fi-sidebar-item-button {
+    background-color: rgb(var(--hub2-action-tint));
+    border-left: 0;
+    box-shadow: inset 2px 0 0 rgb(var(--hub2-action));
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-sidebar-item-active .fi-sidebar-item-label,
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-sidebar-item-active .fi-sidebar-item-icon {
+    color: rgb(var(--hub2-action));
+    font-weight: 600;
+}
+
+/* No hover scaling on controls. */
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-sidebar-close-button:hover,
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-sidebar-open-button:hover {
+    transform: none;
+}
+
+/* ---------- Page header ---------- */
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-header-heading {
+    color: rgb(var(--hub2-n-900));
+    font-size: 20px;
+    line-height: 28px;
+    font-weight: 650;
+    letter-spacing: -0.015em;
+}
+
+@media (min-width: 640px) {
+    :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-header-heading { font-size: 24px; line-height: 32px; }
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-header-subheading {
+    color: rgb(var(--hub2-n-600));
+    font-size: 14px;
+    line-height: 22px;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-breadcrumbs {
+    font-size: 12px;
+    line-height: 16px;
+}
+
+/* ---------- Surfaces: borders, not shadows ---------- */
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-section,
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-wi,
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-ta-ctn,
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-in-section,
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-fo-section {
+    border-radius: 8px;
+    box-shadow: none;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-section,
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-ta-ctn {
+    border: 1px solid rgb(var(--hub2-n-200));
+    --tw-ring-shadow: 0 0 #0000;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-section-header-heading {
+    color: rgb(var(--hub2-n-900));
+    font-size: 15px;
+    line-height: 22px;
+    font-weight: 600;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-section-header-description {
+    color: rgb(var(--hub2-n-600));
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-wi-stats-overview-stat {
+    border: 1px solid rgb(var(--hub2-n-200));
+    border-radius: 8px;
+    box-shadow: none;
+    --tw-ring-shadow: 0 0 #0000;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-wi-stats-overview-stat:hover {
+    box-shadow: var(--hub2-elevation-1);
+    transform: none;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-wi-stats-overview-stat-value {
+    font-size: 28px;
+    line-height: 32px;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Tables ---------- */
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-ta-header-cell {
+    color: rgb(var(--hub2-n-600));
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 600;
+    text-transform: none;
+    letter-spacing: 0;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-ta-row:hover {
+    background-color: rgb(var(--hub2-n-25));
+    box-shadow: none;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-ta-header {
+    background-color: rgb(var(--hub2-n-0));
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-ta-cell {
+    font-size: 14px;
+    line-height: 20px;
+}
+
+/* ---------- Controls ---------- */
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-btn {
+    border-radius: 6px;
+    font-weight: 600;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-btn-primary,
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-btn.fi-color-primary {
+    box-shadow: none;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-btn.fi-color-primary.bg-custom-600 {
+    background-color: rgb(var(--hub2-action));
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-btn.fi-color-primary.bg-custom-600:hover {
+    background-color: rgb(var(--hub2-action-hover));
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-input-wrp {
+    border-radius: 6px;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-input-wrp:focus-within {
+    --tw-ring-color: rgb(var(--hub2-focus));
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-fo-field-wrp-label {
+    color: rgb(var(--hub2-n-800));
+    font-weight: 600;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-badge {
+    border-radius: 4px;
+    font-weight: 600;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-dropdown-panel {
+    border-radius: 12px;
+    box-shadow: var(--hub2-elevation-2);
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-modal-window {
+    border-radius: 12px;
+    box-shadow: var(--hub2-elevation-3);
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-tabs {
+    border-radius: 8px;
+}
+
+/* ---------- Command board ---------- */
+
+.fi-panel-admin .mbfd-command-rail {
+    border-radius: 8px;
+    box-shadow: none;
+}
+
+.fi-panel-admin .mbfd-command-live-state {
+    border-radius: 4px;
+}
+
+.fi-panel-admin .mbfd-command-master-card,
+.fi-panel-admin .mbfd-command-station-card {
+    border-radius: 8px;
+    box-shadow: none;
+}
+
+.fi-panel-admin .mbfd-command-station-card:hover,
+.fi-panel-admin .mbfd-command-station-card:focus-visible {
+    box-shadow: var(--hub2-elevation-1);
+    transform: none;
+}
+
+.fi-panel-admin .mbfd-command-attention-badge {
+    border-radius: 4px;
+}
+
+.fi-panel-admin .mbfd-station-overview-card {
+    color: rgb(var(--hub2-n-800));
+    background: rgb(var(--hub2-n-0));
+    border-color: rgb(var(--hub2-n-200));
+    border-radius: 8px;
+}
+
+.fi-panel-admin .mbfd-station-overview-card:hover,
+.fi-panel-admin .mbfd-station-overview-card:focus-visible {
+    background: rgb(var(--hub2-n-25));
+    border-color: rgb(var(--hub2-action) / 0.4);
+}
+
+.fi-panel-admin .mbfd-station-overview-card-attention { border-inline-start-color: rgb(var(--hub-warning)); }
+.fi-panel-admin .mbfd-station-overview-checkout { color: rgb(var(--hub2-n-600)); }
+.fi-panel-admin .mbfd-station-overview-metrics { color: rgb(var(--hub2-n-600)); }
+.fi-panel-admin .mbfd-station-overview-metrics strong { color: rgb(var(--hub2-n-900)); }
+
+/* ---------- Shared list, form and detail affordances ---------- */
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) :is(.fi-ta-header-toolbar, .fi-ta-filters-header, .fi-ta-filters) {
+    gap: .75rem;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-ta-header-toolbar {
+    padding-block: .875rem;
+    background: rgb(var(--hub2-n-0));
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-ta-table thead {
+    background: rgb(var(--hub2-n-50));
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) :is(.fi-ta-text-item, .fi-in-text-item) {
+    line-height: 1.5;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-ta-row:focus-within {
+    background: rgb(var(--hub2-action-tint));
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) :is(.fi-ta-actions, .fi-ac) {
+    gap: .5rem;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) :is(.fi-link, .fi-ta-actions a) {
+    text-underline-offset: .2em;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-pagination {
+    gap: .75rem;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) :is(.fi-input, .fi-select-input, .fi-fo-select-button) {
+    min-height: 2.75rem;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) :is(.fi-fo-field-wrp-helper-text, .fi-in-entry-wrp-label) {
+    color: rgb(var(--hub2-n-600));
+    font-size: .8125rem;
+    line-height: 1.5;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-tabs-item {
+    min-height: 2.75rem;
+    border-radius: .375rem;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-ta-empty-state {
+    padding-block: clamp(2rem, 5vw, 3rem);
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) :is(.fi-ta-empty-state-heading, .fi-modal-heading, .fi-no-notification-title) {
+    color: rgb(var(--hub2-n-900));
+    font-weight: 650;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) :is(.fi-ta-empty-state-description, .fi-modal-description, .fi-no-notification-body) {
+    color: rgb(var(--hub2-n-600));
+    line-height: 1.6;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-dropdown-list-item {
+    min-height: 2.75rem;
+    border-radius: .375rem;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-modal-header {
+    border-bottom: 1px solid rgb(var(--hub2-n-100));
+    padding-bottom: 1rem;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-modal-footer {
+    border-top: 1px solid rgb(var(--hub2-n-100));
+    padding-top: 1rem;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-no-notification {
+    border: 1px solid rgb(var(--hub2-n-200));
+    border-radius: .5rem;
+    box-shadow: var(--hub2-elevation-2);
+}
+
+@media (pointer: coarse) {
+    :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) :is(.fi-checkbox-input, .fi-radio-input) {
+        min-width: 1.5rem;
+        min-height: 1.5rem;
+    }
+
+    :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-ta-actions .fi-link { min-height: 2.75rem; }
+}
+
+@media (max-width: 639px) {
+    :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-ta-header-toolbar {
+        flex-wrap: wrap;
+        padding-inline: 1rem;
+    }
+
+    :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-ta-search-field {
+        width: 100%;
+        min-width: 0;
+    }
+
+    :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-modal-window {
+        border-radius: .75rem;
+    }
+}
+
+/* ---------- Admin status and record actions ---------- */
+
+.fi-panel-admin .mbfd-admin-status-bar {
+    display: none;
+    position: fixed;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 30;
+    min-height: 2.875rem;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-inline: 1rem;
+    border-top: 1px solid rgb(var(--hub2-n-200));
+    background: rgb(var(--hub2-n-25));
+    color: rgb(var(--hub2-n-600));
+    font-size: .75rem;
+    line-height: 1.5;
+    font-variant-numeric: tabular-nums;
+}
+
+.fi-panel-admin .mbfd-admin-status-group,
+.fi-panel-admin .mbfd-admin-network-state {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+}
+
+.fi-panel-admin .mbfd-admin-network-state { gap: .5rem; }
+.fi-panel-admin .mbfd-admin-status-dot { width: .5rem; height: .5rem; border-radius: 50%; background: rgb(var(--hub-danger)); }
+.fi-panel-admin .mbfd-admin-status-dot[data-state="online"] { background: rgb(var(--hub-success)); }
+.fi-panel-admin .mbfd-admin-environment { padding: .125rem .4rem; border: 1px solid rgb(var(--hub2-n-200)); border-radius: .25rem; font-weight: 600; }
+.fi-panel-admin .mbfd-admin-environment[data-tone="success"] { color: rgb(var(--hub-success)); background: rgb(var(--hub-success) / .06); border-color: rgb(var(--hub-success) / .2); }
+.fi-panel-admin .mbfd-admin-environment[data-tone="warning"] { color: rgb(var(--hub-warning)); background: rgb(var(--hub-warning) / .06); border-color: rgb(var(--hub-warning) / .2); }
+
+.fi-panel-admin .mbfd-admin-shortcuts-button {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    padding-inline: .75rem;
+    border-radius: .375rem;
+    color: rgb(var(--hub2-action));
+    font-weight: 600;
+}
+
+.fi-panel-admin .mbfd-admin-shortcuts-button:hover { background: rgb(var(--hub2-n-100)); }
+.fi-panel-admin [data-admin-context-menu] { border-radius: .5rem; box-shadow: var(--hub2-elevation-2); }
+.fi-panel-admin [data-admin-context-menu] button { min-height: 2.75rem; }
+.fi-panel-admin [data-admin-context-menu] button:disabled { color: rgb(var(--hub2-n-600)); cursor: default; }
+
+@media (min-width: 1024px) {
+    .fi-panel-admin .mbfd-admin-status-bar { display: flex; }
+    .fi-panel-admin .fi-main { padding-bottom: 4rem; }
+    .fi-panel-admin :is(a, button, input, select, textarea, [tabindex]) { scroll-margin-bottom: 4rem; }
+}
+
+@media (max-width: 1199px) {
+    .fi-panel-admin .mbfd-admin-status-system { display: none; }
+}
+
+/* ---------- Working AI assistant ---------- */
+
+.fi-panel-admin .mbfd-admin-ai-brand-icon { color: rgb(var(--hub2-action)); }
+.fi-panel-admin .mbfd-admin-ai-toggle,
+.fi-panel-admin .mbfd-admin-ai-link { display: inline-flex; min-height: 2.75rem; align-items: center; gap: .375rem; color: rgb(var(--hub2-action)); font-size: .8125rem; font-weight: 600; }
+.fi-panel-admin .mbfd-admin-ai-toggle { padding-inline: .5rem; border-radius: .375rem; }
+.fi-panel-admin .mbfd-admin-ai-toggle:hover { background: rgb(var(--hub2-action-tint)); }
+.fi-panel-admin .mbfd-admin-ai-link:hover { text-decoration: underline; text-underline-offset: .2em; }
+.fi-panel-admin .mbfd-admin-ai .command-center-section { background: rgb(var(--hub2-n-25)); border-color: rgb(var(--hub2-n-200)); border-radius: .5rem; }
+.fi-panel-admin .mbfd-admin-ai .mbfd-admin-ai-brief { background: rgb(var(--hub2-action-tint)); }
+.fi-panel-admin .mbfd-admin-ai-meta { color: rgb(var(--hub2-n-600)); font-size: .75rem; line-height: 1.5; }
+.fi-panel-admin .mbfd-admin-ai .command-center-item { color: rgb(var(--hub2-n-800)); font-size: .875rem; }
+.fi-panel-admin .mbfd-admin-ai :is(.command-center-badge-critical, .command-center-badge-warn, .command-center-badge-info, .command-center-badge-ok) { border-radius: .25rem; font-size: .75rem; }
+.fi-panel-admin .mbfd-admin-ai-conversation { min-height: 12.5rem; max-height: 25rem; overflow-y: auto; padding: .875rem; border: 1px solid rgb(var(--hub2-n-200)); border-radius: .5rem; background: rgb(var(--hub2-n-25)); scrollbar-gutter: stable; }
+.fi-panel-admin .mbfd-admin-ai-empty { padding: 1rem .25rem; color: rgb(var(--hub2-n-600)); font-size: .875rem; line-height: 1.6; }
+.fi-panel-admin .mbfd-admin-ai-empty > p { color: rgb(var(--hub2-n-900)); }
+.fi-panel-admin .mbfd-admin-ai-message { max-width: 85%; padding: .625rem .75rem; border: 1px solid rgb(var(--hub2-n-200)); border-radius: .5rem; background: rgb(var(--hub2-n-0)); color: rgb(var(--hub2-n-800)); font-size: .875rem; line-height: 1.6; overflow-wrap: anywhere; }
+.fi-panel-admin .mbfd-admin-ai-message[data-role="user"] { border-color: rgb(var(--hub2-action)); background: rgb(var(--hub2-action)); color: rgb(var(--hub2-n-0)); }
+.fi-panel-admin .mbfd-admin-ai-message-time { display: block; margin-top: .25rem; color: rgb(var(--hub2-n-600)); font-size: .75rem; }
+.fi-panel-admin .mbfd-admin-ai-message[data-role="user"] .mbfd-admin-ai-message-time { color: rgb(var(--hub2-n-0) / .9); }
+.fi-panel-admin .mbfd-admin-ai-loading { display: flex; align-items: center; gap: .5rem; color: rgb(var(--hub2-n-600)); }
+.fi-panel-admin .mbfd-admin-ai-form { display: flex; min-width: 0; gap: .5rem; }
+.fi-panel-admin .mbfd-admin-ai-input { flex: 1; min-width: 0; min-height: 2.75rem; padding: .625rem .75rem; border: 1px solid rgb(var(--hub-control-border)); border-radius: .375rem; background: rgb(var(--hub2-n-0)); color: rgb(var(--hub2-n-900)); font-size: .875rem; }
+.fi-panel-admin .mbfd-admin-ai-input::placeholder { color: rgb(var(--hub2-n-600)); opacity: 1; }
+.fi-panel-admin .mbfd-admin-ai-input:disabled { background: rgb(var(--hub2-n-50)); }
+
+/* The existing install flow keeps its event/storage/SW contracts. */
+.fi-panel-admin [data-admin-pwa-install] { border-radius: .5rem !important; box-shadow: var(--hub2-elevation-2) !important; }
+.fi-panel-admin [data-admin-pwa-install] button { min-height: 2.75rem; }
+.fi-panel-admin [data-admin-pwa-install] [data-act="install"] { background: rgb(var(--hub2-action)) !important; }
+.fi-panel-admin [data-admin-pwa-install] [data-act="install"]:hover { background: rgb(var(--hub2-action-hover)) !important; }
+.fi-panel-admin [data-admin-pwa-install] [data-act="later"] { color: rgb(var(--hub2-n-600)) !important; }
+
+@media (prefers-reduced-motion: reduce) {
+    .fi-panel-admin * {
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+    }
+}

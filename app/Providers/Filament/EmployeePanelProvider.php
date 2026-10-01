@@ -16,6 +16,7 @@ use App\Http\Middleware\AuthenticateCanonicalPanelUser;
 use App\Http\Middleware\EnsureCanonicalEmployeeContext;
 use App\Http\Middleware\EnsureCanonicalSessionIsCurrent;
 use App\Http\Middleware\ForceFilamentPasswordChange;
+use Filament\FontProviders\LocalFontProvider;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -63,7 +64,7 @@ class EmployeePanelProvider extends PanelProvider
                 'success' => Color::Emerald,
                 'warning' => Color::Amber,
             ])
-            ->font('Plus Jakarta Sans')
+            ->font('Plus Jakarta Sans Variable', provider: LocalFontProvider::class)
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->pages([
                 EmployeeDashboard::class,

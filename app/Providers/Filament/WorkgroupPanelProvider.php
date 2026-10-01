@@ -24,6 +24,7 @@ use App\Http\Middleware\AuthenticateCanonicalPanelUser;
 use App\Http\Middleware\EnsureCanonicalSessionIsCurrent;
 use App\Http\Middleware\EnsureWorkgroupPanelAccess;
 use App\Http\Middleware\ForceFilamentPasswordChange;
+use Filament\FontProviders\LocalFontProvider;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -62,7 +63,7 @@ class WorkgroupPanelProvider extends PanelProvider
                 'success' => Color::Emerald,
                 'warning' => Color::Amber,
             ])
-            ->font('Plus Jakarta Sans')
+            ->font('Plus Jakarta Sans Variable', provider: LocalFontProvider::class)
             ->viteTheme('resources/css/filament/admin/theme.css')
             // Explicitly register only the needed resources
             // This hides the deprecated EvaluationTemplateResource and EvaluationCriterionResource
