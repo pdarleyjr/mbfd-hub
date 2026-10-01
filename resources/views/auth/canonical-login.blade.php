@@ -8,7 +8,7 @@
 </head>
 <body>
 <main style="max-width: 26rem">
-    <div class="identity-strip">Miami Beach Fire Department</div>
+    <div class="identity-strip"><img src="/images/mbfd_logo-256.png" alt="" width="32" height="32">Miami Beach Fire Department</div>
     <h1>MBFD Sign In</h1>
     <p>Sign in with your Employee ID or email and password.</p>
     @if (request()->query('session_expired') === '1')
