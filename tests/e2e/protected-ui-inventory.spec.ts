@@ -442,6 +442,12 @@ test('inventory records every route and renders available protected surfaces at 
     persist();
     console.log(`Inventory ${outcomes.length}/${catalog.pages.length}: ${entry.route} ${outcomes.at(-1)?.status}`);
   }
+  const finalCanonicalContext = await context.request.get(`${origin}/api/me/context`, {
+    headers: { Accept: 'application/json', Origin: origin, Referer: origin + '/admin' }, maxRedirects: 0,
+  });
+  expect(finalCanonicalContext.status(), 'Completed inventory retains its canonical employee session').toBe(200);
+  // Preserve this same session's refreshed cookie expiry for the read-only link follow-up.
+  await context.storageState({ path: 'test-results/protected-ui-auth/state.json' });
   await context.close();
   await guestContext.close();
   await onboardingContext.close();
