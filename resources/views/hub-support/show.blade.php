@@ -42,8 +42,8 @@
             <form method="post" action="{{ route('hub-support.reply', $report) }}" class="mt-6 hub-panel p-5 shadow-sm">
                 @csrf
                 <label for="response" class="block font-semibold">Reply</label>
-                <textarea name="response" id="response" required maxlength="5000" rows="4" class="mt-2 w-full rounded-lg border border-hub-border-strong p-3 text-base focus:border-hub-blue focus:outline-none focus:ring-2 focus:ring-hub-focus"></textarea>
-                @error('response') <p role="alert" class="text-sm text-hub-danger">{{ $message }}</p> @enderror
+                <textarea name="response" id="response" required maxlength="5000" rows="4" @error('response') aria-invalid="true" aria-describedby="response-error" @enderror class="mt-2 w-full rounded-lg border border-hub-border-strong p-3 text-base focus:border-hub-blue focus:outline-none focus:ring-2 focus:ring-hub-focus">{{ old('response') }}</textarea>
+                @error('response') <p id="response-error" role="alert" class="text-sm text-hub-danger">{{ $message }}</p> @enderror
                 <button type="submit" class="mt-3 min-h-11 rounded-lg bg-hub-blue px-5 py-3 font-semibold text-white hover:bg-hub-blue-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-hub-focus focus-visible:ring-offset-2">Send Reply</button>
             </form>
         @endif

@@ -65,7 +65,7 @@
 
         <dl class="mbfd-shortcuts-list">
             <div><dt><kbd>Ctrl/Cmd</kbd> + <kbd>K</kbd></dt><dd>Open global search</dd></div>
-            <div><dt><kbd>Ctrl/Cmd</kbd> + <kbd>/</kbd></dt><dd>Show this help (always available)</dd></div>
+            <div><dt><kbd>Ctrl/Cmd</kbd> + <kbd>/</kbd></dt><dd>Show help, even with single keys off</dd></div>
             <div :class="{ 'is-disabled': !enabled }"><dt><kbd>/</kbd></dt><dd>Focus global search</dd></div>
             <div :class="{ 'is-disabled': !enabled }"><dt><kbd>g</kbd> <kbd>a</kbd></dt><dd>Go to Apparatus</dd></div>
             <div :class="{ 'is-disabled': !enabled }"><dt><kbd>g</kbd> <kbd>s</kbd></dt><dd>Go to Stations</dd></div>
@@ -135,7 +135,13 @@
             handleKeyDown(event) {
                 if (event.isComposing || event.repeat) return;
 
-                // Filament's native search remains available regardless of focus.
+                if (event.target.closest?.('[role="dialog"], .fi-modal-window')) {
+                    this.resetSequence();
+                    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') event.preventDefault();
+                    return;
+                }
+
+                // Keep native search available outside active dialogs.
                 if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
                     event.preventDefault();
                     document.querySelector('.fi-global-search-field input')?.focus();
@@ -151,10 +157,6 @@
 
                 if (this.isEditableTarget(event)) return;
                 if (event.altKey || event.metaKey || event.ctrlKey) return;
-                if (event.target.closest?.('[role="dialog"], .fi-modal-window')) {
-                    this.resetSequence();
-                    return;
-                }
                 if (!readEnabled()) {
                     this.resetSequence();
                     return;
@@ -205,7 +207,7 @@
                         w: '/workgroups',
                         t: '/training',
                         p: '/admin/pulse',
-                        h: '/admin/health',
+                        h: '/admin/health-check-results',
                     };
                     const dest = targets[event.key.toLowerCase()];
                     this.resetSequence();

@@ -23,11 +23,13 @@
             </div>
             <div>
                 <label for="attachments" class="font-semibold text-hub-blue">+ Add screenshot or file</label>
-                <input id="attachments" type="file" name="attachments[]" accept="image/png,image/jpeg,application/pdf" multiple class="mt-2 block w-full text-sm">
-                @error('attachments') <p role="alert" class="text-sm text-hub-danger">{{ $message }}</p> @enderror
-                @foreach($errors->get('attachments.*') as $messages)
-                    @foreach($messages as $message) <p role="alert" class="text-sm text-hub-danger">{{ $message }}</p> @endforeach
-                @endforeach
+                <input id="attachments" type="file" name="attachments[]" accept="image/png,image/jpeg,application/pdf" multiple @if($errors->has('attachments') || $errors->has('attachments.*')) aria-invalid="true" aria-describedby="attachments-errors" @endif class="mt-2 block w-full text-sm">
+                <div id="attachments-errors">
+                    @error('attachments') <p role="alert" class="text-sm text-hub-danger">{{ $message }}</p> @enderror
+                    @foreach($errors->get('attachments.*') as $messages)
+                        @foreach($messages as $message) <p role="alert" class="text-sm text-hub-danger">{{ $message }}</p> @endforeach
+                    @endforeach
+                </div>
             </div>
             <p class="text-sm text-hub-muted">We'll automatically include the page and available app information that may help us find the problem.</p>
             <div class="flex justify-end gap-3">

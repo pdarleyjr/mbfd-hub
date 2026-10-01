@@ -4,7 +4,7 @@ import test from 'node:test';
 import vm from 'node:vm';
 
 const view = readFileSync(new URL('../../resources/views/filament/admin/partials/keyboard-shortcuts.blade.php', import.meta.url), 'utf8');
-const script = view.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+const script = view.match(/<script>([\s\S]*?)<\/script>/i)?.[1];
 
 function createHarness({ saved = null, unavailable = false } = {}) {
   const components = new Map();
@@ -77,6 +77,22 @@ test('Ctrl/Cmd+K focuses native Filament search with character shortcuts disable
   harness.key('k', { metaKey: true });
   assert.equal(harness.effects.focus, 2);
   assert.deepEqual(harness.effects.events, []);
+});
+
+test('modifier search stays inside an active dialog', () => {
+  const harness = createHarness();
+  const target = { tagName: 'BUTTON', closest: selector => selector.includes('dialog') ? {} : null };
+  harness.key('k', { ctrlKey: true, target });
+  harness.key('k', { metaKey: true, target });
+  assert.equal(harness.effects.focus, 0);
+  assert.deepEqual(harness.effects.events, []);
+});
+
+test('the health sequence uses the registered Application Health route', () => {
+  const harness = createHarness();
+  harness.key('g');
+  harness.key('h');
+  assert.equal(harness.effects.path, '/admin/health-check-results');
 });
 
 test('typing, composing, repeating, and an open dialog do not trigger character actions', () => {
