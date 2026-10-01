@@ -48,7 +48,7 @@
                     @php($state = $applicationStates[$key])
                     <li class="flex flex-col gap-2 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                         <div><h3 class="font-semibold">{{ $application['label'] }}</h3><p class="text-sm text-hub-muted">{{ $state['status'] }}</p></div>
-                        <span class="w-fit rounded-full px-3 py-1 text-xs font-bold {{ $state['allowed'] ? 'bg-emerald-100 text-emerald-800' : 'bg-hub-surface-muted text-hub-muted' }}">{{ $state['allowed'] ? 'Available' : 'Unavailable' }}</span>
+                        <span class="w-fit rounded-full px-3 py-1 text-xs font-bold {{ $state['allowed'] ? 'bg-emerald-100 text-emerald-800' : 'bg-hub-surface-muted text-hub-ink-secondary' }}">{{ $state['allowed'] ? 'Available' : 'Unavailable' }}</span>
                     </li>
                 @endforeach
             </ul>

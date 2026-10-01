@@ -44,6 +44,7 @@ class StationRequestResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('room.name')
                     ->label('Room')
+                    ->placeholder(fn (StationRequest $record): string => $record->room_name_snapshot ?: 'Station-wide')
                     ->formatStateUsing(fn (?string $state, StationRequest $record): string => $state ?: $record->room_name_snapshot ?: 'Station-wide')
                     ->searchable(query: fn (Builder $query, string $search): Builder => $query->where(function (Builder $nested) use ($search): void {
                         $nested->where('room_name_snapshot', 'like', "%{$search}%")
@@ -87,6 +88,7 @@ class StationRequestResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('assignedTo.name')
                     ->label('Assigned To / Vendor')
+                    ->placeholder(fn (StationRequest $record): string => $record->assigned_vendor ?: 'Unassigned')
                     ->formatStateUsing(fn (?string $state, StationRequest $record): string => $state ?: $record->assigned_vendor ?: 'Unassigned')
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable(),

@@ -46,7 +46,7 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
                 Home
             </a>
-            <a href="{{ url('/login') }}" class="min-h-[44px] px-4 py-2 text-sm font-medium bg-hub-blue text-white rounded-lg hover:bg-hub-blue-strong transition-colors flex items-center gap-2">
+            <a href="{{ url('/login') }}" aria-label="Sign In" class="min-h-[44px] px-4 py-2 text-sm font-medium bg-hub-blue text-white rounded-lg hover:bg-hub-blue-strong transition-colors flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
                 <span class="hidden sm:inline">Sign In</span>
             </a>
@@ -301,7 +301,7 @@
             </h2>
 
             <div class="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
-                <div class="overflow-x-auto">
+                <div class="overflow-x-auto focus-visible:-outline-offset-2" tabindex="0" role="region" aria-labelledby="matrix-title">
                     <table class="min-w-full divide-y divide-neutral-200 text-sm">
                         <caption class="sr-only">MBFD Hub alignment with applicable fire-service standards. Rows include reference, area, alignment description, evidence module, and claim level.</caption>
                         <thead class="bg-neutral-50">
@@ -469,9 +469,9 @@
     <!-- Footer (matches landing page) -->
     <footer class="border-t border-neutral-200 bg-white/60 backdrop-blur-sm mt-4" style="padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row items-center justify-between gap-2">
-            <p class="text-xs text-neutral-400 font-medium">&copy; {{ date('Y') }} Miami Beach Fire Department</p>
-            <div class="flex items-center gap-3 text-xs text-neutral-400">
-                <a href="{{ url('/') }}" class="hover:text-neutral-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 rounded-sm transition-colors">Home</a>
+            <p class="text-xs text-neutral-600 font-medium">&copy; {{ date('Y') }} Miami Beach Fire Department</p>
+            <div class="flex items-center gap-3 text-xs text-neutral-600">
+                <a href="{{ url('/') }}" class="hover:text-neutral-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500/50 rounded-sm transition-colors">Home</a>
                 <span aria-hidden="true">&bull;</span>
                 <span>Secured System</span>
                 <span aria-hidden="true">&bull;</span>

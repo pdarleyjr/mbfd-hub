@@ -97,9 +97,10 @@ class EmployeeResource extends Resource
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('rank')
+                    ->placeholder('Not recorded')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('station')->searchable(),
+                Tables\Columns\TextColumn::make('station')->placeholder('Not assigned')->searchable(),
                 Tables\Columns\TextColumn::make('roster_status')->label('Employment')->badge()->placeholder('Not recorded'),
                 Tables\Columns\TextColumn::make('user.account_status')->label('Login')->badge()->placeholder('Awaiting account')
                     ->formatStateUsing(fn ($state): string => ucfirst(str_replace('_', ' ', $state instanceof \BackedEnum ? $state->value : (string) $state))),

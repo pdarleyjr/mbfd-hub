@@ -231,8 +231,11 @@
     [data-hub-portal="report"] thead { display: table-header-group; }
     [data-hub-portal="report"] :is(th, td) { white-space: normal; overflow-wrap: anywhere; }
 }
+@media (max-width: 1279px) {
+    [data-hub-portal="employee"] .pr-page-grid { grid-template-columns: 1fr; }
+}
 @media (max-width: 900px) {
-    [data-hub-portal="employee"] :is(.ep-two-col, .pr-page-grid),
+    [data-hub-portal="employee"] .ep-two-col,
     [data-hub-portal="workgroups"] .wg-workspace-nav,
     [data-hub-portal="training"] .training-settings-grid { grid-template-columns: 1fr; }
 }

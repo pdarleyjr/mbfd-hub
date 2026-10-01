@@ -130,7 +130,7 @@
         .toc-list { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 0.375rem; }
         .toc-list li a { color: var(--blue); text-decoration: none; font-size: 0.875rem; font-weight: 500; display: flex; gap: 0.5rem; }
         .toc-list li a:hover { text-decoration: underline; }
-        .toc-num { color: var(--slate-400); min-width: 1.5rem; }
+        .toc-num { color: var(--slate-600); min-width: 1.5rem; }
 
         /* ── SECTIONS ── */
         .section { margin-bottom: 2.5rem; }

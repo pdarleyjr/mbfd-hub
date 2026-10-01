@@ -55,10 +55,12 @@
     <dl class="wg-overview-stats" aria-label="Workgroup summary">
         @foreach($stats as $stat)
             <div class="wg-overview-stat">
-                @if($stat->getDescriptionIcon())
-                    <x-dynamic-component :component="$stat->getDescriptionIcon()" class="wg-overview-stat-icon text-primary-600" />
-                @endif
-                <dt class="text-sm font-medium text-gray-600">{{ $stat->getLabel() }}</dt>
+                <dt class="text-sm font-medium text-gray-600">
+                    @if($stat->getDescriptionIcon())
+                        <x-dynamic-component :component="$stat->getDescriptionIcon()" class="wg-overview-stat-icon text-primary-600" />
+                    @endif
+                    {{ $stat->getLabel() }}
+                </dt>
                 <dd @class([
                     'mt-1 text-2xl font-semibold',
                     'text-green-700' => $stat->getColor() === 'success',
@@ -66,8 +68,9 @@
                     'text-red-700' => $stat->getColor() === 'danger',
                     'text-primary-700' => in_array($stat->getColor(), ['primary', 'info'], true),
                     'text-gray-900' => !in_array($stat->getColor(), ['success', 'warning', 'danger', 'primary', 'info'], true),
-                ])>{{ $stat->getValue() }}</dd>
-                @if($stat->getDescription())<p class="mt-1 text-xs text-gray-600">{{ $stat->getDescription() }}</p>@endif
+                ])>{{ $stat->getValue() }}
+                    @if($stat->getDescription())<p class="mt-1 text-xs font-normal text-gray-600">{{ $stat->getDescription() }}</p>@endif
+                </dd>
             </div>
         @endforeach
     </dl>
