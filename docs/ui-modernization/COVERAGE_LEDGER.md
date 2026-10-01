@@ -6,7 +6,7 @@ Rows: 244 · visited: 0 · blocked (frozen): 33 · personas crawled: none yet
 
 | id | route | name | panel | archetype | module | roles reached | title ok | 1×h1 | overflow px widths | axe serious/critical | status |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| UI-001 | `/admin/employees/accounts` | ListAccountProfiles | admin | 8 Settings | admin |  |  |  |  |  | not started |
+| UI-001 | `/admin/employees/accounts` | ListAccountProfiles | admin | 4 Index | admin |  |  |  |  |  | not started |
 | UI-002 | `/admin/employees/accounts/{record}/edit` | EditAccountProfile | admin | 6 Create/edit | admin |  |  |  |  |  | not started |
 | UI-003 | `/admin/apparatus-inspection-exceptions` | ListInspectionExceptions | admin | 4 Index | admin |  |  |  |  |  | not started |
 | UI-004 | `/admin/apparatuses` | ListApparatuses | admin | 4 Index | admin |  |  |  |  |  | not started |
@@ -26,16 +26,16 @@ Rows: 244 · visited: 0 · blocked (frozen): 33 · personas crawled: none yet
 | UI-018 | `/admin/department-updates/create` | CreateDepartmentUpdate | admin | 6 Create/edit | admin |  |  |  |  |  | not started |
 | UI-019 | `/admin/department-updates/{record}` | ViewDepartmentUpdate | admin | 5 Record detail | admin |  |  |  |  |  | not started |
 | UI-020 | `/admin/department-updates/{record}/edit` | EditDepartmentUpdate | admin | 6 Create/edit | admin |  |  |  |  |  | not started |
-| UI-021 | `/admin/employee-equipment-requests` | ListEmployeeEquipmentRequests | admin | 6 Create/edit | admin |  |  |  |  |  | not started |
-| UI-022 | `/admin/employee-equipment-requests/{record}` | ViewEmployeeEquipmentRequest | admin | 6 Create/edit | admin |  |  |  |  |  | not started |
+| UI-021 | `/admin/employee-equipment-requests` | ListEmployeeEquipmentRequests | admin | 4 Index | admin |  |  |  |  |  | not started |
+| UI-022 | `/admin/employee-equipment-requests/{record}` | ViewEmployeeEquipmentRequest | admin | 5 Record detail | admin |  |  |  |  |  | not started |
 | UI-023 | `/admin/employees` | ListEmployees | admin | 4 Index | admin |  |  |  |  |  | not started |
 | UI-024 | `/admin/employees/create` | CreateEmployee | admin | 6 Create/edit | admin |  |  |  |  |  | not started |
 | UI-025 | `/admin/employees/{record}/edit` | EditEmployee | admin | 6 Create/edit | admin |  |  |  |  |  | not started |
 | UI-026 | `/admin/equipment-items` | ListEquipmentItems | admin | 4 Index | admin |  |  |  |  |  | not started |
 | UI-027 | `/admin/equipment-items/create` | CreateEquipmentItem | admin | 6 Create/edit | admin |  |  |  |  |  | not started |
 | UI-028 | `/admin/equipment-items/{record}/edit` | EditEquipmentItem | admin | 6 Create/edit | admin |  |  |  |  |  | not started |
-| UI-029 | `/admin/fire-equipment-requests` | ListFireEquipmentRequests | admin | 6 Create/edit | admin |  |  |  |  |  | not started |
-| UI-030 | `/admin/fire-equipment-requests/{record}` | ViewFireEquipmentRequest | admin | 6 Create/edit | admin |  |  |  |  |  | not started |
+| UI-029 | `/admin/fire-equipment-requests` | ListFireEquipmentRequests | admin | 4 Index | admin |  |  |  |  |  | not started |
+| UI-030 | `/admin/fire-equipment-requests/{record}` | ViewFireEquipmentRequest | admin | 5 Record detail | admin |  |  |  |  |  | not started |
 | UI-031 | `/admin/hub-support-tickets` | ListHubSupportTickets | admin | 4 Index | admin |  |  |  |  |  | not started |
 | UI-032 | `/admin/hub-support-tickets/{record}` | ViewHubSupportTicket | admin | 5 Record detail | admin |  |  |  |  |  | not started |
 | UI-033 | `/admin/inbound-emails` | ListInboundEmails | admin | 4 Index | admin |  |  |  |  |  | not started |
@@ -52,8 +52,8 @@ Rows: 244 · visited: 0 · blocked (frozen): 33 · personas crawled: none yet
 | UI-044 | `/admin/operational-forms/{record}` | ViewOperationalFormRecord | admin | 5 Record detail | forms-video |  |  |  |  |  | not started |
 | UI-045 | `/admin/outbound-emails` | ListOutboundEmails | admin | 4 Index | admin |  |  |  |  |  | not started |
 | UI-046 | `/admin/outbound-emails/{record}` | ViewOutboundEmail | admin | 5 Record detail | admin |  |  |  |  |  | not started |
-| UI-047 | `/admin/recommendations` | ListRecommendations | admin | 9 Analytics/report | admin |  |  |  |  |  | not started |
-| UI-048 | `/admin/recommendations/{record}/edit` | EditRecommendation | admin | 9 Analytics/report | admin |  |  |  |  |  | not started |
+| UI-047 | `/admin/recommendations` | ListRecommendations | admin | 4 Index | admin |  |  |  |  |  | not started |
+| UI-048 | `/admin/recommendations/{record}/edit` | EditRecommendation | admin | 6 Create/edit | admin |  |  |  |  |  | not started |
 | UI-049 | `/admin/room-assets` | ListRoomAssets | admin | 4 Index | admin |  |  |  |  |  | not started |
 | UI-050 | `/admin/room-assets/create` | CreateRoomAsset | admin | 6 Create/edit | admin |  |  |  |  |  | not started |
 | UI-051 | `/admin/room-assets/{record}` | ViewRoomAsset | admin | 5 Record detail | admin |  |  |  |  |  | not started |
@@ -66,8 +66,8 @@ Rows: 244 · visited: 0 · blocked (frozen): 33 · personas crawled: none yet
 | UI-058 | `/admin/single-gas-meters/{record}/edit` | EditSingleGasMeter | admin | 6 Create/edit | admin |  |  |  |  |  | not started |
 | UI-059 | `/admin/station-inspections` | ListStationInspections | admin | 4 Index | admin |  |  |  |  |  | not started |
 | UI-060 | `/admin/station-inspections/{record}` | ViewStationInspection | admin | 5 Record detail | admin |  |  |  |  |  | not started |
-| UI-061 | `/admin/station-requests` | ListStationRequests | admin | 6 Create/edit | admin |  |  |  |  |  | not started |
-| UI-062 | `/admin/station-requests/{record}` | ViewStationRequest | admin | 6 Create/edit | admin |  |  |  |  |  | not started |
+| UI-061 | `/admin/station-requests` | ListStationRequests | admin | 4 Index | admin |  |  |  |  |  | not started |
+| UI-062 | `/admin/station-requests/{record}` | ViewStationRequest | admin | 5 Record detail | admin |  |  |  |  |  | not started |
 | UI-063 | `/admin/stations` | ListStations | admin | 4 Index | admin |  |  |  |  |  | not started |
 | UI-064 | `/admin/stations/create` | CreateStation | admin | 6 Create/edit | admin |  |  |  |  |  | not started |
 | UI-065 | `/admin/stations/{record}` | ViewStation | admin | 5 Record detail | admin |  |  |  |  |  | not started |
@@ -132,9 +132,9 @@ Rows: 244 · visited: 0 · blocked (frozen): 33 · personas crawled: none yet
 | UI-124 | `/admin/personnel-uniforms-equipment/assignments/{record}/edit` | EditPersonnelAssignment | admin | 6 Create/edit | admin |  |  |  |  |  | not started |
 | UI-125 | `/admin/personnel-uniforms-equipment/employee-records` | ListPersonnelEmployees | admin | 4 Index | admin |  |  |  |  |  | not started |
 | UI-126 | `/admin/personnel-uniforms-equipment/employee-records/{record}` | ViewPersonnelEmployee | admin | 5 Record detail | admin |  |  |  |  |  | not started |
-| UI-127 | `/admin/personnel-uniforms-equipment/personnel-requests` | ListPersonnelRequests | admin | 6 Create/edit | admin |  |  |  |  |  | not started |
-| UI-128 | `/admin/personnel-uniforms-equipment/personnel-requests/{record}` | ViewPersonnelRequest | admin | 6 Create/edit | admin |  |  |  |  |  | not started |
-| UI-129 | `/admin/personnel-uniforms-equipment/uniform-inventory` | ListPersonnelUniforms | admin | 9 Analytics/report | admin |  |  |  |  |  | not started |
+| UI-127 | `/admin/personnel-uniforms-equipment/personnel-requests` | ListPersonnelRequests | admin | 4 Index | admin |  |  |  |  |  | not started |
+| UI-128 | `/admin/personnel-uniforms-equipment/personnel-requests/{record}` | ViewPersonnelRequest | admin | 5 Record detail | admin |  |  |  |  |  | not started |
+| UI-129 | `/admin/personnel-uniforms-equipment/uniform-inventory` | ListPersonnelUniforms | admin | 4 Index | admin |  |  |  |  |  | not started |
 | UI-130 | `/admin/personnel-uniforms-equipment/uniform-inventory/create` | CreatePersonnelUniform | admin | 6 Create/edit | admin |  |  |  |  |  | not started |
 | UI-131 | `/admin/personnel-uniforms-equipment/uniform-inventory/{record}/edit` | EditPersonnelUniform | admin | 6 Create/edit | admin |  |  |  |  |  | not started |
 | UI-132 | `/admin` | Dashboard | admin | 2 Operational dashboard | admin |  |  |  |  |  | not started |

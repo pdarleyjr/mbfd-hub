@@ -45,7 +45,7 @@
         "App\\Http\\Middleware\\ForceFilamentPasswordChange",
         "App\\Http\\Middleware\\EnsureCityEmailReview"
       ],
-      "archetype": "8 Settings",
+      "archetype": "4 Index",
       "migrationModule": "admin",
       "catalogScope": "IN SCOPE",
       "frozen": null,
@@ -925,7 +925,7 @@
         "App\\Http\\Middleware\\ForceFilamentPasswordChange",
         "App\\Http\\Middleware\\EnsureCityEmailReview"
       ],
-      "archetype": "6 Create/edit",
+      "archetype": "4 Index",
       "migrationModule": "admin",
       "catalogScope": "IN SCOPE",
       "frozen": null,
@@ -969,7 +969,7 @@
         "App\\Http\\Middleware\\ForceFilamentPasswordChange",
         "App\\Http\\Middleware\\EnsureCityEmailReview"
       ],
-      "archetype": "6 Create/edit",
+      "archetype": "5 Record detail",
       "migrationModule": "admin",
       "catalogScope": "IN SCOPE",
       "frozen": null,
@@ -1277,7 +1277,7 @@
         "App\\Http\\Middleware\\ForceFilamentPasswordChange",
         "App\\Http\\Middleware\\EnsureCityEmailReview"
       ],
-      "archetype": "6 Create/edit",
+      "archetype": "4 Index",
       "migrationModule": "admin",
       "catalogScope": "IN SCOPE",
       "frozen": null,
@@ -1321,7 +1321,7 @@
         "App\\Http\\Middleware\\ForceFilamentPasswordChange",
         "App\\Http\\Middleware\\EnsureCityEmailReview"
       ],
-      "archetype": "6 Create/edit",
+      "archetype": "5 Record detail",
       "migrationModule": "admin",
       "catalogScope": "IN SCOPE",
       "frozen": null,
@@ -2069,7 +2069,7 @@
         "App\\Http\\Middleware\\ForceFilamentPasswordChange",
         "App\\Http\\Middleware\\EnsureCityEmailReview"
       ],
-      "archetype": "9 Analytics/report",
+      "archetype": "4 Index",
       "migrationModule": "admin",
       "catalogScope": "IN SCOPE",
       "frozen": null,
@@ -2113,7 +2113,7 @@
         "App\\Http\\Middleware\\ForceFilamentPasswordChange",
         "App\\Http\\Middleware\\EnsureCityEmailReview"
       ],
-      "archetype": "9 Analytics/report",
+      "archetype": "6 Create/edit",
       "migrationModule": "admin",
       "catalogScope": "IN SCOPE",
       "frozen": null,
@@ -2685,7 +2685,7 @@
         "App\\Http\\Middleware\\ForceFilamentPasswordChange",
         "App\\Http\\Middleware\\EnsureCityEmailReview"
       ],
-      "archetype": "6 Create/edit",
+      "archetype": "4 Index",
       "migrationModule": "admin",
       "catalogScope": "IN SCOPE",
       "frozen": null,
@@ -2729,7 +2729,7 @@
         "App\\Http\\Middleware\\ForceFilamentPasswordChange",
         "App\\Http\\Middleware\\EnsureCityEmailReview"
       ],
-      "archetype": "6 Create/edit",
+      "archetype": "5 Record detail",
       "migrationModule": "admin",
       "catalogScope": "IN SCOPE",
       "frozen": null,
@@ -5589,7 +5589,7 @@
         "App\\Http\\Middleware\\ForceFilamentPasswordChange",
         "App\\Http\\Middleware\\EnsureCityEmailReview"
       ],
-      "archetype": "6 Create/edit",
+      "archetype": "4 Index",
       "migrationModule": "admin",
       "catalogScope": "IN SCOPE",
       "frozen": null,
@@ -5633,7 +5633,7 @@
         "App\\Http\\Middleware\\ForceFilamentPasswordChange",
         "App\\Http\\Middleware\\EnsureCityEmailReview"
       ],
-      "archetype": "6 Create/edit",
+      "archetype": "5 Record detail",
       "migrationModule": "admin",
       "catalogScope": "IN SCOPE",
       "frozen": null,
@@ -5677,7 +5677,7 @@
         "App\\Http\\Middleware\\ForceFilamentPasswordChange",
         "App\\Http\\Middleware\\EnsureCityEmailReview"
       ],
-      "archetype": "9 Analytics/report",
+      "archetype": "4 Index",
       "migrationModule": "admin",
       "catalogScope": "IN SCOPE",
       "frozen": null,

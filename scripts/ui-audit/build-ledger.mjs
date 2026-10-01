@@ -102,7 +102,9 @@ const summary = {
 };
 writeFileSync(resolve(out, 'coverage-ledger.json'), JSON.stringify({ summary, rows }, null, 2) + '\n');
 
-const cell = v => v === null || v === undefined ? '' : Array.isArray(v) ? v.join(', ') : String(v).replace(/\|/g, '\\|');
+// Escape backslashes before pipes so a trailing backslash cannot neutralize the pipe escape.
+const escapeCell = text => text.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
+const cell = v => v === null || v === undefined ? '' : escapeCell(Array.isArray(v) ? v.join(', ') : String(v));
 const header = ['id', 'route', 'name', 'panel', 'archetype', 'module', 'roles reached', 'title ok', '1×h1', 'overflow px widths', 'axe serious/critical', 'status'];
 const md = [
   '# UI Modernization Coverage Ledger',
