@@ -45,11 +45,10 @@ for (const persona of Object.keys(personas)) {
         : finalPath === path || (path !== '/' && finalPath.startsWith(`${path}/`)) ? 'allow'
         : `redirect:${finalPath}`;
     }
-    // Read-only entitlement signal: /account renders ApplicationAccessService::states(); /auth/*/authorize would issue a code.
-    await page.goto(`${origin}/account`, { waitUntil: 'domcontentloaded' });
-    const state = async (label: string) => (await page.locator('li', { has: page.getByRole('heading', { name: label, exact: true }) })
-      .locator('span').last().innerText()).trim() === 'Available';
-    const entitlements = { bid: await state('Bid'), mediaControl: await state('Media Control') };
+    // Application entitlements come from the production User methods (recorded read-only by the seeder);
+    // /account's Available badge also requires SSO client config, which the sanitized harness clears.
+    const recorded = JSON.parse(readFileSync('test-results/protected-ui-auth/persona-entitlements.json', 'utf8'))[persona] as { bid: boolean; mediaControl: boolean };
+    const entitlements = { bid: recorded.bid, mediaControl: recorded.mediaControl };
     await context.close();
 
     mkdirSync(artifactDir, { recursive: true });

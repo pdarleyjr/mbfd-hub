@@ -9,7 +9,7 @@ export const uiAuditEnvironment = protectedUiInventoryEnvironment;
 
 export default defineConfig({
   ...inventory,
-  testMatch: /ui-audit\/(persona-access|role-crawl)\.spec\.ts/,
+  testMatch: /ui-audit\/(persona-access|role-crawl|module-acceptance)\.spec\.ts/,
   globalSetup: './tests/e2e/ui-audit/ui-audit.setup.ts',
   projects: [{ name: 'ui-audit' }],
   workers: 1, retries: 0, timeout: 60 * 60_000,

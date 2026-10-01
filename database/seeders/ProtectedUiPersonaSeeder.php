@@ -29,15 +29,15 @@ final class ProtectedUiPersonaSeeder extends Seeder
      * @var array<string, array{employee_id: string, rank: string, roles: list<string>, workgroup_role?: string}>
      */
     private const PERSONAS = [
-        'member' => ['employee_id' => '99872', 'rank' => 'Firefighter', 'roles' => ['member']],
-        'officer' => ['employee_id' => '99873', 'rank' => 'Captain', 'roles' => ['member']],
-        'employee-only' => ['employee_id' => '99874', 'rank' => 'Firefighter', 'roles' => []],
-        'logistics-admin' => ['employee_id' => '99875', 'rank' => 'Lieutenant', 'roles' => ['logistics_admin']],
-        'admin' => ['employee_id' => '99876', 'rank' => 'Captain', 'roles' => ['admin']],
-        'workgroup-member' => ['employee_id' => '99877', 'rank' => 'Firefighter', 'roles' => ['member'], 'workgroup_role' => 'member'],
-        'workgroup-facilitator' => ['employee_id' => '99879', 'rank' => 'Lieutenant', 'roles' => ['member'], 'workgroup_role' => 'facilitator'],
-        'training-viewer' => ['employee_id' => '99878', 'rank' => 'Firefighter', 'roles' => ['training_viewer']],
-        'training-admin' => ['employee_id' => '99880', 'rank' => 'Captain', 'roles' => ['training_admin']],
+        'member' => ['employee_id' => '99901', 'rank' => 'Firefighter', 'roles' => ['member']],
+        'officer' => ['employee_id' => '99902', 'rank' => 'Captain', 'roles' => ['member']],
+        'employee-only' => ['employee_id' => '99903', 'rank' => 'Firefighter', 'roles' => []],
+        'logistics-admin' => ['employee_id' => '99904', 'rank' => 'Lieutenant', 'roles' => ['logistics_admin']],
+        'admin' => ['employee_id' => '99905', 'rank' => 'Captain', 'roles' => ['admin']],
+        'workgroup-member' => ['employee_id' => '99906', 'rank' => 'Firefighter', 'roles' => ['member'], 'workgroup_role' => 'member'],
+        'workgroup-facilitator' => ['employee_id' => '99907', 'rank' => 'Lieutenant', 'roles' => ['member'], 'workgroup_role' => 'facilitator'],
+        'training-viewer' => ['employee_id' => '99908', 'rank' => 'Firefighter', 'roles' => ['training_viewer']],
+        'training-admin' => ['employee_id' => '99909', 'rank' => 'Captain', 'roles' => ['training_admin']],
     ];
 
     /**
@@ -97,6 +97,18 @@ final class ProtectedUiPersonaSeeder extends Seeder
 
         File::ensureDirectoryExists(base_path('test-results/protected-ui-auth'));
         File::put(base_path('test-results/protected-ui-auth/personas.json'), json_encode($manifest, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT));
+
+        // Read-only: evaluated by the production User entitlement methods, independent of SSO client config.
+        $entitlements = [];
+        foreach ($manifest as $persona => $employeeId) {
+            $user = User::query()->where('employee_id', $employeeId)->firstOrFail();
+            $entitlements[$persona] = [
+                'admin' => $user->hasCurrentAdminPanelEntitlement(),
+                'bid' => $user->hasCurrentBidEntitlement(),
+                'mediaControl' => $user->hasCurrentMediaControlEntitlement(),
+            ];
+        }
+        File::put(base_path('test-results/protected-ui-auth/persona-entitlements.json'), json_encode($entitlements, JSON_THROW_ON_ERROR | JSON_PRETTY_PRINT));
     }
 
     /** @param array{employee_id: string, rank: string, roles: list<string>, workgroup_role?: string} $definition */
