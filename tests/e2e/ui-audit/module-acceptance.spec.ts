@@ -1,5 +1,5 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test, type Request } from '@playwright/test';
+import { expect, test, type BrowserContext, type Request } from '@playwright/test';
 import { createHash } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -29,6 +29,15 @@ const surfaces: Surface[] = [
 
 const selected = (process.env.UI_MODULES ?? '').split(',').map(value => value.trim()).filter(Boolean);
 
+async function assertCanonicalSession(context: BrowserContext, persona: string): Promise<void> {
+  const canonical = await context.request.get(`${origin}/api/me/context`, {
+    headers: { Accept: 'application/json', Origin: origin, Referer: origin + '/' }, maxRedirects: 0,
+  });
+  expect(canonical.status(), `${persona} current canonical employee session`).toBe(200);
+  expect(canonical.headers()['content-type'], `${persona} canonical context is JSON`).toMatch(/^application\/json\b/i);
+  expect((await canonical.json()).session?.authenticated, `${persona} canonical session is authenticated`).toBe(true);
+}
+
 for (const surface of surfaces.filter(entry => selected.length === 0 || selected.includes(entry.module))) {
   test(`${surface.module}: ${surface.persona} ${surface.path}`, async ({ browser }) => {
     const context = await browser.newContext({ storageState: `test-results/protected-ui-auth/persona-${surface.persona}.json`, serviceWorkers: surface.path === '/training/settings' ? 'allow' : 'block', viewport: { width: widths[0], height: 844 } });
@@ -36,6 +45,7 @@ for (const surface of surfaces.filter(entry => selected.length === 0 || selected
     const blockedRequests: string[] = [];
     // Rendering only: allow known Livewire reads and refuse mutations.
     await guardUiRendering(context, origin, { onBlocked: description => blockedRequests.push(description), onAllowedLivewireRequest: request => allowedLivewireRequests.add(request) });
+    await assertCanonicalSession(context, surface.persona);
     const page = await context.newPage();
     const consoleErrors: string[] = [];
     const readResponses: Record<string, unknown>[] = [];
@@ -80,6 +90,14 @@ for (const surface of surfaces.filter(entry => selected.length === 0 || selected
       const response = await page.goto(origin + surface.path, { waitUntil: 'domcontentloaded' });
       await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => undefined);
       const slug = `${surface.module}-${surface.persona}-${surface.path.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') || 'root'}-${width}`;
+      const finalUrl = new URL(page.url());
+      const finalPath = finalUrl.pathname;
+      // EmployeePanelProvider registers EmployeeDashboard with the source slug `dashboard`.
+      const expectedPath = surface.path === '/employee' ? '/employee/dashboard' : surface.path;
+      writeFileSync(resolve(artifactDir, `${slug}-navigation.json`), JSON.stringify({ width, requestedPath: surface.path,
+        expectedPath, finalPath, finalOrigin: finalUrl.origin, status: response?.status() }, null, 2));
+      expect(finalUrl.origin, `destination origin at ${width}px`).toBe(origin);
+      expect(finalPath, `requested surface destination at ${width}px`).toBe(expectedPath);
       const overlay = page.locator('.fi-sidebar-close-overlay');
       if (await overlay.isVisible()) {
         await page.screenshot({ path: resolve(artifactDir, `${slug}-native-drawer.png`), fullPage: true });
@@ -102,7 +120,7 @@ for (const surface of surfaces.filter(entry => selected.length === 0 || selected
       const serious = axe.violations.filter(v => ['serious', 'critical'].includes(v.impact ?? ''))
         .map(v => ({ id: v.id, impact: v.impact, targets: v.nodes.slice(0, 5).map(n => n.target.join(' ')) }));
       await page.screenshot({ path: resolve(artifactDir, `${slug}.png`), fullPage: true });
-      results.push({ width, status: response?.status(), ...layout, serious, renderingReadiness, renderingReadinessError });
+      results.push({ width, status: response?.status(), finalPath, ...layout, serious, renderingReadiness, renderingReadinessError });
     }
     await Promise.all([...pendingReadEvidence]);
     await context.close();
@@ -130,8 +148,10 @@ if (selected.length === 0 || selected.includes('admin')) {
       serviceWorkers: 'block', viewport: { width: 1440, height: 900 },
     });
     await guardUiRendering(context, origin);
+    await assertCanonicalSession(context, 'super-admin');
     const page = await context.newPage();
     await page.goto(origin + '/admin');
+    await expect(page).toHaveURL(origin + '/admin');
     await page.keyboard.press('Control+/');
     const dialog = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
     await expect(dialog).toBeVisible();
@@ -142,6 +162,7 @@ if (selected.length === 0 || selected.includes('admin')) {
     await page.keyboard.press('Escape');
     await expect(dialog).toBeHidden();
     await page.reload();
+    await expect(page).toHaveURL(origin + '/admin');
     await page.locator('body').click({ position: { x: 900, y: 120 } });
     await page.keyboard.press('/');
     await page.keyboard.press('g');
