@@ -210,6 +210,7 @@ Desktop.ini
 
 # Playwright failure traces are local diagnostics; committed acceptance images live in tests/e2e/screenshots.
 /test-results/*/
+/tests/e2e/.auth/
 /playwright-report/
 
 # Generated reflection / local test artifact (not source)

@@ -42,7 +42,7 @@ export default defineConfig({
       name: 'desktop',
       use: {
         viewport: { width: 1280, height: 800 },
-        storageState: 'tests/e2e/.auth/admin.json',
+        storageState: 'test-results/e2e-auth/admin.json',
       },
       dependencies: ['setup'],
       testMatch: /mbfd-full-verification\.spec\.ts/,
@@ -56,7 +56,7 @@ export default defineConfig({
           'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.0 Mobile/15E148 Safari/604.1',
         hasTouch: true,
         isMobile: true,
-        storageState: 'tests/e2e/.auth/admin.json',
+        storageState: 'test-results/e2e-auth/admin.json',
       },
       dependencies: ['setup'],
       testMatch: /mbfd-full-verification\.spec\.ts/,
@@ -104,7 +104,7 @@ export default defineConfig({
       name: 'admin-pwa-desktop',
       use: {
         viewport: { width: 1920, height: 1080 },
-        storageState: 'tests/e2e/.auth/admin.json',
+        storageState: 'test-results/e2e-auth/admin.json',
         serviceWorkers: 'allow',
       },
       dependencies: ['setup'],
@@ -114,7 +114,7 @@ export default defineConfig({
       name: 'admin-ux-acceptance',
       use: {
         viewport: { width: 1366, height: 768 },
-        storageState: 'tests/e2e/.auth/admin.json',
+        storageState: 'test-results/e2e-auth/admin.json',
         serviceWorkers: 'allow',
       },
       dependencies: ['setup'],
