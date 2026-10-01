@@ -15,7 +15,7 @@ const surfaces: Surface[] = [
   { module: 'home', persona: 'super-admin', path: '/', migrated: true },
   { module: 'home', persona: 'member', path: '/', migrated: true },
   { module: 'home', persona: 'workgroup-member', path: '/', migrated: true },
-  ...['/admin', '/admin/apparatuses', '/admin/equipment-items', '/admin/station-requests', '/admin/apparatuses/create'].map(path => ({ module: 'admin', persona: 'super-admin', path, migrated: true })),
+  ...['/admin', '/admin/apparatuses', '/admin/equipment-items', '/admin/station-requests', '/admin/employees', '/admin/employees/create', '/admin/equipment-intake'].map(path => ({ module: 'admin', persona: 'super-admin', path, migrated: true })),
   ...['/employee', '/employee/my-requests', '/employee/request-equipment', '/employee/apparatus-service-request', '/employee/forms'].map(path => ({ module: 'employee', persona: 'member', path, migrated: true })),
   { module: 'employee', persona: 'officer', path: '/employee/personnel-equipment-request', migrated: true },
   ...['/workgroups', '/workgroups/evaluations', '/workgroups/surveys', '/workgroups/files', '/workgroups/profile'].map(path => ({ module: 'workgroups', persona: 'workgroup-member', path, migrated: true })),
@@ -23,7 +23,7 @@ const surfaces: Surface[] = [
   { module: 'training', persona: 'training-viewer', path: '/training', migrated: true },
   { module: 'training', persona: 'training-admin', path: '/training/training-todos', migrated: true },
   { module: 'training', persona: 'training-admin', path: '/training/settings', migrated: true },
-  ...['/account', '/support', '/support/create', '/updates', '/install', '/security-standards'].map(path => ({ module: 'specialized', persona: 'member', path, migrated: true })),
+  ...['/account', '/support/issues', '/support/issues/create', '/updates', '/install', '/security-standards'].map(path => ({ module: 'specialized', persona: 'member', path, migrated: true })),
 ];
 
 const selected = (process.env.UI_MODULES ?? '').split(',').map(value => value.trim()).filter(Boolean);
@@ -31,7 +31,7 @@ const selected = (process.env.UI_MODULES ?? '').split(',').map(value => value.tr
 for (const surface of surfaces.filter(entry => selected.length === 0 || selected.includes(entry.module))) {
   test(`${surface.module}: ${surface.persona} ${surface.path}`, async ({ browser }) => {
     const context = await browser.newContext({ storageState: `test-results/protected-ui-auth/persona-${surface.persona}.json`, serviceWorkers: 'block' });
-    // Rendering only: refuse every write so acceptance never mutates fixture state.
+    // Rendering only: allow known Livewire reads and refuse mutations.
     await guardUiRendering(context, origin);
     const page = await context.newPage();
     const consoleErrors: string[] = [];
@@ -69,5 +69,50 @@ for (const surface of surfaces.filter(entry => selected.length === 0 || selected
       }
       expect.soft(consoleErrors, 'console errors').toEqual([]);
     }
+  });
+}
+
+if (selected.length === 0 || selected.includes('admin')) {
+  test('admin character shortcut preference persists and modifier shortcuts remain available', async ({ browser }) => {
+    const context = await browser.newContext({
+      storageState: 'test-results/protected-ui-auth/persona-super-admin.json',
+      serviceWorkers: 'block', viewport: { width: 1440, height: 900 },
+    });
+    await guardUiRendering(context, origin);
+    const page = await context.newPage();
+    await page.goto(origin + '/admin');
+    await page.keyboard.press('Control+/');
+    const dialog = page.getByRole('dialog', { name: 'Keyboard shortcuts' });
+    await expect(dialog).toBeVisible();
+    const singleKeys = dialog.getByRole('switch', { name: 'Single-key shortcuts' });
+    await expect(singleKeys).toHaveAttribute('aria-checked', 'true');
+    await singleKeys.click();
+    await expect(singleKeys).toHaveAttribute('aria-checked', 'false');
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+    await page.reload();
+    await page.locator('body').click({ position: { x: 900, y: 120 } });
+    await page.keyboard.press('/');
+    await page.keyboard.press('g');
+    await page.keyboard.press('a');
+    await expect(page).toHaveURL(origin + '/admin');
+    const search = page.locator('.fi-global-search-field input');
+    await expect(search).not.toBeFocused();
+    await page.keyboard.press('Control+k');
+    await expect(search).toBeFocused();
+    await page.keyboard.press('Control+/');
+    await expect(dialog).toBeVisible();
+    await expect(singleKeys).toHaveAttribute('aria-checked', 'false');
+    const closeHelp = dialog.getByRole('button', { name: 'Close keyboard shortcuts' });
+    await expect(closeHelp).toBeFocused();
+    await page.keyboard.press('Control+k');
+    await expect(closeHelp).toBeFocused();
+    await singleKeys.click();
+    await page.keyboard.press('Escape');
+    await page.locator('body').click({ position: { x: 900, y: 120 } });
+    await page.keyboard.press('g');
+    await page.keyboard.press('a');
+    await expect(page).toHaveURL(origin + '/admin/apparatuses');
+    await context.close();
   });
 }

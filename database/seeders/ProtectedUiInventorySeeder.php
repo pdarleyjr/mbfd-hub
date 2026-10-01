@@ -23,8 +23,8 @@ final class ProtectedUiInventorySeeder extends Seeder
     {
         if (! app()->environment('testing') || config('database.default') !== 'sqlite'
             || basename((string) config('database.connections.sqlite.database')) !== 'protected_ui_e2e.sqlite'
-            || config('mail.default') !== 'array') {
-            throw new RuntimeException('Inventory fixtures require the isolated UI SQLite database and array mailer.');
+            || config('mail.default') !== 'array' || config('filesystems.private', 'local') !== 'local') {
+            throw new RuntimeException('Inventory fixtures require the isolated UI SQLite database, array mailer, and local private storage.');
         }
         if (filter_var(config('workgroup.ai_worker_enabled'), FILTER_VALIDATE_BOOL)
             || trim((string) config('workgroup.ai_worker_url')) !== ''
@@ -85,18 +85,57 @@ final class ProtectedUiInventorySeeder extends Seeder
             $this->fixture(Models\OperationalFormRecord::class, ['employee_id' => $employee->id, 'form_type' => 'ics_214', 'form_version' => '1.0', 'title' => 'Local UI test activity log', 'data' => [], 'status' => 'draft']);
 
             $workgroup = $this->fixture(Models\Workgroup::class, ['name' => 'Local UI test workgroup', 'is_active' => true, 'created_by' => $user->id]);
-            $member = $this->fixture(Models\WorkgroupMember::class, ['workgroup_id' => $workgroup->id, 'user_id' => $user->id, 'role' => 'facilitator', 'is_active' => true]);
+            $member = $this->fixture(Models\WorkgroupMember::class, ['workgroup_id' => $workgroup->id, 'user_id' => $user->id, 'role' => 'facilitator', 'is_active' => true, 'count_evaluations' => true]);
             $session = $this->fixture(Models\WorkgroupSession::class, ['workgroup_id' => $workgroup->id, 'name' => 'Local UI test session', 'start_date' => today(), 'end_date' => today()->addWeek(), 'status' => 'active']);
             $category = $this->fixture(Models\EvaluationCategory::class, ['name' => 'Local UI test equipment', 'assessment_profile' => 'generic_apparatus', 'is_active' => true]);
             $template = $this->fixture(Models\EvaluationTemplate::class, ['name' => 'Local UI test rubric', 'category_id' => $category->id, 'is_active' => true]);
             $this->fixture(Models\EvaluationCriterion::class, ['template_id' => $template->id, 'name' => 'Local UI test handling', 'max_score' => 10, 'weight' => 1]);
-            $product = $this->fixture(Models\CandidateProduct::class, ['workgroup_session_id' => $session->id, 'category_id' => $category->id, 'name' => 'Local UI test product', 'manufacturer' => 'Synthetic fixture']);
-            $this->fixture(Models\EvaluationSubmission::class, ['workgroup_member_id' => $member->id, 'candidate_product_id' => $product->id, 'status' => 'draft', 'assessment_profile' => 'generic_apparatus', 'rubric_version' => \App\Support\Workgroups\UniversalEvaluationRubric::VERSION]);
+            $product = $this->fixture(Models\CandidateProduct::class, ['workgroup_session_id' => $session->id, 'category_id' => $category->id, 'name' => 'Local UI test product', 'manufacturer' => 'Synthetic fixture', 'competitor_group' => 'local-ui-comparison']);
+            $draftEvaluation = $this->fixture(Models\EvaluationSubmission::class, ['workgroup_member_id' => $member->id, 'candidate_product_id' => $product->id, 'status' => 'draft', 'assessment_profile' => 'generic_apparatus', 'rubric_version' => \App\Support\Workgroups\UniversalEvaluationRubric::VERSION]);
+            // Keep the editable draft fixture and add a separate completed product.
+            // Derive score values through the same rubric model method as the form.
+            $completedProduct = $this->fixture(Models\CandidateProduct::class, ['workgroup_session_id' => $session->id, 'category_id' => $category->id, 'name' => 'Local UI test evaluated product', 'manufacturer' => 'Synthetic fixture', 'competitor_group' => 'local-ui-comparison']);
+            $ratings = array_fill_keys(array_keys(\App\Support\Workgroups\UniversalEvaluationRubric::getAllCriteriaForProfile('generic_apparatus')), \App\Support\Workgroups\UniversalEvaluationRubric::RATING_STRONG);
+            $completedEvaluation = $this->fixture(Models\EvaluationSubmission::class, [
+                'workgroup_member_id' => $member->id, 'candidate_product_id' => $completedProduct->id,
+                'status' => 'submitted', 'submitted_at' => now(), 'assessment_profile' => 'generic_apparatus',
+                'rubric_version' => \App\Support\Workgroups\UniversalEvaluationRubric::VERSION,
+                'advance_recommendation' => \App\Support\Workgroups\UniversalEvaluationRubric::RECOMMEND_YES,
+                'confidence_level' => \App\Support\Workgroups\UniversalEvaluationRubric::CONFIDENCE_HIGH,
+                'criterion_payload' => ['ratings' => $ratings, 'notes' => []],
+                'narrative_payload' => ['strongest_advantages' => 'Synthetic local review: straightforward handling.', 'biggest_weaknesses' => 'Synthetic local review: additional operational evaluation required.'],
+            ]);
+            $completedEvaluation->calculateRubricScores();
+            $completedEvaluation->saveQuietly();
+            $this->records[Models\CandidateProduct::class] = $product;
+            $this->records[Models\EvaluationSubmission::class] = $draftEvaluation;
             $survey = $this->fixture(Models\WorkgroupSurvey::class, ['workgroup_id' => $workgroup->id, 'workgroup_session_id' => $session->id, 'title' => 'Local UI test usability survey', 'status' => 'active', 'created_by' => $user->id]);
-            $this->fixture(Models\WorkgroupSurveyQuestion::class, ['survey_id' => $survey->id, 'position' => 1, 'type' => 'single', 'prompt' => 'Local fixture: assess handling.', 'configuration' => ['options' => [['key' => 'ready', 'label' => 'Ready for local visual review'], ['key' => 'review', 'label' => 'Needs local review']]]]);
+            $questionConfiguration = ['options' => [['key' => 'ready', 'label' => 'Ready for local visual review'], ['key' => 'review', 'label' => 'Needs local review']]];
+            $this->fixture(Models\WorkgroupSurveyQuestion::class, ['survey_id' => $survey->id, 'position' => 1, 'type' => 'single', 'prompt' => 'Local fixture: assess handling.', 'configuration' => $questionConfiguration]);
+            $populatedSurvey = $this->fixture(Models\WorkgroupSurvey::class, ['workgroup_id' => $workgroup->id, 'workgroup_session_id' => $session->id, 'title' => 'Local UI test completed usability survey', 'status' => 'active', 'is_anonymous' => true, 'revision' => 1, 'created_by' => $user->id]);
+            $populatedQuestion = $this->fixture(Models\WorkgroupSurveyQuestion::class, ['survey_id' => $populatedSurvey->id, 'position' => 1, 'type' => 'single', 'prompt' => 'Local fixture: assess handling.', 'configuration' => $questionConfiguration]);
+            $contextKey = \App\Support\Workgroups\WorkgroupContext::SESSION_KEY;
+            $previousContext = session()->get($contextKey);
+            try {
+                app(\App\Support\Workgroups\WorkgroupContext::class)->select($user, $workgroup->id);
+                $this->records[Models\WorkgroupSurveyResponse::class] = app(\App\Services\Workgroup\SurveyResponseService::class)
+                    ->submit($populatedSurvey, $user, [(string) $populatedQuestion->id => 'ready']);
+            } finally {
+                if ($previousContext === null) {
+                    session()->forget($contextKey);
+                } else {
+                    session()->put($contextKey, $previousContext);
+                }
+            }
+            $this->records[Models\WorkgroupSurvey::class] = $survey;
+            $this->fixture(Models\WorkgroupNote::class, ['workgroup_member_id' => $member->id, 'workgroup_session_id' => $session->id, 'title' => 'Local UI test shared review note', 'content' => '<p>Synthetic local review: inspect handling and storage before the next session.</p>', 'is_shared' => true]);
             $filePath = 'protected-ui-inventory/local-fixture.txt';
             Storage::disk('local')->put($filePath, 'Synthetic local UI fixture. No operational content.');
             $this->fixture(Models\WorkgroupFile::class, ['workgroup_id' => $workgroup->id, 'workgroup_session_id' => $session->id, 'filename' => 'local-fixture.txt', 'filepath' => $filePath, 'file_type' => 'txt', 'file_size' => Storage::disk('local')->size($filePath), 'uploaded_by' => $user->id]);
+            // Reuse a real bundled PNG, matching the upload form's image MIME allowlist.
+            $sharedPath = 'workgroup-shared-uploads/'.$workgroup->id.'/local-ui-reference.png';
+            Storage::disk('local')->put($sharedPath, file_get_contents(public_path('images/mbfd-logo.png')));
+            $this->fixture(Models\WorkgroupSharedUpload::class, ['workgroup_id' => $workgroup->id, 'workgroup_session_id' => $session->id, 'user_id' => $user->id, 'workgroup_member_id' => $member->id, 'filename' => 'local-ui-reference.png', 'filepath' => $sharedPath, 'file_type' => 'image/png', 'file_size' => Storage::disk('local')->size($sharedPath)]);
             Cache::put("workgroup_saver_report_{$workgroup->id}_{$session->id}", '<h2>Local UI fixture report</h2><p>This synthetic report tests the presentation shell only.</p><table><tr><th>Test item</th><th>Status</th></tr><tr><td>Local fixture</td><td>Ready for visual inspection</td></tr></table>', now()->addHour());
 
             $this->fixture(Models\InboundEmail::class, ['provider_message_id' => 'local-ui-inbound-01', 'from_address' => 'sender@example.test', 'to_address' => 'recipient@example.test', 'subject' => 'Local UI test inbound message', 'received_at' => now(), 'text_body' => 'Synthetic fixture; no message received externally.']);
@@ -121,7 +160,7 @@ final class ProtectedUiInventorySeeder extends Seeder
         }
         $survey = $this->records[Models\WorkgroupSurvey::class];
         $destinations['/workgroups/survey-form-page'] = '/workgroups/survey-form-page?surveyId='.$survey->id;
-        $destinations['/workgroups/survey-results-page'] = '/workgroups/survey-results-page?surveyId='.$survey->id;
+        $destinations['/workgroups/survey-results-page'] = '/workgroups/survey-results-page?surveyId='.$this->records[Models\WorkgroupSurveyResponse::class]->survey_id;
         $destinations['/workgroups/evaluation-form-page'] = '/workgroups/evaluation-form-page?productId='.$this->records[Models\CandidateProduct::class]->id;
         $destinations['/admin/apparatuses/{record}/inspections/{inspection}'] = '/admin/apparatuses/'.$apparatus->id.'/inspections/'.$this->records[Models\ApparatusInspection::class]->id;
         $destinations['/updates/{departmentUpdate}'] = '/updates/'.$this->records[Models\DepartmentUpdate::class]->getRouteKey();
