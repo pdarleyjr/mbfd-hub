@@ -83,7 +83,7 @@
 .inspection-muted { font-size: 13px; color: var(--muted); }
 .confirm-compartment { color: var(--green); font-weight: 650; font-size: 13px; border: 1px solid #0d9367; padding: 8px 12px; border-radius: 6px; background: #f3fff9; }
 .inspection-observation-hint { color: var(--muted); font-size: 12px; padding: 0 0 12px; }
-.equipment-list { display: grid; gap: 7px; }
+.equipment-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 7px; }
 .equipment-row { background: #fff; border: 1px solid var(--line); border-radius: 8px; }
 .equipment-row.has-issue { background: #fff9f0; }
 .equipment-row.is-expanded { box-shadow: inset 0 0 0 1px #9aaab3; }

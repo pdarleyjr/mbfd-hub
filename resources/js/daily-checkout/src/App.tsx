@@ -28,7 +28,7 @@ const PageLoading = () => (
 const HomeNav = () => (
   <header className="daily-home-nav sticky top-0 z-50 border-b min-h-16 flex items-center justify-between gap-3 px-4 py-2 lg:px-6 bg-hub-header border-hub-border-strong/30" style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0px))' }}>
     <div className="flex min-w-0 items-center gap-3">
-      <img src="/images/mbfd_logo-256.png" alt="" width="40" height="40" className="h-10 w-10 shrink-0 object-contain" />
+      <img src="/images/mbfd_logo-256.png" alt="MBFD Logo" width="40" height="40" className="h-10 w-10 shrink-0 object-contain" />
       <div className="min-w-0">
         <p className="text-white font-bold text-sm sm:text-base leading-tight font-heading">MBFD Support Hub</p>
         <p className="hidden sm:block text-xs text-white/80">Daily Checkout</p>
