@@ -245,6 +245,11 @@
     color: rgb(var(--warning-800));
 }
 
+html:not(.dark) .fi-panel-admin .fi-badge.fi-color-success,
+html:not(.dark) .fi-panel-admin .fi-ta-actions .fi-link.fi-color-success > span {
+    color: rgb(var(--success-800));
+}
+
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-dropdown-panel {
     border-radius: 12px;
     box-shadow: var(--hub2-elevation-2);
