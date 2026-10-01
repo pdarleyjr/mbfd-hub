@@ -1,15 +1,21 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, test } from '@playwright/test';
+import { expect, test, type BrowserContext } from '@playwright/test';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { protectedUiInventoryEnvironment } from '../../playwright.protected-ui-inventory.config';
 import { guardUiRendering, waitForUiRendering } from './support/ui-readonly';
+import { fixtureSessionRenewal } from './support/fixture-session-renewal';
 
 type Entry = { route: string; name: string; panel: string | null; scope: string; parent: string; route_name: string | null };
 const catalog = JSON.parse(readFileSync(resolve('tests/e2e/support/protected-ui-inventory.json'), 'utf8')) as { pages: Entry[] };
 const widths = [320, 390, 820, 1024, 1280, 1440, 1920];
 const origin = 'http://127.0.0.1:8127';
 const serviceWorkers = process.env.PROTECTED_UI_INVENTORY_ALLOW_SW === '1' ? 'allow' as const : 'block' as const;
+const ownedContexts: BrowserContext[] = [];
+
+test.afterEach(async () => {
+  await Promise.all(ownedContexts.splice(0).map(context => context.close()));
+});
 
 function redactEvidence(value: unknown): unknown {
   if (typeof value !== 'string') return value;
@@ -93,6 +99,7 @@ test('inventory records every route and renders available protected surfaces at 
   expect(protectedUiInventoryEnvironment.WORKGROUP_AI_WORKER_URL).toBe('');
   expect(protectedUiInventoryEnvironment.WORKGROUP_AI_WORKER_SECRET).toBe('');
   const context = await browser.newContext({ storageState: 'test-results/protected-ui-auth/state.json', serviceWorkers });
+  ownedContexts.push(context);
   const canonicalContext = await context.request.get(`${origin}/api/me/context`, { headers: { Accept: 'application/json', Origin: origin, Referer: origin + '/admin' } });
   expect(canonicalContext.status(), 'Inventory starts with a current canonical employee session').toBe(200);
   const fixtureFile = resolve('test-results/protected-ui-auth/fixture-routes.json');
@@ -106,9 +113,12 @@ test('inventory records every route and renders available protected surfaces at 
     '/daily/forms-hub/equipment-request': '/daily/forms-hub/station-request',
   };
   const guestContext = await browser.newContext({ storageState: { cookies: [], origins: [] }, serviceWorkers });
+  ownedContexts.push(guestContext);
   const onboardingContext = await browser.newContext({ storageState: 'test-results/protected-ui-auth/onboarding-state.json', serviceWorkers });
+  ownedContexts.push(onboardingContext);
   // Only these source-defined push settings pages exercise native registration.
   const pushSettingsContext = await browser.newContext({ storageState: 'test-results/protected-ui-auth/state.json', serviceWorkers: 'allow' });
+  ownedContexts.push(pushSettingsContext);
   const authenticatedPage = await context.newPage();
   const guestPage = await guestContext.newPage();
   const onboardingPage = await onboardingContext.newPage();
@@ -145,6 +155,8 @@ test('inventory records every route and renders available protected surfaces at 
     allowDisabledAiReport: true,
     onBlocked: description => blockedRequests.push(description),
   });
+  const canonicalRenewal = await fixtureSessionRenewal([context, pushSettingsContext]);
+  await canonicalRenewal.beforeBoundary('inventory start');
 
   const priority = (entry: Entry) => /analysis-report|final-presentation|saver-report|^\/member-onboarding$/.test(entry.route) ? -1 : Number(/[{:]/.test(entry.route));
   const entries = catalog.pages.map((entry, index) => ({ entry, index })).filter(({ entry }) => !outcomes.some(outcome => outcome.route === entry.route)).sort((a, b) => priority(a.entry) - priority(b.entry));
@@ -159,6 +171,7 @@ test('inventory records every route and renders available protected surfaces at 
     },
     baseline: 'Candidate working tree', widths, expectedRoutes: catalog.pages.length,
     discoveredInternalLinks: [...links].sort(),
+    canonicalSessionRenewals: canonicalRenewal.events,
     sourceClassification: catalog.pages.map(entry => ({ route: entry.route, ...structuralClassification(entry),
       fixtureRouteMapped: Boolean(fixtureRoutes[entry.route]), sessionFixture: entry.route === '/member-onboarding' ? 'onboarding-state.json' : null, dependencyState: dependencyState(entry) })),
     outcomes: outcomes.toSorted((a, b) => Number(a.index) - Number(b.index)).map(outcome => ({ ...outcome,
@@ -177,6 +190,7 @@ test('inventory records every route and renders available protected surfaces at 
   };
 
   for (const { entry, index } of entries) {
+    await canonicalRenewal.beforeBoundary(entry.route);
     page = /\/(login|forgot-password|reset-password)(?:\/|$)|^\/member-onboarding/.test(entry.route) ? guestPage : authenticatedPage;
     if (entry.route === '/member-onboarding') page = onboardingPage;
     if (['/admin/settings', '/training/settings'].includes(entry.route)) page = pushSettingsPage;
@@ -442,16 +456,14 @@ test('inventory records every route and renders available protected surfaces at 
     persist();
     console.log(`Inventory ${outcomes.length}/${catalog.pages.length}: ${entry.route} ${outcomes.at(-1)?.status}`);
   }
+  await canonicalRenewal.beforeBoundary('completed inventory');
   const finalCanonicalContext = await context.request.get(`${origin}/api/me/context`, {
     headers: { Accept: 'application/json', Origin: origin, Referer: origin + '/admin' }, maxRedirects: 0,
   });
   expect(finalCanonicalContext.status(), 'Completed inventory retains its canonical employee session').toBe(200);
-  // Preserve this same session's refreshed cookie expiry for the read-only link follow-up.
+  // Preserve the same fixture/actor's current supported session for link follow-up.
   await context.storageState({ path: 'test-results/protected-ui-auth/state.json' });
-  await context.close();
-  await guestContext.close();
-  await onboardingContext.close();
-  await pushSettingsContext.close();
+  persist();
   await info.attach('inventory-results', { path: info.outputPath('inventory-results.json'), contentType: 'application/json' });
   expect(outcomes).toHaveLength(catalog.pages.length);
   // All route evidence is written before acceptance assertions so one failure

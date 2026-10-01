@@ -2,6 +2,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type APIRequestContext, type BrowserContext, type Page } from '@playwright/test';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
+import { fixtureSessionRenewal } from '../support/fixture-session-renewal';
 
 const origin = 'http://127.0.0.1:8127';
 const widths = [320, 390, 820, 1024, 1280, 1440, 1920];
@@ -216,8 +217,8 @@ if (inventoryResultsPath) {
     expect(Array.isArray(inventory.discoveredInternalLinks), 'Inventory must export actually discovered internal links').toBe(true);
     expect(inventory.discoveredInternalLinks.length).toBeGreaterThan(0);
 
-    // Reuse the fresh inventory's exact session and fixture. The follow-up
-    // config must disable globalSetup so no reseeding invalidates these links.
+    // Reuse the fresh inventory's fixture and canonical actor. The follow-up
+    // config must disable globalSetup; only supported local sign-in renews it.
     const context = await browser.newContext({ storageState: 'test-results/protected-ui-auth/state.json', serviceWorkers: 'block' });
     try {
       const canonical = await context.request.get(`${origin}/api/me/context`, {
@@ -225,14 +226,20 @@ if (inventoryResultsPath) {
       });
       expect(canonical.status(), 'Current canonical employee session from fresh inventory').toBe(200);
       recordProfileDestination('super-admin', (await canonical.json()).personnel?.employee_profile_id);
+      const canonicalRenewal = await fixtureSessionRenewal([context]);
+      await canonicalRenewal.beforeBoundary('linked GET start');
       const targets = [...new Set(inventory.discoveredInternalLinks)].sort();
       const links = [];
-      for (const target of targets) links.push(await probeLink(context.request, 'super-admin', target, ['fresh inventory rendered document']));
+      for (const target of targets) {
+        await canonicalRenewal.beforeBoundary('linked GET target');
+        links.push(await probeLink(context.request, 'super-admin', target, ['fresh inventory rendered document']));
+      }
       const brokenLinks = links.filter(link => 'error' in link);
-      const evidence = { persona: 'super-admin', fixture: 'Exact disposable fresh inventory fixture and canonical employee session',
+      const evidence = { persona: 'super-admin', fixture: 'Exact disposable fresh inventory fixture and canonical actor; supported local sign-in renewal only',
         phase: 'FRESH_INVENTORY_LINKED_GET_ACCEPTANCE', buildAssets, inventoryResultsPath: resolve(inventoryResultsPath),
         probedAt: new Date().toISOString(), discoveredTargets: targets.length, classifiedTargets: links.length, brokenLinks, links,
-        meaning: 'Every exported internal target is either explicitly source-excluded or checked by GET with manual source-defined redirects. No POST, scripts, export/download operation, page-count cap or route-pattern sample. Linked 403 fails; unlinked denied-panel seeds are classified only in persona discovery.' };
+        canonicalSessionRenewals: canonicalRenewal.events,
+        meaning: 'Every exported internal target is either explicitly source-excluded or checked by GET with manual source-defined redirects. Target probes use no POST, scripts, export/download operation, page-count cap or route-pattern sample. Separate fixture-only authentication uses canonical POST /login. Linked 403 fails; unlinked denied-panel seeds are classified only in persona discovery.' };
       mkdirSync(artifactDir, { recursive: true });
       const evidencePath = resolve(artifactDir, 'linked-get-inventory-super-admin.json');
       writeFileSync(evidencePath, JSON.stringify(evidence, redactEvidence, 2));
