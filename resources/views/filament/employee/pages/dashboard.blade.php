@@ -1,4 +1,4 @@
-<x-filament-panels::page>
+<x-filament-panels::page data-hub-ui="2" data-hub-portal="employee">
     {{-- Hero Identity Strip --}}
     <div class="ep-hero">
         <div class="ep-hero-badge">
@@ -39,6 +39,7 @@
         </div>
     </div>
 
+    <h2 class="hub-portal-section-title">Your workspace</h2>
     {{-- Quick Actions --}}
     <div class="ep-actions-row">
         <a href="{{ \App\Filament\Employee\Pages\MyEquipmentPage::getUrl(panel: 'employee') }}" class="ep-action-card ep-action-primary">
@@ -71,12 +72,20 @@
         </a>
     </div>
 
+    <nav class="ep-workspace-links" aria-label="Employee tools">
+        <a href="{{ \App\Filament\Employee\Pages\MyRequestsPage::getUrl(panel: 'employee') }}">Request history</a>
+        <a href="{{ \App\Filament\Employee\Pages\ApparatusServiceRequestPage::getUrl(panel: 'employee') }}">Apparatus service</a>
+        <a href="{{ \App\Filament\Employee\Pages\OperationalForms::getUrl(panel: 'employee') }}">Operational forms</a>
+        <a href="{{ \App\Filament\Employee\Pages\VideoConferencing::getUrl(panel: 'employee') }}">Video conferencing</a>
+        <a href="{{ route('account.show') }}">My account</a>
+    </nav>
+
     {{-- Two columns: Recent Equipment + Recent Requests --}}
     <div class="ep-two-col">
         {{-- Recent Equipment --}}
         <div class="ep-panel">
             <div class="ep-panel-header">
-                <span class="ep-panel-title">Recently Assigned</span>
+                <h2 class="ep-panel-title">Recently assigned</h2>
                 <a href="{{ \App\Filament\Employee\Pages\MyEquipmentPage::getUrl(panel: 'employee') }}" class="ep-panel-link">View all →</a>
             </div>
             @if($recentEquipment->isEmpty())
@@ -103,7 +112,7 @@
         {{-- Recent Requests --}}
         <div class="ep-panel">
             <div class="ep-panel-header">
-                <span class="ep-panel-title">My Requests</span>
+                <h2 class="ep-panel-title">My requests</h2>
                 <a href="{{ \App\Filament\Employee\Pages\MyRequestsPage::getUrl(panel: 'employee') }}" class="ep-panel-link">View all →</a>
             </div>
             @if($recentRequests->isEmpty())
@@ -133,294 +142,4 @@
             @endif
         </div>
     </div>
-
-    <style>
-        /* Employee portal presentation uses the shared Hub semantic tokens. */
-        .ep-hero {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            padding: 1.25rem 1.5rem;
-            background: rgb(var(--hub-header));
-            border-radius: 0.875rem;
-            margin-bottom: 1rem;
-            color: rgb(var(--hub-surface));
-        }
-        .ep-hero-badge {
-            width: 3rem;
-            height: 3rem;
-            border-radius: 50%;
-            background: rgb(var(--hub-surface) / .08);
-            border: 1px solid rgb(var(--hub-surface) / .2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
-        .ep-hero-badge-icon {
-            width: 1.5rem;
-            height: 1.5rem;
-            color: rgb(var(--hub-border));
-        }
-        .ep-hero-info { flex: 1; min-width: 0; }
-        .ep-hero-name {
-            font-size: 1.125rem;
-            font-weight: 700;
-            color: rgb(var(--hub-surface));
-            line-height: 1.3;
-        }
-        .ep-hero-meta {
-            display: flex;
-            align-items: center;
-            gap: 0.375rem;
-            margin-top: 0.25rem;
-        }
-        .ep-hero-rank {
-            font-size: 0.8125rem;
-            color: rgb(var(--hub-border));
-            font-weight: 600;
-        }
-        .ep-hero-sep {
-            color: rgb(var(--hub-border));
-            font-size: 0.75rem;
-        }
-        .ep-hero-id {
-            font-size: 0.8125rem;
-            color: rgb(var(--hub-border));
-            font-variant-numeric: tabular-nums;
-        }
-        .ep-home-btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.375rem;
-            min-width: 44px;
-            min-height: 44px;
-            padding: 0.5rem 0.875rem;
-            border-radius: 0.5rem;
-            background: rgba(255,255,255,0.08);
-            border: 1px solid rgba(255,255,255,0.15);
-            color: rgb(var(--hub-border));
-            font-size: 0.75rem;
-            font-weight: 500;
-            text-decoration: none;
-            transition: background 150ms, color 150ms;
-            flex-shrink: 0;
-        }
-        .ep-home-btn:hover {
-            background: rgba(255,255,255,0.15);
-            color: rgb(var(--hub-surface));
-        }
-        /* Stats bar */
-        .ep-stats-bar {
-            display: flex;
-            align-items: center;
-            gap: 0;
-            background: rgb(var(--hub-surface));
-            border: 1px solid rgb(var(--hub-border));
-            border-radius: 0.75rem;
-            overflow: hidden;
-            margin-bottom: 1rem;
-        }
-        .ep-stat {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 1rem 1.5rem;
-        }
-        .ep-stat-divider {
-            width: 1px;
-            height: 2.5rem;
-            background: rgb(var(--hub-border));
-        }
-        .ep-stat-value {
-            font-size: 1.875rem;
-            font-weight: 800;
-            color: rgb(var(--hub-ink));
-            font-variant-numeric: tabular-nums;
-            line-height: 1;
-        }
-        .ep-stat-pending { color: rgb(var(--hub-warning)); }
-        .ep-stat-label {
-            font-size: 0.75rem;
-            color: rgb(var(--hub-muted));
-            font-weight: 500;
-            margin-top: 0.25rem;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-        }
-        /* Action cards */
-        .ep-actions-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.75rem;
-            margin-bottom: 1rem;
-        }
-        @media (max-width: 640px) {
-            .ep-actions-row { grid-template-columns: 1fr; }
-        }
-        .ep-action-card {
-            display: flex;
-            align-items: center;
-            gap: 0.875rem;
-            padding: 1rem 1.125rem;
-            background: rgb(var(--hub-surface));
-            border: 1px solid rgb(var(--hub-border));
-            border-radius: 0.75rem;
-            text-decoration: none;
-            transition: border-color 150ms, box-shadow 150ms;
-        }
-        .ep-action-card:hover {
-            border-color: rgb(var(--hub-border-strong));
-            box-shadow: var(--hub-shadow-card);
-        }
-        .ep-action-primary { border-left: 3px solid rgb(var(--hub-blue)); }
-        .ep-action-icon {
-            width: 2.5rem;
-            height: 2.5rem;
-            border-radius: 0.625rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
-        .ep-action-icon-blue { background: rgb(var(--hub-blue) / .08); color: rgb(var(--hub-blue)); }
-        .ep-action-icon-neutral { background: rgb(var(--hub-surface-muted)); color: rgb(var(--hub-action-navigation)); }
-        .ep-action-body {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
-        .ep-action-title {
-            font-size: 0.9375rem;
-            font-weight: 600;
-            color: rgb(var(--hub-ink));
-        }
-        .ep-action-desc {
-            font-size: 0.75rem;
-            color: rgb(var(--hub-muted));
-            margin-top: 0.125rem;
-        }
-        .ep-action-arrow {
-            width: 1rem;
-            height: 1rem;
-            color: rgb(var(--hub-border-strong));
-            flex-shrink: 0;
-        }
-        /* Two-column panels */
-        .ep-two-col {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.75rem;
-        }
-        @media (max-width: 768px) {
-            .ep-two-col { grid-template-columns: 1fr; }
-        }
-        .ep-panel {
-            background: rgb(var(--hub-surface));
-            border: 1px solid rgb(var(--hub-border));
-            border-radius: 0.75rem;
-            overflow: hidden;
-        }
-        .ep-panel-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0.875rem 1.125rem;
-            border-bottom: 1px solid rgb(var(--hub-border-soft));
-            background: rgb(var(--hub-surface-muted));
-        }
-        .ep-panel-title {
-            font-size: 0.8125rem;
-            font-weight: 700;
-            color: rgb(var(--hub-ink-secondary));
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-        }
-        .ep-panel-link {
-            display: inline-flex;
-            align-items: center;
-            min-height: 44px;
-            font-size: 0.75rem;
-            color: rgb(var(--hub-action-navigation));
-            text-decoration: none;
-            font-weight: 500;
-        }
-        .ep-panel-link:hover { text-decoration: underline; }
-        .ep-empty {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 2rem 1rem;
-            color: rgb(var(--hub-muted));
-            font-size: 0.8125rem;
-            gap: 0.5rem;
-        }
-        .ep-empty-icon {
-            width: 2rem;
-            height: 2rem;
-            color: rgb(var(--hub-border-strong));
-        }
-        /* List items */
-        .ep-list-item {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            padding: 0.75rem 1.125rem;
-            border-bottom: 1px solid rgb(var(--hub-border-soft));
-        }
-        .ep-list-item:last-child { border-bottom: none; }
-        .ep-list-dot {
-            width: 0.5rem;
-            height: 0.5rem;
-            border-radius: 50%;
-            flex-shrink: 0;
-        }
-        .ep-dot-blue { background: rgb(var(--hub-blue)); }
-        .ep-dot-green { background: rgb(var(--hub-success)); }
-        .ep-dot-amber { background: rgb(var(--hub-warning)); }
-        .ep-dot-red { background: rgb(var(--hub-danger)); }
-        .ep-dot-gray { background: rgb(var(--hub-muted)); }
-        .ep-list-body {
-            flex: 1;
-            min-width: 0;
-            display: flex;
-            flex-direction: column;
-        }
-        .ep-list-primary {
-            font-size: 0.8125rem;
-            font-weight: 600;
-            color: rgb(var(--hub-ink));
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-        .ep-list-secondary {
-            font-size: 0.6875rem;
-            color: rgb(var(--hub-muted));
-            margin-top: 0.125rem;
-        }
-        .ep-list-meta {
-            font-size: 0.6875rem;
-            color: rgb(var(--hub-muted));
-            flex-shrink: 0;
-        }
-        /* Status badges */
-        .ep-status-badge {
-            display: inline-flex;
-            align-items: center;
-            padding: 0.125rem 0.5rem;
-            border-radius: 9999px;
-            font-size: 0.625rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-            flex-shrink: 0;
-        }
-        .ep-status-pending { background: rgb(var(--hub-warning) / .08); color: rgb(var(--hub-warning)); }
-        .ep-status-approved { background: rgb(var(--hub-success) / .08); color: rgb(var(--hub-success)); }
-        .ep-status-declined { background: rgb(var(--hub-danger) / .08); color: rgb(var(--hub-danger)); }
-        .ep-status-ordered { background: rgb(var(--hub-blue) / .08); color: rgb(var(--hub-blue)); }
-    </style>
 </x-filament-panels::page>

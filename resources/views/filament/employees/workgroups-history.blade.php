@@ -6,7 +6,7 @@
     $events = $account ? \App\Models\SecurityActionEvent::query()->with('actor')->where('target_user_id', $account->id)->latest('id')->limit(50)->get() : collect();
     $profileEvents = $employee ? \App\Models\EmployeeProfileEvent::query()->where('employee_id', $employee->id)->latest('id')->limit(50)->get() : collect();
 @endphp
-<div class="space-y-6">
+<div class="hub-portal-records" data-hub-ui="2" data-hub-portal="employee">
     <section>
         <h3 class="text-base font-semibold">Workgroups</h3>
         <ul class="mt-2 space-y-2">
@@ -37,9 +37,9 @@
     </section>
     <section>
         <h3 class="text-base font-semibold">Security audit — latest 50 events</h3>
-        <div class="overflow-x-auto">
-            <table class="mt-2 w-full text-left text-sm">
-                <thead><tr><th class="p-2">Time</th><th class="p-2">Action / result</th><th class="p-2">Administrator</th><th class="p-2">Reason</th></tr></thead>
+        <div class="hub-portal-table-scroll" tabindex="0" role="region" aria-label="Security audit">
+            <table class="hub-portal-table mt-2 min-w-[36rem]">
+                <thead><tr><th scope="col" class="p-2">Time</th><th scope="col" class="p-2">Action / result</th><th scope="col" class="p-2">Administrator</th><th scope="col" class="p-2">Reason</th></tr></thead>
                 <tbody>
                     @forelse ($events as $event)
                         <tr><td class="p-2">{{ $event->created_at->format('M j, Y g:i A') }}</td><td class="p-2">{{ $event->action }} / {{ $event->result }}</td><td class="p-2">{{ $event->actor?->name ?? 'Retained actor ID '.$event->actor_user_id }}</td><td class="p-2">{{ $event->reason ?? '—' }}</td></tr>

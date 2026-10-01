@@ -7,23 +7,23 @@
     <title>{{ $request->request_number }} · MBFD Employee Portal</title>
     @vite('resources/css/app.css')
 </head>
-<body class="min-h-screen bg-hub-canvas text-hub-ink">
+<body data-hub-ui="2" data-hub-portal="employee" class="min-h-screen bg-white text-hub-ink">
     <main class="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:py-10">
         <x-hub-header back-href="/employee/my-requests" back-label="Back to My Requests" />
 
-        <article class="mt-5 overflow-hidden rounded-2xl border border-hub-border bg-white shadow-sm">
-            <header class="border-b border-hub-border bg-hub-surface-muted px-5 py-5 sm:px-7">
-                <p class="text-sm font-bold uppercase tracking-wider text-hub-blue">{{ $request->type->label() }}</p>
+        <article class="mt-5 overflow-hidden rounded-md border border-hub-border bg-white">
+            <header class="border-b border-hub-border bg-white px-5 py-5 sm:px-7">
+                <p class="hub-portal-eyebrow">{{ $request->type->label() }}</p>
                 <div class="mt-2 flex flex-wrap items-center justify-between gap-3">
                     <h1 class="text-2xl font-bold text-hub-ink">{{ $request->request_number }}</h1>
-                    <span class="rounded-full bg-blue-100 px-3 py-1.5 text-sm font-bold text-blue-900">{{ $request->status->label() }}</span>
+                    <span class="hub-tag hub-tag--info">{{ $request->status->label() }}</span>
                 </div>
                 <p class="mt-2 text-sm text-hub-ink-secondary">Submitted by {{ $request->requester_rank }} {{ $request->requester_name }} on {{ $request->created_at->format('M j, Y \a\t g:i A') }}</p>
             </header>
 
             <div class="grid gap-7 px-5 py-6 sm:px-7 lg:grid-cols-[1fr_0.8fr]">
                 <section>
-                    <h2 class="text-lg font-bold">Requested items</h2>
+                    <h2 class="text-lg font-semibold">Requested items</h2>
                     <div class="mt-3 divide-y divide-hub-border rounded-xl border border-hub-border">
                         @foreach($request->items as $item)
                             <div class="p-4">
@@ -67,7 +67,7 @@
                 </section>
 
                 <section>
-                    <h2 class="text-lg font-bold">Request history</h2>
+                    <h2 class="text-lg font-semibold">Request history</h2>
                     <ol class="mt-4 border-l-2 border-blue-200 pl-5">
                         @foreach($request->updates as $update)
                             <li class="relative pb-6 before:absolute before:-left-[1.62rem] before:top-1 before:h-3 before:w-3 before:rounded-full before:bg-hub-blue">
