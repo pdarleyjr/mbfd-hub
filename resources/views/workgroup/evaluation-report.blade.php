@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MBFD Workgroup Evaluation Results — Hydraulic Rescue Tool Evaluation</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Source+Serif+4:ital,wght@0,300;0,400;0,600;1,300;1,400&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         :root {
@@ -28,7 +26,7 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
-            font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+            font-family: var(--hub-font-sans);
             background: var(--color-slate-100);
             color: var(--color-body);
             font-size: 15px;
@@ -230,7 +228,7 @@
         .section + .section { border-top: 1px solid var(--color-slate-200); padding-top: 2.5rem; }
 
         /* ── HEADINGS ── */
-        h1.section-title {
+        .section-title {
             font-size: 1.5rem;
             font-weight: 800;
             color: var(--color-navy);
@@ -239,7 +237,7 @@
             gap: 0.75rem;
             margin-bottom: 1.25rem;
         }
-        h1.section-title .section-num {
+        .section-title .section-num {
             background: var(--color-red);
             color: white;
             width: 2rem;
@@ -252,7 +250,7 @@
             font-weight: 700;
             flex-shrink: 0;
         }
-        h2.subsection-title {
+        .subsection-title {
             font-size: 1.0625rem;
             font-weight: 700;
             color: var(--color-slate-800);
@@ -260,7 +258,7 @@
             padding-bottom: 0.5rem;
             border-bottom: 2px solid var(--color-slate-200);
         }
-        h3.sub-subsection {
+        .sub-subsection {
             font-size: 0.9375rem;
             font-weight: 700;
             color: var(--color-slate-700);
@@ -603,7 +601,7 @@
             .chart-section { page-break-inside: avoid; }
             .data-table { page-break-inside: avoid; }
             .winner-banner { page-break-inside: avoid; }
-            h1.section-title, h2.subsection-title { page-break-after: avoid; }
+            .section-title, .subsection-title { page-break-after: avoid; }
             .report-image { max-height: 280px; }
             @@page {
                 margin: 0.75in;
@@ -624,7 +622,7 @@
     </style>
     @vite(['resources/css/app.css'])
 </head>
-<body class="hub-report hub-report--evaluation-report">
+<body data-hub-ui="2" data-hub-portal="report" class="hub-report hub-report--evaluation-report">
     <div class="hub-report-navigation"><x-hub-header back-href="/workgroups/links" back-label="Back to Workgroup Links" max-width="max-w-7xl" /></div>
 
     <!-- Print Bar -->
@@ -690,7 +688,7 @@
 
             <!-- ══ SECTION 1: Executive Summary ══ -->
             <section class="section" id="sec1">
-                <h1 class="section-title"><span class="section-num">1</span> Executive Summary</h1>
+                <h2 class="section-title"><span class="section-num">1</span> Executive Summary</h2>
 
                 <p>This report presents the findings of the <strong>Miami Beach Fire Department (MBFD) Workgroup</strong> evaluation of hydraulic rescue tools, rotary cut-off saws, and vehicle stabilization equipment. From a broader field of vendors and tools tested, the workgroup identified finalists for detailed analysis: the <strong>top 2 extrication tool brands</strong> (Holmatro and Hurst), the <strong>top-performing cut-off saws</strong>, the <strong>top 3 stabilization struts</strong>, and specific individual tools with targeted operational roles.</p>
 
@@ -733,7 +731,7 @@
 
             <!-- ══ SECTION 2: Operational Context ══ -->
             <section class="section" id="sec2">
-                <h1 class="section-title"><span class="section-num">2</span> Problem / Operational Context</h1>
+                <h2 class="section-title"><span class="section-num">2</span> Problem / Operational Context</h2>
 
                 <p>The Miami Beach Fire Department operates in a dense, high-rise urban coastal environment that imposes strict constraints on tool selection, apparatus compartment geometry, and deployment speed.</p>
 
@@ -742,7 +740,7 @@
                     MBFD apparatus — including mid-mount ladder trucks — have limited compartment space, requiring tools that are compact in their retracted/stored state while delivering maximum capability when deployed. Miami Beach's barrier-island geography demands tools that can be rapidly deployed in congested settings with limited staging area.
                 </div>
 
-                <h2 class="subsection-title">Key Operational Constraints</h2>
+                <h3 class="subsection-title">Key Operational Constraints</h3>
 
                 <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="spec-table">
                     <tbody>
@@ -776,17 +774,17 @@
 
             <!-- ══ SECTION 3: Analysis ══ -->
             <section class="section" id="sec3">
-                <h1 class="section-title"><span class="section-num">3</span> Analysis</h1>
+                <h2 class="section-title"><span class="section-num">3</span> Analysis</h2>
 
-                <h2 class="subsection-title">3A. Evaluation Framework</h2>
+                <h3 class="subsection-title">3A. Evaluation Framework</h3>
 
                 <p>The workgroup evaluation employed a standardized scoring model applied consistently across all 14 products. Evaluators assessed each tool during hands-on testing sessions documented across multiple evaluation days.</p>
 
                 <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead>
                         <tr>
-                            <th>Dimension</th>
-                            <th>Description</th>
+                            <th scope="col">Dimension</th>
+                            <th scope="col">Description</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -812,21 +810,23 @@
                 <p>Each dimension was scored on a 0–100 scale. A composite <strong>Overall Score</strong> was computed as a weighted aggregate reflecting operational priorities for frontline deployment.</p>
 
                 <hr class="section-divider">
-                <h2 class="subsection-title">3B. Brand Performance</h2>
+                <h3 class="subsection-title">3B. Brand Performance</h3>
 
                 <div class="chart-section">
                     <div class="chart-title">Brand Average Composite Scores (All Categories)</div>
                     <div class="chart-container">
-                        <canvas id="brandChart"></canvas>
+                        <canvas id="brandChart" role="img" aria-label="Manufacturer performance comparison" aria-describedby="evaluation-brand-description">Manufacturer performance comparison</canvas>
                     </div>
+                    <p id="evaluation-brand-description" class="hub-chart-description">DeWalt has the highest average composite score, 91.25, followed by Holmatro at 87.93 and Hurst at 84.60. The chart axis runs from 50 to 100. <a href="#evaluation-brand-data">Read all six brand scores in the table.</a></p>
                 </div>
 
                 <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
+                    <caption id="evaluation-brand-data">Brand average composite scores shown in the chart</caption>
                     <thead>
                         <tr>
-                            <th>Brand</th>
-                            <th>Products Evaluated</th>
-                            <th class="right">Avg. Composite Score</th>
+                            <th scope="col">Brand</th>
+                            <th scope="col">Products Evaluated</th>
+                            <th scope="col" class="right">Avg. Composite Score</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -863,22 +863,24 @@
                     </tbody>
                 </table></div>
 
-                <h3 class="sub-subsection">Frontline Hydraulic Tool Dimension Comparison (Holmatro vs. Hurst)</h3>
+                <h4 class="sub-subsection">Frontline Hydraulic Tool Dimension Comparison (Holmatro vs. Hurst)</h4>
 
                 <div class="chart-section">
                     <div class="chart-title">Four-Dimension Breakdown — Holmatro Pentheon vs. Hurst E3</div>
                     <div class="chart-container">
-                        <canvas id="dimensionChart"></canvas>
+                        <canvas id="dimensionChart" role="img" aria-label="Comparison across evaluation dimensions" aria-describedby="evaluation-dimensions-description">Comparison across evaluation dimensions</canvas>
                     </div>
+                    <p id="evaluation-dimensions-description" class="hub-chart-description">Holmatro Pentheon has higher scores than Hurst E3 in all four dimensions; the largest difference is Usability, 93.99 compared with 85.76. The chart axis runs from 75 to 100. <a href="#evaluation-dimensions-data">Read every dimension score in the table.</a></p>
                 </div>
 
                 <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
+                    <caption id="evaluation-dimensions-data">Holmatro Pentheon and Hurst E3 dimension scores shown in the chart</caption>
                     <thead>
                         <tr>
-                            <th>Dimension</th>
-                            <th class="right">Holmatro (Pentheon)</th>
-                            <th class="right">Hurst (E3)</th>
-                            <th class="right">Δ Delta</th>
+                            <th scope="col">Dimension</th>
+                            <th scope="col" class="right">Holmatro (Pentheon)</th>
+                            <th scope="col" class="right">Hurst (E3)</th>
+                            <th scope="col" class="right">Δ Delta</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -917,9 +919,9 @@
                 <div class="image-caption">Holmatro Pentheon Series — Full product line overview</div>
 
                 <hr class="section-divider">
-                <h2 class="subsection-title">3C. Frontline Tools</h2>
+                <h3 class="subsection-title">3C. Frontline Tools</h3>
 
-                <h3 class="sub-subsection">Spreaders</h3>
+                <h4 class="sub-subsection">Spreaders</h4>
 
                 <div class="winner-banner">
                     <div class="winner-info">
@@ -936,12 +938,12 @@
                 <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead>
                         <tr>
-                            <th>Product</th>
-                            <th>Manufacturer</th>
-                            <th class="right">Score</th>
-                            <th class="right">Capability</th>
-                            <th class="right">Usability</th>
-                            <th class="right">Deploy.</th>
+                            <th scope="col">Product</th>
+                            <th scope="col">Manufacturer</th>
+                            <th scope="col" class="right">Score</th>
+                            <th scope="col" class="right">Capability</th>
+                            <th scope="col" class="right">Usability</th>
+                            <th scope="col" class="right">Deploy.</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -971,17 +973,17 @@
                      onerror="this.style.display='none'">
                 <div class="image-caption">Holmatro PSP40 Spreader — Pentheon Series</div>
 
-                <h3 class="sub-subsection">Cutters</h3>
+                <h4 class="sub-subsection">Cutters</h4>
 
                 <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead>
                         <tr>
-                            <th>Product</th>
-                            <th>Manufacturer</th>
-                            <th class="right">Score</th>
-                            <th class="right">Capability</th>
-                            <th class="right">Usability</th>
-                            <th class="right">Deploy.</th>
+                            <th scope="col">Product</th>
+                            <th scope="col">Manufacturer</th>
+                            <th scope="col" class="right">Score</th>
+                            <th scope="col" class="right">Capability</th>
+                            <th scope="col" class="right">Usability</th>
+                            <th scope="col" class="right">Deploy.</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1011,17 +1013,17 @@
                      onerror="this.style.display='none'">
                 <div class="image-caption">Holmatro PCU30CL Cutter — Pentheon Series</div>
 
-                <h3 class="sub-subsection">Rams</h3>
+                <h4 class="sub-subsection">Rams</h4>
 
                 <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead>
                         <tr>
-                            <th>Product</th>
-                            <th>Manufacturer</th>
-                            <th class="right">Score</th>
-                            <th class="right">Capability</th>
-                            <th class="right">Usability</th>
-                            <th class="right">Deploy.</th>
+                            <th scope="col">Product</th>
+                            <th scope="col">Manufacturer</th>
+                            <th scope="col" class="right">Score</th>
+                            <th scope="col" class="right">Capability</th>
+                            <th scope="col" class="right">Usability</th>
+                            <th scope="col" class="right">Deploy.</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1049,12 +1051,13 @@
                 <div class="chart-section">
                     <div class="chart-title">Frontline Tool Composite Scores — All Categories &amp; Brands</div>
                     <div class="chart-container tall">
-                        <canvas id="frontlineChart"></canvas>
+                        <canvas id="frontlineChart" role="img" aria-label="Frontline tool evaluation scores" aria-describedby="evaluation-frontline-description">Frontline tool evaluation scores</canvas>
                     </div>
+                    <p id="evaluation-frontline-description" class="hub-chart-description">Holmatro scores: spreader 92.02, cutter 88.86, ram 91.29. Hurst scores: spreader 90.99, cutter 82.57, ram 86.02. The chart axis runs from 78 to 95. The preceding Spreader, Cutter, and Ram tables include these composite scores alongside the product and dimension details.</p>
                 </div>
 
                 <hr class="section-divider">
-                <h2 class="subsection-title">3D. Rotary Cut-Off Saws</h2>
+                <h3 class="subsection-title">3D. Rotary Cut-Off Saws</h3>
 
                 <div class="winner-banner">
                     <div class="winner-info">
@@ -1071,10 +1074,10 @@
                 <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead>
                         <tr>
-                            <th>Product</th>
-                            <th>Manufacturer</th>
-                            <th>Blade</th>
-                            <th class="right">Score</th>
+                            <th scope="col">Product</th>
+                            <th scope="col">Manufacturer</th>
+                            <th scope="col">Blade</th>
+                            <th scope="col" class="right">Score</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1110,16 +1113,16 @@
                 <div class="image-caption">DeWalt DCPS612AG2 POWERSHIFT 12-inch Cut-Off Saw</div>
 
                 <hr class="section-divider">
-                <h2 class="subsection-title">3E. Vehicle Stabilization</h2>
+                <h3 class="subsection-title">3E. Vehicle Stabilization</h3>
 
                 <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead>
                         <tr>
-                            <th>Product</th>
-                            <th>Manufacturer</th>
-                            <th>Mechanism</th>
-                            <th>Weight</th>
-                            <th class="right">Score</th>
+                            <th scope="col">Product</th>
+                            <th scope="col">Manufacturer</th>
+                            <th scope="col">Mechanism</th>
+                            <th scope="col">Weight</th>
+                            <th scope="col" class="right">Score</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1165,9 +1168,9 @@
                 </div>
 
                 <hr class="section-divider">
-                <h2 class="subsection-title">3F. Specialty Tools</h2>
+                <h3 class="subsection-title">3F. Specialty Tools</h3>
 
-                <h3 class="sub-subsection">Holmatro T1 — Forcible Entry Tool</h3>
+                <h4 class="sub-subsection">Holmatro T1 — Forcible Entry Tool</h4>
 
                 <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="spec-table">
                     <tbody>
@@ -1183,7 +1186,7 @@
 
                 <p>The T1 is a six-function-in-one tool designed for rapid entry operations. Self-contained — no batteries, no external pump, no hoses. A 30 kg manual force on the pump rod yields up to 14.2 ton hydraulic cutting force. Documented deal-breaker concerns were noted in the workgroup evaluation.</p>
 
-                <h3 class="sub-subsection">Hurst M40 — 40-inch Spreader (Supplemental)</h3>
+                <h4 class="sub-subsection">Hurst M40 — 40-inch Spreader (Supplemental)</h4>
 
                 <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="spec-table">
                     <tbody>
@@ -1205,11 +1208,11 @@
 
             <!-- ══ SECTION 4: Findings ══ -->
             <section class="section" id="sec4">
-                <h1 class="section-title"><span class="section-num">4</span> Findings</h1>
+                <h2 class="section-title"><span class="section-num">4</span> Findings</h2>
 
-                <h2 class="subsection-title">4A. Top Performers</h2>
+                <h3 class="subsection-title">4A. Top Performers</h3>
 
-                <h3 class="sub-subsection">Top 2 Brands — Frontline Hydraulic Tools</h3>
+                <h4 class="sub-subsection">Top 2 Brands — Frontline Hydraulic Tools</h4>
 
                 <div class="winner-banner">
                     <div class="winner-info">
@@ -1235,15 +1238,15 @@
                     </div>
                 </div>
 
-                <h3 class="sub-subsection">Top Tool Per Category</h3>
+                <h4 class="sub-subsection">Top Tool Per Category</h4>
 
                 <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead>
                         <tr>
-                            <th>Category</th>
-                            <th>Top Tool</th>
-                            <th>Manufacturer</th>
-                            <th class="right">Score</th>
+                            <th scope="col">Category</th>
+                            <th scope="col">Top Tool</th>
+                            <th scope="col">Manufacturer</th>
+                            <th scope="col" class="right">Score</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1284,15 +1287,15 @@
                      alt="Workgroup Top Performer Analysis"
                      onerror="this.style.display='none'">
 
-                <h2 class="subsection-title">4B. Cross-Category Insights</h2>
+                <h3 class="subsection-title">4B. Cross-Category Insights</h3>
 
-                <h3 class="sub-subsection">Ergonomics as a Performance Driver</h3>
+                <h4 class="sub-subsection">Ergonomics as a Performance Driver</h4>
                 <p>Across all categories, products with superior ergonomic design consistently scored higher. Holmatro's 360-degree inline control handle contributed to a <strong>93.99 Usability score</strong> — the highest dimension score in the entire dataset. The DeWalt saw's gear-driven design similarly delivered category dominance despite a smaller blade diameter.</p>
 
-                <h3 class="sub-subsection">Deployment Speed Impact</h3>
+                <h4 class="sub-subsection">Deployment Speed Impact</h4>
                 <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead>
-                        <tr><th>Category</th><th>Key Deployment Differentiator</th><th class="right">Score Advantage</th></tr>
+                        <tr><th scope="col">Category</th><th scope="col">Key Deployment Differentiator</th><th scope="col" class="right">Score Advantage</th></tr>
                     </thead>
                     <tbody>
                         <tr>
@@ -1313,10 +1316,10 @@
                     </tbody>
                 </table></div>
 
-                <h3 class="sub-subsection">Tool Weight vs. Performance Correlation</h3>
+                <h4 class="sub-subsection">Tool Weight vs. Performance Correlation</h4>
                 <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead>
-                        <tr><th>Product</th><th class="right">Weight (lbs)</th><th class="right">Score</th></tr>
+                        <tr><th scope="col">Product</th><th scope="col" class="right">Weight (lbs)</th><th scope="col" class="right">Score</th></tr>
                     </thead>
                     <tbody>
                         <tr><td>Holmatro PRA40 (Ram)</td><td class="right">31.1</td><td class="right"><span class="score-badge score-elite">91.29</span></td></tr>
@@ -1330,14 +1333,14 @@
 
             <!-- ══ SECTION 5: Controlled Considerations ══ -->
             <section class="section" id="sec5">
-                <h1 class="section-title"><span class="section-num">5</span> Controlled Considerations</h1>
+                <h2 class="section-title"><span class="section-num">5</span> Controlled Considerations</h2>
 
                 <div class="callout note">
                     <div class="callout-label">Scope Note</div>
                     This section contains <strong>descriptive analysis only</strong> — no recommendations, no procurement language, no purchasing strategies. Per workgroup protocol.
                 </div>
 
-                <h2 class="subsection-title">T1 Tool — Rabbit Tool Replacement Analysis</h2>
+                <h3 class="subsection-title">T1 Tool — Rabbit Tool Replacement Analysis</h3>
 
                 <p>The Holmatro T1 Forcible Entry Tool (composite score: <strong>82.23</strong>) was evaluated specifically as a <strong>potential replacement for the traditional rabbit tool</strong> (halligan bar/flathead axe combination) in forced-entry operations.</p>
 
@@ -1366,7 +1369,7 @@
                     </tbody>
                 </table></div>
 
-                <h2 class="subsection-title">M40 — 300's Truck Supplemental Deployment</h2>
+                <h3 class="subsection-title">M40 — 300's Truck Supplemental Deployment</h3>
 
                 <p>The Hurst M40 (40-inch Spreader, composite score: <strong>78.80</strong>) was evaluated as a <strong>supplemental heavy-duty spreader</strong> to be deployed on dedicated apparatus — specifically <strong>300's new truck</strong> — in addition to the standard frontline extrication set.</p>
 
@@ -1377,7 +1380,7 @@
 
             <!-- ══ APPENDIX ══ -->
             <section class="section" id="appendix">
-                <h1 class="section-title"><span class="section-num">A</span> Appendix: Data Source Verification</h1>
+                <h2 class="section-title"><span class="section-num">A</span> Appendix: Data Source Verification</h2>
 
                 <div class="callout note">
                     <div class="callout-label">Data Integrity</div>
@@ -1388,11 +1391,11 @@
                 <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead>
                         <tr>
-                            <th>Row</th>
-                            <th>Product</th>
-                            <th>Category</th>
-                            <th>Manufacturer</th>
-                            <th class="right">Score</th>
+                            <th scope="col">Row</th>
+                            <th scope="col">Product</th>
+                            <th scope="col">Category</th>
+                            <th scope="col">Manufacturer</th>
+                            <th scope="col" class="right">Score</th>
                         </tr>
                     </thead>
                     <tbody>

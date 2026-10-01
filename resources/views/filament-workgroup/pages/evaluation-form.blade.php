@@ -1,9 +1,9 @@
-<x-filament-panels::page>
+<x-filament-panels::page data-hub-ui="2" data-hub-portal="workgroups">
     <form wire:submit.prevent="submitEvaluation">
         {{ $this->form }}
 
         @if(!$isReadOnly)
-            <div class="mt-6 flex flex-wrap gap-3">
+            <div class="wg-evaluation-actions mt-6 flex flex-wrap gap-3">
                 <x-filament::button wire:click="setAllHighest" color="warning" type="button">
                     Set All to Highest
                 </x-filament::button>

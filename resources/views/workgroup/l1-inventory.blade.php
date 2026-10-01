@@ -20,7 +20,7 @@
     </style>
     @vite(['resources/css/app.css', 'resources/js/workgroup-l1-inventory.jsx'])
 </head>
-<body class="hub-report hub-report--l1-inventory">
+<body data-hub-ui="2" data-hub-portal="report" class="hub-report hub-report--l1-inventory">
     <div class="hub-report-navigation"><x-hub-header back-href="/workgroups/links" back-label="Back to Workgroup Links" max-width="max-w-7xl" /></div>
     <div id="root"></div>
 

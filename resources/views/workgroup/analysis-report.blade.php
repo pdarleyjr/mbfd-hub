@@ -87,7 +87,7 @@
     </style>
     @vite(['resources/css/app.css'])
 </head>
-<body class="hub-report hub-report--analysis-report antialiased selection:bg-[#00B4D8] selection:text-white">
+<body data-hub-ui="2" data-hub-portal="report" class="hub-report hub-report--analysis-report antialiased selection:bg-[#00B4D8] selection:text-white">
     <div class="hub-report-navigation"><x-hub-header back-href="/workgroups/links" back-label="Back to Workgroup Links" max-width="max-w-7xl" /></div>
 
     <!-- Navigation -->
@@ -96,7 +96,7 @@
             <div class="flex items-center gap-4">
                 <div class="icon-box">&#9881;</div>
                 <div>
-                    <h1 class="text-xl md:text-2xl text-white tracking-widest leading-none">TECHNICAL EVALUATION <span class="text-[#00B4D8]">COMMAND</span></h1>
+                    <p class="text-xl md:text-2xl text-white tracking-widest leading-none">TECHNICAL EVALUATION <span class="text-[#00B4D8]">COMMAND</span></p>
                     <span class="text-xs text-[#48E5C2] tracking-widest font-mono">Q1 2026 WORKGROUP REPORT</span>
                 </div>
             </div>
@@ -161,7 +161,20 @@
 
             <div class="glass-panel p-6 md:p-8">
                 <div class="chart-container">
-                    <canvas id="brandChart"></canvas>
+                    <canvas id="brandChart" role="img" aria-label="Manufacturer performance comparison" aria-describedby="analysis-brand-description">Manufacturer performance comparison</canvas>
+                </div>
+                <p id="analysis-brand-description" class="hub-chart-description">Technical performance scores for the three frontline tool categories: Holmatro 90.72, Hurst 86.53, TNT 75.12, and Amkus 73.56. The chart axis runs from 65 to 95; the complete values are listed below.</p>
+                <div class="hub-chart-data" tabindex="0" role="region" aria-label="Manufacturer performance chart data">
+                    <table>
+                        <caption>Manufacturer technical performance scores</caption>
+                        <thead><tr><th scope="col">Manufacturer</th><th scope="col">Score</th></tr></thead>
+                        <tbody>
+                            <tr><th scope="row">Holmatro</th><td>90.72</td></tr>
+                            <tr><th scope="row">Hurst</th><td>86.53</td></tr>
+                            <tr><th scope="row">TNT</th><td>75.12</td></tr>
+                            <tr><th scope="row">Amkus</th><td>73.56</td></tr>
+                        </tbody>
+                    </table>
                 </div>
                 <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="bg-[#0B132B]/50 p-5 rounded-lg border-l-4 border-l-[#48E5C2]">
@@ -191,7 +204,19 @@
 
             <div class="glass-panel p-6 md:p-8">
                 <div class="chart-container-large">
-                    <canvas id="toolsCategoryChart"></canvas>
+                    <canvas id="toolsCategoryChart" role="img" aria-label="Tool category performance comparison" aria-describedby="analysis-tools-description">Tool category performance comparison</canvas>
+                </div>
+                <p id="analysis-tools-description" class="hub-chart-description">Composite scores compare four manufacturers across 32-inch spreaders, cutters, and rams. Holmatro has the highest score in each category. The chart axis runs from 60 to 100; every plotted score appears in the table.</p>
+                <div class="hub-chart-data" tabindex="0" role="region" aria-label="Frontline tool chart data">
+                    <table>
+                        <caption>Frontline tool composite scores by manufacturer</caption>
+                        <thead><tr><th scope="col">Tool category</th><th scope="col">Holmatro</th><th scope="col">Hurst</th><th scope="col">TNT</th><th scope="col">Amkus</th></tr></thead>
+                        <tbody>
+                            <tr><th scope="row">32-inch spreader</th><td>92.02</td><td>90.99</td><td>81.10</td><td>78.91</td></tr>
+                            <tr><th scope="row">Cutter</th><td>88.86</td><td>82.57</td><td>67.11</td><td>74.73</td></tr>
+                            <tr><th scope="row">Ram</th><td>91.29</td><td>86.02</td><td>78.31</td><td>72.29</td></tr>
+                        </tbody>
+                    </table>
                 </div>
                 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-10">
@@ -228,7 +253,19 @@
                     Workgroup evaluation of battery-operated rotary cut-off saws for rapid breaching, concrete, and metal cutting. The assessment revealed a massive divergence in operational effectiveness between the leading 12-inch platform and competing 14-inch models.
                 </p>
                 <div class="chart-container">
-                    <canvas id="sawsChart"></canvas>
+                    <canvas id="sawsChart" role="img" aria-label="Cut-off saw evaluation scores" aria-describedby="analysis-saws-description">Cut-off saw evaluation scores</canvas>
+                </div>
+                <p id="analysis-saws-description" class="hub-chart-description">Technical scores on a 0–100 chart scale: DeWalt 12-inch DCPS612AG2, 91.25; Makita 14-inch GEC01PL4, 64.83; Husqvarna 14-inch K1 Pace, 61.78.</p>
+                <div class="hub-chart-data" tabindex="0" role="region" aria-label="Cut-off saw chart data">
+                    <table>
+                        <caption>Cut-off saw technical scores</caption>
+                        <thead><tr><th scope="col">Saw</th><th scope="col">Score</th></tr></thead>
+                        <tbody>
+                            <tr><th scope="row">DeWalt 12-inch DCPS612AG2</th><td>91.25</td></tr>
+                            <tr><th scope="row">Makita 14-inch GEC01PL4</th><td>64.83</td></tr>
+                            <tr><th scope="row">Husqvarna 14-inch K1 Pace</th><td>61.78</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 

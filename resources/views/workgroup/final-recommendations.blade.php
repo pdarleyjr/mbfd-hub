@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MBFD Workgroup Final Recommendations — Final Equipment Selection &amp; Implementation Report</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <style>
         :root {
@@ -31,7 +29,7 @@
         }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+            font-family: var(--hub-font-sans);
             background: var(--slate-100);
             color: #1a202c;
             font-size: 15px;
@@ -137,16 +135,16 @@
         /* ── SECTIONS ── */
         .section { margin-bottom: 2.5rem; }
         .section + .section { border-top: 1px solid var(--slate-200); padding-top: 2.5rem; }
-        h1.section-title {
+        .section-title {
             font-size: 1.5rem; font-weight: 800; color: var(--navy);
             display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem;
         }
-        h1.section-title .section-num {
+        .section-title .section-num {
             background: var(--red); color: white; width: 2rem; height: 2rem;
             border-radius: 0.375rem; display: flex; align-items: center; justify-content: center;
             font-size: 0.875rem; font-weight: 700; flex-shrink: 0;
         }
-        h2.subsection-title {
+        .subsection-title {
             font-size: 1.0625rem; font-weight: 700; color: var(--navy-mid);
             margin: 1.5rem 0 0.75rem; padding-bottom: 0.5rem;
             border-bottom: 2px solid var(--slate-200);
@@ -298,7 +296,7 @@
             .section + .section { page-break-inside: avoid; }
             .selection-card { page-break-inside: avoid; }
             .data-table { page-break-inside: avoid; }
-            h1.section-title, h2.subsection-title { page-break-after: avoid; }
+            .section-title, .subsection-title { page-break-after: avoid; }
             .report-image { max-height: 260px; }
             @@page { margin: 0.75in; size: letter; }
         }
@@ -312,7 +310,7 @@
     </style>
     @vite(['resources/css/app.css'])
 </head>
-<body class="hub-report hub-report--final-recommendations">
+<body data-hub-ui="2" data-hub-portal="report" class="hub-report hub-report--final-recommendations">
     <div class="hub-report-navigation"><x-hub-header back-href="/workgroups/links" back-label="Back to Workgroup Links" max-width="max-w-7xl" /></div>
 
     <!-- Print Bar -->
@@ -366,10 +364,10 @@
                 <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table" style="margin:0; border:none;">
                     <thead>
                         <tr>
-                            <th>Category</th>
-                            <th>Selected Equipment</th>
-                            <th>Platform</th>
-                            <th>Status</th>
+                            <th scope="col">Category</th>
+                            <th scope="col">Selected Equipment</th>
+                            <th scope="col">Platform</th>
+                            <th scope="col">Status</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -403,7 +401,7 @@
 
             <!-- ══ SEC 1: Executive Summary ══ -->
             <section class="section" id="sec1">
-                <h1 class="section-title"><span class="section-num">1</span> Executive Summary</h1>
+                <h2 class="section-title"><span class="section-num">1</span> Executive Summary</h2>
                 <p>This report documents the <strong>final outcome</strong> of the Miami Beach Fire Department Mid-Mount Ladder Workgroup evaluation process (Q1 2026). Following structured multi-day evaluations of hydraulic rescue tools, cut-off saws, vehicle stabilization systems, and specialty tools, the workgroup has reached consensus on final equipment selections.</p>
 
                 <div class="callout success">
@@ -416,7 +414,7 @@
 
             <!-- ══ SEC 2: Final Selections ══ -->
             <section class="section" id="sec-selections">
-                <h1 class="section-title"><span class="section-num">2</span> Final Equipment Selections</h1>
+                <h2 class="section-title"><span class="section-num">2</span> Final Equipment Selections</h2>
 
                 <!-- Cut-Off Saw -->
                 <div class="selection-card">
@@ -486,7 +484,7 @@
                         <img class="report-image" src="/workgroup-report/images/Holmatro Pentheon Series USA-1_p10_i1.png"
                              alt="Extrication Tool System" onerror="this.style.display='none'">
                         <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table" style="margin-top:0.75rem;">
-                            <thead><tr><th>Tool</th><th>Model</th><th>Role</th><th class="right">Score</th></tr></thead>
+                            <thead><tr><th scope="col">Tool</th><th scope="col">Model</th><th scope="col">Role</th><th scope="col" class="right">Score</th></tr></thead>
                             <tbody>
                                 <tr><td>Spreader</td><td><strong>SP 777 E3 Connect</strong></td><td>Primary spreading</td><td class="right"><span class="score-badge score-elite">90.99</span></td></tr>
                                 <tr><td>Cutter</td><td><strong>S 789 E3 Connect</strong></td><td>Primary cutting</td><td class="right"><span class="score-badge score-high">82.57</span></td></tr>
@@ -560,7 +558,7 @@
 
             <!-- ══ SEC 3: Deployment Strategy ══ -->
             <section class="section" id="sec-deployment">
-                <h1 class="section-title"><span class="section-num">3</span> Apparatus Deployment Strategy</h1>
+                <h2 class="section-title"><span class="section-num">3</span> Apparatus Deployment Strategy</h2>
 
                 <p>The workgroup has established a tiered deployment model to ensure full operational independence across all rescue scenarios.</p>
 
@@ -580,7 +578,7 @@
                     </div>
                     <div class="tier-body">
                         <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table" style="margin:0;">
-                            <thead><tr><th>Equipment</th><th>Deployment Role</th></tr></thead>
+                            <thead><tr><th scope="col">Equipment</th><th scope="col">Deployment Role</th></tr></thead>
                             <tbody>
                                 <tr><td><strong>Hurst SP 777 E3 Connect Spreader</strong></td><td>Primary extrication spreading</td></tr>
                                 <tr><td><strong>Hurst S 789 E3 Connect Cutter</strong></td><td>Primary extrication cutting</td></tr>
@@ -606,7 +604,7 @@
                     </div>
                     <div class="tier-body">
                         <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table" style="margin:0;">
-                            <thead><tr><th>Equipment</th><th>Deployment Role</th></tr></thead>
+                            <thead><tr><th scope="col">Equipment</th><th scope="col">Deployment Role</th></tr></thead>
                             <tbody>
                                 <tr><td><strong>Hurst M40 40" Spreader</strong></td><td>Heavy extrication capability</td></tr>
                                 <tr><td><strong>2 × CAPTIUM Batteries</strong></td><td>Extended power supply</td></tr>
@@ -636,9 +634,9 @@
 
             <!-- ══ SEC 4: Training & Implementation ══ -->
             <section class="section" id="sec-training">
-                <h1 class="section-title"><span class="section-num">4</span> Training &amp; In-Service Implementation Plan</h1>
+                <h2 class="section-title"><span class="section-num">4</span> Training &amp; In-Service Implementation Plan</h2>
 
-                <h2 class="subsection-title">Train-the-Trainer Model</h2>
+                <h3 class="subsection-title">Train-the-Trainer Model</h3>
                 <p>Workgroup members who participated in the evaluation process will serve as <strong>subject matter experts (SMEs)</strong> and lead departmental training.</p>
 
                 <div class="phases">
@@ -678,7 +676,7 @@
                     </div>
                 </div>
 
-                <h2 class="subsection-title">Ladder Truck In-Service Training Requirements</h2>
+                <h3 class="subsection-title">Ladder Truck In-Service Training Requirements</h3>
 
                 <div class="callout warning">
                     <div class="callout-label">Mandatory Requirement</div>
@@ -686,7 +684,7 @@
                 </div>
 
                 <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
-                    <thead><tr><th>Training Component</th><th>Requirement</th></tr></thead>
+                    <thead><tr><th scope="col">Training Component</th><th scope="col">Requirement</th></tr></thead>
                     <tbody>
                         <tr><td><strong>Driving Operations</strong></td><td>Full certification on mid-mount ladder configuration</td></tr>
                         <tr><td><strong>Pumping Operations</strong></td><td>Operational proficiency on all pump functions</td></tr>
@@ -695,12 +693,12 @@
                     </tbody>
                 </table></div>
 
-                <h2 class="subsection-title">Ongoing Workgroup Involvement</h2>
+                <h3 class="subsection-title">Ongoing Workgroup Involvement</h3>
 
                 <p>The Mid-Mount Ladder Workgroup remains <strong>active through full implementation</strong> of the selected equipment.</p>
 
                 <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
-                    <thead><tr><th>Function</th><th>Description</th></tr></thead>
+                    <thead><tr><th scope="col">Function</th><th scope="col">Description</th></tr></thead>
                     <tbody>
                         <tr><td><strong>Procurement Tracking</strong></td><td>Monitor status of all equipment orders</td></tr>
                         <tr><td><strong>Delivery Coordination</strong></td><td>Coordinate receipt and initial inspection</td></tr>
@@ -713,13 +711,13 @@
 
             <!-- ══ SEC 5: Justification ══ -->
             <section class="section" id="sec3">
-                <h1 class="section-title"><span class="section-num">5</span> Justification for Selection</h1>
+                <h2 class="section-title"><span class="section-num">5</span> Justification for Selection</h2>
 
-                <h2 class="subsection-title">Evaluation Framework</h2>
+                <h3 class="subsection-title">Evaluation Framework</h3>
                 <p>The workgroup evaluation employed a standardized scoring model across all 14 products. Four scoring dimensions were applied consistently:</p>
 
                 <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
-                    <thead><tr><th>Dimension</th><th>Description</th></tr></thead>
+                    <thead><tr><th scope="col">Dimension</th><th scope="col">Description</th></tr></thead>
                     <tbody>
                         <tr><td><strong>Capability</strong></td><td>Raw performance metrics — force output, cutting capacity, spreading distance</td></tr>
                         <tr><td><strong>Usability</strong></td><td>Ergonomic design, control interface, operator comfort under sustained use</td></tr>
@@ -728,26 +726,43 @@
                     </tbody>
                 </table></div>
 
-                <h2 class="subsection-title">Brand Performance Context</h2>
+                <h3 class="subsection-title">Brand Performance Context</h3>
 
                 <div class="chart-section">
                     <div class="chart-title">Brand Average Composite Scores — Final Selection Context</div>
                     <div class="chart-container">
-                        <canvas id="brandChart"></canvas>
+                        <canvas id="brandChart" role="img" aria-label="Manufacturer performance comparison" aria-describedby="recommendations-brand-description">Manufacturer performance comparison</canvas>
                     </div>
+                    <p id="recommendations-brand-description" class="hub-chart-description">Average composite scores across the report's evaluated products: DeWalt 91.25, Holmatro 87.93, Hurst 84.60, Paratech 76.13, Makita 64.83, and Husqvarna 61.78. The chart axis runs from 50 to 100.</p>
+                </div>
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Brand average chart data">
+                    <table class="data-table">
+                        <caption>Brand average composite scores shown in the chart</caption>
+                        <thead><tr><th scope="col">Brand</th><th scope="col" class="right">Average composite score</th></tr></thead>
+                        <tbody>
+                            <tr><th scope="row">DeWalt</th><td class="right">91.25</td></tr>
+                            <tr><th scope="row">Holmatro</th><td class="right">87.93</td></tr>
+                            <tr><th scope="row">Hurst</th><td class="right">84.60</td></tr>
+                            <tr><th scope="row">Paratech</th><td class="right">76.13</td></tr>
+                            <tr><th scope="row">Makita</th><td class="right">64.83</td></tr>
+                            <tr><th scope="row">Husqvarna</th><td class="right">61.78</td></tr>
+                        </tbody>
+                    </table>
                 </div>
 
-                <h2 class="subsection-title">Frontline Tool Dimension Comparison</h2>
+                <h3 class="subsection-title">Frontline Tool Dimension Comparison</h3>
 
                 <div class="chart-section">
                     <div class="chart-title">Four-Dimension Breakdown — Holmatro Pentheon vs. Hurst E3</div>
                     <div class="chart-container">
-                        <canvas id="dimensionChart"></canvas>
+                        <canvas id="dimensionChart" role="img" aria-label="Comparison across evaluation dimensions" aria-describedby="recommendations-dimensions-description">Comparison across evaluation dimensions</canvas>
                     </div>
+                    <p id="recommendations-dimensions-description" class="hub-chart-description">Holmatro Pentheon has higher scores than Hurst E3 in all four dimensions; the largest difference is Usability, 93.99 compared with 85.76. The chart axis runs from 75 to 100. <a href="#recommendations-dimensions-data">Read every dimension score in the table.</a></p>
                 </div>
 
                 <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
-                    <thead><tr><th>Dimension</th><th class="right">Holmatro</th><th class="right">Hurst</th><th class="right">Δ Delta</th></tr></thead>
+                    <caption id="recommendations-dimensions-data">Holmatro Pentheon and Hurst E3 dimension scores shown in the chart</caption>
+                    <thead><tr><th scope="col">Dimension</th><th scope="col" class="right">Holmatro</th><th scope="col" class="right">Hurst</th><th scope="col" class="right">Δ Delta</th></tr></thead>
                     <tbody>
                         <tr><td><strong>Capability</strong></td><td class="right">89.41</td><td class="right">87.56</td><td class="right" style="color:var(--emerald)">+1.85</td></tr>
                         <tr><td><strong>Usability</strong></td><td class="right">93.99</td><td class="right">85.76</td><td class="right" style="color:var(--emerald)">+8.23</td></tr>
@@ -756,13 +771,25 @@
                     </tbody>
                 </table></div>
 
-                <h2 class="subsection-title">Frontline Tool Scores — Final Selection Context</h2>
+                <h3 class="subsection-title">Frontline Tool Scores — Final Selection Context</h3>
 
                 <div class="chart-section">
                     <div class="chart-title">Composite Scores — All Frontline Tools</div>
                     <div class="chart-container tall">
-                        <canvas id="frontlineChart"></canvas>
+                        <canvas id="frontlineChart" role="img" aria-label="Frontline tool evaluation scores" aria-describedby="recommendations-frontline-description">Frontline tool evaluation scores</canvas>
                     </div>
+                    <p id="recommendations-frontline-description" class="hub-chart-description">Holmatro and Hurst composite scores are compared for spreaders, cutters, and rams. The chart axis runs from 78 to 95; all six scores appear in the table below.</p>
+                </div>
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Frontline tool chart data">
+                    <table class="data-table">
+                        <caption>Frontline tool composite scores shown in the chart</caption>
+                        <thead><tr><th scope="col">Tool category</th><th scope="col" class="right">Holmatro</th><th scope="col" class="right">Hurst</th></tr></thead>
+                        <tbody>
+                            <tr><th scope="row">Spreader</th><td class="right">92.02</td><td class="right">90.99</td></tr>
+                            <tr><th scope="row">Cutter</th><td class="right">88.86</td><td class="right">82.57</td></tr>
+                            <tr><th scope="row">Ram</th><td class="right">91.29</td><td class="right">86.02</td></tr>
+                        </tbody>
+                    </table>
                 </div>
 
                 <div class="image-grid">
@@ -781,13 +808,13 @@
 
             <!-- ══ SEC 6: Workgroup Determinations ══ -->
             <section class="section" id="sec4">
-                <h1 class="section-title"><span class="section-num">6</span> Workgroup Determinations</h1>
+                <h2 class="section-title"><span class="section-num">6</span> Workgroup Determinations</h2>
 
-                <h2 class="subsection-title">Final Selected Equipment — Per Category</h2>
+                <h3 class="subsection-title">Final Selected Equipment — Per Category</h3>
 
                 <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead>
-                        <tr><th>Category</th><th>Selected Tool</th><th>Manufacturer</th><th class="right">Score</th></tr>
+                        <tr><th scope="col">Category</th><th scope="col">Selected Tool</th><th scope="col">Manufacturer</th><th scope="col" class="right">Score</th></tr>
                     </thead>
                     <tbody>
                         <tr><td>Spreaders</td><td><strong>Holmatro PSP40</strong></td><td><span class="brand-pill">Holmatro</span></td><td class="right"><span class="score-badge score-elite">92.02</span></td></tr>
@@ -802,10 +829,10 @@
                      alt="Workgroup Final Selection Performance Data"
                      onerror="this.style.display='none'">
 
-                <h2 class="subsection-title">Cross-Category Insights</h2>
+                <h3 class="subsection-title">Cross-Category Insights</h3>
 
                 <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
-                    <thead><tr><th>Category</th><th>Key Differentiator</th><th class="right">Advantage</th></tr></thead>
+                    <thead><tr><th scope="col">Category</th><th scope="col">Key Differentiator</th><th scope="col" class="right">Advantage</th></tr></thead>
                     <tbody>
                         <tr><td>Saws</td><td>Gear-driven instant-start + 3-second electric brake (DeWalt)</td><td class="right" style="color:var(--emerald)">+26.42 to +29.47 pts</td></tr>
                         <tr><td>Frontline Tools</td><td>On-Tool Charging + cordless auto start/stop (Holmatro)</td><td class="right" style="color:var(--emerald)">+6.95 pts Deployability</td></tr>
@@ -816,14 +843,14 @@
 
             <!-- ══ SEC 7: Implementation Notes ══ -->
             <section class="section" id="sec5">
-                <h1 class="section-title"><span class="section-num">7</span> Implementation Notes — Specialty Tools</h1>
+                <h2 class="section-title"><span class="section-num">7</span> Implementation Notes — Specialty Tools</h2>
 
                 <div class="callout note">
                     <div class="callout-label">Scope Note</div>
                     This section contains <strong>descriptive justification only</strong> — no speculation, no procurement language beyond approved selections.
                 </div>
 
-                <h2 class="subsection-title">T1 Tool — Rabbit Tool Trial</h2>
+                <h3 class="subsection-title">T1 Tool — Rabbit Tool Trial</h3>
                 <p>The Holmatro T1 (score: <strong>82.23</strong>) is authorized on trial as a potential replacement for the traditional rabbit tool. Key comparisons:</p>
 
                 <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="spec-table">
@@ -835,7 +862,7 @@
                     </tbody>
                 </table></div>
 
-                <h2 class="subsection-title">M40 — 300's Truck Assignment</h2>
+                <h3 class="subsection-title">M40 — 300's Truck Assignment</h3>
                 <p>The Hurst M40 (score: <strong>78.80</strong>) is assigned to <strong>300's new truck</strong> (currently at Fleet for emergency lighting installation). The M40's 40-inch spread exceeds standard 32-inch parameters for heavy rescue scenarios.</p>
 
                 <div class="callout warning">
@@ -846,7 +873,7 @@
 
             <!-- ══ APPENDIX ══ -->
             <section class="section" id="appendix">
-                <h1 class="section-title"><span class="section-num">A</span> Appendix: Data Source Verification</h1>
+                <h2 class="section-title"><span class="section-num">A</span> Appendix: Data Source Verification</h2>
 
                 <div class="callout note">
                     <div class="callout-label">Data Integrity</div>
@@ -854,7 +881,7 @@
                 </div>
 
                 <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
-                    <thead><tr><th>Row</th><th>Product</th><th>Category</th><th>Manufacturer</th><th class="right">Score</th></tr></thead>
+                    <thead><tr><th scope="col">Row</th><th scope="col">Product</th><th scope="col">Category</th><th scope="col">Manufacturer</th><th scope="col" class="right">Score</th></tr></thead>
                     <tbody>
                         <tr><td>2</td><td>Holmatro PSP40 (32-inch Spreader)</td><td>Hydraulic Tool</td><td><span class="brand-pill">Holmatro</span></td><td class="right"><span class="score-badge score-elite">92.02</span></td></tr>
                         <tr><td>3</td><td>Holmatro PCU30CL (Cutter)</td><td>Hydraulic Tool</td><td><span class="brand-pill">Holmatro</span></td><td class="right"><span class="score-badge score-elite">88.86</span></td></tr>

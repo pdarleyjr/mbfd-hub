@@ -1,4 +1,4 @@
-<x-filament-panels::page>
+<x-filament-panels::page data-hub-ui="2" data-hub-portal="workgroups">
     {{-- Admin Stats Overview --}}
     @if(!empty($stats))
     <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); gap: 0.875rem; margin-bottom: 1.5rem;">

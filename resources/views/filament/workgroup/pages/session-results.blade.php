@@ -1,4 +1,4 @@
-<x-filament-panels::page class="wg-session-results">
+<x-filament-panels::page class="wg-session-results" data-hub-ui="2" data-hub-portal="workgroups">
     <style>
         .wg-session-results .wg-ai-panel-header,
         .wg-session-results .wg-saver-header { flex-wrap: wrap; }
