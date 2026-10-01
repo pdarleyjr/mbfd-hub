@@ -333,6 +333,10 @@
     line-height: 1.5;
 }
 
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-ta-placeholder {
+    color: rgb(var(--hub2-n-600));
+}
+
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-ta-row:focus-within {
     background: rgb(var(--hub2-action-tint));
 }

@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { protectedUiInventoryEnvironment } from '../../playwright.protected-ui-inventory.config';
+import { guardUiRendering, waitForUiRendering } from './support/ui-readonly';
 
 type Entry = { route: string; name: string; panel: string | null; scope: string; parent: string; route_name: string | null };
 const catalog = JSON.parse(readFileSync(resolve('tests/e2e/support/protected-ui-inventory.json'), 'utf8')) as { pages: Entry[] };
@@ -106,9 +107,12 @@ test('inventory records every route and renders available protected surfaces at 
   };
   const guestContext = await browser.newContext({ storageState: { cookies: [], origins: [] }, serviceWorkers });
   const onboardingContext = await browser.newContext({ storageState: 'test-results/protected-ui-auth/onboarding-state.json', serviceWorkers });
+  // Only these source-defined push settings pages exercise native registration.
+  const pushSettingsContext = await browser.newContext({ storageState: 'test-results/protected-ui-auth/state.json', serviceWorkers: 'allow' });
   const authenticatedPage = await context.newPage();
   const guestPage = await guestContext.newPage();
   const onboardingPage = await onboardingContext.newPage();
+  const pushSettingsPage = await pushSettingsContext.newPage();
   let page = authenticatedPage;
   const links = new Set<string>();
   const resumeFile = process.env.PROTECTED_UI_INVENTORY_RESUME_FILE;
@@ -124,8 +128,8 @@ test('inventory records every route and renders available protected surfaces at 
   let consoleMessages: { type: string; text: string; url: string; classification: string }[] = [];
   let resourceFailures: { url: string; detail: string; classification: string }[] = [];
   let serverUnavailable = false;
-  for (const currentContext of [context, guestContext, onboardingContext]) currentContext.setDefaultTimeout(5_000);
-  for (const currentPage of [authenticatedPage, guestPage, onboardingPage]) {
+  for (const currentContext of [context, guestContext, onboardingContext, pushSettingsContext]) currentContext.setDefaultTimeout(5_000);
+  for (const currentPage of [authenticatedPage, guestPage, onboardingPage, pushSettingsPage]) {
     currentPage.on('pageerror', error => browserErrors.push(error.message));
     currentPage.on('console', message => {
       if (['error', 'warning'].includes(message.type())) consoleMessages.push({ type: message.type(), text: message.text(), url: message.location().url,
@@ -137,29 +141,9 @@ test('inventory records every route and renders available protected surfaces at 
       if (response.status() >= 400) resourceFailures.push({ url: response.url(), detail: `HTTP ${response.status()}`, classification: 'HTTP_ERROR' });
     });
   }
-  for (const currentContext of [context, guestContext, onboardingContext]) await currentContext.route('**/*', async route => {
-    const request = route.request();
-    const url = new URL(request.url());
-    if (request.isNavigationRequest() && url.origin !== origin) {
-      blockedRequests.push(`External navigation: ${url.origin}${url.pathname}`);
-      return route.abort('blockedbyclient');
-    }
-    if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method())) {
-      const payload = url.origin === origin && url.pathname === '/livewire/update' ? request.postDataJSON() : null;
-      const components = payload?.components;
-      const readOnlyRenderLoad = Array.isArray(components) && components.length > 0 && components.every(component => {
-        const componentName = JSON.parse(component.snapshot || '{}').memo?.name || '';
-        return Object.keys(component.updates || {}).length === 0 && Array.isArray(component.calls)
-          && component.calls.length > 0 && component.calls.every(call => ['loadTable', '__lazyLoad', 'getFormUploadedFiles'].includes(call.method)
-            || (call.method === '$refresh' && componentName.startsWith('pulse.'))
-            || (call.method === 'loadAiReport' && componentName.endsWith('session-results-page') && new URL(currentContext.pages()[0]?.url() || origin).pathname === '/workgroups/session-results'));
-      });
-      if (!readOnlyRenderLoad) {
-        blockedRequests.push(`${request.method()} ${url.pathname}: ${components?.flatMap(component => component.calls?.map(call => call.method) || []).join(',') || 'non-read request'}`);
-        return route.abort('blockedbyclient');
-      }
-    }
-    return route.continue();
+  for (const currentContext of [context, guestContext, onboardingContext, pushSettingsContext]) await guardUiRendering(currentContext, origin, {
+    allowDisabledAiReport: true,
+    onBlocked: description => blockedRequests.push(description),
   });
 
   const priority = (entry: Entry) => /analysis-report|final-presentation|saver-report|^\/member-onboarding$/.test(entry.route) ? -1 : Number(/[{:]/.test(entry.route));
@@ -174,6 +158,7 @@ test('inventory records every route and renders available protected surfaces at 
       tables: 'Rendered table bounds, or their native auto/scroll viewport, must fit within 1px of the document viewport without a hidden/clip ancestor cutting them. This is CSS geometry evidence, not a keyboard/touch scrolling test.',
     },
     baseline: 'Candidate working tree', widths, expectedRoutes: catalog.pages.length,
+    discoveredInternalLinks: [...links].sort(),
     sourceClassification: catalog.pages.map(entry => ({ route: entry.route, ...structuralClassification(entry),
       fixtureRouteMapped: Boolean(fixtureRoutes[entry.route]), sessionFixture: entry.route === '/member-onboarding' ? 'onboarding-state.json' : null, dependencyState: dependencyState(entry) })),
     outcomes: outcomes.toSorted((a, b) => Number(a.index) - Number(b.index)).map(outcome => ({ ...outcome,
@@ -194,6 +179,7 @@ test('inventory records every route and renders available protected surfaces at 
   for (const { entry, index } of entries) {
     page = /\/(login|forgot-password|reset-password)(?:\/|$)|^\/member-onboarding/.test(entry.route) ? guestPage : authenticatedPage;
     if (entry.route === '/member-onboarding') page = onboardingPage;
+    if (['/admin/settings', '/training/settings'].includes(entry.route)) page = pushSettingsPage;
     const reason = exclusion(entry);
     if (reason || serverUnavailable) {
       outcomes.push({ index, ...entry, status: 'NOT_RENDERED', reason: reason || 'Local test server became unavailable.', captures: [] });
@@ -257,20 +243,6 @@ test('inventory records every route and renders available protected surfaces at 
         await recordRenderCheck('Station detail heading', () => expect(page.getByRole('heading', { name: /^Station \d/ }).first()).toBeVisible({ timeout: 10_000 }));
       }
       await page.waitForLoadState('networkidle', { timeout: 2_000 }).catch(() => undefined);
-      for (const frame of page.frames().filter(frame => frame.url().startsWith(origin + '/'))) {
-        const lazyWidgets = await frame.locator('[wire\\:snapshot]').all();
-        for (const widget of lazyWidgets) {
-          const snapshot = await widget.getAttribute('wire:snapshot').catch(() => null);
-          if (snapshot && JSON.parse(snapshot).memo?.lazyLoaded === false && await widget.isVisible()) {
-            await widget.scrollIntoViewIfNeeded().catch(() => undefined);
-            await page.waitForTimeout(200);
-            await page.waitForLoadState('networkidle', { timeout: 3_000 }).catch(() => undefined);
-          }
-        }
-        await frame.evaluate(() => window.scrollTo(0, 0));
-      }
-      await page.evaluate(() => window.scrollTo(0, 0));
-      await page.waitForTimeout(250);
       await page.evaluate(() => Promise.race([document.fonts.ready, new Promise(done => setTimeout(done, 1500))]));
       const final = new URL(page.url());
       const httpStatus = response?.status() ?? null;
@@ -285,6 +257,7 @@ test('inventory records every route and renders available protected surfaces at 
         persist();
         continue;
       }
+      await recordRenderCheck('Native content readiness before link discovery', () => waitForUiRendering(page, origin));
       const discovered = await page.locator('a[href]').evaluateAll(elements => elements.map(el => (el as HTMLAnchorElement).href));
       for (const link of discovered) if (new URL(link).origin === origin) links.add(new URL(link).pathname + new URL(link).search);
       for (const width of widths) {
@@ -298,6 +271,8 @@ test('inventory records every route and renders available protected surfaces at 
           const sidebar = page.locator('.fi-sidebar');
           if (await sidebar.count()) await recordRenderCheck(`${width}px: Mobile sidebar is hidden`, () => expect.poll(() => sidebar.evaluate(el => el.getBoundingClientRect().right <= 1 || getComputedStyle(el).display === 'none')).toBeTruthy());
         }
+        let renderingReadiness: Awaited<ReturnType<typeof waitForUiRendering>> | null = null;
+        await recordRenderCheck(`${width}px: Native content readiness`, async () => { renderingReadiness = await waitForUiRendering(page, origin); });
         // Full-page screenshots do not trigger below-fold native lazy images.
         if (/^\/workgroups\/(?:analysis-report|evaluation-report|final-recommendations|workgroup-summary|l1-inventory)$/.test(entry.route)) {
           for (const image of await page.locator('img[loading="lazy"]').all()) {
@@ -451,7 +426,7 @@ test('inventory records every route and renders available protected surfaces at 
             }).length })) : { status: 'INNER_CONTENT_NOT_VERIFIED', url: frame.url() });
         }
         await page.screenshot({ path: info.outputPath(filename), fullPage: true, animations: 'disabled', timeout: 15_000 });
-        captures.push({ width, screenshot: filename, geometry, frames, axeSeriousCritical, axeError });
+        captures.push({ width, screenshot: filename, geometry, frames, axeSeriousCritical, axeError, renderingReadiness });
       }
       await page.waitForLoadState('networkidle', { timeout: 2_000 }).catch(() => undefined);
       await checkCanonicalSession('after');
@@ -470,6 +445,7 @@ test('inventory records every route and renders available protected surfaces at 
   await context.close();
   await guestContext.close();
   await onboardingContext.close();
+  await pushSettingsContext.close();
   await info.attach('inventory-results', { path: info.outputPath('inventory-results.json'), contentType: 'application/json' });
   expect(outcomes).toHaveLength(catalog.pages.length);
   // All route evidence is written before acceptance assertions so one failure
