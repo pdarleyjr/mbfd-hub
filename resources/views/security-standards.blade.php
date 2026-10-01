@@ -16,12 +16,9 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="MBFD Hub">
     <title>Security &amp; Standards | MBFD Hub</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     @vite('resources/css/app.css')
     <style>
-        body, .font-heading { font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+        body, .font-heading { font-family: var(--hub-font-sans); }
         .sec-card { transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease; }
         .sec-card:hover { transform: translateY(-1px); }
         @media (prefers-reduced-motion: reduce) {
@@ -30,9 +27,9 @@
         }
     </style>
 </head>
-<body class="antialiased bg-hub-canvas text-hub-ink min-h-screen flex flex-col">
+<body data-hub-ui="2" class="hub-page antialiased bg-hub-canvas text-hub-ink min-h-screen flex flex-col">
 
-    <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 bg-red-600 text-white px-3 py-2 rounded-md text-sm font-medium">Skip to content</a>
+    <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 bg-hub-blue text-white px-3 py-2 rounded-md text-sm font-medium">Skip to content</a>
 
     <!-- Header (matches landing page) -->
     <header class="sticky top-0 z-50 h-16 border-b border-white/10 bg-hub-header px-4 backdrop-blur-md lg:px-6" style="padding-top: max(0px, env(safe-area-inset-top, 0px));">
@@ -40,7 +37,7 @@
         <a href="{{ url('/') }}" class="flex items-center gap-3 group" aria-label="Return to MBFD Support Hub home">
             <img src="/images/mbfd_logo-256.png" alt="" class="h-10 w-10 object-contain" width="40" height="40" aria-hidden="true">
             <div class="hidden sm:block">
-                <h1 class="text-white font-semibold text-base leading-tight font-heading">MBFD Support Hub</h1>
+                <span class="text-white font-semibold text-base leading-tight font-heading">MBFD Support Hub</span>
                 <p class="text-blue-100 text-xs">Enterprise Command Portal</p>
             </div>
         </a>
@@ -49,7 +46,7 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
                 Home
             </a>
-            <a href="{{ url('/login') }}" class="min-h-[44px] px-4 py-2 text-sm font-medium bg-hub-red text-white rounded-lg hover:bg-hub-red-strong transition-colors flex items-center gap-2">
+            <a href="{{ url('/login') }}" class="min-h-[44px] px-4 py-2 text-sm font-medium bg-hub-blue text-white rounded-lg hover:bg-hub-blue-strong transition-colors flex items-center gap-2">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
                 <span class="hidden sm:inline">Sign In</span>
             </a>

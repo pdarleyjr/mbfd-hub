@@ -7,14 +7,15 @@
     <title>My Report · MBFD Hub</title>
     @vite('resources/css/app.css')
 </head>
-<body class="min-h-screen bg-hub-canvas text-hub-ink">
+<body data-hub-ui="2" class="hub-page min-h-screen bg-hub-canvas text-hub-ink">
+    <a href="#main" class="hub-skip-link">Skip to content</a>
     <x-hub-header back-href="{{ route('hub-support.index') }}" back-label="My Reports" max-width="max-w-3xl" />
-    <main class="mx-auto max-w-3xl break-words px-4 py-8 sm:py-12">
+    <main id="main" class="hub-page__main mx-auto max-w-3xl break-words px-4 py-8 sm:py-12">
         @if(session('status')) <p class="rounded-lg border border-hub-success/30 bg-hub-success/10 p-4 text-hub-success" role="status">{{ session('status') }}</p> @endif
         <h1 class="mt-6 text-2xl font-bold">{{ $report->generated_title }}</h1>
         <p class="mt-2 text-sm font-semibold text-hub-muted">{{ $report->status->memberLabel() }}</p>
         <p class="mt-1 text-xs text-hub-muted">Reference: {{ $report->ticket_number }}</p>
-        <section class="mt-6 rounded-xl border border-hub-border bg-hub-surface p-5 shadow-sm">
+        <section class="mt-6 hub-panel p-5 shadow-sm">
             <h2 class="font-semibold">What you told us</h2>
             <p class="mt-3 whitespace-pre-wrap">{{ $report->description }}</p>
             @if($report->attachments->isNotEmpty())
@@ -32,13 +33,13 @@
             </section>
         @endif
         @foreach($report->updates as $update)
-            <section class="mt-4 rounded-xl border border-hub-border bg-hub-surface p-5 shadow-sm">
+            <section class="mt-4 hub-panel p-5 shadow-sm">
                 <p class="whitespace-pre-wrap">{{ $update->public_response }}</p>
                 <p class="mt-2 text-xs text-hub-muted">{{ $update->created_at->timezone('America/New_York')->format('M j, Y · g:i A') }}</p>
             </section>
         @endforeach
         @if($report->status !== \App\Enums\HubSupportTicketStatus::Closed)
-            <form method="post" action="{{ route('hub-support.reply', $report) }}" class="mt-6 rounded-xl border border-hub-border bg-hub-surface p-5 shadow-sm">
+            <form method="post" action="{{ route('hub-support.reply', $report) }}" class="mt-6 hub-panel p-5 shadow-sm">
                 @csrf
                 <label for="response" class="block font-semibold">Reply</label>
                 <textarea name="response" id="response" required maxlength="5000" rows="4" class="mt-2 w-full rounded-lg border border-hub-border-strong p-3 text-base focus:border-hub-blue focus:outline-none focus:ring-2 focus:ring-hub-focus"></textarea>

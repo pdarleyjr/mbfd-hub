@@ -20,6 +20,10 @@
 .fi-page:has(#operational-forms-root) .fi-header { display: none; }
 .fi-page:has(#operational-forms-root) { gap: 0; }
 #operational-forms-root { margin: 0; color: rgb(var(--hub-ink)); font-family: var(--hub-font-sans); }
+#operational-forms-root :is(button, a, input, select, textarea, summary):focus-visible { outline: 3px solid rgb(var(--hub-focus)); outline-offset: 2px; }
+@media (pointer: coarse) {
+    #operational-forms-root :is(button, a, select, input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), .of-file-picker) { min-height: 44px; }
+}
 .of-loading { min-height: 65vh; display: grid; place-items: center; }
 .of-app { min-height: 100dvh; background: var(--of-canvas); overflow: hidden; }
 .of-topbar { min-height: 52px; background: var(--of-navy); color: white; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; }

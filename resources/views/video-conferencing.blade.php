@@ -9,7 +9,7 @@
         @vite('resources/css/app.css')
     @endif
 </head>
-<body>
+<body data-hub-ui="2" class="hub-page">
     @if (! $enabled)
         <x-hub-header back-href="/" back-label="Back to Hub home" />
         <main class="conference-unavailable mx-auto max-w-3xl px-4 py-8">
