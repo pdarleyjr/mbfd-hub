@@ -15,6 +15,13 @@
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
 
 /* Member tools sit in the navigation rail; the original PDF remains the workspace. */
+.pdf-links { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+.pdf-link { position: absolute; display: block; pointer-events: auto; cursor: pointer; background: transparent; }
+.pdf-link:hover { background: #087e8618; }
+.pdf-link:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; background: #087e8624; }
+#download-pdf { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+.subject-alias { border-bottom: 1px solid var(--line); padding-block: 9px; }
+.alias-title { font-size: 12px; line-height: 1.5; margin: 0; color: var(--secondary); }
 :root { --workspace: #e9edf1; --line: #dce3e9; --navy: #123456; --aqua: #087e86; }
 .library-header { padding-inline: clamp(16px, 2vw, 32px); }
 .brand { min-width: 0; }

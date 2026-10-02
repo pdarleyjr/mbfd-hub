@@ -494,9 +494,13 @@ def main():
     scope = parser.add_mutually_exclusive_group()
     scope.add_argument("--moms-only", action="store_true")
     scope.add_argument("--sog-only", action="store_true")
+    parser.add_argument("--delivery-manifest", type=Path, help="Stage the exact coordinated SOG delivery manifest instead of discovering version folders")
+    parser.add_argument("--delivery-sha256", default="4b6f079bf3e392f45e2cf85e2246c268a606e138c10351610583b2677ebd8314", help="Expected SHA-256 of the explicitly selected delivery manifest")
     parser.add_argument("--verify-render", action="store_true")
     parser.add_argument("--linearize", action="store_true")
     args = parser.parse_args()
+    if args.delivery_manifest and not args.sog_only:
+        parser.error("--delivery-manifest requires --sog-only; the existing MOMS edition must remain unchanged")
     if not args.qpdf or not args.qpdf.is_file():
         parser.error("qpdf is required; provide its absolute executable path with --qpdf")
     output = args.output.resolve()
@@ -505,7 +509,10 @@ def main():
     original_moms_hash = digest(args.moms) if not args.sog_only else None
     sources, audits, manuals = [], [], []
     inventory = []
-    if not args.moms_only:
+    if args.delivery_manifest:
+        from import_delivery import import_delivery
+        manuals.extend(import_delivery(args, output, sources, audits))
+    elif not args.moms_only:
         manual, inventory = import_sog(args, output, sources, audits)
         manuals.append(manual)
     if not args.sog_only:

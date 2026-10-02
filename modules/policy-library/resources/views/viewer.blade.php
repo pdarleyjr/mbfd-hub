@@ -1,14 +1,20 @@
 <!doctype html>
 <html lang="en">
 <head>
+    @php
+        $viewerScript = public_path('vendor/policy-library/viewer.js');
+        $viewerStyle = public_path('vendor/policy-library/viewer.css');
+        $viewerScriptVersion = is_file($viewerScript) ? hash_file('sha256', $viewerScript) : '';
+        $viewerStyleVersion = is_file($viewerStyle) ? hash_file('sha256', $viewerStyle) : '';
+    @endphp
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="robots" content="noindex,nofollow,noarchive">
     <title>Policy &amp; Protocol Library · MBFD</title>
     <link rel="icon" type="image/png" href="{{ asset('vendor/policy-library/images/mbfd-logo.png') }}">
-    <link rel="stylesheet" href="{{ asset('vendor/policy-library/viewer.css') }}">
-    <script type="module" src="{{ asset('vendor/policy-library/viewer.js') }}"></script>
+    <link rel="stylesheet" href="{{ asset('vendor/policy-library/viewer.css') }}?v={{ $viewerStyleVersion }}">
+    <script type="module" src="{{ asset('vendor/policy-library/viewer.js') }}?v={{ $viewerScriptVersion }}"></script>
 </head>
 <body class="library-body">
     <a class="skip-link" href="#document-workspace">Skip to document</a>
@@ -39,14 +45,14 @@
             <p class="sidebar-footnote">MBFD · Original department documents</p>
         </aside>
         <main id="document-workspace" class="document-workspace" tabindex="-1">
-            <div class="document-heading"><div class="document-heading-text"><p id="document-path" class="eyebrow">MBFD LIBRARY</p><h2 id="document-title">Your department manuals</h2><p id="revision-info" class="revision-info">Choose a policy or protocol to begin.</p></div><div class="page-share"><button id="copy-link" type="button" class="view-button" disabled>Copy link</button><span id="copy-status" class="copy-status" role="status"></span><input id="copy-link-value" aria-label="Current page link" type="text" readonly hidden></div></div>
+            <div class="document-heading"><div class="document-heading-text"><p id="document-path" class="eyebrow">MBFD LIBRARY</p><h2 id="document-title">Your department manuals</h2><p id="revision-info" class="revision-info">Choose a policy or protocol to begin.</p></div><div class="page-share"><a id="download-pdf" class="view-button" hidden>Download PDF</a><button id="copy-link" type="button" class="view-button" disabled>Copy link</button><span id="copy-status" class="copy-status" role="status"></span><input id="copy-link-value" aria-label="Current page link" type="text" readonly hidden></div></div>
             <div class="viewer-toolbar" aria-label="Document controls">
                 <div class="page-controls"><button type="button" data-nav="previous" class="nav-button" disabled aria-label="Previous page">← <span>Previous</span></button><span class="page-status" data-page-status>—</span><button type="button" data-nav="next" class="nav-button" disabled aria-label="Next page"><span>Next</span> →</button></div>
                 <div class="view-controls"><button type="button" id="fit-page" class="view-button" aria-pressed="true">Fit page</button><button type="button" id="fit-width" class="view-button" aria-pressed="false">Fit width</button><span class="control-divider"></span><button type="button" id="zoom-out" class="icon-button" aria-label="Zoom out">−</button><output id="zoom-value" aria-label="Zoom level">100%</output><button type="button" id="zoom-in" class="icon-button" aria-label="Zoom in">+</button><button type="button" id="focus-mode" class="view-button" aria-pressed="false">Focus view</button></div>
             </div>
             <section id="page-stage" class="page-stage" aria-label="PDF page">
                 <div id="viewer-message" class="viewer-message" role="status"><span class="document-symbol" aria-hidden="true">▤</span><h3>Ready when you need it</h3><p>Select SOGs or Medical Protocols, then choose a section.</p></div>
-                <div id="pdf-page" class="pdf-page" hidden><canvas id="pdf-canvas" aria-label="Original PDF document page"></canvas><div id="pdf-text" class="textLayer"></div></div>
+                <div id="pdf-page" class="pdf-page" hidden><canvas id="pdf-canvas" aria-label="Original PDF document page"></canvas><div id="pdf-text" class="textLayer"></div><div id="pdf-links" class="pdf-links" aria-label="Document links"></div></div>
             </section>
             <footer class="bottom-toolbar" aria-label="Bottom page controls"><button type="button" data-nav="previous" class="nav-button" disabled aria-label="Previous page">← Previous</button><span class="page-status" data-page-status>—</span><button type="button" data-nav="next" class="nav-button" disabled aria-label="Next page">Next →</button></footer>
             <p id="page-announcement" class="sr-only" aria-live="polite"></p>

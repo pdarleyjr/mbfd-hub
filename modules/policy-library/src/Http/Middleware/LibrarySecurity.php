@@ -16,7 +16,7 @@ final class LibrarySecurity
         $response->headers->set('X-Robots-Tag', 'noindex, nofollow, noarchive');
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('Referrer-Policy', 'same-origin');
-        $response->headers->set('Cache-Control', $response->headers->get('Content-Type') === 'application/pdf' ? 'private, max-age=300, must-revalidate' : 'private, no-store');
+        $response->headers->set('Cache-Control', $response->headers->get('Content-Type') === 'application/pdf' ? $response->headers->get('Cache-Control', 'private, max-age=300, must-revalidate') : 'private, no-store');
         $response->headers->set('CDN-Cache-Control', 'no-store');
         $response->headers->set('Cloudflare-CDN-Cache-Control', 'no-store');
         if (! $request->is('login')) {

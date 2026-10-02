@@ -52,7 +52,7 @@ final class TreeService
                 return [
                     'id' => $node->id, 'parent_id' => $node->parent_id, 'slug' => $node->slug,
                     'title' => $node->title, 'short_title' => $node->short_title, 'type' => $node->type,
-                    'metadata' => ['related_document_slugs' => array_values(array_filter($node->metadata['related_document_slugs'] ?? [], fn ($slug) => is_string($slug) && preg_match('/^[a-z0-9-]+$/', $slug)))],
+                    'metadata' => Arr::only($node->metadata ?? [], ['asset_id', 'review_edition', 'parent_identity_id']) + ['related_document_slugs' => array_values(array_filter($node->metadata['related_document_slugs'] ?? [], fn ($slug) => is_string($slug) && preg_match('/^[a-z0-9-]+$/', $slug)))],
                     'sort_order' => $node->sort_order, 'revision' => $revision && $revision->state === 'published' ? $this->revisionData($revision) : null,
                     'children' => $visit($node->id),
                 ];
@@ -60,15 +60,23 @@ final class TreeService
         };
         $tree = $visit(null);
 
-        return ['manual' => $manual->only(['id', 'slug', 'name', 'type', 'description']), 'nodes' => $tree, 'documents' => $documents];
+        return ['manual' => $manual->only(['id', 'slug', 'name', 'type', 'description', 'active_edition_id']), 'nodes' => $tree, 'documents' => $documents];
     }
 
     public function revisionData(DocumentRevision $revision): array
     {
+        $metadata = Arr::only($revision->metadata ?? [], ['asset_id', 'canonical_sha256', 'source_sha256', 'asset_type', 'parent_identity_id', 'review_edition', 'primary_entries', 'subject_aliases', 'peer_links']);
+        if (isset($metadata['primary_entries'])) {
+            $metadata['primary_entries'] = array_map(fn (array $entry): array => Arr::except($entry, ['semantic_text']), $metadata['primary_entries']);
+        }
+
         return [
             'id' => $revision->uuid, 'version_label' => $revision->version_label,
             'revision_date' => $revision->revision_date?->toDateString(), 'published_at' => $revision->published_at?->toIso8601String(),
             'page_count' => $revision->page_count, 'asset_url' => '/assets/'.$revision->uuid,
+            'download_url' => '/assets/'.$revision->uuid.'/download',
+            'canonical_url' => $revision->source_path ? '/assets/'.$revision->uuid.'/canonical' : null,
+            'metadata' => $metadata,
             'pages' => $revision->pages->map(fn ($page) => $page->only(['page', 'physical_page', 'printed_label', 'title']))->all(),
         ];
     }

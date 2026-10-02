@@ -20,6 +20,7 @@ Route::domain(config('policy-library.domain'))->middleware(['web', LibrarySecuri
     Route::middleware(LibraryAuthenticate::class)->group(function (): void {
         Route::get('/access', [AccessController::class, 'show'])->name('access');
         Route::post('/access', [AccessController::class, 'store'])->name('access.store');
+        Route::get('/current-sog/{assetId}', [AssetController::class, 'currentSog'])->where('assetId', '[A-Za-z0-9][A-Za-z0-9.\-]{0,99}')->name('current-sog');
         Route::middleware(ViewerGate::class)->group(function (): void {
             Route::get('/', [ViewerController::class, 'index'])->name('viewer');
             Route::get('/api/manuals', [ViewerController::class, 'manuals'])->name('manuals');
@@ -27,8 +28,11 @@ Route::domain(config('policy-library.domain'))->middleware(['web', LibrarySecuri
             Route::get('/api/manuals/{slug}/tree', [ViewerController::class, 'tree'])->name('tree');
             Route::get('/api/nodes/{node}/document', [ViewerController::class, 'document'])->name('document');
             Route::get('/assets/{uuid}', [AssetController::class, 'show'])->whereUuid('uuid')->name('asset');
+            Route::get('/assets/{uuid}/download', [AssetController::class, 'download'])->whereUuid('uuid')->name('download');
+            Route::get('/assets/{uuid}/canonical', [AssetController::class, 'canonical'])->whereUuid('uuid')->name('canonical');
             Route::post('/api/viewer-errors', [ViewerErrorController::class, 'store'])->middleware('throttle:12,1')->name('viewer-errors');
         });
         Route::get('/manage/revisions/{uuid}/preview', [AssetController::class, 'preview'])->whereUuid('uuid')->middleware(EnsureLibraryAdmin::class)->name('preview');
+        Route::get('/manage/revisions/{uuid}/canonical', [AssetController::class, 'adminCanonical'])->whereUuid('uuid')->middleware(EnsureLibraryAdmin::class)->name('admin-canonical');
     });
 });

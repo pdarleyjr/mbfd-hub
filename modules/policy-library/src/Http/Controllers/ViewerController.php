@@ -25,7 +25,7 @@ final class ViewerController
         $manage = LibraryAccess::canManage($request->user('web'));
 
         return response()->json([
-            'manuals' => Manual::query()->where('is_active', true)->whereNotNull('active_edition_id')->orderBy('sort_order')->orderBy('id')->get(['id', 'slug', 'name', 'type', 'description', 'updated_at']),
+            'manuals' => Manual::query()->where('is_active', true)->whereNotNull('active_edition_id')->orderBy('sort_order')->orderBy('id')->get(['id', 'slug', 'name', 'type', 'description', 'active_edition_id', 'updated_at']),
             'can_manage' => $manage, 'manage_url' => $manage ? '/manage' : null,
         ]);
     }
