@@ -1,0 +1,13 @@
+# Optional extension of the existing Laravel service; no new service or port.
+services:
+  laravel.test:
+    # The dedicated importer allows a 1800s job and 1815s Supervisor stop wait.
+    stop_grace_period: 1860s
+    networks:
+      mbfd-net: {}
+      policy-library-scanner: {}
+
+networks:
+  policy-library-scanner:
+    external: true
+    name: mbfd-workspace-internal
