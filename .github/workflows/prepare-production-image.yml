@@ -1,206 +1,150 @@
-name: Prepare immutable Hub production image
+name: Inspect existing token for private CI capability
 
-# This workflow is deliberately limited to a disposable GitHub-hosted runner.
-# It proves and publishes an immutable candidate, but never contacts production.
 on:
   workflow_dispatch:
     inputs:
-      final_release_sha:
-        description: 'Exact 40-character main SHA to build and publish.'
+      expected_probe_sha:
+        description: Exact independently reviewed diagnostic commit SHA
         required: true
         type: string
-      confirm_image_publication:
-        description: 'I confirm this exact main SHA may be published to GHCR after all gates pass.'
-        required: true
-        default: false
-        type: boolean
+
+permissions: {}
 
 concurrency:
-  group: production-image-preparation
+  group: policy-library-token-capability-probe
   cancel-in-progress: false
 
-permissions:
-  contents: read
-  pull-requests: read
-  packages: write
-
 jobs:
-  assert-main:
-    if: ${{ github.ref == 'refs/heads/main' }}
+  inspect-private-ci-capability:
+    if: >-
+      github.repository == 'pdarleyjr/mbfd-hub' &&
+      github.repository_owner == 'pdarleyjr' &&
+      github.actor == 'pdarleyjr' &&
+      github.ref == 'refs/heads/codex/policy-library-token-capability-probe'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Require exact current main candidate and publication confirmation
+      - name: Inspect token metadata and dispatch fixed private CI
         env:
-          FINAL_RELEASE_SHA: ${{ inputs.final_release_sha }}
-          CONFIRM_IMAGE_PUBLICATION: ${{ inputs.confirm_image_publication }}
+          PROBE_TOKEN: ${{ secrets.GH_PAT }}
+          EXPECTED_PROBE_SHA: ${{ inputs.expected_probe_sha }}
         run: |
-          set -euo pipefail
-          test "$GITHUB_REF" = "refs/heads/main"
-          test "$CONFIRM_IMAGE_PUBLICATION" = "true"
-          [[ "$FINAL_RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
-            echo 'final_release_sha must be a lowercase 40-character commit SHA.' >&2
-            exit 1
-          }
-          test "$GITHUB_SHA" = "$FINAL_RELEASE_SHA"
+          python3 - <<'PY'
+          import json, os, re, sys, time, urllib.error, urllib.request
 
-  release-gates:
-    needs: assert-main
-    uses: ./.github/workflows/hub-release-gates.yml
-    with:
-      pint_base_sha: ${{ format('{0}^', github.sha) }}
+          REPOSITORY = 'pdarleyjr/mbfd-policy-library'
+          WORKFLOW_PATH = '.github/workflows/ci.yml'
+          WORKFLOW_ID = 372623806
+          SOURCE_SHA = 'bb0d779756d19a551f73a2b96d3017ef4d45a4d1'
+          BRANCH = 'refs/heads/codex/policy-library-token-capability-probe'
+          ENDPOINT = 'https://api.github.com/repos/' + REPOSITORY + '/actions/'
+          ALLOWED_SCOPES = {
+              'repo', 'repo:status', 'repo_deployment', 'public_repo', 'repo:invite', 'security_events', 'workflow',
+              'read:packages', 'write:packages', 'delete:packages', 'read:org', 'write:org', 'admin:org',
+              'read:repo_hook', 'write:repo_hook', 'admin:repo_hook', 'user', 'read:user', 'user:email', 'user:follow',
+              'gist', 'notifications', 'delete_repo', 'read:public_key', 'write:public_key', 'admin:public_key',
+              'read:gpg_key', 'write:gpg_key', 'admin:gpg_key', 'read:ssh_signing_key', 'write:ssh_signing_key',
+              'admin:ssh_signing_key', 'read:project', 'project', 'codespace', 'manage_runners:org', 'audit_log'}
+          phase = 'guard'
 
-  build-test-scan-publish:
-    needs: release-gates
-    if: ${{ github.ref == 'refs/heads/main' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    outputs:
-      image_ref: ${{ steps.publish.outputs.image_ref }}
-      image_digest: ${{ steps.publish.outputs.image_digest }}
-    steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          ref: ${{ inputs.final_release_sha }}
-          fetch-depth: 1
+          class ProbeFailure(Exception):
+              def __init__(self, code, status=None):
+                  self.code, self.status = code, status
 
-      - name: Verify isolated immutable build context
-        env:
-          FINAL_RELEASE_SHA: ${{ inputs.final_release_sha }}
-        run: |
-          set -euo pipefail
-          test "$(git rev-parse HEAD)" = "$FINAL_RELEASE_SHA"
-          test -z "$(git status --porcelain)"
-          IMAGE_BUILD_CONTEXT="$RUNNER_TEMP/mbfd-hub-image-source"
-          mkdir -p "$IMAGE_BUILD_CONTEXT"
-          git archive --format=tar "$FINAL_RELEASE_SHA" | tar -x -C "$IMAGE_BUILD_CONTEXT"
-          test -z "$(find "$IMAGE_BUILD_CONTEXT" -mindepth 1 -maxdepth 1 -name .git -print -quit)"
-          printf 'IMAGE_BUILD_CONTEXT=%s\n' "$IMAGE_BUILD_CONTEXT" >> "$GITHUB_ENV"
+          def require(condition, code):
+              if not condition:
+                  raise ProbeFailure(code)
 
-      - name: Build immutable Hub image once
-        env:
-          FINAL_RELEASE_SHA: ${{ inputs.final_release_sha }}
-        run: |
-          set -euo pipefail
-          IMAGE_LOCAL="mbfd-hub-candidate:$FINAL_RELEASE_SHA"
-          printf 'IMAGE_LOCAL=%s\n' "$IMAGE_LOCAL" >> "$GITHUB_ENV"
-          docker buildx build --load \
-            --tag "$IMAGE_LOCAL" \
-            --file "$IMAGE_BUILD_CONTEXT/docker/production/Dockerfile" \
-            --build-arg "SOURCE_REVISION=$FINAL_RELEASE_SHA" \
-            --build-arg "WWWUSER=1000" \
-            --build-arg "WWWGROUP=1000" \
-            "$IMAGE_BUILD_CONTEXT"
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, request, fp, code, msg, headers, newurl):
+                  return None
 
-      - name: Test immutable Hub image contents and identity
-        env:
-          FINAL_RELEASE_SHA: ${{ inputs.final_release_sha }}
-        run: |
-          set -euo pipefail
-          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$IMAGE_LOCAL")" = "$FINAL_RELEASE_SHA"
-          docker run --rm --entrypoint sh "$IMAGE_LOCAL" -ec '
-            test "$(id -u)" = 1000
-            test "$(id -g)" = 1000
-            test "$(id -Gn)" = sail
-            test "$SUPERVISOR_PHP_USER" = sail
-            test -s /var/www/html/public/build/manifest.json
-            test -s /var/www/html/public/daily/index.html
-            test -d /var/www/html/vendor
-            ! test -e /var/www/html/vendor/laravel/sail
-            command -v node
-            node --input-type=module -e "import(\"pdf-lib\")"
-            command -v qpdf
-            qpdf --version
-            command -v pdfinfo
-            pdfinfo -v
-          '
+          def request(path, payload=None):
+              require(path in ('workflows/ci.yml', 'workflows/ci.yml/runs?branch=main&event=push&per_page=1',
+                               'workflows/ci.yml/dispatches') or re.fullmatch(r'runs/[1-9][0-9]{0,19}', path), 'unexpected_endpoint')
+              require(payload is None or (path == 'workflows/ci.yml/dispatches' and payload == {'ref': 'main'}), 'unexpected_payload')
+              headers = {'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json',
+                         'X-GitHub-Api-Version': '2026-03-10', 'User-Agent': 'mbfd-owned-private-ci-capability-probe'}
+              data = json.dumps(payload).encode() if payload is not None else None
+              query = urllib.request.Request(ENDPOINT + path, headers=headers, data=data)
+              try:
+                  response = urllib.request.build_opener(NoRedirect()).open(query, timeout=15)
+              except urllib.error.HTTPError as error:
+                  status = error.code
+                  error.close()
+                  raise ProbeFailure('redirect_denied' if 300 <= status < 400 else 'http_rejected', status)
+              with response:
+                  if response.status != 200:
+                      raise ProbeFailure('unexpected_http_status', response.status)
+                  body = response.read(65537)
+                  require(len(body) <= 65536, 'response_exceeds_bound')
+                  scopes = response.headers.get('X-OAuth-Scopes')
+                  return json.loads(body), scopes
 
-      - name: Test immutable Hub Supervisor runtime readiness
-        env:
-          FINAL_RELEASE_SHA: ${{ inputs.final_release_sha }}
-        run: |
-          set -euo pipefail
-          RUNTIME_CONTAINER="mbfd-hub-supervisor-runtime-${FINAL_RELEASE_SHA}"
-          cleanup() {
-            docker rm --force "$RUNTIME_CONTAINER" >/dev/null 2>&1 || true
-          }
-          trap cleanup EXIT
-          docker run --detach --name "$RUNTIME_CONTAINER" --network none \
-            --env WWWUSER=1000 \
-            --env WWWGROUP=1000 \
-            --env APP_ENV=production \
-            --env APP_KEY='base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=' \
-            --env APP_DEBUG=false \
-            --env DB_CONNECTION=sqlite \
-            --env DB_DATABASE=/tmp/mbfd-runtime.sqlite \
-            --env CACHE_STORE=array \
-            --env SESSION_DRIVER=array \
-            --env QUEUE_CONNECTION=sync \
-            --env MAIL_MAILER=array \
-            --env BROADCAST_CONNECTION=log \
-            --env PULSE_ENABLED=false \
-            --env SENTRY_LARAVEL_DSN='' \
-            --env WORKGROUP_AI_ENABLED=false \
-            "$IMAGE_LOCAL"
-          docker exec "$RUNTIME_CONTAINER" supervisord --version
-          for _ in $(seq 1 10); do
-            status="$(docker exec "$RUNTIME_CONTAINER" supervisorctl -c /etc/supervisor/conf.d/supervisord.conf status || true)"
-            if printf '%s\n' "$status" | grep -Eq '^php +RUNNING ' \
-              && printf '%s\n' "$status" | grep -Eq '^queue-worker:queue-worker_00 +RUNNING ' \
-              && printf '%s\n' "$status" | grep -Eq '^reverb +RUNNING ' \
-              && printf '%s\n' "$status" | grep -Eq '^scheduler +RUNNING '; then
-              break
-            fi
-            sleep 1
-          done
-          printf '%s\n' "$status"
-          printf '%s\n' "$status" | grep -Eq '^php +RUNNING '
-          printf '%s\n' "$status" | grep -Eq '^queue-worker:queue-worker_00 +RUNNING '
-          printf '%s\n' "$status" | grep -Eq '^reverb +RUNNING '
-          printf '%s\n' "$status" | grep -Eq '^scheduler +RUNNING '
-          test "$(docker exec "$RUNTIME_CONTAINER" id -u)" = 1000
-          test "$(docker exec "$RUNTIME_CONTAINER" id -g)" = 1000
-          test "$(docker exec "$RUNTIME_CONTAINER" id -un)" = sail
-          test -z "$(docker exec "$RUNTIME_CONTAINER" ps -eo uid= | awk '$1 == 0 { print; exit }')"
-          test -z "$(docker port "$RUNTIME_CONTAINER")"
-          test "$(docker exec "$RUNTIME_CONTAINER" curl --silent --show-error --max-time 10 --header 'Cookie:' --output /dev/null --write-out '%{http_code}' http://localhost:8081/daily/stations/6)" = '302'
-          test "$(docker exec "$RUNTIME_CONTAINER" curl --silent --show-error --max-time 10 --header 'Cookie:' --output /dev/null --write-out '%{http_code}' http://localhost:8081/api/public/stations)" = '302'
-          sleep 5
-          docker exec "$RUNTIME_CONTAINER" supervisorctl -c /etc/supervisor/conf.d/supervisord.conf status
+          def emit(marker, record):
+              encoded = json.dumps(record, sort_keys=True, separators=(',', ':'))
+              require(len(encoded.encode()) <= 2048, 'record_exceeds_bound')
+              print(marker + encoded, flush=True)
 
-      - name: Generate CycloneDX SBOM for immutable image
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.18.0
-        with:
-          image: ${{ env.IMAGE_LOCAL }}
-          format: cyclonedx-json
-          artifact-name: mbfd-hub-image.cyclonedx.json
-
-      - name: Scan immutable Hub image with Trivy
-        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
-        with:
-          scan-type: image
-          image-ref: ${{ env.IMAGE_LOCAL }}
-          severity: CRITICAL,HIGH
-          exit-code: 1
-          format: table
-
-      - name: Push tested immutable Hub image and record digest
-        id: publish
-        env:
-          FINAL_RELEASE_SHA: ${{ inputs.final_release_sha }}
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          IMAGE_REPOSITORY="$(head -n 1 "$IMAGE_BUILD_CONTEXT/docker/production/image-repository")"
-          test "$IMAGE_REPOSITORY" = 'ghcr.io/pdarleyjr/mbfd-hub'
-          IMAGE_TAG="$IMAGE_REPOSITORY:sha-$FINAL_RELEASE_SHA"
-          printf '%s' "$GITHUB_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
-          docker tag "$IMAGE_LOCAL" "$IMAGE_TAG"
-          docker push "$IMAGE_TAG"
-          IMAGE_DIGEST="sha256:$(docker buildx imagetools inspect --raw "$IMAGE_TAG" | sha256sum | awk '{print $1}')"
-          case "$IMAGE_DIGEST" in sha256:[0-9a-f][0-9a-f]*) ;; *) exit 1 ;; esac
-          IMAGE_REF="$IMAGE_REPOSITORY@$IMAGE_DIGEST"
-          docker pull "$IMAGE_REF"
-          test "$(docker image inspect --format '{{ index .Config.Labels "org.opencontainers.image.revision" }}' "$IMAGE_REF")" = "$FINAL_RELEASE_SHA"
-          printf 'image_ref=%s\n' "$IMAGE_REF" >> "$GITHUB_OUTPUT"
-          printf 'image_digest=%s\n' "$IMAGE_DIGEST" >> "$GITHUB_OUTPUT"
+          try:
+              require(os.environ.get('GITHUB_REPOSITORY') == 'pdarleyjr/mbfd-hub'
+                      and os.environ.get('GITHUB_REPOSITORY_OWNER') == 'pdarleyjr'
+                      and os.environ.get('GITHUB_ACTOR') == 'pdarleyjr'
+                      and os.environ.get('GITHUB_REF') == BRANCH
+                      and os.environ.get('GITHUB_EVENT_NAME') == 'workflow_dispatch', 'wrong_diagnostic_identity')
+              expected = os.environ.get('EXPECTED_PROBE_SHA', '')
+              require(re.fullmatch(r'[a-f0-9]{40}', expected) and expected == os.environ.get('GITHUB_SHA'), 'wrong_diagnostic_source')
+              token = os.environ.pop('PROBE_TOKEN', '')
+              require(bool(token), 'existing_secret_unavailable')
+              kind = ('fine_grained_personal_access_token' if token.startswith('github_pat_') else
+                      'classic_personal_access_token' if token.startswith('ghp_') else
+                      'installation_token' if token.startswith('ghs_') else
+                      'oauth_user_token' if token.startswith(('gho_', 'ghu_')) else 'unrecognized_token_kind')
+              phase = 'workflow_read'
+              workflow, scopes = request('workflows/ci.yml')
+              require(workflow.get('id') == WORKFLOW_ID and workflow.get('path') == WORKFLOW_PATH
+                      and workflow.get('state') == 'active'
+                      and workflow.get('url') == ENDPOINT + 'workflows/' + str(WORKFLOW_ID), 'wrong_workflow_identity')
+              listed = [scope.strip() for scope in (scopes or '').split(',') if scope.strip()]
+              emit('MBFD_GH_PAT_CAPABILITY_READ_V1=', {
+                  'token_kind': kind, 'oauth_scope_header': 'absent' if scopes is None else 'present',
+                  'oauth_scopes': None if scopes is None else sorted(set(listed) & ALLOWED_SCOPES),
+                  'unrecognized_scope_present': None if scopes is None else bool(set(listed) - ALLOWED_SCOPES),
+                  'workflow_repository': REPOSITORY, 'workflow_id': str(WORKFLOW_ID),
+                  'workflow_path': WORKFLOW_PATH, 'workflow_read': 'PASS'})
+              phase = 'exact_private_ci_source'
+              history, _ = request('workflows/ci.yml/runs?branch=main&event=push&per_page=1')
+              runs = history.get('workflow_runs', [])
+              require(len(runs) == 1 and runs[0].get('head_sha') == SOURCE_SHA and runs[0].get('head_branch') == 'main'
+                      and runs[0].get('path') == WORKFLOW_PATH and runs[0].get('workflow_id') == WORKFLOW_ID
+                      and runs[0].get('event') == 'push' and runs[0].get('status') == 'completed'
+                      and runs[0].get('conclusion') == 'success', 'private_ci_source_not_qualified')
+              phase = 'workflow_dispatch'
+              dispatched, _ = request('workflows/ci.yml/dispatches', {'ref': 'main'})
+              run_id = dispatched.get('workflow_run_id')
+              require(type(run_id) is int and re.fullmatch(r'[1-9][0-9]{0,19}', str(run_id)), 'missing_exact_dispatched_run_id')
+              require(dispatched.get('run_url') == ENDPOINT + 'runs/' + str(run_id), 'wrong_dispatched_run_url')
+              phase = 'dispatched_run_identity'
+              for attempt in range(6):
+                  try:
+                      metadata, _ = request('runs/' + str(run_id))
+                      break
+                  except ProbeFailure as error:
+                      if error.status != 404 or attempt == 5:
+                          raise
+                      time.sleep(2)
+              require(metadata.get('id') == run_id and metadata.get('head_sha') == SOURCE_SHA
+                      and metadata.get('head_branch') == 'main' and metadata.get('path') == WORKFLOW_PATH
+                      and metadata.get('workflow_id') == WORKFLOW_ID and metadata.get('event') == 'workflow_dispatch'
+                      and metadata.get('run_attempt') == 1
+                      and metadata.get('repository', {}).get('full_name') == REPOSITORY
+                      and metadata.get('repository', {}).get('private') is True, 'wrong_dispatched_ci_identity')
+              emit('MBFD_GH_PAT_CAPABILITY_WRITE_V1=', {
+                  'workflow_run_id': str(run_id), 'workflow_repository': REPOSITORY, 'workflow_path': WORKFLOW_PATH,
+                  'head_sha': SOURCE_SHA, 'run_attempt': '1', 'workflow_dispatch': 'PASS', 'production_activation': False})
+          except BaseException as error:
+              code = error.code if isinstance(error, ProbeFailure) else 'unclassified_probe_failure'
+              status = error.status if isinstance(error, ProbeFailure) else None
+              print(json.dumps({'phase': phase, 'failure': code, 'http_status': status}, separators=(',', ':')), flush=True)
+              sys.exit(1)
+          PY
