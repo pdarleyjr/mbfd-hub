@@ -158,7 +158,8 @@ test('inventory records every route and renders available protected surfaces at 
   const canonicalRenewal = await fixtureSessionRenewal([context, pushSettingsContext]);
   await canonicalRenewal.beforeBoundary('inventory start');
 
-  const priority = (entry: Entry) => /analysis-report|final-presentation|saver-report|^\/member-onboarding$/.test(entry.route) ? -1 : Number(/[{:]/.test(entry.route));
+  const expiringPrerequisites = new Set(['/member-onboarding', '/member-onboarding/invite', '/reset-password/{token}', '/account/city-email/verify/{token}', '/workgroup/saver-report']);
+  const priority = (entry: Entry) => expiringPrerequisites.has(entry.route) ? -2 : /analysis-report|final-presentation/.test(entry.route) ? -1 : Number(/[{:]/.test(entry.route));
   const entries = catalog.pages.map((entry, index) => ({ entry, index })).filter(({ entry }) => !outcomes.some(outcome => outcome.route === entry.route)).sort((a, b) => priority(a.entry) - priority(b.entry));
   const persist = () => {
     const serialized = JSON.stringify({
@@ -280,7 +281,12 @@ test('inventory records every route and renders available protected surfaces at 
         // Normalize only the navigation drawer, never a form or record action.
         const overlay = page.locator('.fi-sidebar-close-overlay');
         if (width < 1024 && await overlay.isVisible()) {
-          await overlay.click({ position: { x: width - 8, y: 100 } });
+          const drawer = await page.locator('.fi-sidebar').boundingBox();
+          if (drawer && drawer.x + drawer.width > width - 8) {
+            await page.locator('.fi-sidebar-header').getByRole('button', { name: 'Collapse sidebar', exact: true }).click();
+          } else {
+            await overlay.click({ position: { x: width - 8, y: 100 } });
+          }
           await recordRenderCheck(`${width}px: Sidebar overlay closes`, () => expect(overlay).toBeHidden({ timeout: 5_000 }));
           const sidebar = page.locator('.fi-sidebar');
           if (await sidebar.count()) await recordRenderCheck(`${width}px: Mobile sidebar is hidden`, () => expect.poll(() => sidebar.evaluate(el => el.getBoundingClientRect().right <= 1 || getComputedStyle(el).display === 'none')).toBeTruthy());
