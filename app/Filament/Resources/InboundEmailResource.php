@@ -12,13 +12,15 @@ use Filament\Tables\Table;
 
 final class InboundEmailResource extends Resource
 {
+    protected static ?int $navigationSort = 30;
+
     protected static ?string $model = InboundEmail::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-inbox';
 
     protected static ?string $navigationGroup = 'Communications';
 
-    protected static ?string $navigationLabel = 'Inbox';
+    protected static ?string $navigationLabel = 'Inbound Email';
 
     public static function table(Table $table): Table
     {

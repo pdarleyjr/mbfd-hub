@@ -26,13 +26,13 @@ class EmployeeResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-identification';
 
-    protected static ?string $navigationGroup = 'Administration';
+    protected static ?string $navigationGroup = 'Personnel';
 
-    protected static ?string $navigationLabel = 'Employees & Access';
+    protected static ?string $navigationLabel = 'Employees';
 
     protected static ?string $pluralModelLabel = 'Employees & Access';
 
-    protected static ?int $navigationSort = 5;
+    protected static ?int $navigationSort = 10;
 
     public static function form(Form $form): Form
     {
@@ -89,23 +89,27 @@ class EmployeeResource extends Resource
             ->modifyQueryUsing(fn ($query) => $query->with('user.memberOnboardingInvitation'))
             ->columns([
                 Tables\Columns\TextColumn::make('employee_id')
+                    ->wrap()
+                    ->extraAttributes(['class' => 'hub-phone-summary'])
+                    ->description(fn (Employee $record): string => $record->name.' · '.($record->rank ?: 'Rank unrecorded').' · '.($record->user?->getRawOriginal('account_status') ? str($record->user->getRawOriginal('account_status'))->headline() : 'Awaiting account'))
                     ->label('Employee ID')
                     ->url(fn (Employee $record): string => static::getUrl('edit', ['record' => $record]))
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('name')
+                Tables\Columns\TextColumn::make('name')->visibleFrom('md')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('rank')
+                Tables\Columns\TextColumn::make('rank')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)
+                    ->placeholder('Not recorded')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('station')->searchable(),
-                Tables\Columns\TextColumn::make('roster_status')->label('Employment')->badge()->placeholder('Not recorded'),
-                Tables\Columns\TextColumn::make('user.account_status')->label('Login')->badge()->placeholder('Awaiting account')
+                Tables\Columns\TextColumn::make('station')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)->placeholder('Not assigned')->searchable(),
+                Tables\Columns\TextColumn::make('roster_status')->visibleFrom('md')->label('Employment')->badge()->placeholder('Not recorded'),
+                Tables\Columns\TextColumn::make('user.account_status')->visibleFrom('md')->label('Login')->badge()->placeholder('Awaiting account')
                     ->formatStateUsing(fn ($state): string => ucfirst(str_replace('_', ' ', $state instanceof \BackedEnum ? $state->value : (string) $state))),
-                Tables\Columns\TextColumn::make('invitation_delivery')->label('Invitation email')->badge()
+                Tables\Columns\TextColumn::make('invitation_delivery')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)->label('Invitation email')->badge()
                     ->state(fn (Employee $record): string => $record->user?->memberOnboardingInvitation?->emailDeliveryLabel() ?? 'Invitation not sent'),
-                Tables\Columns\TextColumn::make('invitation_status')->label('Account activation')->badge()
+                Tables\Columns\TextColumn::make('invitation_status')->visibleFrom('md')->label('Account activation')->badge()
                     ->state(function (Employee $record): string {
                         $status = $record->user?->getRawOriginal('account_status');
                         if ($status === 'active') {
@@ -124,7 +128,7 @@ class EmployeeResource extends Resource
                         return $invitation?->redeemed_at !== null || $invitation?->delivery_status === 'redeemed'
                             ? 'Opened / redeemed' : 'Awaiting activation';
                     }),
-                Tables\Columns\TextColumn::make('updated_at')
+                Tables\Columns\TextColumn::make('updated_at')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)
                     ->label('Last Updated')
                     ->dateTime('M j, Y g:i A')
                     ->sortable(),
@@ -140,33 +144,35 @@ class EmployeeResource extends Resource
                         ->toArray()),
             ])
             ->actions([
-                Tables\Actions\Action::make('sendMemberInvitation')
-                    ->label(fn (Employee $record): string => $record->user?->memberOnboardingInvitation === null ? 'Send invitation' : 'Resend invitation')
-                    ->icon('heroicon-o-envelope')
-                    ->visible(fn (Employee $record, Pages\ListEmployees $livewire): bool => $livewire->canInviteMember($record))
-                    ->modalHeading('Invite this member')
-                    ->modalSubmitActionLabel('Queue this invitation')
-                    ->fillForm(function (Employee $record): array {
-                        $user = $record->user;
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\Action::make('sendMemberInvitation')
+                        ->label(fn (Employee $record): string => $record->user?->memberOnboardingInvitation === null ? 'Send invitation' : 'Resend invitation')
+                        ->icon('heroicon-o-envelope')
+                        ->visible(fn (Employee $record, Pages\ListEmployees $livewire): bool => $livewire->canInviteMember($record))
+                        ->modalHeading('Invite this member')
+                        ->modalSubmitActionLabel('Queue this invitation')
+                        ->fillForm(function (Employee $record): array {
+                            $user = $record->user;
 
-                        return ['binding_hash' => $user === null ? '' : IssueMemberOnboardingInvitation::bindingHash(
-                            $user->id, $record->employee_id, (string) $record->city_email, $user->security_version,
-                        )];
-                    })
-                    ->form([
-                        Forms\Components\Placeholder::make('recipient')->label('Exact recipient')
-                            ->content(fn (Employee $record): HtmlString => new HtmlString(
-                                '<strong>'.e($record->employee_id).'</strong> — '.e(strtolower(trim((string) $record->city_email))),
-                            )),
-                        Forms\Components\Hidden::make('binding_hash')->required(),
-                        Forms\Components\Checkbox::make('confirm_member')
-                            ->label('I reviewed this Employee ID and City email and want to send one invitation.')
-                            ->rule('accepted')->required(),
-                        Forms\Components\TextInput::make('current_password')->label('Your administrator password')
-                            ->password()->autocomplete('current-password')->required(),
-                    ])
-                    ->action(fn (array $data, Employee $record, Pages\ListEmployees $livewire) => $livewire->queueMemberInvitation($record, $data)),
-                Tables\Actions\EditAction::make(),
+                            return ['binding_hash' => $user === null ? '' : IssueMemberOnboardingInvitation::bindingHash(
+                                $user->id, $record->employee_id, (string) $record->city_email, $user->security_version,
+                            )];
+                        })
+                        ->form([
+                            Forms\Components\Placeholder::make('recipient')->label('Exact recipient')
+                                ->content(fn (Employee $record): HtmlString => new HtmlString(
+                                    '<strong>'.e($record->employee_id).'</strong> — '.e(strtolower(trim((string) $record->city_email))),
+                                )),
+                            Forms\Components\Hidden::make('binding_hash')->required(),
+                            Forms\Components\Checkbox::make('confirm_member')
+                                ->label('I reviewed this Employee ID and City email and want to send one invitation.')
+                                ->rule('accepted')->required(),
+                            Forms\Components\TextInput::make('current_password')->label('Your administrator password')
+                                ->password()->autocomplete('current-password')->required(),
+                        ])
+                        ->action(fn (array $data, Employee $record, Pages\ListEmployees $livewire) => $livewire->queueMemberInvitation($record, $data)),
+                    Tables\Actions\EditAction::make(),
+                ])->label('Actions')->icon('heroicon-m-ellipsis-horizontal')->button()->color('gray'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkAction::make('sendSelectedOnboardingInvitations')

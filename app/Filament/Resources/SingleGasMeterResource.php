@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\SingleGasMeterResource\Pages;
 use App\Models\Apparatus;
 use App\Models\SingleGasMeter;
@@ -12,19 +13,20 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
-use App\Filament\Concerns\EnterpriseTable;
 class SingleGasMeterResource extends Resource
 {
+    protected static ?int $navigationSort = 60;
+
     use EnterpriseTable;
 
     protected static ?string $model = SingleGasMeter::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-beaker';
-    
-    protected static ?string $navigationGroup = 'Inventory & Logistics';
-    
-    protected static ?string $navigationLabel = 'Single Gas Meters';
-    
+
+    protected static ?string $navigationGroup = 'Logistics';
+
+    protected static ?string $navigationLabel = 'Gas Meters';
+
     protected static ?string $pluralModelLabel = 'Single Gas Meters';
 
     public static function form(Form $form): Form
@@ -45,7 +47,7 @@ class SingleGasMeterResource extends Resource
                             ->searchable()
                             ->preload()
                             ->helperText('Select the apparatus this meter is assigned to'),
-                        
+
                         Forms\Components\TextInput::make('serial_number')
                             ->label('Serial Number')
                             ->required()
@@ -55,7 +57,7 @@ class SingleGasMeterResource extends Resource
                             ->unique(ignoreRecord: true)
                             ->helperText('Enter the last 5 digits of the serial number')
                             ->placeholder('12345'),
-                        
+
                         Forms\Components\DatePicker::make('activation_date')
                             ->label('Activation Date')
                             ->required()
@@ -67,7 +69,7 @@ class SingleGasMeterResource extends Resource
                                     $set('expiration_date', \Carbon\Carbon::parse($state)->addYears(2)->format('Y-m-d'));
                                 }
                             }),
-                        
+
                         Forms\Components\DatePicker::make('expiration_date')
                             ->label('Expiration Date')
                             ->disabled()
@@ -85,22 +87,22 @@ class SingleGasMeterResource extends Resource
                     ->label('Apparatus')
                     ->searchable()
                     ->sortable(),
-                
+
                 Tables\Columns\TextColumn::make('serial_number')
                     ->label('Serial Number')
                     ->searchable()
                     ->sortable(),
-                
+
                 Tables\Columns\TextColumn::make('activation_date')
                     ->label('Activation Date')
                     ->date()
                     ->sortable(),
-                
+
                 Tables\Columns\TextColumn::make('expiration_date')
                     ->label('Expiration Date')
                     ->date()
                     ->sortable(),
-                
+
                 Tables\Columns\TextColumn::make('status')
                     ->label('Status')
                     ->badge()
@@ -109,7 +111,7 @@ class SingleGasMeterResource extends Resource
                         'Expired' => 'danger',
                         default => 'gray',
                     }),
-                
+
                 Tables\Columns\TextColumn::make('daysUntilExpiration')
                     ->label('Days Until Expiration')
                     ->state(fn (SingleGasMeter $record): int => $record->daysUntilExpiration())
@@ -117,7 +119,7 @@ class SingleGasMeterResource extends Resource
                         return $query->orderBy('expiration_date', $direction);
                     })
                     ->suffix(' days'),
-                
+
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Created At')
                     ->dateTime()
@@ -136,11 +138,11 @@ class SingleGasMeterResource extends Resource
                     ->searchable()
                     ->preload()
                     ->label('Filter by Apparatus'),
-                
+
                 Tables\Filters\Filter::make('expired')
                     ->query(fn (Builder $query): Builder => $query->where('expiration_date', '<', now()))
                     ->label('Expired Only'),
-                
+
                 Tables\Filters\Filter::make('expiring_soon')
                     ->query(fn (Builder $query): Builder => $query
                         ->where('expiration_date', '>', now())

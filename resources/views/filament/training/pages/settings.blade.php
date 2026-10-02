@@ -1,5 +1,5 @@
-<x-filament-panels::page>
-    <div class="grid gap-6 md:grid-cols-2">
+<x-filament-panels::page data-hub-ui="2" data-hub-portal="training">
+    <div class="training-settings-grid">
         {{-- Push Notifications Section --}}
         <x-filament::section>
             <x-slot name="heading">
@@ -146,7 +146,7 @@
             </x-slot>
 
             <div class="space-y-4">
-                <div class="grid grid-cols-2 gap-4 text-sm">
+                <div class="training-profile-facts">
                     <div>
                         <span class="text-gray-500 dark:text-gray-400">Name:</span>
                         <p class="font-medium">{{ auth()->user()->name }}</p>

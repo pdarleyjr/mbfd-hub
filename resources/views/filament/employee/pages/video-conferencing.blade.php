@@ -1,6 +1,6 @@
-<x-filament-panels::page>
+<x-filament-panels::page data-hub-ui="2" data-hub-portal="employee">
     @if (! $enabled)
-        <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm" aria-labelledby="conference-unavailable-title">
+        <section class="hub-panel p-6" aria-labelledby="conference-unavailable-title">
             <div class="flex items-start gap-4">
                 <div class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
                     <x-heroicon-o-video-camera-slash class="h-6 w-6" />

@@ -1,6 +1,9 @@
 @import '@fontsource-variable/plus-jakarta-sans/wght.css';
 @import '../../../../vendor/filament/filament/dist/theme.css';
 @import '../../mbfd-theme.css';
+@import '../../hub-components.css';
+@import '../hub-portals-v2.css';
+@import './hub-admin-v2.css';
 /**
  * MBFD Hub — Unified Impeccable Enterprise Theme
  * Applied to ALL panels (Admin, Employee, Workgroup, Training) via ->viteTheme()
@@ -199,7 +202,7 @@
 }
 
 .fi-topbar {
-    border-bottom: 2px solid rgb(var(--hub-red) / 0.3);
+    border-bottom: 1px solid rgb(var(--hub-border));
 }
 
 .fi-topbar > nav {
@@ -736,6 +739,8 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
 .fi-wi-stats-overview-stat-description.fi-color-success { color: rgb(var(--hub-success)); }
 .filament-spatie-health > .text-gray-400 { color: rgb(var(--hub-muted)); }
 .filament-spatie-health > .text-red-500 { color: rgb(var(--hub-danger)); }
+
+.fi-ta-placeholder { color: rgb(var(--hub-ink-secondary)); }
 
 .fi-fo-field-wrp input:not(:disabled)::placeholder,
 .fi-fo-field-wrp textarea:not(:disabled)::placeholder,
@@ -1563,6 +1568,7 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
     body.mbfd-pwa .fi-topbar a,
     body.mbfd-pwa .fi-topbar button,
     body.mbfd-pwa .fi-topbar input,
+    body.mbfd-pwa .fi-topbar summary,
     body.mbfd-pwa .fi-global-search {
         -webkit-app-region: no-drag;
     }
@@ -1570,9 +1576,9 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
 
 /* --- Active-row highlight from keyboard j/k nav ----------------------- */
 .fi-ta-row.admin-row-focused {
-    outline: 2px solid rgba(220, 38, 38, 0.5);
+    outline: 2px solid rgb(var(--hub-focus));
     outline-offset: -2px;
-    background-color: rgba(254, 242, 242, 0.5);
+    background-color: rgb(238 243 250);
 }
 
 /* --- Dark mode tokens (opt-in via body.mbfd-dark) --------------------- */

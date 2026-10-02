@@ -29,15 +29,15 @@ class BidAccessPin extends Page implements HasForms
 
     protected static ?string $navigationIcon = 'heroicon-o-key';
 
-    protected static ?string $navigationLabel = 'Bid Access PIN';
+    protected static ?string $navigationLabel = 'Bid PIN';
 
     protected static ?string $title = 'Bid Access PIN';
 
     protected static ?string $slug = 'bid-access-pin';
 
-    protected static ?string $navigationGroup = 'Bid Administration';
+    protected static ?string $navigationGroup = 'Programs';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 60;
 
     protected static string $view = 'filament.admin.pages.bid-access-pin';
 

@@ -26,6 +26,13 @@ class CandidateProductResource extends Resource
 
     protected static ?int $navigationSort = 8;
 
+    public static function getNavigationGroup(): ?string
+    {
+        return filament()->getCurrentPanel()?->getId() === 'admin'
+            ? 'Programs'
+            : parent::getNavigationGroup();
+    }
+
     public static function form(Form $form): Form
     {
         return $form

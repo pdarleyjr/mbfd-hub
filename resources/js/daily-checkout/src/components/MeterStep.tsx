@@ -174,8 +174,8 @@ export default function MeterStep({
               onBlur={() => handleBlur('engine_hours')}
               className={`w-full px-4 py-3 text-lg font-medium rounded-lg border-2 transition-colors focus:outline-none ${
                 errors.engine_hours
-                  ? 'border-red-400 focus:border-red-500 bg-red-50/50'
-                  : 'border-neutral-200 focus:border-red-500 bg-neutral-50'
+                  ? 'border-red-400 focus:border-hub-focus bg-red-50/50'
+                  : 'border-neutral-200 focus:border-hub-focus bg-neutral-50'
               }`}
               placeholder={previousHours !== null ? `Previous: ${previousHours}` : 'Enter hours'}
             />
@@ -202,8 +202,8 @@ export default function MeterStep({
               onBlur={() => handleBlur('miles')}
               className={`w-full px-4 py-3 text-lg font-medium rounded-lg border-2 transition-colors focus:outline-none ${
                 errors.miles
-                  ? 'border-red-400 focus:border-red-500 bg-red-50/50'
-                  : 'border-neutral-200 focus:border-red-500 bg-neutral-50'
+                  ? 'border-red-400 focus:border-hub-focus bg-red-50/50'
+                  : 'border-neutral-200 focus:border-hub-focus bg-neutral-50'
               }`}
               placeholder={previousMiles !== null ? `Previous: ${previousMiles.toLocaleString()}` : 'Enter miles'}
             />
@@ -235,7 +235,7 @@ export default function MeterStep({
           </button>
           <button
             type="submit"
-            className="flex-1 min-h-[48px] px-4 py-3 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 active:bg-red-800 transition-colors shadow-sm touch-manipulation"
+            className="flex-1 min-h-[48px] px-4 py-3 rounded-lg bg-hub-blue text-white font-semibold hover:bg-hub-blue-strong active:bg-hub-header transition-colors shadow-sm touch-manipulation"
           >
             {continueLabel}
           </button>

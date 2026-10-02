@@ -1,6 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-    content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
+    content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}", "../hub-ui/**/*.{ts,tsx}"],
     theme: {
         extend: {
             colors: {
@@ -28,29 +28,24 @@ export default {
                     control: 'rgb(var(--hub-control) / <alpha-value>)',
                     'control-border': 'rgb(var(--hub-control-border) / <alpha-value>)',
                 },
-                mbfd: {
-                    red: '#B91C1C',
-                    light: '#DC2626',
-                    dark: '#991B1B',
-                },
                 neutral: {
-                    50:  '#FAFAF8',
-                    100: '#F5F3F0',
-                    200: '#E8E5E0',
-                    300: '#D4D0CA',
-                    400: '#A8A29E',
-                    500: '#78716C',
-                    600: '#57534E',
-                    700: '#44403C',
-                    800: '#292524',
-                    900: '#1C1917',
+                    50:  'rgb(var(--hub-control) / <alpha-value>)',
+                    100: 'rgb(var(--hub-surface-muted) / <alpha-value>)',
+                    200: 'rgb(var(--hub-border-soft) / <alpha-value>)',
+                    300: 'rgb(var(--hub-border) / <alpha-value>)',
+                    400: 'rgb(var(--hub-border-strong) / <alpha-value>)',
+                    500: 'rgb(var(--hub-muted) / <alpha-value>)',
+                    600: 'rgb(var(--hub-ink-secondary) / <alpha-value>)',
+                    700: 'rgb(var(--hub-ink-secondary) / <alpha-value>)',
+                    800: 'rgb(var(--hub-ink) / <alpha-value>)',
+                    900: 'rgb(var(--hub-ink) / <alpha-value>)',
                 },
             },
             fontFamily: {
-                sans: ['"Source Sans 3"', '"DM Sans"', 'system-ui', 'sans-serif'],
+                sans: ['var(--hub-font-sans)'],
                 hub: ['var(--hub-font-sans)'],
-                heading: ['"Plus Jakarta Sans"', '"Outfit"', 'system-ui', 'sans-serif'],
-                mono: ['"JetBrains Mono"', 'monospace'],
+                heading: ['var(--hub-font-sans)'],
+                mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
             },
             fontSize: {
                 'fluid-sm': ['clamp(0.8rem, 0.17vw + 0.76rem, 0.89rem)', { lineHeight: '1.5' }],

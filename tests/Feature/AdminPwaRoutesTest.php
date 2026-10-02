@@ -59,13 +59,13 @@ class AdminPwaRoutesTest extends TestCase
         $this->assertStringNotContainsString('networkOnlyAdminNavigation', $worker);
     }
 
-    public function test_operational_monitoring_is_in_the_collapsed_sidebar_not_the_personal_menu(): void
+    public function test_operational_monitoring_is_in_the_system_sidebar_not_the_personal_menu(): void
     {
         $panelProvider = (string) file_get_contents(app_path('Providers/Filament/AdminPanelProvider.php'));
         $pulsePage = (string) file_get_contents(app_path('Filament/Pages/PulseDashboard.php'));
         $dashboard = (string) file_get_contents(app_path('Filament/Pages/Dashboard.php'));
 
-        $this->assertStringContainsString("->label('Monitoring')", $panelProvider);
+        $this->assertStringContainsString("->label('System')", $panelProvider);
         $this->assertStringContainsString("NavigationItem::make('Laravel Pulse')", $panelProvider);
         $this->assertStringContainsString("NavigationItem::make('Application Health')", $panelProvider);
         $this->assertStringContainsString("protected static ?string \$slug = 'pulse';", $pulsePage);

@@ -2,6 +2,7 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { contextualBackLabel, contextualBackPath } from '../utils/contextualBack';
+import { HubBack } from '../../../hub-ui/HubShell';
 
 interface PreviousPageButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'onClick' | 'type'> {
   children?: ReactNode;
@@ -38,20 +39,17 @@ export default function PreviousPageButton({
   const label = contextualBackLabel(destination);
 
   if (contextual) return (
-    <button
+    <HubBack
       {...buttonProps}
-      type="button"
-      data-hub-back
       aria-label={label}
       className={`inline-flex min-h-11 min-w-11 items-center gap-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus ${className ?? ''}`}
       onClick={() => destination.startsWith('/daily/') || destination === '/daily'
         ? navigate(destination.slice('/daily'.length) || '/', { replace: true })
         : window.location.assign(destination)}
     >
-      <svg className="h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
       <span className="sm:hidden" aria-hidden="true">Back</span>
       <span className="hidden sm:inline" aria-hidden="true">{label}</span>
-    </button>
+    </HubBack>
   );
 
   return (

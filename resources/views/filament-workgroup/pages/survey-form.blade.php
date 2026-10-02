@@ -1,8 +1,8 @@
-<x-filament-panels::page>
+<x-filament-panels::page data-hub-ui="2" data-hub-portal="workgroups">
     @if ($survey)
-        <div class="max-w-4xl space-y-6">
+        <div class="wg-survey-form space-y-6">
             <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-                <h1 class="text-xl font-semibold text-gray-950">{{ $survey->title }}</h1>
+                <h2 class="text-xl font-semibold text-gray-950">{{ $survey->title }}</h2>
                 <p class="mt-2 text-sm text-gray-700">{{ $survey->description }}</p>
                 @if ($survey->is_anonymous)
                     <p class="mt-3 rounded-md bg-blue-50 p-3 text-sm text-blue-900">Responses are de-identified in reports. Completion may be tracked to enforce one response, but answers are not shown with your identity. Demographics are optional and only reported for sufficiently large groups.</p>
@@ -12,7 +12,7 @@
 
             @foreach ($survey->questions as $question)
                 <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm" wire:key="survey-question-{{ $question->id }}">
-                    <h2 class="font-semibold text-gray-950">{{ $question->position }}. {{ $question->prompt }}</h2>
+                    <h3 class="font-semibold text-gray-950">{{ $question->position }}. {{ $question->prompt }}</h3>
                     @if ($question->help_text)<p class="mt-1 text-sm text-gray-600">{{ $question->help_text }}</p>@endif
                     <div class="mt-4 space-y-3" @if($submitted) aria-disabled="true" @endif>
                         @if ($question->type === 'single')
@@ -62,7 +62,7 @@
             @endif
 
             @unless($submitted)
-                <div class="flex justify-end gap-3"><x-filament::button color="gray" wire:click="saveDraft">Save draft</x-filament::button><x-filament::button x-on:click.prevent="if (confirm('Review your answers before submitting. Submitted responses cannot be changed. Submit now?')) { $wire.submit() }">Submit survey</x-filament::button></div>
+                <div class="wg-survey-actions flex flex-wrap justify-end gap-3"><x-filament::button color="gray" wire:click="saveDraft">Save draft</x-filament::button><x-filament::button x-on:click.prevent="if (confirm('Review your answers before submitting. Submitted responses cannot be changed. Submit now?')) { $wire.submit() }">Submit survey</x-filament::button></div>
             @endunless
         </div>
     @endif

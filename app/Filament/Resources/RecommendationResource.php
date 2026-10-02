@@ -2,22 +2,22 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\RecommendationResource\Pages;
-use App\Models\ApparatusDefectRecommendation;
-use App\Models\EquipmentItem;
-use App\Models\ApparatusInventoryAllocation;
 use App\Models\AdminAlertEvent;
+use App\Models\ApparatusDefectRecommendation;
+use App\Models\ApparatusInventoryAllocation;
+use App\Models\EquipmentItem;
+use Closure;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
+use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Filament\Resources\Resource;
-use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
-use Closure;
 
-use App\Filament\Concerns\EnterpriseTable;
 class RecommendationResource extends Resource
 {
     use EnterpriseTable;
@@ -28,9 +28,9 @@ class RecommendationResource extends Resource
 
     protected static ?string $navigationLabel = 'Replacement Recommendations';
 
-    protected static ?string $navigationGroup = 'Administration';
+    protected static ?string $navigationGroup = 'Logistics';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 100;
 
     public static function shouldRegisterNavigation(): bool
     {
@@ -74,7 +74,7 @@ class RecommendationResource extends Resource
                 Forms\Components\TextInput::make('match_confidence')
                     ->label('Match Confidence')
                     ->disabled()
-                    ->formatStateUsing(fn ($state) => $state ? number_format($state * 100, 2) . '%' : 'N/A'),
+                    ->formatStateUsing(fn ($state) => $state ? number_format($state * 100, 2).'%' : 'N/A'),
                 Forms\Components\Textarea::make('reasoning')
                     ->disabled()
                     ->columnSpanFull(),
@@ -108,7 +108,7 @@ class RecommendationResource extends Resource
                     ->limit(30),
                 Tables\Columns\TextColumn::make('match_confidence')
                     ->label('Confidence')
-                    ->formatStateUsing(fn ($state) => $state ? number_format($state * 100, 1) . '%' : 'N/A')
+                    ->formatStateUsing(fn ($state) => $state ? number_format($state * 100, 1).'%' : 'N/A')
                     ->color(fn ($state) => $state >= 0.8 ? 'success' : ($state >= 0.5 ? 'warning' : 'danger'))
                     ->sortable(),
                 Tables\Columns\TextColumn::make('match_method')
@@ -185,7 +185,7 @@ class RecommendationResource extends Resource
                             }),
                         Forms\Components\Placeholder::make('available_stock')
                             ->label('Available Stock')
-                            ->content(fn ($get) => "Available stock: " . ($get('available_stock') ?? 'N/A')),
+                            ->content(fn ($get) => 'Available stock: '.($get('available_stock') ?? 'N/A')),
                         Forms\Components\TextInput::make('qty_allocated')
                             ->label('Quantity to Allocate')
                             ->numeric()
@@ -212,11 +212,11 @@ class RecommendationResource extends Resource
                             // 1. Get item and verify stock
                             $item = EquipmentItem::findOrFail($data['equipment_item_id']);
                             $qty = $data['qty_allocated'];
-                            
+
                             if ($item->stock < $qty) {
                                 throw new \Exception("Insufficient stock: {$item->stock} available, {$qty} requested");
                             }
-                            
+
                             // 2. Create allocation record
                             $allocation = ApparatusInventoryAllocation::create([
                                 'apparatus_id' => $record->defect->apparatus_id,
@@ -227,24 +227,24 @@ class RecommendationResource extends Resource
                                 'allocated_at' => now(),
                                 'notes' => $data['notes'] ?? null,
                             ]);
-                            
+
                             // 3. Decrease stock
                             $item->decreaseStock(
                                 $qty,
                                 "Allocated to {$record->defect->apparatus->unit_id} for defect: {$record->defect->item}",
                                 "ALLOC-{$allocation->id}"
                             );
-                            
+
                             // 4. Mark recommendation as allocated
                             $record->update(['status' => 'allocated']);
-                            
+
                             // 5. Mark defect as resolved
                             $record->defect->update([
                                 'resolved' => true,
                                 'resolved_at' => now(),
                                 'resolution_notes' => "Allocated {$qty} × {$item->name} from inventory. {$data['notes']}",
                             ]);
-                            
+
                             // 6. Create alert
                             AdminAlertEvent::create([
                                 'type' => 'allocation_made',
@@ -254,7 +254,7 @@ class RecommendationResource extends Resource
                                 'related_id' => $allocation->id,
                                 'created_by_user_id' => auth()->id(),
                             ]);
-                            
+
                             // 7. Check for low stock
                             if ($item->refresh()->isLowStock()) {
                                 AdminAlertEvent::create([
@@ -266,13 +266,13 @@ class RecommendationResource extends Resource
                                 ]);
                             }
                         });
-                        
+
                         Notification::make()
                             ->success()
                             ->title('Replacement allocated')
                             ->body('Defect resolved and stock updated')
                             ->send();
-                            
+
                         // Redirect to apparatus page
                         return redirect()->to(ApparatusResource::getUrl('edit', ['record' => $record->defect->apparatus_id]));
                     }),
@@ -292,9 +292,9 @@ class RecommendationResource extends Resource
                     ->action(function (ApparatusDefectRecommendation $record, array $data) {
                         $record->update([
                             'status' => 'dismissed',
-                            'reasoning' => $record->reasoning . "\n\n[DISMISSED] " . $data['dismiss_reason'],
+                            'reasoning' => $record->reasoning."\n\n[DISMISSED] ".$data['dismiss_reason'],
                         ]);
-                        
+
                         Notification::make()
                             ->warning()
                             ->title('Recommendation dismissed')

@@ -16,6 +16,7 @@ use App\Filament\Pages\PulseDashboard;
 use App\Filament\Pages\SetPasswordPage;
 use App\Filament\Pages\Settings;
 use App\Filament\Pages\WorkgroupAdministration;
+use App\Filament\Support\HubPalette;
 use App\Filament\Widgets\FleetStatsWidget;
 use App\Filament\Widgets\InventoryOverviewWidget;
 use App\Filament\Widgets\StationOperationsHubWidget;
@@ -25,6 +26,7 @@ use App\Http\Middleware\EnsureCanonicalSessionIsCurrent;
 use App\Http\Middleware\ForceFilamentPasswordChange;
 use App\Http\Middleware\RedirectTrainingUsers;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
+use Filament\FontProviders\LocalFontProvider;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -33,7 +35,6 @@ use Filament\Navigation\NavigationGroup;
 use Filament\Navigation\NavigationItem;
 use Filament\Panel;
 use Filament\PanelProvider;
-use Filament\Support\Colors\Color;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -60,20 +61,13 @@ class AdminPanelProvider extends PanelProvider
             ->id('admin')
             ->path('admin')
             ->login(CanonicalPanelLoginRedirectController::class)
-            ->brandName('MBFD Support Hub')
+            ->brandName('MBFD Hub')
             ->brandLogo(asset('images/mbfd_logo-256.png'))
             ->brandLogoHeight('2rem')
             ->favicon(asset('favicon.ico'))
             ->darkMode(false)
-            ->colors([
-                'primary' => Color::Blue,
-                'danger' => Color::Rose,
-                'gray' => Color::Slate,
-                'info' => Color::Blue,
-                'success' => Color::Emerald,
-                'warning' => Color::Amber,
-            ])
-            ->font('Plus Jakarta Sans')
+            ->colors(HubPalette::colors())
+            ->font('Plus Jakarta Sans Variable', provider: LocalFontProvider::class)
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->plugin(FilamentShieldPlugin::make())
             ->plugin(
@@ -113,46 +107,13 @@ class AdminPanelProvider extends PanelProvider
                 StationOperationsHubWidget::class,
             ])
             ->navigationGroups([
-                NavigationGroup::make()
-                    ->label('Dashboard')
-                    ->icon('heroicon-o-rectangle-group')
-                    ->collapsed(),
-                NavigationGroup::make()
-                    ->label('Active Operations')
-                    ->icon('heroicon-o-clipboard-document-list')
-                    ->collapsed(),
-                NavigationGroup::make()
-                    ->label('Fleet Management')
-                    ->icon('heroicon-o-truck')
-                    ->collapsed(),
-                NavigationGroup::make()
-                    ->label('Inventory & Logistics')
-                    ->icon('heroicon-o-cube')
-                    ->collapsed(),
-                NavigationGroup::make()
-                    ->label('Workgroup Management')
-                    ->icon('heroicon-o-user-group')
-                    ->collapsed(),
-                NavigationGroup::make()
-                    ->label('Station Management')
-                    ->icon('heroicon-o-building-office-2')
-                    ->collapsed(),
-                NavigationGroup::make()
-                    ->label('Bid Administration')
-                    ->icon('heroicon-o-key')
-                    ->collapsed(),
-                NavigationGroup::make()
-                    ->label('Communications')
-                    ->icon('heroicon-o-envelope')
-                    ->collapsed(),
-                NavigationGroup::make()
-                    ->label('Administration')
-                    ->icon('heroicon-o-cog-6-tooth')
-                    ->collapsed(),
-                NavigationGroup::make()
-                    ->label('Monitoring')
-                    ->icon('heroicon-o-signal')
-                    ->collapsed(),
+                NavigationGroup::make()->label('Operations')->icon('heroicon-o-clipboard-document-list'),
+                NavigationGroup::make()->label('Fleet')->icon('heroicon-o-truck'),
+                NavigationGroup::make()->label('Logistics')->icon('heroicon-o-cube'),
+                NavigationGroup::make()->label('Personnel')->icon('heroicon-o-user-group'),
+                NavigationGroup::make()->label('Programs')->icon('heroicon-o-folder-open'),
+                NavigationGroup::make()->label('Communications')->icon('heroicon-o-envelope'),
+                NavigationGroup::make()->label('System')->icon('heroicon-o-cog-6-tooth'),
             ])
             ->userMenuItems([
                 'profile' => MenuItem::make()->label('My Account')->url(fn (): string => route('account.show'))->icon('heroicon-o-user-circle'),
@@ -193,35 +154,30 @@ class AdminPanelProvider extends PanelProvider
                 NavigationItem::make('Snipe-IT Inventory')
                     ->url('https://inventory.mbfdhub.com/', shouldOpenInNewTab: true)
                     ->icon('heroicon-o-cube')
-                    ->group('Inventory & Logistics')
+                    ->group('Logistics')
                     ->sort(10),
                 NavigationItem::make('Laravel Pulse')
                     ->url(fn (): string => PulseDashboard::getUrl(panel: 'admin'))
                     ->icon('heroicon-o-bolt')
-                    ->group('Monitoring')
+                    ->group('System')
                     ->sort(1)
                     ->visible(fn (): bool => auth()->user()?->can('admin.system.view') ?? false),
                 NavigationItem::make('Application Health')
                     ->url(fn (): string => HealthCheckResults::getUrl(panel: 'admin'))
                     ->icon('heroicon-o-heart')
-                    ->group('Monitoring')
+                    ->group('System')
                     ->sort(2)
                     ->visible(fn (): bool => auth()->user()?->can('admin.system.view') ?? false),
             ])
             ->renderHook(
                 PanelsRenderHook::GLOBAL_SEARCH_BEFORE,
-                fn (): string => '<a href="/" class="flex items-center justify-center w-10 h-10 rounded-lg text-gray-500 hover:text-primary-500 hover:bg-gray-100 transition" title="Return to Home" aria-label="Return to Home"><svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg></a>'
+                fn (): string => '<a href="/" class="flex items-center justify-center w-11 h-11 rounded-lg text-gray-500 hover:text-primary-500 hover:bg-gray-100 transition" title="Return to Home" aria-label="Return to Home"><svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg></a>'
             )
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
                 fn (): string => self::safeRender('filament.admin.partials.head-pwa', '<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="MBFD Hub">')
                     .self::safeRender('filament.admin.partials.navigation-state', data: [
-                        'groups' => [
-                            'Dashboard', 'Active Operations', 'Fleet Management', 'Inventory & Logistics',
-                            'Workgroup Management', 'Station Management', 'Bid Administration', 'Communications',
-                            'Administration', 'Monitoring',
-                        ],
-                        'version' => '2026-09-admin-navigation-defaults-v1',
+                        'version' => '2026-10-admin-task-navigation-v2',
                     ])
             )
             // Bisect step 2 (re-introduce): BODY_END composes 4 desktop-modernization

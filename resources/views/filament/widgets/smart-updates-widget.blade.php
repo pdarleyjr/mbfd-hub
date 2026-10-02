@@ -1,22 +1,24 @@
 <x-filament-widgets::widget>
-    <div x-data="{ expanded: $wire.entangle('isExpanded') }" wire:poll.120s="refreshTick">
+    <div class="mbfd-admin-ai" x-data="{ expanded: $wire.entangle('isExpanded') }" x-id="['admin-ai-chat', 'admin-ai-question']" wire:poll.120s="refreshTick">
         <x-filament::section>
             <x-slot name="heading">
                 <div class="flex items-center gap-2 command-center-heading">
-                    <x-heroicon-o-command-line class="w-5 h-5" style="color: #B91C1C;" />
+                    <x-heroicon-o-command-line class="w-5 h-5 mbfd-admin-ai-brand-icon" aria-hidden="true" />
                     Command Center
                 </div>
             </x-slot>
 
             <x-slot name="headerEnd">
                 <button
+                    type="button"
                     @click="expanded = !expanded"
-                    class="text-sm font-medium flex items-center gap-1"
-                    style="color: #B91C1C;">
+                    :aria-expanded="expanded.toString()"
+                    :aria-controls="$id('admin-ai-chat')"
+                    class="mbfd-admin-ai-toggle">
                     <span x-text="expanded ? 'Collapse' : 'Expand'"></span>
                     <x-heroicon-o-chevron-down
                         class="w-4 h-4"
-                        style="transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1);"
+                        aria-hidden="true"
                         x-bind:style="expanded ? 'transform: rotate(180deg)' : ''" />
                 </button>
             </x-slot>
@@ -26,11 +28,11 @@
                 <div x-show="!expanded" class="space-y-3">
                     {{-- AI Brief — regenerated only when operational data changes --}}
                     @if($aiSummary)
-                        <div class="command-center-section" style="background-color:#FFF7ED; border:1px solid #FED7AA; border-radius:8px; padding:10px;">
+                        <div class="command-center-section mbfd-admin-ai-brief">
                             <div class="flex items-center justify-between mb-1.5">
-                                <span class="command-center-badge-info">✨ AI Brief</span>
+                                <span class="command-center-badge-info">AI Brief</span>
                                 @if($aiSummaryAt)
-                                    <span class="text-xs" style="color:#A8A29E;" title="{{ $aiSummaryAt }}">
+                                    <span class="mbfd-admin-ai-meta" title="{{ $aiSummaryAt }}">
                                         updated {{ \Illuminate\Support\Carbon::parse($aiSummaryAt)->diffForHumans() }}
                                     </span>
                                 @endif
@@ -67,13 +69,13 @@
                                         <span class="{{ $badgeClass }}">
                                             {{ $section['icon'] }} {{ $section['title'] }}
                                         </span>
-                                        <span class="text-xs" style="color: #A8A29E;">
+                                        <span class="mbfd-admin-ai-meta">
                                             {{ count($section['items']) }} {{ count($section['items']) === 1 ? 'item' : 'items' }}
                                         </span>
                                     </div>
                                     @if(in_array($key, ['defects', 'shop_work']))
                                         <a href="{{ $key === 'defects' ? '/admin/defects' : '/admin/shop-works' }}"
-                                           class="text-xs font-medium" style="color: #B91C1C;">
+                                           class="mbfd-admin-ai-link">
                                             View All →
                                         </a>
                                     @endif
@@ -86,7 +88,7 @@
                             </div>
                         @endforeach
                     @else
-                        <p class="text-sm" style="color: #78716C;">Loading summary...</p>
+                        <p class="mbfd-admin-ai-meta" role="status">Loading summary…</p>
                     @endif
 
                     <div class="command-center-divider"></div>
@@ -101,12 +103,11 @@
                 </div>
 
                 {{-- Expanded State - Chat Interface --}}
-                <div x-show="expanded" x-cloak class="space-y-3">
-                    <div class="rounded-lg p-3 min-h-[200px] max-h-[400px] overflow-y-auto dashboard-widget-scrollable"
-                         style="background-color: #FAFAF8; border: 1px solid #E8E5E0;">
+                <div x-show="expanded" x-cloak :id="$id('admin-ai-chat')" class="space-y-3">
+                    <div class="mbfd-admin-ai-conversation dashboard-widget-scrollable" role="log" aria-label="AI assistant conversation" aria-live="polite" aria-relevant="additions" aria-busy="{{ $chatLoading ? 'true' : 'false' }}" tabindex="0">
                         @if(empty($chatMessages))
-                            <div class="text-xs text-center py-4" style="color: #A8A29E;">
-                                <p class="font-medium mb-2" style="color: #57534E;">Ask me anything about:</p>
+                            <div class="mbfd-admin-ai-empty">
+                                <p class="font-medium mb-2">Ask the assistant about:</p>
                                 <ul class="space-y-1">
                                     <li>• Inventory status and low stock items</li>
                                     <li>• Fleet updates and defects</li>
@@ -117,12 +118,9 @@
                         @else
                             @foreach($chatMessages as $msg)
                                 <div class="flex {{ $msg['role'] === 'user' ? 'justify-end' : 'justify-start' }} mb-2">
-                                    <div class="max-w-[85%] rounded-lg px-3 py-2 text-sm"
-                                         style="{{ $msg['role'] === 'user'
-                                             ? 'background-color: #B91C1C; color: #fff;'
-                                             : 'background-color: #fff; color: #44403C; border: 1px solid #E8E5E0;' }}">
+                                    <div class="mbfd-admin-ai-message" data-role="{{ $msg['role'] === 'user' ? 'user' : 'assistant' }}">
                                         <p class="whitespace-pre-wrap">{{ $msg['content'] }}</p>
-                                        <span class="block mt-1" style="font-size: 10px; opacity: 0.6;">{{ $msg['time'] }}</span>
+                                        <span class="mbfd-admin-ai-message-time">{{ $msg['time'] }}</span>
                                     </div>
                                 </div>
                             @endforeach
@@ -130,24 +128,27 @@
 
                         @if($chatLoading)
                             <div class="flex justify-start mb-2">
-                                <div class="rounded-lg px-3 py-2" style="background-color: #fff; border: 1px solid #E8E5E0;">
-                                    <x-filament::loading-indicator class="h-4 w-4" />
+                                <div class="mbfd-admin-ai-message mbfd-admin-ai-loading" role="status">
+                                    <x-filament::loading-indicator class="h-4 w-4" aria-hidden="true" />
+                                    <span>Preparing a response…</span>
                                 </div>
                             </div>
                         @endif
                     </div>
 
-                    <form wire:submit="sendChat" class="flex gap-2">
+                    <form wire:submit="sendChat" class="mbfd-admin-ai-form">
+                        <label :for="$id('admin-ai-question')" class="sr-only">Question or request for the AI assistant</label>
                         <input
+                            :id="$id('admin-ai-question')"
                             type="text"
                             wire:model="chatInput"
-                            placeholder="Type your question or request..."
-                            class="flex-1 text-sm rounded-lg"
-                            style="border-color: #D4D0CA; color: #292524; background-color: #fff;"
+                            placeholder="Type a question or request…"
+                            class="mbfd-admin-ai-input"
                             @if($chatLoading) disabled @endif
                         >
-                        <x-filament::button type="submit" size="sm" :disabled="$chatLoading">
-                            <x-heroicon-o-paper-airplane class="w-4 h-4" />
+                        <x-filament::button type="submit" size="sm" :disabled="$chatLoading" aria-label="Send message to the AI assistant">
+                            <x-heroicon-o-paper-airplane class="w-4 h-4" aria-hidden="true" />
+                            <span>Send</span>
                         </x-filament::button>
                     </form>
                 </div>

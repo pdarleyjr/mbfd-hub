@@ -1,4 +1,4 @@
-<x-filament-panels::page>
+<x-filament-panels::page data-hub-ui="2" data-hub-portal="employee">
     {{-- Identity bar --}}
     <div class="ep-id-bar">
         <div class="ep-id-left">
@@ -36,28 +36,29 @@
         @foreach($byCategory as $category => $items)
             <div class="ep-category">
                 <div class="ep-category-header">
-                    <span class="ep-category-name">{{ $category }}</span>
+                    <h2 class="ep-category-name">{{ $category }}</h2>
                     <span class="ep-category-count">{{ $items->count() }}</span>
                 </div>
                 <div class="ep-eq-table-wrap">
-                    <table class="ep-eq-table">
-                        <thead>
-                            <tr>
-                                <th class="ep-eq-th" style="width:40%">Item</th>
-                                <th class="ep-eq-th ep-eq-th-right" style="width:15%">Qty</th>
-                                <th class="ep-eq-th ep-eq-th-right" style="width:20%">Issued</th>
-                                <th class="ep-eq-th ep-eq-th-right" style="width:25%">Expiration</th>
+                    <table class="ep-eq-table" role="table">
+                        <caption class="hub-visually-hidden">Assigned {{ $category }} equipment</caption>
+                        <thead role="rowgroup">
+                            <tr role="row">
+                                <th scope="col" role="columnheader" class="ep-eq-th">Item</th>
+                                <th scope="col" role="columnheader" class="ep-eq-th ep-eq-th-right">Qty</th>
+                                <th scope="col" role="columnheader" class="ep-eq-th ep-eq-th-right">Issued</th>
+                                <th scope="col" role="columnheader" class="ep-eq-th ep-eq-th-right">Expiration</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody role="rowgroup">
                             @foreach($items as $item)
-                                <tr class="ep-eq-row">
-                                    <td class="ep-eq-td">{{ $item->item_description }}</td>
-                                    <td class="ep-eq-td ep-eq-td-right ep-eq-qty">{{ $item->quantity }}</td>
-                                    <td class="ep-eq-td ep-eq-td-right ep-eq-date">
+                                <tr role="row" class="ep-eq-row">
+                                    <td role="cell" class="ep-eq-td" data-label="Item">{{ $item->item_description }}</td>
+                                    <td role="cell" class="ep-eq-td ep-eq-td-right ep-eq-qty" data-label="Quantity">{{ $item->quantity }}</td>
+                                    <td role="cell" class="ep-eq-td ep-eq-td-right ep-eq-date" data-label="Issued">
                                         {{ $item->issued_at ? $item->issued_at->format('M j, Y') : '—' }}
                                     </td>
-                                    <td class="ep-eq-td ep-eq-td-right ep-eq-date">
+                                    <td role="cell" class="ep-eq-td ep-eq-td-right ep-eq-date" data-label="Expiration">
                                         @if(!$item->expires_at)
                                             —
                                         @elseif($item->expires_at->isBefore(today()))
@@ -87,171 +88,4 @@
             </div>
         @endif
     @endif
-
-    <style>
-        .ep-id-bar {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 0.875rem 1.25rem;
-            background: rgb(var(--hub-header));
-            border-radius: 0.75rem;
-            margin-bottom: 1.25rem;
-            flex-wrap: wrap;
-            gap: 0.75rem;
-        }
-        .ep-id-left {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        .ep-id-name {
-            font-size: 1rem;
-            font-weight: 700;
-            color: #ffffff;
-        }
-        .ep-id-sep { color: #cbd5e1; }
-        .ep-id-rank {
-            font-size: 0.8125rem;
-            color: #e2e8f0;
-            font-weight: 500;
-        }
-        .ep-id-right {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        .ep-id-label {
-            font-size: 0.6875rem;
-            color: #cbd5e1;
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-        }
-        .ep-id-number {
-            font-size: 0.875rem;
-            font-weight: 700;
-            color: #ffffff;
-            font-variant-numeric: tabular-nums;
-            background: rgba(255,255,255,0.08);
-            padding: 0.125rem 0.5rem;
-            border-radius: 0.375rem;
-        }
-        .ep-eq-summary {
-            font-size: 0.8125rem;
-            color: rgb(var(--hub-muted));
-            margin-bottom: 1rem;
-        }
-        .ep-empty-full {
-            display: flex;
-            justify-content: center;
-            padding: 3rem 1rem;
-        }
-        .ep-empty-inner {
-            text-align: center;
-            max-width: 22rem;
-        }
-        .ep-empty-big-icon {
-            width: 3rem;
-            height: 3rem;
-            color: rgb(var(--hub-border-strong));
-            margin: 0 auto 1rem;
-        }
-        .ep-empty-heading {
-            font-size: 1rem;
-            font-weight: 700;
-            color: rgb(var(--hub-ink));
-            margin-bottom: 0.5rem;
-        }
-        .ep-empty-body {
-            font-size: 0.875rem;
-            color: rgb(var(--hub-muted));
-            line-height: 1.6;
-            margin-bottom: 1.25rem;
-        }
-        .ep-empty-cta {
-            display: inline-flex;
-            align-items: center;
-            padding: 0.625rem 1.25rem;
-            background: rgb(var(--hub-blue));
-            color: #ffffff;
-            border-radius: 0.625rem;
-            font-size: 0.875rem;
-            font-weight: 600;
-            text-decoration: none;
-            transition: background 150ms;
-        }
-        .ep-empty-cta:hover { background: rgb(var(--hub-blue-strong)); }
-        .ep-category {
-            margin-bottom: 1.25rem;
-        }
-        .ep-category-header {
-            display: flex;
-            align-items: center;
-            gap: 0.625rem;
-            margin-bottom: 0.5rem;
-        }
-        .ep-category-name {
-            font-size: 0.75rem;
-            font-weight: 700;
-            color: rgb(var(--hub-muted));
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-        }
-        .ep-category-count {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 1.375rem;
-            height: 1.375rem;
-            border-radius: 50%;
-            background: rgb(var(--hub-surface-muted));
-            font-size: 0.625rem;
-            font-weight: 700;
-            color: rgb(var(--hub-muted));
-        }
-        .ep-eq-table-wrap {
-            background: #ffffff;
-            border: 1px solid rgb(var(--hub-border));
-            border-radius: 0.75rem;
-            overflow: hidden;
-        }
-        .ep-eq-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.8125rem;
-        }
-        .ep-eq-th {
-            padding: 0.625rem 1rem;
-            font-size: 0.6875rem;
-            font-weight: 700;
-            color: rgb(var(--hub-muted));
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            background: rgb(var(--hub-surface-muted));
-            border-bottom: 1px solid rgb(var(--hub-border));
-            text-align: left;
-        }
-        .ep-eq-th-right { text-align: right; }
-        .ep-eq-row {
-            border-bottom: 1px solid rgb(var(--hub-surface-muted));
-            transition: background 120ms;
-        }
-        .ep-eq-row:last-child { border-bottom: none; }
-        .ep-eq-row:hover { background: rgb(var(--hub-canvas)); }
-        .ep-eq-td {
-            padding: 0.75rem 1rem;
-            color: rgb(var(--hub-ink));
-        }
-        .ep-eq-td-right { text-align: right; }
-        .ep-expiration{display:inline-flex;border-radius:999px;padding:.2rem .45rem;font-size:.65rem;font-weight:800}.ep-expiration-soon{background:#fef3c7;color:#92400e}.ep-expiration-expired{background:#fee2e2;color:#991b1b}.ep-expired-text{color:#b91c1c}.ep-history-row{display:flex;min-height:3.5rem;align-items:center;justify-content:space-between;gap:1rem;padding:.75rem 1rem;border-bottom:1px solid rgb(var(--hub-surface-muted));color:rgb(var(--hub-ink-secondary));font-size:.78rem}.ep-history-row:last-child{border:0}.ep-history-row strong,.ep-history-row small{display:block}.ep-history-row strong{color:rgb(var(--hub-ink))}.ep-history-row small{margin-top:.15rem;color:rgb(var(--hub-muted))}
-        .ep-eq-qty {
-            font-weight: 700;
-            font-variant-numeric: tabular-nums;
-            color: rgb(var(--hub-ink));
-        }
-        .ep-eq-date {
-            color: rgb(var(--hub-muted));
-            font-variant-numeric: tabular-nums;
-        }
-    </style>
 </x-filament-panels::page>

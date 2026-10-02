@@ -21,15 +21,15 @@ class DefectResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-exclamation-triangle';
 
-    protected static ?string $navigationLabel = 'Missing / Damaged Equipment';
+    protected static ?string $navigationLabel = 'Defects';
 
-    protected static ?string $navigationGroup = 'Fleet Management';
+    protected static ?string $navigationGroup = 'Operations';
 
     protected static ?string $modelLabel = 'Equipment Issue';
 
     protected static ?string $pluralModelLabel = 'Missing / Damaged Equipment';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 60;
 
     public static function form(Form $form): Form
     {
@@ -96,48 +96,51 @@ class DefectResource extends Resource
         return self::applyEnterpriseDefaults($table)
             ->columns([
                 Tables\Columns\TextColumn::make('apparatus.name')
+                    ->wrap()
+                    ->extraAttributes(['class' => 'hub-phone-summary'])
+                    ->description(fn (ApparatusDefect $record): string => $record->compartment.' / '.$record->item.' · '.str($record->issue_type)->headline().' · '.str($record->status)->headline())
                     ->label('Apparatus')
                     ->searchable()
                     ->sortable(),
 
-                Tables\Columns\ImageColumn::make('photo_path')
+                Tables\Columns\ImageColumn::make('photo_path')->visibleFrom('md')
                     ->label('Photo')
                     ->getStateUsing(fn (ApparatusDefect $record): ?string => $record->availablePhotoPath())
                     ->disk('public')
                     ->width(60)
                     ->height(60),
 
-                Tables\Columns\TextColumn::make('photo_availability')
+                Tables\Columns\TextColumn::make('photo_availability')->visibleFrom('md')
                     ->label('Photo status')
                     ->getStateUsing(fn (ApparatusDefect $record): ?string => $record->hasMissingPhotoReference()
                         ? 'Photo unavailable'
                         : null)
                     ->placeholder('—'),
 
-                Tables\Columns\TextColumn::make('compartment')
+                Tables\Columns\TextColumn::make('compartment')->visibleFrom('md')
                     ->searchable()
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('item')
+                Tables\Columns\TextColumn::make('item')->visibleFrom('md')
                     ->searchable(),
 
-                Tables\Columns\TextColumn::make('status')
+                Tables\Columns\TextColumn::make('status')->visibleFrom('md')
                     ->colors([
                         'danger' => 'open',
                         'warning' => 'in_progress',
                         'success' => 'resolved',
                     ]),
 
-                Tables\Columns\TextColumn::make('issue_type')
+                Tables\Columns\TextColumn::make('issue_type')->visibleFrom('md')
                     ->label('Issue Type')
                     ->formatStateUsing(fn ($state) => str_replace('_', ' ', ucfirst($state))),
 
-                Tables\Columns\TextColumn::make('reported_date')
+                Tables\Columns\TextColumn::make('reported_date')->visibleFrom('md')
                     ->label('Reported Date')
                     ->date()
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('resolved_at')
+                Tables\Columns\TextColumn::make('resolved_at')->visibleFrom('md')
                     ->label('Resolved')
                     ->dateTime()
                     ->sortable()
@@ -167,33 +170,35 @@ class DefectResource extends Resource
                     ->label('Station'),
             ])
             ->actions([
-                Tables\Actions\Action::make('mark_resolved')
-                    ->label('Mark Resolved')
-                    ->icon('heroicon-o-check-circle')
-                    ->color('success')
-                    ->tooltip('Resolve this equipment issue')
-                    ->visible(fn (ApparatusDefect $record) => $record->status !== 'resolved')
-                    ->form([
-                        Forms\Components\Textarea::make('resolution_notes')
-                            ->label('Resolution Notes')
-                            ->required()
-                            ->rows(3),
-                    ])
-                    ->action(function (ApparatusDefect $record, array $data) {
-                        $record->update([
-                            'status' => 'resolved',
-                            'resolution_notes' => $data['resolution_notes'],
-                            'resolved_at' => now(),
-                        ]);
-                    })
-                    ->successNotification(
-                        fn () => \Filament\Notifications\Notification::make()
-                            ->success()
-                            ->title('Defect Resolved')
-                            ->body('The defect has been marked as resolved.')
-                    ),
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\Action::make('mark_resolved')
+                        ->label('Mark Resolved')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->tooltip('Resolve this equipment issue')
+                        ->visible(fn (ApparatusDefect $record) => $record->status !== 'resolved')
+                        ->form([
+                            Forms\Components\Textarea::make('resolution_notes')
+                                ->label('Resolution Notes')
+                                ->required()
+                                ->rows(3),
+                        ])
+                        ->action(function (ApparatusDefect $record, array $data) {
+                            $record->update([
+                                'status' => 'resolved',
+                                'resolution_notes' => $data['resolution_notes'],
+                                'resolved_at' => now(),
+                            ]);
+                        })
+                        ->successNotification(
+                            fn () => \Filament\Notifications\Notification::make()
+                                ->success()
+                                ->title('Defect Resolved')
+                                ->body('The defect has been marked as resolved.')
+                        ),
 
-                Tables\Actions\EditAction::make(),
+                    Tables\Actions\EditAction::make(),
+                ])->label('Actions')->icon('heroicon-m-ellipsis-horizontal')->button()->color('gray'),
             ])
             ->defaultSort('reported_date', 'desc');
     }

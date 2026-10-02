@@ -9,8 +9,10 @@ export default defineConfig({
         laravel({
             input: [
                 'resources/css/app.css',
+                'resources/css/pulse-font.css',
                 'resources/js/app.js',
                 'resources/js/home.js',
+                'resources/js/hub-shell.js',
                 'resources/js/hub-support/blade.js',
                 'resources/js/pump-simulator/main.tsx',
                 'resources/js/push-notification-widget.js',

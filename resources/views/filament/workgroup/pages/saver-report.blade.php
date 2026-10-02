@@ -218,7 +218,7 @@
     </style>
     @vite(['resources/css/app.css'])
 </head>
-<body class="hub-report hub-report--saver-report">
+<body data-hub-ui="2" data-hub-portal="report" class="hub-report hub-report--saver-report">
     <div class="hub-report-navigation"><x-hub-header back-href="/workgroups/session-results" back-label="Back to Session Results" max-width="max-w-7xl" /></div>
     <div class="print-controls">
         <button class="print-btn print-btn--primary" onclick="window.print()">

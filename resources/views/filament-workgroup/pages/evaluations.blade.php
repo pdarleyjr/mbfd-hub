@@ -1,4 +1,4 @@
-<x-filament-panels::page>
+<x-filament-panels::page data-hub-ui="2" data-hub-portal="workgroups">
     {{-- Session switcher pill badges (quick-click between sessions) --}}
     @php
         $currentMember = method_exists($this, 'getCurrentMember') ? $this->getCurrentMember() : null;
@@ -6,13 +6,15 @@
     @endphp
 
     @if($attendedSessions->count() > 1)
-    <div class="mb-4 flex flex-wrap gap-2 items-center">
+    <div class="wg-context-switcher mb-4" role="group" aria-label="Select evaluation session">
         <span class="text-sm font-medium text-gray-500 dark:text-gray-400">Session:</span>
         @foreach($attendedSessions as $session)
             <button
+                type="button"
                 wire:click="switchSession({{ $session->id }})"
+                aria-pressed="{{ $selectedSession == $session->id ? 'true' : 'false' }}"
                 @class([
-                    'inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium transition-colors',
+                    'inline-flex items-center gap-1 px-3 py-1.5 rounded-md min-h-11 text-sm font-medium transition-colors',
                     'bg-primary-600 text-white shadow-sm' => $selectedSession == $session->id,
                     'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600' => $selectedSession != $session->id,
                 ])

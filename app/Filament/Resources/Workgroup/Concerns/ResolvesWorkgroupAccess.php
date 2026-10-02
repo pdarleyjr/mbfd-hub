@@ -9,6 +9,13 @@ use App\Support\Workgroups\WorkgroupAccess;
 
 trait ResolvesWorkgroupAccess
 {
+    public static function getNavigationGroup(): ?string
+    {
+        return filament()->getCurrentPanel()?->getId() === 'admin'
+            ? 'Programs'
+            : parent::getNavigationGroup();
+    }
+
     private static function workgroupAccess(): WorkgroupAccess
     {
         return app(WorkgroupAccess::class);

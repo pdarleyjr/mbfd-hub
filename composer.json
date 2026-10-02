@@ -15,7 +15,7 @@
         "google/apiclient": "^2.15",
         "jeremy379/laravel-openid-connect": "^3.3.0",
         "laravel-notification-channels/webpush": "^10.4",
-        "laravel/framework": "^12.61.1",
+        "laravel/framework": "^12.69.0",
         "laravel/passport": "^13.7.1",
         "laravel/pulse": "^1.0",
         "laravel/reverb": "^1.0",
@@ -82,13 +82,6 @@
         "optimize-autoloader": true,
         "preferred-install": "dist",
         "sort-packages": true,
-        "audit": {
-            "ignore": {
-                "PKSA-3r5d-mb8f-1qw9": "No patched Laravel 11 release is available; remove this ignore when Laravel publishes a fixed 11.x release.",
-                "PKSA-m5cs-t1y6-qpcs": "No patched Laravel 11 release is available; remove this ignore when Laravel publishes a fixed 11.x release.",
-                "PKSA-mdq4-51ck-6kdq": "No patched Laravel 11 release is available; remove this ignore when Laravel publishes a fixed 11.x release."
-            }
-        },
         "allow-plugins": {
             "pestphp/pest-plugin": true,
             "php-http/discovery": true

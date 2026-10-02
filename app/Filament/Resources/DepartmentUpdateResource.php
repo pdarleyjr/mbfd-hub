@@ -33,11 +33,11 @@ final class DepartmentUpdateResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-megaphone';
 
-    protected static ?string $navigationGroup = null;
+    protected static ?string $navigationGroup = 'Communications';
 
     protected static ?string $navigationLabel = 'Department Updates';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 10;
 
     public static function form(Form $form): Form
     {
@@ -181,7 +181,11 @@ final class DepartmentUpdateResource extends Resource
                     ->badge()
                     ->formatStateUsing(fn (DepartmentUpdateStatus $state): string => $state->label())
                     ->color(fn (DepartmentUpdateStatus $state): string => $state->color()),
-                Tables\Columns\IconColumn::make('is_pinned')->label('Pinned')->boolean(),
+                Tables\Columns\TextColumn::make('is_pinned')
+                    ->label('Pinned')
+                    ->formatStateUsing(fn (bool $state): string => $state ? 'Pinned' : 'Not pinned')
+                    ->icon(fn (bool $state): string => $state ? 'heroicon-o-check-circle' : 'heroicon-o-x-circle')
+                    ->iconColor(fn (bool $state): string => $state ? 'success' : 'danger'),
                 Tables\Columns\TextColumn::make('author.name')->label('Author')->placeholder('Former user'),
                 Tables\Columns\TextColumn::make('publish_at')->dateTime(timezone: 'America/New_York')->sortable(),
                 Tables\Columns\TextColumn::make('expires_at')->dateTime(timezone: 'America/New_York')->placeholder('No expiration')->sortable(),

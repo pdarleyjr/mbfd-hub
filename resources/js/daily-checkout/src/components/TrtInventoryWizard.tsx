@@ -247,7 +247,7 @@ export default function TrtInventoryWizard() {
       )}
 
       {searchOpen && (
-        <div className="fixed inset-0 z-40 bg-black/50 flex flex-col">
+        <div className="fixed inset-0 z-[60] bg-black/50 flex flex-col">
           <div className="bg-white rounded-b-2xl shadow-xl max-h-[80vh] flex flex-col">
             {/* Search header */}
             <div className="flex items-center gap-3 p-4 border-b border-hub-border">
@@ -339,7 +339,7 @@ export default function TrtInventoryWizard() {
                 Submit when done — works offline too
               </li>
             </ul>
-            <p className="mt-4 text-xs text-hub-muted">
+            <p className="mt-4 text-xs text-hub-ink-secondary">
               Multiple team members can submit their sections. All entries merge into today&apos;s session automatically.
             </p>
           </div>

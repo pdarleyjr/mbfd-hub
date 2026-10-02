@@ -17,7 +17,7 @@
     --hub-red: 220 38 38;
     --hub-red-strong: 185 28 28;
 
-    --hub-canvas: 247 250 252;
+    --hub-canvas: 255 255 255;
     --hub-surface: 255 255 255;
     --hub-surface-muted: 241 245 249;
 
@@ -32,6 +32,7 @@
 
     --hub-success: 4 120 87;
     --hub-warning: 180 83 9;
+    --hub-warning-strong: 146 64 14;
     --hub-danger: 185 28 28;
     --hub-focus: 29 78 216;
 

@@ -4,12 +4,14 @@ namespace App\Providers\Filament;
 
 use App\Filament\Pages\NotificationSettings;
 use App\Filament\Pages\SetPasswordPage;
+use App\Filament\Support\HubPalette;
 use App\Filament\Training\Pages\Settings as TrainingSettings;
 use App\Http\Controllers\Auth\CanonicalPanelLoginRedirectController;
 use App\Http\Middleware\AuthenticateCanonicalPanelUser;
 use App\Http\Middleware\EnsureCanonicalSessionIsCurrent;
 use App\Http\Middleware\EnsureTrainingPanelAccess;
 use App\Http\Middleware\ForceFilamentPasswordChange;
+use Filament\FontProviders\LocalFontProvider;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
@@ -17,7 +19,6 @@ use Filament\Navigation\MenuItem;
 use Filament\Navigation\NavigationGroup;
 use Filament\Panel;
 use Filament\PanelProvider;
-use Filament\Support\Colors\Color;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -35,21 +36,14 @@ class TrainingPanelProvider extends PanelProvider
             ->path('training')
             ->homeUrl('/')
             ->login(CanonicalPanelLoginRedirectController::class)
-            ->brandName('MBFD Training Division')
+            ->brandName('MBFD Hub · Training')
             ->brandLogo(asset('images/mbfd_logo-256.png'))
             ->brandLogoHeight('2rem')
             ->darkModeBrandLogo(asset('images/mbfd_logo-256.png'))
             ->favicon(asset('favicon.ico'))
             ->darkMode(false)
-            ->colors([
-                'primary' => Color::Blue,
-                'danger' => Color::Rose,
-                'gray' => Color::Slate,
-                'info' => Color::Blue,
-                'success' => Color::Emerald,
-                'warning' => Color::Amber,
-            ])
-            ->font('Plus Jakarta Sans')
+            ->colors(HubPalette::colors())
+            ->font('Plus Jakarta Sans Variable', provider: LocalFontProvider::class)
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->discoverResources(in: app_path('Filament/Training/Resources'), for: 'App\\Filament\\Training\\Resources')
             ->discoverPages(in: app_path('Filament/Training/Pages'), for: 'App\\Filament\\Training\\Pages')

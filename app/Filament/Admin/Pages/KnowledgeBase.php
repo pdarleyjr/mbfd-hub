@@ -25,15 +25,15 @@ class KnowledgeBase extends Page implements HasForms
 
     protected static ?string $navigationIcon = 'heroicon-o-book-open';
 
-    protected static ?string $navigationLabel = 'AI Knowledge Base';
+    protected static ?string $navigationLabel = 'Knowledge Base';
 
     protected static ?string $title = 'AI Knowledge Base';
 
     protected static ?string $slug = 'knowledge-base';
 
-    protected static ?string $navigationGroup = 'Administration';
+    protected static ?string $navigationGroup = 'Communications';
 
-    protected static ?int $navigationSort = 90;
+    protected static ?int $navigationSort = 60;
 
     protected static string $view = 'filament.admin.pages.knowledge-base';
 

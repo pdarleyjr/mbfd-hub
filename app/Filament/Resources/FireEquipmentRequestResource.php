@@ -22,9 +22,9 @@ class FireEquipmentRequestResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
 
-    protected static ?string $navigationGroup = 'Station Management';
+    protected static ?string $navigationGroup = 'Operations';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 35;
 
     protected static ?string $navigationLabel = 'Equipment Requests';
 

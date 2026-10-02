@@ -4,8 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MBFD Workgroup Summary — Mid-Mount Ladder Equipment Evaluation Report</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Source+Serif+4:opsz,wght@8..60,300;8..60,400;8..60,500;8..60,600;8..60,700&display=swap" rel="stylesheet">
     <style>
         /* ── CSS Reset & Base ── */
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -28,7 +26,7 @@
             --color-border: #e2e8f0;
             --color-bg: #ffffff;
             --color-bg-alt: #f8fafc;
-            --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+            --font-sans: var(--hub-font-sans);
             --font-serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;
         }
 
@@ -501,7 +499,7 @@
     </style>
     @vite(['resources/css/app.css'])
 </head>
-<body class="hub-report hub-report--workgroup-summary">
+<body data-hub-ui="2" data-hub-portal="report" class="hub-report hub-report--workgroup-summary">
     <div class="hub-report-navigation"><x-hub-header back-href="/workgroups/links" back-label="Back to Workgroup Links" max-width="max-w-7xl" /></div>
 
 <!-- ══ Print / Save as PDF Button ══ -->
@@ -627,9 +625,9 @@
 
             <h3 class="subsection-heading">3.2 The Compartment Challenge: Asymmetrical Storage</h3>
             <p>The most consequential platform constraint identified on Day 1 was the asymmetrical compartment architecture inherent to the mid-mount design:</p>
-            <div class="report-table-wrap">
+            <div class="report-table-wrap" tabindex="0" role="region" aria-label="Equipment report table">
                 <table class="report-table">
-                    <thead><tr><th>Side</th><th>Configuration</th><th>Implication</th></tr></thead>
+                    <thead><tr><th scope="col">Side</th><th scope="col">Configuration</th><th scope="col">Implication</th></tr></thead>
                     <tbody>
                         <tr><td><strong>Driver Side (L Zones)</strong></td><td>Full height, full depth</td><td>Primary bulk storage for fans, saws, rescue kits</td></tr>
                         <tr><td><strong>Officer Side (R Zones)</strong></td><td>Full height, <em>reduced depth</em></td><td>Torque box intrusion limits stowage depth</td></tr>
@@ -715,9 +713,9 @@
 
             <h3 class="subsection-heading">5.1 Extrication Brand Overall Performance (Corrected)</h3>
             <p>Four extrication manufacturers advanced to the final evaluation. Brand averages are derived strictly from the frontline triad (32-inch spreader, cutter, ram):</p>
-            <div class="report-table-wrap">
+            <div class="report-table-wrap" tabindex="0" role="region" aria-label="Equipment report table">
                 <table class="report-table">
-                    <thead><tr><th>Rank</th><th>Brand</th><th>Corrected Avg</th><th>Capability</th><th>Usability</th><th>Maintainability</th><th>Deployability</th></tr></thead>
+                    <thead><tr><th scope="col">Rank</th><th scope="col">Brand</th><th scope="col">Corrected Avg</th><th scope="col">Capability</th><th scope="col">Usability</th><th scope="col">Maintainability</th><th scope="col">Deployability</th></tr></thead>
                     <tbody>
                         <tr><td><span class="rank-badge rank-1">#1</span></td><td><strong>Holmatro</strong></td><td class="score-elite">90.72</td><td>89.41</td><td>93.99</td><td>89.82</td><td>89.69</td></tr>
                         <tr><td><span class="rank-badge rank-2">#2</span></td><td><strong>Hurst</strong></td><td class="score-capable">86.53</td><td>87.56</td><td>85.76</td><td>82.58</td><td>82.74</td></tr>
@@ -729,9 +727,9 @@
             <p>Holmatro achieved Elite classification (90+) while Hurst achieved Highly Capable (80–89). The most significant dimension gap between the top two brands occurred in <strong>Usability</strong> (+8.23 points favoring Holmatro). The narrowest gap appeared in <strong>Capability</strong> (+1.85), confirming that both platforms deliver competitive raw performance.</p>
 
             <h3 class="subsection-heading">5.2 Frontline Extrication Tools: Individual Corrected Scores</h3>
-            <div class="report-table-wrap">
+            <div class="report-table-wrap" tabindex="0" role="region" aria-label="Equipment report table">
                 <table class="report-table">
-                    <thead><tr><th>Tool Category</th><th>Product Model</th><th>Manufacturer</th><th>Corrected Score</th></tr></thead>
+                    <thead><tr><th scope="col">Tool Category</th><th scope="col">Product Model</th><th scope="col">Manufacturer</th><th scope="col">Corrected Score</th></tr></thead>
                     <tbody>
                         <tr><td>Spreader</td><td>PSP40 (32-inch)</td><td>Holmatro</td><td class="score-elite">92.02</td></tr>
                         <tr><td>Ram</td><td>PRA40</td><td>Holmatro</td><td class="score-elite">91.29</td></tr>
@@ -788,9 +786,9 @@
                     <span class="score-badge elite">91.25 Elite</span>
                 </div>
             </div>
-            <div class="report-table-wrap">
+            <div class="report-table-wrap" tabindex="0" role="region" aria-label="Equipment report table">
                 <table class="report-table">
-                    <thead><tr><th>Rank</th><th>Product</th><th>Manufacturer</th><th>Score</th></tr></thead>
+                    <thead><tr><th scope="col">Rank</th><th scope="col">Product</th><th scope="col">Manufacturer</th><th scope="col">Score</th></tr></thead>
                     <tbody>
                         <tr><td><span class="rank-badge rank-1">#1</span></td><td>12-inch (DCPS612AG2)</td><td>DeWalt</td><td class="score-elite">91.25</td></tr>
                         <tr><td><span class="rank-badge rank-2">#2</span></td><td>14-inch (GEC01PL4)</td><td>Makita</td><td class="score-deficient">64.83</td></tr>
@@ -810,9 +808,9 @@
                     <p class="img-caption">Paratech StrutDriver — 76.13</p>
                 </div>
             </div>
-            <div class="report-table-wrap">
+            <div class="report-table-wrap" tabindex="0" role="region" aria-label="Equipment report table">
                 <table class="report-table">
-                    <thead><tr><th>Rank</th><th>System</th><th>Manufacturer</th><th>Score</th></tr></thead>
+                    <thead><tr><th scope="col">Rank</th><th scope="col">System</th><th scope="col">Manufacturer</th><th scope="col">Score</th></tr></thead>
                     <tbody>
                         <tr><td><span class="rank-badge rank-1">#1</span></td><td>V-Strut (Auto-locking)</td><td>Holmatro</td><td class="score-capable">87.28</td></tr>
                         <tr><td><span class="rank-badge rank-2">#2</span></td><td>OmniShore (Pneumatic)</td><td>Holmatro</td><td class="score-capable">85.87</td></tr>
@@ -837,9 +835,9 @@
                     <span class="score-badge capable">82.23 Highly Capable</span>
                 </div>
             </div>
-            <div class="report-table-wrap">
+            <div class="report-table-wrap" tabindex="0" role="region" aria-label="Equipment report table">
                 <table class="report-table">
-                    <thead><tr><th>Specification</th><th>Value</th></tr></thead>
+                    <thead><tr><th scope="col">Specification</th><th scope="col">Value</th></tr></thead>
                     <tbody>
                         <tr><td>Weight</td><td>17.0 lbs (7.7 kg)</td></tr>
                         <tr><td>Spreading Force</td><td>33.0 kN (7,419 lbf)</td></tr>
@@ -884,9 +882,9 @@
             </ol>
 
             <h3 class="subsection-heading">7.2 Final Selected Equipment Package</h3>
-            <div class="report-table-wrap">
+            <div class="report-table-wrap" tabindex="0" role="region" aria-label="Equipment report table">
                 <table class="report-table">
-                    <thead><tr><th>Category</th><th>Selected Equipment</th><th>Platform Assignment</th></tr></thead>
+                    <thead><tr><th scope="col">Category</th><th scope="col">Selected Equipment</th><th scope="col">Platform Assignment</th></tr></thead>
                     <tbody>
                         <tr><td>Cut-Off Saw</td><td>DeWalt 12" Battery Cut-Off Saw (DCPS612AG2)</td><td>Frontline (L1/L3)</td></tr>
                         <tr><td>Chainsaw</td><td>DeWalt 18" Chainsaw (bullet chain + depth markings)</td><td>Frontline (L1/L3)</td></tr>
@@ -920,9 +918,9 @@
             <p>The workgroup established a tiered deployment architecture ensuring full operational independence across all rescue scenarios without dependency on mutual aid.</p>
 
             <h4 class="sub-subsection-heading">Frontline Apparatus (L1 / L3)</h4>
-            <div class="report-table-wrap">
+            <div class="report-table-wrap" tabindex="0" role="region" aria-label="Equipment report table">
                 <table class="report-table">
-                    <thead><tr><th>Equipment</th><th>Deployment Role</th></tr></thead>
+                    <thead><tr><th scope="col">Equipment</th><th scope="col">Deployment Role</th></tr></thead>
                     <tbody>
                         <tr><td>Hurst SP 777 E3 Connect Spreader</td><td>Primary extrication spreading</td></tr>
                         <tr><td>Hurst S 789 E3 Connect Cutter</td><td>Primary extrication cutting</td></tr>
@@ -936,9 +934,9 @@
             </div>
 
             <h4 class="sub-subsection-heading">Command Level (300 / Captain 5)</h4>
-            <div class="report-table-wrap">
+            <div class="report-table-wrap" tabindex="0" role="region" aria-label="Equipment report table">
                 <table class="report-table">
-                    <thead><tr><th>Equipment</th><th>Deployment Role</th></tr></thead>
+                    <thead><tr><th scope="col">Equipment</th><th scope="col">Deployment Role</th></tr></thead>
                     <tbody>
                         <tr><td>Hurst M40 40" Spreader</td><td>Heavy extrication beyond standard parameters</td></tr>
                         <tr><td>2 × CAPTIUM Batteries</td><td>Extended power supply</td></tr>
@@ -977,9 +975,9 @@
             </ul>
 
             <h3 class="subsection-heading">9.2 Ladder Truck In-Service Requirements</h3>
-            <div class="report-table-wrap">
+            <div class="report-table-wrap" tabindex="0" role="region" aria-label="Equipment report table">
                 <table class="report-table">
-                    <thead><tr><th>Training Component</th><th>Requirement</th></tr></thead>
+                    <thead><tr><th scope="col">Training Component</th><th scope="col">Requirement</th></tr></thead>
                     <tbody>
                         <tr><td>Driving Operations</td><td>Full certification on mid-mount ladder configuration</td></tr>
                         <tr><td>Pumping Operations</td><td>Operational proficiency on all pump functions</td></tr>
@@ -1002,9 +1000,9 @@
         <!-- Appendices -->
         <div class="report-section page-break" id="sec-appendix-a">
             <h2 class="section-heading"><span class="section-num">A.</span> Appendix A — Product Evaluation Data Summary</h2>
-            <div class="report-table-wrap">
+            <div class="report-table-wrap" tabindex="0" role="region" aria-label="Equipment report table">
                 <table class="report-table">
-                    <thead><tr><th>Product</th><th>Category</th><th>Manufacturer</th><th>Corrected Score</th></tr></thead>
+                    <thead><tr><th scope="col">Product</th><th scope="col">Category</th><th scope="col">Manufacturer</th><th scope="col">Corrected Score</th></tr></thead>
                     <tbody>
                         <tr><td>Holmatro PSP40 (32" Spreader)</td><td>Hydraulic Tool</td><td>Holmatro</td><td class="score-elite">92.02</td></tr>
                         <tr><td>Holmatro PRA40 (Ram)</td><td>Hydraulic Tool</td><td>Holmatro</td><td class="score-elite">91.29</td></tr>

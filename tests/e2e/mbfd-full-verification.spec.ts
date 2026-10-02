@@ -27,7 +27,7 @@ test.describe('Desktop — Core Pages', () => {
     const manifest = await response?.json();
     expect(manifest.display).toBe('standalone');
     expect(manifest.theme_color).toBe('#102A43');
-    expect(manifest.background_color).toBe('#F7FAFC');
+    expect(manifest.background_color).toBe('#FFFFFF');
     expect(manifest.icons).toBeDefined();
     expect(manifest.icons.length).toBeGreaterThan(0);
   });

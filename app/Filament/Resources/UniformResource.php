@@ -12,6 +12,8 @@ use Filament\Tables\Table;
 
 class UniformResource extends Resource
 {
+    protected static ?int $navigationSort = 40;
+
     public static function shouldRegisterNavigation(): bool
     {
         return false;
@@ -21,7 +23,7 @@ class UniformResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
 
-    protected static ?string $navigationGroup = 'Inventory & Logistics';
+    protected static ?string $navigationGroup = 'Logistics';
 
     public static function form(Form $form): Form
     {

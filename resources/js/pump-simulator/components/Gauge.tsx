@@ -114,10 +114,12 @@ const Gauge: React.FC<GaugeProps> = ({
         {ticks.map((t, i) => (
           <g key={i}>
             <line x1={t.x1} y1={t.y1} x2={t.x2} y2={t.y2} stroke="#333" strokeWidth="1.5" />
-            <text x={t.lx} y={t.ly} textAnchor="middle" dominantBaseline="central"
-              fontSize="9" fill="#444" fontWeight="600" fontFamily="monospace">
-              {t.value}
-            </text>
+            {(max - min <= 500 || (t.value - min) % 500 === 0 || t.value === max) && (
+              <text x={t.lx} y={t.ly} textAnchor="middle" dominantBaseline="central"
+                fontSize="9" fill="#444" fontWeight="600" fontFamily="monospace">
+                {t.value}
+              </text>
+            )}
           </g>
         ))}
 

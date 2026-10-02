@@ -19,9 +19,9 @@ class StationInspectionResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';
 
-    protected static ?string $navigationGroup = 'Station Management';
+    protected static ?string $navigationGroup = 'Operations';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 80;
 
     protected static ?string $navigationLabel = 'Station Inspections';
 

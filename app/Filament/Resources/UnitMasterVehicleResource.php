@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\UnitMasterVehicleResource\Pages;
 use App\Models\UnitMasterVehicle;
 use Filament\Forms;
@@ -10,7 +11,6 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 
-use App\Filament\Concerns\EnterpriseTable;
 class UnitMasterVehicleResource extends Resource
 {
     use EnterpriseTable;
@@ -19,15 +19,15 @@ class UnitMasterVehicleResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
 
-    protected static ?string $navigationGroup = 'Fleet Management';
+    protected static ?string $navigationGroup = 'Fleet';
 
-    protected static ?string $navigationLabel = 'Unit Master Inventory';
+    protected static ?string $navigationLabel = 'Unit Master';
 
     protected static ?string $modelLabel = 'Unit Master Vehicle';
 
     protected static ?string $pluralModelLabel = 'Unit Master Inventory';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 20;
 
     public static function form(Form $form): Form
     {

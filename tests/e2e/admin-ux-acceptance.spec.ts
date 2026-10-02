@@ -54,7 +54,7 @@ test.describe('Admin UX acceptance', () => {
     await expect(fleet).toHaveAttribute('aria-expanded', 'true');
     await expect(page.getByLabel('Inventory & Logistics').first()).toHaveAttribute('aria-expanded', 'false');
 
-    const fresh = await browser.newContext({ storageState: 'tests/e2e/.auth/admin.json' });
+    const fresh = await browser.newContext({ storageState: 'test-results/e2e-auth/admin.json' });
     await fresh.addInitScript(() => localStorage.setItem('collapsedGroups', '[]'));
     const freshPage = await fresh.newPage();
     await freshPage.goto('/admin');

@@ -26,17 +26,19 @@ use Illuminate\Support\Str;
 
 class ApparatusResource extends Resource
 {
+    protected static ?int $navigationSort = 10;
+
     use EnterpriseTable;
 
     protected static ?string $model = Apparatus::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-truck';
 
-    protected static ?string $navigationGroup = 'Fleet Management';
+    protected static ?string $navigationGroup = 'Fleet';
 
     protected static ?string $modelLabel = 'Fire Apparatus';
 
-    protected static ?string $navigationLabel = 'Fire Apparatus';
+    protected static ?string $navigationLabel = 'Apparatus';
 
     protected static ?string $pluralModelLabel = 'Fire Apparatus';
 
@@ -147,6 +149,7 @@ class ApparatusResource extends Resource
                                     ->options(ApparatusPmServiceType::options())
                                     ->helperText('Most recent service type'),
                                 Forms\Components\DatePicker::make('last_service_date')
+                                    ->id('current-meter-last-service-date')
                                     ->label('Service Date')
                                     ->helperText('Date of last service'),
                             ]),
@@ -193,18 +196,21 @@ class ApparatusResource extends Resource
             ->columns([
                 // ── Default visible columns (5 max for alignment) ──
                 Tables\Columns\TextColumn::make('designation')
+                    ->wrap()
+                    ->extraAttributes(['class' => 'hub-phone-summary'])
+                    ->description(fn (Apparatus $record): string => 'Vehicle '.($record->vehicle_number ?: 'Unrecorded').' · '.($record->getAttribute('status') ?: 'Unknown status').' · '.($record->current_location ?: $record->assignment ?: 'Location unrecorded'))
                     ->label('Unit')
                     ->searchable()
                     ->sortable()
                     ->weight('bold')
                     ->alignment(Alignment::Center)
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('vehicle_number')
+                Tables\Columns\TextColumn::make('vehicle_number')->visibleFrom('md')
                     ->label('Veh #')
                     ->searchable()
                     ->alignment(Alignment::Center)
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('status')
+                Tables\Columns\TextColumn::make('status')->visibleFrom('md')
                     ->badge()
                     ->alignment(Alignment::Center)
                     ->color(fn (?string $state): string => match ($state) {
@@ -216,7 +222,7 @@ class ApparatusResource extends Resource
                         default => 'gray',
                     })
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('daily_checkout_requirement')
+                Tables\Columns\TextColumn::make('daily_checkout_requirement')->visibleFrom('md')
                     ->label('Daily Checkout')
                     ->badge()
                     ->getStateUsing(function (Apparatus $record): string {
@@ -233,7 +239,7 @@ class ApparatusResource extends Resource
                         default => 'gray',
                     })
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('daily_checkout_template')
+                Tables\Columns\TextColumn::make('daily_checkout_template')->visibleFrom('md')
                     ->label('Checkout Template')
                     ->badge()
                     ->getStateUsing(function (Apparatus $record): string {
@@ -246,7 +252,7 @@ class ApparatusResource extends Resource
                     ->formatStateUsing(fn (string $state): string => DailyCheckoutChecklistTemplate::options()[$state] ?? 'Invalid template configuration')
                     ->color(fn (string $state): string => $state === DailyCheckoutChecklistTemplate::Pending->value ? 'warning' : 'gray')
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('pm_health_status')
+                Tables\Columns\TextColumn::make('pm_health_status')->visibleFrom('md')
                     ->label('PM')
                     ->badge()
                     ->alignment(Alignment::Center)
@@ -282,7 +288,7 @@ class ApparatusResource extends Resource
                         return "Hours: {$hours}/{$interval} | Miles since PM: {$miles} | Last PM: {$lastPm}";
                     })
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('location_display')
+                Tables\Columns\TextColumn::make('location_display')->visibleFrom('md')
                     ->label('Location')
                     ->alignment(Alignment::Start)
                     ->getStateUsing(function (Apparatus $record): string {
@@ -309,7 +315,7 @@ class ApparatusResource extends Resource
                     ->placeholder('—'),
 
                 // ── Toggleable columns (hidden by default) ──
-                Tables\Columns\TextColumn::make('current_engine_hours')
+                Tables\Columns\TextColumn::make('current_engine_hours')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)
                     ->label('Engine Hrs')
                     ->numeric(decimalPlaces: 1)
                     ->sortable()
@@ -319,7 +325,7 @@ class ApparatusResource extends Resource
                     ->openUrlInNewTab()
                     ->tooltip('Click to submit meter reading')
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('current_miles')
+                Tables\Columns\TextColumn::make('current_miles')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)
                     ->label('Miles')
                     ->numeric()
                     ->sortable()
@@ -329,99 +335,99 @@ class ApparatusResource extends Resource
                     ->openUrlInNewTab()
                     ->tooltip('Click to submit meter reading')
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('notes')
+                Tables\Columns\TextColumn::make('notes')->visibleFrom('md')
                     ->label('Comments')
                     ->limit(30)
                     ->alignment(Alignment::Start)
                     ->tooltip(fn ($record) => $record->notes)
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('inspections_count')
+                Tables\Columns\TextColumn::make('inspections_count')->visibleFrom('md')
                     ->label('Inspections')
                     ->counts('inspections')
                     ->badge()
                     ->alignment(Alignment::Center)
                     ->color('info')
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('active_defects_count')
+                Tables\Columns\TextColumn::make('active_defects_count')->visibleFrom('md')
                     ->label('Active Issues')
                     ->getStateUsing(fn (Apparatus $record) => $record->defects()->where('resolved', false)->count())
                     ->badge()
                     ->alignment(Alignment::Center)
                     ->color(fn ($state) => $state > 0 ? 'danger' : 'success')
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('class_description')
+                Tables\Columns\TextColumn::make('class_description')->visibleFrom('md')
                     ->label('Class')
                     ->searchable()
                     ->alignment(Alignment::Center)
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('station.station_number')
+                Tables\Columns\TextColumn::make('station.station_number')->visibleFrom('md')
                     ->label('Station')
                     ->searchable()
                     ->alignment(Alignment::Center)
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('assignment')
+                Tables\Columns\TextColumn::make('assignment')->visibleFrom('md')
                     ->label('Assignment')
                     ->searchable()
                     ->alignment(Alignment::Start)
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('current_location')
+                Tables\Columns\TextColumn::make('current_location')->visibleFrom('md')
                     ->label('Current Location')
                     ->searchable()
                     ->alignment(Alignment::Start)
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('unit_id')
+                Tables\Columns\TextColumn::make('unit_id')->visibleFrom('md')
                     ->label('Unit ID')
                     ->searchable()
                     ->alignment(Alignment::Center)
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('make')
+                Tables\Columns\TextColumn::make('make')->visibleFrom('md')
                     ->searchable()
                     ->alignment(Alignment::Start)
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('model')
+                Tables\Columns\TextColumn::make('model')->visibleFrom('md')
                     ->searchable()
                     ->alignment(Alignment::Start)
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('year')
+                Tables\Columns\TextColumn::make('year')->visibleFrom('md')
                     ->numeric()
                     ->sortable()
                     ->alignment(Alignment::Center)
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('mileage')
+                Tables\Columns\TextColumn::make('mileage')->visibleFrom('md')
                     ->numeric()
                     ->sortable()
                     ->alignment(Alignment::End)
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('last_service_date')
+                Tables\Columns\TextColumn::make('last_service_date')->visibleFrom('md')
                     ->date()
                     ->sortable()
                     ->alignment(Alignment::Center)
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('vin')
+                Tables\Columns\TextColumn::make('vin')->visibleFrom('md')
                     ->label('VIN')
                     ->searchable()
                     ->alignment(Alignment::Start)
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('reported_at')
+                Tables\Columns\TextColumn::make('reported_at')->visibleFrom('md')
                     ->label('Reported')
                     ->dateTime('n/j/Y')
                     ->sortable()
                     ->alignment(Alignment::Center)
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
-                Tables\Columns\TextColumn::make('created_at')
+                Tables\Columns\TextColumn::make('created_at')->visibleFrom('md')
                     ->dateTime()
                     ->sortable()
                     ->alignment(Alignment::Center)
@@ -509,176 +515,178 @@ class ApparatusResource extends Resource
                     }),
             ])
             ->actions([
-                Tables\Actions\Action::make('daily_checkout')
-                    ->label('Daily Checkout')
-                    ->icon('heroicon-o-clipboard-document-check')
-                    ->color('success')
-                    ->visible(fn (Apparatus $record): bool => $record->daily_checkout_requirement === DailyCheckoutRequirement::Required || $record->daily_checkout_requirement === DailyCheckoutRequirement::Unknown)
-                    ->disabled(fn (Apparatus $record): bool => ! $record->isDailyCheckoutRequired() || ! filled($record->slug))
-                    ->tooltip(fn (Apparatus $record): string => $record->isDailyCheckoutRequired()
-                        ? 'Open the exact Daily Checkout for this apparatus'
-                        : 'Classify the Daily Checkout policy before starting a checkout')
-                    ->url(fn (Apparatus $record): string => url("/daily/vehicle-inspections/{$record->slug}"))
-                    ->openUrlInNewTab(),
-                Tables\Actions\Action::make('view_inspections')
-                    ->label('Inspections')
-                    ->icon('heroicon-o-clipboard-document-list')
-                    ->color('info')
-                    ->tooltip('View all inspections for this apparatus')
-                    ->url(fn (Apparatus $record): string => static::getUrl('edit', ['record' => $record])),
-                Tables\Actions\Action::make('updateStatus')
-                    ->label('Status')
-                    ->icon('heroicon-m-arrow-path')
-                    ->color('info')
-                    ->form([
-                        Forms\Components\Select::make('status')
-                            ->options([
-                                'In Service' => 'In Service',
-                                'Out of Service' => 'Out of Service',
-                                'Maintenance' => 'Maintenance',
-                                'Available' => 'Available',
-                                'Reserve' => 'Reserve',
-                            ])
-                            ->default(fn ($record) => $record->status),
-                    ])
-                    ->action(function (Apparatus $record, array $data) {
-                        /** @var User $actor */
-                        $actor = auth()->user();
-                        app(ApparatusServiceTicketWorkflowService::class)
-                            ->changeOperationalStatus($record, $actor, $data['status']);
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\Action::make('daily_checkout')
+                        ->label('Daily Checkout')
+                        ->icon('heroicon-o-clipboard-document-check')
+                        ->color('success')
+                        ->visible(fn (Apparatus $record): bool => $record->daily_checkout_requirement === DailyCheckoutRequirement::Required || $record->daily_checkout_requirement === DailyCheckoutRequirement::Unknown)
+                        ->disabled(fn (Apparatus $record): bool => ! $record->isDailyCheckoutRequired() || ! filled($record->slug))
+                        ->tooltip(fn (Apparatus $record): string => $record->isDailyCheckoutRequired()
+                            ? 'Open the exact Daily Checkout for this apparatus'
+                            : 'Classify the Daily Checkout policy before starting a checkout')
+                        ->url(fn (Apparatus $record): string => url("/daily/vehicle-inspections/{$record->slug}"))
+                        ->openUrlInNewTab(),
+                    Tables\Actions\Action::make('view_inspections')
+                        ->label('Inspections')
+                        ->icon('heroicon-o-clipboard-document-list')
+                        ->color('info')
+                        ->tooltip('View all inspections for this apparatus')
+                        ->url(fn (Apparatus $record): string => static::getUrl('edit', ['record' => $record])),
+                    Tables\Actions\Action::make('updateStatus')
+                        ->label('Status')
+                        ->icon('heroicon-m-arrow-path')
+                        ->color('info')
+                        ->form([
+                            Forms\Components\Select::make('status')
+                                ->options([
+                                    'In Service' => 'In Service',
+                                    'Out of Service' => 'Out of Service',
+                                    'Maintenance' => 'Maintenance',
+                                    'Available' => 'Available',
+                                    'Reserve' => 'Reserve',
+                                ])
+                                ->default(fn ($record) => $record->status),
+                        ])
+                        ->action(function (Apparatus $record, array $data) {
+                            /** @var User $actor */
+                            $actor = auth()->user();
+                            app(ApparatusServiceTicketWorkflowService::class)
+                                ->changeOperationalStatus($record, $actor, $data['status']);
 
-                        \Filament\Notifications\Notification::make()
-                            ->title('Status Updated')
-                            ->success()
-                            ->body("Status changed to: {$data['status']}")
-                            ->send();
-                    }),
-                Tables\Actions\Action::make('scheduleService')
-                    ->label('Schedule Service')
-                    ->icon('heroicon-o-calendar-days')
-                    ->color('primary')
-                    ->modalHeading(fn (Apparatus $record): string => 'Schedule Service · '.($record->designation ?: $record->name))
-                    ->modalSubmitActionLabel('Create Scheduled Ticket')
-                    ->form([
-                        Forms\Components\Hidden::make('client_submission_id')
-                            ->default(fn (): string => (string) Str::uuid())
-                            ->required(),
-                        Forms\Components\Select::make('category')
-                            ->options(ApparatusServiceTicketCategory::options())
-                            ->default('repair_mechanical')
-                            ->required(),
-                        Forms\Components\Select::make('priority')
-                            ->options(ApparatusServiceTicketPriority::options())
-                            ->default('routine')
-                            ->required(),
-                        Forms\Components\TextInput::make('service_type')
-                            ->label('Service Type')
-                            ->placeholder('Example: PMA, pump repair, aerial inspection')
-                            ->maxLength(255)
-                            ->required(),
-                        Forms\Components\TextInput::make('title')
-                            ->label('Service Summary')
-                            ->minLength(5)
-                            ->maxLength(255)
-                            ->required(),
-                        Forms\Components\Textarea::make('description')
-                            ->label('Service Scope / Observed Issue')
-                            ->minLength(10)
-                            ->maxLength(10000)
-                            ->rows(4)
-                            ->required(),
-                        Forms\Components\DateTimePicker::make('scheduled_for')->required(),
-                        Forms\Components\TextInput::make('scheduled_location')
-                            ->label('Service Location')
-                            ->helperText('Use the established Fleet/location name. No default is assumed.')
-                            ->maxLength(255)
-                            ->required(),
-                        Forms\Components\DateTimePicker::make('expected_return_at')
-                            ->label('Expected Return')
-                            ->afterOrEqual('scheduled_for'),
-                        Forms\Components\Select::make('assigned_to_user_id')
-                            ->label('Assigned To')
-                            ->options(fn (): array => User::query()->orderBy('name')->pluck('name', 'id')->all())
-                            ->searchable(),
-                        Forms\Components\TextInput::make('assigned_vendor')->maxLength(255),
-                        Forms\Components\Textarea::make('public_note')
-                            ->label('Public Update')
-                            ->helperText('Visible at the origin station and during vehicle checkout.')
-                            ->rows(2)
-                            ->required(),
-                        Forms\Components\Textarea::make('internal_note')
-                            ->label('Internal Note')
-                            ->helperText('Visible only to authorized Fleet and administrators.')
-                            ->rows(2),
-                    ])
-                    ->action(function (Apparatus $record, array $data): void {
-                        /** @var User $actor */
-                        $actor = auth()->user();
-                        $data['status'] = 'scheduled';
-                        $result = app(ApparatusServiceTicketWorkflowService::class)
-                            ->createFleetTicket($record, $actor, $data);
+                            \Filament\Notifications\Notification::make()
+                                ->title('Status Updated')
+                                ->success()
+                                ->body("Status changed to: {$data['status']}")
+                                ->send();
+                        }),
+                    Tables\Actions\Action::make('scheduleService')
+                        ->label('Schedule Service')
+                        ->icon('heroicon-o-calendar-days')
+                        ->color('primary')
+                        ->modalHeading(fn (Apparatus $record): string => 'Schedule Service · '.($record->designation ?: $record->name))
+                        ->modalSubmitActionLabel('Create Scheduled Ticket')
+                        ->form([
+                            Forms\Components\Hidden::make('client_submission_id')
+                                ->default(fn (): string => (string) Str::uuid())
+                                ->required(),
+                            Forms\Components\Select::make('category')
+                                ->options(ApparatusServiceTicketCategory::options())
+                                ->default('repair_mechanical')
+                                ->required(),
+                            Forms\Components\Select::make('priority')
+                                ->options(ApparatusServiceTicketPriority::options())
+                                ->default('routine')
+                                ->required(),
+                            Forms\Components\TextInput::make('service_type')
+                                ->label('Service Type')
+                                ->placeholder('Example: PMA, pump repair, aerial inspection')
+                                ->maxLength(255)
+                                ->required(),
+                            Forms\Components\TextInput::make('title')
+                                ->label('Service Summary')
+                                ->minLength(5)
+                                ->maxLength(255)
+                                ->required(),
+                            Forms\Components\Textarea::make('description')
+                                ->label('Service Scope / Observed Issue')
+                                ->minLength(10)
+                                ->maxLength(10000)
+                                ->rows(4)
+                                ->required(),
+                            Forms\Components\DateTimePicker::make('scheduled_for')->required(),
+                            Forms\Components\TextInput::make('scheduled_location')
+                                ->label('Service Location')
+                                ->helperText('Use the established Fleet/location name. No default is assumed.')
+                                ->maxLength(255)
+                                ->required(),
+                            Forms\Components\DateTimePicker::make('expected_return_at')
+                                ->label('Expected Return')
+                                ->afterOrEqual('scheduled_for'),
+                            Forms\Components\Select::make('assigned_to_user_id')
+                                ->label('Assigned To')
+                                ->options(fn (): array => User::query()->orderBy('name')->pluck('name', 'id')->all())
+                                ->searchable(),
+                            Forms\Components\TextInput::make('assigned_vendor')->maxLength(255),
+                            Forms\Components\Textarea::make('public_note')
+                                ->label('Public Update')
+                                ->helperText('Visible at the origin station and during vehicle checkout.')
+                                ->rows(2)
+                                ->required(),
+                            Forms\Components\Textarea::make('internal_note')
+                                ->label('Internal Note')
+                                ->helperText('Visible only to authorized Fleet and administrators.')
+                                ->rows(2),
+                        ])
+                        ->action(function (Apparatus $record, array $data): void {
+                            /** @var User $actor */
+                            $actor = auth()->user();
+                            $data['status'] = 'scheduled';
+                            $result = app(ApparatusServiceTicketWorkflowService::class)
+                                ->createFleetTicket($record, $actor, $data);
 
-                        \Filament\Notifications\Notification::make()
-                            ->title($result->created ? 'Service Scheduled' : 'Service Ticket Already Exists')
-                            ->success()
-                            ->body("{$result->ticket->ticket_number}: {$result->ticket->title}")
-                            ->send();
-                    }),
-                Tables\Actions\Action::make('logPmService')
-                    ->label('Log PM')
-                    ->icon('heroicon-o-wrench-screwdriver')
-                    ->color(fn (Apparatus $record): string => $record->isPmDue() ? 'danger' : 'gray')
-                    ->tooltip('Log a completed PM service')
-                    ->form([
-                        Forms\Components\Hidden::make('client_submission_id')
-                            ->default(fn (): string => (string) Str::uuid())
-                            ->required(),
-                        Forms\Components\Placeholder::make('current_readings')
-                            ->label('Current Meter Readings')
-                            ->content(function (Apparatus $record): string {
-                                $hours = $record->current_engine_hours ?? 'N/A';
-                                $miles = number_format($record->current_miles ?? 0);
-                                $health = $record->getPmHealthStatus();
+                            \Filament\Notifications\Notification::make()
+                                ->title($result->created ? 'Service Scheduled' : 'Service Ticket Already Exists')
+                                ->success()
+                                ->body("{$result->ticket->ticket_number}: {$result->ticket->title}")
+                                ->send();
+                        }),
+                    Tables\Actions\Action::make('logPmService')
+                        ->label('Log PM')
+                        ->icon('heroicon-o-wrench-screwdriver')
+                        ->color(fn (Apparatus $record): string => $record->isPmDue() ? 'danger' : 'gray')
+                        ->tooltip('Log a completed PM service')
+                        ->form([
+                            Forms\Components\Hidden::make('client_submission_id')
+                                ->default(fn (): string => (string) Str::uuid())
+                                ->required(),
+                            Forms\Components\Placeholder::make('current_readings')
+                                ->label('Current Meter Readings')
+                                ->content(function (Apparatus $record): string {
+                                    $hours = $record->current_engine_hours ?? 'N/A';
+                                    $miles = number_format($record->current_miles ?? 0);
+                                    $health = $record->getPmHealthStatus();
 
-                                return "Engine Hours: {$hours} | Miles: {$miles} | Hours since PM: {$health['hours_since_pm']}h";
-                            }),
-                        Forms\Components\DatePicker::make('service_date')
-                            ->label('Service Date')
-                            ->default(now())
-                            ->required(),
-                        Forms\Components\Select::make('service_type')
-                            ->label('Service Type')
-                            ->options(ApparatusPmServiceType::options())
-                            ->required(),
-                        Forms\Components\TextInput::make('service_engine_hours')
-                            ->label('Engine Hours at Service')
-                            ->numeric()
-                            ->step(0.1)
-                            ->default(fn (Apparatus $record) => $record->current_engine_hours)
-                            ->helperText('Defaults to current reading. Adjust if service was at a different reading.'),
-                        Forms\Components\TextInput::make('service_mileage')
-                            ->label('Mileage at Service')
-                            ->numeric()
-                            ->default(fn (Apparatus $record) => $record->current_miles)
-                            ->helperText('Defaults to current reading.'),
-                        Forms\Components\Textarea::make('service_notes')
-                            ->label('Service Notes')
-                            ->placeholder('Additional service details...'),
-                    ])
-                    ->action(function (Apparatus $record, array $data) {
-                        /** @var User $actor */
-                        $actor = auth()->user();
-                        $result = app(ApparatusServiceTicketWorkflowService::class)
-                            ->logPmService($record, $actor, $data);
-                        $unit = $record->designation ?? $record->vehicle_number;
-                        $serviceHours = $result->ticket->service_engine_hours ?? $record->current_engine_hours ?? 0;
-                        \Filament\Notifications\Notification::make()
-                            ->title($result->created ? 'PM Service Logged' : 'PM Service Already Logged')
-                            ->success()
-                            ->body("{$unit}: {$result->ticket->ticket_number} recorded. Next service due at ".round((float) $serviceHours + ($record->pm_interval_hours ?? 300), 1).'h')
-                            ->send();
-                    }),
-                Tables\Actions\EditAction::make(),
+                                    return "Engine Hours: {$hours} | Miles: {$miles} | Hours since PM: {$health['hours_since_pm']}h";
+                                }),
+                            Forms\Components\DatePicker::make('service_date')
+                                ->label('Service Date')
+                                ->default(now())
+                                ->required(),
+                            Forms\Components\Select::make('service_type')
+                                ->label('Service Type')
+                                ->options(ApparatusPmServiceType::options())
+                                ->required(),
+                            Forms\Components\TextInput::make('service_engine_hours')
+                                ->label('Engine Hours at Service')
+                                ->numeric()
+                                ->step(0.1)
+                                ->default(fn (Apparatus $record) => $record->current_engine_hours)
+                                ->helperText('Defaults to current reading. Adjust if service was at a different reading.'),
+                            Forms\Components\TextInput::make('service_mileage')
+                                ->label('Mileage at Service')
+                                ->numeric()
+                                ->default(fn (Apparatus $record) => $record->current_miles)
+                                ->helperText('Defaults to current reading.'),
+                            Forms\Components\Textarea::make('service_notes')
+                                ->label('Service Notes')
+                                ->placeholder('Additional service details...'),
+                        ])
+                        ->action(function (Apparatus $record, array $data) {
+                            /** @var User $actor */
+                            $actor = auth()->user();
+                            $result = app(ApparatusServiceTicketWorkflowService::class)
+                                ->logPmService($record, $actor, $data);
+                            $unit = $record->designation ?? $record->vehicle_number;
+                            $serviceHours = $result->ticket->service_engine_hours ?? $record->current_engine_hours ?? 0;
+                            \Filament\Notifications\Notification::make()
+                                ->title($result->created ? 'PM Service Logged' : 'PM Service Already Logged')
+                                ->success()
+                                ->body("{$unit}: {$result->ticket->ticket_number} recorded. Next service due at ".round((float) $serviceHours + ($record->pm_interval_hours ?? 300), 1).'h')
+                                ->send();
+                        }),
+                    Tables\Actions\EditAction::make(),
+                ])->label('Actions')->icon('heroicon-m-ellipsis-horizontal')->button()->color('gray'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

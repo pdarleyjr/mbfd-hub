@@ -2,22 +2,20 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\ProjectPriority;
+use App\Enums\ProjectStatus;
+use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\CapitalProjectResource\Pages;
 use App\Filament\Resources\CapitalProjectResource\RelationManagers;
 use App\Models\CapitalProject;
-use App\Enums\ProjectStatus;
-use App\Enums\ProjectPriority;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Infolists;
+use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Filament\Infolists;
-use Filament\Infolists\Infolist;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
-use App\Filament\Concerns\EnterpriseTable;
 class CapitalProjectResource extends Resource
 {
     use EnterpriseTable;
@@ -25,10 +23,10 @@ class CapitalProjectResource extends Resource
     protected static ?string $model = CapitalProject::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-building-office';
-    
-    protected static ?string $navigationGroup = 'Active Operations';
-    
-    protected static ?int $navigationSort = 1;
+
+    protected static ?string $navigationGroup = 'Programs';
+
+    protected static ?int $navigationSort = 10;
 
     public static function form(Form $form): Form
     {
@@ -56,12 +54,12 @@ class CapitalProjectResource extends Resource
                             ->required()
                             ->options(ProjectStatus::class)
                             ->default('pending')
-                            ->native(false),
+                            ->native(),
                         Forms\Components\Select::make('priority')
                             ->required()
                             ->options(ProjectPriority::class)
                             ->default('medium')
-                            ->native(false),
+                            ->native(),
                         Forms\Components\Select::make('station_id')
                             ->relationship('station', 'station_number')
                             ->searchable()
@@ -70,7 +68,7 @@ class CapitalProjectResource extends Resource
                             ->placeholder('Select Station'),
                     ])
                     ->columns(2),
-                    
+
                 Forms\Components\Section::make('Timeline')
                     ->schema([
                         Forms\Components\DatePicker::make('start_date')
@@ -85,30 +83,30 @@ class CapitalProjectResource extends Resource
                             ->disabled(fn ($get) => $get('status') !== 'completed'),
                     ])
                     ->columns(3),
-                    
+
                 Forms\Components\Section::make('AI Insights')
                     ->schema([
                         Forms\Components\Placeholder::make('ai_analysis')
                             ->label('AI Analysis Results')
                             ->content(function ($record) {
-                                if (!$record || !$record->ai_priority_rank) {
+                                if (! $record || ! $record->ai_priority_rank) {
                                     return 'No AI analysis available yet.';
                                 }
-                                
-                                return "Rank: {$record->ai_priority_rank} | Score: {$record->ai_priority_score}\n\n" .
-                                       "Reasoning: {$record->ai_reasoning}\n\n" .
-                                       "Last Analysis: " . ($record->last_ai_analysis ? $record->last_ai_analysis->format('M d, Y H:i') : 'N/A');
+
+                                return "Rank: {$record->ai_priority_rank} | Score: {$record->ai_priority_score}\n\n".
+                                       "Reasoning: {$record->ai_reasoning}\n\n".
+                                       'Last Analysis: '.($record->last_ai_analysis ? $record->last_ai_analysis->format('M d, Y H:i') : 'N/A');
                             })
                             ->columnSpanFull(),
                     ])
                     ->visible(fn ($record) => $record && $record->ai_priority_rank !== null),
-                    
+
                 Forms\Components\Section::make('Notes')
                     ->schema([
                         Forms\Components\RichEditor::make('notes')
                             ->columnSpanFull(),
                     ]),
-                    
+
                 Forms\Components\Section::make('Progress & Attachments')
                     ->schema([
                         Forms\Components\TextInput::make('percent_complete')
@@ -174,10 +172,11 @@ class CapitalProjectResource extends Resource
                     }),
                 Tables\Columns\TextColumn::make('target_completion_date')
                     ->date('M d, Y')
+                    ->placeholder('Not set')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('completion_percentage')
                     ->label('Progress')
-                    ->formatStateUsing(fn ($state) => ($state ?? 0) . '%')
+                    ->formatStateUsing(fn ($state) => ($state ?? 0).'%')
                     ->color(fn ($state) => match (true) {
                         ($state ?? 0) >= 75 => 'success',
                         ($state ?? 0) >= 50 => 'warning',
@@ -210,7 +209,7 @@ class CapitalProjectResource extends Resource
                 ]),
             ]);
     }
-    
+
     public static function infolist(Infolist $infolist): Infolist
     {
         return $infolist
@@ -243,7 +242,7 @@ class CapitalProjectResource extends Resource
                             }),
                     ])
                     ->columns(2),
-                    
+
                 Infolists\Components\Section::make('Timeline')
                     ->schema([
                         Infolists\Components\TextEntry::make('start_date')
@@ -256,7 +255,7 @@ class CapitalProjectResource extends Resource
                             ->suffix('%'),
                     ])
                     ->columns(4),
-                    
+
                 Infolists\Components\Section::make('AI Analysis')
                     ->schema([
                         Infolists\Components\TextEntry::make('ai_priority_rank')
@@ -272,14 +271,14 @@ class CapitalProjectResource extends Resource
                     ])
                     ->columns(2)
                     ->visible(fn ($record) => $record->ai_priority_rank !== null),
-                    
+
                 Infolists\Components\Section::make('Notes')
                     ->schema([
                         Infolists\Components\TextEntry::make('notes')
                             ->html()
                             ->columnSpanFull(),
                     ]),
-                    
+
                 Infolists\Components\Section::make('Progress')
                     ->schema([
                         Infolists\Components\TextEntry::make('percent_complete')
@@ -292,7 +291,7 @@ class CapitalProjectResource extends Resource
                                 default => 'danger',
                             }),
                     ]),
-                    
+
                 Infolists\Components\Section::make('Attachments')
                     ->schema([
                         Infolists\Components\TextEntry::make('attachments')
@@ -304,16 +303,17 @@ class CapitalProjectResource extends Resource
                                 $links = [];
                                 foreach ($record->attachments as $path) {
                                     $filename = basename($path);
-                                    $url = asset('storage/' . $path);
+                                    $url = asset('storage/'.$path);
                                     $links[] = "<a href=\"{$url}\" target=\"_blank\" class=\"text-primary-600 hover:underline\">📄 {$filename}</a>";
                                 }
+
                                 return implode('<br>', $links);
                             })
                             ->html()
                             ->columnSpanFull(),
                     ])
                     ->hidden(fn ($record) => empty($record->attachments)),
-                    
+
                 Infolists\Components\Section::make('Related Information')
                     ->schema([
                         Infolists\Components\TextEntry::make('milestones_count')
@@ -330,7 +330,7 @@ class CapitalProjectResource extends Resource
     public static function getRelations(): array
     {
         return [
-//            RelationManagers\MilestonesRelationManager::class,
+            //            RelationManagers\MilestonesRelationManager::class,
             RelationManagers\UpdatesRelationManager::class,
         ];
     }

@@ -6,9 +6,11 @@ namespace App\Filament\Pages;
 
 final class WorkgroupAdministration extends \App\Filament\Workgroup\Pages\AdminDashboard
 {
-    protected static ?string $navigationGroup = 'Workgroup Management';
+    protected static ?int $navigationSort = 40;
 
-    protected static ?string $navigationLabel = 'Workgroup Administration';
+    protected static ?string $navigationGroup = 'Programs';
+
+    protected static ?string $navigationLabel = 'Workgroups';
 
     protected static ?string $title = 'Workgroup Administration';
 

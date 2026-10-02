@@ -23,9 +23,9 @@ class StationResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-building-office-2';
 
-    protected static ?string $navigationGroup = 'Station Management';
+    protected static ?string $navigationGroup = 'Operations';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 20;
 
     public static function form(Form $form): Form
     {
@@ -45,6 +45,7 @@ class StationResource extends Resource
                             ->maxLength(255),
                     ])->columns(3),
                 Forms\Components\Section::make('Address')
+                    ->id('station-address-section')
                     ->schema([
                         Forms\Components\TextInput::make('address')
                             ->required()
@@ -142,30 +143,33 @@ class StationResource extends Resource
         return self::applyEnterpriseDefaults($table)
             ->columns([
                 Tables\Columns\TextColumn::make('station_number')
+                    ->wrap()
+                    ->extraAttributes(['class' => 'hub-phone-summary'])
+                    ->description(fn (Station $record): string => $record->address.' · '.($record->phone ?: 'Phone unrecorded'))
                     ->searchable()
                     ->sortable()
                     ->label('Station'),
-                Tables\Columns\TextColumn::make('address')
+                Tables\Columns\TextColumn::make('address')->visibleFrom('md')
                     ->searchable()
                     ->limit(30),
-                Tables\Columns\TextColumn::make('captain_in_charge')
+                Tables\Columns\TextColumn::make('captain_in_charge')->visibleFrom('md')
                     ->searchable()
                     ->label('Captain'),
-                Tables\Columns\TextColumn::make('phone')
+                Tables\Columns\TextColumn::make('phone')->visibleFrom('md')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('apparatuses_count')
+                Tables\Columns\TextColumn::make('apparatuses_count')->visibleFrom('md')
                     ->label('Assigned Apparatus')
                     ->state(fn ($record) => app(StationStaffingService::class)->summaryFor($record)['assigned_apparatus_count'] ?? 'Unknown'),
-                Tables\Columns\TextColumn::make('assigned_personnel')
+                Tables\Columns\TextColumn::make('assigned_personnel')->visibleFrom('md')
                     ->label('Personnel')
                     ->state(fn ($record) => app(StationStaffingService::class)->summaryFor($record)['assigned_personnel_count'] ?? 'Unknown'),
-                Tables\Columns\TextColumn::make('dorm_beds')
+                Tables\Columns\TextColumn::make('dorm_beds')->visibleFrom('md')
                     ->label('Beds')
                     ->state(fn ($record) => app(StationStaffingService::class)->summaryFor($record)['dorm_beds_count'] ?? 'Unknown'),
-                Tables\Columns\TextColumn::make('rooms_count')
+                Tables\Columns\TextColumn::make('rooms_count')->visibleFrom('md')
                     ->counts('rooms')
                     ->label('Rooms'),
-                Tables\Columns\TextColumn::make('updated_at')
+                Tables\Columns\TextColumn::make('updated_at')->visibleFrom('md')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -174,8 +178,10 @@ class StationResource extends Resource
                 //
             ])
             ->actions([
-                Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\ViewAction::make(),
+                    Tables\Actions\EditAction::make(),
+                ])->label('Actions')->icon('heroicon-m-ellipsis-horizontal')->button()->color('gray'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

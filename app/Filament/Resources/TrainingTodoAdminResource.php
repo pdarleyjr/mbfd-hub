@@ -8,9 +8,11 @@ use App\Filament\Resources\TrainingTodoAdminResource\Pages;
 
 final class TrainingTodoAdminResource extends \App\Filament\Training\Resources\TrainingTodoResource
 {
-    protected static ?string $navigationGroup = 'Administration';
+    protected static ?int $navigationSort = 50;
 
-    protected static ?string $navigationLabel = 'Training Management';
+    protected static ?string $navigationGroup = 'Programs';
+
+    protected static ?string $navigationLabel = 'Training Todos';
 
     protected static ?string $slug = 'training-management';
 

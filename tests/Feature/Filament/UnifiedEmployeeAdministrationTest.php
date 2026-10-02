@@ -32,7 +32,7 @@ final class UnifiedEmployeeAdministrationTest extends TestCase
 
     public function test_one_directory_and_legacy_index_redirect(): void
     {
-        self::assertSame('Employees & Access', EmployeeResource::getNavigationLabel());
+        self::assertSame('Employees', EmployeeResource::getNavigationLabel());
         self::assertFalse(UserResource::shouldRegisterNavigation());
         $this->get(UserResource::getUrl())->assertRedirect(EmployeeResource::getUrl());
     }

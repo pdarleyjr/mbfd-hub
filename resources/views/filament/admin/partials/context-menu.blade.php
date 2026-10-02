@@ -11,19 +11,22 @@
 --}}
 <div
     data-admin-context-menu
+    x-ref="menu"
     x-data="adminContextMenu()"
-    x-init="init()"
     x-show="open"
     x-cloak
     @click.outside="close()"
     @keydown.escape.window="close()"
     :style="`position:fixed; top:${y}px; left:${x}px; z-index:9997;`"
     class="min-w-[180px] rounded-md border border-slate-200 bg-white py-1 text-sm shadow-xl dark:border-slate-700 dark:bg-slate-900"
+    role="group"
+    aria-label="Record actions"
     style="display: none;"
 >
     <template x-for="(item, idx) in items" :key="idx">
         <button
             type="button"
+            :disabled="item.disabled || false"
             @click="run(item)"
             class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800"
         >
@@ -40,18 +43,32 @@
             x: 0,
             y: 0,
             items: [],
+            contextListener: null,
+            returnFocus: null,
 
             init() {
                 if (!window.matchMedia('(pointer: fine)').matches) return;
-                document.addEventListener('contextmenu', (event) => {
+                this.contextListener = (event) => {
                     const row = event.target.closest('.fi-ta-row');
                     if (!row) return;
                     event.preventDefault();
                     this.buildItems(row);
+                    this.returnFocus = document.activeElement;
                     this.x = event.clientX;
                     this.y = event.clientY;
                     this.open = true;
-                });
+                    this.$nextTick(() => {
+                        const bounds = this.$refs.menu.getBoundingClientRect();
+                        this.x = Math.max(8, Math.min(this.x, window.innerWidth - bounds.width - 8));
+                        this.y = Math.max(8, Math.min(this.y, window.innerHeight - bounds.height - 8));
+                        this.$refs.menu.querySelector('button:not([disabled])')?.focus();
+                    });
+                };
+                document.addEventListener('contextmenu', this.contextListener);
+            },
+
+            destroy() {
+                document.removeEventListener('contextmenu', this.contextListener);
             },
 
             buildItems(row) {
@@ -90,8 +107,12 @@
             },
 
             close() {
+                if (!this.open) return;
                 this.open = false;
                 this.items = [];
+                const target = this.returnFocus;
+                this.returnFocus = null;
+                if (target && typeof target.focus === 'function') this.$nextTick(() => target.focus());
             },
         }));
     });

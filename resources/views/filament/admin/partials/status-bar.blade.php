@@ -1,91 +1,91 @@
 {{--
     Enterprise status bar — bottom of admin viewport.
 
-    Layout:
-      [WS state]   [queue depth]   [user · role · env]
-
-    Only renders for users on a desktop (gated by CSS via `desktop:flex`
-    + `hidden`). Mobile/tablet never see it — they get the existing
-    Filament chrome unchanged.
-
-    Connection state polls /admin/health (or a lightweight ping) every 15s.
-    Queue depth is fed by Pulse when available; falls back to a static
-    placeholder if Pulse is not authorized.
+    Browser network state and keyboard help stay available on desktop.
+    System details are shown only with the existing admin.system.view capability.
+    Queue depth is shown only when Pulse supplies a confirmed count.
 --}}
 @php
     $user = auth()->user();
+    $canViewSystemStatus = $user?->can('admin.system.view') ?? false;
+    $canViewQueueStatus = $canViewSystemStatus && ($user?->can('view_queue_status') ?? false);
     $envBadge = match(app()->environment()) {
-        'production' => ['label' => 'PROD', 'classes' => 'bg-emerald-600 text-white'],
-        'staging' => ['label' => 'STAGING', 'classes' => 'bg-amber-500 text-white'],
-        default => ['label' => strtoupper(app()->environment()), 'classes' => 'bg-slate-500 text-white'],
+        'production' => ['label' => 'Production', 'tone' => 'success'],
+        'staging' => ['label' => 'Staging', 'tone' => 'warning'],
+        default => ['label' => ucfirst(app()->environment()), 'tone' => 'neutral'],
     };
 @endphp
 
 <div
     data-admin-status-bar
-    x-data="adminStatusBar()"
-    x-init="init()"
-    class="hidden desktop:flex fixed bottom-0 left-0 right-0 z-30 h-7 items-center justify-between border-t border-slate-200 bg-slate-50 px-3 text-[11px] text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
-    style="font-feature-settings: 'tnum';"
+    x-data="adminStatusBar(@js($canViewSystemStatus), @js($canViewQueueStatus))"
+    class="mbfd-admin-status-bar"
 >
-    <div class="flex items-center gap-4">
-        <span class="flex items-center gap-1.5">
+    <div class="mbfd-admin-status-group">
+        <span class="mbfd-admin-network-state" role="status" aria-live="polite">
             <span
-                class="inline-block h-2 w-2 rounded-full"
-                :class="online ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'"
+                class="mbfd-admin-status-dot"
+                :data-state="online ? 'online' : 'offline'"
                 aria-hidden="true"
             ></span>
-            <span x-text="online ? 'Connected' : 'Offline'"></span>
+            <span x-text="online ? 'Browser online' : 'Offline'"></span>
         </span>
-        <span class="hidden lg:inline">
-            WS: <span x-text="wsState" class="font-medium"></span>
-        </span>
-    </div>
-
-    <div class="flex items-center gap-4">
-        <span class="hidden xl:inline">
-            Queue: <span x-text="queueDepth" class="font-medium"></span>
-        </span>
-        <span class="hidden lg:inline">
-            <span class="text-slate-400">Build</span>
-            <span class="font-mono" x-text="buildSha"></span>
-        </span>
-    </div>
-
-    <div class="flex items-center gap-3">
-        @if($user)
-            <span>
-                {{ $user->name }}
-                @if(method_exists($user, 'getRoleNames'))
-                    <span class="ml-1 text-slate-400">·</span>
-                    <span class="ml-1 text-slate-500">{{ $user->getRoleNames()->first() ?? 'user' }}</span>
-                @endif
+        @if($canViewSystemStatus)
+            <span class="mbfd-admin-status-system" x-show="wsState !== null" x-cloak>
+                Live updates: <span x-text="wsState"></span>
             </span>
         @endif
-        <span class="rounded px-1.5 py-0.5 text-[10px] font-semibold tracking-wider {{ $envBadge['classes'] }}">
-            {{ $envBadge['label'] }}
-        </span>
+    </div>
+
+    @if($canViewSystemStatus)
+        <div class="mbfd-admin-status-group mbfd-admin-status-system">
+            @if($canViewQueueStatus)
+                <span x-show="queueDepth !== null" x-cloak>Queue: <strong x-text="queueDepth"></strong></span>
+            @endif
+            <span x-show="buildSha" x-cloak>Build <span x-text="buildSha"></span></span>
+            <span class="mbfd-admin-environment" data-tone="{{ $envBadge['tone'] }}">{{ $envBadge['label'] }}</span>
+        </div>
+    @endif
+
+    <div class="mbfd-admin-status-group">
+        <button
+            type="button"
+            class="mbfd-admin-shortcuts-button"
+            @click="window.dispatchEvent(new CustomEvent('open-admin-shortcuts-help', { detail: { trigger: $event.currentTarget } }))"
+        >
+            Keyboard shortcuts
+        </button>
     </div>
 </div>
 
 <script>
     document.addEventListener('alpine:init', () => {
-        Alpine.data('adminStatusBar', () => ({
+        Alpine.data('adminStatusBar', (canViewSystemStatus = false, canViewQueueStatus = false) => ({
             online: navigator.onLine,
-            wsState: 'idle',
-            queueDepth: '—',
+            wsState: null,
+            queueDepth: null,
             buildSha: '',
+            queueTimer: null,
+            connection: null,
+            connectionListener: null,
+            onlineListener: null,
+            offlineListener: null,
 
             init() {
                 this.online = navigator.onLine;
-                window.addEventListener('online', () => (this.online = true));
-                window.addEventListener('offline', () => (this.online = false));
+                this.onlineListener = () => (this.online = true);
+                this.offlineListener = () => (this.online = false);
+                window.addEventListener('online', this.onlineListener);
+                window.addEventListener('offline', this.offlineListener);
+
+                if (!canViewSystemStatus) return;
 
                 // Detect Reverb WS state via global Echo if available
                 if (window.Echo && window.Echo.connector && window.Echo.connector.pusher) {
-                    const conn = window.Echo.connector.pusher.connection;
-                    this.wsState = conn.state || 'idle';
-                    conn.bind('state_change', (s) => (this.wsState = s.current));
+                    this.connection = window.Echo.connector.pusher.connection;
+                    this.wsState = this.connection.state || 'idle';
+                    this.connectionListener = (state) => (this.wsState = state.current);
+                    this.connection.bind('state_change', this.connectionListener);
                 }
 
                 // Pull build SHA from the /__version endpoint if present
@@ -95,20 +95,31 @@
                     .catch(() => {});
 
                 // Pull queue depth from Pulse JSON endpoint if accessible
-                this.refreshQueue();
-                setInterval(() => this.refreshQueue(), 30_000);
+                if (canViewQueueStatus) {
+                    this.refreshQueue();
+                    this.queueTimer = setInterval(() => this.refreshQueue(), 30_000);
+                }
+            },
+
+            destroy() {
+                window.removeEventListener('online', this.onlineListener);
+                window.removeEventListener('offline', this.offlineListener);
+                if (this.queueTimer) clearInterval(this.queueTimer);
+                this.connection?.unbind('state_change', this.connectionListener);
             },
 
             refreshQueue() {
-                // Best-effort: if /admin/pulse is forbidden for the user, swallow silently
+                if (!canViewQueueStatus) return;
                 fetch('/admin/pulse/queues.json', { credentials: 'same-origin' })
                     .then((r) => (r.ok ? r.json() : null))
                     .then((data) => {
                         if (data && typeof data.pending === 'number') {
                             this.queueDepth = String(data.pending);
+                        } else {
+                            this.queueDepth = null;
                         }
                     })
-                    .catch(() => {});
+                    .catch(() => { this.queueDepth = null; });
             },
         }));
     });

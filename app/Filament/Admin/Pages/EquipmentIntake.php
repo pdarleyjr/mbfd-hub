@@ -21,9 +21,9 @@ class EquipmentIntake extends Page implements HasForms
 
     protected static ?string $slug = 'equipment-intake';
 
-    protected static ?string $navigationGroup = 'Inventory & Logistics';
+    protected static ?string $navigationGroup = 'Logistics';
 
-    protected static ?int $navigationSort = 10;
+    protected static ?int $navigationSort = 70;
 
     protected static string $view = 'filament.admin.pages.equipment-intake';
 

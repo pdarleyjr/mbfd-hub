@@ -179,6 +179,10 @@ test('installed Daily worker caches the shell and an offline queue survives relo
   await addQueuedInspection(page);
   await page.reload();
   await expect.poll(async () => (await queuedInspections(page)).length).toBe(1);
+  expect(await page.evaluate(async () => {
+    await document.fonts.ready;
+    return [...document.fonts].some(font => font.family.includes('Plus Jakarta Sans Variable') && font.status === 'loaded');
+  })).toBe(true);
 
   await context.setOffline(false);
   await expect.poll(async () => (await queuedInspections(page)).length).toBe(0);

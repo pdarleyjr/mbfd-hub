@@ -26,9 +26,9 @@ class ApparatusServiceTicketResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-wrench-screwdriver';
 
-    protected static ?string $navigationGroup = 'Fleet Management';
+    protected static ?string $navigationGroup = 'Operations';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 70;
 
     protected static ?string $navigationLabel = 'Service Tickets';
 
@@ -38,10 +38,13 @@ class ApparatusServiceTicketResource extends Resource
     {
         return self::applyEnterpriseDefaults($table)
             ->columns([
-                Tables\Columns\TextColumn::make('ticket_number')->label('Ticket')->searchable()->sortable(),
-                Tables\Columns\TextColumn::make('unit_designation_snapshot')->label('Unit')->searchable()->sortable()->weight('bold'),
-                Tables\Columns\TextColumn::make('station.station_number')->label('Station')->sortable()->placeholder('—'),
-                Tables\Columns\TextColumn::make('title')
+                Tables\Columns\TextColumn::make('ticket_number')
+                    ->wrap()
+                    ->extraAttributes(['class' => 'hub-phone-summary'])
+                    ->description(fn (ApparatusServiceTicket $record): string => $record->unit_designation_snapshot.' · '.ApparatusServiceTicketStatus::from($record->status)->label().' · '.ucfirst($record->priority).' priority · '.$record->title)->label('Ticket')->searchable()->sortable(),
+                Tables\Columns\TextColumn::make('unit_designation_snapshot')->visibleFrom('md')->label('Unit')->searchable()->sortable()->weight('bold'),
+                Tables\Columns\TextColumn::make('station.station_number')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)->label('Station')->sortable()->placeholder('—'),
+                Tables\Columns\TextColumn::make('title')->visibleFrom('md')
                     ->searchable(query: fn (Builder $query, string $search): Builder => $query->where(function (Builder $nested) use ($search): void {
                         $nested->where('title', 'like', "%{$search}%")
                             ->orWhere('description', 'like', "%{$search}%")
@@ -49,29 +52,29 @@ class ApparatusServiceTicketResource extends Resource
                             ->orWhere('assigned_vendor', 'like', "%{$search}%");
                     }))
                     ->limit(48),
-                Tables\Columns\TextColumn::make('category')
+                Tables\Columns\TextColumn::make('category')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)
                     ->badge()
                     ->formatStateUsing(fn (string $state): string => ApparatusServiceTicketCategory::options()[$state] ?? str($state)->headline()->toString()),
-                Tables\Columns\TextColumn::make('priority')
+                Tables\Columns\TextColumn::make('priority')->visibleFrom('md')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
                         'urgent' => 'danger',
                         'attention' => 'warning',
                         default => 'gray',
                     }),
-                Tables\Columns\TextColumn::make('status')
+                Tables\Columns\TextColumn::make('status')->visibleFrom('md')
                     ->badge()
                     ->formatStateUsing(fn (string $state): string => ApparatusServiceTicketStatus::from($state)->label())
                     ->color(fn (string $state): string => ApparatusServiceTicketStatus::from($state)->color())
                     ->sortable(),
-                Tables\Columns\TextColumn::make('scheduled_for')->dateTime()->sortable()->placeholder('Not scheduled')->toggleable(),
-                Tables\Columns\TextColumn::make('assignedTo.name')
+                Tables\Columns\TextColumn::make('scheduled_for')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)->dateTime()->sortable()->placeholder('Not scheduled'),
+                Tables\Columns\TextColumn::make('assignedTo.name')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)
                     ->label('Assigned To / Vendor')
                     ->formatStateUsing(fn (?string $state, ApparatusServiceTicket $record): string => $state ?: $record->assigned_vendor ?: 'Unassigned')
-                    ->toggleable(),
-                Tables\Columns\TextColumn::make('requester_name_snapshot')->label('Requested By')->searchable()->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable(),
-                Tables\Columns\TextColumn::make('updated_at')->label('Last Updated')->dateTime()->sortable(),
+                    ->placeholder(fn (ApparatusServiceTicket $record): string => $record->assigned_vendor ?: 'Unassigned'),
+                Tables\Columns\TextColumn::make('requester_name_snapshot')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)->label('Requested By')->searchable(),
+                Tables\Columns\TextColumn::make('created_at')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)->dateTime()->sortable(),
+                Tables\Columns\TextColumn::make('updated_at')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)->label('Last Updated')->dateTime()->sortable(),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('station_id')->relationship('station', 'station_number')->label('Station'),

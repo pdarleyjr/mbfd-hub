@@ -30,11 +30,11 @@ class EmployeeEquipmentRequestResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-shopping-cart';
 
-    protected static ?string $navigationGroup = 'Inventory & Logistics';
+    protected static ?string $navigationGroup = 'Personnel';
 
-    protected static ?string $navigationLabel = 'Employee Gear Requests';
+    protected static ?string $navigationLabel = 'Gear Requests';
 
-    protected static ?int $navigationSort = 12;
+    protected static ?int $navigationSort = 30;
 
     public static function form(Form $form): Form
     {

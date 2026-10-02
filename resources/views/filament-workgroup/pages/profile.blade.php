@@ -1,4 +1,4 @@
-<x-filament-panels::page>
+<x-filament-panels::page data-hub-ui="2" data-hub-portal="workgroups">
     <div class="space-y-6">
         <x-filament::section>
             <x-slot name="heading">Profile Information</x-slot>

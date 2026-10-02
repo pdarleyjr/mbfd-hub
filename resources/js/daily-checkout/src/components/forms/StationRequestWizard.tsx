@@ -347,7 +347,7 @@ export default function StationRequestWizard() {
       <ol className={`grid gap-2 ${requestType === 'equipment' ? 'grid-cols-4' : 'grid-cols-3'}`} aria-label="Request progress">
         {stepLabels.map((label, index) => {
           const number = index + 1;
-          return <li key={label} className={`rounded-lg px-2 py-2 text-center text-xs font-semibold ${number === step ? 'bg-hub-blue text-white' : number < step ? 'bg-hub-surface-muted text-hub-blue' : 'bg-hub-surface-muted text-hub-muted'}`} aria-current={number === step ? 'step' : undefined}>{number}. {label}</li>;
+          return <li key={label} className={`rounded-lg px-2 py-2 text-center text-xs font-semibold ${number === step ? 'bg-hub-blue text-white' : number < step ? 'bg-hub-surface-muted text-hub-blue' : 'bg-hub-surface-muted text-hub-ink-secondary'}`} aria-current={number === step ? 'step' : undefined}>{number}. {label}</li>;
         })}
       </ol>
 
@@ -482,7 +482,7 @@ export default function StationRequestWizard() {
 
       <div className="flex gap-3 rounded-2xl bg-white/95 p-3 shadow-lg ring-1 ring-hub-border backdrop-blur">
         {step > 1 && <button type="button" onClick={() => { setError(''); setStep((current) => current - 1); }} className="min-h-12 flex-1 rounded-xl border border-hub-border-strong px-4 font-semibold text-hub-ink hover:bg-hub-canvas">Back</button>}
-        {step < totalSteps ? <button type="button" onClick={advance} disabled={processingPhotoIds.length > 0} className="min-h-12 flex-[2] rounded-xl bg-hub-blue px-5 font-bold text-white hover:bg-hub-blue-strong disabled:cursor-wait disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus">{processingPhotoIds.length > 0 ? 'Preparing photo…' : 'Continue'}</button> : <button type="button" onClick={handleSubmit} disabled={submitting} className="min-h-12 flex-[2] rounded-xl bg-orange-600 px-5 font-bold text-white hover:bg-orange-700 disabled:cursor-wait disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-orange-700">{submitting ? 'Submitting…' : 'Submit station request'}</button>}
+        {step < totalSteps ? <button type="button" onClick={advance} disabled={processingPhotoIds.length > 0} className="min-h-12 flex-[2] rounded-xl bg-hub-blue px-5 font-bold text-white hover:bg-hub-blue-strong disabled:cursor-wait disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus">{processingPhotoIds.length > 0 ? 'Preparing photo…' : 'Continue'}</button> : <button type="button" onClick={handleSubmit} disabled={submitting} className="min-h-12 flex-[2] rounded-xl bg-hub-blue px-5 font-bold text-white hover:bg-hub-blue-strong disabled:cursor-wait disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus">{submitting ? 'Submitting…' : 'Submit station request'}</button>}
       </div>
     </div>
   );

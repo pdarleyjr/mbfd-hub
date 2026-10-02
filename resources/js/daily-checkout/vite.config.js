@@ -92,6 +92,7 @@ const hubManifestPreviewPlugin = {
 // https://vitejs.dev/config/
 export default defineConfig({
   base: '/daily/',
+  resolve: { dedupe: ['react', 'react-dom'] },
   plugins: [
     react(),
     manifestCopyPlugin,

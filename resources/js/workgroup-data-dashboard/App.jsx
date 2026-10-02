@@ -121,7 +121,7 @@ export default function App() {
           </nav>
 
           <div className="mt-8 bg-slate-100 p-4 rounded-xl border border-slate-200">
-            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3">Scoring Key</h4>
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600 mb-3">Scoring Key</h4>
             <ul className="space-y-2 text-sm">
               <li className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-green-500"></span> 90+ (Elite)</li>
               <li className="flex items-center gap-2"><span className="w-3 h-3 rounded-full bg-blue-500"></span> 80-89 (Highly Capable)</li>
@@ -145,7 +145,7 @@ export default function App() {
             </div>
 
             {/* Table */}
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto focus-visible:outline focus-visible:outline-2 focus-visible:outline-hub-focus" tabIndex={0} role="region" aria-label={currentData.title}>
               <table className="w-full text-left text-sm whitespace-nowrap">
                 <thead className="bg-slate-50 text-slate-600 border-b border-slate-200">
                   <tr>

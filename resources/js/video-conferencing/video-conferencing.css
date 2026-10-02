@@ -1,23 +1,31 @@
-:root {
-    --vc-navy: #17243a;
+@font-face {
+    font-family: 'Plus Jakarta Sans Variable';
+    font-style: normal;
+    font-display: swap;
+    font-weight: 200 800;
+    src: url('@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-latin-wght-normal.woff2') format('woff2-variations');
+}
 
-    --vc-blue: #155eef;
-    --vc-blue-dark: #1049b8;
-    --vc-orange: #ea580c;
-    --vc-orange-dark: #c2410c;
+:root {
+    --vc-navy: #102a43;
+
+    --vc-blue: #1e4e8c;
+    --vc-blue-dark: #1a4378;
+    --vc-orange: #c2410c;
+    --vc-orange-dark: #9a3412;
     --vc-red: #b91c1c;
     --vc-green: #15803d;
 
-    --vc-ink: #292524;
-    --vc-muted: #78716c;
-    --vc-line: #e7e5e3;
+    --vc-ink: #0f172a;
+    --vc-muted: #475569;
+    --vc-line: #dce2e8;
     --vc-surface: #ffffff;
-    --vc-wash: #fafaf9;
-    --vc-wash-strong: #f5f5f4;
+    --vc-wash: #fafbfc;
+    --vc-wash-strong: #f3f5f8;
 }
 
 body:has(#video-conferencing-root) {
-    background: #fafaf9;
+    background: #fff;
     margin: 0;
 }
 
@@ -27,7 +35,7 @@ html.vc-conference-active body { overflow: hidden; }
 .vc-shell {
     box-sizing: border-box;
     color: var(--vc-ink);
-    font-family: "Plus Jakarta Sans", "Source Sans 3", sans-serif;
+    font-family: "Plus Jakarta Sans Variable", system-ui, sans-serif;
     margin: -1rem;
     padding-bottom: env(safe-area-inset-bottom);
 }
@@ -51,14 +59,14 @@ body:has(> main > #video-conferencing-root) .vc-shell {
 .vc-shell button:focus-visible,
 .vc-shell select:focus-visible,
 .vc-shell input:focus-visible {
-    outline: 3px solid rgba(21, 94, 239, .35);
+    outline: 3px solid #1d4ed8;
     outline-offset: 2px;
 }
 
 .vc-header {
     align-items: center;
     background: var(--vc-navy);
-    border-radius: 20px;
+    border-radius: 8px;
     color: #fff;
     display: flex;
     gap: 1.5rem;
@@ -80,7 +88,7 @@ body:has(> main > #video-conferencing-root) .vc-shell {
 
 .vc-header p {
     color: #e7e5e4;
-    font-family: "Source Sans 3", sans-serif;
+    font-family: inherit;
     font-size: .94rem;
     margin: 0;
     max-width: 44rem;
@@ -122,7 +130,7 @@ body:has(> main > #video-conferencing-root) .vc-shell {
     border: 1px solid;
     border-radius: 12px;
     display: flex;
-    font-family: "Source Sans 3", sans-serif;
+    font-family: inherit;
     font-size: .92rem;
     font-weight: 600;
     gap: .65rem;
@@ -147,7 +155,7 @@ body:has(> main > #video-conferencing-root) .vc-shell {
 .vc-card {
     background: var(--vc-surface);
     border: 1px solid var(--vc-line);
-    border-radius: 18px;
+    border-radius: 8px;
 
     padding: 1.2rem;
 }
@@ -217,7 +225,7 @@ body:has(> main > #video-conferencing-root) .vc-shell {
 
 .vc-device-grid { display: grid; gap: .7rem; grid-template-columns: repeat(3, minmax(0, 1fr)); margin-bottom: .9rem; }
 .vc-device-grid label,
-.vc-field { color: #57534e; display: grid; font-family: "Source Sans 3", sans-serif; font-size: .75rem; font-weight: 700; gap: .35rem; }
+.vc-field { color: #57534e; display: grid; font-family: inherit; font-size: .75rem; font-weight: 700; gap: .35rem; }
 .vc-device-grid select,
 .vc-field input { background: #fff; border: 1px solid #d6d3d1; border-radius: 10px; color: var(--vc-ink); font-size: .86rem; padding: 0 .75rem; width: 100%; }
 
@@ -247,15 +255,15 @@ body:has(> main > #video-conferencing-root) .vc-shell {
 .vc-room-summary { align-items: flex-start; background: var(--vc-wash); border: 1px solid var(--vc-line); border-radius: 12px; display: flex; gap: .75rem; margin-bottom: 1rem; padding: .85rem; }
 .vc-room-summary svg { color: var(--vc-blue); flex-shrink: 0; }
 .vc-room-summary strong { display: block; font-size: .87rem; margin-bottom: .15rem; }
-.vc-room-summary span { color: var(--vc-muted); display: block; font-family: "Source Sans 3", sans-serif; font-size: .76rem; line-height: 1.45; }
+.vc-room-summary span { color: var(--vc-muted); display: block; font-family: inherit; font-size: .76rem; line-height: 1.45; }
 .vc-field { margin-bottom: 1rem; }
 .vc-field input { font-size: 1.05rem; letter-spacing: .22em; }
 
 .vc-standby { align-items: center; background: var(--vc-wash); border: 1px solid var(--vc-line); border-radius: 16px; display: flex; flex-direction: column; gap: .55rem; justify-content: center; min-height: 18rem; padding: 1.5rem; text-align: center; }
 .vc-standby > svg { color: var(--vc-blue); }
 .vc-standby strong { font-size: 1.12rem; letter-spacing: .025em; }
-.vc-standby span { color: #57534e; font-family: "Source Sans 3", sans-serif; }
-.vc-standby small { color: var(--vc-muted); font-family: "Source Sans 3", sans-serif; max-width: 20rem; }
+.vc-standby span { color: #57534e; font-family: inherit; }
+.vc-standby small { color: var(--vc-muted); font-family: inherit; max-width: 20rem; }
 .vc-standby[data-ready="true"] { background: #f0fdf4; border-color: #86efac; }
 .vc-standby[data-ready="true"] > svg,
 .vc-standby[data-ready="true"] strong { color: var(--vc-green); }
@@ -291,13 +299,13 @@ body:has(> main > #video-conferencing-root) .vc-shell {
 .vc-quality--lost { background: #ef4444; }
 
 .vc-command { align-content: start; background: #fff; border: 1px solid var(--vc-line); border-radius: 15px; display: grid; gap: .7rem; padding: .85rem; }
-.vc-command p { color: var(--vc-muted); font-family: "Source Sans 3", sans-serif; font-size: .74rem; line-height: 1.4; margin: .25rem 0 0; }
+.vc-command p { color: var(--vc-muted); font-family: inherit; font-size: .74rem; line-height: 1.4; margin: .25rem 0 0; }
 .vc-command__stations { display: grid; gap: .45rem; }
 .vc-command__stations > div { align-items: center; background: var(--vc-wash); border: 1px solid var(--vc-line); border-radius: 10px; display: grid; gap: .5rem; grid-template-columns: minmax(0, 1fr) auto; min-height: 52px; padding: .45rem .55rem; }
 .vc-command__stations strong,
 .vc-command__stations small { display: block; }
 .vc-command__stations strong { font-size: .76rem; }
-.vc-command__stations small { color: var(--vc-muted); font-family: "Source Sans 3", sans-serif; font-size: .66rem; }
+.vc-command__stations small { color: var(--vc-muted); font-family: inherit; font-size: .66rem; }
 .vc-command__stations button { align-items: center; background: #fff; border: 1px solid #d6d3d1; border-radius: 8px; color: #44403c; cursor: pointer; display: inline-flex; font-size: .7rem; font-weight: 700; gap: .35rem; justify-content: center; min-width: 94px; padding: .35rem .55rem; }
 
 .vc-station-mic { align-items: center; border: 2px solid; border-radius: 13px; display: flex; font-size: .98rem; font-weight: 850; gap: .65rem; justify-content: center; min-height: 56px; padding: .7rem; }
@@ -311,14 +319,14 @@ body:has(> main > #video-conferencing-root) .vc-shell {
 .vc-controls .vc-controls__leave { background: var(--vc-red); border-color: #dc2626; }
 
 .vc-modal-backdrop { align-items: center; background: rgba(23, 36, 58, .7); display: flex; inset: 0; justify-content: center; padding: 1rem; position: fixed; z-index: 100; }
-.vc-modal { background: #fff; border-radius: 18px; max-width: 31rem; padding: 1.5rem; width: 100%; }
+.vc-modal { background: #fff; border-radius: 8px; max-width: 31rem; padding: 1.5rem; width: 100%; }
 .vc-modal > svg { color: var(--vc-red); }
 .vc-modal h2 { font-size: 1.18rem; font-weight: 750; margin: .7rem 0 .4rem; }
-.vc-modal p { color: var(--vc-muted); font-family: "Source Sans 3", sans-serif; font-size: .88rem; line-height: 1.6; }
+.vc-modal p { color: var(--vc-muted); font-family: inherit; font-size: .88rem; line-height: 1.6; }
 .vc-modal > div { display: flex; gap: .6rem; justify-content: flex-end; margin-top: 1.2rem; }
 
 .conference-unavailable { color: var(--vc-ink); font-family: "Plus Jakarta Sans", sans-serif; margin: 4rem auto; max-width: 42rem; padding: 1.5rem; }
-.conference-unavailable p { color: var(--vc-muted); font-family: "Source Sans 3", sans-serif; }
+.conference-unavailable p { color: var(--vc-muted); font-family: inherit; }
 
 .vc-spin { animation: vc-spin .9s linear infinite; }
 @keyframes vc-spin { to { transform: rotate(360deg); } }
@@ -335,9 +343,9 @@ body:has(> main > #video-conferencing-root) .vc-shell {
 
 @media (max-width: 640px) {
     .vc-shell { margin: -.5rem; }
-    .vc-header { align-items: flex-start; border-radius: 15px; flex-direction: column; padding: 1.05rem; }
+    .vc-header { align-items: flex-start; border-radius: 8px; flex-direction: column; padding: 1.05rem; }
 
-    .vc-card { border-radius: 14px; padding: .9rem; }
+    .vc-card { border-radius: 8px; padding: .9rem; }
     .vc-device-grid,
     .vc-readiness { grid-template-columns: 1fr; }
         .vc-controls { justify-content: center; flex-wrap: wrap; padding: .42rem; }

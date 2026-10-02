@@ -669,7 +669,7 @@ export default function InspectionWizard() {
         <p className="text-neutral-500 text-sm mb-6">{error || 'Failed to load inspection data'}</p>
         <PreviousPageButton
           fallback="/vehicle-inspections"
-          className="px-5 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors touch-manipulation font-medium"
+          className="min-h-11 px-5 py-2.5 bg-hub-blue text-white rounded-lg hover:bg-hub-blue-strong transition-colors touch-manipulation font-medium"
         >
           Back to previous page
         </PreviousPageButton>
@@ -699,7 +699,7 @@ export default function InspectionWizard() {
         <div><p className="inspection-eyebrow">Daily Checkout</p><div className="inspection-unit-title"><h1>{apparatus.name}</h1><span className={isOutOfService ? 'inspection-status is-oos' : 'inspection-status'}>{apparatus.status ?? 'Status unavailable'}</span></div>
           <div className="inspection-identity"><span>Vehicle {apparatus.vehicle_number ?? 'Not recorded'}</span><span>{officerInfo.name} · {officerInfo.shift ? 'Shift ' + officerInfo.shift : 'Shift not selected'}</span></div>
         </div>
-        <div className="inspection-save"><div><strong>{isOffline ? 'Offline · On this device' : 'Online'}</strong><small role="status">{autosaveSucceeded === true ? 'Changes saved on this device' : autosaveSucceeded === false ? 'Not saved · Keep this page open' : 'Saving…'}</small></div><div className="inspection-progress"><small>{progress.completed} / {progress.total} inspected</small><progress value={progress.completed} max={progress.total || 1} aria-label="Inspection progress" /></div></div>
+        <div className="inspection-save" data-save-state={autosaveSucceeded === true ? 'saved' : autosaveSucceeded === false ? 'failed' : 'saving'}><div><strong>{isOffline ? 'Offline · On this device' : 'Online'}</strong><small role="status">{autosaveSucceeded === true ? 'Changes saved on this device' : autosaveSucceeded === false ? 'Not saved · Keep this page open' : 'Saving…'}</small></div><div className="inspection-progress"><small>{progress.completed} / {progress.total} inspected</small><progress value={progress.completed} max={progress.total || 1} aria-label="Inspection progress" /></div></div>
       </header>
       <div className="inspection-readiness">
         <span>{apparatus.pm_health ? apparatus.pm_health.status === 'red' ? 'PM due' : apparatus.pm_health.status === 'yellow' ? 'PM due soon' : 'PM current' : 'PM baseline unavailable'}</span>

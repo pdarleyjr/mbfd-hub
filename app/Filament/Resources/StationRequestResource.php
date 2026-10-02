@@ -8,6 +8,7 @@ use App\Enums\StationRequestStatus;
 use App\Enums\StationRequestType;
 use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\StationRequestResource\Pages;
+use App\Models\Station;
 use App\Models\StationRequest;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
@@ -25,9 +26,9 @@ class StationRequestResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-wrench-screwdriver';
 
-    protected static ?string $navigationGroup = 'Station Management';
+    protected static ?string $navigationGroup = 'Operations';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 30;
 
     protected static ?string $navigationLabel = 'Station Requests';
 
@@ -36,26 +37,34 @@ class StationRequestResource extends Resource
         return self::applyEnterpriseDefaults($table)
             ->columns([
                 Tables\Columns\TextColumn::make('request_number')
+                    ->wrap()
+                    ->extraAttributes(['class' => 'hub-phone-summary'])
+                    ->description(function (StationRequest $record): string {
+                        $station = $record->getRelationValue('station');
+                        $stationNumber = $station instanceof Station ? $station->getAttribute('station_number') : null;
+
+                        return 'Station '.($stationNumber ?? 'Unknown').' · '.StationRequestStatus::from($record->status)->label().' · '.ucfirst($record->priority).' priority · '.$record->title;
+                    })
                     ->label('Request')
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('station.station_number')
+                Tables\Columns\TextColumn::make('station.station_number')->visibleFrom('md')
                     ->label('Station')
                     ->sortable(),
-                Tables\Columns\TextColumn::make('room.name')
+                Tables\Columns\TextColumn::make('room.name')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)
                     ->label('Room')
+                    ->placeholder(fn (StationRequest $record): string => $record->room_name_snapshot ?: 'Station-wide')
                     ->formatStateUsing(fn (?string $state, StationRequest $record): string => $state ?: $record->room_name_snapshot ?: 'Station-wide')
                     ->searchable(query: fn (Builder $query, string $search): Builder => $query->where(function (Builder $nested) use ($search): void {
                         $nested->where('room_name_snapshot', 'like', "%{$search}%")
                             ->orWhereHas('room', fn (Builder $roomQuery): Builder => $roomQuery->where('name', 'like', "%{$search}%"));
-                    }))
-                    ->toggleable(),
-                Tables\Columns\TextColumn::make('request_type')
+                    })),
+                Tables\Columns\TextColumn::make('request_type')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)
                     ->label('Type')
                     ->badge()
                     ->formatStateUsing(fn (string $state): string => StationRequestType::from($state)->label())
                     ->color(fn (string $state): string => $state === 'repair_service' ? 'warning' : 'primary'),
-                Tables\Columns\TextColumn::make('title')
+                Tables\Columns\TextColumn::make('title')->visibleFrom('md')
                     ->searchable(query: fn (Builder $query, string $search): Builder => $query->where(function (Builder $nested) use ($search): void {
                         $nested->where('title', 'like', "%{$search}%")
                             ->orWhere('description', 'like', "%{$search}%")
@@ -63,16 +72,14 @@ class StationRequestResource extends Resource
                             ->orWhereHas('items', fn (Builder $itemQuery): Builder => $itemQuery->where('item_name', 'like', "%{$search}%"));
                     }))
                     ->limit(45),
-                Tables\Columns\TextColumn::make('items.item_name')
+                Tables\Columns\TextColumn::make('items.item_name')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)
                     ->label('Items')
                     ->bulleted()
-                    ->limitList(2)
-                    ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('requester_name_snapshot')
+                    ->limitList(2),
+                Tables\Columns\TextColumn::make('requester_name_snapshot')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)
                     ->label('Requested By')
-                    ->searchable()
-                    ->toggleable(),
-                Tables\Columns\TextColumn::make('priority')
+                    ->searchable(),
+                Tables\Columns\TextColumn::make('priority')->visibleFrom('md')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
                         'critical' => 'danger',
@@ -80,17 +87,17 @@ class StationRequestResource extends Resource
                         'normal' => 'primary',
                         default => 'gray',
                     }),
-                Tables\Columns\TextColumn::make('status')
+                Tables\Columns\TextColumn::make('status')->visibleFrom('md')
                     ->badge()
                     ->formatStateUsing(fn (string $state): string => StationRequestStatus::from($state)->label())
                     ->color(fn (string $state): string => StationRequestStatus::from($state)->color())
                     ->sortable(),
-                Tables\Columns\TextColumn::make('assignedTo.name')
+                Tables\Columns\TextColumn::make('assignedTo.name')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)
                     ->label('Assigned To / Vendor')
-                    ->formatStateUsing(fn (?string $state, StationRequest $record): string => $state ?: $record->assigned_vendor ?: 'Unassigned')
-                    ->toggleable(),
-                Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable(),
-                Tables\Columns\TextColumn::make('updated_at')
+                    ->placeholder(fn (StationRequest $record): string => $record->assigned_vendor ?: 'Unassigned')
+                    ->formatStateUsing(fn (?string $state, StationRequest $record): string => $state ?: $record->assigned_vendor ?: 'Unassigned'),
+                Tables\Columns\TextColumn::make('created_at')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)->dateTime()->sortable(),
+                Tables\Columns\TextColumn::make('updated_at')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)
                     ->label('Last Updated')
                     ->dateTime()
                     ->sortable(),

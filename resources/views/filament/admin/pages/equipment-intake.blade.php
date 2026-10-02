@@ -160,7 +160,7 @@
                     {{-- Item Type Selector --}}
                     <div class="mb-4">
                         <label class="block text-sm font-medium text-gray-700 mb-1">Item Type</label>
-                        <select wire:model.live="scan_type"
+                        <select wire:model.live="scan_type" aria-label="Item type"
                             class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base sm:max-w-xs"
                             style="min-height:44px;">
                             <option value="hardware">Hardware Asset (tracked, has serial)</option>
@@ -207,7 +207,7 @@
                                 Location <span style="color:#dc2626;">*</span>
                             </label>
                             <div x-show="!showNewLoc">
-                                <select wire:model="scan_location"
+                                <select wire:model="scan_location" aria-label="Location"
                                     class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base"
                                     style="min-height:44px;" required>
                                     <option value="">Select location...</option>
@@ -271,7 +271,7 @@
                     <div x-data="{ showNewLoc2: false }">
                         <label class="block text-sm font-medium text-gray-700 mb-1">Location <span style="color:#dc2626;">*</span></label>
                         <div x-show="!showNewLoc2">
-                            <select wire:model="bulk_location"
+                            <select wire:model="bulk_location" aria-label="Location for manual bulk entry"
                                 class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base" style="max-width:320px;min-height:44px;">
                                 <option value="">Select location...</option>
                                 @foreach($this->locations as $id => $name)
@@ -319,7 +319,7 @@
                                     </div>
                                     <div class="mb-2 sm:mb-0">
                                         <label class="sm:hidden block text-xs font-medium text-gray-500 mb-1">Category</label>
-                                        <select wire:model="bulk_items.{{ $index }}.category"
+                                        <select wire:model="bulk_items.{{ $index }}.category" aria-label="Category for item {{ $index + 1 }}"
                                             class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base" style="min-height:44px;">
                                             <option value="">—</option>
                                             <option value="Consumable">Consumable</option>
@@ -412,7 +412,7 @@
                                     Bulk Location <span style="color:#dc2626;">*</span>
                                 </label>
                                 <div x-show="!showNewLoc3">
-                                    <select wire:model="ai_bulk_global_location"
+                                    <select wire:model="ai_bulk_global_location" aria-label="Location for AI bulk entry"
                                         class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base" style="min-height:44px;">
                                         <option value="">Select location...</option>
                                         @foreach($this->locations as $id => $name)
@@ -499,7 +499,7 @@
                                             </div>
                                             <div>
                                                 <label class="block text-xs font-medium text-gray-500 mb-1">Category</label>
-                                                <select wire:model="ai_bulk_items.{{ $idx }}.category"
+                                                <select wire:model="ai_bulk_items.{{ $idx }}.category" aria-label="Category for scanned item {{ $idx + 1 }}"
                                                     class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base" style="min-height:40px;">
                                                     <option value="General">General</option>
                                                     <option value="Tool">Tool</option>
@@ -512,7 +512,7 @@
                                             </div>
                                             <div class="sm:col-span-2">
                                                 <label class="block text-xs font-medium text-gray-500 mb-1">Location <span style="color:#dc2626;">*</span></label>
-                                                <select wire:model="ai_bulk_items.{{ $idx }}.location_id"
+                                                <select wire:model="ai_bulk_items.{{ $idx }}.location_id" aria-label="Location for scanned item {{ $idx + 1 }}"
                                                     class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base" style="min-height:40px;">
                                                     <option value="">Select location...</option>
                                                     @foreach($this->locations as $id => $name)

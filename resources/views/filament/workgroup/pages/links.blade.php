@@ -1,5 +1,5 @@
-<x-filament-panels::page>
-    <div class="workgroup-report-links">
+<x-filament-panels::page data-hub-ui="2" data-hub-portal="workgroups">
+    <div class="wg-report-library">
         {{-- Workgroup Analysis Report Card --}}
         <a href="{{ $this->getAnalysisReportUrl() }}"
            target="_blank"
@@ -302,34 +302,4 @@
             </div>
         </a>
     </div>
-
-    @push('styles')
-    <style>
-        .workgroup-report-links {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(min(100%, 25rem), 1fr));
-            gap: 1.5rem;
-        }
-        .workgroup-report-link {
-            display: block;
-            min-width: 0;
-            background: rgb(var(--hub-surface));
-            color: rgb(var(--hub-ink));
-            border: 1px solid rgb(var(--hub-border));
-            border-left: 4px solid rgb(var(--hub-action-primary));
-            border-radius: .75rem;
-            padding: 1.5rem;
-            text-decoration: none;
-            overflow-wrap: anywhere;
-        }
-        .workgroup-report-link:hover {
-            background: rgb(var(--hub-surface-muted));
-            border-color: rgb(var(--hub-action-primary));
-        }
-        .workgroup-report-link:focus-visible {
-            outline: 3px solid rgb(var(--hub-focus));
-            outline-offset: 3px;
-        }
-    </style>
-    @endpush
 </x-filament-panels::page>

@@ -157,7 +157,7 @@
     </style>
     @vite(['resources/css/app.css'])
 </head>
-<body class="hub-report hub-report--final-presentation">
+<body data-hub-ui="2" data-hub-portal="report" class="hub-report hub-report--final-presentation">
     <div class="hub-report-navigation"><x-hub-header back-href="/workgroups/links" back-label="Back to Workgroup Links" max-width="max-w-7xl" /></div>
 
     <div class="reveal">
@@ -249,8 +249,9 @@
                 <div class="grid grid-cols-12 gap-6 max-w-6xl mx-auto items-center">
                     <div class="col-span-7 glass-panel">
                         <div class="chart-container" id="container-saws-chart">
-                            <canvas id="sawsChart"></canvas>
+                            <canvas id="sawsChart" role="img" aria-label="Cut-off saw evaluation scores" aria-describedby="presentation-saws-description">Cut-off saw evaluation scores</canvas>
                         </div>
+                        <p id="presentation-saws-description" class="hub-chart-description">Technical scores: DeWalt 12-inch 91.25; Makita 14-inch 64.83; Husqvarna 14-inch 61.78. Chart axis: 50–100.</p>
                     </div>
                     
                     <div class="col-span-5 text-left space-y-4">
@@ -321,8 +322,9 @@
 
                     <div class="col-span-7 glass-panel">
                         <div class="chart-container" id="container-extrication-chart">
-                            <canvas id="extricationChart"></canvas>
+                            <canvas id="extricationChart" role="img" aria-label="Extrication tool performance comparison" aria-describedby="presentation-extrication-description">Extrication tool performance comparison</canvas>
                         </div>
+                        <p id="presentation-extrication-description" class="hub-chart-description">Holmatro scores: spreader 92.02, cutter 88.86, ram 91.29. Hurst scores: spreader 90.99, cutter 82.57, ram 86.02. Chart axis: 75–95.</p>
                     </div>
                 </div>
             </section>

@@ -1,5 +1,6 @@
 @php
     $compact = $compact ?? false;
+    $headingTag = $headingTag ?? 'h3';
     $ctaUrl = $update->safeCtaUrl();
     $priorityClasses = match ($update->priority) {
         \App\Enums\DepartmentUpdatePriority::Critical => 'border-l-4 border-l-red-600',
@@ -13,7 +14,7 @@
     };
 @endphp
 
-<article data-department-update class="overflow-hidden rounded-xl border border-hub-border bg-hub-surface shadow-card {{ $priorityClasses }}">
+<article data-department-update class="hub-panel overflow-hidden {{ $priorityClasses }}">
     @if($update->image_path && ! $compact)
         <img src="{{ route('updates.image', $update) }}" alt="" class="h-52 w-full object-cover">
     @endif
@@ -32,11 +33,11 @@
                 </span>
             @endif
         </div>
-        <h3 class="mt-3 font-heading text-base font-bold leading-snug text-hub-ink sm:text-lg">
+        <{{ $headingTag }} class="mt-3 font-heading text-base font-bold leading-snug text-hub-ink sm:text-lg">
             <a href="{{ route('updates.show', $update) }}" class="rounded-sm hover:text-hub-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-hub-focus">
                 {{ $update->title }}
             </a>
-        </h3>
+        </{{ $headingTag }}>
         @if($compact)
             <p class="mt-2 text-sm leading-relaxed text-hub-muted">{{ $update->excerpt(165) }}</p>
         @else

@@ -14,15 +14,15 @@ class TrtTrailerInventory extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-truck';
 
-    protected static ?string $navigationLabel = 'TRT Trailer Inventory';
+    protected static ?string $navigationLabel = 'TRT Trailer';
 
     protected static ?string $title = 'TRT Trailer Inventory';
 
     protected static ?string $slug = 'trt-trailer-inventory';
 
-    protected static ?string $navigationGroup = 'Inventory & Logistics';
+    protected static ?string $navigationGroup = 'Logistics';
 
-    protected static ?int $navigationSort = 9;
+    protected static ?int $navigationSort = 80;
 
     protected static string $view = 'filament.admin.pages.trt-trailer-inventory';
 

@@ -5,8 +5,8 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
-    <meta name="theme-color" content="#B91C1C" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#102A43" />
     
     <!-- iOS PWA Support -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -20,15 +20,11 @@
     <meta name="description" content="Daily apparatus inspection app for Miami Beach Fire Department" />
     <link rel="manifest" href="/manifest.json" />
     
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Source+Sans+3:wght@400;500;600;700&display=swap" as="style">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Source+Sans+3:wght@400;500;600;700&display=swap" rel="stylesheet">
     <title>Daily Checkout | MBFD Hub</title>
     <style>
     #splash-screen {
       position: fixed; inset: 0; z-index: 9999;
-      background: #1E293B;
+      background: #102A43;
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
       transition: opacity 0.4s ease;
@@ -36,9 +32,10 @@
     #splash-screen.fade-out { opacity: 0; pointer-events: none; }
     #splash-logo { width: 120px; height: 120px; margin-bottom: 1.5rem; }
     #splash-title { color: #F8FAFC; font-size: 1.5rem; font-weight: 700; font-family: system-ui, -apple-system, sans-serif; }
-    #splash-subtitle { color: #94A3B8; font-size: 0.875rem; margin-top: 0.5rem; font-family: system-ui, sans-serif; }
-    .splash-spinner { width: 40px; height: 40px; border: 3px solid #334155; border-top-color: #B91C1C; border-radius: 50%; animation: spin 0.8s linear infinite; margin-top: 2rem; }
+    #splash-subtitle { color: #D8E2EC; font-size: 0.875rem; margin-top: 0.5rem; font-family: system-ui, sans-serif; }
+    .splash-spinner { width: 40px; height: 40px; border: 3px solid #496580; border-top-color: #fff; border-radius: 50%; animation: spin 0.8s linear infinite; margin-top: 2rem; }
     @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { #splash-screen { transition: none; } .splash-spinner { animation: none; } }
     </style>
   </head>
   <body>
