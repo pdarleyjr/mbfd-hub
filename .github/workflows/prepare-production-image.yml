@@ -255,8 +255,9 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          ref: ${{ inputs.final_release_sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 1
+          persist-credentials: false
       - name: Verify canonical extension provenance validator
         run: python3 -m unittest discover -s scripts/operations/tests -p test_policy_library_image.py -v
       - name: Dispatch and verify exact private extension child
@@ -285,8 +286,9 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          ref: ${{ inputs.final_release_sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 1
+          persist-credentials: false
       - name: Record exact successful canonical output in bounded job logs
         id: record
         env:

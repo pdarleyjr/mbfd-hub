@@ -78,6 +78,14 @@ test("private policy preparation uses a separate repository token boundary and s
   assert.match(child, /policy-library-image\.py bridge/);
   assert.doesNotMatch(child, /packages:|docker (?:pull|login|push|build)|workflow_call|DEPLOY_SSH_KEY/);
   const final = workflowJob(prepare, "canonical-output");
+  for (const job of [child, final]) {
+    const checkout = job.match(/      - uses: actions\/checkout@[^\r\n]+\r?\n(?<settings>(?: {8,}[^\r\n]*\r?\n)+)/)?.groups?.settings;
+    assert.ok(checkout, "new preparation jobs must explicitly configure checkout");
+    assert.match(checkout, /ref: \$\{\{ github\.sha \}\}/);
+    assert.match(checkout, /persist-credentials: false/);
+    assert.doesNotMatch(checkout, /inputs\.final_release_sha/);
+  }
+  assert.match(base, /ref: \$\{\{ inputs\.final_release_sha \}\}/);
   requireJobDependencies(final, ["build-test-scan-publish", "private-extension"]);
   assert.match(final, /needs\.build-test-scan-publish\.result == 'success'/);
   assert.match(final, /needs\.private-extension\.result == 'success'/);
