@@ -12,6 +12,7 @@ use App\Filament\Resources\ApparatusResource\Pages;
 use App\Filament\Resources\ApparatusResource\RelationManagers;
 use App\Jobs\SyncApparatusToSheetJob;
 use App\Models\Apparatus;
+use App\Models\Station;
 use App\Models\User;
 use App\Services\ApparatusServiceTicketWorkflowService;
 use Filament\Forms;
@@ -198,7 +199,7 @@ class ApparatusResource extends Resource
                 Tables\Columns\TextColumn::make('designation')
                     ->wrap()
                     ->extraAttributes(['class' => 'hub-phone-summary'])
-                    ->description(fn (Apparatus $record): string => 'Vehicle '.($record->vehicle_number ?: 'Unrecorded').' · '.($record->getAttribute('status') ?: 'Unknown status').' · '.($record->current_location ?: $record->assignment ?: 'Location unrecorded'))
+                    ->description(fn (Apparatus $record): string => 'Vehicle '.($record->vehicle_number ?: 'Unrecorded').' · '.($record->getAttribute('status') ?: 'Unknown status').' · '.($record->current_location ?: $record->assignment ?: ($record->station instanceof Station ? 'Sta '.$record->station->station_number : 'Location unrecorded')))
                     ->label('Unit')
                     ->searchable()
                     ->sortable()
