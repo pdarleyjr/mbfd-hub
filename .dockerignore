@@ -12,7 +12,12 @@ public/build
 public/daily
 public/deploy-marker.json
 public/storage
+public/vendor/policy-library
 tests/
+modules/policy-library/tests/
+modules/policy-library/public/
+modules/policy-library/var/
+modules/policy-library/**/*.pdf
 test-results/
 playwright-report/
 .phpunit.cache

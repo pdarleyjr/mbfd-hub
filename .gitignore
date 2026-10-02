@@ -50,6 +50,10 @@ cookies.txt
 /public/daily/
 /public/hot
 /public/storage
+/public/vendor/policy-library/
+/modules/policy-library/public/
+/modules/policy-library/var/
+/modules/policy-library/**/*.pdf
 /.phpunit.cache
 .phpunit.result.cache
 .phpactor.json

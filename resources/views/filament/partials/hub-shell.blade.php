@@ -1,3 +1,4 @@
+@if(filament()->getCurrentPanel()?->getId() !== 'policy-library')
 @if(auth('web')->check())
     @php
         $navigation = \App\Support\HubShellNavigation::forUser(auth('web')->user());
@@ -11,3 +12,4 @@
     </div>
 @endif
 @vite('resources/js/hub-shell.js')
+@endif

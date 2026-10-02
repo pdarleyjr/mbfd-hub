@@ -8,4 +8,5 @@ return [
     App\Providers\Filament\TrainingPanelProvider::class,
     App\Providers\Filament\WorkgroupPanelProvider::class,
     App\Providers\Filament\EmployeePanelProvider::class,
+    Mbfd\PolicyLibrary\PolicyLibraryServiceProvider::class,
 ];

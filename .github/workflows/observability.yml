@@ -37,7 +37,9 @@ jobs:
           node-version: 22
 
       - name: Install Node deps
-        run: npm install
+        run: |
+          npm install
+          npm --prefix modules/policy-library ci --ignore-scripts
 
       - name: Build frontend (Vite) with Sentry Source Maps
         env:

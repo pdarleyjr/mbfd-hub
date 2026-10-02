@@ -66,6 +66,7 @@ final class ApplicationAccessRegistry
             }
         }
         $options['admin.communications.send'] = 'Communications — send email';
+        $options['files.manage'] = 'Policy library — manage';
 
         return $options;
     }

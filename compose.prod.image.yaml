@@ -7,6 +7,7 @@ services:
     image: "${HUB_IMAGE_REF:?HUB_IMAGE_REF must be an immutable image digest}"
     container_name: mbfd-hub-laravel
     restart: unless-stopped
+    stop_grace_period: 1860s
     extra_hosts:
       - "host.docker.internal:host-gateway"
     ports:
@@ -23,6 +24,7 @@ services:
       - "${HUB_GOOGLE_SA_PATH:-/dev/null}:/run/secrets/google_service_account.json:ro"
     networks:
       - mbfd-net
+      - policy-scanner
     security_opt:
       - no-new-privileges:true
     healthcheck:
@@ -36,3 +38,6 @@ networks:
   mbfd-net:
     external: true
     name: "${HUB_NETWORK_NAME:?HUB_NETWORK_NAME must name the existing Hub Docker network}"
+  policy-scanner:
+    external: true
+    name: "${POLICY_LIBRARY_SCANNER_NETWORK:-mbfd-workspace-internal}"

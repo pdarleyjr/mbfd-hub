@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit bootstrap="capability-bootstrap.php" colors="true" cacheDirectory="../../var/integration-capability-phpunit-cache">
+    <testsuites>
+        <testsuite name="Exact Hub additive capability integration">
+            <file>CapabilityIntegrationTest.php</file>
+        </testsuite>
+    </testsuites>
+</phpunit>

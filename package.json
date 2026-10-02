@@ -2,7 +2,7 @@
     "private": true,
     "type": "module",
     "scripts": {
-        "build": "vite build",
+        "build": "vite build && npm --prefix modules/policy-library run build",
         "dev": "vite",
         "typecheck": "tsc --noEmit",
         "test:ci-configuration": "node --test tests/Node/ci-configuration.test.mjs",

@@ -37,7 +37,9 @@ jobs:
       - name: Install PHP dependencies
         run: composer install --no-dev --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts --optimize-autoloader
       - name: Install Node dependencies
-        run: npm ci --ignore-scripts --legacy-peer-deps
+        run: |
+          npm ci --ignore-scripts --legacy-peer-deps
+          npm --prefix modules/policy-library ci --ignore-scripts
       - name: Build Vite and Filament assets
         run: |
           npm run build

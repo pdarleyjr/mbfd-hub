@@ -18,6 +18,8 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 WORKDIR /var/www/html
 
+COPY modules/policy-library/tools/requirements.txt /tmp/policy-library-requirements.txt
+
 # The release pipeline must choose the non-root identity deliberately. A
 # Dockerfile fallback would allow a refreshed base image to change the release
 # result or make identity creation ambiguous.
@@ -69,6 +71,7 @@ RUN set -eux; \
         openssh-client \
         poppler-utils \
         python3 \
+        python3-venv \
         qpdf \
         sqlite3 \
         supervisor \
@@ -126,7 +129,11 @@ RUN set -eux; \
         groupadd --gid "${WWWGROUP}" sail; \
         useradd --create-home --shell /bin/bash --uid "${WWWUSER}" --gid sail sail; \
     fi; \
+    python3 -m venv /opt/policy-library-python; \
+    /opt/policy-library-python/bin/python -m pip install --no-cache-dir -r /tmp/policy-library-requirements.txt; \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+ENV POLICY_LIBRARY_PYTHON_BINARY=/opt/policy-library-python/bin/python
 
 COPY docker/production/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 COPY docker/production/php.ini /etc/php/8.5/cli/conf.d/99-mbfd-production.ini
@@ -167,6 +174,8 @@ RUN npm ci --ignore-scripts --legacy-peer-deps
 COPY --from=vendor-build /var/www/html/vendor ./vendor
 COPY . .
 
+RUN npm --prefix modules/policy-library ci --ignore-scripts
+
 RUN SENTRY_AUTH_TOKEN='' \
     SENTRY_ORG='' \
     SENTRY_PROJECT_FRONTEND='' \
@@ -197,6 +206,8 @@ COPY --from=vendor-build /var/www/html/vendor ./vendor
 COPY . .
 COPY --from=frontend-build /var/www/html/public/build ./public/build
 COPY --from=frontend-build /var/www/html/public/daily ./public/daily
+COPY --from=frontend-build /var/www/html/public/vendor/policy-library ./public/vendor/policy-library
+COPY --from=frontend-build /var/www/html/modules/policy-library/public ./modules/policy-library/public
 
 # Do not cache production configuration into the image: its values come from
 # the mounted, host-managed Laravel environment file at runtime.
