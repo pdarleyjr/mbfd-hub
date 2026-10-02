@@ -3,6 +3,7 @@ import { expect, type BrowserContext, type Page, type Request } from '@playwrigh
 // The inventory's render-only Livewire calls read fixture records; edits and actions stay blocked.
 const renderMethods = new Set(['loadTable', '__lazyLoad', 'getFormUploadedFiles']);
 const trainingStatsComponent = 'app.filament.training.widgets.training-stats-widget';
+const nativeNotificationsComponent = 'filament.livewire.database-notifications';
 const nativeSelectSelector = '[x-load-src][x-data^="selectFormComponent("]';
 
 type RenderingGuardOptions = {
@@ -30,9 +31,9 @@ export async function guardUiRendering(context: BrowserContext, origin: string, 
         const pagePath = new URL(request.frame().url() || origin).pathname;
         if (!component.updates || typeof component.updates !== 'object' || Array.isArray(component.updates)
           || Object.keys(component.updates).length !== 0 || !Array.isArray(component.calls)) return false;
-        // Installed CanPoll's bare wire:poll.5s invokes $commit(): no updates or calls.
-        // Only the source/trace-proven Training stats component may make that empty commit.
-        if (component.calls.length === 0) return name === trainingStatsComponent;
+        // Installed CanPoll and native notification polling invoke $commit(): no updates or calls.
+        // Only these source/trace-proven read-only components may make an empty commit.
+        if (component.calls.length === 0) return name === trainingStatsComponent || name === nativeNotificationsComponent;
         return component.calls.every((call: { method: string }) => renderMethods.has(call.method)
             || (call.method === '$refresh' && name.startsWith('pulse.'))
             || (options.allowDisabledAiReport === true && call.method === 'loadAiReport'

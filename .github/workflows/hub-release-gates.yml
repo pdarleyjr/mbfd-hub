@@ -34,6 +34,8 @@ jobs:
         run: |
           npm run test:ci-configuration
           npm run test:changed-php-files
+      - name: Verify read-only rendering guard
+        run: node --test tests/Node/ui-readonly/*.test.mjs
 
   php-quality:
     name: PHP and root frontend quality
