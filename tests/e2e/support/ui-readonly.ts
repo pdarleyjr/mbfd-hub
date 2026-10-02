@@ -3,6 +3,7 @@ import { expect, type BrowserContext, type Page, type Request } from '@playwrigh
 // The inventory's render-only Livewire calls read fixture records; edits and actions stay blocked.
 const renderMethods = new Set(['loadTable', '__lazyLoad', 'getFormUploadedFiles']);
 const trainingStatsComponent = 'app.filament.training.widgets.training-stats-widget';
+const nativeSelectSelector = '[x-load-src][x-data^="selectFormComponent("]';
 
 type RenderingGuardOptions = {
   // Inventory asserts the local AI integration is disabled before enabling this adapter.
@@ -52,6 +53,7 @@ export async function guardUiRendering(context: BrowserContext, origin: string, 
 
 export async function waitForUiRendering(page: Page, origin: string) {
   const localFrames = () => page.frames().filter(frame => frame === page.mainFrame() || frame.url().startsWith(origin + '/'));
+  let nativeSelects = { rendered: 0, hydrated: 0 };
   await expect.poll(async () => {
     const pending: string[] = [];
     for (const frame of localFrames()) {
@@ -71,14 +73,31 @@ export async function waitForUiRendering(page: Page, origin: string) {
 
   await expect.poll(async () => {
     const pending: string[] = [];
-    for (const frame of localFrames()) pending.push(...await frame.locator('.fi-ta').evaluateAll(tables => tables.filter(table => {
-      const style = getComputedStyle(table);
-      if (style.display === 'none' || style.visibility === 'hidden' || table.getClientRects().length === 0) return false;
-      const snapshot = table.closest('[wire\\:snapshot]')?.getAttribute('wire:snapshot');
-      return Boolean(snapshot && JSON.parse(snapshot).data?.isTableLoaded === false);
-    }).map(() => 'native deferred table')));
+    nativeSelects = { rendered: 0, hydrated: 0 };
+    for (const frame of localFrames()) {
+      pending.push(...await frame.locator('.fi-ta').evaluateAll(tables => tables.filter(table => {
+        const style = getComputedStyle(table);
+        if (style.display === 'none' || style.visibility === 'hidden' || table.getClientRects().length === 0) return false;
+        const snapshot = table.closest('[wire\\:snapshot]')?.getAttribute('wire:snapshot');
+        return Boolean(table.getAttribute('wire:init') === 'loadTable' && snapshot && JSON.parse(snapshot).data?.isTableLoaded === false);
+      }).map(() => 'native deferred table')));
+      const selects = await frame.locator(nativeSelectSelector).evaluateAll(elements => elements.flatMap((element, index) => {
+        const style = getComputedStyle(element);
+        if (style.display === 'none' || style.visibility === 'hidden' || element.getClientRects().length === 0
+          || element.closest('[aria-hidden="true"], [inert]')) return [];
+        const inner = element.querySelector('.choices__inner');
+        const bounds = inner?.getBoundingClientRect();
+        return [{ index, hydrated: Boolean(inner && bounds && bounds.width > 0 && bounds.height > 0 && getComputedStyle(inner).visibility !== 'hidden') }];
+      }));
+      nativeSelects.rendered += selects.length;
+      nativeSelects.hydrated += selects.filter(select => select.hydrated).length;
+      for (const select of selects.filter(select => !select.hydrated)) {
+        pending.push(`native searchable select ${select.index + 1}`);
+        await frame.locator(nativeSelectSelector).nth(select.index).scrollIntoViewIfNeeded({ timeout: 10_000 });
+      }
+    }
     return pending;
-  }, { timeout: 60_000, message: 'Visible native deferred tables finish loading before acceptance' }).toEqual([]);
+  }, { timeout: 60_000, message: 'Visible native deferred tables and searchable selects finish loading before acceptance' }).toEqual([]);
 
   const path = new URL(page.url()).pathname.replace(/\/$/, '') || '/';
   if (path === '/training') {
@@ -121,5 +140,5 @@ export async function waitForUiRendering(page: Page, origin: string) {
     await expect(page.locator(pushWorker.permission === 'denied' ? '#permission-denied' : '#subscribe-section')).toBeVisible();
   }
   for (const frame of localFrames()) await frame.evaluate(() => window.scrollTo(0, 0));
-  return { pushWorker };
+  return { pushWorker, nativeSelects };
 }
