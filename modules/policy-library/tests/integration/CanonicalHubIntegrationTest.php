@@ -129,7 +129,8 @@ final class CanonicalHubIntegrationTest extends TestCase
         $user = $this->linkedUser();
         $user->givePermissionTo('files.manage');
         $this->actingAsCanonicalUser($user);
-        $this->get(self::FILES.'/manage')->assertOk()->assertSee('Manual Builder');
+        $this->get(self::FILES.'/manage')->assertOk()->assertSee('Manual Builder')
+            ->assertDontSee('data-hub-shell', false)->assertDontSee('hub-panel-more', false);
     }
 
     public function test_current_hub_admin_entitlement_automatically_allows_library_management(): void
