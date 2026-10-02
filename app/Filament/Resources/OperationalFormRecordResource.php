@@ -20,7 +20,7 @@ class OperationalFormRecordResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';
 
-    protected static ?string $navigationGroup = 'Active Operations';
+    protected static ?string $navigationGroup = 'Operations';
 
     protected static ?string $navigationLabel = 'Forms';
 
@@ -30,7 +30,7 @@ class OperationalFormRecordResource extends Resource
 
     protected static ?string $slug = 'operational-forms';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 100;
 
     public static function form(Form $form): Form
     {

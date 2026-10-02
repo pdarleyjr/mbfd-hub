@@ -1,5 +1,6 @@
 @import '@fontsource-variable/plus-jakarta-sans/wght.css';
 @import "../../../css/mbfd-theme.css";
+@import "../../hub-ui/hub-shell.css";
 
 @tailwind base;
 @tailwind components;
@@ -36,8 +37,7 @@ body:has(.apparatus-inspection) #root > div {
 }
 
 code {
-  font-family: 'JetBrains Mono', source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 /* Daily-only responsive workspace: reading and form surfaces stay bounded,
@@ -295,7 +295,7 @@ textarea {
 }
 
 .skeleton {
-  background: linear-gradient(90deg, #F5F3F0 25%, #E8E5E0 50%, #F5F3F0 75%);
+  background: linear-gradient(90deg, rgb(var(--hub-surface-muted)) 25%, rgb(var(--hub-border-soft)) 50%, rgb(var(--hub-surface-muted)) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
   border-radius: 0.5rem;

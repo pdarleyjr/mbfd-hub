@@ -24,9 +24,9 @@ class CapitalProjectResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-building-office';
 
-    protected static ?string $navigationGroup = 'Active Operations';
+    protected static ?string $navigationGroup = 'Programs';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 10;
 
     public static function form(Form $form): Form
     {

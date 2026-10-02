@@ -148,6 +148,15 @@ class AppServiceProvider extends ServiceProvider
         $this->registerPushNotificationWidgetAssets();
 
         \Filament\Support\Facades\FilamentView::registerRenderHook(
+            \Filament\View\PanelsRenderHook::TOPBAR_START,
+            fn (): \Illuminate\Contracts\View\View => view('filament.partials.hub-shell'),
+        );
+        \Filament\Support\Facades\FilamentView::registerRenderHook(
+            \Filament\View\PanelsRenderHook::BODY_END,
+            fn (): \Illuminate\Contracts\View\View => view('filament.partials.hub-member-navigation'),
+        );
+
+        \Filament\Support\Facades\FilamentView::registerRenderHook(
             \Filament\View\PanelsRenderHook::HEAD_START,
             fn (): \Illuminate\Contracts\View\View => view('filament.partials.async-components'),
         );

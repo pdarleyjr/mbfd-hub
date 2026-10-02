@@ -174,8 +174,8 @@ export default function MeterStep({
               onBlur={() => handleBlur('engine_hours')}
               className={`w-full px-4 py-3 text-lg font-medium rounded-lg border-2 transition-colors focus:outline-none ${
                 errors.engine_hours
-                  ? 'border-red-400 focus:border-red-500 bg-red-50/50'
-                  : 'border-neutral-200 focus:border-red-500 bg-neutral-50'
+                  ? 'border-red-400 focus:border-hub-focus bg-red-50/50'
+                  : 'border-neutral-200 focus:border-hub-focus bg-neutral-50'
               }`}
               placeholder={previousHours !== null ? `Previous: ${previousHours}` : 'Enter hours'}
             />
@@ -202,8 +202,8 @@ export default function MeterStep({
               onBlur={() => handleBlur('miles')}
               className={`w-full px-4 py-3 text-lg font-medium rounded-lg border-2 transition-colors focus:outline-none ${
                 errors.miles
-                  ? 'border-red-400 focus:border-red-500 bg-red-50/50'
-                  : 'border-neutral-200 focus:border-red-500 bg-neutral-50'
+                  ? 'border-red-400 focus:border-hub-focus bg-red-50/50'
+                  : 'border-neutral-200 focus:border-hub-focus bg-neutral-50'
               }`}
               placeholder={previousMiles !== null ? `Previous: ${previousMiles.toLocaleString()}` : 'Enter miles'}
             />

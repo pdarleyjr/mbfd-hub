@@ -14,13 +14,15 @@ use Illuminate\Database\Eloquent\Builder;
 
 final class OutboundEmailResource extends Resource
 {
+    protected static ?int $navigationSort = 40;
+
     protected static ?string $model = OutboundEmail::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-paper-airplane';
 
     protected static ?string $navigationGroup = 'Communications';
 
-    protected static ?string $navigationLabel = 'Sent';
+    protected static ?string $navigationLabel = 'Outbound Email';
 
     public static function table(Table $table): Table
     {

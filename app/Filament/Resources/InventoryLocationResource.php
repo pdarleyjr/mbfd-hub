@@ -6,20 +6,22 @@ use App\Filament\Resources\InventoryLocationResource\Pages;
 use App\Models\InventoryLocation;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Filament\Resources\Resource;
 use Illuminate\Database\Eloquent\Builder;
 
 class InventoryLocationResource extends Resource
 {
+    protected static ?string $navigationLabel = 'Locations';
+
     protected static ?string $model = InventoryLocation::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-map-pin';
 
-    protected static ?string $navigationGroup = 'Inventory & Logistics';
+    protected static ?string $navigationGroup = 'Logistics';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 30;
 
     protected static bool $shouldRegisterNavigation = false;
 
@@ -105,8 +107,7 @@ class InventoryLocationResource extends Resource
                 Tables\Actions\Action::make('view_items')
                     ->label('View Items')
                     ->icon('heroicon-o-eye')
-                    ->url(fn (InventoryLocation $record): string => 
-                        EquipmentItemResource::getUrl('index', ['tableFilters' => ['location_id' => ['value' => $record->id]]])
+                    ->url(fn (InventoryLocation $record): string => EquipmentItemResource::getUrl('index', ['tableFilters' => ['location_id' => ['value' => $record->id]]])
                     ),
                 Tables\Actions\EditAction::make(),
             ])

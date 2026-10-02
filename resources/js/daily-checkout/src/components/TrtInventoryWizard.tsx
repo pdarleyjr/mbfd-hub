@@ -247,7 +247,7 @@ export default function TrtInventoryWizard() {
       )}
 
       {searchOpen && (
-        <div className="fixed inset-0 z-40 bg-black/50 flex flex-col">
+        <div className="fixed inset-0 z-[60] bg-black/50 flex flex-col">
           <div className="bg-white rounded-b-2xl shadow-xl max-h-[80vh] flex flex-col">
             {/* Search header */}
             <div className="flex items-center gap-3 p-4 border-b border-hub-border">

@@ -9,6 +9,12 @@ use Filament\Support\Enums\MaxWidth;
 
 class Dashboard extends BaseDashboard
 {
+    protected static ?string $navigationLabel = 'Command Board';
+
+    protected static ?int $navigationSort = 10;
+
+    protected static ?string $navigationGroup = 'Operations';
+
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-group';
 
     protected static ?string $title = 'Station Operations Command Board';

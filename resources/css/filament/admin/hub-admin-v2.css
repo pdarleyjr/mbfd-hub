@@ -180,6 +180,35 @@
 
 /* ---------- Tables ---------- */
 
+/* Operational indexes show identity and a real status/context summary on
+   phones. Native column breakpoints retain the full desktop table. */
+@media (max-width: 767px) {
+    .fi-panel-admin .fi-ta-cell:has(.hub-phone-summary) {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .fi-panel-admin .hub-phone-summary {
+        text-align: start;
+    }
+
+    .fi-panel-admin .hub-phone-summary :is(p, .fi-ta-text-item-label) {
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
+    .fi-panel-admin .hub-phone-summary > p {
+        margin-top: .25rem;
+        color: rgb(var(--hub-ink-secondary));
+        font-size: .8125rem;
+        line-height: 1.5;
+    }
+}
+
+@media (min-width: 768px) {
+    .fi-panel-admin .hub-phone-summary > p { display: none; }
+}
+
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-ta-header-cell {
     color: rgb(var(--hub2-n-600));
     font-size: 12px;

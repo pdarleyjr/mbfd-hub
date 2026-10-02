@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Station } from '../types';
 import { ApiClient, isApiAuthenticationError, redirectToLoginAfterSessionExpiry } from '../utils/api';
 import StationCard from './StationCard';
+import { HubPageHeader } from '../../../hub-ui/HubShell';
 
 export default function StationListPage() {
   const [stations, setStations] = useState<Station[]>([]);
@@ -65,7 +66,7 @@ export default function StationListPage() {
     return (
       <div className="space-y-8 font-hub">
         {/* Skeleton header */}
-        <div className="border-l-4 border-hub-red pl-4">
+        <div className="border-b border-hub-border pb-5">
           <div className="skeleton mb-2 h-8 w-56"></div>
           <div className="skeleton h-4 w-80 max-w-full"></div>
         </div>
@@ -146,14 +147,10 @@ export default function StationListPage() {
       )}
 
       {/* Welcome Header */}
-      <div className="mb-8 border-l-4 border-hub-red pl-4 md:mb-10">
-        <p className="mb-1 text-xs font-bold uppercase tracking-wider text-hub-blue">Station operations</p>
-        <h1 className="mb-2 text-3xl font-bold text-hub-ink font-heading xl:text-4xl">MBFD Stations</h1>
-        <p className="max-w-2xl leading-relaxed text-hub-ink-secondary">
+      <HubPageHeader eyebrow="Station operations" title="MBFD Stations" description={<>
           Select your station below to access forms, inspections, apparatus information, and more.
           Each station page contains everything you need for daily operations.
-        </p>
-      </div>
+        </>} />
 
       {/* Stations Grid */}
       <div data-testid="daily-station-grid" className="daily-station-grid stagger-list grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-3 lg:gap-6 xl:grid-cols-4 2xl:grid-cols-5 2xl:gap-8">

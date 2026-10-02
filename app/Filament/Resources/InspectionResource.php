@@ -17,6 +17,10 @@ use Illuminate\Database\Eloquent\Model;
 
 class InspectionResource extends Resource
 {
+    protected static ?int $navigationSort = 40;
+
+    protected static ?string $navigationGroup = 'Operations';
+
     use EnterpriseTable;
 
     protected static ?string $model = ApparatusInspection::class;
@@ -50,23 +54,26 @@ class InspectionResource extends Resource
         return self::applyEnterpriseDefaults($table)
             ->columns([
                 Tables\Columns\TextColumn::make('completed_at')
+                    ->wrap()
+                    ->extraAttributes(['class' => 'hub-phone-summary'])
+                    ->description(fn (ApparatusInspection $record): string => ($record->apparatus?->name ?: 'Apparatus unrecorded').' · '.$record->operator_name.' · Shift '.$record->shift)
                     ->label('Date')
                     ->dateTime()
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('apparatus.name')
+                Tables\Columns\TextColumn::make('apparatus.name')->visibleFrom('md')
                     ->label('Apparatus')
                     ->searchable()
                     ->sortable(),
 
-                Tables\Columns\TextColumn::make('operator_name')
+                Tables\Columns\TextColumn::make('operator_name')->visibleFrom('md')
                     ->label('Operator')
                     ->searchable(),
 
-                Tables\Columns\TextColumn::make('rank')
+                Tables\Columns\TextColumn::make('rank')->visibleFrom('md')
                     ->label('Rank'),
 
-                Tables\Columns\TextColumn::make('shift')
+                Tables\Columns\TextColumn::make('shift')->visibleFrom('md')
                     ->badge()
                     ->colors([
                         'primary' => 'A',
@@ -74,7 +81,7 @@ class InspectionResource extends Resource
                         'success' => 'C',
                     ]),
 
-                Tables\Columns\TextColumn::make('defects_count')
+                Tables\Columns\TextColumn::make('defects_count')->visibleFrom('md')
                     ->label('Issues')
                     ->counts('defects')
                     ->badge()

@@ -6,7 +6,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-    <link rel="manifest" href="/site.webmanifest">
+    <link rel="manifest" href="/manifest.json">
     <link rel="shortcut icon" href="/favicon.ico">
     <meta name="theme-color" content="#102A43">
     <meta name="mobile-web-app-capable" content="yes">
@@ -53,7 +53,6 @@
 <body>
     @php
         $currentUser = auth('web')->user();
-        $showAdminPanel = $applicationStates['admin']['allowed'] ?? false;
         $showMediaControl = $applicationStates['media_control']['allowed'] ?? false;
         $showEmployeePortal = $currentUser instanceof \App\Models\User
             && $currentUser->employeeProfile()->exists();
@@ -132,53 +131,7 @@
 
     <a href="#main-content" class="hub-skip-link">Skip to main content</a>
 
-    <header class="hub-appbar">
-        <div class="hub-appbar__inner">
-            <a href="{{ url('/') }}" class="hub-appbar__brand" aria-label="MBFD Hub home">
-                <img src="/images/mbfd_logo-256.png" alt="" class="hub-appbar__badge" width="32" height="32">
-                <span class="hub-appbar__name">MBFD Hub</span>
-            </a>
-            <span class="hub-appbar__spacer"></span>
-
-            <div class="hub-appbar__actions" x-data="{ accountOpen: false }" @keydown.escape.window="accountOpen = false">
-                @if($showAdminPanel)
-                    <a href="{{ url('/admin') }}" data-important-target class="hub-appbar__action">
-                        <svg class="hub-btn__icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 0 1 1.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.559.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.894.149c-.424.07-.764.383-.929.78-.165.398-.143.854.107 1.204l.527.738c.32.447.269 1.06-.12 1.45l-.774.773a1.125 1.125 0 0 1-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.398.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527c-.447.32-1.06.269-1.45-.12l-.773-.774a1.125 1.125 0 0 1-.12-1.45l.527-.737c.25-.35.272-.806.108-1.204-.165-.397-.506-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.108-1.204l-.526-.738a1.125 1.125 0 0 1 .12-1.45l.773-.773a1.125 1.125 0 0 1 1.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.15-.894Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
-                        <span class="hub-appbar__action-text">Admin Panel</span>
-                    </a>
-                @endif
-                <div style="position: relative;">
-                    <button type="button" @click="accountOpen = !accountOpen" :aria-expanded="accountOpen.toString()" aria-expanded="false" aria-haspopup="menu" aria-controls="home-account-menu" class="hub-appbar__action" aria-label="Account menu for {{ $displayName }}">
-                        <span class="hub-avatar" aria-hidden="true">{{ strtoupper(substr($displayName, 0, 1)) }}</span>
-                        <span class="hub-appbar__action-label" aria-hidden="true" style="max-width: 10rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ $displayName }}</span>
-                        <svg class="hub-tag__icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/></svg>
-                    </button>
-                    <div x-cloak x-show="accountOpen" @click.outside="accountOpen = false" id="home-account-menu" role="menu" aria-label="Account" class="hub-menu">
-                        <div class="hub-menu__header">
-                            <p class="hub-menu__title">{{ $displayName }}</p>
-                            <p class="hub-menu__meta">Employee ID <span class="hub-mono">{{ $currentUser?->employee_id ?: 'not linked' }}</span></p>
-                        </div>
-                        <a role="menuitem" href="{{ route('account.show') }}" class="hub-menu__item">
-                            <svg class="hub-menu__icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M17.982 18.725A7.488 7.488 0 0 0 12 15.75a7.488 7.488 0 0 0-5.982 2.975m11.963 0a9 9 0 1 0-11.963 0m11.963 0A8.966 8.966 0 0 1 12 21a8.966 8.966 0 0 1-5.982-2.275M15 9.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
-                            My account
-                        </a>
-                        <a role="menuitem" href="{{ route('hub-support.create') }}" class="hub-menu__item">
-                            <svg class="hub-menu__icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z"/></svg>
-                            Report an issue
-                        </a>
-                        <a role="menuitem" href="{{ route('hub-support.index') }}" class="hub-menu__item">
-                            <svg class="hub-menu__icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-.375 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z"/></svg>
-                            My issue reports
-                        </a>
-                        <form method="POST" action="{{ route('logout') }}">@csrf<button role="menuitem" type="submit" class="hub-menu__item hub-menu__item--danger">
-                            <svg class="hub-menu__icon" style="color: currentColor;" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9"/></svg>
-                            Sign out
-                        </button></form>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </header>
+    <x-hub.shell module="Home" :navigation="\App\Support\HubShellNavigation::forUser($currentUser, $applicationStates)" />
 
     <main id="main-content" class="hub-page">
         <section class="home-today" aria-labelledby="home-greeting">

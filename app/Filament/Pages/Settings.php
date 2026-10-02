@@ -8,13 +8,15 @@ use Illuminate\Support\Facades\Auth;
 
 class Settings extends Page
 {
+    protected static ?string $navigationGroup = 'System';
+
     protected static ?string $navigationIcon = 'heroicon-o-cog-6-tooth';
 
     protected static string $view = 'filament.pages.settings';
 
     protected static ?string $title = 'Settings';
 
-    protected static ?int $navigationSort = 100;
+    protected static ?int $navigationSort = 30;
 
     // Hide from sidebar - accessible via user menu
     protected static bool $shouldRegisterNavigation = false;

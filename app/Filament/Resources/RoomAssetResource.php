@@ -25,9 +25,9 @@ class RoomAssetResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-archive-box';
 
-    protected static ?string $navigationGroup = 'Station Management';
+    protected static ?string $navigationGroup = 'Operations';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 90;
 
     protected static ?string $navigationLabel = 'Room Assets';
 

@@ -202,7 +202,7 @@
 }
 
 .fi-topbar {
-    border-bottom: 2px solid rgb(var(--hub-red) / 0.3);
+    border-bottom: 1px solid rgb(var(--hub-border));
 }
 
 .fi-topbar > nav {
@@ -1568,6 +1568,7 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
     body.mbfd-pwa .fi-topbar a,
     body.mbfd-pwa .fi-topbar button,
     body.mbfd-pwa .fi-topbar input,
+    body.mbfd-pwa .fi-topbar summary,
     body.mbfd-pwa .fi-global-search {
         -webkit-app-region: no-drag;
     }

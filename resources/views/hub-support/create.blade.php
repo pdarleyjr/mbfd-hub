@@ -11,7 +11,7 @@
     <a href="#main" class="hub-skip-link">Skip to content</a>
     <x-hub-header :back-href="route('hub-support.index')" back-label="My Reports" max-width="max-w-xl" />
     <main id="main" class="hub-page__main mx-auto max-w-xl px-4 py-8 sm:py-12">
-        <h1 class="text-2xl font-bold">Report an Issue</h1>
+        <x-hub.page-header title="Report an Issue" />
         <form action="{{ route('hub-support.store') }}" method="post" enctype="multipart/form-data" class="mt-6 space-y-5 hub-panel p-5 shadow-sm sm:p-7">
             @csrf
             <input type="hidden" name="client_submission_id" value="{{ old('client_submission_id', (string) \Illuminate\Support\Str::uuid()) }}">

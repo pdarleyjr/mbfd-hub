@@ -6,9 +6,9 @@ use ShuvroRoy\FilamentSpatieLaravelHealth\Pages\HealthCheckResults as BaseHealth
 
 class HealthCheckResults extends BaseHealthCheckResults
 {
-    protected static ?string $navigationGroup = 'Monitoring';
+    protected static ?string $navigationGroup = 'System';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 40;
 
     protected static bool $shouldRegisterNavigation = false;
 

@@ -3,28 +3,27 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ShopWorkResource\Pages;
-use App\Filament\Resources\ShopWorkResource\RelationManagers;
 use App\Models\ShopWork;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class ShopWorkResource extends Resource
 {
+    protected static ?int $navigationSort = 50;
+
     protected static ?string $model = ShopWork::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
-    
-    protected static ?string $navigationGroup = 'Inventory & Logistics';
-    
-    protected static ?string $navigationLabel = 'Shop Needs';
-    
+
+    protected static ?string $navigationGroup = 'Logistics';
+
+    protected static ?string $navigationLabel = 'Shop Work';
+
     protected static ?string $modelLabel = 'Shop Need';
-    
+
     protected static ?string $pluralModelLabel = 'Shop Needs';
 
     public static function form(Form $form): Form

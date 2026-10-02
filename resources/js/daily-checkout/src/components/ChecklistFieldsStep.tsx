@@ -99,7 +99,7 @@ export default function ChecklistFieldsStep({
             type="checkbox"
             checked={value === true}
             onChange={(event) => updateFieldValue(field.id, event.target.checked)}
-            className="h-5 w-5 rounded border-neutral-400 text-red-600 focus:ring-red-500"
+            className="h-5 w-5 rounded border-neutral-400 text-hub-blue focus:ring-hub-focus"
           />
           <span className="font-medium">{field.name}{!field.required && <span className="ml-1 text-sm font-normal text-neutral-500">· Optional</span>}</span>
         </label>
@@ -117,7 +117,7 @@ export default function ChecklistFieldsStep({
         <label htmlFor={field.id} className="mb-1.5 block text-sm font-semibold text-neutral-700">
           {field.name}{field.required ? ' *' : ' · Optional'}
         </label>
-        {field.multiline ? <textarea id={field.id} rows={3} required={field.required} maxLength={2000} value={value === null ? '' : String(value)} onChange={event => updateFieldValue(field.id, event.target.value)} className="min-h-24 w-full rounded-lg border-2 border-neutral-200 bg-neutral-50 px-4 py-3 text-base text-neutral-900 focus:border-red-500 focus:outline-none" /> : <input
+        {field.multiline ? <textarea id={field.id} rows={3} required={field.required} maxLength={2000} value={value === null ? '' : String(value)} onChange={event => updateFieldValue(field.id, event.target.value)} className="min-h-24 w-full rounded-lg border-2 border-neutral-200 bg-neutral-50 px-4 py-3 text-base text-neutral-900 focus:border-hub-focus focus:outline-none" /> : <input
           id={field.id}
           type={type}
           step={field.id === 'mileage' ? 1 : field.inputType === 'number' || field.inputType === 'percentage' ? 'any' : undefined}
@@ -135,7 +135,7 @@ export default function ChecklistFieldsStep({
 
             updateFieldValue(field.id, event.target.value);
           }}
-          className="min-h-12 w-full rounded-lg border-2 border-neutral-200 bg-neutral-50 px-4 py-3 text-base text-neutral-900 focus:border-red-500 focus:outline-none"
+          className="min-h-12 w-full rounded-lg border-2 border-neutral-200 bg-neutral-50 px-4 py-3 text-base text-neutral-900 focus:border-hub-focus focus:outline-none"
         />}
       </div>
     );

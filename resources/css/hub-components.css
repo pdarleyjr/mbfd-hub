@@ -1,8 +1,8 @@
 /*
  * MBFD Hub design system v2 — tokens and components.
  *
- * Inert by default: every rule is scoped to [data-hub-ui="2"], so importing this
- * file changes nothing until a surface opts in. Plain CSS only (no @apply).
+ * Product components are scoped to [data-hub-ui="2"]; the shared shell uses
+ * explicit hub-shell classes across Blade and native panels. Plain CSS only.
  * Colour channels follow the existing space-separated RGB `--hub-*` convention.
  */
 
@@ -86,6 +86,58 @@
     --hub2-appbar-height: 56px;
     --hub2-gutter: 16px;
     --hub2-content-max: 1600px;
+}
+
+/* Shared Hub navigation uses the same tokens on Blade and native panels. */
+.hub-shell-bar { position: sticky; top: 0; z-index: 30; border-bottom: 1px solid rgb(var(--hub-border)); background: rgb(var(--hub-header)); color: white; padding-top: env(safe-area-inset-top, 0px); }
+.hub-shell-bar__inner { display: flex; align-items: center; gap: 8px; min-height: 56px; max-width: 1600px; margin-inline: auto; padding: 4px 24px; }
+.hub-shell-brand { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; flex: none; color: inherit; font-size: 15px; font-weight: 700; text-decoration: none; white-space: nowrap; }
+.hub-shell-brand img { width: 32px; height: 32px; object-fit: contain; }
+.hub-shell-spacer { flex: 1; }
+.hub-shell-control { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 44px; min-height: 44px; padding: 8px; border-radius: 6px; color: inherit; font-size: 14px; font-weight: 600; text-decoration: none; cursor: pointer; list-style: none; }
+.hub-shell-control::-webkit-details-marker, .hub-member-nav__item::-webkit-details-marker { display: none; }
+.hub-shell-control:hover, .hub-shell-control:focus-visible { background: rgb(255 255 255 / .1); }
+.hub-shell-bar :focus-visible { outline: 2px solid white; outline-offset: 2px; }
+.hub-shell-icon { width: 20px; height: 20px; flex: none; }
+.hub-shell-chevron { width: 14px; height: 14px; flex: none; }
+.hub-shell-menu { position: relative; }
+.hub-shell-popover { position: absolute; top: calc(100% + 6px); left: 0; z-index: 70; min-width: 224px; max-width: min(320px, calc(100vw - 24px)); max-height: min(70vh, 480px); overflow-y: auto; padding: 6px; border: 1px solid rgb(var(--hub-border)); border-radius: 8px; background: rgb(var(--hub-surface)); color: rgb(var(--hub-ink)); box-shadow: var(--hub-shadow-elevated); }
+.hub-shell-account .hub-shell-popover { left: auto; right: 0; }
+.hub-shell-menuitem { display: flex; align-items: center; width: 100%; min-height: 44px; padding: 10px 12px; border: 0; border-radius: 4px; background: transparent; color: rgb(var(--hub-ink)); font: inherit; font-size: 14px; text-align: left; text-decoration: none; }
+.hub-shell-menuitem:hover, .hub-shell-menuitem[aria-current] { background: rgb(var(--hub-blue) / .08); color: rgb(var(--hub-blue)); }
+.hub-shell-menuitem:focus-visible { outline: 2px solid rgb(var(--hub-focus)); outline-offset: -2px; }
+.hub-shell-menuitem--danger { color: rgb(var(--hub-danger)); }
+.hub-shell-account__name { display: inline-block; max-width: 10rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hub-shell-connection { display: inline-flex; align-items: center; gap: 6px; flex: none; color: inherit; font-size: 12px; }
+.hub-shell-connection::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.hub-shell-connection[data-offline="true"] { padding: 4px 8px; border: 1px solid currentColor; border-radius: 4px; }
+.hub-panel-shell { display: flex; align-items: center; gap: 12px; flex: none; color: white; }
+.hub-member-nav { display: none; }
+
+@media (max-width: 1023.98px) {
+    .hub-shell-connection { display: none; }
+    .hub-shell-connection[data-offline="true"] { display: flex; }
+    .hub-shell-account__name { display: none; }
+}
+@media (max-width: 639.98px) {
+    .hub-shell-bar__inner { gap: 4px; padding-inline: 12px; flex-wrap: wrap; }
+    .hub-shell-brand img { display: none; }
+    .hub-shell-chevron { display: none; }
+    .hub-shell-connection[data-offline="true"] { order: 5; width: 100%; justify-content: center; }
+    .hub-shell-popover { position: fixed; top: calc(60px + env(safe-area-inset-top, 0px)); left: 12px; right: 12px; max-width: none; }
+    .hub-shell-account .hub-shell-popover { left: 12px; right: 12px; }
+    .hub-panel-shell { gap: 4px; }
+    .hub-panel-shell .hub-shell-connection { display: none; }
+    .hub-member-nav { display: flex; position: fixed; bottom: 0; left: 0; right: 0; z-index: 40; align-items: stretch; padding: 4px 4px max(4px, env(safe-area-inset-bottom, 0px)); border-top: 1px solid rgb(var(--hub-border)); background: rgb(var(--hub-surface)); color: rgb(var(--hub-ink-secondary)); }
+    .hub-member-nav__item { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-width: 0; min-height: 52px; padding: 4px; border-radius: 6px; font-size: 11px; line-height: 16px; font-weight: 600; text-decoration: none; color: inherit; list-style: none; cursor: pointer; }
+    .hub-member-nav__item[aria-current="page"], .hub-member-nav__item:hover { background: rgb(var(--hub-blue) / .08); color: rgb(var(--hub-blue)); }
+    .hub-member-nav__more { flex: 1; min-width: 0; }
+    .hub-member-nav__more .hub-shell-popover { top: auto; bottom: calc(64px + env(safe-area-inset-bottom, 0px)); }
+    body:has(.hub-member-nav) { padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+}
+@media print {
+    .hub-shell-bar, .hub-member-nav, .hub-panel-shell { display: none !important; }
+    body:has(.hub-member-nav) { padding-bottom: 0; }
 }
 
 @media (min-width: 640px) {

@@ -7,6 +7,7 @@ use App\Filament\Pages\SetPasswordPage;
 use App\Filament\Resources\Workgroup\CandidateProductResource;
 use App\Filament\Resources\Workgroup\EvaluationCategoryResource;
 use App\Filament\Resources\Workgroup\SurveyResource;
+use App\Filament\Support\HubPalette;
 use App\Filament\Workgroup\Pages\Dashboard;
 use App\Filament\Workgroup\Pages\EvaluationFormPage;
 use App\Filament\Workgroup\Pages\Evaluations;
@@ -32,7 +33,6 @@ use Filament\Navigation\MenuItem;
 use Filament\Navigation\NavigationGroup;
 use Filament\Panel;
 use Filament\PanelProvider;
-use Filament\Support\Colors\Color;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -50,19 +50,12 @@ class WorkgroupPanelProvider extends PanelProvider
             ->path('workgroups')
             ->homeUrl('/')
             ->login(CanonicalPanelLoginRedirectController::class)
-            ->brandName('Eval Feedback Hub')
+            ->brandName('MBFD Hub · Workgroups')
             ->brandLogo(asset('images/mbfd_logo-256.png'))
             ->brandLogoHeight('2rem')
             ->favicon(asset('favicon.ico'))
             ->darkMode(false)
-            ->colors([
-                'primary' => Color::Blue,
-                'danger' => Color::Rose,
-                'gray' => Color::Slate,
-                'info' => Color::Blue,
-                'success' => Color::Emerald,
-                'warning' => Color::Amber,
-            ])
+            ->colors(HubPalette::colors())
             ->font('Plus Jakarta Sans Variable', provider: LocalFontProvider::class)
             ->viteTheme('resources/css/filament/admin/theme.css')
             // Explicitly register only the needed resources
@@ -168,7 +161,7 @@ class WorkgroupPanelProvider extends PanelProvider
                 PanelsRenderHook::HEAD_END,
                 fn (): string => '<meta name="apple-mobile-web-app-capable" content="yes">
             <meta name="apple-mobile-web-app-status-bar-style" content="default">
-            <meta name="apple-mobile-web-app-title" content="Eval Feedback Hub">
+            <meta name="apple-mobile-web-app-title" content="MBFD Hub">
             <link rel="apple-touch-icon" href="'.asset('images/mbfd_logo-256.png').'" sizes="180x180">
             <link rel="apple-touch-startup-image" href="'.asset('images/mbfd_logo.png').'" sizes="160x290 640x1136" media="screen and (max-device-width: 414px)">
             <link rel="manifest" href="'.asset('/manifest.json').'">

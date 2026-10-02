@@ -32,7 +32,7 @@ function objectProperty(source, property) {
   assert.fail(`unterminated ${property} object property`);
 }
 
-test("Daily exposes shared semantic tokens while preserving its frozen neutral and global sans definitions", () => {
+test("Daily uses shared cool-neutral tokens and Plus Jakarta primary typography", () => {
   const stylesheet = read("resources/js/daily-checkout/src/index.css");
   const tailwind = read("resources/js/daily-checkout/tailwind.config.js");
 
@@ -41,27 +41,24 @@ test("Daily exposes shared semantic tokens while preserving its frozen neutral a
     /@import\s+["']\.\.\/\.\.\/\.\.\/css\/mbfd-theme\.css["'];/,
     "Daily must import the shared Hub token source",
   );
-  assert.equal(
-    objectProperty(tailwind, "neutral"),
-    `neutral: {
-                    50:  '#FAFAF8',
-                    100: '#F5F3F0',
-                    200: '#E8E5E0',
-                    300: '#D4D0CA',
-                    400: '#A8A29E',
-                    500: '#78716C',
-                    600: '#57534E',
-                    700: '#44403C',
-                    800: '#292524',
-                    900: '#1C1917',
-                }`,
-    "Daily's frozen neutral block must remain byte-identical",
-  );
+  const neutral = objectProperty(tailwind, "neutral");
+  for (const [shade, token] of Object.entries({
+    50: "control", 100: "surface-muted", 200: "border-soft", 300: "border",
+    400: "border-strong", 500: "muted", 600: "ink-secondary", 700: "ink-secondary",
+    800: "ink", 900: "ink",
+  })) {
+    assert.match(
+      neutral,
+      new RegExp(`${shade}:\\s*["']rgb\\(var\\(--hub-${token}\\)\\s*\\/\\s*<alpha-value>\\)["']`),
+      `Daily neutral-${shade} must use the shared cool-neutral ${token} token`,
+    );
+  }
   assert.match(
     tailwind,
-    /sans:\s*\[\s*['"]"Source Sans 3"['"],\s*['"]"DM Sans"['"],\s*['"]system-ui['"],\s*['"]sans-serif['"]\s*\]/,
-    "Daily's existing global Source Sans stack must remain unchanged",
+    /sans:\s*\[\s*["']var\(--hub-font-sans\)["']\s*\]/,
+    "Daily's primary sans stack must use the shared Plus Jakarta token",
   );
+  assert.match(read("resources/css/mbfd-theme.css"), /--hub-font-sans:\s*'Plus Jakarta Sans Variable',\s*'Plus Jakarta Sans'/);
   assert.match(
     tailwind,
     /hub:\s*\[\s*["']var\(--hub-font-sans\)["']\s*\]/,
@@ -133,7 +130,7 @@ test("Station Detail quick actions share ordinary hub-blue treatment", () => {
   }
 });
 
-test("all four Filament panels use blue primary and a distinct red or rose danger palette", () => {
+test("all four Filament panels use the centralized MBFD semantic palette", () => {
   const providers = [
     "app/Providers/Filament/AdminPanelProvider.php",
     "app/Providers/Filament/EmployeePanelProvider.php",
@@ -141,14 +138,12 @@ test("all four Filament panels use blue primary and a distinct red or rose dange
     "app/Providers/Filament/WorkgroupPanelProvider.php",
   ];
 
+  const palette = read("app/Filament/Support/HubPalette.php");
+  for (const [role, hex] of Object.entries({ primary: "#1E4E8C", danger: "#B91C1C", info: "#0369A1", success: "#047857", warning: "#B45309" })) {
+    assert.match(palette, new RegExp(`["']${role}["']\\s*=>\\s*self::semantic\\(["']${hex}["']\\)`), `${role} must use its prescribed MBFD semantic color`);
+  }
   for (const path of providers) {
-    const source = read(path);
-    const primary = source.match(/["']primary["']\s*=>\s*Color::([A-Za-z]+)/)?.[1];
-    const danger = source.match(/["']danger["']\s*=>\s*Color::([A-Za-z]+)/)?.[1];
-
-    assert.equal(primary, "Blue", `${path} must use Color::Blue for primary actions`);
-    assert.ok(["Red", "Rose"].includes(danger), `${path} must use a red or rose danger palette`);
-    assert.notEqual(primary, danger, `${path} primary and danger palettes must remain distinct`);
+    assert.match(read(path), /->colors\(HubPalette::colors\(\)\)/, `${path} must use the shared HubPalette configuration`);
   }
 });
 
@@ -227,7 +222,7 @@ test("Admin browser chrome and installed PWA use Hub header and canvas colors", 
   assert.match(head, /<meta name="theme-color" content="#102A43">/);
   assert.doesNotMatch(head, /#FAFAF8/i);
   assert.equal(manifest.theme_color, "#102A43");
-  assert.equal(manifest.background_color, "#F7FAFC");
+  assert.equal(manifest.background_color, "#FFFFFF");
 });
 
 test("Workgroup views keep links and buttons structurally balanced without nested controls", () => {

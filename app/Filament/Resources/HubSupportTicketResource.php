@@ -22,6 +22,8 @@ use Illuminate\Support\HtmlString;
 
 final class HubSupportTicketResource extends Resource
 {
+    protected static ?int $navigationSort = 50;
+
     use EnterpriseTable;
 
     protected static ?string $model = HubSupportTicket::class;
@@ -30,7 +32,7 @@ final class HubSupportTicketResource extends Resource
 
     protected static ?string $navigationGroup = 'Communications';
 
-    protected static ?string $navigationLabel = 'Website / App Issue Reports';
+    protected static ?string $navigationLabel = 'Support Tickets';
 
     protected static ?string $modelLabel = 'Issue Report';
 
@@ -38,19 +40,22 @@ final class HubSupportTicketResource extends Resource
     {
         return self::applyEnterpriseDefaults($table)
             ->columns([
-                Tables\Columns\TextColumn::make('ticket_number')->label('Ticket')->searchable()->sortable(),
-                Tables\Columns\TextColumn::make('generated_title')->label('Issue')
+                Tables\Columns\TextColumn::make('ticket_number')
+                    ->wrap()
+                    ->extraAttributes(['class' => 'hub-phone-summary'])
+                    ->description(fn (HubSupportTicket $record): string => $record->status->memberLabel().' · '.$record->impact->label().' · '.$record->generated_title)->label('Ticket')->searchable()->sortable(),
+                Tables\Columns\TextColumn::make('generated_title')->visibleFrom('md')->label('Issue')
                     ->searchable(query: fn (Builder $query, string $search): Builder => $query->where(function (Builder $nested) use ($search): void {
                         $nested->where('generated_title', 'like', "%{$search}%")
                             ->orWhere('description', 'like', "%{$search}%")
                             ->orWhere('reporter_name_snapshot', 'like', "%{$search}%");
                     }))->limit(60),
-                Tables\Columns\TextColumn::make('reporter_name_snapshot')->label('Reporter')->searchable(),
-                Tables\Columns\TextColumn::make('affected_component')->label('Component')->badge(),
-                Tables\Columns\TextColumn::make('impact')->badge()->formatStateUsing(fn (HubSupportTicketImpact|string $state): string => ($state instanceof HubSupportTicketImpact ? $state : HubSupportTicketImpact::from($state))->label()),
-                Tables\Columns\TextColumn::make('status')->badge()->formatStateUsing(fn (HubSupportTicketStatus|string $state): string => ($state instanceof HubSupportTicketStatus ? $state : HubSupportTicketStatus::from($state))->memberLabel())->sortable(),
-                Tables\Columns\TextColumn::make('assignedTo.name')->label('Assigned To')->placeholder('Unassigned'),
-                Tables\Columns\TextColumn::make('created_at')->label('Submitted')->dateTime()->sortable(),
+                Tables\Columns\TextColumn::make('reporter_name_snapshot')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)->label('Reporter')->searchable(),
+                Tables\Columns\TextColumn::make('affected_component')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)->label('Component')->badge(),
+                Tables\Columns\TextColumn::make('impact')->visibleFrom('md')->badge()->formatStateUsing(fn (HubSupportTicketImpact|string $state): string => ($state instanceof HubSupportTicketImpact ? $state : HubSupportTicketImpact::from($state))->label()),
+                Tables\Columns\TextColumn::make('status')->visibleFrom('md')->badge()->formatStateUsing(fn (HubSupportTicketStatus|string $state): string => ($state instanceof HubSupportTicketStatus ? $state : HubSupportTicketStatus::from($state))->memberLabel())->sortable(),
+                Tables\Columns\TextColumn::make('assignedTo.name')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)->label('Assigned To')->placeholder('Unassigned'),
+                Tables\Columns\TextColumn::make('created_at')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)->label('Submitted')->dateTime()->sortable(),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('status')->options(collect(HubSupportTicketStatus::cases())->mapWithKeys(fn ($status) => [$status->value => $status->memberLabel()])->all()),

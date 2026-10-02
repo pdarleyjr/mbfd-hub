@@ -8,7 +8,7 @@ class PulseDashboard extends Page
 {
     protected static ?string $navigationIcon = 'heroicon-o-bolt';
 
-    protected static ?string $navigationGroup = 'Monitoring';
+    protected static ?string $navigationGroup = 'System';
 
     protected static ?string $navigationLabel = 'Laravel Pulse';
 
@@ -16,7 +16,7 @@ class PulseDashboard extends Page
 
     protected static ?string $slug = 'pulse';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 50;
 
     protected static bool $shouldRegisterNavigation = false;
 

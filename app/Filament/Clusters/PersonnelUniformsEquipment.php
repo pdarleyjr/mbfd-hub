@@ -10,15 +10,15 @@ class PersonnelUniformsEquipment extends Cluster
 {
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';
 
-    protected static ?string $navigationGroup = 'Inventory & Logistics';
+    protected static ?string $navigationGroup = 'Personnel';
 
-    protected static ?string $navigationLabel = 'Personnel Uniforms / Equipment';
+    protected static ?string $navigationLabel = 'Personnel / Uniforms / Equipment';
 
     protected static ?string $title = 'Personnel Uniforms / Equipment';
 
     protected static ?string $slug = 'personnel-uniforms-equipment';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 20;
 
     public static function canAccess(): bool
     {

@@ -11,6 +11,7 @@ use App\Filament\Employee\Pages\PersonnelEquipmentRequestPage;
 use App\Filament\Employee\Pages\RequestEquipmentPage;
 use App\Filament\Employee\Pages\VideoConferencing;
 use App\Filament\Pages\SetPasswordPage;
+use App\Filament\Support\HubPalette;
 use App\Http\Controllers\Auth\CanonicalPanelLoginRedirectController;
 use App\Http\Middleware\AuthenticateCanonicalPanelUser;
 use App\Http\Middleware\EnsureCanonicalEmployeeContext;
@@ -23,7 +24,6 @@ use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Navigation\MenuItem;
 use Filament\Panel;
 use Filament\PanelProvider;
-use Filament\Support\Colors\Color;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
@@ -50,20 +50,13 @@ class EmployeePanelProvider extends PanelProvider
             ->id('employee')
             ->path('employee')
             ->login(CanonicalPanelLoginRedirectController::class)
-            ->brandName('MBFD Employee Portal')
+            ->brandName('MBFD Hub · Employee')
             ->brandLogo(asset('images/mbfd_logo-256.png'))
             ->brandLogoHeight('2rem')
             ->homeUrl('/')
             ->favicon(asset('favicon.ico'))
             ->darkMode(false)
-            ->colors([
-                'primary' => Color::Blue,
-                'danger' => Color::Rose,
-                'gray' => Color::Slate,
-                'info' => Color::Blue,
-                'success' => Color::Emerald,
-                'warning' => Color::Amber,
-            ])
+            ->colors(HubPalette::colors())
             ->font('Plus Jakarta Sans Variable', provider: LocalFontProvider::class)
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->pages([

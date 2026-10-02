@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources;
 
-use App\Enums\StaffMember;
 use App\Filament\Resources\TodoResource\Pages;
 use App\Models\Todo;
 use App\Models\User;
@@ -21,11 +20,11 @@ class TodoResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-list-bullet';
 
-    protected static ?string $navigationGroup = 'Active Operations';
+    protected static ?string $navigationGroup = 'Programs';
 
-    protected static ?string $navigationLabel = 'Todo List';
+    protected static ?string $navigationLabel = 'Todos';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 30;
 
     public static function form(Form $form): Form
     {
@@ -82,7 +81,7 @@ class TodoResource extends Resource
                                 $record->is_completed ? '✅ Completed' : null,
                             ])->filter()->join(' • ');
 
-                            return trim($desc . ($meta ? "\n{$meta}" : ''));
+                            return trim($desc.($meta ? "\n{$meta}" : ''));
                         }),
                     TextColumn::make('assignee_names')
                         ->label('Assigned To')

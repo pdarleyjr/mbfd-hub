@@ -11,11 +11,13 @@ use Filament\Pages\Page;
 
 final class CommunicationsUsage extends Page
 {
+    protected static ?int $navigationSort = 60;
+
     protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
 
-    protected static ?string $navigationGroup = 'Communications';
+    protected static ?string $navigationGroup = 'System';
 
-    protected static ?string $navigationLabel = 'Usage';
+    protected static ?string $navigationLabel = 'Communications Usage';
 
     protected static string $view = 'filament.pages.communications-usage';
 

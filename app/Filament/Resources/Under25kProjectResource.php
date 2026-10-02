@@ -24,13 +24,13 @@ class Under25kProjectResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-currency-dollar';
 
-    protected static ?string $navigationGroup = 'Active Operations';
+    protected static ?string $navigationGroup = 'Programs';
 
-    protected static ?string $navigationLabel = 'Under 25k';
+    protected static ?string $navigationLabel = 'Under-$25k Projects';
 
     protected static ?string $slug = 'under-25k';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 20;
 
     public static function form(Form $form): Form
     {

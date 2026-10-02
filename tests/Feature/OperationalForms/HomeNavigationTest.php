@@ -125,7 +125,7 @@ class HomeNavigationTest extends TestCase
             ->assertDontSee('bg-orange-500', false);
     }
 
-    public function test_admin_staying_user_sees_direct_admin_panel_link_without_legacy_login(): void
+    public function test_admin_staying_user_sees_permitted_admin_destination_in_app_switcher(): void
     {
         $this->withoutVite();
         $user = $this->actingAsCanonicalFixture();
@@ -135,8 +135,10 @@ class HomeNavigationTest extends TestCase
         $response = $this->get('/');
 
         $response->assertOk();
-        $response->assertSee('Admin Panel');
-        $response->assertSee('href="'.url('/admin').'"', false);
+        $response->assertSee('Applications');
+        $response->assertSee('data-hub-menu', false);
+        $response->assertDontSee('Admin Panel');
+        $response->assertSee('href="/admin"', false);
         $response->assertDontSee('/admin/login', false);
         $response->assertDontSee('Admin Login');
     }

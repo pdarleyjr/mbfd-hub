@@ -10,11 +10,7 @@
     <a href="#main" class="hub-skip-link">Skip to content</a>
     <x-hub-header max-width="max-w-5xl" />
     <main id="main" class="hub-page__main mx-auto max-w-5xl px-4 py-8 sm:px-6">
-        <div class="mb-6">
-            <p class="text-sm font-semibold uppercase tracking-wider text-hub-blue">Member communications</p>
-            <h1 class="mt-1 font-heading text-3xl font-bold text-hub-ink">Department Updates</h1>
-            <p class="mt-2 text-hub-muted">Published operational notices and member information from MBFD.</p>
-        </div>
+        <x-hub.page-header title="Department Updates" eyebrow="Member communications" description="Published operational notices and member information from MBFD." />
         <div class="space-y-4">
             @forelse($departmentUpdates as $update)
                 @include('updates._card', ['update' => $update, 'compact' => true, 'headingTag' => 'h2'])

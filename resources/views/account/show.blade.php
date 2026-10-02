@@ -11,11 +11,7 @@
     <a href="#main" class="hub-skip-link">Skip to content</a>
     <x-hub-header back-label="Hub home" max-width="max-w-5xl" />
     <main id="main" class="hub-page__main mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
-        <div>
-            <p class="text-xs font-bold uppercase tracking-[.16em] text-hub-blue">MBFD Identity</p>
-            <h1 class="mt-1 font-heading text-3xl font-bold text-hub-ink">My account</h1>
-            <p class="mt-2 text-sm text-hub-muted">Manage your Hub identity, security, and granted application access.</p>
-        </div>
+        <x-hub.page-header title="My account" eyebrow="MBFD Identity" description="Manage your Hub identity, security, and granted application access." />
         <section class="overflow-hidden hub-panel" aria-labelledby="identity-heading">
             <div class="border-b border-hub-border px-5 py-4"><h2 id="identity-heading" class="text-lg font-bold">Identity & security</h2><p class="mt-1 text-sm text-hub-muted">Your department identity and current security readiness.</p></div>
             <dl class="grid gap-px bg-hub-border sm:grid-cols-2">

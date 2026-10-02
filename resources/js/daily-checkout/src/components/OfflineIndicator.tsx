@@ -67,10 +67,10 @@ export default function OfflineIndicator() {
     if (attentionCount > 0) {
       setShowToast(false);
     } else if (isOffline) {
-      setToastMessage('You are offline. Changes will be saved locally.');
+      setToastMessage('Offline. Changes are saved on this device.');
       setShowToast(true);
     } else if (!isOffline && pendingCount > 0) {
-      setToastMessage(`Back online! Syncing ${pendingCount} pending submission${pendingCount > 1 ? 's' : ''}...`);
+      setToastMessage(`Connected. ${pendingCount} saved submission${pendingCount > 1 ? 's are' : ' is'} waiting to sync.`);
       setShowToast(true);
       
       // Auto hide after 5 seconds
@@ -78,48 +78,46 @@ export default function OfflineIndicator() {
     }
   }, [attentionCount, isOffline, pendingCount]);
 
-  if (!showToast && !isOffline && attentionCount === 0) return null;
+  const state = attentionCount > 0 ? 'attention' : isOffline ? 'offline' : pendingCount > 0 ? 'pending' : 'connected';
+  const label = attentionCount > 0 ? 'Needs review' : isOffline ? 'Offline' : pendingCount > 0 ? 'Pending sync' : 'Connected';
 
   return (
     <>
+      <div className="hub-connection-bar" data-state={state} role="status" aria-live="polite">
+        <span className="hub-connection-state">{label}</span>
+        <span className="hub-connection-detail">{queueCount > 0 ? `${queueCount} saved on this device` : isOffline ? 'Work stays on this device' : 'No submissions waiting to sync'}</span>
+      </div>
       {/* Offline Banner */}
       {isOffline && attentionCount === 0 && (
-        <div className="bg-amber-100 text-amber-950 px-4 py-2 text-center text-sm font-medium" role="status">
-          <span className="inline-block mr-2" aria-hidden="true">⚠️</span>
-          Offline Mode - Submissions wait for a connection
-          {queueCount > 0 && (
-            <span className="ml-2 inline-block border border-amber-800/30 bg-white/70 text-amber-950 px-2 py-0.5 rounded text-xs">
-              {queueCount} pending
-            </span>
-          )}
+        <div className="hub-sync-notice" role="status">
+          Offline Mode · Submissions wait for a connection. Changes are saved on this device.
         </div>
       )}
 
       {attentionCount > 0 && (
         <div
-          className="bg-red-700 text-white px-4 py-3 text-center text-sm font-medium"
+          className="hub-sync-notice hub-sync-notice--attention"
           role="alert"
         >
           <p>
-            {attentionCount} saved submission{attentionCount > 1 ? 's need' : ' needs'} review before it can be sent. The payload remains saved on this device.
+            {attentionCount} saved submission{attentionCount > 1 ? 's need' : ' needs'} review before it can be sent. Your work remains saved on this device.
           </p>
-          <p className="mt-1 text-red-100">{attentionGuidance(attentionErrorCode, attentionError)}</p>
-          {isOffline && <p className="mt-1 text-red-100">This device is offline; the saved work will remain on this device.</p>}
+          <p>{attentionGuidance(attentionErrorCode, attentionError)}</p>
+          {isOffline && <p>This device is offline; the saved work will remain on this device.</p>}
         </div>
       )}
 
       {/* Toast Notification */}
       {showToast && !isOffline && (
         <div
-          className="bg-gray-900 text-white px-4 py-3 shadow-lg"
-          role="alert"
+          className="hub-sync-notice"
+          role="status"
         >
-          <div className="flex items-start">
-            <span className="mr-2" aria-hidden="true">{isOffline ? '⚠️' : '✓'}</span>
-            <p className="flex-1">{toastMessage}</p>
+          <div className="hub-sync-toast">
+            <p>{toastMessage}</p>
             <button
               onClick={() => setShowToast(false)}
-              className="ml-2 inline-flex min-h-[44px] min-w-[44px] items-center justify-center text-gray-400 hover:text-white"
+              className="inline-flex items-center justify-center"
               aria-label="Close notification"
             >
               ✕

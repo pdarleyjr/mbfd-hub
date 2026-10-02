@@ -15,6 +15,12 @@ use Filament\Tables\Table;
 
 class AccountProfileResource extends Resource
 {
+    protected static ?string $navigationLabel = 'Accounts';
+
+    protected static ?int $navigationSort = 40;
+
+    protected static ?string $navigationGroup = 'Personnel';
+
     protected static ?string $model = User::class;
 
     protected static ?string $slug = 'employees/accounts';

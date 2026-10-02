@@ -2,30 +2,31 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\EquipmentItemResource\Pages;
-use App\Models\EquipmentItem;
-use App\Models\InventoryLocation;
 use App\Models\AdminAlertEvent;
+use App\Models\EquipmentItem;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Notifications\Notification;
+use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Filament\Resources\Resource;
-use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Builder;
 
-use App\Filament\Concerns\EnterpriseTable;
 class EquipmentItemResource extends Resource
 {
+    protected static ?string $navigationLabel = 'Equipment';
+
     use EnterpriseTable;
 
     protected static ?string $model = EquipmentItem::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-cube';
 
-    protected static ?string $navigationGroup = 'Inventory & Logistics';
+    protected static ?string $navigationGroup = 'Logistics';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 10;
 
     protected static bool $shouldRegisterNavigation = false;
 
@@ -111,29 +112,29 @@ class EquipmentItemResource extends Resource
         return self::applyEnterpriseDefaults($table)
             ->columns([
                 Tables\Columns\TextColumn::make('name')
+                    ->wrap()
+                    ->extraAttributes(['class' => 'hub-phone-summary'])
+                    ->description(fn (EquipmentItem $record): string => 'Stock: '.$record->stock.' · '.($record->location?->full_location ?? 'Location unrecorded').' · '.($record->is_active ? 'Active' : 'Inactive'))
                     ->searchable()
                     ->sortable(),
-                Tables\Columns\TextColumn::make('current_stock')
+                Tables\Columns\TextColumn::make('current_stock')->visibleFrom('md')
                     ->label('Stock')
                     ->badge()
-                    ->color(fn (EquipmentItem $record): string => 
-                        $record->stock == 0 ? 'danger' : 
+                    ->color(fn (EquipmentItem $record): string => $record->stock == 0 ? 'danger' :
                         ($record->stock <= $record->reorder_min ? 'warning' : 'success')
                     ),
-                Tables\Columns\TextColumn::make('location.full_location')
+                Tables\Columns\TextColumn::make('location.full_location')->visibleFrom('md')
                     ->label('Location')
-                    ->getStateUsing(fn (EquipmentItem $record): string => 
-                        $record->location?->full_location ?? 'N/A'
+                    ->getStateUsing(fn (EquipmentItem $record): string => $record->location?->full_location ?? 'N/A'
                     ),
-                Tables\Columns\TextColumn::make('reorder_range')
+                Tables\Columns\TextColumn::make('reorder_range')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)
                     ->label('Reorder Range')
-                    ->getStateUsing(fn (EquipmentItem $record): string => 
-                        "Min: {$record->reorder_min}" . ($record->reorder_max ? " / Max: {$record->reorder_max}" : '')
+                    ->getStateUsing(fn (EquipmentItem $record): string => "Min: {$record->reorder_min}".($record->reorder_max ? " / Max: {$record->reorder_max}" : '')
                     ),
-                Tables\Columns\TextColumn::make('manufacturer')
+                Tables\Columns\TextColumn::make('manufacturer')->visibleFrom('md')
                     ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('category')
+                Tables\Columns\TextColumn::make('category')->visibleFrom('md')
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
                         'PPE' => 'info',
@@ -145,9 +146,9 @@ class EquipmentItemResource extends Resource
                         'Other' => 'secondary',
                         default => 'gray',
                     }),
-                Tables\Columns\ToggleColumn::make('is_active')
+                Tables\Columns\ToggleColumn::make('is_active')->visibleFrom('md')
                     ->label('Active'),
-                Tables\Columns\TextColumn::make('updated_at')
+                Tables\Columns\TextColumn::make('updated_at')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)
                     ->since()
                     ->sortable(),
             ])
@@ -155,7 +156,7 @@ class EquipmentItemResource extends Resource
                 // FIXME: This filter needs proper implementation once stock mutations logic is finalized
                 // Tables\Filters\Filter::make('low_stock')
                 //     ->label('Low Stock')
-                //     ->query(fn (Builder $query): Builder => 
+                //     ->query(fn (Builder $query): Builder =>
                 //         $query->whereHas('stockMutations', function ($q) {
                 //             // This gets items that have stock mutations
                 //         }, '>=', 0)
@@ -173,11 +174,12 @@ class EquipmentItemResource extends Resource
                     ]),
                 Tables\Filters\SelectFilter::make('shelf')
                     ->query(function (Builder $query, array $data): Builder {
-                        if (!empty($data['value'])) {
+                        if (! empty($data['value'])) {
                             return $query->whereHas('location', function (Builder $query) use ($data) {
                                 $query->where('shelf', $data['value']);
                             });
                         }
+
                         return $query;
                     })
                     ->options([
@@ -190,11 +192,12 @@ class EquipmentItemResource extends Resource
                     ]),
                 Tables\Filters\SelectFilter::make('row')
                     ->query(function (Builder $query, array $data): Builder {
-                        if (!empty($data['value'])) {
+                        if (! empty($data['value'])) {
                             return $query->whereHas('location', function (Builder $query) use ($data) {
                                 $query->where('row', $data['value']);
                             });
                         }
+
                         return $query;
                     })
                     ->options([
@@ -218,116 +221,118 @@ class EquipmentItemResource extends Resource
                     ->falseLabel('Inactive only'),
             ])
             ->actions([
-                Tables\Actions\Action::make('adjust_stock')
-                    ->label('Adjust Stock')
-                    ->icon('heroicon-o-arrows-up-down')
-                    ->tooltip('Adjust inventory stock levels')
-                    ->form([
-                        Forms\Components\Select::make('operation')
-                            ->options([
-                                'increase' => 'Increase Stock',
-                                'decrease' => 'Decrease Stock',
-                                'set' => 'Set Stock to Exact Value',
-                            ])
-                            ->required()
-                            ->reactive(),
-                        Forms\Components\TextInput::make('quantity')
-                            ->numeric()
-                            ->required()
-                            ->minValue(0)
-                            ->label('Quantity'),
-                        Forms\Components\Textarea::make('reason')
-                            ->required()
-                            ->label('Reason for Adjustment')
-                            ->placeholder('e.g., Shipment received, Physical count adjustment, etc.'),
-                    ])
-                    ->action(function (EquipmentItem $record, array $data) {
-                        $qty = (int) $data['quantity'];
-                        $reason = $data['reason'];
-                        $reference = 'ADMIN-' . now()->format('YmdHis');
-                        
-                        match ($data['operation']) {
-                            'increase' => $record->increaseStock($qty, $reason, $reference),
-                            'decrease' => $record->decreaseStock($qty, $reason, $reference),
-                            'set' => $record->setStock($qty, $reason, $reference),
-                        };
-                        
-                        // Create alert if low stock triggered
-                        if ($record->refresh()->isLowStock()) {
-                            AdminAlertEvent::create([
-                                'type' => 'low_stock',
-                                'severity' => 'warning',
-                                'message' => "Low stock alert: {$record->name} (current: {$record->stock}, min: {$record->reorder_min})",
-                                'related_type' => 'equipment_item',
-                                'related_id' => $record->id,
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\Action::make('adjust_stock')
+                        ->label('Adjust Stock')
+                        ->icon('heroicon-o-arrows-up-down')
+                        ->tooltip('Adjust inventory stock levels')
+                        ->form([
+                            Forms\Components\Select::make('operation')
+                                ->options([
+                                    'increase' => 'Increase Stock',
+                                    'decrease' => 'Decrease Stock',
+                                    'set' => 'Set Stock to Exact Value',
+                                ])
+                                ->required()
+                                ->reactive(),
+                            Forms\Components\TextInput::make('quantity')
+                                ->numeric()
+                                ->required()
+                                ->minValue(0)
+                                ->label('Quantity'),
+                            Forms\Components\Textarea::make('reason')
+                                ->required()
+                                ->label('Reason for Adjustment')
+                                ->placeholder('e.g., Shipment received, Physical count adjustment, etc.'),
+                        ])
+                        ->action(function (EquipmentItem $record, array $data) {
+                            $qty = (int) $data['quantity'];
+                            $reason = $data['reason'];
+                            $reference = 'ADMIN-'.now()->format('YmdHis');
+
+                            match ($data['operation']) {
+                                'increase' => $record->increaseStock($qty, $reason, $reference),
+                                'decrease' => $record->decreaseStock($qty, $reason, $reference),
+                                'set' => $record->setStock($qty, $reason, $reference),
+                            };
+
+                            // Create alert if low stock triggered
+                            if ($record->refresh()->isLowStock()) {
+                                AdminAlertEvent::create([
+                                    'type' => 'low_stock',
+                                    'severity' => 'warning',
+                                    'message' => "Low stock alert: {$record->name} (current: {$record->stock}, min: {$record->reorder_min})",
+                                    'related_type' => 'equipment_item',
+                                    'related_id' => $record->id,
+                                ]);
+                            }
+
+                            Notification::make()
+                                ->success()
+                                ->title('Stock adjusted')
+                                ->body("{$record->name}: {$data['operation']} {$qty}")
+                                ->send();
+                        }),
+                    Tables\Actions\Action::make('move_location')
+                        ->label('Move Location')
+                        ->icon('heroicon-o-map-pin')
+                        ->tooltip('Change storage location')
+                        ->form([
+                            Forms\Components\Select::make('location_id')
+                                ->relationship('location', 'location_name')
+                                ->searchable()
+                                ->preload()
+                                ->createOptionForm([
+                                    Forms\Components\TextInput::make('location_name')->required(),
+                                    Forms\Components\Select::make('shelf')
+                                        ->options(['A' => 'A', 'B' => 'B', 'C' => 'C', 'D' => 'D', 'E' => 'E', 'F' => 'F']),
+                                    Forms\Components\TextInput::make('row')->numeric()->minValue(1)->maxValue(10),
+                                    Forms\Components\TextInput::make('bin'),
+                                ])
+                                ->required(),
+                            Forms\Components\Textarea::make('notes')
+                                ->label('Move Reason')
+                                ->placeholder('e.g., Reorganizing supply room'),
+                        ])
+                        ->action(function (EquipmentItem $record, array $data) {
+                            $oldLocation = $record->location?->full_location ?? 'N/A';
+                            $record->update(['location_id' => $data['location_id']]);
+                            $newLocation = $record->refresh()->location?->full_location ?? 'N/A';
+
+                            Notification::make()
+                                ->success()
+                                ->title('Location updated')
+                                ->body("{$record->name} moved from {$oldLocation} to {$newLocation}")
+                                ->send();
+                        }),
+                    Tables\Actions\Action::make('set_thresholds')
+                        ->label('Set Thresholds')
+                        ->icon('heroicon-o-exclamation-triangle')
+                        ->tooltip('Configure stock thresholds')
+                        ->form([
+                            Forms\Components\TextInput::make('reorder_min')
+                                ->label('Low Stock Threshold')
+                                ->numeric()
+                                ->required()
+                                ->default(fn ($record) => $record->reorder_min),
+                            Forms\Components\TextInput::make('reorder_max')
+                                ->label('Par Level (Target Stock)')
+                                ->numeric()
+                                ->default(fn ($record) => $record->reorder_max),
+                        ])
+                        ->action(function (EquipmentItem $record, array $data) {
+                            $record->update([
+                                'reorder_min' => $data['reorder_min'],
+                                'reorder_max' => $data['reorder_max'],
                             ]);
-                        }
-                        
-                        Notification::make()
-                            ->success()
-                            ->title('Stock adjusted')
-                            ->body("{$record->name}: {$data['operation']} {$qty}")
-                            ->send();
-                    }),
-                Tables\Actions\Action::make('move_location')
-                    ->label('Move Location')
-                    ->icon('heroicon-o-map-pin')
-                    ->tooltip('Change storage location')
-                    ->form([
-                        Forms\Components\Select::make('location_id')
-                            ->relationship('location', 'location_name')
-                            ->searchable()
-                            ->preload()
-                            ->createOptionForm([
-                                Forms\Components\TextInput::make('location_name')->required(),
-                                Forms\Components\Select::make('shelf')
-                                    ->options(['A' => 'A', 'B' => 'B', 'C' => 'C', 'D' => 'D', 'E' => 'E', 'F' => 'F']),
-                                Forms\Components\TextInput::make('row')->numeric()->minValue(1)->maxValue(10),
-                                Forms\Components\TextInput::make('bin'),
-                            ])
-                            ->required(),
-                        Forms\Components\Textarea::make('notes')
-                            ->label('Move Reason')
-                            ->placeholder('e.g., Reorganizing supply room'),
-                    ])
-                    ->action(function (EquipmentItem $record, array $data) {
-                        $oldLocation = $record->location?->full_location ?? 'N/A';
-                        $record->update(['location_id' => $data['location_id']]);
-                        $newLocation = $record->refresh()->location?->full_location ?? 'N/A';
-                        
-                        Notification::make()
-                            ->success()
-                            ->title('Location updated')
-                            ->body("{$record->name} moved from {$oldLocation} to {$newLocation}")
-                            ->send();
-                    }),
-                Tables\Actions\Action::make('set_thresholds')
-                    ->label('Set Thresholds')
-                    ->icon('heroicon-o-exclamation-triangle')
-                    ->tooltip('Configure stock thresholds')
-                    ->form([
-                        Forms\Components\TextInput::make('reorder_min')
-                            ->label('Low Stock Threshold')
-                            ->numeric()
-                            ->required()
-                            ->default(fn ($record) => $record->reorder_min),
-                        Forms\Components\TextInput::make('reorder_max')
-                            ->label('Par Level (Target Stock)')
-                            ->numeric()
-                            ->default(fn ($record) => $record->reorder_max),
-                    ])
-                    ->action(function (EquipmentItem $record, array $data) {
-                        $record->update([
-                            'reorder_min' => $data['reorder_min'],
-                            'reorder_max' => $data['reorder_max'],
-                        ]);
-                        
-                        Notification::make()
-                            ->success()
-                            ->title('Thresholds updated')
-                            ->send();
-                    }),
-                Tables\Actions\EditAction::make(),
+
+                            Notification::make()
+                                ->success()
+                                ->title('Thresholds updated')
+                                ->send();
+                        }),
+                    Tables\Actions\EditAction::make(),
+                ])->label('Actions')->icon('heroicon-m-ellipsis-horizontal')->button()->color('gray'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

@@ -1,14 +1,11 @@
 import { Link } from 'react-router';
 import PreviousPageButton from './PreviousPageButton';
+import { HubPageHeader } from '../../../hub-ui/HubShell';
 
 export default function FormsHub() {
   return (
     <div className="mx-auto max-w-6xl font-hub">
-      <div className="mb-8 border-l-4 border-hub-red pl-4">
-        <p className="mb-1 text-xs font-bold uppercase tracking-wider text-hub-blue">Operational forms</p>
-        <h1 className="mb-2 text-3xl font-bold text-hub-ink font-heading">Forms Hub</h1>
-        <p className="text-hub-ink-secondary">Select the workflow that matches the work you need to complete.</p>
-      </div>
+      <HubPageHeader eyebrow="Operational forms" title="Forms Hub" description="Select the workflow that matches the work you need to complete." />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 stagger-list">
         

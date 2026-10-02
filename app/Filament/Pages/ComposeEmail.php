@@ -24,13 +24,15 @@ use Throwable;
 /** @property Form $form */
 final class ComposeEmail extends Page implements HasForms
 {
+    protected static ?int $navigationSort = 20;
+
     use InteractsWithForms;
 
     protected static ?string $navigationIcon = 'heroicon-o-pencil-square';
 
     protected static ?string $navigationGroup = 'Communications';
 
-    protected static ?string $navigationLabel = 'Compose';
+    protected static ?string $navigationLabel = 'Compose Email';
 
     protected static string $view = 'filament.pages.compose-email';
 

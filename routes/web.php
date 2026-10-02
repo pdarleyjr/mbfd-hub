@@ -315,6 +315,9 @@ Route::get('/manifest.json', function () {
 });
 
 // --- Admin Desktop-PWA -----------------------------------------------------
+Route::redirect('/site.webmanifest', '/manifest.json', 301)
+    ->middleware(PreventPreviousUrlStorage::class);
+
 // These two routes serve the scoped admin manifest + service worker with
 // the correct Content-Type and Service-Worker-Allowed scope header. The
 // raw files live in public/admin-pwa/ so they survive `php artisan
@@ -359,6 +362,9 @@ Route::get('/daily/{path?}', function () {
     $canonicalOrigin = rtrim((string) config('app.url'), '/');
     $runtimeConfig = '<script>window.__MBFD_CANONICAL_ORIGIN__ = '.json_encode(
         $canonicalOrigin,
+        JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT,
+    ).';window.__MBFD_HUB_NAVIGATION__ = '.json_encode(
+        \App\Support\HubShellNavigation::forUser(auth('web')->user()),
         JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT,
     ).';</script>';
 
