@@ -52,7 +52,7 @@ class AccountProfileResource extends Resource
     {
         return $table->columns([
             Tables\Columns\TextColumn::make('name')->searchable()->sortable(),
-            Tables\Columns\TextColumn::make('employee_id')->label('Recorded Employee ID')->searchable(),
+            Tables\Columns\TextColumn::make('employee_id')->label('Recorded Employee ID')->placeholder('No Employee ID')->searchable(),
             Tables\Columns\TextColumn::make('email')->searchable(),
             Tables\Columns\TextColumn::make('account_classification')->label('Classification')->badge()
                 ->formatStateUsing(fn (?string $state): string => $state === 'approved_nonemployee' ? 'Approved nonemployee' : 'Unresolved account'),

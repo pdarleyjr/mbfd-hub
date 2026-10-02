@@ -68,6 +68,7 @@ class ApparatusServiceTicketResource extends Resource
                 Tables\Columns\TextColumn::make('assignedTo.name')
                     ->label('Assigned To / Vendor')
                     ->formatStateUsing(fn (?string $state, ApparatusServiceTicket $record): string => $state ?: $record->assigned_vendor ?: 'Unassigned')
+                    ->placeholder(fn (ApparatusServiceTicket $record): string => $record->assigned_vendor ?: 'Unassigned')
                     ->toggleable(),
                 Tables\Columns\TextColumn::make('requester_name_snapshot')->label('Requested By')->searchable()->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable(),

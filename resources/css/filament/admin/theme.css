@@ -740,6 +740,8 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
 .filament-spatie-health > .text-gray-400 { color: rgb(var(--hub-muted)); }
 .filament-spatie-health > .text-red-500 { color: rgb(var(--hub-danger)); }
 
+.fi-ta-placeholder { color: rgb(var(--hub-ink-secondary)); }
+
 .fi-fo-field-wrp input:not(:disabled)::placeholder,
 .fi-fo-field-wrp textarea:not(:disabled)::placeholder,
 .fi-fo-field-wrp .choices__placeholder {

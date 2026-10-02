@@ -147,6 +147,7 @@ class ApparatusResource extends Resource
                                     ->options(ApparatusPmServiceType::options())
                                     ->helperText('Most recent service type'),
                                 Forms\Components\DatePicker::make('last_service_date')
+                                    ->id('current-meter-last-service-date')
                                     ->label('Service Date')
                                     ->helperText('Date of last service'),
                             ]),
