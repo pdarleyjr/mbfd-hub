@@ -11,7 +11,6 @@ const integrationEnvironmentPrefixes = [
   'GOOGLE_',
   'LIVEKIT_',
   'OLLAMA_',
-  'PULSEPOINT_',
   'R2_',
   'REVERB_',
   'SENTRY_',

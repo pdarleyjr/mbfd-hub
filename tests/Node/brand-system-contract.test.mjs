@@ -188,31 +188,23 @@ test("live Filament command-center and workgroup structural colors resolve throu
 test("Home controls and presentation load from the Hub build without third-party CDNs", () => {
   const home = read("resources/views/welcome.blade.php");
   const appCss = read("resources/css/app.css");
-  const homeJs = read("resources/js/home.js");
-  const vite = read("vite.config.js");
 
   for (const host of ["fonts.googleapis.com", "fonts.gstatic.com", "cdn.jsdelivr.net"]) {
     assert.equal(home.includes(host), false, `Home must not load ${host}`);
   }
   assert.doesNotMatch(appCss, /https?:\/\//i, "Home CSS must not reference external URLs");
   assert.match(appCss, /@import ['"]@fontsource-variable\/plus-jakarta-sans\/wght\.css['"]/);
-  assert.match(home, /@vite\(\['resources\/css\/app\.css', 'resources\/js\/home\.js'\]\)/);
-  assert.match(vite, /'resources\/js\/home\.js'/);
-  assert.match(homeJs, /import Alpine from 'alpinejs'/);
-  assert.match(homeJs, /Alpine\.start\(\)/);
-  assert.match(home, /\.shimmer-line\s*\{[^}]*background:\s*rgb\(var\(--hub-border\)\)/);
+  assert.match(home, /@vite\('resources\/css\/app\.css'\)/);
+  assert.match(read("resources/views/components/hub/shell.blade.php"), /@vite\('resources\/js\/hub-shell\.js'\)/);
+  assert.match(home, /@include\('components\.hub-support-widget'\)/);
 });
 
-test("Home incident status labels only confirmed current data as Live", () => {
+test("Home retains Department Updates and Quick Access without an incident integration", () => {
   const home = read("resources/views/welcome.blade.php");
 
-  assert.match(home, />MBFD Incidents<\/h2>/);
-  assert.doesNotMatch(home, /MBFD Live Incidents|Agency X1012|All units available/);
-  assert.match(home, /x-show="!loading && !error && !stale"/);
-  assert.match(home, /x-show="!loading && stale"/);
-  assert.match(home, /x-show="!loading && error"/);
-  assert.match(home, /data\.staleAsOf/);
-  assert.match(home, /loading \|\| error \? '—' : activeCount/);
+  assert.match(home, /data-home-section="department-updates"/);
+  assert.match(home, /data-home-section="quick-access"/);
+  assert.doesNotMatch(home, /PulsePoint|MBFD Incidents|\/api\/incidents|data-home-column="incidents"|home-feed__/i);
 });
 
 test("Admin browser chrome and installed PWA use Hub header and canvas colors", () => {

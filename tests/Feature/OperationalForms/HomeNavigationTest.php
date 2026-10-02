@@ -14,7 +14,7 @@ class HomeNavigationTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_entitled_home_renders_the_exact_quick_access_stack_and_preserves_pulsepoint(): void
+    public function test_entitled_home_renders_the_exact_quick_access_stack_without_pulsepoint(): void
     {
         $this->withoutVite();
         $user = $this->actingAsCanonicalFixture();
@@ -30,7 +30,7 @@ class HomeNavigationTest extends TestCase
         $response->assertOk();
         $response->assertSee('Department Updates');
         $response->assertSee('No current department updates');
-        $response->assertSeeInOrder(['Department Updates', 'Quick Access', 'MBFD Incidents']);
+        $response->assertSeeInOrder(['Department Updates', 'Quick Access']);
         $response->assertSee('Quick Access');
         $response->assertSeeInOrder([
             'Station / Vehicles / Equipment',
@@ -64,9 +64,10 @@ class HomeNavigationTest extends TestCase
         $response->assertDontSee('/workgroups/login', false);
         $response->assertDontSee('MBFD Support Assistant');
         $response->assertDontSee('aiChat()', false);
-        $response->assertSee('x-data="pulsePointFeed()"', false);
-        $response->assertSee('function pulsePointFeed()', false);
-        $response->assertSee('/api/incidents', false);
+        $response->assertDontSee('MBFD Incidents');
+        $response->assertDontSee('PulsePoint');
+        $response->assertDontSee('pulsePointFeed', false);
+        $response->assertDontSee('/api/incidents', false);
     }
 
     public function test_home_renders_only_active_department_updates_in_the_primary_column(): void

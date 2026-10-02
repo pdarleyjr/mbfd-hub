@@ -64,7 +64,7 @@ test('entitled home exposes the exact unified Quick Access destinations', async 
   await expect(page.getByRole('link', { name: /Videos/i })).toHaveAttribute('href', 'https://videos.mbfdhub.com');
   await expect(page.getByRole('link', { name: /Media Control/i })).toHaveAttribute('href', 'https://media.mbfdhub.com/api/auth/hub/start');
   await expect(page.getByText('MBFD Support Assistant')).toHaveCount(0);
-  await expect(page.locator('[aria-label="MBFD Live Incident Feed"]')).toBeVisible();
+  await expect(page.locator('[data-home-column="incidents"]')).toHaveCount(0);
 });
 
 test('authorized user enters Workgroups without a second login', async ({ page }, testInfo) => {
@@ -164,13 +164,13 @@ test('home layout is ordered, aligned, touch-safe, and overflow-free from 320px 
   await login(page, adminEmployeeId, adminPassword);
 
   const viewports = [
-    { name: 'phone-320', width: 320, height: 568, columns: false },
-    { name: 'phone-390', width: 390, height: 844, columns: false },
-    { name: 'tablet-portrait', width: 768, height: 1024, columns: false },
-    { name: 'tablet-landscape', width: 1024, height: 768, columns: true },
-    { name: 'desktop', width: 1440, height: 1000, columns: true },
-    { name: 'wide-desktop', width: 2560, height: 1440, columns: true },
-    { name: '4k', width: 3840, height: 2160, columns: true },
+    { name: 'phone-320', width: 320, height: 568 },
+    { name: 'phone-390', width: 390, height: 844 },
+    { name: 'tablet-portrait', width: 768, height: 1024 },
+    { name: 'tablet-landscape', width: 1024, height: 768 },
+    { name: 'desktop', width: 1440, height: 1000 },
+    { name: 'wide-desktop', width: 2560, height: 1440 },
+    { name: '4k', width: 3840, height: 2160 },
   ];
 
   for (const viewport of viewports) {
@@ -179,30 +179,24 @@ test('home layout is ordered, aligned, touch-safe, and overflow-free from 320px 
     const primary = page.locator('[data-home-column="primary"]');
     const updates = page.locator('[data-home-section="department-updates"]');
     const quickAccess = page.locator('[data-home-section="quick-access"]');
-    const incidents = page.locator('[data-home-column="incidents"]');
     await expect(primary).toBeVisible();
     await expect(updates).toBeVisible();
     await expect(quickAccess).toBeVisible();
-    await expect(incidents).toBeVisible();
+    await expect(page.locator('[data-home-column="incidents"]')).toHaveCount(0);
     await expect(updates.getByRole('link', { name: 'Department Operations Briefing' })).toBeVisible();
 
-    const [primaryBox, updateBox, quickBox, incidentBox] = await Promise.all([
+    const [layoutBox, primaryBox, updateBox, quickBox] = await Promise.all([
+      page.locator('.home-layout').boundingBox(),
       primary.boundingBox(),
       updates.boundingBox(),
       quickAccess.boundingBox(),
-      incidents.boundingBox(),
     ]);
+    expect(layoutBox).not.toBeNull();
     expect(primaryBox).not.toBeNull();
     expect(updateBox).not.toBeNull();
     expect(quickBox).not.toBeNull();
-    expect(incidentBox).not.toBeNull();
+    expect(Math.abs(primaryBox!.width - layoutBox!.width)).toBeLessThanOrEqual(1);
     expect(updateBox!.y + updateBox!.height).toBeLessThanOrEqual(quickBox!.y + 1);
-    if (viewport.columns) {
-      expect(primaryBox!.x + primaryBox!.width).toBeLessThanOrEqual(incidentBox!.x);
-      expect(Math.abs(updateBox!.y - incidentBox!.y)).toBeLessThanOrEqual(8);
-    } else {
-      expect(quickBox!.y + quickBox!.height).toBeLessThanOrEqual(incidentBox!.y);
-    }
 
     const layout = await page.evaluate(() => ({
       clientWidth: document.documentElement.clientWidth,

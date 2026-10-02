@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Api\Display;
 
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\IncidentsController;
 use App\Models\Employee;
 use App\Models\Station;
 use App\Services\Display\DisplayAiService;
@@ -201,15 +200,6 @@ final class DisplayController extends Controller
                     .'this endpoint reports territory metadata only',
             ])
             ->header('Cache-Control', 'private, max-age='.DisplaySnapshotService::CACHE_TTL);
-    }
-
-    /**
-     * Active/recent incidents — delegates to the existing PulsePoint proxy so
-     * caching and failure behaviour stay identical to the public feed.
-     */
-    public function incidents(IncidentsController $incidents): JsonResponse
-    {
-        return $incidents->index();
     }
 
     public function health(): JsonResponse

@@ -34,7 +34,6 @@ final class TestEnvironmentIsolationTest extends TestCase
             'services.cloudflare.api_secret',
             'services.cloudflare.worker_url',
             'services.display_api.token',
-            'services.pulsepoint.worker_url',
             'services.screentinker.sync_token',
             'services.screentinker.sync_url',
             'services.snipeit.token',

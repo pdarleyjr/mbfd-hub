@@ -112,11 +112,11 @@ class DisplaySnapshotTest extends TestCase
                 'source_health' => [
                     'hub_up',
                     'ai_available',
-                    'incidents_worker_up',
                     'last_deploy_sha',
                     'snapshot_age_seconds',
                 ],
-            ]);
+            ])
+            ->assertJsonMissingPath('source_health.incidents_worker_up');
     }
 
     public function test_snapshot_counts_are_accurate(): void

@@ -14,13 +14,9 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="MBFD Hub">
     <title>Home · MBFD Hub</title>
-    @vite(['resources/css/app.css', 'resources/js/home.js'])
+    @vite('resources/css/app.css')
     <style>
-        [x-cloak] { display: none !important; }
         .home-layout { display: grid; gap: 32px; align-items: start; }
-        @media (min-width: 1024px) {
-            .home-layout { grid-template-columns: minmax(0, 8fr) minmax(20rem, 4fr); gap: 32px; }
-        }
         .home-today { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 24px; margin-bottom: 24px; border-bottom: 1px solid rgb(var(--hub2-n-200)); }
         @media (max-width: 639.98px) {
             .home-today > * { width: 100%; }
@@ -34,18 +30,6 @@
         .home-update__title a:hover { color: rgb(var(--hub2-action)); text-decoration: underline; text-underline-offset: 3px; }
         .update-preview { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; margin: 4px 0 0; color: rgb(var(--hub2-n-600)); font-size: 14px; line-height: 22px; }
         .home-update__footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
-        .home-feed__counts { display: flex; align-items: center; gap: 24px; padding: 12px 16px; border-bottom: 1px solid rgb(var(--hub2-n-100)); }
-        .home-feed__metric { font-size: 20px; line-height: 28px; font-weight: 650; font-variant-numeric: tabular-nums; }
-        .home-feed__metric--active { color: rgb(var(--hub2-red-strong)); }
-        .home-feed__label { margin: 0; color: rgb(var(--hub2-n-600)); font-size: 12px; line-height: 16px; font-weight: 600; }
-        .home-feed__group { margin: 0; padding: 12px 16px 4px; color: rgb(var(--hub2-n-600)); font-size: 11px; line-height: 16px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
-        .home-feed__row { display: flex; align-items: flex-start; gap: 12px; padding: 10px 16px; }
-        .home-feed__time { width: 44px; flex: none; color: rgb(var(--hub2-n-600)); font-size: 12px; line-height: 20px; }
-        .home-feed__unit { padding: 0 6px; border-radius: 4px; background: rgb(var(--hub2-n-50)); color: rgb(var(--hub2-n-800)); font-size: 12px; line-height: 18px; }
-        .shimmer-line { position: relative; overflow: hidden; background: rgb(var(--hub-border)); border-radius: 4px; }
-        .feed-scroll { scrollbar-width: thin; scrollbar-color: rgb(var(--hub-border)) transparent; }
-        .feed-scroll::-webkit-scrollbar { width: 4px; }
-        .feed-scroll::-webkit-scrollbar-thumb { background: rgb(var(--hub-border)); border-radius: 2px; }
         .home-footer { border-top: 1px solid rgb(var(--hub2-n-200)); padding-bottom: max(8px, env(safe-area-inset-bottom, 0px)); }
         .home-footer__inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; max-width: var(--hub2-content-max); margin: 0 auto; padding: 16px var(--hub2-gutter); color: rgb(var(--hub2-n-600)); font-size: 12px; line-height: 16px; }
     </style>
@@ -231,129 +215,6 @@
                     </div>
                 </section>
             </div>
-
-            <section
-                x-data="pulsePointFeed()"
-                x-init="init()"
-                data-home-column="incidents"
-                class="hub-panel"
-                aria-label="MBFD Incident Feed"
-                aria-live="polite"
-                aria-atomic="false"
-            >
-                <div class="hub-panel__header">
-                    <h2 class="hub-h3">MBFD Incidents</h2>
-                    <div style="display: flex; align-items: center; gap: 8px;">
-                        <span x-cloak x-show="loading" class="hub-tag">Checking</span>
-                        <span x-cloak x-show="!loading && !error && !stale" class="hub-tag hub-tag--danger">
-                            <span class="hub-status-dot hub-status-dot--live" aria-hidden="true"></span>
-                            Live
-                        </span>
-                        <span x-cloak x-show="!loading && stale" class="hub-tag hub-tag--warning">
-                            <svg class="hub-tag__icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
-                            Stale
-                        </span>
-                        <span x-cloak x-show="!loading && error" class="hub-tag hub-tag--warning">
-                            <svg class="hub-tag__icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
-                            Unavailable
-                        </span>
-                    </div>
-                </div>
-
-                <div class="home-feed__counts">
-                    <div>
-                        <div class="home-feed__metric home-feed__metric--active" x-text="loading || error ? '—' : activeCount"></div>
-                        <p class="home-feed__label">Active</p>
-                    </div>
-                    <div>
-                        <div class="home-feed__metric" x-text="loading || error ? '—' : recentCount"></div>
-                        <p class="home-feed__label">Recent</p>
-                    </div>
-                    <span class="hub-caption" style="margin-left: auto; text-align: right;" x-text="lastUpdated"></span>
-                </div>
-
-                <div class="feed-scroll" style="max-height: 360px; min-height: 160px; overflow-y: auto;">
-                    <template x-if="loading">
-                        <div style="padding: 12px 16px; display: grid; gap: 12px;">
-                            <template x-for="n in [1,2,3]" :key="n">
-                                <div style="display: flex; gap: 12px;">
-                                    <span class="shimmer-line" style="height: 12px; width: 40px;"></span>
-                                    <span style="flex: 1; display: grid; gap: 6px;">
-                                        <span class="shimmer-line" style="height: 12px; width: 75%;"></span>
-                                        <span class="shimmer-line" style="height: 10px; width: 50%;"></span>
-                                    </span>
-                                </div>
-                            </template>
-                        </div>
-                    </template>
-
-                    <template x-if="!loading && error">
-                        <div class="hub-empty">
-                            <svg class="hub-empty__icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
-                            <p class="hub-empty__title">Monitoring Unavailable</p>
-                            <p class="hub-empty__body">The incident feed will retry automatically.</p>
-                        </div>
-                    </template>
-
-                    <template x-if="!loading && !error && activeIncidents.length > 0">
-                        <div>
-                            <h3 class="home-feed__group" style="color: rgb(var(--hub2-red-strong));">Active calls</h3>
-                            <ul class="hub-list">
-                                <template x-for="(inc, idx) in activeIncidents.slice(0,8)" :key="inc.id">
-                                    <li class="home-feed__row">
-                                        <span class="home-feed__time hub-mono" x-text="formatTime(inc.receivedAt)"></span>
-                                        <div style="flex: 1; min-width: 0;">
-                                            <p style="margin: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" x-text="inc.callType"></p>
-                                            <p class="hub-secondary-text" style="margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" x-text="inc.address"></p>
-                                            <div x-show="inc.units && inc.units.length > 0" style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;">
-                                                <template x-for="unit in inc.units.slice(0,4)" :key="unit.id">
-                                                    <span class="home-feed__unit hub-mono" x-text="unit.id"></span>
-                                                </template>
-                                                <span x-show="inc.units.length > 4" class="hub-caption" x-text="'+' + (inc.units.length - 4) + ' more'"></span>
-                                            </div>
-                                        </div>
-                                        <span class="hub-tag hub-tag--danger">Active</span>
-                                    </li>
-                                </template>
-                            </ul>
-                        </div>
-                    </template>
-
-                    <template x-if="!loading && !error && activeIncidents.length === 0 && recentIncidents.length > 0">
-                        <div>
-                            <h3 class="home-feed__group">Recent calls</h3>
-                            <ul class="hub-list">
-                                <template x-for="(inc, idx) in recentIncidents.slice(0,5)" :key="inc.id">
-                                    <li class="home-feed__row">
-                                        <span class="home-feed__time hub-mono" x-text="formatTime(inc.receivedAt)"></span>
-                                        <div style="flex: 1; min-width: 0;">
-                                            <p style="margin: 0; font-weight: 500; color: rgb(var(--hub2-n-800)); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" x-text="inc.callType"></p>
-                                            <p class="hub-secondary-text" style="margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" x-text="inc.address"></p>
-                                        </div>
-                                        <span class="hub-tag">Cleared</span>
-                                    </li>
-                                </template>
-                            </ul>
-                        </div>
-                    </template>
-
-                    <template x-if="!loading && !error && activeIncidents.length === 0 && recentIncidents.length === 0">
-                        <div class="hub-empty">
-                            <svg class="hub-empty__icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
-                            <p class="hub-empty__title">No incidents listed</p>
-                            <p class="hub-empty__body" x-text="stale ? 'In the last confirmed feed' : 'In the current feed'"></p>
-                        </div>
-                    </template>
-                </div>
-
-                <div class="hub-panel__footer">
-                    <span class="hub-caption">Auto-refreshes every 30 s</span>
-                    <a href="https://web.pulsepoint.org/?agency=X1012" target="_blank" rel="noopener noreferrer" class="hub-link hub-link--standalone" style="font-size: 13px;">
-                        PulsePoint<span class="hub-visually-hidden"> (opens in a new tab)</span>
-                        <svg class="hub-tag__icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>
-                    </a>
-                </div>
-            </section>
         </div>
     </main>
 
@@ -364,74 +225,6 @@
         </div>
     </footer>
 
-    <script>
-    function pulsePointFeed() {
-        return {
-            loading: true,
-            error: false,
-            stale: false,
-            activeIncidents: [],
-            recentIncidents: [],
-            lastUpdated: '',
-            _timer: null,
-
-            get activeCount() { return this.activeIncidents.length; },
-            get recentCount() { return this.recentIncidents.length; },
-
-            init() {
-                this.fetchData();
-                this._timer = setInterval(() => this.fetchData(), 30000);
-            },
-
-            destroy() {
-                if (this._timer) clearInterval(this._timer);
-            },
-
-            async fetchData() {
-                try {
-                    const resp = await fetch('/api/incidents', {
-                        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-                        signal: AbortSignal.timeout(12000)
-                    });
-                    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-                    const data = await resp.json();
-                    if (data.error || !Array.isArray(data.active) || !Array.isArray(data.recent)) throw new Error('Incident feed unavailable');
-                    const staleAsOf = data.stale === true ? new Date(data.staleAsOf) : null;
-                    if (staleAsOf && (!data.staleAsOf || Number.isNaN(staleAsOf.getTime()))) throw new Error('Stale feed timestamp unavailable');
-                    this.activeIncidents = data.active;
-                    this.recentIncidents = data.recent;
-                    this.error = false;
-                    this.stale = data.stale === true;
-                    this.lastUpdated = staleAsOf
-                        ? 'Last confirmed ' + staleAsOf.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York', timeZoneName: 'short' })
-                        : (data.fetchedAt ? 'Updated ' + this.timeAgo(data.fetchedAt) : 'Current feed confirmed');
-                } catch (e) {
-                    this.error = true;
-                    this.stale = false;
-                    this.lastUpdated = 'No confirmed update';
-                } finally {
-                    this.loading = false;
-                }
-            },
-
-            formatTime(isoStr) {
-                if (!isoStr) return '--:--';
-                try {
-                    const d = new Date(isoStr);
-                    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/New_York' });
-                } catch { return '--:--'; }
-            },
-
-            timeAgo(isoStr) {
-                if (!isoStr) return 'just now';
-                const diff = Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000);
-                if (diff < 60) return 'just now';
-                if (diff < 3600) return Math.floor(diff / 60) + ' min ago';
-                return Math.floor(diff / 3600) + 'h ago';
-            }
-        };
-    }
-    </script>
     @include('components.hub-support-widget')
 </body>
 </html>

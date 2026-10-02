@@ -67,19 +67,17 @@ class SecurityHeaders
             $connectSources[] = 'wss:';
         }
         $connectSources = implode(' ', array_unique(array_merge($connectSources, [
-            'https://api.pulsepoint.org',
-            'https://web.pulsepoint.org',
             'https://static.cloudflareinsights.com',
         ])));
         $cspParts = [
             "default-src 'self'",
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://static.cloudflareinsights.com https://www.googletagmanager.com https://pulsepoint.org https://web.pulsepoint.org",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://static.cloudflareinsights.com https://www.googletagmanager.com",
             "style-src 'self' 'unsafe-inline' https://fonts.bunny.net https://fonts.googleapis.com",
             "font-src 'self' data: https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com",
             "img-src 'self' data: blob: https:",
             "media-src 'self' blob: https:",
             "connect-src {$connectSources}",
-            "frame-src 'self' https://www.pulsepoint.org https://web.pulsepoint.org https://inventory.mbfdhub.com",
+            "frame-src 'self' https://inventory.mbfdhub.com",
             // Allow cloud.mbfdhub.com (Nextcloud) to embed this site as an
             // External Sites iframe. All other origins remain blocked.
             "frame-ancestors 'self' https://cloud.mbfdhub.com",
