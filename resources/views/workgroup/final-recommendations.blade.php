@@ -265,7 +265,7 @@
         .callout.warning { background: var(--amber-light); border-color: var(--amber); color: #713f12; }
         .callout.info { background: var(--blue-light); border-color: var(--blue); color: #1e3a5f; }
         .callout.note { background: var(--slate-50); border-color: var(--slate-400); color: var(--navy-light); }
-        .callout-label { font-size: 0.6875rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.375rem; opacity: 0.7; }
+        .callout-label { font-size: 0.6875rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.375rem; opacity: 1; }
 
         /* ── CHART ── */
         .chart-section { background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: 0.625rem; padding: 1.5rem; margin: 1.25rem 0; }
@@ -764,10 +764,10 @@
                     <caption id="recommendations-dimensions-data">Holmatro Pentheon and Hurst E3 dimension scores shown in the chart</caption>
                     <thead><tr><th scope="col">Dimension</th><th scope="col" class="right">Holmatro</th><th scope="col" class="right">Hurst</th><th scope="col" class="right">Δ Delta</th></tr></thead>
                     <tbody>
-                        <tr><td><strong>Capability</strong></td><td class="right">89.41</td><td class="right">87.56</td><td class="right" style="color:var(--emerald)">+1.85</td></tr>
-                        <tr><td><strong>Usability</strong></td><td class="right">93.99</td><td class="right">85.76</td><td class="right" style="color:var(--emerald)">+8.23</td></tr>
-                        <tr><td><strong>Maintainability</strong></td><td class="right">89.82</td><td class="right">82.58</td><td class="right" style="color:var(--emerald)">+7.24</td></tr>
-                        <tr><td><strong>Deployability</strong></td><td class="right">89.69</td><td class="right">82.74</td><td class="right" style="color:var(--emerald)">+6.95</td></tr>
+                        <tr><td><strong>Capability</strong></td><td class="right">89.41</td><td class="right">87.56</td><td class="right" style="color:#065f46">+1.85</td></tr>
+                        <tr><td><strong>Usability</strong></td><td class="right">93.99</td><td class="right">85.76</td><td class="right" style="color:#065f46">+8.23</td></tr>
+                        <tr><td><strong>Maintainability</strong></td><td class="right">89.82</td><td class="right">82.58</td><td class="right" style="color:#065f46">+7.24</td></tr>
+                        <tr><td><strong>Deployability</strong></td><td class="right">89.69</td><td class="right">82.74</td><td class="right" style="color:#065f46">+6.95</td></tr>
                     </tbody>
                 </table></div>
 
@@ -834,9 +834,9 @@
                 <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead><tr><th scope="col">Category</th><th scope="col">Key Differentiator</th><th scope="col" class="right">Advantage</th></tr></thead>
                     <tbody>
-                        <tr><td>Saws</td><td>Gear-driven instant-start + 3-second electric brake (DeWalt)</td><td class="right" style="color:var(--emerald)">+26.42 to +29.47 pts</td></tr>
-                        <tr><td>Frontline Tools</td><td>On-Tool Charging + cordless auto start/stop (Holmatro)</td><td class="right" style="color:var(--emerald)">+6.95 pts Deployability</td></tr>
-                        <tr><td>Stabilization</td><td>15-second auto-lock (V-Strut vs. competitors)</td><td class="right" style="color:var(--emerald)">+1.41 to +11.15 pts</td></tr>
+                        <tr><td>Saws</td><td>Gear-driven instant-start + 3-second electric brake (DeWalt)</td><td class="right" style="color:#065f46">+26.42 to +29.47 pts</td></tr>
+                        <tr><td>Frontline Tools</td><td>On-Tool Charging + cordless auto start/stop (Holmatro)</td><td class="right" style="color:#065f46">+6.95 pts Deployability</td></tr>
+                        <tr><td>Stabilization</td><td>15-second auto-lock (V-Strut vs. competitors)</td><td class="right" style="color:#065f46">+1.41 to +11.15 pts</td></tr>
                     </tbody>
                 </table></div>
             </section>

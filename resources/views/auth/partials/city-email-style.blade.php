@@ -23,7 +23,7 @@
     .status { display: inline-block; padding: .25rem .5rem; border-radius: .3rem; background: rgb(var(--hub-warning) / .12); color: rgb(var(--hub-warning)); font-size: .9rem; font-weight: 700; }
     .verified { background: rgb(var(--hub-success) / .1); color: rgb(var(--hub-success)); }
     .detail { overflow-wrap: anywhere; }
-    .identity { padding: .8rem; border: 1px solid rgb(var(--hub-border)); border-radius: .5rem; background: rgb(var(--hub-surface-muted)); }
+    .identity { padding: .8rem; border: 1px solid rgb(var(--hub-border)); border-radius: .5rem; background: rgb(var(--hub-surface-muted)); color: rgb(var(--hub-ink-secondary)); }
     .identity-strip { display: flex; align-items: center; gap: .75rem; margin: calc(-1 * var(--identity-padding)) calc(-1 * var(--identity-padding)) 1.5rem; padding: .75rem var(--identity-padding); border-radius: .5rem .5rem 0 0; background: rgb(var(--hub-header)); color: white; font-size: .78rem; font-weight: 700; }
     .identity-strip img { width: 32px; height: 32px; flex: none; }
     .divider { display: flex; align-items: center; gap: .75rem; margin: 1.25rem 0 0; color: rgb(var(--hub-muted)); font-size: .8rem; }

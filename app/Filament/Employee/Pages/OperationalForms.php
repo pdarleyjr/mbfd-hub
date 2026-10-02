@@ -16,6 +16,8 @@ class OperationalForms extends Page
 
     protected static ?string $title = 'Operational Forms';
 
+    protected ?string $heading = '';
+
     protected static ?string $navigationLabel = 'Forms';
 
     protected static ?string $slug = 'forms';
