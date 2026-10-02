@@ -2,22 +2,20 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\ProjectPriority;
+use App\Enums\ProjectStatus;
+use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\Under25kProjectResource\Pages;
 use App\Filament\Resources\Under25kProjectResource\RelationManagers;
 use App\Models\Under25kProject;
-use App\Enums\ProjectStatus;
-use App\Enums\ProjectPriority;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Infolists;
+use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Filament\Infolists;
-use Filament\Infolists\Infolist;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
-use App\Filament\Concerns\EnterpriseTable;
 class Under25kProjectResource extends Resource
 {
     use EnterpriseTable;
@@ -25,13 +23,13 @@ class Under25kProjectResource extends Resource
     protected static ?string $model = Under25kProject::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-currency-dollar';
-    
+
     protected static ?string $navigationGroup = 'Active Operations';
-    
+
     protected static ?string $navigationLabel = 'Under 25k';
-    
+
     protected static ?string $slug = 'under-25k';
-    
+
     protected static ?int $navigationSort = 2;
 
     public static function form(Form $form): Form
@@ -65,7 +63,7 @@ class Under25kProjectResource extends Resource
                             ->placeholder('Select Station'),
                     ])
                     ->columns(2),
-                    
+
                 Forms\Components\Section::make('Financial Information')
                     ->schema([
                         Forms\Components\TextInput::make('budget_amount')
@@ -81,7 +79,7 @@ class Under25kProjectResource extends Resource
                             ->label('Spend Amount'),
                     ])
                     ->columns(2),
-                    
+
                 Forms\Components\Section::make('Timeline')
                     ->schema([
                         Forms\Components\DatePicker::make('start_date')
@@ -99,7 +97,7 @@ class Under25kProjectResource extends Resource
                             ->label('Actual Completion Date'),
                     ])
                     ->columns(3),
-                    
+
                 Forms\Components\Section::make('Status & Priority')
                     ->schema([
                         Forms\Components\Select::make('status')
@@ -116,7 +114,7 @@ class Under25kProjectResource extends Resource
                             ->label('Priority'),
                     ])
                     ->columns(2),
-                    
+
                 Forms\Components\Section::make('Progress')
                     ->schema([
                         Forms\Components\TextInput::make('percent_complete')
@@ -129,7 +127,7 @@ class Under25kProjectResource extends Resource
                             ->nullable(),
                     ])
                     ->columns(1),
-                    
+
                 Forms\Components\Section::make('Notes')
                     ->schema([
                         Forms\Components\RichEditor::make('notes')
@@ -141,7 +139,7 @@ class Under25kProjectResource extends Resource
                             ->label('Internal Notes')
                             ->helperText('Only visible to administrators'),
                     ]),
-                    
+
                 Forms\Components\Section::make('Attachments')
                     ->schema([
                         Forms\Components\FileUpload::make('attachments')
@@ -210,7 +208,7 @@ class Under25kProjectResource extends Resource
                     ->label('Target Date'),
                 Tables\Columns\TextColumn::make('percent_complete')
                     ->label('Progress')
-                    ->formatStateUsing(fn ($state) => ($state ?? 0) . '%')
+                    ->formatStateUsing(fn ($state) => ($state ?? 0).'%')
                     ->color(fn ($state) => match (true) {
                         ($state ?? 0) >= 75 => 'success',
                         ($state ?? 0) >= 50 => 'warning',
@@ -244,7 +242,7 @@ class Under25kProjectResource extends Resource
             ])
             ->defaultSort('created_at', 'desc');
     }
-    
+
     public static function infolist(Infolist $infolist): Infolist
     {
         return $infolist
@@ -262,7 +260,7 @@ class Under25kProjectResource extends Resource
                             ->label('Project Manager'),
                     ])
                     ->columns(2),
-                    
+
                 Infolists\Components\Section::make('Financial Information')
                     ->schema([
                         Infolists\Components\TextEntry::make('budget_amount')
@@ -273,7 +271,7 @@ class Under25kProjectResource extends Resource
                             ->label('Spend Amount'),
                     ])
                     ->columns(2),
-                    
+
                 Infolists\Components\Section::make('Timeline')
                     ->schema([
                         Infolists\Components\TextEntry::make('start_date')
@@ -287,7 +285,7 @@ class Under25kProjectResource extends Resource
                             ->label('Actual Completion Date'),
                     ])
                     ->columns(3),
-                    
+
                 Infolists\Components\Section::make('Status & Priority')
                     ->schema([
                         Infolists\Components\TextEntry::make('status')
@@ -312,7 +310,7 @@ class Under25kProjectResource extends Resource
                             ->label('Priority'),
                     ])
                     ->columns(2),
-                    
+
                 Infolists\Components\Section::make('Progress')
                     ->schema([
                         Infolists\Components\TextEntry::make('percent_complete')
@@ -326,7 +324,7 @@ class Under25kProjectResource extends Resource
                             }),
                     ])
                     ->columns(1),
-                    
+
                 Infolists\Components\Section::make('Notes')
                     ->schema([
                         Infolists\Components\TextEntry::make('notes')
@@ -339,7 +337,7 @@ class Under25kProjectResource extends Resource
                             ->visible(fn () => auth()->user()?->isAdmin ?? false),
                     ])
                     ->columns(1),
-                    
+
                 Infolists\Components\Section::make('Attachments')
                     ->schema([
                         Infolists\Components\TextEntry::make('attachments')
@@ -351,16 +349,17 @@ class Under25kProjectResource extends Resource
                                 $links = [];
                                 foreach ($record->attachments as $path) {
                                     $filename = basename($path);
-                                    $url = asset('storage/' . $path);
+                                    $url = asset('storage/'.$path);
                                     $links[] = "<a href=\"{$url}\" target=\"_blank\" class=\"text-primary-600 hover:underline\">📄 {$filename}</a>";
                                 }
+
                                 return implode('<br>', $links);
                             })
                             ->html()
                             ->columnSpanFull(),
                     ])
                     ->hidden(fn ($record) => empty($record->attachments)),
-                    
+
                 Infolists\Components\Section::make('Related Information')
                     ->schema([
                         Infolists\Components\TextEntry::make('updates_count')
