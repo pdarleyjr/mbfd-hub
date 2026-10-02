@@ -121,12 +121,13 @@ const PumpPanel: React.FC = () => {
             {/* Throttle */}
             <div style={{ marginBottom: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                <label style={{ color: '#ccc', fontSize: 12, fontWeight: 600 }}>Throttle</label>
+                <label htmlFor="pump-throttle" style={{ color: '#ccc', fontSize: 12, fontWeight: 600 }}>Throttle</label>
                 <span style={{ color: '#f59e0b', fontWeight: 700, fontFamily: 'monospace', fontSize: 14 }}>
                   {store.throttlePosition}%
                 </span>
               </div>
               <input
+                id="pump-throttle"
                 type="range"
                 min="0"
                 max="100"
@@ -139,12 +140,13 @@ const PumpPanel: React.FC = () => {
             {/* RPM */}
             <div style={{ marginBottom: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                <label style={{ color: '#ccc', fontSize: 12, fontWeight: 600 }}>Engine RPM</label>
+                <label htmlFor="pump-engine-rpm" style={{ color: '#ccc', fontSize: 12, fontWeight: 600 }}>Engine RPM</label>
                 <span style={{ color: '#22c55e', fontWeight: 700, fontFamily: 'monospace', fontSize: 14 }}>
                   {store.engineRpm} RPM
                 </span>
               </div>
               <input
+                id="pump-engine-rpm"
                 type="range"
                 min="0"
                 max="3000"
@@ -158,7 +160,7 @@ const PumpPanel: React.FC = () => {
             {/* Intake Pressure */}
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                <label style={{ color: '#ccc', fontSize: 12, fontWeight: 600 }}>Intake Vacuum/Pressure</label>
+                <label htmlFor="pump-intake-pressure" style={{ color: '#ccc', fontSize: 12, fontWeight: 600 }}>Intake Vacuum/Pressure</label>
                 <span style={{
                   color: store.intakePressure < -10 ? '#ef4444' : '#3b82f6',
                   fontWeight: 700, fontFamily: 'monospace', fontSize: 14,
@@ -167,6 +169,7 @@ const PumpPanel: React.FC = () => {
                 </span>
               </div>
               <input
+                id="pump-intake-pressure"
                 type="range"
                 min="-30"
                 max="30"

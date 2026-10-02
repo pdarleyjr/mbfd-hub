@@ -12,6 +12,7 @@ const maxInstancesPerPattern = 2;
 const artifactDir = resolve(process.env.UI_AUDIT_ARTIFACT_DIR ?? 'test-results/ui-audit-artifacts');
 const inventoryResultsPath = process.env.UI_AUDIT_INVENTORY_RESULTS;
 const personas = JSON.parse(readFileSync('test-results/protected-ui-auth/personas.json', 'utf8')) as Record<string, string>;
+const fixtureRoutes = JSON.parse(readFileSync('test-results/protected-ui-auth/fixture-routes.json', 'utf8')) as Record<string, string>;
 const profileDestinations = new Map<string, string>();
 
 const catalog = JSON.parse(readFileSync('tests/e2e/support/protected-ui-inventory.json', 'utf8')).pages as { route: string }[];
@@ -62,7 +63,9 @@ function sourceRedirect(persona: string, from: string, to: string): boolean {
   // navigation item, RedirectTrainingUsers and the frozen React redirects.
   if (persona === 'training-admin' && /^\/admin(?:\/|$)/.test(from) && to === '/training') return true;
   if (from === '/admin/my-profile') return profileDestinations.get(persona) === to;
+  if (from === fixtureRoutes['/admin/users/{record}/edit']) return to === fixtureRoutes['/admin/employees/{record}/edit'];
   const destinations: Record<string, string> = {
+    '/admin/users': '/admin/employees', '/admin/users/create': '/admin/employees/create',
     '/employee': '/employee/dashboard', '/admin/personnel-uniforms-equipment': '/admin/personnel-uniforms-equipment/overview',
     '/daily': '/daily/stations', '/daily/forms-hub/big-ticket-request': '/daily/forms-hub/station-request',
     '/daily/forms-hub/equipment-request': '/daily/forms-hub/station-request',

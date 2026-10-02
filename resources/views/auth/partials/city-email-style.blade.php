@@ -20,7 +20,7 @@
     .secondary:hover, .cancel:hover { background: rgb(var(--hub-border-soft)); }
     .error { color: rgb(var(--hub-red-strong)); font-weight: 700; }
     .notice { padding: 1rem; border-left: 4px solid rgb(var(--hub-blue)); background: rgb(var(--hub-blue) / .08); line-height: 1.5; overflow-wrap: anywhere; }
-    .status { display: inline-block; padding: .25rem .5rem; border-radius: .3rem; background: rgb(var(--hub-warning) / .12); color: rgb(var(--hub-warning)); font-size: .9rem; font-weight: 700; }
+    .status { display: inline-block; padding: .25rem .5rem; border-radius: .3rem; background: rgb(var(--hub-warning) / .12); color: rgb(var(--hub-warning-strong)); font-size: .9rem; font-weight: 700; }
     .verified { background: rgb(var(--hub-success) / .1); color: rgb(var(--hub-success)); }
     .detail { overflow-wrap: anywhere; }
     .identity { padding: .8rem; border: 1px solid rgb(var(--hub-border)); border-radius: .5rem; background: rgb(var(--hub-surface-muted)); color: rgb(var(--hub-ink-secondary)); }

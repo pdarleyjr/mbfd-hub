@@ -4,7 +4,7 @@
                    capability_avg, usability_avg, affordability_avg, maintainability_avg, deployability_avg,
                    advance_yes, advance_no, deal_breakers
 --}}
-<div style="overflow-x: auto;">
+<div style="overflow-x: auto;" tabindex="0" role="region" aria-label="Tool rankings">
     <table class="wg-table">
         <thead>
             <tr>

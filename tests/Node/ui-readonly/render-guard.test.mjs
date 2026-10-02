@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import Module from 'node:module';
 import { dirname } from 'node:path';
-import { test } from 'node:test';
+import { after, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
 
@@ -18,6 +18,8 @@ const { guardUiRendering } = guardModule.exports;
 const origin = 'http://127.0.0.1:19999';
 const notifications = 'filament.livewire.database-notifications';
 const trainingStats = 'app.filament.training.widgets.training-stats-widget';
+const evaluations = { allowed: 0, blocked: 0 };
+after(() => console.log('guard-evaluations ' + JSON.stringify(evaluations)));
 const component = (name = notifications, methods = [], updates = {}) => ({
     snapshot: JSON.stringify({ memo: { name } }),
     updates,
@@ -26,7 +28,7 @@ const component = (name = notifications, methods = [], updates = {}) => ({
 
 async function classify({ body = { components: [component()] }, method = 'POST',
     url = origin + '/livewire/update', pagePath = '/admin/capital-projects/create',
-    navigation = false, invalidJson = false, guardOptions = {} } = {}) {
+    navigation = false, invalidJson = false, guardOptions = {}, frameOrigin = origin } = {}) {
     let handler;
     const blocked = [];
     const allowed = [];
@@ -38,7 +40,7 @@ async function classify({ body = { components: [component()] }, method = 'POST',
         onAllowedLivewireRequest: request => allowed.push(request) });
     const request = {
         method: () => method, url: () => url, isNavigationRequest: () => navigation,
-        frame: () => ({ url: () => origin + pagePath }),
+        frame: () => ({ url: () => frameOrigin + pagePath }),
         postDataJSON: () => { if (invalidJson) throw new SyntaxError('Synthetic invalid JSON'); return body; },
     };
     await handler({ request: () => request,
@@ -47,6 +49,7 @@ async function classify({ body = { components: [component()] }, method = 'POST',
     assert.equal(actions.length, 1, 'Every request receives exactly one route decision');
     assert.equal(blocked.length, actions[0] === 'abort' ? 1 : 0);
     assert.equal(allowed.length, actions[0] === 'continue' && method === 'POST' ? 1 : 0);
+    evaluations[actions[0] === 'continue' ? 'allowed' : 'blocked']++;
     return actions[0];
 }
 
@@ -145,5 +148,48 @@ test('the exception does not admit other origins, methods, endpoints or external
     }
     for (const method of ['GET', 'HEAD', 'OPTIONS']) {
         assert.equal(await classify({ method, url: origin + '/admin' }), 'continue');
+    }
+});
+
+const pulseCards = ['pulse.cache', 'pulse.usage', 'pulse.queues', 'pulse.servers',
+    'pulse.slow-jobs', 'pulse.exceptions', 'pulse.slow-requests', 'pulse.slow-queries',
+    'pulse.slow-outgoing-requests'];
+
+for (const name of pulseCards) {
+    test(`the observed native ${name} empty poll is permitted only in its Pulse frame`, async () => {
+        assert.equal(await classify({ body: { components: [component(name)] }, pagePath: '/pulse' }), 'continue');
+        assert.equal(await classify({ body: { components: [component(name), component(name, ['__lazyLoad'])] }, pagePath: '/pulse' }), 'continue');
+    });
+
+    test(`${name} updates, mutations, wrong frames and unsafe batches stay blocked`, async () => {
+        for (const updates of [{ period: '24_hours' }, { sort: 'desc' }, { orderBy: 'count' }, []]) {
+            assert.equal(await classify({ body: { components: [component(name, [], updates)] }, pagePath: '/pulse' }), 'abort');
+        }
+        for (const method of ['setPeriod', '$set', '__dispatch', 'clear']) {
+            assert.equal(await classify({ body: { components: [component(name, [method])] }, pagePath: '/pulse' }), 'abort');
+        }
+        for (const pagePath of ['/admin/pulse', '/admin', '/pulse/']) {
+            assert.equal(await classify({ body: { components: [component(name)] }, pagePath }), 'abort');
+        }
+        assert.equal(await classify({ body: { components: [component(name)] }, pagePath: '/pulse', frameOrigin: 'https://example.invalid' }), 'abort');
+        for (const components of [[component(name), component('pulse.unregistered')], [component('pulse.unregistered'), component(name)]]) {
+            assert.equal(await classify({ body: { components }, pagePath: '/pulse' }), 'abort');
+        }
+    });
+}
+
+test('all nine naturally batched Pulse cards retain the empty and preexisting lazy-render calls', async () => {
+    assert.equal(await classify({ body: { components: pulseCards.map(name => component(name)) }, pagePath: '/pulse' }), 'continue');
+    assert.equal(await classify({ body: { components: pulseCards.map((name, index) => component(name, index % 2 ? ['__lazyLoad'] : [])) }, pagePath: '/pulse' }), 'continue');
+});
+
+test('the period selector and Pulse name lookalikes cannot use the empty-poll exception', async () => {
+    for (const name of ['pulse.period-selector', 'pulse.cache.extra', 'Pulse.cache', 'pulse.usage-more', 'other.pulse.usage', 'pulse.']) {
+        assert.equal(await classify({ body: { components: [component(name)] }, pagePath: '/pulse' }), 'abort');
+    }
+    for (const components of [[...pulseCards.map(name => component(name)), component('pulse.period-selector')],
+        [component('pulse.period-selector'), ...pulseCards.map(name => component(name))],
+        [...pulseCards.map(name => component(name)), component('pulse.cache', ['setPeriod'])]]) {
+        assert.equal(await classify({ body: { components }, pagePath: '/pulse' }), 'abort');
     }
 });

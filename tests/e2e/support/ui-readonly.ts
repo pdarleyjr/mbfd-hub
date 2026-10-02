@@ -4,6 +4,8 @@ import { expect, type BrowserContext, type Page, type Request } from '@playwrigh
 const renderMethods = new Set(['loadTable', '__lazyLoad', 'getFormUploadedFiles']);
 const trainingStatsComponent = 'app.filament.training.widgets.training-stats-widget';
 const nativeNotificationsComponent = 'filament.livewire.database-notifications';
+const nativePulseCards = new Set(['pulse.cache', 'pulse.usage', 'pulse.queues', 'pulse.servers',
+  'pulse.slow-jobs', 'pulse.exceptions', 'pulse.slow-requests', 'pulse.slow-queries', 'pulse.slow-outgoing-requests']);
 const nativeSelectSelector = '[x-load-src][x-data^="selectFormComponent("]';
 
 type RenderingGuardOptions = {
@@ -31,9 +33,10 @@ export async function guardUiRendering(context: BrowserContext, origin: string, 
         const pagePath = new URL(request.frame().url() || origin).pathname;
         if (!component.updates || typeof component.updates !== 'object' || Array.isArray(component.updates)
           || Object.keys(component.updates).length !== 0 || !Array.isArray(component.calls)) return false;
-        // Installed CanPoll and native notification polling invoke $commit(): no updates or calls.
+        // Installed CanPoll, notification and Pulse card polling invoke $commit(): no updates or calls.
         // Only these source/trace-proven read-only components may make an empty commit.
-        if (component.calls.length === 0) return name === trainingStatsComponent || name === nativeNotificationsComponent;
+        if (component.calls.length === 0) return name === trainingStatsComponent || name === nativeNotificationsComponent
+          || (nativePulseCards.has(name) && pagePath === '/pulse' && new URL(request.frame().url()).origin === origin);
         return component.calls.every((call: { method: string }) => renderMethods.has(call.method)
             || (call.method === '$refresh' && name.startsWith('pulse.'))
             || (options.allowDisabledAiReport === true && call.method === 'loadAiReport'

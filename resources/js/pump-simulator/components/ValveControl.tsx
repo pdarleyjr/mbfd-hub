@@ -11,6 +11,9 @@ const ValveToggle: React.FC<{ label: string; isOpen: boolean; onToggle: () => vo
   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 0' }}>
     <span style={{ color: '#ccc', fontSize: 12, fontWeight: 600, letterSpacing: 0.5 }}>{label}</span>
     <button
+      type="button"
+      aria-label={label}
+      aria-pressed={isOpen}
       onClick={onToggle}
       style={{
         position: 'relative',
@@ -71,6 +74,7 @@ const LineDetail: React.FC<{ lineId: string; line: HoseLineConfig }> = ({ lineId
           ft
         </label>
         <select
+          aria-label={`${line.label} nozzle`}
           value={line.nozzle.name}
           onChange={(e) => {
             const nozzle = Object.values(NOZZLE_PROFILES).find(n => n.name === e.target.value);

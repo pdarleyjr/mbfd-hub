@@ -1,5 +1,6 @@
 <x-filament-panels::page class="wg-session-results" data-hub-ui="2" data-hub-portal="workgroups">
     <style>
+        .wg-session-results { --hub-muted: 71 85 105; --hub-muted-soft: 71 85 105; --hub-success: 6 95 70; }
         .wg-session-results .wg-ai-panel-header,
         .wg-session-results .wg-saver-header { flex-wrap: wrap; }
         .wg-session-results .wg-ai-panel-header > div:first-child { flex: 1 1 18rem; min-width: 0; }
@@ -416,7 +417,7 @@
                 </div>
             </div>
 
-            <div style="overflow-x: auto;">
+            <div style="overflow-x: auto;" tabindex="0" role="region" aria-label="Category rankings">
                 <table class="wg-table">
                     <thead>
                         <tr>
@@ -769,7 +770,7 @@
                 CSV
             </a>
         </div>
-        <div style="overflow-x: auto;">
+        <div style="overflow-x: auto;" tabindex="0" role="region" aria-label="Finalist rankings">
             <table class="wg-table">
                 <thead>
                     <tr>

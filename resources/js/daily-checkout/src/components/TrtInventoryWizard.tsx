@@ -339,7 +339,7 @@ export default function TrtInventoryWizard() {
                 Submit when done — works offline too
               </li>
             </ul>
-            <p className="mt-4 text-xs text-hub-muted">
+            <p className="mt-4 text-xs text-hub-ink-secondary">
               Multiple team members can submit their sections. All entries merge into today&apos;s session automatically.
             </p>
           </div>

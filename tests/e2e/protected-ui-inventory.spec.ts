@@ -46,6 +46,9 @@ function structuralClassification(entry: Entry) {
   };
   const redirects: Record<string, { reason: string; source: string }> = {
     '/employee': { reason: 'Filament panel home redirects to its registered dashboard.', source: 'EmployeePanelProvider.php; catalog filament.employee.home route' },
+    '/admin/users': { reason: 'Legacy account list redirects to the canonical employee list.', source: 'app/Filament/Resources/UserResource/Pages/ListUsers.php::mount' },
+    '/admin/users/create': { reason: 'Legacy account creation redirects to canonical employee creation.', source: 'app/Filament/Resources/UserResource/Pages/CreateUser.php::mount' },
+    '/admin/users/{record}/edit': { reason: 'Legacy account editing redirects to the linked employee profile after its identity check, or to account profile for an unlinked account.', source: 'app/Filament/Resources/UserResource/Pages/EditUser.php::mount' },
     '/admin/my-profile': { reason: 'Legacy profile entry redirects to password, employee, or account profile according to the current account.', source: 'app/Filament/Pages/MyProfile.php::mount' },
     '/admin/personnel-uniforms-equipment': { reason: 'Filament cluster entry redirects to its first accessible sub-navigation item.', source: 'vendor/filament/filament/src/Clusters/Cluster.php::mount' },
     '/daily': { reason: 'Daily root navigates to /daily/stations.', source: 'resources/js/daily-checkout/src/App.tsx' },
@@ -106,6 +109,9 @@ test('inventory records every route and renders available protected surfaces at 
   const fixtureRoutes: Record<string, string> = existsSync(fixtureFile) ? JSON.parse(readFileSync(fixtureFile, 'utf8')) : {};
   const redirectDestinations: Record<string, string | undefined> = {
     '/employee': '/employee/dashboard',
+    '/admin/users': '/admin/employees',
+    '/admin/users/create': '/admin/employees/create',
+    '/admin/users/{record}/edit': fixtureRoutes['/admin/employees/{record}/edit'],
     '/admin/my-profile': fixtureRoutes['/admin/employees/{record}/edit'],
     '/admin/personnel-uniforms-equipment': '/admin/personnel-uniforms-equipment/overview',
     '/daily': '/daily/stations',
@@ -336,7 +342,7 @@ test('inventory records every route and renders available protected surfaces at 
           const controlName = (el: Element) => {
             const labelledBy = (el.getAttribute('aria-labelledby') || '').split(/\s+/).filter(Boolean)
               .map(id => document.getElementById(id)?.textContent || '').join(' ').trim();
-            const labels = el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement
+            const labels = el instanceof HTMLInputElement || el instanceof HTMLSelectElement || el instanceof HTMLTextAreaElement || el instanceof HTMLButtonElement
               ? [...(el.labels || [])].map(label => label.textContent || '').join(' ').trim() : '';
             const buttonValue = el instanceof HTMLInputElement && ['submit', 'reset', 'button'].includes(el.type)
               ? el.value || (el.type === 'submit' ? 'Submit' : el.type === 'reset' ? 'Reset' : '') : '';

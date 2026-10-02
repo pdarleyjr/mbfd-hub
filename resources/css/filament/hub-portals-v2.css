@@ -201,7 +201,12 @@
 [data-hub-portal="report"] :is(.report-wrapper, .report-container) { border: 1px solid rgb(var(--hub-border)); border-radius: 6px; box-shadow: none; }
 [data-hub-portal="report"] .cover-title { font-size: clamp(1.625rem, 4vw, 2.25rem); font-weight: 650; }
 [data-hub-portal="report"] .toc-list a { align-items: center; min-height: 44px; }
-[data-hub-portal="report"] .section-num { background: rgb(var(--hub-action-primary)); }
+[data-hub-portal="report"] .section-num { background: rgb(var(--hub-action-primary)); color: white; }
+[data-hub-portal="report"].hub-report--workgroup-summary h2.section-heading .section-num { color: white; }
+[data-hub-portal="report"].hub-report--workgroup-summary :is(.score-elite, .score-badge.elite) { color: rgb(var(--hub-success)); }
+[data-hub-portal="report"].hub-report--workgroup-summary .rank-4 { color: rgb(var(--hub-ink-secondary)); }
+[data-hub-portal="report"].hub-report--evaluation-report { --color-slate-400:  #475569; --color-emerald: #047857; }
+[data-hub-portal="report"].hub-report--evaluation-report .callout-label { opacity: 1; }
 [data-hub-portal="report"] th { font-weight: 650; }
 [data-hub-portal="report"] :is(.section-title, .subsection-title) { scroll-margin-top: 8rem; }
 [data-hub-portal="report"].hub-report--analysis-report nav a { display: inline-flex; align-items: center; min-height: 44px; }

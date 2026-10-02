@@ -13,7 +13,7 @@ export default function SuccessPage() {
 
   useEffect(() => {
     // Vibrate on success
-    if ('vibrate' in navigator) {
+    if ('vibrate' in navigator && navigator.userActivation?.hasBeenActive !== false) {
       navigator.vibrate(200);
     }
   }, []);

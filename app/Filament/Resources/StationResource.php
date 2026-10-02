@@ -45,6 +45,7 @@ class StationResource extends Resource
                             ->maxLength(255),
                     ])->columns(3),
                 Forms\Components\Section::make('Address')
+                    ->id('station-address-section')
                     ->schema([
                         Forms\Components\TextInput::make('address')
                             ->required()

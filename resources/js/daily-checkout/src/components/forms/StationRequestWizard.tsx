@@ -347,7 +347,7 @@ export default function StationRequestWizard() {
       <ol className={`grid gap-2 ${requestType === 'equipment' ? 'grid-cols-4' : 'grid-cols-3'}`} aria-label="Request progress">
         {stepLabels.map((label, index) => {
           const number = index + 1;
-          return <li key={label} className={`rounded-lg px-2 py-2 text-center text-xs font-semibold ${number === step ? 'bg-hub-blue text-white' : number < step ? 'bg-hub-surface-muted text-hub-blue' : 'bg-hub-surface-muted text-hub-muted'}`} aria-current={number === step ? 'step' : undefined}>{number}. {label}</li>;
+          return <li key={label} className={`rounded-lg px-2 py-2 text-center text-xs font-semibold ${number === step ? 'bg-hub-blue text-white' : number < step ? 'bg-hub-surface-muted text-hub-blue' : 'bg-hub-surface-muted text-hub-ink-secondary'}`} aria-current={number === step ? 'step' : undefined}>{number}. {label}</li>;
         })}
       </ol>
 
