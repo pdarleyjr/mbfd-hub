@@ -107,13 +107,13 @@ class AdminPanelProvider extends PanelProvider
                 StationOperationsHubWidget::class,
             ])
             ->navigationGroups([
-                NavigationGroup::make()->label('Operations')->icon('heroicon-o-clipboard-document-list'),
-                NavigationGroup::make()->label('Fleet')->icon('heroicon-o-truck'),
-                NavigationGroup::make()->label('Logistics')->icon('heroicon-o-cube'),
-                NavigationGroup::make()->label('Personnel')->icon('heroicon-o-user-group'),
-                NavigationGroup::make()->label('Programs')->icon('heroicon-o-folder-open'),
-                NavigationGroup::make()->label('Communications')->icon('heroicon-o-envelope'),
-                NavigationGroup::make()->label('System')->icon('heroicon-o-cog-6-tooth'),
+                NavigationGroup::make()->label('Operations')->icon('heroicon-o-clipboard-document-list')->collapsed(),
+                NavigationGroup::make()->label('Fleet')->icon('heroicon-o-truck')->collapsed(),
+                NavigationGroup::make()->label('Logistics')->icon('heroicon-o-cube')->collapsed(),
+                NavigationGroup::make()->label('Personnel')->icon('heroicon-o-user-group')->collapsed(),
+                NavigationGroup::make()->label('Programs')->icon('heroicon-o-folder-open')->collapsed(),
+                NavigationGroup::make()->label('Communications')->icon('heroicon-o-envelope')->collapsed(),
+                NavigationGroup::make()->label('System')->icon('heroicon-o-cog-6-tooth')->collapsed(),
             ])
             ->userMenuItems([
                 'profile' => MenuItem::make()->label('My Account')->url(fn (): string => route('account.show'))->icon('heroicon-o-user-circle'),
@@ -176,9 +176,7 @@ class AdminPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::HEAD_END,
                 fn (): string => self::safeRender('filament.admin.partials.head-pwa', '<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="MBFD Hub">')
-                    .self::safeRender('filament.admin.partials.navigation-state', data: [
-                        'version' => '2026-10-admin-task-navigation-v2',
-                    ])
+                    .self::safeRender('filament.admin.partials.navigation-state')
             )
             // Bisect step 2 (re-introduce): BODY_END composes 4 desktop-modernization
             // partials via safeRender. Each partial is wrapped in try/catch/Throwable

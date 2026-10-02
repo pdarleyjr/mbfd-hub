@@ -92,7 +92,6 @@ $testEnvironment = [
     'POSTMARK_TOKEN' => '',
     'PRIVATE_FILESYSTEM_DISK' => 'local',
     'PULSE_ENABLED' => 'false',
-    'PULSEPOINT_WORKER_URL' => '',
     'PUSHER_APP_KEY' => '',
     'PUSHER_APP_SECRET' => '',
     'QUEUE_CONNECTION' => 'sync',

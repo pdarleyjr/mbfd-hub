@@ -16,7 +16,6 @@ export const protectedUiEnvironment = sanitizedTestEnvironment({
   BROADCAST_DRIVER: 'log', BROADCAST_CONNECTION: 'log', MAIL_MAILER: 'array',
   FILESYSTEM_DISK: 'local', PRIVATE_FILESYSTEM_DISK: 'local', QUEUE_CONNECTION: 'sync',
   SESSION_DRIVER: 'file', SESSION_SECURE_COOKIE: 'false',
-  PULSEPOINT_WORKER_URL: 'http://127.0.0.1:9/disabled-integration',
   PROTECTED_UI_E2E_PASSWORD: process.env.PROTECTED_UI_E2E_PASSWORD,
 });
 

@@ -43,7 +43,6 @@ use App\Http\Controllers\HealthReadinessController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\HubSupportTicketAttachmentController;
 use App\Http\Controllers\HubSupportTicketController;
-use App\Http\Controllers\IncidentsController;
 use App\Http\Controllers\ReportExportController;
 use App\Http\Controllers\VideoConferencing\ConferencePageController;
 use App\Http\Controllers\VideoConferencing\StationHeartbeatController;
@@ -92,9 +91,6 @@ Route::get('/admin/hub-support-attachments/{attachment}', [HubSupportTicketAttac
 // Public Security & Standards trust page — no auth required, indexable.
 Route::view('/security-standards', 'security-standards')
     ->name('security-standards');
-
-// Public incident feed — proxies PulsePoint Worker with 60s server-side cache
-Route::get('/api/incidents', [IncidentsController::class, 'index'])->name('incidents.index');
 
 // CSP violation report sink — receives reports from the report-only header in
 // SecurityHeaders middleware. Browsers POST application/csp-report or

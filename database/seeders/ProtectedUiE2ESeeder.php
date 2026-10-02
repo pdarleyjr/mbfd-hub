@@ -19,7 +19,6 @@ use App\Models\TrtInventorySession;
 use App\Models\TrtInventorySubmission;
 use App\Models\User;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -38,11 +37,6 @@ final class ProtectedUiE2ESeeder extends Seeder
         if (! is_string($password) || strlen($password) < 24) {
             throw new RuntimeException('A random ephemeral fixture password is required.');
         }
-        // Local presentation fixture only; the external incident integration stays disabled.
-        Cache::put('pulsepoint_incidents', [
-            'active' => [], 'recent' => [], 'fetchedAt' => now()->toISOString(),
-            'fixture' => 'protected-ui-local-empty-feed',
-        ], now()->addHour());
         $employee = Employee::query()->create([
             'employee_id' => '99871', 'name' => 'Protected UI Test Captain', 'rank' => 'Captain',
             'roster_status' => 'active', 'city_email' => 'protected-ui@example.test',

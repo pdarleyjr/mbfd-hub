@@ -19,22 +19,23 @@ const pages = [
   { name: 'update-detail', path: '/updates/1', back: true, backPath: '/updates' },
 ];
 
-test('Home clearly presents the explicitly simulated unavailable incident feed', async ({ page }, info) => {
-  test.skip(!['width-390', 'width-1440'].includes(info.project.name), 'Separate expected integration failure state.');
-  info.annotations.push({ type: 'local-fixture', description: 'Only /api/incidents is intentionally fulfilled with the controller 503 unavailable response; this is not a zero-resource-failure test.' });
+test('Home presents updates and Quick Access without requesting an incident feed', async ({ page }, info) => {
+  test.skip(!['width-390', 'width-1440'].includes(info.project.name), 'Affected phone and desktop Home acceptance.');
   const errors: string[] = [];
+  const incidentRequests: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.route('**/api/incidents', route => route.fulfill({
-    status: 503, contentType: 'application/json',
-    body: JSON.stringify({ error: 'Incident feed unavailable', active: [], recent: [], stale: false, fetchedAt: new Date().toISOString() }),
-  }));
+  page.on('request', request => {
+    if (new URL(request.url()).pathname === '/api/incidents') incidentRequests.push(request.url());
+  });
   await page.goto('/');
-  await expect(page.getByText('Monitoring Unavailable', { exact: true })).toBeVisible();
-  await expect(page.getByText('Check back shortly', { exact: true })).toBeVisible();
-  await expect(page.getByText('Update failed', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Department Updates', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Quick Access', exact: true })).toBeVisible();
+  await expect(page.locator('[data-home-column="incidents"]')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /PulsePoint/ })).toHaveCount(0);
+  expect(incidentRequests).toEqual([]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBeTruthy();
   expect(errors).toEqual([]);
-  await screenshot(page, info, 'home-incident-feed-unavailable');
+  await screenshot(page, info, 'home-without-incident-feed');
 });
 
 test('populated TRT inventory retains readable statuses inside its table scroll region', async ({ page }, info) => {

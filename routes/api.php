@@ -106,7 +106,6 @@ Route::prefix('display')->middleware(['display.token', 'display.readonly', 'thro
     Route::get('critical-items', [DisplayController::class, 'criticalItems']);
     Route::get('ai-snapshot', [DisplayController::class, 'aiSnapshot']);
     Route::get('cameras', [DisplayController::class, 'cameras']);
-    Route::get('incidents', [DisplayController::class, 'incidents']);
     Route::get('health', [DisplayController::class, 'health']);
 
     // Catch-all for any mutating verb on a display path. Registered AFTER the GET
