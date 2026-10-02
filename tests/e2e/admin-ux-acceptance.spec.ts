@@ -56,7 +56,10 @@ test.describe('Admin UX acceptance', () => {
     await page.reload();
     await expectCollapsedNavigation(page);
 
-    const fresh = await browser.newContext({ storageState: 'test-results/e2e-auth/admin.json' });
+    const fresh = await browser.newContext({
+      baseURL: new URL(page.url()).origin,
+      storageState: 'test-results/e2e-auth/admin.json',
+    });
     await fresh.addInitScript(() => localStorage.setItem('collapsedGroups', '[]'));
     const freshPage = await fresh.newPage();
     await freshPage.goto('/admin');
