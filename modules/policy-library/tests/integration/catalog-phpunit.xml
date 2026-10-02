@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit bootstrap="bootstrap.php" colors="true" cacheDirectory="../../var/integration-catalog-phpunit-cache">
+    <testsuites>
+        <testsuite name="Actual source catalog in exact Hub">
+            <file>FullCatalogIntegrationTest.php</file>
+        </testsuite>
+    </testsuites>
+</phpunit>

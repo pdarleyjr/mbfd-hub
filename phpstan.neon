@@ -4,7 +4,11 @@ includes:
 
 parameters:
     level: 5
+    databaseMigrationsPath:
+        - database/migrations/
+        - modules/policy-library/database/migrations/
     paths:
         - app/
+        - modules/policy-library/src/
     excludePaths:
         - app/Console/Kernel.php (?)

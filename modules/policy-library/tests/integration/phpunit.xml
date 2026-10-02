@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit bootstrap="bootstrap.php" colors="true" cacheDirectory="../../var/integration-phpunit-cache">
+    <testsuites>
+        <testsuite name="Exact live Hub integration">
+            <file>CanonicalHubIntegrationTest.php</file>
+        </testsuite>
+    </testsuites>
+</phpunit>
