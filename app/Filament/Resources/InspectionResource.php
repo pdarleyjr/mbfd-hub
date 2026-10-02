@@ -56,7 +56,12 @@ class InspectionResource extends Resource
                 Tables\Columns\TextColumn::make('completed_at')
                     ->wrap()
                     ->extraAttributes(['class' => 'hub-phone-summary'])
-                    ->description(fn (ApparatusInspection $record): string => ($record->apparatus?->name ?: 'Apparatus unrecorded').' · '.$record->operator_name.' · Shift '.$record->shift)
+                    ->description(function (ApparatusInspection $record): string {
+                        $apparatus = $record->getRelationValue('apparatus');
+                        $apparatusName = $apparatus instanceof Apparatus ? $apparatus->getAttribute('name') : null;
+
+                        return ($apparatusName ?: 'Apparatus unrecorded').' · '.$record->operator_name.' · Shift '.$record->shift;
+                    })
                     ->label('Date')
                     ->dateTime()
                     ->sortable(),

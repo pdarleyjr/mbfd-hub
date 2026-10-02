@@ -6,6 +6,7 @@ use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\EquipmentItemResource\Pages;
 use App\Models\AdminAlertEvent;
 use App\Models\EquipmentItem;
+use App\Models\InventoryLocation;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
@@ -114,7 +115,14 @@ class EquipmentItemResource extends Resource
                 Tables\Columns\TextColumn::make('name')
                     ->wrap()
                     ->extraAttributes(['class' => 'hub-phone-summary'])
-                    ->description(fn (EquipmentItem $record): string => 'Stock: '.$record->stock.' · '.($record->location?->full_location ?? 'Location unrecorded').' · '.($record->is_active ? 'Active' : 'Inactive'))
+                    ->description(function (EquipmentItem $record): string {
+                        $location = $record->getRelationValue('location');
+                        $locationLabel = $location instanceof InventoryLocation
+                            ? $location->getFullLocationAttribute()
+                            : 'Location unrecorded';
+
+                        return 'Stock: '.$record->getCurrentStockAttribute().' · '.$locationLabel.' · '.($record->is_active ? 'Active' : 'Inactive');
+                    })
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('current_stock')->visibleFrom('md')

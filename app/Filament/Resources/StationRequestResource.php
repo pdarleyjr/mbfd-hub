@@ -8,6 +8,7 @@ use App\Enums\StationRequestStatus;
 use App\Enums\StationRequestType;
 use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\StationRequestResource\Pages;
+use App\Models\Station;
 use App\Models\StationRequest;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
@@ -38,7 +39,12 @@ class StationRequestResource extends Resource
                 Tables\Columns\TextColumn::make('request_number')
                     ->wrap()
                     ->extraAttributes(['class' => 'hub-phone-summary'])
-                    ->description(fn (StationRequest $record): string => 'Station '.($record->station?->station_number ?? 'Unknown').' · '.StationRequestStatus::from($record->status)->label().' · '.ucfirst($record->priority).' priority · '.$record->title)
+                    ->description(function (StationRequest $record): string {
+                        $station = $record->getRelationValue('station');
+                        $stationNumber = $station instanceof Station ? $station->getAttribute('station_number') : null;
+
+                        return 'Station '.($stationNumber ?? 'Unknown').' · '.StationRequestStatus::from($record->status)->label().' · '.ucfirst($record->priority).' priority · '.$record->title;
+                    })
                     ->label('Request')
                     ->searchable()
                     ->sortable(),
