@@ -25,7 +25,7 @@ final class StaleRememberCookieRecoveryTest extends TestCase
             'account_status' => 'active',
             'remember_token' => 'current-remember-token',
         ]);
-        $before = $user->getRawOriginal();
+        $before = $user->fresh()->getRawOriginal();
         $identifier = $missingUser ? $user->id + 1 : $user->id;
         $recallerName = Auth::guard('web')->getRecallerName();
         $recaller = $identifier.'|revoked-remember-token|'.$user->getAuthPassword();
@@ -53,7 +53,7 @@ final class StaleRememberCookieRecoveryTest extends TestCase
     public function test_stock_guard_accepts_valid_remember_cookie_hashes(bool $useHmac): void
     {
         $user = User::factory()->create(['remember_token' => 'current-remember-token']);
-        $before = $user->getRawOriginal();
+        $before = $user->fresh()->getRawOriginal();
         $guard = Auth::guard('web');
         self::assertInstanceOf(SessionGuard::class, $guard);
         $passwordHash = $user->getAuthPassword();
@@ -70,7 +70,7 @@ final class StaleRememberCookieRecoveryTest extends TestCase
     public function test_stock_guard_rejects_a_valid_remember_token_with_the_wrong_password_hash(): void
     {
         $user = User::factory()->create(['remember_token' => 'current-remember-token']);
-        $before = $user->getRawOriginal();
+        $before = $user->fresh()->getRawOriginal();
         $guard = Auth::guard('web');
         self::assertInstanceOf(SessionGuard::class, $guard);
         $recaller = $user->id.'|'.$user->getRememberToken().'|wrong-password-hash';
