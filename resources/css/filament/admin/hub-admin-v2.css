@@ -368,6 +368,10 @@ html:not(.dark) .fi-panel-admin .fi-ta-actions .fi-link.fi-color-success > span 
     line-height: 1.5;
 }
 
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-fo-file-upload .filepond--label-action {
+    color: rgb(var(--hub2-action));
+}
+
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-tabs-item {
     min-height: 2.75rem;
     border-radius: .375rem;

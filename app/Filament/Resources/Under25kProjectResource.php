@@ -106,13 +106,13 @@ class Under25kProjectResource extends Resource
                             ->required()
                             ->options(ProjectStatus::class)
                             ->default('pending')
-                            ->native(false)
+                            ->native()
                             ->label('Status'),
                         Forms\Components\Select::make('priority')
                             ->required()
                             ->options(ProjectPriority::class)
                             ->default('medium')
-                            ->native(false)
+                            ->native()
                             ->label('Priority'),
                     ])
                     ->columns(2),

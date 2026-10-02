@@ -149,6 +149,7 @@
                         icon="heroicon-m-chevron-down"
                         icon-alias="section.collapse-button"
                         :label="filled($heading) ? 'Toggle ' . strip_tags((string) $heading) : 'Toggle section'"
+                        x-bind:aria-expanded="(! isCollapsed).toString()"
                         x-on:click.stop="isCollapsed = ! isCollapsed"
                         x-bind:class="{ 'rotate-180': ! isCollapsed }"
                     />
@@ -169,7 +170,6 @@
 
     <div
         @if ($collapsible)
-            x-bind:aria-expanded="(! isCollapsed).toString()"
             @if ($collapsed || $persistCollapsed)
                 x-cloak
             @endif

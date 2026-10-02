@@ -56,12 +56,12 @@ class CapitalProjectResource extends Resource
                             ->required()
                             ->options(ProjectStatus::class)
                             ->default('pending')
-                            ->native(false),
+                            ->native(),
                         Forms\Components\Select::make('priority')
                             ->required()
                             ->options(ProjectPriority::class)
                             ->default('medium')
-                            ->native(false),
+                            ->native(),
                         Forms\Components\Select::make('station_id')
                             ->relationship('station', 'station_number')
                             ->searchable()
@@ -174,6 +174,7 @@ class CapitalProjectResource extends Resource
                     }),
                 Tables\Columns\TextColumn::make('target_completion_date')
                     ->date('M d, Y')
+                    ->placeholder('Not set')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('completion_percentage')
                     ->label('Progress')
