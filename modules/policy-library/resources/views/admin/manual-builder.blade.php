@@ -119,7 +119,18 @@
                 @endif
                 @if ($batches->isNotEmpty())
                     <section class="pl-imports" wire:poll.10s aria-label="Import progress"><div class="pl-eyebrow">Recent imports</div>
-                        @foreach ($batches as $batch)<div class="pl-import-row"><div><strong style="font-size:.8rem">{{ $batch->source_filename }}</strong><p class="pl-muted">{{ ucfirst($batch->state) }} · {{ $batch->status_message }}</p></div>@if ($batch->state === 'ready')@foreach ($batch->edition_ids ?? [] as $id)<button type="button" wire:click="reviewImport({{ $id }})">Review draft →</button>@endforeach@endif</div>@endforeach
+                        @foreach ($batches as $batch)
+                            <div class="pl-import-row" wire:key="import-{{ $batch->id }}">
+                                <div><strong style="font-size:.8rem">{{ $batch->source_filename }}</strong><p class="pl-muted">{{ ucfirst($batch->state) }} · {{ $batch->status_message }}</p></div>
+                                <div>
+                                    @if ($batch->state === 'ready')
+                                        @foreach ($batch->edition_ids ?? [] as $id)
+                                            <button type="button" wire:key="import-edition-{{ $batch->id }}-{{ $id }}" wire:click="reviewImport({{ $id }})">Review draft →</button>
+                                        @endforeach
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
                         <a class="pl-muted" href="{{ $importUrl }}" style="display:inline-flex;align-items:center">All imports and retry options →</a>
                     </section>
                 @endif
