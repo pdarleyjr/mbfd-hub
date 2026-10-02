@@ -10,12 +10,17 @@ on:
         required: true
         type: string
       policy_library_carrier_digest:
-        description: 'Optional reviewed PRIVATE source-only carrier digest (sha256:<64 lowercase hex>); requires module revision.'
+        description: 'Optional reviewed PRIVATE source-only carrier digest; empty disables the extension.'
         required: false
         default: ''
         type: string
       policy_library_revision:
-        description: 'Exact reviewed private module source SHA; empty disables the extension.'
+        description: 'Exact reviewed private module source SHA matching the carrier.'
+        required: false
+        default: ''
+        type: string
+      policy_library_workflow_sha:
+        description: 'Exact reviewed current-main SHA of the private extension workflow.'
         required: false
         default: ''
         type: string
@@ -46,6 +51,7 @@ jobs:
           CONFIRM_IMAGE_PUBLICATION: ${{ inputs.confirm_image_publication }}
           POLICY_LIBRARY_CARRIER_DIGEST: ${{ inputs.policy_library_carrier_digest }}
           POLICY_LIBRARY_REVISION: ${{ inputs.policy_library_revision }}
+          POLICY_LIBRARY_WORKFLOW_SHA: ${{ inputs.policy_library_workflow_sha }}
         run: |
           set -euo pipefail
           test "$GITHUB_REF" = "refs/heads/main"
@@ -55,9 +61,10 @@ jobs:
             exit 1
           }
           test "$GITHUB_SHA" = "$FINAL_RELEASE_SHA"
-          if [[ -n "$POLICY_LIBRARY_CARRIER_DIGEST$POLICY_LIBRARY_REVISION" ]]; then
+          if [[ -n "$POLICY_LIBRARY_CARRIER_DIGEST$POLICY_LIBRARY_REVISION$POLICY_LIBRARY_WORKFLOW_SHA" ]]; then
             [[ "$POLICY_LIBRARY_CARRIER_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
             [[ "$POLICY_LIBRARY_REVISION" =~ ^[0-9a-f]{40}$ ]]
+            [[ "$POLICY_LIBRARY_WORKFLOW_SHA" =~ ^[0-9a-f]{40}$ ]]
           fi
 
   release-gates:
@@ -72,12 +79,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     outputs:
-      image_ref: ${{ steps.canonical-output.outputs.image_ref }}
-      image_digest: ${{ steps.canonical-output.outputs.image_digest }}
-    env:
-      POLICY_LIBRARY_CARRIER_DIGEST: ${{ inputs.policy_library_carrier_digest }}
-      POLICY_LIBRARY_REVISION: ${{ inputs.policy_library_revision }}
-      FINAL_RELEASE_SHA: ${{ inputs.final_release_sha }}
+      image_ref: ${{ steps.publish.outputs.image_ref }}
+      image_digest: ${{ steps.publish.outputs.image_digest }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -96,15 +99,6 @@ jobs:
           git archive --format=tar "$FINAL_RELEASE_SHA" | tar -x -C "$IMAGE_BUILD_CONTEXT"
           test -z "$(find "$IMAGE_BUILD_CONTEXT" -mindepth 1 -maxdepth 1 -name .git -print -quit)"
           printf 'IMAGE_BUILD_CONTEXT=%s\n' "$IMAGE_BUILD_CONTEXT" >> "$GITHUB_ENV"
-
-      - name: Select explicit optional private extension
-        run: |
-          set -euo pipefail
-          enabled=false
-          if [[ -n "$POLICY_LIBRARY_CARRIER_DIGEST$POLICY_LIBRARY_REVISION" ]]; then
-            enabled=true
-          fi
-          printf 'POLICY_LIBRARY_ENABLED=%s\n' "$enabled" >> "$GITHUB_ENV"
 
       - name: Build immutable Hub image once
         env:
@@ -234,80 +228,70 @@ jobs:
           printf 'image_ref=%s\n' "$IMAGE_REF" >> "$GITHUB_OUTPUT"
           printf 'image_digest=%s\n' "$IMAGE_DIGEST" >> "$GITHUB_OUTPUT"
 
-          printf 'CANONICAL_HUB_BASE_IMAGE=%s\nFINAL_CANONICAL_IMAGE_REF=%s\n' "$IMAGE_REF" "$IMAGE_REF" >> "$GITHUB_ENV"
 
-      - name: Verify new extension provenance validator
-        if: env.POLICY_LIBRARY_ENABLED == 'true'
+      - name: Record successful canonical public base in bounded job logs
+        id: base_record
+        env:
+          FINAL_RELEASE_SHA: ${{ inputs.final_release_sha }}
+          CANONICAL_HUB_BASE_IMAGE: ${{ steps.publish.outputs.image_ref }}
+        run: python3 scripts/operations/policy-library-image.py base-record
+
+      # Public job logs require authentication. A bounded, successful step name
+      # exposes the same digest-only proof through public job metadata instead.
+      - name: 'MBFD_CANONICAL_BASE_V1=${{ steps.base_record.outputs.proof }}'
+        run: ':'
+
+  private-extension:
+    needs: build-test-scan-publish
+    if: ${{ github.ref == 'refs/heads/main' && inputs.policy_library_revision != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    # No public-repository package access. The separate private workflow owns
+    # every private pull/build/scan/push under its own repository GITHUB_TOKEN.
+    permissions:
+      contents: read
+    outputs:
+      extension_result: ${{ steps.bridge.outputs.extension_result }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ inputs.final_release_sha }}
+          fetch-depth: 1
+      - name: Verify canonical extension provenance validator
         run: python3 -m unittest discover -s scripts/operations/tests -p test_policy_library_image.py -v
+      - name: Dispatch and verify exact private extension child
+        id: bridge
+        env:
+          # Fine-grained token: ONLY private library repository Actions read/write
+          # plus automatic Metadata read; no Contents or Packages permissions.
+          GH_TOKEN: ${{ secrets.POLICY_LIBRARY_ACTIONS_TOKEN }}
+          FINAL_RELEASE_SHA: ${{ inputs.final_release_sha }}
+          CANONICAL_HUB_BASE_IMAGE: ${{ needs.build-test-scan-publish.outputs.image_ref }}
+          POLICY_LIBRARY_CARRIER_DIGEST: ${{ inputs.policy_library_carrier_digest }}
+          POLICY_LIBRARY_REVISION: ${{ inputs.policy_library_revision }}
+          POLICY_LIBRARY_WORKFLOW_SHA: ${{ inputs.policy_library_workflow_sha }}
+        run: python3 scripts/operations/policy-library-image.py bridge
 
-      - name: Pull reviewed private source-only carrier
-        if: env.POLICY_LIBRARY_ENABLED == 'true'
-        run: |
-          set -euo pipefail
-          python3 scripts/operations/policy-library-image.py private --package mbfd-policy-library-source
-          python3 scripts/operations/policy-library-image.py private --package mbfd-policy-library
-          CARRIER="ghcr.io/pdarleyjr/mbfd-policy-library-source@$POLICY_LIBRARY_CARRIER_DIGEST"
-          docker pull "$CARRIER"
-          python3 scripts/operations/policy-library-image.py carrier --image "$CARRIER" --revision "$POLICY_LIBRARY_REVISION"
-          printf 'POLICY_LIBRARY_CARRIER=%s\n' "$CARRIER" >> "$GITHUB_ENV"
-          printf 'POLICY_IMAGE_LOCAL=mbfd-hub-policy-candidate:%s-%s\n' "$FINAL_RELEASE_SHA" "$POLICY_LIBRARY_REVISION" >> "$GITHUB_ENV"
-
-      - name: Build canonical private extension from the freshly tested Hub image
-        if: env.POLICY_LIBRARY_ENABLED == 'true'
-        run: |
-          set -euo pipefail
-          docker buildx build --load --platform linux/amd64 --tag "$POLICY_IMAGE_LOCAL" \
-            --file docker/production/PolicyLibrary.Dockerfile \
-            --build-arg "HUB_BASE_IMAGE=$CANONICAL_HUB_BASE_IMAGE" \
-            --build-arg "POLICY_LIBRARY_CARRIER=$POLICY_LIBRARY_CARRIER" \
-            --build-arg "POLICY_LIBRARY_REVISION=$POLICY_LIBRARY_REVISION" \
-            --build-arg "PREPARATION_RUN_ID=$GITHUB_RUN_ID" .
-          python3 scripts/operations/policy-library-image.py image --image "$POLICY_IMAGE_LOCAL" \
-            --base "$CANONICAL_HUB_BASE_IMAGE" --sha "$FINAL_RELEASE_SHA" \
-            --revision "$POLICY_LIBRARY_REVISION" --carrier "$POLICY_LIBRARY_CARRIER" --run-id "$GITHUB_RUN_ID"
-
-      - name: Generate private extension SBOM locally
-        if: env.POLICY_LIBRARY_ENABLED == 'true'
-        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.18.0
+  canonical-output:
+    needs: [build-test-scan-publish, private-extension]
+    if: ${{ always() && needs.build-test-scan-publish.result == 'success' && (needs.private-extension.result == 'success' || (inputs.policy_library_revision == '' && needs.private-extension.result == 'skipped')) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      image_ref: ${{ steps.record.outputs.image_ref }}
+      image_digest: ${{ steps.record.outputs.image_digest }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          image: ${{ env.POLICY_IMAGE_LOCAL }}
-          format: cyclonedx-json
-          output-file: ${{ runner.temp }}/mbfd-hub-policy-image.cyclonedx.json
-          upload-artifact: false
-          upload-release-assets: false
-
-      - name: Scan canonical private extension with Trivy
-        if: env.POLICY_LIBRARY_ENABLED == 'true'
-        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
-        with:
-          scan-type: image
-          image-ref: ${{ env.POLICY_IMAGE_LOCAL }}
-          severity: CRITICAL,HIGH
-          exit-code: 1
-          format: table
-
-      - name: Publish tested canonical extension only to the private package
-        if: env.POLICY_LIBRARY_ENABLED == 'true'
-        run: |
-          set -euo pipefail
-          jq -e '.bomFormat == "CycloneDX" and (.components | type == "array")' "$RUNNER_TEMP/mbfd-hub-policy-image.cyclonedx.json" >/dev/null
-          sha256sum "$RUNNER_TEMP/mbfd-hub-policy-image.cyclonedx.json"
-          python3 scripts/operations/policy-library-image.py private --package mbfd-policy-library
-          TAG="ghcr.io/pdarleyjr/mbfd-policy-library:hub-$FINAL_RELEASE_SHA-policy-$POLICY_LIBRARY_REVISION"
-          docker tag "$POLICY_IMAGE_LOCAL" "$TAG"
-          docker push "$TAG"
-          DIGEST="sha256:$(docker buildx imagetools inspect --raw "$TAG" | sha256sum | awk '{print $1}')"
-          [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
-          REF="ghcr.io/pdarleyjr/mbfd-policy-library@$DIGEST"
-          docker pull "$REF"
-          test "$(docker image inspect --format '{{.Id}}' "$REF")" = "$(docker image inspect --format '{{.Id}}' "$POLICY_IMAGE_LOCAL")"
-          python3 scripts/operations/policy-library-image.py private --package mbfd-policy-library
-          printf 'FINAL_CANONICAL_IMAGE_REF=%s\n' "$REF" >> "$GITHUB_ENV"
-
+          ref: ${{ inputs.final_release_sha }}
+          fetch-depth: 1
       - name: Record exact successful canonical output in bounded job logs
-        id: canonical-output
+        id: record
+        env:
+          FINAL_RELEASE_SHA: ${{ inputs.final_release_sha }}
+          CANONICAL_HUB_BASE_IMAGE: ${{ needs.build-test-scan-publish.outputs.image_ref }}
+          EXTENSION_RESULT: ${{ needs.private-extension.outputs.extension_result }}
+          POLICY_LIBRARY_REVISION: ${{ inputs.policy_library_revision }}
         run: python3 scripts/operations/policy-library-image.py record
-
-      - name: Remove ephemeral registry credentials
-        if: always()
-        run: docker logout ghcr.io >/dev/null 2>&1 || true

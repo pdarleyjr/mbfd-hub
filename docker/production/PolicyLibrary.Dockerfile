@@ -9,6 +9,10 @@ ARG HUB_BASE_IMAGE
 ARG POLICY_LIBRARY_CARRIER
 ARG POLICY_LIBRARY_REVISION
 ARG PREPARATION_RUN_ID
+ARG PREPARATION_RUN_ATTEMPT
+ARG PRIVATE_WORKFLOW_SHA
+ARG EXTENSION_RUN_ID
+ARG EXTENSION_RUN_ATTEMPT
 
 # The private carrier supplies code only. Hub vendor/assets/runtime and all
 # Python packages come from this newly accepted Hub base and fresh installation.
@@ -39,5 +43,9 @@ LABEL org.opencontainers.image.source="https://github.com/pdarleyjr/mbfd-policy-
       mbfd.policy-library.revision="${POLICY_LIBRARY_REVISION}" \
       mbfd.policy-library.base-image="${HUB_BASE_IMAGE}" \
       mbfd.policy-library.carrier="${POLICY_LIBRARY_CARRIER}" \
-      mbfd.hub.preparation-run-id="${PREPARATION_RUN_ID}"
+      mbfd.hub.preparation-run-id="${PREPARATION_RUN_ID}" \
+      mbfd.hub.preparation-run-attempt="${PREPARATION_RUN_ATTEMPT}" \
+      mbfd.policy-library.workflow-sha="${PRIVATE_WORKFLOW_SHA}" \
+      mbfd.policy-library.extension-run-id="${EXTENSION_RUN_ID}" \
+      mbfd.policy-library.extension-run-attempt="${EXTENSION_RUN_ATTEMPT}"
 USER sail

@@ -38,7 +38,6 @@ permissions:
   contents: read
   pull-requests: read
   actions: read
-  packages: read
 
 jobs:
   assert-main:
@@ -70,6 +69,11 @@ jobs:
       policy_library_revision: ${{ steps.resolve.outputs.policy_library_revision }}
       policy_library_carrier_digest: ${{ steps.resolve.outputs.policy_library_carrier_digest }}
       policy_library_base_image: ${{ steps.resolve.outputs.policy_library_base_image }}
+      policy_library_image_id: ${{ steps.resolve.outputs.policy_library_image_id }}
+      policy_library_workflow_sha: ${{ steps.resolve.outputs.policy_library_workflow_sha }}
+      policy_library_extension_run_id: ${{ steps.resolve.outputs.policy_library_extension_run_id }}
+      policy_library_extension_run_attempt: ${{ steps.resolve.outputs.policy_library_extension_run_attempt }}
+      preparation_run_attempt: ${{ steps.resolve.outputs.preparation_run_attempt }}
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
       - name: Resolve only a successful exact canonical preparation output
@@ -89,9 +93,10 @@ jobs:
           fi
           [[ "$PREPARATION_RUN_ID" =~ ^[1-9][0-9]*$ ]]
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PREPARATION_RUN_ID" \
-            --jq '{id,path,head_sha,head_branch,event,conclusion}' > "$RUNNER_TEMP/prepare-run.json"
-          JOB_ID="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PREPARATION_RUN_ID/jobs?filter=latest&per_page=100" \
-            --jq '[.jobs[] | select(.name == "build-test-scan-publish" and .conclusion == "success")] | if length == 1 then .[0].id else error("Expected one successful canonical image job") end')"
+            --jq '{id,path,head_sha,head_branch,event,conclusion,run_attempt}' > "$RUNNER_TEMP/prepare-run.json"
+          PREPARATION_RUN_ATTEMPT="$(jq -er .run_attempt "$RUNNER_TEMP/prepare-run.json")"
+          JOB_ID="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PREPARATION_RUN_ID/attempts/$PREPARATION_RUN_ATTEMPT/jobs?per_page=100" \
+            --jq '[.jobs[] | select(.name == "canonical-output" and .conclusion == "success")] | if length == 1 then .[0].id else error("Expected one successful canonical image job") end')"
           python3 scripts/operations/policy-library-image.py capture --repository "$GITHUB_REPOSITORY" \
             --job-id "$JOB_ID" --log "$RUNNER_TEMP/prepare-run.log"
           python3 scripts/operations/policy-library-image.py resolve \
@@ -117,6 +122,12 @@ jobs:
       POLICY_LIBRARY_REVISION: ${{ needs.resolve-image.outputs.policy_library_revision }}
       POLICY_LIBRARY_CARRIER_DIGEST: ${{ needs.resolve-image.outputs.policy_library_carrier_digest }}
       POLICY_LIBRARY_BASE_IMAGE: ${{ needs.resolve-image.outputs.policy_library_base_image }}
+      POLICY_LIBRARY_IMAGE_ID: ${{ needs.resolve-image.outputs.policy_library_image_id }}
+      POLICY_LIBRARY_WORKFLOW_SHA: ${{ needs.resolve-image.outputs.policy_library_workflow_sha }}
+      POLICY_LIBRARY_EXTENSION_RUN_ID: ${{ needs.resolve-image.outputs.policy_library_extension_run_id }}
+      POLICY_LIBRARY_EXTENSION_RUN_ATTEMPT: ${{ needs.resolve-image.outputs.policy_library_extension_run_attempt }}
+      PREPARATION_RUN_ID: ${{ inputs.preparation_run_id }}
+      PREPARATION_RUN_ATTEMPT: ${{ needs.resolve-image.outputs.preparation_run_attempt }}
     environment:
       name: production
       url: https://www.mbfdhub.com
@@ -145,10 +156,11 @@ jobs:
       - name: Inspect Hub production checkout and runtime
         env:
           RELEASE_SHA: ${{ github.sha }}
+          FINAL_IMAGE_DIGEST: ${{ inputs.final_image_digest }}
         run: |
           set -euo pipefail
           test -n "$RELEASE_SHA"
-          ssh -F "$HUB_SSH_CONFIG" deploy-target "POLICY_LIBRARY_ENABLED='$POLICY_LIBRARY_ENABLED' POLICY_LIBRARY_REVISION='$POLICY_LIBRARY_REVISION' POLICY_LIBRARY_CARRIER_DIGEST='$POLICY_LIBRARY_CARRIER_DIGEST' POLICY_LIBRARY_BASE_IMAGE='$POLICY_LIBRARY_BASE_IMAGE' IMAGE_REPOSITORY='$HUB_RELEASE_IMAGE_REPOSITORY' RELEASE_SHA='$RELEASE_SHA' bash -s" <<'REMOTE'
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "FINAL_IMAGE_DIGEST='$FINAL_IMAGE_DIGEST' POLICY_LIBRARY_IMAGE_ID='$POLICY_LIBRARY_IMAGE_ID' POLICY_LIBRARY_WORKFLOW_SHA='$POLICY_LIBRARY_WORKFLOW_SHA' POLICY_LIBRARY_EXTENSION_RUN_ID='$POLICY_LIBRARY_EXTENSION_RUN_ID' POLICY_LIBRARY_EXTENSION_RUN_ATTEMPT='$POLICY_LIBRARY_EXTENSION_RUN_ATTEMPT' PREPARATION_RUN_ID='$PREPARATION_RUN_ID' PREPARATION_RUN_ATTEMPT='$PREPARATION_RUN_ATTEMPT' POLICY_LIBRARY_ENABLED='$POLICY_LIBRARY_ENABLED' POLICY_LIBRARY_REVISION='$POLICY_LIBRARY_REVISION' POLICY_LIBRARY_CARRIER_DIGEST='$POLICY_LIBRARY_CARRIER_DIGEST' POLICY_LIBRARY_BASE_IMAGE='$POLICY_LIBRARY_BASE_IMAGE' IMAGE_REPOSITORY='$HUB_RELEASE_IMAGE_REPOSITORY' RELEASE_SHA='$RELEASE_SHA' bash -s" <<'REMOTE'
           set -euo pipefail
           HUB_CHECKOUT=/opt/mbfd/mbfd-hub
           HUB_APP_CONTAINER=mbfd-hub-laravel
@@ -178,6 +190,25 @@ jobs:
               echo 'A base-only release would remove the installed policy library; prepare its canonical extension first.' >&2
               exit 1
             fi
+          fi
+          if [[ "$POLICY_LIBRARY_ENABLED" == true ]]; then
+            # The owner stages this exact private digest before dispatch. Public
+            # Actions receives no private registry credentials or package ACL.
+            IMAGE_REF="$IMAGE_REPOSITORY@$FINAL_IMAGE_DIGEST"
+            test "$IMAGE_REPOSITORY" = ghcr.io/pdarleyjr/mbfd-policy-library
+            test "$(docker image inspect --format '{{.Id}}' "$IMAGE_REF")" = "$POLICY_LIBRARY_IMAGE_ID"
+            docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$IMAGE_REF" | grep -Fx "$IMAGE_REF"
+            test "$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$IMAGE_REF")" = "$RELEASE_SHA"
+            test "$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.source"}}' "$IMAGE_REF")" = https://github.com/pdarleyjr/mbfd-policy-library
+            for pair in "mbfd.policy-library.revision=$POLICY_LIBRARY_REVISION" \
+              "mbfd.policy-library.base-image=$POLICY_LIBRARY_BASE_IMAGE" \
+              "mbfd.policy-library.carrier=ghcr.io/pdarleyjr/mbfd-policy-library-source@$POLICY_LIBRARY_CARRIER_DIGEST" \
+              "mbfd.hub.preparation-run-id=$PREPARATION_RUN_ID" "mbfd.hub.preparation-run-attempt=$PREPARATION_RUN_ATTEMPT" \
+              "mbfd.policy-library.workflow-sha=$POLICY_LIBRARY_WORKFLOW_SHA" \
+              "mbfd.policy-library.extension-run-id=$POLICY_LIBRARY_EXTENSION_RUN_ID" \
+              "mbfd.policy-library.extension-run-attempt=$POLICY_LIBRARY_EXTENSION_RUN_ATTEMPT"; do
+              test "$(docker image inspect --format "{{index .Config.Labels \"${pair%%=*}\"}}" "$IMAGE_REF")" = "${pair#*=}"
+            done
           fi
           TRT_DUPLICATE_DATES="$(docker exec "$HUB_PG_CONTAINER" psql -v ON_ERROR_STOP=1 -U "$HUB_PG_USER" -d "$HUB_PG_DATABASE" -Atqc \
             'SELECT session_date FROM trt_inventory_sessions WHERE trailer_id IS NULL GROUP BY session_date HAVING COUNT(*) > 1')"
@@ -236,22 +267,17 @@ jobs:
         env:
           FINAL_RELEASE_SHA: ${{ inputs.final_release_sha }}
           FINAL_IMAGE_DIGEST: ${{ inputs.final_image_digest }}
-          HUB_ACTIVATION_RUN_ID: ${{ github.run_id }}
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          [[ "$HUB_ACTIVATION_RUN_ID" =~ ^[1-9][0-9]*$ ]]
-          if [[ "$POLICY_LIBRARY_ENABLED" == true ]]; then
-            printf '%s' "$GH_TOKEN" | ssh -F "$HUB_SSH_CONFIG" deploy-target "umask 077; mkdir '/tmp/mbfd-hub-ghcr-$HUB_ACTIVATION_RUN_ID' && docker --config '/tmp/mbfd-hub-ghcr-$HUB_ACTIVATION_RUN_ID' login ghcr.io --username '$GITHUB_ACTOR' --password-stdin"
-          fi
-          ssh -F "$HUB_SSH_CONFIG" deploy-target "HUB_ACTIVATION_RUN_ID='$HUB_ACTIVATION_RUN_ID' POLICY_LIBRARY_ENABLED='$POLICY_LIBRARY_ENABLED' POLICY_LIBRARY_REVISION='$POLICY_LIBRARY_REVISION' POLICY_LIBRARY_CARRIER_DIGEST='$POLICY_LIBRARY_CARRIER_DIGEST' POLICY_LIBRARY_BASE_IMAGE='$POLICY_LIBRARY_BASE_IMAGE' IMAGE_REPOSITORY='$HUB_RELEASE_IMAGE_REPOSITORY' FINAL_RELEASE_SHA='$FINAL_RELEASE_SHA' FINAL_IMAGE_DIGEST='$FINAL_IMAGE_DIGEST' bash -s" <<'REMOTE'
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "POLICY_LIBRARY_IMAGE_ID='$POLICY_LIBRARY_IMAGE_ID' POLICY_LIBRARY_WORKFLOW_SHA='$POLICY_LIBRARY_WORKFLOW_SHA' POLICY_LIBRARY_EXTENSION_RUN_ID='$POLICY_LIBRARY_EXTENSION_RUN_ID' POLICY_LIBRARY_EXTENSION_RUN_ATTEMPT='$POLICY_LIBRARY_EXTENSION_RUN_ATTEMPT' PREPARATION_RUN_ID='$PREPARATION_RUN_ID' PREPARATION_RUN_ATTEMPT='$PREPARATION_RUN_ATTEMPT' POLICY_LIBRARY_ENABLED='$POLICY_LIBRARY_ENABLED' POLICY_LIBRARY_REVISION='$POLICY_LIBRARY_REVISION' POLICY_LIBRARY_CARRIER_DIGEST='$POLICY_LIBRARY_CARRIER_DIGEST' POLICY_LIBRARY_BASE_IMAGE='$POLICY_LIBRARY_BASE_IMAGE' IMAGE_REPOSITORY='$HUB_RELEASE_IMAGE_REPOSITORY' FINAL_RELEASE_SHA='$FINAL_RELEASE_SHA' FINAL_IMAGE_DIGEST='$FINAL_IMAGE_DIGEST' bash -s" <<'REMOTE'
           set -euo pipefail
           cd /opt/mbfd/mbfd-hub
           test "$(head -n 1 docker/production/image-repository)" = 'ghcr.io/pdarleyjr/mbfd-hub'
           case "$IMAGE_REPOSITORY" in ghcr.io/pdarleyjr/mbfd-hub|ghcr.io/pdarleyjr/mbfd-policy-library) ;; *) exit 1 ;; esac
           IMAGE_REF="$IMAGE_REPOSITORY@$FINAL_IMAGE_DIGEST"
           if [[ "$POLICY_LIBRARY_ENABLED" == true ]]; then
-            docker --config "/tmp/mbfd-hub-ghcr-$HUB_ACTIVATION_RUN_ID" pull "$IMAGE_REF"
+            test "$(docker image inspect --format '{{.Id}}' "$IMAGE_REF")" = "$POLICY_LIBRARY_IMAGE_ID"
+            docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$IMAGE_REF" | grep -Fx "$IMAGE_REF"
           else
             docker pull "$IMAGE_REF"
           fi
@@ -266,7 +292,7 @@ jobs:
           set -euo pipefail
           test -n "$FINAL_IMAGE_DIGEST"
           test -n "$HUB_IMAGE_RUNTIME_ENV"
-          ssh -F "$HUB_SSH_CONFIG" deploy-target "POLICY_LIBRARY_ENABLED='$POLICY_LIBRARY_ENABLED' POLICY_LIBRARY_REVISION='$POLICY_LIBRARY_REVISION' POLICY_LIBRARY_CARRIER_DIGEST='$POLICY_LIBRARY_CARRIER_DIGEST' POLICY_LIBRARY_BASE_IMAGE='$POLICY_LIBRARY_BASE_IMAGE' IMAGE_REPOSITORY='$HUB_RELEASE_IMAGE_REPOSITORY' FINAL_IMAGE_DIGEST='$FINAL_IMAGE_DIGEST' HUB_IMAGE_RUNTIME_ENV='$HUB_IMAGE_RUNTIME_ENV' bash -s" <<'REMOTE'
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "POLICY_LIBRARY_IMAGE_ID='$POLICY_LIBRARY_IMAGE_ID' POLICY_LIBRARY_WORKFLOW_SHA='$POLICY_LIBRARY_WORKFLOW_SHA' POLICY_LIBRARY_EXTENSION_RUN_ID='$POLICY_LIBRARY_EXTENSION_RUN_ID' POLICY_LIBRARY_EXTENSION_RUN_ATTEMPT='$POLICY_LIBRARY_EXTENSION_RUN_ATTEMPT' PREPARATION_RUN_ID='$PREPARATION_RUN_ID' PREPARATION_RUN_ATTEMPT='$PREPARATION_RUN_ATTEMPT' POLICY_LIBRARY_ENABLED='$POLICY_LIBRARY_ENABLED' POLICY_LIBRARY_REVISION='$POLICY_LIBRARY_REVISION' POLICY_LIBRARY_CARRIER_DIGEST='$POLICY_LIBRARY_CARRIER_DIGEST' POLICY_LIBRARY_BASE_IMAGE='$POLICY_LIBRARY_BASE_IMAGE' IMAGE_REPOSITORY='$HUB_RELEASE_IMAGE_REPOSITORY' FINAL_IMAGE_DIGEST='$FINAL_IMAGE_DIGEST' HUB_IMAGE_RUNTIME_ENV='$HUB_IMAGE_RUNTIME_ENV' bash -s" <<'REMOTE'
           set -euo pipefail
           case "$HUB_IMAGE_RUNTIME_ENV" in /*) ;; *) exit 1 ;; esac
           test -f "$HUB_IMAGE_RUNTIME_ENV"
@@ -386,7 +412,7 @@ jobs:
           test -n "$HUB_IMAGE_RUNTIME_ENV"
           test -n "$HUB_BACKUP_DIR"
           test -n "$HUB_ACTIVATION_RUN_ID"
-          ssh -F "$HUB_SSH_CONFIG" deploy-target "POLICY_LIBRARY_ENABLED='$POLICY_LIBRARY_ENABLED' POLICY_LIBRARY_REVISION='$POLICY_LIBRARY_REVISION' POLICY_LIBRARY_CARRIER_DIGEST='$POLICY_LIBRARY_CARRIER_DIGEST' POLICY_LIBRARY_BASE_IMAGE='$POLICY_LIBRARY_BASE_IMAGE' IMAGE_REPOSITORY='$HUB_RELEASE_IMAGE_REPOSITORY' RELEASE_SHA='$RELEASE_SHA' FINAL_IMAGE_DIGEST='$FINAL_IMAGE_DIGEST' HUB_IMAGE_RUNTIME_ENV='$HUB_IMAGE_RUNTIME_ENV' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_ACTIVATION_RUN_ID='$HUB_ACTIVATION_RUN_ID' bash -s" <<'REMOTE'
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "POLICY_LIBRARY_IMAGE_ID='$POLICY_LIBRARY_IMAGE_ID' POLICY_LIBRARY_WORKFLOW_SHA='$POLICY_LIBRARY_WORKFLOW_SHA' POLICY_LIBRARY_EXTENSION_RUN_ID='$POLICY_LIBRARY_EXTENSION_RUN_ID' POLICY_LIBRARY_EXTENSION_RUN_ATTEMPT='$POLICY_LIBRARY_EXTENSION_RUN_ATTEMPT' PREPARATION_RUN_ID='$PREPARATION_RUN_ID' PREPARATION_RUN_ATTEMPT='$PREPARATION_RUN_ATTEMPT' POLICY_LIBRARY_ENABLED='$POLICY_LIBRARY_ENABLED' POLICY_LIBRARY_REVISION='$POLICY_LIBRARY_REVISION' POLICY_LIBRARY_CARRIER_DIGEST='$POLICY_LIBRARY_CARRIER_DIGEST' POLICY_LIBRARY_BASE_IMAGE='$POLICY_LIBRARY_BASE_IMAGE' IMAGE_REPOSITORY='$HUB_RELEASE_IMAGE_REPOSITORY' RELEASE_SHA='$RELEASE_SHA' FINAL_IMAGE_DIGEST='$FINAL_IMAGE_DIGEST' HUB_IMAGE_RUNTIME_ENV='$HUB_IMAGE_RUNTIME_ENV' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_ACTIVATION_RUN_ID='$HUB_ACTIVATION_RUN_ID' bash -s" <<'REMOTE'
           set -euo pipefail
           HUB_CHECKOUT=/opt/mbfd/mbfd-hub
           EVIDENCE_ID="$HUB_ACTIVATION_RUN_ID-$RELEASE_SHA"
@@ -430,19 +456,18 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$RELEASE_SHA"
-          ssh -F "$HUB_SSH_CONFIG" deploy-target "POLICY_LIBRARY_ENABLED='$POLICY_LIBRARY_ENABLED' POLICY_LIBRARY_REVISION='$POLICY_LIBRARY_REVISION' POLICY_LIBRARY_CARRIER_DIGEST='$POLICY_LIBRARY_CARRIER_DIGEST' POLICY_LIBRARY_BASE_IMAGE='$POLICY_LIBRARY_BASE_IMAGE' IMAGE_REPOSITORY='$HUB_RELEASE_IMAGE_REPOSITORY' RELEASE_SHA='$RELEASE_SHA' bash -s" <<'REMOTE'
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "POLICY_LIBRARY_IMAGE_ID='$POLICY_LIBRARY_IMAGE_ID' POLICY_LIBRARY_WORKFLOW_SHA='$POLICY_LIBRARY_WORKFLOW_SHA' POLICY_LIBRARY_EXTENSION_RUN_ID='$POLICY_LIBRARY_EXTENSION_RUN_ID' POLICY_LIBRARY_EXTENSION_RUN_ATTEMPT='$POLICY_LIBRARY_EXTENSION_RUN_ATTEMPT' PREPARATION_RUN_ID='$PREPARATION_RUN_ID' PREPARATION_RUN_ATTEMPT='$PREPARATION_RUN_ATTEMPT' POLICY_LIBRARY_ENABLED='$POLICY_LIBRARY_ENABLED' POLICY_LIBRARY_REVISION='$POLICY_LIBRARY_REVISION' POLICY_LIBRARY_CARRIER_DIGEST='$POLICY_LIBRARY_CARRIER_DIGEST' POLICY_LIBRARY_BASE_IMAGE='$POLICY_LIBRARY_BASE_IMAGE' IMAGE_REPOSITORY='$HUB_RELEASE_IMAGE_REPOSITORY' RELEASE_SHA='$RELEASE_SHA' bash -s" <<'REMOTE'
           set -euo pipefail
           HUB_APP_CONTAINER=mbfd-hub-laravel
           MAINTENANCE_MARKER=/run/mbfd-maintenance/mbfd-hub.json
           MARKER_TEMP="$(mktemp)"
           trap 'rm -f -- "$MARKER_TEMP"' EXIT
           STARTED_AT_EPOCH="$(date +%s)"
-          MAINTENANCE_SECONDS=900
+          EXPIRES_AT_EPOCH="$((STARTED_AT_EPOCH + 900))"
           if [[ "$POLICY_LIBRARY_ENABLED" == true ]]; then
             # Preserve the safety marker through the importer's graceful stop.
-            MAINTENANCE_SECONDS=2100
+            EXPIRES_AT_EPOCH="$((STARTED_AT_EPOCH + 2100))"
           fi
-          EXPIRES_AT_EPOCH="$((STARTED_AT_EPOCH + MAINTENANCE_SECONDS))"
           jq -n --arg service mbfd-hub --arg release_sha "$RELEASE_SHA" \
             --argjson started_at_epoch "$STARTED_AT_EPOCH" --argjson expires_at_epoch "$EXPIRES_AT_EPOCH" \
             '{schema_version:1,service:$service,release_sha:$release_sha,started_at_epoch:$started_at_epoch,expires_at_epoch:$expires_at_epoch}' \
@@ -473,7 +498,7 @@ jobs:
           test -n "$FINAL_IMAGE_DIGEST"
           test -n "$HUB_IMAGE_RUNTIME_ENV"
           test -n "$HUB_ACTIVATION_RUN_ID"
-          ssh -F "$HUB_SSH_CONFIG" deploy-target "POLICY_LIBRARY_ENABLED='$POLICY_LIBRARY_ENABLED' POLICY_LIBRARY_REVISION='$POLICY_LIBRARY_REVISION' POLICY_LIBRARY_CARRIER_DIGEST='$POLICY_LIBRARY_CARRIER_DIGEST' POLICY_LIBRARY_BASE_IMAGE='$POLICY_LIBRARY_BASE_IMAGE' IMAGE_REPOSITORY='$HUB_RELEASE_IMAGE_REPOSITORY' RELEASE_SHA='$RELEASE_SHA' FINAL_IMAGE_DIGEST='$FINAL_IMAGE_DIGEST' HUB_IMAGE_RUNTIME_ENV='$HUB_IMAGE_RUNTIME_ENV' HUB_ACTIVATION_RUN_ID='$HUB_ACTIVATION_RUN_ID' bash -s" <<'REMOTE'
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "POLICY_LIBRARY_IMAGE_ID='$POLICY_LIBRARY_IMAGE_ID' POLICY_LIBRARY_WORKFLOW_SHA='$POLICY_LIBRARY_WORKFLOW_SHA' POLICY_LIBRARY_EXTENSION_RUN_ID='$POLICY_LIBRARY_EXTENSION_RUN_ID' POLICY_LIBRARY_EXTENSION_RUN_ATTEMPT='$POLICY_LIBRARY_EXTENSION_RUN_ATTEMPT' PREPARATION_RUN_ID='$PREPARATION_RUN_ID' PREPARATION_RUN_ATTEMPT='$PREPARATION_RUN_ATTEMPT' POLICY_LIBRARY_ENABLED='$POLICY_LIBRARY_ENABLED' POLICY_LIBRARY_REVISION='$POLICY_LIBRARY_REVISION' POLICY_LIBRARY_CARRIER_DIGEST='$POLICY_LIBRARY_CARRIER_DIGEST' POLICY_LIBRARY_BASE_IMAGE='$POLICY_LIBRARY_BASE_IMAGE' IMAGE_REPOSITORY='$HUB_RELEASE_IMAGE_REPOSITORY' RELEASE_SHA='$RELEASE_SHA' FINAL_IMAGE_DIGEST='$FINAL_IMAGE_DIGEST' HUB_IMAGE_RUNTIME_ENV='$HUB_IMAGE_RUNTIME_ENV' HUB_ACTIVATION_RUN_ID='$HUB_ACTIVATION_RUN_ID' bash -s" <<'REMOTE'
           set -euo pipefail
           HUB_CHECKOUT=/opt/mbfd/mbfd-hub
           HUB_APP_CONTAINER=mbfd-hub-laravel
@@ -575,7 +600,7 @@ jobs:
           test -n "$HUB_IMAGE_RUNTIME_ENV"
           test -n "$HUB_BACKUP_DIR"
           test -n "$HUB_ACTIVATION_RUN_ID"
-          ssh -F "$HUB_SSH_CONFIG" deploy-target "POLICY_LIBRARY_ENABLED='$POLICY_LIBRARY_ENABLED' POLICY_LIBRARY_REVISION='$POLICY_LIBRARY_REVISION' POLICY_LIBRARY_CARRIER_DIGEST='$POLICY_LIBRARY_CARRIER_DIGEST' POLICY_LIBRARY_BASE_IMAGE='$POLICY_LIBRARY_BASE_IMAGE' IMAGE_REPOSITORY='$HUB_RELEASE_IMAGE_REPOSITORY' RELEASE_SHA='$RELEASE_SHA' FINAL_IMAGE_DIGEST='$FINAL_IMAGE_DIGEST' HUB_IMAGE_RUNTIME_ENV='$HUB_IMAGE_RUNTIME_ENV' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_ACTIVATION_RUN_ID='$HUB_ACTIVATION_RUN_ID' bash -s" <<'REMOTE'
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "POLICY_LIBRARY_IMAGE_ID='$POLICY_LIBRARY_IMAGE_ID' POLICY_LIBRARY_WORKFLOW_SHA='$POLICY_LIBRARY_WORKFLOW_SHA' POLICY_LIBRARY_EXTENSION_RUN_ID='$POLICY_LIBRARY_EXTENSION_RUN_ID' POLICY_LIBRARY_EXTENSION_RUN_ATTEMPT='$POLICY_LIBRARY_EXTENSION_RUN_ATTEMPT' PREPARATION_RUN_ID='$PREPARATION_RUN_ID' PREPARATION_RUN_ATTEMPT='$PREPARATION_RUN_ATTEMPT' POLICY_LIBRARY_ENABLED='$POLICY_LIBRARY_ENABLED' POLICY_LIBRARY_REVISION='$POLICY_LIBRARY_REVISION' POLICY_LIBRARY_CARRIER_DIGEST='$POLICY_LIBRARY_CARRIER_DIGEST' POLICY_LIBRARY_BASE_IMAGE='$POLICY_LIBRARY_BASE_IMAGE' IMAGE_REPOSITORY='$HUB_RELEASE_IMAGE_REPOSITORY' RELEASE_SHA='$RELEASE_SHA' FINAL_IMAGE_DIGEST='$FINAL_IMAGE_DIGEST' HUB_IMAGE_RUNTIME_ENV='$HUB_IMAGE_RUNTIME_ENV' HUB_BACKUP_DIR='$HUB_BACKUP_DIR' HUB_ACTIVATION_RUN_ID='$HUB_ACTIVATION_RUN_ID' bash -s" <<'REMOTE'
           set -euo pipefail
           HUB_CHECKOUT=/opt/mbfd/mbfd-hub
           EVIDENCE_ID="$HUB_ACTIVATION_RUN_ID-$RELEASE_SHA"
@@ -615,7 +640,7 @@ jobs:
       - name: Restart Hub queues and verify background services
         run: |
           set -euo pipefail
-          ssh -F "$HUB_SSH_CONFIG" deploy-target "POLICY_LIBRARY_ENABLED='$POLICY_LIBRARY_ENABLED' POLICY_LIBRARY_REVISION='$POLICY_LIBRARY_REVISION' POLICY_LIBRARY_CARRIER_DIGEST='$POLICY_LIBRARY_CARRIER_DIGEST' POLICY_LIBRARY_BASE_IMAGE='$POLICY_LIBRARY_BASE_IMAGE' IMAGE_REPOSITORY='$HUB_RELEASE_IMAGE_REPOSITORY' bash -s" <<'REMOTE'
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "POLICY_LIBRARY_IMAGE_ID='$POLICY_LIBRARY_IMAGE_ID' POLICY_LIBRARY_WORKFLOW_SHA='$POLICY_LIBRARY_WORKFLOW_SHA' POLICY_LIBRARY_EXTENSION_RUN_ID='$POLICY_LIBRARY_EXTENSION_RUN_ID' POLICY_LIBRARY_EXTENSION_RUN_ATTEMPT='$POLICY_LIBRARY_EXTENSION_RUN_ATTEMPT' PREPARATION_RUN_ID='$PREPARATION_RUN_ID' PREPARATION_RUN_ATTEMPT='$PREPARATION_RUN_ATTEMPT' POLICY_LIBRARY_ENABLED='$POLICY_LIBRARY_ENABLED' POLICY_LIBRARY_REVISION='$POLICY_LIBRARY_REVISION' POLICY_LIBRARY_CARRIER_DIGEST='$POLICY_LIBRARY_CARRIER_DIGEST' POLICY_LIBRARY_BASE_IMAGE='$POLICY_LIBRARY_BASE_IMAGE' IMAGE_REPOSITORY='$HUB_RELEASE_IMAGE_REPOSITORY' bash -s" <<'REMOTE'
           set -euo pipefail
           HUB_APP_CONTAINER=mbfd-hub-laravel
           CACHE_DRIVER="$(docker exec -u sail "$HUB_APP_CONTAINER" php -r '
@@ -699,7 +724,7 @@ jobs:
           test -n "$RELEASE_SHA"
           test -n "$FINAL_IMAGE_DIGEST"
           [[ "$PREVIOUS_PRODUCTION_SHA" =~ ^[0-9a-f]{40}$ ]]
-          ssh -F "$HUB_SSH_CONFIG" deploy-target "POLICY_LIBRARY_ENABLED='$POLICY_LIBRARY_ENABLED' POLICY_LIBRARY_REVISION='$POLICY_LIBRARY_REVISION' POLICY_LIBRARY_CARRIER_DIGEST='$POLICY_LIBRARY_CARRIER_DIGEST' POLICY_LIBRARY_BASE_IMAGE='$POLICY_LIBRARY_BASE_IMAGE' IMAGE_REPOSITORY='$HUB_RELEASE_IMAGE_REPOSITORY' RELEASE_SHA='$RELEASE_SHA' FINAL_IMAGE_DIGEST='$FINAL_IMAGE_DIGEST' PREVIOUS_PRODUCTION_SHA='$PREVIOUS_PRODUCTION_SHA' bash -s" <<'REMOTE'
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "POLICY_LIBRARY_IMAGE_ID='$POLICY_LIBRARY_IMAGE_ID' POLICY_LIBRARY_WORKFLOW_SHA='$POLICY_LIBRARY_WORKFLOW_SHA' POLICY_LIBRARY_EXTENSION_RUN_ID='$POLICY_LIBRARY_EXTENSION_RUN_ID' POLICY_LIBRARY_EXTENSION_RUN_ATTEMPT='$POLICY_LIBRARY_EXTENSION_RUN_ATTEMPT' PREPARATION_RUN_ID='$PREPARATION_RUN_ID' PREPARATION_RUN_ATTEMPT='$PREPARATION_RUN_ATTEMPT' POLICY_LIBRARY_ENABLED='$POLICY_LIBRARY_ENABLED' POLICY_LIBRARY_REVISION='$POLICY_LIBRARY_REVISION' POLICY_LIBRARY_CARRIER_DIGEST='$POLICY_LIBRARY_CARRIER_DIGEST' POLICY_LIBRARY_BASE_IMAGE='$POLICY_LIBRARY_BASE_IMAGE' IMAGE_REPOSITORY='$HUB_RELEASE_IMAGE_REPOSITORY' RELEASE_SHA='$RELEASE_SHA' FINAL_IMAGE_DIGEST='$FINAL_IMAGE_DIGEST' PREVIOUS_PRODUCTION_SHA='$PREVIOUS_PRODUCTION_SHA' bash -s" <<'REMOTE'
           set -euo pipefail
           HUB_APP_CONTAINER=mbfd-hub-laravel
           test "$(docker inspect --format '{{.State.Running}}' "$HUB_APP_CONTAINER")" = 'true'
@@ -762,14 +787,3 @@ jobs:
           MARKER_SHA="$(ssh -F "$HUB_SSH_CONFIG" deploy-target 'docker exec -u sail mbfd-hub-laravel cat /var/www/html/storage/app/private/deploy-marker.json' | jq -er '.sha')"
           test "$MARKER_SHA" = "$RELEASE_SHA"
           test "$(curl --silent --show-error --max-time 15 --output /dev/null --write-out '%{http_code}' https://www.mbfdhub.com/deploy-marker.json)" = '404'
-
-      - name: Remove only this run's private-registry pull credentials
-        if: always()
-        env:
-          HUB_ACTIVATION_RUN_ID: ${{ github.run_id }}
-        run: |
-          set -euo pipefail
-          [[ "$HUB_ACTIVATION_RUN_ID" =~ ^[1-9][0-9]*$ ]]
-          if [[ -n "${HUB_SSH_CONFIG:-}" ]]; then
-            ssh -F "$HUB_SSH_CONFIG" deploy-target "dir='/tmp/mbfd-hub-ghcr-$HUB_ACTIVATION_RUN_ID'; if test -d \"\$dir\" && test ! -L \"\$dir\" && test -O \"\$dir\"; then rm -f -- \"\$dir/config.json\"; rmdir -- \"\$dir\" 2>/dev/null || true; fi"
-          fi

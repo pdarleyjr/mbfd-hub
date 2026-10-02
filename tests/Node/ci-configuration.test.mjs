@@ -34,6 +34,77 @@ function workflowStep(job, name) {
   return body;
 }
 
+function workflowNeeds(job) {
+  const match = job.match(/^    needs:[ \t]*([^\r\n]*)\r?\n/m);
+  assert.ok(match, "workflow job must declare dependencies");
+  const value = match[1].split("#", 1)[0].trim();
+  const entries = value.startsWith("[")
+    ? value.slice(1, -1).split(",")
+    : value
+      ? [value]
+      : (job.slice(match.index + match[0].length).match(/^(?:      - [^\r\n]+\r?\n)+/)?.[0] ?? "")
+          .trim().split(/\r?\n/).map((line) => line.replace(/^\s*-\s*/, ""));
+  const dependencies = entries.map((entry) => entry.trim().replace(/^["']|["']$/g, ""));
+  assert.ok(dependencies.length && dependencies.every((name) => /^[A-Za-z0-9_-]+$/.test(name)), "dependencies must be literal job names");
+  return dependencies;
+}
+
+function requireJobDependencies(job, names) {
+  const dependencies = new Set(workflowNeeds(job));
+  for (const name of names) assert.ok(dependencies.has(name), `workflow must require the ${name} job`);
+}
+
+test("production dependencies accept YAML scalar and lists while rejecting a removed gate", () => {
+  requireJobDependencies("    needs: release-gates\n", ["release-gates"]);
+  for (const declaration of ["[release-gates, resolve-image]", "\n      - release-gates\n      - resolve-image"]) {
+    requireJobDependencies(`    needs: ${declaration}\n`, ["release-gates", "resolve-image"]);
+  }
+  for (const missing of ["release-gates", "resolve-image"]) {
+    const remaining = missing === "release-gates" ? "resolve-image" : "release-gates";
+    assert.throws(() => requireJobDependencies(`    needs: [${remaining}]\n`, ["release-gates", "resolve-image"]), new RegExp(missing));
+  }
+});
+
+test("private policy preparation uses a separate repository token boundary and staged immutable deployment", () => {
+  const prepare = readFileSync(resolve(root, ".github/workflows/prepare-production-image.yml"), "utf8");
+  const deploy = readFileSync(resolve(root, ".github/workflows/deploy.yml"), "utf8");
+  const child = workflowJob(prepare, "private-extension");
+  const base = workflowJob(prepare, "build-test-scan-publish");
+  assert.match(base, /id: base_record/);
+  assert.match(base, /name: 'MBFD_CANONICAL_BASE_V1=\$\{\{ steps\.base_record\.outputs\.proof \}\}'\r?\n\s+run: ':'/);
+  requireJobDependencies(child, ["build-test-scan-publish"]);
+  assert.match(child, /permissions:\r?\n      contents: read/);
+  assert.match(child, /secrets\.POLICY_LIBRARY_ACTIONS_TOKEN/);
+  assert.match(child, /policy-library-image\.py bridge/);
+  assert.doesNotMatch(child, /packages:|docker (?:pull|login|push|build)|workflow_call|DEPLOY_SSH_KEY/);
+  const final = workflowJob(prepare, "canonical-output");
+  requireJobDependencies(final, ["build-test-scan-publish", "private-extension"]);
+  assert.match(final, /needs\.build-test-scan-publish\.result == 'success'/);
+  assert.match(final, /needs\.private-extension\.result == 'success'/);
+  assert.match(final, /inputs\.policy_library_revision == '' && needs\.private-extension\.result == 'skipped'/);
+  assert.doesNotMatch(final, /secrets\.|packages:/);
+  const deployment = workflowJob(deploy, "deploy");
+  requireJobDependencies(deployment, ["release-gates", "resolve-image"]);
+  const preflight = workflowStep(deployment, "Inspect Hub production checkout and runtime");
+  assert.match(preflight, /canonical-deployment\.json/);
+  assert.match(preflight, /A base-only release would remove the installed policy library/);
+  assert.match(preflight, /POLICY_LIBRARY_IMAGE_ID/);
+  assert.match(preflight, /\.RepoDigests/);
+  assert.match(preflight, /mbfd\.hub\.preparation-run-attempt/);
+  assert.match(preflight, /mbfd\.policy-library\.workflow-sha/);
+  assert.match(preflight, /mbfd\.policy-library\.extension-run-id/);
+  assert.doesNotMatch(preflight, /docker pull|git checkout|php artisan down/);
+  assert.ok(deployment.indexOf("Inspect Hub production checkout and runtime") < deployment.indexOf("Checkout exact approved candidate"));
+  const pull = workflowStep(deployment, "Pull and verify immutable Hub image");
+  assert.match(pull, /if \[\[ "\$POLICY_LIBRARY_ENABLED" == true \]\]; then[\s\S]*POLICY_LIBRARY_IMAGE_ID[\s\S]*else\r?\n\s+docker pull "\$IMAGE_REF"\r?\n\s+fi/);
+  assert.doesNotMatch(deploy, /packages:|docker login|password-stdin|mbfd-hub-ghcr/);
+  const maintenance = workflowStep(deployment, "Enter maintenance mode and verify queue safety");
+  assert.match(maintenance, /if \[\[ "\$POLICY_LIBRARY_ENABLED" == true \]\]; then[\s\S]*STARTED_AT_EPOCH \+ 2100/);
+  const overlay = readFileSync(resolve(root, "compose.prod.policy-library.yaml"), "utf8");
+  assert.match(overlay, /stop_grace_period: 1860s/);
+  assert.doesNotMatch(overlay, /ports:|build:|command:|entrypoint:/);
+});
+
 test("every Dependabot package directory contains its ecosystem manifest", () => {
   const config = readFileSync(resolve(root, ".github/dependabot.yml"), "utf8");
   const updateBlocks = config.split(/\n(?=\s{2}- package-ecosystem:)/);
@@ -140,6 +211,7 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   const prepare = readFileSync(resolve(root, ".github/workflows/prepare-production-image.yml"), "utf8");
   const imageRepository = readFileSync(resolve(root, "docker/production/image-repository"), "utf8").trim();
   const imageCompose = readFileSync(resolve(root, "compose.prod.image.yaml"), "utf8");
+  const composeSelector = readFileSync(resolve(root, "scripts/operations/policy-library-runtime.sh"), "utf8");
   const productionDockerfile = readFileSync(resolve(root, "docker/production/Dockerfile"), "utf8");
   const productionEntrypoint = readFileSync(resolve(root, "docker/production/start-production-container"), "utf8");
   const gates = readFileSync(resolve(root, ".github/workflows/hub-release-gates.yml"), "utf8");
@@ -186,7 +258,7 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(releaseGateCaller, /pint_base_sha:\s*\$\{\{\s*format\('\{0\}\^',\s*github\.sha\)\s*\}\}/);
 
   const deployment = workflowJob(deploy, "deploy");
-  assert.match(deployment, /needs:\s*release-gates/);
+  requireJobDependencies(deployment, ["release-gates", "resolve-image"]);
   assert.match(deployment, /if:\s*\$\{\{\s*github\.ref\s*==\s*'refs\/heads\/main'\s*\}\}/);
   assert.match(deployment, /environment:\s*\r?\n\s+name:\s*production/);
   assert.doesNotMatch(deployment, /if:\s*\$\{\{\s*always\(\)\s*\}\}/);
@@ -291,7 +363,9 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(canonicalRuntime, /HUB_IMAGE_RUNTIME_ENV/);
   assert.match(canonicalRuntime, /HUB_IMAGE_REF="\$IMAGE_REF" docker compose/);
   assert.match(canonicalRuntime, /--env-file "\$HUB_IMAGE_RUNTIME_ENV"/);
-  assert.match(canonicalRuntime, /-f compose\.prod\.image\.yaml/);
+  assert.match(canonicalRuntime, /source scripts\/operations\/policy-library-runtime\.sh/);
+  assert.match(canonicalRuntime, /"\$\{HUB_COMPOSE_ARGS\[@\]\}"/);
+  assert.match(composeSelector, /HUB_COMPOSE_ARGS=\(-f compose\.prod\.image\.yaml\)/);
   assert.match(canonicalRuntime, /config --format json/);
   assert.match(canonicalRuntime, /\.services\["laravel\.test"\]\.image/);
   assert.match(canonicalRuntime, /\.target == "\/var\/www\/html\/\.env"/);
@@ -347,7 +421,8 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.ok(integrityIndex > migrationStepIndex && integrityIndex < leaveMaintenanceIndex);
   assert.match(activation, /test "\$\(git rev-parse HEAD\)" = "\$RELEASE_SHA"/);
   assert.match(activation, /php artisan migrate:status/);
-  assert.match(activation, /compose\.prod\.image\.yaml/);
+  assert.match(activation, /source scripts\/operations\/policy-library-runtime\.sh/);
+  assert.match(activation, /"\$\{HUB_COMPOSE_ARGS\[@\]\}"/);
   assert.match(activation, /docker compose.*run --interactive=false --rm --no-deps --pull never/s);
   assert.match(activation, /--entrypoint bash/);
   assert.match(activation, /--name "\$HUB_MIGRATION_CONTAINER"/);
@@ -365,7 +440,8 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(activation, /\.RepoDigests/);
   assert.match(activation, /org\.opencontainers\.image\.revision/);
   assert.match(activation, /\/var\/www\/html\/\.git-sha/);
-  assert.doesNotMatch(activation, /composer install|npm ci|vite build|filament:assets/);
+  assert.doesNotMatch(activation, /composer install|npm ci|vite build/);
+  assert.match(activation, /if \[\[ "\$POLICY_LIBRARY_ENABLED" == true \]\]; then\r?\n\s+docker exec -u sail "\$HUB_APP_CONTAINER" php artisan filament:assets\r?\n\s+docker exec -u sail "\$HUB_APP_CONTAINER" test -s \/var\/www\/html\/public\/vendor\/policy-library\/viewer\.js\r?\n\s+fi/);
   assert.match(
     activation,
     /daily-checkout:apply-approved-policy --confirm=APPLY_APPROVED_FRONTLINE_DAILY_POLICY --no-interaction/,

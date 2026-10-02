@@ -7,6 +7,9 @@ if [[ "$POLICY_LIBRARY_ENABLED" == true ]]; then
   [[ "$POLICY_LIBRARY_CARRIER_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
   [[ "$POLICY_LIBRARY_BASE_IMAGE" =~ ^ghcr\.io/pdarleyjr/mbfd-hub@sha256:[0-9a-f]{64}$ ]]
   HUB_COMPOSE_ARGS+=(-f compose.prod.policy-library.yaml)
+  [[ "$POLICY_LIBRARY_IMAGE_ID" =~ ^sha256:[0-9a-f]{64}$ ]]
+  test "$(docker image inspect --format '{{.Id}}' "$IMAGE_REF")" = "$POLICY_LIBRARY_IMAGE_ID"
+  docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$IMAGE_REF" | grep -Fx "$IMAGE_REF" >/dev/null
   test "$(docker image inspect --format '{{index .Config.Labels "mbfd.policy-library.revision"}}' "$IMAGE_REF")" = "$POLICY_LIBRARY_REVISION"
   test "$(docker image inspect --format '{{index .Config.Labels "mbfd.policy-library.base-image"}}' "$IMAGE_REF")" = "$POLICY_LIBRARY_BASE_IMAGE"
   test "$(docker image inspect --format '{{index .Config.Labels "mbfd.policy-library.carrier"}}' "$IMAGE_REF")" = "ghcr.io/pdarleyjr/mbfd-policy-library-source@$POLICY_LIBRARY_CARRIER_DIGEST"
