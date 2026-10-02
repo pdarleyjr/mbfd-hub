@@ -20,7 +20,7 @@ export default async function setup() {
     await page.getByLabel('Password', { exact: true }).fill(protectedUiEnvironment.PROTECTED_UI_E2E_PASSWORD);
     await page.getByRole('button', { name: 'Sign in', exact: true }).click();
     await page.waitForURL(url => url.pathname !== '/login');
-    const adminResponse = await page.goto('http://127.0.0.1:8127/admin');
+    const adminResponse = await page.goto('http://127.0.0.1:8127/admin', { waitUntil: 'domcontentloaded' });
     mkdirSync('test-results/protected-ui-setup', { recursive: true });
     await page.screenshot({ path: 'test-results/protected-ui-setup/admin.png', fullPage: true });
     console.log(`Protected UI authentication destination: ${new URL(page.url()).pathname}; status: ${adminResponse?.status()}`);
