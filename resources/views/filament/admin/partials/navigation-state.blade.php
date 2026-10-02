@@ -1,12 +1,17 @@
 <script>
     (() => {
-        const versionKey = 'mbfd-admin-navigation-state-version';
-        const version = @js($version);
-
-        if (localStorage.getItem(versionKey) !== version) {
-            localStorage.setItem('collapsedGroups', JSON.stringify([]));
-            localStorage.setItem(versionKey, version);
-        }
+        const adminGroups = @js(
+            collect(filament()->getCurrentPanel()->getNavigationGroups())
+                ->filter(fn ($group) => $group->isCollapsed())
+                ->map(fn ($group) => $group->getLabel())
+                ->values()
+                ->all()
+        );
+        const savedGroups = JSON.parse(localStorage.getItem('collapsedGroups') || '[]') || [];
+        const collapsedGroups = [...new Set([...savedGroups, ...adminGroups])];
+        localStorage.setItem('collapsedGroups', JSON.stringify(collapsedGroups));
+        const sidebar = window.Alpine?.store('sidebar');
+        if (sidebar) sidebar.collapsedGroups = collapsedGroups;
 
         // Keep the native Filament toggle preference within each viewport band.
         // Moving from a phone drawer to a wide desktop starts with an open sidebar.

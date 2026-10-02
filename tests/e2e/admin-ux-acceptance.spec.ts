@@ -1,8 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
 const navigationLabels = [
-  'Dashboard', 'Active Operations', 'Fleet Management', 'Inventory & Logistics', 'Workgroup Management',
-  'Station Management', 'Bid Administration', 'Communications', 'Administration', 'Monitoring',
+  'Operations', 'Fleet', 'Logistics', 'Personnel', 'Programs', 'Communications', 'System',
 ];
 
 async function expectCollapsedNavigation(page: Page): Promise<void> {
@@ -49,10 +48,13 @@ test.describe('Admin UX acceptance', () => {
     await page.goto('/admin');
     await expectCollapsedNavigation(page);
 
-    const fleet = page.getByLabel('Fleet Management').first();
+    const fleet = page.getByLabel('Fleet').first();
     await fleet.click();
     await expect(fleet).toHaveAttribute('aria-expanded', 'true');
-    await expect(page.getByLabel('Inventory & Logistics').first()).toHaveAttribute('aria-expanded', 'false');
+    await expect(page.getByLabel('Logistics').first()).toHaveAttribute('aria-expanded', 'false');
+
+    await page.reload();
+    await expectCollapsedNavigation(page);
 
     const fresh = await browser.newContext({ storageState: 'test-results/e2e-auth/admin.json' });
     await fresh.addInitScript(() => localStorage.setItem('collapsedGroups', '[]'));
