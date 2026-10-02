@@ -29,6 +29,8 @@ use App\Http\Controllers\Workgroup\WorkgroupAIController;
 use App\Http\Middleware\PreventPreviousUrlStorage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Laravel\Sanctum\Http\Middleware\AuthenticateSession;
+use Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful;
 
 Route::post('/v2/email/inbound', \App\Http\Controllers\Api\InboundEmailController::class)
     ->middleware('throttle:120,1')
@@ -157,7 +159,9 @@ Route::middleware(['web', 'auth', 'throttle:10,1'])->group(function () {
 // authenticates identically to the browser admin. Canonical entitlement and
 // scoped capability are enforced at the route and controller boundaries.
 // at 60 req/min per IP to bound abuse if a token leaks.
-Route::middleware(['web', PreventPreviousUrlStorage::class, 'auth', 'admin.capability:admin.system.view', 'throttle:60,1'])
+// Run cookie/session/CSRF middleware once, retaining Sanctum's password-hash check.
+Route::middleware(['web', AuthenticateSession::class, PreventPreviousUrlStorage::class, 'auth', 'admin.capability:admin.system.view', 'throttle:60,1'])
+    ->withoutMiddleware(EnsureFrontendRequestsAreStateful::class)
     ->prefix('admin/lookups')
     ->group(function () {
         Route::get('stations', [\App\Http\Controllers\Api\Admin\LookupController::class, 'stations']);
