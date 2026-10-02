@@ -158,7 +158,7 @@ test('inventory records every route and renders available protected surfaces at 
   const canonicalRenewal = await fixtureSessionRenewal([context, pushSettingsContext]);
   await canonicalRenewal.beforeBoundary('inventory start');
 
-  const expiringPrerequisites = new Set(['/member-onboarding', '/member-onboarding/invite', '/reset-password/{token}', '/account/city-email/verify/{token}', '/workgroup/saver-report']);
+  const expiringPrerequisites = new Set(['/', '/member-onboarding', '/member-onboarding/invite', '/reset-password/{token}', '/account/city-email/verify/{token}', '/workgroup/saver-report']);
   const priority = (entry: Entry) => expiringPrerequisites.has(entry.route) ? -2 : /analysis-report|final-presentation/.test(entry.route) ? -1 : Number(/[{:]/.test(entry.route));
   const entries = catalog.pages.map((entry, index) => ({ entry, index })).filter(({ entry }) => !outcomes.some(outcome => outcome.route === entry.route)).sort((a, b) => priority(a.entry) - priority(b.entry));
   const persist = () => {
