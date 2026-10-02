@@ -28,11 +28,11 @@ final class ImportService
                 validator($entry, ['slug' => 'required|alpha_dash|max:100', 'name' => 'required|string|max:255', 'type' => 'required|string|max:50', 'sections' => 'required|array|min:1'])->validate();
                 $manual = Manual::query()->firstOrCreate(['slug' => $entry['slug']], [
                     'name' => $entry['name'], 'type' => $entry['type'], 'description' => $entry['description'] ?? null,
-                    'sort_order' => $entry['sort_order'] ?? 0,
+                    'sort_order' => $entry['sort_order'] ?? 0, 'is_active' => $entry['is_active'] ?? true,
                 ]);
                 $edition = $manual->editions()->create([
                     'label' => $entry['version_label'] ?? 'Imported '.now()->toDateString(), 'created_by' => $userId,
-                    'metadata' => ['source_manifest_sha256' => hash('sha256', json_encode($entry, JSON_THROW_ON_ERROR)), 'audit' => $manifest['audits'] ?? []],
+                    'metadata' => array_merge($entry['metadata'] ?? [], ['source_manifest_sha256' => hash('sha256', json_encode($entry, JSON_THROW_ON_ERROR)), 'audit' => $manifest['audits'] ?? []]),
                 ]);
                 foreach ($entry['sections'] as $order => $section) {
                     $this->section($edition, $section, null, $order, $root, $userId);
@@ -65,11 +65,15 @@ final class ImportService
             $documentNode = $edition->nodes()->create([
                 'manual_id' => $edition->manual_id, 'parent_id' => $node->id, 'title' => $document['title'],
                 'slug' => $document['slug'], 'type' => 'document', 'sort_order' => count($section['children'] ?? []) + $position,
+                'metadata' => $document['node_metadata'] ?? null,
             ]);
             $metadata = $document['metadata'] ?? [];
             if (! empty($document['source_path'])) {
                 $source = $this->sourcePath($root, $document['source_path']);
                 $sourceHash = hash_file('sha256', $source);
+                if (isset($metadata['canonical_sha256']) && $metadata['canonical_sha256'] !== $sourceHash) {
+                    throw ValidationException::withMessages(['manifest' => 'The canonical PDF does not match the import manifest.']);
+                }
                 $sourceArchive = 'sources/'.$sourceHash.'.pdf';
                 $this->revisions->archive($source, $sourceArchive, $sourceHash);
                 $metadata['source_archive'] = $sourceArchive;
