@@ -45,7 +45,7 @@
 .of-main { min-width: 0; padding: 16px clamp(16px, 2vw, 32px) 36px; }
 .of-main > [role="alert"] { margin-bottom: 12px; }
 .of-page-heading { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; margin-bottom: 28px; }
-.of-page-heading h1, .of-record-spine h1 { font-size: 25px; line-height: 1.2; font-weight: 650; color: var(--of-navy); margin: 2px 0 5px; letter-spacing: -.02em; }
+.of-page-heading h2, .of-record-spine h2 { font-size: 25px; line-height: 1.2; font-weight: 650; color: var(--of-navy); margin: 2px 0 5px; letter-spacing: -.02em; }
 .of-page-heading p, .of-record-spine p { color: var(--of-slate); margin: 0; font-size: 14px; }
 .of-heading-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .of-eyebrow { color: var(--of-blue) !important; font-size: 11px !important; text-transform: uppercase; letter-spacing: .1em; font-weight: 700; }
@@ -127,7 +127,7 @@
 .of-save-state.saved { color: #107c10; }
 .of-save-state.offline, .of-save-state.error { color: var(--of-amber); }
 .of-record-spine { background: var(--of-paper); border: 1px solid var(--of-border); border-top: 0; padding: 16px 18px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
-.of-record-spine h1 { font-size: 20px; margin: 5px 0 2px; }
+.of-record-spine h2 { font-size: 20px; margin: 5px 0 2px; }
 .of-record-spine p { font-size: 12px; font-variant-numeric: tabular-nums; }
 .of-spine-status { display: flex; gap: 7px; flex-wrap: wrap; justify-content: flex-end; }
 .of-document-ready { display: grid; grid-template-columns: 38px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px 16px; background: #f2f8f3; border: 1px solid #9cc6a2; border-top: 0; color: #173d22; }
