@@ -198,7 +198,7 @@ class ApparatusResource extends Resource
                 Tables\Columns\TextColumn::make('designation')
                     ->wrap()
                     ->extraAttributes(['class' => 'hub-phone-summary'])
-                    ->description(fn (Apparatus $record): string => 'Vehicle '.($record->vehicle_number ?: 'Unrecorded').' · '.($record->getAttribute('status') ?: 'Unknown status').' · '.($record->current_location ?: $record->assignment ?: 'Location unrecorded'))
+                    ->description(fn (Apparatus $record): string => 'Vehicle '.($record->vehicle_number ?: 'Unrecorded').' · '.($record->getAttribute('status') ?: 'Unknown status').' · '.($record->current_location ?: $record->assignment ?: ($record->station ? 'Sta '.$record->station->station_number : 'Location unrecorded')))
                     ->label('Unit')
                     ->searchable()
                     ->sortable()
