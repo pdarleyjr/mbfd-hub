@@ -368,6 +368,8 @@ jobs:
       - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2
         with:
           php-version: '8.4'
+      - name: Check bounded build advisory classification
+        run: node --test tests/Node/build-advisory-classifier.test.mjs
       - name: Install PHP dependencies
         env:
           COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
@@ -377,17 +379,31 @@ jobs:
       - name: Root NPM security audit
         run: |
           npm ci --ignore-scripts --legacy-peer-deps
-          npm audit --audit-level=high
+          audit_report="$RUNNER_TEMP/root-npm-audit.json"
+          audit_status=0
+          npm audit --audit-level=high --json > "$audit_report" || audit_status=$?
+          node scripts/ci/classify-build-advisory.mjs . "$audit_report" "$audit_status"
       - name: Daily NPM security audit
         working-directory: resources/js/daily-checkout
         run: |
           npm ci --ignore-scripts --legacy-peer-deps
-          npm audit --audit-level=high
+          audit_report="$RUNNER_TEMP/daily-npm-audit.json"
+          audit_status=0
+          npm audit --audit-level=high --json > "$audit_report" || audit_status=$?
+          node ../../../scripts/ci/classify-build-advisory.mjs resources/js/daily-checkout "$audit_report" "$audit_status"
       - name: Inbound Email Worker NPM security audit
         working-directory: cloudflare-email-worker
         run: |
           npm ci --ignore-scripts
           npm audit --audit-level=high
+      - name: Preserve raw NPM security reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: hub-dependency-audits-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/*-npm-audit.json
+          if-no-files-found: warn
+          retention-days: 7
 
   security-secrets:
     name: Hub secret scan
