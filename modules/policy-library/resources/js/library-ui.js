@@ -70,7 +70,13 @@ export async function pdfDestinationPage(pdf, destination) {
     const resolved = typeof destination === 'string' ? await pdf.getDestination(destination) : destination;
     if (!Array.isArray(resolved)) return null;
     const first = resolved[0];
-    const index = Number.isInteger(first) ? first : first && typeof first === 'object' ? await pdf.getPageIndex(first) : -1;
+    let index;
+    try {
+        index = Number.isInteger(first) ? first : first && typeof first === 'object' ? await pdf.getPageIndex(first) : -1;
+    } catch (error) {
+        if (error.name === 'UnknownErrorException' && error.message === 'The reference does not point to a /Page dictionary.') return null;
+        throw error;
+    }
     return Number.isInteger(index) && index >= 0 && index < pdf.numPages ? index + 1 : null;
 }
 

@@ -38,17 +38,25 @@ jobs:
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
+      - name: Check bounded build advisory classification
+        run: node --test tests/Node/build-advisory-classifier.test.mjs
 
       - name: NPM security audit
         run: |
           npm ci --ignore-scripts --legacy-peer-deps
-          npm audit --audit-level=high
+          audit_report="$RUNNER_TEMP/root-npm-audit.json"
+          audit_status=0
+          npm audit --audit-level=high --json > "$audit_report" || audit_status=$?
+          node scripts/ci/classify-build-advisory.mjs . "$audit_report" "$audit_status"
 
       - name: Daily Checkout security audit
         working-directory: resources/js/daily-checkout
         run: |
           npm ci --ignore-scripts
-          npm audit --audit-level=high
+          audit_report="$RUNNER_TEMP/daily-npm-audit.json"
+          audit_status=0
+          npm audit --audit-level=high --json > "$audit_report" || audit_status=$?
+          node ../../../scripts/ci/classify-build-advisory.mjs resources/js/daily-checkout "$audit_report" "$audit_status"
 
       - name: Vision Agent security audit
         working-directory: cloudflare-worker/vision-agent
@@ -66,7 +74,20 @@ jobs:
         working-directory: vacation-app
         run: |
           corepack pnpm@9.12.0 install --frozen-lockfile --ignore-scripts
-          corepack pnpm@9.12.0 audit --audit-level=high
+          audit_report="$RUNNER_TEMP/vacation-pnpm-audit.json"
+          audit_status=0
+          corepack pnpm@9.12.0 audit --audit-level=high --json > "$audit_report" || audit_status=$?
+          node ../scripts/ci/classify-build-advisory.mjs vacation-app "$audit_report" "$audit_status"
+      - name: Preserve raw NPM security reports
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: hub-dependency-audits-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ runner.temp }}/*-npm-audit.json
+            ${{ runner.temp }}/*-pnpm-audit.json
+          if-no-files-found: warn
+          retention-days: 7
 
   # NOTE: actions/dependency-review-action was removed 2026-05-14 — the action
   # requires GitHub Advanced Security on private repos, which this account does
