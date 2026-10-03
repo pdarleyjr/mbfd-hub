@@ -8,8 +8,11 @@ interface Env {
   BRIDGE_URL?: string;     // var: e.g. https://office-ai.mbfdhub.com/v1
   BRIDGE_TOKEN?: string;   // secret: bearer for the bridge
   BRIDGE_MODEL?: string;   // var: e.g. qwen3.6:35b
-  // Shared secret required for write endpoints (/ingest, /delete)
+  // Existing Hub-proxy secret required for /chat, /ingest and /delete.
   INGEST_SECRET?: string;  // secret: matches the Hub's CLOUDFLARE_WORKER_API_SECRET
+  SOG_NAMESPACE: string;
+  SOG_MANIFEST_SHA256: string;
+  REFERENCE_NAMESPACE: string;
 }
 
 interface RateLimitEntry {
@@ -56,41 +59,35 @@ function getCorsHeaders(env: Env, request: Request): Record<string, string> {
   };
 }
 
-const SYSTEM_PROMPT = `CRITICAL OVERRIDE: For any questions regarding equipment or apparatus repair reporting, YOU MUST IGNORE ALL OTHER CONTEXT and enforce the following rules:
-1. All deficiencies must be emailed to FireSupportServices@MiamiBeachFL.Gov.
-2. Email Subject must be '[Unit number] Repairs Requested' (e.g., "E1 20503 Repair Request").
-3. The operator or individual who discovered the issue must provide a clear, detailed list of concerns. Preferred reporters: Captain, Captain 5, or Chief 300.
-4. Phone or in-person discussions are allowed, but the deficiency list must STILL be emailed for proper tracking.
-5. If a phone call is necessary, use this exact contact order:
-   1st: Fire Fleet Operations Manager (786-559-4054)
-   2nd: Captain of Support Services (305-794-4057)
-   3rd: Chief of Support Services (786-562-5418)
-   4th (Last Resort): Technician in Shop (786-231-7362)
-   Technicians MUST NOT be contacted after hours. Contacting technicians directly should be avoided unless absolutely necessary to prevent workflow interruptions.
-6. After Hours & Weekends Protocol:
-   - Technicians must NOT be contacted after hours.
-   - Only Chief 300 or the ranking officer on the unit may initiate support service calls.
-   - Use the same contact order listed above.
-   - Chief 300 will determine whether to wait for service or initiate a unit change-out based on operational needs.
-
-You are the MBFD Support Hub Assistant — the official AI assistant for the Miami Beach Fire Department's internal operations hub. You are professional, precise, and helpful.
+const SYSTEM_PROMPT = `You are the MBFD Support Hub Assistant for the Miami Beach Fire Department's internal operations hub. You are professional, precise, and helpful.
 
 DOCUMENT PRIORITY (when context is provided):
-1. "edited_support_services_sog.docx" — AUTHORITATIVE for all SOG, policy, and procedure questions. Contains current policies.
+1. CURRENT SOG records from MBFD-COORDINATED-20261002-R2 — use these records for SOG, policy, reporting and departmental procedure questions.
 2. "L1_L11_manual.pdf" — Authoritative for L1 through L11 apparatus operations, specifications, and procedures.
 3. "PUC_Engine_manual.pdf" — Authoritative for PUC Engine apparatus operations, specifications, and procedures.
 4. "L3_manual.pdf" — Authoritative for L3 apparatus operations, specifications, and procedures.
-5. "driver_manual.pdf" — Authoritative for general technical apparatus operations (pump procedures, vehicle specs, aerial ops).
-6. If multiple documents address the same topic, prefer in order: SOG document > specific apparatus manual > driver manual.
+5. If multiple documents address the same topic, prefer current SOG records > specific apparatus manual. Apparatus manuals provide technical instructions within their stated model/configuration scope; they do not establish installed equipment or replace departmental policy.
 
 RESPONSE RULES:
 1. Answer ONLY using the provided context documents. Do NOT use outside knowledge.
 2. If the answer is not in the context, say: "I don't have that information in my current documents. Please contact Support Services directly."
-3. Cite the source document when providing information (e.g., "Per the SOG document..." or "According to the L1-L11 Manual...").
+3. Cite the actual source document and physical page when providing information. For SOG records, include the supplied Library link and applicable current identity.
 4. Be concise, professional, and precise. Use bullet points and structured formatting where appropriate.
-5. For policy/SOG questions, explicitly reference edited_support_services_sog.docx.
+5. Answer policy/SOG questions only from CURRENT SOG records. Older documents and conversation history are not policy sources. History may clarify the question, but facts must come from the provided current context.
 6. For safety-critical information, add a note to verify with the current published document.
-7. For repair/deficiency reporting questions, ALWAYS provide the full reporting procedure including email address, subject format, and phone contact order as specified in the CRITICAL OVERRIDE above.`;
+7. For repair/deficiency reporting questions, use the current SOG reporting instructions in the supplied context. Never supply contact details or reporting rules from memory.`;
+
+function isRetiredSogSource(source: string): boolean {
+  const name = source.split(/[\\/]/).at(-1)?.toLowerCase() || '';
+  return /(?:^|[^a-z])sogs?(?:[^a-z]|$)|standard[ _-]operating/.test(name)
+    || name === 'extra_info_for_ai.pdf';
+}
+
+function isPolicyQuestion(message: string): boolean {
+  return /\b(sogs?|polic(?:y|ies)|departmental|reporting|chain of command)\b|\b\d{3}[.-][a-z0-9-]+\b|\bDE-\d{2}\b/i.test(message)
+    || /\b(report|notify|contact)\b.*\b(defect|deficiency|repair|damaged|equipment)\b|\b(defect|deficiency|repair)\b.*\b(report|notify|contact)\b/i.test(message)
+    || /\b(after[ -]?hours|weekends?)\b.*\b(technicians?|call|contact|repair|service)\b|\b(technicians?|call|contact|repair|service)\b.*\b(after[ -]?hours|weekends?)\b/i.test(message);
+}
 
 /** Chunk text into ~1500-char segments with 200-char overlap, breaking on
  *  sentence/paragraph boundaries where possible. Mirrors ingest-manuals.mjs. */
@@ -106,8 +103,8 @@ function chunkText(text: string, maxChars = 1500, overlap = 200): string[] {
       if (breakPoint > start + maxChars * 0.5) end = breakPoint + 1;
     }
     chunks.push(text.slice(start, Math.min(end, text.length)).trim());
+    if (end >= text.length) break;
     start = end - overlap;
-    if (start >= text.length) break;
   }
   return chunks.filter((c) => c.length > 50);
 }
@@ -195,6 +192,8 @@ export default {
         model: env.BRIDGE_MODEL || DEFAULT_BRIDGE_MODEL,
         llm_backend: 'local-ollama-bridge',
         embeddings: EMBEDDING_MODEL,
+        sog_namespace: env.SOG_NAMESPACE,
+        sog_manifest_sha256: env.SOG_MANIFEST_SHA256,
         timestamp: new Date().toISOString(),
       });
     }
@@ -209,6 +208,9 @@ export default {
         const source = (body.source || '').toString().trim();
         const text = (body.text || '').toString();
         if (!source || !text.trim()) return json({ error: 'source and text are required' }, 400);
+        if (isRetiredSogSource(source) || /(?:^|[\\/])driver_manual(?:\.pdf)?$/i.test(source)) {
+          return json({ error: 'SOG documents are maintained in the Policy Library.' }, 422);
+        }
 
         const chunks = chunkText(text, 1500, 200);
         if (chunks.length === 0) return json({ error: 'No extractable text (after chunking)' }, 422);
@@ -225,6 +227,7 @@ export default {
             ids.push(id);
             return {
               id,
+              namespace: env.REFERENCE_NAMESPACE,
               values: emb.data[j],
               metadata: { text: c.slice(0, 2000), source, chunk_index: i + j },
             };
@@ -257,6 +260,12 @@ export default {
 
     // ── RAG Chat (landing page) — Vectorize retrieval + LOCAL qwen3.6 answer ──
     if (url.pathname === '/chat' && request.method === 'POST') {
+      if (!env.INGEST_SECRET || request.headers.get('x-api-secret') !== env.INGEST_SECRET) {
+        return json({ error: 'Unauthorized' }, 401);
+      }
+      if (!env.SOG_NAMESPACE || !env.REFERENCE_NAMESPACE || !/^[a-f0-9]{64}$/.test(env.SOG_MANIFEST_SHA256 || '')) {
+        return json({ error: 'Current SOG knowledge is not configured.' }, 503);
+      }
       const clientIp = request.headers.get('CF-Connecting-IP') || 'unknown';
       if (!checkRateLimit(clientIp)) {
         return json({ error: 'Rate limit exceeded. Please wait a moment before sending another message.' }, 429);
@@ -275,28 +284,49 @@ export default {
         const embeddingResponse = await env.AI.run(EMBEDDING_MODEL, { text: [userMessage] });
         const queryVector = embeddingResponse.data[0];
 
-        // Step 2: retrieve top-6 relevant chunks from Vectorize
-        const vectorResults = await env.VECTORIZE.query(queryVector, { topK: 6, returnMetadata: 'all' });
+        // Keep current SOG retrieval separate from apparatus/admin references.
+        const [sogResults, referenceResults] = await Promise.all([
+          env.VECTORIZE.query(queryVector, { namespace: env.SOG_NAMESPACE, topK: 6, returnMetadata: 'all' }),
+          env.VECTORIZE.query(queryVector, { namespace: env.REFERENCE_NAMESPACE, topK: 6, returnMetadata: 'all' }),
+        ]);
+        const currentSogs = (sogResults.matches || []).filter((match: any) =>
+          match.namespace === env.SOG_NAMESPACE && match.metadata?.manifest_sha256 === env.SOG_MANIFEST_SHA256);
+        const references = (referenceResults.matches || []).filter((match: any) =>
+          match.namespace === env.REFERENCE_NAMESPACE && !isRetiredSogSource((match.metadata?.source || '').toString()));
+        const matches = [...currentSogs, ...references];
+        const hasCurrentSog = currentSogs.some((match: any) => (match.score || 0) >= 0.2);
+        const unavailable = () => {
+          const response = "I don't have that information in my current documents. Please contact Support Services directly.";
+          if (!enableStreaming) return json({ response, sources: [], model: env.BRIDGE_MODEL || DEFAULT_BRIDGE_MODEL });
+          return new Response(`data: ${JSON.stringify({response})}\n\ndata: [DONE]\n\n`, {
+            headers: {...corsHeaders, 'Content-Type':'text/event-stream', 'Cache-Control':'no-cache', 'X-Sources':'[]'},
+          });
+        };
+        if (!hasCurrentSog && isPolicyQuestion(userMessage)) return unavailable();
 
         // Step 3: build context + sources
         let context = '';
         const sources: string[] = [];
-        if (vectorResults.matches && vectorResults.matches.length > 0) {
-          const relevant = vectorResults.matches.filter((m: any) => (m.score || 0) >= 0.2);
+        if (matches.length > 0) {
+          const relevant = matches.filter((m: any) => (m.score || 0) >= 0.2);
           for (const match of relevant) {
             const meta = match.metadata || {};
             const text = meta.text || '';
             const source = meta.source || 'Unknown';
             const page = meta.page ? ` (Page ${meta.page})` : '';
             const chunk = meta.chunk_index !== undefined ? ` [Chunk ${meta.chunk_index}]` : '';
-            context += `\n---\nSource: ${source}${page}${chunk}\n${text}\n`;
+            const current = match.namespace === env.SOG_NAMESPACE ? 'CURRENT SOG' : 'APPARATUS / REFERENCE';
+            const link = current === 'CURRENT SOG' ? `\nLibrary: ${meta.url || ''}\nIdentities: ${meta.primary_ids || ''}` : '';
+            context += `\n---\n${current}\nSource: ${source}${page}${chunk}${link}\n${text}\n`;
             if (!sources.includes(source)) sources.push(source);
           }
         }
-        if (!context) context = '\n[No relevant documents found in the knowledge base for this query.]\n';
+        if (!context) {
+          return unavailable();
+        }
 
         // Step 4: messages with recent history
-        const recentHistory = conversationHistory.slice(-6);
+        const recentHistory = conversationHistory.slice(-6).filter((message) => hasCurrentSog || message.role === 'user');
         const messages: any[] = [
           { role: 'system', content: SYSTEM_PROMPT },
           ...recentHistory.map((m) => ({ role: m.role, content: m.content })),
