@@ -238,7 +238,14 @@ class AppServiceProvider extends ServiceProvider
                 'station_inventory_submission',
                 'New Station Inventory Submission',
                 "Station {$stationName} submitted an inventory alert for {$shift} shift by {$employeeName}.",
-                '/admin/stations/'.$submission->station_id.'?activeRelationManager=inventoryItems',
+                \App\Filament\Resources\StationResource::getUrl('view', [
+                    'record' => $submission->station_id,
+                    'activeRelationManager' => array_search(
+                        \App\Filament\Resources\StationResource\RelationManagers\InventorySubmissionsRelationManager::class,
+                        \App\Filament\Resources\StationResource::getRelations(),
+                        true,
+                    ),
+                ], panel: 'admin'),
             );
         });
     }

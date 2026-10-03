@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Shift, InventoryV2Item, InventoryV2Category, SupplyRequest } from '../types';
 import { ApiClient } from '../utils/api';
 
@@ -28,6 +28,12 @@ export default function InventoryCountPage({
   const [showRequests, setShowRequests] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<Set<number>>(new Set());
   const [saveTimers, setSaveTimers] = useState<Record<number, TimerID>>({});
+  const pendingCounts = useRef(new Map<number, number>());
+  const saveQueues = useRef(new Map<number, Promise<void>>());
+  const submissionKey = useRef(crypto.randomUUID());
+  const [recordNotes, setRecordNotes] = useState('');
+  const [submittingRecord, setSubmittingRecord] = useState(false);
+  const [submittedRecordId, setSubmittedRecordId] = useState<number | null>(null);
 
   const fetchInventory = useCallback(async () => {
     try {
@@ -87,6 +93,7 @@ export default function InventoryCountPage({
     const item = categories[categoryIndex].items[itemIndex];
     const itemId = item.id;
 
+    pendingCounts.current.set(itemId, Math.max(0, newCount));
     setPendingChanges(prev => new Set(prev).add(itemId));
 
     if (saveTimers[itemId]) {
@@ -94,34 +101,59 @@ export default function InventoryCountPage({
     }
 
     const timer = setTimeout(() => {
-      saveItemCount(itemId, newCount);
+      saveItemCount(itemId, Math.max(0, newCount));
     }, 1000);
 
     setSaveTimers(prev => ({ ...prev, [itemId]: timer }));
   };
 
-  const saveItemCount = async (itemId: number, count: number) => {
-    setSaving(prev => ({ ...prev, [itemId]: true }));
-    
-    try {
-      await ApiClient.updateInventoryItem(
-        stationId,
-        itemId,
-        {
-          on_hand: count,
-          actor_shift: actorShift,
+  const saveItemCount = (itemId: number, count: number) => {
+    const save = async () => {
+      setSaving(prev => ({ ...prev, [itemId]: true }));
+
+      try {
+        await ApiClient.updateInventoryItem(
+          stationId,
+          itemId,
+          {
+            on_hand: count,
+            actor_shift: actorShift,
+          }
+        );
+
+        if (pendingCounts.current.get(itemId) === count) {
+          pendingCounts.current.delete(itemId);
+          setPendingChanges(prev => {
+            const updated = new Set(prev);
+            updated.delete(itemId);
+            return updated;
+          });
         }
-      );
-      
-      setPendingChanges(prev => {
-        const updated = new Set(prev);
-        updated.delete(itemId);
-        return updated;
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Failed to save count');
+      } finally {
+        setSaving(prev => ({ ...prev, [itemId]: false }));
+      }
+    };
+    const queued = (saveQueues.current.get(itemId) ?? Promise.resolve()).then(save);
+    saveQueues.current.set(itemId, queued);
+    void queued.finally(() => {
+      if (saveQueues.current.get(itemId) === queued) saveQueues.current.delete(itemId);
+    });
+  };
+
+  const handleSubmitRecord = async () => {
+    if (pendingChanges.size > 0 || submittingRecord || submittedRecordId !== null) return;
+    setSubmittingRecord(true);
+    try {
+      const result = await ApiClient.submitInventoryRecord(stationId, {
+        actor_shift: actorShift, client_submission_id: submissionKey.current, notes: recordNotes,
       });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save count');
+      setSubmittedRecordId(result.submission_id);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'The inventory record could not be submitted.');
     } finally {
-      setSaving(prev => ({ ...prev, [itemId]: false }));
+      setSubmittingRecord(false);
     }
   };
 
@@ -184,6 +216,8 @@ export default function InventoryCountPage({
         return <span className="px-2 py-1 text-xs font-medium bg-yellow-100 text-yellow-800 rounded">ORDERED</span>;
       case 'denied':
         return <span className="px-2 py-1 text-xs font-medium bg-gray-100 text-gray-800 rounded">DENIED</span>;
+      case 'replenished':
+        return <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-800 rounded">REPLENISHED</span>;
       default:
         return null;
     }
@@ -266,6 +300,7 @@ export default function InventoryCountPage({
                       <div className="flex items-center gap-2">
                         <button
                           onClick={() => handleCountChange(catIndex, itemIndex, item.on_hand - 1)}
+                          disabled={submittingRecord}
                           className="w-12 h-12 bg-red-500 hover:bg-red-600 text-white rounded-lg font-bold text-xl shadow-md active:scale-95 transition"
                           aria-label="Decrease count"
                         >
@@ -275,14 +310,17 @@ export default function InventoryCountPage({
                         <input
                           type="number"
                           inputMode="numeric"
+                          aria-label={`On hand: ${item.name}`}
                           value={item.on_hand}
                           onChange={(e) => handleCountChange(catIndex, itemIndex, parseInt(e.target.value) || 0)}
                           className="w-16 text-center text-2xl font-bold border-2 border-gray-300 rounded-lg py-2"
                           min="0"
+                          disabled={submittingRecord}
                         />
                         
                         <button
                           onClick={() => handleCountChange(catIndex, itemIndex, item.on_hand + 1)}
+                          disabled={submittingRecord}
                           className="w-12 h-12 bg-green-500 hover:bg-green-600 textwhite rounded-lg font-bold text-xl shadow-md active:scale-95 transition"
                           aria-label="Increase count"
                         >
@@ -301,7 +339,19 @@ export default function InventoryCountPage({
         ))}
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg">
+      <section className="mx-4 mb-6 rounded-lg border border-hub-border bg-hub-surface p-4">
+        <h2 className="font-semibold text-hub-ink">Submit inventory record</h2>
+        <p className="mt-1 text-sm text-hub-ink-secondary">Save a dated record of this station’s counts for Support Services.</p>
+        <label className="mt-3 block text-sm font-medium text-hub-ink" htmlFor="inventory-record-notes">Notes (optional)</label>
+        <textarea id="inventory-record-notes" value={recordNotes} onChange={event => setRecordNotes(event.target.value)} maxLength={5000} disabled={submittedRecordId !== null} className="mt-1 w-full rounded-lg border border-hub-border p-3" rows={2} />
+        <button type="button" onClick={handleSubmitRecord} disabled={pendingChanges.size > 0 || submittingRecord || submittedRecordId !== null} className="mt-3 min-h-12 rounded-lg bg-hub-blue px-5 font-semibold text-white disabled:opacity-50 hover:bg-hub-blue-strong">
+          {submittingRecord ? 'Submitting…' : submittedRecordId !== null ? 'Inventory record submitted' : 'Submit inventory record'}
+        </button>
+        {pendingChanges.size > 0 && <p className="mt-2 text-sm text-hub-ink-secondary" role="status">Finish saving the counts before submitting.</p>}
+        {submittedRecordId !== null && <p className="mt-2 text-sm text-hub-ink-secondary" role="status">Record #{submittedRecordId} and its PDF are saved for this station.</p>}
+      </section>
+
+      <div className="border-t border-hub-border bg-hub-surface">
         <button
           onClick={() => setShowRequests(!showRequests)}
           className="w-full px-4 py-4 flex items-center justify-between text-left hover:bg-gray-50"
@@ -377,6 +427,7 @@ export default function InventoryCountPage({
                       {getRequestStatusBadge(request.status)}
                     </div>
                     <p className="text-sm text-gray-700 mb-2">{request.request_text}</p>
+                    {request.public_response && <p className="mb-2 text-sm text-hub-blue"><strong>Support Services:</strong> {request.public_response}</p>}
                     <div className="text-xs text-gray-500">
                       {new Date(request.created_at).toLocaleDateString()} {new Date(request.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </div>

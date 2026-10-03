@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use LogicException;
 
 class WorkgroupMember extends Model
 {
@@ -24,6 +25,23 @@ class WorkgroupMember extends Model
         'is_active' => 'boolean',
         'count_evaluations' => 'boolean',
     ];
+
+    protected static function booted(): void
+    {
+        static::deleting(function (WorkgroupMember $member): void {
+            if ($member->hasRetainedEvidence()) {
+                throw new LogicException('Memberships with retained evidence cannot be deleted. Deactivate the member instead.');
+            }
+        });
+    }
+
+    public function hasRetainedEvidence(): bool
+    {
+        return $this->notes()->withTrashed()->exists()
+            || $this->sharedUploads()->withTrashed()->exists()
+            || $this->submissions()->where('status', 'submitted')->exists()
+            || WorkgroupSurveyParticipant::query()->where('workgroup_member_id', $this->getKey())->whereNotNull('submitted_at')->exists();
+    }
 
     /**
      * Virtual 'name' attribute — returns the linked user's display name.
@@ -57,6 +75,8 @@ class WorkgroupMember extends Model
 
     /**
      * Get all notes created by this member.
+     *
+     * @return HasMany<WorkgroupNote, $this>
      */
     public function notes(): HasMany
     {
@@ -65,6 +85,8 @@ class WorkgroupMember extends Model
 
     /**
      * Get all shared uploads by this member.
+     *
+     * @return HasMany<WorkgroupSharedUpload, $this>
      */
     public function sharedUploads(): HasMany
     {

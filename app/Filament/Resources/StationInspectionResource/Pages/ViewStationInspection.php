@@ -5,6 +5,7 @@ namespace App\Filament\Resources\StationInspectionResource\Pages;
 use App\Filament\Resources\StationInspectionResource;
 use App\Models\StationInspection;
 use App\Models\User;
+use App\Services\OperationalEvidenceArchiveService;
 use App\Services\StationInspectionReviewService;
 use Filament\Actions;
 use Filament\Forms;
@@ -14,9 +15,31 @@ class ViewStationInspection extends ViewRecord
 {
     protected static string $resource = StationInspectionResource::class;
 
+    public function getRecord(): StationInspection
+    {
+        /** @var StationInspection $record */
+        $record = parent::getRecord();
+
+        return $record;
+    }
+
     protected function getHeaderActions(): array
     {
         return [
+            Actions\Action::make('archive')
+                ->label('Archive')
+                ->icon('heroicon-o-archive-box')
+                ->color('gray')
+                ->requiresConfirmation()
+                ->form([Forms\Components\Textarea::make('archive_reason')->label('Reason')->required()->maxLength(2000)])
+                ->visible(fn (): bool => StationInspectionResource::canEdit($this->getRecord()) && ! $this->getRecord()->isArchived())
+                ->action(fn (array $data) => app(OperationalEvidenceArchiveService::class)->archive($this->getRecord(), auth()->user(), $data['archive_reason'] ?? null)),
+            Actions\Action::make('restore')
+                ->label('Restore')
+                ->icon('heroicon-o-arrow-uturn-left')
+                ->requiresConfirmation()
+                ->visible(fn (): bool => StationInspectionResource::canEdit($this->getRecord()) && $this->getRecord()->isArchived())
+                ->action(fn () => app(OperationalEvidenceArchiveService::class)->restore($this->getRecord(), auth()->user())),
             Actions\Action::make('acknowledgeInspection')
                 ->label('Review / Acknowledge')
                 ->icon('heroicon-o-check-circle')
@@ -47,8 +70,7 @@ class ViewStationInspection extends ViewRecord
     {
         $record = $this->getRecord();
 
-        return $record instanceof StationInspection
-            && $record->review_status === 'pending_review'
+        return $record->review_status === 'pending_review'
             && StationInspectionResource::canEdit($record);
     }
 
@@ -56,7 +78,7 @@ class ViewStationInspection extends ViewRecord
     {
         $record = $this->getRecord();
         $reviewer = auth()->user();
-        abort_unless($record instanceof StationInspection && $reviewer instanceof User && $this->canReview(), 403);
+        abort_unless($reviewer instanceof User && $this->canReview(), 403);
 
         app(StationInspectionReviewService::class)->review((int) $record->getKey(), $reviewer, $status, $note);
         $record->refresh();

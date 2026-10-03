@@ -29,6 +29,6 @@ class OperationalFormDocumentPolicy
 
     public function delete(User $user, OperationalFormDocument $document): bool
     {
-        return $this->view($user, $document);
+        return false;
     }
 }

@@ -12,6 +12,7 @@ use App\Models\Employee;
 use App\Models\Station;
 use App\Models\User;
 use App\Services\ApparatusServiceTicketWorkflowService;
+use App\Services\RequestArchivalService;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -191,6 +192,30 @@ class ApparatusServiceTicketApiTest extends TestCase
             $this->assertStringNotContainsString('internal_note', $body);
             $this->assertStringNotContainsString('metadata', $body);
         }
+    }
+
+    public function test_archived_service_requests_leave_active_feed_but_keep_safe_public_history_until_restored(): void
+    {
+        $this->actingAs($this->employee, 'employee');
+        $workflow = app(ApparatusServiceTicketWorkflowService::class);
+        $ticket = $workflow->submitFromEmployee($this->employee, $this->apparatus, [
+            'client_submission_id' => '631da031-1894-41a3-a60c-3d3b78e3bd75',
+            'category' => 'electrical', 'title' => '[QA TEST] archived service request',
+            'description' => 'Service archive regression verification.', 'priority' => 'routine',
+        ])->ticket;
+        $admin = $this->makeAdmin('logistics_admin');
+        $workflow->addNote($ticket, $admin, ['public_note' => 'QA fleet update.', 'internal_note' => 'Private QA mechanic detail.']);
+        $archival = app(RequestArchivalService::class);
+        $archival->archive($ticket, $admin, 'Private QA archive reason.');
+        $this->getJson("/api/public/stations/{$this->station->id}/service-tickets?scope=open")
+            ->assertOk()->assertJsonCount(0, 'data');
+        $this->getJson("/api/public/stations/{$this->station->id}/service-tickets?scope=all")
+            ->assertOk()->assertJsonPath('data.0.ticket_number', $ticket->ticket_number)
+            ->assertJsonPath('data.0.is_open', false)
+            ->assertSee('QA fleet update.')->assertDontSee('Private QA mechanic detail.')->assertDontSee('Private QA archive reason.');
+        $archival->restore($ticket, $admin);
+        $this->getJson("/api/public/stations/{$this->station->id}/service-tickets?scope=open")
+            ->assertOk()->assertJsonPath('data.0.is_open', true);
     }
 
     public function test_completed_tickets_leave_active_notices_but_remain_in_history(): void

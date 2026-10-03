@@ -8,8 +8,10 @@ use App\Models\StationInventoryAudit;
 use App\Models\StationInventoryItem;
 use App\Models\StationSupplyRequest;
 use App\Services\Identity\AuthenticatedMemberContextResolver;
+use App\Services\StationInventorySnapshotService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
 /**
@@ -21,9 +23,9 @@ class StationInventoryV2Controller extends Controller
 {
     private function signedShift(Request $request): string
     {
-        $shift = $request->query('shift_context', $request->query('actor_shift', 'Unknown'));
+        $shift = $request->input('actor_shift', $request->query('shift_context', 'Unknown'));
 
-        return is_string($shift) && $shift !== '' ? $shift : 'Unknown';
+        return in_array($shift, ['A', 'B', 'C'], true) ? $shift : 'Unknown';
     }
 
     /**
@@ -100,50 +102,55 @@ class StationInventoryV2Controller extends Controller
             ], 422);
         }
 
-        // The client receives the StationInventoryItem primary key as `item.id`.
-        // Scope it to the station before updating so IDs cannot cross stations.
-        $stationItem = StationInventoryItem::where('station_id', $stationId)
-            ->whereKey($itemId)
-            ->with('inventoryItem')
-            ->firstOrFail();
+        $stationItem = DB::transaction(function () use ($request, $stationId, $itemId, $actor, $employee): StationInventoryItem {
+            // The client receives the StationInventoryItem primary key as `item.id`.
+            // Scope it to the station before updating so IDs cannot cross stations.
+            $stationItem = StationInventoryItem::where('station_id', $stationId)
+                ->whereKey($itemId)
+                ->with('inventoryItem')
+                ->lockForUpdate()
+                ->firstOrFail();
 
-        // Store old values for audit log
-        $oldValues = [
-            'on_hand' => $stationItem->on_hand,
-            'status' => $stationItem->status,
-        ];
-
-        // Update on_hand
-        $stationItem->on_hand = $request->on_hand;
-        $stationItem->last_updated_at = now();
-
-        // Low-stock detection logic
-        $parQuantity = $stationItem->inventoryItem->par_quantity;
-        $lowStockThreshold = (int) floor($parQuantity / 2);
-
-        if ($request->on_hand <= $lowStockThreshold && $stationItem->status !== 'ordered') {
-            $stationItem->status = 'low';
-        } elseif ($request->on_hand > $lowStockThreshold && $stationItem->status === 'low') {
-            $stationItem->status = 'ok';
-        }
-
-        $stationItem->save();
-
-        // Create audit log
-        StationInventoryAudit::create([
-            'station_id' => $stationId,
-            'inventory_item_id' => $stationItem->inventory_item_id,
-            'actor_user_id' => $actor->userId(),
-            'actor_employee_id' => $employee->getKey(),
-            'actor_name' => $employee->name,
-            'actor_shift' => $this->signedShift($request),
-            'action' => 'count_updated',
-            'from_value' => $oldValues,
-            'to_value' => [
+            // Store old values for audit log
+            $oldValues = [
                 'on_hand' => $stationItem->on_hand,
                 'status' => $stationItem->status,
-            ],
-        ]);
+            ];
+
+            // Update on_hand
+            $stationItem->on_hand = $request->on_hand;
+            $stationItem->last_updated_at = now();
+
+            // Low-stock detection logic
+            $parQuantity = $stationItem->inventoryItem->par_quantity;
+            $lowStockThreshold = (int) floor($parQuantity / 2);
+
+            if ($request->on_hand <= $lowStockThreshold && $stationItem->status !== 'ordered') {
+                $stationItem->status = 'low';
+            } elseif ($request->on_hand > $lowStockThreshold && $stationItem->status === 'low') {
+                $stationItem->status = 'ok';
+            }
+
+            $stationItem->save();
+
+            // Create audit log
+            StationInventoryAudit::create([
+                'station_id' => $stationId,
+                'inventory_item_id' => $stationItem->inventory_item_id,
+                'actor_user_id' => $actor->userId(),
+                'actor_employee_id' => $employee->getKey(),
+                'actor_name' => $employee->name,
+                'actor_shift' => $this->signedShift($request),
+                'action' => 'count_updated',
+                'from_value' => $oldValues,
+                'to_value' => [
+                    'on_hand' => $stationItem->on_hand,
+                    'status' => $stationItem->status,
+                ],
+            ]);
+
+            return $stationItem;
+        }, 3);
 
         return response()->json([
             'success' => true,
@@ -170,7 +177,7 @@ class StationInventoryV2Controller extends Controller
     public function getSupplyRequests(Request $request, int $stationId): JsonResponse
     {
         $requests = StationSupplyRequest::where('station_id', $stationId)
-            ->whereIn('status', ['open', 'ordered', 'denied'])
+            ->active()
             ->orderBy('created_at', 'desc')
             ->get()
             ->map(function ($req) {
@@ -178,6 +185,7 @@ class StationInventoryV2Controller extends Controller
                     'id' => $req->id,
                     'request_text' => $req->request_text,
                     'status' => $req->status,
+                    'public_response' => $req->public_response,
                     'created_by_name' => $req->created_by_name,
                     'created_by_shift' => $req->created_by_shift,
                     'created_at' => $req->created_at->toISOString(),
@@ -202,6 +210,7 @@ class StationInventoryV2Controller extends Controller
     ): JsonResponse {
         $actor = $memberContextResolver->resolve($request)->actor();
         $employee = $actor->requireEmployee();
+        Station::findOrFail($stationId);
 
         $validator = Validator::make($request->all(), [
             'request_text' => 'required|string|max:1000',
@@ -214,32 +223,36 @@ class StationInventoryV2Controller extends Controller
             ], 422);
         }
 
-        // Create supply request
-        $supplyRequest = StationSupplyRequest::create([
-            'station_id' => $stationId,
-            'actor_user_id' => $actor->userId(),
-            'actor_employee_id' => $employee->getKey(),
-            'request_text' => $request->request_text,
-            'status' => 'open',
-            'created_by_name' => $employee->name,
-            'created_by_shift' => $this->signedShift($request),
-        ]);
-
-        // Create audit log
-        StationInventoryAudit::create([
-            'station_id' => $stationId,
-            'inventory_item_id' => null,
-            'actor_user_id' => $actor->userId(),
-            'actor_employee_id' => $employee->getKey(),
-            'actor_name' => $employee->name,
-            'actor_shift' => $this->signedShift($request),
-            'action' => 'note_added',
-            'from_value' => null,
-            'to_value' => [
+        $supplyRequest = DB::transaction(function () use ($request, $stationId, $actor, $employee): StationSupplyRequest {
+            // Create supply request
+            $supplyRequest = StationSupplyRequest::create([
+                'station_id' => $stationId,
+                'actor_user_id' => $actor->userId(),
+                'actor_employee_id' => $employee->getKey(),
                 'request_text' => $request->request_text,
-                'request_id' => $supplyRequest->id,
-            ],
-        ]);
+                'status' => 'open',
+                'created_by_name' => $employee->name,
+                'created_by_shift' => $this->signedShift($request),
+            ]);
+
+            // Create audit log
+            StationInventoryAudit::create([
+                'station_id' => $stationId,
+                'inventory_item_id' => null,
+                'actor_user_id' => $actor->userId(),
+                'actor_employee_id' => $employee->getKey(),
+                'actor_name' => $employee->name,
+                'actor_shift' => $this->signedShift($request),
+                'action' => 'note_added',
+                'from_value' => null,
+                'to_value' => [
+                    'request_text' => $request->request_text,
+                    'request_id' => $supplyRequest->id,
+                ],
+            ]);
+
+            return $supplyRequest;
+        }, 3);
 
         return response()->json([
             'success' => true,
@@ -252,5 +265,22 @@ class StationInventoryV2Controller extends Controller
                 'created_at' => $supplyRequest->created_at->toISOString(),
             ],
         ]);
+    }
+
+    public function submitSnapshot(
+        Request $request,
+        int $stationId,
+        AuthenticatedMemberContextResolver $memberContextResolver,
+        StationInventorySnapshotService $snapshots,
+    ): JsonResponse {
+        $actor = $memberContextResolver->resolve($request)->actor();
+        $data = $request->validate([
+            'actor_shift' => ['required', 'in:A,B,C'],
+            'client_submission_id' => ['required', 'uuid'],
+            'notes' => ['nullable', 'string', 'max:5000'],
+        ]);
+        $submission = $snapshots->submit(Station::findOrFail($stationId), $actor->user(), $actor->requireEmployee(), $data);
+
+        return response()->json(['success' => true, 'submission_id' => $submission->id], 201);
     }
 }

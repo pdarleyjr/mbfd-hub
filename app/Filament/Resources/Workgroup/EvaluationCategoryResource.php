@@ -198,7 +198,7 @@ class EvaluationCategoryResource extends Resource
 
     public static function canDelete($record): bool
     {
-        return self::canCreate();
+        return self::canCreate() && ! $record->hasSubmittedEvidence();
     }
 
     public static function canView($record): bool

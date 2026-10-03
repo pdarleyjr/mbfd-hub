@@ -168,6 +168,40 @@ class ApparatusServiceTicketWorkflowService
     }
 
     /** @param array<string, mixed> $data */
+    public function addNote(ApparatusServiceTicket $ticket, User $actor, array $data): ApparatusServiceTicket
+    {
+        abort_unless($actor->can('update', $ticket), 403);
+        $validated = Validator::make($data, [
+            'public_note' => ['nullable', 'string', 'max:5000'],
+            'internal_note' => ['nullable', 'string', 'max:10000'],
+        ])->validate();
+        $public = $this->nullableTrim($validated['public_note'] ?? null);
+        $internal = $this->nullableTrim($validated['internal_note'] ?? null);
+        if ($public === null && $internal === null) {
+            throw ValidationException::withMessages(['public_note' => 'Enter a public update or an internal note.']);
+        }
+
+        return DB::transaction(function () use ($ticket, $actor, $public, $internal): ApparatusServiceTicket {
+            $locked = ApparatusServiceTicket::query()->lockForUpdate()->findOrFail($ticket->id);
+            abort_unless($actor->can('update', $locked), 403);
+            if ($public !== null) {
+                $locked->update(['current_public_response' => $public]);
+            }
+            $locked->updates()->create([
+                'previous_status' => $locked->status,
+                'status' => $locked->status,
+                'public_note' => $public,
+                'internal_note' => $internal,
+                'changed_by_user_id' => $actor->id,
+                'metadata' => ['event' => 'note_added'],
+            ]);
+            DB::afterCommit(fn () => $this->sideEffects->ticketChanged($locked, $public !== null));
+
+            return $this->load($locked);
+        }, 3);
+    }
+
+    /** @param array<string, mixed> $data */
     public function logPmService(Apparatus $apparatus, User $actor, array $data): ApparatusServiceTicketSubmissionResult
     {
         $validated = Validator::make($data, [

@@ -1,5 +1,5 @@
 <div class="space-y-4">
-    @forelse($getRecord()->updates()->orderBy('created_at', 'desc')->get() as $update)
+    @forelse($getRecord()->updates()->withTrashed()->orderBy('created_at', 'desc')->get() as $update)
         <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
             <div class="flex items-start justify-between">
                 <div class="flex items-center gap-2">
@@ -13,18 +13,26 @@
                 </div>
                 <div class="flex items-center gap-2">
                     <span class="text-xs text-gray-400">{{ $update->created_at->format('M d, Y g:i A') }}</span>
-                    @if(auth()->id() === $update->user_id || auth()->user()->role === 'admin')
+                    @if($update->trashed())
+                        <span class="text-xs text-gray-500">Trash</span>
+                    @endif
+                    @if(! $getRecord()->trashed() && auth()->user()?->can('update', $getRecord()))
+                        @if($update->trashed())
+                            <button type="button" wire:click="restoreUpdate({{ $update->id }})" wire:confirm="Restore this update?" class="text-primary-600 p-2" aria-label="Restore update">Restore</button>
+                        @else
                         <button 
                             type="button"
                             wire:click="deleteUpdate({{ $update->id }})"
-                            wire:confirm="Are you sure you want to delete this update?"
+                            wire:confirm="Move this update to Trash? It can be restored."
                             class="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20"
-                            title="Delete update"
+                            title="Move update to Trash"
+                            aria-label="Move update to Trash"
                         >
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
                             </svg>
                         </button>
+                        @endif
                     @endif
                 </div>
             </div>

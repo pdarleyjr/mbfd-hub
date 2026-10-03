@@ -38,11 +38,15 @@ const unknownApparatus = {
 
 async function mockDailySelectorApi(page: Page): Promise<void> {
   await page.route('**/images/**', (route) => {
-    if (new URL(route.request().url()).pathname === '/images/mbfd_logo-256.png') {
+    const path = new URL(route.request().url()).pathname;
+    if (path === '/images/mbfd-official-seal-256.png') {
       return route.fulfill({
-        path: resolve('public/images/mbfd_logo-256.png'),
+        path: resolve('public/images/mbfd-official-seal-256.png'),
         contentType: 'image/png',
       });
+    }
+    if (path === '/images/icons/checkout-apparatus.svg') {
+      return route.fulfill({ path: resolve('public/images/icons/checkout-apparatus.svg'), contentType: 'image/svg+xml' });
     }
 
     return route.fulfill({ status: 204 });
@@ -222,8 +226,8 @@ test('representative viewports preserve station navigation and fail closed for a
   await expectNoHorizontalOverflow(page);
 
   if (['daily-responsive-phone-390', 'daily-responsive-wide-1440'].includes(testInfo.project.name)) {
-    await page.waitForTimeout(750);
-    expect(await page.getByRole('img', { name: 'MBFD Logo' }).evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
+    const logo = page.getByRole('link', { name: 'MBFD Hub home', exact: true }).locator('img');
+    await expect.poll(() => logo.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
 
     const stationScreenshot = testInfo.outputPath(`${testInfo.project.name}-station-profile.png`);
     await page.screenshot({ path: stationScreenshot, fullPage: true });

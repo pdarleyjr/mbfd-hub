@@ -10,10 +10,12 @@ use App\Support\Workgroups\WorkgroupAccess;
 use App\Support\Workgroups\WorkgroupContext;
 use Filament\Actions\Action;
 use Filament\Pages\Page;
+use Filament\Tables\Actions\Action as TableAction;
 use Filament\Tables\Actions\DeleteAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
@@ -58,6 +60,17 @@ class SharedUploads extends Page implements HasTable
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('selectSession')
+                ->label('Choose Session')
+                ->icon('heroicon-o-calendar-days')
+                ->form([\Filament\Forms\Components\Select::make('session_id')->label('Session')->nullable()->placeholder('All sessions')
+                    ->options(fn () => WorkgroupSession::query()->where('workgroup_id', $this->currentMember()->workgroup_id)->orderByDesc('start_date')->pluck('name', 'id'))
+                    ->default(fn () => $this->selectedSession)])
+                ->action(function (array $data): void {
+                    $this->selectedSession = filled($data['session_id'] ?? null) ? (string) $data['session_id'] : null;
+                    $this->selectedSession($this->currentMember());
+                    $this->resetTable();
+                }),
             Action::make('uploadFile')
                 ->label('Upload File')
                 ->icon('heroicon-o-cloud-arrow-up')
@@ -123,18 +136,27 @@ class SharedUploads extends Page implements HasTable
                     ->dateTime('M j, Y g:i A')
                     ->sortable(),
             ])
+            ->filters([TrashedFilter::make()->label('Trash')->trueLabel('All')->falseLabel('Trash')->placeholder('Active')])
             ->actions([
                 \Filament\Tables\Actions\Action::make('download')
                     ->label('Download')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->color('gray')
-                    ->url(fn (WorkgroupSharedUpload $record) => route('workgroup.shared-upload.download', $record)),
+                    ->url(fn (WorkgroupSharedUpload $record) => route('workgroup.shared-upload.download', $record))
+                    ->visible(fn (WorkgroupSharedUpload $record): bool => ! $record->trashed()),
                 DeleteAction::make()
-                    ->label('Delete')
+                    ->label('Move to Trash')
+                    ->modalDescription('The file is retained and can be restored from Trash.')
                     ->action(function (WorkgroupSharedUpload $record): void {
                         $this->ownedUpload($record, $this->currentMember())->delete();
                     })
-                    ->visible(fn (WorkgroupSharedUpload $record) => $this->isCurrentUploader($record)),
+                    ->visible(fn (WorkgroupSharedUpload $record) => ! $record->trashed() && $this->isCurrentUploader($record)),
+                TableAction::make('restore')
+                    ->label('Restore')
+                    ->icon('heroicon-o-arrow-uturn-left')
+                    ->requiresConfirmation()
+                    ->action(fn (WorkgroupSharedUpload $record) => $this->ownedUpload($record, $this->currentMember(), withTrashed: true)->restore())
+                    ->visible(fn (WorkgroupSharedUpload $record) => $record->trashed() && $this->isCurrentUploader($record)),
             ])
             ->emptyStateHeading('No files uploaded yet')
             ->emptyStateDescription('Upload a file to share with your workgroup.');
@@ -146,7 +168,8 @@ class SharedUploads extends Page implements HasTable
         $selectedSession = $this->selectedSession($member);
 
         return app(WorkgroupAccess::class)
-            ->scopeWorkgroupRecords(WorkgroupSharedUpload::query(), $this->currentUser())
+            ->scopeWorkgroupRecords(WorkgroupSharedUpload::withTrashed(), $this->currentUser())
+            ->where(fn (Builder $uploads) => $uploads->whereNull('deleted_at')->orWhere('user_id', $this->currentUser()->id))
             ->where('workgroup_id', $member->workgroup_id)
             ->whereHas('session', fn (Builder $sessions): Builder => $sessions->where('workgroup_id', $member->workgroup_id))
             ->when($selectedSession, fn (Builder $uploads): Builder => $uploads->where('workgroup_session_id', $selectedSession->id))
@@ -248,10 +271,11 @@ class SharedUploads extends Page implements HasTable
             && $record->user_id === $this->currentUser()->id;
     }
 
-    private function ownedUpload(WorkgroupSharedUpload $record, WorkgroupMember $member): WorkgroupSharedUpload
+    private function ownedUpload(WorkgroupSharedUpload $record, WorkgroupMember $member, bool $withTrashed = false): WorkgroupSharedUpload
     {
         $upload = app(WorkgroupAccess::class)
             ->scopeWorkgroupRecords(WorkgroupSharedUpload::query(), $this->currentUser())
+            ->when($withTrashed, fn (Builder $uploads) => $uploads->withTrashed())
             ->where('workgroup_id', $member->workgroup_id)
             ->where('workgroup_member_id', $member->id)
             ->where('user_id', $this->currentUser()->id)

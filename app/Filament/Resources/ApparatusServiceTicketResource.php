@@ -9,6 +9,7 @@ use App\Enums\ApparatusServiceTicketPriority;
 use App\Enums\ApparatusServiceTicketStatus;
 use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\ApparatusServiceTicketResource\Pages;
+use App\Filament\Support\ArchiveFilter;
 use App\Models\ApparatusServiceTicket;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
@@ -77,6 +78,7 @@ class ApparatusServiceTicketResource extends Resource
                 Tables\Columns\TextColumn::make('updated_at')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)->label('Last Updated')->dateTime()->sortable(),
             ])
             ->filters([
+                ArchiveFilter::make(),
                 Tables\Filters\SelectFilter::make('station_id')->relationship('station', 'station_number')->label('Station'),
                 Tables\Filters\SelectFilter::make('apparatus_id')
                     ->relationship('apparatus', 'designation')
@@ -101,6 +103,11 @@ class ApparatusServiceTicketResource extends Resource
     public static function infolist(Infolist $infolist): Infolist
     {
         return $infolist->schema([
+            Infolists\Components\Section::make('Archive')->schema([
+                Infolists\Components\TextEntry::make('archived_at')->dateTime(),
+                Infolists\Components\TextEntry::make('archivedBy.name')->label('Archived by'),
+                Infolists\Components\TextEntry::make('archive_reason')->placeholder('No reason recorded'),
+            ])->columns(3)->visible(fn (ApparatusServiceTicket $record): bool => $record->isArchived()),
             Infolists\Components\Section::make('Service Ticket')
                 ->schema([
                     Infolists\Components\TextEntry::make('ticket_number')->label('Ticket'),

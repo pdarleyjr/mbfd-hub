@@ -252,7 +252,7 @@ jobs:
   daily-contract-integrity:
     name: Daily Checkout contract and integrity
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 65
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -283,20 +283,88 @@ jobs:
         run: npx playwright install --with-deps chromium webkit
       - name: Verify first-login Bid handoff under enforced CSP
         run: node --test tests/Browser/bid-login-handoff.mjs
-      - name: Run mocked Daily Checkout Playwright
-        env:
-          DAILY_CHECKOUT_E2E_BASE_URL: http://127.0.0.1:4176
-        run: npm run test:daily-checkout-e2e
       - name: Install PHP dependencies
         env:
           COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
         run: composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
+      - name: Build Hub assets for authenticated mobile navigation
+        env:
+          SENTRY_AUTH_TOKEN: ""
+          SENTRY_ORG: ""
+          SENTRY_PROJECT_FRONTEND: ""
+          VITE_SENTRY_DSN: ""
+          VITE_SENTRY_RELEASE: ""
+        run: npx vite build
+      - name: Publish Filament assets for authenticated browser workflows
+        run: php artisan filament:assets
+      - name: Verify Home and Daily member shell in Chromium and true iPhone WebKit
+        id: mobile-shell
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/personnel-requests/report.json
+        run: >-
+          npx playwright test tests/e2e/mobile-shell.spec.ts
+          --config=playwright.personnel-requests.config.ts
+          --project=phone-touch
+          --project=hub-shell-webkit-iphone
+          --project=desktop
+          --reporter=list,json
+      - name: Retain authenticated mobile shell evidence
+        if: ${{ always() && steps.mobile-shell.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: authenticated-mobile-shell-evidence
+          path: test-results/personnel-requests
+          retention-days: 7
+      - name: Verify real member submissions and Admin request lifecycles
+        id: member-requests
+        if: ${{ !cancelled() && steps.mobile-shell.outcome != 'skipped' }}
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/personnel-requests/report.json
+        run: >-
+          npx playwright test tests/e2e/personnel-requests.spec.ts
+          --config=playwright.personnel-requests.config.ts
+          --project=desktop
+          --grep 'real '
+          --reporter=list,json
+      - name: Retain member request lifecycle evidence
+        if: ${{ always() && steps.member-requests.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: member-request-lifecycle-evidence
+          path: test-results/personnel-requests
+          retention-days: 7
+      - name: Verify Operational Forms evidence retention
+        id: operational-evidence
+        if: ${{ !cancelled() && steps.mobile-shell.outcome != 'skipped' }}
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/operational-forms-lifecycle/report.json
+        run: >-
+          npx playwright test tests/e2e/operational-forms.spec.ts
+          --config=playwright.operational-forms.config.ts
+          --project=desktop
+          --grep '(admin archives, finds|desktop employee previews)'
+          --output=test-results/operational-forms-lifecycle
+          --reporter=list,json
+      - name: Retain Operational Forms lifecycle evidence
+        if: ${{ always() && steps.operational-evidence.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: operational-forms-lifecycle-evidence
+          path: test-results/operational-forms-lifecycle
+          retention-days: 7
+      - name: Run mocked Daily Checkout Playwright
+        if: ${{ !cancelled() && steps.mobile-shell.outcome != 'skipped' }}
+        env:
+          DAILY_CHECKOUT_E2E_BASE_URL: http://127.0.0.1:4176
+        run: npm run test:daily-checkout-e2e
       - name: Verify shared panel session-expiry handling
+        if: ${{ !cancelled() && steps.mobile-shell.outcome != 'skipped' }}
         # The browser test uses the installed Livewire client from Composer.
         run: |
           node --test tests/Node/panel-session-expiry.test.mjs
           node --test tests/Browser/panel-session-expiry.mjs
       - name: Run Daily Checkout contract and integrity tests
+        if: ${{ !cancelled() && steps.mobile-shell.outcome != 'skipped' }}
         run: >-
           php artisan test
           tests/Feature/Api/DailyCheckoutIntegrityTest.php

@@ -188,7 +188,7 @@ class CandidateProductResource extends Resource
 
     public static function canDelete($record): bool
     {
-        return self::canEdit($record);
+        return self::canEdit($record) && ! $record->hasSubmittedEvidence();
     }
 
     public static function canView($record): bool

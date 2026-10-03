@@ -30,41 +30,49 @@ class OperationalFormsE2ESeeder extends Seeder
             [
                 'name' => 'Operational Forms Test Member',
                 'rank' => 'Firefighter',
+                'city_email' => 'forms-member-fixture@miamibeachfl.gov',
+                'roster_status' => 'active',
                 'password' => Hash::make(env('OPERATIONAL_FORMS_E2E_PASSWORD', 'OperationalForms!1')),
                 'must_change_password' => false,
             ],
         );
         $canonicalUser = User::query()->firstOrNew([
-            'email' => 'forms-member@example.test',
+            'email' => $employee->city_email,
         ]);
         $canonicalUser->forceFill([
             'name' => 'Operational Forms Test Member',
             'password' => Hash::make(env('OPERATIONAL_FORMS_E2E_PASSWORD', 'OperationalForms!1')),
+            'employee_id' => $employee->employee_id,
             'employee_profile_id' => $employee->id,
             'account_status' => 'active',
             'must_change_password' => false,
         ])->save();
+        $canonicalUser->forceFill(['email_verified_at' => now()])->save();
 
         $adminEmployee = Employee::query()->updateOrCreate(
             ['employee_id' => env('OPERATIONAL_FORMS_E2E_ADMIN_EMPLOYEE_ID', 'E215')],
             [
                 'name' => 'Operational Forms Test Admin',
                 'rank' => 'Captain',
+                'city_email' => env('OPERATIONAL_FORMS_E2E_ADMIN_EMAIL', 'forms-admin-fixture@miamibeachfl.gov'),
+                'roster_status' => 'active',
                 'password' => Hash::make(env('OPERATIONAL_FORMS_E2E_ADMIN_PASSWORD', 'OperationalFormsAdmin!1')),
                 'must_change_password' => false,
             ],
         );
         $admin = User::query()->firstOrNew([
-            'email' => env('OPERATIONAL_FORMS_E2E_ADMIN_EMAIL', 'forms-admin@example.test'),
+            'email' => $adminEmployee->city_email,
         ]);
         $admin->forceFill([
             'name' => 'Operational Forms Test Admin',
             'password' => Hash::make(env('OPERATIONAL_FORMS_E2E_ADMIN_PASSWORD', 'OperationalFormsAdmin!1')),
+            'employee_id' => $adminEmployee->employee_id,
             'employee_profile_id' => $adminEmployee->id,
             'account_status' => 'active',
             'is_admin' => true,
             'must_change_password' => false,
         ])->save();
+        $admin->forceFill(['email_verified_at' => now()])->save();
         $this->ensurePermissionTables();
         $roleId = DB::table('roles')->insertGetId([
             'name' => 'admin',

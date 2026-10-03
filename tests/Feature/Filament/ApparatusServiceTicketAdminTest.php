@@ -136,6 +136,28 @@ class ApparatusServiceTicketAdminTest extends TestCase
         $this->assertCount(3, $ticket->updates);
     }
 
+    public function test_completed_ticket_archive_is_searchable_restorable_and_keeps_notes(): void
+    {
+        $ticket = $this->ticket('completed', '[QA TEST] service archive evidence', 'routine');
+        Livewire::test(ViewApparatusServiceTicket::class, ['record' => $ticket->getRouteKey()])
+            ->callAction('add_note', data: ['public_note' => 'Service history retained.', 'internal_note' => 'Private archive QA note.'])
+            ->assertHasNoActionErrors()
+            ->callAction('archive', data: ['archive_reason' => 'QA lifecycle finished.'])
+            ->assertHasNoActionErrors();
+        $this->assertTrue($ticket->refresh()->isArchived());
+        Livewire::test(ListApparatusServiceTickets::class)->call('loadTable')
+            ->filterTable('archive_state', 'active')->assertCanNotSeeTableRecords([$ticket])
+            ->filterTable('archive_state', 'archived')->searchTable('archive evidence')
+            ->assertCanSeeTableRecords([$ticket]);
+        Livewire::test(ViewApparatusServiceTicket::class, ['record' => $ticket->getRouteKey()])
+            ->assertSee('Service history retained.')->assertSee('QA lifecycle finished.')
+            ->callAction('restore_archive')->assertHasNoActionErrors();
+        Livewire::test(ListApparatusServiceTickets::class)->call('loadTable')
+            ->filterTable('archive_state', 'active')->assertCanSeeTableRecords([$ticket]);
+        $this->assertFalse($ticket->refresh()->isArchived());
+        $this->assertSame('completed', $ticket->status);
+    }
+
     public function test_training_only_user_cannot_access_service_ticket_resource(): void
     {
         $trainingRole = Role::findOrCreate('training_admin', 'web');

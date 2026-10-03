@@ -6,6 +6,8 @@ namespace Tests\Feature\HubSupport;
 
 use App\Enums\AccountStatus;
 use App\Enums\HubSupportTicketStatus;
+use App\Filament\Resources\HubSupportTicketResource\Pages\ListHubSupportTickets;
+use App\Filament\Resources\HubSupportTicketResource\Pages\ViewHubSupportTicket;
 use App\Models\HubSupportTicket;
 use App\Models\User;
 use App\Models\UserNotificationSubscription;
@@ -13,12 +15,15 @@ use App\Notifications\HubSupportMemberNotification;
 use App\Notifications\NewSubmissionNotification;
 use App\Services\HubSupport\HubSupportTicketSubmissionService;
 use App\Services\HubSupport\HubSupportTicketWorkflowService;
+use App\Services\RequestArchivalService;
+use Filament\Facades\Filament;
 use Illuminate\Contracts\Notifications\Dispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Livewire\Livewire;
 use LogicException;
 use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -386,6 +391,57 @@ final class HubSupportAuthorizationAndWorkflowTest extends TestCase
         Notification::assertSentTo($authorizedOn, NewSubmissionNotification::class);
         self::assertSame(false, UserNotificationSubscription::query()
             ->where('user_id', $authorizedOn->id)->first()->email_enabled);
+    }
+
+    public function test_support_archive_and_restore_are_reversible_searchable_and_keep_member_attachment_and_resolution(): void
+    {
+        $reporter = User::factory()->create(['account_status' => AccountStatus::Active]);
+        $ticket = app(HubSupportTicketSubmissionService::class)->submit($reporter, [
+            'client_submission_id' => 'cb53a44a-e19b-40da-b352-e45276fa2d96',
+            'description' => '[QA TEST] support archive workflow.',
+        ], [UploadedFile::fake()->image('qa-screen.png')])->ticket;
+        $manager = $this->supportManager();
+        $workflow = app(HubSupportTicketWorkflowService::class);
+        $workflow->transition($ticket, $manager, HubSupportTicketStatus::Acknowledged);
+        $workflow->transition($ticket, $manager, HubSupportTicketStatus::InProgress);
+        $workflow->transition($ticket, $manager, HubSupportTicketStatus::Resolved, ['resolution_summary' => 'QA issue resolved.']);
+        $workflow->transition($ticket, $manager, HubSupportTicketStatus::Closed);
+        $attachment = $ticket->attachments()->sole();
+        $this->actingAsCanonicalUser($manager);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        Livewire::test(ViewHubSupportTicket::class, ['record' => $ticket->getRouteKey()])
+            ->callAction('archive', data: ['archive_reason' => 'Private QA cleanup reason.'])
+            ->assertHasNoActionErrors();
+        $archival = app(RequestArchivalService::class);
+        $archival->archive($ticket, $manager, 'Retry');
+        $this->assertSame('Private QA cleanup reason.', $ticket->refresh()->archive_reason);
+        Livewire::test(ListHubSupportTickets::class)->call('loadTable')
+            ->filterTable('archive_state', 'active')->assertCanNotSeeTableRecords([$ticket])
+            ->filterTable('archive_state', 'archived')->searchTable($ticket->ticket_number)
+            ->assertCanSeeTableRecords([$ticket])
+            ->filterTable('archive_state', 'all')->assertCanSeeTableRecords([$ticket]);
+        $this->actingAsCanonicalUser($reporter)->get(route('hub-support.show', $ticket))
+            ->assertOk()->assertSee('QA issue resolved.')->assertDontSee('Private QA cleanup reason.');
+        $this->get(route('hub-support.attachments.download', $attachment))->assertOk();
+        $this->actingAsCanonicalUser($manager);
+        Livewire::test(ViewHubSupportTicket::class, ['record' => $ticket->getRouteKey()])
+            ->callAction('restore_archive')->assertHasNoActionErrors();
+        $this->assertFalse($ticket->refresh()->isArchived());
+        $this->assertSame(HubSupportTicketStatus::Closed, $ticket->status);
+        $this->assertSame('QA issue resolved.', $ticket->resolution_summary);
+        $this->assertSame(['archived', 'restored'], $ticket->updates()->get()->pluck('metadata.event')
+            ->filter(fn ($event) => in_array($event, ['archived', 'restored'], true))->values()->all());
+    }
+
+    public function test_support_view_permission_alone_cannot_archive_or_restore(): void
+    {
+        $viewer = User::factory()->create(['account_status' => AccountStatus::Active]);
+        foreach (['admin.access', 'admin.support.view'] as $permission) {
+            $viewer->givePermissionTo(Permission::findOrCreate($permission, 'web'));
+        }
+        $ticket = HubSupportTicket::factory()->create();
+        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+        app(RequestArchivalService::class)->archive($ticket, $viewer);
     }
 
     private function supportManager(): User

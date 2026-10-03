@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\OperationalForms;
 
 use App\Models\DepartmentUpdate;
+use App\Support\HubShellNavigation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -13,6 +14,28 @@ use Tests\TestCase;
 class HomeNavigationTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_member_home_uses_the_shared_brand_employee_navigation_and_stations_action(): void
+    {
+        $this->withoutVite();
+        $user = $this->actingAsCanonicalFixture();
+
+        $navigation = HubShellNavigation::forUser($user, []);
+        $this->assertSame(['home', 'checkout', 'employee', 'requests'], array_column($navigation['memberNavigation'], 'key'));
+        $this->assertSame(['Home', 'Checkout', 'Employee', 'Requests'], array_column($navigation['memberNavigation'], 'label'));
+        $this->assertSame('/employee', $navigation['memberNavigation'][2]['href']);
+
+        $this->get('/')->assertOk()
+            ->assertSee('aria-label="MBFD Hub home"', false)
+            ->assertSee('src="/images/mbfd-official-seal-256.png"', false)
+            ->assertSee('<span>Hub</span>', false)
+            ->assertSee('hub-checkout-icon', false)
+            ->assertSee('Stations')
+            ->assertSee('href="'.url('/daily/stations').'"', false)
+            ->assertDontSee('Start Daily Checkout')
+            ->assertSee('ICS Forms')
+            ->assertSee('href="'.url('/employee/forms').'"', false);
+    }
 
     public function test_entitled_home_renders_the_exact_quick_access_stack_without_pulsepoint(): void
     {

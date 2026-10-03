@@ -481,7 +481,7 @@ export default function StationDetailPage() {
           {activeTab === 'rooms' && (
             <div>
               {station.rooms && station.rooms.length > 0 ? (
-                <div className="space-y-7 stagger-list">
+                <div className="space-y-7">
                   {roomGroups.map((group) => (
                     <section key={group.key} aria-labelledby={`room-area-${group.key}`}>
                       <div className="mb-3 flex flex-wrap items-end justify-between gap-2 border-b border-hub-border pb-2">
@@ -493,7 +493,7 @@ export default function StationDetailPage() {
                           <Link
                             key={room.id}
                             to={`/stations/${station.id}/rooms/${room.id}`}
-                            className="block min-h-24 rounded-xl border border-hub-border p-4 transition-all duration-200 hover-lift hover:border-hub-blue/30 hover:bg-hub-blue/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus"
+                            className="block min-h-24 rounded-xl border border-hub-border p-4 transition-all duration-200 hover:border-hub-blue/30 hover:bg-hub-blue/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus"
                           >
                             <div className="flex items-start justify-between gap-4">
                               <div>
@@ -524,7 +524,7 @@ export default function StationDetailPage() {
             <div className="space-y-5">
               <DailyCheckoutPanel dailyCheckout={dailyCheckout} />
               {station.apparatuses && station.apparatuses.length > 0 ? (
-                <div className="stagger-list grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 2xl:gap-6">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 2xl:gap-6">
                   {station.apparatuses.map((apparatus: Apparatus) => {
                     const checkoutRow = dailyCheckoutRows.get(apparatus.id) ?? null;
                     const checkoutState = checkoutRow ? dailyCheckoutStatePresentation(checkoutRow) : null;
@@ -596,7 +596,7 @@ export default function StationDetailPage() {
               ) : tabDataLoading['gas-meters'] ? (
                 <TabSkeleton />
               ) : gasMeters.length > 0 ? (
-                <div className="space-y-3 stagger-list">
+                <div className="space-y-3">
                   {gasMeters.map((meter) => (
                     <div
                       key={meter.id}
@@ -646,7 +646,7 @@ export default function StationDetailPage() {
               ) : tabDataLoading.requests ? (
                 <TabSkeleton />
               ) : stationRequests.filter((request) => requestScope === 'all' || request.is_open).length > 0 ? (
-                <div className="space-y-3 stagger-list">
+                <div className="space-y-3">
                   {stationRequests.filter((request) => requestScope === 'all' || request.is_open).map((req) => (
                     <div
                       key={req.id}
@@ -700,7 +700,7 @@ export default function StationDetailPage() {
               ) : tabDataLoading['service-repair'] ? (
                 <TabSkeleton />
               ) : serviceTickets.filter((ticket) => serviceTicketScope === 'all' || ticket.is_open).length > 0 ? (
-                <div className="space-y-3 stagger-list">
+                <div className="space-y-3">
                   {serviceTickets.filter((ticket) => serviceTicketScope === 'all' || ticket.is_open).map((ticket) => (
                     <article key={ticket.id} className={`rounded-xl border p-4 ${ticket.priority === 'urgent' && ticket.is_open ? 'border-hub-danger/30 bg-hub-danger/10' : 'border-hub-border'}`}>
                       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
@@ -738,7 +738,7 @@ export default function StationDetailPage() {
               ) : tabDataLoading['inspections'] ? (
                 <TabSkeleton />
               ) : stationInspections.length > 0 ? (
-                <div className="space-y-3 stagger-list">
+                <div className="space-y-3">
                   {stationInspections.map((inspection) => (
                     <div
                       key={inspection.id}

@@ -13,6 +13,7 @@ use App\Models\UserNotificationSubscription;
 use App\Notifications\ApparatusServiceTicketEmployeeNotification;
 use App\Notifications\NewSubmissionNotification;
 use App\Services\ApparatusServiceTicketWorkflowService;
+use App\Services\RequestArchivalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Validation\ValidationException;
@@ -154,6 +155,8 @@ class ApparatusServiceTicketWorkflowTest extends TestCase
             'public_note' => 'Scheduled with Fleet for tomorrow.',
         ]);
         $service->transition($ticket, $this->fleetAdmin, ApparatusServiceTicketStatus::InProgress, []);
+        $service->transition($ticket, $this->fleetAdmin, ApparatusServiceTicketStatus::WaitingForParts, ['public_note' => 'Connector ordered.']);
+        $service->transition($ticket, $this->fleetAdmin, ApparatusServiceTicketStatus::InProgress, ['public_note' => 'Part received.']);
         $completed = $service->transition($ticket, $this->fleetAdmin, ApparatusServiceTicketStatus::Completed, [
             'public_note' => 'Connector repaired and function checked.',
             'resolution_summary' => 'Replaced the loose J4 connector and completed a load test.',
@@ -166,13 +169,42 @@ class ApparatusServiceTicketWorkflowTest extends TestCase
         $this->assertSame('Replaced the loose J4 connector and completed a load test.', $completed->resolution_summary);
         $this->assertSame('413.2', $completed->completed_engine_hours);
         $this->assertSame(32140, $completed->completed_miles);
-        $this->assertCount(5, $completed->updates);
+        $this->assertCount(7, $completed->updates);
         $this->assertSame('submitted', $completed->updates[0]->status);
-        $this->assertSame('completed', $completed->updates[4]->status);
+        $this->assertSame('completed', $completed->updates[6]->status);
 
         $update = $completed->updates[1];
         $this->expectException(LogicException::class);
         $update->update(['public_note' => 'History cannot be rewritten.']);
+    }
+
+    public function test_notes_archive_and_restore_preserve_status_history_and_official_apparatus_state(): void
+    {
+        $service = app(ApparatusServiceTicketWorkflowService::class);
+        $ticket = $service->submitFromEmployee($this->employee, $this->apparatus, [
+            'client_submission_id' => 'fcf7bc07-44c8-4d4d-b685-bba4a0398406',
+            'category' => 'electrical', 'title' => '[QA TEST] service archival',
+            'description' => 'Isolated service workflow archive verification.', 'priority' => 'routine',
+        ])->ticket;
+        $service->transition($ticket, $this->fleetAdmin, ApparatusServiceTicketStatus::Cancelled, ['public_note' => 'QA report cancelled.']);
+        $service->addNote($ticket, $this->fleetAdmin, ['public_note' => 'QA verification complete.', 'internal_note' => 'Private vendor detail.']);
+        $archival = app(RequestArchivalService::class);
+        $archival->archive($ticket, $this->fleetAdmin, 'QA cleanup.');
+        $archival->archive($ticket, $this->fleetAdmin, 'Retry');
+        $this->assertSame('QA cleanup.', $ticket->refresh()->archive_reason);
+        $this->assertSame('cancelled', $ticket->status);
+        $this->assertSame(4, $ticket->updates()->count());
+        $archival->restore($ticket, $this->fleetAdmin);
+        $archival->restore($ticket, $this->fleetAdmin);
+        $this->assertNull($ticket->refresh()->archived_at);
+        $this->assertSame('QA verification complete.', $ticket->current_public_response);
+        $this->assertSame('In Service', $this->apparatus->refresh()->status);
+        $this->assertSame(5, $ticket->updates()->count());
+        $last = $ticket->updates()->reorder()->latest('id')->firstOrFail();
+        $this->assertSame('restored', $last->metadata['event']);
+        $this->assertSame('QA cleanup.', $last->metadata['archive_reason']);
+        $this->expectException(LogicException::class);
+        $last->delete();
     }
 
     public function test_pm_log_creates_one_completed_ticket_and_updates_pm_fields_atomically(): void

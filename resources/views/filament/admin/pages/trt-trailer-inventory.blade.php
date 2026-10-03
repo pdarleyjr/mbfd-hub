@@ -8,6 +8,12 @@
 
         {{-- Session Selector --}}
         <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.5rem;flex-wrap:wrap;">
+            <label for="trt-visibility" style="font-size:0.875rem;font-weight:600;color:rgb(var(--hub-ink-secondary));">Visibility:</label>
+            <select id="trt-visibility" wire:model.live="archiveState" style="min-height:44px;border:1px solid rgb(var(--hub-border-strong));border-radius:0.5rem;background:rgb(var(--hub-surface));color:rgb(var(--hub-ink));">
+                <option value="active">Active</option>
+                <option value="archived">Archived</option>
+                <option value="all">All</option>
+            </select>
             <label for="session-select" style="font-size:0.875rem;font-weight:600;color:rgb(var(--hub-ink-secondary));">Session:</label>
             <select
                 id="session-select"
@@ -23,6 +29,21 @@
                 @endif
             </select>
         </div>
+
+        @if($archiveHistory !== [])
+            <details style="margin-bottom:1.5rem;">
+                <summary style="min-height:44px;cursor:pointer;">Archive history</summary>
+                <ul>
+                    @foreach($archiveHistory as $event)
+                        <li style="margin-bottom:0.75rem;">
+                            {{ $event['event_type'] === 'record_archived' ? 'Archived' : 'Restored' }}
+                            · {{ $event['actor_name'] }} · {{ \Illuminate\Support\Carbon::parse($event['created_at'])->format('M j, Y g:i A') }}
+                            <p>{{ $event['metadata']['archive_reason'] }}</p>
+                        </li>
+                    @endforeach
+                </ul>
+            </details>
+        @endif
 
         {{-- Stats Bar --}}
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.75rem;margin-bottom:1.5rem;">

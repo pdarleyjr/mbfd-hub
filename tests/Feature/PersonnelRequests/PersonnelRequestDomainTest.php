@@ -6,15 +6,22 @@ namespace Tests\Feature\PersonnelRequests;
 
 use App\Enums\PersonnelRequestStatus;
 use App\Models\Employee;
+use App\Models\PersonnelRequest;
 use App\Models\Station;
 use App\Models\Uniform;
 use App\Models\User;
+use App\Services\PersonnelRequests\PersonnelRequestFulfillmentService;
 use App\Services\PersonnelRequests\PersonnelRequestSubmissionService;
 use App\Services\PersonnelRequests\PersonnelRequestWorkflowService;
+use App\Services\RequestArchivalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 class PersonnelRequestDomainTest extends TestCase
@@ -269,6 +276,103 @@ class PersonnelRequestDomainTest extends TestCase
             $this->assertNull($request->refresh()->information_requested);
             $this->assertSame(PersonnelRequestStatus::Denied, $request->status);
         }
+    }
+
+    public function test_officer_ppe_request_completes_information_fulfillment_and_reversible_archive_without_losing_signature(): void
+    {
+        Storage::fake((string) config('filesystems.private'));
+        $officer = $this->employee('23301', 'Captain');
+        $beneficiary = $this->employee('23302', 'Firefighter');
+        $station = Station::query()->create(['station_number' => '4', 'address' => '6880 Indian Creek Dr', 'zip_code' => '33141']);
+        $admin = User::factory()->create();
+        Role::findOrCreate('logistics_admin', 'web');
+        $admin->assignRole('logistics_admin');
+        $request = app(PersonnelRequestSubmissionService::class)->submitEquipment(
+            $officer, $beneficiary, $station,
+            [['item_code' => 'bunker_coat', 'reason' => 'damaged', 'quantity' => 1]],
+            $this->signatureDataUrl(), 'ppe-archive-workflow-1',
+        );
+        $signature = $request->officer_signature_path;
+        $workflow = app(PersonnelRequestWorkflowService::class);
+        $workflow->transition($request, PersonnelRequestStatus::Acknowledged, $admin, 'PPE request acknowledged.');
+        $workflow->requestInformation($request, $admin, ['additional_explanation'], 'Describe the damaged coat.');
+        $workflow->employeeRespond($request->refresh(), $beneficiary, 'The cuff tore during training.');
+        foreach ([PersonnelRequestStatus::Ordered, PersonnelRequestStatus::Arrived, PersonnelRequestStatus::ReadyForPickup] as $status) {
+            $workflow->transition($request, $status, $admin);
+        }
+        $item = $request->items()->sole();
+        $fulfillment = app(PersonnelRequestFulfillmentService::class);
+        $assignment = $fulfillment->issueEquipment($item, $admin, now()->toDateString());
+        $retry = $fulfillment->issueEquipment($item, $admin, now()->toDateString());
+        $this->assertTrue($assignment->is($retry));
+        $workflow->transition($request, PersonnelRequestStatus::Completed, $admin, 'Your coat was issued.');
+        $workflow->addNote($request, $admin, 'Pickup confirmed.', 'QA purchasing evidence retained.');
+        $historyBefore = $request->updates()->count();
+        $archival = app(RequestArchivalService::class);
+        $archival->archive($request, $admin, 'QA workflow completed.');
+        $archival->archive($request, $admin, 'Repeated archive must not rewrite the reason.');
+        $this->assertSame('QA workflow completed.', $request->refresh()->archive_reason);
+        $this->assertSame($admin->id, $request->archived_by);
+        $this->assertSame($historyBefore + 1, $request->updates()->count());
+        $this->assertSame(0, $request->newQuery()->active()->whereKey($request->id)->count());
+        $this->assertSame(1, $request->newQuery()->archived()->whereKey($request->id)->count());
+        $archival->restore($request, $admin);
+        $archival->restore($request, $admin);
+        $this->assertFalse($request->refresh()->isArchived());
+        $this->assertSame(PersonnelRequestStatus::Completed, $request->status);
+        $this->assertSame($historyBefore + 2, $request->updates()->count());
+        $this->assertSame($signature, $request->officer_signature_path);
+        Storage::disk((string) config('filesystems.private'))->assertExists($signature);
+        $this->actingAs($beneficiary, 'employee')->get("/employee/my-requests/{$request->public_id}")
+            ->assertOk()->assertSee('Pickup confirmed.')->assertDontSee('QA purchasing evidence retained.');
+    }
+
+    public function test_denied_and_cancelled_personnel_requests_retain_terminal_state_through_archive_restore(): void
+    {
+        $employee = $this->employee('23303', 'Firefighter');
+        $admin = User::factory()->create();
+        Role::findOrCreate('logistics_admin', 'web');
+        $admin->assignRole('logistics_admin');
+        foreach ([[PersonnelRequestStatus::Denied, 'denied_at'], [PersonnelRequestStatus::Cancelled, 'cancelled_at']] as [$status, $column]) {
+            $request = app(PersonnelRequestSubmissionService::class)->submitUniform(
+                $employee, [['item_code' => 't_shirt', 'size' => 'L', 'quantity' => 1]], 'terminal-archive-'.$status->value,
+            );
+            app(PersonnelRequestWorkflowService::class)->transition($request, $status, $admin, '[QA TEST] Terminal workflow verification.');
+            $terminalAt = $request->refresh()->{$column};
+            app(RequestArchivalService::class)->archive($request, $admin);
+            app(RequestArchivalService::class)->restore($request, $admin);
+            $this->assertSame($status, $request->refresh()->status);
+            $this->assertTrue($terminalAt->equalTo($request->{$column}));
+            $this->assertDatabaseCount('assigned_equipment', 0);
+        }
+    }
+
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function test_request_archive_migration_rolls_back_and_reapplies_without_deleting_request_history(): void
+    {
+        // SQLite cannot toggle foreign keys for its table rebuild while the
+        // RefreshDatabase transaction is open. Isolate and replay as a real migration.
+        DB::connection()->commit();
+        $employee = $this->employee('23304', 'Firefighter');
+        $request = app(PersonnelRequestSubmissionService::class)->submitUniform(
+            $employee, [['item_code' => 't_shirt', 'size' => 'L', 'quantity' => 1]], 'archive-migration-retention-1',
+        );
+        $requestId = $request->id;
+        $publicId = $request->public_id;
+        $historyCount = $request->updates()->count();
+        $migration = require database_path('migrations/2026_10_03_010001_add_request_archive_metadata.php');
+        $migration->down();
+        $migration->up();
+
+        $request = PersonnelRequest::query()->findOrFail($requestId);
+        $this->assertSame($publicId, $request->public_id);
+        $this->assertSame(PersonnelRequestStatus::Pending, $request->status);
+        $this->assertSame($historyCount, $request->updates()->count());
+        $this->assertSame(1, $request->items()->count());
+        $this->assertNull($request->archived_at);
+        $this->assertNull($request->archived_by);
+        $this->assertNull($request->archive_reason);
     }
 
     private function employee(string $employeeId, string $rank): Employee

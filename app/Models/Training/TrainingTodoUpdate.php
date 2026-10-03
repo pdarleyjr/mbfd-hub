@@ -5,9 +5,12 @@ namespace App\Models\Training;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class TrainingTodoUpdate extends Model
 {
+    use SoftDeletes;
+
     protected $table = 'training_todo_updates';
 
     protected $fillable = [

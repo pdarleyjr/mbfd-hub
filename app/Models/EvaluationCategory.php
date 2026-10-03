@@ -6,6 +6,7 @@ use App\Support\Workgroups\UniversalEvaluationRubric;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use LogicException;
 
 class EvaluationCategory extends Model
 {
@@ -29,6 +30,20 @@ class EvaluationCategory extends Model
         'display_order' => 'integer',
         'finalists_limit' => 'integer',
     ];
+
+    protected static function booted(): void
+    {
+        static::deleting(function (EvaluationCategory $category): void {
+            if ($category->hasSubmittedEvidence()) {
+                throw new LogicException('Categories with submitted evaluations cannot be deleted. Deactivate the category instead.');
+            }
+        });
+    }
+
+    public function hasSubmittedEvidence(): bool
+    {
+        return $this->candidateProducts()->whereHas('submissions', fn ($submissions) => $submissions->where('status', 'submitted'))->exists();
+    }
 
     /**
      * Get all templates in this category.
@@ -79,7 +94,7 @@ class EvaluationCategory extends Model
         if ($value && in_array($value, UniversalEvaluationRubric::getAssessmentProfiles())) {
             return $value;
         }
-        
+
         // Fall back to heuristic detection from name
         return UniversalEvaluationRubric::getProfileForCategory($this->name ?? '');
     }
@@ -90,6 +105,7 @@ class EvaluationCategory extends Model
     public function getAssessmentProfileLabelAttribute(): string
     {
         $profiles = UniversalEvaluationRubric::getAssessmentProfiles();
+
         return $profiles[$this->assessment_profile] ?? 'Generic Apparatus';
     }
 
@@ -101,7 +117,7 @@ class EvaluationCategory extends Model
         if ($this->instructions_markdown) {
             return $this->instructions_markdown;
         }
-        
+
         return UniversalEvaluationRubric::getEvaluatorInstructions();
     }
 

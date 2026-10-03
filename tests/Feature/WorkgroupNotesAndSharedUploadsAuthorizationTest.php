@@ -9,10 +9,12 @@ use App\Filament\Workgroup\Pages\SharedUploads;
 use App\Models\User;
 use App\Models\Workgroup;
 use App\Models\WorkgroupMember;
+use App\Models\WorkgroupNote;
 use App\Models\WorkgroupSession;
 use App\Models\WorkgroupSharedUpload;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -203,6 +205,75 @@ class WorkgroupNotesAndSharedUploadsAuthorizationTest extends TestCase
         }
 
         $this->assertDatabaseHas('workgroup_shared_uploads', ['id' => $upload->id]);
+        Http::assertNothingSent();
+    }
+
+    public function test_owned_note_trash_and_restore_preserve_content_and_sharing_without_exposing_trash_to_recipients(): void
+    {
+        $author = User::factory()->create();
+        $context = $this->makeContext($author, 'QA');
+        $recipient = User::factory()->create();
+        WorkgroupMember::create(['workgroup_id' => $context['workgroup']->id, 'user_id' => $recipient->id, 'role' => 'member', 'is_active' => true]);
+        $this->actingAs($author);
+        Filament::setCurrentPanel(Filament::getPanel('workgroups'));
+
+        $historical = WorkgroupSession::create(['workgroup_id' => $context['workgroup']->id, 'name' => '[QA TEST] Historical session', 'status' => 'completed', 'start_date' => today()->subDay(), 'end_date' => today()->subDay()]);
+        Livewire::test(Notes::class)->callAction('selectSession', data: ['session_id' => $historical->id])
+            ->callAction('createNote', data: [
+                'title' => '[QA TEST] Shared note', 'content' => 'Retained shared evidence', 'is_shared' => true, 'shared_with_user_id' => $recipient->id,
+            ])->assertHasNoActionErrors();
+        $note = WorkgroupNote::query()->sole();
+        self::assertSame($historical->id, $note->workgroup_session_id);
+        $page = Livewire::test(Notes::class)->assertCanNotSeeTableRecords([$note])
+            ->callAction('selectSession', data: ['session_id' => $historical->id])->assertCanSeeTableRecords([$note])
+            ->callTableAction('delete', $note)->assertHasNoTableActionErrors()->assertCanNotSeeTableRecords([$note]);
+        $this->assertSoftDeleted($note);
+        $page->filterTable('trashed', '0')->assertCanSeeTableRecords([$note]);
+
+        $this->actingAs($recipient);
+        Livewire::test(Notes::class)->callAction('selectSession', data: ['session_id' => null])->filterTable('trashed', '1')->assertCanNotSeeTableRecords([$note]);
+        $this->actingAs($author);
+        Livewire::test(Notes::class)->callAction('selectSession', data: ['session_id' => $historical->id])->filterTable('trashed', '0')
+            ->callTableAction('restore', $note->getKey())->assertHasNoTableActionErrors()
+            ->filterTable('trashed', null)->assertCanSeeTableRecords([$note]);
+        self::assertSame('Retained shared evidence', $note->fresh()->content);
+        self::assertSame($recipient->id, $note->fresh()->shared_with_user_id);
+        $this->assertNotSoftDeleted($note);
+        $this->actingAs($recipient);
+        Livewire::test(Notes::class)->callAction('selectSession', data: ['session_id' => null])->assertCanSeeTableRecords([$note])
+            ->assertTableActionHidden('delete', $note)->assertTableActionHidden('restore', $note);
+        Http::assertNothingSent();
+    }
+
+    public function test_uploaded_file_trash_and_restore_retain_bytes_and_uploader_bound_discovery(): void
+    {
+        $author = User::factory()->create();
+        $context = $this->makeContext($author, 'QA');
+        $other = User::factory()->create();
+        WorkgroupMember::create(['workgroup_id' => $context['workgroup']->id, 'user_id' => $other->id, 'role' => 'member', 'is_active' => true]);
+        $this->actingAs($author);
+        Filament::setCurrentPanel(Filament::getPanel('workgroups'));
+        $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aOioAAAAASUVORK5CYII=');
+        $page = Livewire::test(SharedUploads::class)->callAction('uploadFile', data: [
+            'workgroup_session_id' => $context['session']->id,
+            'file' => UploadedFile::fake()->createWithContent('qa-evidence.png', $png),
+        ])->assertHasNoActionErrors();
+        $upload = WorkgroupSharedUpload::query()->sole();
+        $this->get(route('workgroup.shared-upload.download', $upload))->assertOk();
+        $page->call('loadTable')->assertCanSeeTableRecords([$upload])
+            ->callTableAction('delete', $upload)->assertHasNoTableActionErrors();
+        $this->assertSoftDeleted($upload);
+        self::assertSame($png, Storage::disk('local')->get($upload->filepath));
+        $this->actingAs($other);
+        Livewire::test(SharedUploads::class)->filterTable('trashed', '1')->assertCanNotSeeTableRecords([$upload]);
+        $this->get(route('workgroup.shared-upload.download', $upload))->assertNotFound();
+        $this->actingAs($author);
+        Livewire::test(SharedUploads::class)->filterTable('trashed', '0')->assertCanSeeTableRecords([$upload])
+            ->callTableAction('restore', $upload->getKey())->assertHasNoTableActionErrors()
+            ->filterTable('trashed', null)->assertCanSeeTableRecords([$upload]);
+        $this->get(route('workgroup.shared-upload.download', $upload))->assertOk();
+        self::assertSame($png, Storage::disk('local')->get($upload->filepath));
+        $this->assertNotSoftDeleted($upload);
         Http::assertNothingSent();
     }
 

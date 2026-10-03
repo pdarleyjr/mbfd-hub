@@ -271,12 +271,6 @@ parameters:
 			path: app/Filament/Resources/FireEquipmentRequestResource/Pages/ViewFireEquipmentRequest.php
 
 		-
-			message: '#^Parameter \#1 \$record of method App\\Services\\OperationalForms\\OperationalFormDeletionService\:\:deleteRecord\(\) expects App\\Models\\OperationalFormRecord, Illuminate\\Database\\Eloquent\\Model\|int\|string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Filament/Resources/OperationalFormRecordResource/Pages/ViewOperationalFormRecord.php
-
-		-
 			message: '#^Access to an undefined property App\\Models\\EquipmentItem\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\EquipmentItem\>\:\:\$stock\.$#'
 			identifier: property.notFound
 			count: 4
@@ -420,12 +414,6 @@ parameters:
 			identifier: method.notFound
 			count: 1
 			path: app/Filament/Resources/Workgroup/RelationManagers/AttendanceRelationManager.php
-
-		-
-			message: '#^Cannot access property \$id on Illuminate\\Database\\Eloquent\\Model\|int\|string\.$#'
-			identifier: property.nonObject
-			count: 1
-			path: app/Filament/Training/Resources/TrainingTodoResource/Pages/ViewTrainingTodo.php
 
 		-
 			message: '#^Comparison operation "\>" between 0 and 0 is always false\.$#'
@@ -1153,42 +1141,6 @@ parameters:
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Controllers/Api/StationInventoryController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Api/StationInventoryV2Controller.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$par_quantity\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Http/Controllers/Api/StationInventoryV2Controller.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$par_units\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Api/StationInventoryV2Controller.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$sku\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Api/StationInventoryV2Controller.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$unit_label\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Api/StationInventoryV2Controller.php
-
-		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\StationInventoryItem\>\:\:map\(\) contains unresolvable type\.$#'
-			identifier: argument.unresolvableType
-			count: 1
-			path: app/Http/Controllers/Api/StationInventoryV2Controller.php
 
 		-
 			message: '#^Expression on left side of \?\? is not nullable\.$#'
@@ -2445,18 +2397,6 @@ parameters:
 			path: app/Models/Station.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$effective_low_threshold\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Models/StationInventoryItem.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$par_quantity\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Models/StationInventoryItem.php
-
-		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
 			identifier: property.notFound
 			count: 1
@@ -2887,30 +2827,6 @@ parameters:
 			identifier: deadCode.unreachable
 			count: 1
 			path: app/Services/OperationalForms/FrocZipReader.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$created_at\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/OperationalForms/OperationalFormDeletionService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$source_revision\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Services/OperationalForms/OperationalFormDeletionService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$version_number\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/OperationalForms/OperationalFormDeletionService.php
-
-		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{disk\: string, path\: string\}, Closure\(App\\Models\\OperationalFormDocument\)\: array\{disk\: string, path\: string\} given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Services/OperationalForms/OperationalFormDeletionService.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$result\.$#'

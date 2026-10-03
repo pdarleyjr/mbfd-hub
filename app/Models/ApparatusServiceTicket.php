@@ -5,14 +5,22 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\ApparatusServiceTicketStatus;
+use App\Models\Concerns\HasArchive;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
+/**
+ * @property \Illuminate\Support\Carbon|null $archived_at
+ * @property int|null $archived_by
+ * @property string|null $archive_reason
+ */
 class ApparatusServiceTicket extends Model
 {
+    use HasArchive;
+
     protected $fillable = [
         'client_submission_id',
         'ticket_number',
@@ -127,9 +135,13 @@ class ApparatusServiceTicket extends Model
         return $this->hasMany(ApparatusServiceTicketUpdate::class)->orderBy('created_at')->orderBy('id');
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeOpen(Builder $query): Builder
     {
-        return $query->whereIn('status', ApparatusServiceTicketStatus::openValues());
+        return $query->active()->whereIn('status', ApparatusServiceTicketStatus::openValues());
     }
 
     public function scopeTerminal(Builder $query): Builder
@@ -139,6 +151,6 @@ class ApparatusServiceTicket extends Model
 
     public function getIsOpenAttribute(): bool
     {
-        return in_array($this->status, ApparatusServiceTicketStatus::openValues(), true);
+        return ! $this->isArchived() && in_array($this->status, ApparatusServiceTicketStatus::openValues(), true);
     }
 }

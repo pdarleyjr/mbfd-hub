@@ -3,12 +3,14 @@ function closeMenu(menu, restoreFocus = false) {
     if (restoreFocus) menu.querySelector('summary')?.focus();
 }
 
-document.addEventListener('click', event => {
+function closeMenusOutside(event) {
     document.querySelectorAll('[data-hub-menu][open]').forEach(menu => {
         if (!menu.contains(event.target)) closeMenu(menu);
-        else if (event.target.closest('a, button')) closeMenu(menu);
     });
-});
+}
+// iOS can omit compatibility clicks on noninteractive content outside the menu.
+document.addEventListener('pointerdown', closeMenusOutside);
+document.addEventListener('click', closeMenusOutside);
 
 document.addEventListener('keydown', event => {
     const menu = event.target.closest('[data-hub-menu]');
@@ -31,7 +33,8 @@ document.addEventListener('keydown', event => {
 
 document.addEventListener('focusout', event => {
     const menu = event.target.closest('[data-hub-menu]');
-    if (menu && !menu.contains(event.relatedTarget)) closeMenu(menu);
+    // WebKit touch activation can blur the summary before the link receives its click.
+    if (menu && event.relatedTarget && !menu.contains(event.relatedTarget)) closeMenu(menu);
 });
 
 function updateConnection() {

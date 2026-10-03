@@ -13,7 +13,7 @@ export default function StationCard({ station }: StationCardProps) {
       to={`/stations/${station.id}`}
       data-testid="daily-station-card"
       aria-label={`Open ${station.name}`}
-      className="daily-selector-card group block overflow-hidden rounded-xl bg-hub-surface shadow-sm ring-1 ring-hub-border/80 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:ring-hub-blue/30 focus:outline-none focus:ring-2 focus:ring-hub-focus focus:ring-offset-2 touch-manipulation font-hub"
+      className="daily-selector-card group block overflow-hidden rounded-xl bg-hub-surface shadow-sm ring-1 ring-hub-border/80 transition-all duration-200 hover:shadow-md hover:ring-hub-blue/30 focus:outline-none focus:ring-2 focus:ring-hub-focus focus:ring-offset-2 touch-manipulation font-hub"
     >
       {/* Station Image */}
       <div className="relative h-40 overflow-hidden bg-hub-surface-muted sm:h-48 2xl:h-56">
@@ -21,7 +21,7 @@ export default function StationCard({ station }: StationCardProps) {
           <img
             src={imageUrl}
             alt={`Station ${station.station_number}`}
-            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.02]"
+            className="h-full w-full object-cover"
             loading="lazy"
           />
         ) : (

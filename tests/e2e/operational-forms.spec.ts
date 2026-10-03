@@ -350,6 +350,102 @@ test('admin Forms resource exposes separate controlled-form tabs', async ({ page
   await expect(page.getByText('F-ROC Daily Activity Reports', { exact: true })).toBeVisible();
   await expect(page.getByText('Submitted files', { exact: true })).toBeVisible();
   await expect(page.getByText('E2E Controlled ICS 214')).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByRole('button', { name: 'Delete' }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Move to Trash' }).first()).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('operational-forms-admin-tabs-desktop.png'), fullPage: true });
+});
+
+test('admin archives, finds, trashes and restores an actual member upload without losing its document', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'One full Admin evidence lifecycle acceptance is sufficient.');
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  const title = `[QA TEST] Evidence lifecycle ${Date.now()}`;
+  await page.goto('/employee/forms');
+  await login(page, adminEmployeeId, adminPassword);
+  await expect(page).toHaveURL(/\/employee\/forms$/, { timeout: 30_000 });
+  const upload = page.locator('.of-upload-card');
+  await upload.getByLabel('File name').fill(title);
+  await upload.locator('input[type=file]').setInputFiles({
+    name: 'qa-evidence.txt', mimeType: 'text/plain', buffer: Buffer.from('[QA TEST] Retained private operational evidence'),
+  });
+  const submitted = page.waitForResponse((response) => response.url().endsWith('/employee/forms/api/uploads') && response.request().method() === 'POST');
+  await upload.getByRole('button', { name: 'Submit completed file' }).click();
+  const response = await submitted;
+  expect(response.status()).toBe(201);
+  const { record } = await response.json();
+  const documentId = record.documents[0].id;
+  await testInfo.attach('evidence-record-ids', {
+    body: Buffer.from(JSON.stringify({ recordId: record.id, documentId, title })), contentType: 'application/json',
+  });
+  await expect(page.locator('.of-record-table tbody tr').filter({ hasText: title })).toBeVisible();
+
+  const confirmAction = async (name: string, reason?: string) => {
+    await page.getByRole('button', { name, exact: true }).first().click();
+    const dialog = page.getByRole('dialog').filter({ has: page.getByRole('button', { name: /^(Confirm|Submit)$/ }) });
+    const confirm = dialog.getByRole('button', { name: /^(Confirm|Submit)$/ });
+    await expect(confirm).toBeVisible({ timeout: 30_000 });
+    if (reason) {
+      const reasonField = dialog.getByRole('textbox', { name: /Reason/ });
+      await expect(reasonField).toBeVisible({ timeout: 30_000 });
+      await reasonField.fill(reason);
+    }
+    await confirm.click();
+    await expect(confirm).toBeHidden({ timeout: 30_000 });
+  };
+  const findInVisibility = async (value: string) => {
+    if (new URL(page.url()).pathname !== '/admin/operational-forms') await page.goto('/admin/operational-forms');
+    const filters = page.locator('.fi-ta-filters-dropdown');
+    const visibility = filters.getByLabel('Visibility', { exact: true });
+    await expect(async () => {
+      if (!await visibility.isVisible()) {
+        await filters.getByRole('button', { name: /^Filters?(?: \d+)?$/i }).click({ timeout: 1_000 });
+      }
+      await expect(visibility).toBeVisible({ timeout: 1_000 });
+    }).toPass({ timeout: 10_000 });
+    await expect(visibility).toBeVisible();
+    if (await visibility.inputValue() !== value) {
+      const [filtered] = await Promise.all([
+        page.waitForResponse(response => {
+          if (new URL(response.url()).pathname !== '/livewire/update' || response.request().method() !== 'POST') return false;
+          const payload = response.request().postDataJSON() as { components?: { updates?: Record<string, unknown> }[] };
+          return payload.components?.some(component => component.updates?.['tableFilters.archive_state.value'] === value) ?? false;
+        }, { timeout: 30_000 }),
+        visibility.selectOption(value),
+      ]);
+      expect(filtered.status()).toBe(200);
+      expect(await filtered.finished()).toBeNull();
+    }
+    await page.keyboard.press('Escape');
+    await expect(page.locator('tbody tr').filter({ hasText: title })).toBeVisible({ timeout: 30_000 });
+  };
+
+  await page.goto(`/admin/operational-forms/${record.id}`);
+  await expect(page.getByText('Document history')).toBeVisible();
+  await confirmAction('Archive', '[QA TEST] Reviewed');
+  await expect(page.getByRole('button', { name: 'Restore', exact: true })).toBeVisible();
+  await findInVisibility('archived');
+  await page.goto(`/admin/operational-forms/${record.id}`);
+  await confirmAction('Restore');
+  await confirmAction('Move to Trash');
+  await expect(page).toHaveURL(/\/admin\/operational-forms$/);
+  await findInVisibility('trash');
+  await page.goto(`/admin/operational-forms/${record.id}`);
+  await expect(page.getByText('Trash', { exact: true })).toBeVisible();
+  const retained = await page.request.get(`/admin/operational-forms/documents/${documentId}/download`);
+  expect(retained.status()).toBe(200);
+  const retainedBytes = await retained.body();
+  expect(retainedBytes.toString()).toBe('[QA TEST] Retained private operational evidence');
+  await testInfo.attach('retained-operational-document', { body: retainedBytes, contentType: 'text/plain' });
+  await testInfo.attach('retained-document-metadata', {
+    body: Buffer.from(JSON.stringify({ recordId: record.id, documentId, title, retainedByteLength: retainedBytes.length })),
+    contentType: 'application/json',
+  });
+  await expect(page.getByText('Delete PDF', { exact: true })).toHaveCount(0);
+  await confirmAction('Restore');
+  await page.goto('/employee/forms');
+  await expect(page.locator('.of-record-table tbody tr').filter({ hasText: title })).toBeVisible();
+  await page.goto(`/admin/operational-forms/${record.id}`);
+  await page.screenshot({ path: testInfo.outputPath('operational-forms-archive-trash-restore.png'), fullPage: true });
+  await confirmAction('Move to Trash');
+  testInfo.annotations.push({ type: 'qa-record', description: `${record.id}; retained document ${documentId}; safely trashed` });
+  expect(errors).toEqual([]);
 });

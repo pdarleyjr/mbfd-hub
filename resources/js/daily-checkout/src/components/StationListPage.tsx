@@ -153,7 +153,7 @@ export default function StationListPage() {
         </>} />
 
       {/* Stations Grid */}
-      <div data-testid="daily-station-grid" className="daily-station-grid stagger-list grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-3 lg:gap-6 xl:grid-cols-4 2xl:grid-cols-5 2xl:gap-8">
+      <div data-testid="daily-station-grid" className="daily-station-grid grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-3 lg:gap-6 xl:grid-cols-4 2xl:grid-cols-5 2xl:gap-8">
         {stations.map((station) => (
           <StationCard key={station.id} station={station} />
         ))}

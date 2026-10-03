@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament;
 
+use App\Filament\Resources\StationInspectionResource\Pages\ListStationInspections;
 use App\Filament\Resources\StationInspectionResource\Pages\ViewStationInspection;
 use App\Models\Station;
 use App\Models\StationInspection;
@@ -106,7 +107,84 @@ final class StationInspectionReviewWorkflowTest extends TestCase
         Livewire::test(ViewStationInspection::class, ['record' => $inspection->getRouteKey()])
             ->assertSuccessful()
             ->assertActionHidden('acknowledgeInspection')
-            ->assertActionHidden('needsFollowUp');
+            ->assertActionHidden('needsFollowUp')
+            ->assertActionHidden('archive')
+            ->assertActionHidden('restore');
+    }
+
+    public function test_member_submission_checklist_signature_and_review_survive_archive_and_restore(): void
+    {
+        $station = Station::query()->create([
+            'station_number' => 91, 'address' => 'QA Test Station', 'is_active' => true,
+        ]);
+        $member = $this->actingAsCanonicalFixture('QA-STATION-EVIDENCE');
+        $signature = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aOioAAAAASUVORK5CYII=';
+        $submission = $this->postJson('/api/public/station_inspection', [
+            'station' => 'Station 91',
+            'inspection_type' => '[QA TEST] Station inspection',
+            'date' => today()->toDateString(),
+            'checklist' => [[
+                'id' => 'app_doors', 'label' => 'Apparatus Doors', 'category' => 'Apparatus Area', 'status' => 'pass',
+            ]],
+            'signature' => $signature,
+            'notes' => '[QA TEST] Original submitted evidence',
+            'sog_mandate_acknowledged' => true,
+        ])->assertCreated();
+        $inspection = StationInspection::findOrFail($submission->json('id'));
+        self::assertSame($member->id, $inspection->inspector_id);
+
+        $admin = $this->stationAdmin(manage: true);
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->withoutVite();
+        $this->get("/admin/station-inspections/{$inspection->id}")
+            ->assertOk()->assertSee('Apparatus Doors')->assertSee('src="'.$signature.'"', false);
+
+        Livewire::test(ViewStationInspection::class, ['record' => $inspection->id])
+            ->callAction('acknowledgeInspection', data: ['review_note' => '[QA TEST] Acknowledged'])
+            ->assertHasNoActionErrors()
+            ->callAction('archive', data: ['archive_reason' => ''])
+            ->assertHasActionErrors(['archive_reason' => 'required'])
+            ->callAction('archive', data: ['archive_reason' => '[QA TEST] Complete review'])
+            ->assertHasNoActionErrors()
+            ->assertActionVisible('restore');
+
+        $inspection->refresh();
+        self::assertSame($admin->id, $inspection->archived_by);
+        self::assertSame('reviewed', $inspection->review_status);
+        self::assertSame($signature, $inspection->inspector_signature);
+        self::assertSame('[QA TEST] Original submitted evidence', $inspection->notes);
+
+        Livewire::test(ListStationInspections::class)
+            ->call('loadTable')
+            ->assertCanNotSeeTableRecords([$inspection])
+            ->filterTable('archive_state', 'archived')
+            ->assertCanSeeTableRecords([$inspection])
+            ->callTableAction('restore', $inspection)->assertHasNoTableActionErrors()
+            ->filterTable('archive_state', 'active')
+            ->assertCanSeeTableRecords([$inspection]);
+        self::assertNull($inspection->fresh()->archived_at);
+        self::assertSame('[QA TEST] Acknowledged', $inspection->fresh()->review_note);
+        $archival = app(\App\Services\OperationalEvidenceArchiveService::class);
+        $history = $inspection->fresh()->archive_history;
+        self::assertCount(2, $history);
+        self::assertSame(['record_archived', 'record_restored'], array_column($history, 'event_type'));
+        self::assertSame($admin->id, $history[0]['user_id']);
+        self::assertSame('[QA TEST] Complete review', $history[1]['metadata']['archive_reason']);
+        self::assertNotEmpty($history[0]['created_at']);
+        $archival->archive($inspection, $admin, '[QA TEST] Second review');
+        $archival->archive($inspection, $admin, '[QA TEST] Duplicate archive');
+        self::assertCount(3, $inspection->archive_history);
+        self::assertSame('[QA TEST] Second review', $inspection->archive_reason);
+        $archival->restore($inspection, $admin);
+        $archival->restore($inspection, $admin);
+        self::assertCount(4, $inspection->archive_history);
+        self::assertSame('[QA TEST] Second review', $inspection->archive_history[3]['metadata']['archive_reason']);
+        self::assertSame($signature, $inspection->inspector_signature);
+        $this->get("/admin/station-inspections/{$inspection->id}")->assertOk()->assertSee('Archive history')->assertSee('[QA TEST] Second review');
+
+        $this->expectException(LogicException::class);
+        $inspection->fresh()->delete();
     }
 
     public function test_migration_preserves_and_backfills_historical_reviewed_evidence(): void
@@ -131,6 +209,22 @@ final class StationInspectionReviewWorkflowTest extends TestCase
         self::assertSame($original->notes, $historical->notes);
         self::assertSame($reviewer->id, $historical->reviewed_by);
         self::assertSame('reviewed', $historical->review_status);
+    }
+
+    public function test_station_parent_deletion_cannot_cascade_archived_inspection_evidence(): void
+    {
+        $inspection = $this->inspection();
+        app(\App\Services\OperationalEvidenceArchiveService::class)->archive($inspection, $this->stationAdmin(manage: true), '[QA TEST] retained');
+        try {
+            $inspection->station->delete();
+            self::fail('A station cannot erase archived inspection evidence through cascade deletion.');
+        } catch (LogicException $exception) {
+            self::assertStringContainsString('cannot be deleted', $exception->getMessage());
+        }
+        $this->assertDatabaseHas('station_inspections', ['id' => $inspection->id, 'notes' => 'Original evidence']);
+        $this->assertDatabaseHas('stations', ['id' => $inspection->station_id]);
+        $inspection->station->update(['is_active' => false]);
+        self::assertNotNull($inspection->fresh()->archived_at);
     }
 
     private function inspection(): StationInspection

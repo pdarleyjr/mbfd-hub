@@ -30,13 +30,13 @@ class PublicApparatusServiceTicketController extends Controller
             ->select([
                 'id', 'ticket_number', 'apparatus_id', 'station_id', 'unit_designation_snapshot',
                 'origin', 'category', 'service_type', 'title', 'priority', 'status', 'scheduled_for',
-                'scheduled_location', 'expected_return_at', 'current_public_response', 'created_at', 'updated_at',
+                'scheduled_location', 'expected_return_at', 'current_public_response', 'archived_at', 'created_at', 'updated_at',
             ])
             ->with(['updates' => fn ($query) => $query
                 ->select('id', 'apparatus_service_ticket_id', 'status', 'public_note', 'scheduled_for', 'created_at')])
             ->when(
                 ($validated['scope'] ?? 'open') === 'open',
-                fn ($query) => $query->whereIn('status', ApparatusServiceTicketStatus::openValues()),
+                fn ($query) => $query->open(),
             )
             ->when(filled($validated['status'] ?? null), fn ($query) => $query->where('status', $validated['status']))
             ->when(filled($validated['category'] ?? null), fn ($query) => $query->where('category', $validated['category']))
@@ -55,9 +55,9 @@ class PublicApparatusServiceTicketController extends Controller
             ->select([
                 'id', 'ticket_number', 'apparatus_id', 'station_id', 'unit_designation_snapshot',
                 'origin', 'category', 'service_type', 'title', 'priority', 'status', 'scheduled_for',
-                'scheduled_location', 'expected_return_at', 'current_public_response', 'created_at', 'updated_at',
+                'scheduled_location', 'expected_return_at', 'current_public_response', 'archived_at', 'created_at', 'updated_at',
             ])
-            ->whereIn('status', ApparatusServiceTicketStatus::openValues())
+            ->open()
             ->latest('created_at')
             ->limit(10)
             ->get();

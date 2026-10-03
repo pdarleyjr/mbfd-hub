@@ -5,12 +5,15 @@ namespace App\Filament\Resources;
 use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\OperationalFormRecordResource\Pages;
 use App\Models\OperationalFormRecord;
+use App\Services\OperationalEvidenceArchiveService;
 use App\Services\OperationalForms\OperationalFormDeletionService;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class OperationalFormRecordResource extends Resource
 {
@@ -60,6 +63,19 @@ class OperationalFormRecordResource extends Resource
                 Tables\Columns\TextColumn::make('latestDocument.created_at')->label('Submitted / generated')->since()->dateTimeTooltip()->placeholder('—'),
             ])
             ->filters([
+                SelectFilter::make('archive_state')->label('Visibility')->options([
+                    'active' => 'Active',
+                    'archived' => 'Archived',
+                    'trash' => 'Trash',
+                    'all' => 'All',
+                ])->default('active')->query(function (Builder $query, array $data): Builder {
+                    return match ($data['value'] ?? 'active') {
+                        'all' => $query,
+                        'trash' => $query->whereNotNull('deleted_at'),
+                        'archived' => $query->whereNull('deleted_at')->whereNotNull('archived_at'),
+                        default => $query->whereNull('deleted_at')->whereNull('archived_at'),
+                    };
+                }),
                 SelectFilter::make('form_type')->label('Form type')->options([
                     'ics_214' => 'ICS 214',
                     'froc_log_001_ff' => 'F-ROC Daily Activity Report',
@@ -69,26 +85,42 @@ class OperationalFormRecordResource extends Resource
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
+                Tables\Actions\Action::make('archive')
+                    ->label('Archive')
+                    ->icon('heroicon-o-archive-box')
+                    ->color('gray')
+                    ->requiresConfirmation()
+                    ->form([\Filament\Forms\Components\Textarea::make('archive_reason')->label('Reason')->required()->maxLength(2000)])
+                    ->visible(fn (OperationalFormRecord $record): bool => self::canDelete($record) && ! $record->isArchived() && ! $record->trashed())
+                    ->action(fn (OperationalFormRecord $record, array $data) => app(OperationalEvidenceArchiveService::class)->archive($record, auth()->user(), $data['archive_reason'] ?? null)),
+                Tables\Actions\Action::make('restore')
+                    ->label('Restore')
+                    ->icon('heroicon-o-arrow-uturn-left')
+                    ->requiresConfirmation()
+                    ->visible(fn (OperationalFormRecord $record): bool => self::canDelete($record) && ($record->isArchived() || $record->trashed()))
+                    ->action(fn (OperationalFormRecord $record) => app(OperationalEvidenceArchiveService::class)->restore($record, auth()->user())),
                 Tables\Actions\Action::make('delete')
-                    ->label('Delete')
+                    ->label('Move to Trash')
                     ->icon('heroicon-o-trash')
                     ->color('danger')
                     ->requiresConfirmation()
-                    ->modalHeading('Delete this form and all files?')
-                    ->modalDescription('This permanently deletes the record, every generated PDF or uploaded file, and its version history. This cannot be undone.')
-                    ->action(fn (OperationalFormRecord $record) => app(OperationalFormDeletionService::class)->deleteRecord($record)),
+                    ->modalHeading('Move this form to Trash?')
+                    ->modalDescription('The form leaves active work. Documents and version history are retained and can be restored from the Trash filter.')
+                    ->visible(fn (OperationalFormRecord $record): bool => self::canDelete($record) && ! $record->trashed())
+                    ->action(fn (OperationalFormRecord $record) => app(OperationalFormDeletionService::class)->deleteRecord($record, auth()->user())),
             ])
             ->bulkActions([
                 Tables\Actions\BulkAction::make('delete')
-                    ->label('Delete selected')
+                    ->label('Move selected to Trash')
                     ->icon('heroicon-o-trash')
                     ->color('danger')
                     ->requiresConfirmation()
-                    ->modalHeading('Delete selected forms and files?')
-                    ->modalDescription('This permanently deletes every selected record and all associated files. This cannot be undone.')
+                    ->modalHeading('Move selected forms to Trash?')
+                    ->modalDescription('Documents and version history are retained. Use the Trash filter to find and restore these forms.')
+                    ->visible(fn (): bool => auth()->user()?->can('admin.forms.manage') ?? false)
                     ->action(function ($records): void {
                         $records->each(
-                            fn (OperationalFormRecord $record) => app(OperationalFormDeletionService::class)->deleteRecord($record),
+                            fn (OperationalFormRecord $record) => app(OperationalFormDeletionService::class)->deleteRecord($record, auth()->user()),
                         );
                     })
                     ->deselectRecordsAfterCompletion(),
@@ -114,6 +146,11 @@ class OperationalFormRecordResource extends Resource
     public static function canDelete($record): bool
     {
         return auth()->user()?->can('admin.forms.manage') ?? false;
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->withoutGlobalScopes([SoftDeletingScope::class]);
     }
 
     public static function getPages(): array

@@ -8,6 +8,7 @@ use App\Enums\PersonnelRequestStatus;
 use App\Enums\PersonnelRequestType;
 use App\Filament\Clusters\PersonnelUniformsEquipment;
 use App\Filament\Clusters\PersonnelUniformsEquipment\Resources\PersonnelRequestResource\Pages;
+use App\Filament\Support\ArchiveFilter;
 use App\Models\PersonnelRequest;
 use Filament\Infolists\Components\Grid;
 use Filament\Infolists\Components\RepeatableEntry;
@@ -51,6 +52,7 @@ class PersonnelRequestResource extends Resource
             TextColumn::make('items_count')->counts('items')->label('Items')->alignCenter(),
             TextColumn::make('created_at')->label('Submitted')->dateTime('M j, Y g:i A')->sortable(),
         ])->filters([
+            ArchiveFilter::make(),
             SelectFilter::make('type')->options(['uniform' => 'Uniform', 'equipment' => 'Personnel Equipment']),
             SelectFilter::make('status')->options(collect(PersonnelRequestStatus::cases())->mapWithKeys(fn ($status) => [$status->value => $status->label()])->all())->multiple(),
         ])->actions([ViewAction::make()])->bulkActions([])->defaultSort('created_at', 'desc')->poll('30s');
@@ -59,6 +61,11 @@ class PersonnelRequestResource extends Resource
     public static function infolist(Infolist $infolist): Infolist
     {
         return $infolist->schema([
+            Section::make('Archive')->schema([
+                TextEntry::make('archived_at')->dateTime(),
+                TextEntry::make('archivedBy.name')->label('Archived by'),
+                TextEntry::make('archive_reason')->placeholder('No reason recorded'),
+            ])->columns(3)->visible(fn (PersonnelRequest $record): bool => $record->isArchived()),
             Section::make('Request chain of custody')->schema([
                 Grid::make(3)->schema([
                     TextEntry::make('request_number')->label('Request number')->weight('bold'),

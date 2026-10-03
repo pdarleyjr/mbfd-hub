@@ -15,7 +15,7 @@
 <header class="hub-shell-bar" data-hub-shell>
     <div class="hub-shell-bar__inner">
         <a href="/" class="hub-shell-brand" aria-label="MBFD Hub home">
-            <img src="/images/mbfd_logo-256.png" alt="" width="32" height="32"><span>MBFD Hub</span>
+            <img src="/images/mbfd-official-seal-256.png" alt="" width="32" height="32"><span>Hub</span>
         </a>
         <x-hub.app-switcher :navigation="$navigation" :module="$module" />
         <span class="hub-shell-connection" data-hub-connection role="status">Connected</span>

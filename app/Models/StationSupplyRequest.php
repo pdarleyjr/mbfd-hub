@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasArchive;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class StationSupplyRequest extends Model
 {
+    use HasArchive;
+
     protected $fillable = [
         'station_id',
         'actor_user_id',
@@ -16,6 +19,7 @@ class StationSupplyRequest extends Model
         'created_by_name',
         'created_by_shift',
         'admin_notes',
+        'public_response',
     ];
 
     protected $casts = [
@@ -36,7 +40,7 @@ class StationSupplyRequest extends Model
      */
     public function scopeOpen($query)
     {
-        return $query->where('status', 'open');
+        return $query->active()->where('status', 'open');
     }
 
     /**

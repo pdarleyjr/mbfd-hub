@@ -41,7 +41,7 @@ final class HubShellNavigation
                 if ($key === 'employee') {
                     $navigation['memberNavigation'] = [...$navigation['memberNavigation'],
                         ['key' => 'checkout', 'label' => 'Checkout', 'href' => '/daily/stations'],
-                        ['key' => 'forms', 'label' => 'Forms', 'href' => '/employee/forms'],
+                        ['key' => 'employee', 'label' => 'Employee', 'href' => '/employee'],
                         ['key' => 'requests', 'label' => 'Requests', 'href' => '/employee/my-requests'],
                     ];
                 }

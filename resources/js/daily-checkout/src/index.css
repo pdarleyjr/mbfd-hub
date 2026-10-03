@@ -185,16 +185,16 @@ a {
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: rgb(var(--hub-surface-muted));
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #888;
+  background: rgb(var(--hub-muted));
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  background: rgb(var(--hub-ink-secondary));
 }
 
 /* MBFD Mobile-First Touch Optimizations */
@@ -216,12 +216,10 @@ textarea {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #FFFFFF;
-  color: #0F172A;
-  /* White background, Slate-900 text */
-  border: 2px solid #E2E8F0;
+  background: rgb(var(--hub-surface));
+  color: rgb(var(--hub-ink));
+  border: 2px solid rgb(var(--hub-border-soft));
   border-radius: 8px;
-  /* Slate-200 border */
   font-size: 1.5rem;
   font-weight: 700;
   cursor: pointer;
@@ -234,19 +232,17 @@ textarea {
 
 .stepper-btn:active {
   background: rgb(var(--hub-action-primary));
-  color: #FFFFFF;
+  color: rgb(var(--hub-surface));
   border-color: rgb(var(--hub-action-primary));
 }
 
 .stepper-input {
   min-height: 44px;
   text-align: center;
-  background: #FFFFFF;
-  color: #0F172A;
-  /* White background, Slate-900 text */
-  border: 2px solid #E2E8F0;
+  background: rgb(var(--hub-surface));
+  color: rgb(var(--hub-ink));
+  border: 2px solid rgb(var(--hub-border-soft));
   border-radius: 8px;
-  /* Slate-200 border */
   font-size: 1.25rem;
   font-weight: 600;
   width: 4rem;
@@ -260,33 +256,6 @@ textarea {
   border-color: rgb(var(--hub-focus));
   box-shadow: 0 0 0 3px rgb(var(--hub-focus) / .2);
 }
-
-/* ===== STAGGER REVEAL FOR LIST ITEMS ===== */
-@keyframes fadeSlideUp {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.stagger-list > * {
-  opacity: 0;
-  animation: fadeSlideUp 0.3s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
-}
-.stagger-list > *:nth-child(1) { animation-delay: 0ms; }
-.stagger-list > *:nth-child(2) { animation-delay: 60ms; }
-.stagger-list > *:nth-child(3) { animation-delay: 120ms; }
-.stagger-list > *:nth-child(4) { animation-delay: 180ms; }
-.stagger-list > *:nth-child(5) { animation-delay: 240ms; }
-.stagger-list > *:nth-child(6) { animation-delay: 300ms; }
-.stagger-list > *:nth-child(7) { animation-delay: 360ms; }
-.stagger-list > *:nth-child(8) { animation-delay: 420ms; }
-.stagger-list > *:nth-child(9) { animation-delay: 480ms; }
-.stagger-list > *:nth-child(10) { animation-delay: 540ms; }
-.stagger-list > *:nth-child(11) { animation-delay: 600ms; }
-.stagger-list > *:nth-child(12) { animation-delay: 660ms; }
-.stagger-list > *:nth-child(13) { animation-delay: 720ms; }
-.stagger-list > *:nth-child(14) { animation-delay: 780ms; }
-.stagger-list > *:nth-child(15) { animation-delay: 840ms; }
-.stagger-list > *:nth-child(n+16) { animation-delay: 900ms; }
 
 /* ===== SKELETON SHIMMER ===== */
 @keyframes shimmer {
@@ -310,14 +279,6 @@ textarea {
 }
 
 /* ===== PHASE 4: MICRO-INTERACTIONS & FEEDBACK ===== */
-
-/* 4.1 Button Press Feedback */
-button:active, [role="button"]:active {
-  transform: scale(0.97);
-  transition: transform 100ms cubic-bezier(0.25, 1, 0.5, 1);
-}
-
-.daily-shell button:active, .daily-shell [role="button"]:active { transform: none; }
 
 /* 4.4 Focus-Visible Ring System */
 *:focus-visible {
@@ -352,13 +313,6 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 @media (pointer: coarse) {
   button, [role="button"] { min-height: 48px; }
 }
-@media (hover: hover) {
-  .hover-lift:hover { transform: translateY(-2px); }
-}
-@media (hover: none) {
-  .hover-lift:hover { transform: none; }
-}
-
 /* 6.2 Safe Area Support */
 header, .fi-topbar { padding-top: max(0px, env(safe-area-inset-top)); }
 footer, .bottom-bar { padding-bottom: max(0.5rem, env(safe-area-inset-bottom)); }

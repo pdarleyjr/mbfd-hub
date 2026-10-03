@@ -77,14 +77,20 @@ const serviceWorkerCopyPlugin = {
 }
 
 // Laravel serves the canonical Hub manifest at the origin root. The isolated
-// Daily preview must expose that same asset for the real worker's install step.
+// Daily preview exposes it and the shared brand assets from Laravel's public root.
 const hubManifestPreviewPlugin = {
   name: 'hub-manifest-preview',
   configurePreviewServer(server) {
     server.middlewares.use((request, response, next) => {
-      if (request.url !== '/manifest.json') return next()
-      response.setHeader('Content-Type', 'application/manifest+json')
-      response.end(fs.readFileSync(path.join(__dirname, '../../../public/manifest.json')))
+      const assets = {
+        '/manifest.json': ['manifest.json', 'application/manifest+json'],
+        '/images/mbfd-official-seal-256.png': ['images/mbfd-official-seal-256.png', 'image/png'],
+        '/images/icons/checkout-apparatus.svg': ['images/icons/checkout-apparatus.svg', 'image/svg+xml'],
+      }
+      const asset = assets[request.url]
+      if (!asset) return next()
+      response.setHeader('Content-Type', asset[1])
+      response.end(fs.readFileSync(path.join(__dirname, '../../../public', asset[0])))
     })
   }
 }

@@ -108,7 +108,7 @@ export default function VehicleInspectionSelect() {
         </div>
       </div>
 
-      <div className="stagger-list grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 2xl:gap-6">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 2xl:gap-6">
         {filteredApparatuses.map((apparatus) => {
           // Handle null slug (e.g., "Captain 5") — skip or show disabled
           if (!apparatus.slug) {
@@ -139,7 +139,7 @@ export default function VehicleInspectionSelect() {
             <Link
               key={apparatus.id}
               to={`/vehicle-inspections/${apparatus.slug}`}
-              className="block min-h-24 rounded-xl bg-hub-surface p-5 shadow-sm ring-1 ring-hub-border/80 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:ring-hub-blue/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus"
+              className="block min-h-24 rounded-xl bg-hub-surface p-5 shadow-sm ring-1 ring-hub-border/80 transition-all duration-200 hover:shadow-md hover:ring-hub-blue/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus"
             >
               <div className="flex items-center gap-4">
                 <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg bg-hub-blue/10 text-lg font-bold text-hub-blue">

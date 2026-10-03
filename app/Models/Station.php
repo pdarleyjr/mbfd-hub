@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use LogicException;
 
 class Station extends Model
 {
@@ -25,6 +26,15 @@ class Station extends Model
         'latitude' => 'decimal:8',
         'longitude' => 'decimal:8',
     ];
+
+    protected static function booted(): void
+    {
+        static::deleting(function (Station $station): void {
+            if (StationInspection::query()->where('station_id', $station->getKey())->exists()) {
+                throw new LogicException('Stations with submitted inspection evidence cannot be deleted. Deactivate the station instead.');
+            }
+        });
+    }
 
     /**
      * Get the station name (alias for station_number)
@@ -205,6 +215,8 @@ class Station extends Model
 
     /**
      * Get canonical repair/service and station equipment requests.
+     *
+     * @return HasMany<StationRequest, $this>
      */
     public function stationRequests(): HasMany
     {

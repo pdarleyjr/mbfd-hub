@@ -21,6 +21,7 @@ use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
@@ -66,6 +67,17 @@ class Notes extends Page implements HasTable
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('selectSession')
+                ->label('Choose Session')
+                ->icon('heroicon-o-calendar-days')
+                ->form([Select::make('session_id')->label('Session')->nullable()->placeholder('All sessions')
+                    ->options(fn () => WorkgroupSession::query()->where('workgroup_id', $this->currentMember()->workgroup_id)->orderByDesc('start_date')->pluck('name', 'id'))
+                    ->default(fn () => $this->selectedSession)])
+                ->action(function (array $data): void {
+                    $this->selectedSession = filled($data['session_id'] ?? null) ? (string) $data['session_id'] : null;
+                    $this->selectedSession($this->currentMember());
+                    $this->resetTable();
+                }),
             Action::make('createNote')
                 ->label('New Note')
                 ->icon('heroicon-o-plus-circle')
@@ -162,7 +174,13 @@ class Notes extends Page implements HasTable
                     ->dateTime('M j, Y g:i A')
                     ->sortable(),
             ])
+            ->filters([TrashedFilter::make()->label('Trash')->trueLabel('All')->falseLabel('Trash')->placeholder('Active')])
             ->actions([
+                \Filament\Tables\Actions\ViewAction::make()->infolist([
+                    \Filament\Infolists\Components\TextEntry::make('title'),
+                    \Filament\Infolists\Components\TextEntry::make('content')->html(),
+                    \Filament\Infolists\Components\TextEntry::make('deleted_at')->label('Moved to Trash')->dateTime()->placeholder('Active'),
+                ]),
                 TableAction::make('share')
                     ->label('Share')
                     ->icon('heroicon-o-share')
@@ -194,7 +212,7 @@ class Notes extends Page implements HasTable
 
                         $this->ownedNote($record, $member)->update($this->sharingAttributes($data, $member));
                     })
-                    ->visible(fn (WorkgroupNote $record) => $record->workgroup_member_id === $this->currentMember()->id),
+                    ->visible(fn (WorkgroupNote $record) => ! $record->trashed() && $record->workgroup_member_id === $this->currentMember()->id),
                 EditAction::make()
                     ->label('Edit')
                     ->form($this->getNoteFormSchema())
@@ -210,12 +228,20 @@ class Notes extends Page implements HasTable
                             ...$this->sharingAttributes($data, $member),
                         ]);
                     })
-                    ->visible(fn (WorkgroupNote $record) => $record->workgroup_member_id === $this->currentMember()->id),
+                    ->visible(fn (WorkgroupNote $record) => ! $record->trashed() && $record->workgroup_member_id === $this->currentMember()->id),
                 DeleteAction::make()
+                    ->label('Move to Trash')
+                    ->modalDescription('The note can be found in Trash and restored with its sharing settings intact.')
                     ->action(function (WorkgroupNote $record): void {
                         $this->ownedNote($record, $this->currentMember())->delete();
                     })
-                    ->visible(fn (WorkgroupNote $record) => $record->workgroup_member_id === $this->currentMember()->id),
+                    ->visible(fn (WorkgroupNote $record) => ! $record->trashed() && $record->workgroup_member_id === $this->currentMember()->id),
+                TableAction::make('restore')
+                    ->label('Restore')
+                    ->icon('heroicon-o-arrow-uturn-left')
+                    ->requiresConfirmation()
+                    ->action(fn (WorkgroupNote $record) => $this->ownedNote($record, $this->currentMember(), withTrashed: true)->restore())
+                    ->visible(fn (WorkgroupNote $record) => $record->trashed() && $record->workgroup_member_id === $this->currentMember()->id),
             ])
             ->emptyStateHeading('No notes yet')
             ->emptyStateDescription('Create your first note to get started. You can also share notes with your workgroup members.');
@@ -228,23 +254,25 @@ class Notes extends Page implements HasTable
         $selectedSession = $this->selectedSession($member);
 
         // Show: own notes + notes shared with me (directly or to everyone in my workgroup)
-        $query = $this->notesForCurrentWorkgroup($member)->where(function (Builder $q) use ($member, $userId) {
-            // My own notes
-            $q->where('workgroup_member_id', $member->id);
+        $query = $this->notesForCurrentWorkgroup($member)->withTrashed()
+            ->where(fn (Builder $notes) => $notes->whereNull('deleted_at')->orWhere('workgroup_member_id', $member->id))
+            ->where(function (Builder $q) use ($member, $userId) {
+                // My own notes
+                $q->where('workgroup_member_id', $member->id);
 
-            // Notes shared with me specifically
-            $q->orWhere(function (Builder $shared) use ($userId) {
-                $shared->where('is_shared', true)
-                    ->where('shared_with_user_id', $userId);
-            });
+                // Notes shared with me specifically
+                $q->orWhere(function (Builder $shared) use ($userId) {
+                    $shared->where('is_shared', true)
+                        ->where('shared_with_user_id', $userId);
+                });
 
-            // Notes shared with everyone in my workgroup
-            $q->orWhere(function (Builder $sharedAll) use ($member) {
-                $sharedAll->where('is_shared', true)
-                    ->whereNull('shared_with_user_id')
-                    ->whereHas('member', fn (Builder $mq) => $mq->where('workgroup_id', $member->workgroup_id));
+                // Notes shared with everyone in my workgroup
+                $q->orWhere(function (Builder $sharedAll) use ($member) {
+                    $sharedAll->where('is_shared', true)
+                        ->whereNull('shared_with_user_id')
+                        ->whereHas('member', fn (Builder $mq) => $mq->where('workgroup_id', $member->workgroup_id));
+                });
             });
-        });
 
         if ($selectedSession) {
             $query->where('workgroup_session_id', $selectedSession->id);
@@ -326,9 +354,10 @@ class Notes extends Page implements HasTable
             });
     }
 
-    private function ownedNote(WorkgroupNote $record, WorkgroupMember $member): WorkgroupNote
+    private function ownedNote(WorkgroupNote $record, WorkgroupMember $member, bool $withTrashed = false): WorkgroupNote
     {
         $note = $this->notesForCurrentWorkgroup($member)
+            ->when($withTrashed, fn (Builder $notes) => $notes->withTrashed())
             ->where('workgroup_member_id', $member->id)
             ->find($record->getKey());
 

@@ -49,7 +49,7 @@ class PublicStationRequestController extends Controller
                 'updates' => fn ($query) => $query->select('id', 'station_request_id', 'status', 'public_note', 'created_at')
                     ->where(fn ($nested) => $nested->whereNotNull('public_note')->orWhereNotNull('status')),
             ])
-            ->when(($validated['scope'] ?? 'open') === 'open', fn ($query) => $query->whereIn('status', StationRequestStatus::openValues()))
+            ->when(($validated['scope'] ?? 'open') === 'open', fn ($query) => $query->open())
             ->when(filled($validated['status'] ?? null), fn ($query) => $query->where('status', $validated['status']))
             ->when(filled($validated['request_type'] ?? null), fn ($query) => $query->where('request_type', $validated['request_type']))
             ->when(filled($validated['room_id'] ?? null), fn ($query) => $query->where('room_id', $validated['room_id']))

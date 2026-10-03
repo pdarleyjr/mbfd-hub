@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\HubSupportTicketCategory;
 use App\Enums\HubSupportTicketImpact;
 use App\Enums\HubSupportTicketStatus;
+use App\Models\Concerns\HasArchive;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -44,6 +45,9 @@ use Illuminate\Support\Carbon;
  * @property \Illuminate\Support\Carbon|null $started_at
  * @property \Illuminate\Support\Carbon|null $resolved_at
  * @property \Illuminate\Support\Carbon|null $closed_at
+ * @property \Illuminate\Support\Carbon|null $archived_at
+ * @property int|null $archived_by
+ * @property string|null $archive_reason
  * @property-read User $reporter
  * @property-read Employee|null $reportedByEmployee
  * @property-read User|null $assignedTo
@@ -52,6 +56,8 @@ use Illuminate\Support\Carbon;
  */
 final class HubSupportTicket extends Model
 {
+    use HasArchive;
+
     /** @use HasFactory<\Database\Factories\HubSupportTicketFactory> */
     use HasFactory;
 
@@ -133,8 +139,12 @@ final class HubSupportTicket extends Model
         return $this->hasMany(HubSupportTicketAttachment::class)->orderBy('created_at')->orderBy('id');
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeOpen(Builder $query): Builder
     {
-        return $query->whereNotIn('status', [HubSupportTicketStatus::Resolved->value, HubSupportTicketStatus::Closed->value]);
+        return $query->active()->whereNotIn('status', [HubSupportTicketStatus::Resolved->value, HubSupportTicketStatus::Closed->value]);
     }
 }

@@ -12,6 +12,8 @@ use Filament\Tables;
 use Filament\Tables\Columns\Layout\Split;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Str;
 
 class TrainingTodoResource extends Resource
@@ -104,7 +106,8 @@ class TrainingTodoResource extends Resource
                             $desc = Str::of(strip_tags($record->description ?? ''))->squish()->limit(90);
                             $assigned = $record->assignees->pluck('name')->filter()->join(', ');
                             $meta = $assigned ? "👤 {$assigned}" : null;
-                            return trim($desc . ($meta ? "\n{$meta}" : ''));
+
+                            return trim($desc.($meta ? "\n{$meta}" : ''));
                         }),
                     TextColumn::make('assignee_names')
                         ->label('Assigned To')
@@ -130,6 +133,7 @@ class TrainingTodoResource extends Resource
                 ])->from('md'),
             ])
             ->filters([
+                Tables\Filters\TrashedFilter::make()->label('Trash')->trueLabel('All')->falseLabel('Trash')->placeholder('Active'),
                 Tables\Filters\SelectFilter::make('status')
                     ->options([
                         'pending' => 'Pending',
@@ -151,12 +155,14 @@ class TrainingTodoResource extends Resource
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\EditAction::make()->visible(fn (TrainingTodo $record): bool => ! $record->trashed() && static::canEdit($record)),
+                Tables\Actions\DeleteAction::make()->label('Move to Trash')
+                    ->modalDescription('The task, attachments, and update history are retained and can be restored from Trash.'),
+                Tables\Actions\RestoreAction::make(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make()->label('Move selected to Trash'),
                 ]),
             ])
             ->defaultSort('status', 'asc')
@@ -171,5 +177,15 @@ class TrainingTodoResource extends Resource
             'view' => Pages\ViewTrainingTodo::route('/{record}'),
             'edit' => Pages\EditTrainingTodo::route('/{record}/edit'),
         ];
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->withoutGlobalScopes([SoftDeletingScope::class]);
+    }
+
+    public static function canEdit($record): bool
+    {
+        return ! $record->trashed() && parent::canEdit($record);
     }
 }

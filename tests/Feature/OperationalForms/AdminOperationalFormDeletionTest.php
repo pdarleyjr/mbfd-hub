@@ -4,15 +4,22 @@ declare(strict_types=1);
 
 namespace Tests\Feature\OperationalForms;
 
+use App\Filament\Resources\OperationalFormRecordResource\Pages\ListOperationalFormRecords;
+use App\Filament\Resources\OperationalFormRecordResource\Pages\ViewOperationalFormRecord;
 use App\Models\Employee;
 use App\Models\OperationalFormDocument;
+use App\Models\OperationalFormEvent;
 use App\Models\OperationalFormRecord;
 use App\Models\User;
+use App\Services\OperationalEvidenceArchiveService;
+use Filament\Facades\Filament;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
+use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -31,7 +38,7 @@ class AdminOperationalFormDeletionTest extends TestCase
         Storage::fake($this->disk);
     }
 
-    public function test_each_admin_role_can_delete_draft_and_completed_records_with_private_files(): void
+    public function test_each_admin_role_can_trash_and_restore_drafts_and_completed_records_without_removing_evidence(): void
     {
         foreach (['super_admin', 'admin', 'logistics_admin'] as $index => $roleName) {
             $admin = $this->admin($roleName);
@@ -41,9 +48,13 @@ class AdminOperationalFormDeletionTest extends TestCase
                 ->delete('/admin/operational-forms/records/'.$record->id)
                 ->assertNoContent();
 
-            $this->assertDatabaseMissing('operational_form_records', ['id' => $record->id]);
-            $this->assertDatabaseMissing('operational_form_documents', ['id' => $document->id]);
-            Storage::disk($this->disk)->assertMissing($document->storage_path);
+            $this->assertSoftDeleted($record);
+            $this->assertDatabaseHas('operational_form_documents', ['id' => $document->id]);
+            $this->assertDatabaseHas('operational_form_events', ['form_record_id' => $record->id, 'event_type' => 'record_trashed']);
+            Storage::disk($this->disk)->assertExists($document->storage_path);
+            app(OperationalEvidenceArchiveService::class)->restore($record, $admin);
+            $this->assertNotSoftDeleted($record);
+            self::assertSame(1, $record->fresh()->latest_pdf_version);
             auth('web')->logout();
         }
 
@@ -60,7 +71,7 @@ class AdminOperationalFormDeletionTest extends TestCase
         $this->actingAsCanonicalUser($this->admin('admin'))
             ->delete('/admin/operational-forms/records/'.$draft->id)
             ->assertNoContent();
-        $this->assertDatabaseMissing('operational_form_records', ['id' => $draft->id]);
+        $this->assertSoftDeleted($draft);
     }
 
     public function test_non_admin_cannot_delete_records_or_documents(): void
@@ -78,7 +89,7 @@ class AdminOperationalFormDeletionTest extends TestCase
         Storage::disk($this->disk)->assertExists($document->storage_path);
     }
 
-    public function test_admin_can_delete_one_pdf_version_and_record_state_is_reconciled(): void
+    public function test_document_versions_cannot_be_permanently_deleted_through_the_normal_admin_route(): void
     {
         $admin = $this->admin('admin');
         [$record, $first] = $this->recordWithDocument();
@@ -87,21 +98,120 @@ class AdminOperationalFormDeletionTest extends TestCase
 
         $this->actingAsCanonicalUser($admin)
             ->delete('/admin/operational-forms/documents/'.$second->id)
-            ->assertNoContent();
+            ->assertForbidden();
 
         $record->refresh();
-        $this->assertSame(1, $record->latest_pdf_version);
+        $this->assertSame(2, $record->latest_pdf_version);
         $this->assertSame('completed', $record->status);
-        Storage::disk($this->disk)->assertMissing($second->storage_path);
+        Storage::disk($this->disk)->assertExists($second->storage_path);
         Storage::disk($this->disk)->assertExists($first->storage_path);
 
-        $this->delete('/admin/operational-forms/documents/'.$first->id)
-            ->assertNoContent();
+        $this->assertDatabaseCount('operational_form_documents', 2);
+        $this->assertNotNull($record->completed_at);
+    }
+
+    public function test_evidence_archiving_requires_a_reason_and_preserves_prior_reasons_without_duplicate_events(): void
+    {
+        $admin = $this->admin('admin');
+        [$record, $document] = $this->recordWithDocument();
+        $this->actingAsCanonicalUser($admin);
+        $archival = app(OperationalEvidenceArchiveService::class);
+        foreach (['   ', str_repeat('x', 2001)] as $reason) {
+            try {
+                $archival->archive($record, $admin, $reason);
+                self::fail('Evidence cannot be archived without a valid reason.');
+            } catch (ValidationException $exception) {
+                self::assertArrayHasKey('archive_reason', $exception->errors());
+            }
+        }
+        self::assertNull($record->fresh()->archived_at);
+        $archival->archive($record, $admin, '[QA TEST] First archive');
+        $archival->archive($record, $admin, '[QA TEST] Retry');
+        self::assertSame(1, $record->events()->where('event_type', 'record_archived')->count());
+        $archival->restore($record, $admin);
+        $archival->restore($record, $admin);
+        $archival->archive($record, $admin, '[QA TEST] Second archive');
+        $archival->restore($record, $admin);
+        $events = $record->events()->whereIn('event_type', ['record_archived', 'record_restored'])->orderBy('id')->get();
+        self::assertCount(4, $events);
+        self::assertSame(['[QA TEST] First archive', '[QA TEST] First archive', '[QA TEST] Second archive', '[QA TEST] Second archive'], $events->pluck('metadata.archive_reason')->all());
+        self::assertTrue($events->every(fn (OperationalFormEvent $event): bool => $event->user_id === $admin->id && $event->created_at !== null));
+        Storage::disk($this->disk)->assertExists($document->storage_path);
+        self::assertSame($document->id, $record->documents()->sole()->id);
+    }
+
+    public function test_admin_filters_find_archived_and_trashed_forms_and_restore_documents_and_history(): void
+    {
+        $admin = $this->admin('admin');
+        [$record, $first] = $this->recordWithDocument();
+        $second = $this->document($record, 2);
+        $record->update(['latest_pdf_version' => 2]);
+        $this->actingAsCanonicalUser($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->withoutVite();
+
+        Livewire::test(ListOperationalFormRecords::class)
+            ->call('loadTable')
+            ->assertCanSeeTableRecords([$record])
+            ->callTableAction('archive', $record, data: ['archive_reason' => 'Completed QA review'])
+            ->assertHasNoTableActionErrors()
+            ->assertCanNotSeeTableRecords([$record])
+            ->filterTable('archive_state', 'archived')
+            ->assertCanSeeTableRecords([$record]);
 
         $record->refresh();
-        $this->assertNull($record->latest_pdf_version);
-        $this->assertNull($record->completed_at);
-        $this->assertSame('draft', $record->status);
+        self::assertSame($admin->id, $record->archived_by);
+        self::assertSame('Completed QA review', $record->archive_reason);
+        $this->get('/admin/operational-forms/documents/'.$second->id.'/download')->assertOk();
+
+        Livewire::test(ViewOperationalFormRecord::class, ['record' => $record->id])
+            ->assertSee('Document history')
+            ->assertActionVisible('restore')
+            ->callAction('restore')->assertHasNoActionErrors()
+            ->assertActionVisible('archive')
+            ->callAction('delete')->assertHasNoActionErrors();
+
+        $this->assertSoftDeleted($record);
+        Livewire::test(ListOperationalFormRecords::class)
+            ->call('loadTable')
+            ->assertCanNotSeeTableRecords([$record])
+            ->filterTable('archive_state', 'trash')
+            ->assertCanSeeTableRecords([$record])
+            ->callTableAction('restore', $record)->assertHasNoTableActionErrors()
+            ->filterTable('archive_state', 'active')
+            ->assertCanSeeTableRecords([$record]);
+
+        $this->assertNotSoftDeleted($record);
+        $this->assertDatabaseHas('operational_form_events', ['form_record_id' => $record->id, 'event_type' => 'record_archived']);
+        $this->assertDatabaseHas('operational_form_events', ['form_record_id' => $record->id, 'event_type' => 'record_restored']);
+        self::assertSame('Completed QA review', $record->events()->where('event_type', 'record_archived')->sole()->metadata['archive_reason']);
+        self::assertTrue($record->events()->where('event_type', 'record_restored')->get()
+            ->contains(fn (OperationalFormEvent $event): bool => ($event->metadata['archive_reason'] ?? null) === 'Completed QA review'));
+        $this->assertDatabaseCount('operational_form_documents', 2);
+        Storage::disk($this->disk)->assertExists($first->storage_path);
+        Storage::disk($this->disk)->assertExists($second->storage_path);
+
+        $owner = $record->employee;
+        $this->logoutCanonicalSession();
+        $this->actingAs($owner, 'employee')
+            ->get('/employee/forms/api/documents/'.$first->id.'/download')->assertOk();
+    }
+
+    public function test_forms_viewer_has_no_archive_trash_or_restore_actions(): void
+    {
+        $viewer = $this->admin('admin');
+        $viewer->revokePermissionTo('admin.forms.manage');
+        [$record] = $this->recordWithDocument();
+        $this->actingAsCanonicalUser($viewer);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->withoutVite();
+
+        Livewire::test(ViewOperationalFormRecord::class, ['record' => $record->id])
+            ->assertActionHidden('archive')
+            ->assertActionHidden('delete')
+            ->assertActionHidden('restore');
+        $this->delete('/admin/operational-forms/records/'.$record->id)->assertForbidden();
+        $this->assertNotSoftDeleted($record);
     }
 
     private function recordWithDocument(string $suffix = 'one'): array
@@ -164,6 +274,7 @@ class AdminOperationalFormDeletionTest extends TestCase
         $user->assignRole($role);
         $user->givePermissionTo([
             Permission::findOrCreate('admin.access', 'web'),
+            Permission::findOrCreate('admin.forms.view', 'web'),
             Permission::findOrCreate('admin.forms.manage', 'web'),
         ]);
 

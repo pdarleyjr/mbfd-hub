@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use LogicException;
 
 class CandidateProduct extends Model
 {
@@ -21,6 +22,20 @@ class CandidateProduct extends Model
         'model',
         'description',
     ];
+
+    protected static function booted(): void
+    {
+        static::deleting(function (CandidateProduct $product): void {
+            if ($product->hasSubmittedEvidence()) {
+                throw new LogicException('Products with submitted evaluations cannot be deleted. Retain the product with its completed session.');
+            }
+        });
+    }
+
+    public function hasSubmittedEvidence(): bool
+    {
+        return $this->submissions()->where('status', 'submitted')->exists();
+    }
 
     /**
      * Get the session this product belongs to.
@@ -64,7 +79,7 @@ class CandidateProduct extends Model
             $this->model,
         ]);
 
-        return $this->name . ($parts ? ' (' . implode(' ', $parts) . ')' : '');
+        return $this->name.($parts ? ' ('.implode(' ', $parts).')' : '');
     }
 
     /**

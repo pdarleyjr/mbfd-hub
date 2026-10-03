@@ -7,7 +7,11 @@ namespace App\Filament\Admin\Pages;
 use App\Models\TrtInventoryCatalogItem;
 use App\Models\TrtInventoryEntry;
 use App\Models\TrtInventorySession;
+use App\Services\OperationalEvidenceArchiveService;
+use Filament\Actions;
+use Filament\Forms;
 use Filament\Pages\Page;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Storage;
 
 class TrtTrailerInventory extends Page
@@ -30,6 +34,8 @@ class TrtTrailerInventory extends Page
 
     public ?int $detailItemId = null;
 
+    public string $archiveState = 'active';
+
     public static function canAccess(): bool
     {
         $user = auth()->user();
@@ -39,8 +45,13 @@ class TrtTrailerInventory extends Page
 
     public function mount(): void
     {
-        $latest = TrtInventorySession::orderByDesc('session_date')->first();
-        $this->selectedSessionId = $latest?->id;
+        $this->selectLatestSession();
+    }
+
+    public function updatedArchiveState(): void
+    {
+        $this->detailItemId = null;
+        $this->selectLatestSession();
     }
 
     public function updatedSelectedSessionId(): void
@@ -58,15 +69,70 @@ class TrtTrailerInventory extends Page
         $this->detailItemId = null;
     }
 
+    protected function getHeaderActions(): array
+    {
+        return [
+            Actions\Action::make('archiveSession')
+                ->label('Archive session')
+                ->icon('heroicon-o-archive-box')
+                ->color('gray')
+                ->requiresConfirmation()
+                ->form([Forms\Components\Textarea::make('archive_reason')->label('Reason')->required()->maxLength(2000)])
+                ->visible(function (): bool {
+                    $session = TrtInventorySession::find($this->selectedSessionId);
+
+                    return (auth()->user()?->can('admin.equipment.manage') ?? false)
+                        && $session !== null && ! $session->isArchived() && $session->session_date->isBefore(today());
+                })
+                ->action(function (array $data): void {
+                    app(OperationalEvidenceArchiveService::class)->archive(
+                        TrtInventorySession::findOrFail($this->selectedSessionId), auth()->user(), $data['archive_reason'] ?? null,
+                    );
+                    $this->selectLatestSession();
+                }),
+            Actions\Action::make('restoreSession')
+                ->label('Restore session')
+                ->icon('heroicon-o-arrow-uturn-left')
+                ->requiresConfirmation()
+                ->visible(fn (): bool => (auth()->user()?->can('admin.equipment.manage') ?? false)
+                    && (TrtInventorySession::find($this->selectedSessionId)?->isArchived() ?? false))
+                ->action(function (): void {
+                    app(OperationalEvidenceArchiveService::class)->restore(
+                        TrtInventorySession::findOrFail($this->selectedSessionId), auth()->user(),
+                    );
+                    $this->archiveState = 'active';
+                    $this->detailItemId = null;
+                }),
+        ];
+    }
+
+    /** @return Builder<TrtInventorySession> */
+    private function sessionQuery(): Builder
+    {
+        $query = TrtInventorySession::query();
+
+        return match ($this->archiveState) {
+            'archived' => $query->archived(),
+            'all' => $query,
+            default => $query->active(),
+        };
+    }
+
+    private function selectLatestSession(): void
+    {
+        $sessionId = $this->sessionQuery()->orderByDesc('session_date')->value('id');
+        $this->selectedSessionId = $sessionId !== null ? (int) $sessionId : null;
+        $this->detailItemId = null;
+    }
+
     protected function getViewData(): array
     {
-        $sessions = TrtInventorySession::withCount('entries')
+        $sessions = $this->sessionQuery()->withCount('entries')
             ->orderByDesc('session_date')
-            ->limit(365)
             ->get()
-            ->map(fn ($s) => [
+            ->map(fn (TrtInventorySession $s): array => [
                 'id' => $s->id,
-                'label' => $s->session_date->format('M j, Y')." ({$s->entries_count} entries)",
+                'label' => $s->session_date->format('M j, Y')." ({$s->entries_count} entries)".($s->isArchived() ? ' · Archived' : ''),
             ]);
 
         $aggregatedItems = [];
@@ -162,6 +228,7 @@ class TrtTrailerInventory extends Page
 
         return [
             'sessions' => $sessions,
+            'archiveHistory' => TrtInventorySession::find($this->selectedSessionId)->archive_history ?? [],
             'aggregatedItems' => $aggregatedItems,
             'stats' => $stats,
             'detailEntries' => $detailEntries,

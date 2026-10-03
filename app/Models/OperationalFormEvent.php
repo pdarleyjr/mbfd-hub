@@ -13,11 +13,11 @@ class OperationalFormEvent extends Model
 
     protected $fillable = [
         'form_record_id', 'document_id', 'employee_id', 'user_id',
-        'event_type', 'request_ip_hash', 'created_at',
+        'event_type', 'request_ip_hash', 'metadata', 'created_at',
     ];
 
     protected function casts(): array
     {
-        return ['created_at' => 'datetime'];
+        return ['created_at' => 'datetime', 'metadata' => 'array'];
     }
 }

@@ -2,15 +2,23 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasArchive;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+/**
+ * @property \Illuminate\Support\Carbon|null $archived_at
+ * @property int|null $archived_by
+ * @property string|null $archive_reason
+ * @property array<int, array<string, mixed>>|null $archive_history
+ */
 class StationInventorySubmission extends Model
 {
-    use HasFactory;
+    use HasArchive, HasFactory;
 
     protected $fillable = [
+        'client_submission_id',
         'station_id',
         'employee_name',
         'shift',
@@ -23,6 +31,7 @@ class StationInventorySubmission extends Model
     ];
 
     protected $casts = [
+        'archive_history' => 'array',
         'items' => 'array',
         'submitted_at' => 'datetime',
     ];

@@ -31,7 +31,7 @@ class PersonnelOverview extends Page
     public function getViewData(): array
     {
         $active = [PersonnelRequestStatus::Pending->value, PersonnelRequestStatus::Acknowledged->value, PersonnelRequestStatus::NeedsInformation->value, PersonnelRequestStatus::Ordered->value, PersonnelRequestStatus::Arrived->value, PersonnelRequestStatus::ReadyForPickup->value];
-        $base = PersonnelRequest::query();
+        $base = PersonnelRequest::query()->active();
 
         return [
             'uniform' => $this->summary((clone $base)->where('type', 'uniform'), $active),

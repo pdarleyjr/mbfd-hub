@@ -14,6 +14,7 @@ use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 
 class StationResource extends Resource
 {
@@ -26,6 +27,11 @@ class StationResource extends Resource
     protected static ?string $navigationGroup = 'Operations';
 
     protected static ?int $navigationSort = 20;
+
+    public static function canDelete(Model $record): bool
+    {
+        return $record instanceof Station && parent::canDelete($record) && ! $record->stationInspections()->exists();
+    }
 
     public static function form(Form $form): Form
     {
@@ -90,7 +96,7 @@ class StationResource extends Resource
                             ->color(fn ($state) => $state > 0 ? 'warning' : 'gray'),
                         Infolists\Components\TextEntry::make('supply_request_count')
                             ->label('Supply Requests')
-                            ->state(fn ($record) => $record->supplyRequests()->whereIn('status', ['open', 'ordered'])->count())
+                            ->state(fn ($record) => $record->supplyRequests()->active()->whereIn('status', ['open', 'ordered'])->count())
                             ->badge()
                             ->color(fn ($state) => $state > 0 ? 'warning' : 'gray'),
                         Infolists\Components\TextEntry::make('inventory_link')
