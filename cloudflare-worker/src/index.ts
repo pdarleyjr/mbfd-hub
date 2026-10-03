@@ -44,6 +44,12 @@ interface ReferenceCitation {
   chunk_index?: number;
 }
 
+interface CompletionMetadata {
+  finish_reason?: 'stop' | 'length' | 'tool_calls' | 'content_filter' | 'function_call';
+  prompt_tokens?: number;
+  completion_tokens?: number;
+}
+
 const EMBEDDING_MODEL = '@cf/baai/bge-large-en-v1.5';
 const DEFAULT_BRIDGE_MODEL = 'qwen3.6:35b';
 
@@ -207,6 +213,19 @@ function sanitizeId(source: string): string {
   return source.replace(/[^a-zA-Z0-9]/g, '_');
 }
 
+function completionMetadata(upstream: any): CompletionMetadata {
+  const completion: CompletionMetadata = {};
+  const reason = upstream?.choices?.[0]?.finish_reason;
+  if (['stop', 'length', 'tool_calls', 'content_filter', 'function_call'].includes(reason)) {
+    completion.finish_reason = reason;
+  }
+  for (const field of ['prompt_tokens', 'completion_tokens'] as const) {
+    const count = upstream?.usage?.[field];
+    if (typeof count === 'number' && Number.isSafeInteger(count) && count >= 0) completion[field] = count;
+  }
+  return completion;
+}
+
 /** Translate the bridge's OpenAI-style SSE into the CF-style SSE the landing
  *  page expects: `data: {"response":"<token>"}`. Buffers across chunk
  *  boundaries; emits a final `data: [DONE]`. */
@@ -216,6 +235,7 @@ function openaiToCfStream(upstream: ReadableStream, footer: string, citations: S
   const encoder = new TextEncoder();
   let buffer = '';
   let terminal = false;
+  const completion: CompletionMetadata = {};
   const emitLine = (line: string, controller: ReadableStreamDefaultController) => {
     const t = line.trim();
     if (!t.startsWith('data:') || terminal) return;
@@ -224,6 +244,7 @@ function openaiToCfStream(upstream: ReadableStream, footer: string, citations: S
     if (!payload) return;
     try {
       const j = JSON.parse(payload);
+      Object.assign(completion, completionMetadata(j));
       const tok = j.choices?.[0]?.delta?.content || '';
       if (tok) controller.enqueue(encoder.encode(`data: ${JSON.stringify({ response: tok })}\n\n`));
     } catch {
@@ -239,6 +260,7 @@ function openaiToCfStream(upstream: ReadableStream, footer: string, citations: S
           controller.error(new Error('AI backend stream ended before completion.'));
           return;
         }
+        if (Object.keys(completion).length) controller.enqueue(encoder.encode(`data: ${JSON.stringify({ completion })}\n\n`));
         if (footer) controller.enqueue(encoder.encode(`data: ${JSON.stringify({ response: footer, citations, reference_citations: references })}\n\n`));
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
         controller.close();
@@ -479,7 +501,10 @@ export default {
         }
         const aiJson: any = await bridgeResp.json();
         const answer = aiJson.choices?.[0]?.message?.content || '';
-        return json({ response: answer + footer, sources, citations, reference_citations: referenceCitations, model: env.BRIDGE_MODEL || DEFAULT_BRIDGE_MODEL });
+        const completion = completionMetadata(aiJson);
+        return json({ response: answer + footer, sources, citations, reference_citations: referenceCitations,
+          model: env.BRIDGE_MODEL || DEFAULT_BRIDGE_MODEL,
+          ...(Object.keys(completion).length ? { completion } : {}) });
       } catch (error: any) {
         console.error('Chat error:', error);
         return json({ error: 'An error occurred processing your request. Please try again.' }, 500);
