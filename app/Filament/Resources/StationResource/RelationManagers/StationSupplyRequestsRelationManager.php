@@ -18,6 +18,11 @@ class StationSupplyRequestsRelationManager extends RelationManager
 
     protected static ?string $title = 'Supply Requests';
 
+    public function isReadOnly(): bool
+    {
+        return ! auth()->user()->can('admin.stations.manage');
+    }
+
     public function table(Table $table): Table
     {
         return $table

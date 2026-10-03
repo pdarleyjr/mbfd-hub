@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature\Api;
 
 use App\Enums\AccountStatus;
+use App\Filament\Resources\StationResource\Pages\ViewStation;
+use App\Filament\Resources\StationResource\RelationManagers\StationSupplyRequestsRelationManager;
 use App\Models\Employee;
 use App\Models\InventoryCategory;
 use App\Models\InventoryItem;
@@ -15,11 +17,14 @@ use App\Models\StationInventorySubmission;
 use App\Models\StationSupplyRequest;
 use App\Models\User;
 use App\Services\StationSupplyRequestWorkflowService;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Route as RouteFacade;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Livewire\Livewire;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -155,6 +160,48 @@ final class StationInventoryV2SignedUrlTest extends TestCase
         $this->postJson('/api/v2/station-inventory/999999/supply-requests', ['request_text' => '[QA TEST] Invalid station', 'actor_shift' => 'A'])->assertNotFound();
         $this->assertDatabaseCount('station_supply_requests', 0);
         $this->assertDatabaseCount('station_inventory_audits', 0);
+    }
+
+    public function test_station_view_allows_supply_processing_only_for_existing_station_managers(): void
+    {
+        $station = $this->station('209');
+        $created = $this->postJson("/api/v2/station-inventory/{$station->id}/supply-requests", [
+            'actor_shift' => 'B', 'request_text' => '[QA TEST] Station view supply processing',
+        ])->assertOk();
+        $request = StationSupplyRequest::query()->findOrFail($created->json('request.id'));
+        $manager = User::factory()->create(['name' => '[QA TEST] Station manager', 'account_status' => AccountStatus::Active]);
+        $manager->givePermissionTo(collect(['admin.access', 'admin.stations.view', 'admin.stations.manage'])
+            ->map(fn (string $permission): Permission => Permission::findOrCreate($permission, 'web')));
+        $this->actingAs($manager);
+        $this->withoutVite();
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $page = Livewire::test(StationSupplyRequestsRelationManager::class, [
+            'ownerRecord' => $station, 'pageClass' => ViewStation::class, 'lazy' => false,
+        ])->assertCanSeeTableRecords([$request])->assertTableActionVisible('edit', $request)
+            ->callTableAction('edit', $request, data: [
+                'status' => 'ordered', 'public_response' => '[QA TEST] Ordered response', 'admin_notes' => '[QA TEST] Private supplier note',
+            ])->assertHasNoTableActionErrors();
+        $this->assertSame('ordered', $request->fresh()->status);
+        $this->assertSame('[QA TEST] Ordered response', $request->fresh()->public_response);
+        $this->assertDatabaseHas('station_inventory_audits', ['action' => 'request_updated', 'actor_user_id' => $manager->id]);
+        $page->callTableAction('archive', $request, data: ['reason' => '[QA TEST] Retain history'])->assertHasNoTableActionErrors();
+        $request->refresh();
+        $this->assertTrue($request->isArchived());
+        $page->filterTable('archive_state', 'all')->assertTableActionHidden('edit', $request)
+            ->callTableAction('restore', $request)->assertHasNoTableActionErrors();
+        $request->refresh();
+        $page->assertTableActionVisible('edit', $request);
+        $this->assertSame('ordered', $request->fresh()->status);
+        $this->assertFalse($request->fresh()->isArchived());
+
+        $viewer = User::factory()->create(['account_status' => AccountStatus::Active]);
+        $viewer->givePermissionTo(Permission::findOrCreate('admin.stations.view', 'web'));
+        $this->actingAs($viewer);
+        Livewire::test(StationSupplyRequestsRelationManager::class, [
+            'ownerRecord' => $station, 'pageClass' => ViewStation::class, 'lazy' => false,
+        ])->assertCanSeeTableRecords([$request])->assertTableActionHidden('edit', $request)
+            ->mountTableAction('edit', $request)->assertTableActionNotMounted('edit');
+        $this->assertSame('ordered', $request->fresh()->status);
     }
 
     public function test_inventory_submission_retry_identifier_cannot_be_reused_by_another_member_or_station(): void

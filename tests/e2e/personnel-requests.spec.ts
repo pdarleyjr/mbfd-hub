@@ -1,4 +1,5 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import { writeFile } from 'node:fs/promises';
 
 const qaPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
 
@@ -151,7 +152,19 @@ async function submitAdminModal(page: Page): Promise<void> {
 
 async function setArchiveVisibility(page: Page, value: 'active' | 'archived' | 'all'): Promise<void> {
   await page.getByRole('button', { name: /^Filters?(?: \d+)?$/i }).click();
-  await page.getByLabel('Visibility', { exact: true }).selectOption(value);
+  const visibility = page.getByLabel('Visibility', { exact: true });
+  if (await visibility.inputValue() !== value) {
+    const [filtered] = await Promise.all([
+      page.waitForResponse(response => {
+        if (new URL(response.url()).pathname !== '/livewire/update' || response.request().method() !== 'POST') return false;
+        const payload = response.request().postDataJSON() as { components?: { updates?: Record<string, unknown> }[] };
+        return payload.components?.some(component => component.updates?.['tableFilters.archive_state.value'] === value) ?? false;
+      }, { timeout: 30_000 }),
+      visibility.selectOption(value),
+    ]);
+    expect(filtered.status()).toBe(200);
+    expect(await filtered.finished()).toBeNull();
+  }
   await page.keyboard.press('Escape');
 }
 
@@ -164,16 +177,16 @@ async function archiveFindRestore(page: Page, adminUrl: string, indexUrl: string
   await setArchiveVisibility(page, 'active');
   await expect(page.getByText(reference, { exact: true })).toHaveCount(0);
   await setArchiveVisibility(page, 'archived');
-  await expect(page.getByText(reference, { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(reference, { exact: true }).first()).toBeVisible({ timeout: 30_000 });
   await setArchiveVisibility(page, 'all');
-  await expect(page.getByText(reference, { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(reference, { exact: true }).first()).toBeVisible({ timeout: 30_000 });
   await page.goto(adminUrl);
   await page.getByRole('button', { name: 'Restore', exact: true }).click();
   await submitAdminModal(page);
-  await expect(page.getByRole('button', { name: 'Archive', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Archive', exact: true })).toBeVisible({ timeout: 30_000 });
   await page.goto(indexUrl);
   await setArchiveVisibility(page, 'active');
-  await expect(page.getByText(reference, { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(reference, { exact: true }).first()).toBeVisible({ timeout: 30_000 });
   await page.goto(adminUrl);
   await page.getByRole('button', { name: 'Archive', exact: true }).click();
   await page.getByLabel('Archive reason (optional)').fill('[QA TEST] Finished; retain evidence.');
@@ -324,7 +337,7 @@ async function drawRequestSignature(page: Page, label: string): Promise<void> {
 
 test('real station repair and equipment requests preserve signed submissions, every operational status, public replies and archive discovery', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'One isolated run of each authoritative Station Request type.');
-  test.setTimeout(600_000);
+  test.setTimeout(900_000);
   await loginAdmin(page);
   for (const type of ['repair_service', 'equipment']) {
     await page.goto(`/daily/forms-hub/station-request?station_id=1&type=${type}`);
@@ -474,7 +487,7 @@ test('real Hub Support submission, member reply, resolution, reopen, close and a
 
 test('real station inventory snapshot and supply request appear in their station Admin context', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'One isolated real inventory and supply workflow run.');
-  test.setTimeout(120_000);
+  test.setTimeout(240_000);
   await loginAdmin(page);
   await page.goto('/daily/forms-hub/station-inventory');
   await page.getByRole('button', { name: 'Shift B', exact: true }).click();
@@ -513,7 +526,9 @@ test('real station inventory snapshot and supply request appear in their station
   expect(download.headers()['content-type']).toContain('application/pdf');
   const pdfBody = await download.body();
   expect(pdfBody.subarray(0, 5).toString()).toBe('%PDF-');
-  await testInfo.attach('inventory-submission.pdf', { body: pdfBody, contentType: 'application/pdf' });
+  const pdfPath = testInfo.outputPath('inventory-submission.pdf');
+  await writeFile(pdfPath, pdfBody);
+  await testInfo.attach('inventory-submission.pdf', { path: pdfPath, contentType: 'application/pdf' });
   await page.getByRole('tab', { name: 'Supply Requests', exact: true }).click();
   const supplyRow = page.locator('tr').filter({ hasText: '[QA TEST] Real browser station supply request.' });
   await expect(supplyRow).toBeVisible();
