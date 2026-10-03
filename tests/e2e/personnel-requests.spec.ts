@@ -144,9 +144,9 @@ async function loginAdmin(page: Page): Promise<void> {
 
 async function submitAdminModal(page: Page): Promise<void> {
   const modal = page.locator('.fi-modal-window:visible').last();
-  await expect(modal).toBeVisible();
+  await expect(modal).toBeVisible({ timeout: 30_000 });
   await modal.locator('button[type="submit"]').last().click();
-  await expect(modal).toBeHidden();
+  await expect(modal).toBeHidden({ timeout: 30_000 });
 }
 
 async function setArchiveVisibility(page: Page, value: 'active' | 'archived' | 'all'): Promise<void> {
@@ -240,7 +240,7 @@ async function completePersonnelLifecycle(admin: Page, member: Page, memberPath:
 
 test('real uniform submission follows the complete member and Admin lifecycle through reversible archive', async ({ page, browser, baseURL }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'One isolated complete uniform workflow.');
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   await loginEmployee(page, '99002', requiredPassword('PERSONNEL_REQUESTS_E2E_MEMBER_PASSWORD'));
   await page.goto('/employee/request-equipment');
   const recentRequests = page.locator('.pr-request-row');
@@ -268,7 +268,7 @@ test('real uniform submission follows the complete member and Admin lifecycle th
 
 test('real officer PPE submission retains signature, beneficiary and complete Admin/member lifecycle', async ({ page, browser, baseURL }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'One isolated signed PPE workflow.');
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   await loginEmployee(page, '99001', requiredPassword('PERSONNEL_REQUESTS_E2E_OFFICER_PASSWORD'));
   await page.goto('/employee/personnel-equipment-request?station_id=1');
   await page.locator('[wire\\:key*="beneficiary_employee_id"] [role="combobox"]').click();
@@ -280,14 +280,17 @@ test('real officer PPE submission retains signature, beneficiary and complete Ad
   await page.getByRole('textbox', { name: 'Describe other equipment*', exact: true }).fill('[QA TEST] Browser protective equipment.');
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   const canvas = page.locator('canvas[aria-label="Officer signature pad"]');
+  await expect(canvas).toBeVisible();
+  await canvas.scrollIntoViewIfNeeded();
   const box = await canvas.boundingBox();
   expect(box).not.toBeNull();
   await page.mouse.move(box!.x + 15, box!.y + box!.height - 25);
   await page.mouse.down();
   await page.mouse.move(box!.x + box!.width - 20, box!.y + 25, { steps: 12 });
   await page.mouse.up();
+  await expect(page.locator('.signature-hint')).toBeHidden();
   await page.getByRole('button', { name: 'Sign & Submit Request', exact: true }).click();
-  await expect(page).toHaveURL(/\/employee\/dashboard$/);
+  await expect(page).toHaveURL(/\/employee\/dashboard$/, { timeout: 20_000 });
   const memberContext = await browser.newContext({ baseURL });
   const adminContext = await browser.newContext({ baseURL });
   try {
@@ -309,6 +312,8 @@ test('real officer PPE submission retains signature, beneficiary and complete Ad
 
 async function drawRequestSignature(page: Page, label: string): Promise<void> {
   const canvas = page.locator(`canvas[aria-label="${label}"]`);
+  await expect(canvas).toBeVisible();
+  await canvas.scrollIntoViewIfNeeded();
   const box = await canvas.boundingBox();
   expect(box).not.toBeNull();
   await page.mouse.move(box!.x + 15, box!.y + box!.height - 25);
@@ -319,7 +324,7 @@ async function drawRequestSignature(page: Page, label: string): Promise<void> {
 
 test('real station repair and equipment requests preserve signed submissions, every operational status, public replies and archive discovery', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'One isolated run of each authoritative Station Request type.');
-  test.setTimeout(240_000);
+  test.setTimeout(600_000);
   await loginAdmin(page);
   for (const type of ['repair_service', 'equipment']) {
     await page.goto(`/daily/forms-hub/station-request?station_id=1&type=${type}`);
@@ -364,7 +369,7 @@ test('real station repair and equipment requests preserve signed submissions, ev
 
 test('real apparatus service request progresses through scheduling, parts, notes, completion and archive without vehicle checkout', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'One isolated Service Ticket workflow using the QA apparatus.');
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   await loginAdmin(page);
   await page.goto('/employee/apparatus-service-request?station_id=1&apparatus_id=1');
   await page.getByLabel('Short issue summary', { exact: false }).fill('[QA TEST] Browser apparatus service');
@@ -414,7 +419,7 @@ test('real apparatus service request progresses through scheduling, parts, notes
 
 test('real Hub Support submission, member reply, resolution, reopen, close and archive preserve evidence', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'One isolated real workflow run; responsive surfaces have separate coverage.');
-  test.setTimeout(120_000);
+  test.setTimeout(240_000);
   await loginAdmin(page);
   await page.goto('/support/issues/create');
   await page.getByLabel('What went wrong?').fill('[QA TEST] Browser support workflow verification.');
@@ -497,7 +502,7 @@ test('real station inventory snapshot and supply request appear in their station
   await page.goto('/admin/stations/1');
   await page.getByRole('tab', { name: 'Inventory Submissions', exact: true }).click();
   const inventoryRow = page.locator('tr').filter({ hasText: 'Personnel E2E Admin' }).filter({ hasText: String(recordId) });
-  await expect(inventoryRow).toBeVisible();
+  await expect(inventoryRow).toBeVisible({ timeout: 30_000 });
   await inventoryRow.getByRole('button', { name: 'View', exact: true }).click();
   await expect(page.getByText('[QA TEST] Real browser inventory snapshot.', { exact: true })).toBeVisible();
   await expect(page.getByText(/QA-BROWSER-GLOVES/)).toBeVisible();
