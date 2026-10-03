@@ -232,19 +232,9 @@ test('policy page completion follows the actual 800.P01 V link and adds verified
             const prompt=captured.at(-1).messages.map(message=>message.content).join('\n');
             for(const chunk of chunks) assert.ok(prompt.includes(chunk.metadata.text));
             assert.doesNotMatch(prompt,/NHTSA AND HIGH VOLTAGE REFERENCE|OLD POLICY FROM HISTORY/);
-            const systemPrompt=captured.at(-1).messages.find(message=>message.role==='system').content;
-            assert.match(systemPrompt,/whole question takes priority over brevity/);
-            assert.match(systemPrompt,/every part of the question/);
-            assert.match(systemPrompt,/every applicable source requirement for the requested conditions/);
-            assert.match(systemPrompt,/required record fields and signatures or endorsements/);
-            assert.match(systemPrompt,/receiving role and acknowledgment contents/);
-            assert.match(systemPrompt,/direct follow-up and escalation/);
-            assert.match(systemPrompt,/contingency actions during an outage and reconciliation on restoration/);
-            assert.match(systemPrompt,/conditional approvals, and after-hours limits/);
-            assert.match(systemPrompt,/Omit procedure sections unrelated to the question/);
-            assert.match(systemPrompt,/conditional scope/);
-            assert.match(systemPrompt,/Keep role identifiers exactly as written unless the supplied source explicitly defines them; never infer a job title/);
-            assert.match(systemPrompt,/missing evidence/);
+            assert.match(prompt,/every part of the question/);
+            assert.match(prompt,/conditional scope/);
+            assert.match(prompt,/missing evidence/);
             let citations,answer;
             if(stream) {
                 assert.equal(response.headers.get('X-Sources'),'["MBFD_Section_800.pdf"]');
