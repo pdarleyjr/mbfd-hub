@@ -383,7 +383,11 @@ test('admin archives, finds, trashes and restores an actual member upload withou
     const dialog = page.getByRole('dialog').filter({ has: page.getByRole('button', { name: /^(Confirm|Submit)$/ }) });
     const confirm = dialog.getByRole('button', { name: /^(Confirm|Submit)$/ });
     await expect(confirm).toBeVisible({ timeout: 30_000 });
-    if (reason) await dialog.getByLabel(/^Reason\b/).fill(reason);
+    if (reason) {
+      const reasonField = dialog.getByRole('textbox', { name: /Reason/ });
+      await expect(reasonField).toBeVisible({ timeout: 30_000 });
+      await reasonField.fill(reason);
+    }
     await confirm.click();
     await expect(confirm).toBeHidden({ timeout: 30_000 });
   };

@@ -150,7 +150,7 @@ async function submitAdminModal(page: Page): Promise<void> {
 }
 
 async function setArchiveVisibility(page: Page, value: 'active' | 'archived' | 'all'): Promise<void> {
-  await page.getByRole('button', { name: /^Filters?$/i }).click();
+  await page.getByRole('button', { name: /^Filters?(?: \d+)?$/i }).click();
   await page.getByLabel('Visibility', { exact: true }).selectOption(value);
   await page.keyboard.press('Escape');
 }
@@ -243,13 +243,17 @@ test('real uniform submission follows the complete member and Admin lifecycle th
   test.setTimeout(180_000);
   await loginEmployee(page, '99002', requiredPassword('PERSONNEL_REQUESTS_E2E_MEMBER_PASSWORD'));
   await page.goto('/employee/request-equipment');
+  const recentRequests = page.locator('.pr-request-row');
+  const previousRequestCount = await recentRequests.count();
   await page.locator('[wire\\:key*="item_code"] [role="combobox"]').click();
   await page.keyboard.type('T-Shirt');
   await page.getByRole('option', { name: 'T-Shirt', exact: true }).click();
   await page.getByLabel('Size', { exact: false }).fill('L');
   await page.getByRole('button', { name: 'Submit Uniform Request', exact: true }).click();
-  await expect(page.getByText('Uniform request submitted', { exact: true })).toBeVisible();
-  const memberPath = (await page.locator('.pr-request-row').first().getAttribute('href'))!;
+  await expect(recentRequests).toHaveCount(previousRequestCount + 1);
+  await expect(recentRequests.first()).toContainText('Pending');
+  await expect(recentRequests.first()).toHaveAttribute('href', /\/employee\/my-requests\/[0-9A-Z]{26}$/);
+  const memberPath = (await recentRequests.first().getAttribute('href'))!;
   await testInfo.attach('uniform-record', { body: JSON.stringify({ memberPath, publicId: memberPath.split('/').at(-1) }), contentType: 'application/json' });
   const context = await browser.newContext({ baseURL });
   try {
@@ -273,7 +277,7 @@ test('real officer PPE submission retains signature, beneficiary and complete Ad
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   await page.getByLabel('Equipment*', { exact: true }).selectOption('other');
   await page.getByLabel('Reason*', { exact: true }).selectOption('damaged');
-  await page.getByLabel('Describe other equipment', { exact: false }).fill('[QA TEST] Browser protective equipment.');
+  await page.getByRole('textbox', { name: 'Describe other equipment*', exact: true }).fill('[QA TEST] Browser protective equipment.');
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   const canvas = page.locator('canvas[aria-label="Officer signature pad"]');
   const box = await canvas.boundingBox();
@@ -320,7 +324,7 @@ test('real station repair and equipment requests preserve signed submissions, ev
   for (const type of ['repair_service', 'equipment']) {
     await page.goto(`/daily/forms-hub/station-request?station_id=1&type=${type}`);
     if (type === 'equipment') await page.getByRole('button', { name: 'Equipment Request one or more station equipment items.', exact: true }).click();
-    await page.getByLabel('Requesting employee *', { exact: true }).selectOption({ label: 'Personnel E2E Admin — Captain' });
+    await page.getByRole('combobox', { name: 'Requesting employee *', exact: true }).selectOption({ label: 'Personnel E2E Admin — Captain' });
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
     await page.getByLabel('Short title *', { exact: true }).fill(`[QA TEST] Browser ${type} workflow`);
     await page.getByLabel('Description and operational impact *', { exact: true }).fill('[QA TEST] Isolated browser processing verification.');
@@ -382,7 +386,7 @@ test('real apparatus service request progresses through scheduling, parts, notes
       await page.getByLabel('Service Type', { exact: false }).fill('[QA TEST] Electrical verification');
       await page.getByLabel('Service Location', { exact: false }).fill('[QA TEST] Disposable test shop');
     }
-    await page.getByLabel('Public Update', { exact: true }).fill(`[QA TEST] Fleet: ${label}`);
+    await page.getByRole('textbox', { name: /^Public Update\*?$/ }).fill(`[QA TEST] Fleet: ${label}`);
     await page.getByLabel('Internal Note', { exact: true }).fill('[QA TEST] Private mechanic note.');
     if (label === 'Complete') await page.getByLabel('Resolution Summary', { exact: false }).fill('[QA TEST] Service workflow completed.');
     await submitAdminModal(page);
@@ -497,7 +501,7 @@ test('real station inventory snapshot and supply request appear in their station
   await inventoryRow.getByRole('button', { name: 'View', exact: true }).click();
   await expect(page.getByText('[QA TEST] Real browser inventory snapshot.', { exact: true })).toBeVisible();
   await expect(page.getByText(/QA-BROWSER-GLOVES/)).toBeVisible();
-  await page.locator('.fi-modal-window:visible').last().getByRole('button', { name: 'Close', exact: true }).click();
+  await page.locator('.fi-modal-window:visible').last().getByTitle('Close', { exact: true }).click();
   const pdf = inventoryRow.getByRole('link', { name: 'Download PDF', exact: true });
   const download = await page.request.get((await pdf.getAttribute('href'))!);
   expect(download.status()).toBe(200);
