@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { currentEditionChanged, linkRectangle, pageLink, pdfDestinationPage, pdfUrlTarget, primaryEntries, primaryHierarchy, recentlyPublished, resolveLibrarySelection, subjectAliases } from '../../resources/js/library-ui.js';
 
 test('copy link retains exact logical document and page without temporary search state', () => {
@@ -78,6 +79,36 @@ test('PDF named and explicit destinations resolve exact one-based pages through 
     assert.equal(await pdfDestinationPage(pdf, [31, { name: 'Fit' }]), 32);
     assert.equal(await pdfDestinationPage(pdf, [32, { name: 'Fit' }]), null);
     assert.equal(await pdfDestinationPage(pdf, 'unknown'), null);
+});
+
+test('a real PDF.js non-page destination is omitted while valid links and unrelated errors are preserved', async () => {
+    const objects = [
+        '<< /Type /Catalog /Pages 2 0 R >>',
+        '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+        '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << >> >>',
+        '<< /Type /InvalidDestination >>',
+    ];
+    let source = '%PDF-1.7\n';
+    const offsets = [0];
+    for (const [index, object] of objects.entries()) {
+        offsets.push(Buffer.byteLength(source));
+        source += `${index + 1} 0 obj\n${object}\nendobj\n`;
+    }
+    const xref = Buffer.byteLength(source);
+    source += `xref\n0 ${offsets.length}\n0000000000 65535 f \n`;
+    source += offsets.slice(1).map(offset => `${String(offset).padStart(10, '0')} 00000 n \n`).join('');
+    source += `trailer\n<< /Size ${offsets.length} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+    const loading = getDocument({ data: Uint8Array.from(Buffer.from(source)) });
+    try {
+        const pdf = await loading.promise;
+        const invalid = [{ num: 4, gen: 0 }, { name: 'Fit' }];
+        await assert.rejects(pdf.getPageIndex(invalid[0]), error => error.name === 'UnknownErrorException'
+            && error.message === 'The reference does not point to a /Page dictionary.');
+        assert.equal(await pdfDestinationPage(pdf, invalid), null);
+        assert.equal(await pdfDestinationPage(pdf, [{ num: 3, gen: 0 }, { name: 'Fit' }]), 1);
+    } finally { await loading.destroy(); }
+    const failure = Object.assign(new Error('Worker connection failed'), { name: 'UnknownErrorException' });
+    await assert.rejects(pdfDestinationPage({ getPageIndex: async () => { throw failure; } }, [{ num: 3, gen: 0 }]), error => error === failure);
 });
 
 test('link rectangles follow viewport rotation and ignore invalid source rectangles', () => {
