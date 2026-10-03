@@ -131,3 +131,20 @@ test('a malformed additional pnpm action cannot evade the route checks', () => {
     value.actions.push({ module: 'other', resolves: { id: 1240992, path: 'apps__api>braces' } });
     assert.throws(() => classifyVacationBuildAdvisory(value, 1, now), /Invalid pnpm action schema/);
 });
+test('actual installed pnpm paths classify only the complete reviewed six routes', () => {
+    const value = structuredClone(pnpmReport);
+    const paths = [
+        'apps/web > tailwindcss@3.4.19 > chokidar@3.6.0 > braces@3.0.3',
+        'apps/web > tailwindcss@3.4.19 > fast-glob@3.3.3 > micromatch@4.0.8 > braces@3.0.3',
+        'apps/web > tailwindcss@3.4.19 > micromatch@4.0.8 > braces@3.0.3',
+        'apps/web > tailwindcss-animate@1.0.7 > tailwindcss@3.4.19 > chokidar@3.6.0 > braces@3.0.3',
+        'apps/web > tailwindcss-animate@1.0.7 > tailwindcss@3.4.19 > fast-glob@3.3.3 > micromatch@4.0.8 > braces@3.0.3',
+        'apps/web > tailwindcss-animate@1.0.7 > tailwindcss@3.4.19 > micromatch@4.0.8 > braces@3.0.3',
+    ];
+    value.advisories['1240992'].findings[0].paths = [...paths].reverse();
+    assert.match(classifyVacationBuildAdvisory(value, 1, now), /VISIBLE BUILD ADVISORY/);
+    for (const unreviewed of [undefined, null, {}, paths.slice(1), [...paths, paths[0]], [...paths, 'apps/api > braces@3.0.3']]) {
+        value.advisories['1240992'].findings[0].paths = unreviewed;
+        assert.throws(() => classifyVacationBuildAdvisory(value, 1, now), /Unreviewed pnpm paths/);
+    }
+});

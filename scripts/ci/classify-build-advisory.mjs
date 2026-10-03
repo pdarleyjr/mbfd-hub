@@ -69,7 +69,12 @@ export function classifyVacationBuildAdvisory(report, auditExit, now = Date.now(
         && finding.module_name === 'braces' && finding.severity === 'high' && finding.vulnerable_versions === '<=3.0.3', 'Unclassified pnpm HIGH or CRITICAL finding');
     assert.equal(finding.findings?.length, 1, 'Unreviewed pnpm findings');
     assert.equal(finding.findings[0].version, '3.0.3', 'Unreviewed braces version');
-    assert.deepEqual(finding.findings[0].paths, [], 'Unreviewed pnpm paths');
+    const paths = finding.findings[0].paths;
+    assert.ok(Array.isArray(paths), 'Unreviewed pnpm paths');
+    // Exact routes from the pinned lock for the two Web build dependencies.
+    const prefixes = ['apps/web > tailwindcss@3.4.19', 'apps/web > tailwindcss-animate@1.0.7 > tailwindcss@3.4.19'];
+    const routes = ['chokidar@3.6.0 > braces@3.0.3', 'fast-glob@3.3.3 > micromatch@4.0.8 > braces@3.0.3', 'micromatch@4.0.8 > braces@3.0.3'];
+    if (paths.length) assert.deepEqual([...paths].sort(), prefixes.flatMap((prefix) => routes.map((route) => `${prefix} > ${route}`)).sort(), 'Unreviewed pnpm paths');
     const actions = report.actions.filter((action) => Array.isArray(action.resolves)
         && action.resolves.some((resolved) => String(resolved.id) === String(finding.id)));
     assert.equal(actions.length, 1, 'Unreviewed pnpm actions');
