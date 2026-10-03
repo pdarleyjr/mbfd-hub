@@ -317,6 +317,7 @@ jobs:
           retention-days: 7
       - name: Verify real member submissions and Admin request lifecycles
         id: member-requests
+        if: ${{ !cancelled() && steps.mobile-shell.outcome != 'skipped' }}
         env:
           PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/personnel-requests/report.json
         run: >-
@@ -334,6 +335,7 @@ jobs:
           retention-days: 7
       - name: Verify Operational Forms evidence retention
         id: operational-evidence
+        if: ${{ !cancelled() && steps.mobile-shell.outcome != 'skipped' }}
         env:
           PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/operational-forms-lifecycle/report.json
         run: >-
@@ -351,15 +353,18 @@ jobs:
           path: test-results/operational-forms-lifecycle
           retention-days: 7
       - name: Run mocked Daily Checkout Playwright
+        if: ${{ !cancelled() && steps.mobile-shell.outcome != 'skipped' }}
         env:
           DAILY_CHECKOUT_E2E_BASE_URL: http://127.0.0.1:4176
         run: npm run test:daily-checkout-e2e
       - name: Verify shared panel session-expiry handling
+        if: ${{ !cancelled() && steps.mobile-shell.outcome != 'skipped' }}
         # The browser test uses the installed Livewire client from Composer.
         run: |
           node --test tests/Node/panel-session-expiry.test.mjs
           node --test tests/Browser/panel-session-expiry.mjs
       - name: Run Daily Checkout contract and integrity tests
+        if: ${{ !cancelled() && steps.mobile-shell.outcome != 'skipped' }}
         run: >-
           php artisan test
           tests/Feature/Api/DailyCheckoutIntegrityTest.php

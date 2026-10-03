@@ -3,11 +3,14 @@ function closeMenu(menu, restoreFocus = false) {
     if (restoreFocus) menu.querySelector('summary')?.focus();
 }
 
-document.addEventListener('click', event => {
+function closeMenusOutside(event) {
     document.querySelectorAll('[data-hub-menu][open]').forEach(menu => {
         if (!menu.contains(event.target)) closeMenu(menu);
     });
-});
+}
+// iOS can omit compatibility clicks on noninteractive content outside the menu.
+document.addEventListener('pointerdown', closeMenusOutside);
+document.addEventListener('click', closeMenusOutside);
 
 document.addEventListener('keydown', event => {
     const menu = event.target.closest('[data-hub-menu]');

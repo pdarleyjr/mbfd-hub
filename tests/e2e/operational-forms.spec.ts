@@ -373,15 +373,19 @@ test('admin archives, finds, trashes and restores an actual member upload withou
   expect(response.status()).toBe(201);
   const { record } = await response.json();
   const documentId = record.documents[0].id;
+  await testInfo.attach('evidence-record-ids', {
+    body: Buffer.from(JSON.stringify({ recordId: record.id, documentId, title })), contentType: 'application/json',
+  });
   await expect(page.locator('.of-record-table tbody tr').filter({ hasText: title })).toBeVisible();
 
   const confirmAction = async (name: string, reason?: string) => {
     await page.getByRole('button', { name, exact: true }).first().click();
     const dialog = page.getByRole('dialog').filter({ has: page.getByRole('button', { name: /^(Confirm|Submit)$/ }) });
-    await expect(dialog).toBeVisible();
-    if (reason) await dialog.getByLabel('Reason', { exact: true }).fill(reason);
-    await dialog.getByRole('button', { name: /^(Confirm|Submit)$/ }).click();
-    await expect(dialog).toBeHidden();
+    const confirm = dialog.getByRole('button', { name: /^(Confirm|Submit)$/ });
+    await expect(confirm).toBeVisible({ timeout: 30_000 });
+    if (reason) await dialog.getByLabel(/^Reason\b/).fill(reason);
+    await confirm.click();
+    await expect(confirm).toBeHidden({ timeout: 30_000 });
   };
   const findInVisibility = async (visibility: string) => {
     await page.goto('/admin/operational-forms');
@@ -408,7 +412,7 @@ test('admin archives, finds, trashes and restores an actual member upload withou
   const retainedBytes = await retained.body();
   expect(retainedBytes.toString()).toBe('[QA TEST] Retained private operational evidence');
   await testInfo.attach('retained-operational-document', { body: retainedBytes, contentType: 'text/plain' });
-  await testInfo.attach('evidence-record-ids', {
+  await testInfo.attach('retained-document-metadata', {
     body: Buffer.from(JSON.stringify({ recordId: record.id, documentId, title, retainedByteLength: retainedBytes.length })),
     contentType: 'application/json',
   });
