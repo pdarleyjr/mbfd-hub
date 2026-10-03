@@ -254,11 +254,10 @@ class WorkgroupNotesAndSharedUploadsAuthorizationTest extends TestCase
         $this->actingAs($author);
         Filament::setCurrentPanel(Filament::getPanel('workgroups'));
         $png = base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aOioAAAAASUVORK5CYII=');
-        $page = Livewire::test(SharedUploads::class);
-        $this->invokeProtected($page->instance(), 'uploadFile', [[
+        $page = Livewire::test(SharedUploads::class)->callAction('uploadFile', data: [
             'workgroup_session_id' => $context['session']->id,
             'file' => UploadedFile::fake()->createWithContent('qa-evidence.png', $png),
-        ]]);
+        ])->assertHasNoActionErrors();
         $upload = WorkgroupSharedUpload::query()->sole();
         $this->get(route('workgroup.shared-upload.download', $upload))->assertOk();
         $page->call('loadTable')->assertCanSeeTableRecords([$upload])
