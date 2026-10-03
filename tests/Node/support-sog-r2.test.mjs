@@ -66,7 +66,9 @@ test('policy context excludes apparatus references as well as retired generation
     try {
         const response = await worker.fetch(request('/chat',{message:'How do I report a defect?'}),runtime);
         assert.equal(response.status,200);
-        assert.deepEqual((await response.json()).sources,['Section_800_R2.pdf']);
+        const result = await response.json();
+        assert.deepEqual(result.sources,['Section_800_R2.pdf']);
+        assert.equal('completion' in result,false);
         assert.deepEqual(calls.map(call => call.namespace),[namespace,referenceNamespace]);
         assert.ok(calls.every(call => call.returnMetadata === 'all'));
         const prompt = messages.map(message => message.content).join('\n');
@@ -259,9 +261,11 @@ test('L3 technical questions keep references without invented SOG provenance', a
     let prompt;
     globalThis.fetch=async (_url,options)=>{
         const body=JSON.parse(options.body);prompt=body.messages.at(-1).content;
+        assert.equal('stream_options' in body,false);
         return body.stream
-            ? new Response('data: {"choices":[{"delta":{"content":"MENU > MAINTENANCE; alternator, engine, transmission and pump."}}]}\n\ndata: [DONE]\n\n')
-            : Response.json({choices:[{message:{content:'MENU > MAINTENANCE; alternator, engine, transmission and pump.'}}]});
+            ? new Response('data: {"choices":[{"delta":{"content":"MENU > MAINTENANCE; alternator, engine, transmission and pump."},"finish_reason":"length"}]}\n\ndata: {"choices":[],"usage":{"prompt_tokens":17,"completion_tokens":1024,"total_tokens":1041}}\n\ndata: [DONE]\n\n')
+            : Response.json({choices:[{message:{content:'MENU > MAINTENANCE; alternator, engine, transmission and pump.'},finish_reason:'length'}],
+                usage:{prompt_tokens:17,completion_tokens:1024,total_tokens:1041}});
     };
     try {
         for(const stream of [false,true]) {
@@ -269,9 +273,11 @@ test('L3 technical questions keep references without invented SOG provenance', a
             VECTORIZE:{query:async (_vector,options)=>({matches:options.namespace===referenceNamespace
                 ? [{id:'l3-original',namespace:referenceNamespace,score:0.9,metadata:{source:'l3',chunk_index:63,text:'MENU > MAINTENANCE; alternator, engine, transmission and pump.'}}] : []})},
         }));
-        const body=stream
-            ? JSON.parse((await response.text()).split('\n\n').filter(Boolean).at(-2).slice(6))
-            : await response.json();
+        const events=stream ? (await response.text()).split('\n\n').filter(Boolean).map(event=>event.slice(6)) : null;
+        const body=stream ? JSON.parse(events.at(-2)) : await response.json();
+        const completion=stream ? JSON.parse(events.at(-3)).completion : body.completion;
+        assert.deepEqual(completion,{finish_reason:'length',prompt_tokens:17,completion_tokens:1024});
+        if(stream) assert.equal(events.at(-1),'[DONE]');
         if(!stream) assert.deepEqual(body.sources,['l3']);
         else assert.equal(response.headers.get('X-Sources'),'["l3"]');
         assert.deepEqual(body.citations,[]);
@@ -346,22 +352,49 @@ test('upstream SSE EOF requires actual DONE before emitting citations or complet
     const previousFetch=globalThis.fetch;
     try {
         for(const completed of [false,true]) {
-            globalThis.fetch=async ()=>new Response('data: {"choices":[{"delta":{"content":"Technical answer."}}]}\n\n'+(completed?'data: [DONE]':''));
+            globalThis.fetch=async ()=>new Response('data: {"choices":[{"delta":{"content":"Technical answer."},"finish_reason":"stop"}],"usage":{"prompt_tokens":5,"completion_tokens":2}}\n\n'+(completed?'data: [DONE]':''));
             const response=await worker.fetch(request('/chat',{message:'Where is the L3 maintenance menu?',stream:true}),env({VECTORIZE:{
                 query:async (_vector,options)=>({matches:options.namespace===referenceNamespace
                     ? [{id:'l3-original',namespace:referenceNamespace,score:0.9,metadata:{source:'l3',chunk_index:63,text:'MENU > MAINTENANCE'}}] : []}),
             }}));
             if(completed) {
                 const body=await response.text();
+                assert.match(body,/"completion":\{"finish_reason":"stop","prompt_tokens":5,"completion_tokens":2\}/);
                 assert.match(body,/Reference sources/);
                 assert.match(body,/data: \[DONE\]\n\n$/);
             } else {
                 const reader=response.body.getReader();
                 const first=new TextDecoder().decode((await reader.read()).value);
                 assert.match(first,/Technical answer/);
-                assert.doesNotMatch(first,/Reference sources|\[DONE\]/);
+                assert.doesNotMatch(first,/Reference sources|"completion"|\[DONE\]/);
                 await assert.rejects(reader.read(),/before completion/);
             }
         }
+    } finally {globalThis.fetch=previousFetch;}
+});
+
+test('completion metadata retains only received recognized reasons and safe token counts', async () => {
+    const previousFetch=globalThis.fetch;
+    const runtime=env({VECTORIZE:{query:async (_vector,options)=>({matches:options.namespace===referenceNamespace
+        ? [{id:'l3-original',namespace:referenceNamespace,score:0.9,metadata:{source:'l3',text:'Technical reference.'}}] : []})}});
+    try {
+        globalThis.fetch=async ()=>Response.json({choices:[{message:{content:'Technical answer.'},finish_reason:'stop'}],
+            usage:{prompt_tokens:0,completion_tokens:Number.MAX_SAFE_INTEGER,total_tokens:1},private_reply:'must not escape'});
+        let response=await worker.fetch(request('/chat',{message:'Where is the L3 maintenance menu?'}),runtime);
+        let body=await response.json();
+        assert.deepEqual(body.completion,{finish_reason:'stop',prompt_tokens:0,completion_tokens:Number.MAX_SAFE_INTEGER});
+        assert.equal('private_reply' in body,false);
+
+        globalThis.fetch=async ()=>Response.json({choices:[{message:{content:'Technical answer.'},finish_reason:'private upstream value'}],
+            usage:{prompt_tokens:-1,completion_tokens:1.5}});
+        response=await worker.fetch(request('/chat',{message:'Where is the L3 maintenance menu?'}),runtime);
+        body=await response.json();
+        assert.equal('completion' in body,false);
+
+        globalThis.fetch=async ()=>new Response('data: {"choices":[{"delta":{"content":"Technical answer."},"finish_reason":"stop"}],"usage":{"prompt_tokens":"5","completion_tokens":9007199254740992,"total_tokens":7}}\n\ndata: [DONE]\n\ndata: {"choices":[{"finish_reason":"length"}],"usage":{"prompt_tokens":9}}\n\n');
+        response=await worker.fetch(request('/chat',{message:'Where is the L3 maintenance menu?',stream:true}),runtime);
+        const events=(await response.text()).split('\n\n').filter(Boolean).map(event=>event.slice(6));
+        assert.deepEqual(JSON.parse(events.at(-3)),{completion:{finish_reason:'stop'}});
+        assert.equal(events.at(-1),'[DONE]');
     } finally {globalThis.fetch=previousFetch;}
 });
