@@ -151,8 +151,12 @@ async function submitAdminModal(page: Page): Promise<void> {
 }
 
 async function setArchiveVisibility(page: Page, value: 'active' | 'archived' | 'all'): Promise<void> {
+  const table = page.locator('.fi-ta');
+  await expect(table).toBeVisible();
+  await expect(table).not.toHaveClass(/\banimate-pulse\b/);
   await page.getByRole('button', { name: /^Filters?(?: \d+)?$/i }).click();
   const visibility = page.getByLabel('Visibility', { exact: true });
+  await expect(visibility).toBeVisible();
   if (await visibility.inputValue() !== value) {
     const [filtered] = await Promise.all([
       page.waitForResponse(response => {
