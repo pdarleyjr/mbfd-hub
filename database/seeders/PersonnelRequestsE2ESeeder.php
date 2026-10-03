@@ -31,11 +31,12 @@ class PersonnelRequestsE2ESeeder extends Seeder
         $memberRole = Role::findOrCreate('member', 'web');
         $adminEmployee = Employee::query()->updateOrCreate(
             ['employee_id' => '99003'],
-            ['name' => 'Personnel E2E Admin', 'rank' => 'Captain', 'password' => Hash::make($adminPassword), 'must_change_password' => false],
+            ['name' => 'Personnel E2E Admin', 'rank' => 'Captain', 'city_email' => 'personnel-admin-fixture@miamibeachfl.gov', 'roster_status' => 'active', 'password' => Hash::make($adminPassword), 'must_change_password' => false],
         );
-        $admin = User::query()->firstOrNew(['email' => 'personnel-admin@example.test']);
+        $admin = User::query()->firstOrNew(['employee_id' => $adminEmployee->employee_id]);
         $admin->forceFill([
             'name' => 'Personnel E2E Admin',
+            'email' => $adminEmployee->city_email,
             'password' => Hash::make($adminPassword),
             'must_change_password' => false,
             'employee_id' => $adminEmployee->employee_id,
@@ -43,6 +44,7 @@ class PersonnelRequestsE2ESeeder extends Seeder
             'account_status' => 'active',
             'is_admin' => true,
         ])->save();
+        $admin->forceFill(['email_verified_at' => now()])->save();
         $admin->syncRoles([$role]);
         foreach (['admin.access', 'admin.personnel.view', 'admin.personnel.manage', 'admin.fleet.view', 'admin.fleet.manage', 'admin.stations.view', 'admin.stations.manage', 'admin.support.view', 'admin.support.manage'] as $capability) {
             $admin->givePermissionTo(Permission::findOrCreate($capability, 'web'));
@@ -50,31 +52,35 @@ class PersonnelRequestsE2ESeeder extends Seeder
 
         $officer = Employee::query()->updateOrCreate(
             ['employee_id' => '99001'],
-            ['name' => 'Avery Officer', 'rank' => 'Captain', 'password' => Hash::make($officerPassword), 'must_change_password' => false],
+            ['name' => 'Avery Officer', 'rank' => 'Captain', 'city_email' => 'personnel-officer-fixture@miamibeachfl.gov', 'roster_status' => 'active', 'password' => Hash::make($officerPassword), 'must_change_password' => false],
         );
         $member = Employee::query()->updateOrCreate(
             ['employee_id' => '99002'],
-            ['name' => 'Morgan Member', 'rank' => 'Firefighter', 'password' => Hash::make($memberPassword), 'must_change_password' => false],
+            ['name' => 'Morgan Member', 'rank' => 'Firefighter', 'city_email' => 'personnel-member-fixture@miamibeachfl.gov', 'roster_status' => 'active', 'password' => Hash::make($memberPassword), 'must_change_password' => false],
         );
-        $officerUser = User::query()->firstOrNew(['email' => 'personnel-officer@example.test']);
+        $officerUser = User::query()->firstOrNew(['employee_id' => $officer->employee_id]);
         $officerUser->forceFill([
             'name' => $officer->name,
+            'email' => $officer->city_email,
             'password' => Hash::make($officerPassword),
             'must_change_password' => false,
             'employee_id' => $officer->employee_id,
             'employee_profile_id' => $officer->id,
             'account_status' => 'active',
         ])->save();
+        $officerUser->forceFill(['email_verified_at' => now()])->save();
         $officerUser->syncRoles([$memberRole]);
-        $memberUser = User::query()->firstOrNew(['email' => 'personnel-member@example.test']);
+        $memberUser = User::query()->firstOrNew(['employee_id' => $member->employee_id]);
         $memberUser->forceFill([
             'name' => $member->name,
+            'email' => $member->city_email,
             'password' => Hash::make($memberPassword),
             'must_change_password' => false,
             'employee_id' => $member->employee_id,
             'employee_profile_id' => $member->id,
             'account_status' => 'active',
         ])->save();
+        $memberUser->forceFill(['email_verified_at' => now()])->save();
         $memberUser->syncRoles([$memberRole]);
         $station = Station::query()->updateOrCreate(
             ['station_number' => '1'],

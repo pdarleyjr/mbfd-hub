@@ -36,7 +36,7 @@ class ViewOperationalFormRecord extends ViewRecord
                 ->icon('heroicon-o-archive-box')
                 ->color('gray')
                 ->requiresConfirmation()
-                ->form([\Filament\Forms\Components\Textarea::make('archive_reason')->label('Reason (optional)')->maxLength(2000)])
+                ->form([\Filament\Forms\Components\Textarea::make('archive_reason')->label('Reason')->required()->maxLength(2000)])
                 ->visible(fn (): bool => OperationalFormRecordResource::canDelete($this->getRecord()) && ! $this->getRecord()->isArchived() && ! $this->getRecord()->trashed())
                 ->action(fn (array $data) => app(OperationalEvidenceArchiveService::class)->archive($this->getRecord(), auth()->user(), $data['archive_reason'] ?? null)),
             Actions\Action::make('restore')

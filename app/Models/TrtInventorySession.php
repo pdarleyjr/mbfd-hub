@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property \Illuminate\Support\Carbon|null $archived_at
  * @property int|null $archived_by
  * @property string|null $archive_reason
+ * @property array<int, array<string, mixed>>|null $archive_history
  * @property-read int $entries_count
  */
 class TrtInventorySession extends Model
@@ -24,6 +25,7 @@ class TrtInventorySession extends Model
     ];
 
     protected $casts = [
+        'archive_history' => 'array',
         'session_date' => 'date',
     ];
 

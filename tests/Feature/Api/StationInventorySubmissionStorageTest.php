@@ -160,6 +160,8 @@ class StationInventorySubmissionStorageTest extends TestCase
             ->assertSee('Inventory Storage Actor')
             ->assertSee('Quantity: 2', false)
             ->unmountTableAction()
+            ->callTableAction('archive', $record, data: ['archive_reason' => ''])
+            ->assertHasTableActionErrors(['archive_reason' => 'required'])
             ->callTableAction('archive', $record, data: ['archive_reason' => '[QA TEST] reviewed'])
             ->assertHasNoTableActionErrors()
             ->assertCanNotSeeTableRecords([$record])
@@ -173,6 +175,20 @@ class StationInventorySubmissionStorageTest extends TestCase
         self::assertSame($pdfBytes, Storage::disk($this->privateDisk())->get($record->pdf_path));
         self::assertSame(2, array_values($record->fresh()->items)[0]['quantity']);
         self::assertNull($record->fresh()->archived_at);
+        $archival = app(\App\Services\OperationalEvidenceArchiveService::class);
+        self::assertCount(2, $record->fresh()->archive_history);
+        self::assertSame('[QA TEST] reviewed', $record->fresh()->archive_history[1]['metadata']['archive_reason']);
+        $archival->archive($record, $admin, '[QA TEST] Second inventory review');
+        $archival->archive($record, $admin, '[QA TEST] Duplicate archive');
+        self::assertCount(3, $record->archive_history);
+        self::assertSame($admin->id, $record->archive_history[2]['user_id']);
+        $archival->restore($record, $admin);
+        $archival->restore($record, $admin);
+        self::assertCount(4, $record->archive_history);
+        self::assertSame('[QA TEST] Second inventory review', $record->archive_history[3]['metadata']['archive_reason']);
+        self::assertSame($pdfBytes, Storage::disk($this->privateDisk())->get($record->pdf_path));
+        Livewire::test(InventorySubmissionsRelationManager::class, ['ownerRecord' => $station, 'pageClass' => ViewStation::class, 'lazy' => false])
+            ->call('loadTable')->mountTableAction('view', $record)->assertSee('Archive history')->assertSee('[QA TEST] Second inventory review');
 
         $this->actingAs(User::factory()->create());
         self::assertFalse(InventorySubmissionsRelationManager::canViewForRecord($station, ViewStation::class));

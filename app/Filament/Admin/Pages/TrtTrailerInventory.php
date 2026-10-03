@@ -77,7 +77,7 @@ class TrtTrailerInventory extends Page
                 ->icon('heroicon-o-archive-box')
                 ->color('gray')
                 ->requiresConfirmation()
-                ->form([Forms\Components\Textarea::make('archive_reason')->label('Reason (optional)')->maxLength(2000)])
+                ->form([Forms\Components\Textarea::make('archive_reason')->label('Reason')->required()->maxLength(2000)])
                 ->visible(function (): bool {
                     $session = TrtInventorySession::find($this->selectedSessionId);
 
@@ -228,6 +228,7 @@ class TrtTrailerInventory extends Page
 
         return [
             'sessions' => $sessions,
+            'archiveHistory' => TrtInventorySession::find($this->selectedSessionId)->archive_history ?? [],
             'aggregatedItems' => $aggregatedItems,
             'stats' => $stats,
             'detailEntries' => $detailEntries,

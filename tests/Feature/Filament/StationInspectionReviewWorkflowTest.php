@@ -143,6 +143,8 @@ final class StationInspectionReviewWorkflowTest extends TestCase
         Livewire::test(ViewStationInspection::class, ['record' => $inspection->id])
             ->callAction('acknowledgeInspection', data: ['review_note' => '[QA TEST] Acknowledged'])
             ->assertHasNoActionErrors()
+            ->callAction('archive', data: ['archive_reason' => ''])
+            ->assertHasActionErrors(['archive_reason' => 'required'])
             ->callAction('archive', data: ['archive_reason' => '[QA TEST] Complete review'])
             ->assertHasNoActionErrors()
             ->assertActionVisible('restore');
@@ -163,6 +165,23 @@ final class StationInspectionReviewWorkflowTest extends TestCase
             ->assertCanSeeTableRecords([$inspection]);
         self::assertNull($inspection->fresh()->archived_at);
         self::assertSame('[QA TEST] Acknowledged', $inspection->fresh()->review_note);
+        $archival = app(\App\Services\OperationalEvidenceArchiveService::class);
+        $history = $inspection->fresh()->archive_history;
+        self::assertCount(2, $history);
+        self::assertSame(['record_archived', 'record_restored'], array_column($history, 'event_type'));
+        self::assertSame($admin->id, $history[0]['user_id']);
+        self::assertSame('[QA TEST] Complete review', $history[1]['metadata']['archive_reason']);
+        self::assertNotEmpty($history[0]['created_at']);
+        $archival->archive($inspection, $admin, '[QA TEST] Second review');
+        $archival->archive($inspection, $admin, '[QA TEST] Duplicate archive');
+        self::assertCount(3, $inspection->archive_history);
+        self::assertSame('[QA TEST] Second review', $inspection->archive_reason);
+        $archival->restore($inspection, $admin);
+        $archival->restore($inspection, $admin);
+        self::assertCount(4, $inspection->archive_history);
+        self::assertSame('[QA TEST] Second review', $inspection->archive_history[3]['metadata']['archive_reason']);
+        self::assertSame($signature, $inspection->inspector_signature);
+        $this->get("/admin/station-inspections/{$inspection->id}")->assertOk()->assertSee('Archive history')->assertSee('[QA TEST] Second review');
 
         $this->expectException(LogicException::class);
         $inspection->fresh()->delete();

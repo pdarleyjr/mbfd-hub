@@ -18,6 +18,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -107,6 +108,36 @@ class AdminOperationalFormDeletionTest extends TestCase
 
         $this->assertDatabaseCount('operational_form_documents', 2);
         $this->assertNotNull($record->completed_at);
+    }
+
+    public function test_evidence_archiving_requires_a_reason_and_preserves_prior_reasons_without_duplicate_events(): void
+    {
+        $admin = $this->admin('admin');
+        [$record, $document] = $this->recordWithDocument();
+        $this->actingAsCanonicalUser($admin);
+        $archival = app(OperationalEvidenceArchiveService::class);
+        foreach (['   ', str_repeat('x', 2001)] as $reason) {
+            try {
+                $archival->archive($record, $admin, $reason);
+                self::fail('Evidence cannot be archived without a valid reason.');
+            } catch (ValidationException $exception) {
+                self::assertArrayHasKey('archive_reason', $exception->errors());
+            }
+        }
+        self::assertNull($record->fresh()->archived_at);
+        $archival->archive($record, $admin, '[QA TEST] First archive');
+        $archival->archive($record, $admin, '[QA TEST] Retry');
+        self::assertSame(1, $record->events()->where('event_type', 'record_archived')->count());
+        $archival->restore($record, $admin);
+        $archival->restore($record, $admin);
+        $archival->archive($record, $admin, '[QA TEST] Second archive');
+        $archival->restore($record, $admin);
+        $events = $record->events()->whereIn('event_type', ['record_archived', 'record_restored'])->orderBy('id')->get();
+        self::assertCount(4, $events);
+        self::assertSame(['[QA TEST] First archive', '[QA TEST] First archive', '[QA TEST] Second archive', '[QA TEST] Second archive'], $events->pluck('metadata.archive_reason')->all());
+        self::assertTrue($events->every(fn (OperationalFormEvent $event): bool => $event->user_id === $admin->id && $event->created_at !== null));
+        Storage::disk($this->disk)->assertExists($document->storage_path);
+        self::assertSame($document->id, $record->documents()->sole()->id);
     }
 
     public function test_admin_filters_find_archived_and_trashed_forms_and_restore_documents_and_history(): void

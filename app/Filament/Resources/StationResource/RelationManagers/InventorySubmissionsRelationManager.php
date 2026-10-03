@@ -82,6 +82,15 @@ class InventorySubmissionsRelationManager extends RelationManager
                         Infolists\Components\TextEntry::make('archived_at')->label('Archived At')->dateTime()->placeholder('Active'),
                         Infolists\Components\TextEntry::make('archivedBy.name')->label('Archived By')->placeholder('—'),
                         Infolists\Components\TextEntry::make('archive_reason')->label('Archive Reason')->placeholder('—'),
+                        Infolists\Components\RepeatableEntry::make('archive_history')
+                            ->label('Archive history')->schema([
+                                Infolists\Components\TextEntry::make('event_type')->label('Action')
+                                    ->formatStateUsing(fn (string $state): string => $state === 'record_archived' ? 'Archived' : 'Restored'),
+                                Infolists\Components\TextEntry::make('actor_name')->label('By'),
+                                Infolists\Components\TextEntry::make('created_at')->label('When')->dateTime(),
+                                Infolists\Components\TextEntry::make('metadata.archive_reason')->label('Archive reason'),
+                            ])->columns(2)->columnSpanFull()
+                            ->visible(fn (StationInventorySubmission $record): bool => filled($record->archive_history)),
                         Infolists\Components\TextEntry::make('notes')->label('Notes')->placeholder('No notes')->columnSpanFull(),
                         Infolists\Components\TextEntry::make('items')
                             ->label('Submitted inventory')
@@ -104,7 +113,7 @@ class InventorySubmissionsRelationManager extends RelationManager
                     ->icon('heroicon-o-archive-box')
                     ->color('gray')
                     ->requiresConfirmation()
-                    ->form([\Filament\Forms\Components\Textarea::make('archive_reason')->label('Reason (optional)')->maxLength(2000)])
+                    ->form([\Filament\Forms\Components\Textarea::make('archive_reason')->label('Reason')->required()->maxLength(2000)])
                     ->visible(fn (StationInventorySubmission $record): bool => (auth()->user()?->can('admin.stations.manage') ?? false) && ! $record->isArchived())
                     ->action(fn (StationInventorySubmission $record, array $data) => app(OperationalEvidenceArchiveService::class)->archive($record, auth()->user(), $data['archive_reason'] ?? null)),
                 Tables\Actions\Action::make('restore')

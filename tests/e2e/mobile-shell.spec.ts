@@ -9,6 +9,7 @@ async function loginHome(page: Page, member = false): Promise<void> {
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: /sign in/i }).click();
   await expect(page).toHaveURL(/\/$/);
+  await page.waitForLoadState('domcontentloaded');
   await expect(page.locator('[data-hub-shell]')).toBeVisible();
 }
 
@@ -18,7 +19,7 @@ async function activate(target: Locator, touch: boolean): Promise<void> {
 }
 
 for (const menuName of ['Apps', 'More']) {
-  test(`Home -> ${menuName} -> Admin performs native navigation`, async ({ page, isMobile, hasTouch }) => {
+  test(`Home -> ${menuName} -> Admin performs native navigation`, async ({ page, isMobile, hasTouch }, testInfo) => {
     test.skip(menuName === 'More' && !isMobile, 'The bottom More menu is a phone destination.');
     const errors: string[] = [];
     const failedResponses: string[] = [];
@@ -39,6 +40,7 @@ for (const menuName of ['Apps', 'More']) {
     await expect(page.locator('[data-admin-status-bar]').first()).toBeAttached();
     expect(failedResponses).toEqual([]);
     expect(errors).toEqual([]);
+    await page.screenshot({ path: testInfo.outputPath(`admin-after-${menuName.toLowerCase()}.png`) });
   });
 }
 
@@ -82,12 +84,20 @@ test('phone Home has the official brand, Stations action and five comfortable na
     expect(await icon.evaluate(element => element.getBoundingClientRect().width)).toBe(24);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
     expect(await page.evaluate(() => parseFloat(getComputedStyle(document.body).paddingBottom))).toBeGreaterThanOrEqual(66);
+    await page.evaluate(() => document.fonts.ready.then(() => undefined));
     await page.screenshot({ path: testInfo.outputPath(`home-${width}-viewport.png`) });
     await page.screenshot({ path: testInfo.outputPath(`home-${width}.png`), fullPage: true });
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
     expect(await page.locator('.home-footer').evaluate(element => element.getBoundingClientRect().bottom)).toBeLessThanOrEqual((await navigation.boundingBox())!.y);
     await page.evaluate(() => window.scrollTo(0, 0));
   }
+  await testInfo.attach('home-fonts.json', {
+    body: Buffer.from(JSON.stringify(await page.locator('.hub-shell-brand, #home-greeting, .hub-member-nav__item').evaluateAll(elements => elements.map(element => {
+      const style = getComputedStyle(element);
+      return { label: element.textContent?.trim(), family: style.fontFamily, weight: style.fontWeight, size: style.fontSize };
+    })), null, 2)),
+    contentType: 'application/json',
+  });
 });
 
 test('desktop Home retains the Hub brand and Stations primary action', async ({ page, isMobile }, testInfo) => {
@@ -97,6 +107,7 @@ test('desktop Home retains the Hub brand and Stations primary action', async ({ 
   await expect(page.locator('.hub-shell-brand img')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Stations', exact: true })).toHaveAttribute('href', /\/daily\/stations$/);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
+  await page.evaluate(() => document.fonts.ready.then(() => undefined));
   await page.screenshot({ path: testInfo.outputPath('home-desktop.png'), fullPage: true });
 });
 
@@ -109,7 +120,7 @@ test('menus still close with Escape and outside clicks', async ({ page, hasTouch
   await expect(menu).not.toHaveAttribute('open');
   await expect(menu.locator('summary')).toBeFocused();
   await activate(menu.locator('summary'), hasTouch);
-  await activate(page.getByRole('heading', { name: /Good (morning|afternoon|evening)/ }), hasTouch);
+  await activate(page.getByRole('heading', { name: 'Quick Access', exact: true }), hasTouch);
   await expect(menu).not.toHaveAttribute('open');
 });
 
@@ -138,6 +149,7 @@ test('Daily shares the icon and Employee destination while connected-only naviga
     }
     expect(await icon.evaluate(element => element.getBoundingClientRect().width)).toBe(24);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
+    await page.evaluate(() => document.fonts.ready.then(() => undefined));
     await page.screenshot({ path: testInfo.outputPath(`daily-shell-${width}.png`), fullPage: true });
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
     expect(await page.locator('[data-testid="daily-workspace"]').evaluate(element => element.getBoundingClientRect().bottom)).toBeLessThanOrEqual((await navigation.boundingBox())!.y + 1);

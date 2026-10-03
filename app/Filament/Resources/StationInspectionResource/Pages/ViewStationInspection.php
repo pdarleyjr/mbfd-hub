@@ -31,7 +31,7 @@ class ViewStationInspection extends ViewRecord
                 ->icon('heroicon-o-archive-box')
                 ->color('gray')
                 ->requiresConfirmation()
-                ->form([Forms\Components\Textarea::make('archive_reason')->label('Reason (optional)')->maxLength(2000)])
+                ->form([Forms\Components\Textarea::make('archive_reason')->label('Reason')->required()->maxLength(2000)])
                 ->visible(fn (): bool => StationInspectionResource::canEdit($this->getRecord()) && ! $this->getRecord()->isArchived())
                 ->action(fn (array $data) => app(OperationalEvidenceArchiveService::class)->archive($this->getRecord(), auth()->user(), $data['archive_reason'] ?? null)),
             Actions\Action::make('restore')

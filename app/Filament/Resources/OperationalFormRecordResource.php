@@ -90,7 +90,7 @@ class OperationalFormRecordResource extends Resource
                     ->icon('heroicon-o-archive-box')
                     ->color('gray')
                     ->requiresConfirmation()
-                    ->form([\Filament\Forms\Components\Textarea::make('archive_reason')->label('Reason (optional)')->maxLength(2000)])
+                    ->form([\Filament\Forms\Components\Textarea::make('archive_reason')->label('Reason')->required()->maxLength(2000)])
                     ->visible(fn (OperationalFormRecord $record): bool => self::canDelete($record) && ! $record->isArchived() && ! $record->trashed())
                     ->action(fn (OperationalFormRecord $record, array $data) => app(OperationalEvidenceArchiveService::class)->archive($record, auth()->user(), $data['archive_reason'] ?? null)),
                 Tables\Actions\Action::make('restore')

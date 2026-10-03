@@ -13,6 +13,7 @@ use LogicException;
  * @property \Illuminate\Support\Carbon|null $archived_at
  * @property int|null $archived_by
  * @property string|null $archive_reason
+ * @property array<int, array<string, mixed>>|null $archive_history
  */
 class StationInspection extends Model
 {
@@ -38,6 +39,7 @@ class StationInspection extends Model
     ];
 
     protected $casts = [
+        'archive_history' => 'array',
         'form_data' => 'array',
         'inspection_date' => 'date',
         'reviewed_at' => 'datetime',

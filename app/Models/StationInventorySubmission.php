@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property \Illuminate\Support\Carbon|null $archived_at
  * @property int|null $archived_by
  * @property string|null $archive_reason
+ * @property array<int, array<string, mixed>>|null $archive_history
  */
 class StationInventorySubmission extends Model
 {
@@ -30,6 +31,7 @@ class StationInventorySubmission extends Model
     ];
 
     protected $casts = [
+        'archive_history' => 'array',
         'items' => 'array',
         'submitted_at' => 'datetime',
     ];

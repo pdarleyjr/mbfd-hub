@@ -295,13 +295,61 @@ jobs:
           VITE_SENTRY_DSN: ""
           VITE_SENTRY_RELEASE: ""
         run: npx vite build
+      - name: Publish Filament assets for authenticated browser workflows
+        run: php artisan filament:assets
       - name: Verify Home and Daily member shell in Chromium and true iPhone WebKit
+        id: mobile-shell
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/personnel-requests/report.json
         run: >-
           npx playwright test tests/e2e/mobile-shell.spec.ts
           --config=playwright.personnel-requests.config.ts
           --project=phone-touch
           --project=hub-shell-webkit-iphone
           --project=desktop
+          --reporter=list,json
+      - name: Retain authenticated mobile shell evidence
+        if: ${{ always() && steps.mobile-shell.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: authenticated-mobile-shell-evidence
+          path: test-results/personnel-requests
+          retention-days: 7
+      - name: Verify real member submissions and Admin request lifecycles
+        id: member-requests
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/personnel-requests/report.json
+        run: >-
+          npx playwright test tests/e2e/personnel-requests.spec.ts
+          --config=playwright.personnel-requests.config.ts
+          --project=desktop
+          --grep 'real '
+          --reporter=list,json
+      - name: Retain member request lifecycle evidence
+        if: ${{ always() && steps.member-requests.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: member-request-lifecycle-evidence
+          path: test-results/personnel-requests
+          retention-days: 7
+      - name: Verify Operational Forms evidence retention
+        id: operational-evidence
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/operational-forms-lifecycle/report.json
+        run: >-
+          npx playwright test tests/e2e/operational-forms.spec.ts
+          --config=playwright.operational-forms.config.ts
+          --project=desktop
+          --grep '(admin archives, finds|desktop employee previews)'
+          --output=test-results/operational-forms-lifecycle
+          --reporter=list,json
+      - name: Retain Operational Forms lifecycle evidence
+        if: ${{ always() && steps.operational-evidence.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: operational-forms-lifecycle-evidence
+          path: test-results/operational-forms-lifecycle
+          retention-days: 7
       - name: Run mocked Daily Checkout Playwright
         env:
           DAILY_CHECKOUT_E2E_BASE_URL: http://127.0.0.1:4176

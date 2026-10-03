@@ -250,12 +250,12 @@ test('real uniform submission follows the complete member and Admin lifecycle th
   await page.getByRole('button', { name: 'Submit Uniform Request', exact: true }).click();
   await expect(page.getByText('Uniform request submitted', { exact: true })).toBeVisible();
   const memberPath = (await page.locator('.pr-request-row').first().getAttribute('href'))!;
+  await testInfo.attach('uniform-record', { body: JSON.stringify({ memberPath, publicId: memberPath.split('/').at(-1) }), contentType: 'application/json' });
   const context = await browser.newContext({ baseURL });
   try {
     const admin = await context.newPage();
     await loginAdmin(admin);
     await completePersonnelLifecycle(admin, page, memberPath, false);
-    await testInfo.attach('uniform-record', { body: JSON.stringify({ memberPath }), contentType: 'application/json' });
     await screenshot(admin, testInfo, 'uniform-archived', false);
   } finally {
     await context.close();
@@ -292,10 +292,10 @@ test('real officer PPE submission retains signature, beneficiary and complete Ad
     await member.goto('/employee/my-requests');
     const row = member.locator('.mr-row').filter({ hasText: '[QA TEST] Browser protective equipment.' });
     const memberPath = (await row.getAttribute('href'))!;
+    await testInfo.attach('ppe-record', { body: JSON.stringify({ memberPath, publicId: memberPath.split('/').at(-1), beneficiary: '99002', officer: '99001' }), contentType: 'application/json' });
     const admin = await adminContext.newPage();
     await loginAdmin(admin);
     await completePersonnelLifecycle(admin, member, memberPath, true);
-    await testInfo.attach('ppe-record', { body: JSON.stringify({ memberPath, beneficiary: '99002', officer: '99001' }), contentType: 'application/json' });
     await screenshot(admin, testInfo, 'ppe-archived', false);
   } finally {
     await memberContext.close();
@@ -373,6 +373,7 @@ test('real apparatus service request progresses through scheduling, parts, notes
   const reference = (await row.innerText()).match(/AST-\d{4}-\d+/)![0];
   const view = row.getByRole('link', { name: 'View', exact: true });
   const adminUrl = (await view.getAttribute('href'))!;
+  await testInfo.attach('apparatus-record', { body: JSON.stringify({ id: Number(new URL(adminUrl, page.url()).pathname.split('/').at(-1)), reference, adminUrl, apparatusId: 1 }), contentType: 'application/json' });
   await view.click();
   for (const label of ['Acknowledge', 'Schedule', 'Start Work', 'Wait for Parts', 'Start Work', 'Complete']) {
     await page.getByRole('button', { name: label, exact: true }).click();
@@ -404,7 +405,6 @@ test('real apparatus service request progresses through scheduling, parts, notes
   await expect(page.getByText('[QA TEST] QA unit restored to its original status.', { exact: false }).first()).toBeVisible();
   await expect(page.getByText('[QA TEST] Private mechanic note.', { exact: true })).toHaveCount(0);
   await archiveFindRestore(page, adminUrl, '/admin/apparatus-service-tickets', reference);
-  await testInfo.attach('apparatus-record', { body: JSON.stringify({ reference, adminUrl, apparatusId: 1 }), contentType: 'application/json' });
   await screenshot(page, testInfo, 'apparatus-service-archived', false);
 });
 
@@ -478,6 +478,7 @@ test('real station inventory snapshot and supply request appear in their station
   const response = await submitted;
   expect(response.status()).toBe(201);
   const recordId = (await response.json()).submission_id as number;
+  await testInfo.attach('inventory-record', { body: JSON.stringify({ recordId, stationId: 1 }), contentType: 'application/json' });
   await expect(page.getByRole('button', { name: 'Inventory record submitted', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Special Supply Requests', exact: true }).click();
   await page.getByRole('button', { name: '+ Add New Request', exact: true }).click();
@@ -501,6 +502,9 @@ test('real station inventory snapshot and supply request appear in their station
   const download = await page.request.get((await pdf.getAttribute('href'))!);
   expect(download.status()).toBe(200);
   expect(download.headers()['content-type']).toContain('application/pdf');
+  const pdfBody = await download.body();
+  expect(pdfBody.subarray(0, 5).toString()).toBe('%PDF-');
+  await testInfo.attach('inventory-submission.pdf', { body: pdfBody, contentType: 'application/pdf' });
   await page.getByRole('tab', { name: 'Supply Requests', exact: true }).click();
   const supplyRow = page.locator('tr').filter({ hasText: '[QA TEST] Real browser station supply request.' });
   await expect(supplyRow).toBeVisible();

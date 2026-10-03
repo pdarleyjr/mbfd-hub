@@ -22,6 +22,9 @@ return new class extends Migration
                 $table->timestamp('archived_at')->nullable()->index();
                 $table->foreignId('archived_by')->nullable()->constrained('users')->nullOnDelete();
                 $table->text('archive_reason')->nullable();
+                if ($table->getTable() !== 'operational_form_records') {
+                    $table->json('archive_history')->nullable();
+                }
             });
         }
         Schema::table('operational_form_events', static function (Blueprint $table): void {
@@ -39,6 +42,9 @@ return new class extends Migration
                 $table->dropConstrainedForeignId('archived_by');
                 $table->dropIndex(['archived_at']);
                 $table->dropColumn(['archived_at', 'archive_reason']);
+                if ($table->getTable() !== 'operational_form_records') {
+                    $table->dropColumn('archive_history');
+                }
             });
         }
     }

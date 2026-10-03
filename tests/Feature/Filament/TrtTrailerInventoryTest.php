@@ -78,6 +78,7 @@ class TrtTrailerInventoryTest extends TestCase
         self::assertSame($member->id, $entry->user_id);
         self::assertSame(2, $entry->actual_quantity);
         Storage::disk('public')->assertExists($entry->image_path);
+        $photoBytes = Storage::disk('public')->get($entry->image_path);
         $this->travelBack();
 
         $admin = $this->equipmentAdmin(manage: true);
@@ -93,6 +94,8 @@ class TrtTrailerInventoryTest extends TestCase
             ->assertSee('[QA TEST] TRT Actor')
             ->assertSee('good')
             ->call('closeItemDetail')
+            ->callAction('archiveSession', data: ['archive_reason' => ''])
+            ->assertHasActionErrors(['archive_reason' => 'required'])
             ->callAction('archiveSession', data: ['archive_reason' => '[QA TEST] Historical review'])
             ->assertHasNoActionErrors()
             ->assertSet('selectedSessionId', null)
@@ -107,10 +110,24 @@ class TrtTrailerInventoryTest extends TestCase
             ->assertSet('selectedSessionId', $session->id);
 
         self::assertNull($session->fresh()->archived_at);
+        self::assertCount(2, $session->fresh()->archive_history);
+        self::assertSame('[QA TEST] Historical review', $session->fresh()->archive_history[1]['metadata']['archive_reason']);
+        $archival = app(OperationalEvidenceArchiveService::class);
+        $archival->archive($session, $admin, '[QA TEST] Second historical review');
+        $archival->archive($session, $admin, '[QA TEST] Duplicate archive');
+        self::assertCount(3, $session->archive_history);
+        self::assertSame('[QA TEST] Second historical review', $session->archive_reason);
+        self::assertSame($admin->id, $session->archive_history[2]['user_id']);
+        $archival->restore($session, $admin);
+        $archival->restore($session, $admin);
+        self::assertCount(4, $session->archive_history);
+        self::assertSame('[QA TEST] Second historical review', $session->archive_history[3]['metadata']['archive_reason']);
+        Livewire::test(TrtTrailerInventory::class)->assertSee('Archive history')->assertSee('[QA TEST] Second historical review');
         self::assertSame(2, $entry->fresh()->actual_quantity);
         self::assertSame('good', $entry->fresh()->condition);
         self::assertSame('keep', $entry->fresh()->action);
         Storage::disk('public')->assertExists($entry->image_path);
+        self::assertSame($photoBytes, Storage::disk('public')->get($entry->image_path));
     }
 
     public function test_today_shared_session_cannot_be_archived_and_viewers_have_no_lifecycle_actions(): void
@@ -123,7 +140,7 @@ class TrtTrailerInventoryTest extends TestCase
         Livewire::test(TrtTrailerInventory::class)->assertActionHidden('archiveSession');
 
         try {
-            app(OperationalEvidenceArchiveService::class)->archive($session, $manager);
+            app(OperationalEvidenceArchiveService::class)->archive($session, $manager, '[QA TEST] Current session');
             self::fail('Today’s shared session must remain available for new submissions.');
         } catch (ValidationException) {
             self::assertNull($session->fresh()->archived_at);

@@ -30,6 +30,21 @@
             </select>
         </div>
 
+        @if($archiveHistory !== [])
+            <details style="margin-bottom:1.5rem;">
+                <summary style="min-height:44px;cursor:pointer;">Archive history</summary>
+                <ul>
+                    @foreach($archiveHistory as $event)
+                        <li style="margin-bottom:0.75rem;">
+                            {{ $event['event_type'] === 'record_archived' ? 'Archived' : 'Restored' }}
+                            · {{ $event['actor_name'] }} · {{ \Illuminate\Support\Carbon::parse($event['created_at'])->format('M j, Y g:i A') }}
+                            <p>{{ $event['metadata']['archive_reason'] }}</p>
+                        </li>
+                    @endforeach
+                </ul>
+            </details>
+        @endif
+
         {{-- Stats Bar --}}
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0.75rem;margin-bottom:1.5rem;">
             <div style="background:rgb(var(--hub-surface-muted));border:1px solid rgb(var(--hub-border));border-radius:0.5rem;padding:0.75rem 1rem;text-align:center;">

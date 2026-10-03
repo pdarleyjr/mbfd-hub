@@ -379,7 +379,7 @@ test('admin archives, finds, trashes and restores an actual member upload withou
     await page.getByRole('button', { name, exact: true }).first().click();
     const dialog = page.getByRole('dialog').filter({ has: page.getByRole('button', { name: /^(Confirm|Submit)$/ }) });
     await expect(dialog).toBeVisible();
-    if (reason) await dialog.getByLabel('Reason (optional)').fill(reason);
+    if (reason) await dialog.getByLabel('Reason', { exact: true }).fill(reason);
     await dialog.getByRole('button', { name: /^(Confirm|Submit)$/ }).click();
     await expect(dialog).toBeHidden();
   };
@@ -405,7 +405,13 @@ test('admin archives, finds, trashes and restores an actual member upload withou
   await expect(page.getByText('Trash', { exact: true })).toBeVisible();
   const retained = await page.request.get(`/admin/operational-forms/documents/${documentId}/download`);
   expect(retained.status()).toBe(200);
-  expect((await retained.body()).toString()).toBe('[QA TEST] Retained private operational evidence');
+  const retainedBytes = await retained.body();
+  expect(retainedBytes.toString()).toBe('[QA TEST] Retained private operational evidence');
+  await testInfo.attach('retained-operational-document', { body: retainedBytes, contentType: 'text/plain' });
+  await testInfo.attach('evidence-record-ids', {
+    body: Buffer.from(JSON.stringify({ recordId: record.id, documentId, title, retainedByteLength: retainedBytes.length })),
+    contentType: 'application/json',
+  });
   await expect(page.getByText('Delete PDF', { exact: true })).toHaveCount(0);
   await confirmAction('Restore');
   await page.goto('/employee/forms');

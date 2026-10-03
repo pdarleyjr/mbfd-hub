@@ -12,6 +12,7 @@ use App\Models\TrtInventorySession;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 final class OperationalEvidenceArchiveService
@@ -22,6 +23,8 @@ final class OperationalEvidenceArchiveService
         ?string $reason = null,
     ): void {
         $this->authorize($record, $actor);
+        $reason = trim($reason ?? '');
+        Validator::make(['archive_reason' => $reason], ['archive_reason' => ['required', 'string', 'max:2000']])->validate();
 
         DB::transaction(function () use ($record, $actor, $reason): void {
             $locked = $this->lock($record);
@@ -40,7 +43,7 @@ final class OperationalEvidenceArchiveService
             $locked->forceFill([
                 'archived_at' => now(),
                 'archived_by' => $actor->getKey(),
-                'archive_reason' => filled($reason) ? trim((string) $reason) : null,
+                'archive_reason' => $reason,
             ])->save();
             $this->audit($locked, $actor, 'record_archived', [
                 'archived_at' => $locked->archived_at?->toISOString(),
@@ -113,6 +116,16 @@ final class OperationalEvidenceArchiveService
                 'metadata' => $metadata,
                 'created_at' => now(),
             ]);
+        } elseif ($record instanceof StationInspection || $record instanceof StationInventorySubmission || $record instanceof TrtInventorySession) {
+            $history = $record->archive_history ?? [];
+            $history[] = [
+                'event_type' => $event,
+                'user_id' => $actor->getKey(),
+                'actor_name' => $actor->name,
+                'created_at' => now()->toISOString(),
+                'metadata' => $metadata,
+            ];
+            $record->forceFill(['archive_history' => $history])->save();
         }
     }
 }

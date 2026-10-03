@@ -97,7 +97,7 @@ class StationInspectionResource extends Resource
                     ->icon('heroicon-o-archive-box')
                     ->color('gray')
                     ->requiresConfirmation()
-                    ->form([\Filament\Forms\Components\Textarea::make('archive_reason')->label('Reason (optional)')->maxLength(2000)])
+                    ->form([\Filament\Forms\Components\Textarea::make('archive_reason')->label('Reason')->required()->maxLength(2000)])
                     ->visible(fn (StationInspection $record): bool => self::canEdit($record) && ! $record->isArchived())
                     ->action(fn (StationInspection $record, array $data) => app(OperationalEvidenceArchiveService::class)->archive($record, auth()->user(), $data['archive_reason'] ?? null)),
                 Tables\Actions\Action::make('restore')
@@ -155,6 +155,17 @@ class StationInspectionResource extends Resource
                             ->view('filament.infolists.station-inspection-checklist')
                             ->columnSpanFull(),
                     ]),
+                Infolists\Components\Section::make('Archive history')
+                    ->schema([
+                        Infolists\Components\RepeatableEntry::make('archive_history')
+                            ->label('')->schema([
+                                Infolists\Components\TextEntry::make('event_type')->label('Action')
+                                    ->formatStateUsing(fn (string $state): string => $state === 'record_archived' ? 'Archived' : 'Restored'),
+                                Infolists\Components\TextEntry::make('actor_name')->label('By'),
+                                Infolists\Components\TextEntry::make('created_at')->label('When')->dateTime(),
+                                Infolists\Components\TextEntry::make('metadata.archive_reason')->label('Archive reason'),
+                            ])->columns(2),
+                    ])->collapsible()->collapsed()->visible(fn (StationInspection $record): bool => filled($record->archive_history)),
                 Infolists\Components\Section::make('Signatures')
                     ->schema([
                         Infolists\Components\ViewEntry::make('inspector_signature')
