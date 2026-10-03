@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources\ApparatusServiceTicketResource\Pages;
 
 use App\Enums\ApparatusServiceTicketStatus;
+use App\Filament\Concerns\ArchivesRequests;
 use App\Filament\Resources\ApparatusServiceTicketResource;
 use App\Models\Apparatus;
 use App\Models\ApparatusServiceTicket;
@@ -17,6 +18,8 @@ use Filament\Resources\Pages\ViewRecord;
 
 class ViewApparatusServiceTicket extends ViewRecord
 {
+    use ArchivesRequests;
+
     protected static string $resource = ApparatusServiceTicketResource::class;
 
     protected function getHeaderActions(): array
@@ -30,7 +33,25 @@ class ViewApparatusServiceTicket extends ViewRecord
             ApparatusServiceTicketStatus::Cancelled,
         ])->map(fn (ApparatusServiceTicketStatus $status): Actions\Action => $this->transitionAction($status))->all();
 
-        return [...$workflowActions, $this->operationalStatusAction()];
+        return [...$workflowActions, $this->noteAction(), $this->operationalStatusAction(), ...$this->getArchiveActions()];
+    }
+
+    private function noteAction(): Actions\Action
+    {
+        return Actions\Action::make('add_note')
+            ->label('Add Note')
+            ->icon('heroicon-o-chat-bubble-left-right')
+            ->visible(fn (): bool => auth()->user()?->can('update', $this->ticket()) ?? false)
+            ->form([
+                Forms\Components\Textarea::make('public_note')->label('Public Update')->maxLength(5000),
+                Forms\Components\Textarea::make('internal_note')->label('Internal Note')->maxLength(10000),
+            ])
+            ->action(function (array $data): void {
+                /** @var User $actor */
+                $actor = auth()->user();
+                $this->record = app(ApparatusServiceTicketWorkflowService::class)->addNote($this->ticket(), $actor, $data);
+                Notification::make()->title('Ticket note added')->success()->send();
+            });
     }
 
     private function transitionAction(ApparatusServiceTicketStatus $status): Actions\Action

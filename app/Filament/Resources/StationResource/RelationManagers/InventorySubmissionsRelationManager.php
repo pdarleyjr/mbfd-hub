@@ -2,6 +2,9 @@
 
 namespace App\Filament\Resources\StationResource\RelationManagers;
 
+use App\Filament\Support\ArchiveFilter;
+use App\Models\StationInventorySubmission;
+use App\Services\OperationalEvidenceArchiveService;
 use Filament\Infolists;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
@@ -45,6 +48,7 @@ class InventorySubmissionsRelationManager extends RelationManager
             ])
             ->defaultSort('submitted_at', 'desc')
             ->filters([
+                ArchiveFilter::make(),
                 Tables\Filters\SelectFilter::make('shift')
                     ->options([
                         'A' => 'A Shift',
@@ -53,17 +57,20 @@ class InventorySubmissionsRelationManager extends RelationManager
                     ]),
             ])
             // These records deliberately have no standalone resource. The
-            // owning Station is their canonical, read-only admin context.
+            // owning Station is their canonical admin context. Evidence stays intact.
             ->actions([
                 Tables\Actions\ViewAction::make()
                     ->infolist([
                         Infolists\Components\TextEntry::make('employee_name')->label('Submitted by')->placeholder('Unknown employee'),
                         Infolists\Components\TextEntry::make('shift')->label('Shift')->placeholder('—'),
                         Infolists\Components\TextEntry::make('submitted_at')->label('Submitted')->dateTime('M j, Y g:i A')->timezone('America/New_York'),
+                        Infolists\Components\TextEntry::make('archived_at')->label('Archived At')->dateTime()->placeholder('Active'),
+                        Infolists\Components\TextEntry::make('archivedBy.name')->label('Archived By')->placeholder('—'),
+                        Infolists\Components\TextEntry::make('archive_reason')->label('Archive Reason')->placeholder('—'),
                         Infolists\Components\TextEntry::make('notes')->label('Notes')->placeholder('No notes')->columnSpanFull(),
                         Infolists\Components\TextEntry::make('items')
                             ->label('Submitted inventory')
-                            ->formatStateUsing(static fn (?array $state): string => collect($state ?? [])
+                            ->state(static fn (StationInventorySubmission $record): string => collect($record->items ?? [])
                                 ->map(static fn (array $item): string => collect($item)
                                     ->filter(static fn (mixed $value): bool => $value !== null && $value !== '')
                                     ->map(static fn (mixed $value, string $key): string => str($key)->headline().': '.$value)
@@ -72,6 +79,25 @@ class InventorySubmissionsRelationManager extends RelationManager
                             ->placeholder('No submitted inventory lines')
                             ->columnSpanFull(),
                     ]),
+                Tables\Actions\Action::make('downloadPdf')
+                    ->label('Download PDF')
+                    ->icon('heroicon-o-document-arrow-down')
+                    ->url(fn (StationInventorySubmission $record): string => route('download-inventory-pdf', $record))
+                    ->visible(fn (StationInventorySubmission $record): bool => filled($record->pdf_path)),
+                Tables\Actions\Action::make('archive')
+                    ->label('Archive')
+                    ->icon('heroicon-o-archive-box')
+                    ->color('gray')
+                    ->requiresConfirmation()
+                    ->form([\Filament\Forms\Components\Textarea::make('archive_reason')->label('Reason (optional)')->maxLength(2000)])
+                    ->visible(fn (StationInventorySubmission $record): bool => (auth()->user()?->can('admin.stations.manage') ?? false) && ! $record->isArchived())
+                    ->action(fn (StationInventorySubmission $record, array $data) => app(OperationalEvidenceArchiveService::class)->archive($record, auth()->user(), $data['archive_reason'] ?? null)),
+                Tables\Actions\Action::make('restore')
+                    ->label('Restore')
+                    ->icon('heroicon-o-arrow-uturn-left')
+                    ->requiresConfirmation()
+                    ->visible(fn (StationInventorySubmission $record): bool => (auth()->user()?->can('admin.stations.manage') ?? false) && $record->isArchived())
+                    ->action(fn (StationInventorySubmission $record) => app(OperationalEvidenceArchiveService::class)->restore($record, auth()->user())),
             ])
             ->bulkActions([]);
     }

@@ -34,11 +34,11 @@ class OperationalFormRecordPolicy
 
     public function restore(User $user, OperationalFormRecord $record): bool
     {
-        return false;
+        return $user->can('admin.forms.manage');
     }
 
     public function forceDelete(User $user, OperationalFormRecord $record): bool
     {
-        return $this->viewAny($user);
+        return false;
     }
 }

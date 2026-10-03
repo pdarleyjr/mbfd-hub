@@ -8,6 +8,7 @@ use App\Enums\StationRequestStatus;
 use App\Enums\StationRequestType;
 use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\StationRequestResource\Pages;
+use App\Filament\Support\ArchiveFilter;
 use App\Models\Station;
 use App\Models\StationRequest;
 use Filament\Infolists;
@@ -103,6 +104,7 @@ class StationRequestResource extends Resource
                     ->sortable(),
             ])
             ->filters([
+                ArchiveFilter::make(),
                 Tables\Filters\SelectFilter::make('station_id')
                     ->relationship('station', 'station_number')
                     ->label('Station'),
@@ -127,8 +129,7 @@ class StationRequestResource extends Resource
                     ->queries(
                         true: fn (Builder $query): Builder => $query->whereIn('status', StationRequestStatus::openValues()),
                         false: fn (Builder $query): Builder => $query->whereIn('status', StationRequestStatus::terminalValues()),
-                    )
-                    ->default(true),
+                    ),
             ])
             ->defaultSort('created_at', 'desc')
             ->actions([Tables\Actions\ViewAction::make()]);
@@ -137,6 +138,11 @@ class StationRequestResource extends Resource
     public static function infolist(Infolist $infolist): Infolist
     {
         return $infolist->schema([
+            Infolists\Components\Section::make('Archive')->schema([
+                Infolists\Components\TextEntry::make('archived_at')->dateTime(),
+                Infolists\Components\TextEntry::make('archivedBy.name')->label('Archived by'),
+                Infolists\Components\TextEntry::make('archive_reason')->placeholder('No reason recorded'),
+            ])->columns(3)->visible(fn (StationRequest $record): bool => $record->isArchived()),
             Infolists\Components\Section::make('Request')
                 ->schema([
                     Infolists\Components\TextEntry::make('request_number')->label('Request'),

@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Api;
 
+use App\Enums\StationRequestStatus;
 use App\Models\Employee;
 use App\Models\Room;
 use App\Models\RoomAsset;
 use App\Models\Station;
 use App\Models\StationRequest;
 use App\Models\User;
+use App\Services\RequestArchivalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -514,6 +516,46 @@ class StationRequestApiTest extends TestCase
             'status' => 'cancelled',
         ])->assertOk();
         $this->assertNotNull($cancelled->refresh()->cancelled_at);
+    }
+
+    public function test_every_station_workflow_status_remains_visible_to_members_and_archived_history_retains_signatures(): void
+    {
+        foreach (['repair_service', 'equipment'] as $type) {
+            $this->actingAsCanonicalUser($this->canonicalActor);
+            $payload = $this->equipmentPayload();
+            $payload['client_submission_id'] = (string) str()->uuid();
+            $payload['request_type'] = $type;
+            $payload['title'] = '[QA TEST] '.$type.' state history';
+            $id = $this->postJson('/api/public/station_request', $payload)->assertCreated()->json('data.id');
+            $request = StationRequest::query()->findOrFail($id);
+            $manager = $this->makeAdmin('logistics_admin');
+            $this->actingAs($manager);
+            foreach (array_diff(StationRequestStatus::openValues(), ['pending']) as $status) {
+                $public = 'QA update: '.$status;
+                $this->patchJson("/api/admin/station-requests/{$id}/transition", [
+                    'status' => $status, 'public_note' => $public, 'internal_note' => 'Private QA scheduling note.',
+                    'assigned_to_user_id' => $manager->id, 'assigned_vendor' => 'QA test vendor',
+                ])->assertOk()->assertJsonPath('data.status', $status);
+                $this->getJson("/api/public/stations/{$this->station->id}/requests?scope=all")
+                    ->assertOk()->assertSee($public)->assertDontSee('Private QA scheduling note.');
+            }
+            $signatures = data_get($request->refresh()->metadata, 'signatures', []);
+            $archival = app(RequestArchivalService::class);
+            $archival->archive($request, $manager, 'Private QA archive reason.');
+            $this->getJson("/api/public/stations/{$this->station->id}/requests")
+                ->assertOk()->assertDontSee($request->request_number);
+            $this->getJson("/api/public/stations/{$this->station->id}/requests?scope=all")
+                ->assertOk()->assertSee($request->request_number)->assertDontSee('Private QA archive reason.');
+            foreach ($signatures as $signature) {
+                Storage::disk('public')->assertExists($signature);
+            }
+            $archival->restore($request, $manager);
+            $this->getJson("/api/public/stations/{$this->station->id}/requests")
+                ->assertOk()->assertSee($request->request_number);
+            $this->patchJson("/api/admin/station-requests/{$id}/transition", ['status' => 'completed', 'public_note' => 'QA work completed.'])
+                ->assertOk();
+            $this->assertNotNull($request->refresh()->completed_at);
+        }
     }
 
     public function test_request_updates_and_room_asset_events_are_append_only(): void

@@ -7,6 +7,7 @@ namespace App\Filament\Clusters\PersonnelUniformsEquipment\Resources\PersonnelRe
 use App\Enums\PersonnelRequestStatus;
 use App\Enums\PersonnelRequestType;
 use App\Filament\Clusters\PersonnelUniformsEquipment\Resources\PersonnelRequestResource;
+use App\Filament\Concerns\ArchivesRequests;
 use App\Models\PersonnelRequest;
 use App\Models\Uniform;
 use App\Services\PersonnelRequests\PersonnelRequestFulfillmentService;
@@ -21,6 +22,8 @@ use Filament\Resources\Pages\ViewRecord;
 
 class ViewPersonnelRequest extends ViewRecord
 {
+    use ArchivesRequests;
+
     protected static string $resource = PersonnelRequestResource::class;
 
     protected function getHeaderActions(): array
@@ -29,6 +32,7 @@ class ViewPersonnelRequest extends ViewRecord
         $request = $this->record;
 
         return [
+            ...$this->getArchiveActions(),
             $this->transitionAction('acknowledge', 'Acknowledge', PersonnelRequestStatus::Acknowledged, 'primary', 'heroicon-o-hand-raised'),
             Action::make('request_information')
                 ->label('Request Information')
@@ -85,6 +89,7 @@ class ViewPersonnelRequest extends ViewRecord
                 }),
             $this->transitionAction('complete', 'Complete', PersonnelRequestStatus::Completed, 'success', 'heroicon-o-check-badge'),
             $this->transitionAction('deny', 'Deny', PersonnelRequestStatus::Denied, 'danger', 'heroicon-o-x-circle'),
+            $this->transitionAction('cancel', 'Cancel', PersonnelRequestStatus::Cancelled, 'danger', 'heroicon-o-x-mark'),
             Action::make('add_note')->label('Add Note')->icon('heroicon-o-chat-bubble-left-right')->form([
                 Textarea::make('employee_note')->label('Employee-visible note')->maxLength(2000),
                 Textarea::make('internal_note')->label('Admin-only internal note')->maxLength(2000),

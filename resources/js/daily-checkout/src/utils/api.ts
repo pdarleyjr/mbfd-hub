@@ -1,7 +1,7 @@
 import {
   Apparatus, ChecklistData, ChecklistField, ChecklistInputType, InspectionSubmission, InspectionRevision, EmployeeOption, ScheduledChecklistTask, Station, StationDetail,
   Room, RoomAsset, RoomAudit, BigTicketRequest, BigTicketRequestFormData,
-  StationInventorySubmission, InventorySubmissionItem,
+  StationInventorySubmission, InventorySubmissionItem, Shift,
   InventoryV2Response, SupplyRequest, UpdateItemRequest, CreateSupplyRequestRequest,
   StationInspectionSummary, FireEquipmentRequestSummary,
   SingleGasMeterSummary, StationRequestSummary, ApparatusServiceTicketSummary, StationActivityEntry, RoomProfile,
@@ -657,6 +657,17 @@ export class ApiClient {
     });
     if (!response.ok) {
       throw new Error('Failed to fetch supply requests');
+    }
+    return response.json();
+  }
+
+  static async submitInventoryRecord(stationId: number, data: { actor_shift: Shift; client_submission_id: string; notes: string }): Promise<{ success: boolean; submission_id: number }> {
+    const response = await fetch(`${API_BASE}/v2/station-inventory/${stationId}/submissions`, {
+      method: 'POST', credentials: 'same-origin', headers: mutationHeaders(), body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || 'The inventory record could not be submitted. Your saved counts are unchanged.');
     }
     return response.json();
   }

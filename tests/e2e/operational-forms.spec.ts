@@ -350,6 +350,69 @@ test('admin Forms resource exposes separate controlled-form tabs', async ({ page
   await expect(page.getByText('F-ROC Daily Activity Reports', { exact: true })).toBeVisible();
   await expect(page.getByText('Submitted files', { exact: true })).toBeVisible();
   await expect(page.getByText('E2E Controlled ICS 214')).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByRole('button', { name: 'Delete' }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Move to Trash' }).first()).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('operational-forms-admin-tabs-desktop.png'), fullPage: true });
+});
+
+test('admin archives, finds, trashes and restores an actual member upload without losing its document', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'One full Admin evidence lifecycle acceptance is sufficient.');
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  const title = `[QA TEST] Evidence lifecycle ${Date.now()}`;
+  await page.goto('/employee/forms');
+  await login(page, adminEmployeeId, adminPassword);
+  await expect(page).toHaveURL(/\/employee\/forms$/, { timeout: 30_000 });
+  const upload = page.locator('.of-upload-card');
+  await upload.getByLabel('File name').fill(title);
+  await upload.locator('input[type=file]').setInputFiles({
+    name: 'qa-evidence.txt', mimeType: 'text/plain', buffer: Buffer.from('[QA TEST] Retained private operational evidence'),
+  });
+  const submitted = page.waitForResponse((response) => response.url().endsWith('/employee/forms/api/uploads') && response.request().method() === 'POST');
+  await upload.getByRole('button', { name: 'Submit completed file' }).click();
+  const response = await submitted;
+  expect(response.status()).toBe(201);
+  const { record } = await response.json();
+  const documentId = record.documents[0].id;
+  await expect(page.locator('.of-record-table tbody tr').filter({ hasText: title })).toBeVisible();
+
+  const confirmAction = async (name: string, reason?: string) => {
+    await page.getByRole('button', { name, exact: true }).first().click();
+    const dialog = page.getByRole('dialog').filter({ has: page.getByRole('button', { name: /^(Confirm|Submit)$/ }) });
+    await expect(dialog).toBeVisible();
+    if (reason) await dialog.getByLabel('Reason (optional)').fill(reason);
+    await dialog.getByRole('button', { name: /^(Confirm|Submit)$/ }).click();
+    await expect(dialog).toBeHidden();
+  };
+  const findInVisibility = async (visibility: string) => {
+    await page.goto('/admin/operational-forms');
+    await page.getByRole('button', { name: /filter/i }).first().click();
+    await page.getByLabel('Visibility').selectOption(visibility);
+    await page.getByRole('heading', { name: 'Operational Forms', exact: true }).click();
+    await expect(page.locator('tbody tr').filter({ hasText: title })).toBeVisible();
+  };
+
+  await page.goto(`/admin/operational-forms/${record.id}`);
+  await expect(page.getByText('Document history')).toBeVisible();
+  await confirmAction('Archive', '[QA TEST] Reviewed');
+  await expect(page.getByRole('button', { name: 'Restore', exact: true })).toBeVisible();
+  await findInVisibility('archived');
+  await page.goto(`/admin/operational-forms/${record.id}`);
+  await confirmAction('Restore');
+  await confirmAction('Move to Trash');
+  await expect(page).toHaveURL(/\/admin\/operational-forms$/);
+  await findInVisibility('trash');
+  await page.goto(`/admin/operational-forms/${record.id}`);
+  await expect(page.getByText('Trash', { exact: true })).toBeVisible();
+  const retained = await page.request.get(`/admin/operational-forms/documents/${documentId}/download`);
+  expect(retained.status()).toBe(200);
+  expect((await retained.body()).toString()).toBe('[QA TEST] Retained private operational evidence');
+  await expect(page.getByText('Delete PDF', { exact: true })).toHaveCount(0);
+  await confirmAction('Restore');
+  await page.goto('/employee/forms');
+  await expect(page.locator('.of-record-table tbody tr').filter({ hasText: title })).toBeVisible();
+  await page.goto(`/admin/operational-forms/${record.id}`);
+  await page.screenshot({ path: testInfo.outputPath('operational-forms-archive-trash-restore.png'), fullPage: true });
+  await confirmAction('Move to Trash');
+  testInfo.annotations.push({ type: 'qa-record', description: `${record.id}; retained document ${documentId}; safely trashed` });
+  expect(errors).toEqual([]);
 });

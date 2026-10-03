@@ -7,12 +7,12 @@ export default function FormsHub() {
     <div className="mx-auto max-w-6xl font-hub">
       <HubPageHeader eyebrow="Operational forms" title="Forms Hub" description="Select the workflow that matches the work you need to complete." />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 stagger-list">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         
         {/* One authoritative station repair / service / equipment request */}
         <Link
           to="/forms-hub/station-request"
-          className="group rounded-xl bg-hub-surface p-6 shadow-sm ring-1 ring-hub-border/80 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:ring-hub-blue/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus"
+          className="group rounded-xl bg-hub-surface p-6 shadow-sm ring-1 ring-hub-border/80 transition-all duration-200 hover:shadow-md hover:ring-hub-blue/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus"
         >
           <div className="flex items-start space-x-4">
             <div className="flex-shrink-0">
@@ -40,7 +40,7 @@ export default function FormsHub() {
         {/* Card B: Station Inventory Form */}
         <Link
           to="/forms-hub/station-inventory"
-          className="group rounded-xl bg-hub-surface p-6 shadow-sm ring-1 ring-hub-border/80 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:ring-hub-blue/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus"
+          className="group rounded-xl bg-hub-surface p-6 shadow-sm ring-1 ring-hub-border/80 transition-all duration-200 hover:shadow-md hover:ring-hub-blue/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus"
         >
           <div className="flex items-start space-x-4">
             <div className="flex-shrink-0">
@@ -68,7 +68,7 @@ export default function FormsHub() {
         {/* Station Inspection */}
         <Link
           to="/forms-hub/station-inspection"
-          className="group rounded-xl bg-hub-surface p-6 shadow-sm ring-1 ring-hub-border/80 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:ring-hub-blue/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus"
+          className="group rounded-xl bg-hub-surface p-6 shadow-sm ring-1 ring-hub-border/80 transition-all duration-200 hover:shadow-md hover:ring-hub-blue/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus"
         >
           <div className="flex items-start space-x-4">
             <div className="flex-shrink-0">
@@ -96,7 +96,7 @@ export default function FormsHub() {
         {/* Card E: TRT Trailer Inventory */}
         <Link
           to="/forms-hub/trt-inventory"
-          className="group rounded-xl bg-hub-surface p-6 shadow-sm ring-1 ring-hub-border/80 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:ring-hub-blue/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus"
+          className="group rounded-xl bg-hub-surface p-6 shadow-sm ring-1 ring-hub-border/80 transition-all duration-200 hover:shadow-md hover:ring-hub-blue/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus"
         >
           <div className="flex items-start space-x-4">
             <div className="flex-shrink-0">

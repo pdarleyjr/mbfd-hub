@@ -149,6 +149,7 @@ class WorkgroupResource extends Resource
             RelationManagers\MembersRelationManager::class,
             RelationManagers\SessionsRelationManager::class,
             RelationManagers\FilesRelationManager::class,
+            RelationManagers\SharedUploadsRelationManager::class,
         ];
     }
 
@@ -185,7 +186,7 @@ class WorkgroupResource extends Resource
 
     public static function canDelete($record): bool
     {
-        return self::canEdit($record);
+        return self::canEdit($record) && ! $record->hasRetainedEvidence();
     }
 
     public static function canView($record): bool

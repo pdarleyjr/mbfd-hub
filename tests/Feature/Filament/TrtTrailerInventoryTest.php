@@ -9,9 +9,11 @@ use App\Models\TrtInventoryCatalogItem;
 use App\Models\TrtInventoryEntry;
 use App\Models\TrtInventorySession;
 use App\Models\User;
+use App\Services\OperationalEvidenceArchiveService;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -51,5 +53,101 @@ class TrtTrailerInventoryTest extends TestCase
         Livewire::test(TrtTrailerInventory::class)
             ->assertSee('Missing photo file')
             ->assertDontSee('/storage/trt-inventory/images/missing-audit-photo.jpg');
+    }
+
+    public function test_member_submission_reaches_admin_detail_and_remains_discoverable_after_archive_restore(): void
+    {
+        Storage::fake('public');
+        $this->travelTo(now()->subDay());
+        $member = $this->actingAsCanonicalFixture('QA-TRT-ACTOR', '[QA TEST] TRT Actor');
+        $catalogItem = TrtInventoryCatalogItem::create([
+            'name' => '[QA TEST] Rescue Tool', 'category' => 'QA', 'expected_quantity' => 2, 'active' => true,
+        ]);
+        $response = $this->postJson('/api/public/trt-inventory/submit', [
+            'entries' => [[
+                'catalog_item_id' => $catalogItem->id,
+                'present' => true,
+                'actual_quantity' => 2,
+                'condition' => 'good',
+                'action' => 'keep',
+                'image' => 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aOioAAAAASUVORK5CYII=',
+            ]],
+        ])->assertCreated();
+        $session = TrtInventorySession::findOrFail($response->json('data.session_id'));
+        $entry = $session->entries()->sole();
+        self::assertSame($member->id, $entry->user_id);
+        self::assertSame(2, $entry->actual_quantity);
+        Storage::disk('public')->assertExists($entry->image_path);
+        $this->travelBack();
+
+        $admin = $this->equipmentAdmin(manage: true);
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->withoutVite();
+
+        Livewire::test(TrtTrailerInventory::class)
+            ->assertSet('selectedSessionId', $session->id)
+            ->assertSee('[QA TEST] Rescue Tool')
+            ->assertSee('/storage/'.$entry->image_path, false)
+            ->call('showItemDetail', $catalogItem->id)
+            ->assertSee('[QA TEST] TRT Actor')
+            ->assertSee('good')
+            ->call('closeItemDetail')
+            ->callAction('archiveSession', data: ['archive_reason' => '[QA TEST] Historical review'])
+            ->assertHasNoActionErrors()
+            ->assertSet('selectedSessionId', null)
+            ->set('archiveState', 'archived')
+            ->assertSet('selectedSessionId', $session->id)
+            ->assertSee('Archived')
+            ->call('showItemDetail', $catalogItem->id)
+            ->assertSee('[QA TEST] TRT Actor')
+            ->call('closeItemDetail')
+            ->callAction('restoreSession')->assertHasNoActionErrors()
+            ->assertSet('archiveState', 'active')
+            ->assertSet('selectedSessionId', $session->id);
+
+        self::assertNull($session->fresh()->archived_at);
+        self::assertSame(2, $entry->fresh()->actual_quantity);
+        self::assertSame('good', $entry->fresh()->condition);
+        self::assertSame('keep', $entry->fresh()->action);
+        Storage::disk('public')->assertExists($entry->image_path);
+    }
+
+    public function test_today_shared_session_cannot_be_archived_and_viewers_have_no_lifecycle_actions(): void
+    {
+        $session = TrtInventorySession::findOrCreateForToday();
+        $manager = $this->equipmentAdmin(manage: true);
+        $this->actingAs($manager);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->withoutVite();
+        Livewire::test(TrtTrailerInventory::class)->assertActionHidden('archiveSession');
+
+        try {
+            app(OperationalEvidenceArchiveService::class)->archive($session, $manager);
+            self::fail('Today’s shared session must remain available for new submissions.');
+        } catch (ValidationException) {
+            self::assertNull($session->fresh()->archived_at);
+        }
+
+        $historical = TrtInventorySession::create(['session_date' => yesterday()]);
+        $this->actingAs($this->equipmentAdmin(manage: false));
+        Livewire::test(TrtTrailerInventory::class)
+            ->set('selectedSessionId', $historical->id)
+            ->assertActionHidden('archiveSession')
+            ->assertActionHidden('restoreSession');
+    }
+
+    private function equipmentAdmin(bool $manage): User
+    {
+        $admin = User::factory()->create();
+        $permissions = ['admin.access', 'admin.equipment.view'];
+        if ($manage) {
+            $permissions[] = 'admin.equipment.manage';
+        }
+        foreach ($permissions as $permission) {
+            $admin->givePermissionTo(Permission::findOrCreate($permission, 'web'));
+        }
+
+        return $admin;
     }
 }

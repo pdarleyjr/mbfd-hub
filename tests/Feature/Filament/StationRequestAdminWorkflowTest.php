@@ -14,10 +14,13 @@ use App\Models\RoomAsset;
 use App\Models\Station;
 use App\Models\StationRequest;
 use App\Models\User;
+use App\Services\RequestArchivalService;
+use App\Services\StationRequestWorkflowService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
@@ -72,6 +75,7 @@ class StationRequestAdminWorkflowTest extends TestCase
             ->assertTableFilterExists('status')
             ->assertTableFilterExists('priority')
             ->assertTableFilterExists('open')
+            ->filterTable('open', true)
             ->assertCanSeeTableRecords([$open])
             ->assertCanNotSeeTableRecords([$closed])
             ->searchTable('refrigerator')
@@ -116,6 +120,57 @@ class StationRequestAdminWorkflowTest extends TestCase
             'station_request_id' => $request->id,
             'event_type' => 'created_from_request',
         ]);
+    }
+
+    public function test_repair_and_equipment_archive_restore_actions_preserve_history_and_are_discoverable(): void
+    {
+        foreach (['repair_service', 'equipment'] as $type) {
+            $request = $this->request('completed', '[QA TEST] '.$type.' completed', 'normal');
+            $request->update(['request_type' => $type]);
+            Livewire::test(ViewStationRequest::class, ['record' => $request->getRouteKey()])
+                ->callAction('archive', data: ['archive_reason' => 'QA complete; retain history.'])
+                ->assertHasNoActionErrors();
+            $this->assertTrue($request->refresh()->isArchived());
+            $this->assertSame($this->admin->id, $request->archived_by);
+            Livewire::test(ListStationRequests::class)->call('loadTable')
+                ->filterTable('archive_state', 'active')
+                ->assertCanNotSeeTableRecords([$request])
+                ->filterTable('archive_state', 'archived')
+                ->searchTable($type)
+                ->assertCanSeeTableRecords([$request])
+                ->filterTable('archive_state', 'all')
+                ->assertCanSeeTableRecords([$request]);
+            Livewire::test(ViewStationRequest::class, ['record' => $request->getRouteKey()])
+                ->assertSee('QA complete; retain history.')
+                ->callAction('restore_archive')->assertHasNoActionErrors();
+            $this->assertFalse($request->refresh()->isArchived());
+            $this->assertSame('completed', $request->status);
+            $this->assertSame(['archived', 'restored'], $request->updates()->whereNotNull('metadata')->get()->pluck('metadata.event')->all());
+            Livewire::test(ListStationRequests::class)->call('loadTable')
+                ->filterTable('archive_state', 'active')
+                ->assertCanSeeTableRecords([$request]);
+        }
+    }
+
+    public function test_station_viewer_cannot_process_or_archive_requests_without_manage_permission(): void
+    {
+        $request = $this->request('pending', '[QA TEST] viewer authorization repair', 'normal');
+        $viewer = User::factory()->create();
+        $viewer->givePermissionTo([
+            Permission::findOrCreate('admin.access', 'web'),
+            Permission::findOrCreate('admin.stations.view', 'web'),
+        ]);
+        $this->actingAs($viewer);
+        Livewire::test(ViewStationRequest::class, ['record' => $request->getRouteKey()])
+            ->assertActionHidden('update_workflow')->assertActionHidden('archive');
+        try {
+            app(StationRequestWorkflowService::class)->transition($request, ['status' => 'acknowledged'], $viewer);
+            $this->fail('A station viewer processed a request.');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $exception) {
+            $this->assertSame(403, $exception->getStatusCode());
+        }
+        $this->expectException(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+        app(RequestArchivalService::class)->archive($request, $viewer);
     }
 
     public function test_room_asset_create_edit_validation_toggle_and_filters_work(): void

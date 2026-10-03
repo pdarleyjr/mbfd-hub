@@ -7,6 +7,7 @@ namespace App\Filament\Resources\HubSupportTicketResource\Pages;
 use App\Enums\HubSupportTicketCategory;
 use App\Enums\HubSupportTicketImpact;
 use App\Enums\HubSupportTicketStatus;
+use App\Filament\Concerns\ArchivesRequests;
 use App\Filament\Resources\HubSupportTicketResource;
 use App\Models\HubSupportTicket;
 use App\Models\User;
@@ -18,11 +19,14 @@ use Filament\Resources\Pages\ViewRecord;
 
 final class ViewHubSupportTicket extends ViewRecord
 {
+    use ArchivesRequests;
+
     protected static string $resource = HubSupportTicketResource::class;
 
     protected function getHeaderActions(): array
     {
         return [
+            ...$this->getArchiveActions(),
             ...collect(HubSupportTicketStatus::cases())->filter(fn ($status): bool => $status !== HubSupportTicketStatus::New)
                 ->map(fn ($status): Actions\Action => $this->transitionAction($status))->all(),
             $this->updateAction(),

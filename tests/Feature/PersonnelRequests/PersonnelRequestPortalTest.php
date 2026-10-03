@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature\PersonnelRequests;
 
 use App\Enums\PersonnelRequestStatus;
+use App\Filament\Clusters\PersonnelUniformsEquipment\Resources\PersonnelRequestResource\Pages\ListPersonnelRequests;
+use App\Filament\Clusters\PersonnelUniformsEquipment\Resources\PersonnelRequestResource\Pages\ViewPersonnelRequest;
 use App\Filament\Employee\Pages\EmployeeDashboard;
 use App\Filament\Employee\Pages\PersonnelEquipmentRequestPage;
 use App\Models\Employee;
@@ -253,13 +255,48 @@ class PersonnelRequestPortalTest extends TestCase
         $this->get('/admin/employee-equipment-requests')->assertOk();
     }
 
+    public function test_uniform_admin_archive_filter_and_restore_preserve_member_visible_status(): void
+    {
+        $this->withoutVite();
+        $employee = $this->employee('27402', 'Firefighter', 'QA Uniform Archive Member');
+        $request = app(PersonnelRequestSubmissionService::class)->submitUniform(
+            $employee, [['item_code' => 't_shirt', 'size' => 'L', 'quantity' => 1]], 'uniform-admin-archive-1',
+        );
+        $admin = User::factory()->create();
+        Role::findOrCreate('logistics_admin', 'web');
+        $admin->assignRole('logistics_admin');
+        $admin->givePermissionTo([
+            Permission::findOrCreate('admin.access', 'web'),
+            Permission::findOrCreate('admin.personnel.view', 'web'),
+        ]);
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        Livewire::test(ViewPersonnelRequest::class, ['record' => $request->public_id])
+            ->assertActionExists('cancel')
+            ->callAction('archive', data: ['archive_reason' => 'QA request hidden from active work.'])
+            ->assertHasNoActionErrors();
+        Livewire::test(ListPersonnelRequests::class)
+            ->assertCanNotSeeTableRecords([$request])
+            ->filterTable('archive_state', 'archived')->searchTable($request->request_number)
+            ->assertCanSeeTableRecords([$request])
+            ->filterTable('archive_state', 'all')->assertCanSeeTableRecords([$request]);
+        Livewire::test(ViewPersonnelRequest::class, ['record' => $request->public_id])
+            ->callAction('restore_archive')->assertHasNoActionErrors();
+        $this->assertFalse($request->refresh()->isArchived());
+        $this->assertSame(PersonnelRequestStatus::Pending, $request->status);
+        Livewire::test(ListPersonnelRequests::class)->assertCanSeeTableRecords([$request]);
+        $this->actingAs($employee, 'employee')->get('/employee/my-requests/'.$request->public_id)
+            ->assertOk()->assertSee($request->request_number)->assertDontSee('QA request hidden from active work.');
+    }
+
     public function test_homepage_uses_exact_station_title_and_uniform_specific_employee_copy(): void
     {
         $this->withoutVite();
         $this->actingAsCanonicalFixture();
         $this->get('/')
             ->assertOk()
-            ->assertSee('Station / Vehicles / Equipment')
+            ->assertSee('Stations')
+            ->assertSee('/daily/stations')
             ->assertSee('request approved uniform items')
             ->assertDontSee('submit equipment requests');
     }

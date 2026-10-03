@@ -2,15 +2,17 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\HasArchive;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class StationInventorySubmission extends Model
 {
-    use HasFactory;
+    use HasArchive, HasFactory;
 
     protected $fillable = [
+        'client_submission_id',
         'station_id',
         'employee_name',
         'shift',

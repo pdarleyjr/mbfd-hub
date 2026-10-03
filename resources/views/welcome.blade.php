@@ -126,8 +126,8 @@
             @if($showEmployeePortal)
                 <div class="hub-page-header__actions">
                     <a href="{{ url('/daily/stations') }}" data-important-target class="hub-btn hub-btn--primary hub-btn--field">
-                        <svg class="hub-btn__icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
-                        Start Daily Checkout
+                        <x-heroicon-o-building-office-2 class="hub-btn__icon" aria-hidden="true" />
+                        Stations
                     </a>
                 </div>
             @endif

@@ -9,6 +9,7 @@ use App\Enums\HubSupportTicketImpact;
 use App\Enums\HubSupportTicketStatus;
 use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\HubSupportTicketResource\Pages;
+use App\Filament\Support\ArchiveFilter;
 use App\Models\HubSupportTicket;
 use App\Models\HubSupportTicketUpdate;
 use Filament\Infolists;
@@ -58,6 +59,7 @@ final class HubSupportTicketResource extends Resource
                 Tables\Columns\TextColumn::make('created_at')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)->label('Submitted')->dateTime()->sortable(),
             ])
             ->filters([
+                ArchiveFilter::make(),
                 Tables\Filters\SelectFilter::make('status')->options(collect(HubSupportTicketStatus::cases())->mapWithKeys(fn ($status) => [$status->value => $status->memberLabel()])->all()),
                 Tables\Filters\SelectFilter::make('category')->options(collect(HubSupportTicketCategory::cases())->mapWithKeys(fn ($category) => [$category->value => $category->label()])->all()),
                 Tables\Filters\SelectFilter::make('impact')->options(collect(HubSupportTicketImpact::cases())->mapWithKeys(fn ($impact) => [$impact->value => $impact->label()])->all()),
@@ -74,6 +76,11 @@ final class HubSupportTicketResource extends Resource
     public static function infolist(Infolist $infolist): Infolist
     {
         return $infolist->schema([
+            Infolists\Components\Section::make('Archive')->schema([
+                Infolists\Components\TextEntry::make('archived_at')->dateTime(),
+                Infolists\Components\TextEntry::make('archivedBy.name')->label('Archived by'),
+                Infolists\Components\TextEntry::make('archive_reason')->placeholder('No reason recorded'),
+            ])->columns(3)->visible(fn (HubSupportTicket $record): bool => $record->isArchived()),
             Infolists\Components\Section::make('Issue')->schema([
                 Infolists\Components\TextEntry::make('ticket_number')->label('Reference'),
                 Infolists\Components\TextEntry::make('generated_title')->label('Summary'),

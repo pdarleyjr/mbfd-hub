@@ -700,6 +700,7 @@ export interface SupplyRequest {
   id: number;
   request_text: string;
   status: 'open' | 'ordered' | 'denied' | 'replenished';
+  public_response?: string | null;
   created_by_name: string;
   created_by_shift: Shift;
   created_at: string;

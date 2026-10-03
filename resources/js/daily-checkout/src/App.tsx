@@ -23,7 +23,7 @@ const TrtInventoryWizard = lazy(() => import('./components/TrtInventoryWizard'))
 
 const PageLoading = () => (
   <div className="flex min-h-48 items-center justify-center" role="status" aria-live="polite">
-    <span className="text-sm font-medium text-neutral-600">Loading form…</span>
+    <span className="text-sm font-medium text-hub-ink-secondary">Loading form…</span>
   </div>
 );
 
@@ -45,8 +45,7 @@ function ContextualIssueWidget() {
 function DailyShell() {
   const { pathname } = useLocation();
   const standard = !isActiveInspectionPath(pathname);
-  const currentSection = pathname.startsWith('/forms-hub/station-request') ? 'requests'
-    : pathname.startsWith('/forms-hub') ? 'forms' : 'checkout';
+  const currentSection = pathname.startsWith('/forms-hub/station-request') ? 'requests' : 'checkout';
   return (
       <HubShell module="Daily Checkout" navigation={readHubNavigation()} currentSection={currentSection} renderLink={renderHubLink}
         connection={<OfflineIndicator />} className={standard ? 'daily-shell daily-standard' : 'daily-shell'}>

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use LogicException;
 
 class Workgroup extends Model
 {
@@ -26,6 +27,21 @@ class Workgroup extends Model
                 $workgroup->created_by = auth()->id();
             }
         });
+        static::deleting(function (Workgroup $workgroup): void {
+            if ($workgroup->hasRetainedEvidence()) {
+                throw new LogicException('Workgroups with retained member evidence cannot be deleted. Deactivate the workgroup instead.');
+            }
+        });
+    }
+
+    public function hasRetainedEvidence(): bool
+    {
+        return EvaluationSubmission::query()->where('status', 'submitted')
+            ->whereHas('candidateProduct.session', fn ($sessions) => $sessions->where('workgroup_id', $this->getKey()))->exists()
+            || WorkgroupSurveyResponse::query()->whereNotNull('submitted_at')
+                ->whereHas('survey', fn ($surveys) => $surveys->where('workgroup_id', $this->getKey()))->exists()
+            || $this->sharedUploads()->withTrashed()->exists()
+            || WorkgroupNote::withTrashed()->whereHas('member', fn ($members) => $members->where('workgroup_id', $this->getKey()))->exists();
     }
 
     protected $casts = [

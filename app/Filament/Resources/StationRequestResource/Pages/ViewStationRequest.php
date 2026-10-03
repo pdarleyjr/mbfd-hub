@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources\StationRequestResource\Pages;
 
 use App\Enums\StationRequestStatus;
+use App\Filament\Concerns\ArchivesRequests;
 use App\Filament\Resources\StationRequestResource;
 use App\Models\Room;
 use App\Models\RoomAsset;
@@ -19,18 +20,21 @@ use Filament\Resources\Pages\ViewRecord;
 
 class ViewStationRequest extends ViewRecord
 {
+    use ArchivesRequests;
+
     protected static string $resource = StationRequestResource::class;
 
     protected function getHeaderActions(): array
     {
         return [
+            ...$this->getArchiveActions(),
             Actions\Action::make('update_workflow')
                 ->label('Update Status')
                 ->icon('heroicon-o-arrow-path-rounded-square')
                 ->color('primary')
                 ->modalHeading('Update Station Request')
                 ->modalSubmitActionLabel('Update Status')
-                ->visible(fn (): bool => $this->stationRequest()->is_open)
+                ->visible(fn (): bool => $this->stationRequest()->is_open && (auth()->user()?->can('admin.stations.manage') ?? false))
                 ->fillForm(fn (): array => [
                     'status' => $this->stationRequest()->status,
                     'assigned_to_user_id' => $this->stationRequest()->assigned_to_user_id,

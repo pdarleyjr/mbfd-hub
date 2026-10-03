@@ -276,6 +276,7 @@ Route::prefix('v2')->middleware(['auth:sanctum', 'canonical.api', 'throttle:60,1
         Route::get('/station-inventory/{stationId}/supply-requests', [StationInventoryV2Controller::class, 'getSupplyRequests'])
             ->name('supply-requests');
         Route::post('/station-inventory/{stationId}/supply-requests', [StationInventoryV2Controller::class, 'createSupplyRequest'])->middleware(['auth:sanctum', 'canonical.api']);
+        Route::post('/station-inventory/{stationId}/submissions', [StationInventoryV2Controller::class, 'submitSnapshot']);
     });
 });
 

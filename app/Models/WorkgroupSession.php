@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use LogicException;
 
 class WorkgroupSession extends Model
 {
@@ -24,6 +25,25 @@ class WorkgroupSession extends Model
         'start_date' => 'date',
         'end_date' => 'date',
     ];
+
+    protected static function booted(): void
+    {
+        static::deleting(function (WorkgroupSession $session): void {
+            if ($session->hasRetainedEvidence()) {
+                throw new LogicException('Sessions with retained member evidence cannot be deleted. Complete the session instead.');
+            }
+        });
+    }
+
+    public function hasRetainedEvidence(): bool
+    {
+        return EvaluationSubmission::query()->where('status', 'submitted')
+            ->whereHas('candidateProduct', fn ($products) => $products->where('workgroup_session_id', $this->getKey()))->exists()
+            || WorkgroupSurveyResponse::query()->whereNotNull('submitted_at')
+                ->whereHas('survey', fn ($surveys) => $surveys->where('workgroup_session_id', $this->getKey()))->exists()
+            || $this->sharedUploads()->withTrashed()->exists()
+            || WorkgroupNote::withTrashed()->where('workgroup_session_id', $this->getKey())->exists();
+    }
 
     /**
      * Get the workgroup this session belongs to.

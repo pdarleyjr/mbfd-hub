@@ -5,6 +5,7 @@ namespace App\Filament\Resources\StationInspectionResource\Pages;
 use App\Filament\Resources\StationInspectionResource;
 use App\Models\StationInspection;
 use App\Models\User;
+use App\Services\OperationalEvidenceArchiveService;
 use App\Services\StationInspectionReviewService;
 use Filament\Actions;
 use Filament\Forms;
@@ -17,6 +18,20 @@ class ViewStationInspection extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            Actions\Action::make('archive')
+                ->label('Archive')
+                ->icon('heroicon-o-archive-box')
+                ->color('gray')
+                ->requiresConfirmation()
+                ->form([Forms\Components\Textarea::make('archive_reason')->label('Reason (optional)')->maxLength(2000)])
+                ->visible(fn (): bool => StationInspectionResource::canEdit($this->record) && ! $this->record->isArchived())
+                ->action(fn (array $data) => app(OperationalEvidenceArchiveService::class)->archive($this->record, auth()->user(), $data['archive_reason'] ?? null)),
+            Actions\Action::make('restore')
+                ->label('Restore')
+                ->icon('heroicon-o-arrow-uturn-left')
+                ->requiresConfirmation()
+                ->visible(fn (): bool => StationInspectionResource::canEdit($this->record) && $this->record->isArchived())
+                ->action(fn () => app(OperationalEvidenceArchiveService::class)->restore($this->record, auth()->user())),
             Actions\Action::make('acknowledgeInspection')
                 ->label('Review / Acknowledge')
                 ->icon('heroicon-o-check-circle')

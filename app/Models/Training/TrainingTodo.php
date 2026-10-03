@@ -7,11 +7,12 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Collection;
 
 class TrainingTodo extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $table = 'training_todos';
 
@@ -48,9 +49,9 @@ class TrainingTodo extends Model
                 $todo->status = $todo->is_completed ? 'completed' : 'pending';
             }
 
-            if ($todo->is_completed && !$todo->completed_at) {
+            if ($todo->is_completed && ! $todo->completed_at) {
                 $todo->completed_at = now();
-            } elseif (!$todo->is_completed) {
+            } elseif (! $todo->is_completed) {
                 $todo->completed_at = null;
             }
         });
@@ -73,6 +74,7 @@ class TrainingTodo extends Model
             return collect();
         }
         $intIds = array_map('intval', $ids);
+
         return User::whereIn('id', $intIds)->get();
     }
 

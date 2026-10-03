@@ -41,11 +41,12 @@ const webServerEnvironment = sanitizedTestEnvironment({
 
 export default defineConfig({
   testDir: './tests/e2e',
-  testMatch: /personnel-requests\.spec\.ts/,
+  testMatch: /(?:personnel-requests|mobile-shell)\.spec\.ts/,
   globalSetup: './tests/e2e/personnel-requests.setup.ts',
   timeout: 60_000,
   retries: process.env.CI ? 1 : 0,
   workers: 1,
+  outputDir: 'test-results/personnel-requests',
   reporter: 'list',
   use: {
     baseURL,
@@ -63,5 +64,6 @@ export default defineConfig({
     { name: 'phone-touch', use: { ...devices['iPhone 13'], browserName: 'chromium' } },
     { name: 'tablet-touch', use: { browserName: 'chromium', viewport: { width: 820, height: 1180 }, hasTouch: true } },
     { name: 'desktop', use: { browserName: 'chromium', viewport: { width: 1440, height: 1000 } } },
+    { name: 'hub-shell-webkit-iphone', testMatch: /mobile-shell\.spec\.ts/, use: { ...devices['iPhone 13'], browserName: 'webkit' } },
   ],
 });

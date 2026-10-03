@@ -175,7 +175,7 @@ class WorkgroupMemberResource extends Resource
 
     public static function canDelete($record): bool
     {
-        return self::canEdit($record);
+        return self::canEdit($record) && ! $record->hasRetainedEvidence();
     }
 
     public static function canView($record): bool

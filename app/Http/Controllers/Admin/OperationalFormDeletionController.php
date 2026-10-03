@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\OperationalFormDocument;
 use App\Models\OperationalFormRecord;
 use App\Services\OperationalForms\OperationalFormDeletionService;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -16,9 +15,9 @@ class OperationalFormDeletionController extends Controller
         Request $request,
         string $record,
         OperationalFormDeletionService $deletion,
-    ): Response|RedirectResponse {
+    ): Response {
         $this->authorizeAdmin($request);
-        $deletion->deleteRecord(OperationalFormRecord::query()->findOrFail($record));
+        $deletion->deleteRecord(OperationalFormRecord::query()->findOrFail($record), $request->user());
 
         return response()->noContent();
     }
@@ -27,19 +26,13 @@ class OperationalFormDeletionController extends Controller
         Request $request,
         string $document,
         OperationalFormDeletionService $deletion,
-    ): Response {
+    ): never {
         $this->authorizeAdmin($request);
         $deletion->deleteDocument(
             OperationalFormDocument::query()->findOrFail($document),
             $request->user(),
             $request->ip(),
         );
-
-        if ($request->boolean('redirect')) {
-            return redirect()->back()->with('status', 'The document was deleted.');
-        }
-
-        return response()->noContent();
     }
 
     private function authorizeAdmin(Request $request): void

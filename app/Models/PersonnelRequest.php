@@ -6,12 +6,15 @@ namespace App\Models;
 
 use App\Enums\PersonnelRequestStatus;
 use App\Enums\PersonnelRequestType;
+use App\Models\Concerns\HasArchive;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PersonnelRequest extends Model
 {
+    use HasArchive;
+
     protected $guarded = [];
 
     protected $casts = [

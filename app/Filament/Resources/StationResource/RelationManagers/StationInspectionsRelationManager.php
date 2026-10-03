@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\StationResource\RelationManagers;
 
 use App\Filament\Resources\StationInspectionResource;
+use App\Filament\Support\ArchiveFilter;
 use Filament\Infolists\Infolist;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
@@ -55,6 +56,7 @@ class StationInspectionsRelationManager extends RelationManager
                     ->toggleable(),
             ])
             ->filters([
+                ArchiveFilter::make(),
                 Tables\Filters\SelectFilter::make('overall_status')
                     ->label('Status')
                     ->options([

@@ -13,7 +13,9 @@ class EditTrainingTodo extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\DeleteAction::make(),
+            Actions\DeleteAction::make()->label('Move to Trash')
+                ->modalDescription('Attachments and history are retained. The task can be restored from Trash.'),
+            Actions\RestoreAction::make(),
         ];
     }
 }

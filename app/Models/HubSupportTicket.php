@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\HubSupportTicketCategory;
 use App\Enums\HubSupportTicketImpact;
 use App\Enums\HubSupportTicketStatus;
+use App\Models\Concerns\HasArchive;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -52,6 +53,8 @@ use Illuminate\Support\Carbon;
  */
 final class HubSupportTicket extends Model
 {
+    use HasArchive;
+
     /** @use HasFactory<\Database\Factories\HubSupportTicketFactory> */
     use HasFactory;
 
@@ -135,6 +138,6 @@ final class HubSupportTicket extends Model
 
     public function scopeOpen(Builder $query): Builder
     {
-        return $query->whereNotIn('status', [HubSupportTicketStatus::Resolved->value, HubSupportTicketStatus::Closed->value]);
+        return $query->active()->whereNotIn('status', [HubSupportTicketStatus::Resolved->value, HubSupportTicketStatus::Closed->value]);
     }
 }

@@ -31,8 +31,8 @@ const dailyNavigation: HubNavigation = {
   memberNavigation: [
     { key: 'home', label: 'Home', href: '/' },
     { key: 'checkout', label: 'Checkout', href: '/daily/stations' },
-    { key: 'forms', label: 'Forms', href: '/daily/forms-hub' },
-    { key: 'requests', label: 'Requests', href: '/daily/forms-hub/station-request' },
+    { key: 'employee', label: 'Employee', href: '/employee' },
+    { key: 'requests', label: 'Requests', href: '/employee/my-requests' },
   ],
   account: null,
 };
@@ -44,10 +44,10 @@ export function readHubNavigation(): HubNavigation {
 export type HubLinkRenderer = (props: AnchorHTMLAttributes<HTMLAnchorElement>) => ReactNode;
 
 function HubIcon({ name }: { name: string }) {
+  if (name === 'checkout') return <span className="hub-checkout-icon" aria-hidden="true" />;
   const paths: Record<string, string> = {
     home: 'M3 10.5 12 3l9 7.5M5 9v12h5v-7h4v7h5V9',
-    checkout: 'M9 5H5v16h14V5h-4M9 3h6v4H9V3m-1 10 3 3 5-6',
-    forms: 'M6 3h9l3 3v15H6V3m8 0v5h4M9 12h6m-6 4h6',
+    employee: 'M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM4 21v-2a8 8 0 0 1 16 0v2',
     requests: 'M4 4h16v13H8l-4 4V4m4 4h8m-8 4h5',
     account: 'M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM4 21v-2a8 8 0 0 1 16 0v2',
     more: 'M5 11v2m7-2v2m7-2v2',
@@ -102,7 +102,7 @@ function NavigationMenu({ label, items, icon = 'apps', className = '', renderLin
 
   if (items.length === 0) return null;
   return <div ref={container} className={`hub-navigation-menu ${className}`} onBlur={(event) => {
-    if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
+    if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) setOpen(false);
   }}>
     <button ref={trigger} id={`${id}-trigger`} type="button" className="hub-shell-control" aria-haspopup="menu" aria-expanded={open} aria-controls={open ? `${id}-menu` : undefined}
       onClick={() => { initialFocus.current = 'first'; setOpen(!open); }} onKeyDown={(event) => {
@@ -122,7 +122,7 @@ function NavigationMenu({ label, items, icon = 'apps', className = '', renderLin
           target: external ? '_blank' : undefined, rel: external ? 'noopener' : undefined,
           'aria-label': external ? `${item.label} (opens in new tab)` : undefined,
           className: 'hub-shell-menu-item', children: <>{item.label}{external && <span className="hub-shell-external-hint" aria-hidden="true">↗</span>}</>,
-          onClick: () => { setOpen(false); trigger.current?.focus(); },
+          onClick: () => { window.setTimeout(() => setOpen(false), 0); },
         };
         return <div role="none" key={item.key}>{renderLink ? renderLink(props) : <a {...props} />}</div>;
       })}
@@ -139,20 +139,40 @@ export function HubShell({ module, navigation, connection, currentSection, rende
   children: ReactNode;
   className?: string;
 }) {
+  const [connectionRequired, setConnectionRequired] = useState(false);
+  useEffect(() => {
+    const clearNotice = () => setConnectionRequired(false);
+    window.addEventListener('online', clearNotice);
+    return () => window.removeEventListener('online', clearNotice);
+  }, []);
+  const renderNavigationLink: HubLinkRenderer = ({ href, onClick, ...props }) => {
+    const guardedProps: AnchorHTMLAttributes<HTMLAnchorElement> = {
+      ...props, href, onClick: (event) => {
+        if (!navigator.onLine && !href?.startsWith('/daily/')) {
+          event.preventDefault();
+          setConnectionRequired(true);
+          return;
+        }
+        setConnectionRequired(false);
+        onClick?.(event);
+      },
+    };
+    return renderLink ? renderLink(guardedProps) : <a {...guardedProps} />;
+  };
   const accountItems = navigation.account ? [{ key: 'account', label: 'My account', href: navigation.account.href }] : [];
   return <div className={`hub-shell hub-shell--member ${className}`}>
     <a href="#main-content" className="hub-shell-skip">Skip to main content</a>
-    <header className="hub-shell-header daily-home-nav">
-      <a href="/" className="hub-shell-brand" aria-label="Return to MBFD Hub home page">
-        <img src="/images/mbfd_logo-256.png" alt="MBFD Logo" width="36" height="36" />
-        <span><strong>MBFD Hub</strong><span className="hub-shell-module">{module}</span></span>
-      </a>
+    <header className="hub-shell-header daily-home-nav" aria-label={`${module} navigation`}>
+      {renderNavigationLink({ href: '/', className: 'hub-shell-brand', 'aria-label': 'MBFD Hub home', children: <>
+        <img src="/images/mbfd-official-seal-256.png" alt="" width="36" height="36" /><strong>Hub</strong>
+      </> })}
       <div className="hub-shell-header-actions">
-        <NavigationMenu label="Apps" items={navigation.applications} renderLink={renderLink} />
-        {navigation.account && <NavigationMenu label="Account" icon="account" className="hub-shell-account" items={accountItems} renderLink={renderLink} />}
+        <NavigationMenu label="Apps" items={navigation.applications} renderLink={renderNavigationLink} />
+        {navigation.account && <NavigationMenu label="Account" icon="account" className="hub-shell-account" items={accountItems} renderLink={renderNavigationLink} />}
       </div>
     </header>
     {connection}
+    {connectionRequired && <div className="hub-sync-notice" role="status" data-hub-navigation-notice>Requires connection</div>}
     {children}
     <nav className="hub-member-navigation" aria-label="Hub member navigation">
       {navigation.memberNavigation.map((item) => {
@@ -161,9 +181,9 @@ export function HubShell({ module, navigation, connection, currentSection, rende
           'aria-current': currentSection === item.key ? 'page' : undefined,
           children: <><HubIcon name={item.key} /><span>{item.label}</span></>,
         };
-        return <div key={item.key}>{renderLink ? renderLink(props) : <a {...props} />}</div>;
+        return <div key={item.key}>{renderNavigationLink(props)}</div>;
       })}
-      <NavigationMenu label="More" icon="more" className="hub-member-more" items={[...(navigation.moreNavigation ?? []), ...navigation.applications, ...accountItems]} renderLink={renderLink} />
+      <NavigationMenu label="More" icon="more" className="hub-member-more" items={[...(navigation.moreNavigation ?? []), ...navigation.applications, ...accountItems]} renderLink={renderNavigationLink} />
     </nav>
   </div>;
 }

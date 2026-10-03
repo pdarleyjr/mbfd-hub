@@ -32,6 +32,16 @@ class TrainingTodoPolicy
         return $this->canManageTrainingTodos($user);
     }
 
+    public function restore(User $user, TrainingTodo $trainingTodo): bool
+    {
+        return $this->canManageTrainingTodos($user);
+    }
+
+    public function forceDelete(User $user, TrainingTodo $trainingTodo): bool
+    {
+        return false;
+    }
+
     private function canManageTrainingTodos(User $user): bool
     {
         return $user->hasAnyRole(['super_admin', 'training_admin']);

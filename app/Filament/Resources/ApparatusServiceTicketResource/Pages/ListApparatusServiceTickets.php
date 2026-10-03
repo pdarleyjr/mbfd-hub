@@ -14,6 +14,11 @@ class ListApparatusServiceTickets extends ListRecords
 {
     protected static string $resource = ApparatusServiceTicketResource::class;
 
+    public function getDefaultActiveTab(): string|int|null
+    {
+        return 'all';
+    }
+
     /** @return array<string, Tab> */
     public function getTabs(): array
     {

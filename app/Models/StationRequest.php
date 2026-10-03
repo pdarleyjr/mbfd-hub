@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\StationRequestStatus;
+use App\Models\Concerns\HasArchive;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class StationRequest extends Model
 {
+    use HasArchive;
     use HasFactory;
 
     protected $fillable = [
@@ -124,7 +126,7 @@ class StationRequest extends Model
 
     public function scopeOpen(Builder $query): Builder
     {
-        return $query->whereIn('status', StationRequestStatus::openValues());
+        return $query->active()->whereIn('status', StationRequestStatus::openValues());
     }
 
     public function scopeTerminal(Builder $query): Builder
@@ -134,6 +136,6 @@ class StationRequest extends Model
 
     public function getIsOpenAttribute(): bool
     {
-        return in_array($this->status, StationRequestStatus::openValues(), true);
+        return ! $this->isArchived() && in_array($this->status, StationRequestStatus::openValues(), true);
     }
 }

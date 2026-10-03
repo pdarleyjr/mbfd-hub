@@ -8,6 +8,7 @@ use App\Filament\Resources\Workgroup\CandidateProductResource;
 use App\Filament\Resources\Workgroup\EvaluationCategoryResource;
 use App\Filament\Resources\Workgroup\EvaluationSubmissionResource;
 use App\Filament\Resources\Workgroup\Pages\CreateCandidateProduct;
+use App\Filament\Resources\Workgroup\Pages\ListEvaluationSubmissions;
 use App\Filament\Resources\Workgroup\WorkgroupFileResource;
 use App\Filament\Resources\Workgroup\WorkgroupMemberResource;
 use App\Filament\Resources\Workgroup\WorkgroupResource;
@@ -25,7 +26,9 @@ use App\Models\WorkgroupFile;
 use App\Models\WorkgroupMember;
 use App\Models\WorkgroupSession;
 use App\Models\WorkgroupSharedUpload;
+use App\Models\WorkgroupSurvey;
 use App\Services\Workgroup\EvaluationService;
+use App\Services\Workgroup\SurveyResponseService;
 use App\Support\Workgroups\WorkgroupAccess;
 use App\Support\Workgroups\WorkgroupContext;
 use Filament\Facades\Filament;
@@ -33,6 +36,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
+use LogicException;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
@@ -400,6 +404,109 @@ class WorkgroupTenancyBoundaryTest extends TestCase
             'workgroup_member_id' => $contextA['member']->id,
             'candidate_product_id' => $contextB['product']->id,
         ]);
+    }
+
+    public function test_parent_workgroup_and_session_deletion_cannot_cascade_submitted_evaluation_or_survey_evidence(): void
+    {
+        foreach (['evaluation', 'survey'] as $domain) {
+            $manager = User::factory()->create();
+            $context = $this->makeWorkgroupContext($manager, 'QA-'.$domain, 'facilitator');
+            $this->actingAs($manager);
+            app(WorkgroupContext::class)->select($manager, $context['workgroup']->id);
+            if ($domain === 'evaluation') {
+                $evidence = EvaluationSubmission::create([
+                    'workgroup_member_id' => $context['member']->id, 'candidate_product_id' => $context['product']->id,
+                    'status' => 'submitted', 'submitted_at' => now(), 'criterion_payload' => ['ratings' => ['qa' => 5]],
+                ]);
+            } else {
+                $survey = WorkgroupSurvey::create([
+                    'workgroup_id' => $context['workgroup']->id, 'workgroup_session_id' => $context['session']->id,
+                    'title' => '[QA TEST] Retained survey', 'status' => 'active', 'is_anonymous' => true,
+                ]);
+                $question = $survey->questions()->create([
+                    'position' => 1, 'type' => 'single', 'prompt' => 'QA answer', 'is_required' => true,
+                    'configuration' => ['options' => [['key' => 'confirmed', 'label' => 'Confirmed']]],
+                ]);
+                $evidence = app(SurveyResponseService::class)->submit($survey, $manager, [(string) $question->id => 'confirmed']);
+            }
+            self::assertFalse(WorkgroupResource::canDelete($context['workgroup']));
+            self::assertFalse(WorkgroupSessionResource::canDelete($context['session']));
+            $parents = [$context['workgroup'], $context['session'], $context['member']];
+            if ($domain === 'evaluation') {
+                self::assertFalse(CandidateProductResource::canDelete($context['product']));
+                $parents[] = $context['product'];
+                $parents[] = $context['product']->category;
+            }
+            foreach ($parents as $parent) {
+                try {
+                    $parent->delete();
+                    self::fail('Submitted evidence must prevent parent cascade deletion.');
+                } catch (LogicException $exception) {
+                    self::assertStringContainsString('cannot be deleted', $exception->getMessage());
+                    $this->assertDatabaseHas($parent->getTable(), ['id' => $parent->id]);
+                    $this->assertDatabaseHas($evidence->getTable(), ['id' => $evidence->id]);
+                }
+            }
+            $context['workgroup']->update(['is_active' => false]);
+            $context['session']->update(['status' => 'completed']);
+            $this->assertDatabaseHas($evidence->getTable(), ['id' => $evidence->id]);
+        }
+        Http::assertNothingSent();
+    }
+
+    public function test_parent_deletion_cannot_purge_a_soft_trashed_note_or_upload_without_other_submitted_evidence(): void
+    {
+        $manager = User::factory()->create();
+        $context = $this->makeWorkgroupContext($manager, 'QA-retained-only', 'facilitator');
+        $this->actingAs($manager);
+        $note = $context['member']->notes()->create(['workgroup_session_id' => $context['session']->id, 'title' => '[QA TEST] Retained note', 'content' => 'Retained content']);
+        $upload = $this->makeUpload($context);
+        $note->delete();
+        $upload->delete();
+        foreach ([$context['workgroup'], $context['session'], $context['member']] as $parent) {
+            try {
+                $parent->delete();
+                self::fail('Trash must remain restorable after a denied parent deletion.');
+            } catch (LogicException) {
+                $this->assertSoftDeleted($note);
+                $this->assertSoftDeleted($upload);
+                Storage::disk('local')->assertExists($upload->filepath);
+            }
+        }
+        $note->restore();
+        $upload->restore();
+        self::assertSame('Retained content', $note->fresh()->content);
+        self::assertSame($context['member']->id, $upload->fresh()->workgroup_member_id);
+        Http::assertNothingSent();
+    }
+
+    public function test_member_evaluation_draft_submit_and_admin_discovery_preserve_submitted_content(): void
+    {
+        $member = User::factory()->create();
+        $context = $this->makeWorkgroupContext($member, 'QA-evaluation', 'facilitator');
+        $this->actingAs($member);
+        app(WorkgroupContext::class)->select($member, $context['workgroup']->id);
+        $this->withoutVite();
+        Filament::setCurrentPanel(Filament::getPanel('workgroups'));
+        $page = Livewire::withQueryParams(['productId' => $context['product']->id])->test(EvaluationFormPage::class)
+            ->call('setAllHighest')->set('advance_recommendation', 'yes')->set('confidence_level', 'high')
+            ->set('additional_comments', '[QA TEST] Submitted evaluation evidence')->call('saveDraft')->assertHasNoErrors();
+        $submission = EvaluationSubmission::query()->sole();
+        self::assertSame('draft', $submission->status);
+        self::assertNotEmpty($submission->criterion_payload['ratings']);
+        $page->call('submitEvaluation')->assertHasNoErrors()->assertSet('isReadOnly', true);
+        $submitted = $submission->fresh();
+        self::assertSame('submitted', $submitted->status);
+        self::assertNotNull($submitted->submitted_at);
+        self::assertSame('[QA TEST] Submitted evaluation evidence', $submitted->narrative_payload['additional_comments']);
+        $page->set('additional_comments', 'Forged replacement')->call('saveDraft')->assertStatus(404);
+        self::assertSame($submitted->narrative_payload, $submission->fresh()->narrative_payload);
+
+        $member->givePermissionTo(Permission::findOrCreate('admin.access', 'web'));
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        Livewire::test(ListEvaluationSubmissions::class)->filterTable('status', 'submitted')->assertCanSeeTableRecords([$submission])
+            ->assertTableActionExists('view')->assertTableActionDoesNotExist('delete');
+        Http::assertNothingSent();
     }
 
     /** @return array{workgroup: Workgroup, member: WorkgroupMember, session: WorkgroupSession, product: CandidateProduct} */

@@ -291,6 +291,21 @@ jobs:
         env:
           COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
         run: composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
+      - name: Build Hub assets for authenticated mobile navigation
+        env:
+          SENTRY_AUTH_TOKEN: ""
+          SENTRY_ORG: ""
+          SENTRY_PROJECT_FRONTEND: ""
+          VITE_SENTRY_DSN: ""
+          VITE_SENTRY_RELEASE: ""
+        run: npx vite build
+      - name: Verify Home and Daily member shell in Chromium and true iPhone WebKit
+        run: >-
+          npx playwright test tests/e2e/mobile-shell.spec.ts
+          --config=playwright.personnel-requests.config.ts
+          --project=phone-touch
+          --project=hub-shell-webkit-iphone
+          --project=desktop
       - name: Verify shared panel session-expiry handling
         # The browser test uses the installed Livewire client from Composer.
         run: |

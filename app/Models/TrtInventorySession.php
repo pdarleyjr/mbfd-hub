@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Concerns\HasArchive;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TrtInventorySession extends Model
 {
+    use HasArchive;
+
     protected $fillable = [
         'trailer_id',
         'session_date',

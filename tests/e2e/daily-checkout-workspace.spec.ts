@@ -42,7 +42,8 @@ async function fixture(page: Page, options: { checklist?: typeof sourceChecklist
   const submissions: InspectionSubmission[] = [];
   const revisions: Array<{ reason: string; value?: number }> = [];
   let userId = 401;
-  await page.route('**/images/mbfd_logo-256.png', route => route.fulfill({ path: 'public/images/mbfd_logo-256.png' }));
+  await page.route('**/images/mbfd-official-seal-256.png', route => route.fulfill({ path: 'public/images/mbfd-official-seal-256.png' }));
+  await page.route('**/images/icons/checkout-apparatus.svg', route => route.fulfill({ path: 'public/images/icons/checkout-apparatus.svg', contentType: 'image/svg+xml' }));
   await page.route('**/images/mbfd_app_icon_192.png', route => route.fulfill({ path: 'public/images/mbfd_app_icon_192.png' }));
   await page.route('**/api/**', route => {
     const path = new URL(route.request().url()).pathname;
@@ -258,7 +259,7 @@ test('apparatus workspace fits the viewport and keeps actual equipment visible',
   await expect(page.getByText('PM due soon', { exact: true })).toBeVisible();
   await expect(page.getByText('Browser Member · Shift not selected')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-  const home = page.getByRole('link', { name: 'Return to MBFD Hub home page', exact: true });
+  const home = page.getByRole('link', { name: 'MBFD Hub home', exact: true });
   await expect(page.getByRole('link', { name: 'Report an Issue', exact: true })).toHaveCount(0);
   const homeBox = await home.boundingBox();
   expect(homeBox).not.toBeNull();

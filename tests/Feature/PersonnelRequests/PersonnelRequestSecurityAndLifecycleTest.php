@@ -12,6 +12,7 @@ use App\Models\Uniform;
 use App\Models\User;
 use App\Services\PersonnelRequests\PersonnelRequestFulfillmentService;
 use App\Services\PersonnelRequests\PersonnelRequestSubmissionService;
+use App\Services\RequestArchivalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
@@ -80,6 +81,39 @@ class PersonnelRequestSecurityAndLifecycleTest extends TestCase
         $this->actingAs($other, 'employee')
             ->get("/employee/personnel-request-attachments/{$attachment->public_id}")
             ->assertForbidden();
+    }
+
+    public function test_archiving_uniform_request_preserves_private_documents_and_enforces_manager_authorization(): void
+    {
+        Storage::fake((string) config('filesystems.private'));
+        $employee = $this->employee('24003');
+        $request = $this->uniformRequest($employee);
+        $request->update(['status' => PersonnelRequestStatus::NeedsInformation, 'information_requested' => ['other']]);
+        $this->actingAs($employee, 'employee')->post("/employee/personnel-requests/{$request->public_id}/attachments", [
+            'document_type' => 'other',
+            'attachment' => UploadedFile::fake()->createWithContent('qa-document.pdf', "%PDF-1.4\n% QA evidence"),
+        ])->assertRedirect();
+        $attachment = $request->attachments()->sole();
+        $archival = app(RequestArchivalService::class);
+        try {
+            $archival->archive($request, User::factory()->create());
+            $this->fail('A member archived a personnel request.');
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpException $exception) {
+            $this->assertSame(403, $exception->getStatusCode());
+        }
+        $admin = User::factory()->create();
+        Role::findOrCreate('logistics_admin', 'web');
+        $admin->assignRole('logistics_admin');
+        $archival->archive($request, $admin, 'Keep QA evidence discoverable.');
+        $this->get("/employee/personnel-request-attachments/{$attachment->public_id}")->assertOk();
+        Storage::disk($attachment->disk)->assertExists($attachment->storage_path);
+        $archival->restore($request, $admin);
+        $this->assertNull($request->refresh()->archived_at);
+        $this->assertNull($request->archived_by);
+        $this->assertNull($request->archive_reason);
+        $this->assertDatabaseHas('personnel_request_updates', ['personnel_request_id' => $request->id, 'event' => 'restored']);
+        $this->expectException(\LogicException::class);
+        $request->updates()->firstOrFail()->delete();
     }
 
     public function test_disallowed_and_oversized_documents_are_rejected(): void

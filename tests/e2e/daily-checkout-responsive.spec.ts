@@ -38,11 +38,15 @@ const unknownApparatus = {
 
 async function mockDailySelectorApi(page: Page): Promise<void> {
   await page.route('**/images/**', (route) => {
-    if (new URL(route.request().url()).pathname === '/images/mbfd_logo-256.png') {
+    const path = new URL(route.request().url()).pathname;
+    if (path === '/images/mbfd-official-seal-256.png') {
       return route.fulfill({
-        path: resolve('public/images/mbfd_logo-256.png'),
+        path: resolve('public/images/mbfd-official-seal-256.png'),
         contentType: 'image/png',
       });
+    }
+    if (path === '/images/icons/checkout-apparatus.svg') {
+      return route.fulfill({ path: resolve('public/images/icons/checkout-apparatus.svg'), contentType: 'image/svg+xml' });
     }
 
     return route.fulfill({ status: 204 });

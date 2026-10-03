@@ -5,13 +5,18 @@ declare(strict_types=1);
 namespace Tests\Feature\Api;
 
 use App\Enums\AccountStatus;
+use App\Filament\Resources\StationResource\Pages\ViewStation;
+use App\Filament\Resources\StationResource\RelationManagers\InventorySubmissionsRelationManager;
 use App\Models\Employee;
 use App\Models\Station;
 use App\Models\StationInventorySubmission;
 use App\Models\User;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Livewire;
 use RuntimeException;
+use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
 
 class StationInventorySubmissionStorageTest extends TestCase
@@ -117,5 +122,54 @@ class StationInventorySubmissionStorageTest extends TestCase
 
         $this->assertDatabaseCount('station_inventory_submissions', 0);
         Storage::disk($this->privateDisk())->assertDirectoryEmpty('inventory-submissions');
+    }
+
+    public function test_submitted_inventory_pdf_is_discoverable_under_its_station_and_survives_archive_restore(): void
+    {
+        $station = Station::create(['station_number' => 91, 'address' => 'QA Inventory Station', 'is_active' => true]);
+        $other = Station::create(['station_number' => 92, 'address' => 'Other Station', 'is_active' => true]);
+        $submitted = $this->postJson('/api/station-inventory-submissions', [
+            'station_id' => $station->id,
+            'shift' => 'A',
+            'items' => [['category_id' => 'garbage_paper', 'item_id' => 'paper_towels', 'quantity' => 2]],
+            'notes' => '[QA TEST] inventory evidence',
+        ])->assertCreated();
+        $record = StationInventorySubmission::findOrFail($submitted->json('data.submission_id'));
+        $pdfBytes = Storage::disk($this->privateDisk())->get($record->pdf_path);
+        self::assertStringStartsWith('%PDF-', $pdfBytes);
+        $this->get($submitted->json('data.pdf_download_url'))->assertForbidden();
+
+        $admin = User::factory()->create();
+        $admin->givePermissionTo([
+            Permission::findOrCreate('admin.access', 'web'),
+            Permission::findOrCreate('admin.stations.view', 'web'),
+            Permission::findOrCreate('admin.stations.manage', 'web'),
+        ]);
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->withoutVite();
+
+        Livewire::test(InventorySubmissionsRelationManager::class, ['ownerRecord' => $other, 'pageClass' => ViewStation::class, 'lazy' => false])
+            ->call('loadTable')->assertCanNotSeeTableRecords([$record]);
+        Livewire::test(InventorySubmissionsRelationManager::class, ['ownerRecord' => $station, 'pageClass' => ViewStation::class, 'lazy' => false])
+            ->call('loadTable')
+            ->assertCanSeeTableRecords([$record])
+            ->mountTableAction('view', $record)
+            ->assertSee('Inventory Storage Actor')
+            ->assertSee('Quantity: 2', false)
+            ->unmountTableAction()
+            ->callTableAction('archive', $record, data: ['archive_reason' => '[QA TEST] reviewed'])
+            ->assertHasNoTableActionErrors()
+            ->assertCanNotSeeTableRecords([$record])
+            ->filterTable('archive_state', 'archived')
+            ->assertCanSeeTableRecords([$record])
+            ->callTableAction('restore', $record)->assertHasNoTableActionErrors()
+            ->filterTable('archive_state', 'active')
+            ->assertCanSeeTableRecords([$record]);
+
+        $this->get($submitted->json('data.pdf_download_url'))->assertOk()->assertHeader('content-type', 'application/pdf');
+        self::assertSame($pdfBytes, Storage::disk($this->privateDisk())->get($record->pdf_path));
+        self::assertSame(2, array_values($record->fresh()->items)[0]['quantity']);
+        self::assertNull($record->fresh()->archived_at);
     }
 }

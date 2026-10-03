@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Workgroup\RelationManagers;
 use App\Filament\Resources\Workgroup\RelationManagers\Concerns\AuthorizesWorkgroupOwner;
 use App\Models\User;
 use App\Models\Workgroup;
+use App\Models\WorkgroupMember;
 use App\Services\Workgroup\WorkgroupMembershipService;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -152,7 +153,7 @@ class MembersRelationManager extends RelationManager
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\DeleteAction::make()->visible(fn (WorkgroupMember $record): bool => $this->canManageOwner() && ! $record->hasRetainedEvidence()),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
