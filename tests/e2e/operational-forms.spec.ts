@@ -391,12 +391,31 @@ test('admin archives, finds, trashes and restores an actual member upload withou
     await confirm.click();
     await expect(confirm).toBeHidden({ timeout: 30_000 });
   };
-  const findInVisibility = async (visibility: string) => {
-    await page.goto('/admin/operational-forms');
-    await page.getByRole('button', { name: /filter/i }).first().click();
-    await page.getByLabel('Visibility').selectOption(visibility);
-    await page.getByRole('heading', { name: 'Operational Forms', exact: true }).click();
-    await expect(page.locator('tbody tr').filter({ hasText: title })).toBeVisible();
+  const findInVisibility = async (value: string) => {
+    if (new URL(page.url()).pathname !== '/admin/operational-forms') await page.goto('/admin/operational-forms');
+    const filters = page.locator('.fi-ta-filters-dropdown');
+    const visibility = filters.getByLabel('Visibility', { exact: true });
+    await expect(async () => {
+      if (!await visibility.isVisible()) {
+        await filters.getByRole('button', { name: /^Filters?(?: \d+)?$/i }).click({ timeout: 1_000 });
+      }
+      await expect(visibility).toBeVisible({ timeout: 1_000 });
+    }).toPass({ timeout: 10_000 });
+    await expect(visibility).toBeVisible();
+    if (await visibility.inputValue() !== value) {
+      const [filtered] = await Promise.all([
+        page.waitForResponse(response => {
+          if (new URL(response.url()).pathname !== '/livewire/update' || response.request().method() !== 'POST') return false;
+          const payload = response.request().postDataJSON() as { components?: { updates?: Record<string, unknown> }[] };
+          return payload.components?.some(component => component.updates?.['tableFilters.archive_state.value'] === value) ?? false;
+        }, { timeout: 30_000 }),
+        visibility.selectOption(value),
+      ]);
+      expect(filtered.status()).toBe(200);
+      expect(await filtered.finished()).toBeNull();
+    }
+    await page.keyboard.press('Escape');
+    await expect(page.locator('tbody tr').filter({ hasText: title })).toBeVisible({ timeout: 30_000 });
   };
 
   await page.goto(`/admin/operational-forms/${record.id}`);

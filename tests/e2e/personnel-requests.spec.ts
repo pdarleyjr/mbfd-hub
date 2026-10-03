@@ -513,8 +513,20 @@ test('real station inventory snapshot and supply request appear in their station
   await expect(page.getByText('[QA TEST] Real browser station supply request.', { exact: true })).toBeVisible();
   await testInfo.attach('inventory-records', { body: JSON.stringify({ recordId, supplyId, stationId: 1 }), contentType: 'application/json' });
   await page.goto('/admin/stations/1');
-  await page.getByRole('tab', { name: 'Inventory Submissions', exact: true }).click();
-  const inventoryRow = page.locator('tr').filter({ hasText: 'Personnel E2E Admin' }).filter({ hasText: String(recordId) });
+  const [inventoryTabResponse] = await Promise.all([
+    page.waitForResponse(result => {
+      if (new URL(result.url()).pathname !== '/livewire/update' || result.request().method() !== 'POST') return false;
+      const payload = result.request().postDataJSON() as { components?: { snapshot: string; updates?: Record<string, unknown> }[] };
+      return payload.components?.some(component => component.updates?.activeRelationManager !== undefined
+        && (JSON.parse(component.snapshot) as { memo: { path: string } }).memo.path === 'admin/stations/1') ?? false;
+    }, { timeout: 60_000 }),
+    page.getByRole('tab', { name: 'Inventory Submissions', exact: true }).click(),
+  ]);
+  expect(inventoryTabResponse.status()).toBe(200);
+  expect(await inventoryTabResponse.finished()).toBeNull();
+  const inventoryRow = page.getByRole('row')
+    .filter({ has: page.getByRole('cell', { name: String(recordId), exact: true }) })
+    .filter({ hasText: 'Personnel E2E Admin' });
   await expect(inventoryRow).toBeVisible({ timeout: 30_000 });
   await inventoryRow.getByRole('button', { name: 'View', exact: true }).click();
   await expect(page.getByText('[QA TEST] Real browser inventory snapshot.', { exact: true })).toBeVisible();
@@ -533,7 +545,9 @@ test('real station inventory snapshot and supply request appear in their station
   const supplyRow = page.locator('tr').filter({ hasText: '[QA TEST] Real browser station supply request.' });
   await expect(supplyRow).toBeVisible();
   await supplyRow.getByRole('button', { name: 'Edit', exact: true }).click();
-  await page.getByLabel('Status', { exact: true }).selectOption('ordered');
+  const supplyModal = page.locator('.fi-modal-window:visible').last();
+  await expect(supplyModal).toBeVisible({ timeout: 30_000 });
+  await supplyModal.getByRole('combobox', { name: /^Status\s*\*$/ }).selectOption('ordered');
   await page.getByLabel('Member response', { exact: true }).fill('[QA TEST] Supplies ordered for browser verification.');
   await page.getByLabel('Internal Notes', { exact: true }).fill('[QA TEST] Private supplier detail.');
   await submitAdminModal(page);
