@@ -10,6 +10,7 @@ const API_TOKEN = process.env.CLOUDFLARE_API_TOKEN;
 const ACCOUNT_ID = '265122b6d6f29457b0ca950c55f3ac6e'; // Will detect
 const INDEX_NAME = 'mbfd-rag-index';
 const EMBEDDING_MODEL = '@cf/baai/bge-large-en-v1.5';
+const REFERENCE_NAMESPACE = 'mbfd-support-reference';
 
 if (!API_TOKEN) {
   console.error('CLOUDFLARE_API_TOKEN env var required');
@@ -17,32 +18,6 @@ if (!API_TOKEN) {
 }
 
 // --- Text content from PDFs (extracted) ---
-
-const EXTRA_INFO_TEXT = `Equipment Deficiency Reporting Procedures for Miami Beach Fire Department
-
-To ensure timely and effective repairs, all equipment deficiencies must be reported directly to Fire Fleet. Accurate reporting helps assess operational impact and maintain continuity of service.
-
-Purpose of Streamlining: This process is designed to simplify and centralize communication. Reporting issues to multiple contacts has previously led to missed repair requests and repeat service delays. A single reporting path improves efficiency and ensures units are repaired correctly the first time.
-
-Reporting Instructions:
-1. Submit a Detailed Report via Email. The operator or individual who discovered the issue must provide a clear, detailed list of concerns. Include all relevant information to assist with accurate diagnosis and repair. Preferred reporters: Captain, Captain 5, or Chief 300.
-2. Email Format: Send all reports to FireSupportServices@MiamiBeachFL.Gov. Subject line format: [Unit number] Repairs Requested (e.g., "E1 20503 Repair Request")
-3. Supplemental Contact: Phone or in-person discussions are allowed, but the deficiency list must still be emailed. This ensures proper tracking and minimizes the risk of oversight.
-
-Phone Calls & Drive-Ups - Follow this order of contact:
-1. Fire Fleet Operations Manager - (786-559-4054)
-2. Captain of Support Services - (305-794-4057)
-3. Chief of Support Services - (786-562-5418)
-4. Technician in Shop - Last Resort Only - (786-231-7362)
-Contacting technicians directly should be avoided unless absolutely necessary. This prevents workflow interruptions and supports timely, accurate repairs.
-
-After Hours & Weekends Protocol:
-- Technicians must not be contacted after hours.
-- Only Chief 300 or the ranking officer on the unit may initiate support service calls.
-- Use the same contact order listed above for phone calls and drive-ups.
-- Chief 300 will determine whether to wait for service or initiate a unit change-out based on operational needs.
-
-Following this directive is essential to ensure all requests are completed accurately and to prevent any oversight.`;
 
 // L1_L11 manual was image-based, so we create a description entry
 const L1_L11_DESCRIPTION = `L1 through L11 Apparatus Manual - Miami Beach Fire Department
@@ -87,8 +62,8 @@ function chunkText(text, maxChars = 1500, overlap = 200) {
       }
     }
     chunks.push(text.slice(start, Math.min(end, text.length)).trim());
+    if (end >= text.length) break;
     start = end - overlap;
-    if (start >= text.length) break;
   }
   return chunks.filter(c => c.length > 50);
 }
@@ -121,6 +96,7 @@ async function upsertVectors(vectors) {
   // Vectorize REST API uses NDJSON format
   const ndjson = vectors.map(v => JSON.stringify({
     id: v.id,
+    namespace: v.namespace || REFERENCE_NAMESPACE,
     values: v.values,
     metadata: v.metadata,
   })).join('\n');
@@ -167,12 +143,6 @@ async function main() {
 
   // Prepare documents
   const documents = [];
-
-  // 1. Extra info (repair reporting)
-  documents.push({
-    source: 'extra_info_for_AI.pdf',
-    text: EXTRA_INFO_TEXT,
-  });
 
   // 2. L1-L11 description (image-based PDF)
   documents.push({
@@ -327,6 +297,7 @@ Mechanical Shaft Seal: Relies on water to cool and lubricate sealing surfaces. E
     for (let j = 0; j < batch.length; j++) {
       allVectors.push({
         id: batch[j].id,
+        namespace: REFERENCE_NAMESPACE,
         values: embeddings[j],
         metadata: {
           text: batch[j].text.slice(0, 2000),
@@ -351,6 +322,7 @@ Mechanical Shaft Seal: Relies on water to cool and lubricate sealing surfaces. E
     // Use detected account ID
     const ndjson = batch.map(v => JSON.stringify({
       id: v.id,
+      namespace: v.namespace,
       values: v.values,
       metadata: v.metadata,
     })).join('\n');

@@ -12,6 +12,9 @@ index_name = "mbfd-rag-index"
 [vars]
 SUPPORT_HUB_URL = "https://www.mbfdhub.com"
 ALLOWED_ORIGIN = "https://www.mbfdhub.com"
+SOG_NAMESPACE = "sog-r2-82a32d7127e4"
+SOG_MANIFEST_SHA256 = "82a32d7127e42604f77f591e39a26341844b2c7010e5f1b148d20472aaf20b6c"
+REFERENCE_NAMESPACE = "mbfd-support-reference"
 # Local-LLM bridge (Ollama OpenAI-compatible) for landing-chat generation.
 # Retrieval still uses Workers AI embeddings + Vectorize. Secrets BRIDGE_TOKEN
 # and INGEST_SECRET are set via `wrangler secret put` (never committed).
