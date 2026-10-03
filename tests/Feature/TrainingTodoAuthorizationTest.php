@@ -3,12 +3,15 @@
 namespace Tests\Feature;
 
 use App\Filament\Resources\TrainingTodoAdminResource\Pages\ListTrainingTodos as AdminListTrainingTodos;
+use App\Filament\Training\Resources\TrainingTodoResource\Pages\CreateTrainingTodo;
+use App\Filament\Training\Resources\TrainingTodoResource\Pages\EditTrainingTodo;
 use App\Filament\Training\Resources\TrainingTodoResource\Pages\ListTrainingTodos;
 use App\Filament\Training\Resources\TrainingTodoResource\Pages\ViewTrainingTodo;
 use App\Models\Training\TrainingTodo;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -70,16 +73,31 @@ class TrainingTodoAuthorizationTest extends TestCase
     {
         Notification::fake();
         Storage::fake('public');
-        Storage::disk('public')->put('training-todo-attachments/qa.pdf', '%PDF QA retained');
         $manager = User::factory()->create();
         $manager->assignRole('training_admin');
         $manager->givePermissionTo([Permission::findOrCreate('admin.access', 'web'), Permission::findOrCreate('admin.training.view', 'web'), Permission::findOrCreate('admin.training.manage', 'web')]);
         $this->actingAs($manager);
         $this->withoutVite();
-        $todo = TrainingTodo::create(['title' => '[QA TEST] Completed training task', 'status' => 'completed', 'priority' => 'medium', 'created_by' => $manager->id, 'attachments' => ['training-todo-attachments/qa.pdf']]);
-        $update = $todo->updates()->create(['user_id' => $manager->id, 'username' => $manager->name, 'comment' => '[QA TEST] Completion evidence']);
-        $completedAt = $todo->completed_at->toISOString();
         Filament::setCurrentPanel(Filament::getPanel('training'));
+        Livewire::test(CreateTrainingTodo::class)->fillForm([
+            'title' => '[QA TEST] Completed training task',
+            'status' => 'pending',
+            'priority' => 'medium',
+            'attachments' => [UploadedFile::fake()->createWithContent('qa.pdf', '%PDF QA retained')],
+        ])->call('create')->assertHasNoFormErrors();
+        $todo = TrainingTodo::query()->where('title', '[QA TEST] Completed training task')->sole();
+        self::assertSame($manager->id, $todo->created_by);
+        self::assertSame('pending', $todo->status);
+        $attachments = $todo->attachments;
+        self::assertCount(1, $attachments);
+        Livewire::test(EditTrainingTodo::class, ['record' => $todo->id])->fillForm(['status' => 'completed'])
+            ->call('save')->assertHasNoFormErrors();
+        Livewire::test(ViewTrainingTodo::class, ['record' => $todo->id])
+            ->callAction('addUpdate', data: ['comment' => '[QA TEST] Completion evidence'])->assertHasNoActionErrors();
+        $update = $todo->updates()->sole();
+        self::assertSame($manager->id, $update->user_id);
+        self::assertSame('[QA TEST] Completion evidence', $update->comment);
+        $completedAt = $todo->fresh()->completed_at->toISOString();
         Livewire::test(ListTrainingTodos::class)->assertCanSeeTableRecords([$todo])
             ->callTableAction('delete', $todo)->assertHasNoTableActionErrors()->assertCanNotSeeTableRecords([$todo]);
         $this->assertSoftDeleted($todo);
@@ -91,7 +109,8 @@ class TrainingTodoAuthorizationTest extends TestCase
         self::assertSame('completed', $todo->fresh()->status);
         self::assertSame($completedAt, $todo->fresh()->completed_at->toISOString());
         self::assertSame($update->id, $todo->updates()->sole()->id);
-        Storage::disk('public')->assertExists('training-todo-attachments/qa.pdf');
+        self::assertSame($attachments, $todo->fresh()->attachments);
+        self::assertSame('%PDF QA retained', Storage::disk('public')->get($attachments[0]));
         Notification::assertNothingSent();
     }
 

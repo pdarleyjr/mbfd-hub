@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Survey;
 
+use App\Filament\Resources\Workgroup\Pages\ListSurveys;
+use App\Filament\Workgroup\Pages\SurveyFormPage;
 use App\Filament\Workgroup\Pages\SurveyResultsPage;
 use App\Models\User;
 use App\Models\Workgroup;
@@ -23,6 +25,7 @@ use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use LogicException;
 use RuntimeException;
+use Spatie\Permission\Models\Permission;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
@@ -30,6 +33,40 @@ use Tests\TestCase;
 class SurveyPlatformTest extends TestCase
 {
     use RefreshDatabase;
+
+    public function test_member_survey_page_saves_draft_submits_and_keeps_admin_reporting_immutable(): void
+    {
+        [$manager, $survey] = $this->makeSurvey();
+        $member = $this->addMember($survey->workgroup, true);
+        app(WorkgroupContext::class)->select($member, $survey->workgroup_id);
+        $this->actingAs($member);
+        $this->withoutVite();
+        Filament::setCurrentPanel(Filament::getPanel('workgroups'));
+        $questionId = (string) $survey->questions->sole()->id;
+        $page = Livewire::withQueryParams(['surveyId' => $survey->id])->test(SurveyFormPage::class)
+            ->assertSet('submitted', false)
+            ->set('answers', [$questionId => 'excellent'])->call('saveDraft')->assertHasNoErrors();
+        $response = $survey->responses()->sole();
+        self::assertNull($response->submitted_at);
+        self::assertSame('excellent', $response->answers()->sole()->value());
+
+        $page->call('submit')->assertHasNoErrors()->assertSet('submitted', true);
+        self::assertNotNull($response->fresh()->submitted_at);
+        self::assertNull($response->fresh()->workgroup_member_id);
+        self::assertNotNull($survey->participants()->sole()->submitted_at);
+        $page->set('answers', [$questionId => 'unsure'])->call('saveDraft')->assertStatus(422);
+        self::assertSame('excellent', $response->answers()->sole()->value());
+
+        $manager->givePermissionTo(Permission::findOrCreate('admin.access', 'web'));
+        $this->actingAs($manager);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        Livewire::test(ListSurveys::class)->assertCanSeeTableRecords([$survey]);
+        Filament::setCurrentPanel(Filament::getPanel('workgroups'));
+        Livewire::withQueryParams(['surveyId' => $survey->id])->test(SurveyResultsPage::class)
+            ->assertSet('analytics.summary.submitted_participants', 1)
+            ->assertSet('analytics.summary.included_in_analysis', 1);
+        self::assertSame('excellent', $response->answers()->sole()->value());
+    }
 
     public function test_submission_separates_anonymous_content_from_participation_and_is_immutable(): void
     {
