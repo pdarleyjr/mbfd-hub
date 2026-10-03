@@ -92,6 +92,8 @@ class Workgroup extends Model
 
     /**
      * Get all shared uploads for this workgroup.
+     *
+     * @return HasMany<WorkgroupSharedUpload, $this>
      */
     public function sharedUploads(): HasMany
     {

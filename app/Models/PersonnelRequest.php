@@ -11,6 +11,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property \Illuminate\Support\Carbon|null $archived_at
+ * @property int|null $archived_by
+ * @property string|null $archive_reason
+ */
 class PersonnelRequest extends Model
 {
     use HasArchive;

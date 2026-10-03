@@ -3,6 +3,7 @@
 namespace App\Filament\Training\Resources\TrainingTodoResource\Pages;
 
 use App\Filament\Training\Resources\TrainingTodoResource;
+use App\Models\Training\TrainingTodo;
 use App\Models\Training\TrainingTodoUpdate;
 use Filament\Actions;
 use Filament\Forms;
@@ -16,15 +17,23 @@ class ViewTrainingTodo extends ViewRecord
 {
     protected static string $resource = TrainingTodoResource::class;
 
+    public function getRecord(): TrainingTodo
+    {
+        /** @var TrainingTodo $record */
+        $record = parent::getRecord();
+
+        return $record;
+    }
+
     protected function getHeaderActions(): array
     {
         return [
-            Actions\EditAction::make()->visible(fn (): bool => ! $this->record->trashed() && static::getResource()::canEdit($this->record)),
+            Actions\EditAction::make()->visible(fn (): bool => ! $this->getRecord()->trashed() && static::getResource()::canEdit($this->getRecord())),
             Actions\RestoreAction::make(),
             Actions\Action::make('addUpdate')
                 ->label('Add Update')
                 ->icon('heroicon-o-plus-circle')
-                ->visible(fn (): bool => ! $this->record->trashed() && (auth()->user()?->can('update', $this->record) ?? false))
+                ->visible(fn (): bool => ! $this->getRecord()->trashed() && (auth()->user()?->can('update', $this->getRecord()) ?? false))
                 ->form([
                     Forms\Components\Textarea::make('comment')
                         ->label('Update Comment')
@@ -32,10 +41,10 @@ class ViewTrainingTodo extends ViewRecord
                         ->rows(3),
                 ])
                 ->action(function (array $data): void {
-                    abort_unless(! $this->record->trashed() && auth()->user()?->can('update', $this->record), 403);
+                    abort_unless(! $this->getRecord()->trashed() && auth()->user()?->can('update', $this->getRecord()), 403);
 
                     TrainingTodoUpdate::create([
-                        'training_todo_id' => $this->record->id,
+                        'training_todo_id' => $this->getRecord()->id,
                         'user_id' => auth()->id(),
                         'username' => auth()->user()->name,
                         'comment' => $data['comment'],
@@ -48,8 +57,8 @@ class ViewTrainingTodo extends ViewRecord
 
     public function deleteUpdate(int $updateId): void
     {
-        abort_unless(! $this->record->trashed() && auth()->user()?->can('update', $this->record), 403);
-        $update = $this->record->updates()->find($updateId);
+        abort_unless(! $this->getRecord()->trashed() && auth()->user()?->can('update', $this->getRecord()), 403);
+        $update = $this->getRecord()->updates()->find($updateId);
 
         if (! $update) {
             Notification::make()
@@ -70,8 +79,9 @@ class ViewTrainingTodo extends ViewRecord
 
     public function restoreUpdate(int $updateId): void
     {
-        abort_unless(! $this->record->trashed() && auth()->user()?->can('update', $this->record), 403);
-        $update = $this->record->updates()->onlyTrashed()->findOrFail($updateId);
+        abort_unless(! $this->getRecord()->trashed() && auth()->user()?->can('update', $this->getRecord()), 403);
+        $update = $this->getRecord()->updates()->onlyTrashed()->find($updateId);
+        abort_unless($update, 404);
         $update->restore();
 
         Notification::make()->title('Update restored')->success()->send();

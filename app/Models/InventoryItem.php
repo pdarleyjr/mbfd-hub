@@ -30,10 +30,12 @@ class InventoryItem extends Model
 
     /**
      * Get the category this item belongs to
+     *
+     * @return BelongsTo<InventoryCategory, $this>
      */
     public function category(): BelongsTo
     {
-        return $this->belongsTo(InventoryCategory::class , 'category_id');
+        return $this->belongsTo(InventoryCategory::class, 'category_id');
     }
 
     /**
@@ -41,7 +43,7 @@ class InventoryItem extends Model
      */
     public function stationInventories(): HasMany
     {
-        return $this->hasMany(StationInventoryItem::class , 'inventory_item_id');
+        return $this->hasMany(StationInventoryItem::class, 'inventory_item_id');
     }
 
     /**
@@ -49,7 +51,7 @@ class InventoryItem extends Model
      */
     public function audits(): HasMany
     {
-        return $this->hasMany(StationInventoryAudit::class , 'inventory_item_id');
+        return $this->hasMany(StationInventoryAudit::class, 'inventory_item_id');
     }
 
     /**
@@ -74,6 +76,7 @@ class InventoryItem extends Model
     public function getParUnitsAttribute(): int
     {
         $multiplier = $this->unit_multiplier ?? 1;
+
         return ($this->par_quantity ?? 0) * $multiplier;
     }
 
@@ -86,7 +89,7 @@ class InventoryItem extends Model
             return $this->low_threshold;
         }
 
-        return (int)floor(($this->par_quantity ?? 0) / 2);
+        return (int) floor(($this->par_quantity ?? 0) / 2);
     }
 
     /**

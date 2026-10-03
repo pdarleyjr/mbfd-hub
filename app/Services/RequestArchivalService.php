@@ -16,7 +16,7 @@ final class RequestArchivalService
     public function canManage(User $actor, PersonnelRequest|StationRequest|ApparatusServiceTicket|HubSupportTicket $record): bool
     {
         return $record instanceof StationRequest
-            ? $actor->can('admin.stations.manage')
+            ? $actor->can('admin.stations.manage', 'web')
             : $actor->can('update', $record);
     }
 

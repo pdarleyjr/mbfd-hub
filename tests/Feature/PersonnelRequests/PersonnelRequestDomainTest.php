@@ -15,9 +15,12 @@ use App\Services\PersonnelRequests\PersonnelRequestSubmissionService;
 use App\Services\PersonnelRequests\PersonnelRequestWorkflowService;
 use App\Services\RequestArchivalService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\PreserveGlobalState;
+use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -344,8 +347,13 @@ class PersonnelRequestDomainTest extends TestCase
         }
     }
 
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
     public function test_request_archive_migration_rolls_back_and_reapplies_without_deleting_request_history(): void
     {
+        // SQLite cannot toggle foreign keys for its table rebuild while the
+        // RefreshDatabase transaction is open. Isolate and replay as a real migration.
+        DB::connection()->commit();
         $employee = $this->employee('23304', 'Firefighter');
         $request = app(PersonnelRequestSubmissionService::class)->submitUniform(
             $employee, [['item_code' => 't_shirt', 'size' => 'L', 'quantity' => 1]], 'archive-migration-retention-1',

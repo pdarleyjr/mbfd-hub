@@ -8,6 +8,12 @@ use App\Models\Concerns\HasArchive;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property \Illuminate\Support\Carbon|null $archived_at
+ * @property int|null $archived_by
+ * @property string|null $archive_reason
+ * @property-read int $entries_count
+ */
 class TrtInventorySession extends Model
 {
     use HasArchive;

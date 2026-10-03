@@ -45,6 +45,9 @@ use Illuminate\Support\Carbon;
  * @property \Illuminate\Support\Carbon|null $started_at
  * @property \Illuminate\Support\Carbon|null $resolved_at
  * @property \Illuminate\Support\Carbon|null $closed_at
+ * @property \Illuminate\Support\Carbon|null $archived_at
+ * @property int|null $archived_by
+ * @property string|null $archive_reason
  * @property-read User $reporter
  * @property-read Employee|null $reportedByEmployee
  * @property-read User|null $assignedTo
@@ -136,6 +139,10 @@ final class HubSupportTicket extends Model
         return $this->hasMany(HubSupportTicketAttachment::class)->orderBy('created_at')->orderBy('id');
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeOpen(Builder $query): Builder
     {
         return $query->active()->whereNotIn('status', [HubSupportTicketStatus::Resolved->value, HubSupportTicketStatus::Closed->value]);

@@ -27,7 +27,7 @@ final class StationInventorySnapshotService
             ->with('inventoryItem.category')->orderBy('inventory_item_id')->get()
             ->map(fn (StationInventoryItem $item): array => [
                 'inventory_item_id' => $item->inventory_item_id,
-                'category' => $item->inventoryItem->category?->name ?? 'Uncategorized',
+                'category' => $item->inventoryItem->category->name ?? 'Uncategorized',
                 'name' => $item->inventoryItem->name,
                 'sku' => $item->inventoryItem->sku,
                 'quantity' => $item->on_hand,

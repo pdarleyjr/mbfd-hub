@@ -20,7 +20,7 @@ class StationRequestWorkflowService
     /** @param array<string, mixed> $data */
     public function transition(StationRequest $stationRequest, array $data, User $actor): StationRequest
     {
-        abort_unless($actor->can('admin.stations.manage'), 403);
+        abort_unless($actor->can('admin.stations.manage', 'web'), 403);
 
         return DB::transaction(function () use ($stationRequest, $data, $actor): StationRequest {
             /** @var StationRequest $request */

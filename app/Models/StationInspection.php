@@ -9,6 +9,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
 
+/**
+ * @property \Illuminate\Support\Carbon|null $archived_at
+ * @property int|null $archived_by
+ * @property string|null $archive_reason
+ */
 class StationInspection extends Model
 {
     use HasArchive;

@@ -226,8 +226,8 @@ test('representative viewports preserve station navigation and fail closed for a
   await expectNoHorizontalOverflow(page);
 
   if (['daily-responsive-phone-390', 'daily-responsive-wide-1440'].includes(testInfo.project.name)) {
-    await page.waitForTimeout(750);
-    expect(await page.getByRole('img', { name: 'MBFD Logo' }).evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
+    const logo = page.getByRole('link', { name: 'MBFD Hub home', exact: true }).locator('img');
+    await expect.poll(() => logo.evaluate((image: HTMLImageElement) => image.naturalWidth)).toBeGreaterThan(0);
 
     const stationScreenshot = testInfo.outputPath(`${testInfo.project.name}-station-profile.png`);
     await page.screenshot({ path: stationScreenshot, fullPage: true });

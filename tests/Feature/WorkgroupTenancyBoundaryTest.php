@@ -421,7 +421,7 @@ class WorkgroupTenancyBoundaryTest extends TestCase
             } else {
                 $survey = WorkgroupSurvey::create([
                     'workgroup_id' => $context['workgroup']->id, 'workgroup_session_id' => $context['session']->id,
-                    'title' => '[QA TEST] Retained survey', 'status' => 'active', 'is_anonymous' => true,
+                    'title' => '[QA TEST] Retained survey', 'status' => 'active', 'is_anonymous' => true, 'revision' => 1,
                 ]);
                 $question = $survey->questions()->create([
                     'position' => 1, 'type' => 'single', 'prompt' => 'QA answer', 'is_required' => true,

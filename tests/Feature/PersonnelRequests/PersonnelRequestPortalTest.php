@@ -268,6 +268,7 @@ class PersonnelRequestPortalTest extends TestCase
         $admin->givePermissionTo([
             Permission::findOrCreate('admin.access', 'web'),
             Permission::findOrCreate('admin.personnel.view', 'web'),
+            Permission::findOrCreate('admin.personnel.manage', 'web'),
         ]);
         $this->actingAs($admin);
         Filament::setCurrentPanel(Filament::getPanel('admin'));

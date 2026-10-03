@@ -10,6 +10,11 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+/**
+ * @property \Illuminate\Support\Carbon|null $archived_at
+ * @property int|null $archived_by
+ * @property string|null $archive_reason
+ */
 class OperationalFormRecord extends Model
 {
     use HasArchive, HasUlids, SoftDeletes;

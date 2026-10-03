@@ -217,7 +217,7 @@ class WorkgroupNotesAndSharedUploadsAuthorizationTest extends TestCase
         $this->actingAs($author);
         Filament::setCurrentPanel(Filament::getPanel('workgroups'));
 
-        $historical = WorkgroupSession::create(['workgroup_id' => $context['workgroup']->id, 'name' => '[QA TEST] Historical session', 'status' => 'completed', 'start_date' => yesterday(), 'end_date' => yesterday()]);
+        $historical = WorkgroupSession::create(['workgroup_id' => $context['workgroup']->id, 'name' => '[QA TEST] Historical session', 'status' => 'completed', 'start_date' => today()->subDay(), 'end_date' => today()->subDay()]);
         Livewire::test(Notes::class)->callAction('selectSession', data: ['session_id' => $historical->id])
             ->callAction('createNote', data: [
                 'title' => '[QA TEST] Shared note', 'content' => 'Retained shared evidence', 'is_shared' => true, 'shared_with_user_id' => $recipient->id,
@@ -234,7 +234,7 @@ class WorkgroupNotesAndSharedUploadsAuthorizationTest extends TestCase
         Livewire::test(Notes::class)->callAction('selectSession', data: ['session_id' => null])->filterTable('trashed', '1')->assertCanNotSeeTableRecords([$note]);
         $this->actingAs($author);
         Livewire::test(Notes::class)->callAction('selectSession', data: ['session_id' => $historical->id])->filterTable('trashed', '0')
-            ->callTableAction('restore', $note)->assertHasNoTableActionErrors()
+            ->callTableAction('restore', $note->getKey())->assertHasNoTableActionErrors()
             ->filterTable('trashed', null)->assertCanSeeTableRecords([$note]);
         self::assertSame('Retained shared evidence', $note->fresh()->content);
         self::assertSame($recipient->id, $note->fresh()->shared_with_user_id);
@@ -270,7 +270,7 @@ class WorkgroupNotesAndSharedUploadsAuthorizationTest extends TestCase
         $this->get(route('workgroup.shared-upload.download', $upload))->assertNotFound();
         $this->actingAs($author);
         Livewire::test(SharedUploads::class)->filterTable('trashed', '0')->assertCanSeeTableRecords([$upload])
-            ->callTableAction('restore', $upload)->assertHasNoTableActionErrors()
+            ->callTableAction('restore', $upload->getKey())->assertHasNoTableActionErrors()
             ->filterTable('trashed', null)->assertCanSeeTableRecords([$upload]);
         $this->get(route('workgroup.shared-upload.download', $upload))->assertOk();
         self::assertSame($png, Storage::disk('local')->get($upload->filepath));

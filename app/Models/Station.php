@@ -215,6 +215,8 @@ class Station extends Model
 
     /**
      * Get canonical repair/service and station equipment requests.
+     *
+     * @return HasMany<StationRequest, $this>
      */
     public function stationRequests(): HasMany
     {

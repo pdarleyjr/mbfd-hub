@@ -62,6 +62,7 @@ class TrainingTodo extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    /** @return HasMany<TrainingTodoUpdate, $this> */
     public function updates(): HasMany
     {
         return $this->hasMany(TrainingTodoUpdate::class)->orderBy('created_at', 'desc');

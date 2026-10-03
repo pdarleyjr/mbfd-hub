@@ -73,7 +73,7 @@ class TrainingTodoAuthorizationTest extends TestCase
         Storage::disk('public')->put('training-todo-attachments/qa.pdf', '%PDF QA retained');
         $manager = User::factory()->create();
         $manager->assignRole('training_admin');
-        $manager->givePermissionTo([Permission::findOrCreate('admin.access', 'web'), Permission::findOrCreate('admin.training.view', 'web')]);
+        $manager->givePermissionTo([Permission::findOrCreate('admin.access', 'web'), Permission::findOrCreate('admin.training.view', 'web'), Permission::findOrCreate('admin.training.manage', 'web')]);
         $this->actingAs($manager);
         $this->withoutVite();
         $todo = TrainingTodo::create(['title' => '[QA TEST] Completed training task', 'status' => 'completed', 'priority' => 'medium', 'created_by' => $manager->id, 'attachments' => ['training-todo-attachments/qa.pdf']]);
@@ -85,7 +85,7 @@ class TrainingTodoAuthorizationTest extends TestCase
         $this->assertSoftDeleted($todo);
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         Livewire::test(AdminListTrainingTodos::class)->filterTable('trashed', '0')->assertCanSeeTableRecords([$todo])
-            ->callTableAction('restore', $todo)->assertHasNoTableActionErrors()
+            ->callTableAction('restore', $todo->getKey())->assertHasNoTableActionErrors()
             ->filterTable('trashed', null)->assertCanSeeTableRecords([$todo]);
         $this->assertNotSoftDeleted($todo);
         self::assertSame('completed', $todo->fresh()->status);

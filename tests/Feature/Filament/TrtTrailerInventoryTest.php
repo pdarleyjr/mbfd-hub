@@ -129,7 +129,7 @@ class TrtTrailerInventoryTest extends TestCase
             self::assertNull($session->fresh()->archived_at);
         }
 
-        $historical = TrtInventorySession::create(['session_date' => yesterday()]);
+        $historical = TrtInventorySession::create(['session_date' => today()->subDay()]);
         $this->actingAs($this->equipmentAdmin(manage: false));
         Livewire::test(TrtTrailerInventory::class)
             ->set('selectedSessionId', $historical->id)

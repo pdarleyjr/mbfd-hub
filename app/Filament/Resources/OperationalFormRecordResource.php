@@ -72,8 +72,8 @@ class OperationalFormRecordResource extends Resource
                     return match ($data['value'] ?? 'active') {
                         'all' => $query,
                         'trash' => $query->whereNotNull('deleted_at'),
-                        'archived' => $query->whereNull('deleted_at')->archived(),
-                        default => $query->whereNull('deleted_at')->active(),
+                        'archived' => $query->whereNull('deleted_at')->whereNotNull('archived_at'),
+                        default => $query->whereNull('deleted_at')->whereNull('archived_at'),
                     };
                 }),
                 SelectFilter::make('form_type')->label('Form type')->options([

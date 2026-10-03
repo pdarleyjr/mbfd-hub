@@ -283,10 +283,6 @@ jobs:
         run: npx playwright install --with-deps chromium webkit
       - name: Verify first-login Bid handoff under enforced CSP
         run: node --test tests/Browser/bid-login-handoff.mjs
-      - name: Run mocked Daily Checkout Playwright
-        env:
-          DAILY_CHECKOUT_E2E_BASE_URL: http://127.0.0.1:4176
-        run: npm run test:daily-checkout-e2e
       - name: Install PHP dependencies
         env:
           COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
@@ -306,6 +302,10 @@ jobs:
           --project=phone-touch
           --project=hub-shell-webkit-iphone
           --project=desktop
+      - name: Run mocked Daily Checkout Playwright
+        env:
+          DAILY_CHECKOUT_E2E_BASE_URL: http://127.0.0.1:4176
+        run: npm run test:daily-checkout-e2e
       - name: Verify shared panel session-expiry handling
         # The browser test uses the installed Livewire client from Composer.
         run: |

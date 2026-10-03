@@ -44,7 +44,7 @@ class PersonnelRequestsE2ESeeder extends Seeder
             'is_admin' => true,
         ])->save();
         $admin->syncRoles([$role]);
-        foreach (['admin.access', 'admin.personnel.view', 'admin.stations.view', 'admin.stations.manage', 'admin.support.view', 'admin.support.manage'] as $capability) {
+        foreach (['admin.access', 'admin.personnel.view', 'admin.personnel.manage', 'admin.fleet.view', 'admin.fleet.manage', 'admin.stations.view', 'admin.stations.manage', 'admin.support.view', 'admin.support.manage'] as $capability) {
             $admin->givePermissionTo(Permission::findOrCreate($capability, 'web'));
         }
 

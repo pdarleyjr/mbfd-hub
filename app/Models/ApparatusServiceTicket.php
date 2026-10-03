@@ -12,6 +12,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
+/**
+ * @property \Illuminate\Support\Carbon|null $archived_at
+ * @property int|null $archived_by
+ * @property string|null $archive_reason
+ */
 class ApparatusServiceTicket extends Model
 {
     use HasArchive;
@@ -130,6 +135,10 @@ class ApparatusServiceTicket extends Model
         return $this->hasMany(ApparatusServiceTicketUpdate::class)->orderBy('created_at')->orderBy('id');
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeOpen(Builder $query): Builder
     {
         return $query->active()->whereIn('status', ApparatusServiceTicketStatus::openValues());

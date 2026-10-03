@@ -2,19 +2,34 @@
 
 namespace App\Filament\Resources\StationResource\RelationManagers;
 
+use App\Filament\Resources\StationResource;
 use App\Filament\Support\ArchiveFilter;
+use App\Models\Station;
 use App\Models\StationInventorySubmission;
 use App\Services\OperationalEvidenceArchiveService;
 use Filament\Infolists;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 
 class InventorySubmissionsRelationManager extends RelationManager
 {
     protected static string $relationship = 'inventorySubmissions';
 
     protected static ?string $title = 'Inventory Submissions';
+
+    public static function canViewForRecord(Model $ownerRecord, string $pageClass): bool
+    {
+        return $ownerRecord instanceof Station && StationResource::canView($ownerRecord);
+    }
+
+    protected function canView(Model $record): bool
+    {
+        return $record instanceof StationInventorySubmission
+            && (int) $record->station_id === (int) $this->getOwnerRecord()->getKey()
+            && static::canViewForRecord($this->getOwnerRecord(), $this->getPageClass());
+    }
 
     public function table(Table $table): Table
     {

@@ -271,12 +271,6 @@ parameters:
 			path: app/Filament/Resources/FireEquipmentRequestResource/Pages/ViewFireEquipmentRequest.php
 
 		-
-			message: '#^Parameter \#1 \$record of method App\\Services\\OperationalForms\\OperationalFormDeletionService\:\:deleteRecord\(\) expects App\\Models\\OperationalFormRecord, Illuminate\\Database\\Eloquent\\Model\|int\|string\|null given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Filament/Resources/OperationalFormRecordResource/Pages/ViewOperationalFormRecord.php
-
-		-
 			message: '#^Access to an undefined property App\\Models\\EquipmentItem\|Illuminate\\Database\\Eloquent\\Collection\<int, App\\Models\\EquipmentItem\>\:\:\$stock\.$#'
 			identifier: property.notFound
 			count: 4
@@ -2887,30 +2881,6 @@ parameters:
 			identifier: deadCode.unreachable
 			count: 1
 			path: app/Services/OperationalForms/FrocZipReader.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$created_at\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/OperationalForms/OperationalFormDeletionService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$source_revision\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Services/OperationalForms/OperationalFormDeletionService.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$version_number\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Services/OperationalForms/OperationalFormDeletionService.php
-
-		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,Illuminate\\Database\\Eloquent\\Model\>\:\:map\(\) expects callable\(Illuminate\\Database\\Eloquent\\Model, int\)\: array\{disk\: string, path\: string\}, Closure\(App\\Models\\OperationalFormDocument\)\: array\{disk\: string, path\: string\} given\.$#'
-			identifier: argument.type
-			count: 1
-			path: app/Services/OperationalForms/OperationalFormDeletionService.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$result\.$#'

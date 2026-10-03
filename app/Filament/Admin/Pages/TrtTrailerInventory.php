@@ -106,6 +106,7 @@ class TrtTrailerInventory extends Page
         ];
     }
 
+    /** @return Builder<TrtInventorySession> */
     private function sessionQuery(): Builder
     {
         $query = TrtInventorySession::query();
@@ -129,7 +130,7 @@ class TrtTrailerInventory extends Page
         $sessions = $this->sessionQuery()->withCount('entries')
             ->orderByDesc('session_date')
             ->get()
-            ->map(fn ($s) => [
+            ->map(fn (TrtInventorySession $s): array => [
                 'id' => $s->id,
                 'label' => $s->session_date->format('M j, Y')." ({$s->entries_count} entries)".($s->isArchived() ? ' · Archived' : ''),
             ]);

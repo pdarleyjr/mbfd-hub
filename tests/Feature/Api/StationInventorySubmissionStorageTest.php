@@ -149,6 +149,8 @@ class StationInventorySubmissionStorageTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $this->withoutVite();
 
+        self::assertTrue(InventorySubmissionsRelationManager::canViewForRecord($station, ViewStation::class));
+
         Livewire::test(InventorySubmissionsRelationManager::class, ['ownerRecord' => $other, 'pageClass' => ViewStation::class, 'lazy' => false])
             ->call('loadTable')->assertCanNotSeeTableRecords([$record]);
         Livewire::test(InventorySubmissionsRelationManager::class, ['ownerRecord' => $station, 'pageClass' => ViewStation::class, 'lazy' => false])
@@ -163,7 +165,7 @@ class StationInventorySubmissionStorageTest extends TestCase
             ->assertCanNotSeeTableRecords([$record])
             ->filterTable('archive_state', 'archived')
             ->assertCanSeeTableRecords([$record])
-            ->callTableAction('restore', $record)->assertHasNoTableActionErrors()
+            ->callTableAction('restore', $record->getKey())->assertHasNoTableActionErrors()
             ->filterTable('archive_state', 'active')
             ->assertCanSeeTableRecords([$record]);
 
@@ -171,5 +173,8 @@ class StationInventorySubmissionStorageTest extends TestCase
         self::assertSame($pdfBytes, Storage::disk($this->privateDisk())->get($record->pdf_path));
         self::assertSame(2, array_values($record->fresh()->items)[0]['quantity']);
         self::assertNull($record->fresh()->archived_at);
+
+        $this->actingAs(User::factory()->create());
+        self::assertFalse(InventorySubmissionsRelationManager::canViewForRecord($station, ViewStation::class));
     }
 }

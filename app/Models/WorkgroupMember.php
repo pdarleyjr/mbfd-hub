@@ -75,6 +75,8 @@ class WorkgroupMember extends Model
 
     /**
      * Get all notes created by this member.
+     *
+     * @return HasMany<WorkgroupNote, $this>
      */
     public function notes(): HasMany
     {
@@ -83,6 +85,8 @@ class WorkgroupMember extends Model
 
     /**
      * Get all shared uploads by this member.
+     *
+     * @return HasMany<WorkgroupSharedUpload, $this>
      */
     public function sharedUploads(): HasMany
     {

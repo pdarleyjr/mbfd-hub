@@ -12,6 +12,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property \Illuminate\Support\Carbon|null $archived_at
+ * @property int|null $archived_by
+ * @property string|null $archive_reason
+ */
 class StationRequest extends Model
 {
     use HasArchive;
@@ -124,6 +129,10 @@ class StationRequest extends Model
         return $this->hasMany(RoomAssetEvent::class)->latest('event_at');
     }
 
+    /**
+     * @param  Builder<static>  $query
+     * @return Builder<static>
+     */
     public function scopeOpen(Builder $query): Builder
     {
         return $query->active()->whereIn('status', StationRequestStatus::openValues());

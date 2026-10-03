@@ -34,7 +34,7 @@ class ViewStationRequest extends ViewRecord
                 ->color('primary')
                 ->modalHeading('Update Station Request')
                 ->modalSubmitActionLabel('Update Status')
-                ->visible(fn (): bool => $this->stationRequest()->is_open && (auth()->user()?->can('admin.stations.manage') ?? false))
+                ->visible(fn (): bool => $this->stationRequest()->is_open && (auth()->user()?->can('admin.stations.manage', 'web') ?? false))
                 ->fillForm(fn (): array => [
                     'status' => $this->stationRequest()->status,
                     'assigned_to_user_id' => $this->stationRequest()->assigned_to_user_id,

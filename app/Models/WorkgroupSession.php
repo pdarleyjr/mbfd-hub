@@ -63,6 +63,8 @@ class WorkgroupSession extends Model
 
     /**
      * Get all shared uploads for this session.
+     *
+     * @return HasMany<WorkgroupSharedUpload, $this>
      */
     public function sharedUploads(): HasMany
     {

@@ -15,6 +15,14 @@ class ViewStationInspection extends ViewRecord
 {
     protected static string $resource = StationInspectionResource::class;
 
+    public function getRecord(): StationInspection
+    {
+        /** @var StationInspection $record */
+        $record = parent::getRecord();
+
+        return $record;
+    }
+
     protected function getHeaderActions(): array
     {
         return [
@@ -24,14 +32,14 @@ class ViewStationInspection extends ViewRecord
                 ->color('gray')
                 ->requiresConfirmation()
                 ->form([Forms\Components\Textarea::make('archive_reason')->label('Reason (optional)')->maxLength(2000)])
-                ->visible(fn (): bool => StationInspectionResource::canEdit($this->record) && ! $this->record->isArchived())
-                ->action(fn (array $data) => app(OperationalEvidenceArchiveService::class)->archive($this->record, auth()->user(), $data['archive_reason'] ?? null)),
+                ->visible(fn (): bool => StationInspectionResource::canEdit($this->getRecord()) && ! $this->getRecord()->isArchived())
+                ->action(fn (array $data) => app(OperationalEvidenceArchiveService::class)->archive($this->getRecord(), auth()->user(), $data['archive_reason'] ?? null)),
             Actions\Action::make('restore')
                 ->label('Restore')
                 ->icon('heroicon-o-arrow-uturn-left')
                 ->requiresConfirmation()
-                ->visible(fn (): bool => StationInspectionResource::canEdit($this->record) && $this->record->isArchived())
-                ->action(fn () => app(OperationalEvidenceArchiveService::class)->restore($this->record, auth()->user())),
+                ->visible(fn (): bool => StationInspectionResource::canEdit($this->getRecord()) && $this->getRecord()->isArchived())
+                ->action(fn () => app(OperationalEvidenceArchiveService::class)->restore($this->getRecord(), auth()->user())),
             Actions\Action::make('acknowledgeInspection')
                 ->label('Review / Acknowledge')
                 ->icon('heroicon-o-check-circle')

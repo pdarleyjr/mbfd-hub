@@ -28,7 +28,7 @@ class LighthouseReleaseGateTest extends TestCase
 
     public function test_ui_uses_a_bounded_logo_asset(): void
     {
-        $logo = __DIR__.'/../../public/images/mbfd_logo-256.png';
+        $logo = __DIR__.'/../../public/images/mbfd-official-seal-256.png';
         $shell = file_get_contents(__DIR__.'/../../resources/views/components/hub/shell.blade.php');
         $dimensions = getimagesize($logo);
 
@@ -37,7 +37,7 @@ class LighthouseReleaseGateTest extends TestCase
         $this->assertSame(256, $dimensions[0]);
         $this->assertSame(256, $dimensions[1]);
         $this->assertLessThanOrEqual(128 * 1024, filesize($logo));
-        $this->assertStringContainsString('/images/mbfd_logo-256.png', $shell);
+        $this->assertStringContainsString('/images/mbfd-official-seal-256.png', $shell);
         $this->assertStringNotContainsString('/images/mbfd_logo.png', $shell);
     }
 }
