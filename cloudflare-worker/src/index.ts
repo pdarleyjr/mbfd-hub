@@ -25,8 +25,30 @@ interface ConversationMessage {
   content: string;
 }
 
+interface SogCitation {
+  id: string;
+  namespace: string;
+  manifest_sha256: string;
+  asset_id: string;
+  source: string;
+  page: number;
+  primary_ids: string;
+  url: string;
+  source_sha256?: string;
+}
+
+interface ReferenceCitation {
+  id: string;
+  namespace: string;
+  source: string;
+  chunk_index?: number;
+}
+
 const EMBEDDING_MODEL = '@cf/baai/bge-large-en-v1.5';
 const DEFAULT_BRIDGE_MODEL = 'qwen3.6:35b';
+
+// Page counts projected from the frozen 82a32 manifest's 2,160 verified corpus records.
+const R2_PAGE_CHUNK_COUNTS: Record<string, number[]> = {"100.XX-GOV-R1":[2,2,2,2,2],"200-B7-R1":[2,2,2,1],"200-C1-R1":[2,2,2,2,2],"200-E3-R1":[2,2,2,2,2,2,2,2,2,2,2,2,1],"300-METHODS":[2,2,2,2,2,2,2,3,3,1],"400.XX-JHAT-R1":[2,2,2,3,3,2],"400.XX-K9-R1":[2,2,2],"400.XX-UAS-R1":[2,2,2,2,1],"400.XX-WTR-R1":[2,2,1],"500.01-R1":[2,2,3,3,3,2,3,2,2,3,2,2,2,2,2,3],"500.07-R1":[3,3,2,3,3,2],"500.10-R1":[2,2,3,2,1],"500.XX-CQM-R1":[2,3,2,3,3,1],"500.XX-MD-R1":[2,2,2,1],"600.04-R2":[2,2,2,2],"600.10-R1":[2,2,2,1],"600.XX-ADM-R2":[2,2,2],"900-CS":[3,1,2,2,1,2,2,1,2,2,1,2,3,1,2,2],"900-DE":[2,3,1,2,2,2,2,2,2,1,2,2,2,2,1,2,2,2,3,2,2,2,2,2,2,2,2,2,2,2],"900-DE-QA":[2,2,2,2,3,3],"900-DE-UNIT":[2,2,1,2,2,2,2,2,2,2,1,1,1,1,1,1,1,2,2,1,1,1,1,1,2,3,2,2,2],"900-INSTRUCTOR":[2,2,2,2,2,2,2,2],"900-SKILLS":[2,2,2,2,2,2,3,2,2,2,2,2,3,2],"900-TC":[2,1,2,1,2,1,2,1,2,1,2,1,2,2,2,1],"SECTION-100":[2,2,3,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,3,3,3,3,2,2,2,3,3,3,3,2,1,1,2,2,2,2,2,2,1,2,2,2,2,2,2],"SECTION-200":[3,3,3,3,4,3,1,3,2,3,2,3,3,2,2,3,4,2,2,3,3,3,3,1,2,2,4,3,2,3,3,3,3,2,1,2,2,3,2,3,2,1,3,3,3,3,2,1,2,4,4,3,2,2,2,2,2,2,2,1,3,3,3,3,2,1,3,3,3,2,2,2,3,3,3,4,3,2,2,3,3,3,1,4,3,2,2,4,2,4,4,3,4,3,3,2,3,3,3,1,3,3,1,3,3,2,3,2,2,4,2,3,4,3,3,3,2,3,3,2],"SECTION-300":[3,2,3,3,2,3,2,4,3,3,2,3,3,3,3,3,3,3,2,3,4,3,4,2,2,3,3,4,3,2,2,3,1,3,1,2,3,3,3,2,3,1,2,1,2,3,2,2,3,1,2,2,3,3,3,2,3,2,2,1,3,2,2,2,3,2,3,3,2,2,3,2,3,3,1,2,2,3,2,3,3,2,3,1,2,3,3,1,2,3,1,3,3,2,3,3,1,3,4,3,3,3,2,3,2,3,3,3,3,3,2,2,3],"SECTION-400":[3,2,3,3,3,4,2,2,3,2,2,3,2,2,3,2,2,3,2,3,3,2,2,2,2,2,3,1,3,3,2,2,4,3,2,4,2,3,2,2,2,3,3,3,2,3,3,3,2,3,2,2,3,3,3,3,2,3,3,3,3,3,3,3,1,3,3,2,2,2,4,3,2,3,2,2,2,3,2,3,1,2,3,2,2,2,2,3,2,3,3,2,3,2,2,3,1,2,2,3,3,1,3,3,2,3,3,1,3,3,2,3,3,3,3,2],"SECTION-500":[2,3,3,3,3,2,3,3,3,3,3,3,2,2,2,3,3,2,3,3,3,2,3,3,3,2,2,2,3,3,1,2,3,2,3,3,3,3,2,3,3,2,3,4,3,3,3,3,2,3,3,2,3,3,3,3,2,3,2,3,2,2,3,2,3,3,3,2,3,3,2,1,3,3,2,2],"SECTION-600":[3,3,3,3,3,3,3,2,3,3,3,3,2,2,2,2,3,3,3,3,2,3,3,3,3,2,3,3,3,3,2,2,2,2,2,2,2,2,3,2,3,3,3,1,3,3,3,3,3,3,2,3,3,3,2,3,3,2,3,3,2,3,3,3,3,3,1,3,3,3,2,3,3,2,1,1,1,2,3,1,3,3,2,3,3,3,3,3,3,3,2,3,3,1],"SECTION-800":[3,3,3,3,3,3,3,3,4,4,4,4,4,3,3,4,3,4,3,4,4,4,3,4,4,4,4,4,4,3,3,3,3,3,4,3,4,3,2,3,3,3,3,2,3,3,3,3,3,3,3,3,2,2,2,1,3,3,3,2,2,3,3,2],"SECTION-900":[3,3,3,2,3,3,3,3,2,3,3,2,3,4,4,2,2,3,2,3,3,3,3,3,2,2,3,2,3,3,3,2]};
 
 const rateLimitStore = new Map<string, RateLimitEntry>();
 
@@ -75,7 +97,8 @@ RESPONSE RULES:
 4. Be concise, professional, and precise. Use bullet points and structured formatting where appropriate.
 5. Answer policy/SOG questions only from CURRENT SOG records. Older documents and conversation history are not policy sources. History may clarify the question, but facts must come from the provided current context.
 6. For safety-critical information, add a note to verify with the current published document.
-7. For repair/deficiency reporting questions, use the current SOG reporting instructions in the supplied context. Never supply contact details or reporting rules from memory.`;
+7. For repair/deficiency reporting questions, use the current SOG reporting instructions in the supplied context. Never supply contact details or reporting rules from memory.
+8. Address every part of the question using the supplied evidence. Preserve each requirement's conditional scope and distinguish its responsible receiving owner. Do not guess what an identifier means. Explain missing evidence for any part that the supplied records do not answer; do not fill gaps with apparatus instructions or history.`;
 
 function isRetiredSogSource(source: string): boolean {
   const name = source.split(/[\\/]/).at(-1)?.toLowerCase() || '';
@@ -86,7 +109,77 @@ function isRetiredSogSource(source: string): boolean {
 function isPolicyQuestion(message: string): boolean {
   return /\b(sogs?|polic(?:y|ies)|departmental|reporting|chain of command)\b|\b\d{3}[.-][a-z0-9-]+\b|\bDE-\d{2}\b/i.test(message)
     || /\b(report|notify|contact)\b.*\b(defect|deficiency|repair|damaged|equipment)\b|\b(defect|deficiency|repair)\b.*\b(report|notify|contact)\b/i.test(message)
-    || /\b(after[ -]?hours|weekends?)\b.*\b(technicians?|call|contact|repair|service)\b|\b(technicians?|call|contact|repair|service)\b.*\b(after[ -]?hours|weekends?)\b/i.test(message);
+    || /\b(after[ -]?hours|weekends?)\b.*\b(technicians?|call|contact|repair|service)\b|\b(technicians?|call|contact|repair|service)\b.*\b(after[ -]?hours|weekends?)\b/i.test(message)
+    || (/\b(emergency response|preemption|drivers?|driving)\b/i.test(message)
+      && /\b(red light|stop sign|green light)\b/i.test(message))
+    || (/\b(FDC|standpipes?|tandem pumping)\b/i.test(message) && /\b(pressure|psi)\b/i.test(message)
+      && /\b(alone|determine|choos(?:e|ing)|verify|verified|arrangement|trigger|automatically|setting|must|should|enough)\b/i.test(message));
+}
+
+function currentCitation(match: any, env: Env): SogCitation | null {
+  const meta = match.metadata || {};
+  if (match.namespace !== env.SOG_NAMESPACE || meta.manifest_sha256 !== env.SOG_MANIFEST_SHA256
+    || typeof match.id !== 'string' || !match.id || typeof meta.asset_id !== 'string' || !/^[A-Z0-9][A-Z0-9_.-]*$/.test(meta.asset_id)
+    || !Number.isSafeInteger(meta.page) || meta.page < 1 || typeof meta.source !== 'string'
+    || typeof meta.primary_ids !== 'string'
+    || meta.url !== `https://files.mbfdhub.com/current-sog/${meta.asset_id}?page=${meta.page}`) return null;
+  return { id: match.id, namespace: match.namespace, manifest_sha256: meta.manifest_sha256,
+    asset_id: meta.asset_id, source: meta.source, page: meta.page, primary_ids: meta.primary_ids, url: meta.url,
+    ...(/^[a-f0-9]{64}$/.test(meta.source_sha256 || '') ? { source_sha256: meta.source_sha256 } : {}) };
+}
+
+async function completePolicyPages(seeds: any[], env: Env): Promise<any[] | null> {
+  // Fetch every expected chunk, using the frozen counts and ingest.py's ID derivation.
+  const frozen = env.SOG_MANIFEST_SHA256 === '82a32d7127e42604f77f591e39a26341844b2c7010e5f1b148d20472aaf20b6c';
+  if (!frozen) return null;
+  const records = new Map<string, any>();
+  const load = async (pages: { asset_id: string; page: number }[]) => {
+    if (pages.some(({ asset_id, page }) => !R2_PAGE_CHUNK_COUNTS[asset_id]?.[page - 1])) return false;
+    const locations = await Promise.all(pages.flatMap(({ asset_id, page }) =>
+      Array.from({ length: R2_PAGE_CHUNK_COUNTS[asset_id][page - 1] }, async (_, chunk) => {
+      const bytes = new TextEncoder().encode(`${env.SOG_MANIFEST_SHA256}:${asset_id}:${page}:${chunk}`);
+      const digest = await crypto.subtle.digest('SHA-256', bytes);
+      const id = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+      return { id, asset_id, page, chunk };
+    })));
+    const ids = locations.map(location => location.id);
+    for (let offset = 0; offset < ids.length; offset += 20) {
+      const batch = ids.slice(offset, offset + 20);
+      const returned = new Set<string>();
+      for (const match of await env.VECTORIZE.getByIds(batch)) {
+        const location = locations.find(location => location.id === match.id);
+        if (batch.includes(match.id) && location && currentCitation(match, env)
+          && match.metadata.asset_id === location.asset_id && match.metadata.page === location.page
+          && match.metadata.chunk_index === location.chunk) {
+          records.set(match.id, match);
+          returned.add(match.id);
+        }
+      }
+      if (batch.some(id => !returned.has(id))) return false;
+    }
+    return true;
+  };
+  const pages = [...new Map(seeds.map(match => [
+    `${match.metadata.asset_id}:${match.metadata.page}`,
+    { asset_id: match.metadata.asset_id, page: match.metadata.page },
+  ])).values()];
+  if (!await load(pages)) return null;
+  // Both 800.P03 p34 and 800.P02 p13 explicitly invoke this current section.
+  if ([...records.values()].some(match => /\b(?:follow|under)\s+800\.P01\s+V\b/i.test(match.metadata.text || ''))) {
+    if (!await load([4, 5].map(page => ({ asset_id: 'SECTION-800', page })))) return null;
+  }
+  return [...records.values()].sort((a, b) =>
+    a.metadata.asset_id.localeCompare(b.metadata.asset_id) || a.metadata.page - b.metadata.page
+    || a.metadata.chunk_index - b.metadata.chunk_index);
+}
+
+function citationFooter(citations: SogCitation[], references: ReferenceCitation[]): string {
+  const pages = [...new Map(citations.map(citation => [citation.url, citation])).values()];
+  const current = pages.length ? '\n\nCurrent SOG sources:\n' + pages.map(citation =>
+    `- ${citation.primary_ids ? `${citation.primary_ids} — ` : ''}${citation.source}, physical page ${citation.page}: ${citation.url}`).join('\n') : '';
+  const technical = references.length ? '\n\nReference sources:\n' + references.map(citation =>
+    `- ${citation.source}${citation.chunk_index !== undefined ? `, chunk ${citation.chunk_index}` : ''}`).join('\n') : '';
+  return current + technical;
 }
 
 /** Chunk text into ~1500-char segments with 200-char overlap, breaking on
@@ -116,15 +209,36 @@ function sanitizeId(source: string): string {
 /** Translate the bridge's OpenAI-style SSE into the CF-style SSE the landing
  *  page expects: `data: {"response":"<token>"}`. Buffers across chunk
  *  boundaries; emits a final `data: [DONE]`. */
-function openaiToCfStream(upstream: ReadableStream): ReadableStream {
+function openaiToCfStream(upstream: ReadableStream, footer: string, citations: SogCitation[], references: ReferenceCitation[]): ReadableStream {
   const reader = upstream.getReader();
   const decoder = new TextDecoder();
   const encoder = new TextEncoder();
   let buffer = '';
+  let terminal = false;
+  const emitLine = (line: string, controller: ReadableStreamDefaultController) => {
+    const t = line.trim();
+    if (!t.startsWith('data:') || terminal) return;
+    const payload = t.slice(5).trim();
+    if (payload === '[DONE]') { terminal = true; return; }
+    if (!payload) return;
+    try {
+      const j = JSON.parse(payload);
+      const tok = j.choices?.[0]?.delta?.content || '';
+      if (tok) controller.enqueue(encoder.encode(`data: ${JSON.stringify({ response: tok })}\n\n`));
+    } catch {
+      /* ignore keep-alive / partial */
+    }
+  };
   return new ReadableStream({
     async pull(controller) {
       const { done, value } = await reader.read();
       if (done) {
+        if (buffer) emitLine(buffer + decoder.decode(), controller);
+        if (!terminal) {
+          controller.error(new Error('AI backend stream ended before completion.'));
+          return;
+        }
+        if (footer) controller.enqueue(encoder.encode(`data: ${JSON.stringify({ response: footer, citations, reference_citations: references })}\n\n`));
         controller.enqueue(encoder.encode('data: [DONE]\n\n'));
         controller.close();
         return;
@@ -132,22 +246,10 @@ function openaiToCfStream(upstream: ReadableStream): ReadableStream {
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split('\n');
       buffer = lines.pop() || '';
-      for (const line of lines) {
-        const t = line.trim();
-        if (!t.startsWith('data:')) continue;
-        const payload = t.slice(5).trim();
-        if (payload === '' || payload === '[DONE]') continue;
-        try {
-          const j = JSON.parse(payload);
-          const tok = j.choices?.[0]?.delta?.content || '';
-          if (tok) controller.enqueue(encoder.encode(`data: ${JSON.stringify({ response: tok })}\n\n`));
-        } catch {
-          /* ignore keep-alive / partial */
-        }
-      }
+      for (const line of lines) emitLine(line, controller);
     },
     cancel() {
-      reader.cancel();
+      return reader.cancel();
     },
   });
 }
@@ -289,27 +391,35 @@ export default {
           env.VECTORIZE.query(queryVector, { namespace: env.SOG_NAMESPACE, topK: 6, returnMetadata: 'all' }),
           env.VECTORIZE.query(queryVector, { namespace: env.REFERENCE_NAMESPACE, topK: 6, returnMetadata: 'all' }),
         ]);
-        const currentSogs = (sogResults.matches || []).filter((match: any) =>
-          match.namespace === env.SOG_NAMESPACE && match.metadata?.manifest_sha256 === env.SOG_MANIFEST_SHA256);
+        const policyQuestion = isPolicyQuestion(userMessage);
+        let currentSogs = (sogResults.matches || []).filter((match: any) =>
+          (match.score || 0) >= 0.2 && currentCitation(match, env)).slice(0, 6);
         const references = (referenceResults.matches || []).filter((match: any) =>
-          match.namespace === env.REFERENCE_NAMESPACE && !isRetiredSogSource((match.metadata?.source || '').toString()));
-        const matches = [...currentSogs, ...references];
-        const hasCurrentSog = currentSogs.some((match: any) => (match.score || 0) >= 0.2);
+          (match.score || 0) >= 0.2 && match.namespace === env.REFERENCE_NAMESPACE
+          && !isRetiredSogSource((match.metadata?.source || '').toString()));
+        const hasCurrentSog = currentSogs.length > 0;
         const unavailable = () => {
           const response = "I don't have that information in my current documents. Please contact Support Services directly.";
-          if (!enableStreaming) return json({ response, sources: [], model: env.BRIDGE_MODEL || DEFAULT_BRIDGE_MODEL });
+          if (!enableStreaming) return json({ response, sources: [], citations: [], reference_citations: [], model: env.BRIDGE_MODEL || DEFAULT_BRIDGE_MODEL });
           return new Response(`data: ${JSON.stringify({response})}\n\ndata: [DONE]\n\n`, {
             headers: {...corsHeaders, 'Content-Type':'text/event-stream', 'Cache-Control':'no-cache', 'X-Sources':'[]'},
           });
         };
-        if (!hasCurrentSog && isPolicyQuestion(userMessage)) return unavailable();
+        if (!hasCurrentSog && policyQuestion) return unavailable();
+        if (policyQuestion) {
+          const completed = await completePolicyPages(currentSogs, env);
+          if (!completed) return unavailable();
+          currentSogs = completed;
+        }
+        const matches = policyQuestion ? currentSogs : [...currentSogs, ...references];
 
         // Step 3: build context + sources
         let context = '';
         const sources: string[] = [];
+        const citations: SogCitation[] = [];
+        const referenceCitations: ReferenceCitation[] = [];
         if (matches.length > 0) {
-          const relevant = matches.filter((m: any) => (m.score || 0) >= 0.2);
-          for (const match of relevant) {
+          for (const match of matches) {
             const meta = match.metadata || {};
             const text = meta.text || '';
             const source = meta.source || 'Unknown';
@@ -319,14 +429,22 @@ export default {
             const link = current === 'CURRENT SOG' ? `\nLibrary: ${meta.url || ''}\nIdentities: ${meta.primary_ids || ''}` : '';
             context += `\n---\n${current}\nSource: ${source}${page}${chunk}${link}\n${text}\n`;
             if (!sources.includes(source)) sources.push(source);
+            const citation = currentCitation(match, env);
+            if (citation) citations.push(citation);
+            else if (typeof match.id === 'string' && typeof meta.source === 'string') {
+              referenceCitations.push({ id: match.id, namespace: match.namespace, source: meta.source,
+                ...(Number.isSafeInteger(meta.chunk_index) && meta.chunk_index >= 0 ? { chunk_index: meta.chunk_index } : {}) });
+            }
           }
         }
         if (!context) {
           return unavailable();
         }
+        const footer = citationFooter(citations, referenceCitations);
 
         // Step 4: messages with recent history
-        const recentHistory = conversationHistory.slice(-6).filter((message) => hasCurrentSog || message.role === 'user');
+        const recentHistory = conversationHistory.slice(-6).filter((message) =>
+          (!policyQuestion && hasCurrentSog) || message.role === 'user');
         const messages: any[] = [
           { role: 'system', content: SYSTEM_PROMPT },
           ...recentHistory.map((m) => ({ role: m.role, content: m.content })),
@@ -341,7 +459,7 @@ export default {
             console.error('Bridge stream error', bridgeResp.status, detail);
             return json({ error: 'AI backend unavailable.' }, 502);
           }
-          return new Response(openaiToCfStream(bridgeResp.body), {
+          return new Response(openaiToCfStream(bridgeResp.body, footer, citations, referenceCitations), {
             headers: {
               ...corsHeaders,
               'Content-Type': 'text/event-stream',
@@ -360,7 +478,7 @@ export default {
         }
         const aiJson: any = await bridgeResp.json();
         const answer = aiJson.choices?.[0]?.message?.content || '';
-        return json({ response: answer, sources, model: env.BRIDGE_MODEL || DEFAULT_BRIDGE_MODEL });
+        return json({ response: answer + footer, sources, citations, reference_citations: referenceCitations, model: env.BRIDGE_MODEL || DEFAULT_BRIDGE_MODEL });
       } catch (error: any) {
         console.error('Chat error:', error);
         return json({ error: 'An error occurred processing your request. Please try again.' }, 500);
