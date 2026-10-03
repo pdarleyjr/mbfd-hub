@@ -215,8 +215,8 @@ async function completePersonnelLifecycle(admin: Page, member: Page, memberPath:
   await admin.getByLabel('Request item', { exact: false }).selectOption({ index: 1 });
   if (!equipment) {
     await admin.locator('[wire\\:key*="uniform_id"] [role="combobox"]').click();
-    await admin.keyboard.type('[QA TEST] L');
-    await admin.getByRole('option', { name: /T-Shirt.*QA TEST/ }).click();
+    await admin.keyboard.type('T-Shirt');
+    await admin.getByRole('option', { name: 'T-Shirt — L — 20 on hand', exact: true }).click();
   }
   await admin.getByLabel('Notes', { exact: true }).fill('[QA TEST] Issued only in disposable browser database.');
   await submitAdminModal(admin);
@@ -246,7 +246,7 @@ test('real uniform submission follows the complete member and Admin lifecycle th
   await page.locator('[wire\\:key*="item_code"] [role="combobox"]').click();
   await page.keyboard.type('T-Shirt');
   await page.getByRole('option', { name: 'T-Shirt', exact: true }).click();
-  await page.getByLabel('Size', { exact: false }).fill('[QA TEST] L');
+  await page.getByLabel('Size', { exact: false }).fill('L');
   await page.getByRole('button', { name: 'Submit Uniform Request', exact: true }).click();
   await expect(page.getByText('Uniform request submitted', { exact: true })).toBeVisible();
   const memberPath = (await page.locator('.pr-request-row').first().getAttribute('href'))!;

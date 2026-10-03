@@ -96,7 +96,7 @@ class PersonnelRequestsE2ESeeder extends Seeder
             'on_hand' => 0,
         ]);
         Uniform::query()->create([
-            'item_name' => 'T-Shirt', 'size' => '[QA TEST] L', 'quantity_on_hand' => 20,
+            'item_name' => 'T-Shirt', 'size' => 'L', 'quantity_on_hand' => 20,
             'reorder_level' => 1, 'notes' => '[QA TEST] Disposable browser uniform inventory.',
         ]);
         Apparatus::query()->create([

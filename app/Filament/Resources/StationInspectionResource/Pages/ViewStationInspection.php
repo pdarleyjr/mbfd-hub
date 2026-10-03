@@ -70,8 +70,7 @@ class ViewStationInspection extends ViewRecord
     {
         $record = $this->getRecord();
 
-        return $record instanceof StationInspection
-            && $record->review_status === 'pending_review'
+        return $record->review_status === 'pending_review'
             && StationInspectionResource::canEdit($record);
     }
 
@@ -79,7 +78,7 @@ class ViewStationInspection extends ViewRecord
     {
         $record = $this->getRecord();
         $reviewer = auth()->user();
-        abort_unless($record instanceof StationInspection && $reviewer instanceof User && $this->canReview(), 403);
+        abort_unless($reviewer instanceof User && $this->canReview(), 403);
 
         app(StationInspectionReviewService::class)->review((int) $record->getKey(), $reviewer, $status, $note);
         $record->refresh();

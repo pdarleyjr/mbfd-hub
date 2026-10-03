@@ -81,7 +81,7 @@ class ViewTrainingTodo extends ViewRecord
     {
         abort_unless(! $this->getRecord()->trashed() && auth()->user()?->can('update', $this->getRecord()), 403);
         $update = $this->getRecord()->updates()->onlyTrashed()->find($updateId);
-        abort_unless($update, 404);
+        abort_unless($update !== null, 404);
         $update->restore();
 
         Notification::make()->title('Update restored')->success()->send();

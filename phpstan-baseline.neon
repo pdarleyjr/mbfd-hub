@@ -416,12 +416,6 @@ parameters:
 			path: app/Filament/Resources/Workgroup/RelationManagers/AttendanceRelationManager.php
 
 		-
-			message: '#^Cannot access property \$id on Illuminate\\Database\\Eloquent\\Model\|int\|string\.$#'
-			identifier: property.nonObject
-			count: 1
-			path: app/Filament/Training/Resources/TrainingTodoResource/Pages/ViewTrainingTodo.php
-
-		-
 			message: '#^Comparison operation "\>" between 0 and 0 is always false\.$#'
 			identifier: greater.alwaysFalse
 			count: 2
@@ -1147,42 +1141,6 @@ parameters:
 			identifier: property.notFound
 			count: 1
 			path: app/Http/Controllers/Api/StationInventoryController.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Api/StationInventoryV2Controller.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$par_quantity\.$#'
-			identifier: property.notFound
-			count: 3
-			path: app/Http/Controllers/Api/StationInventoryV2Controller.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$par_units\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Api/StationInventoryV2Controller.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$sku\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Api/StationInventoryV2Controller.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$unit_label\.$#'
-			identifier: property.notFound
-			count: 2
-			path: app/Http/Controllers/Api/StationInventoryV2Controller.php
-
-		-
-			message: '#^Parameter \#1 \$callback of method Illuminate\\Database\\Eloquent\\Collection\<int,App\\Models\\StationInventoryItem\>\:\:map\(\) contains unresolvable type\.$#'
-			identifier: argument.unresolvableType
-			count: 1
-			path: app/Http/Controllers/Api/StationInventoryV2Controller.php
 
 		-
 			message: '#^Expression on left side of \?\? is not nullable\.$#'
@@ -2437,18 +2395,6 @@ parameters:
 			identifier: argument.type
 			count: 1
 			path: app/Models/Station.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$effective_low_threshold\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Models/StationInventoryItem.php
-
-		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$par_quantity\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Models/StationInventoryItem.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$name\.$#'
