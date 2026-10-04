@@ -86,6 +86,9 @@ const hubManifestPreviewPlugin = {
         '/manifest.json': ['manifest.json', 'application/manifest+json'],
         '/images/mbfd-official-seal-256.png': ['images/mbfd-official-seal-256.png', 'image/png'],
         '/images/icons/checkout-apparatus.svg': ['images/icons/checkout-apparatus.svg', 'image/svg+xml'],
+        '/images/wallpapers/mbfd-smartphone-c13ce770.webp': ['images/wallpapers/mbfd-smartphone-c13ce770.webp', 'image/webp'],
+        '/images/wallpapers/mbfd-tablet-87f370c6.webp': ['images/wallpapers/mbfd-tablet-87f370c6.webp', 'image/webp'],
+        '/images/wallpapers/mbfd-desktop-cea4e417.webp': ['images/wallpapers/mbfd-desktop-cea4e417.webp', 'image/webp'],
       }
       const asset = assets[request.url]
       if (!asset) return next()
