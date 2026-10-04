@@ -1,0 +1,74 @@
+/* Supplied MBFD artwork: scale the canvas uniformly to keep the crest round. */
+:root {
+    --hub-wallpaper: url('/images/wallpapers/mbfd-smartphone-c13ce770.webp');
+    --hub-wallpaper-height: calc(min(90vw, 78svh) * 3.51);
+}
+
+@media (min-width: 768px) {
+    :root {
+        --hub-wallpaper: url('/images/wallpapers/mbfd-tablet-87f370c6.webp');
+        --hub-wallpaper-height: calc(min(90vw, 78svh) * 2.43);
+    }
+}
+
+@media (min-width: 1024px) {
+    :root {
+        --hub-wallpaper: url('/images/wallpapers/mbfd-desktop-cea4e417.webp');
+        --hub-wallpaper-height: calc(min(90vw, 78svh) * 2.26);
+    }
+}
+
+@media screen {
+    body {
+        position: relative;
+        isolation: isolate;
+    }
+
+    /* A fixed layer also works on iOS, without background-attachment: fixed. */
+    body::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        pointer-events: none;
+        background-color: #fff;
+        background-image: linear-gradient(rgb(255 255 255 / .65), rgb(255 255 255 / .65)), var(--hub-wallpaper);
+        background-position: center;
+        background-repeat: no-repeat;
+        background-size: cover, auto var(--hub-wallpaper-height);
+    }
+
+    /* Only full-page canvases become transparent; cards and controls stay solid. */
+    .hub-shell.daily-shell,
+    .daily-workspace .min-h-screen:is(.bg-hub-canvas, .bg-gray-50),
+    body:has(.apparatus-inspection) #root > div,
+    .fi-simple-layout,
+    #operational-forms-root .of-app,
+    .document-workspace,
+    .library-body .page-stage,
+    #workgroup-data-dashboard > .min-h-screen,
+    .hub-report--l1-inventory #root > .min-h-screen,
+    .pump-panel-bg {
+        background: transparent !important;
+    }
+
+    .pump-panel-bg > div:first-child > div > h1 {
+        color: #0f172a !important;
+    }
+
+    .pump-panel-bg > div:first-child > div > p {
+        color: #475569 !important;
+    }
+
+    .hub-report--analysis-report main :is(h1, h2, h3):not(.glass-panel *) {
+        color: #0f172a !important;
+    }
+
+    .hub-report--analysis-report main p:not(.glass-panel *) {
+        color: #475569 !important;
+    }
+}
+
+@media print {
+    body::before { display: none; }
+}

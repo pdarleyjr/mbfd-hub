@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#102A43">
     <title>{{ $code }} — {{ $title }} | MBFD Hub</title>
+    <link rel="stylesheet" href="/css/hub-wallpaper-v1.css">
     <style>
         * { box-sizing: border-box; }
         body { margin: 0; min-height: 100vh; padding: 24px; display: grid; place-items: center; background: #fff; color: #102a43; font: 16px/1.6 system-ui, sans-serif; }
