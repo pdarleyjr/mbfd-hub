@@ -16,12 +16,12 @@ export default function StationCard({ station }: StationCardProps) {
       className="daily-selector-card group block overflow-hidden rounded-xl bg-hub-surface shadow-sm ring-1 ring-hub-border/80 transition-all duration-200 hover:shadow-md hover:ring-hub-blue/30 focus:outline-none focus:ring-2 focus:ring-hub-focus focus:ring-offset-2 touch-manipulation font-hub"
     >
       {/* Station Image */}
-      <div className="relative h-40 overflow-hidden bg-hub-surface-muted sm:h-48 2xl:h-56">
+      <div className={`relative overflow-hidden bg-hub-surface-muted ${imageUrl ? 'xl:h-48 2xl:h-56' : 'h-40 sm:h-48 2xl:h-56'}`}>
         {imageUrl ? (
           <img
             src={imageUrl}
             alt={`Station ${station.station_number}`}
-            className="h-full w-full object-cover"
+            className="h-auto w-full object-contain xl:h-full xl:object-cover"
             loading="lazy"
           />
         ) : (
