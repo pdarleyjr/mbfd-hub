@@ -110,6 +110,7 @@ final class EmployeeAccessSchema
                 self::controls('ecosystem', 'Application access & administrator roles', [
                     'manageApplicationAccess' => 'Edit application access',
                     'manageApplicationAdministration' => 'Edit application administrator roles',
+                    'manageMeetingRole' => 'Edit Meeting role',
                 ], 'Current settings are shown below. Application entry and application administrator roles are separate from Hub capabilities.'),
                 Forms\View::make('filament.employees.application-access'),
             ]),

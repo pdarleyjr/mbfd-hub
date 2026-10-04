@@ -61,6 +61,17 @@ trait ManagesEmployeeAccess
                 }));
         }
 
+        $actions[] = Action::make('manageMeetingRole')->label('Meeting role')
+            ->visible(fn (): bool => $this->canManageAccountAccess() && $this->targetAccount()->hasDirectWebPermission('app.meeting.access'))
+            ->fillForm(fn (): array => ['meeting_role' => app(\App\Services\Security\ApplicationRoleResolver::class)->forUser($this->targetAccount()->fresh(), 'meeting') ?? 'viewer'])
+            ->form([
+                Forms\Select::make('meeting_role')->label('Meeting role')->options(fn (): array => app(ApplicationAccessRegistry::class)->meetingRoleOptions())->required()
+                    ->helperText('Changing this role signs the member out of Meeting Intelligence. Meeting access is managed separately.'),
+                ...$this->securityFields(),
+            ])
+            ->action(fn (array $data) => $this->runProtected(fn () => app(ApplicationAccessService::class)->syncMeetingRole(
+                $this->actor(), $this->targetAccount(), $data['meeting_role'] ?? null, $data['current_password'], $data['reason'])));
+
         $actions[] = Action::make('manageRoles')->label('Hub roles')
             ->visible(function (): bool {
                 $target = $this->accountOrNull();

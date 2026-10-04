@@ -279,6 +279,104 @@ final class HubOidcProviderTest extends TestCase
         self::assertContains('throttle:6000,1', app('router')->getRoutes()->getByName('oidc.userinfo')->middleware());
     }
 
+    public function test_meeting_exchange_and_userinfo_use_current_hub_roles_and_registered_callback(): void
+    {
+        [$user, $client] = $this->fixture('meeting');
+        foreach (['viewer', 'participant', 'operator', 'admin'] as $role) {
+            if ($role !== 'viewer') {
+                $user->givePermissionTo(Permission::findOrCreate('app.meeting.'.$role, 'web'));
+            }
+            $token = $this->exchange($client, $this->code($user, $client))->assertOk()->json();
+            $jwks = $this->getJson('/oauth/jwks')->assertOk()->json();
+            $claims = \Firebase\JWT\JWT::decode($token['id_token'], \Firebase\JWT\JWK::parseKeySet($jwks, 'RS256'));
+            self::assertSame('https://mbfdhub.com', $claims->iss);
+            self::assertSame($client->id, $claims->aud);
+            self::assertSame('test-nonce', $claims->nonce);
+            self::assertSame('hub-user:'.$user->id, $claims->sub);
+            self::assertSame((string) $user->employee_id, $claims->employee_id);
+            self::assertSame('meeting', $claims->application);
+            self::assertSame($role, $claims->role);
+            $this->withToken($token['access_token'])->getJson('/oauth/userinfo')->assertOk()
+                ->assertJsonPath('sid', $claims->sid)->assertJsonPath('application', 'meeting')->assertJsonPath('role', $role);
+        }
+        $this->actingAs($user)->get('/oauth/authorize?'.http_build_query([
+            ...$this->authorizationQuery($client), 'redirect_uri' => 'https://cmd.mbfdhub.com/auth/callback',
+        ]))->assertUnauthorized();
+    }
+
+    public function test_meeting_requires_direct_access_and_rejects_ambiguous_client_mapping(): void
+    {
+        [$user, $client] = $this->fixture('meeting');
+        $user->revokePermissionTo('app.meeting.access');
+        $role = \Spatie\Permission\Models\Role::findOrCreate('meeting-inherited-test-only', 'web');
+        $role->givePermissionTo(Permission::findOrCreate('app.meeting.access', 'web'));
+        $user->assignRole($role);
+        $this->actingAs($user)->get('/oauth/authorize?'.http_build_query($this->authorizationQuery($client)))->assertUnauthorized();
+        $user->givePermissionTo('app.meeting.access');
+        config(['oidc.clients.cmd' => $client->id]);
+        $this->actingAs($user)->get('/oauth/authorize?'.http_build_query($this->authorizationQuery($client)))->assertUnauthorized();
+    }
+
+    public function test_audited_meeting_role_change_permanently_revokes_old_credentials_and_preserves_cmd(): void
+    {
+        [$user, $client] = $this->fixture('meeting');
+        $user->givePermissionTo(Permission::findOrCreate('app.meeting.operator', 'web'));
+        $user->givePermissionTo(Permission::findOrCreate('app.cmd.access', 'web'));
+        $cmd = Client::query()->create(['name' => 'CMD isolation test', 'secret' => 'test-client-secret', 'provider' => 'users',
+            'redirect_uris' => ['https://cmd.mbfdhub.com/auth/callback'], 'grant_types' => ['authorization_code'], 'revoked' => false]);
+        config(['oidc.clients.cmd' => $cmd->id]);
+        $meetingToken = $this->exchange($client, $this->code($user, $client))->assertOk()->json('access_token');
+        $pending = $this->code($user, $client);
+        $cmdToken = $this->exchange($cmd, $this->code($user, $cmd))->assertOk()->json('access_token');
+        $actor = User::factory()->create(['account_status' => 'active', 'password' => 'Meeting-admin-password!']);
+        $actor->assignRole(\Spatie\Permission\Models\Role::findOrCreate('super_admin', 'web'));
+        $service = app(\App\Services\Security\ApplicationAccessService::class);
+        $service->syncMeetingRole($actor, $user, 'viewer', 'Meeting-admin-password!', 'Operator duties removed');
+        $this->assertDatabaseMissing('oidc_sessions', ['user_id' => $user->id, 'application' => 'meeting', 'revoked_at' => null]);
+        $this->assertDatabaseMissing('oauth_access_tokens', ['user_id' => $user->id, 'client_id' => $client->id, 'revoked' => false]);
+        $this->assertDatabaseMissing('oauth_auth_codes', ['user_id' => $user->id, 'client_id' => $client->id, 'revoked' => false]);
+        $service->syncMeetingRole($actor, $user, 'operator', 'Meeting-admin-password!', 'New operator grant');
+        $this->withToken($meetingToken)->getJson('/oauth/userinfo')->assertUnauthorized();
+        $this->exchange($client, $pending)->assertStatus(400);
+        $this->withToken($cmdToken)->getJson('/oauth/userinfo')->assertOk()->assertJsonPath('application', 'cmd')->assertJsonMissingPath('role');
+        $fresh = $this->exchange($client, $this->code($user, $client))->assertOk()->json('access_token');
+        $this->withToken($fresh)->getJson('/oauth/userinfo')->assertOk()->assertJsonPath('role', 'operator');
+    }
+
+    public function test_meeting_access_removal_and_regrant_cannot_restore_old_token_or_elevated_role(): void
+    {
+        [$user, $client] = $this->fixture('meeting');
+        $user->givePermissionTo(Permission::findOrCreate('app.meeting.admin', 'web'));
+        $token = $this->exchange($client, $this->code($user, $client))->assertOk()->json('access_token');
+        $pending = $this->code($user, $client);
+        $actor = User::factory()->create(['account_status' => 'active', 'password' => 'Meeting-admin-password!']);
+        $actor->assignRole(\Spatie\Permission\Models\Role::findOrCreate('super_admin', 'web'));
+        $service = app(\App\Services\Security\ApplicationAccessService::class);
+        $service->syncApplications($actor, $user, [], 'Meeting-admin-password!', 'Meeting access removed');
+        $service->syncApplications($actor, $user, ['meeting'], 'Meeting-admin-password!', 'Viewer access restored');
+        $this->withToken($token)->getJson('/oauth/userinfo')->assertUnauthorized();
+        $this->exchange($client, $pending)->assertStatus(400);
+        $fresh = $this->exchange($client, $this->code($user, $client))->assertOk()->json('access_token');
+        $this->withToken($fresh)->getJson('/oauth/userinfo')->assertOk()->assertJsonPath('role', 'viewer');
+    }
+
+    public function test_super_admin_promotion_requires_new_meeting_credentials_for_the_elevated_role(): void
+    {
+        [$user, $client] = $this->fixture('meeting');
+        $token = $this->exchange($client, $this->code($user, $client))->assertOk()->json('access_token');
+        $pending = $this->code($user, $client);
+        $super = \Spatie\Permission\Models\Role::findOrCreate('super_admin', 'web');
+        $actor = User::factory()->create(['account_status' => 'active', 'password' => 'Meeting-admin-password!']);
+        $actor->assignRole($super);
+        config(['security.role_assignment.allow_critical_role_changes' => true]);
+        app(\App\Services\Security\RoleAssignmentService::class)->syncWithAuthorization(
+            $actor, $user, ['super_admin'], 'Meeting-admin-password!', 'Approved Super Administrator promotion');
+        $this->withToken($token)->getJson('/oauth/userinfo')->assertUnauthorized();
+        $this->exchange($client, $pending)->assertStatus(400);
+        $fresh = $this->exchange($client, $this->code($user, $client))->assertOk()->json('access_token');
+        $this->withToken($fresh)->getJson('/oauth/userinfo')->assertOk()->assertJsonPath('role', 'admin');
+    }
+
     private function code(User $user, Client $client, array $overrides = []): string
     {
         $response = $this->actingAs($user)->get('/oauth/authorize?'.http_build_query([...$this->authorizationQuery($client), ...$overrides]))->assertRedirect();
@@ -291,12 +389,12 @@ final class HubOidcProviderTest extends TestCase
     {
         return $this->postJson('/oauth/token', [...[
             'grant_type' => 'authorization_code', 'client_id' => $client->id, 'client_secret' => 'test-client-secret',
-            'redirect_uri' => 'https://cmd.mbfdhub.com/auth/callback', 'code' => $code, 'code_verifier' => str_repeat('v', 64),
+            'redirect_uri' => $client->redirect_uris[0], 'code' => $code, 'code_verifier' => str_repeat('v', 64),
         ], ...$overrides]);
     }
 
     /** @return array{User, Client} */
-    private function fixture(): array
+    private function fixture(string $application = 'cmd'): array
     {
         $key = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
         openssl_pkey_export($key, $private);
@@ -304,10 +402,11 @@ final class HubOidcProviderTest extends TestCase
         $employee = Employee::query()->create(['name' => 'OIDC Test', 'employee_id' => 'OIDC-99001', 'city_email' => 'oidctest@miamibeachfl.gov', 'password' => bcrypt('Test-password-only!')]);
         $user = User::factory()->create(['employee_profile_id' => $employee->id, 'employee_id' => $employee->employee_id,
             'email' => $employee->city_email, 'account_status' => 'active', 'security_version' => 1, 'must_change_password' => false]);
-        $user->givePermissionTo(Permission::findOrCreate('app.cmd.access', 'web'));
-        $client = Client::query()->create(['name' => 'CMD test', 'secret' => 'test-client-secret', 'provider' => 'users',
-            'redirect_uris' => ['https://cmd.mbfdhub.com/auth/callback'], 'grant_types' => ['authorization_code'], 'revoked' => false]);
-        config(['oidc.clients.cmd' => $client->id]);
+        $user->givePermissionTo(Permission::findOrCreate('app.'.$application.'.access', 'web'));
+        $callback = $application === 'meeting' ? 'https://meet.mbfdhub.com/auth/callback' : 'https://cmd.mbfdhub.com/auth/callback';
+        $client = Client::query()->create(['name' => $application.' test', 'secret' => 'test-client-secret', 'provider' => 'users',
+            'redirect_uris' => [$callback], 'grant_types' => ['authorization_code'], 'revoked' => false]);
+        config(['oidc.clients.'.$application => $client->id]);
 
         $this->actingAsCanonicalUser($user);
 
@@ -317,7 +416,7 @@ final class HubOidcProviderTest extends TestCase
     /** @return array<string, string> */
     private function authorizationQuery(Client $client): array
     {
-        return ['client_id' => $client->id, 'redirect_uri' => 'https://cmd.mbfdhub.com/auth/callback', 'response_type' => 'code',
+        return ['client_id' => $client->id, 'redirect_uri' => $client->redirect_uris[0], 'response_type' => 'code',
             'scope' => 'openid profile', 'state' => 'test-state', 'nonce' => 'test-nonce', 'code_challenge_method' => 'S256',
             'code_challenge' => rtrim(strtr(base64_encode(hash('sha256', str_repeat('v', 64), true)), '+/', '-_'), '=')];
     }

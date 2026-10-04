@@ -22,6 +22,8 @@ final class ApplicationRoleResolver
         return match ($application) {
             'bid' => $administrator ? 'admin' : 'member',
             'media_control' => $administrator ? 'platform_admin' : 'user',
+            'meeting' => $administrator ? 'admin' : ($user->hasDirectWebPermission('app.meeting.operator') ? 'operator'
+                : ($user->hasDirectWebPermission('app.meeting.participant') ? 'participant' : 'viewer')),
             default => null,
         };
     }

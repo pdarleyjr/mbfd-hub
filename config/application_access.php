@@ -10,5 +10,6 @@ return [
         'media_control' => env('MEDIA_CONTROL_IDENTITY_RUNTIME_VERIFIED', false),
         'cmd' => env('CMD_IDENTITY_RUNTIME_VERIFIED', false),
         'cloud' => env('CLOUD_IDENTITY_RUNTIME_VERIFIED', false),
+        'meeting' => env('MEETING_IDENTITY_RUNTIME_VERIFIED', false),
     ],
 ];

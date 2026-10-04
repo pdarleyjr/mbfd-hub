@@ -15,7 +15,7 @@ final class OidcIdentityPolicy
     public function application(string $clientId): string
     {
         $matches = [];
-        foreach (['cmd', 'cloud'] as $application) {
+        foreach (['cmd', 'cloud', 'meeting'] as $application) {
             if ($clientId !== '' && config('oidc.clients.'.$application) === $clientId) {
                 $matches[] = $application;
             }
@@ -75,6 +75,9 @@ final class OidcIdentityPolicy
         }
         if ($session->application === 'cloud') {
             $claims['nextcloud_uid'] = $this->cloudLink($user)?->external_uid;
+        }
+        if ($session->application === 'meeting') {
+            $claims['role'] = app(\App\Services\Security\ApplicationRoleResolver::class)->forUser($user, 'meeting');
         }
 
         return $claims;

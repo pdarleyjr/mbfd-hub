@@ -44,7 +44,7 @@ final class HubOidcServiceProvider extends \Laravel\Passport\PassportServiceProv
             $key = $this->makeCryptKey('private');
             $encryptionKey = \Laravel\Passport\Passport::tokenEncryptionKey($this->app->make('encrypter'));
             $response = new IdTokenResponse(app(IdentityRepository::class),
-                new ClaimExtractor(new ClaimSet('openid', ['employee_id', 'security_version', 'sid', 'application', 'nextcloud_uid'])),
+                new ClaimExtractor(new ClaimSet('openid', ['employee_id', 'security_version', 'sid', 'application', 'nextcloud_uid', 'role'])),
                 Configuration::forAsymmetricSigner(new Sha256, InMemory::plainText($key->getKeyContents()), InMemory::plainText($this->makeCryptKey('public')->getKeyContents())),
                 ['kid' => hash('sha256', $this->makeCryptKey('public')->getKeyContents())], false,
                 app(LaravelCurrentRequestService::class), $encryptionKey, (string) config('oidc.issuer'));
