@@ -5,6 +5,9 @@ const APP_SHELL_CACHE_KEYS = [
   '/daily/',
   '/daily/index.html',
   '/manifest.json',
+  '/images/wallpapers/mbfd-smartphone-c13ce770.webp',
+  '/images/wallpapers/mbfd-tablet-87f370c6.webp',
+  '/images/wallpapers/mbfd-desktop-cea4e417.webp',
   ...BUILD_ASSETS,
 ];
 
