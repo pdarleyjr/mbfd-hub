@@ -147,11 +147,12 @@ Route::prefix('admin/trt-inventory')->middleware(['web', 'auth', 'admin.capabili
 // Push notification routes (public VAPID key, authenticated subscription management)
 Route::get('push/vapid-public-key', [PushSubscriptionController::class, 'vapidPublicKey']);
 
-Route::middleware(['web', 'auth', 'throttle:10,1'])->group(function () {
-    Route::post('push-subscriptions', [PushSubscriptionController::class, 'store']);
-    Route::delete('push-subscriptions', [PushSubscriptionController::class, 'destroy']);
-    Route::post('push/test', [TestNotificationController::class, 'sendTestNotification']);
-});
+Route::middleware(['web', AuthenticateSession::class, 'auth', 'throttle:10,1'])
+    ->withoutMiddleware(EnsureFrontendRequestsAreStateful::class)->group(function () {
+        Route::post('push-subscriptions', [PushSubscriptionController::class, 'store']);
+        Route::delete('push-subscriptions', [PushSubscriptionController::class, 'destroy']);
+        Route::post('push/test', [TestNotificationController::class, 'sendTestNotification']);
+    });
 
 // Admin lookup endpoints — powers the desktop-PWA Dexie prefetch + future typeahead.
 // Uses the Filament admin cookie session (web + auth) so the installed PWA
@@ -284,9 +285,10 @@ Route::prefix('v2')->middleware(['auth:sanctum', 'canonical.api', 'throttle:60,1
 // Workgroup AI Routes — Eval analysis & AI summaries (separate from chatbot)
 // Requires authentication (Filament session auth via 'web' middleware)
 // =========================================================================
-Route::prefix('workgroup/ai')->middleware(['web', 'auth', 'workgroup.access', 'throttle:30,1'])->group(function () {
-    Route::post('analyze-product/{productId}', [WorkgroupAIController::class, 'analyzeProduct']);
-    Route::post('category-summary', [WorkgroupAIController::class, 'categorySummary']);
-    Route::post('executive-report', [WorkgroupAIController::class, 'executiveReport']);
-    Route::post('vectorize-upload/{uploadId}', [WorkgroupAIController::class, 'vectorizeUpload']);
-});
+Route::prefix('workgroup/ai')->middleware(['web', AuthenticateSession::class, 'auth', 'workgroup.access', 'throttle:30,1'])
+    ->withoutMiddleware(EnsureFrontendRequestsAreStateful::class)->group(function () {
+        Route::post('analyze-product/{productId}', [WorkgroupAIController::class, 'analyzeProduct']);
+        Route::post('category-summary', [WorkgroupAIController::class, 'categorySummary']);
+        Route::post('executive-report', [WorkgroupAIController::class, 'executiveReport']);
+        Route::post('vectorize-upload/{uploadId}', [WorkgroupAIController::class, 'vectorizeUpload']);
+    });

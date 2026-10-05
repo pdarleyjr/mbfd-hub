@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Mbfd\PolicyLibrary\Http\Controllers;
 
+use App\Models\AuthenticationSession;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -39,7 +40,20 @@ final class AccessController
             return back()->withErrors(['pin' => 'The access PIN is incorrect.']);
         }
         RateLimiter::clear($key);
-        $request->session()->regenerate();
+        $registryId = $request->session()->get('auth.canonical_session_id');
+        $oldSessionHash = hash_hmac('sha256', $request->session()->getId(), (string) config('app.key'));
+        $request->session()->regenerate(true);
+        if (is_string($registryId) && $registryId !== '') {
+            $updated = AuthenticationSession::query()
+                ->whereKey($registryId)
+                ->where('user_id', $request->user('web')->getAuthIdentifier())
+                ->where('session_id_hash', $oldSessionHash)
+                ->whereNull('revoked_at')
+                ->update([
+                    'session_id_hash' => hash_hmac('sha256', $request->session()->getId(), (string) config('app.key')),
+                ]);
+            abort_unless($updated === 1, 401);
+        }
         $request->session()->put('policy-library.access', [
             'user_id' => (string) $request->user('web')->getAuthIdentifier(),
             'expires_at' => now()->addMinutes(config('policy-library.pin_ttl_minutes'))->timestamp,

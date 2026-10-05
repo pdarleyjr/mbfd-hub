@@ -163,6 +163,7 @@ final class ForcedPasswordChangeTest extends TestCase
         );
         self::assertTrue(app(SessionRegistry::class)->isCurrent($user, $replacement, CarbonImmutable::now()));
         self::assertIsInt(session((string) config('security.recent_authentication.session_key')));
+        $this->withCookie((string) config('session.cookie'), $this->app['session.store']->getId());
         $this->get('/admin')->assertOk();
 
         $secondBrowserRequest = Request::create('/admin', 'GET');

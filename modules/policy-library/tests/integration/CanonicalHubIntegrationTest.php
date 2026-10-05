@@ -79,9 +79,22 @@ final class CanonicalHubIntegrationTest extends TestCase
         $this->carryCurrentSession();
         self::assertFalse((bool) session('auth.city_email_review_required'));
         $this->getJson(self::FILES.'/api/manuals')->assertForbidden();
+        $registered = AuthenticationSession::query()->findOrFail(session('auth.canonical_session_id'));
+        $beforeSessionId = session()->getId();
+        $beforeAttributes = $registered->getRawOriginal();
         $this->post(self::FILES.'/access', ['pin' => $this->pin])->assertRedirect();
+        self::assertNotSame($beforeSessionId, session()->getId());
+        self::assertSame($registered->id, session('auth.canonical_session_id'));
+        $afterAttributes = $registered->fresh()->getRawOriginal();
+        self::assertSame(
+            hash_hmac('sha256', session()->getId(), (string) config('app.key')),
+            $afterAttributes['session_id_hash'],
+        );
+        unset($beforeAttributes['session_id_hash'], $beforeAttributes['updated_at'], $afterAttributes['session_id_hash'], $afterAttributes['updated_at']);
+        self::assertSame($beforeAttributes, $afterAttributes);
         $this->carryCurrentSession();
         $this->getJson(self::FILES.'/api/manuals')->assertOk()->assertJsonPath('can_manage', false);
+        $this->get('https://www.mbfdhub.com/employee/dashboard')->assertOk();
     }
 
     public function test_markerless_real_hub_user_cannot_enter_even_with_a_valid_pin_grant(): void
