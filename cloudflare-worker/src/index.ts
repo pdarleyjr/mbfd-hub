@@ -471,7 +471,7 @@ export default {
         const messages: any[] = [
           { role: 'system', content: SYSTEM_PROMPT },
           ...recentHistory.map((m) => ({ role: m.role, content: m.content })),
-          { role: 'user', content: `CONTEXT DOCUMENTS:\n${context}\n\nUSER QUESTION: ${userMessage}` },
+          { role: 'user', content: `CONTEXT DOCUMENTS:\n${context}\n\nUSER QUESTION: ${userMessage}\n\nRESPONSE CHECK:\nFor every requested condition, follow the supplied procedure through completion or continued responsibility: include applicable unresolved-step follow-up/escalation, contingency, authorization/time-of-day limits and required records/signatures/evidence. Preserve source distinctions between transmission and acceptance. Use source role identifiers without added definitions; state any unanswered part instead of omitting it.` },
         ];
 
         // Step 5: generate with LOCAL qwen3.6 via the bridge
