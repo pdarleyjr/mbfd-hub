@@ -40,6 +40,10 @@ final readonly class EnsureCanonicalSessionIsCurrent
         $registered = AuthenticationSession::query()->find($registryId);
         if ($user instanceof User
             && $registered instanceof AuthenticationSession
+            && hash_equals(
+                (string) $registered->session_id_hash,
+                hash_hmac('sha256', $request->session()->getId(), (string) config('app.key')),
+            )
             && $this->sessions->isCurrent($user, $registered, CarbonImmutable::now())) {
             return $next($request);
         }

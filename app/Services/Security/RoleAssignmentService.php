@@ -71,6 +71,9 @@ final class RoleAssignmentService
                     // including OIDC/Cloud hooks, so regrant cannot revive old JWTs.
                     app(\App\Services\Identity\AccountSecurityService::class)->revokeAll($lockedTarget, 'Super Administrator role removed', now());
                 }
+                if (! $wasSuperAdministrator && in_array('super_admin', $proposedRoleNames, true)) {
+                    app(\App\Services\Oidc\OidcSessionRevoker::class)->revoke($lockedTarget, 'meeting');
+                }
                 $this->auditRecorder->record($lockedActor, $lockedTarget, 'change_role', 'allowed', $reason === null ? null : trim($reason), [
                     'roles' => $proposedRoleNames,
                 ]);

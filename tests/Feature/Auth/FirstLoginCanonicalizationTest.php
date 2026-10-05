@@ -75,6 +75,7 @@ final class FirstLoginCanonicalizationTest extends TestCase
             'employee_id' => $employee->employee_id,
             'password' => 'individual-temporary-password-2026',
         ])->assertRedirect('/employee/set-password');
+        $this->withCookie((string) config('session.cookie'), $this->app['session.store']->getId());
 
         $this->assertAuthenticatedAs($issued, 'web');
         self::assertTrue($issued->fresh()->must_change_password);

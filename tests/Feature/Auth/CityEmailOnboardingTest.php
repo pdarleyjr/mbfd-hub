@@ -35,6 +35,7 @@ final class CityEmailOnboardingTest extends TestCase
             'employee_id' => $user->employee_id,
             'password' => 'city-email-test-password',
         ])->assertRedirect('/');
+        $this->withCookie((string) config('session.cookie'), $this->app['session.store']->getId());
 
         $this->get('/')->assertRedirect('/account/city-email');
         $this->assertTrue(session(EnsureCityEmailReview::SESSION_KEY));
@@ -51,6 +52,7 @@ final class CityEmailOnboardingTest extends TestCase
             $user->forceFill(['email' => $email, 'email_verified_at' => null])->save();
             $before = $user->fresh()->getRawOriginal();
             $this->post('/login', ['employee_id' => $user->employee_id, 'password' => 'city-email-test-password'])->assertRedirect('/');
+            $this->withCookie((string) config('session.cookie'), $this->app['session.store']->getId());
             $this->get('/')->assertOk();
             self::assertFalse(session(EnsureCityEmailReview::SESSION_KEY));
             $this->get('/account/city-email')->assertOk()->assertSee('Email already connected')->assertSee($email)
@@ -250,6 +252,7 @@ final class CityEmailOnboardingTest extends TestCase
         $this->post('/logout');
         $this->get($path)->assertRedirect('/login');
         $this->post('/login', ['employee_id' => $user->employee_id, 'password' => 'city-email-test-password'])->assertRedirect($path);
+        $this->withCookie((string) config('session.cookie'), $this->app['session.store']->getId());
         $this->get($path)->assertOk()->assertSee('examplemember@miamibeachfl.gov');
     }
 

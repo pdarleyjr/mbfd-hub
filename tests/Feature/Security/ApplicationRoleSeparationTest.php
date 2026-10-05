@@ -180,6 +180,75 @@ final class ApplicationRoleSeparationTest extends TestCase
         }
     }
 
+    public function test_meeting_roles_are_exclusive_audited_and_do_not_change_other_application_rights(): void
+    {
+        [$actor, $target] = $this->members();
+        $target->givePermissionTo(Permission::findOrCreate('training.access', 'web'));
+        $service = app(ApplicationAccessService::class);
+        $service->syncApplications($actor, $target, ['meeting'], 'Role-test-password!', 'Meeting viewer access');
+        $version = $target->fresh()->security_version;
+        foreach (['viewer', 'participant', 'operator', 'admin', 'viewer'] as $role) {
+            $service->syncMeetingRole($actor, $target, $role, 'Role-test-password!', 'Meeting role '.$role);
+            self::assertSame($role, app(ApplicationRoleResolver::class)->forUser($target->fresh(), 'meeting'));
+            self::assertSame($role === 'viewer' ? [] : ['app.meeting.'.$role], $target->permissions()
+                ->whereIn('name', ['app.meeting.participant', 'app.meeting.operator', 'app.meeting.admin'])->pluck('name')->all());
+            self::assertTrue($target->fresh()->hasDirectWebPermission('training.access'));
+            self::assertSame($version, $target->fresh()->security_version);
+            $this->assertDatabaseHas('security_action_events', ['target_user_id' => $target->id, 'action' => 'change_meeting_role', 'result' => 'allowed', 'reason' => 'Meeting role '.$role]);
+        }
+        self::assertSame('admin', app(ApplicationRoleResolver::class)->forUser($actor->fresh(), 'meeting'));
+        self::assertSame(['bid', 'media_control'], array_keys(app(ApplicationAccessRegistry::class)->applicationAdministrationOptions()));
+    }
+
+    public function test_meeting_role_requires_access_and_rejects_forged_scope_or_nested_values(): void
+    {
+        [$actor, $target] = $this->members();
+        $service = app(ApplicationAccessService::class);
+        try {
+            $service->syncMeetingRole($actor, $target, 'viewer', 'Role-test-password!', 'Missing access');
+            self::fail('Viewer selection cannot grant Meeting access.');
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            self::assertArrayHasKey('meeting_role', $exception->errors());
+        }
+        foreach ([null, ['admin'], 'app.bid.admin', 'unknown'] as $role) {
+            try {
+                $service->syncMeetingRole($actor, $target, $role, 'Role-test-password!', 'Forged role');
+                self::fail('Unsupported role must fail atomically.');
+            } catch (AuthorizationException) {
+                self::assertSame([], $target->fresh()->permissions()->pluck('name')->all());
+            }
+        }
+        $this->assertDatabaseHas('security_action_events', ['target_user_id' => $target->id, 'action' => 'change_meeting_role', 'result' => 'denied']);
+    }
+
+    public function test_meeting_access_removal_clears_all_dormant_roles_and_regrant_is_viewer(): void
+    {
+        [$actor, $target] = $this->members();
+        foreach (['access', 'participant', 'operator', 'admin'] as $permission) {
+            $target->givePermissionTo(Permission::findOrCreate('app.meeting.'.$permission, 'web'));
+        }
+        self::assertSame('admin', app(ApplicationRoleResolver::class)->forUser($target->fresh(), 'meeting'));
+        $service = app(ApplicationAccessService::class);
+        $service->syncApplications($actor, $target, [], 'Role-test-password!', 'Remove Meeting');
+        self::assertSame([], $target->permissions()->where('name', 'like', 'app.meeting.%')->pluck('name')->all());
+        $service->syncApplications($actor, $target, ['meeting'], 'Role-test-password!', 'Restore viewer');
+        self::assertSame('viewer', app(ApplicationRoleResolver::class)->forUser($target->fresh(), 'meeting'));
+        $target->forceFill(['must_change_password' => true])->save();
+        self::assertNull(app(ApplicationRoleResolver::class)->forUser($target->fresh(), 'meeting'));
+    }
+
+    public function test_meeting_permission_migration_is_idempotent_and_does_not_grant_existing_members_access(): void
+    {
+        [, $target] = $this->members();
+        $before = $target->fresh()->getAttributes();
+        $migration = require database_path('migrations/2026_10_04_150000_add_meeting_application_permissions.php');
+        $migration->up();
+        $migration->up();
+        self::assertSame(4, Permission::query()->where('guard_name', 'web')->where('name', 'like', 'app.meeting.%')->count());
+        self::assertFalse($target->fresh()->hasDirectWebPermission('app.meeting.access'));
+        self::assertSame($before, $target->fresh()->getAttributes());
+    }
+
     /** @return array{User, User} */
     private function members(): array
     {

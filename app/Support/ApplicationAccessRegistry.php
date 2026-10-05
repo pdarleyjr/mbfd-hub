@@ -17,6 +17,7 @@ final class ApplicationAccessRegistry
             'media_control' => ['label' => 'Media Control', 'permission' => 'app.media_control.access', 'description' => 'Allows this member to use Media Control.'],
             'cmd' => ['label' => 'CMD — cmd.mbfdhub.com', 'permission' => 'app.cmd.access', 'description' => 'Hub sign-in through the configured CMD client. Current account status and CMD access are checked during use.'],
             'cloud' => ['label' => 'Cloud — cloud.mbfdhub.com', 'permission' => 'app.cloud.access', 'description' => 'Requires a separately approved link to the existing Cloud account. Account and device-token changes synchronize through the audited Cloud lifecycle.'],
+            'meeting' => ['label' => 'Meeting Intelligence', 'permission' => 'app.meeting.access', 'description' => 'Viewer access to meetings. Participant, Operator, and Admin roles are assigned separately.'],
         ];
     }
 
@@ -37,6 +38,12 @@ final class ApplicationAccessRegistry
     public function applicationAdministrationOptions(): array
     {
         return ['bid' => 'Bid administrator', 'media_control' => 'Media Control platform administrator'];
+    }
+
+    /** @return array<string, string> */
+    public function meetingRoleOptions(): array
+    {
+        return ['viewer' => 'Viewer', 'participant' => 'Participant', 'operator' => 'Operator', 'admin' => 'Admin'];
     }
 
     /** @return list<string> */
@@ -120,6 +127,7 @@ final class ApplicationAccessRegistry
                 'media_control' => $current->hasCurrentMediaControlEntitlement(),
                 'cmd' => $current->hasRole('super_admin') || $current->hasDirectWebPermission('app.cmd.access'),
                 'cloud' => app(\App\Services\Oidc\CloudIdentityAccess::class)->forUser($current) !== null,
+                'meeting' => app(\App\Services\Security\ApplicationRoleResolver::class)->forUser($current, 'meeting') !== null,
                 default => false,
             };
             $active = $current?->isAuthenticationAllowed() === true && ! $current->must_change_password;
@@ -132,6 +140,7 @@ final class ApplicationAccessRegistry
                 'role' => $role,
                 'role_status' => match ($key) {
                     'bid', 'media_control' => $role === null ? 'No application access — administrator role inactive' : 'Hub application role: '.$role,
+                    'meeting' => $role === null ? 'No application access — Meeting role inactive' : 'Hub application role: '.$role,
                     'admin' => 'Individual Hub administration capabilities are managed separately.',
                     default => 'No Hub-managed administrator role is supported. App-local roles are not changed.',
                 },
@@ -155,7 +164,7 @@ final class ApplicationAccessRegistry
         if ($application === 'media_control') {
             return filled(config('services.media_control.authorization.service_token')) && filled(config('services.media_control.authorization.clients.media-control.callbacks'));
         }
-        if (! in_array($application, ['cmd', 'cloud'], true) || ! filled($id = config('oidc.clients.'.$application))) {
+        if (! in_array($application, ['cmd', 'cloud', 'meeting'], true) || ! filled($id = config('oidc.clients.'.$application))) {
             return false;
         }
         $client = \Laravel\Passport\Client::query()->find($id);

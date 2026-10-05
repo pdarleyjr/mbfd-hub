@@ -113,6 +113,39 @@ final class PanelGuardConvergenceTest extends TestCase
         }
     }
 
+    public function test_employee_session_id_mismatch_reaches_login_without_redirecting_back_to_home(): void
+    {
+        $this->withoutVite();
+        $user = $this->linkedActiveUser('D03-SESSION-ID-MISMATCH');
+        $this->actingAsCanonicalUser($user)
+            ->withSession([\App\Http\Middleware\EnsureCityEmailReview::SESSION_KEY => false]);
+        $registered = AuthenticationSession::query()->sole();
+        $registered->forceFill([
+            'session_id_hash' => hash_hmac('sha256', 'another-browser-session', (string) config('app.key')),
+        ])->save();
+
+        $this->get('/employee/dashboard')->assertRedirect('/login');
+        $this->get('/login')->assertOk()->assertSee('MBFD Sign In');
+        $this->assertGuest('web');
+        self::assertNull(session('auth.canonical_session_id'));
+        self::assertNotNull($registered->fresh()->revoked_at);
+        $this->get('/')->assertRedirect('/login');
+    }
+
+    public function test_registered_current_session_keeps_access_to_employee_dashboard(): void
+    {
+        $this->withoutVite();
+        $user = $this->linkedActiveUser('D03-SESSION-ID-CURRENT');
+        $this->actingAsCanonicalUser($user)
+            ->withSession([\App\Http\Middleware\EnsureCityEmailReview::SESSION_KEY => false]);
+        $registered = AuthenticationSession::query()->sole();
+
+        $this->get('/employee/dashboard')->assertOk()->assertSee('Your workspace');
+        $this->get('/login')->assertRedirect('/');
+        $this->assertAuthenticatedAs($user, 'web');
+        self::assertNull($registered->fresh()->revoked_at);
+    }
+
     public function test_a_revoked_canonical_session_loses_access_to_every_converted_panel(): void
     {
         foreach (['/admin', '/employee', '/training', '/workgroups'] as $index => $panelPath) {

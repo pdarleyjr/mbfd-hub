@@ -300,6 +300,7 @@ final class CanonicalHumanAuthenticationTest extends TestCase
             'password' => 'correct-password',
         ])->assertRedirect('/');
         $registered = AuthenticationSession::query()->sole();
+        $this->withCookie((string) config('session.cookie'), $this->app['session.store']->getId());
 
         $response = $this->post('/logout');
 

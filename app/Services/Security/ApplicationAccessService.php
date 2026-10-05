@@ -51,6 +51,13 @@ final class ApplicationAccessService
         $this->sync($actor, $target, $applications, $scope, $currentPassword, $reason, 'change_application_administration');
     }
 
+    public function syncMeetingRole(User $actor, User $target, mixed $role, string $currentPassword, string $reason): void
+    {
+        $this->sync($actor, $target, $role === 'viewer' ? [] : [$role], [
+            'participant' => 'app.meeting.participant', 'operator' => 'app.meeting.operator', 'admin' => 'app.meeting.admin',
+        ], $currentPassword, $reason, 'change_meeting_role');
+    }
+
     /**
      * @param  array<array-key, mixed>  $selected
      * @param  array<string, string>  $scope
@@ -82,6 +89,9 @@ final class ApplicationAccessService
                 if (! Hash::check($currentPassword, $currentActor->getAuthPassword())) {
                     throw new CurrentPasswordMismatch('The current password is incorrect.');
                 }
+                if ($action === 'change_meeting_role' && ! $currentTarget->hasDirectWebPermission('app.meeting.access')) {
+                    throw \Illuminate\Validation\ValidationException::withMessages(['meeting_role' => 'Grant Meeting access before assigning its role.']);
+                }
                 foreach ($selected as $key) {
                     if ($action === 'change_application_administration' && ! $currentTarget->hasDirectWebPermission('app.'.$key.'.access')) {
                         throw \Illuminate\Validation\ValidationException::withMessages(['administrations' => 'Grant application access separately before granting its administrator role.']);
@@ -99,6 +109,10 @@ final class ApplicationAccessService
                             $dependentRoles[] = $permission;
                         }
                     }
+                    if (in_array('app.meeting.access', $remove, true)) {
+                        $dependentRoles = [...$dependentRoles, ...$currentTarget->permissions()->where('guard_name', 'web')
+                            ->whereIn('name', ['app.meeting.participant', 'app.meeting.operator', 'app.meeting.admin'])->pluck('name')->all()];
+                    }
                     $currentTarget->permissions()->detach(Permission::query()->where('guard_name', 'web')->whereIn('name', $dependentRoles)->pluck('id')->all());
                 }
                 $currentTarget->permissions()->detach($known->only($remove)->values()->all());
@@ -113,10 +127,13 @@ final class ApplicationAccessService
                     $currentTarget = app(\App\Services\Identity\AccountSecurityService::class)
                         ->revokeAll($currentTarget, 'Bid administrator role removed', now());
                 }
-                foreach (['cmd', 'cloud'] as $application) {
+                foreach (['cmd', 'cloud', 'meeting'] as $application) {
                     if (in_array('app.'.$application.'.access', $remove, true)) {
                         app(\App\Services\Oidc\OidcSessionRevoker::class)->revoke($currentTarget, $application);
                     }
+                }
+                if ($action === 'change_meeting_role' && [...$add, ...$remove] !== []) {
+                    app(\App\Services\Oidc\OidcSessionRevoker::class)->revoke($currentTarget, 'meeting');
                 }
                 if (in_array('app.cloud.access', [...$add, ...$remove], true)) {
                     app(\App\Services\Cloud\NextcloudAccountSynchronizer::class)->request($currentTarget);

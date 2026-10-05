@@ -30,8 +30,9 @@ final class HubShellNavigation
             'admin' => ['label' => 'Admin', 'href' => '/admin'],
             'bid' => ['label' => 'Bid', 'href' => 'https://bid.mbfdhub.com/api/auth/start'],
             'media_control' => ['label' => 'Media Control', 'href' => 'https://media.mbfdhub.com/api/auth/hub/start'],
+            'meeting' => ['label' => 'Meeting Intelligence', 'href' => 'https://meet.mbfdhub.com/'],
         ] as $key => $application) {
-            if ($states[$key]['allowed'] ?? false) {
+            if (($states[$key]['allowed'] ?? false) && ($key !== 'meeting' || config('application_access.runtime_verified.meeting') === true)) {
                 $navigation['applications'][] = ['key' => $key, ...$application];
             }
         }

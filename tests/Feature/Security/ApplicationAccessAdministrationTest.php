@@ -239,6 +239,50 @@ final class ApplicationAccessAdministrationTest extends TestCase
         self::assertSame(EmployeeResource::getUrl('edit', ['record' => $employee]), $column->record($employee)->getUrl());
     }
 
+    public function test_actual_meeting_role_action_requires_password_and_can_be_corrected_inline(): void
+    {
+        [$actor, $target] = $this->members();
+        $target->givePermissionTo(Permission::findOrCreate('app.meeting.access', 'web'));
+        $this->actingAs($actor);
+        $this->withoutVite();
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $component = Livewire::test(EditAccountProfile::class, ['record' => $target->getRouteKey()])
+            ->assertActionExists('manageMeetingRole')
+            ->assertSee('Edit Meeting role')
+            ->callAction('manageMeetingRole', ['meeting_role' => 'operator', 'current_password' => 'Wrong-password-do-not-retain', 'reason' => 'Meeting operation duties'])
+            ->assertHasActionErrors(['current_password'])
+            ->assertSet('mountedActionsData.0.current_password', '');
+        self::assertFalse($target->fresh()->hasDirectWebPermission('app.meeting.operator'));
+        $component->set('mountedActionsData.0.current_password', 'Access-test-password!')
+            ->call('callMountedAction')->assertHasNoActionErrors();
+        self::assertTrue($target->fresh()->hasDirectWebPermission('app.meeting.operator'));
+        $this->assertDatabaseHas('security_action_events', ['target_user_id' => $target->id, 'action' => 'change_meeting_role', 'result' => 'allowed']);
+        self::assertStringNotContainsString('Wrong-password-do-not-retain', \App\Models\SecurityActionEvent::all()->toJson());
+    }
+
+    public function test_meeting_role_service_rechecks_stale_actor_and_denies_self_or_super_admin_targets(): void
+    {
+        [$actor, $target] = $this->members();
+        $target->givePermissionTo(Permission::findOrCreate('app.meeting.access', 'web'));
+        $service = app(ApplicationAccessService::class);
+        foreach ([$actor, $target] as $recipient) {
+            if ($recipient->is($target)) {
+                $target->assignRole(Role::findOrCreate('super_admin', 'web'));
+            }
+            try {
+                $service->syncMeetingRole($actor, $recipient, 'admin', 'Access-test-password!', 'Forbidden target');
+                self::fail('Self or Super Administrator direct-role changes must fail.');
+            } catch (AuthorizationException) {
+                self::assertFalse($recipient->fresh()->hasDirectWebPermission('app.meeting.admin'));
+            }
+        }
+        $target->syncRoles([]);
+        $actor->load('roles');
+        $actor->roles()->detach();
+        $this->expectException(AuthorizationException::class);
+        $service->syncMeetingRole($actor, $target, 'admin', 'Access-test-password!', 'Stale actor');
+    }
+
     /** @return array{User, User} */
     private function members(): array
     {

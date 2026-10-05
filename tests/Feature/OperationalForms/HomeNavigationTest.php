@@ -37,6 +37,18 @@ class HomeNavigationTest extends TestCase
             ->assertSee('href="'.url('/employee/forms').'"', false);
     }
 
+    public function test_meeting_launch_requires_current_access_and_verified_consumer_configuration(): void
+    {
+        $user = $this->actingAsCanonicalFixture();
+        $states = ['meeting' => ['allowed' => true]];
+        config(['application_access.runtime_verified.meeting' => false]);
+        self::assertNotContains('meeting', array_column(HubShellNavigation::forUser($user, $states)['applications'], 'key'));
+        config(['application_access.runtime_verified.meeting' => true]);
+        $applications = HubShellNavigation::forUser($user, $states)['applications'];
+        self::assertContains(['key' => 'meeting', 'label' => 'Meeting Intelligence', 'href' => 'https://meet.mbfdhub.com/'], $applications);
+        self::assertNotContains('meeting', array_column(HubShellNavigation::forUser($user, ['meeting' => ['allowed' => false]])['applications'], 'key'));
+    }
+
     public function test_entitled_home_renders_the_exact_quick_access_stack_without_pulsepoint(): void
     {
         $this->withoutVite();
