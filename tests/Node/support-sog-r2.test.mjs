@@ -40,10 +40,11 @@ test('missing current-generation configuration fails before querying the whole i
     assert.equal(response.status,503);
     assert.equal(retrieved,false);
 });
-test('policy context excludes apparatus references as well as retired generations', async () => {
+test('policy passages visibly exclude apparatus references, retired generations and history', async () => {
     const calls = [];
+    const completed = [];
     const current = {id:'r2',score:0.9,namespace,metadata:{manifest_sha256:manifest,asset_id:'SECTION-800',chunk_index:0,source:'Section_800_R2.pdf',page:8,primary_ids:'800.P02',url:'https://files.mbfdhub.com/current-sog/SECTION-800?page=8',text:'Use the current reporting route.'}};
-    const runtime = env({VECTORIZE:{getByIds:async ids => ids.map((id,chunk_index)=>({...current,id,metadata:{...current.metadata,chunk_index}})),query:async (_vector, options) => {
+    const runtime = env({VECTORIZE:{getByIds:async ids => {const chunks=ids.map((id,chunk_index)=>({...current,id,metadata:{...current.metadata,chunk_index}}));completed.push(...chunks);return chunks;},query:async (_vector, options) => {
         calls.push(options);
         return {matches:options.namespace === namespace ? [
             current,
@@ -58,27 +59,36 @@ test('policy context excludes apparatus references as well as retired generation
         ]};
     }}});
     const previousFetch = globalThis.fetch;
-    let messages;
-    globalThis.fetch = async (_url, options) => {
-        messages = JSON.parse(options.body).messages;
-        return Response.json({choices:[{message:{content:'Current source answer'}}]});
+    let bridgeCalls=0;
+    const poison='300 (Logistics/Dispatch center) and PSCD (Premier Shift Command Director/Suppression Division Chief).';
+    globalThis.fetch = async () => {
+        bridgeCalls++;
+        return Response.json({choices:[{message:{content:poison},finish_reason:'stop'}],usage:{prompt_tokens:1,completion_tokens:1}});
     };
     try {
-        const response = await worker.fetch(request('/chat',{message:'How do I report a defect?'}),runtime);
+        const response = await worker.fetch(request('/chat',{message:'How do I report a defect?',history:[{role:'assistant',content:'OLD POLICY FROM HISTORY'}]}),runtime);
         assert.equal(response.status,200);
         const result = await response.json();
+        assert.equal(bridgeCalls,0,'policy passages must not invoke generation');
+        assert.match(result.response,/current (?:policy|sog)(?: source)? passages/i);
         assert.deepEqual(result.sources,['Section_800_R2.pdf']);
+        assert.deepEqual(result.reference_citations,[]);
+        assert.equal('model' in result,false);
         assert.equal('completion' in result,false);
         assert.deepEqual(calls.map(call => call.namespace),[namespace,referenceNamespace]);
         assert.ok(calls.every(call => call.returnMetadata === 'all'));
-        const prompt = messages.map(message => message.content).join('\n');
-        assert.match(prompt,/CURRENT SOG/);
-        assert.match(prompt,/current-sog\/SECTION-800\?page=8/);
-        assert.match(prompt,/800\.P02/);
-        assert.doesNotMatch(prompt,/Technical pump information/);
-        assert.match(prompt,/stated model\/configuration scope/);
-        assert.doesNotMatch(prompt,/driver_manual\.pdf.*Authoritative/);
-        assert.doesNotMatch(prompt,/RETIRED|edited_support_services_sog|CRITICAL OVERRIDE|786-559-4054/);
+        assert.deepEqual(result.citations.map(c=>c.id),completed.map(chunk=>chunk.id));
+        let offset=0;
+        for(const chunk of completed) {
+            const position=result.response.indexOf(chunk.metadata.text,offset);
+            assert.ok(position>=offset,'each completed chunk must retain its exact source wording');
+            offset=position+chunk.metadata.text.length;
+        }
+        assert.match(result.response,/current-sog\/SECTION-800\?page=8/);
+        assert.match(result.response,/800\.P02/);
+        assert.doesNotMatch(result.response,/Technical pump information|L3_manual|OLD POLICY FROM HISTORY/);
+        assert.doesNotMatch(result.response,/RETIRED|edited_support_services_sog|CRITICAL OVERRIDE|786-559-4054/);
+        assert.ok(!result.response.includes(poison));
     } finally { globalThis.fetch = previousFetch; }
 });
 test('an admin upload cannot restore a retired SOG or reporting supplement', async () => {
@@ -210,12 +220,16 @@ test('policy page completion follows the actual 800.P01 V link and adds verified
         currentChunk(34,0,'Section 800 — Logistics\nSECTION-800; physical page 34; MBFD-COORDINATED-20261002-R2\n800.P03 — Equipment Maintenance and Monitoring','800.P03'),
     ];
     const previousFetch=globalThis.fetch;
-    const captured=[];
+    const ordered=[...chunks].sort((a,b)=>a.metadata.page-b.metadata.page||a.metadata.chunk_index-b.metadata.chunk_index);
+    const responses=[];
+    let bridgeCalls=0;
+    const poison='300 (Logistics/Dispatch center) and PSCD (Premier Shift Command Director/Suppression Division Chief).';
     globalThis.fetch=async (_url,options)=>{
-        const body=JSON.parse(options.body);captured.push(body);
+        bridgeCalls++;
+        const body=JSON.parse(options.body);
         return body.stream
-            ? new Response('data: {"choices":[{"delta":{"content":"Read the current guidance."}}]}\n\ndata: [DONE]\n\n')
-            : Response.json({choices:[{message:{content:'Read the current guidance.'}}]});
+            ? new Response('data: '+JSON.stringify({choices:[{delta:{content:poison},finish_reason:'stop'}]})+'\n\ndata: [DONE]\n\n')
+            : Response.json({choices:[{message:{content:poison},finish_reason:'stop'}],usage:{prompt_tokens:1,completion_tokens:1}});
     };
     try {
         for (const stream of [false,true]) {
@@ -231,44 +245,50 @@ test('policy page completion follows the actual 800.P01 V link and adds verified
             }),runtime);
             assert.equal(response.status,200);
             assert.ok(gets.length<=3 && gets.every(ids=>ids.length<=20));
-            const generation=captured.at(-1);
-            const prompt=generation.messages.map(message=>message.content).join('\n');
-            const finalPrompt=generation.messages.at(-1).content.split('\n\nRESPONSE CHECK:\n');
-            assert.equal(finalPrompt.length,2);
-            assert.match(finalPrompt[0],/USER QUESTION:.*acknowledgment is unavailable\?$/);
-            assert.match(finalPrompt[1],/every requested condition/);
-            assert.match(finalPrompt[1],/unresolved-step follow-up\/escalation/);
-            assert.match(finalPrompt[1],/authorization\/time-of-day limits/);
-            assert.match(finalPrompt[1],/records\/signatures\/evidence/);
-            assert.match(finalPrompt[1],/transmission and acceptance/);
-            assert.match(finalPrompt[1],/source role identifiers without added definitions/);
-            assert.match(finalPrompt[1],/state any unanswered part/);
-            assert.equal(generation.model,'qwen3.6:35b');
-            assert.equal(generation.max_tokens,1024);
-            assert.equal(generation.temperature,0.3);
-            assert.equal(generation.reasoning_effort,'none');
-            for(const chunk of chunks) assert.ok(prompt.includes(chunk.metadata.text));
-            assert.doesNotMatch(prompt,/NHTSA AND HIGH VOLTAGE REFERENCE|OLD POLICY FROM HISTORY/);
-            assert.match(prompt,/every part of the question/);
-            assert.match(prompt,/conditional scope/);
-            assert.match(prompt,/missing evidence/);
-            let citations,answer;
+            let result;
             if(stream) {
-                assert.equal(response.headers.get('X-Sources'),'["MBFD_Section_800.pdf"]');
+                assert.equal(response.headers.get('Content-Type'),'text/event-stream');
+                assert.equal(response.headers.get('Cache-Control'),'no-cache');
+                const sources=JSON.parse(response.headers.get('X-Sources'));
                 const events=(await response.text()).split('\n\n').filter(Boolean).map(event=>event.slice(6));
                 assert.equal(events.at(-1),'[DONE]');
-                const footer=JSON.parse(events.at(-2));citations=footer.citations;
-                answer=events.slice(0,-1).map(event=>JSON.parse(event).response||'').join('');
+                const parts=events.slice(0,-1).map(event=>JSON.parse(event));
+                assert.ok(parts.every(part=>!('model' in part)&&!('completion' in part)));
+                const cited=parts.find(part=>Array.isArray(part.citations));
+                assert.ok(cited,'SSE must preserve the completed current citations');
+                result={response:parts.map(part=>part.response||'').join(''),sources,
+                    citations:cited.citations,reference_citations:cited.reference_citations};
             } else {
-                const body=await response.json();citations=body.citations;answer=body.response;
-                assert.deepEqual(body.sources,['MBFD_Section_800.pdf']);
+                const body=await response.json();
+                assert.equal('model' in body,false);
+                assert.equal('completion' in body,false);
+                result={response:body.response,sources:body.sources,citations:body.citations,reference_citations:body.reference_citations};
             }
-            assert.deepEqual(citations.map(c=>c.id).sort(),chunks.map(c=>c.id).sort());
-            assert.ok(citations.every(c=>c.namespace===namespace&&c.manifest_sha256===manifest));
-            assert.ok(citations.every(c=>c.source_sha256===chunks[0].metadata.source_sha256));
-            for(const page of [4,5,13,34]) assert.ok(answer.includes(`https://files.mbfdhub.com/current-sog/SECTION-800?page=${page}`));
+            assert.equal(bridgeCalls,0,'policy passages must never invoke the poisoned bridge');
+            assert.match(result.response,/current (?:policy|sog)(?: source)? passages/i);
+            assert.deepEqual(result.sources,['MBFD_Section_800.pdf']);
+            assert.deepEqual(result.reference_citations,[]);
+            assert.deepEqual(result.citations.map(c=>c.id),ordered.map(chunk=>chunk.id));
+            assert.ok(result.citations.every(c=>c.namespace===namespace&&c.manifest_sha256===manifest));
+            assert.ok(result.citations.every(c=>c.source_sha256===chunks[0].metadata.source_sha256));
+            let offset=0;
+            for(const chunk of ordered) {
+                const position=result.response.indexOf(chunk.metadata.text,offset);
+                assert.ok(position>=offset,'physical page '+chunk.metadata.page+', chunk '+chunk.metadata.chunk_index+' must retain exact source wording/order');
+                offset=position+chunk.metadata.text.length;
+            }
+            assert.match(result.response,/Company Officer reviews unresolved safety and readiness items at handoff/);
+            assert.match(result.response,/Logistics Captain and then Logistics Division Chief/);
+            assert.match(result.response,/preserve required signatures, original event time and supporting evidence/);
+            assert.match(result.response,/contacts the receiving owner directly when acknowledgment, a due action or protection is missing/);
+            assert.doesNotMatch(result.response,/NHTSA AND HIGH VOLTAGE REFERENCE|OLD POLICY FROM HISTORY|RETIRED/);
+            assert.ok(!result.response.includes(poison));
+            assert.doesNotMatch(result.response,/Logistics\/Dispatch center|Premier Shift Command Director/);
+            for(const page of [4,5,13,34]) assert.ok(result.response.includes('https://files.mbfdhub.com/current-sog/SECTION-800?page='+page));
+            responses.push(result);
         }
-        assert.deepEqual(captured[0].messages,captured[1].messages);
+        assert.deepEqual(responses[0],responses[1],'JSON and SSE must deliver identical passages, sources and citations');
+        assert.equal(bridgeCalls,0);
     } finally {globalThis.fetch=previousFetch;}
 });
 
@@ -277,6 +297,10 @@ test('L3 technical questions keep references without invented SOG provenance', a
     let prompt;
     globalThis.fetch=async (_url,options)=>{
         const body=JSON.parse(options.body);prompt=body.messages.at(-1).content;
+        assert.equal(body.model,'qwen3.6:35b');
+        assert.equal(body.max_tokens,1024);
+        assert.equal(body.temperature,0.3);
+        assert.equal(body.reasoning_effort,'none');
         assert.equal('stream_options' in body,false);
         return body.stream
             ? new Response('data: {"choices":[{"delta":{"content":"MENU > MAINTENANCE; alternator, engine, transmission and pump."},"finish_reason":"length"}]}\n\ndata: {"choices":[],"usage":{"prompt_tokens":17,"completion_tokens":1024,"total_tokens":1041}}\n\ndata: [DONE]\n\n')

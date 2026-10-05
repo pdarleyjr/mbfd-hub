@@ -465,6 +465,18 @@ export default {
         }
         const footer = citationFooter(citations, referenceCitations);
 
+        if (policyQuestion) {
+          const response = 'Current policy passages\n\nThese passages are quoted from the current policy pages retrieved for your question. Review the stated conditions and linked pages to confirm which requirements apply; retrieval may not cover every applicable policy.'
+            + currentSogs.map(({ metadata: meta }) =>
+              `\n\n### ${meta.primary_ids ? `${meta.primary_ids} — ` : ''}${meta.source}, physical page ${meta.page}\n\n${meta.text}`).join('')
+            + footer;
+          const result = { response, sources, citations, reference_citations: referenceCitations };
+          if (!enableStreaming) return json(result);
+          return new Response(`data: ${JSON.stringify({ response, citations, reference_citations: referenceCitations })}\n\ndata: [DONE]\n\n`, {
+            headers: { ...corsHeaders, 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'X-Sources': JSON.stringify(sources) },
+          });
+        }
+
         // Step 4: messages with recent history
         const recentHistory = conversationHistory.slice(-6).filter((message) =>
           (!policyQuestion && hasCurrentSog) || message.role === 'user');
