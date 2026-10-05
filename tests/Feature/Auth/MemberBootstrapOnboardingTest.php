@@ -77,6 +77,7 @@ final class MemberBootstrapOnboardingTest extends TestCase
             'password' => 'New-Private-Password!7824',
             'password_confirmation' => 'New-Private-Password!7824',
         ])->assertRedirect('/');
+        $this->withCookie((string) config('session.cookie'), $this->app['session.store']->getId());
 
         $memberA->refresh();
         self::assertSame(AccountStatus::Active, $memberA->account_status);
@@ -98,6 +99,7 @@ final class MemberBootstrapOnboardingTest extends TestCase
             'employee_id' => $memberA->employee_id,
             'password' => 'New-Private-Password!7824',
         ])->assertRedirect('/');
+        $this->withCookie((string) config('session.cookie'), $this->app['session.store']->getId());
         $this->get('/account')->assertOk();
         $this->assertAuthenticatedAs($memberA, 'web');
     }
