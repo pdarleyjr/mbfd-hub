@@ -48,6 +48,9 @@ async function mockDailySelectorApi(page: Page): Promise<void> {
     if (path === '/images/icons/checkout-apparatus.svg') {
       return route.fulfill({ path: resolve('public/images/icons/checkout-apparatus.svg'), contentType: 'image/svg+xml' });
     }
+    if (/^\/images\/stations\/station-(1|2|3|4|6)\.png$/.test(path)) {
+      return route.fulfill({ path: resolve('public', path.slice(1)), contentType: 'image/png' });
+    }
 
     return route.fulfill({ status: 204 });
   });
@@ -175,6 +178,41 @@ test('station selector stays visible, touchable, and horizontally contained at e
   const viewportWidth = await page.evaluate(() => window.innerWidth);
   expect(cardBoxes.every((box) => box.height >= 44 && box.left >= 0 && box.right <= viewportWidth)).toBe(true);
 
+  for (const card of await page.getByTestId('daily-station-card').all()) {
+    await card.scrollIntoViewIfNeeded();
+    const photo = card.getByRole('img');
+    await expect.poll(() => photo.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
+    const composition = await photo.evaluate((image: HTMLImageElement) => {
+      const box = image.getBoundingClientRect();
+      const frame = image.parentElement!.getBoundingClientRect();
+      return {
+        naturalRatio: image.naturalWidth / image.naturalHeight,
+        displayedRatio: box.width / box.height,
+        fit: getComputedStyle(image).objectFit,
+        frameHeight: frame.height,
+        contained: box.top >= frame.top - 1 && box.bottom <= frame.bottom + 1,
+      };
+    });
+    if (viewportWidth < 1_280) {
+      expect(Math.abs(composition.displayedRatio - composition.naturalRatio)).toBeLessThan(0.01);
+      expect(composition.contained).toBe(true);
+    } else {
+      expect(composition.fit).toBe('cover');
+      expect(composition.frameHeight).toBe(viewportWidth >= 1_536 ? 224 : 192);
+    }
+    await expect(card.getByRole('heading')).toBeVisible();
+    const action = card.getByText('View Station');
+    await action.evaluate((element) => element.scrollIntoView({ block: 'center', behavior: 'instant' }));
+    await expect(action).toBeVisible();
+    expect(await action.evaluate((element) => {
+      const box = element.getBoundingClientRect();
+      const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+      return hit !== null && element.closest('[data-testid="daily-station-card"]') === hit.closest('[data-testid="daily-station-card"]');
+    })).toBe(true);
+  }
+  await page.getByTestId('daily-station-card').first().scrollIntoViewIfNeeded();
+  await expectNoHorizontalOverflow(page);
+
   if (testInfo.project.name === 'daily-responsive-display-3840') {
     const layout = await page.getByTestId('daily-workspace').evaluate((workspace) => {
       const grid = document.querySelector('[data-testid="daily-station-grid"]');
@@ -187,11 +225,14 @@ test('station selector stays visible, touchable, and horizontally contained at e
     expect(layout.columns).toBeGreaterThanOrEqual(4);
   }
 
-  if (['daily-responsive-phone-390', 'daily-responsive-display-3840'].includes(testInfo.project.name)) {
-    const screenshot = testInfo.outputPath(`${testInfo.project.name}.png`);
-    await page.screenshot({ path: screenshot, fullPage: true });
-    await testInfo.attach(`${testInfo.project.name} selector`, { path: screenshot, contentType: 'image/png' });
-  }
+  const screenshot = testInfo.outputPath(`${testInfo.project.name}.png`);
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    window.scrollTo(0, 0);
+  });
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+  await page.screenshot({ path: screenshot, fullPage: true });
+  await testInfo.attach(`${testInfo.project.name} selector`, { path: screenshot, contentType: 'image/png' });
 
   expect(quality.consoleErrors).toEqual([]);
   expect(quality.failedRequests).toEqual([]);
