@@ -43,6 +43,7 @@
     .daily-workspace .min-h-screen:is(.bg-hub-canvas, .bg-gray-50),
     body:has(.apparatus-inspection) #root > div,
     .fi-simple-layout,
+    #operational-forms-root > .fui-FluentProvider,
     #operational-forms-root .of-app,
     .document-workspace,
     .library-body .page-stage,
