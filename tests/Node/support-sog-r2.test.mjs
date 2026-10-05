@@ -197,7 +197,7 @@ test('policy page completion follows the actual 800.P01 V link and adds verified
     const chunks=[
         currentChunk(34,1,'Replacement requests shall include the required Lost/Damaged/Stolen equipment record endorsed by the Company Officer and Suppression Division Chief.','800.P03'),
         currentChunk(34,2,'Use one linked authoritative history, not duplicate daily/logbook narratives. Follow 800.P01 V for acknowledgment, escalation and paper/scanned contingency.','800.P03'),
-        currentChunk(13,2,'Fleet/Logistics acknowledges the defect with a named owner, priority, interim restriction and next action/review point, and provides the disposition to the Company Officer and 300. During a platform outage use the approved paper contingency record; submit a legible scan through the designated secure process on restoration and reconcile linked records under 800.P01 V. An automated ticket number is not technical acceptance.','800.P02'),
+        currentChunk(13,2,'Fleet/Logistics acknowledges the defect with a named owner, priority, interim restriction and next action/review point, and provides the disposition to the Company Officer and 300. During a platform outage use the approved paper contingency record; submit a legible scan through the designated secure process on restoration and reconcile linked records under 800.P01 V. An automated ticket number is not technical acceptance. G. After hours, only 300 or the ranking officer on the unit initiates the Logistics service call through the authorized on-call Fleet/Logistics contact. If that contact is unavailable, the officer escalates through 300 to the Logistics Captain or Logistics Division Chief for authorized technical coordination. Do not independently call an off-duty technician. While assistance is arranged, 300 decides coverage/change-out and confirms the limitation with PSCD. An unanswered call or closed shop does not remove the restriction or the duty to protect people.','800.P02'),
         currentChunk(4,1,'The Company Officer reviews unresolved safety and readiness items at handoff and contacts the receiving owner directly when acknowledgment, a due action or protection is missing. Unresolved operational impact goes to 300; unresolved Logistics action goes to the Logistics Captain and then Logistics Division Chief.','800.P01'),
         currentChunk(5,2,'When the platform is unavailable, use the approved paper contingency record for that function and preserve required signatures, original event time and supporting evidence. Continue direct urgent notification. On restoration, the submitting member sends a legible scanned copy through the designated secure process; the receiving owner reconciles duplicate, missing or incomplete entries and links the paper record to the authoritative electronic history.','800.P01'),
         currentChunk(4,0,'Section 800 — Logistics\nSECTION-800; physical page 4; MBFD-COORDINATED-20261002-R2\n800.P01 — Logistics Asset Control','800.P01'),
@@ -231,7 +231,22 @@ test('policy page completion follows the actual 800.P01 V link and adds verified
             }),runtime);
             assert.equal(response.status,200);
             assert.ok(gets.length<=3 && gets.every(ids=>ids.length<=20));
-            const prompt=captured.at(-1).messages.map(message=>message.content).join('\n');
+            const generation=captured.at(-1);
+            const prompt=generation.messages.map(message=>message.content).join('\n');
+            const finalPrompt=generation.messages.at(-1).content.split('\n\nRESPONSE CHECK:\n');
+            assert.equal(finalPrompt.length,2);
+            assert.match(finalPrompt[0],/USER QUESTION:.*acknowledgment is unavailable\?$/);
+            assert.match(finalPrompt[1],/every requested condition/);
+            assert.match(finalPrompt[1],/unresolved-step follow-up\/escalation/);
+            assert.match(finalPrompt[1],/authorization\/time-of-day limits/);
+            assert.match(finalPrompt[1],/records\/signatures\/evidence/);
+            assert.match(finalPrompt[1],/transmission and acceptance/);
+            assert.match(finalPrompt[1],/source role identifiers without added definitions/);
+            assert.match(finalPrompt[1],/state any unanswered part/);
+            assert.equal(generation.model,'qwen3.6:35b');
+            assert.equal(generation.max_tokens,1024);
+            assert.equal(generation.temperature,0.3);
+            assert.equal(generation.reasoning_effort,'none');
             for(const chunk of chunks) assert.ok(prompt.includes(chunk.metadata.text));
             assert.doesNotMatch(prompt,/NHTSA AND HIGH VOLTAGE REFERENCE|OLD POLICY FROM HISTORY/);
             assert.match(prompt,/every part of the question/);
@@ -253,6 +268,7 @@ test('policy page completion follows the actual 800.P01 V link and adds verified
             assert.ok(citations.every(c=>c.source_sha256===chunks[0].metadata.source_sha256));
             for(const page of [4,5,13,34]) assert.ok(answer.includes(`https://files.mbfdhub.com/current-sog/SECTION-800?page=${page}`));
         }
+        assert.deepEqual(captured[0].messages,captured[1].messages);
     } finally {globalThis.fetch=previousFetch;}
 });
 
@@ -284,6 +300,12 @@ test('L3 technical questions keep references without invented SOG provenance', a
         assert.deepEqual(body.reference_citations,[{id:'l3-original',namespace:referenceNamespace,source:'l3',chunk_index:63}]);
         assert.match(body.response,/Reference sources:\n- l3, chunk 63/);
         assert.match(prompt,/MENU > MAINTENANCE/);
+        const responseCheck=prompt.split('\n\nRESPONSE CHECK:\n');
+        assert.equal(responseCheck.length,2);
+        assert.match(responseCheck[1],/applicable/);
+        assert.match(responseCheck[1],/source role identifiers without added definitions/);
+        assert.match(responseCheck[1],/state any unanswered part/);
+        assert.doesNotMatch(responseCheck[1],/300|Logistics|Company Officer|800\.P/);
         assert.doesNotMatch(body.response,/current-sog|physical page/);
         }
     } finally {globalThis.fetch=previousFetch;}
