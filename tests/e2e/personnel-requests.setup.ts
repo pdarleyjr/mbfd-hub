@@ -36,4 +36,5 @@ export default function globalSetup() {
 
   execFileSync(php, ['artisan', 'migrate:fresh', '--force'], options);
   execFileSync(php, ['artisan', 'db:seed', '--class=Database\\Seeders\\PersonnelRequestsE2ESeeder', '--force'], options);
+  execFileSync(php, ['artisan', 'db:seed', '--class=Database\\Seeders\\BidAssignmentsE2ESeeder', '--force'], options);
 }

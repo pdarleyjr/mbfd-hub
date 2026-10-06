@@ -44,6 +44,7 @@ $testEnvironment = [
     'BID_CONSOLE_URL' => '',
     'BID_FEDERATION_TOKEN' => '',
     'BID_READER_TOKEN' => '',
+    'BID_WRITER_TOKEN' => '',
     'BROADCAST_DRIVER' => 'log',
     'CACHE_STORE' => 'array',
     'CLOUDFLARE_ACCOUNT_ID' => '',

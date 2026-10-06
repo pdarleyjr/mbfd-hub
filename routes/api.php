@@ -237,6 +237,11 @@ Route::post('/apparatus-inspections/{inspection}/reject', [ApparatusController::
 // =========================================================================
 // Numeric Laravel throttles otherwise share one IP/domain counter across
 // routes and applications. Keep exchange and identity budgets independent.
+Route::post('/v2/members/{employeeId}/bid-assignment', \App\Http\Controllers\Api\Bid\BidAssignmentController::class)
+    ->where('employeeId', '[A-Za-z0-9_-]{1,64}')
+    ->middleware(['verify.bid.writer', 'throttle:300,1,bid-assignment:'])
+    ->name('api.v2.members.bid-assignment');
+
 Route::prefix('v2')->middleware(['throttle:30,1,bid-exchange:', 'verify.bid.federation'])->group(function () {
     Route::post('/bid/auth/exchange', BidAuthorizationCodeExchangeController::class)
         ->name('api.v2.bid.auth.exchange');

@@ -54,6 +54,7 @@ $app = Application::configure(basePath: dirname(__DIR__))
             'workgroup.global' => \App\Http\Middleware\EnsureGlobalWorkgroupAccess::class,
             'verify.bid.reader' => \App\Http\Middleware\VerifyBidReaderToken::class,
             'verify.bid.federation' => \App\Http\Middleware\VerifyBidFederationToken::class,
+            'verify.bid.writer' => \App\Http\Middleware\VerifyBidWriterToken::class,
             'verify.media-control.token' => \App\Http\Middleware\VerifyMediaControlServiceToken::class,
             'display.readonly' => \App\Http\Middleware\EnsureDisplayReadOnly::class,
             'display.token' => \App\Http\Middleware\EnsureDisplayToken::class,

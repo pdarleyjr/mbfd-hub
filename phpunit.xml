@@ -43,6 +43,7 @@
         <env name="BCRYPT_ROUNDS" value="4" force="true"/>
         <env name="BID_CONSOLE_URL" value="" force="true"/>
         <env name="BID_READER_TOKEN" value="" force="true"/>
+        <env name="BID_WRITER_TOKEN" value="" force="true"/>
         <env name="BROADCAST_DRIVER" value="log" force="true"/>
         <env name="CACHE_STORE" value="array" force="true"/>
         <env name="CLOUDFLARE_ACCOUNT_ID" value="" force="true"/>
