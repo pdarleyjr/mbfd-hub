@@ -1,4 +1,5 @@
-<x-filament-panels::page data-hub-ui="2" data-hub-portal="employee">
+<x-filament-panels::page data-hub-ui="2" data-hub-portal="employee"
+    x-init="window.matchMedia('(max-width: 1023px)').matches && $store.sidebar.close()">
     {{-- Hero Identity Strip --}}
     <div class="ep-hero">
         <div class="ep-hero-badge">
@@ -38,6 +39,31 @@
             <span class="ep-stat-label">Pending Requests</span>
         </div>
     </div>
+
+    @if($bidAssignment)
+        <section class="ep-bid-assignment ep-panel" aria-labelledby="bid-assignment-heading" data-bid-assignment>
+            <div class="ep-panel-header">
+                <h2 id="bid-assignment-heading" class="ep-panel-title">{{ $bidAssignment->term_label }} {{ $bidAssignment->assignment_source === 'retained_nonbiddable' ? 'Assignment' : 'Bid Selection' }}</h2>
+                <span class="ep-status-badge">{{ $bidAssignment->assignment_source === 'retained_nonbiddable' ? 'Retained assignment' : 'Bid award' }}</span>
+            </div>
+            <dl class="ep-bid-details">
+                <div class="ep-bid-selection">
+                    <dt>{{ $bidAssignment->assignment_source === 'retained_nonbiddable' ? 'Assignment' : 'Bid Selection' }}</dt>
+                    <dd>{{ $bidAssignment->bid_selection_label }}</dd>
+                </div>
+                <div><dt>{{ $bidAssignment->assignment_source === 'retained_nonbiddable' ? 'Rank' : 'Rank at bid' }}</dt><dd>{{ $bidAssignment->rank_label }}</dd></div>
+                @if($bidAssignment->position_label && $bidAssignment->position_label !== $bidAssignment->bid_selection_label && $bidAssignment->position_label !== $bidAssignment->rank_label)
+                    <div><dt>Seat / Position</dt><dd>{{ $bidAssignment->position_label }}</dd></div>
+                @endif
+                <div><dt>Shift</dt><dd>{{ $bidAssignment->shift_label }}</dd></div>
+                <div><dt>Station / Assignment Area</dt><dd>{{ $bidAssignment->station_label }}</dd></div>
+                @if($bidAssignment->division_label)
+                    <div><dt>Division</dt><dd>{{ $bidAssignment->division_label }}</dd></div>
+                @endif
+                <div><dt>A-Day</dt><dd>{{ $bidAssignment->a_day_label }}</dd></div>
+            </dl>
+        </section>
+    @endif
 
     <h2 class="hub-portal-section-title">Your workspace</h2>
     {{-- Quick Actions --}}

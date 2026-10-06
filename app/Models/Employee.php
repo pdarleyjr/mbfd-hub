@@ -153,4 +153,10 @@ class Employee extends Authenticatable
     {
         return $this->hasOne(User::class, 'employee_profile_id');
     }
+
+    /** @return HasMany<EmployeeBidAssignment, $this> */
+    public function bidAssignments(): HasMany
+    {
+        return $this->hasMany(EmployeeBidAssignment::class, 'employee_profile_id');
+    }
 }

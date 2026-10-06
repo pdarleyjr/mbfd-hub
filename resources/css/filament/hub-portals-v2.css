@@ -59,6 +59,14 @@
 [data-hub-portal="employee"] .ep-panel { min-width: 0; }
 [data-hub-portal="employee"] .ep-panel-header { display: flex; align-items: center; justify-content: space-between; gap: .75rem; border-bottom: 1px solid rgb(var(--hub-border)); }
 [data-hub-portal="employee"] .ep-panel-title { color: rgb(var(--hub-header)); font-size: 1rem; font-weight: 650; }
+[data-hub-portal="employee"] .ep-bid-assignment { padding: 1.25rem; border: 1px solid rgb(var(--hub-border)); border-radius: 6px; background: rgb(var(--hub-surface)); }
+[data-hub-portal="employee"] .ep-bid-assignment .ep-panel-header { flex-wrap: wrap; padding-bottom: .75rem; }
+[data-hub-portal="employee"] .ep-bid-details { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: 1rem 1.5rem; margin-top: 1rem; }
+[data-hub-portal="employee"] .ep-bid-details > div { min-width: 0; }
+[data-hub-portal="employee"] .ep-bid-details dt { margin-bottom: .25rem; color: rgb(var(--hub-ink-secondary)); font-size: .8125rem; }
+[data-hub-portal="employee"] .ep-bid-details dd { color: rgb(var(--hub-ink)); font-size: 1rem; font-weight: 600; line-height: 1.5; }
+[data-hub-portal="employee"] .ep-bid-selection { grid-column: 1 / -1; }
+[data-hub-portal="employee"] .ep-bid-selection dd { color: rgb(var(--hub-header)); font-size: 1.375rem; }
 [data-hub-portal="employee"] .ep-list-item { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; min-height: 72px; padding: .875rem 0; border-bottom: 1px solid rgb(var(--hub-border-soft)); }
 [data-hub-portal="employee"] .ep-list-body { display: flex; flex: 1 1 8rem; min-width: 0; flex-direction: column; gap: .25rem; }
 [data-hub-portal="employee"] .ep-list-primary { color: rgb(var(--hub-ink)); font-size: .875rem; font-weight: 600; overflow-wrap: anywhere; }

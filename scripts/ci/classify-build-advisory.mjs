@@ -13,12 +13,12 @@ const expires = Date.parse('2026-10-10T00:00:00Z');
 // images or emitted browser bundles. Raw reports and all other gates remain.
 const inputs = {
     '.': {
-        'package.json': 'dec86aefcb0dd8343bc9578e11a26cb71013e79794ef7ce558656d4f0c71fd62',
-        'package-lock.json': 'bcfec5f543297fbcbc76c41116741ae379d1992ba5bb5cafc6305adbea89e727',
+        'package.json': 'eed6a2bb56d771a64211f6c7cb23c7a827062c93ef1ec36ef5f3c28e9971bec7',
+        'package-lock.json': 'ada5fb4f60eaccbe519538620986a1fc6e095c545c009d13304df580797b7f40',
     },
     'resources/js/daily-checkout': {
-        'resources/js/daily-checkout/package.json': 'dd650f5264bdf62ad65b7f4139245217c78a41c9178e7ca6e3551545ad568da8',
-        'resources/js/daily-checkout/package-lock.json': '4dffdbc36352cea7dccc52a8c600704d6719d887c4bc4442854b6a127f8ce395',
+        'resources/js/daily-checkout/package.json': 'da5514ab8f3302816fab2b29a02a9e1f7a7c67d6c4a0bdcef66b6fe6b4f9f5e8',
+        'resources/js/daily-checkout/package-lock.json': '9607b49199b181d5ed059f10839e0b1b5d529e82cdf00752c7e70136d993f0a4',
     },
 };
 const runtimeInputs = {
@@ -26,8 +26,8 @@ const runtimeInputs = {
     '.dockerignore': 'c360145b9617b149ed9b27b613b63cc577e2abd22005efa5367f608e71c67dbc',
 };
 const vacationInputs = {
-    'vacation-app/package.json': '6796644cb0207950ce948833d67ac794f70109045d136150b360ec795a818798',
-    'vacation-app/pnpm-lock.yaml': '3810018ddfb2519ce90fa942b0ac17b911b82cfada655bdd3b865811c2358d94',
+    'vacation-app/package.json': 'd61754c0c36d0b84845861424ff69fe7724a979527f43cbad45379e4cf2cbf51',
+    'vacation-app/pnpm-lock.yaml': 'c5c0d2eff1cc56f670525ad8565206f35c8d569a61e291a3c44568598b0343fc',
     'vacation-app/apps/web/package.json': '175fe663476f4d9dc88c075509d851d4de68947bc3570086074c37b73a674a24',
     'vacation-app/apps/web/tailwind.config.ts': '96732f9aaa71986b4c6a9af762ac99323eb6024849cbb1ab4daf1e6122ddd5c6',
 };

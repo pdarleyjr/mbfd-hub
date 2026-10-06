@@ -315,6 +315,27 @@ jobs:
           name: authenticated-mobile-shell-evidence
           path: test-results/personnel-requests
           retention-days: 7
+      - name: Verify final Bid assignments in authenticated responsive browsers
+        id: bid-assignments
+        if: ${{ !cancelled() && steps.mobile-shell.outcome != 'skipped' }}
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/bid-assignments/report.json
+        run: >-
+          npx playwright test tests/e2e/employee-bid-assignment.spec.ts
+          --config=playwright.personnel-requests.config.ts
+          --project=phone-touch
+          --project=tablet-touch
+          --project=desktop
+          --project=hub-shell-webkit-iphone
+          --output=test-results/bid-assignments
+          --reporter=list,json
+      - name: Retain final Bid assignment browser evidence
+        if: ${{ always() && steps.bid-assignments.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: final-bid-assignment-browser-evidence
+          path: test-results/bid-assignments
+          retention-days: 7
       - name: Verify real member submissions and Admin request lifecycles
         id: member-requests
         if: ${{ !cancelled() && steps.mobile-shell.outcome != 'skipped' }}

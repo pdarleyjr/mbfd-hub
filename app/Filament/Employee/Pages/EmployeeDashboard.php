@@ -1,11 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Filament\Employee\Pages;
 
 use App\Concerns\ResolvesCanonicalEmployee;
 use App\Enums\PersonnelRequestStatus;
 use App\Models\AssignedEquipment;
-use App\Models\Employee;
 use Filament\Pages\Page;
 
 class EmployeeDashboard extends Page
@@ -27,6 +28,7 @@ class EmployeeDashboard extends Page
     public function getViewData(): array
     {
         $employee = $this->authenticatedEmployee();
+        $bidAssignment = $employee->bidAssignments()->whereNull('superseded_at')->orderByDesc('bid_year')->first();
 
         $equipmentCount = AssignedEquipment::where('employee_portal_id', $employee->id)->where('status', 'active')->count();
         $pendingRequests = $employee->personnelRequests()
@@ -44,6 +46,6 @@ class EmployeeDashboard extends Page
         // For blade compatibility — use $user variable name but it's an Employee
         $user = $employee;
 
-        return compact('user', 'equipmentCount', 'pendingRequests', 'recentEquipment', 'recentRequests');
+        return compact('user', 'bidAssignment', 'equipmentCount', 'pendingRequests', 'recentEquipment', 'recentRequests');
     }
 }

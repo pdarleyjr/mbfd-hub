@@ -113,6 +113,7 @@ return [
     'bid' => [
         'reader_token' => env('BID_READER_TOKEN'),
         'federation_token' => env('BID_FEDERATION_TOKEN'),
+        'writer_token' => env('BID_WRITER_TOKEN'),
         // Convenience: where to send a member when they click "Bid Console"
         // from the portal home. Falls back to staging during cutover.
         'console_url' => env('BID_CONSOLE_URL', 'https://staging.bid.mbfdhub.com'),
