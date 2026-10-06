@@ -21,6 +21,9 @@ final class EmployeeBidAssignment extends Model
 {
     protected $guarded = ['id', 'created_at', 'updated_at'];
 
+    // Keep the canonical pick instant, including fractions and its UTC offset.
+    protected $dateFormat = 'Y-m-d H:i:s.uP';
+
     protected function casts(): array
     {
         return [
