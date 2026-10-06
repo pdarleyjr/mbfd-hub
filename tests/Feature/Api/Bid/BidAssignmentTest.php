@@ -12,6 +12,7 @@ use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\Attributes\Group;
 use Tests\TestCase;
 
 final class BidAssignmentTest extends TestCase
@@ -140,6 +141,14 @@ final class BidAssignmentTest extends TestCase
         ];
     }
 
+    #[Group('postgres')]
+    #[DataProvider('pickedTimestampInstants')]
+    public function test_postgres_receiver_preserves_exact_pick_instant_and_fractional_precision(string $input, string $utc, string $sessionTimezone): void
+    {
+        self::assertSame('pgsql', DB::connection()->getDriverName());
+        $this->test_receiver_preserves_exact_pick_instant_and_fractional_precision($input, $utc, $sessionTimezone);
+    }
+
     public function test_forward_precision_migration_preserves_existing_revisions(): void
     {
         $migration = require database_path('migrations/2026_10_06_130000_preserve_bid_pick_timestamp_precision.php');
@@ -161,6 +170,13 @@ final class BidAssignmentTest extends TestCase
         }
         self::assertSame($before, EmployeeBidAssignment::query()->sole()->toArray());
         $this->assertDatabaseCount('employee_profile_events', 1);
+    }
+
+    #[Group('postgres')]
+    public function test_postgres_forward_precision_migration_preserves_existing_revisions(): void
+    {
+        self::assertSame('pgsql', DB::connection()->getDriverName());
+        $this->test_forward_precision_migration_preserves_existing_revisions();
     }
 
     public function test_correction_preserves_history_and_stale_delivery_cannot_replace_it(): void
