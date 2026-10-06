@@ -26,8 +26,8 @@ const runtimeInputs = {
     '.dockerignore': 'c360145b9617b149ed9b27b613b63cc577e2abd22005efa5367f608e71c67dbc',
 };
 const vacationInputs = {
-    'vacation-app/package.json': 'd61754c0c36d0b84845861424ff69fe7724a979527f43cbad45379e4cf2cbf51',
-    'vacation-app/pnpm-lock.yaml': 'c5c0d2eff1cc56f670525ad8565206f35c8d569a61e291a3c44568598b0343fc',
+    'vacation-app/package.json': '7099515e7fad1162ca4bfa942457c9375024ff27e72d452004654d9adb3fa168',
+    'vacation-app/pnpm-lock.yaml': '189189f32d51e7063c081c7be8f79bc750b1b8525223270fb2693e3d1fde6d6f',
     'vacation-app/apps/web/package.json': '175fe663476f4d9dc88c075509d851d4de68947bc3570086074c37b73a674a24',
     'vacation-app/apps/web/tailwind.config.ts': '96732f9aaa71986b4c6a9af762ac99323eb6024849cbb1ab4daf1e6122ddd5c6',
 };
