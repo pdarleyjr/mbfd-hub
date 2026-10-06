@@ -13,8 +13,8 @@ const expires = Date.parse('2026-10-10T00:00:00Z');
 // images or emitted browser bundles. Raw reports and all other gates remain.
 const inputs = {
     '.': {
-        'package.json': 'eed6a2bb56d771a64211f6c7cb23c7a827062c93ef1ec36ef5f3c28e9971bec7',
-        'package-lock.json': 'ada5fb4f60eaccbe519538620986a1fc6e095c545c009d13304df580797b7f40',
+        'package.json': '3989a826179517a56272f5e0d27a5d5cde773747aefd54451c94422321687b81',
+        'package-lock.json': 'e75e8158bde4694e7dbe7b14947f0679b26a9c240c9e7a880a3c442bb63409f0',
     },
     'resources/js/daily-checkout': {
         'resources/js/daily-checkout/package.json': 'da5514ab8f3302816fab2b29a02a9e1f7a7c67d6c4a0bdcef66b6fe6b4f9f5e8',
