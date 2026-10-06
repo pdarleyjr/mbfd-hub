@@ -7,6 +7,7 @@ namespace Tests\Feature\Api\Bid;
 use App\Models\Employee;
 use App\Models\EmployeeBidAssignment;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -107,13 +108,69 @@ final class BidAssignmentTest extends TestCase
         $this->assertDatabaseCount('employee_profile_events', 1);
     }
 
+    #[DataProvider('pickedTimestampInstants')]
+    public function test_receiver_preserves_exact_pick_instant_and_fractional_precision(string $input, string $utc, string $sessionTimezone): void
+    {
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            // Production must preserve the instant independently of session timezone.
+            DB::select('select set_config(?, ?, true)', ['TimeZone', $sessionTimezone]);
+            $column = DB::selectOne("select datetime_precision from information_schema.columns where table_name = 'employee_bid_assignments' and column_name = 'picked_at'");
+            self::assertSame(6, $column?->datetime_precision);
+        }
+        $this->linkedEmployee();
+        $payload = array_replace($this->payload(), ['picked_at' => $input]);
+        $this->publish($payload)->assertOk();
+        $assignment = EmployeeBidAssignment::query()->sole();
+        self::assertSame($utc, CarbonImmutable::parse(DB::table('employee_bid_assignments')->value('picked_at'))->utc()->format('Y-m-d\TH:i:s.u\Z'));
+        self::assertSame($utc, $assignment->picked_at?->utc()->format('Y-m-d\TH:i:s.u\Z'));
+        self::assertSame($utc, $assignment->toArray()['picked_at']);
+        $this->publish($payload)->assertStatus(409)->assertJsonPath('code', 'already_recorded');
+        $this->assertDatabaseCount('employee_bid_assignments', 1);
+    }
+
+    public static function pickedTimestampInstants(): array
+    {
+        return [
+            'UTC milliseconds' => ['2026-10-05T12:00:00.789Z', '2026-10-05T12:00:00.789000Z', 'UTC'],
+            'non-UTC milliseconds' => ['2026-10-05T12:00:00.789Z', '2026-10-05T12:00:00.789000Z', 'America/New_York'],
+            'UTC explicit offset' => ['2026-10-05T17:30:00.789+05:30', '2026-10-05T12:00:00.789000Z', 'UTC'],
+            'non-UTC explicit offset' => ['2026-10-05T17:30:00.789+05:30', '2026-10-05T12:00:00.789000Z', 'America/New_York'],
+            'UTC microseconds' => ['2026-10-05T12:00:00.789123Z', '2026-10-05T12:00:00.789123Z', 'UTC'],
+            'non-UTC microseconds' => ['2026-10-05T12:00:00.789123Z', '2026-10-05T12:00:00.789123Z', 'America/New_York'],
+        ];
+    }
+
+    public function test_forward_precision_migration_preserves_existing_revisions(): void
+    {
+        $migration = require database_path('migrations/2026_10_06_130000_preserve_bid_pick_timestamp_precision.php');
+        $migration->down(); // Empty disposable table can reproduce the earlier schema.
+        $this->linkedEmployee();
+        $this->publish($this->payload())->assertOk();
+        $before = EmployeeBidAssignment::query()->sole()->toArray();
+        $migration->up();
+        self::assertSame($before, EmployeeBidAssignment::query()->sole()->toArray());
+        if (DB::connection()->getDriverName() === 'pgsql') {
+            try {
+                $migration->down();
+                self::fail('Populated historical timestamp precision was downgraded.');
+            } catch (\LogicException) {
+                $this->addToAssertionCount(1);
+            }
+            $column = DB::selectOne("select datetime_precision from information_schema.columns where table_name = 'employee_bid_assignments' and column_name = 'picked_at'");
+            self::assertSame(6, $column?->datetime_precision);
+        }
+        self::assertSame($before, EmployeeBidAssignment::query()->sole()->toArray());
+        $this->assertDatabaseCount('employee_profile_events', 1);
+    }
+
     public function test_correction_preserves_history_and_stale_delivery_cannot_replace_it(): void
     {
         $employee = $this->linkedEmployee();
-        $initial = $this->payload();
+        $initial = array_replace($this->payload(), ['picked_at' => '2026-10-05T12:00:00.789Z']);
         $this->publish($initial)->assertOk();
         $correction = array_replace($initial, ['idempotency_key' => 'final-correction', 'source_sequence' => 4,
-            'bid_selection_label' => 'Captain 5', 'position_label' => 'Captain', 'rank_label' => 'Captain']);
+            'bid_selection_label' => 'Captain 5', 'position_label' => 'Captain', 'rank_label' => 'Captain',
+            'picked_at' => '2026-10-05T17:31:00.123+05:30']);
         $this->publish($correction)->assertOk();
         $this->publish($initial)->assertStatus(409);
         $stale = array_replace($initial, ['idempotency_key' => 'delayed-new-key']);
@@ -126,6 +183,8 @@ final class BidAssignmentTest extends TestCase
         $this->assertSame(1, $employee->bidAssignments()->whereNull('superseded_at')->count());
         $this->assertDatabaseHas('employee_bid_assignments', ['idempotency_key' => 'final-correction', 'bid_selection_label' => 'Captain 5']);
         $this->assertNotNull($employee->bidAssignments()->where('idempotency_key', 'final-test')->firstOrFail()->superseded_at);
+        self::assertSame('2026-10-05T12:00:00.789000Z', $employee->bidAssignments()->where('idempotency_key', 'final-test')->firstOrFail()->picked_at?->utc()->format('Y-m-d\TH:i:s.u\Z'));
+        self::assertSame('2026-10-05T12:01:00.123000Z', $employee->bidAssignments()->where('idempotency_key', 'final-correction')->firstOrFail()->picked_at?->utc()->format('Y-m-d\TH:i:s.u\Z'));
         $this->assertSame('Firefighter', $employee->fresh()->rank);
         $this->assertSame('Firefighter', $employee->user()->firstOrFail()->rank);
     }
