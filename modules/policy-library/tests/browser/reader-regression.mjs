@@ -7,6 +7,7 @@ const flatten=nodes=>nodes.flatMap(node=>[...(node.revision?[node]:[]),...flatte
 const sog=flatten(native.manuals.find(m=>m.slug==='sogs').tree.nodes)[0];
 const med=JSON.parse(await readFile(path.join(evidence,'medical-sample.json'),'utf8'));
 const base=process.env.POLICY_LIBRARY_BROWSER_URL || 'http://127.0.0.1:8877';
+const report=process.env.READER_QA_LABEL || 'browser-regression';
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const checks=[];
 let debugPage;
@@ -18,11 +19,27 @@ try{
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
  const rendered=async()=>{await page.locator('#pdf-page:not([hidden])').waitFor();await page.locator('#pdf-text span').first().waitFor();};
  await page.goto(`${base}/?manual=sogs&node=${sog.slug}&page=1`);await rendered();
- await check('phone default fit width with contained scrolling and one canvas',async()=>{
-  await expect(page.locator('#fit-width')).toHaveAttribute('aria-pressed','true');
+ await check('phone default read size uses actual source body glyphs with contained scrolling',async()=>{
+  await expect(page.locator('#read-size')).toHaveAttribute('aria-pressed','true');
+  await expect.poll(()=>page.locator('#pdf-page').getAttribute('data-body-text-px').then(Number)).toBeGreaterThanOrEqual(18);
   await expect(page.locator('#pdf-page canvas')).toHaveCount(1);
   await expect(page.locator('canvas:visible')).toHaveCount(1);
   expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth||document.documentElement.scrollHeight>innerHeight)).toBe(false);
+ });
+ await check('phone pan and visible zoom controls enlarge actual PDF content without browser zoom',async()=>{
+  await page.locator('#pan-right').click();expect(await page.locator('#page-stage').evaluate(el=>el.scrollLeft)).toBeGreaterThan(100);
+  await page.locator('#pan-left').click();expect(await page.locator('#page-stage').evaluate(el=>el.scrollLeft)).toBeLessThanOrEqual(2);
+  await page.locator('#read-zoom-in').click();await expect.poll(()=>page.locator('#pdf-page').getAttribute('data-body-text-px').then(Number)).toBeGreaterThanOrEqual(22.5);
+  await page.locator('#read-zoom-out').click();
+ });
+ await check('selected SOG thumbnails contain only explicitly owned pages and preserve selection identity',async()=>{
+  const entry=sog.revision.metadata.primary_entries.find(entry=>entry.id==='100.01');
+  await page.goto(`${base}/?manual=sogs&node=${entry.slug}&page=${entry.physical_page}`);await rendered();
+  await page.locator('#pages-toggle').click();await expect(page.locator('#page-sidebar')).toBeInViewport();
+  expect(await page.locator('.thumbnail').evaluateAll(items=>items.map(el=>Number(el.dataset.page)))).toEqual(entry.semantic_pages);
+  await page.locator('.thumbnail canvas').first().waitFor();
+  await page.locator(`.thumbnail[data-page="${entry.semantic_pages.at(-1)}"]`).click();await expect(page).toHaveURL(new RegExp(`node=${entry.slug}&page=${entry.semantic_pages.at(-1)}`));await rendered();
+  await page.locator('#menu-toggle').click();await expect(page.locator('.tree-pages')).toHaveCount(0);await expect(page.locator('.tree-primary').first()).toContainText('Mission');await page.keyboard.press('Escape');
  });
  await check('View controls remain within phone viewport and escape restores focus',async()=>{
   await page.locator('#reader-options summary').click();
@@ -69,6 +86,20 @@ try{
   const enginePattern='**/vendor/policy-library/assets/pdf-*.js';
   await page.route(enginePattern,route=>route.fulfill({status:500,body:'test-only engine failure'}));await page.reload();await expect(page.locator('#viewer-message')).toContainText('This document could not be displayed');await page.unroute(enginePattern);await page.getByRole('button',{name:'Retry',exact:true}).click();await rendered();
  });
+ await check('desktop contents and pages collapse independently and restore exact titles',async()=>{
+  const desktop=await browser.newContext({viewport:{width:1366,height:768}});const reader=await desktop.newPage();
+  await reader.goto(`${base}/?manual=sogs&node=${sog.slug}&page=1`);await reader.locator('#pdf-text span').first().waitFor();
+  await expect(reader.locator('#manual-sidebar')).toBeInViewport();await expect(reader.locator('#page-sidebar')).toBeInViewport();
+  const widths=[];const paperWidth=()=>reader.locator('#pdf-page').boundingBox().then(rect=>rect.width);
+  widths.push(await paperWidth());await reader.locator('#drawer-close').click();await expect(reader.locator('#menu-toggle')).toHaveAttribute('aria-expanded','false');await expect(reader.locator('#page-sidebar')).toBeInViewport();
+  await expect.poll(paperWidth).toBeGreaterThan(widths[0]+200);widths.push(await paperWidth());
+  await reader.locator('#pages-close').click();await expect(reader.locator('#pages-toggle')).toHaveAttribute('aria-expanded','false');await expect.poll(paperWidth).toBeGreaterThan(widths[1]+100);
+  await reader.locator('#menu-toggle').click();await expect(reader.locator('#manual-sidebar')).toBeInViewport();await expect(reader.locator('#page-sidebar')).toBeHidden();
+  await reader.locator('#pages-toggle').click();await expect(reader.locator('#page-sidebar')).toBeInViewport();await reader.locator('.thumbnail canvas').first().waitFor();
+  expect(await reader.locator('.thumbnail canvas').count()).toBeLessThanOrEqual(6);await expect(reader.locator('.tree-pages')).toHaveCount(0);
+  await reader.locator('#focus-mode').click();await reader.locator('#focus-pages').click();await expect(reader.locator('#page-sidebar')).toBeInViewport();await reader.keyboard.press('Escape');await expect(reader.locator('#focus-pages')).toBeFocused();
+  await desktop.close();
+ });
  await context.close();
- await writeFile(path.join(evidence,'browser-regression.json'),JSON.stringify({capturedUtc:new Date().toISOString(),scope:'Loopback exact production catalog/native PDF/source candidate; authentication/admin mutations are excluded',checks,unexpectedPageErrors:errors},null,2));console.log(JSON.stringify({passed:checks.length,pageErrors:errors}));
-}catch(error){await debugPage?.screenshot({path:path.join(evidence,'browser-regression-failure.png')});await writeFile(path.join(evidence,'browser-regression-failure.json'),JSON.stringify({checks,error:error.message,message:await debugPage?.locator('#viewer-message').innerText()},null,2));throw error;}finally{await browser.close();}
+ await writeFile(path.join(evidence,`${report}.json`),JSON.stringify({capturedUtc:new Date().toISOString(),scope:'Loopback exact production catalog/native PDF/source candidate; authentication/admin mutations are excluded',checks,unexpectedPageErrors:errors},null,2));console.log(JSON.stringify({passed:checks.length,pageErrors:errors}));
+}catch(error){await debugPage?.screenshot({path:path.join(evidence,`${report}-failure.png`)});await writeFile(path.join(evidence,`${report}-failure.json`),JSON.stringify({checks,error:error.message,message:await debugPage?.locator('#viewer-message').innerText()},null,2));throw error;}finally{await browser.close();}
