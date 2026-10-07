@@ -80,7 +80,7 @@ final class TreeService
     {
         $nodes = $manual->nodes()->where('edition_id', $manual->active_edition_id)->where('is_active', true)
             ->with(['currentRevision' => fn ($revisions) => $revisions->select(['id', 'state', 'metadata->search_role as search_role', 'metadata->asset_id as asset_id'])])
-            ->orderBy('sort_order')->orderBy('id')->get(['id', 'parent_id', 'current_revision_id', 'metadata->asset_id as asset_id'])->groupBy('parent_id');
+            ->orderBy('sort_order')->orderBy('id')->get(['id', 'parent_id', 'current_revision_id', 'metadata->asset_id as asset_id', 'metadata->search_role as search_role'])->groupBy('parent_id');
         $documents = [];
         $visit = function (?int $parentId) use (&$visit, $nodes, &$documents): void {
             foreach ($nodes[$parentId ?? ''] ?? [] as $node) {
@@ -99,7 +99,8 @@ final class TreeService
     private function aggregateSafeDocuments(array $documents, Collection $nodes): array
     {
         $visible = $nodes->filter(fn (ManualNode $node): bool => in_array($node->id, $documents, true));
-        $aggregates = $visible->filter(fn (ManualNode $node): bool => ($node->currentRevision->search_role ?? $node->currentRevision->metadata['search_role'] ?? null) === 'aggregate');
+        $aggregates = $visible->filter(fn (ManualNode $node): bool => ($node->search_role ?? $node->metadata['search_role'] ?? null) === 'aggregate'
+            || ($node->currentRevision->search_role ?? $node->currentRevision->metadata['search_role'] ?? null) === 'aggregate');
         if ($aggregates->isEmpty()) {
             return $documents;
         }
@@ -118,8 +119,10 @@ final class TreeService
         $metadata = $unloaded->isEmpty() ? collect() : DocumentRevision::query()->whereIn('id', $unloaded)->pluck('metadata', 'id');
         $denied = [];
         foreach ($aggregates as $node) {
-            $leaves = ($node->currentRevision->metadata ?? $metadata[$node->current_revision_id] ?? [])['leaf_asset_ids'] ?? null;
-            if (! is_array($leaves) || $leaves === [] || count($leaves) > 2000
+            $revisionMetadata = $node->currentRevision->metadata ?? $metadata[$node->current_revision_id] ?? [];
+            $leaves = $revisionMetadata['leaf_asset_ids'] ?? null;
+            if (($revisionMetadata['search_role'] ?? null) !== 'aggregate'
+                || ! is_array($leaves) || $leaves === [] || count($leaves) > 2000
                 || count(array_filter($leaves, fn ($id): bool => is_string($id) && $id !== '')) !== count($leaves)
                 || count(array_unique($leaves)) !== count($leaves) || array_diff($leaves, $leafAssets) !== []) {
                 $denied[] = $node->id;

@@ -45,7 +45,7 @@ final class CanonicalReadingDataTest extends TestCase
         $manual->update(['active_edition_id' => $edition->id]);
         $nodes = [];
         foreach (['SECTION-100', '100.01'] as $asset) {
-            $node = $edition->nodes()->create(['manual_id' => $manual->id, 'title' => $asset, 'slug' => Str::slug($asset), 'metadata' => ['asset_id' => $asset]]);
+            $node = $edition->nodes()->create(['manual_id' => $manual->id, 'title' => $asset, 'slug' => Str::slug($asset), 'metadata' => ['asset_id' => $asset, 'search_role' => $asset === 'SECTION-100' ? 'aggregate' : 'leaf']]);
             $revision = $node->revisions()->create(['uuid' => (string) Str::uuid(), 'source_filename' => 'synthetic-unit.pdf', 'storage_path' => 'revisions/'.str_repeat('a', 64).'.pdf', 'sha256' => str_repeat('a', 64), 'page_count' => 1, 'state' => 'published', 'metadata' => [
                 'asset_id' => $asset, 'search_role' => $asset === 'SECTION-100' ? 'aggregate' : 'leaf', 'leaf_asset_ids' => ['100.01'],
                 'source_docx_sha256' => str_repeat('b', 64), 'primary_entries' => [['id' => '100.01', 'slug' => '100-01', 'title' => 'Synthetic policy', 'physical_page' => 1, 'semantic_pages' => [1], 'semantic_text' => 'needle']],
@@ -119,5 +119,42 @@ final class CanonicalReadingDataTest extends TestCase
         self::assertSame([$leaf->id], array_column($search->search('needle', $manual->slug, $trees)['results'], 'node_id'));
         $leaf->update(['is_active' => false]);
         self::assertSame([], $search->search('needle', $manual->slug, $trees)['results']);
+    }
+
+    public function test_replacement_upload_cannot_erase_the_persistent_aggregate_declaration(): void
+    {
+        [$manual, $aggregate, $leaf] = $this->documents();
+        $trees = $this->app->make(TreeService::class);
+        $search = $this->app->make(SearchService::class);
+        self::assertContains($aggregate->id, $trees->documentIds($manual));
+        // Standard admin upload supplies version/date/notes, without the governed coverage declaration.
+        // Model its newly published immutable revision; the node declaration survives replacement.
+        $replacement = $aggregate->revisions()->create([...$aggregate->currentRevision->only(['source_filename', 'storage_path', 'sha256', 'page_count', 'state']),
+            'uuid' => (string) Str::uuid(), 'metadata' => ['version_label' => 'Replacement', 'revision_date' => '2026-10-07', 'revision_notes' => 'Synthetic upload regression']]);
+        $replacement->pages()->create(['page' => 1, 'title' => 'Synthetic policy', 'text' => 'needle SECTION-100']);
+        $aggregate->update(['current_revision_id' => $replacement->id]);
+        self::assertSame([$leaf->id], $trees->documentIds($manual));
+        self::assertSame([$leaf->id], $trees->tree($manual)['documents']);
+        self::assertSame([$leaf->id], array_column($search->search('needle', $manual->slug, $trees)['results'], 'node_id'));
+        self::assertSame([], $search->search('SECTION-100', $manual->slug, $trees)['results']);
+        $leaf->update(['is_active' => false]);
+        self::assertSame([], $trees->documentIds($manual));
+        self::assertSame([], $trees->tree($manual)['documents']);
+        self::assertSame([], $search->search('needle', $manual->slug, $trees)['results']);
+        self::assertSame([], $search->search('SECTION-100', $manual->slug, $trees)['results']);
+    }
+
+    public function test_node_declared_aggregate_requires_its_replacement_revision_role_and_coverage(): void
+    {
+        [$manual, $aggregate, $leaf] = $this->documents();
+        $trees = $this->app->make(TreeService::class);
+        foreach ([['leaf_asset_ids' => ['100.01']], ['search_role' => 'aggregate']] as $metadata) {
+            $replacement = $aggregate->revisions()->create([...$aggregate->currentRevision->only(['source_filename', 'storage_path', 'sha256', 'page_count', 'state']),
+                'uuid' => (string) Str::uuid(), 'metadata' => $metadata]);
+            $aggregate->update(['current_revision_id' => $replacement->id]);
+            $aggregate->refresh();
+            self::assertSame([$leaf->id], $trees->documentIds($manual));
+            self::assertSame([$leaf->id], $trees->tree($manual)['documents']);
+        }
     }
 }
