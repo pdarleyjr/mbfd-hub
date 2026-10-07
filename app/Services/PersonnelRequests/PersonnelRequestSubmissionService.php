@@ -20,18 +20,28 @@ final class PersonnelRequestSubmissionService
         private readonly OfficerAuthorizationService $officers,
         private readonly SignatureImageService $signatures,
         private readonly PersonnelRequestNotifier $notifier,
+        private readonly UniformEntitlementService $entitlements,
     ) {}
 
-    public function submitUniform(Employee $employee, array $items, string $idempotencyKey): PersonnelRequest
+    public function submitUniform(Employee $employee, array $items, string $idempotencyKey, array $metadata = []): PersonnelRequest
     {
         if ($existing = $this->existingSubmission($idempotencyKey, $employee, PersonnelRequestType::Uniform)) {
             return $existing;
         }
 
         $normalized = $this->validateUniformItems($items);
+        $note = $metadata['member_note'] ?? null;
+        $noteMax = (int) config('uniform_orders.note_max', 4000);
+        if ($note !== null && (! is_string($note) || mb_strlen($note) > $noteMax)) {
+            throw ValidationException::withMessages(['member_note' => 'Notes must be text of no more than '.number_format($noteMax).' characters.']);
+        }
+        $note = filled($note) ? trim($note) : null;
+        $context = $this->entitlements->forEmployee($employee);
+        $summary = $this->entitlements->summarize($context, $normalized);
+        $snapshot = $this->entitlements->snapshot($context, $summary, $note);
 
         try {
-            return $this->persist(PersonnelRequestType::Uniform, $employee, $employee, null, $normalized, $idempotencyKey);
+            return $this->persist(PersonnelRequestType::Uniform, $employee, $employee, null, $normalized, $idempotencyKey, metadata: $snapshot);
         } catch (\Illuminate\Database\UniqueConstraintViolationException $exception) {
             return $this->existingSubmission($idempotencyKey, $employee, PersonnelRequestType::Uniform) ?? throw $exception;
         }
@@ -83,12 +93,13 @@ final class PersonnelRequestSubmissionService
         array $items,
         string $idempotencyKey,
         ?array $signature = null,
+        array $metadata = [],
     ): PersonnelRequest {
         if (! preg_match('/^[A-Za-z0-9._:-]{8,100}$/', $idempotencyKey)) {
             throw ValidationException::withMessages(['idempotency_key' => 'A valid submission key is required.']);
         }
 
-        $request = DB::transaction(function () use ($type, $beneficiary, $requester, $station, $items, $idempotencyKey, $signature): PersonnelRequest {
+        $request = DB::transaction(function () use ($type, $beneficiary, $requester, $station, $items, $idempotencyKey, $signature, $metadata): PersonnelRequest {
             $publicId = (string) Str::ulid();
             $request = PersonnelRequest::query()->create([
                 'public_id' => $publicId,
@@ -110,6 +121,7 @@ final class PersonnelRequestSubmissionService
                 'officer_signature_sha256' => $signature['sha256'] ?? null,
                 'signed_at' => $signature ? now() : null,
                 'idempotency_key' => $idempotencyKey,
+                'metadata' => $metadata ?: null,
             ]);
 
             foreach ($items as $item) {
@@ -136,8 +148,19 @@ final class PersonnelRequestSubmissionService
             throw ValidationException::withMessages(['items' => 'Add at least one uniform item.']);
         }
 
+        $structured = array_filter($items, fn ($item): bool => is_array($item)
+            && (array_key_exists('metadata', $item) || array_key_exists('attributes', $item)));
+        $structuredByKey = $structured === [] ? [] : array_combine(array_keys($structured), $this->entitlements->normalizeItems($structured));
         $normalized = [];
         foreach ($items as $index => $item) {
+            if (! is_array($item)) {
+                throw ValidationException::withMessages(["items.{$index}" => 'Select a valid uniform item.']);
+            }
+            if (array_key_exists($index, $structuredByKey)) {
+                $normalized[] = $structuredByKey[$index];
+
+                continue;
+            }
             $code = is_string($item['item_code'] ?? null) ? $item['item_code'] : '';
             $catalogItem = $this->catalog->uniform($code);
             if ($catalogItem === null) {

@@ -5,16 +5,13 @@ declare(strict_types=1);
 namespace App\Filament\Employee\Pages;
 
 use App\Concerns\ResolvesCanonicalEmployee;
-use App\Services\PersonnelRequests\PersonnelCatalog;
 use App\Services\PersonnelRequests\PersonnelRequestSubmissionService;
-use Filament\Forms\Components\Hidden;
-use Filament\Forms\Components\Repeater;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Form;
+use App\Services\PersonnelRequests\UniformEntitlementService;
+use App\Services\PersonnelRequests\UniformOrderCatalog;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class RequestEquipmentPage extends Page
 {
@@ -34,56 +31,89 @@ class RequestEquipmentPage extends Page
 
     public ?array $data = [];
 
-    public function mount(): void
+    public ?string $submittedRequestNumber = null;
+
+    public ?string $submittedRequestId = null;
+
+    private ?array $entitlementContext = null;
+
+    private function entitlementContext(): array
     {
-        $this->form->fill([
-            'items' => [['item_code' => null, 'size' => null, 'quantity' => 1]],
-            'idempotency_key' => (string) Str::uuid(),
-        ]);
+        return $this->entitlementContext ??= app(UniformEntitlementService::class)->forEmployee($this->authenticatedEmployee());
     }
 
-    public function form(Form $form): Form
+    public function mount(): void
     {
-        return $form->schema([
-            Repeater::make('items')
-                ->label('Uniform items')
-                ->minItems(1)
-                ->maxItems(10)
-                ->addActionLabel('Add another uniform item')
-                ->reorderable(false)
-                ->schema([
-                    Select::make('item_code')
-                        ->label('Uniform item')
-                        ->options(fn (): array => collect(app(PersonnelCatalog::class)->uniforms())->mapWithKeys(fn (array $item, string $code) => [$code => $item['label']])->all())
-                        ->searchable()
-                        ->required(),
-                    TextInput::make('size')
-                        ->label('Size')
-                        ->placeholder('Examples: L, 34x32, 10.5')
-                        ->maxLength(30)
-                        ->required(),
-                    TextInput::make('quantity')
-                        ->numeric()
-                        ->minValue(1)
-                        ->maxValue(10)
-                        ->default(1)
-                        ->required(),
-                ])
-                ->columns(['sm' => 3]),
-            Hidden::make('idempotency_key')->required(),
-        ])->statePath('data');
+        $this->resetOrder();
+    }
+
+    private function resetOrder(): void
+    {
+        $context = $this->entitlementContext();
+        $items = [];
+        foreach (app(UniformOrderCatalog::class)->products() as $code => $product) {
+            $items[$code] = [
+                'item_code' => $code,
+                'quantity' => 0,
+                'metadata' => $context['recommended_variants'][$code] ?? [],
+            ];
+        }
+        $this->data = ['items' => $items, 'member_note' => '', 'idempotency_key' => (string) Str::uuid()];
+        $this->resetValidation();
+    }
+
+    public function updated(string $property): void
+    {
+        $this->resetValidation($property);
+        if (! preg_match('/^data\.items\.([a-z_]+)\.(quantity|metadata\.[a-z_]+)$/', $property, $matches)) {
+            return;
+        }
+        $code = $matches[1];
+        if (in_array($this->data['items'][$code]['quantity'] ?? null, [0, '0'], true)) {
+            $this->resetValidation('data.items.'.$code.'.*');
+
+            return;
+        }
+        try {
+            app(UniformEntitlementService::class)->normalizeItems([$code => $this->data['items'][$code]]);
+        } catch (ValidationException $exception) {
+            foreach ($exception->errors() as $key => $messages) {
+                if ('data.'.$key === $property) {
+                    $this->addError($property, $messages[0]);
+                }
+            }
+        }
     }
 
     public function submit(PersonnelRequestSubmissionService $submissions): void
     {
-        $employee = $this->authenticatedEmployee();
-        $data = $this->form->getState();
-        $request = $submissions->submitUniform($employee, $data['items'], $data['idempotency_key']);
+        $this->resetValidation();
+        $this->validate([
+            'data.items' => ['required', 'array'],
+            'data.items.*' => ['array'],
+            'data.items.*.item_code' => ['required', 'string'],
+            'data.items.*.metadata' => ['present', 'array'],
+            'data.member_note' => ['nullable', 'string', 'max:'.config('uniform_orders.note_max')],
+            'data.idempotency_key' => ['required', 'string', 'max:100'],
+            'data.items.*.quantity' => ['required', 'integer', 'min:0', 'max:'.config('uniform_orders.quantity_max')],
+        ], [], ['data.member_note' => 'Notes for Support Services', 'data.items.*.quantity' => 'quantity']);
 
-        $this->form->fill([
-            'items' => [['item_code' => null, 'size' => null, 'quantity' => 1]],
-            'idempotency_key' => (string) Str::uuid(),
-        ]);
+        $items = array_filter($this->data['items'], fn ($item): bool => is_array($item) && (int) $item['quantity'] > 0);
+        try {
+            $request = $submissions->submitUniform(
+                $this->authenticatedEmployee(),
+                $items,
+                $this->data['idempotency_key'],
+                ['member_note' => $this->data['member_note'] ?? ''],
+            );
+        } catch (ValidationException $exception) {
+            throw ValidationException::withMessages(collect($exception->errors())
+                ->mapWithKeys(fn (array $messages, string $key): array => ['data.'.$key => $messages])->all());
+        }
+
+        $this->submittedRequestNumber = $request->request_number;
+        $this->submittedRequestId = $request->public_id;
+        $this->resetOrder();
         Notification::make()
             ->title('Uniform request submitted')
             ->body("{$request->request_number} is now visible in My Requests.")
@@ -97,7 +127,25 @@ class RequestEquipmentPage extends Page
     public function getViewData(): array
     {
         $employee = $this->authenticatedEmployee();
+        $catalog = app(UniformOrderCatalog::class);
+        $entitlements = app(UniformEntitlementService::class);
+        $context = $this->entitlementContext();
+        $products = $catalog->products();
+        $categories = $catalog->categories();
+        if ($context['marine']) {
+            $categories = ['marine' => 'Your Marine Allocation'] + $categories;
+        }
+        $rows = $this->data['items'] ?? [];
+        $selectedItems = array_filter(is_array($rows) ? $rows : [], fn ($item): bool => is_array($item) && is_string($item['item_code'] ?? null) && is_numeric($item['quantity'] ?? null) && (float) $item['quantity'] > 0);
 
-        return ['recentRequests' => $employee->personnelRequests()->where('type', 'uniform')->latest()->limit(5)->get()];
+        return [
+            'member' => $employee,
+            'context' => $context,
+            'products' => $products,
+            'categories' => $categories,
+            'selectedItems' => $selectedItems,
+            'summary' => $entitlements->summarize($context, $selectedItems),
+            'recentRequests' => $employee->personnelRequests()->where('type', 'uniform')->withCount('items')->latest()->limit(5)->get(),
+        ];
     }
 }

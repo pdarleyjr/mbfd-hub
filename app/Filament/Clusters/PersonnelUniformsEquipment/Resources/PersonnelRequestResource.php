@@ -10,6 +10,8 @@ use App\Filament\Clusters\PersonnelUniformsEquipment;
 use App\Filament\Clusters\PersonnelUniformsEquipment\Resources\PersonnelRequestResource\Pages;
 use App\Filament\Support\ArchiveFilter;
 use App\Models\PersonnelRequest;
+use App\Models\PersonnelRequestItem;
+use App\Services\PersonnelRequests\UniformOrderCatalog;
 use Filament\Infolists\Components\Grid;
 use Filament\Infolists\Components\RepeatableEntry;
 use Filament\Infolists\Components\Section;
@@ -78,6 +80,32 @@ class PersonnelRequestResource extends Resource
                     TextEntry::make('created_at')->label('Submitted')->dateTime('M j, Y g:i A'),
                 ]),
             ]),
+            Section::make('Bid / assignment at submission')->schema([
+                TextEntry::make('metadata.term_label')->label('Term')->placeholder('No bid assignment recorded'),
+                TextEntry::make('metadata.bid_year')->label('Bid year')->placeholder('—'),
+                TextEntry::make('metadata.assignment_label')->label('Assignment')->placeholder('No current bid assignment'),
+                TextEntry::make('metadata.bid_assignment_snapshot.position_label')->label('Position')->placeholder('—'),
+                TextEntry::make('metadata.bid_assignment_snapshot.unit_label')->label('Unit')->placeholder('—'),
+                TextEntry::make('metadata.bid_assignment_snapshot.shift_label')->label('Shift')->placeholder('—'),
+                TextEntry::make('metadata.bid_assignment_snapshot.station_label')->label('Station')->placeholder('—'),
+                TextEntry::make('metadata.bid_assignment_snapshot.division_label')->label('Division')->placeholder('—'),
+                TextEntry::make('metadata.entitlement_profile_label')->label('Allocation profile')->badge(),
+                TextEntry::make('metadata.marine_entitlement')->label('Marine allowance')->formatStateUsing(fn ($state): string => $state ? 'Additional annual Marine allocation' : 'Not part of the standard assignment'),
+                TextEntry::make('metadata.calculated_swap_credits')->label('Jumpsuit exchange credits')->placeholder('Not applicable'),
+                TextEntry::make('allocation_summary')->label('Standard allowances recorded for this request')->state(function (PersonnelRequest $record): array {
+                    $labels = app(UniformOrderCatalog::class)->groupLabels() + ['dress_uniforms' => 'Dress uniforms', 'work_sets' => 'Work sets'];
+
+                    return collect(data_get($record->metadata, 'standard_allowances', []))
+                        ->map(fn ($quantity, string $group): string => ($labels[$group] ?? str($group)->replace('_', ' ')->title()).": {$quantity}")
+                        ->values()->all();
+                })->listWithLineBreaks()->columnSpanFull(),
+            ])->columns(3)->visible(fn (PersonnelRequest $record): bool => $record->type === PersonnelRequestType::Uniform && filled($record->metadata)),
+            Section::make('Notes for Support Services')->schema([
+                TextEntry::make('metadata.member_note')->hiddenLabel()->placeholder('No member note provided')->columnSpanFull(),
+            ])->visible(fn (PersonnelRequest $record): bool => filled(data_get($record->metadata, 'member_note'))),
+            Section::make('Allocation advisories at submission')->description('These are review advisories. The member was able to submit this selection.')->schema([
+                TextEntry::make('metadata.warnings_at_submission')->hiddenLabel()->listWithLineBreaks()->color('warning'),
+            ])->visible(fn (PersonnelRequest $record): bool => filled(data_get($record->metadata, 'warnings_at_submission'))),
             Section::make('Requested items')->schema([
                 RepeatableEntry::make('items')->hiddenLabel()->schema([
                     TextEntry::make('item_name')->label('Item')->weight('bold'),
@@ -85,6 +113,11 @@ class PersonnelRequestResource extends Resource
                     TextEntry::make('quantity'),
                     TextEntry::make('reason')->formatStateUsing(fn ($state) => $state ? str($state)->title() : '—'),
                     TextEntry::make('fulfillment_status')->badge()->formatStateUsing(fn ($state) => str($state)->replace('_', ' ')->title()),
+                    TextEntry::make('ordering_details')->label('Ordering details')->state(function (PersonnelRequestItem $record): array {
+                        $details = app(UniformOrderCatalog::class)->orderingDetails($record->item_code, $record->metadata ?? []);
+
+                        return collect($details)->map(fn (string $value, string $label): string => "{$label}: {$value}")->values()->all();
+                    })->listWithLineBreaks()->columnSpanFull()->visible(fn (PersonnelRequestItem $record): bool => filled($record->metadata)),
                 ])->columns(5),
             ]),
             Section::make('Workflow history')->schema([

@@ -9,7 +9,16 @@ final class PersonnelCatalog
     /** @return array<string, array{label: string, sizes: array<int, string>}> */
     public function uniforms(): array
     {
-        return config('personnel_requests.uniform_catalog', []);
+        $uniforms = config('personnel_requests.uniform_catalog', []);
+        foreach (app(UniformOrderCatalog::class)->products() as $code => $product) {
+            if (isset($uniforms[$code])) {
+                continue;
+            }
+            $sizeField = collect($product['fields'])->firstWhere('key', 'size');
+            $uniforms[$code] = ['label' => $product['label'], 'sizes' => array_keys($sizeField['options'] ?? [])];
+        }
+
+        return $uniforms;
     }
 
     /** @return array<string, string> */

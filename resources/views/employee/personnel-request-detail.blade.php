@@ -36,6 +36,13 @@
                         @endforeach
                     </div>
 
+                    @if(filled(data_get($request->metadata, 'member_note')))
+                        <div class="mt-6 rounded-xl border border-hub-border p-4">
+                            <h2 class="font-semibold">Your notes for Support Services</h2>
+                            <p class="mt-2 whitespace-pre-wrap text-sm leading-6 text-hub-ink-secondary">{{ data_get($request->metadata, 'member_note') }}</p>
+                        </div>
+                    @endif
+
                     @if(in_array($request->status, [\App\Enums\PersonnelRequestStatus::NeedsInformation, \App\Enums\PersonnelRequestStatus::Acknowledged], true) && filled($request->information_requested))
                         <div class="mt-6 rounded-xl border-2 border-amber-300 bg-amber-50 p-5">
                             <h2 class="font-bold text-amber-950">{{ $request->status === \App\Enums\PersonnelRequestStatus::NeedsInformation ? 'Information needed' : 'Requested information received' }}</h2>
