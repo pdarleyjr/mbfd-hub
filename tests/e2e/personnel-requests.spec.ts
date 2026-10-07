@@ -223,7 +223,7 @@ async function completePersonnelLifecycle(admin: Page, member: Page, memberPath:
     await member.getByRole('button', { name: 'Upload securely', exact: true }).click();
   }
   await member.getByLabel('Your response', { exact: true }).fill('[QA TEST] Replacement needed for workflow verification.');
-  await member.getByRole('button', { name: /^Send (?:additional )?response$/i }).click();
+  await member.getByRole('button', { name: /^Send (?:message|(?:additional )?response)$/i }).click();
   await admin.reload();
   await expect(admin.getByText('[QA TEST] Replacement needed for workflow verification.', { exact: true })).toBeVisible();
   for (const label of ['Mark Ordered', 'Mark Arrived', 'Ready for Pickup']) {
@@ -420,6 +420,7 @@ test('individual uniform arrivals, partial issue, batch issue, scoped messages a
 test('real officer PPE submission retains signature, beneficiary and complete Admin/member lifecycle', async ({ page, browser, baseURL }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'One isolated signed PPE workflow.');
   test.setTimeout(240_000);
+  const description = `[QA TEST] Browser protective equipment ${testInfo.testId}, attempt ${testInfo.retry}.`;
   await loginEmployee(page, '99001', requiredPassword('PERSONNEL_REQUESTS_E2E_OFFICER_PASSWORD'));
   await page.goto('/employee/personnel-equipment-request?station_id=1');
   await page.locator('[wire\\:key*="beneficiary_employee_id"] [role="combobox"]').click();
@@ -428,7 +429,7 @@ test('real officer PPE submission retains signature, beneficiary and complete Ad
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   await page.getByLabel('Equipment*', { exact: true }).selectOption('other');
   await page.getByLabel('Reason*', { exact: true }).selectOption('damaged');
-  await page.getByRole('textbox', { name: 'Describe other equipment*', exact: true }).fill('[QA TEST] Browser protective equipment.');
+  await page.getByRole('textbox', { name: 'Describe other equipment*', exact: true }).fill(description);
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   const canvas = page.locator('canvas[aria-label="Officer signature pad"]');
   await expect(canvas).toBeVisible();
@@ -448,7 +449,9 @@ test('real officer PPE submission retains signature, beneficiary and complete Ad
     const member = await memberContext.newPage();
     await loginEmployee(member, '99002', requiredPassword('PERSONNEL_REQUESTS_E2E_MEMBER_PASSWORD'));
     await member.goto('/employee/my-requests');
-    const row = member.locator('.mr-row').filter({ hasText: '[QA TEST] Browser protective equipment.' });
+    const row = member.locator('.mr-row').filter({ hasText: description });
+    await expect(row).toHaveCount(1);
+    await expect(row).toHaveAttribute('href', /^\/employee\/my-requests\/[0-9A-Z]{26}$/);
     const memberPath = (await row.getAttribute('href'))!;
     await testInfo.attach('ppe-record', { body: JSON.stringify({ memberPath, publicId: memberPath.split('/').at(-1), beneficiary: '99002', officer: '99001' }), contentType: 'application/json' });
     const admin = await adminContext.newPage();
