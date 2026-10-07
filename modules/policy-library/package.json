@@ -6,6 +6,8 @@
     "build": "vite build && node scripts/build-assets.mjs",
     "test": "node --test tests/js/*.test.mjs",
     "test:browser": "playwright test",
+    "test:reader": "node tests/browser/reader-regression.mjs",
+    "preview:reader-tests": "node tests/browser/reader-server.mjs",
     "check": "node --check resources/js/viewer.js"
   },
   "dependencies": {

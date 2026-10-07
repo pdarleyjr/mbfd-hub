@@ -101,3 +101,69 @@
     .page-stage { padding: 12px 8px; }
     .bottom-toolbar { flex-shrink: 0; }
 }
+
+/* Reading shell: reserve the viewport for paper and disclose secondary controls on demand. */
+.library-header { height: 56px; min-height: 56px; padding: 6px 16px; gap: 10px; }
+.library-header img { width: 40px; height: 40px; }
+.brand h1 { font-size: 17px; margin: 2px 0 0; }
+.library-layout { height: calc(100dvh - 56px); min-height: 0; }
+.manual-sidebar { width: 290px; padding: 16px 14px 8px; }
+.document-workspace { min-height: 0; }
+.document-heading { flex-shrink: 0; padding: 10px 16px; }
+.document-heading h2 { font-size: clamp(17px, 1.2vw, 23px); margin: 3px 0; line-height: 1.25; }
+#document-path { font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.revision-info { font-size: 12px; line-height: 1.4; }
+.viewer-toolbar { flex-shrink: 0; padding: 6px 12px; gap: 8px; flex-wrap: wrap; align-items: center; }
+.page-controls { width: auto; gap: 4px; }
+.view-controls { width: auto; gap: 6px; margin-left: auto; flex-wrap: nowrap; }
+.page-stage { min-height: 0; padding: 12px; overscroll-behavior: contain; }
+.focus-navigation { display: none; }
+.reader-menu { position: relative; }
+.reader-menu > summary { list-style: none; cursor: pointer; }
+.reader-menu > summary::-webkit-details-marker { display: none; }
+.reader-menu[open] > summary { background: var(--control); }
+.reader-menu-panel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 40; width: min(300px, calc(100vw - 24px)); padding: 12px; background: var(--paper); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 4px 14px #17345420; }
+.fit-controls { display: flex; flex-wrap: wrap; gap: 6px; }
+.zoom-controls { display: flex; justify-content: center; align-items: center; gap: 12px; margin-block: 12px; }
+.page-jump { display: flex; align-items: center; gap: 8px; }
+.page-jump label { font-size: 13px; }
+.page-jump input { width: 64px; min-height: 44px; border: 1px solid var(--line); border-radius: 4px; padding: 8px; }
+.reader-menu-panel.page-share { display: grid; grid-template-columns: 1fr 1fr; align-items: stretch; gap: 8px; }
+.copy-status, #copy-link-value { grid-column: 1 / -1; max-width: none; width: 100%; text-align: left; }
+.is-focus .library-header, .is-focus .document-heading { display: none; }
+.is-focus .library-layout { height: 100dvh; }
+.is-focus .focus-navigation { display: inline-flex; }
+.is-focus .manual-sidebar { display: flex; position: fixed; left: 0; top: 56px; bottom: 0; z-index: 30; width: min(350px, calc(100vw - 44px)); transform: translateX(-100%); }
+.is-focus.drawer-open .manual-sidebar { transform: translateX(0); }
+.is-focus .drawer-shade { display: block; inset: 56px 0 0; }
+.is-focus #drawer-close { display: inline-flex; }
+@media (max-width: 900px) {
+    .manual-sidebar { top: 56px; width: min(350px, calc(100vw - 44px)); }
+    .drawer-shade { inset: 56px 0 0; }
+    .document-heading { padding: 8px 12px; }
+    .document-heading h2 { font-size: 17px; }
+    .library-header .quiet-link { max-width: 72px; padding: 4px; }
+    .page-stage { padding: 8px; }
+    .view-controls { margin-left: auto; }
+}
+@media (max-width: 600px) {
+    .brand h1 { font-size: 14px; }
+    .document-heading h2 { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+    .viewer-toolbar { padding: 6px 8px; }
+    .page-controls .nav-button { width: 44px; padding: 8px; }
+    .page-controls .nav-button span { display: none; }
+    .page-status { min-width: 70px; }
+    .view-controls { gap: 4px; }
+    .view-controls .view-button { padding-inline: 8px; font-size: 12px; }
+    .view-controls #focus-mode { font-size: 0; }
+    .view-controls #focus-mode::after { content: 'Focus'; font-size: 12px; }
+    .view-controls #focus-mode[aria-pressed='true']::after { content: 'Exit focus'; }
+    #reader-options .reader-menu-panel { right: -64px; }
+}
+@media (max-height: 500px) {
+    .document-heading { padding-block: 6px; }
+    #document-path { display: none; }
+    .document-heading h2 { font-size: 16px; }
+    .manual-sidebar { overflow: auto; }
+    .reader-menu-panel { max-height: calc(100dvh - 116px); overflow: auto; }
+}

@@ -10,6 +10,11 @@ function loadPdfEngine() {
         engine.GlobalWorkerOptions.workerSrc = workerUrl;
         pdfEngine = engine;
         return engine;
+    }).catch(() => {
+        enginePromise = null;
+        const error = new Error('PDF reader could not be loaded');
+        error.name = 'PdfEngineLoadError';
+        throw error;
     });
     return enginePromise;
 }
@@ -25,8 +30,20 @@ const state = {
     selectionGeneration: 0, renderGeneration: 0, abort: null, open: new Set(),
     searchAbort: null,
     editionId: null, editionCheck: null,
-    mode: matchMedia('(max-width: 900px)').matches ? 'width' : 'page', zoom: 1,
+    mode: 'width', zoom: 1,
 };
+try {
+    const preference = JSON.parse(localStorage.getItem('policy-library.reader-view'));
+    if (preference && ['width', 'page', 'actual'].includes(preference.mode) && Number.isFinite(preference.zoom)) {
+        state.mode = preference.mode;
+        state.zoom = Math.max(0.5, Math.min(3, preference.zoom));
+    }
+} catch { /* Private browsing can disable preference storage. */ }
+
+function saveViewPreference() {
+    try { localStorage.setItem('policy-library.reader-view', JSON.stringify({ mode: state.mode, zoom: state.zoom })); }
+    catch { /* Reading remains available without local storage. */ }
+}
 
 function element(tag, text, className) {
     const item = document.createElement(tag);
@@ -78,14 +95,16 @@ function reportFailure(error) {
         headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': token, Accept: 'application/json' },
         body: JSON.stringify(context),
     }).catch(() => {});
-    showMessage('This document could not be displayed.', 'Your place is saved. Try loading this page again.', () => selectDocument(state.entry?.slug || state.node.id, state.page, false, true));
+    showMessage('This document could not be displayed.', 'Your place is saved. Try loading this page again.',
+        error.name === 'PdfEngineLoadError' ? () => location.reload() : () => selectDocument(state.entry?.slug || state.node.id, state.page, false, true));
 }
 
 function setDrawer(open) {
     document.body.classList.toggle('drawer-open', open);
     byId('drawer-shade').hidden = !open;
+    byId('focus-navigation').setAttribute('aria-expanded', String(open));
     byId('menu-toggle').setAttribute('aria-expanded', String(matchMedia('(max-width: 900px)').matches ? open : !document.body.classList.contains('rail-collapsed')));
-    if (matchMedia('(max-width: 900px)').matches) {
+    if (matchMedia('(max-width: 900px)').matches || document.body.classList.contains('is-focus')) {
         ui.sidebar.inert = !open;
         if (open) { byId('drawer-close').focus(); revealSelectedDocument(); }
     }
@@ -365,6 +384,10 @@ function expandSelected(nodes, target) {
 
 function updateControls() {
     byId('copy-link').disabled = !state.node;
+    byId('print-pdf').disabled = !state.node;
+    byId('page-number').disabled = !state.node;
+    byId('page-number').max = state.node?.revision.page_count || 1;
+    byId('page-number').value = state.page;
     const download = byId('download-pdf');
     download.hidden = !state.node?.revision.download_url;
     if (!download.hidden) download.href = state.node.revision.download_url;
@@ -375,6 +398,7 @@ function updateControls() {
     for (const label of document.querySelectorAll('[data-page-status]')) label.textContent = state.node ? `${state.entry ? 'PDF ' : ''}${state.page} / ${state.node.revision.page_count}` : '—';
     byId('fit-page').setAttribute('aria-pressed', String(state.mode === 'page'));
     byId('fit-width').setAttribute('aria-pressed', String(state.mode === 'width'));
+    byId('actual-size').setAttribute('aria-pressed', String(state.mode === 'actual'));
     byId('zoom-value').value = `${Math.round(state.zoom * 100)}%`;
     byId('zoom-out').disabled = state.zoom <= 0.5;
     byId('zoom-in').disabled = state.zoom >= 3;
@@ -450,10 +474,10 @@ async function renderPage() {
     const page = await pdf.getPage(pageNumber);
     if (generation !== state.renderGeneration || pdf !== state.pdf) return;
     const base = page.getViewport({ scale: 1 });
-    const padding = matchMedia('(max-width: 900px)').matches ? 18 : 52;
-    const width = Math.max(100, ui.stage.clientWidth - padding);
-    const height = Math.max(100, ui.stage.clientHeight - padding);
-    const fit = state.mode === 'width' ? width / base.width : Math.min(width / base.width, height / base.height);
+    const stageStyle = getComputedStyle(ui.stage);
+    const width = Math.max(100, ui.stage.clientWidth - parseFloat(stageStyle.paddingLeft) - parseFloat(stageStyle.paddingRight) - 2);
+    const height = Math.max(100, ui.stage.clientHeight - parseFloat(stageStyle.paddingTop) - parseFloat(stageStyle.paddingBottom) - 2);
+    const fit = state.mode === 'actual' ? 96 / 72 : state.mode === 'width' ? width / base.width : Math.min(width / base.width, height / base.height);
     const viewport = page.getViewport({ scale: fit * state.zoom });
     const dimensions = canvasDimensions(viewport.width, viewport.height, window.devicePixelRatio);
     ui.canvas.width = dimensions.width;
@@ -542,6 +566,9 @@ async function selectCurrentDocument(nodeId, pageNumber, push = true, retry = fa
         if (state.revisionId !== revision.id || retry) {
             showMessage('Loading document…', state.node.title);
             await cancelRendering();
+            // A newer selection can resume while render cancellation is awaited.
+            // Do not clear or destroy the newer selection's document instance.
+            if (generation !== state.selectionGeneration) return;
             const previousLoad = state.loading;
             state.loading = null;
             state.pdf = null;
@@ -668,16 +695,48 @@ async function navigate(direction) {
 }
 
 for (const button of document.querySelectorAll('[data-nav]')) button.addEventListener('click', () => navigate(button.dataset.nav === 'next' ? 1 : -1));
-for (const [id, mode] of [['fit-page', 'page'], ['fit-width', 'width']]) byId(id).addEventListener('click', () => {
-    state.mode = mode; state.zoom = 1; updateControls(); renderPage().catch(reportFailure);
+for (const [id, mode] of [['fit-page', 'page'], ['fit-width', 'width'], ['actual-size', 'actual']]) byId(id).addEventListener('click', () => {
+    state.mode = mode; state.zoom = 1; saveViewPreference(); updateControls(); renderPage().catch(reportFailure);
 });
 for (const [id, delta] of [['zoom-in', 0.25], ['zoom-out', -0.25]]) byId(id).addEventListener('click', () => {
-    state.zoom = Math.max(0.5, Math.min(3, state.zoom + delta)); updateControls(); renderPage().catch(reportFailure);
+    state.zoom = Math.max(0.5, Math.min(3, state.zoom + delta)); saveViewPreference(); updateControls(); renderPage().catch(reportFailure);
 });
 byId('focus-mode').addEventListener('click', () => {
     const focus = document.body.classList.toggle('is-focus');
     byId('focus-mode').setAttribute('aria-pressed', String(focus));
     byId('focus-mode').textContent = focus ? 'Exit focus' : 'Focus view';
+    setDrawer(false);
+});
+byId('focus-navigation').addEventListener('click', () => setDrawer(!document.body.classList.contains('drawer-open')));
+byId('page-jump').addEventListener('submit', event => {
+    event.preventDefault();
+    if (!state.node) return;
+    const page = Number(byId('page-number').value);
+    if (!Number.isInteger(page) || page < 1 || page > state.node.revision.page_count) return;
+    byId('reader-options').open = false;
+    selectDocument(state.node.id, page);
+});
+byId('print-pdf').addEventListener('click', async () => {
+    if (!state.node) return;
+    // Reserve a browser-owned PDF tab during the user gesture; its native viewer owns printing.
+    const popup = window.open('about:blank', '_blank');
+    if (!popup) { byId('copy-status').textContent = 'Allow a new PDF tab to print this document.'; return; }
+    popup.opener = null;
+    try {
+        await refreshEdition();
+        if (!state.node) { popup.close(); return; }
+        popup.location.replace(`${state.node.revision.asset_url}#page=${state.page}`);
+    } catch { popup.close(); byId('copy-status').textContent = 'Check your connection and try again.'; }
+});
+byId('fullscreen-document').hidden = !document.fullscreenEnabled;
+byId('fullscreen-document').addEventListener('click', async () => {
+    try {
+        if (document.fullscreenElement) await document.exitFullscreen();
+        else await document.documentElement.requestFullscreen();
+    } catch { byId('copy-status').textContent = 'Full screen is unavailable. Use Focus view.'; }
+});
+document.addEventListener('fullscreenchange', () => {
+    byId('fullscreen-document').textContent = document.fullscreenElement ? 'Exit full screen' : 'Full screen';
 });
 byId('menu-toggle').addEventListener('click', () => {
     if (matchMedia('(max-width: 900px)').matches) setDrawer(!document.body.classList.contains('drawer-open'));
@@ -687,7 +746,10 @@ byId('menu-toggle').addEventListener('click', () => {
         if (!collapsed) revealSelectedDocument();
     }
 });
-for (const id of ['drawer-close', 'drawer-shade']) byId(id).addEventListener('click', () => { setDrawer(false); byId('menu-toggle').focus(); });
+function returnNavigationFocus() {
+    byId(document.body.classList.contains('is-focus') ? 'focus-navigation' : 'menu-toggle').focus();
+}
+for (const id of ['drawer-close', 'drawer-shade']) byId(id).addEventListener('click', () => { setDrawer(false); returnNavigationFocus(); });
 ui.search.addEventListener('input', () => renderTree());
 byId('page-search-form').addEventListener('submit', searchPages);
 byId('contents-toggle').addEventListener('click', () => setRailView('contents'));
@@ -718,7 +780,13 @@ byId('download-pdf').addEventListener('click', async event => {
     } catch { showMessage('The manual could not be loaded.', 'Try again when your connection is available.', refreshWhenVisible); }
 });
 document.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && document.body.classList.contains('drawer-open')) { setDrawer(false); byId('menu-toggle').focus(); }
+    if (event.key === 'Escape') {
+        for (const id of ['reader-options', 'document-actions']) {
+            const menu = byId(id);
+            if (menu.open) { menu.open = false; menu.querySelector('summary').focus(); }
+        }
+    }
+    if (event.key === 'Escape' && document.body.classList.contains('drawer-open')) { setDrawer(false); returnNavigationFocus(); }
     if (event.key === 'Tab' && document.body.classList.contains('drawer-open')) {
         const items = [...ui.sidebar.querySelectorAll('button,input,summary,a')].filter(item => !item.disabled && item.getClientRects().length);
         const first = items[0], last = items.at(-1);
