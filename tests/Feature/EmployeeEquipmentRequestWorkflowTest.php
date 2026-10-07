@@ -31,15 +31,10 @@ class EmployeeEquipmentRequestWorkflowTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('employee'));
 
         Livewire::test(RequestEquipmentPage::class)
-            ->fillForm([
-                'items' => [[
-                    'item_code' => 't_shirt',
-                    'size' => 'L',
-                    'quantity' => 2,
-                ]],
-            ])
+            ->set('data.items.t_shirt.quantity', 2)
+            ->set('data.items.t_shirt.metadata.size', 'L')
             ->call('submit')
-            ->assertHasNoFormErrors();
+            ->assertHasNoErrors();
 
         $this->assertDatabaseHas('personnel_requests', [
             'beneficiary_employee_id' => $employee->id,
@@ -49,7 +44,7 @@ class EmployeeEquipmentRequestWorkflowTest extends TestCase
         ]);
         $this->assertDatabaseHas('personnel_request_items', [
             'item_code' => 't_shirt',
-            'item_name' => 'T-Shirt',
+            'item_name' => 'Short Sleeve T-Shirt',
             'size' => 'L',
             'quantity' => 2,
         ]);

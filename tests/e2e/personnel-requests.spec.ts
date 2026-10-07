@@ -260,12 +260,11 @@ test('real uniform submission follows the complete member and Admin lifecycle th
   test.setTimeout(240_000);
   await loginEmployee(page, '99002', requiredPassword('PERSONNEL_REQUESTS_E2E_MEMBER_PASSWORD'));
   await page.goto('/employee/request-equipment');
-  const recentRequests = page.locator('.pr-request-row');
+  const recentRequests = page.locator('.uo-recent-request');
   const previousRequestCount = await recentRequests.count();
-  await page.locator('[wire\\:key*="item_code"] [role="combobox"]').click();
-  await page.keyboard.type('T-Shirt');
-  await page.getByRole('option', { name: 'T-Shirt', exact: true }).click();
-  await page.getByLabel('Size', { exact: false }).fill('L');
+  const shirt = page.locator('[data-product="t_shirt"]');
+  await shirt.getByRole('spinbutton', { name: /quantity/i }).fill('1');
+  await shirt.getByLabel('Size', { exact: false }).selectOption('L');
   await page.getByRole('button', { name: 'Submit Uniform Request', exact: true }).click();
   await expect(recentRequests).toHaveCount(previousRequestCount + 1);
   await expect(recentRequests.first()).toContainText('Pending');
