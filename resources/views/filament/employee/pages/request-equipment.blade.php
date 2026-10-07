@@ -1,5 +1,17 @@
 <x-filament-panels::page data-hub-ui="2" data-hub-portal="employee">
-    <div class="uo-builder" x-init="window.matchMedia('(max-width: 1023px)').matches && $store.sidebar.close()" x-data="{
+    <div class="uo-builder" x-init="window.matchMedia('(max-width: 1023px)').matches && $store.sidebar.close(); $nextTick(() => observeCatalog())" x-on:resize.window.debounce.100ms="observeCatalog()" x-data="{
+        mobileActionVisible: false,
+        catalogObserver: null,
+        observeCatalog() {
+            this.catalogObserver?.disconnect();
+            const nav = this.$refs.categoryNav;
+            const top = Number.parseFloat(getComputedStyle(nav).top) || 0;
+            this.catalogObserver = new IntersectionObserver(([entry]) => {
+                this.mobileActionVisible = entry.boundingClientRect.top <= top;
+            }, { rootMargin: '-' + top + 'px 0px 0px' });
+            this.catalogObserver.observe(this.$refs.catalogStart);
+        },
+        destroy() { this.catalogObserver?.disconnect(); },
         imageTrigger: null,
         openImage(src, label, trigger) {
             this.imageTrigger = trigger;
@@ -63,7 +75,8 @@
                         @error('data.idempotency_key') <p>{{ $message }}</p> @enderror
                     </div>
                 @endif
-                <nav class="uo-category-nav" aria-label="Uniform categories">
+                <div class="uo-catalog-start" x-ref="catalogStart" aria-hidden="true" wire:key="uniform-catalog-start"></div>
+                <nav class="uo-category-nav" aria-label="Uniform categories" x-ref="categoryNav">
                     <select class="uo-category-jump" aria-label="Jump to a section" x-on:change="document.getElementById($event.target.value)?.scrollIntoView({ block: 'start' }); $event.target.value = ''">
                         <option value="">Jump to a section…</option>
                         @foreach($categories as $category => $categoryLabel)
@@ -199,7 +212,7 @@
                     <p class="uo-workflow-help">Structural firefighting PPE is handled by an authorized officer through the Personnel Equipment Request workflow.</p>
                 </section>
             </aside>
-            <div class="uo-mobile-action"><a href="#uo-summary-heading">{{ $summary['selected_total'] }} selected · Review order <x-heroicon-o-arrow-down aria-hidden="true" /></a><button type="submit" wire:loading.attr="disabled" wire:target="submit"><span wire:loading.remove wire:target="submit">Submit request</span><span wire:loading wire:target="submit">Submitting…</span></button></div>
+            <div class="uo-mobile-action" x-show="mobileActionVisible" x-cloak><a href="#uo-summary-heading">{{ $summary['selected_total'] }} selected · Review order <x-heroicon-o-arrow-down aria-hidden="true" /></a><button type="submit" wire:loading.attr="disabled" wire:target="submit"><span wire:loading.remove wire:target="submit">Submit request</span><span wire:loading wire:target="submit">Submitting…</span></button></div>
         </form>
 
         <dialog class="uo-image-viewer" x-ref="viewer" aria-labelledby="uo-image-title" wire:ignore x-on:keydown.tab.prevent="$refs.imageClose.focus()" x-on:click="if ($event.target === $refs.viewer) closeImage()" x-on:close="restoreImageFocus()">

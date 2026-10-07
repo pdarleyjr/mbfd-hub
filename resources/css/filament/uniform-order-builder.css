@@ -23,6 +23,7 @@
 .uo-builder .uo-workflow-help { margin-top: 1rem; color: rgb(var(--hub2-n-600)); font-size: .75rem; line-height: 1.6; }
 .uo-builder .uo-order-layout { display: grid; gap: 1.75rem; align-items: start; min-width: 0; }
 .uo-builder :is(.uo-catalog, .uo-summary-column) { min-width: 0; }
+.uo-builder .uo-catalog-start { height: 1px; pointer-events: none; }
 .uo-builder .uo-category-nav { display: flex; flex-wrap: wrap; gap: .375rem .625rem; position: sticky; top: 4rem; z-index: 20; margin-bottom: 1rem; padding: .5rem 0; border-bottom: 1px solid rgb(var(--hub2-n-100)); background: rgb(var(--hub2-n-0)); }
 .uo-builder .uo-category-jump { width: 100%; min-height: 44px; padding: .5rem 2rem .5rem .75rem; border: 1px solid rgb(var(--hub2-n-200)); border-radius: 6px; background-color: rgb(var(--hub2-n-0)); color: rgb(var(--hub2-action)); font-size: 1rem; font-weight: 600; }
 .uo-builder .uo-category-nav a { display: none; align-items: center; min-height: 44px; padding: .375rem .75rem; border: 1px solid rgb(var(--hub2-n-200)); border-radius: 6px; color: rgb(var(--hub2-action)); font-size: .8125rem; font-weight: 600; text-decoration: none; }

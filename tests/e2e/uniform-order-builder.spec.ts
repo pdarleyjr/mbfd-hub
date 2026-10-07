@@ -21,6 +21,7 @@ async function openBuilder(page: Page, employeeId = 'BID-E2E-D07'): Promise<void
   await page.goto('/employee/request-equipment');
   await expect(page.getByRole('heading', { name: 'Request Uniforms', exact: true })).toBeVisible();
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
+  await expect(page.locator('.uo-mobile-action')).toBeHidden();
   expect(await page.locator('.uo-assignment').evaluate(element => ({
     background: getComputedStyle(element).backgroundColor,
     border: getComputedStyle(element).borderTopWidth,
@@ -155,6 +156,7 @@ test('catalog is touch ready and only loads larger images on expansion', async (
 
 test('section shortcuts avoid catalog scrolling and order rows return directly to sizing', async ({ page }, testInfo) => {
   await openBuilder(page);
+  await page.screenshot({ path: testInfo.outputPath('shortcut-initial-viewport.png'), animations: 'disabled' });
   const jump = page.getByRole('combobox', { name: 'Jump to a section', exact: true });
   const work = page.locator('#uo-section-work');
   const compactNavigation = (testInfo.project.use.viewport?.width ?? 1440) < 1200;
@@ -173,6 +175,14 @@ test('section shortcuts avoid catalog scrolling and order rows return directly t
   }
 
   await setQuantity(page, 'uniform_pants', 1);
+  if (compactNavigation) {
+    await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+    await page.locator('.uo-assignment').evaluate(element => element.scrollIntoView({ block: 'start' }));
+    await expect(page.locator('.uo-mobile-action')).toBeHidden();
+    await jump.selectOption('uo-section-work');
+    await page.evaluate(() => (document.activeElement as HTMLElement)?.blur());
+    await expect(page.locator('.uo-mobile-action')).toBeVisible();
+  }
   if (compactNavigation) await jump.selectOption('uo-summary-heading');
   await page.getByRole('link', { name: 'Edit 5.11 Tactical Pants, quantity 1', exact: true }).click();
   const pantsBounds = await product(page, 'uniform_pants').boundingBox();
