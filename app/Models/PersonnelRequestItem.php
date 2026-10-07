@@ -12,7 +12,7 @@ class PersonnelRequestItem extends Model
 {
     protected $guarded = [];
 
-    protected $casts = ['metadata' => 'array', 'quantity' => 'integer', 'fulfilled_quantity' => 'integer'];
+    protected $casts = ['metadata' => 'array', 'quantity' => 'integer', 'arrived_quantity' => 'integer', 'fulfilled_quantity' => 'integer'];
 
     /** @return BelongsTo<PersonnelRequest, $this> */
     public function request(): BelongsTo

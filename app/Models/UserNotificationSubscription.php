@@ -49,4 +49,24 @@ final class UserNotificationSubscription extends Model
             'updated_at' => now(),
         ]);
     }
+
+    public static function ensurePersonnelRequestsForUser(User $user): void
+    {
+        $events = [User::NOTIFICATION_PREFERENCE_MEMBER_REQUEST_UPDATES];
+        if ($user->hasAnyRole(['super_admin', 'admin', 'logistics_admin'])) {
+            $events[] = User::NOTIFICATION_PREFERENCE_UNIFORM_REQUESTS;
+            $events[] = User::NOTIFICATION_PREFERENCE_PERSONNEL_EQUIPMENT_REQUESTS;
+        }
+        foreach ($events as $event) {
+            DB::table((new self)->getTable())->insertOrIgnore([
+                'user_id' => $user->id,
+                'event_key' => $event,
+                'database_enabled' => true,
+                'webpush_enabled' => false,
+                'email_enabled' => false,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        }
+    }
 }

@@ -100,6 +100,18 @@ final class PersonnelRequestSubmissionService
         }
 
         $request = DB::transaction(function () use ($type, $beneficiary, $requester, $station, $items, $idempotencyKey, $signature, $metadata): PersonnelRequest {
+            if ($type === PersonnelRequestType::Uniform) {
+                Employee::query()->whereKey($beneficiary->id)->lockForUpdate()->firstOrFail();
+                if ($existing = $this->existingSubmission($idempotencyKey, $requester, $type)) {
+                    return $existing;
+                }
+                if (collect($items)->contains('item_code', 'jacket')) {
+                    $eligibility = $this->entitlements->jacketEligibility($beneficiary);
+                    if (! $eligibility['can_order']) {
+                        throw ValidationException::withMessages(['items.jacket.quantity' => $eligibility['reason']]);
+                    }
+                }
+            }
             $publicId = (string) Str::ulid();
             $request = PersonnelRequest::query()->create([
                 'public_id' => $publicId,
@@ -147,6 +159,7 @@ final class PersonnelRequestSubmissionService
         if ($items === []) {
             throw ValidationException::withMessages(['items' => 'Add at least one uniform item.']);
         }
+        $this->entitlements->validateJacketQuantity($items);
 
         $structured = array_filter($items, fn ($item): bool => is_array($item)
             && (array_key_exists('metadata', $item) || array_key_exists('attributes', $item)));

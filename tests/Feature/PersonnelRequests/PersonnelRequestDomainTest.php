@@ -167,6 +167,8 @@ class PersonnelRequestDomainTest extends TestCase
     {
         $employee = $this->employee('23001', 'Firefighter');
         $admin = User::factory()->create();
+        Role::findOrCreate('logistics_admin', 'web');
+        $admin->assignRole('logistics_admin');
         $request = app(PersonnelRequestSubmissionService::class)->submitUniform(
             $employee,
             [['item_code' => 'polo_shirt', 'size' => 'M', 'quantity' => 1]],
@@ -201,6 +203,8 @@ class PersonnelRequestDomainTest extends TestCase
     {
         $employee = $this->employee('23101', 'Firefighter');
         $admin = User::factory()->create();
+        Role::findOrCreate('logistics_admin', 'web');
+        $admin->assignRole('logistics_admin');
         $workflow = app(PersonnelRequestWorkflowService::class);
         $request = app(PersonnelRequestSubmissionService::class)->submitUniform(
             $employee,
@@ -257,6 +261,8 @@ class PersonnelRequestDomainTest extends TestCase
     {
         $employee = $this->employee('23301', 'Firefighter');
         $admin = User::factory()->create();
+        Role::findOrCreate('logistics_admin', 'web');
+        $admin->assignRole('logistics_admin');
         $request = app(PersonnelRequestSubmissionService::class)->submitUniform(
             $employee,
             [['item_code' => 't_shirt', 'size' => 'L', 'quantity' => 1]],

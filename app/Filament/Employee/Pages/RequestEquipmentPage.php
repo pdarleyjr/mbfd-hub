@@ -42,6 +42,13 @@ class RequestEquipmentPage extends Page
         return $this->entitlementContext ??= app(UniformEntitlementService::class)->forEmployee($this->authenticatedEmployee());
     }
 
+    private function orderingProducts(): array
+    {
+        return array_diff_key(app(UniformOrderCatalog::class)->products(), array_flip([
+            'uniform_shirt', 'work_boots', 'class_a_coat',
+        ]));
+    }
+
     public function mount(): void
     {
         $this->resetOrder();
@@ -51,11 +58,14 @@ class RequestEquipmentPage extends Page
     {
         $context = $this->entitlementContext();
         $items = [];
-        foreach (app(UniformOrderCatalog::class)->products() as $code => $product) {
+        foreach ($this->orderingProducts() as $code => $product) {
             $items[$code] = [
                 'item_code' => $code,
                 'quantity' => 0,
-                'metadata' => $context['recommended_variants'][$code] ?? [],
+                'metadata' => array_replace(
+                    array_fill_keys(array_column($product['fields'], 'key'), ''),
+                    $context['recommended_variants'][$code] ?? [],
+                ),
             ];
         }
         $this->data = ['items' => $items, 'member_note' => '', 'idempotency_key' => (string) Str::uuid()];
@@ -130,7 +140,7 @@ class RequestEquipmentPage extends Page
         $catalog = app(UniformOrderCatalog::class);
         $entitlements = app(UniformEntitlementService::class);
         $context = $this->entitlementContext();
-        $products = $catalog->products();
+        $products = $this->orderingProducts();
         $categories = $catalog->categories();
         if ($context['marine']) {
             $categories = ['marine' => 'Your Marine Allocation'] + $categories;
@@ -145,6 +155,7 @@ class RequestEquipmentPage extends Page
             'categories' => $categories,
             'selectedItems' => $selectedItems,
             'summary' => $entitlements->summarize($context, $selectedItems),
+            'jacketEligibility' => $entitlements->jacketEligibility($employee),
             'recentRequests' => $employee->personnelRequests()->where('type', 'uniform')->withCount('items')->latest()->limit(5)->get(),
         ];
     }

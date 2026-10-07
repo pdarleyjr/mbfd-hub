@@ -22,6 +22,7 @@ class NewSubmissionNotification extends Notification implements ShouldQueue
         private string $body,
         private string $actionUrl = '/admin',
         private string $icon = 'heroicon-o-document-check',
+        private bool $essentialInApp = false,
     ) {}
 
     /**
@@ -37,12 +38,12 @@ class NewSubmissionNotification extends Notification implements ShouldQueue
         $subscription = $eventKey === null
             ? null
             : $notifiable->notificationSubscriptions()->where('event_key', $eventKey)->first();
-        if ($subscription === null) {
+        if ($subscription === null && ! $this->essentialInApp) {
             return [];
         }
 
         $channels = [];
-        if ($subscription->database_enabled) {
+        if ($this->essentialInApp || $subscription->database_enabled) {
             $channels[] = 'database';
         }
         $pushSubscriptionCount = $notifiable->pushSubscriptions()->count();
@@ -56,10 +57,10 @@ class NewSubmissionNotification extends Notification implements ShouldQueue
         ]);
 
         // Only add WebPush if user has active push subscriptions
-        if ($subscription->webpush_enabled && $pushSubscriptionCount > 0) {
+        if ($subscription?->webpush_enabled && $pushSubscriptionCount > 0) {
             $channels[] = WebPushChannel::class;
         }
-        if ($subscription->email_enabled && filled($notifiable->employeeProfile?->city_email)) {
+        if ($subscription?->email_enabled && filled($notifiable->employeeProfile?->city_email)) {
             $channels[] = BudgetedMailChannel::class;
         }
 

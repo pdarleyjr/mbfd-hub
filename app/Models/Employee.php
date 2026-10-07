@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
@@ -152,6 +153,16 @@ class Employee extends Authenticatable
     public function user(): HasOne
     {
         return $this->hasOne(User::class, 'employee_profile_id');
+    }
+
+    /** Database alerts belong to the canonical account used by every Hub panel. */
+    public function routeNotificationForDatabase(): MorphMany
+    {
+        $user = $this->user;
+
+        return $user instanceof User && $user->employee_id === $this->employee_id
+            ? $user->notifications()
+            : $this->notifications();
     }
 
     /** @return HasMany<EmployeeBidAssignment, $this> */

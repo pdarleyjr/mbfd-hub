@@ -81,6 +81,7 @@ export default defineConfig({
       name: `uniform-${width}`,
       use: { viewport: { width, height: width < 768 ? 844 : 1000 }, hasTouch: width < 1024 },
     })),
+    { name: 'uniform-830-short', use: { viewport: { width: 830, height: 668 }, hasTouch: true } },
     { name: 'uniform-webkit-390', use: { browserName: 'webkit', viewport: { width: 390, height: 844 }, hasTouch: true } },
     { name: 'uniform-webkit-768', use: { browserName: 'webkit', viewport: { width: 768, height: 1000 }, hasTouch: true } },
     { name: 'uniform-firefox-1440', use: { browserName: 'firefox', viewport: { width: 1440, height: 1000 } } },

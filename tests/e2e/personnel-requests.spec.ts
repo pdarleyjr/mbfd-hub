@@ -47,8 +47,10 @@ test('employee uniform, request ledger, and expiration pages are responsive and 
 
   await page.goto('/employee/request-equipment');
   await expect(page.getByRole('heading', { name: 'Request Uniforms' })).toBeVisible();
-  await expect(page.getByText('Structural firefighting PPE is handled by an authorized officer')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Submit Uniform Request' })).toBeVisible();
+  await page.getByRole('button', { name: 'Review order', exact: true }).click();
+  await page.locator('.uo-recent summary').click();
+  await expect(page.getByText('Structural firefighting PPE is handled by an authorized officer')).toBeVisible();
   await expect(page.locator('.employee-global-back a')).toBeVisible();
   await expectViewportFit(page);
   for (const target of await page.locator('.employee-global-back a, .pr-primary-action').evaluateAll((elements) => elements.map((element) => {
@@ -221,7 +223,7 @@ async function completePersonnelLifecycle(admin: Page, member: Page, memberPath:
     await member.getByRole('button', { name: 'Upload securely', exact: true }).click();
   }
   await member.getByLabel('Your response', { exact: true }).fill('[QA TEST] Replacement needed for workflow verification.');
-  await member.getByRole('button', { name: /^Send (?:additional )?response$/i }).click();
+  await member.getByRole('button', { name: /^Send (?:message|(?:additional )?response)$/i }).click();
   await admin.reload();
   await expect(admin.getByText('[QA TEST] Replacement needed for workflow verification.', { exact: true })).toBeVisible();
   for (const label of ['Mark Ordered', 'Mark Arrived', 'Ready for Pickup']) {
@@ -262,11 +264,14 @@ test('real uniform submission follows the complete member and Admin lifecycle th
   await page.goto('/employee/request-equipment');
   const recentRequests = page.locator('.uo-recent-request');
   const previousRequestCount = await recentRequests.count();
+  await page.getByRole('combobox', { name: 'Uniform category', exact: true }).selectOption('tshirts');
   const shirt = page.locator('[data-product="t_shirt"]');
   await shirt.getByRole('spinbutton', { name: /quantity/i }).fill('1');
   await shirt.getByLabel('Size', { exact: false }).selectOption('L');
   await page.getByRole('button', { name: 'Submit Uniform Request', exact: true }).click();
   await expect(recentRequests).toHaveCount(previousRequestCount + 1);
+  await page.getByRole('button', { name: 'Review order', exact: true }).click();
+  await page.locator('.uo-recent summary').click();
   await expect(recentRequests.first()).toContainText('Pending');
   await expect(recentRequests.first()).toHaveAttribute('href', /\/employee\/my-requests\/[0-9A-Z]{26}$/);
   const memberPath = (await recentRequests.first().getAttribute('href'))!;
@@ -282,9 +287,140 @@ test('real uniform submission follows the complete member and Admin lifecycle th
   }
 });
 
+test('individual uniform arrivals, partial issue, batch issue, scoped messages and notifications reach the member', async ({ page, browser, baseURL }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'One complete item workflow in the disposable personnel database.');
+  test.setTimeout(240_000);
+  page.setDefaultTimeout(30_000);
+  await loginEmployee(page, '99002', requiredPassword('PERSONNEL_REQUESTS_E2E_MEMBER_PASSWORD'));
+  await page.goto('/employee/request-equipment');
+  await page.getByRole('combobox', { name: 'Uniform category', exact: true }).selectOption('tshirts');
+  const shirt = page.locator('[data-product="t_shirt"]');
+  await shirt.getByRole('spinbutton', { name: 'Quantity', exact: true }).fill('3');
+  await shirt.getByLabel('Size', { exact: true }).selectOption('L');
+  await page.getByRole('combobox', { name: 'Uniform category', exact: true }).selectOption('accessories');
+  const belt = page.locator('[data-product="belt"]');
+  await belt.getByRole('spinbutton', { name: 'Quantity', exact: true }).fill('1');
+  await belt.getByLabel('Size', { exact: true }).selectOption('M');
+  await page.getByRole('button', { name: 'Submit Uniform Request', exact: true }).click();
+  const success = page.locator('[data-order-success]');
+  await expect(success).toBeVisible({ timeout: 30_000 });
+  const memberPath = (await success.getByRole('link', { name: 'View your request', exact: true }).getAttribute('href'))!;
+  const publicId = memberPath.split('/').at(-1)!;
+  await page.goto(memberPath);
+  const shirtCard = page.locator('[data-request-item]').filter({ hasText: 'Short Sleeve T-Shirt' });
+  const beltCard = page.locator('[data-request-item]').filter({ hasText: 'JUKMO Work Belt' });
+  const itemId = (await shirtCard.getAttribute('data-request-item'))!;
+  await expect(shirtCard.locator('[data-arrived-quantity]')).toHaveText('0');
+  await expect(beltCard.locator('[data-issued-quantity]')).toHaveText('0');
+
+  const context = await browser.newContext({ baseURL, viewport: { width: 1440, height: 1000 } });
+  try {
+    const admin = await context.newPage();
+    admin.setDefaultTimeout(30_000);
+    await loginAdmin(admin);
+    const adminUrl = '/admin/personnel-uniforms-equipment/personnel-requests/' + publicId;
+    await admin.goto(adminUrl);
+    await admin.getByRole('button', { name: 'Item Actions', exact: true }).click();
+    await admin.getByRole('button', { name: 'Acknowledge Item', exact: true }).click();
+    await admin.getByLabel('Request item', { exact: false }).selectOption(itemId);
+    await admin.getByLabel('Message visible to member (optional)', { exact: true }).fill('[QA TEST] Shirt size acknowledged independently.');
+    await submitAdminModal(admin);
+    await page.reload();
+    await expect(shirtCard).toContainText('Acknowledged');
+    await expect(page.getByText('Pending', { exact: true }).first()).toBeVisible();
+    await expect(beltCard).toContainText('Awaiting arrival');
+
+    await admin.getByRole('button', { name: 'Add Note', exact: true }).click();
+    await admin.getByLabel('Applies to', { exact: true }).selectOption(itemId);
+    await admin.getByLabel('Employee-visible note', { exact: true }).fill('[QA TEST] Shirts will arrive in separate deliveries.');
+    await admin.getByLabel('Admin-only internal note', { exact: true }).fill('[QA TEST] Private item supplier evidence.');
+    await submitAdminModal(admin);
+    await admin.getByRole('button', { name: 'Item Actions', exact: true }).click();
+    await admin.getByRole('button', { name: 'Record Item Arrival', exact: true }).click();
+    await admin.getByLabel('Request item', { exact: false }).selectOption(itemId);
+    await admin.getByLabel('Quantity arrived now', { exact: false }).fill('1');
+    await admin.getByLabel('Message visible to member (optional)', { exact: true }).fill('[QA TEST] One shirt has arrived; two are still pending.');
+    await submitAdminModal(admin);
+    await page.reload();
+    await expect(shirtCard.locator('[data-arrived-quantity]')).toHaveText('1');
+    await expect(shirtCard.locator('[data-issued-quantity]')).toHaveText('0');
+    await expect(beltCard.locator('[data-arrived-quantity]')).toHaveText('0');
+    await shirtCard.locator('summary').click();
+    await expect(shirtCard).toContainText('[QA TEST] Shirts will arrive in separate deliveries.');
+    await expect(shirtCard).toContainText('[QA TEST] One shirt has arrived; two are still pending.');
+    await expect(page.getByText('[QA TEST] Private item supplier evidence.', { exact: true })).toHaveCount(0);
+
+    await admin.getByRole('button', { name: 'Issue Uniform', exact: true }).click();
+    await admin.getByLabel('Request item', { exact: false }).selectOption(itemId);
+    const issueQuantity = admin.getByLabel('Quantity to issue now', { exact: false });
+    await expect(issueQuantity).toHaveValue('3');
+    await issueQuantity.fill('1');
+    await admin.locator('[wire\\:key*="uniform_id"] [role="combobox"]').click();
+    await admin.getByRole('option', { name: /^T-Shirt — L — \d+ on hand$/ }).click();
+    await admin.getByLabel('Notes', { exact: true }).fill('[QA TEST] First independent shirt pickup.');
+    await submitAdminModal(admin);
+    await page.reload();
+    await expect(shirtCard.locator('[data-arrived-quantity]')).toHaveText('1');
+    await expect(shirtCard.locator('[data-issued-quantity]')).toHaveText('1');
+    await expect(shirtCard).toContainText('Partially issued');
+    await expect(beltCard.locator('[data-issued-quantity]')).toHaveText('0');
+    await expect(page.getByText('Pending', { exact: true }).first()).toBeVisible();
+    await expectViewportFit(page);
+    await screenshot(page, testInfo, 'member-partial-item-progress');
+
+    await page.goto('/employee/dashboard');
+    await page.getByRole('button', { name: /^Open notifications(?: \d+)?$/ }).click();
+    const notifications = page.locator('.fi-modal-window:visible').last();
+    for (const title of ['Short Sleeve T-Shirt: Acknowledged', 'Short Sleeve T-Shirt: Message from Support Services', 'Short Sleeve T-Shirt: Arrived', 'Short Sleeve T-Shirt: Issued']) {
+      await expect(notifications.getByText(title, { exact: true })).toBeVisible();
+    }
+    const itemNotifications = notifications.locator('a[href="' + memberPath + '#item-' + itemId + '"]');
+    await expect(itemNotifications).toHaveCount(4);
+    await itemNotifications.first().click();
+    await expect(page).toHaveURL(new RegExp(publicId + '#item-' + itemId + '$'));
+    await page.getByLabel('About', { exact: true }).selectOption(itemId);
+    await page.getByLabel('Your response', { exact: true }).fill('[QA TEST] I collected one shirt and will wait for the remaining two.');
+    await page.getByRole('button', { name: 'Send message', exact: true }).click();
+    await expect(page.getByRole('status').filter({ hasText: 'Your response was sent' })).toBeVisible();
+    await admin.reload();
+    await expect(admin.getByText('[QA TEST] I collected one shirt and will wait for the remaining two.', { exact: true }).first()).toBeVisible();
+    await admin.getByRole('button', { name: /^Open notifications(?: \d+)?$/ }).click();
+    await expect(admin.locator('.fi-modal-window:visible').last().getByText('Member reply: Short Sleeve T-Shirt', { exact: true })).toBeVisible();
+    await admin.goto(adminUrl);
+    await admin.getByRole('button', { name: 'Item Actions', exact: true }).click();
+    await admin.getByRole('button', { name: 'Issue Selected Items', exact: true }).click();
+    const batchModal = admin.locator('.fi-modal-window:visible').last();
+    const batchQuantities = batchModal.getByLabel('Issue now', { exact: false });
+    await expect(batchQuantities).toHaveCount(2);
+    await batchQuantities.first().fill('2');
+    await batchQuantities.first().blur();
+    const batchStock = batchModal.locator('[wire\\:key*="uniform_id"] [role="combobox"]').first();
+    await expect(batchStock).not.toHaveAttribute('aria-disabled', 'true');
+    await batchStock.click();
+    await admin.getByRole('option', { name: /^T-Shirt — L — \d+ on hand$/ }).click();
+    await expect(batchQuantities.last()).toHaveValue('0');
+    await admin.getByLabel('Notes', { exact: true }).fill('[QA TEST] Remaining shirts issued together; belt stays pending.');
+    await submitAdminModal(admin);
+    await page.goto(memberPath);
+    await expect(shirtCard.locator('[data-arrived-quantity]')).toHaveText('3');
+    await expect(shirtCard.locator('[data-issued-quantity]')).toHaveText('3');
+    await expect(shirtCard).toContainText('Issued');
+    await expect(beltCard.locator('[data-arrived-quantity]')).toHaveText('0');
+    await expect(beltCard.locator('[data-issued-quantity]')).toHaveText('0');
+    await expect(page.getByText('Pending', { exact: true }).first()).toBeVisible();
+    await page.setViewportSize({ width: 375, height: 844 });
+    await expectViewportFit(page);
+    await screenshot(page, testInfo, 'member-final-item-progress-phone');
+    await testInfo.attach('item-workflow-record', { body: JSON.stringify({ memberPath, publicId, itemId }), contentType: 'application/json' });
+  } finally {
+    await context.close();
+  }
+});
+
 test('real officer PPE submission retains signature, beneficiary and complete Admin/member lifecycle', async ({ page, browser, baseURL }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'One isolated signed PPE workflow.');
   test.setTimeout(240_000);
+  const description = `[QA TEST] Browser protective equipment ${testInfo.testId}, attempt ${testInfo.retry}.`;
   await loginEmployee(page, '99001', requiredPassword('PERSONNEL_REQUESTS_E2E_OFFICER_PASSWORD'));
   await page.goto('/employee/personnel-equipment-request?station_id=1');
   await page.locator('[wire\\:key*="beneficiary_employee_id"] [role="combobox"]').click();
@@ -293,7 +429,7 @@ test('real officer PPE submission retains signature, beneficiary and complete Ad
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   await page.getByLabel('Equipment*', { exact: true }).selectOption('other');
   await page.getByLabel('Reason*', { exact: true }).selectOption('damaged');
-  await page.getByRole('textbox', { name: 'Describe other equipment*', exact: true }).fill('[QA TEST] Browser protective equipment.');
+  await page.getByRole('textbox', { name: 'Describe other equipment*', exact: true }).fill(description);
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   const canvas = page.locator('canvas[aria-label="Officer signature pad"]');
   await expect(canvas).toBeVisible();
@@ -313,7 +449,9 @@ test('real officer PPE submission retains signature, beneficiary and complete Ad
     const member = await memberContext.newPage();
     await loginEmployee(member, '99002', requiredPassword('PERSONNEL_REQUESTS_E2E_MEMBER_PASSWORD'));
     await member.goto('/employee/my-requests');
-    const row = member.locator('.mr-row').filter({ hasText: '[QA TEST] Browser protective equipment.' });
+    const row = member.locator('.mr-row').filter({ hasText: description });
+    await expect(row).toHaveCount(1);
+    await expect(row).toHaveAttribute('href', /^\/employee\/my-requests\/[0-9A-Z]{26}$/);
     const memberPath = (await row.getAttribute('href'))!;
     await testInfo.attach('ppe-record', { body: JSON.stringify({ memberPath, publicId: memberPath.split('/').at(-1), beneficiary: '99002', officer: '99001' }), contentType: 'application/json' });
     const admin = await adminContext.newPage();

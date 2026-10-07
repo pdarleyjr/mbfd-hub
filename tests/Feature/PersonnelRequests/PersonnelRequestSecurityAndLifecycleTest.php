@@ -151,6 +151,8 @@ class PersonnelRequestSecurityAndLifecycleTest extends TestCase
         ]);
         $admin = User::factory()->create();
         $service = app(PersonnelRequestFulfillmentService::class);
+        Role::findOrCreate('logistics_admin', 'web');
+        $admin->assignRole('logistics_admin');
 
         $first = $service->issueUniform($item, $uniform, $admin, now()->toDateString(), now()->addYear()->toDateString());
         $retry = $service->issueUniform($item->refresh(), $uniform->refresh(), $admin, now()->toDateString(), now()->addYear()->toDateString());

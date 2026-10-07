@@ -110,23 +110,33 @@ class PersonnelRequestResource extends Resource
                 RepeatableEntry::make('items')->hiddenLabel()->schema([
                     TextEntry::make('item_name')->label('Item')->weight('bold'),
                     TextEntry::make('size')->placeholder('—'),
-                    TextEntry::make('quantity'),
+                    TextEntry::make('quantity')->label('Requested'),
+                    TextEntry::make('arrived_quantity')->label('Arrived')->state(fn (PersonnelRequestItem $record): int => (int) $record->arrived_quantity),
+                    TextEntry::make('fulfilled_quantity')->label('Issued'),
                     TextEntry::make('reason')->formatStateUsing(fn ($state) => $state ? str($state)->title() : '—'),
-                    TextEntry::make('fulfillment_status')->badge()->formatStateUsing(fn ($state) => str($state)->replace('_', ' ')->title()),
+                    TextEntry::make('fulfillment_status')->label('Item status')->badge()->formatStateUsing(fn ($state) => str($state)->replace('_', ' ')->title()),
                     TextEntry::make('ordering_details')->label('Ordering details')->state(function (PersonnelRequestItem $record): array {
                         $details = app(UniformOrderCatalog::class)->orderingDetails($record->item_code, $record->metadata ?? []);
 
                         return collect($details)->map(fn (string $value, string $label): string => "{$label}: {$value}")->values()->all();
                     })->listWithLineBreaks()->columnSpanFull()->visible(fn (PersonnelRequestItem $record): bool => filled($record->metadata)),
-                ])->columns(5),
+                    TextEntry::make('item_messages')->label('Item messages')->state(fn (PersonnelRequestItem $record, $livewire): array => $livewire->getRecord()->updates
+                        ->filter(fn ($update): bool => (int) data_get($update->metadata, 'item_id') === $record->id)
+                        ->filter(fn ($update): bool => filled($update->employee_visible_note) || filled($update->internal_note))
+                        ->map(fn ($update): string => implode(' · ', array_filter([
+                            $update->employee_visible_note,
+                            filled($update->internal_note) ? 'Internal: '.$update->internal_note : null,
+                        ])))->values()->all())->listWithLineBreaks()->placeholder('No item messages')->columnSpanFull(),
+                ])->columns(4),
             ]),
             Section::make('Workflow history')->schema([
                 RepeatableEntry::make('updates')->hiddenLabel()->schema([
                     TextEntry::make('created_at')->label('When')->dateTime('M j, Y g:i A'),
                     TextEntry::make('status')->formatStateUsing(fn (PersonnelRequestStatus $state) => $state->label())->badge(),
+                    TextEntry::make('metadata.item_id')->label('Applies to')->formatStateUsing(fn ($state, $livewire): string => $livewire->getRecord()->items->firstWhere('id', $state)->item_name ?? 'Request item')->placeholder('Whole request'),
                     TextEntry::make('employee_visible_note')->label('Employee-visible note')->placeholder('—'),
                     TextEntry::make('internal_note')->label('Internal note')->placeholder('—'),
-                ])->columns(4),
+                ])->columns(5),
             ]),
             Section::make('Private attachments')->schema([
                 RepeatableEntry::make('attachments')->hiddenLabel()->schema([
