@@ -40,7 +40,8 @@ final class TreeService
     public function tree(Manual $manual): array
     {
         $nodes = $manual->nodes()->where('edition_id', $manual->active_edition_id)->where('is_active', true)
-            ->with(['currentRevision.pages'])->orderBy('sort_order')->orderBy('id')->get()->groupBy('parent_id');
+            ->with(['currentRevision.pages' => fn ($pages) => $pages->select(['id', 'revision_id', 'page', 'physical_page', 'printed_label', 'title'])])
+            ->orderBy('sort_order')->orderBy('id')->get()->groupBy('parent_id');
         $documents = [];
         $visit = function (?int $parentId) use (&$visit, $nodes, &$documents): array {
             return ($nodes[$parentId ?? ''] ?? collect())->map(function (ManualNode $node) use (&$visit, &$documents): array {
@@ -61,6 +62,26 @@ final class TreeService
         $tree = $visit(null);
 
         return ['manual' => $manual->only(['id', 'slug', 'name', 'type', 'description', 'active_edition_id']), 'nodes' => $tree, 'documents' => $documents];
+    }
+
+    /** Current visible document IDs, without PDF metadata or searchable page bodies. */
+    public function documentIds(Manual $manual): array
+    {
+        $nodes = $manual->nodes()->where('edition_id', $manual->active_edition_id)->where('is_active', true)
+            ->with(['currentRevision' => fn ($revisions) => $revisions->select(['id', 'state'])])
+            ->orderBy('sort_order')->orderBy('id')->get(['id', 'parent_id', 'current_revision_id'])->groupBy('parent_id');
+        $documents = [];
+        $visit = function (?int $parentId) use (&$visit, $nodes, &$documents): void {
+            foreach ($nodes[$parentId ?? ''] ?? [] as $node) {
+                if ($node->currentRevision?->state === 'published') {
+                    $documents[] = $node->id;
+                }
+                $visit($node->id);
+            }
+        };
+        $visit(null);
+
+        return $documents;
     }
 
     public function revisionData(DocumentRevision $revision): array
