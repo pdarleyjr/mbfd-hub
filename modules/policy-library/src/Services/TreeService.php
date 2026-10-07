@@ -47,7 +47,8 @@ final class TreeService
         $visit = function (?int $parentId) use (&$visit, $nodes, &$documents): array {
             return ($nodes[$parentId ?? ''] ?? collect())->map(function (ManualNode $node) use (&$visit, &$documents): array {
                 $revision = $node->currentRevision;
-                if ($revision && $revision->state === 'published') {
+                $published = $revision && $revision->state === 'published' && $revision->node_id === $node->id;
+                if ($published) {
                     $documents[] = $node->id;
                 }
 
@@ -55,7 +56,7 @@ final class TreeService
                     'id' => $node->id, 'parent_id' => $node->parent_id, 'slug' => $node->slug,
                     'title' => $node->title, 'short_title' => $node->short_title, 'type' => $node->type,
                     'metadata' => Arr::only($node->metadata ?? [], ['asset_id', 'review_edition', 'parent_identity_id']) + ['related_document_slugs' => array_values(array_filter($node->metadata['related_document_slugs'] ?? [], fn ($slug) => is_string($slug) && preg_match('/^[a-z0-9-]+$/', $slug)))],
-                    'sort_order' => $node->sort_order, 'revision' => $revision && $revision->state === 'published' ? $this->revisionData($revision) : null,
+                    'sort_order' => $node->sort_order, 'revision' => $published ? $this->revisionData($revision) : null,
                     'children' => $visit($node->id),
                 ];
             })->all();
@@ -79,12 +80,12 @@ final class TreeService
     public function documentIds(Manual $manual): array
     {
         $nodes = $manual->nodes()->where('edition_id', $manual->active_edition_id)->where('is_active', true)
-            ->with(['currentRevision' => fn ($revisions) => $revisions->select(['id', 'state', 'metadata->search_role as search_role', 'metadata->asset_id as asset_id'])])
+            ->with(['currentRevision' => fn ($revisions) => $revisions->select(['id', 'node_id', 'state', 'metadata->search_role as search_role', 'metadata->asset_id as asset_id'])])
             ->orderBy('sort_order')->orderBy('id')->get(['id', 'parent_id', 'current_revision_id', 'metadata->asset_id as asset_id', 'metadata->search_role as search_role'])->groupBy('parent_id');
         $documents = [];
         $visit = function (?int $parentId) use (&$visit, $nodes, &$documents): void {
             foreach ($nodes[$parentId ?? ''] ?? [] as $node) {
-                if ($node->currentRevision?->state === 'published') {
+                if ($node->currentRevision?->state === 'published' && $node->currentRevision->node_id === $node->id) {
                     $documents[] = $node->id;
                 }
                 $visit($node->id);

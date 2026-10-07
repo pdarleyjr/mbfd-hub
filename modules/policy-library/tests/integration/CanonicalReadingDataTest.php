@@ -7,6 +7,7 @@ namespace Mbfd\PolicyLibrary\Integration;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Mbfd\PolicyLibrary\Models\DocumentRevision;
 use Mbfd\PolicyLibrary\Models\Manual;
 use Mbfd\PolicyLibrary\Models\ManualNode;
 use Mbfd\PolicyLibrary\Services\ReadingViewService;
@@ -156,5 +157,53 @@ final class CanonicalReadingDataTest extends TestCase
             self::assertSame([$leaf->id], $trees->documentIds($manual));
             self::assertSame([$leaf->id], $trees->tree($manual)['documents']);
         }
+    }
+
+    private function foreignLeafRevision(Manual $manual, bool $otherManual): DocumentRevision
+    {
+        if ($otherManual) {
+            $manual = Manual::query()->create(['name' => 'Other manual', 'slug' => 'reading-other', 'type' => 'sog']);
+        }
+        $edition = $manual->editions()->create(['label' => 'Foreign edition', 'state' => 'published']);
+        $node = $edition->nodes()->create(['manual_id' => $manual->id, 'title' => 'Foreign policy', 'slug' => 'foreign-policy', 'metadata' => ['asset_id' => '100.01']]);
+
+        return $node->revisions()->create(['uuid' => (string) Str::uuid(), 'source_filename' => 'synthetic-foreign.pdf',
+            'storage_path' => 'revisions/'.str_repeat('b', 64).'.pdf', 'sha256' => str_repeat('b', 64),
+            'page_count' => 1, 'state' => 'published', 'metadata' => ['asset_id' => '100.01']]);
+    }
+
+    public function test_old_edition_revision_cannot_satisfy_current_aggregate_coverage(): void
+    {
+        [$manual, , $leaf] = $this->documents();
+        $leaf->update(['current_revision_id' => $this->foreignLeafRevision($manual, false)->id]);
+        $trees = $this->app->make(TreeService::class);
+        self::assertSame([], $trees->documentIds($manual));
+        $tree = $trees->tree($manual);
+        self::assertSame([], $tree['documents']);
+        self::assertNull($tree['nodes'][0]['revision']);
+        self::assertSame([], $this->app->make(SearchService::class)->search('SECTION-100', $manual->slug, $trees)['results']);
+    }
+
+    public function test_another_manual_revision_cannot_satisfy_current_aggregate_coverage(): void
+    {
+        [$manual, , $leaf] = $this->documents();
+        $leaf->update(['current_revision_id' => $this->foreignLeafRevision($manual, true)->id]);
+        $trees = $this->app->make(TreeService::class);
+        self::assertSame([], $trees->documentIds($manual));
+        self::assertSame([], $trees->tree($manual)['documents']);
+    }
+
+    public function test_protected_aggregate_asset_withholds_foreign_leaf_revision_coverage(): void
+    {
+        [$manual, $aggregate, $leaf] = $this->documents();
+        $leaf->update(['current_revision_id' => $this->foreignLeafRevision($manual, false)->id]);
+        File::makeDirectory($this->privateRoot.'/revisions', 0700, true);
+        // Controlled gate bytes only; this test makes no PDF fidelity claim.
+        File::put($this->privateRoot.'/revisions/'.str_repeat('a', 64).'.pdf', 'Synthetic aggregate gate fixture');
+        config()->set('policy-library.accel_prefix', null);
+        $user = $this->actingAsCanonicalFixture('QA-WEB-AGGREGATE', 'QA Aggregate');
+        $this->withSession(['policy-library.access' => ['user_id' => (string) $user->id,
+            'expires_at' => now()->timestamp + 60, 'pin_version' => hash('sha256', (string) config('policy-library.pin_hash'))]])
+            ->get('https://files.mbfdhub.com/assets/'.$aggregate->currentRevision->uuid)->assertNotFound();
     }
 }
