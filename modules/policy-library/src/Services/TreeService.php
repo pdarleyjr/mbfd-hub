@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Mbfd\PolicyLibrary\Services;
 
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use Mbfd\PolicyLibrary\Models\DocumentRevision;
 use Mbfd\PolicyLibrary\Models\Manual;
@@ -60,16 +61,26 @@ final class TreeService
             })->all();
         };
         $tree = $visit(null);
+        $allowed = $this->aggregateSafeDocuments($documents, $nodes->flatten(1));
+        $denied = array_diff($documents, $allowed);
+        $filter = function (array $branch) use (&$filter, $denied): array {
+            return array_values(array_map(function (array $node) use (&$filter): array {
+                $node['children'] = $filter($node['children']);
 
-        return ['manual' => $manual->only(['id', 'slug', 'name', 'type', 'description', 'active_edition_id']), 'nodes' => $tree, 'documents' => $documents];
+                return $node;
+            }, array_filter($branch, fn (array $node): bool => ! in_array($node['id'], $denied, true))));
+        };
+        $tree = $filter($tree);
+
+        return ['manual' => $manual->only(['id', 'slug', 'name', 'type', 'description', 'active_edition_id']), 'nodes' => $tree, 'documents' => $allowed];
     }
 
     /** Current visible document IDs, without PDF metadata or searchable page bodies. */
     public function documentIds(Manual $manual): array
     {
         $nodes = $manual->nodes()->where('edition_id', $manual->active_edition_id)->where('is_active', true)
-            ->with(['currentRevision' => fn ($revisions) => $revisions->select(['id', 'state'])])
-            ->orderBy('sort_order')->orderBy('id')->get(['id', 'parent_id', 'current_revision_id'])->groupBy('parent_id');
+            ->with(['currentRevision' => fn ($revisions) => $revisions->select(['id', 'state', 'metadata->search_role as search_role', 'metadata->asset_id as asset_id'])])
+            ->orderBy('sort_order')->orderBy('id')->get(['id', 'parent_id', 'current_revision_id', 'metadata->asset_id as asset_id'])->groupBy('parent_id');
         $documents = [];
         $visit = function (?int $parentId) use (&$visit, $nodes, &$documents): void {
             foreach ($nodes[$parentId ?? ''] ?? [] as $node) {
@@ -81,7 +92,41 @@ final class TreeService
         };
         $visit(null);
 
-        return $documents;
+        return $this->aggregateSafeDocuments($documents, $nodes->flatten(1));
+    }
+
+    /** Declared aggregates cannot reintroduce missing, hidden or unpublished leaves. */
+    private function aggregateSafeDocuments(array $documents, Collection $nodes): array
+    {
+        $visible = $nodes->filter(fn (ManualNode $node): bool => in_array($node->id, $documents, true));
+        $aggregates = $visible->filter(fn (ManualNode $node): bool => ($node->currentRevision->search_role ?? $node->currentRevision->metadata['search_role'] ?? null) === 'aggregate');
+        if ($aggregates->isEmpty()) {
+            return $documents;
+        }
+        $leafAssets = [];
+        foreach ($visible as $node) {
+            if ($aggregates->contains('id', $node->id)) {
+                continue;
+            }
+            $asset = $node->asset_id ?? $node->metadata['asset_id'] ?? null;
+            $revisionAsset = $node->currentRevision->asset_id ?? $node->currentRevision->metadata['asset_id'] ?? null;
+            if (is_string($asset) && $asset !== '' && $asset === $revisionAsset) {
+                $leafAssets[] = $asset;
+            }
+        }
+        $unloaded = $aggregates->filter(fn (ManualNode $node): bool => ! is_array($node->currentRevision->metadata))->pluck('current_revision_id');
+        $metadata = $unloaded->isEmpty() ? collect() : DocumentRevision::query()->whereIn('id', $unloaded)->pluck('metadata', 'id');
+        $denied = [];
+        foreach ($aggregates as $node) {
+            $leaves = ($node->currentRevision->metadata ?? $metadata[$node->current_revision_id] ?? [])['leaf_asset_ids'] ?? null;
+            if (! is_array($leaves) || $leaves === [] || count($leaves) > 2000
+                || count(array_filter($leaves, fn ($id): bool => is_string($id) && $id !== '')) !== count($leaves)
+                || count(array_unique($leaves)) !== count($leaves) || array_diff($leaves, $leafAssets) !== []) {
+                $denied[] = $node->id;
+            }
+        }
+
+        return array_values(array_diff($documents, $denied));
     }
 
     public function revisionData(DocumentRevision $revision): array
@@ -97,6 +142,7 @@ final class TreeService
             'page_count' => $revision->page_count, 'asset_url' => '/assets/'.$revision->uuid,
             'download_url' => '/assets/'.$revision->uuid.'/download',
             'canonical_url' => $revision->source_path ? '/assets/'.$revision->uuid.'/canonical' : null,
+            'reading_url' => ReadingViewService::available($revision) ? '/api/nodes/'.$revision->node_id.'/reading?revision='.$revision->uuid : null,
             'metadata' => $metadata,
             'pages' => $revision->pages->map(fn ($page) => $page->only(['page', 'physical_page', 'printed_label', 'title']))->all(),
         ];

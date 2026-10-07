@@ -20,7 +20,7 @@
     <a class="skip-link" href="#document-workspace">Skip to document</a>
     <header class="library-header">
         <button type="button" id="menu-toggle" class="icon-button" aria-label="Toggle manual navigation" aria-expanded="false" aria-controls="manual-sidebar">☰</button>
-        <img src="{{ asset('vendor/policy-library/images/mbfd-logo.png') }}" alt="Miami Beach Fire Rescue" width="48" height="48">
+        <img src="{{ asset('vendor/policy-library/images/mbfd-logo.png') }}" alt="Miami Beach Fire Rescue" width="48" height="48" decoding="async" fetchpriority="low">
         <div class="brand"><span>MIAMI BEACH FIRE RESCUE</span><h1>Policy &amp; Protocol Library</h1></div>
         <a id="manage-link" class="quiet-link" href="/manage" hidden>Manage library</a>
         <button id="pages-toggle" type="button" class="view-button" aria-controls="page-sidebar" aria-expanded="false">Pages</button>
@@ -56,8 +56,9 @@
             <section id="page-stage" class="page-stage" aria-label="PDF page">
                 <div id="viewer-message" class="viewer-message" role="status"><span class="document-symbol" aria-hidden="true">▤</span><h3>Ready when you need it</h3><p>Select SOGs or Medical Protocols, then choose a section.</p></div>
                 <div id="pdf-page" class="pdf-page" hidden><canvas id="pdf-canvas" aria-label="Original PDF document page"></canvas><div id="pdf-text" class="textLayer"></div><div id="pdf-links" class="pdf-links" aria-label="Document links"></div></div>
+                <article id="reading-page" class="reading-page" aria-label="Selected SOG reading text" hidden></article>
             </section>
-            <div id="reading-tools" class="reading-tools" aria-label="Reading size and pan controls"><button id="read-size" type="button" class="view-button" aria-pressed="false">Read size</button><button id="read-zoom-out" type="button" class="icon-button" aria-label="Reduce reading size">−</button><button id="read-zoom-in" type="button" class="icon-button" aria-label="Enlarge reading size">+</button><span id="pan-hint" class="pan-hint">Scroll to read</span><button id="pan-left" type="button" class="icon-button" aria-label="Pan document left">←</button><button id="pan-right" type="button" class="icon-button" aria-label="Pan document right">→</button></div>
+            <div id="reading-tools" class="reading-tools" aria-label="Reading size and pan controls"><button id="reading-format" type="button" class="view-button" aria-pressed="false" hidden>Reading text</button><button id="read-size" type="button" class="view-button" aria-pressed="false">Read size</button><button id="read-zoom-out" type="button" class="icon-button" aria-label="Reduce reading size">−</button><button id="read-zoom-in" type="button" class="icon-button" aria-label="Enlarge reading size">+</button><span id="pan-hint" class="pan-hint">Scroll to read</span><button id="pan-left" type="button" class="icon-button" aria-label="Pan document left">←</button><button id="pan-right" type="button" class="icon-button" aria-label="Pan document right">→</button></div>
             <p id="page-announcement" class="sr-only" aria-live="polite"></p>
         </main>
         <aside id="page-sidebar" class="page-sidebar" aria-label="Selected document pages"><div class="sidebar-heading"><span class="eyebrow">PAGES</span><button id="pages-close" type="button" class="icon-button" aria-label="Collapse pages panel">→</button></div><p id="thumbnail-title" class="thumbnail-title">Select a document</p><div id="page-thumbnails" class="page-thumbnails" aria-label="Selected document thumbnails"></div></aside>

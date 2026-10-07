@@ -10,6 +10,7 @@ const base=process.env.POLICY_LIBRARY_BROWSER_URL || 'http://127.0.0.1:8877';
 const report=process.env.READER_QA_LABEL || 'browser-regression';
 const browser=await chromium.launch({channel:'chrome',headless:true});
 const checks=[];
+const viewerErrors=[];
 let debugPage;
 const check=async(name,body)=>{await body();checks.push({name,status:'pass'});};
 try{
@@ -17,6 +18,7 @@ try{
  const page=await context.newPage();
  debugPage=page;
  const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ page.on('request',request=>{if(request.url().endsWith('/api/viewer-errors'))viewerErrors.push(request.postDataJSON());});
  const rendered=async()=>{await page.locator('#pdf-page:not([hidden])').waitFor();await page.locator('#pdf-text span').first().waitFor();};
  await page.goto(`${base}/?manual=sogs&node=${sog.slug}&page=1`);await rendered();
  await check('phone default read size uses actual source body glyphs with contained scrolling',async()=>{
@@ -102,4 +104,4 @@ try{
  });
  await context.close();
  await writeFile(path.join(evidence,`${report}.json`),JSON.stringify({capturedUtc:new Date().toISOString(),scope:'Loopback exact production catalog/native PDF/source candidate; authentication/admin mutations are excluded',checks,unexpectedPageErrors:errors},null,2));console.log(JSON.stringify({passed:checks.length,pageErrors:errors}));
-}catch(error){await debugPage?.screenshot({path:path.join(evidence,`${report}-failure.png`)});await writeFile(path.join(evidence,`${report}-failure.json`),JSON.stringify({checks,error:error.message,message:await debugPage?.locator('#viewer-message').innerText()},null,2));throw error;}finally{await browser.close();}
+}catch(error){await debugPage?.screenshot({path:path.join(evidence,`${report}-failure.png`)});await writeFile(path.join(evidence,`${report}-failure.json`),JSON.stringify({checks,viewerErrors,error:error.message,message:await debugPage?.locator('#viewer-message').innerText()},null,2));throw error;}finally{await browser.close();}

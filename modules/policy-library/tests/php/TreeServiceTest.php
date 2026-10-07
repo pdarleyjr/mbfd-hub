@@ -36,7 +36,8 @@ final class TreeServiceTest extends TestCase
         $this->assertSame(array_values($expected), $service->documentIds($manual));
         $this->assertCount(2, $queries);
         $this->assertStringNotContainsString('policy_pages', implode(' ', $queries));
-        $this->assertStringNotContainsString('metadata', implode(' ', $queries));
+        $this->assertStringContainsString('as "search_role"', implode(' ', $queries));
+        $this->assertStringNotContainsString('"metadata" from', implode(' ', $queries));
         $this->assertSame($service->tree($manual)['documents'], $service->documentIds($manual));
     }
 

@@ -3,6 +3,19 @@ import assert from 'node:assert/strict';
 import { getDocument } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { currentEditionChanged, linkRectangle, pageLink, pdfDestinationPage, pdfUrlTarget, primaryEntries, primaryHierarchy, recentlyPublished, resolveLibrarySelection, subjectAliases } from '../../resources/js/library-ui.js';
 
+test('individual canonical SOG takes precedence while full section remains directly selectable', () => {
+    const entry = { id: '100.01', slug: '100-01', title: 'Source title', physical_page: 2, semantic_pages: [2, 3] };
+    const aggregate = { id: 10, slug: 'asset-section-100', metadata: { asset_id: 'SECTION-100' }, revision: { page_count: 50, metadata: { primary_entries: [entry] } } };
+    const leaf = { id: 20, slug: '100-01-leaf', metadata: { asset_id: '100.01' }, revision: { page_count: 3, metadata: { primary_entries: [{ ...entry, physical_page: 1, semantic_pages: [1, 2, 3] }] } } };
+    for (const documents of [[aggregate, leaf], [leaf, aggregate]]) {
+        assert.equal(primaryEntries(documents).length, 1);
+        assert.equal(resolveLibrarySelection(documents, '100-01').node.id, 20);
+        assert.equal(resolveLibrarySelection(documents, '100-01').page, 1);
+        assert.equal(resolveLibrarySelection(documents, 'asset-section-100', 40).node.id, 10);
+        assert.equal(resolveLibrarySelection(documents, 'asset-section-100', 40).page, 40);
+    }
+});
+
 test('copy link retains exact logical document and page without temporary search state', () => {
     assert.equal(pageLink('https://files.mbfdhub.com/?q=private&manual=old#search', 'medical', 'procedures-pocus', 3),
         'https://files.mbfdhub.com/?manual=medical&node=procedures-pocus&page=3');

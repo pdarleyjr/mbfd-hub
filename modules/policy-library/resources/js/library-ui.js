@@ -11,9 +11,15 @@ export function pageLink(base, manual, node, page) {
 }
 
 export function primaryEntries(documents) {
-    return documents.flatMap(node => (node.revision.metadata?.primary_entries || []).filter(entry =>
+    const entries = documents.flatMap(node => (node.revision.metadata?.primary_entries || []).filter(entry =>
         entry.id && entry.slug && Number.isInteger(entry.physical_page) && entry.physical_page >= 1 && entry.physical_page <= node.revision.page_count,
     ).map(entry => ({ ...entry, node })));
+    const preferred = new Map();
+    for (const entry of entries) {
+        const prior = preferred.get(entry.id);
+        if (!prior || (entry.node.metadata?.asset_id === entry.id && prior.node.metadata?.asset_id !== entry.id)) preferred.set(entry.id, entry);
+    }
+    return [...preferred.values()];
 }
 
 export function primaryHierarchy(entries) {

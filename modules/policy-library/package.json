@@ -7,6 +7,7 @@
     "test": "node --test tests/js/*.test.mjs",
     "test:browser": "playwright test",
     "test:reader": "node tests/browser/reader-regression.mjs",
+    "test:reading-text": "node tests/browser/reading-text-regression.mjs",
     "preview:reader-tests": "node tests/browser/reader-server.mjs",
     "check": "node --check resources/js/viewer.js"
   },

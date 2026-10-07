@@ -25,6 +25,7 @@ const ui = {
     stage: byId('page-stage'), paper: byId('pdf-page'), canvas: byId('pdf-canvas'),
     text: byId('pdf-text'), links: byId('pdf-links'), message: byId('viewer-message'), sidebar: byId('manual-sidebar'),
     thumbnails: byId('page-thumbnails'), pageSidebar: byId('page-sidebar'),
+    reading: byId('reading-page'),
 };
 const state = {
     manuals: [], manual: null, tree: [], documents: [], entries: [], entry: null, node: null, page: 1,
@@ -34,6 +35,7 @@ const state = {
     editionId: null, editionCheck: null,
     mode: matchMedia('(max-width: 600px)').matches ? 'read' : 'width', zoom: 1,
     textSizes: new Map(),
+    representation: 'pdf', readingPreference: null, readingData: null, readingZoom: 1,
 };
 try {
     const preference = JSON.parse(localStorage.getItem('policy-library.reader-view'));
@@ -71,6 +73,7 @@ async function api(path, signal) {
 
 function showMessage(title, detail, retry) {
     ui.paper.hidden = true;
+    ui.reading.hidden = true;
     ui.message.replaceChildren(element('span', '▤', 'document-symbol'), element('h3', title), element('p', detail));
     if (retry) {
         const button = element('button', 'Retry', 'view-button');
@@ -191,6 +194,7 @@ function updateThumbnails() {
             button.append(element('span', '▤', 'thumbnail-placeholder'), element('span', `Page ${page}`, 'thumbnail-label'));
             button.addEventListener('click', () => {
                 const identity = state.entry?.slug || state.node.id;
+                state.readingPreference = 'pdf'; state.representation = 'pdf';
                 selectDocument(identity, page);
                 if (pagesAreDrawer()) { setPagesDrawer(false); byId('document-workspace').focus(); }
             });
@@ -507,11 +511,15 @@ function updateControls() {
     byId('read-size').setAttribute('aria-pressed', String(state.mode === 'read'));
     byId('read-size-option').setAttribute('aria-pressed', String(state.mode === 'read'));
     document.body.classList.toggle('is-reading-size', state.mode === 'read');
+    document.body.classList.toggle('is-text-reading', state.representation === 'reading');
+    byId('reading-format').hidden = !state.node?.revision.reading_url;
+    byId('reading-format').textContent = state.representation === 'reading' ? 'PDF view' : 'Reading text';
+    byId('reading-format').setAttribute('aria-pressed', String(state.representation === 'reading'));
     byId('zoom-value').value = `${Math.round(state.zoom * 100)}%`;
     byId('zoom-out').disabled = state.zoom <= 0.5;
     byId('zoom-in').disabled = state.zoom >= 3;
-    byId('read-zoom-out').disabled = !state.node || state.zoom <= 0.5;
-    byId('read-zoom-in').disabled = !state.node || state.zoom >= 3;
+    byId('read-zoom-out').disabled = !state.node || (state.representation === 'reading' ? state.readingZoom <= 1 : state.zoom <= 0.5);
+    byId('read-zoom-in').disabled = !state.node || (state.representation === 'reading' ? state.readingZoom >= 1.5 : state.zoom >= 3);
     byId('read-size').disabled = !state.node;
 }
 
@@ -576,11 +584,98 @@ async function renderLinks(page, viewport, pdf, generation) {
     if (generation === state.renderGeneration && pdf === state.pdf) ui.links.replaceChildren(...links);
 }
 
+async function renderReading(generation, pdf) {
+    const revision = state.node.revision;
+    if (state.readingData?.revision_id !== revision.id) state.readingData = await api(revision.reading_url);
+    if (generation !== state.renderGeneration || pdf !== state.pdf) return;
+    if (state.readingData.revision_id !== revision.id) throw new Error('Reading revision mismatch');
+    const identity = state.entry?.id || state.node.metadata?.asset_id;
+    const entry = state.readingData.entries.find(entry => entry.id === identity);
+    if (!entry) throw new Error('Reading identity unavailable');
+    const allowed = ownedPages(state.node, state.entry);
+    const blocks = entry.blocks.filter(block => allowed.includes(block.pdf_page));
+    if (!blocks.length) throw new Error('Reading text unavailable');
+    const items = [element('h2', entry.title), element('p', 'Original PDF available for tables, figures and forms.', 'reading-note')];
+    if (state.readingData.cover?.length) {
+        const cover = element('div', undefined, 'reading-cover');
+        for (const line of state.readingData.cover) cover.append(element('p', line));
+        const original = element('button', 'View original cover', 'source-page-link');
+        original.type = 'button';
+        original.addEventListener('click', () => {
+            state.readingPreference = 'pdf'; state.representation = 'pdf';
+            selectDocument(state.node.id, state.readingData.cover_pdf_page);
+        });
+        cover.append(original); items.push(cover);
+    }
+    let group, page;
+    for (const block of blocks) {
+        if (page !== block.pdf_page) {
+            page = block.pdf_page;
+            group = element('section', undefined, 'reading-source-page');
+            group.dataset.pdfPage = page;
+            const original = element('button', `Original PDF · page ${page}`, 'source-page-link');
+            original.type = 'button';
+            original.addEventListener('click', () => {
+                state.readingPreference = 'pdf'; state.representation = 'pdf';
+                selectDocument(state.entry?.slug || state.node.id, block.pdf_page);
+            });
+            group.append(original); items.push(group);
+        }
+        let item;
+        if (block.type === 'table') {
+            item = element('div', undefined, 'reading-table-scroll');
+            item.tabIndex = 0;
+            item.setAttribute('role', 'region');
+            item.setAttribute('aria-label', `Original table text, PDF page ${block.pdf_page}. Scroll horizontally if needed.`);
+            const table = element('table');
+            for (const row of block.rows) {
+                const tr = element('tr');
+                for (const cell of row) {
+                    const td = element(cell.header ? 'th' : 'td', cell.text);
+                    td.colSpan = cell.col_span; td.rowSpan = cell.row_span;
+                    if (cell.header) td.scope = 'col';
+                    td.dataset.pdfPage = cell.pdf_page;
+                    tr.append(td);
+                }
+                table.append(tr);
+            }
+            item.append(table);
+        } else item = element(block.type === 'heading' ? 'h3' : 'p', block.text, block.type === 'pdf_reference' ? 'reading-pdf-reference' : 'reading-block');
+        item.dataset.pdfPage = block.pdf_page;
+        group.append(item);
+        if (block.type === 'pdf_reference') {
+            const original = element('button', `View original PDF page ${block.pdf_page}`, 'view-button');
+            original.type = 'button';
+            original.addEventListener('click', () => {
+                state.readingPreference = 'pdf'; state.representation = 'pdf';
+                selectDocument(state.entry?.slug || state.node.id, block.pdf_page);
+            });
+            group.append(original);
+        }
+    }
+    ui.reading.replaceChildren(...items);
+    ui.reading.style.fontSize = `${18 * state.readingZoom}px`;
+    ui.reading.hidden = false; ui.paper.hidden = true; ui.message.hidden = true;
+    byId('pan-left').hidden = true; byId('pan-right').hidden = true;
+    byId('pan-hint').textContent = 'Text size';
+    updateThumbnails();
+    const selected = [...ui.reading.querySelectorAll('.reading-source-page')].find(group => Number(group.dataset.pdfPage) === state.page);
+    if (selected) ui.stage.scrollTop += selected.getBoundingClientRect().top - ui.stage.getBoundingClientRect().top - 8;
+    else ui.stage.scrollTop = 0;
+    ui.stage.scrollLeft = 0;
+    byId('page-announcement').textContent = `${entry.id} · ${entry.title}, reading text. Original PDF page links are available.`;
+}
+
 async function renderPage() {
     if (!state.pdf || !state.node) return;
     const generation = await cancelRendering();
     if (generation !== state.renderGeneration || !state.pdf || !state.node) return;
     const pdf = state.pdf;
+    if (state.representation === 'reading' && state.node.revision.reading_url) {
+        await renderReading(generation, pdf);
+        return;
+    }
+    ui.reading.hidden = true;
     const pageNumber = state.page;
     const page = await pdf.getPage(pageNumber);
     if (generation !== state.renderGeneration || pdf !== state.pdf) return;
@@ -660,6 +755,7 @@ async function selectCurrentDocument(nodeId, pageNumber, push = true, retry = fa
     state.node = selection.node;
     state.entry = selection.entry || null;
     state.page = selection.page;
+    state.representation = state.node.revision.reading_url && (state.readingPreference === 'reading' || (state.readingPreference === null && matchMedia('(max-width: 600px)').matches)) ? 'reading' : 'pdf';
     byId('copy-status').textContent = '';
     byId('copy-link-value').hidden = true;
     expandSelected(state.tree, state.node.id);
@@ -698,6 +794,7 @@ async function selectCurrentDocument(nodeId, pageNumber, push = true, retry = fa
             state.pdf = null;
             state.revisionId = null;
             state.textSizes.clear();
+            state.readingData = null;
             resetThumbnails();
             if (previousLoad) await previousLoad.destroy().catch(() => {});
             if (generation !== state.selectionGeneration) return;
@@ -749,6 +846,7 @@ async function loadManual(slug, selectedNode, pageNumber, push = true) {
     state.pdf = null;
     state.revisionId = null;
     state.textSizes.clear();
+    state.readingData = null;
     resetThumbnails();
     byId('thumbnail-title').textContent = 'Select a document';
     updateControls();
@@ -833,7 +931,17 @@ for (const [id, mode] of [['fit-page', 'page'], ['fit-width', 'width'], ['actual
     state.mode = mode; state.zoom = 1; saveViewPreference(); updateControls(); renderPage().catch(reportFailure);
 });
 for (const [id, delta] of [['zoom-in', 0.25], ['zoom-out', -0.25], ['read-zoom-in', 0.25], ['read-zoom-out', -0.25]]) byId(id).addEventListener('click', () => {
+    if (state.representation === 'reading' && id.startsWith('read-zoom-')) {
+        state.readingZoom = Math.max(1, Math.min(1.5, state.readingZoom + delta));
+        ui.reading.style.fontSize = `${18 * state.readingZoom}px`;
+        updateControls(); return;
+    }
     state.zoom = Math.max(0.5, Math.min(3, state.zoom + delta)); saveViewPreference(); updateControls(); renderPage().catch(reportFailure);
+});
+byId('reading-format').addEventListener('click', () => {
+    state.representation = state.representation === 'reading' ? 'pdf' : 'reading';
+    state.readingPreference = state.representation;
+    updateControls(); renderPage().catch(reportFailure);
 });
 byId('focus-mode').addEventListener('click', () => {
     const focus = document.body.classList.toggle('is-focus');

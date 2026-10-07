@@ -195,6 +195,22 @@
 .pdf-page { margin: 0 auto; }
 .reading-tools { display: none; flex-shrink: 0; gap: 4px; align-items: center; justify-content: center; padding: 4px 8px max(4px, env(safe-area-inset-bottom)); background: var(--paper); border-top: 1px solid var(--line); }
 .is-reading-size .reading-tools { display: flex; }
+.is-text-reading .reading-tools { display: flex; }
+.is-text-reading #read-size, .is-text-reading #pan-left, .is-text-reading #pan-right { display: none; }
+.reading-page { flex: 0 0 auto; margin-inline: auto; width: min(100%, 48rem); padding: clamp(16px, 3vw, 36px); background: var(--paper); color: var(--ink); font-size: 18px; line-height: 1.65; overflow-wrap: anywhere; }
+.reading-page h2 { margin: 0 0 8px; font-size: 1.35em; line-height: 1.35; }
+.reading-page h3 { margin: 22px 0 8px; font-size: 1.05em; line-height: 1.5; }
+.reading-block { margin-block: 8px 18px; white-space: pre-wrap; }
+.reading-note { font-size: 13px; color: var(--secondary); line-height: 1.6; margin: 0 0 16px; }
+.reading-cover { border-block: 1px solid var(--line); padding-block: 12px; margin-bottom: 16px; font-size: 16px; line-height: 1.5; }
+.reading-cover p { margin-block: 4px; }
+.reading-source-page + .reading-source-page { border-top: 1px solid var(--line); padding-top: 20px; margin-top: 28px; }
+.source-page-link { display: inline-flex; align-items: center; min-height: 44px; border: 0; background: transparent; color: var(--aqua); padding: 4px 0; font-size: 13px; font-weight: 600; }
+.reading-pdf-reference { font-size: 16px; line-height: 1.6; border-top: 1px solid var(--line); padding-top: 12px; }
+.reading-table-scroll { max-width: 100%; overflow: auto; margin-block: 16px; overscroll-behavior: contain; border: 1px solid var(--line); }
+.reading-table-scroll table { border-collapse: collapse; font-size: 17px; line-height: 1.55; width: 100%; }
+.reading-table-scroll td, .reading-table-scroll th { padding: 10px; border: 1px solid var(--line); white-space: pre-wrap; vertical-align: top; min-width: 120px; }
+.reading-table-scroll th { background: var(--control); text-align: left; font-weight: 700; }
 .pan-hint { color: var(--secondary); font-size: 12px; margin-inline: 8px; }
 .focus-pages { display: none; }
 .is-focus .focus-pages { display: inline-flex; }
