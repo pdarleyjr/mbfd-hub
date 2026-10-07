@@ -8,6 +8,7 @@ use App\Models\AssignedEquipment;
 use App\Models\Employee;
 use App\Models\PersonnelRequestItem;
 use App\Models\Uniform;
+use App\Services\PersonnelRequests\UniformEntitlementService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -29,7 +30,12 @@ class UniformInventoryService
         }
 
         return DB::transaction(function () use ($uniform, $employee, $quantity, $issuedAt, $notes, $sourceItem, $expiresAt): AssignedEquipment {
+            $entitlements = app(UniformEntitlementService::class);
+            $beneficiary = $entitlements->lockIssueRecipient($employee);
             $inventory = Uniform::query()->lockForUpdate()->findOrFail($uniform->getKey());
+            if ($entitlements->isJacketStock($inventory, $sourceItem)) {
+                $entitlements->assertJacketIssueAllowed($beneficiary, $quantity, $issuedAt);
+            }
 
             if ($inventory->quantity_on_hand < $quantity) {
                 throw ValidationException::withMessages([
@@ -44,7 +50,7 @@ class UniformInventoryService
 
             $assignment = AssignedEquipment::create([
                 'user_id' => null,
-                'employee_portal_id' => $employee->getKey(),
+                'employee_portal_id' => $beneficiary->id,
                 'uniform_id' => $inventory->getKey(),
                 'category' => 'Uniform Inventory',
                 'item_description' => $description,

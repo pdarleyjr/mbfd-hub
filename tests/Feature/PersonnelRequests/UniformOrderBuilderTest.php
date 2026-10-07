@@ -16,6 +16,7 @@ use App\Services\BidAssignmentReceiver;
 use App\Services\PersonnelRequests\PersonnelRequestFulfillmentService;
 use App\Services\PersonnelRequests\PersonnelRequestSubmissionService;
 use App\Services\PersonnelRequests\PersonnelRequestWorkflowService;
+use App\Services\PersonnelRequests\UniformOrderCatalog;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -96,6 +97,42 @@ final class UniformOrderBuilderTest extends TestCase
             ->assertOk()->assertSee('34x32')->assertSee($request->request_number);
         $this->actingAs($this->admin())->get('/admin/personnel-uniforms-equipment/personnel-requests/'.$request->public_id)
             ->assertOk()->assertSee('34x32')->assertSee('Workflow history');
+    }
+
+    public function test_new_orders_hide_removed_products_without_removing_legacy_request_support(): void
+    {
+        $this->withoutVite();
+        $employee = $this->employee('UNIFORM-LEGACY-SHIRT');
+        $this->actingAs($employee, 'employee');
+        $this->bindCanonicalSessionToLivewireTestRequests();
+        Filament::setCurrentPanel(Filament::getPanel('employee'));
+        $builder = Livewire::test(RequestEquipmentPage::class);
+
+        $legacyProducts = [
+            'uniform_shirt' => 'Uniform Shirt',
+            'work_boots' => 'Footwear — Boots or Dress Shoes',
+            'class_a_coat' => 'Class A Coat',
+        ];
+        foreach ($legacyProducts as $code => $label) {
+            $this->assertArrayNotHasKey($code, $builder->get('data.items'));
+            $builder->assertViewHas('products', fn (array $products): bool => ! array_key_exists($code, $products))
+                ->assertDontSee('data-product="'.$code.'"', false);
+            $this->assertSame($label, app(UniformOrderCatalog::class)->product($code)['label']);
+        }
+
+        $request = app(PersonnelRequestSubmissionService::class)->submitUniform($employee, array_map(
+            fn (string $code): array => ['item_code' => $code, 'size' => 'L', 'quantity' => 1],
+            array_keys($legacyProducts),
+        ), 'legacy-removed-uniform-items-1');
+        $this->assertEqualsCanonicalizing(array_keys($legacyProducts), $request->items->pluck('item_code')->all());
+        $legacyLabels = ['Uniform Shirt', 'Work Boots', 'Class A Coat'];
+        $this->assertEqualsCanonicalizing($legacyLabels, $request->items->pluck('item_name')->all());
+        $memberResponse = $this->get('/employee/my-requests/'.$request->public_id)->assertOk();
+        $adminResponse = $this->actingAs($this->admin())->get('/admin/personnel-uniforms-equipment/personnel-requests/'.$request->public_id)->assertOk();
+        foreach ($legacyLabels as $label) {
+            $memberResponse->assertSee($label);
+            $adminResponse->assertSee($label);
+        }
     }
 
     public function test_retry_keeps_original_items_note_snapshot_and_single_submission_event(): void

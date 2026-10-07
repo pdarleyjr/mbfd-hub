@@ -36,6 +36,10 @@ class NotificationSettings extends Page implements HasForms
         /** @var User|null $user */
         $user = Auth::user();
 
+        if ($user instanceof User) {
+            UserNotificationSubscription::ensurePersonnelRequestsForUser($user);
+        }
+
         $subscriptions = $user instanceof User
             ? $user->notificationSubscriptions()->get()->keyBy('event_key')
             : collect();
@@ -44,8 +48,8 @@ class NotificationSettings extends Page implements HasForms
                 $subscription = $subscriptions->get($key);
 
                 return [$key => [
-                    'database' => $subscription instanceof UserNotificationSubscription
-                        && $subscription->database_enabled,
+                    'database' => $key === User::NOTIFICATION_PREFERENCE_MEMBER_REQUEST_UPDATES || ($subscription instanceof UserNotificationSubscription
+                        && $subscription->database_enabled),
                     'webpush' => $subscription instanceof UserNotificationSubscription
                         && $subscription->webpush_enabled,
                     'email' => $subscription instanceof UserNotificationSubscription
@@ -69,7 +73,9 @@ class NotificationSettings extends Page implements HasForms
                 ...collect($definitions)->map(
                     fn (array $definition, string $key): Fieldset => Fieldset::make($definition['label'])
                         ->schema([
-                            Toggle::make("{$key}.database")->label('Admin inbox'),
+                            Toggle::make("{$key}.database")
+                                ->label(($definition['essential_in_app'] ?? false) ? 'In-app alerts (always enabled)' : 'Admin inbox')
+                                ->disabled((bool) ($definition['essential_in_app'] ?? false)),
                             Toggle::make("{$key}.webpush")->label('Web push'),
                             Toggle::make("{$key}.email")->label('City email'),
                         ])
@@ -91,7 +97,7 @@ class NotificationSettings extends Page implements HasForms
         foreach (array_keys(User::notificationPreferenceDefinitions()) as $key) {
             $channels = (array) ($data[$key] ?? []);
             $user->notificationSubscriptions()->updateOrCreate(['event_key' => $key], [
-                'database_enabled' => (bool) ($channels['database'] ?? false),
+                'database_enabled' => $key === User::NOTIFICATION_PREFERENCE_MEMBER_REQUEST_UPDATES || (bool) ($channels['database'] ?? false),
                 'webpush_enabled' => (bool) ($channels['webpush'] ?? false),
                 'email_enabled' => (bool) ($channels['email'] ?? false),
             ]);

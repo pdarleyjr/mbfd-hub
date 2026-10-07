@@ -171,7 +171,7 @@ final class UniformOrderDomainTest extends TestCase
         self::assertSame(1, $context['allowances']['marine_shoes']);
         self::assertSame(3, $context['allowances']['marine_shorts']);
         self::assertCount(1, $summary['warnings']);
-        self::assertStringContainsString('Issue history is not available', $summary['warnings'][0]);
+        self::assertStringContainsString('every 3 years from its issue date', $summary['warnings'][0]);
         self::assertSame('every_3_years', app(UniformOrderCatalog::class)->product('raincoat')['frequency']);
     }
 

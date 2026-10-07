@@ -8,6 +8,7 @@ use App\Filament\Clusters\PersonnelUniformsEquipment\Resources\PersonnelEmployee
 use App\Models\AssignedEquipment;
 use App\Models\Employee;
 use App\Models\Uniform;
+use App\Services\PersonnelRequests\UniformEntitlementService;
 use App\Services\UniformInventoryService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
@@ -17,6 +18,8 @@ use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 class ViewPersonnelEmployee extends ViewRecord
 {
@@ -48,14 +51,32 @@ class ViewPersonnelEmployee extends ViewRecord
                 DatePicker::make('expires_at')->afterOrEqual('issued_at'),
                 Textarea::make('notes')->maxLength(2000),
             ])->action(function (array $data) use ($employee): void {
-                DB::transaction(fn () => $employee->assignedEquipment()->create([
-                    ...$data,
-                    'user_id' => null,
-                    'status' => 'active',
-                ]));
+                DB::transaction(function () use ($employee, $data): void {
+                    if ($data['category'] === 'Jacket') {
+                        $this->validateManualJacket($employee, $data);
+                    }
+                    $employee->assignedEquipment()->create([
+                        ...$data,
+                        'user_id' => null,
+                        'status' => 'active',
+                    ]);
+                });
                 Notification::make()->title('Equipment assigned')->success()->send();
             }),
         ];
+    }
+
+    private function validateManualJacket(Employee $employee, array $data): void
+    {
+        try {
+            Validator::make($data, ['quantity' => ['required', 'integer', 'in:1']])->validate();
+            app(UniformEntitlementService::class)->assertJacketIssueAllowed($employee, (int) $data['quantity'], $data['issued_at']);
+        } catch (ValidationException $exception) {
+            $prefix = $this->getMountedActionForm()->getStatePath();
+            throw ValidationException::withMessages(collect($exception->errors())->mapWithKeys(fn (array $messages, string $key): array => [
+                $prefix.'.'.($key === 'employee' ? 'quantity' : $key) => $messages,
+            ])->all());
+        }
     }
 
     protected function getViewData(): array

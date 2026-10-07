@@ -6,6 +6,7 @@ use App\Filament\Resources\UniformResource;
 use App\Models\AssignedEquipment;
 use App\Models\Employee;
 use App\Models\Uniform;
+use App\Services\PersonnelRequests\UniformEntitlementService;
 use App\Services\UniformInventoryService;
 use Filament\Actions;
 use Filament\Forms\Components\DatePicker;
@@ -15,6 +16,9 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Get;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ListRecords;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 class ListUniforms extends ListRecords
 {
@@ -144,16 +148,22 @@ class ListUniforms extends ListRecords
                             $data['issued_at'],
                             $data['notes'] ?? null,
                         )
-                        : AssignedEquipment::create([
-                            'employee_portal_id' => $employee->id,
-                            'user_id' => null,
-                            'uniform_id' => null,
-                            'category' => $data['category'],
-                            'item_description' => $data['item_description'],
-                            'quantity' => $data['quantity'],
-                            'issued_at' => $data['issued_at'],
-                            'notes' => $data['notes'] ?? null,
-                        ]);
+                        : DB::transaction(function () use ($employee, $data): AssignedEquipment {
+                            if ($data['category'] === 'Jacket') {
+                                $this->validateManualJacket($employee, $data);
+                            }
+
+                            return AssignedEquipment::create([
+                                'employee_portal_id' => $employee->id,
+                                'user_id' => null,
+                                'uniform_id' => null,
+                                'category' => $data['category'],
+                                'item_description' => $data['item_description'],
+                                'quantity' => $data['quantity'],
+                                'issued_at' => $data['issued_at'],
+                                'notes' => $data['notes'] ?? null,
+                            ]);
+                        });
 
                     // Send Filament database notification to the employee (employee guard)
                     Notification::make()
@@ -171,5 +181,18 @@ class ListUniforms extends ListRecords
                 }),
             Actions\CreateAction::make(),
         ];
+    }
+
+    private function validateManualJacket(Employee $employee, array $data): void
+    {
+        try {
+            Validator::make($data, ['quantity' => ['required', 'integer', 'in:1']])->validate();
+            app(UniformEntitlementService::class)->assertJacketIssueAllowed($employee, (int) $data['quantity'], $data['issued_at']);
+        } catch (ValidationException $exception) {
+            $prefix = $this->getMountedActionForm()->getStatePath();
+            throw ValidationException::withMessages(collect($exception->errors())->mapWithKeys(fn (array $messages, string $key): array => [
+                $prefix.'.'.($key === 'employee' ? 'employee_portal_id' : $key) => $messages,
+            ])->all());
+        }
     }
 }

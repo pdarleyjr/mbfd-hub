@@ -13,12 +13,19 @@ $neck = ['key' => 'neck', 'label' => 'Neck (inches)', 'type' => 'number', 'min' 
 $shoeSize = ['key' => 'shoe_size', 'label' => 'Shoe size (US)', 'type' => 'number', 'min' => 1, 'max' => 30, 'step' => 0.5, 'required' => true,
     'help' => 'Enter your requested size; Support Services will confirm the vendor sizing.'];
 $measurementHelp = 'Enter your measurements; Support Services will confirm available vendor sizes.';
+$jacketStyles = [
+    'vintage' => ['label' => 'MBFD Vintage jacket', 'asset' => 'jacket-vintage'],
+    'quarter_zip' => ['label' => '5.11 Quarter Zip', 'asset' => 'jacket-quarter-zip'],
+    'softshell' => ['label' => '5.11 Softshell', 'asset' => 'jacket-softshell'],
+];
 
 return [
     'version' => '2026-10-07',
     'form_version' => 'uniform-builder-v1',
     'quantity_max' => 999,
     'note_max' => 4000,
+    'jacket_styles' => $jacketStyles,
+    'legacy_jacket_stock_labels' => ['Winter Jacket'],
     'categories' => [
         'dress' => 'Dress Uniform',
         'work' => 'Work Uniforms',
@@ -49,7 +56,7 @@ return [
     ],
     'marine_allowances' => ['marine_shorts' => 3, 'marine_ss' => 3, 'marine_ls' => 3, 'marine_shoes' => 1],
     'three_year_allowances' => ['jackets' => 1, 'raincoats' => 1],
-    'three_year_message' => 'Winter jacket and raincoat are provided every 3 years. Issue history is not available here, so whether you are due must be confirmed by Support Services.',
+    'three_year_message' => 'One jacket is provided every 3 years from its issue date. Raincoat issue history must be confirmed by Support Services.',
     'swap' => ['from' => 'jumpsuits', 'to' => ['polos', 'pants'], 'rate' => 1],
     'assignment_matching' => [
         'marine' => '/\b(?:marine|fire\s*boat)\b/i',
@@ -65,9 +72,10 @@ return [
             'fields' => [$neck, ['key' => 'sleeve_length', 'label' => 'Sleeve length (inches)', 'type' => 'number', 'min' => 1, 'max' => 60, 'step' => 0.5, 'required' => true]],
             'variant' => ['sleeve' => 'long'], 'asset' => 'class-a-long', 'help' => $measurementHelp],
         'class_a_pants' => ['label' => 'Class A Pants', 'category' => 'dress', 'group' => 'dress_pants',
+            'asset' => 'class-a-pants',
             'fields' => [$waist, $inseam, ['key' => 'color', 'label' => 'Requested color', 'type' => 'select', 'options' => ['navy' => 'Navy', 'black' => 'Black'], 'required' => true]],
             'help' => $measurementHelp],
-        'tie' => ['label' => 'Uniform Tie', 'category' => 'dress', 'group' => 'ties', 'fields' => []],
+        'tie' => ['label' => 'Uniform Tie', 'category' => 'dress', 'group' => 'ties', 'fields' => [], 'asset' => 'tie'],
         'work_boots' => ['label' => 'Footwear — Boots or Dress Shoes', 'category' => 'dress', 'group' => 'footwear',
             'fields' => [['key' => 'footwear_type', 'label' => 'Footwear type', 'type' => 'select', 'options' => ['boots' => 'Boots', 'dress_shoes' => 'Dress shoes'], 'required' => true], $shoeSize, $cut,
                 ['key' => 'width', 'label' => 'Requested width', 'type' => 'text', 'max_length' => 30, 'required' => false, 'help' => 'Use the width shown on your current footwear, if known.']],
@@ -90,8 +98,11 @@ return [
             'fields' => [$size], 'variant' => ['sleeve' => 'long'], 'asset' => 'tshirt-long'],
         'belt' => ['label' => 'JUKMO Work Belt', 'category' => 'accessories', 'group' => 'belts', 'asset' => 'belt',
             'fields' => [['key' => 'size', 'label' => 'Size', 'type' => 'select', 'options' => ['S' => 'S', 'M' => 'M', 'L' => 'L', 'XL' => 'XL', 'XXL' => 'XXL'], 'required' => true]]],
-        'jacket' => ['label' => 'Winter Jacket', 'category' => 'accessories', 'group' => 'jackets', 'fields' => [$size], 'frequency' => 'every_3_years'],
-        'raincoat' => ['label' => 'Raincoat', 'category' => 'accessories', 'group' => 'raincoats', 'fields' => [$size], 'frequency' => 'every_3_years'],
+        'jacket' => ['label' => 'Jacket', 'category' => 'accessories', 'group' => 'jackets', 'quantity_max' => 1,
+            'asset' => 'jacket-vintage',
+            'fields' => [['key' => 'jacket_style', 'label' => 'Jacket style', 'type' => 'select', 'options' => array_map(fn (array $style): string => $style['label'], $jacketStyles), 'required' => true], $size],
+            'frequency' => 'every_3_years', 'help' => 'Choose one style. The 3-year cycle begins when your jacket is issued.'],
+        'raincoat' => ['label' => 'Raincoat', 'category' => 'accessories', 'group' => 'raincoats', 'fields' => [$size], 'frequency' => 'every_3_years', 'asset' => 'raincoat'],
         'class_a_coat' => ['label' => 'Class A Coat', 'category' => 'dress', 'group' => 'class_a_coats',
             'fields' => [['key' => 'size', 'label' => 'Requested size', 'type' => 'text', 'max_length' => 30, 'required' => true]],
             'help' => 'Existing uniform catalog item. Enter your current coat size for Support Services review.'],

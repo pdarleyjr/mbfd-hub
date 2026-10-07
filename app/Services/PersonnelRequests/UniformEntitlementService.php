@@ -4,12 +4,133 @@ declare(strict_types=1);
 
 namespace App\Services\PersonnelRequests;
 
+use App\Enums\PersonnelRequestStatus;
+use App\Enums\PersonnelRequestType;
+use App\Models\AssignedEquipment;
 use App\Models\Employee;
+use App\Models\PersonnelRequestItem;
+use App\Models\Uniform;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
 final class UniformEntitlementService
 {
     public function __construct(private readonly UniformOrderCatalog $catalog) {}
+
+    /** Jacket styles share one allowance, measured from an actual recorded issue. */
+    public function jacketEligibility(Employee $employee): array
+    {
+        // Check outstanding requests before issues so a concurrently completed issue
+        // cannot disappear between checking its request and checking its issue date.
+        $pending = $employee->personnelRequests()->where('type', PersonnelRequestType::Uniform)
+            ->whereNotIn('status', [PersonnelRequestStatus::Denied, PersonnelRequestStatus::Cancelled])
+            ->whereHas('items', fn (Builder $query) => $query->where('item_code', 'jacket'))
+            ->where(fn (Builder $query) => $query->where('status', '!=', PersonnelRequestStatus::Completed)
+                ->orWhereHas('items', fn (Builder $items) => $items->where('item_code', 'jacket')
+                    ->where(fn (Builder $unfulfilled) => $unfulfilled->where('fulfillment_status', '!=', 'fulfilled')
+                        ->orWhereColumn('fulfilled_quantity', '<', 'quantity'))))
+            ->exists();
+        $lastIssue = $this->lastJacketIssue($employee);
+        $issuedAt = $lastIssue?->issued_at;
+        $eligibleFrom = $issuedAt?->copy()->addYearsNoOverflow(3);
+        $recentIssue = $eligibleFrom !== null && today()->lt($eligibleFrom);
+        $reason = $pending ? 'You already have a jacket request awaiting issue. View it in My Requests.'
+            : ($recentIssue ? 'Your last jacket was issued on '.$issuedAt->format('M j, Y').'. You may request one again from '.$eligibleFrom->format('M j, Y').'.'
+                : ($issuedAt ? 'You may request one jacket. All three styles share the same 3-year allowance.'
+                    : 'You may request one jacket. Support Services will confirm any earlier off-system issue history.'));
+
+        return [
+            'can_order' => ! $pending && ! $recentIssue,
+            'reason' => $reason,
+            'last_issued_at' => $issuedAt?->toDateString(),
+            'eligible_from' => $eligibleFrom?->toDateString(),
+        ];
+    }
+
+    public function isJacketStock(Uniform $uniform, ?PersonnelRequestItem $sourceItem = null): bool
+    {
+        return $sourceItem?->item_code === 'jacket' || in_array($uniform->item_name, $this->jacketStockLabels(), true);
+    }
+
+    /** Issuance ignores pending holds; an actual issue starts the shared cycle. */
+    public function assertJacketIssueAllowed(Employee|User $recipient, int $quantity, string $issuedAt): void
+    {
+        $recipient = $this->lockIssueRecipient($recipient);
+        if ($quantity !== 1) {
+            throw ValidationException::withMessages(['quantity' => 'Issue only one jacket. All three styles share one allowance every 3 years.']);
+        }
+        Validator::make(['issued_at' => $issuedAt], ['issued_at' => ['required', 'date', 'before_or_equal:today']])->validate();
+        $lastIssue = $this->lastJacketIssue($recipient);
+        $eligibleFrom = $lastIssue?->issued_at?->copy()->addYearsNoOverflow(3);
+        if ($eligibleFrom !== null && Carbon::parse($issuedAt)->startOfDay()->lt($eligibleFrom)) {
+            throw ValidationException::withMessages(['issued_at' => 'The next jacket may be issued from '.$eligibleFrom->format('M j, Y').'. The 3-year cycle starts when issued.']);
+        }
+    }
+
+    public function lockIssueRecipient(Employee|User $recipient): Employee|User
+    {
+        if ($recipient instanceof User) {
+            $user = User::query()->lockForUpdate()->findOrFail($recipient->id);
+            if ($user->employee_profile_id === null) {
+                return $user;
+            }
+            $employee = Employee::query()->whereKey($user->employee_profile_id)->where('employee_id', $user->employee_id)->lockForUpdate()->first();
+        } else {
+            $user = User::query()->where('employee_profile_id', $recipient->id)->lockForUpdate()->first();
+            $employee = Employee::query()->lockForUpdate()->findOrFail($recipient->id);
+            if ($user && $user->employee_id !== $employee->employee_id) {
+                $employee = null;
+            }
+        }
+        if ($employee === null) {
+            throw ValidationException::withMessages(['employee' => 'Confirm the existing canonical personnel link before issuing inventory.']);
+        }
+
+        return $employee;
+    }
+
+    private function jacketStockLabels(): array
+    {
+        return array_unique(array_merge([
+            $this->catalog->product('jacket')['label'],
+            config('personnel_requests.uniform_catalog.jacket.label'),
+        ], config('uniform_orders.legacy_jacket_stock_labels', []), array_column(config('uniform_orders.jacket_styles'), 'label')));
+    }
+
+    private function lastJacketIssue(Employee|User $recipient): ?AssignedEquipment
+    {
+        $names = $this->jacketStockLabels();
+        $query = AssignedEquipment::query()->whereNotNull('issued_at');
+        if ($recipient instanceof User) {
+            $query->where('user_id', $recipient->id);
+        } else {
+            $query->where(fn (Builder $owned) => $owned->where('employee_portal_id', $recipient->id)
+                ->orWhere(fn (Builder $legacy) => $legacy->whereNull('employee_portal_id')
+                    ->whereHas('user', fn (Builder $users) => $users->where('employee_profile_id', $recipient->id)->where('employee_id', $recipient->employee_id))));
+        }
+
+        return $query->where(fn (Builder $match) => $match->whereHas('sourcePersonnelRequestItem', fn (Builder $items) => $items->where('item_code', 'jacket'))
+            ->orWhereHas('uniform', fn (Builder $uniforms) => $uniforms->whereIn('item_name', $names))
+            ->orWhere(fn (Builder $legacy) => $legacy->whereNull('source_personnel_request_item_id')->where('category', 'Jacket')))
+            ->orderByDesc('issued_at')->first();
+    }
+
+    public function validateJacketQuantity(array $items): void
+    {
+        $total = 0;
+        foreach ($items as $index => $item) {
+            if (! is_array($item) || ($item['item_code'] ?? null) !== 'jacket') {
+                continue;
+            }
+            $quantity = filter_var($item['quantity'] ?? null, FILTER_VALIDATE_INT);
+            if (is_bool($item['quantity'] ?? null) || $quantity !== 1 || ++$total > 1) {
+                throw ValidationException::withMessages(["items.{$index}.quantity" => 'Choose only one jacket. All three styles share one allowance every 3 years.']);
+            }
+        }
+    }
 
     public function forEmployee(Employee $employee): array
     {
@@ -166,6 +287,7 @@ final class UniformEntitlementService
         if ($items === []) {
             throw ValidationException::withMessages(['items' => 'Select at least one uniform item.']);
         }
+        $this->validateJacketQuantity($items);
         $errors = [];
         $normalized = [];
         foreach ($items as $index => $item) {
@@ -183,8 +305,9 @@ final class UniformEntitlementService
                 continue;
             }
             $quantity = filter_var($item['quantity'] ?? null, FILTER_VALIDATE_INT);
-            if (is_bool($item['quantity'] ?? null) || $quantity === false || $quantity < 1 || $quantity > config('uniform_orders.quantity_max')) {
-                $errors[$path.'.quantity'] = 'Enter a whole quantity between 1 and '.config('uniform_orders.quantity_max').'.';
+            $quantityMax = $product['quantity_max'] ?? config('uniform_orders.quantity_max');
+            if (is_bool($item['quantity'] ?? null) || $quantity === false || $quantity < 1 || $quantity > $quantityMax) {
+                $errors[$path.'.quantity'] = 'Enter a whole quantity between 1 and '.$quantityMax.'.';
             }
             $attributes = $item['metadata'] ?? $item['attributes'] ?? [];
             if (! is_array($attributes)) {
@@ -225,7 +348,8 @@ final class UniformEntitlementService
             }
             $normalized[] = [
                 'item_code' => $code,
-                'item_name' => $product['label'],
+                'item_name' => $code === 'jacket' && isset($metadata['jacket_style'])
+                    ? config('uniform_orders.jacket_styles.'.$metadata['jacket_style'].'.label') : $product['label'],
                 'category' => 'uniform',
                 'quantity' => $quantity,
                 'size' => $this->canonicalSize($metadata, $product),

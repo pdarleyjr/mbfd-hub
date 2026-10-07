@@ -15,6 +15,7 @@ final class CanonicalSessionIssuer
         private readonly CanonicalSessionPolicy $policy,
         private readonly SessionRegistry $sessions,
         private readonly CityEmailVerificationService $cityEmail,
+        private readonly CanonicalNotificationInbox $inbox,
     ) {}
 
     public function issue(Request $request, User $user): string
@@ -22,6 +23,7 @@ final class CanonicalSessionIssuer
         if (! $user->isAuthenticationAllowed()) {
             throw new \LogicException('A canonical session cannot be issued for this account.');
         }
+        $this->inbox->migrateEmployeeAlerts($user);
         Auth::guard('web')->login($user, false);
         $request->session()->regenerate();
         $issuedAt = CarbonImmutable::now();

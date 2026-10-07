@@ -55,6 +55,12 @@ class User extends Authenticatable implements FilamentUser
 
     public const NOTIFICATION_PREFERENCE_HUB_SUPPORT_TICKETS = 'hub_support_tickets';
 
+    public const NOTIFICATION_PREFERENCE_UNIFORM_REQUESTS = 'uniform_requests';
+
+    public const NOTIFICATION_PREFERENCE_PERSONNEL_EQUIPMENT_REQUESTS = 'personnel_equipment_requests';
+
+    public const NOTIFICATION_PREFERENCE_MEMBER_REQUEST_UPDATES = 'member_request_updates';
+
     /**
      * The current roles that grant access to the Filament admin panel.
      *
@@ -94,6 +100,9 @@ class User extends Authenticatable implements FilamentUser
         self::NOTIFICATION_PREFERENCE_STATION_INVENTORY_ALERTS => true,
         self::NOTIFICATION_PREFERENCE_DEPARTMENT_UPDATES => true,
         self::NOTIFICATION_PREFERENCE_HUB_SUPPORT_TICKETS => false,
+        self::NOTIFICATION_PREFERENCE_UNIFORM_REQUESTS => true,
+        self::NOTIFICATION_PREFERENCE_PERSONNEL_EQUIPMENT_REQUESTS => true,
+        self::NOTIFICATION_PREFERENCE_MEMBER_REQUEST_UPDATES => true,
     ];
 
     /**
@@ -356,6 +365,19 @@ class User extends Authenticatable implements FilamentUser
                 'label' => 'Website / App Issue Reports',
                 'description' => 'Receive reports from members about MBFD Hub problems.',
             ],
+            self::NOTIFICATION_PREFERENCE_UNIFORM_REQUESTS => [
+                'label' => 'Uniform Requests',
+                'description' => 'Receive new uniform orders and member replies for Support Services review.',
+            ],
+            self::NOTIFICATION_PREFERENCE_PERSONNEL_EQUIPMENT_REQUESTS => [
+                'label' => 'Personnel Equipment Requests',
+                'description' => 'Receive personal equipment requests and member replies for Support Services review.',
+            ],
+            self::NOTIFICATION_PREFERENCE_MEMBER_REQUEST_UPDATES => [
+                'label' => 'My Request Updates',
+                'description' => 'Messages, item arrivals, and issue updates for your own requests. In-app alerts remain enabled.',
+                'essential_in_app' => true,
+            ],
         ];
     }
 
@@ -370,6 +392,9 @@ class User extends Authenticatable implements FilamentUser
             'evaluation_submission' => self::NOTIFICATION_PREFERENCE_WORKGROUP_EVALUATIONS,
             'hub_support_ticket' => self::NOTIFICATION_PREFERENCE_HUB_SUPPORT_TICKETS,
             'station_inventory_submission' => self::NOTIFICATION_PREFERENCE_STATION_INVENTORY_ALERTS,
+            'uniform_request' => self::NOTIFICATION_PREFERENCE_UNIFORM_REQUESTS,
+            'personnel_equipment_request' => self::NOTIFICATION_PREFERENCE_PERSONNEL_EQUIPMENT_REQUESTS,
+            'member_request_update' => self::NOTIFICATION_PREFERENCE_MEMBER_REQUEST_UPDATES,
             default => null,
         };
     }
