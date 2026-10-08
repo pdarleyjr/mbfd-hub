@@ -27,6 +27,7 @@ Route::domain(config('policy-library.domain'))->middleware(['web', LibrarySecuri
             Route::get('/api/search', [ViewerController::class, 'search'])->middleware('throttle:60,1')->name('search');
             Route::get('/api/manuals/{slug}/tree', [ViewerController::class, 'tree'])->name('tree');
             Route::get('/api/nodes/{node}/document', [ViewerController::class, 'document'])->name('document');
+            Route::get('/api/nodes/{node}/reading', [ViewerController::class, 'reading'])->name('reading');
             Route::get('/assets/{uuid}', [AssetController::class, 'show'])->whereUuid('uuid')->name('asset');
             Route::get('/assets/{uuid}/download', [AssetController::class, 'download'])->whereUuid('uuid')->name('download');
             Route::get('/assets/{uuid}/canonical', [AssetController::class, 'canonical'])->whereUuid('uuid')->name('canonical');

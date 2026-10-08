@@ -17,6 +17,7 @@ use Illuminate\Foundation\Bootstrap\LoadConfiguration;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Mbfd\PolicyLibrary\Models\Manual;
 use Sentry\Event;
 use Sentry\State\Scope;
 use Spatie\Permission\Models\Permission;
@@ -60,6 +61,7 @@ final class CanonicalHubIntegrationTest extends TestCase
     {
         $this->get(self::FILES.'/')->assertRedirect(self::FILES.'/login');
         $this->getJson(self::FILES.'/api/manuals')->assertUnauthorized();
+        $this->getJson($this->existingReadingNodeUrl())->assertUnauthorized();
         $this->getJson(self::FILES.'/assets/00000000-0000-4000-8000-000000000000')->assertUnauthorized();
         $this->getJson(self::FILES.'/manage/manuals')->assertUnauthorized();
         $this->get(self::FILES.'/login')->assertOk()->assertSee('employee_id', false);
@@ -79,6 +81,7 @@ final class CanonicalHubIntegrationTest extends TestCase
         $this->carryCurrentSession();
         self::assertFalse((bool) session('auth.city_email_review_required'));
         $this->getJson(self::FILES.'/api/manuals')->assertForbidden();
+        $this->getJson($this->existingReadingNodeUrl())->assertForbidden();
         $registered = AuthenticationSession::query()->findOrFail(session('auth.canonical_session_id'));
         $beforeSessionId = session()->getId();
         $beforeAttributes = $registered->getRawOriginal();
@@ -362,6 +365,16 @@ final class CanonicalHubIntegrationTest extends TestCase
             }
         }
         self::fail('The real management form did not emit its signed Livewire snapshot.');
+    }
+
+    private function existingReadingNodeUrl(): string
+    {
+        $manual = Manual::query()->create(['name' => 'Reading probe', 'slug' => 'reading-probe', 'type' => 'sog']);
+        $edition = $manual->editions()->create(['label' => 'Current', 'state' => 'published']);
+        $manual->update(['active_edition_id' => $edition->id]);
+        $node = $edition->nodes()->create(['manual_id' => $manual->id, 'title' => 'Reading probe', 'slug' => 'reading-probe']);
+
+        return self::FILES.'/api/nodes/'.$node->id.'/reading?revision=00000000-0000-4000-8000-000000000000';
     }
 
     private function linkedUser(?string $password = null): User

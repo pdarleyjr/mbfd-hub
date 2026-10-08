@@ -91,7 +91,9 @@ final class ImportService
         DB::transaction(function () use ($edition, $userId): void {
             $manual = Manual::query()->lockForUpdate()->findOrFail($edition->manual_id);
             $target = Edition::query()->lockForUpdate()->findOrFail($edition->id);
-            $nodes = $target->nodes()->where('type', 'document')->with('currentRevision')->get();
+            $nodes = $target->nodes()->where('type', 'document')->with('currentRevision')->get()
+                ->sortBy(fn (ManualNode $node): int => (($node->metadata['search_role'] ?? null) === 'aggregate'
+                    || ($node->currentRevision?->metadata['search_role'] ?? null) === 'aggregate') ? 1 : 0)->values();
             if ($nodes->isEmpty()) {
                 throw ValidationException::withMessages(['edition' => 'This edition has no documents.']);
             }

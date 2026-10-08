@@ -46,7 +46,7 @@ final class AssetController
             ->with(['manual', 'edition', 'currentRevision'])->firstOrFail();
         $revision = $node->currentRevision;
         abort_unless($revision?->state === 'published' && ($revision->metadata['asset_id'] ?? null) === $assetId, 404);
-        abort_unless(in_array($node->id, $trees->tree($node->manual)['documents'], true), 404);
+        abort_unless(in_array($node->id, $trees->documentIds($node->manual), true), 404);
         $page = (int) ($data['page'] ?? 1);
         abort_unless($page <= $revision->page_count, 404);
 
@@ -74,7 +74,7 @@ final class AssetController
         abort_unless(($node->manual->is_active || $controls) && $node->is_active && $revision->state === 'published'
             && $node->edition->state === 'published' && $node->current_revision_id === $revision->id
             && $node->edition_id === $node->manual->active_edition_id, 404);
-        abort_unless(in_array($node->id, $trees->tree($node->manual)['documents'], true), 404);
+        abort_unless(in_array($node->id, $trees->documentIds($node->manual), true), 404);
 
         return $revision;
     }

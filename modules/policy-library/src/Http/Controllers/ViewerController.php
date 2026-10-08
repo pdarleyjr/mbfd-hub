@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Mbfd\PolicyLibrary\Models\Manual;
 use Mbfd\PolicyLibrary\Models\ManualNode;
+use Mbfd\PolicyLibrary\Services\ReadingViewService;
 use Mbfd\PolicyLibrary\Services\SearchService;
 use Mbfd\PolicyLibrary\Services\TreeService;
 use Mbfd\PolicyLibrary\Support\LibraryAccess;
@@ -48,14 +49,28 @@ final class ViewerController
     {
         $manual = $node->manual;
         abort_unless($manual->is_active && $node->is_active && $node->edition_id === $manual->active_edition_id && $node->currentRevision?->state === 'published', 404);
-        $tree = $trees->tree($manual);
-        $position = array_search($node->id, $tree['documents'], true);
+        $documents = $trees->documentIds($manual);
+        $position = array_search($node->id, $documents, true);
         abort_if($position === false, 404); // A hidden ancestor also hides its descendants.
+        $node->currentRevision->load(['pages' => fn ($pages) => $pages->select(['id', 'revision_id', 'page', 'physical_page', 'printed_label', 'title'])]);
 
         return response()->json([
             'node' => $node->only(['id', 'manual_id', 'title', 'slug']), 'revision' => $trees->revisionData($node->currentRevision),
-            'previous_node_id' => $position > 0 ? $tree['documents'][$position - 1] : null,
-            'next_node_id' => $tree['documents'][$position + 1] ?? null,
+            'previous_node_id' => $position > 0 ? $documents[$position - 1] : null,
+            'next_node_id' => $documents[$position + 1] ?? null,
         ]);
+    }
+
+    public function reading(Request $request, ManualNode $node, TreeService $trees, ReadingViewService $reading): JsonResponse
+    {
+        $data = $request->validate(['revision' => ['required', 'uuid']]);
+        $manual = $node->manual;
+        $revision = $node->currentRevision;
+        abort_unless($manual->is_active && $node->is_active && $node->edition_id === $manual->active_edition_id
+            && $node->edition?->state === 'published' && $revision?->state === 'published'
+            && $revision->node_id === $node->id
+            && $revision->uuid === $data['revision'] && in_array($node->id, $trees->documentIds($manual), true), 404);
+
+        return response()->json($reading->load($revision));
     }
 }

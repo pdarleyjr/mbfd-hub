@@ -2,6 +2,7 @@ import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.mjs?url';
 import '../css/viewer.css';
 import { adjacentPage, canvasDimensions, flattenDocuments } from './navigation.js';
 import { currentEditionChanged, linkRectangle, pageLink, pdfDestinationPage, pdfUrlTarget, primaryEntries, primaryHierarchy, recentlyPublished, resolveLibrarySelection, subjectAliases } from './library-ui.js';
+import { bodyTextSize, ownedPages, peerAnnotationTarget, readingScale, readingSection } from './reader-model.js';
 
 let pdfEngine;
 let enginePromise;
@@ -10,6 +11,11 @@ function loadPdfEngine() {
         engine.GlobalWorkerOptions.workerSrc = workerUrl;
         pdfEngine = engine;
         return engine;
+    }).catch(() => {
+        enginePromise = null;
+        const error = new Error('PDF reader could not be loaded');
+        error.name = 'PdfEngineLoadError';
+        throw error;
     });
     return enginePromise;
 }
@@ -18,6 +24,8 @@ const ui = {
     tree: byId('manual-tree'), manuals: byId('manual-select'), search: byId('title-search'),
     stage: byId('page-stage'), paper: byId('pdf-page'), canvas: byId('pdf-canvas'),
     text: byId('pdf-text'), links: byId('pdf-links'), message: byId('viewer-message'), sidebar: byId('manual-sidebar'),
+    thumbnails: byId('page-thumbnails'), pageSidebar: byId('page-sidebar'),
+    reading: byId('reading-page'),
 };
 const state = {
     manuals: [], manual: null, tree: [], documents: [], entries: [], entry: null, node: null, page: 1,
@@ -25,8 +33,22 @@ const state = {
     selectionGeneration: 0, renderGeneration: 0, abort: null, open: new Set(),
     searchAbort: null,
     editionId: null, editionCheck: null,
-    mode: matchMedia('(max-width: 900px)').matches ? 'width' : 'page', zoom: 1,
+    mode: matchMedia('(max-width: 600px)').matches ? 'read' : 'width', zoom: 1,
+    textSizes: new Map(),
+    representation: 'pdf', readingPreference: null, readingData: null, readingZoom: 1,
 };
+try {
+    const preference = JSON.parse(localStorage.getItem('policy-library.reader-view'));
+    if (preference && ['width', 'page', 'actual', 'read'].includes(preference.mode) && Number.isFinite(preference.zoom)) {
+        state.mode = preference.mode;
+        state.zoom = Math.max(0.5, Math.min(3, preference.zoom));
+    }
+} catch { /* Private browsing can disable preference storage. */ }
+
+function saveViewPreference() {
+    try { localStorage.setItem('policy-library.reader-view', JSON.stringify({ mode: state.mode, zoom: state.zoom })); }
+    catch { /* Reading remains available without local storage. */ }
+}
 
 function element(tag, text, className) {
     const item = document.createElement(tag);
@@ -51,6 +73,7 @@ async function api(path, signal) {
 
 function showMessage(title, detail, retry) {
     ui.paper.hidden = true;
+    ui.reading.hidden = true;
     ui.message.replaceChildren(element('span', '▤', 'document-symbol'), element('h3', title), element('p', detail));
     if (retry) {
         const button = element('button', 'Retry', 'view-button');
@@ -78,16 +101,142 @@ function reportFailure(error) {
         headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': token, Accept: 'application/json' },
         body: JSON.stringify(context),
     }).catch(() => {});
-    showMessage('This document could not be displayed.', 'Your place is saved. Try loading this page again.', () => selectDocument(state.entry?.slug || state.node.id, state.page, false, true));
+    showMessage('This document could not be displayed.', 'Your place is saved. Try loading this page again.',
+        error.name === 'PdfEngineLoadError' ? () => location.reload() : () => selectDocument(state.entry?.slug || state.node.id, state.page, false, true));
 }
 
 function setDrawer(open) {
+    if (open) setPagesDrawer(false);
     document.body.classList.toggle('drawer-open', open);
-    byId('drawer-shade').hidden = !open;
+    byId('drawer-shade').hidden = !open && !document.body.classList.contains('pages-open');
+    byId('focus-navigation').setAttribute('aria-expanded', String(open));
     byId('menu-toggle').setAttribute('aria-expanded', String(matchMedia('(max-width: 900px)').matches ? open : !document.body.classList.contains('rail-collapsed')));
-    if (matchMedia('(max-width: 900px)').matches) {
+    if (matchMedia('(max-width: 900px)').matches || document.body.classList.contains('is-focus')) {
         ui.sidebar.inert = !open;
         if (open) { byId('drawer-close').focus(); revealSelectedDocument(); }
+    }
+}
+
+function pagesAreDrawer() {
+    return matchMedia('(max-width: 1100px)').matches || document.body.classList.contains('is-focus');
+}
+
+function updatePanels() {
+    const pagesOpen = pagesAreDrawer() ? document.body.classList.contains('pages-open') : !document.body.classList.contains('pages-collapsed');
+    byId('pages-toggle').setAttribute('aria-expanded', String(pagesOpen));
+    byId('focus-pages').setAttribute('aria-expanded', String(pagesOpen));
+    ui.pageSidebar.inert = !pagesOpen;
+    byId('drawer-shade').hidden = !document.body.classList.contains('drawer-open') && !document.body.classList.contains('pages-open');
+    if (pagesOpen) {
+        for (const button of thumbs.visible) if (!button.querySelector('canvas') && !thumbs.queue.includes(button)) thumbs.queue.push(button);
+        renderThumbnailQueue(thumbs.generation);
+    } else thumbs.render?.cancel();
+}
+
+function setPagesDrawer(open) {
+    document.body.classList.toggle('pages-open', open);
+    updatePanels();
+    if (open) {
+        byId('pages-close').focus();
+        ui.thumbnails.querySelector('[aria-current="page"]')?.scrollIntoView({ block: 'nearest' });
+    }
+}
+
+function collapseContents() {
+    if (matchMedia('(max-width: 900px)').matches || document.body.classList.contains('is-focus')) setDrawer(false);
+    else {
+        document.body.classList.add('rail-collapsed');
+        ui.sidebar.inert = true;
+        byId('menu-toggle').setAttribute('aria-expanded', 'false');
+    }
+    returnNavigationFocus();
+}
+
+const thumbs = { key: null, generation: 0, observer: null, queue: [], busy: false, render: null, visible: new Set() };
+function resetThumbnails() {
+    thumbs.generation++;
+    thumbs.observer?.disconnect();
+    thumbs.render?.cancel();
+    thumbs.render = null;
+    thumbs.key = null;
+    thumbs.queue = [];
+    thumbs.visible.clear();
+    ui.thumbnails.replaceChildren();
+}
+
+function updateThumbnails() {
+    if (!state.node || !state.pdf) return;
+    const key = `${state.revisionId}:${state.entry?.slug || state.node.slug}`;
+    if (thumbs.key !== key) {
+        resetThumbnails();
+        thumbs.key = key;
+        const generation = thumbs.generation;
+        byId('thumbnail-title').textContent = state.entry ? `${state.entry.id} · ${state.entry.title}` : state.node.title;
+        const pages = ownedPages(state.node, state.entry);
+        thumbs.observer = new IntersectionObserver(records => {
+            for (const record of records) {
+                const button = record.target;
+                if (record.isIntersecting) {
+                    thumbs.visible.add(button);
+                    if (!button.querySelector('canvas') && !thumbs.queue.includes(button)) thumbs.queue.push(button);
+                } else thumbs.visible.delete(button);
+            }
+            // Keep only the visible thumbnails plus a small nearby buffer in memory.
+            const cached = [...ui.thumbnails.querySelectorAll('.thumbnail:has(canvas)')];
+            for (const button of cached.filter(button => !thumbs.visible.has(button)).slice(0, Math.max(0, cached.length - 6))) button.querySelector('canvas')?.remove();
+            renderThumbnailQueue(generation);
+        }, { root: ui.thumbnails, rootMargin: '40px' });
+        for (const page of pages) {
+            const button = element('button', undefined, 'thumbnail');
+            button.type = 'button';
+            button.dataset.page = page;
+            button.setAttribute('aria-label', `Open PDF page ${page}`);
+            button.append(element('span', '▤', 'thumbnail-placeholder'), element('span', `Page ${page}`, 'thumbnail-label'));
+            button.addEventListener('click', () => {
+                const identity = state.entry?.slug || state.node.id;
+                state.readingPreference = 'pdf'; state.representation = 'pdf';
+                selectDocument(identity, page);
+                if (pagesAreDrawer()) { setPagesDrawer(false); byId('document-workspace').focus(); }
+            });
+            ui.thumbnails.append(button);
+            thumbs.observer.observe(button);
+        }
+    }
+    for (const button of ui.thumbnails.children) button.setAttribute('aria-current', Number(button.dataset.page) === state.page ? 'page' : 'false');
+}
+
+async function renderThumbnailQueue(generation) {
+    if (thumbs.busy || generation !== thumbs.generation || ui.pageSidebar.inert) return;
+    thumbs.busy = true;
+    const pdf = state.pdf;
+    try {
+        while (thumbs.queue.length && generation === thumbs.generation && pdf === state.pdf && !ui.pageSidebar.inert) {
+            const button = thumbs.queue.shift();
+            if (!button.isConnected || !thumbs.visible.has(button) || button.querySelector('canvas')) continue;
+            // Main page always owns the high-resolution render; thumbnails are sequential and small.
+            if (state.render) await state.render.promise.catch(() => {});
+            if (generation !== thumbs.generation || pdf !== state.pdf) break;
+            const page = await pdf.getPage(Number(button.dataset.page));
+            if (generation !== thumbs.generation || pdf !== state.pdf) break;
+            const viewport = page.getViewport({ scale: 108 / page.getViewport({ scale: 1 }).width });
+            const canvas = element('canvas');
+            canvas.width = Math.ceil(viewport.width);
+            canvas.height = Math.ceil(viewport.height);
+            canvas.setAttribute('aria-hidden', 'true');
+            const render = page.render({ canvasContext: canvas.getContext('2d', { alpha: false }), viewport });
+            thumbs.render = render;
+            await render.promise;
+            if (generation !== thumbs.generation || pdf !== state.pdf || !button.isConnected) break;
+            button.prepend(canvas);
+            thumbs.render = null;
+            await new Promise(resolve => setTimeout(resolve, 0));
+        }
+    } catch (error) {
+        // A thumbnail failure does not block the source page or remove its page button.
+        if (!['RenderingCancelledException', 'AbortException'].includes(error.name)) ui.thumbnails.dataset.previewStatus = 'Some previews unavailable';
+    } finally {
+        thumbs.busy = false;
+        if (thumbs.queue.length && !ui.pageSidebar.inert) renderThumbnailQueue(thumbs.generation);
     }
 }
 
@@ -196,18 +345,6 @@ function renderTree(reveal = false) {
                 button.setAttribute('aria-current', String(selected));
                 button.addEventListener('click', () => { selectDocument(node.id, 1); setDrawer(false); byId('document-workspace').focus(); });
                 items.push(button);
-                if (selected) {
-                    const pages = element('div', undefined, 'tree-pages');
-                    pages.setAttribute('aria-label', `${node.title} pages`);
-                    for (let number = 1; number <= node.revision.page_count; number++) {
-                        const page = element('button', `Page ${number} of ${node.revision.page_count}`, 'tree-page');
-                        page.type = 'button';
-                        page.setAttribute('aria-current', number === state.page ? 'page' : 'false');
-                        page.addEventListener('click', () => { selectDocument(node.id, number); setDrawer(false); byId('document-workspace').focus(); });
-                        pages.append(page);
-                    }
-                    items.push(pages);
-                }
             }
             const related = (!query || ownMatch) ? (node.metadata?.related_document_slugs || []).map(slug => state.documents.find(document => document.slug === slug)).filter(Boolean) : [];
             const childrenToShow = [...(node.children || []), ...related];
@@ -233,20 +370,6 @@ function renderTree(reveal = false) {
     if (reveal === true) revealSelectedDocument();
 }
 
-function pageButtons(node, entry) {
-    const pages = element('div', undefined, 'tree-pages');
-    pages.setAttribute('aria-label', `${node.title} PDF pages`);
-    const numbers = entry ? entry.semantic_pages || [entry.physical_page] : Array.from({ length: node.revision.page_count }, (_, index) => index + 1);
-    for (const number of numbers) {
-        const button = element('button', entry ? `PDF page ${number}` : `Page ${number} of ${node.revision.page_count}`, 'tree-page');
-        button.type = 'button';
-        button.setAttribute('aria-current', number === state.page ? 'page' : 'false');
-        button.addEventListener('click', () => openPolicy(entry?.slug || node.id, number));
-        pages.append(button);
-    }
-    return pages;
-}
-
 function openPolicy(node, page) {
     selectDocument(node, page);
     setDrawer(false);
@@ -269,7 +392,6 @@ function renderPolicyTree(reveal) {
         button.setAttribute('aria-current', String(selected));
         button.addEventListener('click', () => openPolicy(entry.slug));
         const items = [button];
-        if (selected) items.push(pageButtons(entry.node, state.entry ? entry : null));
         if (entry.children.length) {
             const details = element('details', undefined, 'tree-group');
             details.open = Boolean(query || state.open.has(`entry-${entry.id}`));
@@ -285,22 +407,27 @@ function renderPolicyTree(reveal) {
         return items;
     });
     const items = [];
-    for (const node of state.documents.filter(item => /^SECTION-\d{3}$/.test(item.metadata?.asset_id || ''))) {
-        const section = node.metadata.asset_id.slice(-3);
-        const ownMatch = query && node.title.toLocaleLowerCase().includes(query);
-        const entries = roots.filter(entry => entry.id.startsWith(section));
+    const sectionDocuments = state.documents.filter(item => /^SECTION-\d{3}$/.test(item.metadata?.asset_id || ''));
+    const sections = [...new Set([...sectionDocuments.map(node => node.metadata.asset_id.slice(-3)), ...roots.map(readingSection).filter(Boolean)])].sort();
+    for (const section of sections) {
+        const node = sectionDocuments.find(item => item.metadata.asset_id === `SECTION-${section}`);
+        const sectionNode = state.tree.find(item => item.slug === `section-${section}` || item.metadata?.section === section);
+        const title = sectionNode?.title || node?.title || `Section ${section}`;
+        const ownMatch = query && title.toLocaleLowerCase().includes(query);
+        const entries = roots.filter(entry => readingSection(entry) === section);
         if (query && !ownMatch && !entries.some(matches)) continue;
         const details = element('details', undefined, 'tree-group');
         const key = `asset-${section}`;
         details.open = Boolean(query || state.open.has(key));
-        details.append(element('summary', node.title));
+        details.append(element('summary', title));
         const children = element('div', undefined, 'tree-children');
-        const fullPdf = element('button', 'Full section PDF', 'tree-document');
-        fullPdf.type = 'button'; fullPdf.dataset.node = node.id;
-        fullPdf.setAttribute('aria-current', String(!state.entry && String(state.node?.id) === String(node.id)));
-        fullPdf.addEventListener('click', () => openPolicy(node.id, 1));
-        children.append(fullPdf);
-        if (!state.entry && String(state.node?.id) === String(node.id)) children.append(pageButtons(node));
+        if (node) {
+            const fullPdf = element('button', 'Full section PDF', 'tree-document');
+            fullPdf.type = 'button'; fullPdf.dataset.node = node.id;
+            fullPdf.setAttribute('aria-current', String(!state.entry && String(state.node?.id) === String(node.id)));
+            fullPdf.addEventListener('click', () => openPolicy(node.id, 1));
+            children.append(fullPdf);
+        }
         children.append(...branch(entries, ownMatch));
         details.append(children);
         details.addEventListener('toggle', () => {
@@ -308,6 +435,7 @@ function renderPolicyTree(reveal) {
         });
         items.push(details);
     }
+    items.push(...branch(roots.filter(entry => !readingSection(entry))));
     const aliases = subjectAliases(state.documents).filter(alias => !query ||
         `${alias.legacy_id} ${alias.source_title} ${alias.source_record_id}`.toLocaleLowerCase().includes(query) ||
         alias.resolved_current_targets.some(target => `${target.id} ${target.title}`.toLocaleLowerCase().includes(query)),
@@ -365,6 +493,10 @@ function expandSelected(nodes, target) {
 
 function updateControls() {
     byId('copy-link').disabled = !state.node;
+    byId('print-pdf').disabled = !state.node;
+    byId('page-number').disabled = !state.node;
+    byId('page-number').max = state.node?.revision.page_count || 1;
+    byId('page-number').value = state.page;
     const download = byId('download-pdf');
     download.hidden = !state.node?.revision.download_url;
     if (!download.hidden) download.href = state.node.revision.download_url;
@@ -375,9 +507,20 @@ function updateControls() {
     for (const label of document.querySelectorAll('[data-page-status]')) label.textContent = state.node ? `${state.entry ? 'PDF ' : ''}${state.page} / ${state.node.revision.page_count}` : '—';
     byId('fit-page').setAttribute('aria-pressed', String(state.mode === 'page'));
     byId('fit-width').setAttribute('aria-pressed', String(state.mode === 'width'));
+    byId('actual-size').setAttribute('aria-pressed', String(state.mode === 'actual'));
+    byId('read-size').setAttribute('aria-pressed', String(state.mode === 'read'));
+    byId('read-size-option').setAttribute('aria-pressed', String(state.mode === 'read'));
+    document.body.classList.toggle('is-reading-size', state.mode === 'read');
+    document.body.classList.toggle('is-text-reading', state.representation === 'reading');
+    byId('reading-format').hidden = !state.node?.revision.reading_url;
+    byId('reading-format').textContent = state.representation === 'reading' ? 'PDF view' : 'Reading text';
+    byId('reading-format').setAttribute('aria-pressed', String(state.representation === 'reading'));
     byId('zoom-value').value = `${Math.round(state.zoom * 100)}%`;
     byId('zoom-out').disabled = state.zoom <= 0.5;
     byId('zoom-in').disabled = state.zoom >= 3;
+    byId('read-zoom-out').disabled = !state.node || (state.representation === 'reading' ? state.readingZoom <= 1 : state.zoom <= 0.5);
+    byId('read-zoom-in').disabled = !state.node || (state.representation === 'reading' ? state.readingZoom >= 1.5 : state.zoom >= 3);
+    byId('read-size').disabled = !state.node;
 }
 
 function writeLocation(push = true) {
@@ -411,7 +554,12 @@ async function renderLinks(page, viewport, pdf, generation) {
         const rectangle = linkRectangle(viewport, annotation.rect);
         if (!rectangle || !rectangle.width || !rectangle.height) continue;
         let target;
-        if (annotation.dest) {
+        const peer = peerAnnotationTarget(state.node.revision, annotation, page.pageNumber, state.documents);
+        if (peer.bound) {
+            if (!peer.target) continue;
+            const node = state.documents.find(item => item.id === peer.target.node);
+            target = { ...peer.target, href: pageLink(location.href, state.manual.slug, node.slug || node.id, peer.target.page) };
+        } else if (annotation.dest) {
             const number = await pdfDestinationPage(pdf, annotation.dest);
             if (!number) continue;
             const entry = typeof annotation.dest === 'string' ? state.entries.find(item => item.node.id === state.node.id && item.anchor === annotation.dest) : null;
@@ -441,19 +589,113 @@ async function renderLinks(page, viewport, pdf, generation) {
     if (generation === state.renderGeneration && pdf === state.pdf) ui.links.replaceChildren(...links);
 }
 
+async function renderReading(generation, pdf) {
+    const revision = state.node.revision;
+    if (state.readingData?.revision_id !== revision.id) state.readingData = await api(revision.reading_url);
+    if (generation !== state.renderGeneration || pdf !== state.pdf) return;
+    if (state.readingData.revision_id !== revision.id) throw new Error('Reading revision mismatch');
+    const identity = state.entry?.id || state.node.metadata?.asset_id;
+    const entry = state.readingData.entries.find(entry => entry.id === identity);
+    if (!entry) throw new Error('Reading identity unavailable');
+    const allowed = ownedPages(state.node, state.entry);
+    const blocks = entry.blocks.filter(block => allowed.includes(block.pdf_page));
+    if (!blocks.length) throw new Error('Reading text unavailable');
+    const items = [element('h2', entry.title), element('p', 'Original PDF available for tables, figures and forms.', 'reading-note')];
+    if (state.readingData.cover?.length) {
+        const cover = element('div', undefined, 'reading-cover');
+        for (const line of state.readingData.cover) cover.append(element('p', line));
+        const original = element('button', 'View original cover', 'source-page-link');
+        original.type = 'button';
+        original.addEventListener('click', () => {
+            state.readingPreference = 'pdf'; state.representation = 'pdf';
+            selectDocument(state.node.id, state.readingData.cover_pdf_page);
+        });
+        cover.append(original); items.push(cover);
+    }
+    let group, page;
+    for (const block of blocks) {
+        if (page !== block.pdf_page) {
+            page = block.pdf_page;
+            group = element('section', undefined, 'reading-source-page');
+            group.dataset.pdfPage = page;
+            const original = element('button', `Original PDF · page ${page}`, 'source-page-link');
+            original.type = 'button';
+            original.addEventListener('click', () => {
+                state.readingPreference = 'pdf'; state.representation = 'pdf';
+                selectDocument(state.entry?.slug || state.node.id, block.pdf_page);
+            });
+            group.append(original); items.push(group);
+        }
+        let item;
+        if (block.type === 'table') {
+            item = element('div', undefined, 'reading-table-scroll');
+            item.tabIndex = 0;
+            item.setAttribute('role', 'region');
+            item.setAttribute('aria-label', `Original table text, PDF page ${block.pdf_page}. Scroll horizontally if needed.`);
+            const table = element('table');
+            for (const row of block.rows) {
+                const tr = element('tr');
+                for (const cell of row) {
+                    const td = element(cell.header ? 'th' : 'td', cell.text);
+                    td.colSpan = cell.col_span; td.rowSpan = cell.row_span;
+                    if (cell.header) td.scope = 'col';
+                    td.dataset.pdfPage = cell.pdf_page;
+                    tr.append(td);
+                }
+                table.append(tr);
+            }
+            item.append(table);
+        } else item = element(block.type === 'heading' ? 'h3' : 'p', block.text, block.type === 'pdf_reference' ? 'reading-pdf-reference' : 'reading-block');
+        item.dataset.pdfPage = block.pdf_page;
+        group.append(item);
+        if (block.type === 'pdf_reference') {
+            const original = element('button', `View original PDF page ${block.pdf_page}`, 'view-button');
+            original.type = 'button';
+            original.addEventListener('click', () => {
+                state.readingPreference = 'pdf'; state.representation = 'pdf';
+                selectDocument(state.entry?.slug || state.node.id, block.pdf_page);
+            });
+            group.append(original);
+        }
+    }
+    ui.reading.replaceChildren(...items);
+    ui.reading.style.fontSize = `${18 * state.readingZoom}px`;
+    ui.reading.hidden = false; ui.paper.hidden = true; ui.message.hidden = true;
+    byId('pan-left').hidden = true; byId('pan-right').hidden = true;
+    byId('pan-hint').textContent = 'Text size';
+    updateThumbnails();
+    const selected = [...ui.reading.querySelectorAll('.reading-source-page')].find(group => Number(group.dataset.pdfPage) === state.page);
+    if (selected) ui.stage.scrollTop += selected.getBoundingClientRect().top - ui.stage.getBoundingClientRect().top - 8;
+    else ui.stage.scrollTop = 0;
+    ui.stage.scrollLeft = 0;
+    byId('page-announcement').textContent = `${entry.id} · ${entry.title}, reading text. Original PDF page links are available.`;
+}
+
 async function renderPage() {
     if (!state.pdf || !state.node) return;
     const generation = await cancelRendering();
     if (generation !== state.renderGeneration || !state.pdf || !state.node) return;
     const pdf = state.pdf;
+    if (state.representation === 'reading' && state.node.revision.reading_url) {
+        await renderReading(generation, pdf);
+        return;
+    }
+    ui.reading.hidden = true;
     const pageNumber = state.page;
     const page = await pdf.getPage(pageNumber);
     if (generation !== state.renderGeneration || pdf !== state.pdf) return;
     const base = page.getViewport({ scale: 1 });
-    const padding = matchMedia('(max-width: 900px)').matches ? 18 : 52;
-    const width = Math.max(100, ui.stage.clientWidth - padding);
-    const height = Math.max(100, ui.stage.clientHeight - padding);
-    const fit = state.mode === 'width' ? width / base.width : Math.min(width / base.width, height / base.height);
+    const stageStyle = getComputedStyle(ui.stage);
+    const width = Math.max(100, ui.stage.clientWidth - parseFloat(stageStyle.paddingLeft) - parseFloat(stageStyle.paddingRight) - 2);
+    const height = Math.max(100, ui.stage.clientHeight - parseFloat(stageStyle.paddingTop) - parseFloat(stageStyle.paddingBottom) - 2);
+    let textSize = state.textSizes.get(pageNumber);
+    if (state.mode === 'read' && !textSize) {
+        const content = await page.getTextContent();
+        if (generation !== state.renderGeneration || pdf !== state.pdf) return;
+        textSize = bodyTextSize(content.items);
+        state.textSizes.set(pageNumber, textSize);
+    }
+    const fit = state.mode === 'read' ? readingScale(width / base.width, textSize) : state.mode === 'actual' ? 96 / 72 : state.mode === 'width' ? width / base.width : Math.min(width / base.width, height / base.height);
     const viewport = page.getViewport({ scale: fit * state.zoom });
     const dimensions = canvasDimensions(viewport.width, viewport.height, window.devicePixelRatio);
     ui.canvas.width = dimensions.width;
@@ -480,6 +722,12 @@ async function renderPage() {
     state.textLayer = textLayer;
     await textLayer.render();
     if (generation !== state.renderGeneration) return;
+    ui.paper.dataset.bodyTextPx = textSize ? String(textSize * viewport.scale) : '';
+    updateThumbnails();
+    const canPan = viewport.width > width + 2;
+    byId('pan-hint').textContent = canPan ? 'Swipe or pan to read' : 'Scroll to read';
+    byId('pan-left').hidden = !canPan;
+    byId('pan-right').hidden = !canPan;
     try { await renderLinks(page, viewport, pdf, generation); }
     catch (error) { if (generation === state.renderGeneration && pdf === state.pdf) throw error; }
     if (generation !== state.renderGeneration) return;
@@ -512,6 +760,7 @@ async function selectCurrentDocument(nodeId, pageNumber, push = true, retry = fa
     state.node = selection.node;
     state.entry = selection.entry || null;
     state.page = selection.page;
+    state.representation = state.node.revision.reading_url && (state.readingPreference === 'reading' || (state.readingPreference === null && matchMedia('(max-width: 600px)').matches)) ? 'reading' : 'pdf';
     byId('copy-status').textContent = '';
     byId('copy-link-value').hidden = true;
     expandSelected(state.tree, state.node.id);
@@ -542,10 +791,16 @@ async function selectCurrentDocument(nodeId, pageNumber, push = true, retry = fa
         if (state.revisionId !== revision.id || retry) {
             showMessage('Loading document…', state.node.title);
             await cancelRendering();
+            // A newer selection can resume while render cancellation is awaited.
+            // Do not clear or destroy the newer selection's document instance.
+            if (generation !== state.selectionGeneration) return;
             const previousLoad = state.loading;
             state.loading = null;
             state.pdf = null;
             state.revisionId = null;
+            state.textSizes.clear();
+            state.readingData = null;
+            resetThumbnails();
             if (previousLoad) await previousLoad.destroy().catch(() => {});
             if (generation !== state.selectionGeneration) return;
             const engine = await loadPdfEngine();
@@ -595,6 +850,10 @@ async function loadManual(slug, selectedNode, pageNumber, push = true) {
     state.loading = null;
     state.pdf = null;
     state.revisionId = null;
+    state.textSizes.clear();
+    state.readingData = null;
+    resetThumbnails();
+    byId('thumbnail-title').textContent = 'Select a document';
     updateControls();
     if (!state.manual) { showMessage('No manuals are available yet.', 'The library administrator is preparing the documents.'); return; }
     manualButtons();
@@ -663,31 +922,106 @@ async function navigate(direction) {
     try { await refreshEdition(); }
     catch { showMessage('The manual could not be loaded.', 'Try again when your connection is available.', () => navigate(direction)); return; }
     if (!state.node || state.manual?.slug !== requestedManual) return;
+    if (state.entry) {
+        const pages = ownedPages(state.node, state.entry);
+        const next = pages[pages.indexOf(state.page) + direction];
+        if (next !== undefined) { selectCurrentDocument(state.entry.slug, next); return; }
+    }
     const target = adjacentPage(state.documents, state.node.id, state.page, direction);
     if (target) selectCurrentDocument(target.node, target.page);
 }
 
 for (const button of document.querySelectorAll('[data-nav]')) button.addEventListener('click', () => navigate(button.dataset.nav === 'next' ? 1 : -1));
-for (const [id, mode] of [['fit-page', 'page'], ['fit-width', 'width']]) byId(id).addEventListener('click', () => {
-    state.mode = mode; state.zoom = 1; updateControls(); renderPage().catch(reportFailure);
+for (const [id, mode] of [['fit-page', 'page'], ['fit-width', 'width'], ['actual-size', 'actual'], ['read-size', 'read'], ['read-size-option', 'read']]) byId(id).addEventListener('click', () => {
+    state.mode = mode; state.zoom = 1; saveViewPreference(); updateControls(); renderPage().catch(reportFailure);
 });
-for (const [id, delta] of [['zoom-in', 0.25], ['zoom-out', -0.25]]) byId(id).addEventListener('click', () => {
-    state.zoom = Math.max(0.5, Math.min(3, state.zoom + delta)); updateControls(); renderPage().catch(reportFailure);
+for (const [id, delta] of [['zoom-in', 0.25], ['zoom-out', -0.25], ['read-zoom-in', 0.25], ['read-zoom-out', -0.25]]) byId(id).addEventListener('click', () => {
+    if (state.representation === 'reading' && id.startsWith('read-zoom-')) {
+        state.readingZoom = Math.max(1, Math.min(1.5, state.readingZoom + delta));
+        ui.reading.style.fontSize = `${18 * state.readingZoom}px`;
+        updateControls(); return;
+    }
+    state.zoom = Math.max(0.5, Math.min(3, state.zoom + delta)); saveViewPreference(); updateControls(); renderPage().catch(reportFailure);
+});
+byId('reading-format').addEventListener('click', () => {
+    state.representation = state.representation === 'reading' ? 'pdf' : 'reading';
+    state.readingPreference = state.representation;
+    updateControls(); renderPage().catch(reportFailure);
 });
 byId('focus-mode').addEventListener('click', () => {
     const focus = document.body.classList.toggle('is-focus');
     byId('focus-mode').setAttribute('aria-pressed', String(focus));
     byId('focus-mode').textContent = focus ? 'Exit focus' : 'Focus view';
+    setDrawer(false);
+    setPagesDrawer(false);
+    updatePanels();
+});
+byId('focus-navigation').addEventListener('click', () => setDrawer(!document.body.classList.contains('drawer-open')));
+byId('page-jump').addEventListener('submit', event => {
+    event.preventDefault();
+    if (!state.node) return;
+    const page = Number(byId('page-number').value);
+    if (!Number.isInteger(page) || page < 1 || page > state.node.revision.page_count) return;
+    byId('reader-options').open = false;
+    selectDocument(state.entry && ownedPages(state.node, state.entry).includes(page) ? state.entry.slug : state.node.id, page);
+});
+byId('print-pdf').addEventListener('click', async () => {
+    if (!state.node) return;
+    // Reserve a browser-owned PDF tab during the user gesture; its native viewer owns printing.
+    const popup = window.open('about:blank', '_blank');
+    if (!popup) { byId('copy-status').textContent = 'Allow a new PDF tab to print this document.'; return; }
+    popup.opener = null;
+    try {
+        await refreshEdition();
+        if (!state.node) { popup.close(); return; }
+        popup.location.replace(`${state.node.revision.asset_url}#page=${state.page}`);
+    } catch { popup.close(); byId('copy-status').textContent = 'Check your connection and try again.'; }
+});
+byId('fullscreen-document').hidden = !document.fullscreenEnabled;
+byId('fullscreen-document').addEventListener('click', async () => {
+    try {
+        if (document.fullscreenElement) await document.exitFullscreen();
+        else await document.documentElement.requestFullscreen();
+    } catch { byId('copy-status').textContent = 'Full screen is unavailable. Use Focus view.'; }
+});
+document.addEventListener('fullscreenchange', () => {
+    byId('fullscreen-document').textContent = document.fullscreenElement ? 'Exit full screen' : 'Full screen';
 });
 byId('menu-toggle').addEventListener('click', () => {
     if (matchMedia('(max-width: 900px)').matches) setDrawer(!document.body.classList.contains('drawer-open'));
     else {
         const collapsed = document.body.classList.toggle('rail-collapsed');
+        ui.sidebar.inert = collapsed;
         byId('menu-toggle').setAttribute('aria-expanded', String(!collapsed));
         if (!collapsed) revealSelectedDocument();
     }
 });
-for (const id of ['drawer-close', 'drawer-shade']) byId(id).addEventListener('click', () => { setDrawer(false); byId('menu-toggle').focus(); });
+function returnNavigationFocus() {
+    byId(document.body.classList.contains('is-focus') ? 'focus-navigation' : 'menu-toggle').focus();
+}
+function returnPagesFocus() {
+    byId(document.body.classList.contains('is-focus') ? 'focus-pages' : 'pages-toggle').focus();
+}
+byId('drawer-close').addEventListener('click', collapseContents);
+byId('drawer-shade').addEventListener('click', () => {
+    const pages = document.body.classList.contains('pages-open');
+    setDrawer(false); setPagesDrawer(false);
+    if (pages) returnPagesFocus(); else returnNavigationFocus();
+});
+function togglePages() {
+    if (pagesAreDrawer()) { const open = !document.body.classList.contains('pages-open'); setDrawer(false); setPagesDrawer(open); }
+    else { document.body.classList.toggle('pages-collapsed'); updatePanels(); }
+}
+byId('pages-toggle').addEventListener('click', togglePages);
+byId('focus-pages').addEventListener('click', togglePages);
+byId('pages-close').addEventListener('click', () => {
+    if (pagesAreDrawer()) setPagesDrawer(false);
+    else { document.body.classList.add('pages-collapsed'); updatePanels(); }
+    returnPagesFocus();
+});
+for (const [id, direction] of [['pan-left', -1], ['pan-right', 1]]) byId(id).addEventListener('click', () => {
+    ui.stage.scrollBy({ left: direction * ui.stage.clientWidth * 0.75, behavior: 'auto' });
+});
 ui.search.addEventListener('input', () => renderTree());
 byId('page-search-form').addEventListener('submit', searchPages);
 byId('contents-toggle').addEventListener('click', () => setRailView('contents'));
@@ -718,9 +1052,17 @@ byId('download-pdf').addEventListener('click', async event => {
     } catch { showMessage('The manual could not be loaded.', 'Try again when your connection is available.', refreshWhenVisible); }
 });
 document.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && document.body.classList.contains('drawer-open')) { setDrawer(false); byId('menu-toggle').focus(); }
-    if (event.key === 'Tab' && document.body.classList.contains('drawer-open')) {
-        const items = [...ui.sidebar.querySelectorAll('button,input,summary,a')].filter(item => !item.disabled && item.getClientRects().length);
+    if (event.key === 'Escape') {
+        for (const id of ['reader-options', 'document-actions']) {
+            const menu = byId(id);
+            if (menu.open) { menu.open = false; menu.querySelector('summary').focus(); }
+        }
+    }
+    if (event.key === 'Escape' && document.body.classList.contains('drawer-open')) { setDrawer(false); returnNavigationFocus(); }
+    if (event.key === 'Escape' && document.body.classList.contains('pages-open')) { setPagesDrawer(false); returnPagesFocus(); }
+    if (event.key === 'Tab' && (document.body.classList.contains('drawer-open') || document.body.classList.contains('pages-open'))) {
+        const panel = document.body.classList.contains('pages-open') ? ui.pageSidebar : ui.sidebar;
+        const items = [...panel.querySelectorAll('button,input,summary,a')].filter(item => !item.disabled && item.getClientRects().length);
         const first = items[0], last = items.at(-1);
         if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
         if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
@@ -744,6 +1086,7 @@ matchMedia('(max-width: 900px)').addEventListener('change', event => {
     if (event.matches) setDrawer(false);
     else { ui.sidebar.inert = false; setDrawer(false); }
 });
+matchMedia('(max-width: 1100px)').addEventListener('change', () => { setPagesDrawer(false); updatePanels(); });
 
 async function start() {
     try {
@@ -752,6 +1095,7 @@ async function start() {
         if (data.can_manage && data.manage_url) { byId('manage-link').href = data.manage_url; byId('manage-link').hidden = false; }
         const query = new URLSearchParams(location.search);
         setDrawer(false);
+        updatePanels();
         await loadManual(query.get('manual'), query.get('node'), query.get('page'), false);
     } catch (error) { showMessage('The library could not be loaded.', 'Try again when your connection is available.', start); }
 }

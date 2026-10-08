@@ -235,6 +235,10 @@ jobs:
         run: npm run build
       - name: Run PHPUnit suite
         run: php artisan test --exclude-group=postgres
+      - name: Test Policy Library navigation and source proof processing
+        run: |
+          npm --prefix modules/policy-library test
+          "$TEST_PYTHON_BINARY" -m unittest discover -s modules/policy-library/tests/python
       - name: Test restricted Cloud identity bridge
         run: python3 -m unittest discover -s tests/Python -p test_nextcloud_identity_bridge.py
       - name: Run PostgreSQL concurrency and integrity tests

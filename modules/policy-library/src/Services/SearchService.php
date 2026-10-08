@@ -39,11 +39,35 @@ final class SearchService
             return ['results' => [], 'has_more' => false];
         }
 
+        $privateMetadata = DocumentRevision::query()->whereIn('uuid', array_column($catalog, 'id'))->pluck('metadata', 'uuid');
+        foreach ($catalog as &$revision) {
+            $revision['metadata'] = $privateMetadata[$revision['id']] ?? [];
+        }
+        unset($revision);
+        $searchable = $visible;
+        foreach ($catalog as $nodeId => $revision) {
+            $metadata = $revision['metadata'];
+            $leaves = $metadata['leaf_asset_ids'] ?? null;
+            if (($metadata['search_role'] ?? null) !== 'aggregate' || ! is_array($leaves) || $leaves === []
+                || mb_strtolower($metadata['asset_id'] ?? '') === mb_strtolower(trim($query))) {
+                continue;
+            }
+            $available = [];
+            foreach ($catalog as $leafId => $leaf) {
+                if ($visible[$leafId]['manual']['slug'] === $visible[$nodeId]['manual']['slug'] && ($leaf['metadata']['search_role'] ?? null) !== 'aggregate') {
+                    $available[] = $leaf['metadata']['asset_id'] ?? null;
+                }
+            }
+            if (count(array_filter($leaves, fn ($id): bool => is_string($id) && in_array($id, $available, true))) === count($leaves)) {
+                unset($searchable[$nodeId]);
+            }
+        }
+
         $pages = DB::table('policy_pages')->join('policy_revisions', 'policy_revisions.id', '=', 'policy_pages.revision_id')
             ->join('policy_nodes', 'policy_nodes.current_revision_id', '=', 'policy_revisions.id')
             ->join('policy_manuals', 'policy_manuals.id', '=', 'policy_nodes.manual_id')
             ->join('policy_editions', 'policy_editions.id', '=', 'policy_nodes.edition_id')
-            ->whereIn('policy_nodes.id', array_keys($visible))->where('policy_revisions.state', 'published')
+            ->whereIn('policy_nodes.id', array_keys($searchable))->where('policy_revisions.state', 'published')
             ->where('policy_editions.state', 'published')->whereColumn('policy_revisions.node_id', 'policy_nodes.id')
             ->where('policy_nodes.is_active', true)->where('policy_manuals.is_active', true)
             ->whereColumn('policy_nodes.edition_id', 'policy_manuals.active_edition_id');
@@ -58,11 +82,6 @@ final class SearchService
             ->orderBy('policy_nodes.id')->orderBy('policy_pages.page')->limit(51)
             ->get(['policy_nodes.id as node_id', 'policy_pages.page', 'policy_pages.printed_label', 'policy_pages.text']);
 
-        $privateMetadata = DocumentRevision::query()->whereIn('uuid', array_column($catalog, 'id'))->pluck('metadata', 'uuid');
-        foreach ($catalog as &$revision) {
-            $revision['metadata'] = $privateMetadata[$revision['id']] ?? [];
-        }
-        unset($revision);
         $results = $this->identityResults($visible, $catalog, $terms, $identifier);
         $matchedPages = array_fill_keys(array_map(fn (array $result): string => $result['node_id'].':'.$result['page'], $results), true);
         foreach ($rows as $row) {
@@ -107,6 +126,9 @@ final class SearchService
             foreach ($revision['metadata']['primary_entries'] ?? [] as $entry) {
                 $page = (int) ($entry['physical_page'] ?? 0);
                 if (! isset($entry['id'], $entry['title']) || $page < 1 || $page > $revision['page_count']) {
+                    continue;
+                }
+                if (isset($targets[$entry['id']]) && ($revision['metadata']['asset_id'] ?? null) !== $entry['id']) {
                     continue;
                 }
                 $targets[$entry['id']] = [...$visible[$nodeId], 'node_id' => $nodeId, 'page' => $page,

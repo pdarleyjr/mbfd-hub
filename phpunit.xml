@@ -16,6 +16,7 @@
         </testsuite>
         <testsuite name="Policy Library">
             <file>modules/policy-library/tests/integration/CanonicalHubIntegrationTest.php</file>
+            <file>modules/policy-library/tests/integration/CanonicalReadingDataTest.php</file>
             <file>modules/policy-library/tests/php/SearchTest.php</file>
             <file>modules/policy-library/tests/php/ManualBuilderTest.php</file>
             <file>modules/policy-library/tests/php/CurrentSogTest.php</file>
