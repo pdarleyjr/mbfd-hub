@@ -2,7 +2,7 @@ import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.mjs?url';
 import '../css/viewer.css';
 import { adjacentPage, canvasDimensions, flattenDocuments } from './navigation.js';
 import { currentEditionChanged, linkRectangle, pageLink, pdfDestinationPage, pdfUrlTarget, primaryEntries, primaryHierarchy, recentlyPublished, resolveLibrarySelection, subjectAliases } from './library-ui.js';
-import { bodyTextSize, ownedPages, peerAnnotationTarget, readingScale, readingSection } from './reader-model.js';
+import { bodyTextSize, ownedPages, peerAnnotationTarget, readingContent, readingScale, readingSection } from './reader-model.js';
 
 let pdfEngine;
 let enginePromise;
@@ -594,11 +594,9 @@ async function renderReading(generation, pdf) {
     if (state.readingData?.revision_id !== revision.id) state.readingData = await api(revision.reading_url);
     if (generation !== state.renderGeneration || pdf !== state.pdf) return;
     if (state.readingData.revision_id !== revision.id) throw new Error('Reading revision mismatch');
-    const identity = state.entry?.id || state.node.metadata?.asset_id;
-    const entry = state.readingData.entries.find(entry => entry.id === identity);
+    const entry = readingContent(state.node, state.entry, state.readingData.entries);
     if (!entry) throw new Error('Reading identity unavailable');
-    const allowed = ownedPages(state.node, state.entry);
-    const blocks = entry.blocks.filter(block => allowed.includes(block.pdf_page));
+    const blocks = entry.blocks;
     if (!blocks.length) throw new Error('Reading text unavailable');
     const items = [element('h2', entry.title), element('p', 'Original PDF available for tables, figures and forms.', 'reading-note')];
     if (state.readingData.cover?.length) {

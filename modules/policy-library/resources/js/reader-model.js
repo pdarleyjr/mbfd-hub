@@ -5,6 +5,33 @@ export function ownedPages(node, entry) {
     return [...new Set(pages)].filter(page => Number.isInteger(page) && page >= 1 && page <= count).sort((a, b) => a - b);
 }
 
+export function readingContent(node, selected, entries) {
+    const identity = selected?.id || node.metadata?.asset_id;
+    let entry = entries.find(entry => entry.id === identity);
+    let owner = selected;
+    if (!entry && selected) {
+        const asset = node.metadata?.asset_id;
+        const catalog = node.revision.metadata?.primary_entries || [];
+        owner = catalog.find(item => item.id === selected.id);
+        if (!asset || node.revision.metadata?.asset_id !== asset || selected.owning_asset_id !== asset
+            || !owner || owner.owning_asset_id !== asset || selected.parent !== owner.parent) return null;
+        // Native artifacts hold the whole owning document. A semantic descendant
+        // may use that root only through its declared same-asset parent chain.
+        const visited = new Set();
+        let parent = owner;
+        while (parent && parent.id !== asset) {
+            if (parent.owning_asset_id !== asset || !parent.parent || visited.has(parent.id)) return null;
+            visited.add(parent.id);
+            parent = catalog.find(item => item.id === parent.parent);
+        }
+        if (!parent || (parent.owning_asset_id && parent.owning_asset_id !== asset)) return null;
+        entry = entries.find(item => item.id === asset);
+    }
+    if (!entry) return null;
+    const allowed = ownedPages(node, owner);
+    return { id: identity, title: selected?.title || entry.title, blocks: entry.blocks.filter(block => allowed.includes(block.pdf_page)) };
+}
+
 // Character-weighted dominant horizontal text size avoids a large title deciding
 // the reading scale. This retains PDF geometry; it does not reinterpret tables.
 export function bodyTextSize(items) {
