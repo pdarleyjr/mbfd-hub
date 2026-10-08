@@ -15,16 +15,10 @@ export function readingContent(node, selected, entries) {
         owner = catalog.find(item => item.id === selected.id);
         if (!asset || node.revision.metadata?.asset_id !== asset || selected.owning_asset_id !== asset
             || !owner || owner.owning_asset_id !== asset || selected.parent !== owner.parent) return null;
-        // Native artifacts hold the whole owning document. A semantic descendant
-        // may use that root only through its declared same-asset parent chain.
-        const visited = new Set();
-        let parent = owner;
-        while (parent && parent.id !== asset) {
-            if (parent.owning_asset_id !== asset || !parent.parent || visited.has(parent.id)) return null;
-            visited.add(parent.id);
-            parent = catalog.find(item => item.id === parent.parent);
-        }
-        if (!parent || (parent.owning_asset_id && parent.owning_asset_id !== asset)) return null;
+        // Doctrine hierarchy can have no parent or a parent in another document.
+        // The catalog's explicit PDF owner binds native artifact fallback.
+        const root = catalog.find(item => item.id === asset);
+        if (!root || (root.owning_asset_id && root.owning_asset_id !== asset)) return null;
         entry = entries.find(item => item.id === asset);
     }
     if (!entry) return null;

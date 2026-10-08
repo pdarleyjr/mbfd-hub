@@ -54,7 +54,7 @@ test('native root and explicit subsection artifacts retain their original select
     assert.deepEqual(readingContent(ricNode, ricFigure, [...ricReading, explicit]).blocks, explicit.blocks);
 });
 
-test('native root fallback rejects unknown, foreign, orphaned and cyclic subsection identities', () => {
+test('native root fallback rejects unknown, foreign and unbound subsection identities', () => {
     const nodeWith = primary_entries => ({ ...ricNode, revision: { ...ricNode.revision, metadata: { ...ricNode.revision.metadata, primary_entries } } });
     assert.equal(readingContent(ricNode, { ...ricFigure, id: '300-RIC-UNKNOWN' }, ricReading), null);
     assert.equal(readingContent(ricNode, { ...ricFigure, owning_asset_id: '300.01' }, ricReading), null);
@@ -62,13 +62,16 @@ test('native root fallback rejects unknown, foreign, orphaned and cyclic subsect
     assert.equal(readingContent(ricNode, ricFigure, []), null);
     assert.equal(readingContent(ricNode, ricFigure, [{ ...ricReading[0], id: '300.01' }]), null);
     assert.equal(readingContent(nodeWith([ricFigure]), ricFigure, ricReading), null);
-    const orphan = { ...ricFigure, parent: 'missing' };
-    assert.equal(readingContent(nodeWith([ricRoot, orphan]), orphan, ricReading), null);
     const foreign = { ...ricFigure, owning_asset_id: '300.01' };
     assert.equal(readingContent(nodeWith([ricRoot, foreign]), ricFigure, ricReading), null);
-    const cycle = { ...ricFigure, parent: ricFigure.id };
-    assert.equal(readingContent(nodeWith([ricRoot, cycle]), cycle, ricReading), null);
+    assert.equal(readingContent(nodeWith([{ ...ricRoot, owning_asset_id: '300.01' }, ricFigure]), ricFigure, ricReading), null);
     assert.equal(readingContent({ ...ricNode, revision: { ...ricNode.revision, metadata: { ...ricNode.revision.metadata, asset_id: '300.01' } } }, ricFigure, ricReading), null);
+});
+
+test('a catalog-declared external doctrine parent does not change the explicit PDF owner', () => {
+    const selected = { ...ricFigure, parent: '300-CMD' };
+    const node = { ...ricNode, revision: { ...ricNode.revision, metadata: { ...ricNode.revision.metadata, primary_entries: [ricRoot, selected] } } };
+    assert.deepEqual(readingContent(node, selected, ricReading).blocks, ricBlocks.filter(block => block.pdf_page === 4));
 });
 
 test('nested semantic content keeps only catalog-owned pages, including PDF references', () => {
@@ -76,6 +79,20 @@ test('nested semantic content keeps only catalog-owned pages, including PDF refe
     const node = { ...ricNode, revision: { ...ricNode.revision, metadata: { ...ricNode.revision.metadata, primary_entries: [ricRoot, ricFigure, nested] } } };
     assert.deepEqual(readingContent(node, nested, ricReading).blocks, [ricBlocks.at(-1)]);
     assert.deepEqual(readingContent(node, { ...nested, semantic_pages: [4, 5, 6] }, ricReading).blocks, [ricBlocks.at(-1)]);
+});
+
+test('all nine C2 organization references resolve their explicit PDF owner without a hierarchy parent', () => {
+    const titles = ['Organizational Reference Control', 'Department Organization', 'Logistics Organization', 'Training Division Organization', 'Public Safety Communications Organization', 'Fire Operations Organization', 'Fire Rescue Division Organization', 'Fire Prevention Division Organization', 'Emergency Management Organization'];
+    const root = { id: '100.03', owning_asset_id: '100.03', title: 'Table of Organization', parent: null, physical_page: 2, semantic_pages: Array.from({ length: 12 }, (_, index) => index + 1) };
+    const references = titles.map((title, index) => ({ id: `100.03-R0${index}`, title, owning_asset_id: '100.03', document_class: 'controlled_reference', parent: null, physical_page: index + 4, semantic_pages: [index + 4] }));
+    const blocks = references.map(entry => ({ type: 'pdf_reference', text: entry.title, pdf_page: entry.physical_page }));
+    const node = { metadata: { asset_id: '100.03' }, revision: { page_count: 12, metadata: { asset_id: '100.03', primary_entries: [root, ...references] } } };
+    for (const entry of references) {
+        const content = readingContent(node, entry, [{ id: root.id, title: root.title, blocks }]);
+        assert.ok(content, `${entry.id} has an explicit, catalog-declared PDF owner`);
+        assert.equal(content.title, entry.title);
+        assert.deepEqual(content.blocks, blocks.filter(block => block.pdf_page === entry.physical_page));
+    }
 });
 
 const sourceHash = 'a'.repeat(64), targetHash = 'b'.repeat(64);
