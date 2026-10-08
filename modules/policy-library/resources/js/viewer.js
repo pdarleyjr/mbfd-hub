@@ -1065,7 +1065,7 @@ document.addEventListener('keydown', event => {
         if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
         if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
     }
-    if (event.target.closest('input,textarea,select,[contenteditable="true"],button,summary,a') || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    if (event.target.closest('input,textarea,select,[contenteditable="true"],button,summary,a,.reading-table-scroll') || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
     if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') { event.preventDefault(); navigate(event.key === 'ArrowRight' ? 1 : -1); }
 });
 window.addEventListener('popstate', () => {
