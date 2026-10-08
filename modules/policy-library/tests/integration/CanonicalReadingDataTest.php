@@ -10,9 +10,11 @@ use Illuminate\Support\Str;
 use Mbfd\PolicyLibrary\Models\DocumentRevision;
 use Mbfd\PolicyLibrary\Models\Manual;
 use Mbfd\PolicyLibrary\Models\ManualNode;
+use Mbfd\PolicyLibrary\Services\ImportService;
 use Mbfd\PolicyLibrary\Services\ReadingViewService;
 use Mbfd\PolicyLibrary\Services\SearchService;
 use Mbfd\PolicyLibrary\Services\TreeService;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
 
@@ -20,6 +22,46 @@ use Tests\TestCase;
 final class CanonicalReadingDataTest extends TestCase
 {
     use RefreshDatabase;
+
+    public static function aggregateMarkerCases(): array
+    {
+        return ['matching markers' => ['aggregate'], 'revision aggregate despite node leaf marker' => ['leaf']];
+    }
+
+    #[DataProvider('aggregateMarkerCases')]
+    public function test_canonical_leaves_publish_before_aggregate_books_regardless_of_node_order(string $bookNodeRole): void
+    {
+        $manual = Manual::query()->create(['name' => 'Publication order fixture', 'slug' => 'publication-order-fixture', 'type' => 'sog']);
+        $edition = $manual->editions()->create(['label' => 'Draft order fixture', 'state' => 'draft']);
+        $bytes = 'Synthetic publication-state fixture; not a PDF fidelity or malware proof';
+        $hash = hash('sha256', $bytes);
+        File::makeDirectory($this->privateRoot.'/revisions', 0700, true);
+        File::put($this->privateRoot.'/revisions/'.$hash.'.pdf', $bytes);
+        foreach (['SECTION-100' => 'aggregate', '100.01' => 'leaf'] as $asset => $role) {
+            $node = $edition->nodes()->create(['manual_id' => $manual->id, 'title' => $asset, 'slug' => Str::slug($asset), 'type' => 'document',
+                'metadata' => ['asset_id' => $asset, 'search_role' => $role === 'aggregate' ? $bookNodeRole : $role]]);
+            $revision = $node->revisions()->create(['uuid' => (string) Str::uuid(), 'source_filename' => 'state-order-fixture.pdf',
+                'storage_path' => 'revisions/'.$hash.'.pdf', 'sha256' => $hash, 'page_count' => 1, 'state' => 'draft',
+                'metadata' => ['asset_id' => $asset, 'search_role' => $role, 'leaf_asset_ids' => ['100.01']]]);
+            $revision->pages()->create(['page' => 1, 'title' => $asset]);
+            $node->update(['current_revision_id' => $revision->id]);
+        }
+        $order = [];
+        $recording = true;
+        DocumentRevision::updated(static function (DocumentRevision $revision) use (&$order, &$recording, $manual): void {
+            if ($recording && $revision->wasChanged('state') && $revision->state === 'published') {
+                $order[] = $revision->metadata['asset_id'];
+                self::assertNull($manual->fresh()->active_edition_id);
+            }
+        });
+        try {
+            app(ImportService::class)->publish($edition, null);
+        } finally {
+            $recording = false;
+        }
+        self::assertSame(['100.01', 'SECTION-100'], $order);
+        self::assertSame($edition->id, $manual->fresh()->active_edition_id);
+    }
 
     private string $privateRoot;
 
