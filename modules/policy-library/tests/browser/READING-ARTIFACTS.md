@@ -43,6 +43,14 @@ During the governed new-edition import, persist `search_role: aggregate` in each
 
 Default search excludes complete declared aggregates to avoid duplicate whole-book/individual hits. Explicit queries for the aggregate asset ID remain possible when it passes all visibility checks. Existing subject alias mappings resolve to the canonical leaf when present; their semantic identities and stored source records are retained.
 
+## Portable PDF cross-references
+
+Keep the served source PDF bytes unchanged. Portable `/GoToR` actions often name a peer file and an actual PDF destination rather than a web URL. The import must inspect each actual action and destination, then bind revision `peer_links` to its annotation ID, source page, exact rectangle, source PDF SHA-256, canonical target asset ID, target PDF SHA-256 and measured target page. PDF name syntax and literal text strings have different semantics: strip the slash syntax only from a `NameObject`, never from a literal string by guess. Missing or ambiguous destinations withhold the binding/import.
+
+The viewer resolves a proved binding only when the currently visible tree contains exactly one identity-bound current target with the expected PDF hash and page. Hidden targets, another revision, duplicate identities, changed source hashes or annotation rectangles reject the binding. A rejected declared binding never falls back to the raw file URL. Existing unbound local PDF and URI links retain their prior behavior. This adapter changes navigation metadata and DOM overlays; it does not rewrite approved leaf PDFs or their independently approved reader artifacts.
+
+`tests/browser/peer-link-regression.mjs` exercises an actual source annotation and exact target PDF through the loopback fixture, then removes/tampers with its target/source bindings. Run it with the same private fixture environment as the reading tests. Fixture success is separate from final import preflight and authenticated live acceptance.
+
 ## Deterministic local UI checks
 
 `tests/browser/reader-server.mjs` is a loopback fixture adapter, not production Hub authentication. `POLICY_LIBRARY_READING_PREVIEW` points to a task-owned manifest specifying an actual content-addressed artifact, exact matching PDF path and source-derived nodes. The adapter marks the active edition as a diagnostic C2 preview. Its revision identity is a source hash for UI testing, not a production database UUID. Backend authentication, immutable revision binding and validation gates are tested independently by `ReadingViewTest.php`.

@@ -2,7 +2,7 @@ import workerUrl from 'pdfjs-dist/legacy/build/pdf.worker.mjs?url';
 import '../css/viewer.css';
 import { adjacentPage, canvasDimensions, flattenDocuments } from './navigation.js';
 import { currentEditionChanged, linkRectangle, pageLink, pdfDestinationPage, pdfUrlTarget, primaryEntries, primaryHierarchy, recentlyPublished, resolveLibrarySelection, subjectAliases } from './library-ui.js';
-import { bodyTextSize, ownedPages, readingScale, readingSection } from './reader-model.js';
+import { bodyTextSize, ownedPages, peerAnnotationTarget, readingScale, readingSection } from './reader-model.js';
 
 let pdfEngine;
 let enginePromise;
@@ -554,7 +554,12 @@ async function renderLinks(page, viewport, pdf, generation) {
         const rectangle = linkRectangle(viewport, annotation.rect);
         if (!rectangle || !rectangle.width || !rectangle.height) continue;
         let target;
-        if (annotation.dest) {
+        const peer = peerAnnotationTarget(state.node.revision, annotation, page.pageNumber, state.documents);
+        if (peer.bound) {
+            if (!peer.target) continue;
+            const node = state.documents.find(item => item.id === peer.target.node);
+            target = { ...peer.target, href: pageLink(location.href, state.manual.slug, node.slug || node.id, peer.target.page) };
+        } else if (annotation.dest) {
             const number = await pdfDestinationPage(pdf, annotation.dest);
             if (!number) continue;
             const entry = typeof annotation.dest === 'string' ? state.entries.find(item => item.node.id === state.node.id && item.anchor === annotation.dest) : null;
