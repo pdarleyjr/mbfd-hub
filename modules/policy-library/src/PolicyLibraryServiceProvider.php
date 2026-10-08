@@ -6,6 +6,7 @@ namespace Mbfd\PolicyLibrary;
 
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use Mbfd\PolicyLibrary\Console\DeliveryCommand;
 use Mbfd\PolicyLibrary\Console\ImportCommand;
 use Mbfd\PolicyLibrary\Console\PublishCommand;
 use Mbfd\PolicyLibrary\Filament\LibraryPanelProvider;
@@ -44,7 +45,7 @@ final class PolicyLibraryServiceProvider extends ServiceProvider
         $this->publishes([__DIR__.'/../public' => public_path('vendor/policy-library')], 'policy-library-assets');
         $this->publishes([__DIR__.'/../config/policy-library.php' => config_path('policy-library.php')], 'policy-library-config');
         if ($this->app->runningInConsole()) {
-            $this->commands([ImportCommand::class, PublishCommand::class]);
+            $this->commands([ImportCommand::class, PublishCommand::class, DeliveryCommand::class]);
         }
     }
 }

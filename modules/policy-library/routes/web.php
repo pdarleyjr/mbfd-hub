@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Route;
 use Mbfd\PolicyLibrary\Http\Controllers\AccessController;
 use Mbfd\PolicyLibrary\Http\Controllers\AssetController;
 use Mbfd\PolicyLibrary\Http\Controllers\CanonicalLoginBridge;
+use Mbfd\PolicyLibrary\Http\Controllers\ManualDeliveryController;
 use Mbfd\PolicyLibrary\Http\Controllers\ViewerController;
 use Mbfd\PolicyLibrary\Http\Controllers\ViewerErrorController;
 use Mbfd\PolicyLibrary\Http\Middleware\EnsureLibraryAdmin;
@@ -26,6 +27,7 @@ Route::domain(config('policy-library.domain'))->middleware(['web', LibrarySecuri
             Route::get('/api/manuals', [ViewerController::class, 'manuals'])->name('manuals');
             Route::get('/api/search', [ViewerController::class, 'search'])->middleware('throttle:60,1')->name('search');
             Route::get('/api/manuals/{slug}/tree', [ViewerController::class, 'tree'])->name('tree');
+            Route::get('/manuals/{slug}/pdf', [ManualDeliveryController::class, 'show'])->whereIn('slug', ['sogs', 'medical-protocols'])->name('manual-pdf');
             Route::get('/api/nodes/{node}/document', [ViewerController::class, 'document'])->name('document');
             Route::get('/api/nodes/{node}/reading', [ViewerController::class, 'reading'])->name('reading');
             Route::get('/assets/{uuid}', [AssetController::class, 'show'])->whereUuid('uuid')->name('asset');
