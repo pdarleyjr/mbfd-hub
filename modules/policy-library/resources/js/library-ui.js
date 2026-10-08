@@ -17,7 +17,8 @@ export function primaryEntries(documents) {
     const preferred = new Map();
     for (const entry of entries) {
         const prior = preferred.get(entry.id);
-        if (!prior || (entry.node.metadata?.asset_id === entry.id && prior.node.metadata?.asset_id !== entry.id)) preferred.set(entry.id, entry);
+        const owner = entry.owning_asset_id || entry.id;
+        if (!prior || (entry.node.metadata?.asset_id === owner && prior.node.metadata?.asset_id !== (prior.owning_asset_id || prior.id))) preferred.set(entry.id, entry);
     }
     return [...preferred.values()];
 }

@@ -21,6 +21,18 @@ test('copy link retains exact logical document and page without temporary search
         'https://files.mbfdhub.com/?manual=medical&node=procedures-pocus&page=3');
 });
 
+test('nested semantic identities use their proved canonical leaf owner regardless of book ordering', () => {
+    const entry = { id: '200-B6-FRM05', owning_asset_id: '200-B6-R1', parent: '200-B6-R1', slug: '200-b6-frm05', title: 'Controlled instrument', physical_page: 8, semantic_pages: [8, 9] };
+    const aggregate = { id: 10, slug: 'asset-section-200', metadata: { asset_id: 'SECTION-200' }, revision: { page_count: 50, metadata: { primary_entries: [entry] } } };
+    const leaf = { id: 20, slug: 'asset-200-b6-r1', metadata: { asset_id: '200-B6-R1' }, revision: { page_count: 12, metadata: { primary_entries: [{ ...entry, physical_page: 3, semantic_pages: [3, 4] }] } } };
+    for (const documents of [[aggregate, leaf], [leaf, aggregate]]) {
+        assert.equal(primaryEntries(documents).length, 1);
+        assert.equal(resolveLibrarySelection(documents, '200-b6-frm05').node.id, 20);
+        assert.equal(resolveLibrarySelection(documents, '200-b6-frm05').page, 3);
+        assert.equal(resolveLibrarySelection(documents, 'asset-section-200', 8).node.id, 10);
+    }
+});
+
 test('recent documents use recorded publication dates and do not mutate reading order', () => {
     const documents = [
         { id: 1, revision: { published_at: '2026-09-01T00:00:00Z' } },
