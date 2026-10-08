@@ -9,6 +9,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Mbfd\PolicyLibrary\Models\Manual;
 use Mbfd\PolicyLibrary\Models\ManualNode;
+use Mbfd\PolicyLibrary\Services\ManualDeliveryService;
 use Mbfd\PolicyLibrary\Services\ReadingViewService;
 use Mbfd\PolicyLibrary\Services\SearchService;
 use Mbfd\PolicyLibrary\Services\TreeService;
@@ -35,7 +36,7 @@ final class ViewerController
     {
         $manual = Manual::query()->where('slug', $slug)->where('is_active', true)->whereNotNull('active_edition_id')->firstOrFail();
 
-        return response()->json($trees->tree($manual));
+        return response()->json($trees->tree($manual) + ['delivery' => app(ManualDeliveryService::class)->summary($manual)]);
     }
 
     public function search(Request $request, SearchService $search, TreeService $trees): JsonResponse

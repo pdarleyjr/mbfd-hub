@@ -32,7 +32,7 @@ const state = {
     pdf: null, revisionId: null, loading: null, render: null, textLayer: null,
     selectionGeneration: 0, renderGeneration: 0, abort: null, open: new Set(),
     searchAbort: null,
-    editionId: null, editionCheck: null,
+    editionId: null, editionCheck: null, manualDelivery: null,
     mode: matchMedia('(max-width: 600px)').matches ? 'read' : 'width', zoom: 1,
     textSizes: new Map(),
     representation: 'pdf', readingPreference: null, readingData: null, readingZoom: 1,
@@ -499,7 +499,23 @@ function updateControls() {
     byId('page-number').value = state.page;
     const download = byId('download-pdf');
     download.hidden = !state.node?.revision.download_url;
-    if (!download.hidden) download.href = state.node.revision.download_url;
+    if (!download.hidden) {
+        download.href = state.node.revision.download_url;
+        const scope = state.node.revision.metadata?.asset_type === 'full_section' ? 'section' : 'document';
+        download.textContent = `Download this ${scope} (PDF)`;
+        byId('print-pdf').textContent = `Open this ${scope} to print`;
+    }
+    const delivery = state.manualDelivery?.edition_id === state.editionId ? state.manualDelivery : null;
+    const entireDownload = byId('download-manual');
+    const entirePrint = byId('print-manual');
+    entireDownload.hidden = !delivery;
+    entirePrint.hidden = !delivery;
+    if (delivery) {
+        const manualName = state.manual?.slug === 'sogs' ? 'all SOGs' : 'all protocols';
+        entireDownload.href = delivery.download_url;
+        entireDownload.textContent = `Download ${manualName} (${(delivery.byte_size / 1_000_000).toFixed(1)} MB PDF)`;
+        entirePrint.textContent = `Open ${manualName} to print`;
+    }
     for (const button of document.querySelectorAll('[data-nav]')) {
         const direction = button.dataset.nav === 'next' ? 1 : -1;
         button.disabled = !state.node || !adjacentPage(state.documents, state.node.id, state.page, direction);
@@ -843,6 +859,7 @@ async function loadManual(slug, selectedNode, pageNumber, push = true) {
     state.documents = [];
     state.entries = [];
     state.editionId = null;
+    state.manualDelivery = null;
     state.open.clear();
     const previousLoad = state.loading;
     state.loading = null;
@@ -869,6 +886,7 @@ async function loadManual(slug, selectedNode, pageNumber, push = true) {
         if (abort.signal.aborted || state.abort !== abort) return;
         state.tree = data.nodes;
         state.editionId = data.manual?.active_edition_id ?? manual.active_edition_id ?? null;
+        state.manualDelivery = data.delivery || null;
         state.documents = flattenDocuments(data.nodes);
         state.entries = primaryEntries(state.documents);
         renderRecent();
@@ -1048,6 +1066,29 @@ byId('download-pdf').addEventListener('click', async event => {
         await refreshEdition();
         if (state.node?.revision.download_url) location.assign(state.node.revision.download_url);
     } catch { showMessage('The manual could not be loaded.', 'Try again when your connection is available.', refreshWhenVisible); }
+});
+byId('download-manual').addEventListener('click', async event => {
+    if (event.button !== 0 || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+    event.preventDefault();
+    const slug = state.manual?.slug;
+    try {
+        await refreshEdition();
+        if (state.manual?.slug === slug && state.manualDelivery?.edition_id === state.editionId) {
+            location.assign(state.manualDelivery.download_url);
+        }
+    } catch { byId('copy-status').textContent = 'Check your connection and try again.'; }
+});
+byId('print-manual').addEventListener('click', async () => {
+    const slug = state.manual?.slug;
+    if (!state.manualDelivery) return;
+    const popup = window.open('about:blank', '_blank');
+    if (!popup) { byId('copy-status').textContent = 'Allow a new PDF tab to print the complete manual.'; return; }
+    popup.opener = null;
+    try {
+        await refreshEdition();
+        if (state.manual?.slug !== slug || state.manualDelivery?.edition_id !== state.editionId) { popup.close(); return; }
+        popup.location.replace(state.manualDelivery.print_url);
+    } catch { popup.close(); byId('copy-status').textContent = 'Check your connection and try again.'; }
 });
 document.addEventListener('keydown', event => {
     if (event.key === 'Escape') {

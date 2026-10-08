@@ -1,0 +1,17 @@
+# Complete manual delivery copies
+
+The viewer retains its selected document or section PDF actions. When a reviewed complete-manual delivery is prepared for the exact current catalog, Actions also offers a complete PDF download (with its actual size) and opens that complete PDF in the browser's native PDF viewer for printing.
+
+Delivery copies are separate private artifacts under `policy-library.storage_root/deliveries`. Preparing them does not create, publish, adopt, or modify any policy revision, edition, account, permission, PIN, or original source. Both delivery actions use the existing canonical identity and Policy Library PIN middleware, `private, no-store` responses, and byte-range PDF delivery. Review controls cannot use these routes.
+
+## Prepare a reviewed edition
+
+1. Read the exact current binding with `php artisan policy-library:delivery sogs` or `php artisan policy-library:delivery medical-protocols`. This command is read-only when no file options are supplied.
+2. Prepare and independently review a source-preserving complete PDF. For SOGs, include each `individual_sog` once, exclude duplicate `full_section` books, and keep controlled companions in their separate package. For Medical Protocols, include every current visible protocol and its front matter once. Preserve text, vectors, images, page boxes, bookmarks, links, and source authority. Do not use lossy image downsampling or OCR as compression.
+3. Extend the exact snapshot JSON with `schema: "mbfd-manual-delivery-v1"`, the complete PDF's `sha256`, integer `byte_size`, integer `page_count`, integer `front_pages` (0–100), and `independent_qa_sha256` for the saved independent source/structure/render/visual review receipt. The page count must equal the sum of the included source pages plus the declared front matter. Keep the returned source bindings exactly as supplied.
+4. Run `php artisan policy-library:delivery SLUG --manifest=PATH --pdf=PATH --qa=PATH`. The command checks the exact current catalog and included source bindings, every current source PDF checksum, the derived PDF and QA receipt checksums, ClamAV, qpdf (warnings rejected), unencrypted page count, and a second current-state check. Copies and manifests are immutable and exact retries are idempotent. Do not disable the scanner or relax a failed guard.
+5. Verify actual authenticated/PIN-protected download and print URLs, byte-range delivery, output hash/size/page count, current source preservation, and the viewer's current-versus-complete labels. Original source checks, rendered PDF review, CI, deployment, and authenticated browser acceptance remain distinct evidence.
+
+Hidden ancestors, retired editions, changed visibility, replacement revisions, source metadata changes, reordered catalog entries, incomplete coverage, or changed prepared bytes withhold the old complete PDF. Registration verifies the originals on disk; each current download verifies the complete delivery's bytes and current database catalog bindings. It does not rehash every original source on each byte-range request. Prepare a fresh reviewed copy after a catalog change; the viewer continues to offer individual current PDFs while a new complete copy is unavailable. Old prepared copies remain private and cannot be requested by arbitrary hash or path.
+
+PDF compression is internal and lossless; users receive one printable PDF without archive extraction. ZIP was evaluated separately but is not needed for this interface.
