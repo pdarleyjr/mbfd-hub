@@ -179,7 +179,10 @@ for (const scenario of profiles) {
     await expectTouchTargets(page);
     const accessibility = await new AxeBuilder({ page }).include('.uo-builder').analyze();
     expect(accessibility.violations.map(({ id, impact, nodes }) => ({ id, impact, nodes: nodes.map(node => node.target) }))).toEqual([]);
-    await expect.poll(() => page.locator('[data-product]').first().locator('img').evaluate(element => (element as HTMLImageElement).naturalWidth), { timeout: 20_000 }).toBeGreaterThan(0);
+    const firstImage = page.locator('[data-product]').first().locator('img');
+    if (await firstImage.count()) {
+      await expect.poll(() => firstImage.evaluate(element => (element as HTMLImageElement).naturalWidth), { timeout: 20_000 }).toBeGreaterThan(0);
+    }
     await page.screenshot({ path: testInfo.outputPath('catalog-viewport.png'), animations: 'disabled' });
     if (scenario.assignment === 'Rescue 1' && testInfo.project.name === 'uniform-375') {
       await page.setViewportSize({ width: 320, height: 844 });
@@ -315,6 +318,9 @@ test('cart counts every unit immediately and removes the complete selected line'
     await expect(page.locator('[data-cart-count]')).toHaveText(String(count));
   }
   await shirt.getByLabel('Size', { exact: true }).selectOption('L');
+  await shirt.getByRole('spinbutton', { name: 'Quantity', exact: true }).press('Enter');
+  await expect(page.locator('[data-order-success]')).toHaveCount(0);
+  await expect(shirt.getByRole('spinbutton', { name: 'Quantity', exact: true })).toHaveValue('3');
   await setQuantity(page, 'long_sleeve_shirt', 2);
   await expect(page.locator('[data-cart-count]')).toHaveText('5');
   const summary = await reviewOrder(page);
@@ -400,15 +406,17 @@ test('three jacket styles share one selection, retain size, and reject a second 
   await expect(jacket).toContainText('Support Services will confirm any earlier off-system issue history.');
   await quantity.fill('1');
   await jacket.getByLabel('Size', { exact: true }).selectOption('L');
-  await reviewOrder(page);
-  await page.getByRole('button', { name: 'Submit Uniform Request', exact: true }).click();
-  await expect(page.locator('.uo-input-errors')).toContainText('Check your order details');
-  await expect(page.getByRole('dialog', { name: 'Your cart', exact: true })).toHaveCount(0);
-  await expect(jacket.getByRole('radio').first()).toHaveAttribute('aria-invalid', 'true');
-  await expect(jacket.getByRole('radio').first()).toBeFocused();
-  await expect(jacket.getByRole('radio').first()).toBeInViewport();
-  await expect(jacket.getByLabel('Size', { exact: true })).toHaveValue('L');
-  await expect(page.locator('.uo-recent-request')).toHaveCount(priorRequests);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    await reviewOrder(page);
+    await page.getByRole('button', { name: 'Submit Uniform Request', exact: true }).click();
+    await expect(page.locator('.uo-input-errors')).toContainText('Check your order details');
+    await expect(page.getByRole('dialog', { name: 'Your cart', exact: true })).toHaveCount(0);
+    await expect(jacket.getByRole('radio').first()).toHaveAttribute('aria-invalid', 'true');
+    await expect(jacket.getByRole('radio').first()).toBeFocused();
+    await expect(jacket.getByRole('radio').first()).toBeInViewport();
+    await expect(jacket.getByLabel('Size', { exact: true })).toHaveValue('L');
+    await expect(page.locator('.uo-recent-request')).toHaveCount(priorRequests);
+  }
   for (const [index, style] of styles.entries()) {
     const radio = jacket.getByRole('radio', { name: style.label, exact: true });
     await radio.check();

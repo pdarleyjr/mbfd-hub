@@ -2,6 +2,15 @@
     <div class="uo-builder" x-init="window.matchMedia('(max-width: 1279px)').matches && $store.sidebar.close()" x-on:resize.window="desktop = window.matchMedia('(min-width: 1024px)').matches; if (desktop) cartOpen = false" x-data="{
         desktop: window.matchMedia('(min-width: 1024px)').matches,
         cartOpen: false,
+        init() {
+            this.$wire.$hook('commit', ({ commit, succeed }) => {
+                if (commit.calls.some(call => call.method === 'submit')) {
+                    succeed(() => this.$nextTick(() => {
+                        if (this.$root.querySelector('.uo-input-errors')) this.showErrors();
+                    }));
+                }
+            });
+        },
         get itemCount() {
             return Object.values(this.$wire.data.items || {}).reduce((total, item) => total + Math.max(0, Math.floor(Number(item.quantity) || 0)), 0);
         },
@@ -24,7 +33,7 @@
             if (invalid?.closest('#uo-cart')) { if (!this.desktop) this.openCart(); }
             else this.closeCart(false);
             this.$nextTick(() => {
-                const target = invalid || this.$root.querySelector('.uo-input-errors');
+                const target = this.$root.querySelector('[aria-invalid=true]') || this.$root.querySelector('.uo-input-errors');
                 target?.scrollIntoView({ block: 'center' });
                 target?.focus({ preventScroll: true });
             });
@@ -82,7 +91,7 @@
 
         <p class="uo-image-disclaimer"><x-heroicon-o-information-circle aria-hidden="true" /><span>Product images are for demonstration purposes only. Shirt color, embroidery, badge/brass color, rank markings and other rank- or assignment-specific details will be adjusted to your actual rank and position.</span></p>
 
-        <form wire:submit="submit" x-on:submit="if ($el.querySelector('.uo-input-errors')) showErrors()" x-on:keydown.enter="if ($event.target.matches('input')) $event.preventDefault()" class="uo-order-layout" novalidate>
+        <form wire:submit="submit" x-on:keydown.enter="if ($event.target.matches('input')) $event.preventDefault()" class="uo-order-layout" novalidate>
             <div class="uo-toolbar" wire:ignore.self :inert="cartOpen && !desktop">
                 <p class="uo-shopping-help"><strong>Choose your uniforms</strong><span>Add items and sizes, then submit your order.</span></p>
                 <button type="button" class="uo-cart-button" x-ref="cartButton" aria-label="Open cart" aria-controls="uo-cart" aria-haspopup="dialog" :aria-expanded="cartOpen.toString()" x-on:click="openCart()">
@@ -91,7 +100,7 @@
             </div>
             <div class="uo-catalog" wire:ignore.self :inert="cartOpen && !desktop">
                 @if($errors->any())
-                    <div class="uo-input-errors" role="alert" tabindex="-1" x-init="$nextTick(() => showErrors())" wire:key="uniform-errors-{{ md5(json_encode($errors->messages())) }}">
+                    <div class="uo-input-errors" role="alert" tabindex="-1" wire:key="uniform-errors-{{ md5(json_encode($errors->messages())) }}">
                         <strong>Check your order details</strong>
                         <p>Correct the fields shown below, then submit again. Your selections are still here.</p>
                         @error('data.items') <p>{{ $message }}</p> @enderror
