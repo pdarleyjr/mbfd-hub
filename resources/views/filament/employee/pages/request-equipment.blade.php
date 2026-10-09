@@ -82,7 +82,7 @@
 
         <p class="uo-image-disclaimer"><x-heroicon-o-information-circle aria-hidden="true" /><span>Product images are for demonstration purposes only. Shirt color, embroidery, badge/brass color, rank markings and other rank- or assignment-specific details will be adjusted to your actual rank and position.</span></p>
 
-        <form wire:submit="submit" class="uo-order-layout" novalidate>
+        <form wire:submit="submit" x-on:submit="if ($el.querySelector('.uo-input-errors')) showErrors()" x-on:keydown.enter="if ($event.target.matches('input')) $event.preventDefault()" class="uo-order-layout" novalidate>
             <div class="uo-toolbar" wire:ignore.self :inert="cartOpen && !desktop">
                 <p class="uo-shopping-help"><strong>Choose your uniforms</strong><span>Add items and sizes, then submit your order.</span></p>
                 <button type="button" class="uo-cart-button" x-ref="cartButton" aria-label="Open cart" aria-controls="uo-cart" aria-haspopup="dialog" :aria-expanded="cartOpen.toString()" x-on:click="openCart()">
