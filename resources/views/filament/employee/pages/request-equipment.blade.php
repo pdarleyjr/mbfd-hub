@@ -221,7 +221,7 @@
                                 <button type="button" class="uo-cart-remove" aria-label="Remove {{ $selectedLabel }} from cart" x-on:click="$wire.set(@js('data.items.'.$code.'.quantity'), 0)"><x-heroicon-o-trash aria-hidden="true" /></button>
                             </div>
                         @empty
-                            <p class="uo-summary-empty">Add a quantity to any item to start your order. Sizing appears when you select it.</p>
+                            <p class="uo-summary-empty" x-text="itemCount > 0 ? 'Updating your cart…' : 'Add a quantity to any item to start your order. Sizing appears when you select it.'">Add a quantity to any item to start your order. Sizing appears when you select it.</p>
                         @endforelse
                         @if($context['profile'] !== 'day_other' || $context['marine'])
                             <details class="uo-allocation-details" wire:ignore.self>

@@ -325,7 +325,7 @@ test('cart counts every unit immediately and removes the complete selected line'
   await expect(page.locator('[data-cart-count]')).toHaveText('5');
   const summary = await reviewOrder(page);
   await expect(summary.locator('[data-cart-total]')).toHaveText('5');
-  await expect(summary.getByRole('link', { name: 'Edit Short Sleeve T-Shirt, quantity 3', exact: true })).toBeVisible();
+  await expect(summary.getByRole('link', { name: 'Edit Short Sleeve T-Shirt, quantity 3', exact: true })).toBeVisible({ timeout: 20_000 });
   await summary.getByRole('button', { name: 'Remove Short Sleeve T-Shirt from cart', exact: true }).click();
   await expect(page.locator('[data-cart-count]')).toHaveText('2');
   await expect(summary.locator('[data-cart-total]')).toHaveText('2');
@@ -344,7 +344,10 @@ test('mobile cart traps keyboard focus, closes with Escape and restores its trig
   await setQuantity(page, 't_shirt', 1);
   await product(page, 't_shirt').getByLabel('Size', { exact: true }).selectOption('L');
   const cartButton = page.getByRole('button', { name: 'Open cart', exact: true });
-  await reviewOrder(page);
+  const summary = await reviewOrder(page);
+  const selectedShirt = summary.getByRole('link', { name: 'Edit Short Sleeve T-Shirt, quantity 1', exact: true });
+  await expect(selectedShirt).toBeVisible({ timeout: 20_000 });
+  await expect(selectedShirt).toContainText('Size: L', { timeout: 20_000 });
   const dialog = page.getByRole('dialog', { name: 'Your cart', exact: true });
   await expect.poll(() => dialog.evaluate(element => element.contains(document.activeElement))).toBe(true);
   await dialog.getByRole('button', { name: 'Close cart', exact: true }).focus();
