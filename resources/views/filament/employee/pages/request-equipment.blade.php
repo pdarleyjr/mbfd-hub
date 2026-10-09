@@ -32,11 +32,11 @@
             const invalid = this.$root.querySelector('[aria-invalid=true]');
             if (invalid?.closest('#uo-cart')) { if (!this.desktop) this.openCart(); }
             else this.closeCart(false);
-            this.$nextTick(() => {
+            this.$nextTick(() => requestAnimationFrame(() => {
                 const target = this.$root.querySelector('[aria-invalid=true]') || this.$root.querySelector('.uo-input-errors');
                 target?.scrollIntoView({ block: 'center' });
                 target?.focus({ preventScroll: true });
-            });
+            }));
         },
         imageTrigger: null,
         openImage(src, label, trigger) {
