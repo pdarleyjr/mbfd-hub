@@ -47,8 +47,9 @@ test('employee uniform, request ledger, and expiration pages are responsive and 
 
   await page.goto('/employee/request-equipment');
   await expect(page.getByRole('heading', { name: 'Request Uniforms' })).toBeVisible();
+  const cart = page.getByRole('button', { name: 'Open cart', exact: true });
+  if (await cart.isVisible()) await cart.click();
   await expect(page.getByRole('button', { name: 'Submit Uniform Request' })).toBeVisible();
-  await page.getByRole('button', { name: 'Review order', exact: true }).click();
   await page.locator('.uo-recent summary').click();
   await expect(page.getByText('Structural firefighting PPE is handled by an authorized officer')).toBeVisible();
   await expect(page.locator('.employee-global-back a')).toBeVisible();
@@ -264,13 +265,11 @@ test('real uniform submission follows the complete member and Admin lifecycle th
   await page.goto('/employee/request-equipment');
   const recentRequests = page.locator('.uo-recent-request');
   const previousRequestCount = await recentRequests.count();
-  await page.getByRole('combobox', { name: 'Uniform category', exact: true }).selectOption('tshirts');
   const shirt = page.locator('[data-product="t_shirt"]');
   await shirt.getByRole('spinbutton', { name: /quantity/i }).fill('1');
   await shirt.getByLabel('Size', { exact: false }).selectOption('L');
   await page.getByRole('button', { name: 'Submit Uniform Request', exact: true }).click();
   await expect(recentRequests).toHaveCount(previousRequestCount + 1);
-  await page.getByRole('button', { name: 'Review order', exact: true }).click();
   await page.locator('.uo-recent summary').click();
   await expect(recentRequests.first()).toContainText('Pending');
   await expect(recentRequests.first()).toHaveAttribute('href', /\/employee\/my-requests\/[0-9A-Z]{26}$/);
@@ -293,11 +292,9 @@ test('individual uniform arrivals, partial issue, batch issue, scoped messages a
   page.setDefaultTimeout(30_000);
   await loginEmployee(page, '99002', requiredPassword('PERSONNEL_REQUESTS_E2E_MEMBER_PASSWORD'));
   await page.goto('/employee/request-equipment');
-  await page.getByRole('combobox', { name: 'Uniform category', exact: true }).selectOption('tshirts');
   const shirt = page.locator('[data-product="t_shirt"]');
   await shirt.getByRole('spinbutton', { name: 'Quantity', exact: true }).fill('3');
   await shirt.getByLabel('Size', { exact: true }).selectOption('L');
-  await page.getByRole('combobox', { name: 'Uniform category', exact: true }).selectOption('accessories');
   const belt = page.locator('[data-product="belt"]');
   await belt.getByRole('spinbutton', { name: 'Quantity', exact: true }).fill('1');
   await belt.getByLabel('Size', { exact: true }).selectOption('M');
