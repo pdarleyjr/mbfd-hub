@@ -1,9 +1,34 @@
 <x-filament-panels::page data-hub-ui="2" data-hub-portal="employee">
-    <div class="uo-builder" x-init="window.matchMedia('(max-width: 1023px)').matches && $store.sidebar.close()" x-data="{
-        activeCategory: @js($context['marine'] ? 'marine' : 'work'),
-        reviewing: false,
-        showCategory(category) { this.activeCategory = category; this.reviewing = false; },
-        reviewOrder() { this.reviewing = !this.reviewing; },
+    <div class="uo-builder" x-init="window.matchMedia('(max-width: 1279px)').matches && $store.sidebar.close()" x-on:resize.window="desktop = window.matchMedia('(min-width: 1024px)').matches; if (desktop) cartOpen = false" x-data="{
+        desktop: window.matchMedia('(min-width: 1024px)').matches,
+        cartOpen: false,
+        get itemCount() {
+            return Object.values(this.$wire.data.items || {}).reduce((total, item) => total + Math.max(0, Math.floor(Number(item.quantity) || 0)), 0);
+        },
+        openCart() { this.cartOpen = true; },
+        closeCart(restoreFocus = true) {
+            this.cartOpen = false;
+            if (restoreFocus && !this.desktop) this.$nextTick(() => this.$refs.cartButton.focus());
+        },
+        editItem(code) {
+            this.closeCart(false);
+            this.$nextTick(() => {
+                const product = document.getElementById('uo-product-' + code);
+                product?.scrollIntoView({ block: 'start' });
+                const field = product?.querySelector('.uo-product-fields input, .uo-product-fields select') || product?.querySelector('.uo-stepper input');
+                field?.focus({ preventScroll: true });
+            });
+        },
+        showErrors() {
+            const invalid = this.$root.querySelector('[aria-invalid=true]');
+            if (invalid?.closest('#uo-cart')) { if (!this.desktop) this.openCart(); }
+            else this.closeCart(false);
+            this.$nextTick(() => {
+                const target = invalid || this.$root.querySelector('.uo-input-errors');
+                target?.scrollIntoView({ block: 'center' });
+                target?.focus({ preventScroll: true });
+            });
+        },
         imageTrigger: null,
         openImage(src, label, trigger) {
             this.imageTrigger = trigger;
@@ -16,7 +41,7 @@
         restoreImageFocus() { this.imageTrigger?.focus(); }
     }">
         @if($submittedRequestNumber)
-            <div class="uo-success" role="status" data-order-success>
+            <div class="uo-success" role="status" tabindex="-1" data-order-success x-init="closeCart(false); $nextTick(() => { $el.scrollIntoView({ block: 'center' }); $el.focus({ preventScroll: true }); })" wire:key="uniform-success-{{ $submittedRequestNumber }}">
                 <x-heroicon-o-check-circle aria-hidden="true" />
                 <div><strong>Uniform request submitted · {{ $submittedRequestNumber }}</strong>
                     <p>Support Services can now review your order. <a href="/employee/my-requests/{{ $submittedRequestId }}">View your request</a></p>
@@ -57,46 +82,26 @@
 
         <p class="uo-image-disclaimer"><x-heroicon-o-information-circle aria-hidden="true" /><span>Product images are for demonstration purposes only. Shirt color, embroidery, badge/brass color, rank markings and other rank- or assignment-specific details will be adjusted to your actual rank and position.</span></p>
 
-        <form wire:submit="submit" x-on:submit="reviewing = false; const invalid = $el.querySelector('[aria-invalid=true]'); if (invalid) activeCategory = invalid.closest('[data-category]')?.dataset.category || activeCategory" class="uo-order-layout" novalidate>
-            <div class="uo-toolbar">
-                <nav class="uo-category-nav" aria-label="Uniform categories">
-                    <label class="sr-only" for="uo-category-select">Uniform category</label>
-                    <select id="uo-category-select" class="uo-category-jump" x-model="activeCategory" x-on:change="reviewing = false">
-                        @foreach($categories as $category => $categoryLabel)
-                            <option value="{{ $category }}">{{ $category === 'marine' && $context['marine'] ? 'Your Marine Allocation' : $categoryLabel }}</option>
-                        @endforeach
-                    </select>
-                </nav>
-                <div class="uo-order-actions">
-                    <button type="button" class="uo-review-button" aria-label="Review order" x-on:click="reviewOrder()" :aria-pressed="reviewing.toString()">Review <span>{{ $summary['selected_total'] }}</span></button>
-                    <button type="submit" class="uo-submit" aria-label="Submit Uniform Request" wire:loading.attr="disabled" wire:target="submit"><span wire:loading.remove wire:target="submit">Submit request</span><span wire:loading wire:target="submit">Submitting…</span><x-heroicon-o-arrow-right aria-hidden="true" /></button>
-                </div>
+        <form wire:submit="submit" class="uo-order-layout" novalidate>
+            <div class="uo-toolbar" wire:ignore.self :inert="cartOpen && !desktop">
+                <p class="uo-shopping-help"><strong>Choose your uniforms</strong><span>Add items and sizes, then submit your order.</span></p>
+                <button type="button" class="uo-cart-button" x-ref="cartButton" aria-label="Open cart" aria-controls="uo-cart" aria-haspopup="dialog" :aria-expanded="cartOpen.toString()" x-on:click="openCart()">
+                    <x-heroicon-o-shopping-cart aria-hidden="true" /><span>Cart</span><span class="uo-cart-count" data-cart-count x-text="itemCount" aria-live="polite" aria-atomic="true">{{ $summary['selected_total'] }}</span>
+                </button>
             </div>
-            @if($summary['warnings'])
-                <p class="uo-inline-advisory" role="status" x-show="!reviewing">Support Services will review this selection. You can still submit.</p>
-            @endif
-            <div class="uo-catalog">
+            <div class="uo-catalog" wire:ignore.self :inert="cartOpen && !desktop">
                 @if($errors->any())
-                    @php
-                        $errorCategory = null;
-                        foreach ($errors->keys() as $errorKey) {
-                            if (preg_match('/^data\.items\.([a-z_]+)\./', $errorKey, $match) && isset($products[$match[1]])) {
-                                $errorCategory = $products[$match[1]]['category'];
-                                break;
-                            }
-                        }
-                    @endphp
-                    <div class="uo-input-errors" role="alert" tabindex="-1" x-init="{{ $errorCategory ? 'showCategory('.Illuminate\Support\Js::from($errorCategory).');' : 'reviewing = true;' }} $nextTick(() => $el.scrollIntoView({ block: 'nearest' }))" wire:key="uniform-errors-{{ md5(json_encode($errors->messages())) }}">
+                    <div class="uo-input-errors" role="alert" tabindex="-1" x-init="$nextTick(() => showErrors())" wire:key="uniform-errors-{{ md5(json_encode($errors->messages())) }}">
                         <strong>Check your order details</strong>
                         <p>Correct the fields shown below, then submit again. Your selections are still here.</p>
                         @error('data.items') <p>{{ $message }}</p> @enderror
                         @error('data.idempotency_key') <p>{{ $message }}</p> @enderror
                     </div>
                 @endif
-                @foreach($categories as $category => $categoryLabel)
-                    <section class="uo-category" id="uo-section-{{ $category }}" data-category="{{ $category }}" aria-labelledby="uo-heading-{{ $category }}" x-show="!reviewing && activeCategory === @js($category)" @if($category !== ($context['marine'] ? 'marine' : 'work')) x-cloak @endif>
+                @foreach(($context['marine'] ? $categories : ['work' => $categories['work']] + $categories) as $category => $categoryLabel)
+                    <section class="uo-category" id="uo-section-{{ $category }}" data-category="{{ $category }}" aria-labelledby="uo-heading-{{ $category }}">
                         <header class="uo-category-heading">
-                            <h2 class="sr-only" id="uo-heading-{{ $category }}">{{ $categoryLabel }}</h2>
+                            <h2 id="uo-heading-{{ $category }}">{{ $categoryLabel }}</h2>
                             @if($category === 'marine')
                                 <p>@if($context['marine']) Annual allowance: {{ $context['allowances']['marine_shorts'] }} shorts · {{ $context['allowances']['marine_ss'] }} short sleeve shirts · {{ $context['allowances']['marine_ls'] }} long sleeve shirts · {{ $context['allowances']['marine_shoes'] }} pair boating shoes. @else Available by request for Support Services review. @endif</p>
                             @elseif($category === 'work')
@@ -149,7 +154,7 @@
                                             @foreach(config('uniform_orders.jacket_styles') as $styleCode => $style)
                                                 <label class="uo-jacket-option">
                                                     <img src="{{ asset('images/uniforms/'.$style['asset'].'-thumb.webp') }}" alt="{{ $style['label'] }} demonstration" width="160" height="160" loading="lazy" decoding="async">
-                                                    <span><input type="radio" name="jacket_style" aria-label="{{ $style['label'] }}" value="{{ $styleCode }}" wire:model.live="data.items.jacket.metadata.jacket_style" x-on:change="quantity = 1" @disabled($jacketBlocked)>{{ $style['label'] }}</span>
+                                                    <span><input type="radio" name="jacket_style" aria-label="{{ $style['label'] }}" aria-invalid="{{ $errors->has('data.items.jacket.metadata.jacket_style') ? 'true' : 'false' }}" value="{{ $styleCode }}" wire:model.live="data.items.jacket.metadata.jacket_style" x-on:change="quantity = 1" @disabled($jacketBlocked)>{{ $style['label'] }}</span>
                                                 </label>
                                             @endforeach
                                             @error('data.items.jacket.metadata.jacket_style') <p class="uo-error" id="uo-jacket-jacket_style-error">{{ $message }}</p> @enderror
@@ -185,9 +190,9 @@
                 @endforeach
             </div>
 
-            <aside class="uo-summary-column" x-show="reviewing" x-cloak>
+            <div class="uo-summary-column" id="uo-cart" wire:ignore.self x-show="desktop || cartOpen" x-cloak :role="desktop ? 'complementary' : 'dialog'" :aria-modal="desktop ? null : 'true'" aria-labelledby="uo-summary-heading" x-trap.inert.noscroll.noreturn="cartOpen && !desktop" x-on:keydown.escape.prevent.stop="closeCart()">
                 <section class="uo-summary" aria-labelledby="uo-summary-heading" data-order-summary>
-                    <header><h2 id="uo-summary-heading">Order summary <span>{{ $summary['selected_total'] }}</span></h2></header>
+                    <header><h2 id="uo-summary-heading">Your cart</h2><button type="button" class="uo-cart-close" aria-label="Close cart" x-on:click="closeCart()"><x-heroicon-o-x-mark aria-hidden="true" /></button></header>
                     <div class="uo-summary-content">
                         @forelse($selectedItems as $code => $item)
                             @php
@@ -197,7 +202,15 @@
                                     $selectedLabel = data_get(config('uniform_orders.jacket_styles'), $selectedStyle.'.label', $selectedLabel);
                                 }
                             @endphp
-                            <a class="uo-summary-item" href="#uo-product-{{ $code }}" x-on:click.prevent="showCategory(@js($products[$code]['category'] ?? 'work')); $nextTick(() => document.getElementById('uo-product-{{ $code }}')?.scrollIntoView({ block: 'start' }))" aria-label="Edit {{ $selectedLabel }}, quantity {{ $item['quantity'] }}"><span>{{ $selectedLabel }}</span><strong>× {{ $item['quantity'] }} <small>Edit</small></strong></a>
+                            <div class="uo-cart-item" wire:key="uniform-cart-item-{{ $code }}">
+                                <a class="uo-summary-item" href="#uo-product-{{ $code }}" x-on:click.prevent="editItem(@js($code))" aria-label="Edit {{ $selectedLabel }}, quantity {{ $item['quantity'] }}"><span>{{ $selectedLabel }}<small>
+                                    @foreach($products[$code]['fields'] ?? [] as $field)
+                                        @php $value = data_get($item, 'metadata.'.$field['key']); @endphp
+                                        @if(is_scalar($value) && $value !== '' && $field['key'] !== 'jacket_style')<span>{{ $field['label'] }}: {{ $field['options'][$value] ?? $value }}</span>@endif
+                                    @endforeach
+                                </small></span><strong>× {{ $item['quantity'] }} <small>Edit</small></strong></a>
+                                <button type="button" class="uo-cart-remove" aria-label="Remove {{ $selectedLabel }} from cart" x-on:click="$wire.set(@js('data.items.'.$code.'.quantity'), 0)"><x-heroicon-o-trash aria-hidden="true" /></button>
+                            </div>
                         @empty
                             <p class="uo-summary-empty">Add a quantity to any item to start your order. Sizing appears when you select it.</p>
                         @endforelse
@@ -227,11 +240,15 @@
                             <summary>Notes for Support Services <small>(optional)</small></summary>
                             <label class="sr-only" for="uo-member-note">Notes for Support Services (optional)</label>
                             <p id="uo-notes-help">Replacement needs, special sizing, or additional context.</p>
-                            <textarea id="uo-member-note" wire:model="data.member_note" rows="2" maxlength="{{ config('uniform_orders.note_max') }}" aria-describedby="uo-notes-help uo-note-error"></textarea>
-                            @error('data.member_note') <p class="uo-error" id="uo-note-error" x-init="$refs.notes.open = true">{{ $message }}</p> @enderror
+                            <textarea id="uo-member-note" wire:model="data.member_note" rows="2" maxlength="{{ config('uniform_orders.note_max') }}" aria-invalid="{{ $errors->has('data.member_note') ? 'true' : 'false' }}" aria-describedby="uo-notes-help uo-note-error"></textarea>
+                            @error('data.member_note') <p class="uo-error" id="uo-note-error" x-init="$refs.notes.open = true; if (!desktop) openCart()">{{ $message }}</p> @enderror
                         </details>
                         <p class="uo-review-note">Support Services reviews your request. Assignment and sizing details are saved automatically.</p>
                     </div>
+                    <footer class="uo-checkout">
+                        <p class="uo-cart-total"><span>Total items</span><strong data-cart-total x-text="itemCount">{{ $summary['selected_total'] }}</strong></p>
+                        <button type="submit" class="uo-submit" aria-label="Submit Uniform Request" wire:loading.attr="disabled" wire:target="submit"><span wire:loading.remove wire:target="submit">Submit order</span><span wire:loading wire:target="submit">Submitting…</span><x-heroicon-o-arrow-right aria-hidden="true" /></button>
+                    </footer>
                 </section>
                 <details class="uo-recent" wire:ignore.self>
                     <summary>Recent requests</summary>
@@ -243,7 +260,7 @@
                     @endforelse
                     <p class="uo-workflow-help">Structural firefighting PPE is handled by an authorized officer through the Personnel Equipment Request workflow.</p>
                 </details>
-            </aside>
+            </div>
         </form>
 
         <dialog class="uo-image-viewer" x-ref="viewer" aria-labelledby="uo-image-title" wire:ignore x-on:keydown.tab.prevent="$refs.imageClose.focus()" x-on:click="if ($event.target === $refs.viewer) closeImage()" x-on:close="restoreImageFocus()">

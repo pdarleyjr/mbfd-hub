@@ -30,33 +30,47 @@ async function openBuilder(page: Page, employeeId = 'BID-E2E-D07'): Promise<void
   await page.goto('/employee/request-equipment');
   await expect(page.getByRole('heading', { name: 'Request Uniforms', exact: true })).toBeVisible();
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
-  const submit = page.getByRole('button', { name: 'Submit Uniform Request', exact: true });
+  const submit = page.getByRole('button', { name: 'Submit Uniform Request', exact: true, includeHidden: true });
   await expect(submit).toHaveCount(1);
-  await expect(submit).toBeInViewport({ ratio: 1 });
-  await expect(submit).toContainText('Submit request');
-  await expect(page.getByRole('button', { name: 'Review order', exact: true })).toBeInViewport();
+  await expect(submit).toContainText('Submit order');
+  await expect(page.getByRole('combobox', { name: 'Uniform category', exact: true })).toHaveCount(0);
+  await expect(page.locator('[data-cart-count]')).toHaveText('0');
+  await expectOrderLayout(page);
   for (const code of ['uniform_shirt', 'work_boots', 'class_a_coat']) {
     await expect(product(page, code)).toHaveCount(0);
   }
   await expect(page.locator('.uo-mobile-action')).toHaveCount(0);
-  await expect(page.locator('[data-product]')).toHaveCount(17);
+  await expect(page.locator('[data-product]:visible')).toHaveCount(17);
 }
 
 function product(page: Page, code: string): Locator {
   return page.locator('[data-product="' + code + '"]');
 }
 
-async function selectCategory(page: Page, category: string): Promise<void> {
-  const selector = page.getByRole('combobox', { name: 'Uniform category', exact: true });
-  await selector.selectOption(category);
-  await expect(selector).toHaveValue(category);
-  await expect(product(page, categoryProducts[category][0])).toBeVisible();
+function usesMobileCart(page: Page): boolean {
+  return (page.viewportSize()?.width ?? 1440) < 1024;
+}
+
+async function closeCart(page: Page): Promise<void> {
+  const close = page.getByRole('button', { name: 'Close cart', exact: true });
+  if (await close.isVisible()) await close.click();
+  await expectCatalogInteractive(page);
+}
+
+async function expectCatalogInteractive(page: Page, interactive = true): Promise<void> {
+  await expect.poll(() => page.locator('.uo-catalog').evaluate(element => !element.closest('[inert], [aria-hidden="true"]'))).toBe(interactive);
+}
+
+async function scrollToCategory(page: Page, category: string): Promise<void> {
+  await closeCart(page);
+  await product(page, categoryProducts[category][0]).scrollIntoViewIfNeeded();
+  await expect(page.locator('[data-product]:visible')).toHaveCount(17);
 }
 
 async function setQuantity(page: Page, code: string, quantity: number): Promise<void> {
   const category = Object.entries(categoryProducts).find(([, codes]) => codes.includes(code))?.[0];
   if (!category) throw new Error('Unknown uniform product: ' + code);
-  await selectCategory(page, category);
+  await scrollToCategory(page, category);
   const input = product(page, code).getByRole('spinbutton', { name: /quantity/i });
   await input.fill(String(quantity));
   await input.blur();
@@ -64,12 +78,49 @@ async function setQuantity(page: Page, code: string, quantity: number): Promise<
 }
 
 async function reviewOrder(page: Page): Promise<Locator> {
-  const review = page.getByRole('button', { name: 'Review order', exact: true });
-  if (await review.getAttribute('aria-pressed') !== 'true') await review.click();
+  if (usesMobileCart(page) && !await page.getByRole('dialog', { name: 'Your cart', exact: true }).isVisible()) {
+    await page.getByRole('button', { name: 'Open cart', exact: true }).click();
+  }
   const summary = page.locator('[data-order-summary]');
   await expect(summary).toBeVisible();
-  await expect(page.locator('[data-product]:visible')).toHaveCount(0);
+  await expect(page.locator('[data-product]:visible')).toHaveCount(17);
+  if (usesMobileCart(page)) {
+    await expect(page.getByRole('dialog', { name: 'Your cart', exact: true })).toHaveAttribute('aria-modal', 'true');
+    await expectCatalogInteractive(page, false);
+  }
   return summary;
+}
+
+async function expectOrderLayout(page: Page): Promise<void> {
+  const summary = page.locator('[data-order-summary]');
+  const cart = page.getByRole('button', { name: 'Open cart', exact: true });
+  if (usesMobileCart(page)) {
+    await expect(summary).toBeHidden();
+    await expect(cart).toBeInViewport({ ratio: 1 });
+    await expect(page.getByRole('button', { name: 'Submit Uniform Request', exact: true })).toBeHidden();
+  } else {
+    await expect(summary).toBeVisible();
+    await expect(cart).toBeHidden();
+    const catalogBounds = await page.locator('.uo-catalog').boundingBox();
+    const summaryBounds = await summary.boundingBox();
+    expect(catalogBounds).not.toBeNull();
+    expect(summaryBounds).not.toBeNull();
+    expect(summaryBounds!.x).toBeGreaterThanOrEqual(catalogBounds!.x + catalogBounds!.width);
+    await expect(page.getByRole('button', { name: 'Submit Uniform Request', exact: true })).toBeVisible();
+  }
+}
+
+async function expectStackedProducts(page: Page): Promise<void> {
+  const bounds = await page.locator('[data-product]').evaluateAll(elements => elements.map(element => {
+    const { x, y, width, height } = element.getBoundingClientRect();
+    return { x, y, width, height };
+  }));
+  expect(bounds).toHaveLength(17);
+  for (let index = 1; index < bounds.length; index++) {
+    expect(bounds[index].x).toBeCloseTo(bounds[0].x, 0);
+    expect(bounds[index].width).toBeCloseTo(bounds[0].width, 0);
+    expect(bounds[index].y).toBeGreaterThanOrEqual(bounds[index - 1].y + bounds[index - 1].height - 1);
+  }
 }
 
 async function expandDetails(page: Page, label: string): Promise<void> {
@@ -85,7 +136,7 @@ async function expectViewportFit(page: Page): Promise<void> {
 }
 
 async function expectTouchTargets(page: Page): Promise<void> {
-  for (const target of await page.locator('.uo-toolbar button, .uo-category-jump, [data-product] button, [data-product] input[type="number"], [data-product] select').evaluateAll(elements => elements.filter(element => {
+  for (const target of await page.locator('.uo-toolbar button, .uo-summary-column button, [data-product] button, [data-product] input[type="number"], [data-product] select').evaluateAll(elements => elements.filter(element => {
     const rect = element.getBoundingClientRect();
     return rect.width > 0 && rect.height > 0;
   }).map(element => {
@@ -109,7 +160,7 @@ const profiles = [
 ];
 
 for (const scenario of profiles) {
-  test(scenario.assignment + ' member sees a compact default category and complete catalog', async ({ page }, testInfo) => {
+  test(scenario.assignment + ' member sees every category in one stacked catalog', async ({ page }, testInfo) => {
     await openBuilder(page, scenario.id);
     const assignment = page.locator('[data-entitlement-profile]');
     await expect(assignment).toContainText(scenario.assignment);
@@ -119,25 +170,22 @@ for (const scenario of profiles) {
     const allocation = page.locator('details').filter({ has: page.locator('summary').filter({ hasText: 'Annual allocation' }) });
     await expect(allocation).toHaveCount(1);
     await expect(allocation).not.toHaveAttribute('open', '');
-    const defaultCategory = scenario.marine ? 'marine' : 'work';
-    await expect(page.getByRole('combobox', { name: 'Uniform category', exact: true })).toHaveValue(defaultCategory);
-    await expect(page.locator('[data-product]:visible')).toHaveCount(categoryProducts[defaultCategory].length);
-    const firstProduct = await product(page, categoryProducts[defaultCategory][0]).boundingBox();
+    await expect(page.locator('[data-category]:visible')).toHaveCount(Object.keys(categoryProducts).length);
+    await expectStackedProducts(page);
+    const firstProduct = await page.locator('[data-product]').first().boundingBox();
     expect(firstProduct).not.toBeNull();
-    if (scenario.marine) await expect(product(page, 'marine_shorts')).toBeInViewport({ ratio: 1 });
-    else expect(firstProduct!.y).toBeLessThan((testInfo.project.use.viewport?.width ?? 1440) >= 1024 ? 400 : 500);
+    expect(firstProduct!.y).toBeLessThan(550);
     await expectViewportFit(page);
     await expectTouchTargets(page);
     const accessibility = await new AxeBuilder({ page }).include('.uo-builder').analyze();
     expect(accessibility.violations.map(({ id, impact, nodes }) => ({ id, impact, nodes: nodes.map(node => node.target) }))).toEqual([]);
-    for (const image of await page.locator('[data-product]:visible img').all()) {
-      await expect.poll(() => image.evaluate(element => (element as HTMLImageElement).naturalWidth), { timeout: 20_000 }).toBeGreaterThan(0);
-    }
+    await expect.poll(() => page.locator('[data-product]').first().locator('img').evaluate(element => (element as HTMLImageElement).naturalWidth), { timeout: 20_000 }).toBeGreaterThan(0);
     await page.screenshot({ path: testInfo.outputPath('catalog-viewport.png'), animations: 'disabled' });
     if (scenario.assignment === 'Rescue 1' && testInfo.project.name === 'uniform-375') {
       await page.setViewportSize({ width: 320, height: 844 });
-      await expect(page.getByRole('button', { name: 'Submit Uniform Request', exact: true })).toBeInViewport({ ratio: 1 });
-      expect((await product(page, 'polo_shirt').boundingBox())!.y).toBeLessThan(500);
+      await expectOrderLayout(page);
+      await expectStackedProducts(page);
+      expect((await page.locator('[data-product]').first().boundingBox())!.y).toBeLessThan(550);
       await expectTouchTargets(page);
       await expectViewportFit(page);
       await page.screenshot({ path: testInfo.outputPath('catalog-320-viewport.png'), animations: 'disabled' });
@@ -145,8 +193,7 @@ for (const scenario of profiles) {
     }
 
     for (const [category, codes] of Object.entries(categoryProducts)) {
-      await selectCategory(page, category);
-      await expect(page.locator('[data-product]:visible')).toHaveCount(codes.length);
+      await scrollToCategory(page, category);
       for (const code of codes) {
         await expect(product(page, code)).toBeVisible();
         await expect(product(page, code).getByRole('spinbutton', { name: /quantity/i })).toBeEnabled();
@@ -154,8 +201,9 @@ for (const scenario of profiles) {
       await expectViewportFit(page);
     }
     await product(page, 'boating_shoes').scrollIntoViewIfNeeded();
-    await expect(page.getByRole('button', { name: 'Submit Uniform Request', exact: true })).toBeInViewport({ ratio: 1 });
-    await selectCategory(page, defaultCategory);
+    if (usesMobileCart(page)) await expect(page.getByRole('button', { name: 'Open cart', exact: true })).toBeInViewport({ ratio: 1 });
+    else await expect(page.getByRole('button', { name: 'Submit Uniform Request', exact: true })).toBeInViewport({ ratio: 1 });
+    await page.locator('[data-product]').first().scrollIntoViewIfNeeded();
     await capture(page, testInfo, 'allocation-' + scenario.assignment.replaceAll(' ', '-').toLowerCase());
   });
 }
@@ -175,7 +223,7 @@ test('catalog is touch ready and only loads larger images on expansion', async (
     await expect(thumb).toHaveAttribute('src', /-thumb\.webp$/);
   }
   expect(requestedImages.filter(url => url.endsWith('-large.webp'))).toHaveLength(0);
-  await selectCategory(page, 'dress');
+  await scrollToCategory(page, 'dress');
   await expectTouchTargets(page);
 
   const shirt = product(page, 'class_a_shirt');
@@ -218,14 +266,14 @@ test('catalog is touch ready and only loads larger images on expansion', async (
   await expectViewportFit(page);
 });
 
-test('category switching preserves quantities and review returns directly to selected sizing', async ({ page }, testInfo) => {
+test('cart review returns directly to selected sizing and preserves the complete catalog', async ({ page }, testInfo) => {
   await openBuilder(page);
   await setQuantity(page, 'uniform_pants', 1);
   await product(page, 'uniform_pants').getByLabel('Waist (inches)').fill('34');
   await product(page, 'uniform_pants').getByLabel('Inseam (inches)').fill('32');
-  await selectCategory(page, 'tshirts');
-  await expect(product(page, 'uniform_pants')).toBeHidden();
-  await selectCategory(page, 'work');
+  await scrollToCategory(page, 'tshirts');
+  await expect(product(page, 'uniform_pants')).toBeVisible();
+  await scrollToCategory(page, 'work');
   await expect(product(page, 'uniform_pants').getByRole('spinbutton', { name: 'Quantity', exact: true })).toHaveValue('1');
   await expect(product(page, 'uniform_pants').getByLabel('Waist (inches)')).toHaveValue('34');
   await expect(product(page, 'uniform_pants').getByLabel('Inseam (inches)')).toHaveValue('32');
@@ -240,7 +288,9 @@ test('category switching preserves quantities and review returns directly to sel
   await summary.getByRole('link', { name: 'Edit 5.11 Tactical Pants, quantity 1', exact: true }).click();
   await expect(product(page, 'uniform_pants')).toBeVisible();
   await expect(product(page, 'uniform_pants').getByLabel('Waist (inches)')).toBeInViewport();
-  await expect(page.getByRole('combobox', { name: 'Uniform category', exact: true })).toHaveValue('work');
+  await expect(page.getByRole('dialog', { name: 'Your cart', exact: true })).toHaveCount(0);
+  await expect(product(page, 'uniform_pants').getByLabel('Waist (inches)')).toBeFocused();
+  await expectCatalogInteractive(page);
   await expectTouchTargets(page);
   await expectViewportFit(page);
   await page.screenshot({ path: testInfo.outputPath('selected-work-viewport.png'), animations: 'disabled' });
@@ -255,10 +305,89 @@ test('category switching preserves quantities and review returns directly to sel
   }
 });
 
+test('cart counts every unit immediately and removes the complete selected line', async ({ page }) => {
+  await openBuilder(page);
+  await scrollToCategory(page, 'tshirts');
+  const shirt = product(page, 't_shirt');
+  const add = shirt.getByRole('button', { name: 'Add one Short Sleeve T-Shirt', exact: true });
+  for (let count = 1; count <= 3; count++) {
+    await add.click();
+    await expect(page.locator('[data-cart-count]')).toHaveText(String(count));
+  }
+  await shirt.getByLabel('Size', { exact: true }).selectOption('L');
+  await setQuantity(page, 'long_sleeve_shirt', 2);
+  await expect(page.locator('[data-cart-count]')).toHaveText('5');
+  const summary = await reviewOrder(page);
+  await expect(summary.locator('[data-cart-total]')).toHaveText('5');
+  await expect(summary.getByRole('link', { name: 'Edit Short Sleeve T-Shirt, quantity 3', exact: true })).toBeVisible();
+  await summary.getByRole('button', { name: 'Remove Short Sleeve T-Shirt from cart', exact: true }).click();
+  await expect(page.locator('[data-cart-count]')).toHaveText('2');
+  await expect(summary.locator('[data-cart-total]')).toHaveText('2');
+  await expect(summary.getByRole('link', { name: /Edit Short Sleeve T-Shirt/ })).toHaveCount(0);
+  await closeCart(page);
+  await expect(shirt.getByRole('spinbutton', { name: 'Quantity', exact: true })).toHaveValue('0');
+  await setQuantity(page, 'long_sleeve_shirt', 0);
+  await expect(page.locator('[data-cart-count]')).toHaveText('0');
+  await reviewOrder(page);
+  await expect(summary.locator('.uo-summary-empty')).toBeVisible();
+});
+
+test('mobile cart traps keyboard focus, closes with Escape and restores its trigger', async ({ page }, testInfo) => {
+  test.skip((testInfo.project.use.viewport?.width ?? 1440) >= 1024, 'The desktop review panel stays visible.');
+  await openBuilder(page);
+  await setQuantity(page, 't_shirt', 1);
+  await product(page, 't_shirt').getByLabel('Size', { exact: true }).selectOption('L');
+  const cartButton = page.getByRole('button', { name: 'Open cart', exact: true });
+  await reviewOrder(page);
+  const dialog = page.getByRole('dialog', { name: 'Your cart', exact: true });
+  await expect.poll(() => dialog.evaluate(element => element.contains(document.activeElement))).toBe(true);
+  await dialog.getByRole('button', { name: 'Close cart', exact: true }).focus();
+  for (const key of ['Shift+Tab', 'Tab', 'Tab']) {
+    await page.keyboard.press(key);
+    expect(await dialog.evaluate(element => element.contains(document.activeElement))).toBe(true);
+  }
+  const accessibility = await new AxeBuilder({ page }).include('.uo-builder').analyze();
+  expect(accessibility.violations.map(({ id, impact }) => ({ id, impact }))).toEqual([]);
+  await expectViewportFit(page);
+  await page.screenshot({ path: testInfo.outputPath('mobile-cart-checkout.png'), animations: 'disabled' });
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(cartButton).toBeFocused();
+  await expectCatalogInteractive(page);
+  await reviewOrder(page);
+  await closeCart(page);
+  await expect(cartButton).toBeFocused();
+  await expect(page.locator('[data-cart-count]')).toHaveText('1');
+});
+
+test('crossing the tablet breakpoint releases cart focus and keeps the selection', async ({ page }, testInfo) => {
+  test.skip(!['uniform-390', 'uniform-webkit-390', 'uniform-firefox-1440'].includes(testInfo.project.name), 'One breakpoint recovery check per browser engine.');
+  await openBuilder(page);
+  await setQuantity(page, 't_shirt', 2);
+  await product(page, 't_shirt').getByLabel('Size', { exact: true }).selectOption('M');
+  await page.setViewportSize({ width: 1023, height: 900 });
+  await expectOrderLayout(page);
+  await reviewOrder(page);
+  await page.setViewportSize({ width: 1024, height: 900 });
+  await expectOrderLayout(page);
+  await expect(page.getByRole('dialog', { name: 'Your cart', exact: true })).toHaveCount(0);
+  await expectCatalogInteractive(page);
+  await expect(page.locator('[data-cart-total]')).toHaveText('2');
+  await product(page, 't_shirt').getByLabel('Size', { exact: true }).selectOption('L');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expectOrderLayout(page);
+  await expect(product(page, 't_shirt').getByLabel('Size', { exact: true })).toHaveValue('L');
+  await expect(page.locator('[data-cart-count]')).toHaveText('2');
+  await expectStackedProducts(page);
+  await expectViewportFit(page);
+  const summary = await reviewOrder(page);
+  await expect(summary.getByRole('link', { name: 'Edit Short Sleeve T-Shirt, quantity 2', exact: true })).toBeVisible();
+});
+
 test('three jacket styles share one selection, retain size, and reject a second jacket before persistence', async ({ page }, testInfo) => {
   await openBuilder(page);
   const priorRequests = await page.locator('.uo-recent-request').count();
-  await selectCategory(page, 'accessories');
+  await scrollToCategory(page, 'accessories');
   const jacket = product(page, 'jacket');
   const quantity = jacket.getByRole('spinbutton', { name: 'Quantity', exact: true });
   await expect(quantity).toHaveAttribute('max', '1');
@@ -269,6 +398,17 @@ test('three jacket styles share one selection, retain size, and reject a second 
   ];
   await expect(jacket.getByRole('radio')).toHaveCount(3);
   await expect(jacket).toContainText('Support Services will confirm any earlier off-system issue history.');
+  await quantity.fill('1');
+  await jacket.getByLabel('Size', { exact: true }).selectOption('L');
+  await reviewOrder(page);
+  await page.getByRole('button', { name: 'Submit Uniform Request', exact: true }).click();
+  await expect(page.locator('.uo-input-errors')).toContainText('Check your order details');
+  await expect(page.getByRole('dialog', { name: 'Your cart', exact: true })).toHaveCount(0);
+  await expect(jacket.getByRole('radio').first()).toHaveAttribute('aria-invalid', 'true');
+  await expect(jacket.getByRole('radio').first()).toBeFocused();
+  await expect(jacket.getByRole('radio').first()).toBeInViewport();
+  await expect(jacket.getByLabel('Size', { exact: true })).toHaveValue('L');
+  await expect(page.locator('.uo-recent-request')).toHaveCount(priorRequests);
   for (const [index, style] of styles.entries()) {
     const radio = jacket.getByRole('radio', { name: style.label, exact: true });
     await radio.check();
@@ -299,8 +439,9 @@ test('three jacket styles share one selection, retain size, and reject a second 
   await reviewOrder(page);
   await page.getByRole('button', { name: 'Submit Uniform Request', exact: true }).click();
   await expect(page.locator('.uo-input-errors')).toContainText('Check your order details');
-  await expect(page.getByRole('combobox', { name: 'Uniform category', exact: true })).toHaveValue('accessories');
+  await expect(page.getByRole('dialog', { name: 'Your cart', exact: true })).toHaveCount(0);
   await expect(quantity).toHaveAttribute('aria-invalid', 'true');
+  await expect(quantity).toBeFocused();
   await expect(page.locator('[data-order-success]')).toHaveCount(0);
   await expect(page.locator('.uo-recent-request')).toHaveCount(priorRequests);
   await quantity.fill('1');
@@ -308,6 +449,7 @@ test('three jacket styles share one selection, retain size, and reject a second 
   await expect(quantity).toHaveAttribute('aria-invalid', 'false', { timeout: 20_000 });
   await expect(jacket.getByRole('radio', { name: '5.11 Softshell', exact: true })).toBeChecked();
   await expect(jacket.getByLabel('Size', { exact: true })).toHaveValue('L');
+  await reviewOrder(page);
   await expect(page.getByRole('button', { name: 'Submit Uniform Request', exact: true })).toBeEnabled();
 });
 
@@ -342,9 +484,10 @@ test('jumpsuit exchanges and combined T-shirt overages remain advisory', async (
   await capture(page, testInfo, 'selected-sizing-and-advisories');
 });
 
-test('invalid procurement measurements return to their category and preserve the selection', async ({ page }, testInfo) => {
+test('invalid procurement measurements close the cart, focus the field and preserve the selection', async ({ page }, testInfo) => {
   await openBuilder(page);
   const priorRequests = await page.locator('.uo-recent-request').count();
+  await reviewOrder(page);
   await page.getByRole('button', { name: 'Submit Uniform Request', exact: true }).click();
   await expect(page.locator('.uo-input-errors')).toContainText('Check your order details');
   await expect(page.locator('[data-order-success]')).toHaveCount(0);
@@ -353,13 +496,15 @@ test('invalid procurement measurements return to their category and preserve the
   const waist = pants.getByLabel('Waist (inches)', { exact: false });
   await waist.fill('0');
   await pants.getByLabel('Inseam (inches)', { exact: false }).fill('32');
-  await selectCategory(page, 'tshirts');
+  await scrollToCategory(page, 'tshirts');
   await reviewOrder(page);
   await page.getByRole('button', { name: 'Submit Uniform Request', exact: true }).click();
   await expect(page.locator('.uo-input-errors')).toContainText('Check your order details');
-  await expect(page.getByRole('combobox', { name: 'Uniform category', exact: true })).toHaveValue('work');
+  await expect(page.getByRole('dialog', { name: 'Your cart', exact: true })).toHaveCount(0);
   await expect(waist).toBeVisible();
   await expect(waist).toHaveAttribute('aria-invalid', 'true');
+  await expect(waist).toBeFocused();
+  await expect(waist).toBeInViewport();
   await expect(pants.getByRole('spinbutton', { name: 'Quantity', exact: true })).toHaveValue('1');
   await expect(page.locator('.uo-recent-request')).toHaveCount(priorRequests);
   await expect(page.locator('[data-order-success]')).toHaveCount(0);
@@ -378,7 +523,7 @@ test('over-allocation order persists structured sizes, note, My Requests and the
   await product(page, 'uniform_pants').getByLabel('Waist (inches)', { exact: false }).fill('34');
   await product(page, 'uniform_pants').getByLabel('Inseam (inches)', { exact: false }).fill('32');
   await product(page, 'uniform_pants').getByLabel('Requested cut', { exact: false }).selectOption('mens');
-  await selectCategory(page, 'accessories');
+  await scrollToCategory(page, 'accessories');
   await product(page, 'jacket').getByRole('radio', { name: '5.11 Softshell', exact: true }).check();
   await product(page, 'jacket').getByLabel('Size', { exact: true }).selectOption('L');
   await reviewOrder(page);
@@ -423,7 +568,7 @@ test('over-allocation order persists structured sizes, note, My Requests and the
     await context.close();
   }
   await page.goto('/employee/request-equipment');
-  await selectCategory(page, 'accessories');
+  await scrollToCategory(page, 'accessories');
   const jacket = product(page, 'jacket');
   await expect(jacket).toContainText('You already have a jacket request awaiting issue.');
   await expect(jacket.getByRole('spinbutton', { name: 'Quantity', exact: true })).toBeDisabled();
