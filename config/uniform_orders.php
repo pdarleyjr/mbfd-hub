@@ -14,7 +14,6 @@ $shoeSize = ['key' => 'shoe_size', 'label' => 'Shoe size (US)', 'type' => 'numbe
     'help' => 'Enter your requested size; Support Services will confirm the vendor sizing.'];
 $measurementHelp = 'Enter your measurements; Support Services will confirm available vendor sizes.';
 $jacketStyles = [
-    'vintage' => ['label' => 'MBFD Vintage jacket', 'asset' => 'jacket-vintage'],
     'quarter_zip' => ['label' => '5.11 Quarter Zip', 'asset' => 'jacket-quarter-zip'],
     'softshell' => ['label' => '5.11 Softshell', 'asset' => 'jacket-softshell'],
 ];
@@ -25,7 +24,7 @@ return [
     'quantity_max' => 999,
     'note_max' => 4000,
     'jacket_styles' => $jacketStyles,
-    'legacy_jacket_stock_labels' => ['Winter Jacket'],
+    'legacy_jacket_stock_labels' => ['Winter Jacket', 'MBFD Vintage jacket'],
     'categories' => [
         'dress' => 'Dress Uniform',
         'work' => 'Work Uniforms',
@@ -99,7 +98,7 @@ return [
         'belt' => ['label' => 'JUKMO Work Belt', 'category' => 'accessories', 'group' => 'belts', 'asset' => 'belt',
             'fields' => [['key' => 'size', 'label' => 'Size', 'type' => 'select', 'options' => ['S' => 'S', 'M' => 'M', 'L' => 'L', 'XL' => 'XL', 'XXL' => 'XXL'], 'required' => true]]],
         'jacket' => ['label' => 'Jacket', 'category' => 'accessories', 'group' => 'jackets', 'quantity_max' => 1,
-            'asset' => 'jacket-vintage',
+            'asset' => 'jacket-quarter-zip',
             'fields' => [['key' => 'jacket_style', 'label' => 'Jacket style', 'type' => 'select', 'options' => array_map(fn (array $style): string => $style['label'], $jacketStyles), 'required' => true], $size],
             'frequency' => 'every_3_years', 'help' => 'Choose one style. The 3-year cycle begins when your jacket is issued.'],
         'raincoat' => ['label' => 'Raincoat', 'category' => 'accessories', 'group' => 'raincoats', 'fields' => [$size], 'frequency' => 'every_3_years', 'asset' => 'raincoat'],
