@@ -218,8 +218,8 @@ test('catalog is touch ready and only loads larger images on expansion', async (
   });
   await openBuilder(page);
   const thumbs = page.locator('[data-product] img');
-  await expect(thumbs).toHaveCount(16);
-  expect(new Set(await thumbs.evaluateAll(elements => elements.map(element => element.getAttribute('src')))).size).toBe(15);
+  await expect(thumbs).toHaveCount(15);
+  expect(new Set(await thumbs.evaluateAll(elements => elements.map(element => element.getAttribute('src')))).size).toBe(14);
   for (const thumb of await thumbs.all()) {
     await expect(thumb).toHaveAttribute('loading', 'lazy');
     await expect(thumb).toHaveAttribute('alt', /.+/);
@@ -393,7 +393,7 @@ test('crossing the tablet breakpoint releases cart focus and keeps the selection
   await expect(summary.getByRole('link', { name: 'Edit Short Sleeve T-Shirt, quantity 2', exact: true })).toBeVisible();
 });
 
-test('three jacket styles share one selection, retain size, and reject a second jacket before persistence', async ({ page }, testInfo) => {
+test('two jacket styles share one selection, retain size, and reject a second jacket before persistence', async ({ page }, testInfo) => {
   await openBuilder(page);
   const priorRequests = await page.locator('.uo-recent-request').count();
   await scrollToCategory(page, 'accessories');
@@ -401,11 +401,12 @@ test('three jacket styles share one selection, retain size, and reject a second 
   const quantity = jacket.getByRole('spinbutton', { name: 'Quantity', exact: true });
   await expect(quantity).toHaveAttribute('max', '1');
   const styles = [
-    { label: 'MBFD Vintage jacket', asset: 'jacket-vintage' },
     { label: '5.11 Quarter Zip', asset: 'jacket-quarter-zip' },
     { label: '5.11 Softshell', asset: 'jacket-softshell' },
   ];
-  await expect(jacket.getByRole('radio')).toHaveCount(3);
+  await expect(jacket.getByRole('radio')).toHaveCount(2);
+  await expect(jacket.getByRole('radio', { name: 'MBFD Vintage jacket', exact: true })).toHaveCount(0);
+  await expect(jacket.locator('.uo-thumbnail img')).toHaveAttribute('src', /jacket-quarter-zip-thumb\.webp$/);
   await expect(jacket).toContainText('Support Services will confirm any earlier off-system issue history.');
   await quantity.fill('1');
   await jacket.getByLabel('Size', { exact: true }).selectOption('L');
@@ -430,7 +431,7 @@ test('three jacket styles share one selection, retain size, and reject a second 
     if (index === 0) await size.selectOption('L');
     await expect(size).toHaveValue('L');
     await expect(jacket.locator('.uo-thumbnail img')).toHaveAttribute('src', new RegExp(style.asset + '-thumb\\.webp$'), { timeout: 20_000 });
-    await expect(page.locator('[data-product] img')).toHaveCount(16);
+    await expect(page.locator('[data-product] img')).toHaveCount(15);
     await jacket.getByRole('button', { name: 'Enlarge Jacket image', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Jacket', exact: true });
     await expect(dialog.getByRole('img')).toHaveAttribute('src', new RegExp(style.asset + '-large\\.webp$'));
