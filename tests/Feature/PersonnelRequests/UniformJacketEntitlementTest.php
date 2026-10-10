@@ -46,7 +46,7 @@ final class UniformJacketEntitlementTest extends TestCase
 
     public static function jacketStyles(): array
     {
-        return [['vintage', 'MBFD Vintage jacket'], ['quarter_zip', '5.11 Quarter Zip'], ['softshell', '5.11 Softshell']];
+        return [['quarter_zip', '5.11 Quarter Zip'], ['softshell', '5.11 Softshell']];
     }
 
     #[DataProvider('invalidJackets')]
@@ -63,10 +63,11 @@ final class UniformJacketEntitlementTest extends TestCase
 
     public static function invalidJackets(): array
     {
-        $structured = ['item_code' => 'jacket', 'quantity' => 1, 'metadata' => ['jacket_style' => 'vintage', 'size' => 'L']];
+        $structured = ['item_code' => 'jacket', 'quantity' => 1, 'metadata' => ['jacket_style' => 'quarter_zip', 'size' => 'L']];
         $legacy = ['item_code' => 'jacket', 'quantity' => 1, 'size' => 'L'];
 
         return [
+            'removed vintage style' => [['jacket' => array_replace_recursive($structured, ['metadata' => ['jacket_style' => 'vintage']])], 'items.jacket.metadata.jacket_style'],
             'unknown style' => [['jacket' => array_replace_recursive($structured, ['metadata' => ['jacket_style' => 'unknown']])], 'items.jacket.metadata.jacket_style'],
             'missing style' => [['jacket' => ['item_code' => 'jacket', 'quantity' => 1, 'metadata' => ['size' => 'L']]], 'items.jacket.metadata.jacket_style'],
             'structured quantity two' => [['jacket' => array_replace($structured, ['quantity' => 2])], 'items.jacket.quantity'],
@@ -212,7 +213,7 @@ final class UniformJacketEntitlementTest extends TestCase
         $retry = $service->submitUniform($employee, [], 'jacket-idempotent');
 
         $this->assertTrue($first->is($retry));
-        $this->assertSame('MBFD Vintage jacket', $retry->items->sole()->item_name);
+        $this->assertSame('5.11 Quarter Zip', $retry->items->sole()->item_name);
         $this->assertDatabaseCount('personnel_requests', 1);
         $this->assertDatabaseCount('personnel_request_updates', 1);
     }
@@ -298,6 +299,21 @@ final class UniformJacketEntitlementTest extends TestCase
         $this->assertDatabaseCount('employees', 0);
     }
 
+    public function test_previous_vintage_inventory_issue_still_counts_toward_the_three_year_limit(): void
+    {
+        $this->travelTo(Carbon::parse('2026-10-10'));
+        $employee = $this->employee();
+        $stock = Uniform::query()->create(['item_name' => 'MBFD Vintage jacket', 'size' => 'L', 'quantity_on_hand' => 0, 'reorder_level' => 0]);
+        AssignedEquipment::query()->create(['employee_portal_id' => $employee->id, 'uniform_id' => $stock->id,
+            'category' => 'Uniform Inventory', 'item_description' => 'MBFD Vintage jacket', 'quantity' => 1, 'issued_at' => '2025-10-10']);
+
+        $eligibility = app(UniformEntitlementService::class)->jacketEligibility($employee);
+
+        $this->assertFalse($eligibility['can_order']);
+        $this->assertSame('2025-10-10', $eligibility['last_issued_at']);
+        $this->assertSame('2028-10-10', $eligibility['eligible_from']);
+    }
+
     private function jacketStock(): Uniform
     {
         return Uniform::query()->create(['item_name' => 'Department Jacket', 'size' => 'L', 'quantity_on_hand' => 5, 'reorder_level' => 0]);
@@ -318,7 +334,7 @@ final class UniformJacketEntitlementTest extends TestCase
             'rank' => 'Firefighter', 'password' => 'unused-fixture-credential', 'must_change_password' => false]);
     }
 
-    private function jacket(string $style = 'vintage'): array
+    private function jacket(string $style = 'quarter_zip'): array
     {
         return ['item_code' => 'jacket', 'quantity' => 1, 'metadata' => ['jacket_style' => $style, 'size' => 'L']];
     }
