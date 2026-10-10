@@ -218,8 +218,8 @@ test('catalog is touch ready and only loads larger images on expansion', async (
   });
   await openBuilder(page);
   const thumbs = page.locator('[data-product] img');
-  await expect(thumbs).toHaveCount(16);
-  expect(new Set(await thumbs.evaluateAll(elements => elements.map(element => element.getAttribute('src')))).size).toBe(15);
+  await expect(thumbs).toHaveCount(15);
+  expect(new Set(await thumbs.evaluateAll(elements => elements.map(element => element.getAttribute('src')))).size).toBe(14);
   for (const thumb of await thumbs.all()) {
     await expect(thumb).toHaveAttribute('loading', 'lazy');
     await expect(thumb).toHaveAttribute('alt', /.+/);
@@ -431,7 +431,7 @@ test('two jacket styles share one selection, retain size, and reject a second ja
     if (index === 0) await size.selectOption('L');
     await expect(size).toHaveValue('L');
     await expect(jacket.locator('.uo-thumbnail img')).toHaveAttribute('src', new RegExp(style.asset + '-thumb\\.webp$'), { timeout: 20_000 });
-    await expect(page.locator('[data-product] img')).toHaveCount(16);
+    await expect(page.locator('[data-product] img')).toHaveCount(15);
     await jacket.getByRole('button', { name: 'Enlarge Jacket image', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: 'Jacket', exact: true });
     await expect(dialog.getByRole('img')).toHaveAttribute('src', new RegExp(style.asset + '-large\\.webp$'));
