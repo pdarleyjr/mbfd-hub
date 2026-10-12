@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,14 +11,12 @@ import test from "node:test";
  * `resources/css/mbfd-theme.css` is the only file allowed to give a `--hub-*` token a value, and
  * every `--hub2-*` name must be a one-line alias of a `--hub-*` token declared there.
  *
- * These assertions describe the state WP1 delivers. They are marked `todo` so they are reported
- * but do not fail CI on `main`. WP1 must delete each `todo` option in the same commit that makes
- * the assertion pass; a `todo` test that starts passing is the signal to do so.
+ * WP0 added these assertions as `todo` while the repository was in its audited state; WP1
+ * consolidated the tokens and they are enforced from here on.
  */
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const tokenSource = "resources/css/mbfd-theme.css";
-const WP1 = "WP1 token consolidation: this holds once --hub2-* become aliases and the section 4.1 tokens exist";
 
 // Token names section 4.1 of the modernization brief adds to (or moves into) mbfd-theme.css.
 const requiredTokens = [
@@ -96,7 +95,7 @@ test("the token inventory finds the stylesheets it is meant to police", () => {
   );
 });
 
-test("each section 4.1 token is declared with a value in mbfd-theme.css and nowhere else", { todo: WP1 }, () => {
+test("each section 4.1 token is declared with a value in mbfd-theme.css and nowhere else", () => {
   const all = declarations();
   const problems = [];
   for (const name of requiredTokens) {
@@ -108,7 +107,7 @@ test("each section 4.1 token is declared with a value in mbfd-theme.css and nowh
   assert.deepEqual(problems, [], `Token declarations are not consolidated:\n${problems.join("\n")}`);
 });
 
-test("no --hub-* or --hub2-* token receives a value in more than one stylesheet", { todo: WP1 }, () => {
+test("no --hub-* or --hub2-* token receives a value in more than one stylesheet", () => {
   const all = declarations();
   const offenders = [...new Set(all.map(item => item.name))]
     .map(name => ({ name, files: filesDeclaring(all, name) }))
@@ -117,7 +116,30 @@ test("no --hub-* or --hub2-* token receives a value in more than one stylesheet"
   assert.deepEqual(offenders, [], `Tokens declared in several files:\n${offenders.join("\n")}`);
 });
 
-test("every --hub2-* token is a one-line alias of a --hub-* token declared in mbfd-theme.css", { todo: WP1 }, () => {
+test("the authority bar navy is the official logo ring, #012766", () => {
+  const all = declarations().filter(item => item.file === tokenSource);
+  const value = name => all.find(item => item.name === name)?.value;
+  assert.equal(value("--hub-header"), "1 39 102", "--hub-header must be #012766");
+  assert.equal(value("--hub-header-deep"), "0 16 58", "--hub-header-deep must be #00103A");
+  assert.equal(value("--hub-header-elevated"), "1 49 131", "--hub-header-elevated must be #013183");
+});
+
+test("no tracked source still uses the retired navy #102A43", () => {
+  const tracked = execFileSync("git", ["ls-files", "-z"], { cwd: root, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 })
+    .split("\0")
+    .filter(path => path !== "" && !path.startsWith("vacation-app/") && !/\.(png|jpe?g|webp|ico|woff2?|pdf|zip|lock)$/i.test(path))
+    .filter(path => path !== ".impeccable.md" && path !== "tests/Node/design-tokens-contract.test.mjs");
+  const offenders = tracked.filter(path => {
+    try {
+      return /#102a43/i.test(readFileSync(join(root, path), "utf8"));
+    } catch {
+      return false;
+    }
+  });
+  assert.deepEqual(offenders, [], `The retired navy remains in:\n${offenders.join("\n")}`);
+});
+
+test("every --hub2-* token is a one-line alias of a --hub-* token declared in mbfd-theme.css", () => {
   const all = declarations();
   const hubNames = new Set(all.filter(item => item.file === tokenSource && item.name.startsWith("--hub-")).map(item => item.name));
   const problems = [];

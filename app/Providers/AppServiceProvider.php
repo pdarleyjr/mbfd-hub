@@ -173,7 +173,7 @@ class AppServiceProvider extends ServiceProvider
         // All Filament panels share one session-expiry boundary, including polls.
         \Filament\Support\Facades\FilamentView::registerRenderHook(
             \Filament\View\PanelsRenderHook::HEAD_END,
-            fn (): string => '<link rel="stylesheet" href="/css/hub-wallpaper-v1.css?v=2">',
+            fn (): string => '<link rel="stylesheet" href="/css/hub-wallpaper-v1.css?v=3">',
         );
         \Filament\Support\Facades\FilamentView::registerRenderHook(
             \Filament\View\PanelsRenderHook::HEAD_END,

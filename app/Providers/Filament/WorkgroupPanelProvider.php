@@ -165,7 +165,7 @@ class WorkgroupPanelProvider extends PanelProvider
             <link rel="apple-touch-icon" href="'.asset('images/mbfd_logo-256.png').'" sizes="180x180">
             <link rel="apple-touch-startup-image" href="'.asset('images/mbfd_logo.png').'" sizes="160x290 640x1136" media="screen and (max-device-width: 414px)">
             <link rel="manifest" href="'.asset('/manifest.json').'">
-            <meta name="theme-color" content="#102A43">',
+            <meta name="theme-color" content="#012766">',
             );
     }
 }

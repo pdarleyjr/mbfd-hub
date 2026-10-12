@@ -32,7 +32,8 @@
         z-index: -1;
         pointer-events: none;
         background-color: #fff;
-        background-image: linear-gradient(rgb(255 255 255 / .65), rgb(255 255 255 / .65)), var(--hub-wallpaper);
+        /* The veil strength is the --hub-wallpaper-veil token (mbfd-theme.css); .90 applies where it is not loaded. */
+        background-image: linear-gradient(rgb(255 255 255 / var(--hub-wallpaper-veil, .90)), rgb(255 255 255 / var(--hub-wallpaper-veil, .90))), var(--hub-wallpaper);
         background-position: center;
         background-repeat: no-repeat;
         background-size: cover, auto var(--hub-wallpaper-height);

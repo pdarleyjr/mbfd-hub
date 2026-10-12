@@ -211,9 +211,9 @@ test("Admin browser chrome and installed PWA use Hub header and canvas colors", 
   const head = read("resources/views/filament/admin/partials/head-pwa.blade.php");
   const manifest = JSON.parse(read("public/admin-pwa/manifest.webmanifest"));
 
-  assert.match(head, /<meta name="theme-color" content="#102A43">/);
+  assert.match(head, /<meta name="theme-color" content="#012766">/);
   assert.doesNotMatch(head, /#FAFAF8/i);
-  assert.equal(manifest.theme_color, "#102A43");
+  assert.equal(manifest.theme_color, "#012766");
   assert.equal(manifest.background_color, "#FFFFFF");
 });
 

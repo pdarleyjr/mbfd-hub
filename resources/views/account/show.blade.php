@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#102A43">
+    <meta name="theme-color" content="#012766">
     <title>My account · MBFD Hub</title>
     @vite('resources/css/app.css')
 </head>

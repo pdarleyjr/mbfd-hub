@@ -3,12 +3,12 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#102A43">
+    <meta name="theme-color" content="#012766">
     <title>{{ $code }} — {{ $title }} | MBFD Hub</title>
     <link rel="stylesheet" href="/css/hub-wallpaper-v1.css">
     <style>
         * { box-sizing: border-box; }
-        body { margin: 0; min-height: 100vh; padding: 24px; display: grid; place-items: center; background: #fff; color: #102a43; font: 16px/1.6 system-ui, sans-serif; }
+        body { margin: 0; min-height: 100vh; padding: 24px; display: grid; place-items: center; background: #fff; color: #012766; font: 16px/1.6 system-ui, sans-serif; }
         main { width: min(100%, 38rem); }
         .identity { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; font-weight: 650; }
         .identity img { width: 48px; height: 48px; }
