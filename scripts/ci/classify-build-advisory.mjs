@@ -6,10 +6,14 @@ import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const advisory = 'https://github.com/advisories/GHSA-vfj7-8cjw-p6xm';
-const expires = Date.parse('2026-10-10T00:00:00Z');
+const expires = Date.parse('2026-11-12T00:00:00Z');
 // Approved under ROOT_BUILD_BRACES_EXCEPTION_20261003T0413Z and the P0 request
-// to document existing unrelated advisories using project policy. This covers
-// exact locked build graphs until 2026-10-10, not assembled Vacation runtime
+// to document existing unrelated advisories using project policy. Renewed once,
+// 2026-10-12, by the owner (Peter) for 30 days: GHSA-vfj7-8cjw-p6xm has no patched
+// braces release (3.0.3 is the latest) and only Tailwind 3 build tooling is affected.
+// Scope, advisory and input hashes are unchanged; the next step is a Tailwind 4
+// migration, not another renewal. This covers
+// exact locked build graphs until 2026-11-12, not assembled Vacation runtime
 // images or emitted browser bundles. Raw reports and all other gates remain.
 const inputs = {
     '.': {
@@ -88,7 +92,7 @@ export function classifyVacationBuildAdvisory(report, auditExit, now = Date.now(
     const web = JSON.parse(readFileSync(resolve(root, 'vacation-app/apps/web/package.json'), 'utf8'));
     assert.equal(web.dependencies?.['tailwindcss-animate'], undefined, 'Production peer remains');
     assert.equal(web.devDependencies?.['tailwindcss-animate'], '^1.0.7', 'Unreviewed build plugin');
-    return `VISIBLE BUILD ADVISORY: ${advisory}; braces 3.0.3; exact vacation lock/build inputs; expires 2026-10-10T00:00:00Z; assembled Vacation runtime remains unqualified`;
+    return `VISIBLE BUILD ADVISORY: ${advisory}; braces 3.0.3; exact vacation lock/build inputs; expires 2026-11-12T00:00:00Z; assembled Vacation runtime remains unqualified`;
 }
 
 export function classifyBuildAdvisory(report, scope, auditExit, now = Date.now()) {
@@ -121,7 +125,7 @@ export function classifyBuildAdvisory(report, scope, auditExit, now = Date.now()
     }
 
     for (const [name] of blocking) assert.ok(isReviewedFinding(name), `Unclassified HIGH or CRITICAL finding: ${name}`);
-    return `VISIBLE BUILD ADVISORY: ${advisory}; braces 3.0.3; exact ${scope} inputs; expires 2026-10-10T00:00:00Z; ${blocking.length} transitive HIGH findings classified`;
+    return `VISIBLE BUILD ADVISORY: ${advisory}; braces 3.0.3; exact ${scope} inputs; expires 2026-11-12T00:00:00Z; ${blocking.length} transitive HIGH findings classified`;
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
