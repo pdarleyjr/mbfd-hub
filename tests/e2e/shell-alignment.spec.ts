@@ -8,22 +8,11 @@ import { expect, test, type Page, type TestInfo } from '@playwright/test';
  *   npx playwright test -c playwright.shell-alignment.config.ts
  * on the protected-UI harness (clean checkout, no .env, isolated SQLite database).
  *
- * Until WP2 lands, the cases that the audit predicts will fail are marked expected-fail
- * (test.fail) with the reason beside each marker, so the suite stays green while the gap is
- * documented. Cases the audit predicts will pass (for example aligned 64px bars on tall desktop
- * viewports) are not marked and guard against regressions. Set SHELL_ALIGNMENT_STRICT=1 to drop
- * every marker and see the real assertion failures. WP2 deletes EXPECTED_TO_FAIL; a marked case
- * that unexpectedly passes is reported as a failure, which is the signal to do so.
- *
  * Each case starts as a first-time visitor (no persisted sidebar state). Admin closes its drawer
  * on phones with its own viewport script; the Employee, Training and Workgroups panels keep
  * Filament's default of an open drawer, so their phone cases measure both bars and assert they align.
  */
 
-const EXPECTED_TO_FAIL = process.env.SHELL_ALIGNMENT_STRICT !== '1';
-const TOKEN_GAP = 'Known gap until WP1/WP2: --hub-shell-bar-height is not declared, and the bars are 64/48px (Filament) and 56px plus a 1px border (Blade).';
-const ALIGNMENT_GAP = 'Known gap until WP2: at viewports 800px tall or less and 1024px wide or more, the top bar shrinks to 48px (hub-admin-v2.css) while the sidebar header stays 64px.';
-const SURFACE_GAP = 'Known gap until WP2: the Blade bar (57px) and the Filament bars (64/48px) disagree.';
 const TOLERANCE_PX = 0.5;
 
 type Surface = { name: string; path: string; kind: 'filament' | 'blade' };
@@ -158,7 +147,6 @@ test.describe('shell bars', () => {
 
   for (const surface of [...filamentSurfaces, ...bladeSurfaces]) {
     test(`${surface.name} (${surface.path}) bar height equals --hub-shell-bar-height`, async ({ page }, testInfo) => {
-      test.fail(EXPECTED_TO_FAIL, TOKEN_GAP);
       await open(page, surface);
       const measurement = await measure(page, surface);
       await attachMeasurement(testInfo, measurement);
@@ -174,8 +162,6 @@ test.describe('shell bars', () => {
 
   for (const surface of filamentSurfaces) {
     test(`${surface.name} (${surface.path}) top bar and sidebar header end on the same row`, async ({ page }, testInfo) => {
-      const viewport = page.viewportSize() ?? { width: 0, height: 0 };
-      test.fail(EXPECTED_TO_FAIL && viewport.width >= 1024 && viewport.height <= 800, ALIGNMENT_GAP);
       await open(page, surface);
       const measurement = await measure(page, surface);
       await attachMeasurement(testInfo, measurement);
@@ -191,7 +177,6 @@ test.describe('shell bars', () => {
   }
 
   test('every shell surface reports the same bar height', async ({ page }, testInfo) => {
-    test.fail(EXPECTED_TO_FAIL, SURFACE_GAP);
     const seen: Record<string, number[]> = {};
     for (const surface of [...bladeSurfaces, ...filamentSurfaces.filter((_, index) => index % 2 === 0)]) {
       await open(page, surface);

@@ -14,16 +14,16 @@
 
 /* ---------- App bar ---------- */
 
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) :is(.fi-topbar > nav, .fi-sidebar-header) {
+    height: var(--hub-shell-bar-height);
+    min-height: var(--hub-shell-bar-height);
+    border: 0;
+    box-shadow: inset 0 -1px 0 rgb(var(--hub-header-deep));
+    background: rgb(var(--hub-header));
+}
+
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-topbar {
     border-bottom: 0;
-}
-
-:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-topbar > nav {
-    min-height: 56px;
-}
-
-@media (max-height: 800px) and (min-width: 1024px) {
-    :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-topbar > nav { min-height: 48px; height: 48px; }
 }
 
 /* Notification counts are one of red's sanctioned meanings. */

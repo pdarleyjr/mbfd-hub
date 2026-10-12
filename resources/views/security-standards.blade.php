@@ -2,19 +2,12 @@
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <x-hub.head />
     <meta name="robots" content="index, follow">
     <meta name="description" content="MBFD Hub Security & Standards — a public summary of the platform's security posture and alignment with applicable fire-service documentation standards.">
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
-    <link rel="manifest" href="/manifest.json">
     <link rel="shortcut icon" href="/favicon.ico">
-    <meta name="theme-color" content="#012766">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="MBFD Hub">
     <title>Security &amp; Standards | MBFD Hub</title>
     @vite('resources/css/app.css')
     <style>
@@ -31,28 +24,7 @@
 
     <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 bg-hub-blue text-white px-3 py-2 rounded-md text-sm font-medium">Skip to content</a>
 
-    <!-- Header (matches landing page) -->
-    <header class="sticky top-0 z-50 h-16 border-b border-white/10 bg-hub-header px-4 backdrop-blur-md lg:px-6" style="padding-top: max(0px, env(safe-area-inset-top, 0px));">
-        <div class="mx-auto flex h-full max-w-6xl items-center justify-between">
-        <a href="{{ url('/') }}" class="flex items-center gap-3 group" aria-label="Return to MBFD Support Hub home">
-            <img src="/images/mbfd_logo-256.png" alt="" class="h-10 w-10 object-contain" width="40" height="40" aria-hidden="true">
-            <div class="hidden sm:block">
-                <span class="text-white font-semibold text-base leading-tight font-heading">MBFD Support Hub</span>
-                <p class="text-blue-100 text-xs">Enterprise Command Portal</p>
-            </div>
-        </a>
-        <div class="flex items-center gap-2">
-            <a href="{{ url('/') }}" class="hidden sm:inline-flex min-h-[44px] px-3 py-2 text-sm font-medium text-blue-100 hover:text-white items-center gap-2 rounded-lg hover:bg-white/10 transition-colors">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
-                Home
-            </a>
-            <a href="{{ url('/login') }}" aria-label="Sign In" class="min-h-[44px] px-4 py-2 text-sm font-medium bg-hub-blue text-white rounded-lg hover:bg-hub-blue-strong transition-colors flex items-center gap-2">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path></svg>
-                <span class="hidden sm:inline">Sign In</span>
-            </a>
-        </div>
-        </div>
-    </header>
+    <x-hub.shell module="Security">
 
     <main id="main" class="flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 py-8 lg:py-12">
 
@@ -479,6 +451,7 @@
             </div>
         </div>
     </footer>
+    </x-hub.shell>
 
 </body>
 </html>

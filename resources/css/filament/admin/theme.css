@@ -2,6 +2,7 @@
 @import '../../../../vendor/filament/filament/dist/theme.css';
 @import '../../mbfd-theme.css';
 @import '../../hub-components.css';
+@import '../../hub-shell.css';
 @import '../hub-portals-v2.css';
 @import '../uniform-order-builder.css';
 @import './hub-admin-v2.css';
@@ -104,10 +105,8 @@
     transition: opacity 100ms ease-in;
 }
 
-/* Sidebar header — dark to match topbar, creating unified header bar */
+/* Sidebar header: colour, height and edge come from the shared bar rule in hub-admin-v2.css. */
 .fi-sidebar-header {
-    background-color: rgb(var(--hub-header));
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     --tw-ring-opacity: 0;
     --tw-shadow: 0 0 #0000;
     --tw-ring-shadow: 0 0 #0000;
@@ -198,12 +197,6 @@
     background-color: rgb(var(--hub-header));
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
-    border-bottom: none;
-    box-shadow: none;
-}
-
-.fi-topbar {
-    border-bottom: 1px solid rgb(var(--hub-border));
 }
 
 .fi-topbar > nav {
@@ -278,7 +271,7 @@
 @media (max-width: 359px) {
     .fi-topbar > nav {
         height: auto;
-        min-height: 4rem;
+        min-height: var(--hub-shell-bar-height);
         flex-wrap: wrap;
         justify-content: space-between;
         gap: .25rem 0;
@@ -313,20 +306,6 @@
 
 .fi-topbar > nav .fi-breadcrumbs a:hover {
     color: rgb(var(--hub-surface));
-}
-
-/* Any injected render hook content (home icon) */
-.fi-topbar > nav a[title="Return to Home"],
-.fi-topbar > nav a[aria-label="Return to Home"] {
-    color: rgb(var(--hub-border));
-    min-width: 2.75rem;
-    min-height: 2.75rem;
-}
-
-.fi-topbar > nav a[title="Return to Home"]:is(:hover, :focus-visible),
-.fi-topbar > nav a[aria-label="Return to Home"]:is(:hover, :focus-visible) {
-    color: rgb(var(--hub-surface));
-    background-color: rgb(var(--hub-surface) / .1);
 }
 
 /* --- CRITICAL: Dropdown panels must keep DARK text on WHITE background --- */
@@ -1535,14 +1514,7 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
 
 /* --- Standalone-mode (installed PWA) treatment ------------------------ */
 @media (display-mode: standalone), (display-mode: window-controls-overlay) {
-    body.mbfd-pwa .fi-topbar {
-        height: 44px;
-        min-height: 44px;
-    }
-    body.mbfd-pwa .fi-topbar-ctn {
-        height: 44px;
-        align-items: center;
-    }
+    /* The installed app keeps the same bar height as the browser: --hub-shell-bar-height. */
     body.mbfd-pwa .fi-user-avatar {
         width: 26px;
         height: 26px;

@@ -42,6 +42,10 @@ function updateConnection() {
         status.textContent = navigator.onLine ? 'Connected' : 'Requires connection';
         status.dataset.offline = String(!navigator.onLine);
     });
+    // The offline state is shown once, as a strip below the bar, never inside it.
+    document.querySelectorAll('[data-hub-offline-strip]').forEach(strip => {
+        strip.hidden = navigator.onLine;
+    });
 }
 updateConnection();
 window.addEventListener('online', updateConnection);

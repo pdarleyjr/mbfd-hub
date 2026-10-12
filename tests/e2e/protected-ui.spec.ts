@@ -533,25 +533,36 @@ test('Report Issue modal contains content and restores keyboard focus without su
   expect(submissions).toEqual([]);
 });
 
-test('topbar Home icon remains visible on hover with a touch sized target', async ({ page }, info) => {
-  test.skip(!['width-390', 'width-1440'].includes(info.project.name), 'Phone and desktop topbar hover acceptance.');
+test('Hub Home stays reachable on hover with a touch sized target', async ({ page }, info) => {
+  test.skip(!['width-390', 'width-1440'].includes(info.project.name), 'Phone and desktop Home acceptance.');
+  const desktop = info.project.name === 'width-1440';
   for (const path of ['/admin', '/training', '/workgroups']) {
     await page.goto(path);
     await closeInitialMobileSidebar(page);
-    const home = page.locator('.fi-topbar a[aria-label="Return to Home"]');
+    // Desktop: the shared brand in the sidebar header is the Hub home link.
+    // Phone: the brand sits in the closed drawer, so Home is the first item of the Apps switcher.
+    let home;
+    let measured: string;
+    if (desktop) {
+      home = page.locator('.fi-sidebar-header a[href="/"]').first();
+      measured = '.fi-sidebar-header .hub-shell-brand__word';
+    } else {
+      await page.locator('.hub-panel-shell .hub-app-switcher > summary').click();
+      home = page.locator('.hub-panel-shell').getByRole('menuitem', { name: 'Home', exact: true });
+      measured = '.hub-panel-shell .hub-shell-popover .hub-shell-menuitem';
+    }
     await expect(home).toBeVisible();
     const box = (await home.boundingBox())!;
-    expect.soft(box.width).toBeGreaterThanOrEqual(44);
     expect.soft(box.height).toBeGreaterThanOrEqual(44);
+    expect.soft(box.width).toBeGreaterThanOrEqual(44);
     await home.hover();
     await home.evaluate(async element => Promise.all(element.getAnimations({ subtree: true }).map(animation => animation.finished.catch(() => {}))));
-    const contrast = await measureContrast(page, { homeIcon: '.fi-topbar a[aria-label="Return to Home"] svg' });
+    const contrast = await measureContrast(page, { home: measured });
     await info.attach(`home-hover-${path.slice(1)}`, { body: JSON.stringify(contrast, null, 2), contentType: 'application/json' });
     for (const result of contrast) expect.soft(result.ratio, JSON.stringify(result)).toBeGreaterThanOrEqual(3);
     await screenshot(page, info, `home-hover-${path.slice(1)}`);
   }
 });
-
 test('deferred table remains interactive when Alpine component modules arrive after its first morph', async ({ page }, info) => {
   test.skip(info.project.name !== 'width-1440', 'One controlled lazy-module race regression.');
   const failures: string[] = [];

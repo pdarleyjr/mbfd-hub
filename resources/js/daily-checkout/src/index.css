@@ -1,6 +1,6 @@
 @import '@fontsource-variable/plus-jakarta-sans/wght.css';
 @import "../../../css/mbfd-theme.css";
-@import "../../hub-ui/hub-shell.css";
+@import "../../../css/hub-shell.css";
 
 @tailwind base;
 @tailwind components;

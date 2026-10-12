@@ -152,8 +152,17 @@ class AppServiceProvider extends ServiceProvider
             fn (): \Illuminate\Contracts\View\View => view('filament.partials.hub-shell'),
         );
         \Filament\Support\Facades\FilamentView::registerRenderHook(
+            \Filament\View\PanelsRenderHook::TOPBAR_AFTER,
+            fn (): \Illuminate\Contracts\View\View => view('filament.partials.hub-offline-strip'),
+        );
+        \Filament\Support\Facades\FilamentView::registerRenderHook(
             \Filament\View\PanelsRenderHook::BODY_END,
             fn (): \Illuminate\Contracts\View\View => view('filament.partials.hub-member-navigation'),
+        );
+        // One set of install and notch metas for every panel; the Admin PWA script stays in head-pwa.
+        \Filament\Support\Facades\FilamentView::registerRenderHook(
+            \Filament\View\PanelsRenderHook::HEAD_END,
+            fn (): string => filament()->getCurrentPanel()?->getId() === 'policy-library' ? '' : view('components.hub.head')->render(),
         );
 
         \Filament\Support\Facades\FilamentView::registerRenderHook(

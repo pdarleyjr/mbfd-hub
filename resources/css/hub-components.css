@@ -2,63 +2,11 @@
  * MBFD Hub design system v2 — tokens and components.
  *
  * Product components are scoped to [data-hub-ui="2"]; the shared shell uses
- * explicit hub-shell classes across Blade and native panels. Plain CSS only.
+ * explicit hub-shell classes (resources/css/hub-shell.css). Plain CSS only.
  * Colour channels follow the existing space-separated RGB `--hub-*` convention.
  */
 
 /* Tokens live in resources/css/mbfd-theme.css. The --hub2-* names are aliases of --hub-* tokens there. */
-
-/* Shared Hub navigation uses the same tokens on Blade and native panels. */
-.hub-shell-bar { position: sticky; top: 0; z-index: 30; border-bottom: 1px solid rgb(var(--hub-border)); background: rgb(var(--hub-header)); color: white; padding-top: env(safe-area-inset-top, 0px); }
-.hub-shell-bar__inner { display: flex; align-items: center; gap: 8px; min-height: 56px; max-width: 1600px; margin-inline: auto; padding: 4px 24px; }
-.hub-shell-brand { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; flex: none; color: inherit; font-size: 15px; font-weight: 700; text-decoration: none; white-space: nowrap; }
-.hub-shell-brand img { width: 32px; height: 32px; object-fit: contain; }
-.hub-shell-spacer { flex: 1; }
-.hub-shell-control { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 44px; min-height: 44px; padding: 8px; border-radius: 6px; color: inherit; font-size: 14px; font-weight: 600; text-decoration: none; cursor: pointer; list-style: none; }
-.hub-shell-control::-webkit-details-marker, .hub-member-nav__item::-webkit-details-marker { display: none; }
-.hub-shell-control:hover, .hub-shell-control:focus-visible { background: rgb(255 255 255 / .1); }
-.hub-shell-bar :focus-visible { outline: 2px solid white; outline-offset: 2px; }
-.hub-shell-icon { width: 20px; height: 20px; flex: none; }
-.hub-shell-chevron { width: 14px; height: 14px; flex: none; }
-.hub-shell-menu { position: relative; }
-.hub-shell-popover { position: absolute; top: calc(100% + 6px); left: 0; z-index: 70; min-width: 224px; max-width: min(320px, calc(100vw - 24px)); max-height: min(70vh, 480px); overflow-y: auto; padding: 6px; border: 1px solid rgb(var(--hub-border)); border-radius: 8px; background: rgb(var(--hub-surface)); color: rgb(var(--hub-ink)); box-shadow: var(--hub-shadow-elevated); }
-.hub-shell-account .hub-shell-popover { left: auto; right: 0; }
-.hub-shell-menuitem { display: flex; align-items: center; width: 100%; min-height: 44px; padding: 10px 12px; border: 0; border-radius: 4px; background: transparent; color: rgb(var(--hub-ink)); font: inherit; font-size: 14px; text-align: left; text-decoration: none; }
-.hub-shell-menuitem:hover, .hub-shell-menuitem[aria-current] { background: rgb(var(--hub-blue) / .08); color: rgb(var(--hub-blue)); }
-.hub-shell-menuitem:focus-visible { outline: 2px solid rgb(var(--hub-focus)); outline-offset: -2px; }
-.hub-shell-menuitem--danger { color: rgb(var(--hub-danger)); }
-.hub-shell-account__name { display: inline-block; max-width: 10rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.hub-shell-connection { display: inline-flex; align-items: center; gap: 6px; flex: none; color: inherit; font-size: 12px; }
-.hub-shell-connection::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-.hub-shell-connection[data-offline="true"] { padding: 4px 8px; border: 1px solid currentColor; border-radius: 4px; }
-.hub-panel-shell { display: flex; align-items: center; gap: 12px; flex: none; color: white; }
-.hub-member-nav { display: none; }
-
-@media (max-width: 1023.98px) {
-    .hub-shell-connection { display: none; }
-    .hub-shell-connection[data-offline="true"] { display: flex; }
-    .hub-shell-account__name { display: none; }
-}
-@media (max-width: 639.98px) {
-    .hub-shell-bar__inner { gap: 4px; padding-inline: 12px; flex-wrap: wrap; }
-    .hub-shell-chevron { display: none; }
-    .hub-shell-connection[data-offline="true"] { order: 5; width: 100%; justify-content: center; }
-    .hub-shell-popover { position: fixed; top: calc(60px + env(safe-area-inset-top, 0px)); left: 12px; right: 12px; max-width: none; }
-    .hub-shell-account .hub-shell-popover { left: 12px; right: 12px; }
-    .hub-panel-shell { gap: 4px; }
-    .hub-panel-shell .hub-shell-connection { display: none; }
-    .hub-member-nav { display: flex; position: fixed; bottom: 0; left: 0; right: 0; z-index: 40; align-items: stretch; height: calc(var(--hub-member-nav-height) + env(safe-area-inset-bottom, 0px)); padding: 0 max(4px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(4px, env(safe-area-inset-left, 0px)); border-top: 1px solid rgb(var(--hub-border)); background: rgb(var(--hub-surface)); color: rgb(var(--hub-ink-secondary)); }
-    .hub-member-nav__item { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-width: 0; height: var(--hub-member-nav-height); padding: 4px 2px; border-radius: 6px; font-size: var(--hub-member-nav-label-size); line-height: 16px; font-weight: 600; text-decoration: none; color: inherit; list-style: none; cursor: pointer; }
-    .hub-member-nav__item .hub-shell-icon { width: var(--hub-member-nav-icon-size); height: var(--hub-member-nav-icon-size); }
-    .hub-member-nav__item[aria-current="page"], .hub-member-nav__item:hover { background: rgb(var(--hub-blue) / .08); color: rgb(var(--hub-blue)); }
-    .hub-member-nav__more { flex: 1; min-width: 0; }
-    .hub-member-nav__more .hub-shell-popover { top: auto; bottom: calc(var(--hub-member-nav-height) + 8px + env(safe-area-inset-bottom, 0px)); }
-    body:has(.hub-member-nav) { padding-bottom: calc(var(--hub-member-nav-height) + 16px + env(safe-area-inset-bottom, 0px)); }
-}
-@media print {
-    .hub-shell-bar, .hub-member-nav, .hub-panel-shell { display: none !important; }
-    body:has(.hub-member-nav) { padding-bottom: 0; }
-}
 
 /* ------------------------------------------------------------------ */
 /* Base                                                                */
@@ -120,123 +68,6 @@ body[data-hub-ui="2"] {
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border: 0;
-}
-
-/* ------------------------------------------------------------------ */
-/* App bar                                                             */
-/* ------------------------------------------------------------------ */
-
-[data-hub-ui="2"] .hub-appbar {
-    position: sticky;
-    top: 0;
-    z-index: var(--hub2-z-appbar);
-    background: rgb(var(--hub2-header));
-    color: rgb(var(--hub2-n-0));
-    padding-top: env(safe-area-inset-top, 0px);
-}
-
-[data-hub-ui="2"] .hub-appbar__inner {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    height: var(--hub2-appbar-height);
-    max-width: var(--hub2-content-max);
-    margin: 0 auto;
-    padding: 0 var(--hub2-gutter);
-}
-
-[data-hub-ui="2"] .hub-appbar__brand {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    min-height: 44px;
-    min-width: 0;
-    border-radius: var(--hub2-radius-md);
-    color: inherit;
-    text-decoration: none;
-}
-
-[data-hub-ui="2"] .hub-appbar__badge {
-    width: 32px;
-    height: 32px;
-    flex: none;
-    object-fit: contain;
-}
-
-[data-hub-ui="2"] .hub-appbar__name {
-    font-size: 15px;
-    line-height: 20px;
-    font-weight: 650;
-    letter-spacing: -0.005em;
-    white-space: nowrap;
-}
-
-[data-hub-ui="2"] .hub-appbar__module {
-    display: none;
-    align-items: center;
-    gap: 8px;
-    color: rgb(var(--hub2-n-200));
-    font-size: 14px;
-    font-weight: 500;
-    white-space: nowrap;
-}
-
-@media (min-width: 640px) {
-    [data-hub-ui="2"] .hub-appbar__module { display: inline-flex; }
-}
-
-[data-hub-ui="2"] .hub-appbar__spacer { flex: 1 1 auto; }
-
-[data-hub-ui="2"] .hub-appbar__actions {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-[data-hub-ui="2"] .hub-appbar__action {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    min-height: 44px;
-    min-width: 44px;
-    padding: 0 12px;
-    border: 0;
-    border-radius: var(--hub2-radius-md);
-    background: transparent;
-    color: rgb(var(--hub2-n-0));
-    font: inherit;
-    font-size: 14px;
-    font-weight: 600;
-    text-decoration: none;
-    cursor: pointer;
-    transition: background-color var(--hub2-duration-fast) var(--hub2-ease-enter);
-}
-
-[data-hub-ui="2"] .hub-appbar__action:hover { background: rgb(255 255 255 / 0.10); }
-[data-hub-ui="2"] .hub-appbar__action:active { background: rgb(255 255 255 / 0.16); }
-
-[data-hub-ui="2"] .hub-appbar :focus-visible {
-    outline-color: rgb(var(--hub2-n-0));
-}
-
-[data-hub-ui="2"] .hub-appbar__action-label { display: none; }
-
-/* Keeps the accessible name on narrow screens while showing only the icon. */
-@media (max-width: 639.98px) {
-    [data-hub-ui="2"] .hub-appbar__action-text {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        margin: -1px;
-        overflow: hidden;
-        clip: rect(0, 0, 0, 0);
-        white-space: nowrap;
-    }
-}
-
-@media (min-width: 640px) {
-    [data-hub-ui="2"] .hub-appbar__action-label { display: inline; }
 }
 
 /* ------------------------------------------------------------------ */
