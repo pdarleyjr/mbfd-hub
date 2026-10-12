@@ -49,7 +49,7 @@ test('CRITICAL findings, unrelated nodes and invented dependency edges fail', ()
     ]) assert.throws(() => classifyBuildAdvisory(changed(change), '.', 1, now), /Unclassified HIGH or CRITICAL/);
 });
 test('expiry has no CLI or environment override', () => {
-    assert.throws(() => classifyBuildAdvisory(report, '.', 1, Date.parse('2026-10-10T00:00:00Z')), /expired/);
+    assert.throws(() => classifyBuildAdvisory(report, '.', 1, Date.parse('2026-11-12T00:00:00Z')), /expired/);
 });
 test('failed clean audits, malformed reports and inconsistent counts fail', () => {
     const clean = { auditReportVersion: 2, vulnerabilities: {}, metadata: { vulnerabilities: { info: 0, low: 0, moderate: 0, high: 0, critical: 0, total: 0 } } };
@@ -89,7 +89,7 @@ test('a changed lock SHA cannot reuse the exception', async () => {
 });
 test('pnpm classifies only the exact reviewed braces build graph and expiry', () => {
     assert.match(classifyVacationBuildAdvisory(pnpmReport, 1, now), /runtime remains unqualified/);
-    assert.throws(() => classifyVacationBuildAdvisory(pnpmReport, 1, Date.parse('2026-10-10T00:00:00Z')), /expired/);
+    assert.throws(() => classifyVacationBuildAdvisory(pnpmReport, 1, Date.parse('2026-11-12T00:00:00Z')), /expired/);
     for (const mutate of [
         (copy) => { copy.advisories['1240992'].github_advisory_id = 'GHSA-induced-other-high'; },
         (copy) => { copy.advisories['1240992'].findings[0].version = '3.0.2'; },
