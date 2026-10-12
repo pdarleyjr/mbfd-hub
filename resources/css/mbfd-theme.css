@@ -88,6 +88,22 @@
     :root { --hub-shell-bar-height: 48px; }
 }
 
+/* Opaque surfaces for people who ask for less transparency and for browsers without backdrop blur. */
+@media (prefers-reduced-transparency: reduce) {
+    :root {
+        --hub-glass-alpha: 1;
+        --hub-overlay-alpha: 1;
+        --hub-overlay-blur: none;
+    }
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+    :root {
+        --hub-overlay-alpha: 1;
+        --hub-overlay-blur: none;
+    }
+}
+
 /* Sign-in pages keep the crest more visible than the working pages. */
 body:has(.identity-strip, .fi-simple-layout) {
     --hub-wallpaper-veil: .65;

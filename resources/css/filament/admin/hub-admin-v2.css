@@ -31,54 +31,60 @@
     border-radius: 9999px;
 }
 
-/* ---------- Sidebar ---------- */
+/* ---------- Sidebar: a glass rail ---------- */
 
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-sidebar {
-    background-color: rgb(var(--hub2-n-0));
-    border-right: 1px solid rgb(var(--hub2-n-200));
+    background-color: rgb(var(--hub-glass) / var(--hub-glass-alpha));
+    border-right: 1px solid rgb(var(--hub-glass-border));
 }
 
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) :is(.fi-sidebar-nav-group-label, .fi-sidebar-group-label) {
-    color: rgb(var(--hub2-n-500));
+    color: rgb(var(--hub-n-600));
     font-size: 12px;
     line-height: 16px;
     font-weight: 600;
-    letter-spacing: 0.06em;
+    letter-spacing: normal;
+    text-transform: none;
 }
 
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-sidebar-group-button .fi-sidebar-group-icon,
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-sidebar-item-icon {
-    color: rgb(var(--hub2-n-500));
+    color: rgb(var(--hub-n-600));
 }
 
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-sidebar-item-button {
-    border-radius: 6px;
-    color: rgb(var(--hub2-n-800));
+    min-height: 2.5rem;
+    border-radius: var(--hub-radius-control);
+    color: rgb(var(--hub-n-800));
+}
+
+@media (pointer: coarse) {
+    :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-sidebar-item-button { min-height: 2.75rem; }
 }
 
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-sidebar-item-label {
-    color: rgb(var(--hub2-n-800));
+    color: rgb(var(--hub-n-800));
     font-size: 14px;
     line-height: 20px;
     font-weight: 500;
 }
 
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-sidebar-item-button:hover {
-    background-color: rgb(var(--hub2-n-50));
+    background-color: rgb(var(--hub-well) / .7);
 }
 
+/* The current page is a white well with a hairline edge: no side stripe. */
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-sidebar-item-active > .fi-sidebar-item-button {
-    background-color: rgb(var(--hub2-action-tint));
+    background-color: rgb(var(--hub-well));
     border-left: 0;
-    box-shadow: inset 2px 0 0 rgb(var(--hub2-action));
+    box-shadow: inset 0 0 0 1px rgb(var(--hub-glass-border));
 }
 
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-sidebar-item-active .fi-sidebar-item-label,
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-sidebar-item-active .fi-sidebar-item-icon {
-    color: rgb(var(--hub2-action));
+    color: rgb(var(--hub-blue));
     font-weight: 600;
 }
-
 /* No hover scaling on controls. */
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-sidebar-close-button:hover,
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-sidebar-open-button:hover {
@@ -110,43 +116,60 @@
     line-height: 16px;
 }
 
-/* ---------- Surfaces: borders, not shadows ---------- */
+/* ---------- Surfaces: white field, grey glass, white wells ---------- */
 
-:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-section,
-:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-wi,
-:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-ta-ctn,
-:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-in-section,
-:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-fo-section {
-    border-radius: 8px;
-    box-shadow: none;
-}
-
-:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-section,
-:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-ta-ctn {
-    border: 1px solid rgb(var(--hub2-n-200));
+/* Level 1 glass: sections, tables, form/infolist sections and stat tiles. No backdrop blur
+   (blur is reserved for overlays) and no hover lift. */
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) :is(.fi-section, .fi-ta-ctn, .fi-in-section, .fi-fo-section, .fi-wi-stats-overview-stat) {
+    background: rgb(var(--hub-glass) / var(--hub-glass-alpha));
+    border: 1px solid rgb(var(--hub-glass-border));
+    border-radius: var(--hub-radius-card);
+    box-shadow: var(--hub-glass-highlight), var(--hub-shadow-card);
     --tw-ring-shadow: 0 0 #0000;
 }
 
+/* Widget wrappers only lay out their content; the card is the section or tile inside. */
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-wi {
+    border: 0;
+    border-radius: var(--hub-radius-card);
+    background: transparent;
+    box-shadow: none;
+}
+
+/* Never nest glass in glass: anything inside a glass surface is a white well. */
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) :is(.fi-section, .fi-ta-ctn, .fi-in-section, .fi-fo-section, .fi-wi-stats-overview-stat) :is(.fi-section, .fi-ta-ctn, .fi-in-section, .fi-fo-section) {
+    background: rgb(var(--hub-well));
+    box-shadow: none;
+}
+
+/* Level 2 wells: inputs and table bodies sit white on the glass. */
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) :is(.fi-section, .fi-fo-section, .fi-in-section, .fi-ta-ctn) .fi-input-wrp,
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-ta-content {
+    background-color: rgb(var(--hub-well));
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-ta-row:hover {
+    background-color: rgb(var(--hub-n-25));
+}
+
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-section-header-heading {
-    color: rgb(var(--hub2-n-900));
+    color: rgb(var(--hub-n-900));
     font-size: 15px;
     line-height: 22px;
     font-weight: 600;
 }
 
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-section-header-description {
-    color: rgb(var(--hub2-n-600));
+    color: rgb(var(--hub-n-600));
 }
 
-:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-wi-stats-overview-stat {
-    border: 1px solid rgb(var(--hub2-n-200));
-    border-radius: 8px;
-    box-shadow: none;
-    --tw-ring-shadow: 0 0 #0000;
+/* Secondary text on glass is #475569; the muted slate (#64748B) is only 4.2:1 there. */
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-wi-stats-overview-stat-label {
+    color: rgb(var(--hub-n-600));
 }
 
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-wi-stats-overview-stat:hover {
-    box-shadow: var(--hub2-elevation-1);
+    box-shadow: var(--hub-glass-highlight), var(--hub-shadow-card);
     transform: none;
 }
 
@@ -156,7 +179,6 @@
     font-weight: 650;
     font-variant-numeric: tabular-nums;
 }
-
 /* ---------- Tables ---------- */
 
 /* Operational indexes show identity and a real status/context summary on

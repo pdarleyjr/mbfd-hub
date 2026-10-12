@@ -406,30 +406,7 @@
     outline-color: rgb(var(--hub-surface));
 }
 
-/* ===== STAT CARDS ===== */
-.fi-wi-stats-overview-stat {
-    border-radius: 0.75rem;
-    box-shadow: var(--hub-shadow-card);
-    border: 1px solid rgb(var(--hub-border));
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
-}
-
-.fi-wi-stats-overview-stat:hover {
-    box-shadow: var(--hub-shadow-elevated);
-    transform: translateY(-1px);
-}
-
-/* ===== WIDGETS & SECTIONS ===== */
-.fi-wi {
-    box-shadow: var(--hub-shadow-card);
-    border-radius: 0.75rem;
-}
-
-.fi-section {
-    box-shadow: var(--hub-shadow-card);
-    border-radius: 0.75rem;
-    border: 1px solid rgb(var(--hub-border));
-}
+/* Cards, sections, widgets and stat tiles take their surface from hub-admin-v2.css (glass tokens). */
 
 /* The Admin dashboard is an exception overview; its grid is owned by the
    Dashboard page's responsive column contract rather than a global override. */
@@ -736,7 +713,6 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
 
 /* ===== CARD HOVER UTILITY ===== */
 .fi-ta-ctn {
-    border-radius: 0.75rem;
     overflow: hidden;
 }
 
@@ -1485,15 +1461,6 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
     .fi-in-text-item {
         font-feature-settings: "tnum", "lnum";
         font-variant-numeric: tabular-nums lining-nums;
-    }
-
-    /* Subtle inner shadow on cards/tables = "native app" depth signal */
-    .fi-section,
-    .fi-wi-card,
-    .fi-ta-ctn {
-        box-shadow:
-            0 1px 3px 0 rgba(15, 23, 42, 0.06),
-            inset 0 1px 0 rgba(255, 255, 255, 0.5);
     }
 }
 
