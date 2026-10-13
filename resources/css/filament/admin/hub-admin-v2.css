@@ -7,27 +7,6 @@
  */
 
 .fi-body:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) {
-    --hub2-header: 16 42 67;
-    --hub2-action: 30 78 140;
-    --hub2-action-hover: 26 67 120;
-    --hub2-action-tint: 238 243 250;
-    --hub2-focus: 29 78 216;
-    --hub2-red: 220 38 38;
-    --hub2-n-0: 255 255 255;
-    --hub2-n-25: 250 251 252;
-    --hub2-n-50: 243 245 248;
-    --hub2-n-100: 232 236 241;
-    --hub2-n-200: 220 226 232;
-    --hub2-n-400: 133 147 163;
-    --hub2-n-500: 100 116 139;
-    --hub2-n-600: 71 85 105;
-    --hub2-n-800: 30 41 59;
-    --hub2-n-900: 15 23 42;
-    --hub2-elevation-1: 0 1px 2px rgb(16 42 67 / 0.06);
-    --hub2-elevation-2: 0 8px 24px -8px rgb(16 42 67 / 0.18);
-    --hub2-elevation-3: 0 24px 48px -12px rgb(16 42 67 / 0.28);
-    --hub2-ease-enter: cubic-bezier(0.2, 0, 0, 1);
-
     background-color: rgb(var(--hub2-n-0));
     color: rgb(var(--hub2-n-900));
     font-variant-numeric: tabular-nums;
@@ -35,16 +14,16 @@
 
 /* ---------- App bar ---------- */
 
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) :is(.fi-topbar > nav, .fi-sidebar-header) {
+    height: var(--hub-shell-bar-height);
+    min-height: var(--hub-shell-bar-height);
+    border: 0;
+    box-shadow: inset 0 -1px 0 rgb(var(--hub-header-deep));
+    background: rgb(var(--hub-header));
+}
+
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-topbar {
     border-bottom: 0;
-}
-
-:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-topbar > nav {
-    min-height: 56px;
-}
-
-@media (max-height: 800px) and (min-width: 1024px) {
-    :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-topbar > nav { min-height: 48px; height: 48px; }
 }
 
 /* Notification counts are one of red's sanctioned meanings. */

@@ -25,7 +25,7 @@
 .inspection-readiness .oos { color: #a9232b; font-weight: 750; }
 .inspection-layout { display: grid; grid-template-columns: minmax(320px, 1.15fr) minmax(0, .85fr); gap: 20px; align-items: start; }
 .inspection-layout.with-area-rail { grid-template-columns: minmax(240px, .65fr) minmax(0, 1.35fr); }
-.inspection-navigation { position: sticky; top: 84px; padding: 18px; background: #fff; border: 1px solid var(--line); border-radius: 8px; max-height: calc(100dvh - 180px); overflow-y: auto; overscroll-behavior: contain; }
+.inspection-navigation { position: sticky; top: calc(var(--hub-shell-bar-height) + 20px); padding: 18px; background: #fff; border: 1px solid var(--line); border-radius: 8px; max-height: calc(100dvh - var(--hub-shell-bar-height) - 116px); overflow-y: auto; overscroll-behavior: contain; }
 .inspection-panel-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 12px; color: var(--muted); }
 .inspection-panel-heading h2 { margin: 0; color: var(--ink); white-space: nowrap; }
 .inspection-navigation h2 { font-size: 21px; font-weight: 650; margin: 3px 0 12px; }
@@ -157,7 +157,7 @@
 }
 @media (min-width: 1024px) {
   .inspection-review-columns { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr); gap: 36px; align-items: start; }
-  .inspection-signature { position: sticky; top: 84px; }
+  .inspection-signature { position: sticky; top: calc(var(--hub-shell-bar-height) + 20px); }
 }
 @media (max-width: 960px) {
   .apparatus-inspection > nav { flex-wrap: nowrap; overflow-x: auto; }

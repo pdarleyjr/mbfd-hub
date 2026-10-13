@@ -29,7 +29,9 @@ class LighthouseReleaseGateTest extends TestCase
     public function test_ui_uses_a_bounded_logo_asset(): void
     {
         $logo = __DIR__.'/../../public/images/mbfd-official-seal-256.png';
-        $shell = file_get_contents(__DIR__.'/../../resources/views/components/hub/shell.blade.php');
+        // The shell renders the seal through the shared brand component, so inspect both.
+        $shell = file_get_contents(__DIR__.'/../../resources/views/components/hub/shell.blade.php')
+            .file_get_contents(__DIR__.'/../../resources/views/components/hub/brand.blade.php');
         $dimensions = getimagesize($logo);
 
         $this->assertIsString($shell);

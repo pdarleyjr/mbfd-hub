@@ -14,9 +14,7 @@
 @endphp
 <header class="hub-shell-bar" data-hub-shell>
     <div class="hub-shell-bar__inner">
-        <a href="/" class="hub-shell-brand" aria-label="MBFD Hub home">
-            <img src="/images/mbfd-official-seal-256.png" alt="" width="32" height="32"><span>Hub</span>
-        </a>
+        <x-hub.brand />
         <x-hub.app-switcher :navigation="$navigation" :module="$module" />
         <span class="hub-shell-connection" data-hub-connection role="status">Connected</span>
         <span class="hub-shell-spacer"></span>
@@ -37,9 +35,12 @@
                     <form method="POST" action="{{ route('logout') }}">@csrf<button role="menuitem" type="submit" class="hub-shell-menuitem hub-shell-menuitem--danger">Sign out</button></form>
                 </div>
             </details>
+        @else
+            <a href="{{ url('/login') }}" class="hub-shell-control" aria-label="Sign In">Sign in</a>
         @endif
     </div>
 </header>
+<x-hub.offline-strip />
 <x-hub.member-navigation :navigation="$navigation" />
 @vite('resources/js/hub-shell.js')
 {{ $slot }}

@@ -101,7 +101,7 @@ function NavigationMenu({ label, items, icon = 'apps', className = '', renderLin
   }
 
   if (items.length === 0) return null;
-  return <div ref={container} className={`hub-navigation-menu ${className}`} onBlur={(event) => {
+  return <div ref={container} className={`hub-shell-menu ${className}`} onBlur={(event) => {
     if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) setOpen(false);
   }}>
     <button ref={trigger} id={`${id}-trigger`} type="button" className="hub-shell-control" aria-haspopup="menu" aria-expanded={open} aria-controls={open ? `${id}-menu` : undefined}
@@ -114,14 +114,14 @@ function NavigationMenu({ label, items, icon = 'apps', className = '', renderLin
       }}>
       <HubIcon name={icon} /><span>{label}</span>
     </button>
-    {open && <div ref={menu} id={`${id}-menu`} className="hub-shell-menu" role="menu" aria-labelledby={`${id}-trigger`} onKeyDown={onMenuKeyDown}>
+    {open && <div ref={menu} id={`${id}-menu`} className="hub-shell-popover" role="menu" aria-labelledby={`${id}-trigger`} onKeyDown={onMenuKeyDown}>
       {items.map((item) => {
         const external = /^https?:\/\//.test(item.href);
         const props: AnchorHTMLAttributes<HTMLAnchorElement> = {
           href: item.href, role: 'menuitem', tabIndex: -1,
           target: external ? '_blank' : undefined, rel: external ? 'noopener' : undefined,
           'aria-label': external ? `${item.label} (opens in new tab)` : undefined,
-          className: 'hub-shell-menu-item', children: <>{item.label}{external && <span className="hub-shell-external-hint" aria-hidden="true">↗</span>}</>,
+          className: 'hub-shell-menuitem', children: <>{item.label}{external && <span className="hub-shell-external-hint" aria-hidden="true">↗</span>}</>,
           onClick: () => { window.setTimeout(() => setOpen(false), 0); },
         };
         return <div role="none" key={item.key}>{renderLink ? renderLink(props) : <a {...props} />}</div>;
@@ -164,7 +164,7 @@ export function HubShell({ module, navigation, connection, currentSection, rende
     <a href="#main-content" className="hub-shell-skip">Skip to main content</a>
     <header className="hub-shell-header daily-home-nav" aria-label={`${module} navigation`}>
       {renderNavigationLink({ href: '/', className: 'hub-shell-brand', 'aria-label': 'MBFD Hub home', children: <>
-        <img src="/images/mbfd-official-seal-256.png" alt="" width="36" height="36" /><strong>Hub</strong>
+        <img src="/images/mbfd-official-seal-256.png" alt="" width="32" height="32" /><span className="hub-shell-brand__word"><span className="hub-shell-brand__prefix" aria-hidden="true" /><span>Hub</span></span>
       </> })}
       <div className="hub-shell-header-actions">
         <NavigationMenu label="Apps" items={navigation.applications} renderLink={renderNavigationLink} />

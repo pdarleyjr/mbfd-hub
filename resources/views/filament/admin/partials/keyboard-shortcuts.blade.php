@@ -283,7 +283,7 @@
 <style>
     [x-cloak] { display: none !important; }
     .mbfd-shortcuts-overlay { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgb(15 23 42 / 0.45); }
-    .mbfd-shortcuts-dialog { width: 100%; max-width: 560px; max-height: calc(100vh - 32px); overflow-y: auto; border: 1px solid rgb(220 226 232); border-radius: 12px; background: rgb(255 255 255); color: rgb(15 23 42); box-shadow: 0 24px 48px -12px rgb(16 42 67 / 0.28); font-size: 14px; line-height: 22px; }
+    .mbfd-shortcuts-dialog { width: 100%; max-width: 560px; max-height: calc(100vh - 32px); overflow-y: auto; border: 1px solid rgb(220 226 232); border-radius: 12px; background: rgb(255 255 255); color: rgb(15 23 42); box-shadow: 0 24px 48px -12px rgb(1 39 102 / 0.28); font-size: 14px; line-height: 22px; }
     .mbfd-shortcuts-dialog:focus { outline: none; }
     .mbfd-shortcuts-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 8px 8px 20px; border-bottom: 1px solid rgb(220 226 232); }
     .mbfd-shortcuts-header h2 { margin: 0; font-size: 18px; line-height: 26px; font-weight: 600; }

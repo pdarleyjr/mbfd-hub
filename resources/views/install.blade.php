@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#102A43">
+    <meta name="theme-color" content="#012766">
     <link rel="manifest" href="/manifest.json">
     <title>Install MBFD Hub</title>
     @vite('resources/css/app.css')
@@ -11,7 +11,7 @@
         :root { color-scheme: light; font-family: var(--hub-font-sans); --ink:rgb(var(--hub-ink)); --muted:rgb(var(--hub-ink-secondary)); --line:rgb(var(--hub-border)); --field:rgb(var(--hub-canvas)); --brand:rgb(var(--hub-blue)); --brand-strong:rgb(var(--hub-blue-strong)); --navy:rgb(var(--hub-header)); --blue:rgb(var(--hub-blue)); }
         * { box-sizing: border-box; }
         body { min-height:100vh; margin:0; padding:24px; display:grid; place-items:center; background:var(--field); color:var(--ink); }
-        main { width:min(100%, 38rem); padding:clamp(24px, 6vw, 44px); border:1px solid var(--line); border-radius:8px; background:#fff; box-shadow:0 1px 2px rgba(16,42,67,.06); }
+        main { width:min(100%, 38rem); padding:clamp(24px, 6vw, 44px); border:1px solid var(--line); border-radius:8px; background:#fff; box-shadow:0 1px 2px rgba(1,39,102,.06); }
         .eyebrow { margin:0 0 12px; color:var(--navy); font-size:.78rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
         h1 { margin:0; color:var(--navy); font-size:clamp(1.8rem, 5vw, 2.5rem); line-height:1.2; letter-spacing:-.04em; }
         #install-introduction { margin-top:12px; }

@@ -33,7 +33,6 @@ use Filament\Navigation\MenuItem;
 use Filament\Navigation\NavigationGroup;
 use Filament\Panel;
 use Filament\PanelProvider;
-use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -50,9 +49,9 @@ class WorkgroupPanelProvider extends PanelProvider
             ->path('workgroups')
             ->homeUrl('/')
             ->login(CanonicalPanelLoginRedirectController::class)
-            ->brandName('MBFD Hub · Workgroups')
-            ->brandLogo(asset('images/mbfd_logo-256.png'))
-            ->brandLogoHeight('2rem')
+            ->brandName('MBFD Hub')
+            ->brandLogo(fn () => view('components.hub.brand', ['link' => false]))
+            ->brandLogoHeight('2.75rem')
             ->favicon(asset('favicon.ico'))
             ->darkMode(false)
             ->colors(HubPalette::colors())
@@ -153,19 +152,7 @@ class WorkgroupPanelProvider extends PanelProvider
                 \App\Http\Middleware\EnsureCityEmailReview::class,
             ])
             ->sidebarCollapsibleOnDesktop()
-            ->renderHook(
-                PanelsRenderHook::GLOBAL_SEARCH_BEFORE,
-                fn (): string => '<a href="/" class="flex items-center justify-center w-10 h-10 rounded-lg text-gray-500 hover:text-primary-500 hover:bg-gray-100 transition" title="Return to Home" aria-label="Return to Home"><svg class="w-5 h-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg></a>',
-            )
-            ->renderHook(
-                PanelsRenderHook::HEAD_END,
-                fn (): string => '<meta name="apple-mobile-web-app-capable" content="yes">
-            <meta name="apple-mobile-web-app-status-bar-style" content="default">
-            <meta name="apple-mobile-web-app-title" content="MBFD Hub">
-            <link rel="apple-touch-icon" href="'.asset('images/mbfd_logo-256.png').'" sizes="180x180">
-            <link rel="apple-touch-startup-image" href="'.asset('images/mbfd_logo.png').'" sizes="160x290 640x1136" media="screen and (max-device-width: 414px)">
-            <link rel="manifest" href="'.asset('/manifest.json').'">
-            <meta name="theme-color" content="#102A43">',
-            );
+            ->sidebarWidth('18rem')
+            ->collapsedSidebarWidth('4rem');
     }
 }

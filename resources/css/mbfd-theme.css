@@ -14,8 +14,10 @@
     --hub-member-nav-icon-size: 24px;
     --hub-member-nav-label-size: 12px;
 
-    --hub-header: 16 42 67;
-    --hub-header-elevated: 23 58 94;
+    /* Authority bar navy: the blue ring of the official department logo (#012766), owner-confirmed. */
+    --hub-header: 1 39 102;
+    --hub-header-deep: 0 16 58;
+    --hub-header-elevated: 1 49 131;
 
     --hub-blue: 30 78 140;
     --hub-blue-strong: 29 78 216;
@@ -56,8 +58,193 @@
     --hub-control: 248 250 252;
     --hub-control-border: 148 163 184;
 
-    --hub-shadow-card: 0 1px 2px rgb(15 23 42 / 0.05), 0 1px 3px rgb(15 23 42 / 0.06);
-    --hub-shadow-elevated: 0 10px 24px rgb(15 23 42 / 0.10);
+    /* Surfaces: white canvas, grey glass panels, white wells inside them, blurred overlays. */
+    --hub-glass: 238 241 245;
+    --hub-glass-alpha: .82;
+    --hub-glass-border: 208 215 224;
+    --hub-glass-highlight: inset 0 1px 0 rgb(255 255 255 / .75);
+    --hub-well: 255 255 255;
+    --hub-overlay-alpha: .92;
+    --hub-overlay-blur: blur(16px) saturate(1.3);
+    --hub-shadow-card: 0 1px 2px rgb(1 39 102 / .05);
+    --hub-shadow-elevated: 0 8px 24px -8px rgb(1 39 102 / .18);
+
+    /* Shell geometry: every bar on every surface takes its height from this one token. */
+    --hub-shell-bar-height: 56px;
+    --hub-sidebar-width: 18rem;
+    --hub-sidebar-collapsed: 4rem;
+    --hub-content-max: 1600px;
+
+    --hub-radius-tag: 6px;
+    --hub-radius-control: 8px;
+    --hub-radius-card: 12px;
+    --hub-radius-sheet: 16px;
+
+    /* Strength of the white veil over the crest wallpaper; sign-in pages override it below. */
+    --hub-wallpaper-veil: .90;
+}
+
+@media (max-height: 800px) and (min-width: 1024px) {
+    :root { --hub-shell-bar-height: 48px; }
+}
+
+/* Sign-in pages keep the crest more visible than the working pages. */
+body:has(.identity-strip, .fi-simple-layout) {
+    --hub-wallpaper-veil: .65;
+}
+
+/* Scale values that product components share. The --hub2-* names below alias these. */
+:root {
+    --hub-font-mono: ui-monospace, SFMono-Regular, Consolas, monospace;
+
+    --hub-blue-hover: 26 67 120;
+    --hub-blue-pressed: 22 58 102;
+    --hub-blue-tint: 238 243 250;
+    --hub-gold: 160 122 44;
+
+    --hub-n-0: 255 255 255;
+    --hub-n-25: 250 251 252;
+    --hub-n-50: 243 245 248;
+    --hub-n-100: 232 236 241;
+    --hub-n-200: 220 226 232;
+    --hub-n-400: 133 147 163;
+    --hub-n-500: 100 116 139;
+    --hub-n-600: 71 85 105;
+    --hub-n-800: 30 41 59;
+    --hub-n-900: 15 23 42;
+
+    --hub-success-bg: 236 253 245;
+    --hub-success-border: 167 243 208;
+    --hub-warning-bg: 255 251 235;
+    --hub-warning-border: 253 230 138;
+    --hub-warning-solid: 217 119 6;
+    --hub-danger-bg: 254 242 242;
+    --hub-danger-border: 254 202 202;
+    --hub-info: 3 105 161;
+    --hub-info-bg: 240 249 255;
+    --hub-info-border: 186 230 253;
+    --hub-neutral: var(--hub-n-600);
+    --hub-neutral-bg: 241 245 249;
+    --hub-neutral-border: var(--hub-n-200);
+
+    --hub-domain-operations: var(--hub-blue);
+    --hub-domain-logistics: 15 118 110;
+    --hub-domain-personnel: 91 63 184;
+    --hub-domain-training: 138 100 22;
+    --hub-domain-programs: 51 65 85;
+
+    --hub-radius-sm: 4px;
+    --hub-radius-md: 6px;
+    --hub-radius-lg: 8px;
+    --hub-radius-xl: 12px;
+
+    --hub-elevation-1: 0 1px 2px rgb(1 39 102 / 0.06);
+    --hub-elevation-2: var(--hub-shadow-elevated);
+    --hub-elevation-3: 0 24px 48px -12px rgb(1 39 102 / 0.28);
+
+    --hub-z-sticky: 10;
+    --hub-z-appbar: 30;
+    --hub-z-drawer: 40;
+    --hub-z-overlay: 50;
+    --hub-z-modal: 60;
+    --hub-z-popover: 70;
+    --hub-z-toast: 80;
+    --hub-z-tooltip: 90;
+
+    --hub-ease-enter: cubic-bezier(0.2, 0, 0, 1);
+    --hub-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+    --hub-duration-fast: 120ms;
+    --hub-duration-base: 180ms;
+    --hub-duration-slow: 240ms;
+
+    --hub-gutter: 16px;
+}
+
+@media (min-width: 640px) {
+    :root { --hub-gutter: 24px; }
+}
+
+@media (min-width: 1280px) {
+    :root { --hub-gutter: 32px; }
+}
+
+/* Product-component names. Aliases only: change a value on the --hub-* token, never here. */
+:root {
+    --hub2-header: var(--hub-header);
+    --hub2-header-elevated: var(--hub-header-elevated);
+    --hub2-action: var(--hub-blue);
+    --hub2-action-hover: var(--hub-blue-hover);
+    --hub2-action-pressed: var(--hub-blue-pressed);
+    --hub2-action-tint: var(--hub-blue-tint);
+    --hub2-focus: var(--hub-focus);
+    --hub2-red: var(--hub-red);
+    --hub2-red-strong: var(--hub-red-strong);
+    --hub2-gold: var(--hub-gold);
+
+    --hub2-n-0: var(--hub-n-0);
+    --hub2-n-25: var(--hub-n-25);
+    --hub2-n-50: var(--hub-n-50);
+    --hub2-n-100: var(--hub-n-100);
+    --hub2-n-200: var(--hub-n-200);
+    --hub2-n-400: var(--hub-n-400);
+    --hub2-n-500: var(--hub-n-500);
+    --hub2-n-600: var(--hub-n-600);
+    --hub2-n-800: var(--hub-n-800);
+    --hub2-n-900: var(--hub-n-900);
+
+    --hub2-success: var(--hub-success);
+    --hub2-success-bg: var(--hub-success-bg);
+    --hub2-success-border: var(--hub-success-border);
+    --hub2-warning: var(--hub-warning);
+    --hub2-warning-bg: var(--hub-warning-bg);
+    --hub2-warning-border: var(--hub-warning-border);
+    --hub2-warning-solid: var(--hub-warning-solid);
+    --hub2-danger: var(--hub-danger);
+    --hub2-danger-bg: var(--hub-danger-bg);
+    --hub2-danger-border: var(--hub-danger-border);
+    --hub2-info: var(--hub-info);
+    --hub2-info-bg: var(--hub-info-bg);
+    --hub2-info-border: var(--hub-info-border);
+    --hub2-neutral: var(--hub-neutral);
+    --hub2-neutral-bg: var(--hub-neutral-bg);
+    --hub2-neutral-border: var(--hub-neutral-border);
+
+    --hub2-domain-operations: var(--hub-domain-operations);
+    --hub2-domain-logistics: var(--hub-domain-logistics);
+    --hub2-domain-personnel: var(--hub-domain-personnel);
+    --hub2-domain-training: var(--hub-domain-training);
+    --hub2-domain-programs: var(--hub-domain-programs);
+
+    --hub2-radius-sm: var(--hub-radius-sm);
+    --hub2-radius-md: var(--hub-radius-md);
+    --hub2-radius-lg: var(--hub-radius-lg);
+    --hub2-radius-xl: var(--hub-radius-xl);
+
+    --hub2-elevation-1: var(--hub-elevation-1);
+    --hub2-elevation-2: var(--hub-elevation-2);
+    --hub2-elevation-3: var(--hub-elevation-3);
+
+    --hub2-z-sticky: var(--hub-z-sticky);
+    --hub2-z-appbar: var(--hub-z-appbar);
+    --hub2-z-drawer: var(--hub-z-drawer);
+    --hub2-z-overlay: var(--hub-z-overlay);
+    --hub2-z-modal: var(--hub-z-modal);
+    --hub2-z-popover: var(--hub-z-popover);
+    --hub2-z-toast: var(--hub-z-toast);
+    --hub2-z-tooltip: var(--hub-z-tooltip);
+
+    --hub2-ease-enter: var(--hub-ease-enter);
+    --hub2-ease-exit: var(--hub-ease-exit);
+    --hub2-duration-fast: var(--hub-duration-fast);
+    --hub2-duration-base: var(--hub-duration-base);
+    --hub2-duration-slow: var(--hub-duration-slow);
+
+    --hub2-font-sans: var(--hub-font-sans);
+    --hub2-font-mono: var(--hub-font-mono);
+
+    --hub2-appbar-height: var(--hub-shell-bar-height);
+    --hub2-gutter: var(--hub-gutter);
+    --hub2-content-max: var(--hub-content-max);
 }
 
 .hub-checkout-icon {

@@ -50,9 +50,9 @@ class EmployeePanelProvider extends PanelProvider
             ->id('employee')
             ->path('employee')
             ->login(CanonicalPanelLoginRedirectController::class)
-            ->brandName('MBFD Hub · Employee')
-            ->brandLogo(asset('images/mbfd_logo-256.png'))
-            ->brandLogoHeight('2rem')
+            ->brandName('MBFD Hub')
+            ->brandLogo(fn () => view('components.hub.brand', ['link' => false]))
+            ->brandLogoHeight('2.75rem')
             ->homeUrl('/')
             ->favicon(asset('favicon.ico'))
             ->darkMode(false)
@@ -133,6 +133,8 @@ class EmployeePanelProvider extends PanelProvider
                 PanelsRenderHook::PAGE_START,
                 fn () => auth('web')->check() ? view('filament.employee.partials.back-button') : '',
             )
-            ->sidebarCollapsibleOnDesktop();
+            ->sidebarCollapsibleOnDesktop()
+            ->sidebarWidth('18rem')
+            ->collapsedSidebarWidth('4rem');
     }
 }

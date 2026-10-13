@@ -267,8 +267,12 @@ test('apparatus workspace fits the viewport and keeps actual equipment visible',
   for (const control of [home]) {
     const geometry = await control.evaluate(element => {
       const box = element.getBoundingClientRect();
+      const bar = element.closest('.hub-shell-header')!.getBoundingClientRect();
       const hit = document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2);
-      return { width: box.width, height: box.height, inViewport: box.left >= 0 && box.top >= 0 && box.right <= innerWidth && box.bottom <= innerHeight, receivesClick: hit !== null && element.contains(hit) };
+      // The control must sit inside the pinned bar. WebKit's phone emulation reports a sticky bar up to 8px above
+      // the viewport edge once the page has scrolled (also on the previous 64px bar, which hid it), so the bar is the bound.
+      const insideBar = box.top >= bar.top && box.bottom <= bar.bottom && bar.top >= -8;
+      return { width: box.width, height: box.height, inViewport: insideBar && box.left >= 0 && box.right <= innerWidth && box.top < innerHeight, receivesClick: hit !== null && element.contains(hit) };
     });
     expect(geometry.width).toBeGreaterThanOrEqual(44);
     expect(geometry.height).toBeGreaterThanOrEqual(44);

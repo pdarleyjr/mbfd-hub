@@ -208,12 +208,13 @@ test("Home retains Department Updates and Quick Access without an incident integ
 });
 
 test("Admin browser chrome and installed PWA use Hub header and canvas colors", () => {
-  const head = read("resources/views/filament/admin/partials/head-pwa.blade.php");
+  // The shared head component supplies theme-color for every panel; head-pwa adds only Admin PWA wiring.
+  const head = read("resources/views/components/hub/head.blade.php") + read("resources/views/filament/admin/partials/head-pwa.blade.php");
   const manifest = JSON.parse(read("public/admin-pwa/manifest.webmanifest"));
 
-  assert.match(head, /<meta name="theme-color" content="#102A43">/);
+  assert.match(head, /<meta name="theme-color" content="#012766">/);
   assert.doesNotMatch(head, /#FAFAF8/i);
-  assert.equal(manifest.theme_color, "#102A43");
+  assert.equal(manifest.theme_color, "#012766");
   assert.equal(manifest.background_color, "#FFFFFF");
 });
 

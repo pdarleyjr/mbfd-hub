@@ -3,7 +3,7 @@
     :root { color-scheme: light; font-family: var(--hub-font-sans); }
     * { box-sizing: border-box; }
     body { margin: 0; min-height: 100vh; padding: clamp(1rem, 4vw, 3rem); background: rgb(var(--hub-surface)); color: rgb(var(--hub-ink)); }
-    main { --identity-padding: clamp(1.25rem, 5vw, 2.5rem); width: min(100%, 40rem); margin: 0 auto; padding: var(--identity-padding); border: 1px solid rgb(var(--hub-border)); border-radius: .5rem; background: rgb(var(--hub-surface)); box-shadow: 0 1px 2px rgba(16, 42, 67, .06); }
+    main { --identity-padding: clamp(1.25rem, 5vw, 2.5rem); width: min(100%, 40rem); margin: 0 auto; padding: var(--identity-padding); border: 1px solid rgb(var(--hub-border)); border-radius: .5rem; background: rgb(var(--hub-surface)); box-shadow: 0 1px 2px rgba(1, 39, 102, .06); }
     h1 { font-weight: 700; margin: .4rem 0 1rem; font-size: clamp(1.5rem, 5vw, 2rem); line-height: 1.2; }
     h2 { font-weight: 700; margin-top: 1.5rem; font-size: 1.15rem; }
     p { margin-block: 1rem; color: rgb(var(--hub-muted)); line-height: 1.5; }
