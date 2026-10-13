@@ -24,10 +24,10 @@ use Throwable;
 
 final class MemberSelfServiceActivationController extends Controller
 {
-    private const FAILURE = 'We could not activate an account with that information. Check your Employee ID, City email, and the shift and unit you bid, then try again or use email activation.';
+    private const FAILURE = 'We could not activate an account with that information. Check your Employee ID, City email, and the shift and unit you bid (or your position), then try again or use email activation.';
 
     /** Answers a member should not have to re-enter after a refusal. */
-    private const REMEMBERED = ['employee_id', 'email', 'shift', 'unit'];
+    private const REMEMBERED = ['employee_id', 'email', 'shift', 'unit', 'position'];
 
     private const THROTTLED = 'Too many attempts. Wait a few minutes before trying again, or contact MBFD Hub support.';
 
@@ -62,14 +62,16 @@ final class MemberSelfServiceActivationController extends Controller
         $validator = Validator::make($request->all(), [
             'employee_id' => ['required', 'string', 'max:64'],
             'email' => ['required', 'string', 'max:254'],
-            'shift' => ['required', 'string', 'max:32'],
-            'unit' => ['required', 'string', 'max:200'],
+            'shift' => ['nullable', 'required_without:position', 'string', 'max:32'],
+            'unit' => ['nullable', 'required_without:position', 'string', 'max:200'],
+            'position' => ['nullable', 'string', 'max:255'],
             'password' => ['required', 'string', 'confirmed', Password::default(), new SafeNewPassword],
         ], [], [
             'employee_id' => 'Employee ID',
             'email' => 'City email',
             'shift' => 'shift',
             'unit' => 'unit',
+            'position' => 'position',
         ]);
         if ($validator->fails()) {
             return back()->withErrors($validator)->withInput($request->only(self::REMEMBERED));
@@ -86,10 +88,14 @@ final class MemberSelfServiceActivationController extends Controller
 
         // Hash before any lookup so every refusal costs the same as a success.
         $passwordHash = Hash::make($data['password']);
+        // A chosen position means "my position does not bid": shift and unit do not apply.
+        $position = is_string($data['position'] ?? null) && $data['position'] !== '' ? $data['position'] : null;
+        $shift = $position === null ? ($data['shift'] ?? null) : null;
+        $unit = $position === null ? ($data['unit'] ?? null) : null;
         try {
             $user = $employeeId === ''
                 ? null
-                : $activation->claim($employeeId, $data['email'], $data['shift'], $data['unit'], $passwordHash, CarbonImmutable::now());
+                : $activation->claim($employeeId, $data['email'], $shift, $unit, $position, $passwordHash, CarbonImmutable::now());
         } catch (Throwable $exception) {
             // Contain failures here so error reporting never receives this form body.
             Log::error('member_self_service_activation_failed', ['exception_class' => $exception::class]);

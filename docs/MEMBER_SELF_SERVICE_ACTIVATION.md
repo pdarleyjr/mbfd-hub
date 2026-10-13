@@ -19,6 +19,12 @@ The shift and unit are the member's **latest published bid results**, not where
 they currently work. The drop-downs list every shift and unit in those results,
 so spelling can never block a match.
 
+Members whose position does not bid (chief officers, civilian inspectors,
+analysts, mechanics, administrative staff) open **My position does not bid** and
+select their position from a list instead of a shift and unit. That list is the
+positions of active personnel who have no result in the latest bid. A member who
+has a bid result cannot use the position list, and vice versa.
+
 A match activates the member's existing account and signs them in. Nothing is
 created; no SMS, emailed link or administrator approval is involved. The member's
 City inbox receives a short notice that the account was activated.
@@ -32,9 +38,10 @@ The member cannot choose the destination address.
 A member can self-activate only when the Hub holds all of:
 
 - an approved Employee ID / City email pairing (the onboarding roster), and
-- exactly one current result for that member in the latest bid year.
+- either exactly one current result for that member in the latest bid year, or
+  no bid result and a position on their personnel record.
 
-Everyone else (no bid result, no approved email, or locked after wrong answers)
+Everyone else (no approved email, or locked after wrong answers)
 uses email activation or an administrator-issued invitation. Nothing needs to be
 imported or maintained for this feature: corrected bid results and roster updates
 take effect immediately.

@@ -174,6 +174,42 @@ final class MemberSelfServiceActivationTest extends TestCase
         self::assertSame(AccountStatus::Active, $member->fresh()->account_status);
     }
 
+    public function test_a_member_whose_position_does_not_bid_activates_by_selecting_that_position(): void
+    {
+        $this->pending('SELF-BIDDER');
+        $analyst = $this->pending('SELF-ANALYST', bid: false, rank: 'Plans Analyst #2');
+        $this->pending('SELF-MECHANIC', bid: false, rank: 'Mechanic #1');
+
+        $this->get('/activate')->assertOk()
+            ->assertSee('My position does not bid')
+            ->assertSee('Plans Analyst #2')->assertSee('Mechanic #1')
+            ->assertDontSee('Firefighter');
+        $this->post('/activate', $this->positionForm('SELF-ANALYST', 'Mechanic #1'))->assertSessionHasErrors('activation');
+        self::assertSame(AccountStatus::PendingActivation, $analyst->fresh()->account_status);
+
+        // Stray shift and unit choices are ignored once a position is selected.
+        $this->post('/activate', $this->positionForm('SELF-ANALYST', 'Plans Analyst #2') + ['shift' => 'A Shift', 'unit' => 'Engine 1'])
+            ->assertRedirect('/');
+        self::assertSame(AccountStatus::Active, $analyst->fresh()->account_status);
+    }
+
+    public function test_bidders_and_non_bidders_cannot_use_each_others_answers(): void
+    {
+        $bidder = $this->pending('SELF-CROSS-BID');
+        $staff = $this->pending('SELF-CROSS-STAFF', bid: false, rank: 'Clerk Typist');
+
+        // A bidder may not fall back to the smaller position list.
+        $this->post('/activate', $this->positionForm('SELF-CROSS-BID', 'Firefighter'))->assertSessionHasErrors('activation');
+        // A non-bidder has no shift and unit to match.
+        $this->post('/activate', $this->form('SELF-CROSS-STAFF'))->assertSessionHasErrors('activation');
+        // Nothing selected at all is a form error, not an attempt.
+        $this->post('/activate', ['shift' => '', 'unit' => ''] + $this->form('SELF-CROSS-STAFF'))->assertSessionHasErrors(['shift', 'unit']);
+
+        self::assertSame(AccountStatus::PendingActivation, $bidder->fresh()->account_status);
+        self::assertSame(AccountStatus::PendingActivation, $staff->fresh()->account_status);
+        self::assertSame(1, MemberActivationAttempt::query()->where('employee_profile_id', $bidder->employee_profile_id)->sole()->failed_attempts);
+    }
+
     public function test_a_superseded_bid_result_is_not_accepted(): void
     {
         $member = $this->pending('SELF-CORRECTED', shift: 'C Shift', unit: 'Engine 4');
@@ -260,13 +296,13 @@ final class MemberSelfServiceActivationTest extends TestCase
         $activation = app(MemberSelfServiceActivation::class);
         $email = 'self-lock@miamibeachfl.gov';
         for ($attempt = 0; $attempt < 5; $attempt++) {
-            self::assertNull($activation->claim('SELF-LOCK', $email, 'B Shift', 'Engine 1', Hash::make(self::PASSWORD), CarbonImmutable::now()));
+            self::assertNull($activation->claim('SELF-LOCK', $email, 'B Shift', 'Engine 1', null, Hash::make(self::PASSWORD), CarbonImmutable::now()));
         }
 
         $record = MemberActivationAttempt::query()->sole();
         self::assertSame(5, $record->failed_attempts);
         self::assertNotNull($record->locked_at);
-        self::assertNull($activation->claim('SELF-LOCK', $email, 'A Shift', 'Engine 1', Hash::make(self::PASSWORD), CarbonImmutable::now()));
+        self::assertNull($activation->claim('SELF-LOCK', $email, 'A Shift', 'Engine 1', null, Hash::make(self::PASSWORD), CarbonImmutable::now()));
         self::assertSame(AccountStatus::PendingActivation, $member->fresh()->account_status);
         self::assertSame(5, SecurityActionEvent::query()->where('action', 'member_self_service_activation_denied')->count());
         self::assertSame('verification_locked', SecurityActionEvent::query()->latest('id')->value('reason'));
@@ -510,6 +546,18 @@ final class MemberSelfServiceActivationTest extends TestCase
         ];
     }
 
+    /** @return array<string,string> */
+    private function positionForm(string $employeeId, string $position): array
+    {
+        return [
+            'employee_id' => $employeeId,
+            'email' => strtolower($employeeId).'@miamibeachfl.gov',
+            'position' => $position,
+            'password' => self::PASSWORD,
+            'password_confirmation' => self::PASSWORD,
+        ];
+    }
+
     private function pending(
         string $employeeId,
         bool $cityEmail = true,
@@ -517,11 +565,13 @@ final class MemberSelfServiceActivationTest extends TestCase
         string $shift = 'A Shift',
         string $unit = 'Engine 1',
         int $bidYear = 2026,
+        ?string $rank = null,
     ): User {
         $email = strtolower($employeeId).'@miamibeachfl.gov';
         $employee = Employee::query()->create([
             'employee_id' => $employeeId,
             'name' => 'Activation Member '.$employeeId,
+            'rank' => $rank ?? ($bid ? 'Firefighter' : null),
             'roster_status' => 'active',
             'city_email' => $cityEmail ? $email : null,
             'password' => Hash::make('legacy-password'),

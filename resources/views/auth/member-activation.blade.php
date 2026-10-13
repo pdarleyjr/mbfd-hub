@@ -28,7 +28,7 @@
         @error('email')<div id="email-error" class="error" role="alert">{{ $message }}</div>@enderror
 
         <label for="shift">Shift you bid</label>
-        <select id="shift" name="shift" required aria-describedby="bid-hint" @error('shift') aria-invalid="true" @enderror>
+        <select id="shift" name="shift" aria-describedby="bid-hint" @error('shift') aria-invalid="true" @enderror>
             <option value="" @selected(old('shift') === null)>Select your shift</option>
             @foreach ($bidChoices['shifts'] as $shift)
                 <option value="{{ $shift }}" @selected(old('shift') === $shift)>{{ $shift }}</option>
@@ -37,7 +37,7 @@
         @error('shift')<div class="error" role="alert">{{ $message }}</div>@enderror
 
         <label for="unit">Unit you bid</label>
-        <select id="unit" name="unit" required aria-describedby="bid-hint" @error('unit') aria-invalid="true" @enderror>
+        <select id="unit" name="unit" aria-describedby="bid-hint" @error('unit') aria-invalid="true" @enderror>
             <option value="" @selected(old('unit') === null)>Select your unit</option>
             @foreach ($bidChoices['units'] as $unit)
                 <option value="{{ $unit }}" @selected(old('unit') === $unit)>{{ $unit }}</option>
@@ -45,6 +45,20 @@
         </select>
         <div id="bid-hint" class="hint">Use your most recent bid results, even if you have not moved yet.</div>
         @error('unit')<div class="error" role="alert">{{ $message }}</div>@enderror
+
+        @if ($bidChoices['positions'] !== [])
+            <details class="field-alternative" @if (old('position')) open @endif>
+                <summary>My position does not bid</summary>
+                <label for="position">Your position</label>
+                <select id="position" name="position" aria-describedby="position-hint">
+                    <option value="" @selected(old('position') === null)>Select your position</option>
+                    @foreach ($bidChoices['positions'] as $position)
+                        <option value="{{ $position }}" @selected(old('position') === $position)>{{ $position }}</option>
+                    @endforeach
+                </select>
+                <div id="position-hint" class="hint">For administrative and staff positions. Leave shift and unit blank.</div>
+            </details>
+        @endif
 
         <label for="password">Create a password</label>
         <input id="password" name="password" type="password" maxlength="72" autocomplete="new-password" aria-describedby="password-hint" required @error('password') aria-invalid="true" @enderror>

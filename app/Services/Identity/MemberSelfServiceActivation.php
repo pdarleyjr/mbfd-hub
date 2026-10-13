@@ -55,32 +55,37 @@ final class MemberSelfServiceActivation
      * Choices for the form, taken from the latest bid results so a member
      * selects rather than types. Empty when no results have been published.
      *
-     * @return array{shifts:list<string>,units:list<string>}
+     * @return array{shifts:list<string>,units:list<string>,positions:list<string>}
      */
     public function bidChoices(): array
     {
         $year = $this->latestBidYear();
         if ($year === null) {
-            return ['shifts' => [], 'units' => []];
+            return ['shifts' => [], 'units' => [], 'positions' => []];
         }
         $current = EmployeeBidAssignment::query()->where('bid_year', $year)->whereNull('superseded_at');
         $shifts = (clone $current)->distinct()->orderBy('shift_label')->pluck('shift_label')->all();
         $units = (clone $current)->distinct()->pluck('unit_label')->all();
         sort($units, SORT_NATURAL | SORT_FLAG_CASE);
 
-        return ['shifts' => $shifts, 'units' => $units];
+        return ['shifts' => $shifts, 'units' => $units, 'positions' => $this->nonBidPositions($year)];
     }
 
-    /** Returns the activated account, or null for every kind of refusal. */
+    /**
+     * Returns the activated account, or null for every kind of refusal.
+     * Members who bid answer with shift and unit; members whose position does
+     * not bid answer with that position. Neither group can use the other's path.
+     */
     public function claim(
         string $employeeId,
         string $email,
-        string $shift,
-        string $unit,
+        ?string $shift,
+        ?string $unit,
+        ?string $position,
         string $passwordHash,
         CarbonImmutable $at,
     ): ?User {
-        $activated = DB::transaction(function () use ($employeeId, $email, $shift, $unit, $passwordHash, $at): ?User {
+        $activated = DB::transaction(function () use ($employeeId, $email, $shift, $unit, $position, $passwordHash, $at): ?User {
             $identity = $this->soleIdentity($employeeId);
             if ($identity === null) {
                 return null;
@@ -102,11 +107,12 @@ final class MemberSelfServiceActivation
                 return null;
             }
 
-            // Evaluate all three so a refusal never reveals which one was wrong.
+            // Evaluate every answer so a refusal never reveals which one was wrong.
             $matches = [
                 hash_equals($record['email'], strtolower(trim($email))),
-                hash_equals($record['shift'], $shift),
-                hash_equals($record['unit'], $unit),
+                hash_equals((string) $record['shift'], (string) $shift),
+                hash_equals((string) $record['unit'], (string) $unit),
+                hash_equals((string) $record['position'], (string) $position),
             ];
             if (in_array(false, $matches, true)) {
                 $this->recordFailure($attempt, $user, $at);
@@ -191,7 +197,7 @@ final class MemberSelfServiceActivation
      * The answers a member must give. Null when the Hub does not hold a
      * complete, unambiguous record, which leaves email activation as the route.
      *
-     * @return array{email:string,shift:string,unit:string}|null
+     * @return array{email:string,shift:string|null,unit:string|null,position:string|null}|null
      */
     private function trustedRecord(Employee $employee): ?array
     {
@@ -208,13 +214,39 @@ final class MemberSelfServiceActivation
         $assignments = EmployeeBidAssignment::query()
             ->where('employee_profile_id', $employee->id)
             ->where('bid_year', $year)->whereNull('superseded_at')->limit(2)->get(['shift_label', 'unit_label']);
-        if ($assignments->count() !== 1) {
+        if ($assignments->count() > 1) {
             return null;
+        }
+        if ($assignments->isEmpty()) {
+            // A position that does not bid: the position itself is the answer.
+            $position = trim((string) $employee->rank);
+
+            return $position === '' ? null : ['email' => $email, 'shift' => null, 'unit' => null, 'position' => $position];
         }
         $shift = (string) $assignments->first()->getAttribute('shift_label');
         $unit = (string) $assignments->first()->getAttribute('unit_label');
 
-        return $shift === '' || $unit === '' ? null : ['email' => $email, 'shift' => $shift, 'unit' => $unit];
+        return $shift === '' || $unit === '' ? null : ['email' => $email, 'shift' => $shift, 'unit' => $unit, 'position' => null];
+    }
+
+    /**
+     * Positions held by active personnel with no result in the latest bid.
+     *
+     * @return list<string>
+     */
+    private function nonBidPositions(int $year): array
+    {
+        $positions = Employee::query()
+            ->where('roster_status', 'active')
+            ->whereNotNull('rank')
+            ->whereNotIn('id', EmployeeBidAssignment::query()->select('employee_profile_id')
+                ->where('bid_year', $year)->whereNull('superseded_at'))
+            ->distinct()->pluck('rank')
+            ->map(static fn (mixed $rank): string => trim((string) $rank))
+            ->filter()->unique()->values()->all();
+        sort($positions, SORT_NATURAL | SORT_FLAG_CASE);
+
+        return $positions;
     }
 
     private function latestBidYear(): ?int

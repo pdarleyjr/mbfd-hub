@@ -25,6 +25,7 @@ $user = app(App\Services\Identity\MemberSelfServiceActivation::class)->claim(
     getenv('RACE_EMAIL'),
     'A Shift',
     'Engine 1',
+    null,
     Illuminate\Support\Facades\Hash::make('claim-'.getenv('RACE_WORKER')),
     Carbon\CarbonImmutable::now(),
 );
