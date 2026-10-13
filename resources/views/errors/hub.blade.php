@@ -1,44 +1,47 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-hub-ui="2">
 <head>
     <meta charset="utf-8">
     <x-hub.head />
     <title>{{ $code }} — {{ $title }} | MBFD Hub</title>
     <link rel="stylesheet" href="/css/hub-wallpaper-v1.css">
+    {{-- Error pages must render even when the build is missing: a failed stylesheet lookup degrades to unstyled text. --}}
+    @php
+        try {
+            $hubErrorStyles = app(\Illuminate\Foundation\Vite::class)('resources/css/app.css');
+        } catch (\Throwable) {
+            $hubErrorStyles = '';
+        }
+    @endphp
+    {!! $hubErrorStyles !!}
     <style>
-        * { box-sizing: border-box; }
-        body { margin: 0; min-height: 100vh; padding: 24px; display: grid; place-items: center; background: #fff; color: #012766; font: 16px/1.6 system-ui, sans-serif; }
-        main { width: min(100%, 38rem); }
-        .identity { display: flex; align-items: center; gap: 12px; margin-bottom: 40px; font-weight: 650; }
-        .identity img { width: 48px; height: 48px; }
-        .code { margin: 0 0 8px; color: #475569; font-size: 14px; font-weight: 650; letter-spacing: .08em; }
-        h1 { margin: 0; font-size: clamp(28px, 6vw, 40px); line-height: 1.2; letter-spacing: -.025em; }
-        .message { margin: 20px 0 28px; color: #475569; }
-        .notice { padding: 16px; border: 1px solid #fde68a; border-radius: 6px; background: #fffbeb; color: #92400e; }
-        .actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
-        a { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 18px; border: 1px solid #dce2e8; border-radius: 6px; color: #1e4e8c; font-weight: 650; text-decoration: none; }
-        a.primary { border-color: #1e4e8c; background: #1e4e8c; color: #fff; }
-        a:hover { text-decoration: underline; text-underline-offset: 3px; }
-        a:focus-visible { outline: 3px solid #1d4ed8; outline-offset: 3px; }
-        footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid #dce2e8; color: #475569; font-size: 13px; }
+        .hub-error { min-height: 100vh; padding: 24px; display: grid; place-items: center; font-family: var(--hub-font-sans); }
+        .hub-error__card { width: min(100%, 38rem); padding: clamp(20px, 5vw, 32px); }
+        .hub-error__identity { display: flex; align-items: center; gap: 12px; margin-bottom: 32px; color: rgb(var(--hub-header)); font-weight: 700; }
+        .hub-error__identity img { width: 48px; height: 48px; }
+        .hub-error__code { margin: 0 0 8px; color: rgb(var(--hub-n-600)); font-size: 14px; font-weight: 700; letter-spacing: .08em; }
+        .hub-error h1 { margin: 0; color: rgb(var(--hub-header)); font-size: clamp(28px, 6vw, 40px); line-height: 1.2; letter-spacing: -.025em; }
+        .hub-error__message { margin: 20px 0 28px; color: rgb(var(--hub-n-600)); line-height: 1.6; }
+        .hub-error__actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 28px; }
+        .hub-error__footer { margin-top: 40px; padding-top: 20px; border-top: 1px solid rgb(var(--hub-glass-border)); color: rgb(var(--hub-n-600)); font-size: 13px; }
     </style>
 </head>
-<body>
-    <main>
-        <div class="identity"><img src="/images/mbfd_logo-256.png" alt="" width="48" height="48">MBFD Hub</div>
-        <p class="code">ERROR {{ $code }}</p>
+<body class="hub-error">
+    <main class="hub-panel hub-error__card">
+        <div class="hub-error__identity"><img src="/images/mbfd_logo-256.png" alt="" width="48" height="48">MBFD Hub</div>
+        <p class="hub-error__code">ERROR {{ $code }}</p>
         <h1>{{ $title }}</h1>
-        <p class="message">{{ $message }}</p>
+        <p class="hub-error__message">{{ $message }}</p>
         @if($code !== 404)
-            <p class="notice">If this is an active incident, contact the duty officer directly.</p>
+            <p class="hub-callout hub-callout--warning p-4">If this is an active incident, contact the duty officer directly.</p>
         @endif
-        <div class="actions">
-            <a class="primary" href="{{ url('/') }}">Return to Hub home</a>
+        <div class="hub-error__actions">
+            <a class="hub-btn hub-btn--primary" href="{{ url('/') }}">Return to Hub home</a>
             @if($code !== 404)
-                <a href="{{ url()->current() }}">Try again</a>
+                <a class="hub-btn hub-btn--secondary" href="{{ url()->current() }}">Try again</a>
             @endif
         </div>
-        <footer>Miami Beach Fire Department · Support Services Division</footer>
+        <div class="hub-error__footer">Miami Beach Fire Department · Support Services Division</div>
     </main>
 </body>
 </html>

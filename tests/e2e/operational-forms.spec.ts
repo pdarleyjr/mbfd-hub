@@ -195,8 +195,17 @@ test('home layout is ordered, aligned, touch-safe, and overflow-free from 320px 
     expect(primaryBox).not.toBeNull();
     expect(updateBox).not.toBeNull();
     expect(quickBox).not.toBeNull();
-    expect(Math.abs(primaryBox!.width - layoutBox!.width)).toBeLessThanOrEqual(1);
-    expect(updateBox!.y + updateBox!.height).toBeLessThanOrEqual(quickBox!.y + 1);
+    if (viewport.width >= 1280) {
+      // Wide screens: updates in the main column (~62%), Quick Access as a rail on the right.
+      expect(quickBox!.x).toBeGreaterThanOrEqual(updateBox!.x + updateBox!.width - 1);
+      expect(Math.abs(quickBox!.y - updateBox!.y)).toBeLessThanOrEqual(2);
+      const share = primaryBox!.width / layoutBox!.width;
+      expect(share).toBeGreaterThan(0.55);
+      expect(share).toBeLessThan(0.68);
+    } else {
+      expect(Math.abs(primaryBox!.width - layoutBox!.width)).toBeLessThanOrEqual(1);
+      expect(updateBox!.y + updateBox!.height).toBeLessThanOrEqual(quickBox!.y + 1);
+    }
 
     const layout = await page.evaluate(() => ({
       clientWidth: document.documentElement.clientWidth,

@@ -15,6 +15,8 @@ class VideoConferencing extends Page
 
     protected static ?string $navigationIcon = 'heroicon-o-video-camera';
 
+    protected static ?string $navigationGroup = 'Request';
+
     protected static string $view = 'filament.employee.pages.video-conferencing';
 
     protected static ?string $title = 'Video Conferencing';
@@ -23,7 +25,7 @@ class VideoConferencing extends Page
 
     protected static ?string $slug = 'video-conferencing';
 
-    protected static ?int $navigationSort = 2;
+    protected static ?int $navigationSort = 4;
 
     public function getViewData(): array
     {

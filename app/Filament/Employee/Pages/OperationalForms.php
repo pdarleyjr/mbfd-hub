@@ -12,6 +12,8 @@ class OperationalForms extends Page
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
 
+    protected static ?string $navigationGroup = 'My work';
+
     protected static string $view = 'filament.employee.pages.operational-forms';
 
     protected static ?string $title = 'Operational Forms';

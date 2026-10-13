@@ -30,6 +30,8 @@ class ApparatusServiceRequestPage extends Page
 
     protected static ?string $navigationIcon = 'heroicon-o-wrench-screwdriver';
 
+    protected static ?string $navigationGroup = 'Request';
+
     protected static string $view = 'filament.employee.pages.apparatus-service-request';
 
     protected static ?string $title = 'Apparatus Service Request';
@@ -38,7 +40,7 @@ class ApparatusServiceRequestPage extends Page
 
     protected static ?string $slug = 'apparatus-service-request';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 2;
 
     public ?array $data = [];
 

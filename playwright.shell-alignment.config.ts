@@ -15,7 +15,7 @@ const viewports = [
 
 export default defineConfig({
   ...protectedUi,
-  testMatch: /(?:shell-(?:alignment|baseline)|surface-system|phone-layer)\.spec\.ts/,
+  testMatch: /(?:shell-(?:alignment|baseline)|surface-system|phone-layer|home-layout)\.spec\.ts/,
   outputDir: 'test-results/shell-alignment',
   reporter: [
     ['list'],

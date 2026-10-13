@@ -19,11 +19,13 @@ class RequestEquipmentPage extends Page
 
     protected static ?string $navigationIcon = 'heroicon-o-shopping-bag';
 
+    protected static ?string $navigationGroup = 'Request';
+
     protected static string $view = 'filament.employee.pages.request-equipment';
 
     protected static ?string $title = 'Request Uniforms';
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 1;
 
     protected static ?string $navigationLabel = 'Request Uniforms';
 
