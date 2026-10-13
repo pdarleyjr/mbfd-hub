@@ -179,6 +179,101 @@
     font-weight: 650;
     font-variant-numeric: tabular-nums;
 }
+/* ---------- Controls ---------- */
+
+/* Buttons: 40px with a mouse, 44px on touch, 8px radius. Small sizes stay compact (32px) with a mouse. */
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-btn {
+    min-height: 2.5rem;
+    border-radius: var(--hub-radius-control);
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-btn:is(.fi-btn-size-xs, .fi-btn-size-sm) {
+    min-height: 2rem;
+}
+
+@media (pointer: coarse) {
+    :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-btn,
+    :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-btn:is(.fi-btn-size-xs, .fi-btn-size-sm) {
+        min-height: 2.75rem;
+    }
+}
+
+/* Inputs are white wells with a #8593A3 edge; Filament keeps its own invalid and focus rings. */
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-input-wrp {
+    border-radius: var(--hub-radius-control);
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-input-wrp:not(.fi-invalid, .fi-disabled):not(:focus-within) {
+    --tw-ring-color: rgb(var(--hub-n-400));
+}
+
+/* Tabs on the canvas are underline tabs. */
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-tabs:not(.fi-contained) {
+    gap: 4px;
+    max-width: 100%;
+    margin-inline: 0;
+    padding: 0;
+    border-bottom: 1px solid rgb(var(--hub-glass-border));
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    --tw-ring-shadow: 0 0 #0000;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-tabs:not(.fi-contained) .fi-tabs-item {
+    min-height: 2.75rem;
+    margin-bottom: -1px;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    background: transparent;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-tabs:not(.fi-contained) .fi-tabs-item.fi-active {
+    border-bottom-color: rgb(var(--hub-blue));
+}
+
+/* Tabs inside a card are a segmented control. */
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-tabs.fi-contained {
+    gap: 2px;
+    width: fit-content;
+    max-width: 100%;
+    margin: 12px;
+    padding: 3px;
+    border: 0;
+    border-radius: var(--hub-radius-control);
+    background: rgb(var(--hub-n-100));
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-tabs.fi-contained .fi-tabs-item {
+    min-height: 2.25rem;
+    border-radius: var(--hub-radius-md);
+    background: transparent;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-tabs.fi-contained .fi-tabs-item.fi-active {
+    background: rgb(var(--hub-well));
+    box-shadow: var(--hub-shadow-card);
+}
+
+/* Level 3 overlays: dialogs, notifications and menus are blurred glass above the page. */
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-modal-window {
+    border-radius: var(--hub-radius-sheet);
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-no-notification {
+    border-radius: var(--hub-radius-card);
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-dropdown-panel {
+    border-radius: var(--hub-radius-card);
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) :is(.fi-modal-window, .fi-no-notification, .fi-dropdown-panel) {
+    background-color: rgb(var(--hub-well) / var(--hub-overlay-alpha));
+    -webkit-backdrop-filter: var(--hub-overlay-blur);
+    backdrop-filter: var(--hub-overlay-blur);
+    box-shadow: var(--hub-shadow-elevated);
+}
 /* ---------- Tables ---------- */
 
 /* Operational indexes show identity and a real status/context summary on
@@ -236,7 +331,6 @@
 /* ---------- Controls ---------- */
 
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-btn {
-    border-radius: 6px;
     font-weight: 600;
 }
 
@@ -282,10 +376,6 @@
     padding-inline-end: 4rem;
 }
 
-:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-input-wrp {
-    border-radius: 6px;
-}
-
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-input-wrp:focus-within {
     --tw-ring-color: rgb(var(--hub2-focus));
 }
@@ -295,8 +385,10 @@
     font-weight: 600;
 }
 
+/* Tags: 22px tall, 6px radius, text plus tint plus border (never colour alone). */
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-badge {
-    border-radius: 4px;
+    min-height: 1.375rem;
+    border-radius: var(--hub-radius-tag);
     font-weight: 600;
 }
 
@@ -308,20 +400,6 @@ html:not(.dark) :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .
 html:not(.dark) :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-link.fi-color-success,
 html:not(.dark) :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-link.fi-color-success > span {
     color: rgb(var(--hub-success));
-}
-
-:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-dropdown-panel {
-    border-radius: 12px;
-    box-shadow: var(--hub2-elevation-2);
-}
-
-:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-modal-window {
-    border-radius: 12px;
-    box-shadow: var(--hub2-elevation-3);
-}
-
-:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-tabs {
-    border-radius: 8px;
 }
 
 /* ---------- Command board ---------- */

@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { PRIMARY_BUTTON, readButton, type ComputedButton } from './support/control-contract';
 
 /*
  * Surface system contract (WP3): white canvas, grey glass panels, white wells inside them.
@@ -80,6 +81,24 @@ test.describe('surface system', () => {
       expect(summary, `${path} contrast:\n${summary.join('\n')}`).toEqual([]);
     });
   }
+
+  test('primary button: Blade and Filament compute the shared contract (colour, radius, height)', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'vp-1366x768', 'The contract values are for a fine pointer.');
+    // Blade: a real .hub-btn--primary rendered into the live Home page with the real stylesheets.
+    await open(page, '/');
+    const blade = await page.evaluate(`(${readButton.toString()})(
+      (() => { const a = document.createElement('a'); a.className = 'hub-btn hub-btn--primary'; a.textContent = 'Contract check'; a.href = '#'; document.querySelector('main, body').appendChild(a); return a; })()
+    )`) as ComputedButton;
+    expect(blade).toMatchObject({ background: PRIMARY_BUTTON.background, color: PRIMARY_BUTTON.color, borderTopLeftRadius: PRIMARY_BUTTON.borderTopLeftRadius });
+    expect(Math.abs(blade.height - PRIMARY_BUTTON.height)).toBeLessThanOrEqual(0.5);
+
+    // Filament: the header action on the Training dashboard.
+    await open(page, '/training');
+    const filament = await page.locator('.fi-header .fi-btn.fi-color-primary').first().evaluate(readButton);
+    expect(filament).toMatchObject({ background: PRIMARY_BUTTON.background, color: PRIMARY_BUTTON.color, borderTopLeftRadius: PRIMARY_BUTTON.borderTopLeftRadius });
+    expect(Math.abs(filament.height - PRIMARY_BUTTON.height)).toBeLessThanOrEqual(0.5);
+    await testInfo.attach('primary-buttons.json', { body: Buffer.from(JSON.stringify({ blade, filament, contract: PRIMARY_BUTTON }, null, 2)), contentType: 'application/json' });
+  });
 
   test('stat tiles do not lift or gain a shadow on hover', async ({ page }, testInfo) => {
     test.skip(testInfo.project.name !== 'vp-1366x768', 'Hover applies to a fine pointer, not to touch phones.');

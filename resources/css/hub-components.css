@@ -262,7 +262,7 @@ body[data-hub-ui="2"] {
     min-height: 40px;
     padding: 0 16px;
     border: 1px solid transparent;
-    border-radius: var(--hub2-radius-md);
+    border-radius: var(--hub-radius-control);
     font: inherit;
     font-size: 14px;
     line-height: 20px;
@@ -346,7 +346,7 @@ body[data-hub-ui="2"] {
     min-height: 22px;
     padding: 0 8px;
     border: 1px solid rgb(var(--hub2-neutral-border));
-    border-radius: var(--hub2-radius-sm);
+    border-radius: var(--hub-radius-tag);
     background: rgb(var(--hub2-neutral-bg));
     color: rgb(var(--hub2-neutral));
     font-size: 12px;
@@ -474,6 +474,13 @@ body[data-hub-ui="2"] {
     height: 12px;
     border-radius: var(--hub2-radius-sm);
     background: rgb(var(--hub2-n-100));
+    animation: hub-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+/* Loading placeholders breathe with opacity only; reduced motion removes it below. */
+@keyframes hub-skeleton-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .5; }
 }
 
 /* ------------------------------------------------------------------ */
