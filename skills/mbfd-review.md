@@ -110,24 +110,26 @@ async def validate_ui():
 
 ## 4. Impeccable Design Audit (MANDATORY for all UI changes)
 
-### Color Space
-- ✅ OKLCH color space and tinted neutrals required
-- ❌ Pure blacks (#000) and pure grays (#808080) PROHIBITED
+### Colour and surfaces (`.impeccable.md` is the authority)
+- ✅ White field, grey glass, navy authority `#012766`; every colour, radius, shadow and bar height comes from a `mbfd-theme.css` token
+- ❌ No hex literals or inline `style=` in views (computed values only); no second token source
+- ❌ No warm stone palettes, no red primary buttons, no gradients, hover lift or coloured side stripes
+- ✅ Glass only at level 1 (no blur); white wells inside it; blur only on overlays (menus, dialogs, sheets)
 
 ### Structure
 - ❌ NO `@apply` directives in CSS (iOS Safari crash — ERROR-031)
-- ❌ NO nested cards ("card-in-a-card" patterns)
+- ❌ NO nested glass ("card-in-a-card" patterns)
 
 ### Typography
 - ❌ NO generic defaults (Inter, Arial, system-ui)
-- ✅ Plus Jakarta Sans (headings) + Source Sans 3 (body)
+- ✅ Plus Jakarta Sans (self-hosted); 14px/22px base
 
 ### Automated Steps
 1. Run `/audit` on every generated React component
 2. Run `/polish` before presenting code
 3. Verify WCAG AA contrast (4.5:1 body, 3:1 large)
 4. Confirm no `@apply` directives
-5. Verify OKLCH or warm-tinted CSS properties
+5. Run `tests/e2e/shell-alignment.spec.ts`, `surface-system.spec.ts` and `phone-layer.spec.ts` (`playwright.shell-alignment.config.ts`) for any shell or surface change
 
 ---
 
