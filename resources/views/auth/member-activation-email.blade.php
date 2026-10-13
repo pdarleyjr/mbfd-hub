@@ -27,7 +27,7 @@
     </form>
 
     @if ($claimEnabled)
-        <a class="help" href="{{ route('member-activation.show', array_filter(['login_attempt' => $loginAttempt])) }}">Activate with date of birth and phone instead</a>
+        <a class="help" href="{{ route('member-activation.show', array_filter(['login_attempt' => $loginAttempt])) }}">Activate with your bid shift and unit instead</a>
     @endif
     <a class="help" href="{{ $loginAttempt ? '/login?login_attempt='.$loginAttempt : route('login') }}">Already activated? Sign in</a>
 </main>

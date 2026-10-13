@@ -8,28 +8,34 @@ use App\Enums\AccountStatus;
 use App\Exceptions\MemberBootstrapStateChanged;
 use App\Jobs\IssueMemberOnboardingInvitation;
 use App\Models\Employee;
-use App\Models\MemberActivationVerifier;
+use App\Models\EmployeeBidAssignment;
+use App\Models\MemberActivationAttempt;
 use App\Models\MemberOnboardingInvitation;
+use App\Models\MemberOnboardingRosterBinding;
 use App\Models\User;
+use App\Services\Communications\CloudflareEmailDispatcher;
 use App\Services\Security\SecurityAuditRecorder;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
+use Throwable;
 
 /**
- * First-time account claiming from trusted personnel records.
+ * First-time account claiming from records the Hub already holds: Employee ID,
+ * the approved City email, and the shift and unit from the latest bid results.
  *
- * Employee ID, date of birth and phone are knowledge, not possession: this is
- * not MFA. It may only ever activate a never-activated ordinary member account
- * and can never reset or replace an established credential.
+ * These are things a member knows, not something they hold: this is not MFA.
+ * It may only ever activate a never-activated ordinary member account and can
+ * never reset or replace an established credential.
  */
 final class MemberSelfServiceActivation
 {
     public function __construct(
-        private readonly MemberActivationVerifierDigest $digests,
         private readonly AccountSecurityService $security,
         private readonly MemberOnboardingInvitationService $invitations,
         private readonly SecurityAuditRecorder $audit,
+        private readonly CloudflareEmailDispatcher $email,
     ) {}
 
     public function enabled(): bool
@@ -45,15 +51,36 @@ final class MemberSelfServiceActivation
         return (bool) config('identity.self_service_activation.email_request_enabled');
     }
 
+    /**
+     * Choices for the form, taken from the latest bid results so a member
+     * selects rather than types. Empty when no results have been published.
+     *
+     * @return array{shifts:list<string>,units:list<string>}
+     */
+    public function bidChoices(): array
+    {
+        $year = $this->latestBidYear();
+        if ($year === null) {
+            return ['shifts' => [], 'units' => []];
+        }
+        $current = EmployeeBidAssignment::query()->where('bid_year', $year)->whereNull('superseded_at');
+        $shifts = (clone $current)->distinct()->orderBy('shift_label')->pluck('shift_label')->all();
+        $units = (clone $current)->distinct()->pluck('unit_label')->all();
+        sort($units, SORT_NATURAL | SORT_FLAG_CASE);
+
+        return ['shifts' => $shifts, 'units' => $units];
+    }
+
     /** Returns the activated account, or null for every kind of refusal. */
     public function claim(
         string $employeeId,
-        CarbonImmutable $dateOfBirth,
-        string $normalizedPhone,
+        string $email,
+        string $shift,
+        string $unit,
         string $passwordHash,
         CarbonImmutable $at,
     ): ?User {
-        return DB::transaction(function () use ($employeeId, $dateOfBirth, $normalizedPhone, $passwordHash, $at): ?User {
+        $activated = DB::transaction(function () use ($employeeId, $email, $shift, $unit, $passwordHash, $at): ?User {
             $identity = $this->soleIdentity($employeeId);
             if ($identity === null) {
                 return null;
@@ -65,18 +92,24 @@ final class MemberSelfServiceActivation
             if (! $user instanceof User || ! $employee instanceof Employee || ! $this->eligible($user, $employee)) {
                 return null;
             }
-            $verifier = MemberActivationVerifier::query()
-                ->where('employee_profile_id', $employee->id)->lockForUpdate()->first();
-            if (! $verifier instanceof MemberActivationVerifier
-                || ! $verifier->isUsable()
-                || $verifier->employee_id !== $employee->employee_id) {
+            $record = $this->trustedRecord($employee);
+            if ($record === null) {
+                return null;
+            }
+            $attempt = MemberActivationAttempt::query()->where('employee_profile_id', $employee->id)->lockForUpdate()->first()
+                ?? new MemberActivationAttempt(['employee_profile_id' => $employee->id]);
+            if ($attempt->locked_at !== null) {
                 return null;
             }
 
-            $dobMatches = hash_equals((string) $verifier->dob_digest, $this->digests->dateOfBirth($employee->id, $dateOfBirth));
-            $phoneMatches = hash_equals((string) $verifier->phone_digest, $this->digests->phone($employee->id, $normalizedPhone));
-            if (! $dobMatches || ! $phoneMatches) {
-                $this->recordFailure($verifier, $user, $at);
+            // Evaluate all three so a refusal never reveals which one was wrong.
+            $matches = [
+                hash_equals($record['email'], strtolower(trim($email))),
+                hash_equals($record['shift'], $shift),
+                hash_equals($record['unit'], $unit),
+            ];
+            if (in_array(false, $matches, true)) {
+                $this->recordFailure($attempt, $user, $at);
 
                 return null;
             }
@@ -88,10 +121,16 @@ final class MemberSelfServiceActivation
             } catch (MemberBootstrapStateChanged) {
                 return null;
             }
-            $verifier->forceFill(['dob_digest' => null, 'phone_digest' => null, 'consumed_at' => $at])->save();
+            $attempt->forceFill(['activated_at' => $at])->save();
 
             return $activated;
         }, 3);
+
+        if ($activated instanceof User) {
+            $this->notifyMember($activated);
+        }
+
+        return $activated;
     }
 
     /**
@@ -148,6 +187,43 @@ final class MemberSelfServiceActivation
             || $user->permissions()->exists();
     }
 
+    /**
+     * The answers a member must give. Null when the Hub does not hold a
+     * complete, unambiguous record, which leaves email activation as the route.
+     *
+     * @return array{email:string,shift:string,unit:string}|null
+     */
+    private function trustedRecord(Employee $employee): ?array
+    {
+        $email = strtolower(trim((string) $employee->city_email));
+        $approved = MemberOnboardingRosterBinding::query()
+            ->where('employee_profile_id', $employee->id)
+            ->where('employee_id', $employee->employee_id)
+            ->where('city_email', $email)
+            ->exists();
+        $year = $this->latestBidYear();
+        if ($email === '' || ! $approved || $year === null) {
+            return null;
+        }
+        $assignments = EmployeeBidAssignment::query()
+            ->where('employee_profile_id', $employee->id)
+            ->where('bid_year', $year)->whereNull('superseded_at')->limit(2)->get(['shift_label', 'unit_label']);
+        if ($assignments->count() !== 1) {
+            return null;
+        }
+        $shift = (string) $assignments->first()->getAttribute('shift_label');
+        $unit = (string) $assignments->first()->getAttribute('unit_label');
+
+        return $shift === '' || $unit === '' ? null : ['email' => $email, 'shift' => $shift, 'unit' => $unit];
+    }
+
+    private function latestBidYear(): ?int
+    {
+        $year = EmployeeBidAssignment::query()->whereNull('superseded_at')->max('bid_year');
+
+        return $year === null ? null : (int) $year;
+    }
+
     /** @return array{user_id:int,employee_profile_id:int}|null */
     private function soleIdentity(string $employeeId): ?array
     {
@@ -165,18 +241,43 @@ final class MemberSelfServiceActivation
         return ['user_id' => (int) $linked->first(), 'employee_profile_id' => (int) $employee->id];
     }
 
-    private function recordFailure(MemberActivationVerifier $verifier, User $user, CarbonImmutable $at): void
+    private function recordFailure(MemberActivationAttempt $attempt, User $user, CarbonImmutable $at): void
     {
-        $attempts = $verifier->failed_attempts + 1;
-        $locked = $attempts >= max(1, (int) config('identity.self_service_activation.max_failed_attempts', 10));
-        $verifier->forceFill([
+        $attempts = $attempt->failed_attempts + 1;
+        $locked = $attempts >= max(1, (int) config('identity.self_service_activation.max_failed_attempts', 5));
+        $attempt->forceFill([
             'failed_attempts' => $attempts,
             'last_failed_at' => $at,
             'locked_at' => $locked ? $at : null,
         ])->save();
         $this->audit->record($user, $user, 'member_self_service_activation_denied', 'denied',
             $locked ? 'verification_locked' : 'verification_mismatch',
-            ['employee_profile_id' => $verifier->employee_profile_id, 'failed_attempts' => $attempts],
+            ['employee_profile_id' => $attempt->employee_profile_id, 'failed_attempts' => $attempts],
         );
+    }
+
+    /** Tell the real owner right away, so a claim made by someone else is noticed. */
+    private function notifyMember(User $user): void
+    {
+        $address = strtolower(trim((string) $user->employeeProfile?->city_email));
+        if ($address === '') {
+            return;
+        }
+        try {
+            $this->email->send(
+                to: [$address],
+                subject: 'Your MBFD Hub account was activated',
+                text: "Your MBFD Hub account was just activated and a password was set.\n\nIf this was you, no action is needed.\n\nIf this was NOT you, contact MBFD Hub support right away so the account can be secured.",
+                html: null,
+                sourceType: 'member_self_service_activation',
+                sourceId: (string) $user->id,
+                actor: $user,
+            );
+        } catch (Throwable $exception) {
+            Log::warning('member_self_service_activation_notice_failed', [
+                'user_id' => $user->id,
+                'exception_class' => $exception::class,
+            ]);
+        }
     }
 }

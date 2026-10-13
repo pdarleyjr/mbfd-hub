@@ -10,26 +10,21 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Trusted self-service activation proofs. Date of birth and phone are
-        // stored only as keyed digests and are cleared once the account is claimed.
-        Schema::create('member_activation_verifiers', function (Blueprint $table): void {
+        // Per-member guard for self-service activation: wrong answers are
+        // counted here so guessing locks the path instead of succeeding.
+        Schema::create('member_activation_attempts', function (Blueprint $table): void {
             $table->id();
             $table->foreignId('employee_profile_id')->unique()->constrained('employees')->cascadeOnDelete();
-            $table->string('employee_id');
-            $table->string('dob_digest', 64)->nullable();
-            $table->string('phone_digest', 64)->nullable();
-            $table->string('source_sha256', 64);
-            $table->timestamp('approved_at');
             $table->unsignedSmallInteger('failed_attempts')->default(0);
             $table->timestamp('last_failed_at')->nullable();
             $table->timestamp('locked_at')->nullable();
-            $table->timestamp('consumed_at')->nullable();
+            $table->timestamp('activated_at')->nullable();
             $table->timestamps();
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('member_activation_verifiers');
+        Schema::dropIfExists('member_activation_attempts');
     }
 };

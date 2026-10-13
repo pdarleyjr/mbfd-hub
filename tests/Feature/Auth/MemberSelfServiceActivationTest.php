@@ -7,20 +7,24 @@ namespace Tests\Feature\Auth;
 use App\Enums\AccountStatus;
 use App\Exceptions\MemberBootstrapStateChanged;
 use App\Jobs\IssueMemberOnboardingInvitation;
+use App\Models\CloudflareUsageBudget;
 use App\Models\Employee;
-use App\Models\MemberActivationVerifier;
+use App\Models\EmployeeBidAssignment;
+use App\Models\MemberActivationAttempt;
 use App\Models\MemberOnboardingInvitation;
 use App\Models\MemberOnboardingRosterBinding;
+use App\Models\OutboundEmail;
 use App\Models\SecurityActionEvent;
 use App\Models\User;
 use App\Services\Identity\AccountSecurityService;
 use App\Services\Identity\CityEmailVerificationService;
 use App\Services\Identity\EstablishedAccountIntegritySnapshot;
-use App\Services\Identity\MemberActivationVerifierDigest;
 use App\Services\Identity\MemberSelfServiceActivation;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -39,16 +43,47 @@ final class MemberSelfServiceActivationTest extends TestCase
         config()->set('identity.local_login_enabled', true);
         config()->set('identity.self_service_activation.enabled', true);
         config()->set('identity.self_service_activation.email_request_enabled', true);
+        config()->set('communications.cloudflare.account_id', str_repeat('a', 32));
+        config()->set('communications.cloudflare.api_token', 'member-activation-test-token');
+        $now = CarbonImmutable::now();
+        CloudflareUsageBudget::query()->create([
+            'provider_account_id' => str_repeat('a', 32),
+            'cycle_start' => $now->startOfMonth(),
+            'cycle_end' => $now->addMonth()->startOfMonth(),
+            'provider_chargeable_used' => 0,
+            'provider_daily_quota' => 100,
+            'provider_daily_used' => 0,
+            'hub_safe_ceiling' => 100,
+            'worker_request_threshold' => 9_000_000,
+            'worker_cpu_ms_threshold' => 27_000_000,
+            'reconciled_at' => $now,
+            'provider_daily_reconciled_at' => $now,
+            'worker_requests_used' => 0,
+            'worker_cpu_ms_used' => 0,
+        ]);
+        Http::fake(fn (Request $request) => Http::response([
+            'success' => true,
+            'result' => [
+                'message_id' => 'member-activation-test-message',
+                'delivered' => $request->data()['to'],
+                'queued' => [],
+                'permanent_bounces' => [],
+                'suppressed_recipients' => [],
+            ],
+        ]));
     }
 
     public function test_eligible_member_activates_the_existing_account_and_reaches_the_hub(): void
     {
         $member = $this->pending('SELF-OK');
-        $other = $this->pending('SELF-OTHER');
+        $other = $this->pending('SELF-OTHER', shift: 'B Shift', unit: 'Rescue 2');
         $userCount = User::query()->count();
 
         $this->get('/login')->assertOk()->assertSee('Activate Your Account');
-        $this->get('/activate')->assertOk()->assertSee('Date of birth')->assertHeader('Cache-Control', 'no-store, private');
+        $this->get('/activate')->assertOk()
+            ->assertSee('Shift you bid')->assertSee('A Shift')->assertSee('B Shift')
+            ->assertSee('Engine 1')->assertSee('Rescue 2')
+            ->assertHeader('Cache-Control', 'no-store, private');
         $this->post('/activate', $this->form('SELF-OK'))->assertRedirect('/');
         $this->withCookie((string) config('session.cookie'), $this->app['session.store']->getId());
 
@@ -59,15 +94,12 @@ final class MemberSelfServiceActivationTest extends TestCase
         self::assertFalse($member->must_change_password);
         self::assertFalse($member->bootstrap_onboarding_eligible);
         self::assertNotNull($member->bootstrap_onboarding_completed_at);
-        self::assertNull($member->email_verified_at, 'No mailbox was proven, so the email must stay unverified.');
+        self::assertNull($member->email_verified_at, 'Typing an address proves nothing about the mailbox.');
         self::assertSame(2, $member->security_version);
         self::assertSame(AccountStatus::PendingActivation, $other->fresh()->account_status);
         self::assertDatabaseHas('authentication_sessions', ['user_id' => $member->id, 'revoked_at' => null]);
-        self::assertSame('complete_member_self_service_activation', SecurityActionEvent::query()->latest('id')->value('action'));
-        $verifier = MemberActivationVerifier::query()->where('employee_profile_id', $member->employee_profile_id)->sole();
-        self::assertNotNull($verifier->consumed_at);
-        self::assertNull($verifier->dob_digest);
-        self::assertNull($verifier->phone_digest);
+        self::assertDatabaseHas('security_action_events', ['target_user_id' => $member->id, 'action' => 'complete_member_self_service_activation']);
+        self::assertNotNull(MemberActivationAttempt::query()->where('employee_profile_id', $member->employee_profile_id)->sole()->activated_at);
 
         $this->get('/account')->assertOk();
         $this->assertAuthenticatedAs($member, 'web');
@@ -75,17 +107,25 @@ final class MemberSelfServiceActivationTest extends TestCase
         $this->post('/login', ['employee_id' => 'SELF-OK', 'password' => self::PASSWORD])->assertRedirect('/');
     }
 
-    public function test_phone_formatting_is_normalized_but_a_different_number_is_refused(): void
+    public function test_the_member_is_told_at_their_city_address_that_the_account_was_activated(): void
     {
-        $member = $this->pending('SELF-PHONE');
+        $member = $this->pending('SELF-NOTICE');
 
-        $this->post('/activate', $this->form('SELF-PHONE', ['phone' => '305-555-0199']))
-            ->assertSessionHasErrors('activation');
-        self::assertSame(AccountStatus::PendingActivation, $member->fresh()->account_status);
+        $this->post('/activate', $this->form('SELF-NOTICE', ['email' => '  SELF-NOTICE@MiamiBeachFL.gov ']))->assertRedirect('/');
 
-        $this->post('/activate', $this->form('SELF-PHONE', ['phone' => '+1 (305) 555-0142']))->assertRedirect('/');
+        $notice = OutboundEmail::query()->where('source_type', 'member_self_service_activation')->sole();
+        self::assertSame(['self-notice@miamibeachfl.gov'], $notice->to_recipients);
+        self::assertSame((string) $member->id, $notice->source_id);
+    }
+
+    public function test_a_failed_notice_never_undoes_or_blocks_the_activation(): void
+    {
+        Http::fake(fn () => throw new \RuntimeException('Mail provider unavailable'));
+        $member = $this->pending('SELF-NOTICE-DOWN');
+
+        $this->post('/activate', $this->form('SELF-NOTICE-DOWN'))->assertRedirect('/');
+
         self::assertSame(AccountStatus::Active, $member->fresh()->account_status);
-        self::assertNull($member->fresh()->phone, 'The submitted phone must never be written to the profile.');
     }
 
     public function test_every_refusal_returns_the_same_response(): void
@@ -93,16 +133,18 @@ final class MemberSelfServiceActivationTest extends TestCase
         $this->pending('SELF-GENERIC');
         $active = $this->pending('SELF-ACTIVE');
         $active->forceFill(['account_status' => AccountStatus::Active, 'bootstrap_onboarding_eligible' => false])->save();
-        $noRecords = $this->pending('SELF-NORECORDS', verifier: false);
+        $noBid = $this->pending('SELF-NOBID', bid: false);
+        $noEmail = $this->pending('SELF-NOEMAIL', cityEmail: false);
 
         $messages = [];
         foreach ([
-            $this->form('SELF-GENERIC', ['dob_day' => '15']),
-            $this->form('SELF-GENERIC', ['phone' => '3055550100']),
-            $this->form('SELF-GENERIC', ['phone' => '12']),
-            $this->form('SELF-GENERIC', ['dob_month' => '2', 'dob_day' => '31']),
+            $this->form('SELF-GENERIC', ['email' => 'someone.else@miamibeachfl.gov']),
+            $this->form('SELF-GENERIC', ['shift' => 'B Shift']),
+            $this->form('SELF-GENERIC', ['unit' => 'Rescue 2']),
+            $this->form('SELF-GENERIC', ['unit' => 'Not A Real Unit']),
             $this->form('SELF-ACTIVE'),
-            $this->form('SELF-NORECORDS'),
+            $this->form('SELF-NOBID'),
+            $this->form('SELF-NOEMAIL'),
             $this->form('SELF-DOES-NOT-EXIST'),
         ] as $attempt) {
             $response = $this->from('/activate')->post('/activate', $attempt);
@@ -114,7 +156,42 @@ final class MemberSelfServiceActivationTest extends TestCase
 
         self::assertCount(1, array_unique($messages));
         self::assertSame(AccountStatus::Active, $active->fresh()->account_status);
-        self::assertSame(AccountStatus::PendingActivation, $noRecords->fresh()->account_status);
+        self::assertSame(AccountStatus::PendingActivation, $noBid->fresh()->account_status);
+        self::assertSame(AccountStatus::PendingActivation, $noEmail->fresh()->account_status);
+    }
+
+    public function test_only_the_latest_published_bid_results_are_accepted(): void
+    {
+        $member = $this->pending('SELF-LATEST', shift: 'C Shift', unit: 'Engine 4', bidYear: 2025);
+        $this->bid($member->employeeProfile, 'A Shift', 'Engine 1', 2026);
+
+        $this->get('/activate')->assertOk()->assertSee('Engine 1')->assertDontSee('Engine 4');
+        $this->post('/activate', $this->form('SELF-LATEST', ['shift' => 'C Shift', 'unit' => 'Engine 4']))
+            ->assertSessionHasErrors('activation');
+        self::assertSame(AccountStatus::PendingActivation, $member->fresh()->account_status);
+
+        $this->post('/activate', $this->form('SELF-LATEST'))->assertRedirect('/');
+        self::assertSame(AccountStatus::Active, $member->fresh()->account_status);
+    }
+
+    public function test_a_superseded_bid_result_is_not_accepted(): void
+    {
+        $member = $this->pending('SELF-CORRECTED', shift: 'C Shift', unit: 'Engine 4');
+        EmployeeBidAssignment::query()->where('employee_profile_id', $member->employee_profile_id)->first()->update(['superseded_at' => now()]);
+        $this->bid($member->employeeProfile, 'A Shift', 'Engine 1', 2026);
+
+        $this->post('/activate', $this->form('SELF-CORRECTED', ['shift' => 'C Shift', 'unit' => 'Engine 4']))
+            ->assertSessionHasErrors('activation');
+        $this->post('/activate', $this->form('SELF-CORRECTED'))->assertRedirect('/');
+    }
+
+    public function test_an_email_without_roster_approval_cannot_be_used(): void
+    {
+        $member = $this->pending('SELF-UNAPPROVED');
+        MemberOnboardingRosterBinding::query()->where('employee_profile_id', $member->employee_profile_id)->delete();
+
+        $this->post('/activate', $this->form('SELF-UNAPPROVED'))->assertSessionHasErrors('activation');
+        self::assertSame(AccountStatus::PendingActivation, $member->fresh()->account_status);
     }
 
     public function test_an_activated_account_cannot_be_claimed_or_reset_again(): void
@@ -134,14 +211,12 @@ final class MemberSelfServiceActivationTest extends TestCase
 
     public function test_established_accounts_are_untouched_by_activation_attempts(): void
     {
-        $established = $this->pending('SELF-ESTABLISHED', verifier: false);
+        $established = $this->pending('SELF-ESTABLISHED');
         $established->forceFill([
             'account_status' => AccountStatus::Active,
             'bootstrap_onboarding_eligible' => false,
             'password' => Hash::make('Established-Password!1'),
         ])->save();
-        // Even a stray proof row must never let an active account be claimed.
-        $this->verifier($established->employeeProfile);
         $this->pending('SELF-NEW');
         $snapshots = app(EstablishedAccountIntegritySnapshot::class);
         $before = $snapshots->capture();
@@ -179,36 +254,37 @@ final class MemberSelfServiceActivationTest extends TestCase
         }
     }
 
-    public function test_repeated_wrong_answers_lock_the_proof_until_it_is_reapproved(): void
+    public function test_five_wrong_answers_lock_the_member_to_email_activation(): void
     {
-        config()->set('identity.self_service_activation.max_failed_attempts', 3);
         $member = $this->pending('SELF-LOCK');
         $activation = app(MemberSelfServiceActivation::class);
-        $wrong = CarbonImmutable::create(1985, 6, 15);
-        for ($attempt = 0; $attempt < 3; $attempt++) {
-            self::assertNull($activation->claim('SELF-LOCK', $wrong, '3055550142', Hash::make(self::PASSWORD), CarbonImmutable::now()));
+        $email = 'self-lock@miamibeachfl.gov';
+        for ($attempt = 0; $attempt < 5; $attempt++) {
+            self::assertNull($activation->claim('SELF-LOCK', $email, 'B Shift', 'Engine 1', Hash::make(self::PASSWORD), CarbonImmutable::now()));
         }
 
-        $verifier = MemberActivationVerifier::query()->sole();
-        self::assertSame(3, $verifier->failed_attempts);
-        self::assertNotNull($verifier->locked_at);
-        self::assertNull($activation->claim('SELF-LOCK', CarbonImmutable::create(1985, 6, 14), '3055550142', Hash::make(self::PASSWORD), CarbonImmutable::now()));
+        $record = MemberActivationAttempt::query()->sole();
+        self::assertSame(5, $record->failed_attempts);
+        self::assertNotNull($record->locked_at);
+        self::assertNull($activation->claim('SELF-LOCK', $email, 'A Shift', 'Engine 1', Hash::make(self::PASSWORD), CarbonImmutable::now()));
         self::assertSame(AccountStatus::PendingActivation, $member->fresh()->account_status);
-        self::assertSame(3, SecurityActionEvent::query()->where('action', 'member_self_service_activation_denied')->count());
+        self::assertSame(5, SecurityActionEvent::query()->where('action', 'member_self_service_activation_denied')->count());
         self::assertSame('verification_locked', SecurityActionEvent::query()->latest('id')->value('reason'));
+        self::assertSame('ready', app(\App\Services\Identity\MemberOnboardingInvitationService::class)->assess($member->employeeProfile)['status']);
     }
 
     public function test_requests_are_rate_limited_per_employee_id(): void
     {
+        config()->set('identity.self_service_activation.max_failed_attempts', 50);
         $member = $this->pending('SELF-THROTTLE');
         for ($attempt = 0; $attempt < 5; $attempt++) {
-            $this->post('/activate', $this->form('SELF-THROTTLE', ['dob_year' => '1990']))->assertSessionHasErrors('activation');
+            $this->post('/activate', $this->form('SELF-THROTTLE', ['shift' => 'B Shift']))->assertSessionHasErrors('activation');
         }
 
         $this->post('/activate', $this->form('SELF-THROTTLE'))->assertSessionHasErrors('activation');
         self::assertStringContainsString('Too many attempts', session('errors')->first('activation'));
         self::assertSame(AccountStatus::PendingActivation, $member->fresh()->account_status);
-        self::assertSame(5, MemberActivationVerifier::query()->sole()->failed_attempts);
+        self::assertSame(5, MemberActivationAttempt::query()->sole()->failed_attempts);
     }
 
     public function test_only_one_of_two_competing_claims_can_win(): void
@@ -259,27 +335,19 @@ final class MemberSelfServiceActivationTest extends TestCase
         $this->post('/activate', $this->form('EMAIL-FIRST'))->assertSessionHasErrors('activation');
 
         self::assertSame($hash, $member->fresh()->getRawOriginal('password'));
-        self::assertNull(MemberActivationVerifier::query()->sole()->consumed_at);
+        self::assertDatabaseCount('member_activation_attempts', 0);
     }
 
-    public function test_activated_member_without_a_city_email_is_not_forced_into_email_review(): void
-    {
-        $member = $this->pending('SELF-NOEMAIL', cityEmail: false);
-        self::assertTrue(app(CityEmailVerificationService::class)->requiresReview($member));
-
-        $this->post('/activate', $this->form('SELF-NOEMAIL'))->assertRedirect('/');
-        $this->withCookie((string) config('session.cookie'), $this->app['session.store']->getId());
-
-        self::assertFalse(app(CityEmailVerificationService::class)->requiresReview($member->fresh()));
-        $this->get('/account')->assertOk();
-    }
-
-    public function test_self_service_activation_does_not_grant_email_recovery(): void
+    public function test_activation_does_not_grant_email_recovery_or_force_email_review(): void
     {
         $member = $this->pending('SELF-RECOVERY');
         $this->post('/activate', $this->form('SELF-RECOVERY'))->assertRedirect('/');
+        $this->withCookie((string) config('session.cookie'), $this->app['session.store']->getId());
 
-        self::assertNull(app(CityEmailVerificationService::class)->recoveryAddress($member->fresh()));
+        $cityEmail = app(CityEmailVerificationService::class);
+        self::assertNull($cityEmail->recoveryAddress($member->fresh()));
+        self::assertFalse($cityEmail->requiresReview($member->fresh()));
+        $this->get('/account')->assertOk();
     }
 
     public function test_weak_or_mismatched_passwords_are_rejected_before_any_claim(): void
@@ -288,11 +356,15 @@ final class MemberSelfServiceActivationTest extends TestCase
 
         $this->post('/activate', $this->form('SELF-WEAK', ['password' => 'short', 'password_confirmation' => 'short']))
             ->assertSessionHasErrors('password');
+        self::assertSame(
+            ['employee_id' => 'SELF-WEAK', 'email' => 'self-weak@miamibeachfl.gov', 'shift' => 'A Shift', 'unit' => 'Engine 1'],
+            session()->getOldInput(),
+        );
         $this->post('/activate', $this->form('SELF-WEAK', ['password_confirmation' => 'Different-Password!1']))
             ->assertSessionHasErrors('password');
 
         self::assertSame(AccountStatus::PendingActivation, $member->fresh()->account_status);
-        self::assertSame(0, MemberActivationVerifier::query()->sole()->failed_attempts);
+        self::assertDatabaseCount('member_activation_attempts', 0);
     }
 
     public function test_disabling_the_feature_hides_it_without_affecting_sign_in(): void
@@ -309,13 +381,22 @@ final class MemberSelfServiceActivationTest extends TestCase
         self::assertSame(AccountStatus::PendingActivation, $member->fresh()->account_status);
     }
 
+    public function test_claiming_follows_the_local_login_switch(): void
+    {
+        config()->set('identity.local_login_enabled', false);
+        $member = $this->pending('SELF-NOLOCAL');
+
+        $this->post('/activate', $this->form('SELF-NOLOCAL'))->assertNotFound();
+        self::assertSame(AccountStatus::PendingActivation, $member->fresh()->account_status);
+    }
+
     public function test_email_only_mode_sends_members_to_the_email_request_page(): void
     {
         config()->set('identity.self_service_activation.enabled', false);
 
         $this->get('/login')->assertOk()->assertSee('Activate Your Account');
         $this->get('/activate')->assertRedirect('/activate/email');
-        $this->get('/activate/email')->assertOk()->assertSee('Email my setup link')->assertDontSee('date of birth and phone');
+        $this->get('/activate/email')->assertOk()->assertSee('Email my setup link')->assertDontSee('bid shift and unit');
         $this->post('/activate', $this->form('ANY'))->assertNotFound();
     }
 
@@ -346,7 +427,7 @@ final class MemberSelfServiceActivationTest extends TestCase
         $this->pending('EMAIL-NOBINDING', cityEmail: false);
         $active = $this->pending('EMAIL-ACTIVE');
         $active->forceFill(['account_status' => AccountStatus::Active, 'bootstrap_onboarding_eligible' => false])->save();
-        $eligible = $this->pending('EMAIL-ELIGIBLE');
+        $eligible = $this->pending('EMAIL-ELIGIBLE', bid: false);
 
         $statuses = [];
         foreach (['EMAIL-NOBINDING', 'EMAIL-ACTIVE', 'EMAIL-UNKNOWN', 'EMAIL-ELIGIBLE'] as $employeeId) {
@@ -369,27 +450,6 @@ final class MemberSelfServiceActivationTest extends TestCase
         }
 
         $this->post('/activate/email', ['employee_id' => 'EMAIL-LIMIT'])->assertSessionHasErrors('employee_id');
-    }
-
-    public function test_date_of_birth_and_phone_are_never_flashed_into_the_session(): void
-    {
-        $this->pending('SELF-FLASH');
-
-        $this->post('/activate', $this->form('SELF-FLASH', ['password' => 'short', 'password_confirmation' => 'short']))
-            ->assertSessionHasErrors('password');
-        self::assertSame(['employee_id' => 'SELF-FLASH'], session()->getOldInput());
-
-        $this->post('/activate', $this->form('SELF-FLASH', ['dob_year' => '1990']))->assertSessionHasErrors('activation');
-        self::assertSame(['employee_id' => 'SELF-FLASH'], session()->getOldInput());
-    }
-
-    public function test_claiming_follows_the_local_login_switch(): void
-    {
-        config()->set('identity.local_login_enabled', false);
-        $member = $this->pending('SELF-NOLOCAL');
-
-        $this->post('/activate', $this->form('SELF-NOLOCAL'))->assertNotFound();
-        self::assertSame(AccountStatus::PendingActivation, $member->fresh()->account_status);
     }
 
     public function test_member_requested_email_is_capped_per_member_and_refused_for_privileged_accounts(): void
@@ -442,17 +502,22 @@ final class MemberSelfServiceActivationTest extends TestCase
     {
         return $overrides + [
             'employee_id' => $employeeId,
-            'dob_month' => '6',
-            'dob_day' => '14',
-            'dob_year' => '1985',
-            'phone' => '(305) 555-0142',
+            'email' => strtolower($employeeId).'@miamibeachfl.gov',
+            'shift' => 'A Shift',
+            'unit' => 'Engine 1',
             'password' => self::PASSWORD,
             'password_confirmation' => self::PASSWORD,
         ];
     }
 
-    private function pending(string $employeeId, bool $verifier = true, bool $cityEmail = true): User
-    {
+    private function pending(
+        string $employeeId,
+        bool $cityEmail = true,
+        bool $bid = true,
+        string $shift = 'A Shift',
+        string $unit = 'Engine 1',
+        int $bidYear = 2026,
+    ): User {
         $email = strtolower($employeeId).'@miamibeachfl.gov';
         $employee = Employee::query()->create([
             'employee_id' => $employeeId,
@@ -470,14 +535,14 @@ final class MemberSelfServiceActivationTest extends TestCase
                 'approved_at' => now(),
             ]);
         }
-        if ($verifier) {
-            $this->verifier($employee);
+        if ($bid) {
+            $this->bid($employee, $shift, $unit, $bidYear);
         }
 
         return User::factory()->create([
             'employee_profile_id' => $employee->id,
             'employee_id' => $employeeId,
-            'email' => 'pending-'.strtolower($employeeId).'@canonical.mbfdhub.invalid',
+            'email' => $cityEmail ? $email : 'pending-'.strtolower($employeeId).'@canonical.mbfdhub.invalid',
             'account_status' => AccountStatus::PendingActivation,
             'bootstrap_onboarding_eligible' => true,
             'bootstrap_onboarding_eligible_at' => now(),
@@ -485,17 +550,27 @@ final class MemberSelfServiceActivationTest extends TestCase
         ])->fresh('employeeProfile');
     }
 
-    private function verifier(Employee $employee): MemberActivationVerifier
+    private function bid(Employee $employee, string $shift, string $unit, int $year): EmployeeBidAssignment
     {
-        $digests = app(MemberActivationVerifierDigest::class);
+        $key = 'activation-test-'.$employee->id.'-'.$year.'-'.bin2hex(random_bytes(4));
 
-        return MemberActivationVerifier::query()->create([
+        return EmployeeBidAssignment::query()->create([
             'employee_profile_id' => $employee->id,
-            'employee_id' => $employee->employee_id,
-            'dob_digest' => $digests->dateOfBirth($employee->id, CarbonImmutable::create(1985, 6, 14)),
-            'phone_digest' => $digests->phone($employee->id, '3055550142'),
-            'source_sha256' => str_repeat('b', 64),
-            'approved_at' => now(),
+            'payload_version' => 2,
+            'bid_year' => $year,
+            'term_label' => $year.'–'.($year + 1),
+            'bid_session_id' => 'session-'.$year,
+            'position_id' => 'P-'.$employee->id,
+            'rank_label' => 'Firefighter',
+            'shift_label' => $shift,
+            'station_label' => 'Station 1',
+            'unit_label' => $unit,
+            'bid_selection_label' => $unit,
+            'assignment_source' => 'bid_award',
+            'a_day_label' => 'None',
+            'idempotency_key' => $key,
+            'payload_hash' => hash('sha256', $key),
+            'is_forced' => false,
         ]);
     }
 }

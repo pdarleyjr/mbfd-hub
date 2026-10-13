@@ -10,7 +10,6 @@ use App\Rules\SafeNewPassword;
 use App\Services\Identity\CanonicalLoginDestination;
 use App\Services\Identity\CanonicalSessionIssuer;
 use App\Services\Identity\FederationLoginAttempt;
-use App\Services\Identity\MemberActivationVerifierDigest;
 use App\Services\Identity\MemberSelfServiceActivation;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
@@ -25,7 +24,10 @@ use Throwable;
 
 final class MemberSelfServiceActivationController extends Controller
 {
-    private const FAILURE = 'We could not activate an account with that information. Check your Employee ID, date of birth, and phone number, then try again or use email activation.';
+    private const FAILURE = 'We could not activate an account with that information. Check your Employee ID, City email, and the shift and unit you bid, then try again or use email activation.';
+
+    /** Answers a member should not have to re-enter after a refusal. */
+    private const REMEMBERED = ['employee_id', 'email', 'shift', 'unit'];
 
     private const THROTTLED = 'Too many attempts. Wait a few minutes before trying again, or contact MBFD Hub support.';
 
@@ -48,7 +50,6 @@ final class MemberSelfServiceActivationController extends Controller
     public function store(
         Request $request,
         MemberSelfServiceActivation $activation,
-        MemberActivationVerifierDigest $digests,
         CanonicalSessionIssuer $sessionIssuer,
     ): Response {
         abort_unless($activation->enabled(), 404);
@@ -60,21 +61,18 @@ final class MemberSelfServiceActivationController extends Controller
         }
         $validator = Validator::make($request->all(), [
             'employee_id' => ['required', 'string', 'max:64'],
-            'dob_month' => ['required', 'integer', 'between:1,12'],
-            'dob_day' => ['required', 'integer', 'between:1,31'],
-            'dob_year' => ['required', 'integer', 'between:1900,2100'],
-            'phone' => ['required', 'string', 'max:32'],
+            'email' => ['required', 'string', 'max:254'],
+            'shift' => ['required', 'string', 'max:32'],
+            'unit' => ['required', 'string', 'max:200'],
             'password' => ['required', 'string', 'confirmed', Password::default(), new SafeNewPassword],
         ], [], [
             'employee_id' => 'Employee ID',
-            'dob_month' => 'month',
-            'dob_day' => 'day',
-            'dob_year' => 'year',
-            'phone' => 'phone number',
+            'email' => 'City email',
+            'shift' => 'shift',
+            'unit' => 'unit',
         ]);
         if ($validator->fails()) {
-            // Never flash the date of birth or phone into the session store.
-            return back()->withErrors($validator)->withInput($request->only('employee_id'));
+            return back()->withErrors($validator)->withInput($request->only(self::REMEMBERED));
         }
         $data = $validator->validated();
 
@@ -88,13 +86,10 @@ final class MemberSelfServiceActivationController extends Controller
 
         // Hash before any lookup so every refusal costs the same as a success.
         $passwordHash = Hash::make($data['password']);
-        $now = CarbonImmutable::now();
-        $dateOfBirth = $digests->parseDateOfBirth((int) $data['dob_year'], (int) $data['dob_month'], (int) $data['dob_day'], $now);
-        $phone = $digests->normalizePhone($data['phone']);
         try {
-            $user = $employeeId === '' || $dateOfBirth === null || $phone === null
+            $user = $employeeId === ''
                 ? null
-                : $activation->claim($employeeId, $dateOfBirth, $phone, $passwordHash, $now);
+                : $activation->claim($employeeId, $data['email'], $data['shift'], $data['unit'], $passwordHash, CarbonImmutable::now());
         } catch (Throwable $exception) {
             // Contain failures here so error reporting never receives this form body.
             Log::error('member_self_service_activation_failed', ['exception_class' => $exception::class]);
@@ -171,6 +166,7 @@ final class MemberSelfServiceActivationController extends Controller
 
         return response()->view($view, [
             'loginAttempt' => is_string($loginAttempt) && preg_match('/\A[a-f0-9]{64}\z/', $loginAttempt) === 1 ? $loginAttempt : null,
+            'bidChoices' => $view === 'auth.member-activation' ? $activation->bidChoices() : null,
             'claimEnabled' => $activation->enabled(),
             'emailEnabled' => $activation->emailRequestEnabled(),
         ])->header('Cache-Control', 'no-store, private')->header('Referrer-Policy', 'no-referrer');
@@ -184,7 +180,7 @@ final class MemberSelfServiceActivationController extends Controller
             'source_fingerprint' => hash_hmac('sha256', (string) $request->ip(), (string) config('app.key')),
         ]);
 
-        return back()->withErrors(['activation' => $message])->withInput($request->only('employee_id'));
+        return back()->withErrors(['activation' => $message])->withInput($request->only(self::REMEMBERED));
     }
 
     /** @return array{identity:string,source:string} */

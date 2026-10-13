@@ -23,31 +23,28 @@
         <input id="employee_id" name="employee_id" type="text" maxlength="64" autocomplete="username" autocapitalize="characters" spellcheck="false" value="{{ old('employee_id') }}" required autofocus @error('employee_id') aria-invalid="true" aria-describedby="employee_id-error" @enderror>
         @error('employee_id')<div id="employee_id-error" class="error" role="alert">{{ $message }}</div>@enderror
 
-        <fieldset class="field-group" @if ($errors->hasAny(['dob_month', 'dob_day', 'dob_year'])) aria-describedby="dob-error" @endif>
-            <legend>Date of birth</legend>
-            <div class="field-row">
-                <div>
-                    <label class="field-sub" for="dob_month">Month</label>
-                    <input id="dob_month" name="dob_month" type="text" inputmode="numeric" pattern="[0-9]{1,2}" maxlength="2" placeholder="MM" autocomplete="bday-month" value="{{ old('dob_month') }}" required>
-                </div>
-                <div>
-                    <label class="field-sub" for="dob_day">Day</label>
-                    <input id="dob_day" name="dob_day" type="text" inputmode="numeric" pattern="[0-9]{1,2}" maxlength="2" placeholder="DD" autocomplete="bday-day" value="{{ old('dob_day') }}" required>
-                </div>
-                <div class="field-wide">
-                    <label class="field-sub" for="dob_year">Year</label>
-                    <input id="dob_year" name="dob_year" type="text" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" placeholder="YYYY" autocomplete="bday-year" value="{{ old('dob_year') }}" required>
-                </div>
-            </div>
-        </fieldset>
-        @if ($errors->hasAny(['dob_month', 'dob_day', 'dob_year']))
-            <div id="dob-error" class="error" role="alert">Enter your date of birth as month, day, and four-digit year.</div>
-        @endif
+        <label for="email">City email</label>
+        <input id="email" name="email" type="email" inputmode="email" maxlength="254" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="name@miamibeachfl.gov" value="{{ old('email') }}" required @error('email') aria-invalid="true" aria-describedby="email-error" @enderror>
+        @error('email')<div id="email-error" class="error" role="alert">{{ $message }}</div>@enderror
 
-        <label for="phone">Personal phone number</label>
-        <input id="phone" name="phone" type="tel" inputmode="tel" maxlength="32" autocomplete="tel-national" aria-describedby="phone-hint" value="{{ old('phone') }}" required @error('phone') aria-invalid="true" @enderror>
-        <div id="phone-hint" class="hint">The number the department has on file for you.</div>
-        @error('phone')<div class="error" role="alert">{{ $message }}</div>@enderror
+        <label for="shift">Shift you bid</label>
+        <select id="shift" name="shift" required aria-describedby="bid-hint" @error('shift') aria-invalid="true" @enderror>
+            <option value="" @selected(old('shift') === null)>Select your shift</option>
+            @foreach ($bidChoices['shifts'] as $shift)
+                <option value="{{ $shift }}" @selected(old('shift') === $shift)>{{ $shift }}</option>
+            @endforeach
+        </select>
+        @error('shift')<div class="error" role="alert">{{ $message }}</div>@enderror
+
+        <label for="unit">Unit you bid</label>
+        <select id="unit" name="unit" required aria-describedby="bid-hint" @error('unit') aria-invalid="true" @enderror>
+            <option value="" @selected(old('unit') === null)>Select your unit</option>
+            @foreach ($bidChoices['units'] as $unit)
+                <option value="{{ $unit }}" @selected(old('unit') === $unit)>{{ $unit }}</option>
+            @endforeach
+        </select>
+        <div id="bid-hint" class="hint">Use your most recent bid results, even if you have not moved yet.</div>
+        @error('unit')<div class="error" role="alert">{{ $message }}</div>@enderror
 
         <label for="password">Create a password</label>
         <input id="password" name="password" type="password" maxlength="72" autocomplete="new-password" aria-describedby="password-hint" required @error('password') aria-invalid="true" @enderror>

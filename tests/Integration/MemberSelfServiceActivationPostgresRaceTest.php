@@ -6,12 +6,10 @@ namespace Tests\Integration;
 
 use App\Enums\AccountStatus;
 use App\Models\Employee;
-use App\Models\MemberActivationVerifier;
+use App\Models\EmployeeBidAssignment;
 use App\Models\MemberOnboardingInvitation;
 use App\Models\MemberOnboardingRosterBinding;
 use App\Models\User;
-use App\Services\Identity\MemberActivationVerifierDigest;
-use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use PHPUnit\Framework\Attributes\Group;
@@ -24,8 +22,9 @@ final class MemberSelfServiceActivationPostgresRaceTest extends TestCase
     private const CLAIM = <<<'PHP'
 $user = app(App\Services\Identity\MemberSelfServiceActivation::class)->claim(
     getenv('RACE_EMPLOYEE_NUMBER'),
-    Carbon\CarbonImmutable::create(1985, 6, 14),
-    '3055550142',
+    getenv('RACE_EMAIL'),
+    'A Shift',
+    'Engine 1',
     Illuminate\Support\Facades\Hash::make('claim-'.getenv('RACE_WORKER')),
     Carbon\CarbonImmutable::now(),
 );
@@ -153,6 +152,7 @@ PHP;
             'RACE_USER_ID' => (string) $user->id,
             'RACE_EMPLOYEE_ID' => (string) $employee->id,
             'RACE_EMPLOYEE_NUMBER' => $employee->employee_id,
+            'RACE_EMAIL' => (string) $employee->city_email,
             'SystemRoot' => (string) getenv('SystemRoot'),
             'WINDIR' => (string) getenv('WINDIR'),
         ] + $_ENV);
@@ -185,14 +185,24 @@ PHP;
             'source_sha256' => str_repeat('a', 64),
             'approved_at' => now(),
         ]);
-        $digests = app(MemberActivationVerifierDigest::class);
-        MemberActivationVerifier::query()->create([
+        // A far-future year keeps this the latest result in a shared test database.
+        EmployeeBidAssignment::query()->create([
             'employee_profile_id' => $employee->id,
-            'employee_id' => $employee->employee_id,
-            'dob_digest' => $digests->dateOfBirth($employee->id, CarbonImmutable::create(1985, 6, 14)),
-            'phone_digest' => $digests->phone($employee->id, '3055550142'),
-            'source_sha256' => str_repeat('b', 64),
-            'approved_at' => now(),
+            'payload_version' => 2,
+            'bid_year' => 2099,
+            'term_label' => '2099–2100',
+            'bid_session_id' => 'race-'.$suffix,
+            'position_id' => 'P-'.$suffix,
+            'rank_label' => 'Firefighter',
+            'shift_label' => 'A Shift',
+            'station_label' => 'Station 1',
+            'unit_label' => 'Engine 1',
+            'bid_selection_label' => 'Engine 1',
+            'assignment_source' => 'bid_award',
+            'a_day_label' => 'None',
+            'idempotency_key' => 'race-'.$suffix,
+            'payload_hash' => hash('sha256', $suffix),
+            'is_forced' => false,
         ]);
 
         return [$user, $employee];
@@ -204,7 +214,9 @@ PHP;
         DB::table('authentication_sessions')->where('user_id', $user->id)->delete();
         DB::table('member_onboarding_invitations')->where('user_id', $user->id)->delete();
         DB::table('member_onboarding_roster_bindings')->where('employee_profile_id', $employee->id)->delete();
-        DB::table('member_activation_verifiers')->where('employee_profile_id', $employee->id)->delete();
+        DB::table('member_activation_attempts')->where('employee_profile_id', $employee->id)->delete();
+        DB::table('outbound_emails')->where('source_type', 'member_self_service_activation')->where('source_id', (string) $user->id)->delete();
+        DB::table('employee_bid_assignments')->where('employee_profile_id', $employee->id)->delete();
         DB::table('users')->where('id', $user->id)->delete();
         DB::table('employees')->where('id', $employee->id)->delete();
     }

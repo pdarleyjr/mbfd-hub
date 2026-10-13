@@ -20,13 +20,13 @@ return [
         'password_hash' => env('MBFD_MEMBER_BOOTSTRAP_PASSWORD_HASH'),
         'session_ttl_seconds' => 900,
     ],
-    // First-time account claiming from trusted personnel records (Employee ID,
-    // date of birth, phone). Both switches fail closed; turning them off never
-    // affects accounts that are already active.
+    // First-time account claiming from records the Hub already holds (Employee
+    // ID, approved City email, latest bid shift and unit). Both switches fail
+    // closed; turning them off never affects accounts that are already active.
     'self_service_activation' => [
         'enabled' => env('MBFD_SELF_SERVICE_ACTIVATION_ENABLED', false),
         'email_request_enabled' => env('MBFD_MEMBER_EMAIL_ACTIVATION_REQUEST_ENABLED', false),
-        'max_failed_attempts' => 10,
+        'max_failed_attempts' => 5,
     ],
     'canary_user_ids' => array_values(array_filter(array_map(
         static fn (string $value): ?int => ctype_digit(trim($value)) ? (int) trim($value) : null,

@@ -35,10 +35,8 @@
     a.help { display: flex; align-items: center; justify-content: center; min-height: 44px; }
     .identity-narrow { max-width: 26rem; }
     .hint { margin-top: .35rem; color: rgb(var(--hub-muted)); font-size: .9rem; }
-    .field-group { margin: 1rem 0 0; padding: 0; border: 0; min-width: 0; }
-    .field-group legend { padding: 0; font-weight: 700; }
-    .field-row { display: grid; grid-template-columns: 1fr 1fr 1.5fr; gap: .75rem; }
-    .field-sub { margin-top: .4rem; font-size: .9rem; font-weight: 400; color: rgb(var(--hub-muted)); }
+    select { width: 100%; min-height: 44px; margin-top: .4rem; padding: .75rem; border: 1px solid rgb(var(--hub-n-400)); border-radius: var(--hub-radius-control); background-color: rgb(var(--hub-well)); color: rgb(var(--hub-ink)); font: inherit; }
+    select:focus { outline: 3px solid rgb(var(--hub-focus)); outline-offset: 2px; }
     .identity-secondary { display: flex; align-items: center; justify-content: center; min-height: 44px; margin-top: 1.25rem; padding: .75rem; border: 1px solid rgb(var(--hub-blue)); border-radius: var(--hub-radius-control); color: rgb(var(--hub-blue)); font-weight: 700; text-align: center; text-decoration: none; }
     .identity-secondary:hover { background: rgb(var(--hub-well)); }
 </style>

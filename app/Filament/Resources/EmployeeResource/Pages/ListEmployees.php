@@ -8,7 +8,7 @@ use App\Enums\AccountStatus;
 use App\Filament\Resources\EmployeeResource;
 use App\Jobs\IssueMemberOnboardingInvitation;
 use App\Models\Employee;
-use App\Models\MemberActivationVerifier;
+use App\Models\MemberActivationAttempt;
 use App\Models\MemberOnboardingInvitation;
 use App\Models\User;
 use App\Services\Identity\MemberOnboardingInvitationService;
@@ -231,16 +231,13 @@ class ListEmployees extends ListRecords
             .$this->selfServiceActivationStatus());
     }
 
-    /** Counts only; the verification records themselves are never shown anywhere. */
     private function selfServiceActivationStatus(): string
     {
-        $verifiers = MemberActivationVerifier::query();
-        $ready = (clone $verifiers)->whereNull('consumed_at')->whereNull('locked_at')->count();
-        $locked = (clone $verifiers)->whereNull('consumed_at')->whereNotNull('locked_at')->count();
-        $activated = (clone $verifiers)->whereNotNull('consumed_at')->count();
+        $locked = MemberActivationAttempt::query()->whereNull('activated_at')->whereNotNull('locked_at')->count();
+        $activated = MemberActivationAttempt::query()->whereNotNull('activated_at')->count();
         $state = config('identity.self_service_activation.enabled') ? 'on' : 'off';
 
-        return '<p>Self-service activation ('.$state.') — records on file: '.$ready.'; locked after wrong answers: '.$locked.'; activated: '.$activated.'. Members without a record, or locked, use an email invitation.</p>';
+        return '<p>Self-service activation ('.$state.') — activated: '.$activated.'; locked after wrong answers: '.$locked.'. Locked members, and members without bid results or an approved City email, use an email invitation.</p>';
     }
 
     public function previewSelectedInvitations(Collection $records): array
