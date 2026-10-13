@@ -34,7 +34,7 @@
 
     --hub-ink: 15 23 42;
     --hub-ink-secondary: 51 65 85;
-    --hub-muted: 100 116 139;
+    --hub-muted: 86 101 121;
     --hub-muted-soft: 148 163 184;
 
     --hub-success: 4 120 87;
@@ -126,7 +126,7 @@ body:has(.identity-strip, .fi-simple-layout) {
     --hub-n-100: 232 236 241;
     --hub-n-200: 220 226 232;
     --hub-n-400: 133 147 163;
-    --hub-n-500: 100 116 139;
+    --hub-n-500: 86 101 121;
     --hub-n-600: 71 85 105;
     --hub-n-800: 30 41 59;
     --hub-n-900: 15 23 42;

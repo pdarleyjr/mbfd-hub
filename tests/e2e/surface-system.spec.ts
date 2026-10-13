@@ -26,6 +26,17 @@ const landingPages = [
   '/employee/my-requests',
   '/training',
   '/workgroups',
+  // Standalone pages, settings and create forms that the route inventory flagged for muted text on grey.
+  '/updates',
+  '/account',
+  '/support/issues',
+  '/support/issues/create',
+  '/admin/settings',
+  '/admin/knowledge-base',
+  '/training/settings',
+  '/workgroups/profile',
+  '/admin/employees/create',
+  '/admin/users/create',
 ];
 
 async function open(page: Page, path: string): Promise<void> {
@@ -112,4 +123,18 @@ test.describe('surface system', () => {
     expect(after).toEqual(before);
     expect(after.transform).toBe('none');
   });
+});
+
+test.describe('signed-out standalone pages', () => {
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  for (const path of ['/login', '/forgot-password', '/security-standards']) {
+    test(`${path}: no colour-contrast violations`, async ({ page }) => {
+      await page.goto(path, { waitUntil: 'load' });
+      await page.evaluate(() => document.fonts.ready.then(() => undefined));
+      const result = await new AxeBuilder({ page }).withRules(['color-contrast']).analyze();
+      const summary = result.violations.flatMap(violation => violation.nodes.map(node => `${node.target.join(' ')} :: ${node.any[0]?.message ?? violation.help}`));
+      expect(summary, `${path} contrast:\n${summary.join('\n')}`).toEqual([]);
+    });
+  }
 });

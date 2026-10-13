@@ -1,5 +1,5 @@
 <div class="space-y-4">
-    @forelse($getRecord()->updates()->withTrashed()->orderBy('created_at', 'desc')->get() as $update)
+    @forelse($getRecord()->updates()->orderBy('created_at', 'desc')->get() as $update)
         <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
             <div class="flex items-start justify-between">
                 <div class="flex items-center gap-2">

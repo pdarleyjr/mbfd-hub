@@ -163,7 +163,7 @@
     color: rgb(var(--hub-n-600));
 }
 
-/* Secondary text on glass is #475569; the muted slate (#64748B) is only 4.2:1 there. */
+/* Secondary text on glass is #475569; muted text (n-500, #566579) stays above 4.5:1 on glass and wells. */
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-wi-stats-overview-stat-label {
     color: rgb(var(--hub-n-600));
 }
