@@ -163,7 +163,7 @@
     color: rgb(var(--hub-n-600));
 }
 
-/* Secondary text on glass is #475569; the muted slate (#64748B) is only 4.2:1 there. */
+/* Secondary text on glass is #475569; muted text (n-500, #566579) stays above 4.5:1 on glass and wells. */
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-wi-stats-overview-stat-label {
     color: rgb(var(--hub-n-600));
 }
@@ -189,6 +189,11 @@
 
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-btn:is(.fi-btn-size-xs, .fi-btn-size-sm) {
     min-height: 2rem;
+}
+
+/* Buttons that ask for a 44px target (the contextual Back button) keep it with a mouse too. */
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-btn:is(.min-h-11, .min-h-12) {
+    min-height: 2.75rem;
 }
 
 @media (pointer: coarse) {

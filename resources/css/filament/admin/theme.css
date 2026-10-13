@@ -1032,7 +1032,7 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
 
 .wg-group-count {
     font-weight: 400;
-    color: rgb(var(--hub-muted-soft));
+    color: rgb(var(--hub-n-600));
     text-transform: none;
     letter-spacing: normal;
 }
@@ -1319,7 +1319,7 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
 /* SAVER column colors */
 .wg-saver-s { color: #6D28D9; }
 .wg-saver-a { color: #2563EB; }
-.wg-saver-v { color: #059669; }
+.wg-saver-v { color: rgb(var(--hub-success)); }
 .wg-saver-e { color: rgb(var(--hub-warning)); }
 .wg-saver-r { color: rgb(var(--hub-danger)); }
 

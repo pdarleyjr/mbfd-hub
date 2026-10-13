@@ -1,5 +1,12 @@
+@php
+    // Training todo updates are soft-deleted and stay visible as trashed; plain todo updates are not.
+    $updatesQuery = $getRecord()->updates();
+    if (in_array(\Illuminate\Database\Eloquent\SoftDeletes::class, class_uses_recursive($updatesQuery->getRelated()), true)) {
+        $updatesQuery = $updatesQuery->withTrashed();
+    }
+@endphp
 <div class="space-y-4">
-    @forelse($getRecord()->updates()->withTrashed()->orderBy('created_at', 'desc')->get() as $update)
+    @forelse($updatesQuery->orderBy('created_at', 'desc')->get() as $update)
         <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
             <div class="flex items-start justify-between">
                 <div class="flex items-center gap-2">
