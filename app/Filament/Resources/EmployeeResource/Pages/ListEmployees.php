@@ -8,6 +8,7 @@ use App\Enums\AccountStatus;
 use App\Filament\Resources\EmployeeResource;
 use App\Jobs\IssueMemberOnboardingInvitation;
 use App\Models\Employee;
+use App\Models\MemberActivationAttempt;
 use App\Models\MemberOnboardingInvitation;
 use App\Models\User;
 use App\Services\Identity\MemberOnboardingInvitationService;
@@ -226,7 +227,17 @@ class ListEmployees extends ListRecords
 
         return new HtmlString('<p>Notification jobs awaiting work: <strong>'.$queueDepth.'</strong> (includes other notifications). Invitation records appear as sends begin.</p>'
             .'<p>Email delivery — preparing: '.$delivery['preparing'].'; provider processing: '.$delivery['processing'].'; delivered: '.$delivery['delivered'].'; failed: '.$delivery['failed'].'; needs review: '.$delivery['review'].'.</p>'
-            .'<p>Accounts — awaiting activation: '.$accounts['awaiting'].'; link redeemed: '.$accounts['redeemed'].'; expired: '.$accounts['expired'].'; activated: '.$accounts['activated'].'.</p>');
+            .'<p>Accounts — awaiting activation: '.$accounts['awaiting'].'; link redeemed: '.$accounts['redeemed'].'; expired: '.$accounts['expired'].'; activated: '.$accounts['activated'].'.</p>'
+            .$this->selfServiceActivationStatus());
+    }
+
+    private function selfServiceActivationStatus(): string
+    {
+        $locked = MemberActivationAttempt::query()->whereNull('activated_at')->whereNotNull('locked_at')->count();
+        $activated = MemberActivationAttempt::query()->whereNotNull('activated_at')->count();
+        $state = config('identity.self_service_activation.enabled') ? 'on' : 'off';
+
+        return '<p>Self-service activation ('.$state.') — activated: '.$activated.'; locked after wrong answers: '.$locked.'. Locked members, and members without bid results or an approved City email, use an email invitation.</p>';
     }
 
     public function previewSelectedInvitations(Collection $records): array

@@ -15,6 +15,7 @@ use App\Http\Controllers\Auth\CityEmailController;
 use App\Http\Controllers\Auth\EmployeePasswordResetController;
 use App\Http\Controllers\Auth\MemberBootstrapOnboardingController;
 use App\Http\Controllers\Auth\MemberOnboardingInvitationController;
+use App\Http\Controllers\Auth\MemberSelfServiceActivationController;
 use App\Http\Controllers\DepartmentUpdateController;
 use App\Http\Controllers\Employee\OperationalForms\EmployeeLookupController;
 use App\Http\Controllers\Employee\OperationalForms\FormDocumentController;
@@ -115,6 +116,14 @@ Route::prefix('member-onboarding')->name('member-onboarding.')->group(function (
     Route::post('/', [MemberBootstrapOnboardingController::class, 'store'])
         ->middleware('throttle:6,1')->name('store');
     Route::post('/cancel', [MemberBootstrapOnboardingController::class, 'cancel'])->name('cancel');
+});
+Route::prefix('activate')->name('member-activation.')->group(function (): void {
+    Route::get('/', [MemberSelfServiceActivationController::class, 'show'])->name('show');
+    Route::post('/', [MemberSelfServiceActivationController::class, 'store'])
+        ->middleware('throttle:10,1')->name('store');
+    Route::get('/email', [MemberSelfServiceActivationController::class, 'email'])->name('email');
+    Route::post('/email', [MemberSelfServiceActivationController::class, 'requestEmail'])
+        ->middleware('throttle:6,1')->name('email.request');
 });
 Route::get('/auth/identity', [AuthentikLoginController::class, 'redirect'])
     ->middleware('throttle:30,1')

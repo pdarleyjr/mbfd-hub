@@ -11,6 +11,7 @@ use App\Services\Identity\CanonicalLoginDestination;
 use App\Services\Identity\CanonicalSessionIssuer;
 use App\Services\Identity\CanonicalUserResolver;
 use App\Services\Identity\FederationLoginAttempt;
+use App\Services\Identity\MemberSelfServiceActivation;
 use App\Services\Identity\SessionRegistry;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
@@ -31,6 +32,7 @@ final class CanonicalLoginController extends Controller
     public function create(
         Request $request,
         FederationLoginAttempt $attempts,
+        MemberSelfServiceActivation $activation,
     ): View|Response {
         if ($attempts->requested($request) && $attempts->current($request) === null) {
             return $attempts->unavailable($request);
@@ -46,6 +48,9 @@ final class CanonicalLoginController extends Controller
             'loginAction' => $attempts->requested($request) ? $attempts->loginUrl($request) : route('login.store'),
             'loginAttempt' => $attempts->requested($request) ? $request->query('login_attempt') : null,
             'applicationLabel' => $attempts->requested($request) ? $attempts->applicationLabel($request) : null,
+            'activationUrl' => $activation->enabled() || $activation->emailRequestEnabled()
+                ? route('member-activation.show', $attempts->requested($request) ? ['login_attempt' => $request->query('login_attempt')] : [])
+                : null,
         ]);
     }
 
