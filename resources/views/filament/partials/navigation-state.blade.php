@@ -21,5 +21,28 @@
                 // Storage can be unavailable; Filament retains its defaults.
             }
         })();
+
+        // Keep the native Filament toggle preference within each viewport band, for every panel.
+        // A phone starts with the drawer closed; moving to a wide desktop starts with an open sidebar.
+        // (Filament's own default is open, which covered most of a phone on a first visit.)
+        (() => {
+            const viewportKey = 'mbfd-sidebar-viewport';
+            const updateViewport = () => {
+                try {
+                    const viewport = window.innerWidth >= 1280 ? 'wide' : window.innerWidth >= 1024 ? 'rail' : 'drawer';
+                    if (localStorage.getItem(viewportKey) === viewport) return;
+                    const isOpen = viewport === 'wide';
+                    localStorage.setItem('isOpen', JSON.stringify(isOpen));
+                    localStorage.setItem(viewportKey, viewport);
+                    const sidebar = window.Alpine?.store('sidebar');
+                    if (sidebar) sidebar.isOpen = isOpen;
+                } catch {
+                    // Storage can be unavailable; Filament retains its defaults.
+                }
+            };
+            updateViewport();
+            window.matchMedia('(min-width: 1024px)').addEventListener('change', updateViewport);
+            window.matchMedia('(min-width: 1280px)').addEventListener('change', updateViewport);
+        })();
     </script>
 @endif

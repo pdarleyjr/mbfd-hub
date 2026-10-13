@@ -13,6 +13,8 @@ class MyRequestsPage extends Page
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
 
+    protected static ?string $navigationGroup = 'My work';
+
     protected static string $view = 'filament.employee.pages.my-requests';
 
     protected static ?string $title = 'My Requests';

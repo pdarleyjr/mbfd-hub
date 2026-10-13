@@ -1,0 +1,518 @@
+/*
+ * Equipment Intake page (resources/views/filament/admin/pages/equipment-intake.blade.php).
+ *
+ * Every colour, radius and shadow comes from the MBFD Hub tokens declared in
+ * resources/css/mbfd-theme.css. All selectors are scoped under .ei-page so
+ * nothing leaks into the rest of the admin panel. Light only.
+ *
+ * Surfaces: .ei-card is level-1 glass (no blur, no lift); controls, rows and the
+ * upload zone are level-2 white wells and never sit on another glass layer.
+ */
+
+.ei-page {
+    min-width: 0;
+    max-width: 100%;
+    color: rgb(var(--hub-n-900));
+}
+
+.ei-page :focus-visible {
+    outline: 2px solid rgb(var(--hub-focus));
+    outline-offset: 2px;
+}
+
+/* ---------- Tabs ---------- */
+.ei-page .ei-tabs {
+    display: flex;
+    overflow-x: auto;
+    margin-bottom: -1px;
+    border-bottom: 1px solid rgb(var(--hub-glass-border));
+    max-width: 100%;
+}
+
+.ei-page .ei-tab-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-height: 48px;
+    padding: 0.75rem 1rem;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: none;
+    color: rgb(var(--hub-n-600));
+    font-size: 0.875rem;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: color var(--hub-duration-fast), border-color var(--hub-duration-fast);
+}
+
+.ei-page .ei-tab-btn:hover {
+    color: rgb(var(--hub-n-900));
+}
+
+.ei-page .ei-tab-btn.active {
+    border-bottom-color: rgb(var(--hub-blue));
+    color: rgb(var(--hub-blue));
+    font-weight: 600;
+}
+
+.ei-page .ei-tab-btn svg {
+    width: 1.25rem;
+    height: 1.25rem;
+    flex-shrink: 0;
+}
+
+/* ---------- Glass card (level 1) ---------- */
+.ei-page .ei-card {
+    min-width: 0;
+    padding: 1rem;
+    border: 1px solid rgb(var(--hub-glass-border));
+    border-radius: var(--hub-radius-card);
+    background: rgb(var(--hub-glass) / var(--hub-glass-alpha));
+    box-shadow: var(--hub-glass-highlight), var(--hub-shadow-card);
+}
+
+@media (min-width: 640px) {
+    .ei-page .ei-card { padding: 1.5rem; }
+}
+
+.ei-page .ei-title {
+    margin: 0;
+    color: rgb(var(--hub-n-900));
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+.ei-page .ei-title--tight { margin-bottom: 0.25rem; }
+.ei-page .ei-title--loose { margin-bottom: 1rem; }
+
+.ei-page .ei-lede {
+    margin: 0 0 1rem;
+    color: rgb(var(--hub-n-600));
+    font-size: 0.875rem;
+}
+
+.ei-page .ei-text-secondary {
+    color: rgb(var(--hub-n-600));
+    font-size: 0.875rem;
+}
+
+.ei-page .ei-help {
+    color: rgb(var(--hub-n-600));
+}
+
+.ei-page .ei-required {
+    color: rgb(var(--hub-danger));
+}
+
+/* ---------- Form labels and controls (level 2 wells) ---------- */
+.ei-page .ei-label {
+    display: block;
+    margin-bottom: 0.25rem;
+    color: rgb(var(--hub-n-800));
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.ei-page .ei-label--sm {
+    color: rgb(var(--hub-n-600));
+    font-size: 0.75rem;
+}
+
+.ei-page .ei-control {
+    display: block;
+    width: 100%;
+    min-height: 44px;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid rgb(var(--hub-control-border));
+    border-radius: var(--hub-radius-control);
+    background-color: rgb(var(--hub-well));
+    color: rgb(var(--hub-n-900));
+    font-size: 1rem;
+    box-shadow: none;
+}
+
+.ei-page .ei-control::placeholder {
+    color: rgb(var(--hub-n-500));
+}
+
+.ei-page .ei-control:focus {
+    border-color: rgb(var(--hub-focus));
+    outline: 2px solid rgb(var(--hub-focus));
+    outline-offset: 0;
+}
+
+.ei-page .ei-control--narrow { max-width: 20rem; }
+.ei-page .ei-control--compact { min-height: 40px; }
+
+@media (pointer: coarse) {
+    .ei-page .ei-control--compact { min-height: 44px; }
+}
+
+/* ---------- Buttons ---------- */
+.ei-page .ei-btn-primary,
+.ei-page .ei-btn-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    min-height: 48px;
+    padding: 0.875rem 1.5rem;
+    border-radius: var(--hub-radius-control);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    text-align: center;
+    cursor: pointer;
+    transition: background-color var(--hub-duration-fast), border-color var(--hub-duration-fast);
+}
+
+.ei-page .ei-btn-primary {
+    border: 1px solid transparent;
+    background: rgb(var(--hub-blue));
+    color: rgb(var(--hub-n-0));
+}
+
+.ei-page .ei-btn-primary:hover { background: rgb(var(--hub-blue-hover)); }
+.ei-page .ei-btn-primary:active { background: rgb(var(--hub-blue-pressed)); }
+
+.ei-page .ei-btn-primary.ei-btn-success { background: rgb(var(--hub-success)); }
+.ei-page .ei-btn-primary.ei-btn-success:hover { background: rgb(var(--hub-success)); filter: brightness(0.92); }
+
+.ei-page .ei-btn-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.ei-page .ei-btn-secondary {
+    border: 1px solid rgb(var(--hub-control-border));
+    background: rgb(var(--hub-well));
+    color: rgb(var(--hub-n-800));
+}
+
+.ei-page .ei-btn-secondary:hover { background: rgb(var(--hub-n-50)); }
+.ei-page .ei-btn-secondary.ei-btn-muted { color: rgb(var(--hub-n-600)); }
+
+@media (min-width: 640px) {
+    .ei-page .ei-btn-primary,
+    .ei-page .ei-btn-secondary { width: auto; }
+}
+
+.ei-page .ei-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 0.25rem;
+    border: 0;
+    background: none;
+    color: rgb(var(--hub-blue));
+    font-size: 0.875rem;
+    cursor: pointer;
+}
+
+.ei-page .ei-link:hover { text-decoration: underline; }
+.ei-page .ei-link--strong { font-weight: 500; }
+.ei-page .ei-link--success { color: rgb(var(--hub-success)); font-weight: 500; }
+.ei-page .ei-link--muted { color: rgb(var(--hub-n-600)); }
+
+.ei-page .ei-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: var(--hub-radius-control);
+    background: none;
+    color: rgb(var(--hub-n-600));
+    cursor: pointer;
+}
+
+.ei-page .ei-icon-btn:hover {
+    background: rgb(var(--hub-n-50));
+    color: rgb(var(--hub-danger));
+}
+
+/* ---------- Icons ---------- */
+.ei-page .ei-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+}
+
+.ei-page .ei-icon--xs { width: 16px; height: 16px; }
+.ei-page .ei-icon--sm { width: 18px; height: 18px; margin-top: 1px; }
+.ei-page .ei-icon--lg { width: 24px; height: 24px; }
+.ei-page .ei-icon--xl { width: 28px; height: 28px; }
+.ei-page .ei-icon--hero { width: 48px; height: 48px; }
+.ei-page .ei-icon--muted { color: rgb(var(--hub-n-500)); }
+
+.ei-page .ei-file-input { display: none; }
+
+/* ---------- Capture thumbnails ---------- */
+.ei-page .ei-thumb-wrap { position: relative; }
+
+.ei-page .ei-thumb {
+    display: block;
+    width: 80px;
+    height: 80px;
+    border-radius: var(--hub-radius-control);
+    object-fit: cover;
+}
+
+.ei-page .ei-thumb-remove {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: rgb(var(--hub-danger));
+    color: rgb(var(--hub-n-0));
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+}
+
+@media (pointer: coarse) {
+    /* Grow the hit area to 44px without changing the visible 22px badge. */
+    .ei-page .ei-thumb-remove::after {
+        content: "";
+        position: absolute;
+        inset: -11px;
+    }
+}
+
+.ei-page .ei-thumb-badge {
+    position: absolute;
+    right: 4px;
+    bottom: 4px;
+    padding: 1px 5px;
+    border-radius: var(--hub-radius-sm);
+    background: rgb(var(--hub-n-900) / 0.65);
+    color: rgb(var(--hub-n-0));
+    font-size: 12px;
+}
+
+/* ---------- Alerts and status (text always accompanies colour) ---------- */
+.ei-page .ei-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    border: 1px solid transparent;
+    border-radius: var(--hub-radius-control);
+    font-size: 0.875rem;
+    overflow-wrap: anywhere;
+}
+
+.ei-page .ei-alert--danger {
+    border-color: rgb(var(--hub-danger-border));
+    background: rgb(var(--hub-danger-bg));
+    color: rgb(var(--hub-danger));
+}
+
+.ei-page .ei-alert--success {
+    align-items: center;
+    padding: 1rem;
+    border-color: rgb(var(--hub-success-border));
+    background: rgb(var(--hub-success-bg));
+    color: rgb(var(--hub-success));
+}
+
+.ei-page .ei-processing {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    color: rgb(var(--hub-blue));
+}
+
+.ei-page .ei-done {
+    color: rgb(var(--hub-success));
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+/* ---------- Upload zone (white well, dashed edge) ---------- */
+.ei-page .ei-upload-zone {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 2rem 1rem;
+    border: 2px dashed rgb(var(--hub-control-border));
+    border-radius: var(--hub-radius-card);
+    background: rgb(var(--hub-well));
+    text-align: center;
+    cursor: pointer;
+    transition: border-color var(--hub-duration-fast), background-color var(--hub-duration-fast);
+}
+
+.ei-page .ei-upload-zone:hover {
+    border-color: rgb(var(--hub-blue));
+    background: rgb(var(--hub-blue-tint));
+}
+
+.ei-page .ei-upload-zone svg { color: rgb(var(--hub-n-500)); }
+.ei-page .ei-upload-zone p { margin: 0; }
+.ei-page .ei-upload-zone .ei-upload-title {
+    color: rgb(var(--hub-n-800));
+    font-size: 1rem;
+    font-weight: 600;
+}
+.ei-page .ei-upload-zone .ei-upload-hint {
+    margin-top: 0.25rem;
+    color: rgb(var(--hub-n-600));
+    font-size: 0.875rem;
+}
+
+/* ---------- Progress ---------- */
+.ei-page .ei-progress-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+}
+
+.ei-page .ei-progress-bar {
+    height: 0.5rem;
+    overflow: hidden;
+    border-radius: 9999px;
+    background: rgb(var(--hub-n-200));
+}
+
+.ei-page .ei-progress-fill {
+    height: 100%;
+    border-radius: 9999px;
+    background: rgb(var(--hub-blue));
+    transition: width var(--hub-duration-slow);
+}
+
+/* ---------- Manual bulk grid ---------- */
+.ei-page .ei-bulk-head {
+    display: none;
+    margin-bottom: 0.5rem;
+    padding: 0 0.25rem;
+    color: rgb(var(--hub-n-600));
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+
+.ei-page .ei-bulk-row {
+    padding: 0.75rem;
+    border: 1px solid rgb(var(--hub-n-200));
+    border-radius: var(--hub-radius-control);
+    background: rgb(var(--hub-well));
+}
+
+.ei-page .ei-bulk-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.ei-page .ei-bulk-cell { margin-bottom: 0.5rem; }
+.ei-page .ei-bulk-actions { display: flex; justify-content: flex-end; }
+
+@media (min-width: 640px) {
+    .ei-page .ei-bulk-head,
+    .ei-page .ei-bulk-grid {
+        grid-template-columns: minmax(0, 2fr) 80px minmax(0, 1fr) minmax(0, 1fr) 44px;
+    }
+
+    .ei-page .ei-bulk-head {
+        display: grid;
+        gap: 0.5rem;
+    }
+
+    .ei-page .ei-bulk-row {
+        padding: 0;
+        border-color: transparent;
+        background: transparent;
+    }
+
+    .ei-page .ei-bulk-grid {
+        gap: 0.5rem;
+        align-items: center;
+    }
+
+    .ei-page .ei-bulk-cell { margin-bottom: 0; }
+    .ei-page .ei-bulk-actions { justify-content: center; }
+}
+
+/* ---------- AI bulk review ---------- */
+.ei-page .ei-loc-field {
+    flex: 1 1 0%;
+    min-width: 0;
+    max-width: 360px;
+}
+
+.ei-page .ei-results-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.ei-page .ei-result {
+    padding: 0.75rem;
+    border: 1px solid rgb(var(--hub-n-200));
+    border-radius: var(--hub-radius-card);
+    background: rgb(var(--hub-well));
+}
+
+@media (min-width: 640px) {
+    .ei-page .ei-result { padding: 1rem; }
+}
+
+.ei-page .ei-result__thumb {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 64px;
+    height: 64px;
+    border: 1px solid rgb(var(--hub-n-200));
+    border-radius: var(--hub-radius-control);
+    object-fit: cover;
+}
+
+.ei-page .ei-result__thumb--empty { background: rgb(var(--hub-n-100)); }
+
+.ei-page .ei-result__index {
+    margin-bottom: 0.25rem;
+    color: rgb(var(--hub-n-600));
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.ei-page .ei-result__name {
+    color: rgb(var(--hub-n-900));
+    font-size: 0.875rem;
+    font-weight: 500;
+    overflow-wrap: anywhere;
+}
+
+.ei-page .ei-result__meta {
+    color: rgb(var(--hub-n-600));
+    font-size: 0.75rem;
+    overflow-wrap: anywhere;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ei-page * {
+        transition-duration: 0.01ms !important;
+    }
+}

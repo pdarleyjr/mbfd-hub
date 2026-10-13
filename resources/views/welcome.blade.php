@@ -8,24 +8,6 @@
     <link rel="shortcut icon" href="/favicon.ico">
     <title>Home · MBFD Hub</title>
     @vite('resources/css/app.css')
-    <style>
-        .home-layout { display: grid; gap: 32px; align-items: start; }
-        .home-today { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 24px; margin-bottom: 24px; border-bottom: 1px solid rgb(var(--hub2-n-200)); }
-        @media (max-width: 639.98px) {
-            .home-today > * { width: 100%; }
-            .home-today .hub-btn { width: 100%; }
-        }
-        .home-update { position: relative; padding: 16px 0 16px 16px; }
-        .home-update--critical { box-shadow: inset 3px 0 0 rgb(var(--hub2-red)); }
-        .home-update__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-        .home-update__title { margin: 8px 0 0; font-size: 15px; line-height: 22px; font-weight: 600; }
-        .home-update__title a { color: rgb(var(--hub2-n-900)); text-decoration: none; border-radius: 4px; }
-        .home-update__title a:hover { color: rgb(var(--hub2-action)); text-decoration: underline; text-underline-offset: 3px; }
-        .update-preview { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; margin: 4px 0 0; color: rgb(var(--hub2-n-600)); font-size: 14px; line-height: 22px; }
-        .home-update__footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
-        .home-footer { border-top: 1px solid rgb(var(--hub2-n-200)); padding-bottom: max(8px, env(safe-area-inset-bottom, 0px)); }
-        .home-footer__inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; max-width: var(--hub2-content-max); margin: 0 auto; padding: 16px var(--hub2-gutter); color: rgb(var(--hub2-n-600)); font-size: 12px; line-height: 16px; }
-    </style>
 </head>
 <body>
     @php
@@ -161,7 +143,7 @@
                                 </h3>
                                 <p class="update-preview">{{ $update->excerpt(180) }}</p>
                                 <div class="home-update__footer">
-                                    <p class="hub-caption" style="margin: 0;">
+                                    <p class="hub-caption home-update__stamp">
                                         <time datetime="{{ $update->publish_at?->toIso8601String() }}">{{ $update->publish_at?->timezone('America/New_York')->format('M j · g:i A') }}</time>
                                         @if($update->author?->name)<span aria-hidden="true"> · </span>{{ $update->author->name }}@endif
                                     </p>
@@ -178,11 +160,14 @@
                     </div>
                 </section>
 
+            </div>
+
+            <aside data-home-column="rail" class="min-w-0" aria-label="Quick access">
                 <section data-home-section="quick-access" aria-labelledby="quick-access-heading" class="hub-section min-w-0">
                     <div class="hub-section__header">
                         <h2 id="quick-access-heading" class="hub-h2">Quick Access</h2>
                     </div>
-                    <div class="hub-tiles" style="margin-top: 12px;">
+                    <div class="hub-tiles hub-tiles--rail">
                         @foreach($quickAccessItems as $item)
                             @continue(! $item['visible'])
                             <a
@@ -207,14 +192,14 @@
                         @endforeach
                     </div>
                 </section>
-            </div>
+            </aside>
         </div>
     </main>
 
     <footer class="home-footer">
         <div class="home-footer__inner">
-            <p style="margin: 0;">&copy; {{ date('Y') }} Miami Beach Fire Department · Support Services Division</p>
-            <a href="{{ url('/security-standards') }}" class="hub-link" style="font-weight: 500;">Security &amp; Standards</a>
+            <p>&copy; {{ date('Y') }} Miami Beach Fire Department · Support Services Division</p>
+            <a href="{{ url('/security-standards') }}" class="hub-link">Security &amp; Standards</a>
         </div>
     </footer>
 

@@ -24,6 +24,8 @@
     #operational-forms-root :is(button, a, select, input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]), .of-file-picker) { min-height: 44px; }
 }
 .of-loading { min-height: 65vh; display: grid; place-items: center; }
+/* Buttons match the rest of the Hub: 40px with a mouse (44px on touch, below), 8px radius. */
+#operational-forms-root .fui-Button { min-height: 40px; }
 .of-app { min-height: 100dvh; background: var(--of-canvas); overflow: hidden; }
 .of-topbar { box-sizing: border-box; height: var(--hub-shell-bar-height); min-height: var(--hub-shell-bar-height); background: var(--of-navy); box-shadow: inset 0 -1px 0 rgb(var(--hub-header-deep)); color: white; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; }
 .of-brand { display: flex; align-items: center; gap: 9px; font-size: 14px; font-weight: 600; letter-spacing: .01em; }

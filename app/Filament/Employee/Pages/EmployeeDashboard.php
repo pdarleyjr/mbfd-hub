@@ -15,6 +15,8 @@ class EmployeeDashboard extends Page
 
     protected static ?string $navigationIcon = 'heroicon-o-home';
 
+    protected static ?string $navigationGroup = 'My work';
+
     protected static string $view = 'filament.employee.pages.dashboard';
 
     protected static ?string $title = 'Dashboard';

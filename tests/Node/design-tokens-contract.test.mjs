@@ -139,6 +139,31 @@ test("no tracked source still uses the retired navy #102A43", () => {
   assert.deepEqual(offenders, [], `The retired navy remains in:\n${offenders.join("\n")}`);
 });
 
+test("translucent surfaces fall back to opaque for reduced transparency and for browsers without backdrop blur", () => {
+  const theme = stripComments(readFileSync(join(root, tokenSource), "utf8"));
+  assert.match(
+    theme,
+    /@media \(prefers-reduced-transparency: reduce\)\s*\{\s*:root\s*\{[^}]*--hub-glass-alpha:\s*1;[^}]*--hub-overlay-alpha:\s*1;[^}]*--hub-overlay-blur:\s*none;/,
+    "reduced transparency must make glass and overlays opaque",
+  );
+  assert.match(
+    theme,
+    /@supports not \(backdrop-filter: blur\(1px\)\)\s*\{\s*:root\s*\{[^}]*--hub-overlay-alpha:\s*1;[^}]*--hub-overlay-blur:\s*none;/,
+    "overlays must be opaque where backdrop-filter is unsupported",
+  );
+});
+
+test("card surfaces never lift on hover and glass never uses backdrop blur", () => {
+  for (const file of ["resources/css/filament/admin/theme.css", "resources/css/filament/admin/hub-admin-v2.css", "resources/css/hub-components.css"]) {
+    const css = stripComments(readFileSync(join(root, file), "utf8"));
+    for (const rule of css.matchAll(/([^{}]*(?:fi-wi-stats-overview-stat|hub-tile|\.hub-panel|fi-section|fi-ta-ctn)[^{}]*)\{([^}]*)\}/g)) {
+      const [, selector, body] = rule;
+      assert.doesNotMatch(body, /translate[XY]?\(-|scale\(1\.\d/, `${file}: ${selector.trim()} must not lift or scale`);
+      assert.doesNotMatch(body, /backdrop-filter:\s*(?!none)/, `${file}: ${selector.trim()} is glass and must not blur; blur is for overlays only`);
+    }
+  }
+});
+
 test("every --hub2-* token is a one-line alias of a --hub-* token declared in mbfd-theme.css", () => {
   const all = declarations();
   const hubNames = new Set(all.filter(item => item.file === tokenSource && item.name.startsWith("--hub-")).map(item => item.name));

@@ -22,6 +22,7 @@ use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Navigation\MenuItem;
+use Filament\Navigation\NavigationGroup;
 use Filament\Panel;
 use Filament\PanelProvider;
 use Filament\View\PanelsRenderHook;
@@ -71,6 +72,10 @@ class EmployeePanelProvider extends PanelProvider
                 SetPasswordPage::class,
             ])
             ->widgets([])
+            ->navigationGroups([
+                NavigationGroup::make('My work'),
+                NavigationGroup::make('Request'),
+            ])
             ->userMenuItems([
                 MenuItem::make()->label('My Account')->url(fn (): string => route('account.show'))->icon('heroicon-o-user-circle'),
                 MenuItem::make()->label('Change Password')->url(fn (): string => SetPasswordPage::getUrl(panel: 'employee'))->icon('heroicon-o-key'),

@@ -216,9 +216,23 @@
         align-items: stretch;
         height: calc(var(--hub-member-nav-height) + env(safe-area-inset-bottom, 0px));
         padding: 0 max(4px, env(safe-area-inset-right, 0px)) env(safe-area-inset-bottom, 0px) max(4px, env(safe-area-inset-left, 0px));
-        border-top: 1px solid rgb(var(--hub-border));
-        background: rgb(var(--hub-surface));
+        isolation: isolate;
+        border-top: 1px solid rgb(var(--hub-glass-border));
+        background: transparent;
         color: rgb(var(--hub-ink-secondary));
+    }
+
+    /* Level 3 overlay glass lives on a pseudo-element: a backdrop-filter on the bar itself would make it the
+       containing block of the fixed bottom sheet below and clip it to the bar. */
+    .hub-member-nav::before,
+    .hub-member-navigation::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        background: rgb(var(--hub-well) / var(--hub-overlay-alpha));
+        -webkit-backdrop-filter: var(--hub-overlay-blur);
+        backdrop-filter: var(--hub-overlay-blur);
     }
 
     .hub-member-nav { z-index: var(--hub-z-drawer); }
@@ -261,9 +275,57 @@
 
     .hub-member-navigation :is(a, button):focus-visible { outline: 2px solid rgb(var(--hub-focus)); outline-offset: -3px; }
     .hub-member-nav__more { flex: 1; min-width: 0; }
-    .hub-member-nav__more .hub-shell-popover { top: auto; bottom: calc(var(--hub-member-nav-height) + 8px + env(safe-area-inset-bottom, 0px)); }
-    .hub-member-more { position: relative; }
-    .hub-member-more .hub-shell-popover { position: absolute; top: auto; bottom: calc(100% + 8px); left: auto; right: 0; }
+
+    /* "More" is a bottom sheet: full width, 16px top corners, at most 80% of the screen. The backdrop is the
+       open <details> itself (Blade) or .hub-sheet-backdrop (React); both close the sheet and return focus. */
+    .hub-member-nav__more[open]::before,
+    .hub-sheet-backdrop {
+        content: '';
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        background: rgb(var(--hub-header-deep) / .45);
+    }
+
+    .hub-member-nav__more .hub-shell-popover,
+    .hub-member-more .hub-shell-popover {
+        position: fixed;
+        inset: auto 0 0 0;
+        z-index: 1;
+        width: auto;
+        min-width: 0;
+        max-width: none;
+        max-height: 80dvh;
+        padding: 8px 12px calc(12px + env(safe-area-inset-bottom, 0px));
+        border-width: 1px 0 0;
+        border-color: rgb(var(--hub-glass-border));
+        border-radius: var(--hub-radius-sheet) var(--hub-radius-sheet) 0 0;
+        background: rgb(var(--hub-well) / var(--hub-overlay-alpha));
+        -webkit-backdrop-filter: var(--hub-overlay-blur);
+        backdrop-filter: var(--hub-overlay-blur);
+        box-shadow: var(--hub-shadow-elevated);
+    }
+
+    /* Only an open sheet animates in: an animation on closed details content never settles. */
+    .hub-member-nav__more[open] .hub-shell-popover,
+    .hub-member-more .hub-shell-popover {
+        animation: hub-sheet-in var(--hub-duration-base) var(--hub-ease-enter);
+    }
+
+    .hub-member-more { position: static; }
+
+    /* The page behind an open sheet does not scroll. */
+    body:has(.hub-member-nav__more[open]),
+    body:has(.hub-sheet-backdrop) { overflow: hidden; }
+
+    @keyframes hub-sheet-in {
+        from { opacity: 0; transform: translateY(16px); }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .hub-member-nav__more .hub-shell-popover,
+        .hub-member-more .hub-shell-popover { animation: none; }
+    }
 
     body:has(.hub-member-nav) { padding-bottom: calc(var(--hub-member-nav-height) + 16px + env(safe-area-inset-bottom, 0px)); }
 }

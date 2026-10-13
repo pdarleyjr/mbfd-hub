@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Restart application sign-in</title>@include('auth.partials.city-email-style')</head>
+<head><meta charset="utf-8"><x-hub.head /><title>Restart application sign-in</title>@include('auth.partials.city-email-style')</head>
 <body>
 <main style="max-width: 30rem">
     <div class="identity-strip">Miami Beach Fire Department</div>

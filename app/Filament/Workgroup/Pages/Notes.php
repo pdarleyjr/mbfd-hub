@@ -137,15 +137,20 @@ class Notes extends Page implements HasTable
             ->columns([
                 TextColumn::make('title')
                     ->label('Title')
+                    ->wrap()
+                    ->extraAttributes(['class' => 'hub-phone-summary'])
+                    ->description(fn ($record): string => ($record->is_shared ? 'Shared' : 'Private').' · '.$record->created_at?->format('M j, Y'))
                     ->searchable()
                     ->sortable(),
 
                 TextColumn::make('preview')
                     ->label('Preview')
+                    ->visibleFrom('md')
                     ->limit(50),
 
                 IconColumn::make('is_shared')
                     ->label('Shared')
+                    ->visibleFrom('md')
                     ->boolean()
                     ->trueIcon('heroicon-o-share')
                     ->falseIcon('heroicon-o-lock-closed')
@@ -154,6 +159,7 @@ class Notes extends Page implements HasTable
 
                 TextColumn::make('sharedWith.name')
                     ->label('Shared With')
+                    ->visibleFrom('md')
                     ->default('Everyone')
                     ->placeholder('—')
                     ->visible(fn () => true)
@@ -171,6 +177,7 @@ class Notes extends Page implements HasTable
 
                 TextColumn::make('created_at')
                     ->label('Created')
+                    ->visibleFrom('md')
                     ->dateTime('M j, Y g:i A')
                     ->sortable(),
             ])

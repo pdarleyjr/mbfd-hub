@@ -54,11 +54,15 @@ class Files extends Page implements HasTable
             ->columns([
                 TextColumn::make('filename')
                     ->label('Filename')
+                    ->wrap()
+                    ->extraAttributes(['class' => 'hub-phone-summary'])
+                    ->description(fn ($record): string => ($record->session->name ?? 'All Sessions').' · '.$record->file_type.' · '.$record->created_at?->format('M j, Y'))
                     ->searchable()
                     ->sortable(),
 
                 TextColumn::make('session.name')
                     ->label('Session')
+                    ->visibleFrom('md')
                     ->badge()
                     ->color('primary')
                     ->default('All Sessions')
@@ -66,11 +70,13 @@ class Files extends Page implements HasTable
 
                 TextColumn::make('file_type')
                     ->label('Type')
+                    ->visibleFrom('md')
                     ->badge()
                     ->color('gray'),
 
                 TextColumn::make('created_at')
                     ->label('Uploaded')
+                    ->visibleFrom('md')
                     ->dateTime('M j, Y g:i A')
                     ->sortable(),
             ])

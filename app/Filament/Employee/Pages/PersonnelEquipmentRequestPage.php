@@ -34,6 +34,8 @@ class PersonnelEquipmentRequestPage extends Page
 
     protected static ?string $navigationIcon = 'heroicon-o-shield-exclamation';
 
+    protected static ?string $navigationGroup = 'Request';
+
     protected static string $view = 'filament.employee.pages.personnel-equipment-request';
 
     protected static ?string $title = 'Personnel Equipment Request';
@@ -42,7 +44,7 @@ class PersonnelEquipmentRequestPage extends Page
 
     protected static ?string $slug = 'personnel-equipment-request';
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 3;
 
     public ?array $data = [];
 

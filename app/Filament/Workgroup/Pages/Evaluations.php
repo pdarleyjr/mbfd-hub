@@ -173,15 +173,20 @@ class Evaluations extends Page implements HasTable
             ->columns([
                 TextColumn::make('name')
                     ->label('Product')
+                    ->wrap()
+                    ->extraAttributes(['class' => 'hub-phone-summary'])
+                    ->description(fn ($record): string => implode(' · ', array_filter([$record->manufacturer, $record->category?->name])))
                     ->searchable()
                     ->sortable(),
 
                 TextColumn::make('manufacturer')
                     ->label('Manufacturer')
+                    ->visibleFrom('md')
                     ->searchable(),
 
                 TextColumn::make('category.name')
                     ->label('Category')
+                    ->visibleFrom('md')
                     ->badge()
                     ->color('gray'),
 

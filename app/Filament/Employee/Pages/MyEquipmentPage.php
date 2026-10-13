@@ -13,11 +13,13 @@ class MyEquipmentPage extends Page
 
     protected static ?string $navigationIcon = 'heroicon-o-shield-check';
 
+    protected static ?string $navigationGroup = 'My work';
+
     protected static string $view = 'filament.employee.pages.my-equipment';
 
     protected static ?string $title = 'My Assigned Equipment';
 
-    protected static ?int $navigationSort = 1;
+    protected static ?int $navigationSort = 3;
 
     protected static ?string $navigationLabel = 'My Equipment';
 

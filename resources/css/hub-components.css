@@ -262,7 +262,7 @@ body[data-hub-ui="2"] {
     min-height: 40px;
     padding: 0 16px;
     border: 1px solid transparent;
-    border-radius: var(--hub2-radius-md);
+    border-radius: var(--hub-radius-control);
     font: inherit;
     font-size: 14px;
     line-height: 20px;
@@ -346,7 +346,7 @@ body[data-hub-ui="2"] {
     min-height: 22px;
     padding: 0 8px;
     border: 1px solid rgb(var(--hub2-neutral-border));
-    border-radius: var(--hub2-radius-sm);
+    border-radius: var(--hub-radius-tag);
     background: rgb(var(--hub2-neutral-bg));
     color: rgb(var(--hub2-neutral));
     font-size: 12px;
@@ -384,11 +384,13 @@ body[data-hub-ui="2"] {
 /* Panels, lists, empty, skeleton                                      */
 /* ------------------------------------------------------------------ */
 
+/* Level 1 glass; nothing inside it may be glass again (rows, inputs and tables are white wells). */
 [data-hub-ui="2"] .hub-panel {
     min-width: 0;
-    border: 1px solid rgb(var(--hub2-n-200));
-    border-radius: var(--hub2-radius-lg);
-    background: rgb(var(--hub2-n-0));
+    border: 1px solid rgb(var(--hub-glass-border));
+    border-radius: var(--hub-radius-card);
+    background: rgb(var(--hub-glass) / var(--hub-glass-alpha));
+    box-shadow: var(--hub-glass-highlight), var(--hub-shadow-card);
 }
 
 [data-hub-ui="2"] .hub-panel__header {
@@ -398,7 +400,7 @@ body[data-hub-ui="2"] {
     gap: 12px;
     min-height: 52px;
     padding: 8px 16px;
-    border-bottom: 1px solid rgb(var(--hub2-n-200));
+    border-bottom: 1px solid rgb(var(--hub-glass-border));
 }
 
 [data-hub-ui="2"] .hub-panel__footer {
@@ -407,7 +409,7 @@ body[data-hub-ui="2"] {
     justify-content: space-between;
     gap: 12px;
     padding: 4px 16px;
-    border-top: 1px solid rgb(var(--hub2-n-100));
+    border-top: 1px solid rgb(var(--hub-glass-border));
 }
 
 [data-hub-ui="2"].hub-page .hub-page__main {
@@ -416,7 +418,6 @@ body[data-hub-ui="2"] {
     overflow-wrap: anywhere;
 }
 
-[data-hub-ui="2"].hub-page .hub-panel { box-shadow: none; }
 [data-hub-ui="2"] .hub-page__header-inner { min-height: var(--hub2-appbar-height); }
 [data-hub-ui="2"] .hub-page__header img { width: 32px; height: 32px; }
 
@@ -434,7 +435,31 @@ body[data-hub-ui="2"] {
     list-style: none;
 }
 
-[data-hub-ui="2"] .hub-list > * + * { border-top: 1px solid rgb(var(--hub2-n-100)); }
+[data-hub-ui="2"] .hub-list > * + * { border-top: 1px solid rgb(var(--hub-n-100)); }
+[data-hub-ui="2"] .hub-panel .hub-list > * { background: rgb(var(--hub-well)); }
+
+[data-hub-ui="2"] .hub-panel__header-block { border-bottom: 1px solid rgb(var(--hub-glass-border)); }
+
+/* White well: input-level surface inside glass (level 2). */
+[data-hub-ui="2"] .hub-well {
+    border: 1px solid rgb(var(--hub-glass-border));
+    border-radius: var(--hub-radius-control);
+    background: rgb(var(--hub-well));
+}
+
+[data-hub-ui="2"] .hub-callout {
+    border: 1px solid rgb(var(--hub-glass-border));
+    border-radius: var(--hub-radius-control);
+}
+
+[data-hub-ui="2"] .hub-callout--warning {
+    border-color: rgb(var(--hub-warning-border));
+    background: rgb(var(--hub-warning-bg));
+    color: rgb(var(--hub-warning-strong));
+}
+
+/* Request history rail: a quiet neutral line with action-tinted markers. */
+[data-hub-ui="2"] .hub-timeline { border-left: 2px solid rgb(var(--hub-n-200)); }
 
 [data-hub-ui="2"] .hub-empty {
     display: flex;
@@ -472,6 +497,13 @@ body[data-hub-ui="2"] {
     height: 12px;
     border-radius: var(--hub2-radius-sm);
     background: rgb(var(--hub2-n-100));
+    animation: hub-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+/* Loading placeholders breathe with opacity only; reduced motion removes it below. */
+@keyframes hub-skeleton-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: .5; }
 }
 
 /* ------------------------------------------------------------------ */
@@ -496,10 +528,11 @@ body[data-hub-ui="2"] {
     gap: 12px;
     min-height: 72px;
     padding: 12px 16px;
-    border: 1px solid rgb(var(--hub2-n-200));
+    border: 1px solid rgb(var(--hub-glass-border));
     border-top: 3px solid rgb(var(--tile-accent));
-    border-radius: var(--hub2-radius-lg);
-    background: rgb(var(--hub2-n-0));
+    border-radius: var(--hub-radius-card);
+    background: rgb(var(--hub-glass) / var(--hub-glass-alpha));
+    box-shadow: var(--hub-glass-highlight), var(--hub-shadow-card);
     color: rgb(var(--hub2-n-900));
     text-decoration: none;
     transition: border-color var(--hub2-duration-fast) var(--hub2-ease-enter),
@@ -510,8 +543,7 @@ body[data-hub-ui="2"] {
 [data-hub-ui="2"] .hub-tile:hover {
     border-color: rgb(var(--tile-accent) / 0.4);
     border-top-color: rgb(var(--tile-accent));
-    background: rgb(var(--hub2-n-25));
-    box-shadow: var(--hub2-elevation-1);
+    background: rgb(var(--hub-well));
 }
 
 [data-hub-ui="2"] .hub-tile--operations { --tile-accent: var(--hub2-domain-operations); }
@@ -551,6 +583,59 @@ body[data-hub-ui="2"] {
     flex: none;
     color: rgb(var(--hub2-n-500));
 }
+
+/* ------------------------------------------------------------------ */
+/* Home layout                                                         */
+/* ------------------------------------------------------------------ */
+
+[data-hub-ui="2"] .home-layout { display: grid; gap: 32px; align-items: start; }
+
+/* Wide screens: updates take the main column, Quick Access is a compact rail beside it. */
+@media (min-width: 1280px) {
+    [data-hub-ui="2"] .home-layout { grid-template-columns: minmax(0, 62fr) minmax(0, 38fr); gap: 40px; }
+    [data-hub-ui="2"] .home-layout > [data-home-column="rail"] { position: sticky; top: calc(var(--hub-shell-bar-height) + 24px); }
+}
+
+[data-hub-ui="2"] .home-layout .hub-section__header { min-height: 40px; align-items: center; }
+
+[data-hub-ui="2"] .home-today {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding-bottom: 24px;
+    margin-bottom: 24px;
+    border-bottom: 1px solid rgb(var(--hub2-n-200));
+}
+
+@media (max-width: 639.98px) {
+    [data-hub-ui="2"] .home-today > *,
+    [data-hub-ui="2"] .home-today .hub-btn { width: 100%; }
+}
+
+/* Update rows are white wells on the glass list; the priority tag, not a colour stripe, carries severity. */
+[data-hub-ui="2"] .home-update { position: relative; padding: 16px; }
+[data-hub-ui="2"] .home-update__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+[data-hub-ui="2"] .home-update__title { margin: 8px 0 0; font-size: 15px; line-height: 22px; font-weight: 600; }
+[data-hub-ui="2"] .home-update__title a { color: rgb(var(--hub2-n-900)); text-decoration: none; border-radius: 4px; }
+[data-hub-ui="2"] .home-update__title a:hover { color: rgb(var(--hub2-action)); text-decoration: underline; text-underline-offset: 3px; }
+[data-hub-ui="2"] .update-preview { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; margin: 4px 0 0; color: rgb(var(--hub2-n-600)); font-size: 14px; line-height: 22px; }
+[data-hub-ui="2"] .home-update__footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 4px; }
+[data-hub-ui="2"] .home-update__stamp { margin: 0; }
+
+[data-hub-ui="2"] .home-footer { border-top: 1px solid rgb(var(--hub2-n-200)); padding-bottom: max(8px, env(safe-area-inset-bottom, 0px)); }
+[data-hub-ui="2"] .home-footer__inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; max-width: var(--hub2-content-max); margin: 0 auto; padding: 16px var(--hub2-gutter); color: rgb(var(--hub2-n-600)); font-size: 12px; line-height: 16px; }
+[data-hub-ui="2"] .home-footer__inner p { margin: 0; }
+[data-hub-ui="2"] .home-footer__inner .hub-link { font-weight: 500; }
+
+/* Quick Access rail: one compact glass row per destination. */
+[data-hub-ui="2"] .hub-tiles--rail { gap: 8px; margin-top: 12px; }
+@media (min-width: 1280px) {
+    [data-hub-ui="2"] .hub-tiles--rail { grid-template-columns: minmax(0, 1fr); }
+}
+[data-hub-ui="2"] .hub-tiles--rail .hub-tile { min-height: 56px; padding: 8px 16px; border-top-width: 1px; }
+[data-hub-ui="2"] .hub-tiles--rail .hub-tile:hover { border-top-color: rgb(var(--tile-accent) / 0.4); }
 
 /* ------------------------------------------------------------------ */
 /* Motion preferences                                                  */

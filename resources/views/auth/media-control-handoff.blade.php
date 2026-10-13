@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <x-hub.head />
     <meta name="referrer" content="no-referrer">
     <meta http-equiv="refresh" content="0;url={{ $destination }}">
     <title>Opening Media Control</title>

@@ -115,6 +115,7 @@ class AdminPanelProvider extends PanelProvider
                 NavigationGroup::make()->label('Programs')->icon('heroicon-o-folder-open')->collapsed(),
                 NavigationGroup::make()->label('Communications')->icon('heroicon-o-envelope')->collapsed(),
                 NavigationGroup::make()->label('System')->icon('heroicon-o-cog-6-tooth')->collapsed(),
+                NavigationGroup::make()->label('Workgroup Management')->icon('heroicon-o-user-group')->collapsed(),
             ])
             ->userMenuItems([
                 'profile' => MenuItem::make()->label('My Account')->url(fn (): string => route('account.show'))->icon('heroicon-o-user-circle'),
