@@ -117,22 +117,29 @@ class SharedUploads extends Page implements HasTable
             ->columns([
                 TextColumn::make('filename')
                     ->label('Filename')
+                    ->wrap()
+                    ->extraAttributes(['class' => 'hub-phone-summary'])
+                    ->description(fn ($record): string => implode(' · ', array_filter([$record->file_type, $record->formatted_size, $record->user?->name, $record->created_at?->format('M j, Y')])))
                     ->searchable()
                     ->sortable(),
 
                 TextColumn::make('file_type')
                     ->label('Type')
+                    ->visibleFrom('md')
                     ->badge()
                     ->color('gray'),
 
                 TextColumn::make('formatted_size')
+                    ->visibleFrom('md')
                     ->label('Size'),
 
                 TextColumn::make('user.name')
+                    ->visibleFrom('md')
                     ->label('Uploaded By'),
 
                 TextColumn::make('created_at')
                     ->label('Uploaded')
+                    ->visibleFrom('md')
                     ->dateTime('M j, Y g:i A')
                     ->sortable(),
             ])

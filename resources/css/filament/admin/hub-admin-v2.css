@@ -274,26 +274,63 @@
     backdrop-filter: var(--hub-overlay-blur);
     box-shadow: var(--hub-shadow-elevated);
 }
-/* ---------- Tables ---------- */
+
+/* Phones: dialogs are bottom sheets with a sticky action footer, and create/edit pages keep one
+   sticky action bar above the bottom navigation (Admin has none, so it sits at the screen edge). */
+@media (max-width: 639.98px) {
+    :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-modal-window:not(.fi-modal-slide-over-window) {
+        grid-row: 3;
+        align-self: end;
+        width: calc(100% + 2rem);
+        max-width: none;
+        margin: 0 -1rem -1rem;
+        border-radius: var(--hub-radius-sheet) var(--hub-radius-sheet) 0 0;
+    }
+
+    :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-modal-window .fi-modal-footer {
+        position: sticky;
+        bottom: 0;
+        padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+        border-top: 1px solid rgb(var(--hub-glass-border));
+        background: inherit;
+    }
+
+    :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) :is(.fi-resource-create-record-page, .fi-resource-edit-record-page) .fi-form-actions {
+        position: sticky;
+        bottom: calc(var(--hub-member-nav-height) + env(safe-area-inset-bottom, 0px) + 8px);
+        z-index: var(--hub-z-sticky);
+        padding: 12px;
+        border: 1px solid rgb(var(--hub-glass-border));
+        border-radius: var(--hub-radius-card);
+        background: rgb(var(--hub-well) / var(--hub-overlay-alpha));
+        -webkit-backdrop-filter: var(--hub-overlay-blur);
+        backdrop-filter: var(--hub-overlay-blur);
+        box-shadow: var(--hub-shadow-elevated);
+    }
+
+    .fi-panel-admin :is(.fi-resource-create-record-page, .fi-resource-edit-record-page) .fi-form-actions {
+        bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+    }
+}/* ---------- Tables ---------- */
 
 /* Operational indexes show identity and a real status/context summary on
    phones. Native column breakpoints retain the full desktop table. */
 @media (max-width: 767px) {
-    .fi-panel-admin .fi-ta-cell:has(.hub-phone-summary) {
+    :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-ta-cell:has(.hub-phone-summary) {
         width: 100%;
         min-width: 0;
     }
 
-    .fi-panel-admin .hub-phone-summary {
+    :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .hub-phone-summary {
         text-align: start;
     }
 
-    .fi-panel-admin .hub-phone-summary :is(p, .fi-ta-text-item-label) {
+    :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .hub-phone-summary :is(p, .fi-ta-text-item-label) {
         white-space: normal;
         overflow-wrap: anywhere;
     }
 
-    .fi-panel-admin .hub-phone-summary > p {
+    :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .hub-phone-summary > p {
         margin-top: .25rem;
         color: rgb(var(--hub-ink-secondary));
         font-size: .8125rem;
@@ -302,7 +339,7 @@
 }
 
 @media (min-width: 768px) {
-    .fi-panel-admin .hub-phone-summary > p { display: none; }
+    :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .hub-phone-summary > p { display: none; }
 }
 
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-ta-header-cell {

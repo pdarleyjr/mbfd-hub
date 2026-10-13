@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <x-hub.head />
     <meta name="referrer" content="no-referrer">
     <title>Verify your city email · MBFD Hub</title>
     @include('auth.partials.city-email-style')

@@ -59,7 +59,7 @@ async function open(page: Page, surface: Surface): Promise<void> {
   // The sidebar drawer slides with a CSS transition after Alpine initialises; measure only at rest.
   for (let round = 0; round < 3; round += 1) {
     await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => resolve())));
-    await page.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished.catch(() => undefined))).then(() => undefined));
+    await page.evaluate(() => Promise.all(document.getAnimations().filter(animation => animation.effect?.getComputedTiming().iterations !== Infinity).map(animation => animation.finished.catch(() => undefined))).then(() => undefined));
   }
 }
 

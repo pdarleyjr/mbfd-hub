@@ -2,8 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#012766">
+    <x-hub.head />
     <title>{{ $code }} — {{ $title }} | MBFD Hub</title>
     <link rel="stylesheet" href="/css/hub-wallpaper-v1.css">
     <style>

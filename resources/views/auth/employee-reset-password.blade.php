@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<html lang="en"><head><meta charset="utf-8"><x-hub.head />
 <title>Choose MBFD Hub Password</title>@include('auth.partials.city-email-style')</head><body><main style="max-width: 26rem"><div class="identity-strip">Miami Beach Fire Department</div><h1>Choose a new password</h1>
 <form method="POST" action="{{ route('password.update') }}">@csrf<input type="hidden" name="token" value="{{ $token }}"><label for="employee_id">Employee ID</label><input id="employee_id" name="employee_id" maxlength="64" required value="{{ old('employee_id', $employeeId) }}"><label for="password">New password</label><input id="password" name="password" type="password" autocomplete="new-password" required><label for="password_confirmation">Confirm new password</label><input id="password_confirmation" name="password_confirmation" type="password" autocomplete="new-password" required>@foreach($errors->all() as $error)<p class="error">{{ $error }}</p>@endforeach<button type="submit">Reset password</button></form>
 </main></body></html>

@@ -35,7 +35,7 @@ async function open(page: Page, path: string): Promise<void> {
   const response = await page.goto(path, { waitUntil: 'load' });
   expect(response?.status(), `${path} must render for the seeded super admin`).toBe(200);
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
-  await page.evaluate(() => Promise.all(document.getAnimations().map(animation => animation.finished.catch(() => undefined))).then(() => undefined));
+  await page.evaluate(() => Promise.all(document.getAnimations().filter(animation => animation.effect?.getComputedTiming().iterations !== Infinity).map(animation => animation.finished.catch(() => undefined))).then(() => undefined));
 }
 
 test.describe('surface system', () => {

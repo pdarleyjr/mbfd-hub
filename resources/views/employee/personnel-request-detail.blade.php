@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <x-hub.head />
     <meta name="robots" content="noindex,nofollow">
     <title>{{ $request->request_number }} · MBFD Employee Portal</title>
     @vite('resources/css/app.css')

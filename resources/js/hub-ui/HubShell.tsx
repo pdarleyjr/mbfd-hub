@@ -69,6 +69,8 @@ function NavigationMenu({ label, items, icon = 'apps', className = '', renderLin
   const trigger = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
   const initialFocus = useRef<'first' | 'last'>('first');
+  // The phone More menu is a bottom sheet: it gets a backdrop and keeps focus inside while open.
+  const sheet = className.includes('hub-member-more');
 
   useEffect(() => {
     if (!open) return;
@@ -90,6 +92,14 @@ function NavigationMenu({ label, items, icon = 'apps', className = '', renderLin
     }
     const links = Array.from(menu.current?.querySelectorAll<HTMLAnchorElement>('[role="menuitem"]') ?? []);
     const current = links.indexOf(document.activeElement as HTMLAnchorElement);
+    if (sheet && event.key === 'Tab' && links.length > 0) {
+      const wrapFrom = event.shiftKey ? 0 : links.length - 1;
+      if (current === wrapFrom) {
+        event.preventDefault();
+        links[event.shiftKey ? links.length - 1 : 0]?.focus();
+      }
+      return;
+    }
     let next: number;
     if (event.key === 'ArrowDown') next = (current + 1) % links.length;
     else if (event.key === 'ArrowUp') next = (current - 1 + links.length) % links.length;
@@ -114,6 +124,7 @@ function NavigationMenu({ label, items, icon = 'apps', className = '', renderLin
       }}>
       <HubIcon name={icon} /><span>{label}</span>
     </button>
+    {open && sheet && <div className="hub-sheet-backdrop" aria-hidden="true" onClick={() => { setOpen(false); trigger.current?.focus(); }} />}
     {open && <div ref={menu} id={`${id}-menu`} className="hub-shell-popover" role="menu" aria-labelledby={`${id}-trigger`} onKeyDown={onMenuKeyDown}>
       {items.map((item) => {
         const external = /^https?:\/\//.test(item.href);

@@ -2,9 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#012766">
-    <link rel="manifest" href="/manifest.json">
+    <x-hub.head />
     <title>Install MBFD Hub</title>
     @vite('resources/css/app.css')
     <style>
