@@ -304,6 +304,11 @@
         -webkit-backdrop-filter: var(--hub-overlay-blur);
         backdrop-filter: var(--hub-overlay-blur);
         box-shadow: var(--hub-shadow-elevated);
+    }
+
+    /* Only an open sheet animates in: an animation on closed details content never settles. */
+    .hub-member-nav__more[open] .hub-shell-popover,
+    .hub-member-more .hub-shell-popover {
         animation: hub-sheet-in var(--hub-duration-base) var(--hub-ease-enter);
     }
 

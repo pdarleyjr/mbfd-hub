@@ -56,7 +56,7 @@ class Files extends Page implements HasTable
                     ->label('Filename')
                     ->wrap()
                     ->extraAttributes(['class' => 'hub-phone-summary'])
-                    ->description(fn ($record): string => ($record->session?->name ?? 'All Sessions').' · '.$record->file_type.' · '.$record->created_at?->format('M j, Y'))
+                    ->description(fn ($record): string => ($record->session->name ?? 'All Sessions').' · '.$record->file_type.' · '.$record->created_at?->format('M j, Y'))
                     ->searchable()
                     ->sortable(),
 

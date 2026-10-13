@@ -71,6 +71,8 @@
 
     /* Shell geometry: every bar on every surface takes its height from this one token. */
     --hub-shell-bar-height: 56px;
+    /* Admin desktop status bar: its height, the content space reserved above it and the scroll margin all derive from this. */
+    --hub-status-bar-height: 2.875rem;
     --hub-sidebar-width: 18rem;
     --hub-sidebar-collapsed: 4rem;
     --hub-content-max: 1600px;

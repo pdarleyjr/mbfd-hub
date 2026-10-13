@@ -6,11 +6,18 @@ const authStyles = readFileSync(
   'utf8',
 );
 
+// The shared head component carries the viewport meta; render it as the browser would receive it.
+const sharedHead = readFileSync(
+  new URL('../../resources/views/components/hub/head.blade.php', import.meta.url),
+  'utf8',
+).replace(/\{\{--[\s\S]*?--\}\}/g, '');
+
 const template = readFileSync(
   new URL('../../resources/views/auth/canonical-login.blade.php', import.meta.url),
   'utf8',
 )
   .replace("@include('auth.partials.city-email-style')", authStyles)
+  .replace('<x-hub.head />', sharedHead)
   .replace(/{{[^}]*}}/g, '')
   .replace(/@(csrf|error\([^)]*\)|enderror)/g, '');
 

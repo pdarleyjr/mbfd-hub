@@ -1,0 +1,389 @@
+/*
+ * Workgroups panel pages: Session Results (.wg-session-results, sr-*) and Links (.wl-links, wl-*).
+ *
+ * Every colour, radius and shadow comes from the --hub-* tokens declared in mbfd-theme.css; this
+ * file declares no token values. Surfaces follow the Hub contract: level-1 glass is applied by
+ * hub-portals-v2.css to .wg-section / .wg-ai-panel / .wg-stat-card, rows and table bodies inside
+ * glass are white wells (--hub-well), and no glass is nested in glass.
+ */
+
+/* =========================================================================
+   SESSION RESULTS
+   ========================================================================= */
+
+/* Secondary text on glass is n-600 (the muted slate is only 4.2:1 there). Aliases, not new values. */
+.wg-session-results {
+    --sr-muted: var(--hub-n-600);
+    --sr-muted-soft: var(--hub-n-600);
+}
+
+.wg-session-results .wg-ai-panel-header,
+.wg-session-results .wg-saver-header { flex-wrap: wrap; }
+.wg-session-results .wg-ai-panel-header > div:first-child { flex: 1 1 18rem; min-width: 0; }
+.wg-session-results .wg-report-actions { flex-wrap: wrap; max-width: 100%; }
+.wg-session-results .wg-ai-btn { min-height: 44px; text-decoration: none; }
+.wg-session-results .wg-ai-icon,
+.wg-session-results .wg-ai-btn--primary { background: rgb(var(--hub-action-primary)); }
+.wg-session-results .wg-ai-btn--primary:hover { background: rgb(var(--hub-action-primary-hover)); }
+.wg-session-results .wg-ai-btn--secondary { color: rgb(var(--hub-action-primary)); border-color: rgb(var(--hub-border)); }
+.wg-session-results .wg-ai-btn--secondary:hover { background: rgb(var(--hub-surface-muted)); }
+
+/* Section chrome: flat header band inside the glass card, spacing between sections. */
+.wg-session-results .wg-section-header { background: transparent; }
+.wg-session-results .sr-section { margin-bottom: 1.25rem; }
+.wg-session-results .sr-block { margin-top: 1.5rem; }
+.wg-session-results .sr-stack { margin-bottom: 1.5rem; }
+.wg-session-results .sr-grow { flex: 1; min-width: 0; }
+.wg-session-results .sr-header--plain { background: none; border: 0; padding-left: 0; }
+.wg-session-results .sr-section-lead { margin-bottom: .5rem; color: rgb(var(--hub-n-600)); font-size: .875rem; }
+.wg-session-results .sr-weight-medium { font-weight: 500; }
+
+/* Shared small text and states. */
+.wg-session-results .sr-caption { color: rgb(var(--hub-n-600)); font-size: .75rem; }
+.wg-session-results .sr-caption--xs { font-size: .6875rem; }
+.wg-session-results .sr-dash { color: rgb(var(--hub-n-500)); }
+.wg-session-results .sr-center { text-align: center; }
+.wg-session-results .sr-tone--good { color: rgb(var(--hub-success)); }
+.wg-session-results .sr-tone--mid { color: rgb(var(--hub-warning)); }
+.wg-session-results .sr-tone--bad { color: rgb(var(--hub-danger)); }
+
+/* Icons and spinner. */
+.wg-session-results .sr-icon { width: 1rem; height: 1rem; flex: none; }
+.wg-session-results .sr-icon--lg { width: 1.5rem; height: 1.5rem; }
+.wg-session-results .sr-spin { animation: sr-spin 1s linear infinite; }
+.wg-session-results .sr-spin--accent { color: rgb(var(--hub-action-primary)); }
+.wg-session-results .sr-spin-track { opacity: .25; }
+.wg-session-results .sr-spin-arc { opacity: .75; }
+@keyframes sr-spin { to { transform: rotate(360deg); } }
+
+/* AI report panel. */
+.wg-session-results .sr-ai-heading { display: flex; align-items: center; gap: .75rem; }
+.wg-session-results .sr-actions { display: flex; align-items: center; gap: .5rem; flex-shrink: 0; }
+.wg-session-results .sr-ai-empty { padding: 1.5rem 0; text-align: center; }
+.wg-session-results .sr-ai-empty p { max-width: 28rem; margin: 0 auto; color: rgb(var(--hub-n-600)); font-size: .8125rem; }
+.wg-session-results .sr-ai-empty .wg-ai-btn { margin-top: .75rem; }
+
+/* Loading skeleton. */
+.wg-session-results .sr-skeleton { padding: 1rem 0; }
+.wg-session-results .sr-skeleton__lead { display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem; }
+.wg-session-results .sr-skeleton__lead p { color: rgb(var(--hub-n-600)); font-size: .8125rem; }
+.wg-session-results .sr-skeleton__dots { display: flex; gap: .375rem; }
+.wg-session-results .sr-skeleton__dot { display: inline-block; width: .5rem; height: .5rem; border-radius: 9999px; }
+.wg-session-results .sr-skeleton__line { width: 100%; height: .875rem; margin-bottom: .5rem; }
+.wg-session-results .sr-skeleton__line--85 { width: 85%; }
+.wg-session-results .sr-skeleton__line--75 { width: 75%; }
+.wg-session-results .sr-skeleton__line--70 { width: 70%; }
+.wg-session-results .sr-skeleton__line:last-child { margin-bottom: 0; }
+
+/* Error callout with retry. */
+.wg-session-results .sr-error {
+    padding: .875rem;
+    border: 1px solid rgb(var(--hub-danger-border));
+    border-radius: var(--hub-radius-control);
+    background: rgb(var(--hub-danger-bg));
+}
+.wg-session-results .sr-error--inset { margin: 1rem; padding: 1rem; }
+.wg-session-results .sr-error p { color: rgb(var(--hub-danger)); font-size: .8125rem; }
+.wg-session-results .sr-error__retry {
+    margin-top: .5rem;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: rgb(var(--hub-danger));
+    font-size: .75rem;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+/* SAVER executive report generator: navy bar inside the glass section. */
+.wg-session-results .sr-saver__header {
+    background: rgb(var(--hub-header-elevated));
+    color: rgb(var(--hub-n-0));
+}
+.wg-session-results .sr-saver__icon { background: rgb(var(--hub-n-0) / .2); }
+.wg-session-results .sr-saver__intro { flex: 1 1 16rem; min-width: 0; }
+.wg-session-results .sr-saver__title { color: rgb(var(--hub-n-0)); font-size: 1rem; font-weight: 700; }
+.wg-session-results .sr-saver__subtitle { color: rgb(var(--hub-n-0) / .85); font-size: .75rem; }
+.wg-session-results .sr-saver__header .sr-saver__btn {
+    border: 1px solid rgb(var(--hub-n-0) / .3);
+    background: rgb(var(--hub-n-0) / .15);
+    color: rgb(var(--hub-n-0));
+}
+.wg-session-results .sr-saver__header .sr-saver__btn:hover { background: rgb(var(--hub-n-0) / .25); }
+.wg-session-results .sr-btn-state { align-items: center; gap: .5rem; }
+.wg-session-results .sr-btn-state--idle { display: flex; }
+.wg-session-results .sr-saver__loading { padding: 2rem; text-align: center; }
+.wg-session-results .sr-saver__loading-lead { display: flex; align-items: center; justify-content: center; gap: .75rem; margin-bottom: 1rem; }
+.wg-session-results .sr-saver__loading-lead p { color: rgb(var(--hub-ink-secondary)); font-size: .875rem; font-weight: 500; }
+.wg-session-results .sr-saver__content { padding: 1.25rem; color: rgb(var(--hub-ink)); font-size: .875rem; line-height: 1.6; }
+
+/* Medals: rank is always the number; colour only reinforces it. */
+.wg-session-results .wg-rank-medal.sr-medal--gold { background: rgb(var(--hub-gold)); color: rgb(var(--hub-n-900)); }
+.wg-session-results .wg-rank-medal.sr-medal--silver { background: rgb(var(--hub-n-400)); color: rgb(var(--hub-n-900)); }
+.wg-session-results .wg-rank-medal.sr-medal--bronze { background: rgb(var(--hub-warning)); color: rgb(var(--hub-n-0)); }
+.wg-session-results .wg-rank-medal.sr-medal--xs { width: 1.5rem; height: 1.5rem; font-size: .6875rem; }
+.wg-session-results .wg-rank-medal.sr-medal--sm { width: 1.75rem; height: 1.75rem; font-size: .6875rem; }
+
+/* Score badges and chips. */
+.wg-session-results .wg-score-badge.sr-badge--lg { padding: .375rem .75rem; font-size: 1rem; }
+.wg-session-results .wg-score-badge.sr-badge--md { font-size: .875rem; }
+.wg-session-results .sr-pill {
+    padding: .125rem .5rem;
+    border: 1px solid rgb(var(--hub-border));
+    border-radius: 9999px;
+    background: rgb(var(--hub-well));
+    color: rgb(var(--hub-n-600));
+    font-size: .75rem;
+}
+.wg-session-results .sr-top-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+    padding: .25rem .625rem;
+    border: 1px solid rgb(var(--hub-warning-border));
+    border-radius: 9999px;
+    background: rgb(var(--hub-warning-bg));
+    color: rgb(var(--hub-warning-strong));
+    font-size: .875rem;
+    font-weight: 500;
+}
+
+/* T1 standalone card. */
+.wg-session-results .sr-t1 {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    padding: .75rem 1rem;
+    border: 1px solid rgb(var(--hub-warning-border));
+    border-radius: var(--hub-radius-control);
+    background: rgb(var(--hub-warning-bg));
+}
+.wg-session-results .sr-t1__name { color: rgb(var(--hub-ink)); font-size: 1rem; font-weight: 700; }
+.wg-session-results .sr-t1__score { text-align: right; }
+.wg-session-results .sr-t1__score .sr-caption { margin-top: .25rem; font-size: .6875rem; }
+.wg-session-results .sr-saver-cells { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .75rem; }
+.wg-session-results .sr-saver-cell {
+    flex: 1;
+    min-width: 5rem;
+    padding: .5rem;
+    border: 1px solid rgb(var(--hub-border));
+    border-radius: var(--hub-radius-tag);
+    background: rgb(var(--hub-well));
+    text-align: center;
+}
+.wg-session-results .sr-saver-cell__label {
+    color: rgb(var(--hub-n-600));
+    font-size: .6875rem;
+    font-weight: 600;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+}
+.wg-session-results .sr-saver-cell__value { margin-top: .125rem; color: rgb(var(--hub-ink)); font-size: 1rem; }
+
+/* Brand rankings. */
+.wg-session-results .sr-brand-row { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
+.wg-session-results .sr-brand-row--tight { gap: .5rem; }
+.wg-session-results .wg-brand-label.sr-brand-label--lg { font-size: 1.0625rem; }
+
+/* Ranking tables sit in a white well with a bounded horizontal scroll. */
+.wg-session-results .sr-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+    background: rgb(var(--hub-well));
+}
+.wg-session-results .sr-scroll .wg-table { min-width: 40rem; }
+.wg-session-results .sr-scroll:focus-visible {
+    outline: 2px solid rgb(var(--hub-focus));
+    outline-offset: -2px;
+}
+.wg-session-results .wg-table th.sr-col-rank { width: 3rem; text-align: center; }
+.wg-session-results .wg-table th.sr-col-rank--wide { width: 3.5rem; text-align: center; }
+.wg-session-results .wg-table th.sr-center,
+.wg-session-results .wg-table td.sr-center { text-align: center; }
+.wg-session-results .wg-table td.sr-cell-sm { font-size: .75rem; }
+.wg-session-results .sr-rank-plain { color: rgb(var(--hub-n-600)); font-size: .75rem; }
+.wg-session-results .sr-product-name { color: rgb(var(--hub-ink)); font-weight: 600; }
+.wg-session-results .sr-product-sub { color: rgb(var(--hub-n-600)); font-size: .6875rem; }
+.wg-session-results .wg-table td.sr-cell-strong { color: rgb(var(--hub-ink)); font-weight: 600; }
+.wg-session-results .wg-table td.sr-cell-muted { color: rgb(var(--hub-n-600)); }
+.wg-session-results .wg-table td.sr-cell-small-muted { color: rgb(var(--hub-n-600)); font-size: .75rem; }
+.wg-session-results .sr-adv { font-size: .75rem; }
+.wg-session-results .sr-adv__yes { color: rgb(var(--hub-success)); font-weight: 500; }
+.wg-session-results .sr-adv__no { margin-left: .25rem; color: rgb(var(--hub-danger)); }
+.wg-session-results .sr-adv__flag { margin-left: .25rem; color: rgb(var(--hub-danger)); font-size: .75rem; }
+.wg-session-results .sr-resp {
+    padding: .125rem .5rem;
+    border-radius: 9999px;
+    background: rgb(var(--hub-surface-muted));
+    color: rgb(var(--hub-n-600));
+    font-size: .75rem;
+}
+.wg-session-results .sr-resp--ok { background: rgb(var(--hub-blue-tint)); color: rgb(var(--hub-blue-strong)); }
+.wg-session-results .sr-row--leader { background: rgb(var(--hub-warning-bg)); }
+
+/* Competitor group rankings. */
+.wg-session-results .sr-cg { padding: .75rem 1.25rem; border-bottom: 1px solid rgb(var(--hub-border)); }
+.wg-session-results .sr-cg__title { margin-bottom: .75rem; color: rgb(var(--hub-ink)); font-size: .875rem; font-weight: 700; }
+.wg-session-results .wg-group-item { min-width: 0; }
+.wg-session-results .wg-group-item--leader {
+    border: 1px solid rgb(var(--hub-border));
+    background: rgb(var(--hub-well));
+}
+.wg-session-results .sr-ranking-name { color: rgb(var(--hub-ink)); font-size: .8125rem; font-weight: 600; }
+.wg-session-results .sr-ranking-brand { margin-left: .25rem; color: rgb(var(--hub-n-600)); font-size: .6875rem; }
+
+/* Brand group purchase analysis. */
+.wg-session-results .sr-bg { padding: 1rem 1.25rem; border-bottom: 1px solid rgb(var(--hub-border)); }
+.wg-session-results .sr-bg__head { margin-bottom: .75rem; }
+.wg-session-results .sr-bg__title { color: rgb(var(--hub-ink)); font-size: .9375rem; font-weight: 700; }
+.wg-session-results .sr-ps-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 10rem), 1fr));
+    gap: .375rem;
+    margin-top: .5rem;
+}
+.wg-session-results .sr-ps {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem;
+    min-width: 0;
+    padding: .375rem .625rem;
+    border: 1px solid rgb(var(--hub-border));
+    border-radius: var(--hub-radius-tag);
+    background: rgb(var(--hub-well));
+    font-size: .75rem;
+}
+.wg-session-results .sr-ps__name {
+    min-width: 0;
+    overflow: hidden;
+    color: rgb(var(--hub-n-600));
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.wg-session-results .sr-ps__score { flex-shrink: 0; }
+
+/* Standalone product analysis. */
+.wg-session-results .sr-iso-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+    gap: 1rem;
+    margin-top: .75rem;
+}
+.wg-session-results .wg-isolated-product { min-width: 0; background: rgb(var(--hub-well)); }
+.wg-session-results .sr-iso__head { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; margin-bottom: .5rem; }
+.wg-session-results .sr-iso__name { color: rgb(var(--hub-ink)); font-size: .875rem; font-weight: 600; }
+.wg-session-results .sr-iso__note { margin-bottom: .5rem; color: rgb(var(--hub-n-600)); font-size: .75rem; font-style: italic; }
+.wg-session-results .sr-iso__meta { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; color: rgb(var(--hub-n-600)); font-size: .6875rem; }
+.wg-session-results .sr-chips { display: flex; flex-wrap: wrap; gap: .375rem; margin-top: .5rem; font-size: .6875rem; }
+.wg-session-results .sr-chip {
+    padding: .125rem .375rem;
+    border: 1px solid rgb(var(--hub-border));
+    border-radius: var(--hub-radius-sm);
+    background: rgb(var(--hub-well));
+    color: rgb(var(--hub-ink-secondary));
+    font-variant-numeric: tabular-nums;
+}
+
+/* Non-rankable feedback: no coloured side stripe, a bordered white well instead. */
+.wg-session-results .wg-feedback-quote {
+    border: 1px solid rgb(var(--hub-border));
+    border-radius: var(--hub-radius-control);
+    background: rgb(var(--hub-well));
+}
+.wg-session-results .wg-feedback-meta { flex-wrap: wrap; gap: .5rem; }
+.wg-session-results .sr-row { display: flex; align-items: center; gap: .5rem; min-width: 0; }
+.wg-session-results .sr-fb-score { color: rgb(var(--hub-ink-secondary)); font-size: .75rem; }
+
+/* Empty state: no sessions. */
+.wg-session-results .sr-empty-state { padding: 4rem 0; text-align: center; }
+.wg-session-results .sr-empty-state__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 4rem;
+    height: 4rem;
+    margin: 0 auto 1rem;
+    border: 1px solid rgb(var(--hub-border));
+    border-radius: 9999px;
+    background: rgb(var(--hub-well));
+}
+.wg-session-results .sr-empty-state__glyph { color: rgb(var(--hub-n-600)); }
+.wg-session-results .sr-empty-state__title { margin-bottom: .5rem; color: rgb(var(--hub-ink)); font-size: 1.125rem; font-weight: 700; }
+.wg-session-results .sr-empty-state__text { max-width: 28rem; margin: 0 auto; color: rgb(var(--hub-n-600)); font-size: .875rem; }
+
+/* Phone: 16px gutters, nothing may widen the document. */
+@media (max-width: 639px) {
+    .wg-session-results .sr-t1 { flex-direction: column; align-items: flex-start; }
+    .wg-session-results .sr-t1__score { text-align: left; }
+    .wg-session-results .sr-cg,
+    .wg-session-results .sr-bg { padding-inline: 1rem; }
+    .wg-session-results .sr-empty-state { padding: 2.5rem 0; }
+    .wg-session-results .sr-saver__loading { padding: 1.5rem 1rem; }
+}
+
+/* Touch targets on coarse pointers. */
+@media (pointer: coarse) {
+    .wg-session-results .sr-error__retry {
+        display: inline-flex;
+        align-items: center;
+        min-width: 44px;
+        min-height: 44px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .wg-session-results .sr-spin,
+    .wg-session-results .wg-shimmer::after { animation: none; }
+}
+
+/* =========================================================================
+   LINKS (report library)
+   ========================================================================= */
+
+.wl-links .workgroup-report-link:focus-visible {
+    outline: 2px solid rgb(var(--hub-focus));
+    outline-offset: -2px;
+}
+.wl-links .wl-row { display: flex; align-items: flex-start; gap: 1rem; }
+.wl-links .wl-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 2.75rem;
+    height: 2.75rem;
+    border-radius: var(--hub-radius-control);
+    background: rgb(var(--hub-blue-tint));
+    color: rgb(var(--hub-action-primary));
+}
+.wl-links .wl-glyph { width: 1.25rem; height: 1.25rem; }
+.wl-links .wl-body { flex: 1; min-width: 0; }
+.wl-links .wl-titlerow { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; margin-bottom: .25rem; }
+.wl-links .wl-title {
+    margin: 0 0 .25rem;
+    color: rgb(var(--hub-ink));
+    font-size: 1.0625rem;
+    font-weight: 600;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+}
+.wl-links .wl-titlerow .wl-title { margin: 0; }
+.wl-links .wl-tag {
+    display: inline-block;
+    padding: .125rem .5rem;
+    border-radius: var(--hub-radius-sm);
+    background: rgb(var(--hub-action-primary));
+    color: rgb(var(--hub-n-0));
+    font-size: .6875rem;
+    font-weight: 700;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+}
+.wl-links .wl-desc { margin: 0; color: rgb(var(--hub-n-600)); font-size: .875rem; line-height: 1.5; overflow-wrap: anywhere; }
+.wl-links .wl-ext { flex-shrink: 0; align-self: center; color: rgb(var(--hub-n-600)); }
+
+@media (max-width: 639px) {
+    .wl-links .wl-row { gap: .75rem; }
+}

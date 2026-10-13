@@ -3,64 +3,15 @@
   Tested on: smartphone (portrait/landscape), tablet, desktop
   Rules:
     - NO violet-* classes (not in Filament CSS purge)
-    - NO bare SVG heroicons for decorative large icons (use inline style for sizing)
+    - NO bare SVG heroicons for decorative large icons (size them with the .ei-icon classes)
     - All touch targets min 48px height
     - File inputs use capture="environment" for camera, multiple for gallery
 --}}
 <x-filament-panels::page>
-    {{-- Scoped inline styles for items not in Tailwind purge --}}
-    <style>
-        .ei-help { color: rgb(var(--hub-muted)); }
-        .ei-upload-zone {
-            display: flex; flex-direction: column; align-items: center;
-            justify-content: center; gap: 1rem;
-            padding: 2rem 1rem; text-align: center;
-            border: 2px dashed #e5e7eb; border-radius: 0.75rem;
-            background: #f9fafb; cursor: pointer;
-            transition: border-color 0.15s, background 0.15s;
-        }
-        .ei-upload-zone:hover { border-color: rgb(var(--hub-action-primary)); background: rgb(var(--hub-action-primary) / 0.08); }
-        .ei-upload-zone svg { width: 3rem; height: 3rem; color: #9ca3af; }
-        .ei-btn-primary {
-            display: inline-flex; align-items: center; justify-content: center;
-            gap: 0.5rem; padding: 0.875rem 1.5rem; font-size: 0.9375rem;
-            font-weight: 600; border-radius: 0.5rem; border: none; cursor: pointer;
-            min-height: 48px; width: 100%; background: rgb(var(--hub-action-primary)); color: #fff;
-            transition: background 0.15s; text-align: center;
-        }
-        .ei-btn-primary:hover { background: rgb(var(--hub-action-primary-hover)); }
-        .ei-btn-primary:active { background: rgb(var(--hub-header-elevated)); }
-        .ei-btn-secondary {
-            display: inline-flex; align-items: center; justify-content: center;
-            gap: 0.5rem; padding: 0.875rem 1.5rem; font-size: 0.9375rem;
-            font-weight: 600; border-radius: 0.5rem; border: 1px solid #d1d5db;
-            cursor: pointer; min-height: 48px; width: 100%; background: #fff;
-            color: #374151; transition: background 0.15s; text-align: center;
-        }
-        .ei-btn-secondary:hover { background: #f9fafb; }
-        .ei-tab-btn {
-            display: flex; align-items: center; gap: 0.5rem;
-            padding: 0.75rem 1rem; font-size: 0.875rem; font-weight: 500;
-            border-bottom: 2px solid transparent; color: #6b7280;
-            background: none; border-left: none; border-right: none; border-top: none;
-            cursor: pointer; white-space: nowrap; transition: color 0.15s, border-color 0.15s;
-            min-height: 48px;
-        }
-        .ei-tab-btn.active { border-bottom-color: rgb(var(--hub-action-primary)); color: rgb(var(--hub-action-primary)); font-weight: 600; }
-        .ei-tab-btn svg { width: 1.25rem; height: 1.25rem; flex-shrink: 0; }
-        .ei-progress-bar { height: 0.5rem; background: #e5e7eb; border-radius: 9999px; overflow: hidden; }
-        .ei-progress-fill { height: 100%; background: rgb(var(--hub-action-primary)); border-radius: 9999px; transition: width 0.3s; }
-        @media (min-width: 640px) {
-            .ei-btn-primary, .ei-btn-secondary { width: auto; }
-            .ei-bulk-row { background: transparent; }
-            .ei-bulk-grid { grid-template-columns: minmax(0, 2fr) 80px minmax(0, 1fr) minmax(0, 1fr) 40px; }
-        }
-    </style>
-
     {{-- Tab Switcher --}}
-    <div x-data="{ activeTab: 'scan' }" class="space-y-5">
+    <div x-data="{ activeTab: 'scan' }" class="ei-page space-y-5">
         {{-- Tab Navigation --}}
-        <div class="flex border-b border-gray-200 overflow-x-auto -mb-px">
+        <div class="ei-tabs">
             <button type="button" @click="activeTab = 'scan'"
                 :class="activeTab === 'scan' ? 'ei-tab-btn active' : 'ei-tab-btn'">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" /><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" /></svg>
@@ -85,20 +36,20 @@
             <div x-data="equipmentScanner()" @equipment-saved.window="resetCapture()" class="space-y-5">
 
                 {{-- Camera Capture Card --}}
-                <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 p-4 sm:p-6">
-                    <h3 class="text-base font-semibold text-gray-900 mb-1">Capture Equipment Photos</h3>
-                    <p class="text-sm text-gray-500 mb-4">Take up to 3 photos of the same tool (e.g. one of the tool body, one of the data plate). AI will combine them for best results.</p>
+                <div class="ei-card">
+                    <h3 class="ei-title ei-title--tight">Capture Equipment Photos</h3>
+                    <p class="ei-lede">Take up to 3 photos of the same tool (e.g. one of the tool body, one of the data plate). AI will combine them for best results.</p>
 
                     {{-- Thumbnail strip --}}
                     <template x-if="imagePreviews.length > 0">
                         <div class="flex flex-wrap gap-3 mb-4">
                             <template x-for="(preview, idx) in imagePreviews" :key="idx">
-                                <div class="relative">
-                                    <img :src="preview" style="width:80px;height:80px;object-fit:cover;border-radius:0.5rem;display:block;" />
+                                <div class="ei-thumb-wrap">
+                                    <img :src="preview" class="ei-thumb" alt="" />
                                     <button type="button" @click="removeImage(idx)"
-                                        style="position:absolute;top:-8px;right:-8px;width:22px;height:22px;background:#ef4444;color:#fff;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:bold;line-height:1;"
+                                        class="ei-thumb-remove"
                                         aria-label="Remove photo">&times;</button>
-                                    <span style="position:absolute;bottom:4px;right:4px;background:rgba(0,0,0,0.6);color:#fff;font-size:10px;padding:1px 5px;border-radius:3px;" x-text="'#'+(idx+1)"></span>
+                                    <span class="ei-thumb-badge" x-text="'#'+(idx+1)"></span>
                                 </div>
                             </template>
                         </div>
@@ -107,39 +58,39 @@
                     {{-- Action Buttons --}}
                     <div class="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                         {{-- Take Photo — mobile camera --}}
-                        <label class="ei-btn-primary" style="cursor:pointer;" :class="imageFiles.length >= 3 ? 'opacity-50 pointer-events-none' : ''">
-                            <svg style="width:20px;height:20px;flex-shrink:0;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" /><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" /></svg>
+                        <label class="ei-btn-primary" :class="imageFiles.length >= 3 ? 'opacity-50 pointer-events-none' : ''">
+                            <svg class="ei-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" /><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0zM18.75 10.5h.008v.008h-.008V10.5z" /></svg>
                             <span x-text="imageFiles.length === 0 ? 'Take Photo' : 'Add Another Photo'"></span>
-                            <input type="file" accept="image/*" capture="environment" style="display:none;" @change="handleCapture($event)" x-ref="cameraInput" />
+                            <input type="file" accept="image/*" capture="environment" class="ei-file-input" @change="handleCapture($event)" x-ref="cameraInput" />
                         </label>
 
                         {{-- Choose from Gallery --}}
-                        <label class="ei-btn-secondary" style="cursor:pointer;" :class="imageFiles.length >= 3 ? 'opacity-50 pointer-events-none' : ''">
-                            <svg style="width:20px;height:20px;flex-shrink:0;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>
+                        <label class="ei-btn-secondary" :class="imageFiles.length >= 3 ? 'opacity-50 pointer-events-none' : ''">
+                            <svg class="ei-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" /></svg>
                             <span>Choose from Gallery</span>
-                            <input type="file" accept="image/*" multiple style="display:none;" @change="handleGallerySelect($event)" x-ref="galleryInput" />
+                            <input type="file" accept="image/*" multiple class="ei-file-input" @change="handleGallerySelect($event)" x-ref="galleryInput" />
                         </label>
 
                         {{-- Analyze --}}
                         <template x-if="imagePreviews.length > 0 && !processing">
-                            <button type="button" @click="analyzeAllImages()" class="ei-btn-primary" style="background:#16a34a;">
-                                <svg style="width:20px;height:20px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
+                            <button type="button" @click="analyzeAllImages()" class="ei-btn-primary ei-btn-success">
+                                <svg class="ei-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
                                 Analyze <span x-text="imagePreviews.length"></span> Photo(s) with AI
                             </button>
                         </template>
 
                         {{-- Clear --}}
                         <template x-if="imagePreviews.length > 0 && !processing">
-                            <button type="button" @click="resetCapture()" class="ei-btn-secondary" style="color:#6b7280;">Clear All</button>
+                            <button type="button" @click="resetCapture()" class="ei-btn-secondary ei-btn-muted">Clear All</button>
                         </template>
                     </div>
 
                     {{-- Processing --}}
                     <template x-if="processing">
-                        <div class="mt-4 flex items-center gap-3" style="color:rgb(var(--hub-action-primary));">
-                            <svg class="animate-spin" style="width:24px;height:24px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle style="opacity:0.25;" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path style="opacity:0.75;" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        <div class="ei-processing">
+                            <svg class="animate-spin ei-icon ei-icon--lg" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle opacity="0.25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path opacity="0.75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                             </svg>
                             <span class="text-sm font-medium">Analyzing <span x-text="imageFiles.length"></span> image(s) with AI…</span>
                         </div>
@@ -147,22 +98,21 @@
 
                     {{-- Error --}}
                     <template x-if="scanError">
-                        <div class="mt-4 p-3 rounded-lg text-sm flex items-start gap-2" style="background:#fef2f2;color:#dc2626;">
-                            <svg style="width:18px;height:18px;flex-shrink:0;margin-top:1px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+                        <div class="ei-alert ei-alert--danger mt-4">
+                            <svg class="ei-icon ei-icon--sm" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
                             <span x-text="scanError"></span>
                         </div>
                     </template>
                 </div>
 
                 {{-- Asset Details Form --}}
-                <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 p-4 sm:p-6">
-                    <h3 class="text-base font-semibold text-gray-900 mb-4">Asset Details</h3>
+                <div class="ei-card">
+                    <h3 class="ei-title ei-title--loose">Asset Details</h3>
                     {{-- Item Type Selector --}}
                     <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Item Type</label>
+                        <label class="ei-label">Item Type</label>
                         <select wire:model.live="scan_type" aria-label="Item type"
-                            class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base sm:max-w-xs"
-                            style="min-height:44px;">
+                            class="ei-control ei-control--narrow">
                             <option value="hardware">Hardware Asset (tracked, has serial)</option>
                             <option value="accessory">Accessory (consumable add-on)</option>
                             <option value="consumable">Consumable (disposable supply)</option>
@@ -173,65 +123,58 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Brand / Manufacturer</label>
+                            <label class="ei-label">Brand / Manufacturer</label>
                             <input type="text" :value="aiField_brand" @input="aiField_brand=$event.target.value; $wire.set('scan_brand',$event.target.value)"
-                                class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-                                style="min-height:44px;" placeholder="e.g. Scott, MSA, Motorola" />
+                                class="ei-control" placeholder="e.g. Scott, MSA, Motorola" />
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Model</label>
+                            <label class="ei-label">Model</label>
                             <input type="text" :value="aiField_model" @input="aiField_model=$event.target.value; $wire.set('scan_model',$event.target.value)"
-                                class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-                                style="min-height:44px;" placeholder="e.g. Air-Pak X3 Pro" />
+                                class="ei-control" placeholder="e.g. Air-Pak X3 Pro" />
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Serial Number</label>
+                            <label class="ei-label">Serial Number</label>
                             <input type="text" :value="aiField_serial" @input="aiField_serial=$event.target.value; $wire.set('scan_serial',$event.target.value)"
-                                class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-                                style="min-height:44px;" placeholder="e.g. SN-2024-00123" />
+                                class="ei-control" placeholder="e.g. SN-2024-00123" />
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Item / Device Name <span class="ei-help text-xs">(AI-suggested)</span></label>
+                            <label class="ei-label">Item / Device Name <span class="ei-help text-xs">(AI-suggested)</span></label>
                             <input type="text" :value="aiField_item_name" @input="aiField_item_name=$event.target.value"
-                                class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base"
-                                style="min-height:44px;" placeholder="e.g. 18 inch chainsaw, hydraulic spreader" />
+                                class="ei-control" placeholder="e.g. 18 inch chainsaw, hydraulic spreader" />
                         </div>
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 mb-1">Category <span class="ei-help text-xs">(AI-suggested)</span></label>
+                            <label class="ei-label">Category <span class="ei-help text-xs">(AI-suggested)</span></label>
                             <input type="text" :value="aiField_category" @input="aiField_category=$event.target.value"
-                                class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base"
-                                style="min-height:44px;" placeholder="e.g. Saw, Rescue Tool, SCBA, Fan" />
+                                class="ei-control" placeholder="e.g. Saw, Rescue Tool, SCBA, Fan" />
                         </div>
                         <div x-data="{ showNewLoc: false }">
-                            <label class="block text-sm font-medium text-gray-700 mb-1">
-                                Location <span style="color:#dc2626;">*</span>
+                            <label class="ei-label">
+                                Location <span class="ei-required">*</span>
                             </label>
                             <div x-show="!showNewLoc">
                                 <select wire:model="scan_location" aria-label="Location"
-                                    class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base"
-                                    style="min-height:44px;" required>
+                                    class="ei-control" required>
                                     <option value="">Select location...</option>
                                     @foreach($this->locations as $id => $name)
                                         <option value="{{ $id }}">{{ $name }}</option>
                                     @endforeach
                                 </select>
-                                <button type="button" @click="showNewLoc = true" class="mt-1 text-sm" style="color:rgb(var(--hub-action-primary));min-height:44px;">+ New location</button>
+                                <button type="button" @click="showNewLoc = true" class="ei-link">+ New location</button>
                             </div>
                             <div x-show="showNewLoc" class="space-y-2">
                                 <input type="text" wire:model="new_location_name"
-                                    class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base"
-                                    style="min-height:44px;" placeholder="New location name..." />
+                                    class="ei-control" placeholder="New location name..." />
                                 <div class="flex gap-3">
-                                    <button type="button" wire:click="createNewLocation" class="text-sm font-medium" style="color:#16a34a;">Save</button>
-                                    <button type="button" @click="showNewLoc = false" class="text-sm" style="color:#6b7280;">Cancel</button>
+                                    <button type="button" wire:click="createNewLocation" class="ei-link ei-link--success">Save</button>
+                                    <button type="button" @click="showNewLoc = false" class="ei-link ei-link--muted">Cancel</button>
                                 </div>
                             </div>
                         </div>
                     </div>
                     <div class="mt-4">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Notes (optional)</label>
+                        <label class="ei-label">Notes (optional)</label>
                         <textarea wire:model="scan_notes" rows="2"
-                            class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base"
+                            class="ei-control"
                             placeholder="Any additional notes..."></textarea>
                     </div>
                     <div class="mt-5 flex flex-col gap-3 sm:flex-row">
@@ -239,20 +182,20 @@
                             @click="isSaving=true; $wire.approveAndSaveWithData(aiField_brand, aiField_model, aiField_serial, aiField_item_name, aiField_category).then(()=>{isSaving=false})"
                             :disabled="isSaving"
                             class="ei-btn-primary">
-                            <svg style="width:20px;height:20px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            <svg class="ei-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                             <span x-show="!isSaving">Approve &amp; Save to Snipe-IT</span>
                             <span x-show="isSaving">Saving&#x2026;</span>
                         </button>
                         <button type="button" wire:click="resetScanForm" class="ei-btn-secondary">
-                            <svg style="width:20px;height:20px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
+                            <svg class="ei-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
                             Clear Form
                         </button>
                     </div>
                 </div>
 
                 @if($scan_success)
-                    <div class="p-4 rounded-lg text-sm flex items-center gap-2" style="background:#f0fdf4;color:#16a34a;">
-                        <svg style="width:20px;height:20px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <div class="ei-alert ei-alert--success">
+                        <svg class="ei-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                         {{ $scan_success }}
                     </div>
                 @endif
@@ -265,62 +208,59 @@
         <div x-show="activeTab === 'bulk'" x-cloak>
             <div class="space-y-5">
                 {{-- Location --}}
-                <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 p-4 sm:p-6">
-                    <h3 class="text-base font-semibold text-gray-900 mb-1">Manual Bulk Entry</h3>
-                    <p class="text-sm text-gray-500 mb-4">For items without photos or serial numbers. Select location then fill the grid.</p>
+                <div class="ei-card">
+                    <h3 class="ei-title ei-title--tight">Manual Bulk Entry</h3>
+                    <p class="ei-lede">For items without photos or serial numbers. Select location then fill the grid.</p>
                     <div x-data="{ showNewLoc2: false }">
-                        <label class="block text-sm font-medium text-gray-700 mb-1">Location <span style="color:#dc2626;">*</span></label>
+                        <label class="ei-label">Location <span class="ei-required">*</span></label>
                         <div x-show="!showNewLoc2">
                             <select wire:model="bulk_location" aria-label="Location for manual bulk entry"
-                                class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base" style="max-width:320px;min-height:44px;">
+                                class="ei-control ei-control--narrow">
                                 <option value="">Select location...</option>
                                 @foreach($this->locations as $id => $name)
                                     <option value="{{ $id }}">{{ $name }}</option>
                                 @endforeach
                             </select>
-                            <button type="button" @click="showNewLoc2 = true" class="mt-1 text-sm" style="color:rgb(var(--hub-action-primary));min-height:44px;">+ New location</button>
+                            <button type="button" @click="showNewLoc2 = true" class="ei-link">+ New location</button>
                         </div>
                         <div x-show="showNewLoc2" class="space-y-2">
                             <input type="text" wire:model="new_location_name"
-                                class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base"
-                                style="max-width:320px;min-height:44px;" placeholder="New location name..." />
+                                class="ei-control ei-control--narrow" placeholder="New location name..." />
                             <div class="flex gap-3">
-                                <button type="button" wire:click="createNewLocation" class="text-sm font-medium" style="color:#16a34a;">Save</button>
-                                <button type="button" @click="showNewLoc2 = false" class="text-sm" style="color:#6b7280;">Cancel</button>
+                                <button type="button" wire:click="createNewLocation" class="ei-link ei-link--success">Save</button>
+                                <button type="button" @click="showNewLoc2 = false" class="ei-link ei-link--muted">Cancel</button>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 {{-- Grid --}}
-                <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 p-4 sm:p-6">
-                    <h3 class="text-base font-semibold text-gray-900 mb-4">Items</h3>
+                <div class="ei-card">
+                    <h3 class="ei-title ei-title--loose">Items</h3>
 
                     {{-- Desktop header --}}
-                    <div class="hidden sm:grid gap-2 mb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider px-1" style="grid-template-columns: 2fr 80px 1fr 1fr 40px;">
+                    <div class="ei-bulk-head">
                         <div>Item Name</div><div>Qty</div><div>Category</div><div>Notes</div><div></div>
                     </div>
 
                     <div class="space-y-3">
                         @foreach($bulk_items as $index => $item)
-                            <div class="ei-bulk-row rounded-lg bg-gray-50 p-3 sm:p-0">
-                                <div class="ei-bulk-grid grid grid-cols-1 sm:gap-2 sm:items-center">
-                                    <div class="mb-2 sm:mb-0">
-                                        <label class="sm:hidden block text-xs font-medium text-gray-500 mb-1">Item Name</label>
+                            <div class="ei-bulk-row">
+                                <div class="ei-bulk-grid">
+                                    <div class="ei-bulk-cell">
+                                        <label class="ei-label ei-label--sm sm:hidden">Item Name</label>
                                         <input type="text" wire:model="bulk_items.{{ $index }}.name"
-                                            class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base"
-                                            style="min-height:44px;" placeholder="e.g. Flashlight batteries" />
+                                            class="ei-control" placeholder="e.g. Flashlight batteries" />
                                     </div>
-                                    <div class="mb-2 sm:mb-0">
-                                        <label class="sm:hidden block text-xs font-medium text-gray-500 mb-1">Qty</label>
+                                    <div class="ei-bulk-cell">
+                                        <label class="ei-label ei-label--sm sm:hidden">Qty</label>
                                         <input type="number" wire:model="bulk_items.{{ $index }}.quantity" min="1"
-                                            class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base"
-                                            style="min-height:44px;" />
+                                            class="ei-control" />
                                     </div>
-                                    <div class="mb-2 sm:mb-0">
-                                        <label class="sm:hidden block text-xs font-medium text-gray-500 mb-1">Category</label>
+                                    <div class="ei-bulk-cell">
+                                        <label class="ei-label ei-label--sm sm:hidden">Category</label>
                                         <select wire:model="bulk_items.{{ $index }}.category" aria-label="Category for item {{ $index + 1 }}"
-                                            class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base" style="min-height:44px;">
+                                            class="ei-control">
                                             <option value="">—</option>
                                             <option value="Consumable">Consumable</option>
                                             <option value="Tool">Tool</option>
@@ -331,17 +271,16 @@
                                             <option value="Other">Other</option>
                                         </select>
                                     </div>
-                                    <div class="mb-2 sm:mb-0">
-                                        <label class="sm:hidden block text-xs font-medium text-gray-500 mb-1">Notes</label>
+                                    <div class="ei-bulk-cell">
+                                        <label class="ei-label ei-label--sm sm:hidden">Notes</label>
                                         <input type="text" wire:model="bulk_items.{{ $index }}.notes"
-                                            class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base"
-                                            style="min-height:44px;" placeholder="Optional" />
+                                            class="ei-control" placeholder="Optional" />
                                     </div>
-                                    <div class="flex justify-end sm:justify-center">
+                                    <div class="ei-bulk-actions">
                                         @if(count($bulk_items) > 1)
                                             <button type="button" wire:click="removeBulkRow({{ $index }})"
-                                                style="color:#9ca3af;padding:8px;border:none;background:none;cursor:pointer;" title="Remove">
-                                                <svg style="width:20px;height:20px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                                class="ei-icon-btn" title="Remove" aria-label="Remove row">
+                                                <svg class="ei-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                             </button>
                                         @endif
                                     </div>
@@ -352,11 +291,11 @@
 
                     <div class="mt-4 flex flex-col gap-3 sm:flex-row">
                         <button type="button" wire:click="addBulkRow" class="ei-btn-secondary">
-                            <svg style="width:20px;height:20px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                            <svg class="ei-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                             Add Row
                         </button>
                         <button type="button" wire:click="submitBulkItems" wire:loading.attr="disabled" class="ei-btn-primary">
-                            <svg style="width:20px;height:20px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
+                            <svg class="ei-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
                             <span wire:loading.remove wire:target="submitBulkItems">Submit All to Snipe-IT</span>
                             <span wire:loading wire:target="submitBulkItems">Submitting…</span>
                         </button>
@@ -372,30 +311,30 @@
             <div x-data="aiBulkScanner()" class="space-y-5">
 
                 {{-- Upload Section --}}
-                <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 p-4 sm:p-6">
-                    <h3 class="text-base font-semibold text-gray-900 mb-1">AI Bulk Photo Import</h3>
-                    <p class="text-sm text-gray-500 mb-4">
+                <div class="ei-card">
+                    <h3 class="ei-title ei-title--tight">AI Bulk Photo Import</h3>
+                    <p class="ei-lede">
                         Select up to 20 photos of <strong>different</strong> tools from your camera roll or gallery.
                         The AI will analyze each photo and fill in Brand, Model &amp; Serial for you to review.
                     </p>
 
                     {{-- Big upload zone — always visible --}}
-                    <label class="ei-upload-zone" style="cursor:pointer;" :class="totalImages > 0 && doneImages < totalImages ? 'pointer-events-none opacity-75' : ''">
-                        <svg style="width:48px;height:48px;color:#9ca3af;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                    <label class="ei-upload-zone" :class="totalImages > 0 && doneImages < totalImages ? 'pointer-events-none opacity-75' : ''">
+                        <svg class="ei-icon ei-icon--hero ei-icon--muted" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5zm10.5-11.25h.008v.008h-.008V8.25zm.375 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z" />
                         </svg>
                         <div>
-                            <p class="text-base font-semibold text-gray-700">Tap to select equipment photos</p>
-                            <p class="text-sm text-gray-500 mt-1">Up to 20 photos • All image formats supported</p>
+                            <p class="ei-upload-title">Tap to select equipment photos</p>
+                            <p class="ei-upload-hint">Up to 20 photos • All image formats supported</p>
                         </div>
-                        <input type="file" accept="image/*" multiple style="display:none;" @change="startBulkAnalysis($event)" x-ref="bulkInput" />
+                        <input type="file" accept="image/*" multiple class="ei-file-input" @change="startBulkAnalysis($event)" x-ref="bulkInput" />
                     </label>
 
                     {{-- Progress --}}
                     <div x-show="totalImages > 0" class="mt-4">
-                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                            <span class="text-sm text-gray-600" x-text="`Analyzing ${doneImages} of ${totalImages} photos…`"></span>
-                            <span x-show="doneImages === totalImages && totalImages > 0" class="text-sm font-semibold" style="color:#16a34a;">✓ Done</span>
+                        <div class="ei-progress-head">
+                            <span class="ei-text-secondary" x-text="`Analyzing ${doneImages} of ${totalImages} photos…`"></span>
+                            <span x-show="doneImages === totalImages && totalImages > 0" class="ei-done">✓ Done</span>
                         </div>
                         <div class="ei-progress-bar">
                             <div class="ei-progress-fill" :style="`width:${totalImages > 0 ? Math.round((doneImages/totalImages)*100) : 0}%`"></div>
@@ -405,34 +344,33 @@
 
                 {{-- Global Location bar (shows when results exist) --}}
                 @if(count($ai_bulk_items) > 0)
-                    <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 p-4 sm:p-6">
+                    <div class="ei-card">
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
-                            <div x-data="{ showNewLoc3: false }" class="flex-1" style="max-width:360px;">
-                                <label class="block text-sm font-medium text-gray-700 mb-1">
-                                    Bulk Location <span style="color:#dc2626;">*</span>
+                            <div x-data="{ showNewLoc3: false }" class="ei-loc-field">
+                                <label class="ei-label">
+                                    Bulk Location <span class="ei-required">*</span>
                                 </label>
                                 <div x-show="!showNewLoc3">
                                     <select wire:model="ai_bulk_global_location" aria-label="Location for AI bulk entry"
-                                        class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base" style="min-height:44px;">
+                                        class="ei-control">
                                         <option value="">Select location...</option>
                                         @foreach($this->locations as $id => $name)
                                             <option value="{{ $id }}">{{ $name }}</option>
                                         @endforeach
                                     </select>
-                                    <button type="button" @click="showNewLoc3 = true" class="mt-1 text-sm" style="color:rgb(var(--hub-action-primary));min-height:44px;">+ New location</button>
+                                    <button type="button" @click="showNewLoc3 = true" class="ei-link">+ New location</button>
                                 </div>
                                 <div x-show="showNewLoc3" class="space-y-2">
                                     <input type="text" wire:model="new_location_name"
-                                        class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base"
-                                        style="min-height:44px;" placeholder="New location name..." />
+                                        class="ei-control" placeholder="New location name..." />
                                     <div class="flex gap-3">
-                                        <button type="button" wire:click="createNewLocation" class="text-sm font-medium" style="color:#16a34a;">Save</button>
-                                        <button type="button" @click="showNewLoc3 = false" class="text-sm" style="color:#6b7280;">Cancel</button>
+                                        <button type="button" wire:click="createNewLocation" class="ei-link ei-link--success">Save</button>
+                                        <button type="button" @click="showNewLoc3 = false" class="ei-link ei-link--muted">Cancel</button>
                                     </div>
                                 </div>
                             </div>
                             <button type="button" wire:click="applyGlobalLocationToBulk" class="ei-btn-secondary">
-                                <svg style="width:20px;height:20px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 16.5v-9m0 0l-3 3m3-3l3 3m6 3v-9m0 0l-3 3m3-3l3 3" /></svg>
+                                <svg class="ei-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 16.5v-9m0 0l-3 3m3-3l3 3m6 3v-9m0 0l-3 3m3-3l3 3" /></svg>
                                 Apply to All Rows
                             </button>
                         </div>
@@ -441,66 +379,66 @@
 
                 {{-- Results Grid --}}
                 @if(count($ai_bulk_items) > 0)
-                    <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 p-4 sm:p-6">
-                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
-                            <h3 class="text-base font-semibold text-gray-900">Review &amp; Edit ({{ count($ai_bulk_items) }} items)</h3>
-                            <button type="button" wire:click="resetAiBulk" class="text-sm" style="color:#9ca3af;">Clear All</button>
+                    <div class="ei-card">
+                        <div class="ei-results-head">
+                            <h3 class="ei-title">Review &amp; Edit ({{ count($ai_bulk_items) }} items)</h3>
+                            <button type="button" wire:click="resetAiBulk" class="ei-link ei-link--muted">Clear All</button>
                         </div>
 
                         <div class="space-y-4">
                             @foreach($ai_bulk_items as $idx => $row)
-                                <div class="rounded-xl p-3 sm:p-4 ring-1" style="background:#f9fafb;ring-color:#f3f4f6;">
+                                <div class="ei-result">
                                     {{-- Row header: thumbnail + error or fields --}}
                                     @if(!empty($row['error']))
-                                        <div style="display:flex;align-items:center;gap:8px;color:#dc2626;background:#fef2f2;padding:8px 12px;border-radius:8px;font-size:14px;">
-                                            <svg style="width:16px;height:16px;flex-shrink:0;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+                                        <div class="ei-alert ei-alert--danger">
+                                            <svg class="ei-icon ei-icon--xs" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
                                             <span>{{ $row['error'] }}</span>
                                         </div>
                                     @else
                                         {{-- Thumbnail + fields layout --}}
                                         <div class="flex gap-3 items-start mb-3">
                                             @if(!empty($row['thumbnail']))
-                                                <img src="{{ $row['thumbnail'] }}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0;border:1px solid #e5e7eb;" />
+                                                <img src="{{ $row['thumbnail'] }}" class="ei-result__thumb" alt="" />
                                             @else
-                                                <div style="width:64px;height:64px;background:#e5e7eb;border-radius:8px;flex-shrink:0;display:flex;align-items:center;justify-content:center;">
-                                                    <svg style="width:28px;height:28px;color:#9ca3af;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5z" /></svg>
+                                                <div class="ei-result__thumb ei-result__thumb--empty">
+                                                    <svg class="ei-icon ei-icon--xl ei-icon--muted" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 001.5-1.5V6a1.5 1.5 0 00-1.5-1.5H3.75A1.5 1.5 0 002.25 6v12a1.5 1.5 0 001.5 1.5z" /></svg>
                                                 </div>
                                             @endif
                                             <div class="flex-1 min-w-0">
-                                                <div class="text-xs font-semibold text-gray-500 mb-1">Item #{{ $idx + 1 }}</div>
-                                                <div class="text-sm font-medium text-gray-800">
+                                                <div class="ei-result__index">Item #{{ $idx + 1 }}</div>
+                                                <div class="ei-result__name">
                                                     {{ !empty($row['brand']) ? $row['brand'] : '—' }}
                                                     {{ !empty($row['model']) ? '· '.$row['model'] : '' }}
                                                 </div>
-                                                <div class="text-xs text-gray-500">{{ !empty($row['serial']) ? 'S/N: '.$row['serial'] : 'No serial' }}</div>
+                                                <div class="ei-result__meta">{{ !empty($row['serial']) ? 'S/N: '.$row['serial'] : 'No serial' }}</div>
                                             </div>
                                             <button type="button" wire:click="removeAiBulkRow({{ $idx }})"
-                                                style="color:#9ca3af;border:none;background:none;cursor:pointer;padding:4px;flex-shrink:0;" title="Remove">
-                                                <svg style="width:20px;height:20px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                                class="ei-icon-btn" title="Remove" aria-label="Remove item">
+                                                <svg class="ei-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                                             </button>
                                         </div>
 
                                         {{-- Editable fields --}}
                                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             <div>
-                                                <label class="block text-xs font-medium text-gray-500 mb-1">Brand</label>
+                                                <label class="ei-label ei-label--sm">Brand</label>
                                                 <input type="text" wire:model="ai_bulk_items.{{ $idx }}.brand"
-                                                    class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base" style="min-height:40px;" />
+                                                    class="ei-control ei-control--compact" />
                                             </div>
                                             <div>
-                                                <label class="block text-xs font-medium text-gray-500 mb-1">Model</label>
+                                                <label class="ei-label ei-label--sm">Model</label>
                                                 <input type="text" wire:model="ai_bulk_items.{{ $idx }}.model"
-                                                    class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base" style="min-height:40px;" />
+                                                    class="ei-control ei-control--compact" />
                                             </div>
                                             <div>
-                                                <label class="block text-xs font-medium text-gray-500 mb-1">Serial #</label>
+                                                <label class="ei-label ei-label--sm">Serial #</label>
                                                 <input type="text" wire:model="ai_bulk_items.{{ $idx }}.serial"
-                                                    class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base" style="min-height:40px;" />
+                                                    class="ei-control ei-control--compact" />
                                             </div>
                                             <div>
-                                                <label class="block text-xs font-medium text-gray-500 mb-1">Category</label>
+                                                <label class="ei-label ei-label--sm">Category</label>
                                                 <select wire:model="ai_bulk_items.{{ $idx }}.category" aria-label="Category for scanned item {{ $idx + 1 }}"
-                                                    class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base" style="min-height:40px;">
+                                                    class="ei-control ei-control--compact">
                                                     <option value="General">General</option>
                                                     <option value="Tool">Tool</option>
                                                     <option value="PPE">PPE</option>
@@ -511,9 +449,9 @@
                                                 </select>
                                             </div>
                                             <div class="sm:col-span-2">
-                                                <label class="block text-xs font-medium text-gray-500 mb-1">Location <span style="color:#dc2626;">*</span></label>
+                                                <label class="ei-label ei-label--sm">Location <span class="ei-required">*</span></label>
                                                 <select wire:model="ai_bulk_items.{{ $idx }}.location_id" aria-label="Location for scanned item {{ $idx + 1 }}"
-                                                    class="fi-input block w-full rounded-lg border-gray-300 shadow-sm text-base" style="min-height:40px;">
+                                                    class="ei-control ei-control--compact">
                                                     <option value="">Select location...</option>
                                                     @foreach($this->locations as $id => $name)
                                                         <option value="{{ $id }}">{{ $name }}</option>
@@ -528,12 +466,12 @@
 
                         <div class="mt-5 flex flex-col gap-3 sm:flex-row">
                             <button type="button" wire:click="submitAiBulkItems" wire:loading.attr="disabled" class="ei-btn-primary">
-                                <svg style="width:20px;height:20px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
+                                <svg class="ei-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
                                 <span wire:loading.remove wire:target="submitAiBulkItems">Submit All to Snipe-IT</span>
                                 <span wire:loading wire:target="submitAiBulkItems">Submitting…</span>
                             </button>
                             <button type="button" wire:click="resetAiBulk" class="ei-btn-secondary">
-                                <svg style="width:20px;height:20px;" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
+                                <svg class="ei-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" /></svg>
                                 Start Over
                             </button>
                         </div>

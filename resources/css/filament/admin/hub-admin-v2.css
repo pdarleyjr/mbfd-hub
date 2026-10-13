@@ -440,59 +440,12 @@ html:not(.dark) :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .
 }
 
 /* ---------- Command board ---------- */
-
-.fi-panel-admin .mbfd-command-rail {
-    border-radius: 8px;
-    box-shadow: none;
-}
-
-.fi-panel-admin .mbfd-command-live-state {
-    border-radius: 4px;
-}
-
-.fi-panel-admin .mbfd-command-master-card,
-.fi-panel-admin .mbfd-command-station-card {
-    border-radius: 8px;
-    box-shadow: none;
-}
-
-.fi-panel-admin .mbfd-command-station-card:hover,
-.fi-panel-admin .mbfd-command-station-card:focus-visible {
-    box-shadow: var(--hub2-elevation-1);
-    transform: none;
-}
-
-.fi-panel-admin .mbfd-command-attention-badge {
-    border-radius: 4px;
-}
-
-.fi-panel-admin .mbfd-command-count[data-tone="warning"],
-.fi-panel-admin .mbfd-command-attention-badge[data-tone="warning"] {
-    color: rgb(var(--hub-warning-strong));
-}
+/* Surfaces, radii and status chips are owned by theme.css (glass, wells and status tokens). */
 
 .fi-panel-admin .mbfd-command-fleet-counts span,
 .fi-panel-admin .mbfd-command-station-fleet > span {
     color: rgb(var(--hub2-n-600));
 }
-
-.fi-panel-admin .mbfd-station-overview-card {
-    color: rgb(var(--hub2-n-800));
-    background: rgb(var(--hub2-n-0));
-    border-color: rgb(var(--hub2-n-200));
-    border-radius: 8px;
-}
-
-.fi-panel-admin .mbfd-station-overview-card:hover,
-.fi-panel-admin .mbfd-station-overview-card:focus-visible {
-    background: rgb(var(--hub2-n-25));
-    border-color: rgb(var(--hub2-action) / 0.4);
-}
-
-.fi-panel-admin .mbfd-station-overview-card-attention { border-inline-start-color: rgb(var(--hub-warning)); }
-.fi-panel-admin .mbfd-station-overview-checkout { color: rgb(var(--hub2-n-600)); }
-.fi-panel-admin .mbfd-station-overview-metrics { color: rgb(var(--hub2-n-600)); }
-.fi-panel-admin .mbfd-station-overview-metrics strong { color: rgb(var(--hub2-n-900)); }
 
 /* ---------- Shared list, form and detail affordances ---------- */
 
@@ -620,7 +573,7 @@ html:not(.dark) :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .
     inset-inline: 0;
     bottom: 0;
     z-index: 30;
-    min-height: 2.875rem;
+    min-height: var(--hub-status-bar-height);
     align-items: center;
     justify-content: space-between;
     gap: 1rem;
@@ -664,8 +617,8 @@ html:not(.dark) :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .
 
 @media (min-width: 1024px) {
     .fi-panel-admin .mbfd-admin-status-bar { display: flex; }
-    .fi-panel-admin .fi-main { padding-bottom: 4rem; }
-    .fi-panel-admin :is(a, button, input, select, textarea, [tabindex]) { scroll-margin-bottom: 4rem; }
+    .fi-panel-admin .fi-main { padding-bottom: calc(var(--hub-status-bar-height) + 1.125rem); }
+    .fi-panel-admin :is(a, button, input, select, textarea, [tabindex]) { scroll-margin-bottom: calc(var(--hub-status-bar-height) + 1.125rem); }
 }
 
 @media (max-width: 1199px) {
