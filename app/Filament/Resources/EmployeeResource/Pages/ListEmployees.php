@@ -8,6 +8,7 @@ use App\Enums\AccountStatus;
 use App\Filament\Resources\EmployeeResource;
 use App\Jobs\IssueMemberOnboardingInvitation;
 use App\Models\Employee;
+use App\Models\MemberActivationVerifier;
 use App\Models\MemberOnboardingInvitation;
 use App\Models\User;
 use App\Services\Identity\MemberOnboardingInvitationService;
@@ -226,7 +227,20 @@ class ListEmployees extends ListRecords
 
         return new HtmlString('<p>Notification jobs awaiting work: <strong>'.$queueDepth.'</strong> (includes other notifications). Invitation records appear as sends begin.</p>'
             .'<p>Email delivery — preparing: '.$delivery['preparing'].'; provider processing: '.$delivery['processing'].'; delivered: '.$delivery['delivered'].'; failed: '.$delivery['failed'].'; needs review: '.$delivery['review'].'.</p>'
-            .'<p>Accounts — awaiting activation: '.$accounts['awaiting'].'; link redeemed: '.$accounts['redeemed'].'; expired: '.$accounts['expired'].'; activated: '.$accounts['activated'].'.</p>');
+            .'<p>Accounts — awaiting activation: '.$accounts['awaiting'].'; link redeemed: '.$accounts['redeemed'].'; expired: '.$accounts['expired'].'; activated: '.$accounts['activated'].'.</p>'
+            .$this->selfServiceActivationStatus());
+    }
+
+    /** Counts only; the verification records themselves are never shown anywhere. */
+    private function selfServiceActivationStatus(): string
+    {
+        $verifiers = MemberActivationVerifier::query();
+        $ready = (clone $verifiers)->whereNull('consumed_at')->whereNull('locked_at')->count();
+        $locked = (clone $verifiers)->whereNull('consumed_at')->whereNotNull('locked_at')->count();
+        $activated = (clone $verifiers)->whereNotNull('consumed_at')->count();
+        $state = config('identity.self_service_activation.enabled') ? 'on' : 'off';
+
+        return '<p>Self-service activation ('.$state.') — records on file: '.$ready.'; locked after wrong answers: '.$locked.'; activated: '.$activated.'. Members without a record, or locked, use an email invitation.</p>';
     }
 
     public function previewSelectedInvitations(Collection $records): array

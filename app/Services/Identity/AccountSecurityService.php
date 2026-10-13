@@ -98,6 +98,70 @@ final class AccountSecurityService
         }, 3);
     }
 
+    /**
+     * Claim a never-activated account after its trusted personnel records were
+     * matched. No mailbox was proven, so the City email stays unverified and
+     * any outstanding email invitation stops being usable.
+     */
+    public function completeSelfServiceActivation(
+        int $userId,
+        int $employeeProfileId,
+        int $expectedSecurityVersion,
+        string $passwordHash,
+        CarbonInterface $at,
+    ): User {
+        return DB::transaction(function () use ($userId, $employeeProfileId, $expectedSecurityVersion, $passwordHash, $at): User {
+            /** @var User|null $lockedUser */
+            $lockedUser = User::query()->lockForUpdate()->find($userId);
+            /** @var Employee|null $lockedEmployee */
+            $lockedEmployee = Employee::query()->lockForUpdate()->find($employeeProfileId);
+            if (! $lockedUser instanceof User || ! $lockedEmployee instanceof Employee
+                || $lockedUser->employee_profile_id !== $lockedEmployee->getKey()
+                || $lockedUser->employee_id !== $lockedEmployee->employee_id
+                || $lockedEmployee->roster_status !== 'active'
+                || $lockedUser->getRawOriginal('account_status') !== AccountStatus::PendingActivation->value
+                || ! $lockedUser->bootstrap_onboarding_eligible
+                || $lockedUser->bootstrap_onboarding_completed_at !== null
+                || $lockedUser->security_version !== $expectedSecurityVersion
+                // Privileged accounts are activated only by administrator-issued invitation.
+                || $lockedUser->roles()->where('name', '!=', 'member')->exists()
+                || $lockedUser->permissions()->exists()) {
+                throw new MemberBootstrapStateChanged('The account is no longer awaiting first-time activation.');
+            }
+
+            DB::table('users')->where('id', $lockedUser->id)->update([
+                'password' => $passwordHash,
+                'temporary_credential_fingerprint' => null,
+                'account_status' => AccountStatus::Active->value,
+                'must_change_password' => false,
+                'password_changed_at' => $at,
+                'bootstrap_onboarding_eligible' => false,
+                'bootstrap_onboarding_completed_at' => $at,
+                'email_verified_at' => null,
+                'security_version' => $lockedUser->security_version + 1,
+                'updated_at' => $at,
+            ]);
+            MemberOnboardingInvitation::query()->where('user_id', $lockedUser->id)->update([
+                'token_hash' => null,
+                'expires_at' => null,
+                'redeemed_binding_hash' => null,
+                'updated_at' => $at,
+            ]);
+            $lockedUser = $lockedUser->fresh('employeeProfile');
+            $this->revokeSessions($lockedUser, 'member self-service activation completed', $at);
+            app(SecurityAuditRecorder::class)->record(
+                $lockedUser,
+                $lockedUser,
+                'complete_member_self_service_activation',
+                'allowed',
+                null,
+                ['employee_profile_id' => $lockedEmployee->id, 'city_email_verified' => false],
+            );
+
+            return $lockedUser;
+        }, 3);
+    }
+
     public function setAdministrativeRecoveryPassword(User $user, string $passwordHash, string $fingerprint, CarbonInterface $at): User
     {
         return DB::transaction(function () use ($user, $passwordHash, $fingerprint, $at): User {

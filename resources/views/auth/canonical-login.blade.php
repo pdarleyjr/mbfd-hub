@@ -14,6 +14,9 @@
     @if (request()->query('session_expired') === '1')
         <p role="status">Your session has ended. Please sign in again. Unsaved changes were not submitted. Review the record after signing in.</p>
     @endif
+    @if (session('status'))
+        <p class="notice" role="status">{{ session('status') }}</p>
+    @endif
     @if ($applicationLabel ?? null)
         <p>Sign in to continue to {{ $applicationLabel }}.</p>
     @endif
@@ -37,7 +40,11 @@
         <button type="submit">Sign in</button>
     </form>
     <a class="help" href="{{ route('password.request') }}">Forgot your password?</a>
-    <p class="help">First time signing in? Open the personal setup link sent to your City email. If you did not receive one, contact MBFD Hub support.</p>
+    @if (config('identity.self_service_activation.enabled') || config('identity.self_service_activation.email_request_enabled'))
+        <a class="identity-secondary" href="{{ route('member-activation.show', array_filter(['login_attempt' => $loginAttempt ?? null])) }}">First time using MBFD Hub? Activate Your Account</a>
+    @else
+        <p class="help">First time signing in? Open the personal setup link sent to your City email. If you did not receive one, contact MBFD Hub support.</p>
+    @endif
 </main>
 </body>
 </html>

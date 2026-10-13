@@ -7,6 +7,7 @@ namespace App\Services\Identity;
 use App\Enums\AccountStatus;
 use App\Models\CityEmailVerification;
 use App\Models\Employee;
+use App\Models\MemberActivationVerifier;
 use App\Models\User;
 use App\Services\Communications\CloudflareEmailDispatcher;
 use Illuminate\Database\QueryException;
@@ -42,11 +43,19 @@ final class CityEmailVerificationService
 
     public function requiresReview(User $user): bool
     {
-        if ($user->fresh()?->employee_profile_id === null) {
+        $profileId = $user->fresh()?->employee_profile_id;
+        if ($profileId === null) {
+            return false;
+        }
+        if ($this->connectedEmail($user) !== null || $this->status($user) !== null) {
             return false;
         }
 
-        return $this->connectedEmail($user) === null && $this->status($user) === null;
+        // Self-service activation exists so members without a usable City
+        // mailbox can get in; never route them back into a forced email step.
+        // They can still confirm an address from their account page.
+        return ! MemberActivationVerifier::query()
+            ->where('employee_profile_id', $profileId)->whereNotNull('consumed_at')->exists();
     }
 
     /**
