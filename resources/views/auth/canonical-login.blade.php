@@ -40,8 +40,8 @@
         <button type="submit">Sign in</button>
     </form>
     <a class="help" href="{{ route('password.request') }}">Forgot your password?</a>
-    @if (config('identity.self_service_activation.enabled') || config('identity.self_service_activation.email_request_enabled'))
-        <a class="identity-secondary" href="{{ route('member-activation.show', array_filter(['login_attempt' => $loginAttempt ?? null])) }}">First time using MBFD Hub? Activate Your Account</a>
+    @if ($activationUrl ?? null)
+        <a class="identity-secondary" href="{{ $activationUrl }}">First time using MBFD Hub? Activate Your Account</a>
     @else
         <p class="help">First time signing in? Open the personal setup link sent to your City email. If you did not receive one, contact MBFD Hub support.</p>
     @endif
