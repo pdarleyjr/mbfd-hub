@@ -209,6 +209,7 @@ interface QueuedInspection {
   lastError?: string;
   lastErrorStatus?: number;
   lastErrorCode?: string;
+  nextAttemptAt?: string;
   retentionExpiresAt?: string;
   ownerUserId?: number;
   ownerSecurityVersion?: number;
@@ -240,8 +241,13 @@ interface GenericQueuedSubmission {
   lastErrorCode?: string;
 }
 
+type SubmitAttempt = 'abort' | { readonly status: number; readonly headers?: Record<string, string>; readonly json?: Record<string, unknown> };
+
 interface InspectionApiMock {
   readonly submissions: Array<Record<string, unknown>>;
+  /** Submission requests the mocked server accepted (2xx). */
+  readonly accepted: () => number;
+  readonly contextRequests: () => number;
   readonly genericSubmissions: Array<Record<string, unknown>>;
   readonly sessionStarts: Array<Record<string, unknown>>;
   readonly abandonments: Array<Record<string, unknown>>;
@@ -260,9 +266,14 @@ async function mockInspectionApi(
     readonly processingStatus?: 'accepted' | 'accepted_with_exception';
     readonly stationDailyCheckout?: 'canonical' | 'unavailable';
     readonly stationNumber?: string;
+    /** Responses for successive submission attempts before the default one. */
+    readonly submitSequence?: readonly SubmitAttempt[];
   } = {},
 ): Promise<InspectionApiMock> {
   const submissions: Array<Record<string, unknown>> = [];
+  const submitSequence = [...(options.submitSequence ?? [])];
+  let accepted = 0;
+  let contextRequests = 0;
   const genericSubmissions: Array<Record<string, unknown>> = [];
   const sessionStarts: Array<Record<string, unknown>> = [];
   const abandonments: Array<Record<string, unknown>> = [];
@@ -276,6 +287,7 @@ async function mockInspectionApi(
     const path = new URL(request.url()).pathname;
 
     if (path === '/api/me/context') {
+      contextRequests += 1;
       return route.fulfill({
         json: {
           version: 1,
@@ -345,8 +357,19 @@ async function mockInspectionApi(
         return route.abort('connectionreset');
       }
 
+      const scripted = submitSequence.shift();
+      if (scripted === 'abort') {
+        return route.abort('connectionreset');
+      }
+      if (scripted) {
+        if (scripted.status < 300) accepted += 1;
+        return route.fulfill({ status: scripted.status, headers: scripted.headers, json: scripted.json ?? { message: `Scripted ${scripted.status}.` } });
+      }
+
+      const status = options.checklistVersionMismatchOnSubmit ? 409 : submitStatus;
+      if (status < 300) accepted += 1;
       return route.fulfill({
-        status: options.checklistVersionMismatchOnSubmit ? 409 : submitStatus,
+        status,
         json: options.checklistVersionMismatchOnSubmit
           ? {
               message: 'The checklist changed after this inspection was saved. Officer review is required.',
@@ -369,6 +392,8 @@ async function mockInspectionApi(
 
   return {
     submissions,
+    accepted: () => accepted,
+    contextRequests: () => contextRequests,
     genericSubmissions,
     sessionStarts,
     abandonments,
@@ -552,6 +577,8 @@ async function mockFireBoatInspectionApi(
 
   return {
     submissions,
+    accepted: () => submissions.length,
+    contextRequests: () => 0,
     genericSubmissions,
     sessionStarts,
     abandonments,
@@ -1320,7 +1347,7 @@ test('queued inspection syncs after reconnect while the queued success page rema
   await expect(page.getByRole('status').filter({ hasText: 'Offline Mode' })).toBeVisible();
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Inspection Queued!' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspection saved on this device' })).toBeVisible();
   const queuedBeforeRetry = await queuedInspections(page);
   expect(queuedBeforeRetry).toHaveLength(1);
   expect(queuedBeforeRetry[0]).toMatchObject({
@@ -1356,7 +1383,7 @@ test('a different canonical user cannot replay the prior user offline queue', as
   await context.setOffline(true);
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Inspection Queued!' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspection saved on this device' })).toBeVisible();
   await expect.poll(async () => (await queuedInspections(page))[0]?.ownerUserId).toBe(101);
 
   api.setIdentity(202, 1);
@@ -1476,7 +1503,7 @@ test('queued inspection reports pending review after reconnect without retaining
   await context.setOffline(true);
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Inspection Queued!' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspection saved on this device' })).toBeVisible();
   await expect.poll(async () => (await queuedInspections(page)).length).toBe(1);
 
   await context.setOffline(false);
@@ -1509,6 +1536,251 @@ test('reload replays an ambiguous submission with its original durable client id
     clientSubmissionId,
     clientSubmissionId,
   ]);
+});
+
+test('Retry now replays an ambiguous online failure with its durable client id without a reload', async ({ page }) => {
+  const api = await mockInspectionApi(page, { abortFirstSubmit: true });
+
+  await page.goto('/daily/apparatus/engine-1');
+  await completeInspection(page);
+  await page.getByRole('button', { name: 'Submit Inspection' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Saved inspection not sent yet' })).toBeVisible();
+  await expect(page.getByTestId('queued-inspection-last-error')).toContainText('The connection failed before the server confirmed this inspection');
+  const queued = await queuedInspections(page);
+  expect(queued).toHaveLength(1);
+  expect(queued[0]).toMatchObject({ status: 'pending', retryCount: 1 });
+  const clientSubmissionId = queued[0].data.client_submission_id;
+
+  await page.getByRole('button', { name: 'Retry now' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
+  await expect.poll(async () => (await queuedInspections(page)).length).toBe(0);
+  expect(api.submissions.map((submission) => submission.client_submission_id)).toEqual([clientSubmissionId, clientSubmissionId]);
+  expect(api.accepted()).toBe(1);
+  // No background replay sends the accepted record again.
+  await page.waitForTimeout(500);
+  expect(api.submissions).toHaveLength(2);
+});
+
+test('rate limiting keeps the inspection pending and honours Retry-After before replaying', async ({ page }) => {
+  const api = await mockInspectionApi(page, {
+    submitSequence: [{ status: 429, headers: { 'Retry-After': '120' }, json: { message: 'Too Many Attempts.' } }],
+  });
+
+  await page.goto('/daily/apparatus/engine-1');
+  await completeInspection(page);
+  await page.getByRole('button', { name: 'Submit Inspection' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Saved inspection not sent yet' })).toBeVisible();
+  await expect(page.getByTestId('queued-inspection-last-error')).toContainText('The server is busy');
+  const [queued] = await queuedInspections(page);
+  expect(queued).toMatchObject({ status: 'pending', lastErrorStatus: 429 });
+  expect(queued.nextAttemptAt).toBeTruthy();
+
+  await page.getByRole('button', { name: 'Retry now' }).click();
+  await expect(page.getByTestId('queued-inspection-last-error')).toContainText('asked the app to wait');
+  expect(api.submissions).toHaveLength(1);
+  expect((await queuedInspections(page))[0]).toMatchObject({ status: 'pending' });
+});
+
+test('an expired session token (419) stays pending and is sent after the member context is refreshed', async ({ page }) => {
+  const api = await mockInspectionApi(page, { submitSequence: [{ status: 419, json: { message: 'CSRF token mismatch.' } }] });
+
+  await page.goto('/daily/apparatus/engine-1');
+  await completeInspection(page);
+  await page.getByRole('button', { name: 'Submit Inspection' }).click();
+
+  await expect(page.getByTestId('queued-inspection-last-error')).toContainText('Your sign-in expired before this inspection was sent');
+  expect((await queuedInspections(page))[0]).toMatchObject({ status: 'pending', lastErrorStatus: 419 });
+  await expect(page.getByText('needs review before it can be sent')).toHaveCount(0);
+
+  const contextRequestsBeforeRetry = api.contextRequests();
+  await page.getByRole('button', { name: 'Retry now' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
+  expect(api.contextRequests()).toBeGreaterThan(contextRequestsBeforeRetry);
+  expect(api.accepted()).toBe(1);
+  expect(new Set(api.submissions.map((submission) => submission.client_submission_id)).size).toBe(1);
+});
+
+test('a rejected inspection can be reviewed and is discarded only after explicit confirmation', async ({ page }) => {
+  await mockInspectionApi(page, { submitSequence: [{ status: 422, json: { message: 'The meter reading is not valid.' } }] });
+
+  await page.goto('/daily/apparatus/engine-1');
+  await completeInspection(page);
+  await page.getByRole('button', { name: 'Submit Inspection' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Saved inspection needs review' })).toBeVisible();
+  await expect(page.getByTestId('queued-inspection-last-error')).toContainText('The meter reading is not valid.');
+  await expect(page.getByRole('button', { name: 'Retry now' })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Review saved inspections' }).click();
+  const saved = page.getByRole('list', { name: 'Saved inspections that need review' });
+  await expect(saved.getByRole('listitem')).toHaveCount(1);
+  await expect(saved).toContainText('Vehicle E1');
+  await expect(saved).toContainText('The meter reading is not valid.');
+
+  await saved.getByRole('button', { name: 'Discard this saved inspection…' }).click();
+  await page.getByRole('button', { name: 'Keep it' }).click();
+  expect(await queuedInspections(page)).toHaveLength(1);
+
+  await saved.getByRole('button', { name: 'Discard this saved inspection…' }).click();
+  await expect(page.getByRole('group', { name: 'Confirm discard' })).toContainText('cannot be recovered');
+  await page.getByRole('button', { name: 'Discard permanently' }).click();
+
+  await expect.poll(async () => (await queuedInspections(page)).length).toBe(0);
+  // The draft is restored so the member can correct it and submit again.
+  await expect(page.getByText(/Restored from autosave/)).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Engine 1', exact: true })).toBeVisible();
+});
+
+test('another member’s rejected inspection cannot be discarded from this device', async ({ page }) => {
+  await mockInspectionApi(page);
+  await page.goto('/daily/stations');
+  await addQueuedInspection(page, {
+    id: 'daily_cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+    apparatusId: apparatus.id,
+    checklistVersion: 'c'.repeat(64),
+    status: 'requires_attention',
+    retryCount: 1,
+    lastError: 'Rejected for another member.',
+    lastErrorStatus: 422,
+    ownerUserId: 202,
+    ownerSecurityVersion: 1,
+    ownershipState: 'owned',
+    data: { client_submission_id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc', checklist_version: 'c'.repeat(64), operator_name: 'Other Member', compartments: [] },
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+  await page.reload();
+
+  await page.getByRole('button', { name: 'Review saved inspections' }).click();
+  const saved = page.getByRole('list', { name: 'Saved inspections that need review' });
+  await expect(saved).toContainText('Rejected for another member.');
+  await expect(saved.getByRole('button', { name: /Discard/ })).toHaveCount(0);
+});
+
+test('the receipt returns the member to the station they came from', async ({ page }) => {
+  await mockInspectionApi(page);
+
+  await page.goto('/daily/vehicle-inspections/engine-1?return_to=%2Fstations%2F1');
+  await completeInspection(page);
+  await page.getByRole('button', { name: 'Submit Inspection' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
+  const back = page.getByRole('link', { name: 'Back to station' });
+  await expect(back).toHaveAttribute('href', '/daily/stations/1');
+  expect((await back.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+  await back.click();
+  await expect(page).toHaveURL(/\/daily\/stations\/1$/);
+});
+
+test('an unsafe return target falls back to the station list', async ({ page }) => {
+  await mockInspectionApi(page);
+
+  await page.goto('/daily/vehicle-inspections/engine-1?return_to=https%3A%2F%2Fevil.test%2Fstations%2F1');
+  await completeInspection(page);
+  await page.getByRole('button', { name: 'Submit Inspection' }).click();
+
+  await expect(page.getByRole('link', { name: 'Back to stations' })).toHaveAttribute('href', '/daily/stations');
+});
+
+test('queued receipt never claims the inspection was sent until the replay is accepted', async ({ page, context }) => {
+  const api = await mockInspectionApi(page);
+
+  await page.goto('/daily/apparatus/engine-1');
+  await completeInspection(page);
+  await context.setOffline(true);
+  await page.getByRole('button', { name: 'Submit Inspection' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Inspection saved on this device' })).toBeVisible();
+  await expect(page.locator('main')).toContainText('It has not been sent yet.');
+  await expect(page.locator('main')).not.toContainText('recorded');
+
+  await context.setOffline(false);
+  await expect.poll(() => api.accepted()).toBe(1);
+  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
+  await expect(page.locator('main')).not.toContainText('not been sent');
+});
+
+test('typing is written to the device after a pause, not on every keystroke', async ({ page }) => {
+  await page.addInitScript(() => {
+    const put = IDBObjectStore.prototype.put;
+    (window as unknown as { __draftWrites: number }).__draftWrites = 0;
+    IDBObjectStore.prototype.put = function (this: IDBObjectStore, ...args: Parameters<IDBObjectStore['put']>) {
+      if (this.name === 'dailyCheckoutDrafts') (window as unknown as { __draftWrites: number }).__draftWrites += 1;
+      return put.apply(this, args);
+    };
+  });
+  await mockInspectionApi(page);
+  await page.goto('/daily/apparatus/engine-1');
+  await expect(page.getByRole('status').filter({ hasText: 'Changes saved on this device' })).toBeVisible();
+
+  await page.getByRole('button', { name: /^Portable Radio/ }).click();
+  await page.getByRole('group', { name: 'Status for Portable Radio' }).getByRole('button', { name: /Damaged/ }).click();
+  const notes = page.getByLabel('Notes (optional)');
+  await notes.click();
+  await page.waitForTimeout(1_000);
+  const writesBeforeTyping = await page.evaluate(() => (window as unknown as { __draftWrites: number }).__draftWrites);
+  await notes.pressSequentially('Lens cracked on the left side', { delay: 15 });
+  await expect.poll(async () => (await readDrafts(page))[0]?.data.compartments[0]?.items[0]?.notes).toBe('Lens cracked on the left side');
+
+  const typingWrites = await page.evaluate(() => (window as unknown as { __draftWrites: number }).__draftWrites) - writesBeforeTyping;
+  expect(typingWrites).toBeGreaterThanOrEqual(1);
+  expect(typingWrites).toBeLessThanOrEqual(3);
+});
+
+test('the last edit is kept when the page is reloaded before the autosave pause ends', async ({ page }) => {
+  await mockInspectionApi(page);
+  await page.goto('/daily/apparatus/engine-1');
+  await expect(page.getByRole('status').filter({ hasText: 'Changes saved on this device' })).toBeVisible();
+
+  await page.getByRole('button', { name: /^Portable Radio/ }).click();
+  await page.getByRole('group', { name: 'Status for Portable Radio' }).getByRole('button', { name: /Damaged/ }).click();
+  await page.getByLabel('Notes (optional)').fill('Noted just before the page closed.');
+  await page.reload();
+
+  await expect(page.getByText(/Restored from autosave/)).toBeVisible();
+  await page.getByRole('button', { name: /^Portable Radio/ }).click();
+  await expect(page.getByLabel('Notes (optional)')).toHaveValue('Noted just before the page closed.');
+});
+
+test('station request history follows every page of the complete history', async ({ page }) => {
+  await mockInspectionApi(page);
+  const requestedPages: string[] = [];
+  const summary = (id: number) => ({ id, title: `Station request ${id}`, status: 'open', type: 'equipment', created_at: '2026-10-01T12:00:00Z' });
+  await page.route('**/api/public/stations/1/requests**', async (route) => {
+    const url = new URL(route.request().url());
+    requestedPages.push(`${url.searchParams.get('scope')}:${url.searchParams.get('per_page')}:${url.searchParams.get('page')}`);
+    const current = Number(url.searchParams.get('page'));
+    return route.fulfill({ json: { data: [summary(current * 100 + 1), summary(current * 100 + 2)], meta: { current_page: current, last_page: 2, total: 4 } } });
+  });
+
+  await page.goto('/daily/stations/1');
+  await page.getByRole('button', { name: 'Requests', exact: true }).click();
+
+  await expect.poll(() => requestedPages).toEqual(['all:200:1', 'all:200:2']);
+  await page.waitForTimeout(300);
+  expect(requestedPages).toHaveLength(2);
+});
+
+test('a failed checklist load offers Try again without leaving the page', async ({ page }) => {
+  await mockInspectionApi(page);
+  let failChecklist = true;
+  await page.route(`**/api/public/apparatuses/${apparatus.id}/checklist`, async (route) => {
+    if (failChecklist) return route.fulfill({ status: 503, json: { message: 'Checklist service unavailable.' } });
+    return route.fallback();
+  });
+
+  await page.goto('/daily/apparatus/engine-1');
+  await expect(page.getByText('Inspection Data Unavailable', { exact: true })).toBeVisible();
+  await expect(page.getByText('Checklist service unavailable.')).toBeVisible();
+
+  failChecklist = false;
+  await page.getByRole('button', { name: 'Try again' }).click();
+  await expect(page.getByRole('heading', { name: 'Engine 1', exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Compartment Inspection' })).toBeVisible();
 });
 
 test('a validation 422 retains the payload and durable client id for review', async ({ page }) => {
@@ -1549,7 +1821,7 @@ test('an offline checklist version is retained for review when the server change
   await context.setOffline(true);
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Inspection Queued!' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspection saved on this device' })).toBeVisible();
   const queuedBeforeReconnect = await queuedInspections(page);
   expect(queuedBeforeReconnect).toHaveLength(1);
   const savedClientSubmissionId = queuedBeforeReconnect[0].data.client_submission_id;
@@ -1611,7 +1883,7 @@ test('a current checklist submission is queued separately while an older version
   await completeInspection(page);
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Inspection Queued!' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspection saved on this device' })).toBeVisible();
   const saved = await queuedInspections(page);
   expect(saved).toHaveLength(2);
 

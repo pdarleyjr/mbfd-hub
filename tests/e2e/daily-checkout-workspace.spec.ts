@@ -574,7 +574,7 @@ test('paper text autosaves, survives refresh and offline editing, and queues the
   const closeNotification = page.getByRole('button', { name: 'Close notification' });
   if (await closeNotification.isVisible()) await closeNotification.click();
   await page.getByRole('button', { name: 'Submit Inspection', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Inspection Queued!' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspection saved on this device' })).toBeVisible();
   expect(await readDrafts(page)).toHaveLength(1);
   const rows = await queued(page);
   expect(rows).toHaveLength(1);
@@ -601,7 +601,7 @@ test('actual Engine 2 blank readings retain source IDs and queue an identical re
   const closeNotification = page.getByRole('button', { name: 'Close notification' });
   if (await closeNotification.isVisible()) await closeNotification.click();
   await page.getByRole('button', { name: 'Submit Inspection', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Inspection Queued!' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspection saved on this device' })).toBeVisible();
   const rows = await queued(page);
   expect(rows).toHaveLength(1);
   const payload = rows[0].data;

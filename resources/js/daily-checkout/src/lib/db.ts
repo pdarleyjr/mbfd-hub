@@ -43,6 +43,8 @@ export interface DailyCheckoutQueuedSubmission {
   lastErrorStatus?: number;
   lastErrorCode?: string;
   lastErrorAt?: Date;
+  /** Not indexed: the earliest automatic replay a Retry-After response allows. */
+  nextAttemptAt?: Date;
   retentionExpiresAt?: Date;
   ownerUserId?: number;
   ownerSecurityVersion?: number;

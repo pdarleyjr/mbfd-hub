@@ -73,7 +73,7 @@ async function waitForCachedDailyShell(page: Page): Promise<string[]> {
   expect(emittedAssets.filter(asset => asset.endsWith('.png')).length).toBeGreaterThanOrEqual(15);
 
   await expect.poll(async () => page.evaluate(async expectedAssets => {
-    const cache = await caches.open('mbfd-checkout-v8');
+    const cache = await caches.open('mbfd-checkout-v9');
     const cachedPaths = (await cache.keys()).map(request => new URL(request.url).pathname);
 
     return Boolean(await cache.match('/daily/index.html'))
@@ -151,10 +151,10 @@ test('installed Daily worker caches the shell and an offline queue survives relo
 
   const cacheEvidence = await page.evaluate(async () => ({
     names: await caches.keys(),
-    shell: Boolean(await (await caches.open('mbfd-checkout-v8')).match('/daily/index.html')),
-    assets: (await (await caches.open('mbfd-checkout-v8')).keys()).map(request => new URL(request.url).pathname),
+    shell: Boolean(await (await caches.open('mbfd-checkout-v9')).match('/daily/index.html')),
+    assets: (await (await caches.open('mbfd-checkout-v9')).keys()).map(request => new URL(request.url).pathname),
   }));
-  expect(cacheEvidence.names).toContain('mbfd-checkout-v8');
+  expect(cacheEvidence.names).toContain('mbfd-checkout-v9');
   expect(cacheEvidence.names).not.toContain('mbfd-checkout-v6');
   expect(cacheEvidence.names).not.toContain('mbfd-api-cache-v6');
   expect(cacheEvidence.shell).toBe(true);
@@ -278,7 +278,7 @@ test('multiple camera-sized photos survive a real offline reload and queue repla
   const close = page.getByRole('button', { name: 'Close notification' });
   if (await close.isVisible()) await close.click();
   await page.getByRole('button', { name: 'Submit Inspection', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Inspection Queued!' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspection saved on this device' })).toBeVisible();
   expect(await readDrafts(page)).toHaveLength(1);
   const queued = await queuedInspections(page);
   expect(queued).toHaveLength(1);
