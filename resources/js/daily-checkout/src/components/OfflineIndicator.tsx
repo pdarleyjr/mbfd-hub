@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useState } from 'react';
 import { useOffline } from '../hooks/useOffline';
 import {
+  DAILY_CHECKOUT_SIGN_IN_REQUIRED_EVENT,
   discardDailyCheckoutAttentionRecord,
   getDailyCheckoutAttentionRecords,
   getDailyCheckoutQueueSummary,
@@ -9,6 +10,7 @@ import {
 } from '../utils/dailyCheckoutSubmissionQueue';
 import { db } from '../lib/db';
 import { identityForQueueCapture } from '../lib/offlineIdentity';
+import { redirectToLoginAfterSessionExpiry } from '../utils/api';
 
 /** Safety net only: queue changes normally arrive as events. */
 const FALLBACK_POLL_MS = 20_000;
@@ -68,7 +70,7 @@ function AttentionReview({ onChanged }: AttentionReviewProps) {
   const load = useCallback(async () => {
     let currentUserId: number | undefined;
     try {
-      currentUserId = (await identityForQueueCapture()).userId;
+      currentUserId = (await identityForQueueCapture({ redirectOnExpiry: false })).userId;
     } catch {
       currentUserId = undefined;
     }
@@ -164,6 +166,14 @@ export default function OfflineIndicator() {
   const [toastMessage, setToastMessage] = useState('');
   const [reviewOpen, setReviewOpen] = useState(false);
   const [refreshRevision, setRefreshRevision] = useState(0);
+  const [signInRequired, setSignInRequired] = useState(false);
+
+  useEffect(() => {
+    const onSignInRequired = (event: Event) => setSignInRequired((event as CustomEvent<boolean>).detail === true);
+    window.addEventListener(DAILY_CHECKOUT_SIGN_IN_REQUIRED_EVENT, onSignInRequired);
+
+    return () => window.removeEventListener(DAILY_CHECKOUT_SIGN_IN_REQUIRED_EVENT, onSignInRequired);
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -237,6 +247,18 @@ export default function OfflineIndicator() {
         <span className="hub-connection-state">{label}</span>
         <span className="hub-connection-detail">{queueCount > 0 ? `${queueCount} saved on this device` : isOffline ? 'Work stays on this device' : 'No submissions waiting to sync'}</span>
       </div>
+      {signInRequired && !isOffline && (
+        <div className="hub-sync-notice" role="status" data-testid="sign-in-required-notice">
+          <p>Your sign-in expired. Saved work stays on this device and is sent after you sign in again.</p>
+          <button
+            type="button"
+            className="mt-1 inline-flex min-h-11 items-center font-semibold text-hub-ink underline underline-offset-2 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus"
+            onClick={() => redirectToLoginAfterSessionExpiry()}
+          >
+            Sign in again
+          </button>
+        </div>
+      )}
       {/* Offline Banner */}
       {isOffline && attentionCount === 0 && (
         <div className="hub-sync-notice" role="status">
