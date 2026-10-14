@@ -128,6 +128,7 @@ class Dashboard extends BaseDashboard
                 ->label('My Notes')
                 ->icon('heroicon-o-pencil-square')
                 ->color('gray')
+                ->visible(fn (): bool => Notes::canAccess())
                 ->url(fn () => Notes::getUrl()),
             Action::make('openEvaluations')
                 ->label('Evaluations')

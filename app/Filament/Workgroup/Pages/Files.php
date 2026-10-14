@@ -43,6 +43,7 @@ class Files extends Page implements HasTable
                 ->label('Upload File')
                 ->icon('heroicon-o-cloud-arrow-up')
                 ->color('primary')
+                ->visible(fn (): bool => SharedUploads::canAccess())
                 ->url(fn () => SharedUploads::getUrl()),
         ];
     }

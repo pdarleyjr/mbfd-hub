@@ -9,6 +9,7 @@ use App\Services\Workgroup\EvaluationService;
 use App\Services\Workgroup\WorkgroupAIService;
 use App\Support\Workgroups\WorkgroupAccess;
 use App\Support\Workgroups\WorkgroupContext;
+use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
@@ -259,10 +260,20 @@ class SessionResultsPage extends Page
     {
         abort_unless(static::canAccess(), 404);
 
-        $session = $this->scopedSessions()->active()->orderBy('id')->first()
-            ?? $this->scopedSessions()->orderBy('id')->first();
+        // No workgroup at all means nothing to show; an ambiguous context still must not be guessed.
+        $session = app(WorkgroupContext::class)->available($this->currentUser())->isEmpty()
+            ? null
+            : ($this->scopedSessions()->active()->orderBy('id')->first()
+                ?? $this->scopedSessions()->orderBy('id')->first());
 
-        abort_unless($session !== null, 404);
+        if ($session === null) {
+            // Between evaluation cycles there is nothing to show yet; say so instead of a 404.
+            Notification::make()->info()->title('No evaluation sessions yet')
+                ->body('Session results appear here once an evaluation session has been created.')->send();
+            $this->redirect(Dashboard::getUrl());
+
+            return;
+        }
 
         $this->selectedSessionId = $session->id;
     }
