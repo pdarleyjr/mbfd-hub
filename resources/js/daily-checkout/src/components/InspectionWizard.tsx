@@ -1,10 +1,26 @@
-import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { useParams, useNavigate, useLocation } from 'react-router';
 import { Apparatus, ApparatusServiceTicketSummary, OfficerInfo, ChecklistData, ChecklistFieldValue, Compartment, Defect, InspectionData, MeterData, InspectionSubmission, ScheduledChecklistTaskResult } from '../types';
-import { ApiClient } from '../utils/api';
-import { getQueuedSubmission, getQueuedSubmissionForApparatusAndChecklistVersion, onDailyCheckoutQueueChanged, queueSubmission, submitQueuedInspection } from '../utils/dailyCheckoutSubmissionQueue';
+import { ApiClient, READ_TIMEOUT_MS } from '../utils/api';
+import {
+  DAILY_CHECKOUT_QUEUE_SYNC_EVENT,
+  describeSubmissionFailure,
+  getQueuedSubmission,
+  getQueuedSubmissionForApparatusAndChecklistVersion,
+  isPermanentSubmissionFailure,
+  onDailyCheckoutQueueChanged,
+  queueSubmission,
+  receiptOutcomeForSync,
+  retryQueuedSubmission,
+  submitQueuedInspection,
+  withDeadline,
+  type DailyCheckoutQueueSyncResult,
+  type InspectionReceiptOutcome,
+  type InspectionReceiptState,
+} from '../utils/dailyCheckoutSubmissionQueue';
 import type { DailyCheckoutQueuedSubmission } from '../lib/db';
-import { clearInspectionProgress, clearInspectionSessionAbandonKey, clearInspectionSessionStartKey, createClientSubmissionId, getOrCreateInspectionSessionAbandonKey, getOrCreateInspectionSessionStartKey, loadInspectionProgress, saveInspectionProgress } from '../utils/storage';
+import { clearInspectionProgress, clearInspectionSessionAbandonKey, clearInspectionSessionStartKey, createClientSubmissionId, createDraftAutosaver, getOrCreateInspectionSessionAbandonKey, getOrCreateInspectionSessionStartKey, loadInspectionProgress, type DraftAutosaver } from '../utils/storage';
+import { safeContextualPath } from '../utils/contextualBack';
 import { useOffline } from '../hooks/useOffline';
 import OfficerStep from './OfficerStep';
 import ChecklistFieldsStep from './ChecklistFieldsStep';
@@ -82,10 +98,41 @@ const restoreIssuedFireBoatApparatus = (saved: InspectionData | null, slug: stri
   return apparatus;
 };
 
+type ReadinessSummary = ReturnType<typeof inspectionReadiness>;
+
+/** Why the inspection cannot be submitted yet, in the member's terms. */
+const readinessExplanation = (readiness: ReadinessSummary): string => {
+  if (readiness.equipment.total === 0) return 'This checklist has no equipment to inspect. Contact an officer.';
+  if (readiness.equipment.remaining > 0) {
+    return `${readiness.equipment.remaining} ${readiness.equipment.remaining === 1 ? 'item still needs' : 'items still need'} a status under Apparatus.`;
+  }
+  if (readiness.missingFields.length > 0 || readiness.missingDuties.length > 0) return 'Complete the required checklist details.';
+  if (readiness.missingShift) return 'Select your shift under Member / Vehicle Info.';
+  if (readiness.invalidMeters) return 'Correct the vehicle readings.';
+
+  return 'Review the inspection and sign it.';
+};
+
+/** The station or list the member came from, as an in-app route. */
+const inAppReturnTarget = (state: unknown, search: string): string | null => {
+  const fromState = (state as { returnTo?: unknown } | null)?.returnTo;
+  const candidate = typeof fromState === 'string' ? fromState : new URLSearchParams(search).get('return_to');
+  const safe = safeContextualPath(candidate, window.location.origin);
+
+  return safe?.startsWith('/daily/') ? safe.slice('/daily'.length) : null;
+};
+
+const SAVE_STATUS_TEXT = {
+  saved: 'Changes saved on this device',
+  failed: 'Not saved · Keep this page open',
+} as const;
+
 export default function InspectionWizard() {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const isOffline = useOffline();
+  const returnTo = useMemo(() => inAppReturnTarget(location.state, location.search), [location.state, location.search]);
 
   const [apparatus, setApparatus] = useState<Apparatus | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
@@ -109,7 +156,8 @@ export default function InspectionWizard() {
   const [error, setError] = useState<string | null>(null);
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const [hasLoadedAutosave, setHasLoadedAutosave] = useState(false);
-  const [autosaveSucceeded, setAutosaveSucceeded] = useState<boolean | null>(null);
+  const [autosaveState, setAutosaveState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
+  const [saveStatusText, setSaveStatusText] = useState('');
   const [autosaveReviewMessage, setAutosaveReviewMessage] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [abandonmentError, setAbandonmentError] = useState<string | null>(null);
@@ -118,17 +166,75 @@ export default function InspectionWizard() {
   const [serviceNoticesUnavailable, setServiceNoticesUnavailable] = useState(false);
   const [queuedSubmissionBlocker, setQueuedSubmissionBlocker] = useState<DailyCheckoutQueuedSubmission | null>(null);
   const [queueRevision, setQueueRevision] = useState(0);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [retryingQueued, setRetryingQueued] = useState(false);
+  const [queuedRetryMessage, setQueuedRetryMessage] = useState<string | null>(null);
+  const [showNotReady, setShowNotReady] = useState(false);
   const clientSubmissionIdRef = useRef<string | null>(null);
+  const autosaverRef = useRef<DraftAutosaver | null>(null);
+  const lastAutosaveStepRef = useRef<Step | null>(null);
+  const mountedRef = useRef(true);
+  const blockerPresentRef = useRef(false);
+  const receiptShownRef = useRef(false);
   const meterFormRef = useRef<HTMLFormElement>(null);
   const hasQueuedInspectionRef = useRef(false);
   const initializedChecklistKeyRef = useRef<string | null>(null);
   const loadedContractRef = useRef<{ slug: string; apparatus: Apparatus; checklist: ChecklistData } | null>(null);
   const readiness = inspectionReadiness(checklist, compartments, fieldValues, scheduledTasks, officerInfo, meterData);
   const continueLabel = readiness.nextStep === 'compartments' ? 'Continue: Apparatus' : readiness.label;
+  const backFallback = returnTo ?? '/vehicle-inspections';
+
+  if (autosaverRef.current === null) {
+    autosaverRef.current = createDraftAutosaver((succeeded) => {
+      if (!mountedRef.current) return;
+      setAutosaveState(succeeded ? 'saved' : 'failed');
+      setSaveStatusText(succeeded ? SAVE_STATUS_TEXT.saved : SAVE_STATUS_TEXT.failed);
+    });
+  }
+  const autosaver = autosaverRef.current;
+
+  const showReceipt = (outcome: InspectionReceiptOutcome, queuedSubmissionId?: string) => {
+    receiptShownRef.current = true;
+    const state: InspectionReceiptState = { outcome, queuedSubmissionId, returnTo: returnTo ?? undefined };
+    navigate(outcome === 'queued' ? '/success?queued=true' : '/success', { state });
+  };
 
   useEffect(() => onDailyCheckoutQueueChanged(() => {
     setQueueRevision((revision) => revision + 1);
   }), []);
+
+  // A background replay (reconnect, return to the app, backoff timer) may
+  // send the record blocking this checkout; show its receipt.
+  const blockerId = queuedSubmissionBlocker?.id;
+  useEffect(() => {
+    if (!blockerId) return undefined;
+    const onSynced = (event: Event) => {
+      const outcome = receiptOutcomeForSync((event as CustomEvent<DailyCheckoutQueueSyncResult>).detail, blockerId);
+      if (outcome) showReceipt(outcome);
+    };
+    window.addEventListener(DAILY_CHECKOUT_QUEUE_SYNC_EVENT, onSynced);
+
+    return () => window.removeEventListener(DAILY_CHECKOUT_QUEUE_SYNC_EVENT, onSynced);
+  });
+
+  // Never lose the last edits: write the pending draft when the page is
+  // hidden or closed and when this screen unmounts (in-app navigation).
+  useEffect(() => {
+    mountedRef.current = true;
+    const flush = () => { void autosaver.flush(); };
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') flush();
+    };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      flush();
+      mountedRef.current = false;
+    };
+  }, [autosaver]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -137,15 +243,34 @@ export default function InspectionWizard() {
       try {
         const loadedContract = loadedContractRef.current;
         if (loadedContract?.slug === slug) {
-          setQueuedSubmissionBlocker(await getQueuedSubmissionForApparatusAndChecklistVersion(
+          const blocker = await getQueuedSubmissionForApparatusAndChecklistVersion(
             loadedContract.apparatus.id,
             loadedContract.checklist.checklist_version,
-          ));
+          );
+          const hadBlocker = blockerPresentRef.current;
+          blockerPresentRef.current = blocker !== null;
+          setQueuedSubmissionBlocker(blocker);
           setError(null);
 
-          return;
+          // Keep the current form while nothing changed. When the record that
+          // blocked this checkout disappears without a receipt (the member
+          // discarded a rejected inspection), start over from the saved draft
+          // with a new submission identity so it can be corrected and sent.
+          const formInitialized = initializedChecklistKeyRef.current === `${slug}:${loadedContract.checklist.checklist_version}`;
+          if (blocker || receiptShownRef.current || (formInitialized && !hadBlocker)) {
+            return;
+          }
+          loadedContractRef.current = null;
+          initializedChecklistKeyRef.current = null;
+          hasQueuedInspectionRef.current = false;
+          clientSubmissionIdRef.current = null;
+          lastAutosaveStepRef.current = null;
+          setQueuedRetryMessage(null);
+          setSubmissionError(null);
+          setLoading(true);
         }
 
+        blockerPresentRef.current = false;
         setQueuedSubmissionBlocker(null);
         const identity = await identityForQueueCapture();
         if (!identity.personnel?.name || !identity.personnel.employee_profile_id) {
@@ -249,6 +374,7 @@ export default function InspectionWizard() {
           checklistData.checklist_version,
         );
         if (queuedSubmission) {
+          blockerPresentRef.current = true;
           setQueuedSubmissionBlocker(queuedSubmission);
 
           return;
@@ -335,31 +461,34 @@ export default function InspectionWizard() {
     };
 
     fetchData();
-  }, [slug, queueRevision, isOffline]);
+  }, [slug, queueRevision, isOffline, loadAttempt]);
 
-  // Autosave progress
+  // Autosave progress: debounced while editing, immediate on a step change.
   useEffect(() => {
-    let cancelled = false;
     if (
-      !loading
-      && !submitting
-      && !hasQueuedInspectionRef.current
-      && !queuedSubmissionBlocker
-      && memberIdentity
-      && slug
-      && apparatus
-      && checklist
-      && (
-        currentStep === 'meter'
-        || currentStep === 'details'
-        || currentStep === 'compartments'
-        || currentStep === 'submit'
-        || currentStep === 'officer'
-      )
+      loading
+      || submitting
+      || hasQueuedInspectionRef.current
+      || queuedSubmissionBlocker
+      || !memberIdentity
+      || !slug
+      || !apparatus
+      || !checklist
     ) {
-      const saveData = {
-        actorUserId: memberIdentity?.userId,
-        actorSecurityVersion: memberIdentity?.securityVersion,
+      // A queued or submitting inspection is durable in the submission queue;
+      // the draft was flushed before submitting.
+      autosaver.cancel();
+      return;
+    }
+
+    const stepChanged = lastAutosaveStepRef.current !== currentStep;
+    lastAutosaveStepRef.current = currentStep;
+    setAutosaveState((state) => (state === 'failed' ? state : 'saving'));
+    autosaver.schedule({
+      apparatusSlug: slug,
+      data: {
+        actorUserId: memberIdentity.userId,
+        actorSecurityVersion: memberIdentity.securityVersion,
         checklist_version: checklist.checklist_version,
         apparatusSnapshot: apparatus,
         officer: officerInfo,
@@ -370,18 +499,14 @@ export default function InspectionWizard() {
         scheduledTasks,
         inspectionSession: checklist.inspection_session,
         checklistSnapshot: checklist,
-      };
-      setAutosaveSucceeded(null);
-      void saveInspectionProgress(slug, saveData).then(succeeded => {
-        if (cancelled) return;
-        setAutosaveSucceeded(succeeded);
-        if (succeeded && checklist.schema_version === 2 && checklist.inspection_session) {
-          clearInspectionSessionStartKey(slug, checklist.checklist_version);
-        }
-      });
-    }
-    return () => { cancelled = true; };
-  }, [officerInfo, meterData, compartments, fieldValues, scheduledTasks, currentStep, slug, apparatus, checklist, memberIdentity, loading, signature, submitting, queuedSubmissionBlocker]);
+      },
+      clearSessionStartKeyFor: checklist.schema_version === 2 && checklist.inspection_session ? checklist.checklist_version : undefined,
+    }, stepChanged);
+  }, [officerInfo, meterData, compartments, fieldValues, scheduledTasks, currentStep, slug, apparatus, checklist, memberIdentity, loading, signature, submitting, queuedSubmissionBlocker, autosaver]);
+
+  useEffect(() => {
+    if (readiness.ready) setShowNotReady(false);
+  }, [readiness.ready]);
 
   const handleOfficerChange = (info: OfficerInfo) => {
     setOfficerInfo(info);
@@ -483,7 +608,12 @@ export default function InspectionWizard() {
 
   const handleSubmit = async (signature: string | null) => {
     if (!apparatus || !slug || !checklist) return;
-    if (!readiness.ready) { setCurrentStep(readiness.nextStep); return; }
+    if (!readiness.ready) {
+      // Say why instead of silently moving to another step.
+      setShowNotReady(true);
+      setCurrentStep(readiness.nextStep);
+      return;
+    }
 
     const inspectionSession = checklist.inspection_session;
     if (checklist.schema_version === 2 && !inspectionSession) {
@@ -495,7 +625,13 @@ export default function InspectionWizard() {
     setSubmitting(true);
     setSubmissionError(null);
     try {
-      const currentIdentity = await identityForQueueCapture();
+      // The draft must match what is queued so it is cleared once accepted.
+      await autosaver.flush();
+      const currentIdentity = await withDeadline(
+        identityForQueueCapture(),
+        READ_TIMEOUT_MS,
+        'Your sign-in could not be checked in time. Nothing was sent; your answers are saved on this device. Try again.',
+      );
       if (currentIdentity.userId !== memberIdentity?.userId || currentIdentity.securityVersion !== memberIdentity?.securityVersion) {
         throw new Error('Your sign-in changed. This inspection remains saved for its original member; sign in with that account to continue.');
       }
@@ -576,9 +712,7 @@ export default function InspectionWizard() {
           navigator.vibrate([50, 100, 50]);
         }
         
-        navigate('/success?queued=true', {
-          state: { queuedSubmissionId: queueId },
-        });
+        showReceipt('queued', queueId);
       } else {
         const submissionResult = await submitQueuedInspection(queueId);
         if (submissionResult !== 'submitted' && submissionResult !== 'pending_review' && submissionResult !== 'accepted_with_exception') {
@@ -590,13 +724,45 @@ export default function InspectionWizard() {
           navigator.vibrate(200);
         }
         
-        navigate('/success');
+        showReceipt(submissionResult);
       }
     } catch (err) {
       setSubmissionError(err instanceof Error ? err.message : 'Failed to submit inspection');
     } finally {
-      setSubmitting(false);
+      if (mountedRef.current) setSubmitting(false);
     }
+  };
+
+  /**
+   * Replay the record blocking this checkout through the shared queue path
+   * (same payload and client_submission_id; a concurrent background replay
+   * shares the same request).
+   */
+  const handleRetryQueued = async () => {
+    const blocker = queuedSubmissionBlocker;
+    if (!blocker || retryingQueued) return;
+    setRetryingQueued(true);
+    setQueuedRetryMessage(null);
+    try {
+      const result = await retryQueuedSubmission(blocker.id);
+      if (result === 'not_found') {
+        setQueueRevision((revision) => revision + 1);
+        return;
+      }
+      if ('vibrate' in navigator) navigator.vibrate(200);
+      showReceipt(result);
+    } catch (err) {
+      setQueuedRetryMessage(isPermanentSubmissionFailure(err) ? err.message : describeSubmissionFailure(err));
+    } finally {
+      if (mountedRef.current) setRetryingQueued(false);
+    }
+  };
+
+  const retryLoad = () => {
+    loadedContractRef.current = null;
+    setError(null);
+    setLoading(true);
+    setLoadAttempt((attempt) => attempt + 1);
   };
 
   const changeStep = (step: Step) => {
@@ -636,44 +802,83 @@ export default function InspectionWizard() {
 
   if (queuedSubmissionBlocker !== null && apparatus !== null && checklist !== null) {
     const requiresOfficerReview = queuedSubmissionBlocker.status === 'requires_attention';
+    const lastError = queuedRetryMessage ?? queuedSubmissionBlocker.lastError;
 
     return (
-      <div className="max-w-md mx-auto text-center p-8 bg-amber-50 rounded-xl ring-1 ring-amber-300">
-        <p role="alert" className="text-amber-950 font-medium mb-3">
+      <section className="mx-auto max-w-md rounded-xl border border-hub-warning/40 bg-hub-warning/5 p-6 text-hub-ink sm:p-8" aria-labelledby="queued-inspection-heading">
+        <h1 id="queued-inspection-heading" className="text-lg font-semibold">
+          {requiresOfficerReview ? 'Saved inspection needs review' : 'Saved inspection not sent yet'}
+        </h1>
+        <p role="alert" className="mt-2 font-medium text-hub-warning">
           {requiresOfficerReview
             ? 'A saved Daily Checkout using this checklist version needs officer review.'
             : 'A saved Daily Checkout using this checklist version is still awaiting synchronization.'}
         </p>
-        <p className="text-amber-900 text-sm mb-6">
-          Its original payload remains saved on this device. To prevent a duplicate or overwritten inspection, do not begin another checkout for {apparatus.name} until this record is submitted or reconciled.
+        {lastError ? (
+          <p className="mt-3 rounded-lg border border-hub-border bg-hub-surface p-3 text-sm" data-testid="queued-inspection-last-error">
+            <span className="font-semibold">{requiresOfficerReview ? 'Server response: ' : 'Last attempt: '}</span>
+            {lastError}
+          </p>
+        ) : !requiresOfficerReview && (
+          <p className="mt-3 text-sm text-hub-ink-secondary">It will be sent automatically when this device is connected.</p>
+        )}
+        <p className="mt-3 text-sm text-hub-ink-secondary">
+          Its original answers remain saved on this device. To prevent a duplicate or overwritten inspection, do not begin another checkout for {apparatus.name} until this record is submitted or reconciled.
         </p>
-        <PreviousPageButton
-          fallback="/vehicle-inspections"
-          className="px-5 py-2.5 bg-amber-700 text-white rounded-lg hover:bg-amber-800 transition-colors touch-manipulation font-medium"
-        >
-          Back to vehicle inspections
-        </PreviousPageButton>
-      </div>
+        <div className="mt-6 flex flex-wrap gap-3">
+          {!requiresOfficerReview && (
+            <button
+              type="button"
+              onClick={() => { void handleRetryQueued(); }}
+              disabled={retryingQueued || isOffline}
+              className="inline-flex min-h-11 items-center rounded-lg bg-hub-blue px-5 font-semibold text-white transition-colors hover:bg-hub-blue-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus disabled:cursor-not-allowed disabled:opacity-60 touch-manipulation"
+            >
+              {retryingQueued ? 'Sending…' : 'Retry now'}
+            </button>
+          )}
+          <PreviousPageButton
+            fallback={backFallback}
+            className="inline-flex min-h-11 items-center rounded-lg border border-hub-border bg-hub-surface px-5 font-semibold text-hub-ink transition-colors hover:bg-hub-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus touch-manipulation"
+          >
+            {returnTo?.startsWith('/stations/') ? 'Back to station' : 'Back to vehicle inspections'}
+          </PreviousPageButton>
+        </div>
+        {!requiresOfficerReview && isOffline && (
+          <p className="mt-3 text-sm text-hub-ink-secondary">This device is offline. Retry becomes available when the connection returns.</p>
+        )}
+        {requiresOfficerReview && (
+          <p className="mt-3 text-sm text-hub-ink-secondary">Use Review saved inspections at the top of the page to see every saved inspection that needs review.</p>
+        )}
+      </section>
     );
   }
 
   if (error || !apparatus || !checklist) {
     return (
-      <div className="max-w-md mx-auto text-center p-8 bg-neutral-100 rounded-xl ring-1 ring-neutral-200/60">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-50 mb-4">
-          <svg className="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <section className="mx-auto max-w-md rounded-xl border border-hub-border bg-hub-surface p-8 text-center" aria-labelledby="inspection-unavailable-heading">
+        <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-full bg-hub-danger/10">
+          <svg className="h-8 w-8 text-hub-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
           </svg>
         </div>
-        <p className="text-red-600 font-medium mb-2">Inspection Data Unavailable</p>
-        <p className="text-neutral-500 text-sm mb-6">{error || 'Failed to load inspection data'}</p>
-        <PreviousPageButton
-          fallback="/vehicle-inspections"
-          className="min-h-11 px-5 py-2.5 bg-hub-blue text-white rounded-lg hover:bg-hub-blue-strong transition-colors touch-manipulation font-medium"
-        >
-          Back to previous page
-        </PreviousPageButton>
-      </div>
+        <p id="inspection-unavailable-heading" className="mb-2 font-medium text-hub-danger">Inspection Data Unavailable</p>
+        <p className="mb-6 text-sm text-hub-ink-secondary">{error || 'Failed to load inspection data'}</p>
+        <div className="flex flex-wrap justify-center gap-3">
+          <button
+            type="button"
+            onClick={retryLoad}
+            className="inline-flex min-h-11 items-center rounded-lg bg-hub-blue px-5 font-medium text-white transition-colors hover:bg-hub-blue-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus touch-manipulation"
+          >
+            Try again
+          </button>
+          <PreviousPageButton
+            fallback={backFallback}
+            className="inline-flex min-h-11 items-center rounded-lg border border-hub-border bg-hub-surface px-5 font-medium text-hub-ink transition-colors hover:bg-hub-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus touch-manipulation"
+          >
+            Back to previous page
+          </PreviousPageButton>
+        </div>
+      </section>
     );
   }
 
@@ -699,63 +904,68 @@ export default function InspectionWizard() {
         <div><p className="inspection-eyebrow">Daily Checkout</p><div className="inspection-unit-title"><h1>{apparatus.name}</h1><span className={isOutOfService ? 'inspection-status is-oos' : 'inspection-status'}>{apparatus.status ?? 'Status unavailable'}</span></div>
           <div className="inspection-identity"><span>Vehicle {apparatus.vehicle_number ?? 'Not recorded'}</span><span>{officerInfo.name} · {officerInfo.shift ? 'Shift ' + officerInfo.shift : 'Shift not selected'}</span></div>
         </div>
-        <div className="inspection-save" data-save-state={autosaveSucceeded === true ? 'saved' : autosaveSucceeded === false ? 'failed' : 'saving'}><div><strong>{isOffline ? 'Offline · On this device' : 'Online'}</strong><small role="status">{autosaveSucceeded === true ? 'Changes saved on this device' : autosaveSucceeded === false ? 'Not saved · Keep this page open' : 'Saving…'}</small></div><div className="inspection-progress"><small>{progress.completed} / {progress.total} inspected</small><progress value={progress.completed} max={progress.total || 1} aria-label="Inspection progress" /></div></div>
+        <div className="inspection-save" data-save-state={autosaveState === 'idle' ? 'saving' : autosaveState}><div><strong>{isOffline ? 'Offline · On this device' : 'Online'}</strong>{/* Announced politely and only when a write finishes or fails, not on every edit. */}<small role="status" aria-live="polite">{saveStatusText}</small></div><div className="inspection-progress"><small>{progress.completed} / {progress.total} inspected</small><progress value={progress.completed} max={progress.total || 1} aria-label="Inspection progress" /></div></div>
       </header>
       <div className="inspection-readiness">
         <span>{apparatus.pm_health ? apparatus.pm_health.status === 'red' ? 'PM due' : apparatus.pm_health.status === 'yellow' ? 'PM due soon' : 'PM current' : 'PM baseline unavailable'}</span>
         <span>{progress.issues} reported {progress.issues === 1 ? 'issue' : 'issues'}</span>
       </div>
-      {autosaveSucceeded === false && <p role="alert" className="inspection-alert">Changes could not be saved on this device. Keep this page open until the inspection is submitted successfully.</p>}
+      {autosaveState === 'failed' && <p role="alert" className="inspection-alert">Changes could not be saved on this device. Keep this page open until the inspection is submitted successfully.</p>}
       {submissionError && <p role="alert" className="inspection-alert">{submissionError}</p>}
+      {showNotReady && !readiness.ready && (
+        <p role="alert" className="mt-2 rounded-lg border border-hub-warning/40 bg-hub-warning/5 p-3 text-sm text-hub-ink">
+          <span className="font-semibold">Not submitted yet.</span> {readinessExplanation(readiness)}
+        </p>
+      )}
       <div>
         {hasLoadedAutosave && (
           <p className="inspection-restored">Restored from autosave</p>
         )}
         {autosaveReviewMessage && (
-          <p role="alert" className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+          <p role="alert" className="mt-2 rounded-lg border border-hub-warning/40 bg-hub-warning/5 p-3 text-sm text-hub-ink">
             {autosaveReviewMessage}
           </p>
         )}
         {priorDayInspectionSession && (
-          <section role="alert" className="mt-3 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+          <section role="alert" className="mt-3 rounded-xl border border-hub-warning/40 bg-hub-warning/5 p-4 text-sm text-hub-ink">
             <p className="font-semibold">A valid Fire Boat inspection from the prior duty date is still active.</p>
             <p className="mt-1">
-              Continue and submit that server-issued contract, or explicitly close it before starting today\'s inspection. Local browser storage loss cannot start a new duty date.
+              Continue and submit that server-issued contract, or explicitly close it before starting today’s inspection. Local browser storage loss cannot start a new duty date.
             </p>
             {isOffline ? (
-              <p className="mt-3 font-medium">Reconnect before abandoning the prior inspection or starting today\'s inspection.</p>
+              <p className="mt-3 font-medium">Reconnect before abandoning the prior inspection or starting today’s inspection.</p>
             ) : (
               <button
                 type="button"
                 onClick={handleAbandonPriorSession}
                 disabled={abandoningPriorSession}
-                className="mt-3 rounded-lg bg-amber-800 px-4 py-2 font-semibold text-white transition-colors hover:bg-amber-900 disabled:cursor-not-allowed disabled:opacity-60"
+                className="mt-3 inline-flex min-h-11 items-center rounded-lg bg-hub-warning px-4 font-semibold text-white transition-colors hover:bg-hub-warning/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {abandoningPriorSession ? 'Starting Today\'s Inspection…' : 'Abandon Prior Inspection / Start Today’s Inspection'}
               </button>
             )}
-            {abandonmentError && <p className="mt-3 font-medium text-red-700">{abandonmentError}</p>}
+            {abandonmentError && <p className="mt-3 font-medium text-hub-danger">{abandonmentError}</p>}
           </section>
         )}
       </div>
 
       {serviceNotices.length > 0 && (
-        <section aria-labelledby="service-notices-heading" className={`mb-8 rounded-2xl border p-4 ${isOutOfService ? 'border-red-400 bg-red-50 text-red-950' : 'border-amber-300 bg-amber-50 text-amber-950'}`}>
+        <section aria-labelledby="service-notices-heading" className={`mb-8 rounded-xl border p-4 text-hub-ink ${isOutOfService ? 'border-hub-danger/40 bg-hub-danger/5' : 'border-hub-warning/40 bg-hub-warning/5'}`}>
           <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
             <div>
-              <p className={`text-xs font-bold uppercase tracking-wider ${isOutOfService ? 'text-red-800' : 'text-amber-800'}`}>Fleet awareness</p>
+              <p className={`text-xs font-bold uppercase tracking-wider ${isOutOfService ? 'text-hub-danger' : 'text-hub-warning'}`}>Fleet awareness</p>
               <h2 id="service-notices-heading" className="mt-1 font-heading text-lg font-bold">
                 {isOutOfService ? 'Unit out of service' : `Open service ${serviceNotices.length === 1 ? 'notice' : 'notices'} for this unit`}
               </h2>
             </div>
-            {apparatus.status && <span className={`w-fit rounded-full bg-white px-3 py-1 text-xs font-bold ring-1 ${isOutOfService ? 'ring-red-300' : 'ring-amber-300'}`}>Operational status: {apparatus.status}</span>}
+            {apparatus.status && <span className={`w-fit rounded-full bg-hub-surface px-3 py-1 text-xs font-bold ring-1 ${isOutOfService ? 'ring-hub-danger/40' : 'ring-hub-warning/40'}`}>Operational status: {apparatus.status}</span>}
           </div>
           <ul className="mt-3 space-y-2">
             {serviceNotices.map((notice) => (
-              <li key={notice.id} className={`rounded-xl bg-white/80 p-3 ring-1 ${isOutOfService ? 'ring-red-200' : 'ring-amber-200'}`}>
+              <li key={notice.id} className={`rounded-lg bg-hub-surface p-3 ring-1 ${isOutOfService ? 'ring-hub-danger/25' : 'ring-hub-warning/25'}`}>
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <strong>{notice.status === 'scheduled' ? `${notice.service_type || notice.title} · ${notice.ticket_number}` : `${notice.ticket_number} · ${notice.title}`}</strong>
-                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${isOutOfService ? 'bg-red-100' : 'bg-amber-100'}`}>
+                  <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${isOutOfService ? 'bg-hub-danger/10 text-hub-danger' : 'bg-hub-warning/10 text-hub-warning'}`}>
                     {notice.status === 'scheduled' ? 'Service scheduled' : notice.status.replaceAll('_', ' ')}
                   </span>
                 </div>
@@ -778,7 +988,7 @@ export default function InspectionWizard() {
       )}
 
       {serviceNoticesUnavailable && (
-        <p role="status" className="mb-6 rounded-xl border border-neutral-200 bg-neutral-50 p-3 text-sm text-neutral-600">
+        <p role="status" className="mb-6 rounded-xl border border-hub-border bg-hub-surface-muted p-3 text-sm text-hub-ink-secondary">
           Live Fleet service notices are temporarily unavailable. You can continue this inspection.
         </p>
       )}
@@ -839,6 +1049,19 @@ export default function InspectionWizard() {
           onBack={() => setCurrentStep('officer')}
           backLabel="Member / Vehicle Info"
         />
+      )}
+
+      {currentStep === 'submit' && !readiness.ready && !showNotReady && (
+        <div role="alert" className="mb-4 rounded-lg border border-hub-warning/40 bg-hub-warning/5 p-3 text-sm text-hub-ink">
+          <p><span className="font-semibold">Not ready to submit.</span> {readinessExplanation(readiness)}</p>
+          <button
+            type="button"
+            onClick={() => changeStep(readiness.nextStep)}
+            className="mt-2 inline-flex min-h-11 items-center rounded-lg border border-hub-border bg-hub-surface px-4 font-semibold text-hub-ink hover:bg-hub-surface-muted focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus"
+          >
+            {readiness.label}
+          </button>
+        </div>
       )}
 
       {currentStep === 'submit' && (

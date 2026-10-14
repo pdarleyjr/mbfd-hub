@@ -278,7 +278,7 @@ test('multiple camera-sized photos survive a real offline reload and queue repla
   const close = page.getByRole('button', { name: 'Close notification' });
   if (await close.isVisible()) await close.click();
   await page.getByRole('button', { name: 'Submit Inspection', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Inspection Queued!' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspection saved on this device' })).toBeVisible();
   expect(await readDrafts(page)).toHaveLength(1);
   const queued = await queuedInspections(page);
   expect(queued).toHaveLength(1);
