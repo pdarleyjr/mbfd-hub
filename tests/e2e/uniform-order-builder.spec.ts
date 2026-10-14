@@ -167,7 +167,7 @@ for (const scenario of profiles) {
     await expect(assignment).toContainText(scenario.profile);
     await expect(assignment).toContainText('2026');
     await expect(page.getByText('Product images are for demonstration purposes only.', { exact: false })).toBeVisible();
-    const allocation = page.locator('details').filter({ has: page.locator('summary').filter({ hasText: 'Annual allocation' }) });
+    const allocation = page.locator('details').filter({ has: page.locator('summary').filter({ hasText: 'Click here to see your annual allocation' }) });
     await expect(allocation).toHaveCount(1);
     await expect(allocation).not.toHaveAttribute('open', '');
     await expect(page.locator('[data-category]:visible')).toHaveCount(Object.keys(categoryProducts).length);

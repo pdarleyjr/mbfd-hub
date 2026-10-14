@@ -71,7 +71,7 @@
                 @if($context['marine']) <span class="uo-chip">Marine allocation added</span> @endif
             </div>
             <details class="uo-assignment-rules" wire:ignore.self>
-                <summary>Annual allocation</summary>
+                <summary>Click here to see your annual allocation</summary>
                 @if($context['profile'] === 'day_other')
                     <h3>Day / Administrative Uniform Rule</h3>
                     <p>{{ $context['message'] }}</p>

@@ -34,6 +34,20 @@ final class UniformPresentationConsistencyTest extends TestCase
         $this->assertDatabaseCount('personnel_requests', 0);
     }
 
+    public function test_the_builder_offers_no_vintage_jacket_and_labels_the_allocation_toggle_plainly(): void
+    {
+        $this->withoutVite();
+        $builder = $this->builder($this->employee('UNIFORM-COPY'));
+
+        $builder->assertSee('Click here to see your annual allocation')
+            ->assertDontSee('<summary>Annual allocation</summary>', false)
+            ->assertSee('5.11 Quarter Zip')
+            ->assertSee('5.11 Softshell')
+            ->assertDontSee('MBFD Vintage jacket')
+            ->assertDontSee('jacket-vintage', false);
+        $this->assertArrayNotHasKey('vintage', config('uniform_orders.jacket_styles'));
+    }
+
     public function test_offered_items_still_submit_normally(): void
     {
         $this->withoutVite();
