@@ -329,7 +329,7 @@ test('five stations wait without LiveKit, then all join 300 and floor controls w
         await command.page.getByRole('dialog', {name:'End Morning Lineup?'}).getByRole('button', {name:'Cancel', exact:true}).click();
         await expect(command.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'connected');
         await stations[4].page.getByRole('button', {name:'Back', exact:true}).click();
-        await expect.poll(() => stations[4].navigations).toContain('/daily/stations/6');
+        await expect.poll(() => stations[4].navigations.some(path => /^\/daily\/stations\/\d+$/.test(path))).toBe(true);
         await expect(command.page.locator('.vc-tile')).toHaveCount(5);
         if (forceRelay) {
             await expectRelayOnly(command.page);
@@ -341,8 +341,9 @@ test('five stations wait without LiveKit, then all join 300 and floor controls w
         }
         await command.page.getByRole('button', {name:'End Conference', exact:true}).click();
         await command.page.getByRole('dialog', {name:'End Morning Lineup?'}).getByRole('button', {name:'End Conference', exact:true}).click();
-        await expect(command.page).toHaveURL(/\/daily\/stations\/2$/);
-        for (const station of stations) await expect.poll(() => station.navigations).toContain('/daily/stations/' + station.station);
+        // Back links resolve the station number to its database id, which seeding does not fix.
+        await expect(command.page).toHaveURL(/\/daily\/stations\/\d+$/);
+        for (const station of stations) await expect.poll(() => station.navigations.some(path => /^\/daily\/stations\/\d+$/.test(path))).toBe(true);
     } finally {
         await cleanupTestConference(command);
         // Close sequentially so Playwright finalizes each context's trace archive.
@@ -372,7 +373,8 @@ test('300 can place and end a direct Station 1 call', async ({ browser, baseURL 
         expect(station.errors).toEqual([]);
         await command.page.getByRole('button', {name:'End Direct Call', exact:true}).click();
         await command.page.getByRole('dialog', {name:'End Direct Call?'}).getByRole('button', {name:'End Direct Call', exact:true}).click();
-        await expect(command.page).toHaveURL(/\/daily\/stations\/2$/);
+        // Back links resolve the station number to its database id, which seeding does not fix.
+        await expect(command.page).toHaveURL(/\/daily\/stations\/\d+$/);
         await expect(station.page).toHaveURL(/\/daily\/stations\/1$/);
     } finally {
         await cleanupTestConference(command);
@@ -401,7 +403,8 @@ test('self join keeps the exact session for status fallback and returns safely',
         expect(self.errors).toEqual([]);
         await command.page.getByRole('button', {name:'End Conference', exact:true}).click();
         await command.page.getByRole('dialog', {name:'End Morning Lineup?'}).getByRole('button', {name:'End Conference', exact:true}).click();
-        await expect(command.page).toHaveURL(/\/daily\/stations\/2$/);
+        // Back links resolve the station number to its database id, which seeding does not fix.
+        await expect(command.page).toHaveURL(/\/daily\/stations\/\d+$/);
     } finally {
         await cleanupTestConference(command);
         await command.context.close();
