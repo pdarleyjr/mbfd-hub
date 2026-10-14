@@ -17,6 +17,18 @@ interface Props {
   actionLabel: string;
 }
 
+/** Answers replaced by "Confirm all present", kept so the member can undo the batch for this area. */
+interface BatchUndo {
+  compartmentId: string;
+  previous: Array<Pick<ChecklistItem, 'id' | 'status' | 'observed'>>;
+}
+
+const needsValue = (item: ChecklistItem) => Boolean(item.inputType && item.inputType !== 'checkbox');
+const isNumeric = (item: ChecklistItem) => item.inputType === 'number' || item.inputType === 'percentage';
+const percentageOutOfRange = (item: ChecklistItem) => item.inputType === 'percentage' && typeof item.value === 'number' && (item.value < 0 || item.value > 100);
+/** The batch only marks plain present/absent items that have not been reported or still need a typed value. */
+const batchEligible = (item: ChecklistItem) => !((item.observed && item.status !== 'Present') || (needsValue(item) && !itemIsComplete(item)));
+
 export default function CompartmentStep({ checklistType, compartments, findings = [], onChange, onSubmit, onBack, actionLabel }: Props) {
   const profile = resolveBlueprint(checklistType);
   const mappedViews = profile?.views.filter(view => view.zones.some(zone => compartments.some(compartment => compartment.id === zone.compartmentId))) ?? [];
@@ -28,8 +40,10 @@ export default function CompartmentStep({ checklistType, compartments, findings 
   const [focusItem, setFocusItem] = useState<string | null>(null);
   const [pickerCollapsed, setPickerCollapsed] = useState(false);
   const [focusWorkspace, setFocusWorkspace] = useState(false);
+  const [batchUndo, setBatchUndo] = useState<BatchUndo | null>(null);
   const workspaceRef = useRef<HTMLDivElement>(null);
   const quickButtonRef = useRef<HTMLButtonElement>(null);
+  const quickDialogRef = useRef<HTMLElement>(null);
   const navigationRef = useRef<HTMLElement>(null);
   const current = compartments.find(compartment => compartment.id === activeId) ?? compartments[0];
   const view = mappedViews.find(entry => entry.id === viewId) ?? mappedViews[0];
@@ -54,7 +68,7 @@ export default function CompartmentStep({ checklistType, compartments, findings 
     const existing = findingsForArea(compartment, findings).length;
     return <button key={compartment.id} data-area-id={compartment.id} type="button" aria-pressed={compartment.id === current?.id} onClick={() => select(compartment.id)}>
       <span className={`area-state ${state.remaining === 0 ? 'is-complete' : ''}`} aria-hidden="true">{state.remaining === 0 ? <Check size={18} /> : <span className="area-open" />}</span>
-      <span className="area-name">{compartment.name}{compartment.id === current?.id && <small className="area-selected">Selected</small>}{(existing > 0 || state.issues > 0) && <small className="area-warning"><TriangleAlert size={13} />{existing > 0 ? `${existing} existing` : ''}{existing > 0 && state.issues > 0 ? ' · ' : ''}{state.issues > 0 ? `${state.issues} reported` : ''}</small>}</span>
+      <span className="area-name">{compartment.name}{compartment.id === current?.id && <small className="area-selected">Selected</small>}{(existing > 0 || state.issues > 0) && <small className="area-warning"><TriangleAlert size={13} aria-hidden="true" />{existing > 0 ? `${existing} existing` : ''}{existing > 0 && state.issues > 0 ? ' · ' : ''}{state.issues > 0 ? `${state.issues} reported` : ''}</small>}</span>
       <small className="area-progress">{state.completed}/{state.total}</small>
     </button>;
   };
@@ -81,6 +95,16 @@ export default function CompartmentStep({ checklistType, compartments, findings 
     setFocusWorkspace(false);
   }, [focusWorkspace, pickerCollapsed, activeId]);
 
+  // The Quick Checklist is a non-modal dialog: focus moves into it when it opens.
+  useEffect(() => {
+    if (quickOpen) quickDialogRef.current?.focus();
+  }, [quickOpen]);
+
+  const closeQuickChecklist = () => {
+    setQuickOpen(false);
+    quickButtonRef.current?.focus();
+  };
+
   const select = (id: string, itemId?: string) => {
     const nextView = mappedViews.find(entry => entry.zones.some(zone => zone.compartmentId === id));
     if (nextView) setViewId(nextView.id);
@@ -88,6 +112,7 @@ export default function CompartmentStep({ checklistType, compartments, findings 
     setExpandedId(itemId ?? null);
     setQuickOpen(false);
     setPickerCollapsed(true);
+    setBatchUndo(null);
     if (itemId) setFocusItem(itemId);
     else setFocusWorkspace(true);
   };
@@ -96,6 +121,26 @@ export default function CompartmentStep({ checklistType, compartments, findings 
     onChange(previous => previous.map(compartment => compartment.id === compartmentId
       ? { ...compartment, items: compartment.items.map(item => item.id === itemId ? { ...item, ...patch } : item) }
       : compartment));
+  };
+
+  const confirmAllPresent = (area: Compartment) => {
+    const changed = area.items.filter(item => batchEligible(item) && !(item.status === 'Present' && item.observed === true));
+    setBatchUndo(changed.length > 0 ? { compartmentId: area.id, previous: changed.map(({ id, status, observed }) => ({ id, status, observed })) } : null);
+    onChange(previous => previous.map(compartment => compartment.id === area.id ? { ...compartment, items: compartment.items.map(item => batchEligible(item) ? { ...item, status: 'Present', observed: true } : item) } : compartment));
+  };
+
+  const undoBatch = () => {
+    if (!batchUndo) return;
+    const previousById = new Map(batchUndo.previous.map(entry => [entry.id, entry]));
+    // Only answers the batch set are restored; anything the member changed afterwards is kept.
+    onChange(previous => previous.map(compartment => compartment.id === batchUndo.compartmentId ? {
+      ...compartment,
+      items: compartment.items.map(item => {
+        const before = previousById.get(item.id);
+        return before && item.status === 'Present' && item.observed === true ? { ...item, status: before.status, observed: before.observed } : item;
+      }),
+    } : compartment));
+    setBatchUndo(null);
   };
 
   const capturePhoto = (compartmentId: string, itemId: string, file?: File) => {
@@ -111,12 +156,12 @@ export default function CompartmentStep({ checklistType, compartments, findings 
     reader.readAsDataURL(file);
   };
 
-  if (!current || !compartmentProgress) return <div role="alert">No checklist items available. <button onClick={onBack}>Member / Vehicle Info</button></div>;
+  if (!current || !compartmentProgress) return <div data-hub-ui="2" role="alert" className="inspection-alert">No checklist items available. <button type="button" className="hub-btn hub-btn--secondary ml-2" onClick={onBack}>Member / Vehicle Info</button></div>;
 
-  return <div className={`inspection-layout ${showBlueprint ? 'with-blueprint' : 'with-area-rail'} ${pickerCollapsed ? 'picker-collapsed' : ''}`}>
-    <div className="inspection-area-summary">
+  return <div data-hub-ui="2" className={`inspection-layout ${showBlueprint ? 'with-blueprint' : 'with-area-rail'} ${pickerCollapsed ? 'picker-collapsed' : ''}`}>
+    <div className="inspection-area-summary inspection-panel">
       <div><strong>{selectedZone ? `${view.label} · ${selectedZone.label}` : current.name}</strong><span>{compartmentProgress.completed}/{compartmentProgress.total} inspected{compartmentProgress.issues > 0 ? ` · ${compartmentProgress.issues} reported` : ''}</span></div>
-      <button type="button" aria-expanded={!pickerCollapsed} aria-controls="inspection-area-picker" onClick={() => {
+      <button type="button" className="hub-btn hub-btn--tertiary" aria-expanded={!pickerCollapsed} aria-controls="inspection-area-picker" onClick={() => {
         setPickerCollapsed(false);
         requestAnimationFrame(() => {
           const selected = navigationRef.current?.querySelector<HTMLButtonElement>('button[aria-pressed="true"]');
@@ -125,48 +170,55 @@ export default function CompartmentStep({ checklistType, compartments, findings 
         });
       }}>Change area</button>
     </div>
-    <aside id="inspection-area-picker" className="inspection-navigation" aria-label="Apparatus navigation" ref={navigationRef}>
-      <div className="inspection-panel-heading"><h2>Vehicle Areas</h2><div className="blueprint-legend"><span><i className="remaining-dot" />Remaining</span><span><Check size={13} />Inspected</span><span><b>E</b> Existing</span><span><b>R</b> Reported</span></div></div>
+    <aside id="inspection-area-picker" className="inspection-navigation inspection-panel" aria-label="Apparatus navigation" ref={navigationRef}>
+      <div className="inspection-panel-heading"><h2>Vehicle Areas</h2><div className="blueprint-legend"><span><i className="remaining-dot" />Remaining</span><span><Check size={13} aria-hidden="true" />Inspected</span><span><b aria-hidden="true">E</b> Existing</span><span><b aria-hidden="true">R</b> Reported</span></div></div>
       {showBlueprint && view ? <>
         <div className="blueprint-views" aria-label="Apparatus views">
-          {mappedViews.map(entry => <button key={entry.id} type="button" aria-pressed={entry.id === view.id} onClick={() => { setViewId(entry.id); setActiveId(entry.zones.find(zone => compartments.some(compartment => compartment.id === zone.compartmentId))!.compartmentId); setExpandedId(null); }}>{entry.label}</button>)}
+          {mappedViews.map(entry => <button key={entry.id} type="button" aria-pressed={entry.id === view.id} onClick={() => { setViewId(entry.id); setActiveId(entry.zones.find(zone => compartments.some(compartment => compartment.id === zone.compartmentId))!.compartmentId); setExpandedId(null); setBatchUndo(null); }}>{entry.label}</button>)}
         </div>
         <ApparatusBlueprint view={view} compartments={compartments} activeId={current.id} findings={findings} onSelect={select} />
+        {/* The keyboard path for diagram areas: one tab stop per area (the diagram zones are pointer targets). */}
         <div className="blueprint-touch-zones" aria-label="Select a diagram area">{visibleZones.map(zone => {
           const area = compartments.find(compartment => compartment.id === zone.compartmentId)!;
           const state = inspectionProgress([area]);
           const known = findingsForArea(area, findings).length;
-          return <button key={zone.compartmentId} data-area-id={zone.compartmentId} type="button" aria-label={`${area.name}, ${state.completed} of ${state.total} inspected${known ? `, ${known} existing issues` : ''}${state.issues ? `, ${state.issues} reported issues` : ''}`} aria-pressed={current.id === zone.compartmentId} onClick={() => select(zone.compartmentId)}><span>{state.remaining === 0 && <Check size={13} className="area-state is-complete" />}{zone.label}{(known > 0 || state.issues > 0) && <TriangleAlert size={13} className="area-warning" />}</span><small>{current.id === zone.compartmentId ? 'Selected' : state.remaining === 0 ? 'Complete' : `${state.remaining} left`}</small></button>;
+          return <button key={zone.compartmentId} data-area-id={zone.compartmentId} type="button" aria-label={`${zone.label}: ${area.name}, ${state.completed} of ${state.total} inspected${known ? `, ${known} existing issues` : ''}${state.issues ? `, ${state.issues} reported issues` : ''}`} aria-pressed={current.id === zone.compartmentId} onClick={() => select(zone.compartmentId)}><span>{state.remaining === 0 && <Check size={13} className="area-state is-complete" aria-hidden="true" />}{zone.label}{(known > 0 || state.issues > 0) && <TriangleAlert size={13} className="area-warning" aria-hidden="true" />}</span><small>{current.id === zone.compartmentId ? 'Selected' : state.remaining === 0 ? 'Complete' : `${state.remaining} left`}</small></button>;
         })}</div>
         <div className="blueprint-findings">{visibleZones.map(zone => {
           const area = compartments.find(compartment => compartment.id === zone.compartmentId)!;
           const existing = findingsForArea(area, findings).length;
           const reported = inspectionProgress([area]).issues;
-          return existing > 0 || reported > 0 ? <p key={area.id}><TriangleAlert size={14} /><span>{zone.label} · {existing > 0 ? `${existing} existing issue${existing === 1 ? '' : 's'}` : ''}{existing > 0 && reported > 0 ? ' · ' : ''}{reported > 0 ? `${reported} reported` : ''}</span></p> : null;
+          return existing > 0 || reported > 0 ? <p key={area.id}><TriangleAlert size={14} aria-hidden="true" /><span>{zone.label} · {existing > 0 ? `${existing} existing issue${existing === 1 ? '' : 's'}` : ''}{existing > 0 && reported > 0 ? ' · ' : ''}{reported > 0 ? `${reported} reported` : ''}</span></p> : null;
         })}</div>
         {otherAreas.length > 0 && <details className="inspection-other-areas" open={!mappedIds.has(current.id) || undefined}>
-          <summary>Other areas <span>{otherAreas.length}</span><ChevronDown size={16} /></summary>
+          <summary>Other areas <span>{otherAreas.length}</span><ChevronDown size={16} aria-hidden="true" /></summary>
           <section className="inspection-area-list" aria-label="Other areas">{otherAreas.map(areaButton)}</section>
         </details>}
       </> : <section className="inspection-area-list rescue-area-rail" aria-label="Inspection areas">{compartments.map(areaButton)}</section>}
-      {unlocatedFindings.length > 0 && <details className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
-        <summary className="cursor-pointer font-semibold">Other recorded findings ({unlocatedFindings.length})</summary>
-        <p className="mt-2">These findings remain open. Verify the recorded location or duty before acting.</p>
-        <ul className="mt-2 space-y-2">{unlocatedFindings.map(finding => <li key={finding.id}><strong>{finding.item}</strong> · {finding.compartment} · {finding.issue_type}</li>)}</ul>
+      {unlocatedFindings.length > 0 && <details className="inspection-unlocated-findings">
+        <summary>Other recorded findings ({unlocatedFindings.length})</summary>
+        <p>These findings remain open. Verify the recorded location or duty before acting.</p>
+        <ul>{unlocatedFindings.map(finding => <li key={finding.id}><strong>{finding.item}</strong> · {finding.compartment} · {finding.issue_type}</li>)}</ul>
       </details>}
     </aside>
 
-    <section className="inspection-equipment" aria-label="Compartment Inspection" ref={workspaceRef} tabIndex={-1}>
+    <section className="inspection-equipment inspection-panel" aria-label="Compartment Inspection" ref={workspaceRef} tabIndex={-1}>
       <header className="equipment-heading">
         <div><p className="inspection-eyebrow">{showBlueprint && !mappedIds.has(current.id) ? 'Other area · Not shown on vehicle image' : 'Compartment Inspection'}</p><h2>{current.name}</h2><p className="inspection-muted">{compartmentProgress.completed} of {compartmentProgress.total} inspected{compartmentProgress.issues > 0 ? ` · ${compartmentProgress.issues} reported` : ''}</p></div>
-        <button type="button" className="confirm-compartment" aria-label="Mark all items in this compartment as present" onClick={() => onChange(previous => previous.map(compartment => compartment.id === current.id ? { ...compartment, items: compartment.items.map(item => (item.observed && item.status !== 'Present') || (item.inputType && item.inputType !== 'checkbox' && !itemIsComplete(item)) ? item : { ...item, status: 'Present', observed: true }) } : compartment))}>✓ Confirm all present</button>
+        <button type="button" className="hub-btn hub-btn--secondary hub-btn--wrap confirm-compartment" onClick={() => confirmAllPresent(current)}><Check size={18} aria-hidden="true" />Confirm all present</button>
       </header>
+      {batchUndo?.compartmentId === current.id && <div className="inspection-batch-undo">
+        <p role="status">{batchUndo.previous.length} {batchUndo.previous.length === 1 ? 'item' : 'items'} marked present in {current.name}.</p>
+        <button type="button" className="hub-btn hub-btn--tertiary" onClick={undoBatch}>Undo</button>
+      </div>}
       {photoError && <p role="alert" className="inspection-alert">{photoError}</p>}
       <div className="equipment-list">
         {current.items.map(item => {
           const expanded = expandedId === item.id;
           const issue = item.observed && item.status !== 'Present';
           const known = findings.find(finding => finding.compartment === current.name && finding.item === item.name);
+          const actionLabel = needsValue(item) ? 'Record' : 'Pass';
+          const outOfRange = percentageOutOfRange(item);
           return <article key={item.id} className={`equipment-row ${issue ? 'has-issue' : ''} ${expanded ? 'is-expanded' : ''}`}>
             <div className="equipment-summary">
               <button type="button" className="equipment-expand" data-item-id={item.id} aria-expanded={expanded} aria-controls={`details-${current.id}-${item.id}`} onClick={() => setExpandedId(expanded ? null : item.id)}>
@@ -174,27 +226,38 @@ export default function CompartmentStep({ checklistType, compartments, findings 
                 <span><strong>{item.name}</strong><small>{item.expectedQuantity !== undefined ? `Expected quantity: ${item.expectedQuantity} · ` : ''}{issue ? `${item.status} · Open to review` : item.observed ? 'Inspected' : 'Needs inspection'}</small></span>
                 <span className="equipment-chevron" aria-hidden="true">{expanded ? '−' : '+'}</span>
               </button>
-              <button type="button" className={`equipment-pass ${itemIsComplete(item) && !issue ? 'is-passed' : ''}`} aria-label={`Pass ${item.name}`} aria-pressed={itemIsComplete(item) && item.status === 'Present'} onClick={() => { if (item.inputType && item.inputType !== 'checkbox' && !itemIsComplete({ ...item, status: 'Present', observed: true })) { setExpandedId(item.id); } else { update(current.id, item.id, { status: 'Present', observed: true }); } }}>✓ <span>{item.inputType && item.inputType !== 'checkbox' ? 'Record' : 'Pass'}</span></button>
+              <button type="button" className={`equipment-pass ${itemIsComplete(item) && !issue ? 'is-passed' : ''}`} aria-label={`${actionLabel} ${item.name}`} aria-pressed={itemIsComplete(item) && item.status === 'Present'} onClick={() => { if (needsValue(item) && !itemIsComplete({ ...item, status: 'Present', observed: true })) { setExpandedId(item.id); } else { update(current.id, item.id, { status: 'Present', observed: true }); } }}><Check size={16} aria-hidden="true" /><span>{actionLabel}</span></button>
             </div>
-            {known && <p className="px-4 pb-3 text-sm text-amber-900">Known {known.issue_type}{known.last_observation === 'appears_corrected' ? ' · Last reported present' : ''}</p>}
+            {known && <p className="equipment-known">Known {known.issue_type}{known.last_observation === 'appears_corrected' ? ' · Last reported present' : ''}</p>}
             {expanded && <div className="equipment-details" id={`details-${current.id}-${item.id}`}>
-              {item.instructions && <p className="mb-2 text-sm text-slate-600">{item.instructions}</p>}
+              {item.instructions && <p className="equipment-instructions">{item.instructions}</p>}
               <div className="equipment-status" role="group" aria-label={`Status for ${item.name}`}>
                 {(['Present', 'Missing', 'Damaged'] as const).map(status => <button key={status} type="button" aria-pressed={item.observed === true && item.status === status} onClick={() => update(current.id, item.id, { status, observed: true })}>{status}</button>)}
               </div>
               {issue && <p className="equipment-issue-copy">Add a note or photo if it helps describe what you found.</p>}
-              {item.inputType && item.inputType !== 'checkbox' && <label htmlFor={`value-${item.id}`}>
+              {needsValue(item) && <label htmlFor={`value-${item.id}`}>
                 {item.name}
-                <input id={`value-${item.id}`} type={item.inputType === 'number' || item.inputType === 'percentage' ? 'number' : item.inputType === 'date' ? 'date' : 'text'}
-                  value={item.value === null || item.value === undefined ? '' : String(item.value)} maxLength={2000}
-                  className="mt-1 block min-h-12 w-full rounded border border-slate-300 bg-white p-3"
-                  onChange={event => update(current.id, item.id, { value: item.inputType === 'number' || item.inputType === 'percentage' ? event.target.value === '' ? null : Number(event.target.value) : event.target.value, observed: true })} />
+                <input id={`value-${item.id}`} type={isNumeric(item) ? 'number' : item.inputType === 'date' ? 'date' : 'text'}
+                  inputMode={isNumeric(item) ? 'decimal' : undefined}
+                  step={isNumeric(item) ? 'any' : undefined}
+                  min={item.inputType === 'percentage' ? 0 : undefined}
+                  max={item.inputType === 'percentage' ? 100 : undefined}
+                  maxLength={isNumeric(item) ? undefined : 2000}
+                  aria-describedby={item.inputType === 'percentage' ? `value-hint-${item.id}` : undefined}
+                  aria-invalid={outOfRange || undefined}
+                  value={item.value === null || item.value === undefined ? '' : String(item.value)}
+                  onChange={event => update(current.id, item.id, { value: isNumeric(item) ? event.target.value === '' ? null : Number(event.target.value) : event.target.value, observed: true })} />
+                {item.inputType === 'percentage' && <span id={`value-hint-${item.id}`} className={`inspection-field-hint block ${outOfRange ? 'is-invalid' : ''}`}>{outOfRange ? 'Enter a percentage from 0 to 100.' : 'Percentage, 0 to 100.'}</span>}
               </label>}
               <label htmlFor={`note-${item.id}`}>Notes (optional)</label>
               <textarea id={`note-${item.id}`} rows={2} value={item.notes ?? ''} onChange={event => update(current.id, item.id, { notes: event.target.value })} maxLength={2000} />
               <label htmlFor={`photo-${item.id}`}>Photo (optional)</label>
-              <input id={`photo-${item.id}`} type="file" accept="image/*" capture="environment" onChange={event => capturePhoto(current.id, item.id, event.target.files?.[0])} />
-              {item.photo && <img src={item.photo} alt={`Photo of ${item.name}`} className="inspection-photo" />}
+              {/* No forced capture: phones offer the camera or the photo library. The key resets the picker after a change. */}
+              <input key={`photo-${item.id}-${item.photo ? 'set' : 'empty'}`} id={`photo-${item.id}`} type="file" accept="image/*" onChange={event => capturePhoto(current.id, item.id, event.target.files?.[0])} />
+              {item.photo && <div className="inspection-photo-preview">
+                <img src={item.photo} alt={`Photo of ${item.name}`} className="inspection-photo" />
+                <button type="button" className="hub-btn hub-btn--destructive" aria-label={`Remove photo of ${item.name}`} onClick={() => update(current.id, item.id, { photo: undefined })}>Remove photo</button>
+              </div>}
             </div>}
           </article>;
         })}
@@ -204,14 +267,14 @@ export default function CompartmentStep({ checklistType, compartments, findings 
 
     <div className="inspection-action-bar">
       <button ref={quickButtonRef} type="button" className="quick-checklist-trigger" aria-expanded={quickOpen} aria-controls="quick-checklist" onClick={() => setQuickOpen(!quickOpen)}><ClipboardList size={20} aria-hidden="true" /><span>Checklist <strong>{progress.remaining > 0 ? `${progress.remaining} remaining` : 'Equipment inspected'}</strong>{attention.length > 0 && <small>{attention.length} needs attention</small>}</span></button>
-      {progress.remaining > 0 ? <button type="button" className="inspection-review-button" onClick={() => select(navigationIds[(navigationIds.indexOf(current.id) + 1) % navigationIds.length])}>Next area<ArrowRight size={17} aria-hidden="true" /></button>
-        : <button type="button" className="inspection-review-button" disabled={progress.total === 0} onClick={() => onSubmit(compartments)}>{actionLabel}<ArrowRight size={17} aria-hidden="true" /></button>}
+      {progress.remaining > 0 ? <button type="button" className="hub-btn hub-btn--primary hub-btn--wrap inspection-review-button" onClick={() => select(navigationIds[(navigationIds.indexOf(current.id) + 1) % navigationIds.length])}>Next area<ArrowRight size={17} aria-hidden="true" /></button>
+        : <button type="button" className="hub-btn hub-btn--primary hub-btn--wrap inspection-review-button" disabled={progress.total === 0} onClick={() => onSubmit(compartments)}>{actionLabel}<ArrowRight size={17} aria-hidden="true" /></button>}
     </div>
-    {quickOpen && <aside id="quick-checklist" className="quick-checklist" aria-label="Quick Checklist" onKeyDown={event => { if (event.key === 'Escape') { setQuickOpen(false); quickButtonRef.current?.focus(); } }}>
-      <header><div><span className="inspection-eyebrow">Quick Checklist</span><h2>{progress.remaining === 0 ? 'Equipment inspected' : `${progress.remaining} remaining`}</h2></div><button type="button" aria-label="Close Quick Checklist" onClick={() => { setQuickOpen(false); quickButtonRef.current?.focus(); }}><X size={22} /></button></header>
+    {quickOpen && <aside ref={quickDialogRef} id="quick-checklist" className="quick-checklist" role="dialog" aria-modal="false" aria-labelledby="quick-checklist-title" tabIndex={-1} onKeyDown={event => { if (event.key === 'Escape') closeQuickChecklist(); }}>
+      <header><div><span id="quick-checklist-title" className="inspection-eyebrow">Quick Checklist</span><h2>{progress.remaining === 0 ? 'Equipment inspected' : `${progress.remaining} remaining`}</h2></div><button type="button" aria-label="Close Quick Checklist" onClick={closeQuickChecklist}><X size={22} aria-hidden="true" /></button></header>
       <div className="quick-checklist-body">
-        {remaining.length > 0 && <section aria-label="Remaining work"><h3>Remaining ({remaining.length})</h3><ul>{remaining.map(({ compartment, item }) => <li key={`${compartment.id}-${item.id}`}><button type="button" onClick={() => select(compartment.id, item.id)}><span><small>{compartment.name}</small><strong>{item.name}</strong></span><span>Inspect <ArrowRight size={16} /></span></button></li>)}</ul></section>}
-        {attention.length > 0 && <section aria-label="Needs attention"><h3>Needs attention ({attention.length})</h3><ul>{attention.map(({ compartment, item, known }) => <li key={`${compartment.id}-${item.id}`}><button type="button" onClick={() => select(compartment.id, item.id)}><span><small>{compartment.name}</small><strong>{item.name}</strong>{known.length > 0 && <small>Existing {known.map(finding => finding.issue_type).join(', ')}</small>}</span><span>{item.observed && item.status !== 'Present' ? `${item.status} · Reported` : 'Existing issue'} <TriangleAlert size={16} /></span></button></li>)}</ul></section>}
+        {remaining.length > 0 && <section aria-label="Remaining work"><h3>Remaining ({remaining.length})</h3><ul>{remaining.map(({ compartment, item }) => <li key={`${compartment.id}-${item.id}`}><button type="button" onClick={() => select(compartment.id, item.id)}><span><small>{compartment.name}</small><strong>{item.name}</strong></span><span>Inspect <ArrowRight size={16} aria-hidden="true" /></span></button></li>)}</ul></section>}
+        {attention.length > 0 && <section aria-label="Needs attention"><h3>Needs attention ({attention.length})</h3><ul>{attention.map(({ compartment, item, known }) => <li key={`${compartment.id}-${item.id}`}><button type="button" onClick={() => select(compartment.id, item.id)}><span><small>{compartment.name}</small><strong>{item.name}</strong>{known.length > 0 && <small>Existing {known.map(finding => finding.issue_type).join(', ')}</small>}</span><span>{item.observed && item.status !== 'Present' ? `${item.status} · Reported` : 'Existing issue'} <TriangleAlert size={16} aria-hidden="true" /></span></button></li>)}</ul></section>}
         {remaining.length === 0 && attention.length === 0 && <p className="inspection-muted">All equipment inspected. No issues reported.</p>}
       </div>
     </aside>}
