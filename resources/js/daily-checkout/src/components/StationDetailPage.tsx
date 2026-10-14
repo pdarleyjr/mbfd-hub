@@ -553,8 +553,9 @@ function ApparatusCard({ apparatus, checkoutRow, stationId, hubStationReturn }: 
         <p className="mt-2 text-[13px] font-medium text-hub-warning">Daily Checkout policy needs confirmation</p>
       )}
       <div className="mt-auto flex flex-wrap gap-x-4 pt-2">
+        {/* The inspection receipt validates return_to and offers the way back to this station. */}
         {apparatus.daily_checkout_requirement === 'required' && apparatus.slug && (
-          <Link to={`/vehicle-inspections/${apparatus.slug}`} className="hub-link hub-link--standalone">
+          <Link to={`/vehicle-inspections/${apparatus.slug}?return_to=${encodeURIComponent(`/stations/${stationId}`)}`} className="hub-link hub-link--standalone">
             Start Inspection
             <ChevronRight className="h-4 w-4" aria-hidden="true" />
           </Link>

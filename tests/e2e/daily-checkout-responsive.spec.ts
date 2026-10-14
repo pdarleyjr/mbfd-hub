@@ -352,6 +352,10 @@ test('station profile stays contained at 320px with 44px controls, keyboard tabs
     await expectTouchTargets(page, '[role="tabpanel"] a[href], [role="tabpanel"] button');
   }
 
+  await page.getByRole('tab', { name: 'Apparatus', exact: true }).click();
+  await expect(page.getByRole('article', { name: 'Engine 1' }).getByRole('link', { name: 'Start Inspection' }))
+    .toHaveAttribute('href', '/daily/vehicle-inspections/engine-1?return_to=%2Fstations%2F31');
+
   const screenshot = testInfo.outputPath('station-profile-320.png');
   await page.screenshot({ path: screenshot, fullPage: true });
   await testInfo.attach('station profile 320', { path: screenshot, contentType: 'image/png' });
