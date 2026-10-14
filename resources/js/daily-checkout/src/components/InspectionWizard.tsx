@@ -221,17 +221,19 @@ export default function InspectionWizard() {
   // hidden or closed and when this screen unmounts (in-app navigation).
   useEffect(() => {
     mountedRef.current = true;
-    const flush = () => { void autosaver.flush(); };
+    // The document may be torn down before an IndexedDB write commits, so
+    // hiding the page also keeps a synchronous copy of unconfirmed edits.
+    const persistBeforeUnload = () => autosaver.persistBeforeUnload();
     const onVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') flush();
+      if (document.visibilityState === 'hidden') persistBeforeUnload();
     };
-    window.addEventListener('pagehide', flush);
+    window.addEventListener('pagehide', persistBeforeUnload);
     document.addEventListener('visibilitychange', onVisibilityChange);
 
     return () => {
-      window.removeEventListener('pagehide', flush);
+      window.removeEventListener('pagehide', persistBeforeUnload);
       document.removeEventListener('visibilitychange', onVisibilityChange);
-      flush();
+      void autosaver.flush();
       mountedRef.current = false;
     };
   }, [autosaver]);

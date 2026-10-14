@@ -73,6 +73,30 @@ const readInspectionProgress = (key: string): InspectionData | null => {
 // Autosaves are versioned so a checklist update cannot overwrite or clear the
 // older payload. The original unversioned key is read as a legacy candidate but
 // is never rewritten by a current checklist.
+const draftKey = (apparatusSlug: string, data: InspectionData): string => {
+  const owner = data.actorUserId !== undefined && data.actorSecurityVersion !== undefined
+    ? `_actor_${data.actorUserId}_${data.actorSecurityVersion}` : '';
+
+  return `${autosaveKey(apparatusSlug, data.checklist_version)}${owner}`;
+};
+
+/**
+ * Synchronous last-chance copy for page hide/close, when an IndexedDB write may
+ * not commit before the document is torn down. It uses the draft's own
+ * versioned key, so the loader restores it when it is newer than the
+ * IndexedDB draft, and the next successful IndexedDB write removes it. A draft
+ * too large for localStorage (several photos) is skipped; the IndexedDB write
+ * started at the same moment remains the primary copy.
+ */
+export const saveInspectionProgressSnapshot = (apparatusSlug: string, data: InspectionData): boolean => {
+  try {
+    localStorage.setItem(draftKey(apparatusSlug, data), JSON.stringify({ ...data, apparatusSlug, timestamp: Date.now() }));
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export const saveInspectionProgress = async (apparatusSlug: string, data: InspectionData): Promise<boolean> => {
   try {
     const saveData = {
@@ -80,9 +104,7 @@ export const saveInspectionProgress = async (apparatusSlug: string, data: Inspec
       apparatusSlug,
       timestamp: Date.now(),
     };
-    const owner = data.actorUserId !== undefined && data.actorSecurityVersion !== undefined
-      ? `_actor_${data.actorUserId}_${data.actorSecurityVersion}` : '';
-    const key = `${autosaveKey(apparatusSlug, data.checklist_version)}${owner}`;
+    const key = draftKey(apparatusSlug, data);
     await db.dailyCheckoutDrafts.put({ key, apparatusSlug, timestamp: saveData.timestamp, data: saveData });
     localStorage.removeItem(key);
     return true;
@@ -109,6 +131,11 @@ export interface DraftAutosaver {
   flush(): Promise<void>;
   /** Forget an unwritten draft (it was superseded by a durable submission). */
   cancel(): void;
+  /**
+   * Page hide/close: synchronously keep a copy of any draft not yet confirmed
+   * in IndexedDB, then start writing it.
+   */
+  persistBeforeUnload(): void;
 }
 
 /**
@@ -122,6 +149,7 @@ export const createDraftAutosaver = (
   delayMs = AUTOSAVE_DEBOUNCE_MS,
 ): DraftAutosaver => {
   let pending: DraftAutosaveRequest | null = null;
+  let unconfirmed: DraftAutosaveRequest | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let writes: Promise<void> = Promise.resolve();
 
@@ -137,6 +165,7 @@ export const createDraftAutosaver = (
     if (request) {
       writes = writes.then(async () => {
         const succeeded = await saveInspectionProgress(request.apparatusSlug, request.data);
+        if (succeeded && unconfirmed === request) unconfirmed = null;
         if (succeeded && request.clearSessionStartKeyFor) {
           clearInspectionSessionStartKey(request.apparatusSlug, request.clearSessionStartKeyFor);
         }
@@ -150,6 +179,7 @@ export const createDraftAutosaver = (
   return {
     schedule(request, immediate = false) {
       pending = request;
+      unconfirmed = request;
       clearTimer();
       if (immediate) {
         void flush();
@@ -161,6 +191,11 @@ export const createDraftAutosaver = (
     cancel() {
       clearTimer();
       pending = null;
+      unconfirmed = null;
+    },
+    persistBeforeUnload() {
+      if (unconfirmed) saveInspectionProgressSnapshot(unconfirmed.apparatusSlug, unconfirmed.data);
+      void flush();
     },
   };
 };
@@ -178,9 +213,15 @@ export const loadInspectionProgress = async (
       .filter(draft => belongsToOwner(draft.data) && Date.now() - draft.timestamp <= DRAFT_MAX_AGE_MS)
       .sort((left, right) => right.timestamp - left.timestamp);
     const exact = drafts.find(draft => draft.key === key);
-    if (exact) return exact.data;
-
+    // localStorage under the same key holds either a page-hide snapshot that
+    // may be newer than IndexedDB, or an old pre-IndexedDB autosave.
     const legacyExact = readInspectionProgress(key);
+    const legacyTimestamp = Number((legacyExact as (InspectionData & { timestamp?: unknown }) | null)?.timestamp) || 0;
+    if (exact && (!legacyExact || !belongsToOwner(legacyExact) || exact.timestamp >= legacyTimestamp)) {
+      if (legacyExact && belongsToOwner(legacyExact)) localStorage.removeItem(key);
+      return exact.data;
+    }
+
     if (legacyExact && belongsToOwner(legacyExact)) {
       if (await saveInspectionProgress(apparatusSlug, legacyExact)) localStorage.removeItem(key);
       return legacyExact;
