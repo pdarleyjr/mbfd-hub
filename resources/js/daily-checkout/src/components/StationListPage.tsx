@@ -1,19 +1,20 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { House } from 'lucide-react';
 import { Station } from '../types';
 import { ApiClient, isApiAuthenticationError, redirectToLoginAfterSessionExpiry } from '../utils/api';
 import StationCard from './StationCard';
 import { HubPageHeader } from '../../../hub-ui/HubShell';
+import { EmptyState, LoadError } from './ui/StateViews';
+
+const GRID = 'daily-station-grid grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-3 lg:gap-6 xl:grid-cols-4 2xl:grid-cols-5';
 
 export default function StationListPage() {
   const [stations, setStations] = useState<Station[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pullDistance, setPullDistance] = useState(0);
-  const touchStartY = useRef<number>(0);
-  const containerRef = useRef<HTMLDivElement>(null);
 
-  const fetchStations = async () => {
+  const fetchStations = useCallback(async () => {
+    setLoading(true);
     try {
       const data = await ApiClient.getStations();
       setStations(data);
@@ -26,59 +27,28 @@ export default function StationListPage() {
       setError(err instanceof Error ? err.message : 'Failed to load stations');
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchStations();
-  }, []);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (containerRef.current && containerRef.current.scrollTop === 0) {
-      touchStartY.current = e.touches[0].clientY;
-    }
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (containerRef.current && containerRef.current.scrollTop === 0) {
-      const touchY = e.touches[0].clientY;
-      const distance = touchY - touchStartY.current;
-      if (distance > 0 && distance < 150) {
-        setPullDistance(distance);
-      }
-    }
-  };
-
-  const handleTouchEnd = () => {
-    if (pullDistance > 80 && !refreshing) {
-      setRefreshing(true);
-      if ('vibrate' in navigator) {
-        navigator.vibrate(50);
-      }
-      fetchStations();
-    }
-    setPullDistance(0);
-    touchStartY.current = 0;
-  };
+  }, [fetchStations]);
 
   if (loading) {
     return (
-      <div className="space-y-8 font-hub">
-        {/* Skeleton header */}
+      <div data-hub-ui="2" className="space-y-6 font-hub" role="status" aria-label="Loading stations">
         <div className="border-b border-hub-border pb-5">
-          <div className="skeleton mb-2 h-8 w-56"></div>
-          <div className="skeleton h-4 w-80 max-w-full"></div>
+          <span className="hub-skeleton mb-3 !h-7 w-56" />
+          <span className="hub-skeleton !h-4 w-80 max-w-full" />
         </div>
-        {/* Skeleton cards */}
-        <div className="daily-station-grid grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-3 lg:gap-6 xl:grid-cols-4 2xl:grid-cols-5 2xl:gap-8">
+        <div className={GRID}>
           {[1, 2, 3, 4, 5].map(i => (
-            <div key={i} className="overflow-hidden rounded-xl bg-hub-surface shadow-sm ring-1 ring-hub-border/80">
-              <div className="skeleton h-48 w-full rounded-none"></div>
-              <div className="p-5">
-                <div className="skeleton h-6 w-36 mb-3"></div>
-                <div className="skeleton h-4 w-full mb-2"></div>
-                <div className="skeleton h-4 w-40"></div>
+            <div key={i} className="hub-panel overflow-hidden">
+              <span className="hub-skeleton !h-48 w-full !rounded-none" />
+              <div className="space-y-2 p-5">
+                <span className="hub-skeleton !h-5 w-36" />
+                <span className="hub-skeleton w-full" />
+                <span className="hub-skeleton w-40" />
               </div>
             </div>
           ))}
@@ -89,79 +59,35 @@ export default function StationListPage() {
 
   if (error) {
     return (
-      <div className="mx-auto max-w-lg rounded-xl border border-hub-danger/30 bg-hub-danger/10 p-8 text-center font-hub">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-hub-danger/10 mb-4">
-          <svg className="w-8 h-8 text-hub-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-          </svg>
-        </div>
-        <p className="text-hub-danger font-medium mb-2">Failed to load stations</p>
-        <p className="mb-4 text-sm text-hub-ink-secondary">{error}</p>
-        <button
-          onClick={() => {
-            setLoading(true);
-            fetchStations();
-          }}
-          className="mt-2 min-h-11 rounded-lg bg-hub-blue px-5 py-2.5 font-semibold text-white transition-colors hover:bg-hub-blue-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus touch-manipulation"
-        >
-          Retry
-        </button>
+      <div data-hub-ui="2" className="mx-auto max-w-lg font-hub">
+        <LoadError title="Failed to load stations" message={error} onRetry={fetchStations}>
+          <a href="/" className="hub-btn hub-btn--secondary text-hub-ink">Hub home</a>
+        </LoadError>
       </div>
     );
   }
 
   return (
-    <div
-      ref={containerRef}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      className="relative font-hub"
-    >
-      {/* Pull to refresh indicator */}
-      {pullDistance > 0 && (
-        <div
-          className="flex justify-center items-center py-4 transition-opacity"
-          style={{
-            transform: `translateY(${Math.min(pullDistance, 80)}px)`,
-            opacity: pullDistance / 80,
-          }}
-        >
-          <svg className={`w-5 h-5 text-hub-blue ${pullDistance > 80 ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          <span className="ml-2 text-sm font-medium text-hub-ink-secondary">
-            {pullDistance > 80 ? 'Release to refresh' : 'Pull to refresh'}
-          </span>
-        </div>
-      )}
-
-      {/* Refreshing indicator */}
-      {refreshing && (
-        <div className="flex items-center justify-center py-4 font-medium text-hub-blue">
-          <svg className="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          <span className="ml-2 text-sm">Refreshing...</span>
-        </div>
-      )}
-
-      {/* Welcome Header */}
+    <div data-hub-ui="2" className="font-hub">
       <HubPageHeader eyebrow="Station operations" title="MBFD Stations" description={<>
           Select your station below to access forms, inspections, apparatus information, and more.
           Each station page contains everything you need for daily operations.
         </>} />
 
-      {/* Stations Grid */}
-      <div data-testid="daily-station-grid" className="daily-station-grid grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-3 lg:gap-6 xl:grid-cols-4 2xl:grid-cols-5 2xl:gap-8">
-        {stations.map((station) => (
-          <StationCard key={station.id} station={station} />
-        ))}
-      </div>
-
-      {stations.length === 0 && (
-        <div className="mt-8 rounded-xl border border-dashed border-hub-border-strong bg-hub-surface/70 p-8 text-center text-hub-muted">
-          No stations available.
+      {stations.length > 0 ? (
+        <div data-testid="daily-station-grid" className={GRID}>
+          {stations.map((station) => (
+            <StationCard key={station.id} station={station} />
+          ))}
+        </div>
+      ) : (
+        <div className="hub-panel">
+          <EmptyState
+            icon={<House className="hub-empty__icon" aria-hidden="true" />}
+            title="No stations available"
+            body="Stations appear here once they are set up in Administration."
+            action={<a href="/" className="hub-btn hub-btn--secondary">Hub home</a>}
+          />
         </div>
       )}
     </div>
