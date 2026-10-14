@@ -1,6 +1,7 @@
 import { db, type PendingSubmission } from './db';
 import { QueryClient } from '@tanstack/react-query';
 import { identityForQueueCapture, refreshOfflineIdentity, type OfflineIdentity } from './offlineIdentity';
+import { announceSubmissionQueuesChanged } from '../utils/dailyCheckoutSubmissionQueue';
 
 const MAX_RETRIES = 5;
 const BASE_DELAY_MS = 1000;
@@ -85,7 +86,7 @@ export async function enqueueSubmission(
 ): Promise<number> {
   const durableData = withIdempotencyKey(type, data);
   const owner = await identityForQueueCapture();
-  return db.pendingSubmissions.add({
+  const id = await db.pendingSubmissions.add({
     type,
     data: durableData,
     createdAt: new Date(),
@@ -95,6 +96,10 @@ export async function enqueueSubmission(
     ownerSecurityVersion: owner.securityVersion,
     ownershipState: 'owned',
   });
+  // The connection indicator counts saved work from queue-change events.
+  announceSubmissionQueuesChanged();
+
+  return id;
 }
 
 export async function getPendingSubmissionQueueSummary(): Promise<PendingSubmissionQueueSummary> {

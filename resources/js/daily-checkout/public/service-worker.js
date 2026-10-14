@@ -76,9 +76,42 @@ self.addEventListener('install', (event) => {
 });
 
 // Activate event - clean up old caches
+// A worker installed while signed out has no shell. Before older caches are
+// deleted, keep a genuine older shell and the build assets it references, so
+// an offline launch still opens the app; the next online navigation replaces
+// it. A poisoned (non-Daily) shell is never carried over.
+async function carryOverGenuineShell(cacheNames) {
+  const current = await caches.open(CACHE_NAME);
+  if (await current.match('/daily/index.html')) return;
+
+  for (const name of cacheNames) {
+    if (!name.startsWith('mbfd-checkout-') || name === CACHE_NAME) continue;
+    const previous = await caches.open(name);
+    const shell = await previous.match('/daily/index.html');
+    if (!(await isGenuineDailyShell(shell))) continue;
+
+    await current.put('/daily/index.html', shell.clone());
+    await current.put('/daily/', shell.clone());
+    for (const request of await previous.keys()) {
+      const path = new URL(request.url, self.location.origin).pathname;
+      if (!path.startsWith('/daily/assets/') || await current.match(request)) continue;
+      const asset = await previous.match(request);
+      if (asset) await current.put(request, asset);
+    }
+    return;
+  }
+}
+
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
+    caches.keys().then(async (cacheNames) => {
+      try {
+        await carryOverGenuineShell(cacheNames);
+      } catch {
+        // Losing the carried-over shell only affects an offline launch.
+      }
+      return cacheNames;
+    }).then((cacheNames) => {
       return Promise.all(
         cacheNames
           .filter((name) => {

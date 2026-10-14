@@ -1746,6 +1746,139 @@ test('the last edit is kept when the page is reloaded before the autosave pause 
   await expect(page.getByLabel('Notes (optional)')).toHaveValue('Noted just before the page closed.');
 });
 
+test('a background replay that sends the blocking record shows its receipt instead of restarting the form', async ({ page }) => {
+  const api = await mockInspectionApi(page, { abortFirstSubmit: true });
+
+  await page.goto('/daily/apparatus/engine-1');
+  await completeInspection(page);
+  await page.getByRole('button', { name: 'Submit Inspection' }).click();
+  await expect(page.getByRole('heading', { name: 'Saved inspection not sent yet' })).toBeVisible();
+  const [queued] = await queuedInspections(page);
+  // A second, slow record keeps the replay pass (and its result event) open
+  // long after the blocking record was accepted and removed.
+  await page.route('**/api/public/apparatuses/999/inspections', async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 4_000));
+    await route.fulfill({ status: 201, json: { success: true, processing_status: 'accepted' } });
+  });
+  await addQueuedInspection(page, {
+    id: 'daily_dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+    apparatusId: 999,
+    checklistVersion: 'd'.repeat(64),
+    status: 'pending',
+    retryCount: 0,
+    ownerUserId: 101,
+    ownerSecurityVersion: 1,
+    ownershipState: 'owned',
+    data: { client_submission_id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd', checklist_version: 'd'.repeat(64), operator_name: 'Captain Browser', compartments: [] },
+    createdAt: new Date(Date.now() + 60_000).toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+
+  // Reconnect replay, not the member's Retry button.
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+
+  // The receipt appears as soon as the blocking record is accepted, before
+  // the pass finishes; the form is never reset for a second submission.
+  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible({ timeout: 2_500 });
+  expect(api.accepted()).toBe(1);
+  expect(api.submissions.map((submission) => submission.client_submission_id)).toEqual([
+    queued.data.client_submission_id,
+    queued.data.client_submission_id,
+  ]);
+  await expect.poll(async () => (await readDrafts(page)).length).toBe(0);
+  expect(await page.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith('mbfd_autosave_inspection_')))).toEqual([]);
+
+  await page.goto('/daily/apparatus/engine-1');
+  await expect(page.getByRole('heading', { name: 'Engine 1', exact: true })).toBeVisible();
+  await expect(page.getByText(/Restored from autosave/)).toHaveCount(0);
+  await page.waitForTimeout(500);
+  expect(api.submissions).toHaveLength(2);
+});
+
+test('an offline relaunch restores a page-hide copy that is newer than the IndexedDB draft', async ({ page }) => {
+  await mockInspectionApi(page);
+  await page.goto('/daily/apparatus/engine-1');
+  await page.getByRole('button', { name: /^Portable Radio/ }).click();
+  await page.getByRole('group', { name: 'Status for Portable Radio' }).getByRole('button', { name: /Damaged/ }).click();
+  await page.getByLabel('Notes (optional)').fill('Written to IndexedDB.');
+  await expect.poll(async () => (await readDrafts(page))[0]?.data.compartments[0]?.items[0]?.notes).toBe('Written to IndexedDB.');
+
+  // The page was closed before IndexedDB confirmed a later edit; only the
+  // synchronous page-hide copy holds it.
+  await page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('mbfd-daily-checkout');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const draft = await new Promise<{ key: string; timestamp: number; data: Record<string, any> }>((resolve, reject) => {
+      const request = database.transaction('dailyCheckoutDrafts').objectStore('dailyCheckoutDrafts').getAll();
+      request.onsuccess = () => resolve(request.result[0]);
+      request.onerror = () => reject(request.error);
+    });
+    database.close();
+    const snapshot = structuredClone(draft.data);
+    snapshot.compartments[0].items[0].notes = 'Kept by the page-hide copy.';
+    snapshot.timestamp = draft.timestamp + 1_000;
+    localStorage.setItem(draft.key, JSON.stringify(snapshot));
+  });
+
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => false });
+  });
+  await page.unroute('**/api/**');
+  await page.route('**/api/**', (route) => route.fulfill({ status: 503, json: { message: 'Offline' } }));
+  await page.reload();
+
+  await expect(page.getByText(/Restored from autosave/)).toBeVisible();
+  await page.getByRole('button', { name: /^Portable Radio/ }).click();
+  await expect(page.getByLabel('Notes (optional)')).toHaveValue('Kept by the page-hide copy.');
+});
+
+test('returning to the app with nothing queued does not contact the server', async ({ page }) => {
+  const api = await mockInspectionApi(page);
+  await page.goto('/daily/apparatus/engine-1');
+  await expect(page.getByRole('heading', { name: 'Engine 1', exact: true })).toBeVisible();
+  await page.waitForTimeout(500);
+  const contextRequests = api.contextRequests();
+
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await page.waitForTimeout(750);
+
+  expect(api.contextRequests()).toBe(contextRequests);
+});
+
+test('returning to the app inside the backoff window does not resend a pending inspection', async ({ page }) => {
+  const api = await mockInspectionApi(page, { submitSequence: [{ status: 503, json: { message: 'Down for maintenance.' } }] });
+  await page.goto('/daily/apparatus/engine-1');
+  await completeInspection(page);
+  await page.getByRole('button', { name: 'Submit Inspection' }).click();
+  await expect(page.getByRole('heading', { name: 'Saved inspection not sent yet' })).toBeVisible();
+
+  await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+  await page.waitForTimeout(750);
+
+  expect(api.submissions).toHaveLength(1);
+  expect((await queuedInspections(page))[0]).toMatchObject({ status: 'pending', lastErrorStatus: 503 });
+});
+
+test('a background replay that finds the session expired shows a sign-in notice instead of leaving the page', async ({ page }) => {
+  const api = await mockInspectionApi(page, { abortFirstSubmit: true });
+  await page.goto('/daily/apparatus/engine-1');
+  await completeInspection(page);
+  await page.getByRole('button', { name: 'Submit Inspection' }).click();
+  await expect(page.getByRole('heading', { name: 'Saved inspection not sent yet' })).toBeVisible();
+
+  await page.route('**/api/me/context', (route) => route.fulfill({ status: 401, json: { message: 'Unauthenticated.' } }));
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+
+  await expect(page.getByTestId('sign-in-required-notice')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Sign in again' })).toBeVisible();
+  await expect(page).toHaveURL(/\/daily\/apparatus\/engine-1$/);
+  expect(api.submissions).toHaveLength(1);
+  expect((await queuedInspections(page))[0]).toMatchObject({ status: 'pending' });
+});
+
 test('station request history follows every page of the complete history', async ({ page }) => {
   await mockInspectionApi(page);
   const requestedPages: string[] = [];

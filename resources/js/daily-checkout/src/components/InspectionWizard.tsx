@@ -4,6 +4,7 @@ import { Apparatus, ApparatusServiceTicketSummary, OfficerInfo, ChecklistData, C
 import { ApiClient, READ_TIMEOUT_MS } from '../utils/api';
 import {
   DAILY_CHECKOUT_QUEUE_SYNC_EVENT,
+  acceptedOutcomeFor,
   describeSubmissionFailure,
   getQueuedSubmission,
   getQueuedSubmissionForApparatusAndChecklistVersion,
@@ -174,7 +175,7 @@ export default function InspectionWizard() {
   const autosaverRef = useRef<DraftAutosaver | null>(null);
   const lastAutosaveStepRef = useRef<Step | null>(null);
   const mountedRef = useRef(true);
-  const blockerPresentRef = useRef(false);
+  const blockerIdRef = useRef<string | null>(null);
   const receiptShownRef = useRef(false);
   const meterFormRef = useRef<HTMLFormElement>(null);
   const hasQueuedInspectionRef = useRef(false);
@@ -194,6 +195,8 @@ export default function InspectionWizard() {
   const autosaver = autosaverRef.current;
 
   const showReceipt = (outcome: InspectionReceiptOutcome, queuedSubmissionId?: string) => {
+    // The queue-change and replay-result paths can both report one acceptance.
+    if (receiptShownRef.current) return;
     receiptShownRef.current = true;
     const state: InspectionReceiptState = { outcome, queuedSubmissionId, returnTo: returnTo ?? undefined };
     navigate(outcome === 'queued' ? '/success?queued=true' : '/success', { state });
@@ -249,8 +252,8 @@ export default function InspectionWizard() {
             loadedContract.apparatus.id,
             loadedContract.checklist.checklist_version,
           );
-          const hadBlocker = blockerPresentRef.current;
-          blockerPresentRef.current = blocker !== null;
+          const previousBlockerId = blockerIdRef.current;
+          blockerIdRef.current = blocker?.id ?? null;
           setQueuedSubmissionBlocker(blocker);
           setError(null);
 
@@ -259,7 +262,17 @@ export default function InspectionWizard() {
           // discarded a rejected inspection), start over from the saved draft
           // with a new submission identity so it can be corrected and sent.
           const formInitialized = initializedChecklistKeyRef.current === `${slug}:${loadedContract.checklist.checklist_version}`;
-          if (blocker || receiptShownRef.current || (formInitialized && !hadBlocker)) {
+          if (blocker || receiptShownRef.current || (formInitialized && previousBlockerId === null)) {
+            return;
+          }
+          // The queue removes an accepted record (and notifies) before a
+          // background pass reports its result. An accepted inspection must
+          // show its receipt; restarting the form here could send a second
+          // inspection under a new submission id.
+          const acceptedOutcome = previousBlockerId !== null ? acceptedOutcomeFor(previousBlockerId) : null;
+          if (acceptedOutcome) {
+            await clearInspectionProgress(slug, loadedContract.checklist.checklist_version, memberIdentity);
+            showReceipt(acceptedOutcome);
             return;
           }
           loadedContractRef.current = null;
@@ -272,7 +285,7 @@ export default function InspectionWizard() {
           setLoading(true);
         }
 
-        blockerPresentRef.current = false;
+        blockerIdRef.current = null;
         setQueuedSubmissionBlocker(null);
         const identity = await identityForQueueCapture();
         if (!identity.personnel?.name || !identity.personnel.employee_profile_id) {
@@ -376,7 +389,7 @@ export default function InspectionWizard() {
           checklistData.checklist_version,
         );
         if (queuedSubmission) {
-          blockerPresentRef.current = true;
+          blockerIdRef.current = queuedSubmission.id;
           setQueuedSubmissionBlocker(queuedSubmission);
 
           return;
@@ -693,7 +706,7 @@ export default function InspectionWizard() {
         officer_signature: signature,
       };
       clientSubmissionIdRef.current = submission.client_submission_id;
-      const queueId = await queueSubmission(apparatus.id, submission);
+      const queueId = await queueSubmission(apparatus.id, submission, currentIdentity);
       const queuedSubmission = await getQueuedSubmission(queueId);
       if (!queuedSubmission) {
         throw new Error('Unable to retain this inspection for submission. Please try again.');

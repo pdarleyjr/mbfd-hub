@@ -30,7 +30,7 @@ function loadWorker(networkFor) {
     return {
       put: async (request, response) => { store.set(keyOf(request), response); },
       match: async (request) => store.get(keyOf(request)),
-      keys: async () => [...store.keys()],
+      keys: async () => [...store.keys()].map((path) => ({ url: `${ORIGIN}${path}` })),
       addAll: async (keys) => { for (const key of keys) store.set(keyOf(key), fakeResponse({ url: `${ORIGIN}${key}` })); },
     };
   };
@@ -58,8 +58,20 @@ function loadWorker(networkFor) {
   };
   vm.runInNewContext(source, sandbox);
 
-  return { listeners, stores, cacheName: [...source.matchAll(/const CACHE_NAME = '([^']+)'/g)][0][1] };
+  return { listeners, stores, caches: sandbox.caches, cacheName: [...source.matchAll(/const CACHE_NAME = '([^']+)'/g)][0][1] };
 }
+
+const activate = async (worker) => {
+  let pending;
+  worker.listeners.activate({ waitUntil: (promise) => { pending = promise; } });
+  await pending;
+};
+
+const seedPreviousCache = async (worker, shellBody) => {
+  const previous = await worker.caches.open('mbfd-checkout-v8');
+  await previous.put('/daily/index.html', fakeResponse({ body: shellBody, url: `${ORIGIN}/daily/` }));
+  await previous.put('/daily/assets/index-old.js', fakeResponse({ body: 'old bundle', url: `${ORIGIN}/daily/assets/index-old.js`, contentType: 'text/javascript' }));
+};
 
 const install = async (worker) => {
   let pending;
@@ -133,4 +145,39 @@ test('a genuine Daily navigation refreshes the cached shell and offline navigati
   network = () => { throw new TypeError('offline'); };
   const offline = await navigate(worker, '/daily/vehicle-inspections/engine-1');
   assert.equal(await offline.text(), updatedShell);
+});
+
+test('activation after a signed-out install keeps a genuine older shell and its assets for offline launch', async () => {
+  const worker = loadWorker((url) => fakeResponse({ body: LOGIN_PAGE, url: `${ORIGIN}/login`, redirected: true }));
+  await seedPreviousCache(worker, DAILY_SHELL);
+  await install(worker);
+  assert.equal(await cachedShell(worker), null);
+
+  await activate(worker);
+
+  assert.equal(await cachedShell(worker), DAILY_SHELL);
+  assert.equal(worker.stores.get(worker.cacheName).has('/daily/assets/index-old.js'), true);
+  assert.equal(worker.stores.has('mbfd-checkout-v8'), false);
+});
+
+test('activation never carries a poisoned older shell forward', async () => {
+  const worker = loadWorker((url) => fakeResponse({ body: LOGIN_PAGE, url: `${ORIGIN}/login`, redirected: true }));
+  await seedPreviousCache(worker, LOGIN_PAGE);
+  await install(worker);
+
+  await activate(worker);
+
+  assert.equal(await cachedShell(worker), null);
+  assert.equal(worker.stores.has('mbfd-checkout-v8'), false);
+});
+
+test('activation keeps the new shell when the install stored one', async () => {
+  const worker = loadWorker((url) => fakeResponse({ body: DAILY_SHELL.replace('Daily Checkout', 'Daily Checkout v9'), url }));
+  await seedPreviousCache(worker, DAILY_SHELL);
+  await install(worker);
+
+  await activate(worker);
+
+  assert.match(await cachedShell(worker), /Daily Checkout v9/);
+  assert.equal(worker.stores.get(worker.cacheName).has('/daily/assets/index-old.js'), false);
 });
