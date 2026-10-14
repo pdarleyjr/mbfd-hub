@@ -129,15 +129,14 @@ final class UniformPresentationConsistencyTest extends TestCase
             ['id' => 4, 'label' => 'JUKMO Work Belt — M — 5 on hand', 'name' => 'JUKMO Work Belt', 'size' => 'M'],
         ];
 
-        $grouped = ViewPersonnelRequest::groupInventoryChoices($stock, '5.11 Tactical Pants', '34x32');
+        $ordered = ViewPersonnelRequest::orderedInventoryChoices($stock, '5.11 Tactical Pants', '34x32');
 
-        $this->assertSame(['Matches item and size', 'Matches item', 'Other stock'], array_keys($grouped));
-        $this->assertSame([2], array_keys($grouped['Matches item and size']));
-        $this->assertSame([3], array_keys($grouped['Matches item']));
-        $this->assertEqualsCanonicalizing([1, 4], array_keys($grouped['Other stock']));
+        // Flat (no option groups) so the searchable picker keeps real options; matches lead.
+        $this->assertSame([2, 3, 1, 4], array_keys($ordered));
+        $this->assertSame('5.11 Tactical Pants — 34x32 — 2 on hand', $ordered[2]);
 
-        $ungrouped = ViewPersonnelRequest::groupInventoryChoices($stock, null, null);
-        $this->assertSame([1, 2, 3, 4], array_keys($ungrouped));
+        $unknownItem = ViewPersonnelRequest::orderedInventoryChoices($stock, null, null);
+        $this->assertSame([1, 2, 3, 4], array_keys($unknownItem));
     }
 
     private function builder(Employee $employee): \Livewire\Features\SupportTesting\Testable

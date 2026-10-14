@@ -240,33 +240,33 @@ class ViewPersonnelRequest extends ViewRecord
             $itemId = $get('item_id');
             $item = filter_var($itemId, FILTER_VALIDATE_INT) === false ? null : $request->items->firstWhere('id', (int) $itemId);
 
-            return self::groupInventoryChoices($stock, $item?->item_name, $item?->size);
+            // A flat list keeps the searchable picker's choices exposed as options to
+            // assistive technology; grouped choices would be rendered with another role.
+            return self::orderedInventoryChoices($stock, $item?->item_name, $item?->size);
         })->searchable()->helperText('Stock matching the requested item and size is listed first.');
     }
 
     /**
+     * In-stock rows ordered: same item and size first, then same item, then everything else.
+     *
      * @param  list<array{id:int,label:string,name:?string,size:?string}>  $stock
-     * @return array<int|string, mixed>
+     * @return array<int, string>
      */
-    public static function groupInventoryChoices(array $stock, ?string $itemName, ?string $size): array
+    public static function orderedInventoryChoices(array $stock, ?string $itemName, ?string $size): array
     {
         $words = collect(preg_split('/[^a-z0-9]+/', strtolower((string) $itemName)) ?: [])
             ->filter(fn (string $word): bool => strlen($word) > 2 && ! in_array($word, ['and', 'the', 'with', 'mbfd'], true))
             ->values();
-        if ($words->isEmpty()) {
-            return collect($stock)->mapWithKeys(fn (array $row): array => [$row['id'] => $row['label']])->all();
-        }
         $normalizedSize = strtolower(trim((string) $size));
-        $groups = ['Matches item and size' => [], 'Matches item' => [], 'Other stock' => []];
+        $tiers = [[], [], []];
         foreach ($stock as $row) {
             $name = strtolower((string) $row['name']);
-            $matchesItem = $words->contains(fn (string $word): bool => str_contains($name, $word));
+            $matchesItem = $words->isNotEmpty() && $words->contains(fn (string $word): bool => str_contains($name, $word));
             $matchesSize = $normalizedSize !== '' && str_contains(strtolower((string) $row['size']), $normalizedSize);
-            $group = $matchesItem ? ($matchesSize ? 'Matches item and size' : 'Matches item') : 'Other stock';
-            $groups[$group][$row['id']] = $row['label'];
+            $tiers[$matchesItem ? ($matchesSize ? 0 : 1) : 2][$row['id']] = $row['label'];
         }
 
-        return array_filter($groups);
+        return $tiers[0] + $tiers[1] + $tiers[2];
     }
 
     private function batchIssueAction(PersonnelRequest $request): Action

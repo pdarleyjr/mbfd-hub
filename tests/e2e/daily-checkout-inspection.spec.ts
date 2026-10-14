@@ -1891,7 +1891,7 @@ test('station request history follows every page of the complete history', async
   });
 
   await page.goto('/daily/stations/1');
-  await page.getByRole('button', { name: 'Requests', exact: true }).click();
+  await page.getByRole('tab', { name: 'Requests', exact: true }).click();
 
   await expect.poll(() => requestedPages).toEqual(['all:200:1', 'all:200:2']);
   await page.waitForTimeout(300);
