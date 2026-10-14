@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
 import type { OfficerInfo, Compartment, ChecklistData, ChecklistFieldValue, MeterData, ScheduledChecklistTaskResult } from '../types';
-import { Send, Undo2 } from 'lucide-react';
+import { ArrowLeft, Send, TriangleAlert, Undo2 } from 'lucide-react';
 import { inspectionProgress } from '../utils/inspectionProgress';
+import './inspection-workspace.css';
 
 interface SubmitStepProps {
   officerInfo: OfficerInfo;
@@ -18,6 +19,8 @@ interface SubmitStepProps {
   submitting: boolean;
 }
 
+const LABEL = 'text-[13px] text-hub-n-600';
+
 export default function SubmitStep({
   officerInfo,
   compartments,
@@ -32,6 +35,7 @@ export default function SubmitStep({
   submitting
 }: SubmitStepProps) {
   const sigRef = useRef<SignatureCanvas | null>(null);
+  const signatureSectionRef = useRef<HTMLDivElement>(null);
   const [sigError, setSigError] = useState(false);
   useEffect(() => {
     const pad = sigRef.current;
@@ -61,6 +65,8 @@ export default function SubmitStep({
     if (!officerInfo.shift) return;
     if (!signature) {
       setSigError(true);
+      // The action bar stays on screen, so bring the signature pad to the member when it is missing.
+      signatureSectionRef.current?.scrollIntoView({ block: 'center' });
       return;
     }
     setSigError(false);
@@ -78,35 +84,35 @@ export default function SubmitStep({
   };
 
   return (
-    <div className="inspection-review">
+    <div data-hub-ui="2" className="inspection-review">
       <h2 className="text-xl font-semibold">
         Review & Sign Inspection
       </h2>
 
       <div className="inspection-review-summary">
-
-        <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="mb-4 grid grid-cols-2 gap-4">
           <div>
-            <p className="text-sm text-gray-600">Member</p>
+            <p className={LABEL}>Member</p>
             <p className="font-medium">{officerInfo.name}</p>
-            <p className="text-sm text-gray-600">{officerInfo.rank}</p>
+            <p className="text-sm text-hub-n-600">{officerInfo.rank}</p>
             <p className="text-sm">Shift {officerInfo.shift}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Physical vehicle</p>
-            <p className="font-medium">{officerInfo.unitNumber}</p>
+            <p className={LABEL}>Physical vehicle</p>
+            <p className="font-medium tabular-nums">{officerInfo.unitNumber}</p>
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <p className="text-sm text-gray-600">Total Items Checked</p>
-            <p className="font-medium">{totalItems}</p>
+            <p className={LABEL}>Total Items Checked</p>
+            <p className="font-medium tabular-nums">{totalItems}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Items with Issues</p>
-            <p className={`font-medium ${issuesCount > 0 ? 'text-red-600' : 'text-green-600'}`}>
+            <p className={LABEL}>Items with Issues</p>
+            <p className="flex items-center gap-2 font-medium tabular-nums">
               {issuesCount}
+              <span className={`hub-tag ${issuesCount > 0 ? 'hub-tag--danger' : 'hub-tag--success'}`}>{issuesCount > 0 ? 'Reported' : 'None'}</span>
             </p>
           </div>
         </div>
@@ -116,15 +122,16 @@ export default function SubmitStep({
       <section aria-label="Recorded readings and paper fields" className="inspection-review-details">
         <h3 className="mb-3 font-semibold">Readings and checkout details</h3>
         <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {meters.engine_hours !== null && <div><dt className="text-sm text-slate-500">Engine hours</dt><dd>{meters.engine_hours}</dd></div>}
-          {meters.miles !== null && <div><dt className="text-sm text-slate-500">Mileage</dt><dd>{meters.miles}</dd></div>}
-          {fieldValues.filter(answer => answer.value !== null && answer.value !== '').map(answer => <div key={answer.id}><dt className="text-sm text-slate-500">{checklist.fields.find(field => field.id === answer.id)?.name}</dt><dd className="break-words whitespace-pre-wrap">{answer.value === true ? 'Yes' : answer.value === false ? 'No' : String(answer.value)}</dd></div>)}
+          {meters.engine_hours !== null && <div><dt className={LABEL}>Engine hours</dt><dd className="tabular-nums">{meters.engine_hours}</dd></div>}
+          {meters.miles !== null && <div><dt className={LABEL}>Mileage</dt><dd className="tabular-nums">{meters.miles}</dd></div>}
+          {fieldValues.filter(answer => answer.value !== null && answer.value !== '').map(answer => <div key={answer.id}><dt className={LABEL}>{checklist.fields.find(field => field.id === answer.id)?.name}</dt><dd className="break-words whitespace-pre-wrap">{answer.value === true ? 'Yes' : answer.value === false ? 'No' : String(answer.value)}</dd></div>)}
         </dl>
       </section>
 
       {issuesCount > 0 && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <p className="text-red-800 font-medium text-sm">
+        <div className="mb-6 flex items-start gap-3 rounded-hub-control border border-hub-danger-border bg-hub-danger-bg p-4">
+          <TriangleAlert className="mt-0.5 h-5 w-5 flex-none text-hub-danger" aria-hidden="true" />
+          <p className="text-sm font-medium text-hub-n-800">
             {issuesCount} issue{issuesCount !== 1 ? 's' : ''} reported.
             Your inspection will be recorded. Findings needing a decision go to an authorized reviewer.
           </p>
@@ -143,24 +150,24 @@ export default function SubmitStep({
                 <h4>
                   {compartment.name}
                 </h4>
-                <span>
+                <span className="tabular-nums">
                   {issuesInCompartment > 0 ? `${issuesInCompartment} reported` : `${compartment.items.length} inspected`}
                 </span>
               </div>
 
               {issuesInCompartment > 0 && (
-                <div className="space-y-1">
+                <ul className="mt-1 space-y-1">
                   {compartment.items
                     .filter(item => item.status !== 'Present')
                     .map(item => (
-                      <div key={item.id} className="text-sm text-gray-600">
-                        • {item.name}: <span className="font-medium text-red-600">{item.status}</span>
+                      <li key={item.id} className="text-sm text-hub-n-600">
+                        {item.name}: <span className="font-medium text-hub-danger">{item.status}</span>
                         {item.notes && <span> - {item.notes}</span>}
-                      </div>
+                      </li>
                     ))}
-                </div>
+                </ul>
               )}
-              {compartment.items.filter(item => item.value !== null && item.value !== undefined && item.value !== '').map(item => <p key={item.id} className="mt-2 break-words text-sm"><strong>{item.name}:</strong> {String(item.value)}</p>)}
+              {compartment.items.filter(item => item.value !== null && item.value !== undefined && item.value !== '').map(item => <p key={item.id} className="mt-2 break-words text-sm"><strong>{item.name}:</strong> <span className="tabular-nums">{String(item.value)}</span></p>)}
             </div>
           );
         })}
@@ -169,11 +176,11 @@ export default function SubmitStep({
       {scheduledTasks.length > 0 && <section className="inspection-review-details" aria-label="Recorded scheduled duties"><h3 className="mb-3 font-semibold">Scheduled duties</h3><dl>{scheduledTasks.map(task => <div key={task.id} className="inspection-review-area"><dt>{checklist.due_tasks.find(entry => entry.id === task.id)?.name}</dt><dd>{task.status}{task.notes ? ` · ${task.notes}` : ''}</dd></div>)}</dl></section>}
       </div>
 
-      {/* Officer Signature */}
-      <div className="inspection-signature">
-        <h3 id="inspection-signature-label" className="text-lg font-medium text-gray-900 mb-2">Member Signature</h3>
-        <p className="text-sm text-gray-600 mb-3">Sign below to certify this inspection is accurate.</p>
-        <div className={`border-2 rounded-lg bg-white ${sigError ? 'border-red-500' : 'border-gray-300'}`}>
+      {/* Member signature */}
+      <div className="inspection-signature" ref={signatureSectionRef}>
+        <h3 id="inspection-signature-label" className="mb-2 text-lg font-medium text-hub-ink">Member Signature</h3>
+        <p id="inspection-signature-help" className="mb-3 text-sm text-hub-n-600">Sign below to certify this inspection is accurate.</p>
+        <div className={`inspection-signature-pad ${sigError ? 'is-invalid' : ''}`}>
           <SignatureCanvas
             clearOnResize={false}
             ref={sigRef}
@@ -183,8 +190,7 @@ export default function SubmitStep({
               setSigError(false);
             }}
             canvasProps={{
-              className: 'w-full',
-              style: { width: '100%', height: '150px' },
+              className: 'block h-[150px] w-full',
               role: 'img',
               'aria-labelledby': 'inspection-signature-label',
               'aria-description': 'Draw your signature using a mouse, finger, or stylus.'
@@ -192,35 +198,26 @@ export default function SubmitStep({
           />
         </div>
         {sigError && (
-          <p className="text-red-600 text-sm mt-1">Signature is required before submitting.</p>
+          <p role="alert" className="mt-1 text-sm font-semibold text-hub-danger">Signature is required before submitting.</p>
         )}
-        <button
-          type="button"
-          onClick={clearSignature}
-          className="mt-2 text-sm text-blue-600 hover:text-blue-800 underline"
-        >
-          <Undo2 size={16} className="inline mr-2" aria-hidden="true" />Clear Signature
+        <button type="button" onClick={clearSignature} className="hub-btn hub-btn--tertiary mt-2 -ml-2">
+          <Undo2 size={16} aria-hidden="true" />Clear Signature
+        </button>
+      </div>
+      </div>
+
+      {/* Same fixed action bar as the compartment step: the primary action never needs a full scroll. */}
+      <div className="inspection-action-bar inspection-review-actions">
+        <button type="button" onClick={onBack} disabled={submitting} aria-label="Back to Compartments" className="hub-btn hub-btn--secondary">
+          <ArrowLeft size={16} aria-hidden="true" />
+          <span className="sm:hidden">Back</span><span className="hidden sm:inline">Back to Compartments</span>
         </button>
 
-      <div className="inspection-review-actions">
-        <button
-          onClick={onBack}
-          disabled={submitting}
-          className="px-4 py-2 text-gray-600 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 disabled:opacity-50"
-        >
-          Back to Compartments
-        </button>
-
-        <button
-          onClick={handleSubmit}
-          disabled={submitting}
-          className="inspection-review-button disabled:opacity-50"
-        >
+        <button type="button" onClick={handleSubmit} disabled={submitting} className="hub-btn hub-btn--primary hub-btn--wrap inspection-review-button">
           <Send size={16} aria-hidden="true" />
           {submitting ? 'Submitting...' : 'Submit Inspection'}
         </button>
       </div>
-      </div></div>
     </div>
   );
 }

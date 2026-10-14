@@ -48,6 +48,13 @@ const DEFAULT_CHECKLIST: Omit<ChecklistItem, 'status' | 'failNotes' | 'failImage
   { id: 'off_windows', label: 'Windows', category: 'Offices & Lobby' },
 ];
 
+/** Preselects the station when the station page links here with its station number. */
+function stationFromQuery(search: string): string {
+  const stationNumber = new URLSearchParams(search).get('station_number');
+  const station = stationNumber && /^\d+$/.test(stationNumber) ? `Station ${Number(stationNumber)}` : '';
+  return STATIONS.includes(station) ? station : '';
+}
+
 interface FormData {
   station: string;
   date: string;
@@ -65,15 +72,15 @@ export default function StationInspectionWizard() {
   const [submissionError, setSubmissionError] = useState<string | null>(null);
   const sigRef = useRef<SignatureCanvas | null>(null);
 
-  const [form, setForm] = useState<FormData>({
-    station: '',
+  const [form, setForm] = useState<FormData>(() => ({
+    station: stationFromQuery(window.location.search),
     date: new Date().toISOString().split('T')[0],
     checklist: DEFAULT_CHECKLIST.map((item) => ({ ...item, status: null, failNotes: '', failImage: '' })),
     extinguishingSystemDate: '',
     notes: '',
     sogMandate: false,
     signature: '',
-  });
+  }));
 
   const update = useCallback((patch: Partial<FormData>) => {
     setForm((prev) => ({ ...prev, ...patch }));

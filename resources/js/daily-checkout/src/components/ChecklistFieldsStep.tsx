@@ -20,6 +20,16 @@ interface ChecklistFieldsStepProps {
   continueLabel: string;
 }
 
+const INPUT = 'min-h-12 w-full rounded-hub-control border border-hub-control-border bg-hub-well px-4 py-3 text-base text-hub-ink focus:border-hub-focus focus:outline-none';
+const LABEL = 'mb-1.5 block text-sm font-semibold text-hub-ink';
+
+// Selected duty states: text names the state, the fill reinforces it.
+const STATUS_SELECTED: Record<ItemStatus, string> = {
+  Present: 'border-hub-success bg-hub-success text-white',
+  Missing: 'border-hub-danger bg-hub-danger text-white',
+  Damaged: 'border-hub-warning bg-hub-warning text-white',
+};
+
 export default function ChecklistFieldsStep({
   checklist,
   initialFieldValues,
@@ -85,49 +95,49 @@ export default function ChecklistFieldsStep({
     const value = fieldValues.find((fieldValue) => fieldValue.id === field.id)?.value ?? null;
 
     if (field.id === 'fb6-shift') return <div key={field.id}>
-      <label htmlFor={field.id} className="mb-1.5 block text-sm font-semibold text-neutral-700">Shift *</label>
-      <select id={field.id} value={String(value ?? '')} required onChange={event => updateFieldValue(field.id, event.target.value)} className="min-h-12 w-full rounded-lg border-2 border-neutral-200 bg-neutral-50 px-4 py-3 text-base text-neutral-900">
+      <label htmlFor={field.id} className={LABEL}>Shift *</label>
+      <select id={field.id} value={String(value ?? '')} required onChange={event => updateFieldValue(field.id, event.target.value)} className={INPUT}>
         <option value="">Select shift</option>{['A', 'B', 'C'].map(shift => <option key={shift} value={shift}>{shift} Shift</option>)}
       </select>
     </div>;
 
     if (field.inputType === 'checkbox') {
       return (
-        <label key={field.id} className="flex min-h-12 items-center gap-3 rounded-lg border border-neutral-200 px-4 py-3 text-neutral-800">
+        <label key={field.id} className="hub-well flex min-h-12 items-center gap-3 px-4 py-3 text-hub-ink">
           <input
             id={field.id}
             type="checkbox"
             checked={value === true}
             onChange={(event) => updateFieldValue(field.id, event.target.checked)}
-            className="h-5 w-5 rounded border-neutral-400 text-hub-blue focus:ring-hub-focus"
+            className="h-5 w-5 rounded border-hub-control-border text-hub-blue focus:ring-hub-focus"
           />
-          <span className="font-medium">{field.name}{!field.required && <span className="ml-1 text-sm font-normal text-neutral-500">· Optional</span>}</span>
+          <span className="font-medium">{field.name}{!field.required && <span className="ml-1 text-sm font-normal text-hub-n-600">· Optional</span>}</span>
         </label>
       );
     }
 
-    const type = field.inputType === 'number' || field.inputType === 'percentage'
-      ? 'number'
-      : field.inputType === 'date'
-        ? 'date'
-        : 'text';
+    const numeric = field.inputType === 'number' || field.inputType === 'percentage';
+    const type = numeric ? 'number' : field.inputType === 'date' ? 'date' : 'text';
+    const hintId = field.inputType === 'percentage' ? `${field.id}-hint` : undefined;
 
     return (
       <div key={field.id}>
-        <label htmlFor={field.id} className="mb-1.5 block text-sm font-semibold text-neutral-700">
+        <label htmlFor={field.id} className={LABEL}>
           {field.name}{field.required ? ' *' : ' · Optional'}
         </label>
-        {field.multiline ? <textarea id={field.id} rows={3} required={field.required} maxLength={2000} value={value === null ? '' : String(value)} onChange={event => updateFieldValue(field.id, event.target.value)} className="min-h-24 w-full rounded-lg border-2 border-neutral-200 bg-neutral-50 px-4 py-3 text-base text-neutral-900 focus:border-hub-focus focus:outline-none" /> : <input
+        {field.multiline ? <textarea id={field.id} rows={3} required={field.required} maxLength={2000} value={value === null ? '' : String(value)} onChange={event => updateFieldValue(field.id, event.target.value)} className={`min-h-24 ${INPUT}`} /> : <input
           id={field.id}
           type={type}
-          step={field.id === 'mileage' ? 1 : field.inputType === 'number' || field.inputType === 'percentage' ? 'any' : undefined}
-          min={field.id === 'mileage' ? 0 : undefined}
-          max={field.id === 'mileage' ? 999999999 : undefined}
+          inputMode={field.id === 'mileage' ? 'numeric' : numeric ? 'decimal' : undefined}
+          step={field.id === 'mileage' ? 1 : numeric ? 'any' : undefined}
+          min={field.id === 'mileage' || field.inputType === 'percentage' ? 0 : undefined}
+          max={field.id === 'mileage' ? 999999999 : field.inputType === 'percentage' ? 100 : undefined}
+          aria-describedby={hintId}
           value={value === null ? '' : String(value)}
           required={field.required}
           maxLength={field.inputType === 'text' ? 2000 : undefined}
           onChange={(event) => {
-            if (field.inputType === 'number' || field.inputType === 'percentage') {
+            if (numeric) {
               updateFieldValue(field.id, event.target.value === '' ? null : Number(event.target.value));
 
               return;
@@ -135,88 +145,79 @@ export default function ChecklistFieldsStep({
 
             updateFieldValue(field.id, event.target.value);
           }}
-          className="min-h-12 w-full rounded-lg border-2 border-neutral-200 bg-neutral-50 px-4 py-3 text-base text-neutral-900 focus:border-hub-focus focus:outline-none"
+          className={`${INPUT} ${numeric ? 'tabular-nums' : ''}`}
         />}
+        {hintId && <p id={hintId} className="mt-1 text-[13px] text-hub-n-600">Percentage, 0 to 100.</p>}
       </div>
     );
   };
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-2xl mx-auto space-y-4">
+    <form data-hub-ui="2" onSubmit={handleSubmit} className="mx-auto max-w-2xl space-y-4">
       <div className="space-y-1">
-        <h2 className="text-xl font-bold text-neutral-800 font-heading">Checklist Details</h2>
-        <p className="mt-1 text-neutral-500">Complete required checks. Additional readings and identifiers are optional.</p>
+        <h2 className="text-xl font-bold text-hub-ink font-heading">Checklist Details</h2>
+        <p className="mt-1 text-hub-n-600">Complete required checks. Additional readings and identifiers are optional.</p>
       </div>
 
-      {error && <p role="alert" className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800">{error}</p>}
+      {error && <p role="alert" className="rounded-hub-control border border-hub-danger-border bg-hub-danger-bg px-4 py-3 text-sm font-semibold text-hub-danger">{error}</p>}
 
-      {requiredFields.length > 0 && <section aria-label="Required checklist fields" className="grid gap-4 rounded-lg border border-neutral-200 bg-white p-4 sm:grid-cols-2">
+      {requiredFields.length > 0 && <section aria-label="Required checklist fields" className="inspection-panel grid gap-4 p-4 sm:grid-cols-2">
         {requiredFields.map(renderField)}
       </section>}
 
-      {knownFields.length > 0 && <section aria-label="Recorded automatically" className="grid gap-3 rounded-lg border border-neutral-200 bg-neutral-50 p-3 sm:grid-cols-2">
+      {knownFields.length > 0 && <section aria-label="Recorded automatically" className="inspection-panel grid gap-3 p-3 sm:grid-cols-2">
         {knownFields.map(field => <div key={field.id}>
-          <label htmlFor={field.id} className="block text-xs font-medium text-neutral-500">{field.name} · Recorded automatically</label>
-          <input id={field.id} type={field.inputType === 'date' ? 'date' : 'text'} readOnly value={String(fieldValues.find(answer => answer.id === field.id)?.value ?? '')} className="mt-1 min-h-11 w-full border-0 bg-transparent text-sm font-medium text-neutral-800" />
+          <label htmlFor={field.id} className="block text-[13px] font-medium text-hub-n-600">{field.name} · Recorded automatically</label>
+          <input id={field.id} type={field.inputType === 'date' ? 'date' : 'text'} readOnly value={String(fieldValues.find(answer => answer.id === field.id)?.value ?? '')} className="mt-1 min-h-11 w-full border-0 bg-transparent text-sm font-medium tabular-nums text-hub-ink" />
         </div>)}
       </section>}
 
-      {optionalFields.length > 0 && <details className="rounded-lg border border-neutral-200 bg-white" onInvalidCapture={event => { event.currentTarget.open = true; }}>
-        <summary className="min-h-11 cursor-pointer px-4 py-3 font-semibold text-neutral-800">Additional details · Optional</summary>
-        <p className="px-4 pb-3 text-sm text-neutral-500">Enter additional readings and identifiers when available. You may continue without them.</p>
+      {optionalFields.length > 0 && <details className="inspection-panel" onInvalidCapture={event => { event.currentTarget.open = true; }}>
+        <summary className="flex min-h-11 cursor-pointer items-center px-4 py-3 font-semibold text-hub-ink">Additional details · Optional</summary>
+        <p className="px-4 pb-3 text-sm text-hub-n-600">Enter additional readings and identifiers when available. You may continue without them.</p>
         <section aria-label="Optional checklist fields" className="grid gap-4 px-4 pb-4 sm:grid-cols-2">{optionalFields.map(renderField)}</section>
       </details>}
 
-      {checklist.schema_version === 2 && <section aria-labelledby="scheduled-duties-heading" className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
+      {checklist.schema_version === 2 && <section aria-labelledby="scheduled-duties-heading" className="inspection-panel p-4">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 id="scheduled-duties-heading" className="font-heading text-lg font-bold text-neutral-800">Scheduled duties due today</h3>
-            {checklist.inspection_date && <p className="text-sm text-neutral-500">Inspection date: {checklist.inspection_date}</p>}
+            <h3 id="scheduled-duties-heading" className="font-heading text-lg font-bold text-hub-ink">Scheduled duties due today</h3>
+            {checklist.inspection_date && <p className="text-sm tabular-nums text-hub-n-600">Inspection date: {checklist.inspection_date}</p>}
           </div>
           {scheduledTasks.length > 0 && (
-            <button
-              type="button"
-              aria-label="Mark all due duties as present"
-              onClick={markAllDueTasksPresent}
-              className="min-h-11 rounded-lg border border-green-300 bg-green-50 px-4 py-2 text-sm font-semibold text-green-800 hover:bg-green-100"
-            >
-              Mark all present
+            <button type="button" onClick={markAllDueTasksPresent} className="hub-btn hub-btn--secondary hub-btn--wrap">
+              Mark all due duties as present
             </button>
           )}
         </div>
 
         {scheduledTasks.length === 0 ? (
-          <p className="text-sm text-neutral-600">No scheduled duties are due for this inspection date.</p>
+          <p className="text-sm text-hub-n-600">No scheduled duties are due for this inspection date.</p>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {checklist.due_tasks.map((task) => {
               const result = scheduledTasks.find((scheduledTask) => scheduledTask.id === task.id);
               if (!result) return null;
 
               return (
-                <div key={task.id} className="rounded-lg border border-neutral-200 p-3">
-                  <p className="font-semibold text-neutral-900">{task.name}</p>
-                  {task.instructions && <p className="mt-1 text-sm text-neutral-600">{task.instructions}</p>}
+                <div key={task.id} className="hub-well p-3">
+                  <p className="font-semibold text-hub-ink">{task.name}</p>
+                  {task.instructions && <p className="mt-1 text-sm text-hub-n-600">{task.instructions}</p>}
                   <div className="mt-3 flex gap-2" role="group" aria-label={`Status for ${task.name}`}>
-                    {(['Present', 'Missing', 'Damaged'] as const).map((status) => (
-                      <button
-                        key={status}
-                        type="button"
-                        onClick={() => updateScheduledTask(task.id, status)}
-                        aria-pressed={result.observed === true && result.status === status}
-                        className={`min-h-11 flex-1 rounded-lg border px-3 py-2 text-sm font-semibold ${
-                          result.observed === true && result.status === status
-                            ? status === 'Present'
-                              ? 'border-green-600 bg-green-600 text-white'
-                              : status === 'Missing'
-                                ? 'border-red-600 bg-red-600 text-white'
-                                : 'border-amber-500 bg-amber-500 text-white'
-                            : 'border-neutral-300 bg-white text-neutral-700'
-                        }`}
-                      >
-                        {status}
-                      </button>
-                    ))}
+                    {(['Present', 'Missing', 'Damaged'] as const).map((status) => {
+                      const selected = result.observed === true && result.status === status;
+                      return (
+                        <button
+                          key={status}
+                          type="button"
+                          onClick={() => updateScheduledTask(task.id, status)}
+                          aria-pressed={selected}
+                          className={`min-h-11 flex-1 rounded-hub-control border px-3 py-2 text-sm font-semibold transition-colors ${selected ? STATUS_SELECTED[status] : 'border-hub-control-border bg-hub-well text-hub-ink hover:bg-hub-n-50'}`}
+                        >
+                          {status}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               );
@@ -226,17 +227,10 @@ export default function ChecklistFieldsStep({
       </section>}
 
       <div className="flex gap-3">
-        <button
-          type="button"
-          onClick={onBack}
-          className="min-h-12 flex-1 rounded-lg border-2 border-neutral-200 px-4 py-3 font-semibold text-neutral-700 hover:bg-neutral-50"
-        >
+        <button type="button" onClick={onBack} className="hub-btn hub-btn--secondary flex-1">
           Back
         </button>
-        <button
-          type="submit"
-          className="min-h-12 flex-1 rounded-lg bg-hub-blue px-4 py-3 font-semibold text-white hover:bg-hub-blue-strong"
-        >
+        <button type="submit" className="hub-btn hub-btn--primary hub-btn--wrap flex-1">
           {continueLabel}
         </button>
       </div>

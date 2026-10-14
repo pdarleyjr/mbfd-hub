@@ -1,10 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
+import { Boxes, ClipboardList, History } from 'lucide-react';
 import type { RoomProfile, StationRequestSummary } from '../types';
 import { ApiClient } from '../utils/api';
 import PreviousPageButton from './PreviousPageButton';
+import Tabs, { type TabItem } from './ui/Tabs';
+import Tag, { StatusTag } from './ui/Tag';
+import { EmptyState, LoadError, SkeletonRows } from './ui/StateViews';
+import { humanize } from './ui/status';
 
 type ProfileTab = 'assets' | 'open' | 'history' | 'events';
+
+const ATTENTION_CONDITIONS = ['poor', 'critical', 'damaged', 'needs_repair', 'out_of_service'];
+const SECONDARY = 'text-[13px] leading-5 text-hub-n-600';
 
 const formatDate = (value: string) => new Date(value).toLocaleString('en-US', {
   month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
@@ -47,62 +55,58 @@ export default function RoomAssetTracker() {
     loadProfile();
   }, [loadProfile]);
 
-  if (loading) return <div className="flex min-h-64 items-center justify-center text-sm font-semibold text-hub-ink-secondary font-hub" role="status">Loading room profile…</div>;
-  if (error || !profile) return <div className="rounded-xl border border-hub-danger/30 bg-hub-danger/10 p-5 text-hub-danger font-hub"><p className="font-semibold">{error || 'Room not found.'}</p><div className="mt-4 flex flex-wrap gap-3"><button type="button" onClick={loadProfile} className="min-h-12 rounded-lg bg-hub-blue px-5 font-semibold text-white hover:bg-hub-blue-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus">Retry</button><PreviousPageButton contextual fallback={`/stations/${stationId}`} className="inline-flex min-h-12 items-center px-2 font-semibold text-hub-blue hover:text-hub-blue-strong" /></div></div>;
+  if (loading) return <div data-hub-ui="2" className="space-y-4 font-hub" aria-label="Loading room profile"><span className="hub-skeleton !h-11 w-24" /><div className="hub-panel p-5"><SkeletonRows rows={2} className="!h-10" /></div><div className="hub-panel p-5"><SkeletonRows /></div></div>;
+  if (error || !profile) return <div data-hub-ui="2" className="mx-auto max-w-lg font-hub"><LoadError title="Room profile unavailable" message={error || 'Room not found.'} onRetry={loadProfile}><PreviousPageButton contextual fallback={`/stations/${stationId}`} className="hub-btn hub-btn--secondary" /></LoadError></div>;
 
   const room = profile.room;
-  const attention = profile.current_assets.filter((asset) => ['poor', 'critical', 'damaged', 'needs_repair', 'out_of_service'].includes(asset.condition)).length;
+  const attention = profile.current_assets.filter((asset) => ATTENTION_CONDITIONS.includes(asset.condition)).length;
   const returnTo = encodeURIComponent(`/stations/${stationId}/rooms/${roomId}`);
+  const newRequestPath = `/forms-hub/station-request?station_id=${stationId}&return_to=${returnTo}`;
 
-  const tabs: { id: ProfileTab; label: string; count: number }[] = [
-    { id: 'assets', label: 'Current assets', count: profile.current_assets.length },
-    { id: 'open', label: 'Open requests', count: profile.open_requests.length },
-    { id: 'history', label: 'Request history', count: profile.request_history.length },
-    { id: 'events', label: 'Asset events', count: profile.asset_events.length },
+  const tabs: TabItem<ProfileTab>[] = [
+    { id: 'assets', label: 'Current assets', badge: profile.current_assets.length },
+    { id: 'open', label: 'Open requests', badge: profile.open_requests.length },
+    { id: 'history', label: 'Request history', badge: profile.request_history.length },
+    { id: 'events', label: 'Asset events', badge: profile.asset_events.length },
   ];
 
+  const renderPanel = (tab: ProfileTab) => {
+    if (tab === 'assets') return profile.current_assets.length > 0 ? <ul className="grid gap-3 sm:grid-cols-2">{profile.current_assets.map((asset) => <li key={asset.id} className="hub-well p-4"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><h2 className="font-semibold text-hub-ink">{asset.name}</h2><p className={`mt-1 ${SECONDARY}`}>{humanize(asset.condition, 'Condition unknown')}</p></div><Tag className="tabular-nums">Qty {asset.quantity}</Tag></div>{asset.category && <p className={`mt-3 ${SECONDARY}`}>{humanize(asset.category)}</p>}</li>)}</ul> : <EmptyState icon={<Boxes className="hub-empty__icon" aria-hidden="true" />} title="No active assets" body="No active assets are recorded for this room." />;
+    if (tab === 'open') return <RequestList requests={profile.open_requests} empty="No open requests for this room." newRequestPath={newRequestPath} />;
+    if (tab === 'history') return <RequestList requests={profile.request_history} empty="No request history for this room." newRequestPath={newRequestPath} />;
+    return profile.asset_events.length > 0 ? <ol className="space-y-3">{profile.asset_events.map((event) => <li key={event.id} className="hub-well p-4"><div className="flex flex-wrap items-start justify-between gap-2"><p className="font-semibold text-hub-ink">{event.asset_name}</p><Tag tone="info">{humanize(event.event_type)}</Tag></div><p className={`mt-2 tabular-nums ${SECONDARY}`}>{formatDate(event.event_at)}{event.request_number ? ` · ${event.request_number}` : ''}</p></li>)}</ol> : <EmptyState icon={<History className="hub-empty__icon" aria-hidden="true" />} title="No asset events" body="No lifecycle events are recorded for current room assets." />;
+  };
+
   return (
-    <div className="space-y-5 font-hub">
+    <div data-hub-ui="2" className="space-y-5 font-hub">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <PreviousPageButton contextual fallback={`/stations/${stationId}`} className="inline-flex min-h-12 items-center gap-2 px-2 text-sm font-semibold text-hub-ink-secondary hover:text-hub-ink" />
-        <Link to={`/forms-hub/station-request?station_id=${stationId}&return_to=${returnTo}`} className="inline-flex min-h-12 items-center justify-center rounded-lg bg-hub-blue px-5 font-semibold text-white hover:bg-hub-blue-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus">New room request</Link>
+        <PreviousPageButton contextual fallback={`/stations/${stationId}`} className="-ml-2 px-2" />
+        <Link to={newRequestPath} className="hub-btn hub-btn--primary">New room request</Link>
       </div>
 
-      <header className="rounded-xl border-t-4 border-hub-red bg-hub-header p-5 text-white sm:p-7">
-        <p className="text-sm font-semibold text-hub-surface/80">Room profile</p>
-        <h1 className="mt-1 font-heading text-3xl font-bold">{room.name}</h1>
-        <p className="mt-2 text-sm text-hub-muted-soft">{room.floor ? `${room.floor} floor · ` : ''}{room.type?.replaceAll('_', ' ') || 'Station room'}</p>
-        <dl className="mt-6 grid grid-cols-3 gap-3">
+      <header className="hub-panel p-4 sm:p-6">
+        <p className="text-[13px] font-semibold text-hub-n-600">Room profile</p>
+        <h1 className="mt-1 font-heading text-2xl font-bold text-hub-ink sm:text-3xl">{room.name}</h1>
+        <p className={`mt-1 ${SECONDARY}`}>{room.floor ? `${room.floor} floor · ` : ''}{humanize(room.type, 'Station room')}</p>
+        <dl className="mt-5 grid grid-cols-3 gap-3">
           <Stat label="Active assets" value={profile.current_assets.length} />
           <Stat label="Need attention" value={attention} />
           <Stat label="Open requests" value={profile.open_requests.length} />
         </dl>
       </header>
 
-      <section className="overflow-hidden rounded-xl bg-hub-surface shadow-sm ring-1 ring-hub-border/80">
-        <div className="flex overflow-x-auto border-b border-hub-border p-2" role="tablist" aria-label="Room profile sections">
-          {tabs.map((tab) => <button key={tab.id} type="button" role="tab" aria-selected={activeTab === tab.id} onClick={() => setActiveTab(tab.id)} className={`min-h-12 flex-none rounded-lg px-4 text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus ${activeTab === tab.id ? 'bg-hub-blue/10 text-hub-blue' : 'text-hub-ink-secondary hover:bg-hub-canvas hover:text-hub-ink'}`}>{tab.label} <span className="ml-1 tabular-nums">{tab.count}</span></button>)}
-        </div>
-        <div className="p-4 sm:p-6">
-          {activeTab === 'assets' && (profile.current_assets.length > 0 ? <div className="grid gap-3 sm:grid-cols-2">{profile.current_assets.map((asset) => <article key={asset.id} className="rounded-lg border border-hub-border p-4"><div className="flex items-start justify-between gap-3"><div><h2 className="font-semibold text-hub-ink">{asset.name}</h2><p className="mt-1 text-sm capitalize text-hub-muted">{asset.condition?.replaceAll('_', ' ') || 'Condition unknown'}</p></div><span className="rounded-full bg-hub-surface-muted px-2.5 py-1 text-xs font-semibold text-hub-ink-secondary">Qty {asset.quantity}</span></div>{asset.category && <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-hub-blue">{asset.category}</p>}</article>)}</div> : <Empty text="No active assets are recorded for this room." />)}
-          {activeTab === 'open' && <RequestList requests={profile.open_requests} empty="No open requests for this room." />}
-          {activeTab === 'history' && <RequestList requests={profile.request_history} empty="No request history for this room." />}
-          {activeTab === 'events' && (profile.asset_events.length > 0 ? <ol className="space-y-3">{profile.asset_events.map((event) => <li key={event.id} className="rounded-lg border border-hub-border p-4"><div className="flex flex-wrap items-start justify-between gap-2"><p className="font-semibold text-hub-ink">{event.asset_name}</p><span className="rounded-full bg-hub-blue/10 px-2.5 py-1 text-xs font-semibold capitalize text-hub-blue">{event.event_type.replaceAll('_', ' ')}</span></div><p className="mt-2 text-sm text-hub-muted">{formatDate(event.event_at)}{event.request_number ? ` · ${event.request_number}` : ''}</p></li>)}</ol> : <Empty text="No lifecycle events are recorded for current room assets." />)}
-        </div>
+      <section className="hub-panel overflow-hidden" aria-label="Room details">
+        <Tabs tabs={tabs} active={activeTab} onChange={setActiveTab} label="Room profile sections" idPrefix="room" renderPanel={renderPanel} panelClassName="p-4 sm:p-6" />
       </section>
     </div>
   );
 }
 
 function Stat({ label, value }: { label: string; value: number }) {
-  return <div className="rounded-xl bg-hub-surface/10 p-3"><dt className="text-xs text-hub-muted-soft">{label}</dt><dd className="mt-1 font-mono text-2xl font-bold tabular-nums">{value}</dd></div>;
+  return <div className="hub-well p-3"><dt className={SECONDARY}>{label}</dt><dd className="mt-1 text-2xl font-bold tabular-nums text-hub-ink">{value}</dd></div>;
 }
 
-function RequestList({ requests, empty }: { requests: StationRequestSummary[]; empty: string }) {
-  if (requests.length === 0) return <Empty text={empty} />;
-  return <div className="space-y-3">{requests.map((request) => <article key={request.id} className="rounded-lg border border-hub-border p-4"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-mono text-xs font-semibold text-hub-muted">{request.request_number}</p><h2 className="mt-1 font-semibold text-hub-ink">{request.title}</h2></div><span className="rounded-full bg-hub-blue/10 px-2.5 py-1 text-xs font-semibold capitalize text-hub-blue">{request.status.replaceAll('_', ' ')}</span></div>{request.current_public_response && <p className="mt-3 rounded-lg bg-hub-blue/10 p-3 text-sm text-hub-blue"><span className="font-semibold">Latest response:</span> {request.current_public_response}</p>}<p className="mt-3 text-xs text-hub-muted">{request.request_type === 'repair_service' ? 'Repair / service' : 'Equipment'} · {formatDate(request.created_at)}</p></article>)}</div>;
-}
-
-function Empty({ text }: { text: string }) {
-  return <div className="py-12 text-center text-sm text-hub-muted">{text}</div>;
+function RequestList({ requests, empty, newRequestPath }: { requests: StationRequestSummary[]; empty: string; newRequestPath: string }) {
+  if (requests.length === 0) return <EmptyState icon={<ClipboardList className="hub-empty__icon" aria-hidden="true" />} title={empty} action={<Link to={newRequestPath} className="hub-btn hub-btn--secondary">New room request</Link>} />;
+  return <ul className="space-y-3">{requests.map((request) => <li key={request.id} className="hub-well p-4"><div className="flex flex-wrap items-start justify-between gap-2"><div className="min-w-0"><p className="font-mono text-[13px] font-semibold text-hub-n-600">{request.request_number}</p><h2 className="mt-1 font-semibold text-hub-ink">{request.title}</h2></div><StatusTag status={request.status} /></div>{request.current_public_response && <p className="mt-3 rounded-hub-control border border-hub-info-border bg-hub-info-bg p-3 text-sm text-hub-n-800"><span className="font-semibold">Latest response:</span> {request.current_public_response}</p>}<p className={`mt-3 ${SECONDARY}`}>{request.request_type === 'repair_service' ? 'Repair / service' : 'Equipment'} · {formatDate(request.created_at)}</p></li>)}</ul>;
 }

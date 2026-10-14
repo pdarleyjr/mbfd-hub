@@ -1,4 +1,5 @@
 import { useState, type RefObject } from 'react';
+import { Clock, TriangleAlert } from 'lucide-react';
 import type { PmHealthStatus } from '../types';
 
 export interface MeterData {
@@ -19,6 +20,11 @@ interface MeterStepProps {
   maxMiles: number;
   formRef: RefObject<HTMLFormElement | null>;
 }
+
+// Reading inputs keep an 18px reading size; data-input-size opts them out of the 16px coarse-pointer floor.
+const inputClass = (error?: string) => `w-full rounded-hub-control border px-4 py-3 pr-14 text-lg font-medium tabular-nums text-hub-ink transition-colors focus:border-hub-focus focus:outline-none ${
+  error ? 'border-hub-danger bg-hub-danger-bg' : 'border-hub-control-border bg-hub-well'
+}`;
 
 export default function MeterStep({
   pmHealth,
@@ -99,43 +105,40 @@ export default function MeterStep({
   const isPmDue = pmHealth?.status === 'red';
 
   return (
-    <div className="max-w-lg mx-auto">
-      {/* Header */}
+    <div data-hub-ui="2" className="inspection-panel mx-auto max-w-lg p-4 sm:p-5">
       <div className="mb-4">
-        <h2 className="text-2xl font-bold text-neutral-800 font-heading">Readings · Optional</h2>
-        <p className="text-neutral-600 mt-1">Enter current readings when available. You may continue without them.</p>
+        <h2 className="text-xl font-bold text-hub-ink font-heading">Readings · Optional</h2>
+        <p className="mt-1 text-hub-n-600">Enter current readings when available. You may continue without them.</p>
       </div>
 
-      {((engineHours.trim() !== '' && previousHours !== null && Number(engineHours) < previousHours) || (miles.trim() !== '' && previousMiles !== null && Number(miles) < previousMiles)) && <p className="mb-4 text-sm text-amber-800">This is below the previous reading. Record what the display shows; it will be saved for review.</p>}
+      {((engineHours.trim() !== '' && previousHours !== null && Number(engineHours) < previousHours) || (miles.trim() !== '' && previousMiles !== null && Number(miles) < previousMiles)) && <p className="mb-4 rounded-hub-control border border-hub-warning-border bg-hub-warning-bg px-3 py-2 text-sm text-hub-warning-strong">This is below the previous reading. Record what the display shows; it will be saved for review.</p>}
 
-      {/* Previous readings — compact reference strip */}
+      {/* Previous readings: a compact reference well */}
       {(previousHours !== null || previousMiles !== null) && (
-        <div className="flex items-center gap-6 px-4 py-3 mb-6 rounded-lg bg-neutral-100 ring-1 ring-neutral-200/60">
-          <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400">Previous</span>
+        <div className="hub-well mb-5 flex flex-wrap items-center gap-x-6 gap-y-1 px-4 py-3">
+          <span className="text-[13px] font-semibold text-hub-n-600">Previous</span>
           {previousHours !== null && (
-            <span className="text-sm text-neutral-700">
-              <span className="font-medium">{previousHours.toLocaleString()}</span>
-              <span className="text-neutral-400 ml-1">hrs</span>
+            <span className="text-sm tabular-nums text-hub-ink">
+              <span className="font-semibold">{previousHours.toLocaleString()}</span>
+              <span className="ml-1 text-hub-n-600">hrs</span>
             </span>
           )}
           {previousMiles !== null && (
-            <span className="text-sm text-neutral-700">
-              <span className="font-medium">{previousMiles.toLocaleString()}</span>
-              <span className="text-neutral-400 ml-1">mi</span>
+            <span className="text-sm tabular-nums text-hub-ink">
+              <span className="font-semibold">{previousMiles.toLocaleString()}</span>
+              <span className="ml-1 text-hub-n-600">mi</span>
             </span>
           )}
         </div>
       )}
 
-      {/* PM Status Alerts */}
+      {/* PM status: the text carries the state; the callout tone reinforces it. */}
       {isPmDue && (
-        <div className="mb-6 px-4 py-3 rounded-lg bg-red-50 ring-1 ring-red-200 flex items-start gap-3">
-          <svg className="w-5 h-5 text-red-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-          </svg>
+        <div className="mb-5 flex items-start gap-3 rounded-hub-control border border-hub-danger-border bg-hub-danger-bg px-4 py-3">
+          <TriangleAlert className="mt-0.5 h-5 w-5 shrink-0 text-hub-danger" aria-hidden="true" />
           <div>
-            <p className="font-semibold text-red-800 text-sm">PM Service Due</p>
-            <p className="text-red-700 text-xs mt-0.5">
+            <p className="text-sm font-semibold text-hub-danger">PM Service Due</p>
+            <p className="mt-0.5 text-[13px] tabular-nums text-hub-n-800">
               {hoursSinceLastPm?.toFixed(1)}h since last PM · {pmHealth?.interval_hours}h service interval.
             </p>
           </div>
@@ -143,100 +146,88 @@ export default function MeterStep({
       )}
 
       {isApproachingPm && !isPmDue && (
-        <div className="mb-6 px-4 py-3 rounded-lg bg-amber-50 ring-1 ring-amber-200 flex items-start gap-3">
-          <svg className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
+        <div className="mb-5 flex items-start gap-3 rounded-hub-control border border-hub-warning-border bg-hub-warning-bg px-4 py-3">
+          <Clock className="mt-0.5 h-5 w-5 shrink-0 text-hub-warning" aria-hidden="true" />
           <div>
-            <p className="font-semibold text-amber-800 text-sm">PM Approaching</p>
-            <p className="text-amber-700 text-xs mt-0.5">
+            <p className="text-sm font-semibold text-hub-warning-strong">PM Approaching</p>
+            <p className="mt-0.5 text-[13px] tabular-nums text-hub-n-800">
               {hoursSinceLastPm?.toFixed(1)}h of {pmHealth?.interval_hours}h cycle used.
             </p>
           </div>
         </div>
       )}
 
-      {/* Form */}
       <form ref={formRef} onSubmit={handleSubmit} className="space-y-5">
         <div>
-          <label htmlFor="engine_hours" className="block text-sm font-semibold text-neutral-700 mb-1.5">
+          <label htmlFor="engine_hours" className="mb-1.5 block text-sm font-semibold text-hub-ink">
             Engine Hours
           </label>
           <div className="relative">
             <input
               type="text"
               id="engine_hours"
+              data-input-size="large"
               ref={input => { input?.setCustomValidity(validateField('engine_hours', engineHours) ?? ''); }}
               onInvalid={() => handleBlur('engine_hours')}
               inputMode="decimal"
               value={engineHours}
               onChange={(e) => handleEngineHoursChange(e.target.value)}
               onBlur={() => handleBlur('engine_hours')}
-              className={`w-full px-4 py-3 text-lg font-medium rounded-lg border-2 transition-colors focus:outline-none ${
-                errors.engine_hours
-                  ? 'border-red-400 focus:border-hub-focus bg-red-50/50'
-                  : 'border-neutral-200 focus:border-hub-focus bg-neutral-50'
-              }`}
+              aria-invalid={errors.engine_hours ? true : undefined}
+              aria-describedby={errors.engine_hours ? 'engine_hours-error' : undefined}
+              className={inputClass(errors.engine_hours)}
               placeholder={previousHours !== null ? `Previous: ${previousHours}` : 'Enter hours'}
             />
-            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-400 text-sm pointer-events-none">hrs</span>
+            <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-hub-n-600" aria-hidden="true">hrs</span>
           </div>
           {errors.engine_hours && (
-            <p className="mt-1.5 text-xs font-medium text-red-600">{errors.engine_hours}</p>
+            <p id="engine_hours-error" className="mt-1.5 text-[13px] font-medium text-hub-danger">{errors.engine_hours}</p>
           )}
         </div>
 
         <div>
-          <label htmlFor="miles" className="block text-sm font-semibold text-neutral-700 mb-1.5">
+          <label htmlFor="miles" className="mb-1.5 block text-sm font-semibold text-hub-ink">
             Odometer
           </label>
           <div className="relative">
             <input
               type="text"
               id="miles"
+              data-input-size="large"
               ref={input => { input?.setCustomValidity(validateField('miles', miles) ?? ''); }}
               onInvalid={() => handleBlur('miles')}
               inputMode="numeric"
               value={miles}
               onChange={(e) => handleMilesChange(e.target.value)}
               onBlur={() => handleBlur('miles')}
-              className={`w-full px-4 py-3 text-lg font-medium rounded-lg border-2 transition-colors focus:outline-none ${
-                errors.miles
-                  ? 'border-red-400 focus:border-hub-focus bg-red-50/50'
-                  : 'border-neutral-200 focus:border-hub-focus bg-neutral-50'
-              }`}
+              aria-invalid={errors.miles ? true : undefined}
+              aria-describedby={errors.miles ? 'miles-error' : undefined}
+              className={inputClass(errors.miles)}
               placeholder={previousMiles !== null ? `Previous: ${previousMiles.toLocaleString()}` : 'Enter miles'}
             />
-            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-400 text-sm pointer-events-none">mi</span>
+            <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-sm text-hub-n-600" aria-hidden="true">mi</span>
           </div>
           {errors.miles && (
-            <p className="mt-1.5 text-xs font-medium text-red-600">{errors.miles}</p>
+            <p id="miles-error" className="mt-1.5 text-[13px] font-medium text-hub-danger">{errors.miles}</p>
           )}
         </div>
 
         {/* Live PM delta indicator */}
         {hoursSinceLastPm !== null && !errors.engine_hours && (
-          <div className={`flex items-center justify-between px-4 py-2.5 rounded-lg text-sm ${
-            isPmDue ? 'bg-red-50 text-red-700' : isApproachingPm ? 'bg-amber-50 text-amber-700' : 'bg-teal-50 text-teal-700'
-          }`}>
-            <span>Hours since PM</span>
-            <span className="font-bold tabular-nums">{hoursSinceLastPm.toFixed(1)} / {pmHealth?.interval_hours}</span>
+          <div className="hub-well flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 text-sm">
+            <span className="text-hub-n-600">Hours since PM</span>
+            <span className="flex items-center gap-2">
+              <span className="font-bold tabular-nums text-hub-ink">{hoursSinceLastPm.toFixed(1)} / {pmHealth?.interval_hours}</span>
+              <span className={`hub-tag ${isPmDue ? 'hub-tag--danger' : isApproachingPm ? 'hub-tag--warning' : 'hub-tag--success'}`}>{isPmDue ? 'Due' : isApproachingPm ? 'Due soon' : 'Current'}</span>
+            </span>
           </div>
         )}
 
-        {/* Navigation */}
-        <div className="flex gap-3 pt-4">
-          <button
-            type="button"
-            onClick={onBack}
-            className="flex-1 min-h-[48px] px-4 py-3 rounded-lg border-2 border-neutral-200 text-neutral-700 font-semibold hover:bg-neutral-50 active:bg-neutral-100 transition-colors touch-manipulation"
-          >
+        <div className="flex gap-3 pt-2">
+          <button type="button" onClick={onBack} className="hub-btn hub-btn--secondary flex-1 touch-manipulation">
             Back
           </button>
-          <button
-            type="submit"
-            className="flex-1 min-h-[48px] px-4 py-3 rounded-lg bg-hub-blue text-white font-semibold hover:bg-hub-blue-strong active:bg-hub-header transition-colors shadow-sm touch-manipulation"
-          >
+          <button type="submit" className="hub-btn hub-btn--primary hub-btn--wrap flex-1 touch-manipulation">
             {continueLabel}
           </button>
         </div>
