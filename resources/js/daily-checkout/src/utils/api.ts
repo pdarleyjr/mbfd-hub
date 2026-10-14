@@ -101,6 +101,10 @@ export const fetchWithTimeout = async (
   }
 };
 
+const STATION_REQUEST_PAGE_SIZE = 200;
+/** Safety bound: at most 2,000 requests of station history. */
+const STATION_REQUEST_MAX_PAGES = 10;
+
 /** Parse `Retry-After` (delta seconds or HTTP date), capped at 15 minutes. */
 export const parseRetryAfter = (value: string | null, now = Date.now()): number | undefined => {
   if (!value) return undefined;
@@ -765,14 +769,26 @@ export class ApiClient {
   }
 
   static async getStationRequests(stationId: number, scope: 'open' | 'all' = 'all'): Promise<StationRequestSummary[]> {
-    const response = await fetchWithTimeout(`${API_BASE}/public/stations/${stationId}/requests?scope=${scope}`, {
-      headers: { ...DEFAULT_HEADERS },
-    });
-    if (!response.ok) {
-      throw new Error('Failed to fetch station requests');
+    // Complete history is paginated; follow `meta` up to a safety bound. An
+    // older server without `meta` returns its single page as before.
+    const requests: StationRequestSummary[] = [];
+    for (let page = 1; page <= STATION_REQUEST_MAX_PAGES; page += 1) {
+      const response = await fetchWithTimeout(`${API_BASE}/public/stations/${stationId}/requests?scope=${scope}&per_page=${STATION_REQUEST_PAGE_SIZE}&page=${page}`, {
+        headers: { ...DEFAULT_HEADERS },
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch station requests');
+      }
+      const payload = await response.json();
+      requests.push(...(Array.isArray(payload?.data) ? payload.data as StationRequestSummary[] : []));
+      const currentPage = Number(payload?.meta?.current_page);
+      const lastPage = Number(payload?.meta?.last_page);
+      if (!Number.isInteger(currentPage) || !Number.isInteger(lastPage) || currentPage >= lastPage) {
+        break;
+      }
     }
-    const payload = await response.json();
-    return payload.data || [];
+
+    return requests;
   }
 
   static async getApparatusServiceTickets(stationId: number, scope: 'open' | 'all' = 'open'): Promise<ApparatusServiceTicketSummary[]> {
