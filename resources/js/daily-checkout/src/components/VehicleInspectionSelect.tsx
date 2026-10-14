@@ -1,9 +1,35 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router';
+import { ChevronRight, Search, Truck } from 'lucide-react';
 import { Apparatus } from '../types';
 import { ApiClient } from '../utils/api';
 import PreviousPageButton from './PreviousPageButton';
 import InspectionRevisions from './InspectionRevisions';
+import { HubPageHeader } from '../../../hub-ui/HubShell';
+import Tag from './ui/Tag';
+import { EmptyState, LoadError } from './ui/StateViews';
+import { humanize, type Tone } from './ui/status';
+
+const GRID = 'grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5';
+
+/** Operational status reads as text in a tag; the tone only reinforces it. */
+function apparatusStatus(status: string | undefined): { label: string; tone: Tone } {
+  const label = status?.trim() ? status.trim() : 'Status unavailable';
+  const key = label.toLowerCase();
+  if (key === 'in service') return { label, tone: 'success' };
+  if (key === 'out of service') return { label, tone: 'danger' };
+  if (key === 'status unavailable') return { label, tone: 'neutral' };
+  return { label, tone: 'warning' };
+}
+
+function UnitMark({ apparatus, muted = false }: { apparatus: Apparatus; muted?: boolean }) {
+  const initial = apparatus.designation?.trim().charAt(0);
+  return (
+    <span className={`flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-hub-control text-lg font-bold ${muted ? 'border border-hub-glass-border bg-hub-n-100 text-hub-n-600' : 'border border-hub-glass-border bg-hub-well text-hub-blue'}`} aria-hidden="true">
+      {initial || <Truck className="h-6 w-6" />}
+    </span>
+  );
+}
 
 export default function VehicleInspectionSelect() {
   const [apparatuses, setApparatuses] = useState<Apparatus[]>([]);
@@ -11,19 +37,21 @@ export default function VehicleInspectionSelect() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
-  useEffect(() => {
-    const fetchApparatuses = async () => {
-      try {
-        const data = await ApiClient.getApparatuses();
-        setApparatuses(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load vehicles');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchApparatuses();
+  const fetchApparatuses = useCallback(async () => {
+    setLoading(true);
+    try {
+      setApparatuses(await ApiClient.getApparatuses());
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load vehicles');
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchApparatuses();
+  }, [fetchApparatuses]);
 
   const filteredApparatuses = apparatuses.filter((a) => {
     if (!searchQuery.trim()) return true;
@@ -38,21 +66,19 @@ export default function VehicleInspectionSelect() {
 
   if (loading) {
     return (
-      <div className="space-y-6 font-hub">
-        <div className="mb-8 border-l-4 border-hub-red pl-4">
-          <div className="skeleton mb-2 h-8 w-56"></div>
-          <div className="skeleton h-4 w-72 max-w-full"></div>
+      <div data-hub-ui="2" className="space-y-6 font-hub" role="status" aria-label="Loading vehicles">
+        <div className="border-b border-hub-border pb-5">
+          <span className="hub-skeleton mb-3 !h-7 w-56" />
+          <span className="hub-skeleton !h-4 w-72 max-w-full" />
         </div>
-        <div className="skeleton h-11 w-full mb-4 max-w-md mx-auto"></div>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 2xl:gap-6">
-          {[1,2,3,4,5,6,7,8,9].map(i => (
-            <div key={i} className="rounded-xl bg-hub-surface p-5 shadow-sm ring-1 ring-hub-border/80">
-              <div className="flex items-center gap-4">
-                <div className="skeleton w-12 h-12 rounded-lg"></div>
-                <div className="flex-1">
-                  <div className="skeleton h-5 w-32 mb-1"></div>
-                  <div className="skeleton h-3 w-24"></div>
-                </div>
+        <span className="hub-skeleton !h-11 w-full max-w-md !rounded-hub-control" />
+        <div className={GRID}>
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} className="hub-panel flex items-center gap-4 p-4">
+              <span className="hub-skeleton !h-12 !w-12 !rounded-hub-control" />
+              <div className="flex-1 space-y-2">
+                <span className="hub-skeleton !h-5 w-32" />
+                <span className="hub-skeleton w-24" />
               </div>
             </div>
           ))}
@@ -63,119 +89,90 @@ export default function VehicleInspectionSelect() {
 
   if (error) {
     return (
-      <div className="mx-auto max-w-lg rounded-xl border border-hub-danger/30 bg-hub-danger/10 p-8 text-center font-hub">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-hub-danger/10 mb-4">
-          <svg className="w-8 h-8 text-hub-danger" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-          </svg>
-        </div>
-        <p className="text-hub-danger font-medium mb-2">Failed to load vehicles</p>
-        <p className="mb-4 text-sm text-hub-ink-secondary">{error}</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="min-h-11 rounded-lg bg-hub-blue px-5 py-2.5 font-semibold text-white transition-colors hover:bg-hub-blue-strong focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus"
-        >
-          Retry
-        </button>
+      <div data-hub-ui="2" className="mx-auto max-w-lg font-hub">
+        <LoadError title="Failed to load vehicles" message={error} onRetry={fetchApparatuses}>
+          <PreviousPageButton contextual className="hub-btn hub-btn--secondary" />
+        </LoadError>
       </div>
     );
   }
 
   return (
-    <div className="font-hub">
+    <div data-hub-ui="2" className="font-hub">
       <InspectionRevisions />
-      <div className="mb-6 border-l-4 border-hub-red pl-4">
-        <p className="mb-1 text-xs font-bold uppercase tracking-wider text-hub-blue">Daily Checkout</p>
-        <h1 className="mb-2 text-3xl font-bold text-hub-ink font-heading">Vehicle Inspections</h1>
-        <p className="text-hub-ink-secondary">Select a vehicle to begin the daily inspection.</p>
+      <HubPageHeader eyebrow="Daily Checkout" title="Vehicle Inspections" description="Select a vehicle to begin the daily inspection." />
+
+      <div className="relative mb-6 max-w-md">
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-hub-n-500" aria-hidden="true" />
+        <input
+          id="vehicle-search"
+          type="search"
+          aria-label="Search vehicles"
+          placeholder="Search by name, designation, or type"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="min-h-11 w-full rounded-hub-control border border-hub-control-border bg-hub-well py-2.5 pl-10 pr-4 text-sm text-hub-ink placeholder:text-hub-n-500 focus:border-hub-focus focus:outline-none"
+        />
       </div>
 
-      {/* Search/filter */}
-      <div className="mx-auto mb-6 max-w-md">
-        <div className="relative">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-hub-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          <input
-            id="vehicle-search"
-            type="text"
-            aria-label="Search vehicles"
-            placeholder="Search by name, designation, or type..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="min-h-11 w-full rounded-lg border border-hub-border-strong bg-hub-surface-muted py-2.5 pl-10 pr-4 text-sm text-hub-ink placeholder-hub-muted-soft transition focus:border-hub-blue focus:outline-none focus:ring-2 focus:ring-hub-focus/20"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 2xl:gap-6">
-        {filteredApparatuses.map((apparatus) => {
-          // Handle null slug (e.g., "Captain 5") — skip or show disabled
-          if (!apparatus.slug) {
-            return (
-              <div
-                key={apparatus.id}
-                className="block cursor-not-allowed rounded-xl bg-hub-surface-muted/70 p-5 opacity-70 ring-1 ring-hub-border/80"
-              >
-                <div className="flex items-center gap-4">
-                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg bg-hub-surface-muted text-lg font-bold text-hub-ink-secondary">
-                    {apparatus.designation ? apparatus.designation.charAt(0) : '?'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="truncate text-lg font-semibold text-hub-ink-secondary">
-                      {apparatus.designation || apparatus.name || 'Unknown'}
-                    </h3>
-                    {apparatus.vehicle_number && <p className="text-sm text-hub-muted">Vehicle #{apparatus.vehicle_number}</p>}
-                    <p className="mt-0.5 text-xs capitalize text-hub-muted">
-                      {apparatus.type} · No inspection available
-                    </p>
-                  </div>
-                </div>
-              </div>
+      {filteredApparatuses.length > 0 && (
+        <ul className={GRID} aria-label="Vehicles">
+          {filteredApparatuses.map((apparatus) => {
+            const status = apparatusStatus(apparatus.status);
+            const title = apparatus.designation || apparatus.name || 'Unknown';
+            const details = (
+              <>
+                <h3 className="truncate text-base font-semibold text-hub-ink">{title}</h3>
+                {apparatus.vehicle_number && <p className="text-sm tabular-nums text-hub-n-600">Vehicle #{apparatus.vehicle_number}</p>}
+                <p className="text-[13px] text-hub-n-600">{humanize(apparatus.type, 'Type not recorded')}</p>
+              </>
             );
-          }
 
-          return (
-            <Link
-              key={apparatus.id}
-              to={`/vehicle-inspections/${apparatus.slug}`}
-              className="block min-h-24 rounded-xl bg-hub-surface p-5 shadow-sm ring-1 ring-hub-border/80 transition-all duration-200 hover:shadow-md hover:ring-hub-blue/30 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-hub-focus"
-            >
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg bg-hub-blue/10 text-lg font-bold text-hub-blue">
-                  {apparatus.designation ? apparatus.designation.charAt(0) : '🚒'}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="truncate text-lg font-semibold text-hub-ink">
-                    {apparatus.designation || apparatus.name || 'Unknown'}
-                  </h3>
-                  {apparatus.vehicle_number && <p className="text-sm text-hub-ink-secondary">Vehicle #{apparatus.vehicle_number}</p>}
-                  <p className="mt-0.5 text-xs capitalize text-hub-muted">
-                    {apparatus.type}
-                  </p>
-                </div>
-                <svg className="h-5 w-5 flex-shrink-0 text-hub-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </div>
-            </Link>
-          );
-        })}
-      </div>
+            // A unit without a checklist route (for example a command vehicle) is listed but cannot be opened.
+            if (!apparatus.slug) {
+              return (
+                <li key={apparatus.id} className="hub-panel flex min-h-24 items-start gap-4 p-4">
+                  <UnitMark apparatus={apparatus} muted />
+                  <div className="min-w-0 flex-1">
+                    {details}
+                    <div className="mt-2 flex flex-wrap gap-2"><Tag>No inspection available</Tag></div>
+                  </div>
+                </li>
+              );
+            }
 
-      {filteredApparatuses.length === 0 && !loading && (
-        <div className="mt-8 rounded-xl border border-dashed border-hub-border-strong bg-hub-surface/70 py-8 text-center text-hub-muted">
-          <svg className="mx-auto mb-3 h-12 w-12 text-hub-muted-soft" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-          {searchQuery ? `No vehicles matching "${searchQuery}"` : 'No vehicles available for inspection.'}
+            return (
+              <li key={apparatus.id}>
+                <Link
+                  to={`/vehicle-inspections/${apparatus.slug}`}
+                  className="hub-panel group flex h-full min-h-24 items-start gap-4 p-4 transition-colors hover:border-hub-blue/40"
+                >
+                  <UnitMark apparatus={apparatus} />
+                  <div className="min-w-0 flex-1">
+                    {details}
+                    <div className="mt-2 flex flex-wrap gap-2"><Tag tone={status.tone}>{status.label}</Tag></div>
+                  </div>
+                  <ChevronRight className="mt-3 h-5 w-5 flex-shrink-0 text-hub-blue" aria-hidden="true" />
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {filteredApparatuses.length === 0 && (
+        <div className="hub-panel mt-2">
+          <EmptyState
+            icon={<Search className="hub-empty__icon" aria-hidden="true" />}
+            title={searchQuery ? `No vehicles matching "${searchQuery}"` : 'No vehicles available for inspection'}
+            body={searchQuery ? 'Check the designation or vehicle number, or clear the search.' : 'Vehicles appear here once they are assigned a Daily Checkout.'}
+            action={searchQuery ? <button type="button" className="hub-btn hub-btn--secondary" onClick={() => setSearchQuery('')}>Clear search</button> : undefined}
+          />
         </div>
       )}
 
       <div className="mt-8 text-center">
-        <PreviousPageButton contextual
-          className="inline-flex min-h-11 items-center px-4 py-2 font-semibold text-hub-ink-secondary hover:text-hub-ink"
-        />
+        <PreviousPageButton contextual className="px-2" />
       </div>
     </div>
   );
