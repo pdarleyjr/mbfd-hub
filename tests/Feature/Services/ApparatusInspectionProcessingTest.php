@@ -134,6 +134,59 @@ final class ApparatusInspectionProcessingTest extends TestCase
         $this->assertDatabaseHas('apparatus_defects', ['apparatus_id' => $apparatus->id, 'compartment' => 'Cab', 'item' => 'Radio']);
     }
 
+    public function test_open_defects_are_loaded_and_locked_once_for_a_large_checklist(): void
+    {
+        [$apparatus, $initial, $token] = $this->fixture(null, null);
+        $inspection = $initial->replicate(['inspection_reference']);
+        $items = [];
+        for ($index = 1; $index <= 60; $index++) {
+            $items[] = ['id' => "item-{$index}", 'name' => "Item {$index}", 'status' => in_array($index, [3, 40], true) ? 'Missing' : 'Present'];
+        }
+        $inspection->results = [['id' => 'cab', 'name' => 'Cab', 'items' => $items]];
+        $inspection->pending_effects = ['defects' => [
+            ['compartment' => 'Cab', 'item' => 'Item 3', 'status' => 'Missing'],
+            ['compartment' => 'Cab', 'item' => 'Item 40', 'status' => 'Missing'],
+        ]];
+        $inspection->save();
+        $corrected = ApparatusDefect::recordDefect($apparatus->id, 'Cab', 'Item 7', 'Damaged', null, null, null);
+        $confirmed = ApparatusDefect::recordDefect($apparatus->id, 'Cab', 'Item 40', 'Damaged', null, null, null);
+        $otherApparatus = Apparatus::create(['name' => 'Engine 3', 'unit_id' => 'E3', 'designation' => 'E3', 'type' => 'Engine', 'vehicle_number' => 'TEST-103', 'status' => 'In Service']);
+        $unrelated = ApparatusDefect::recordDefect($otherApparatus->id, 'Cab', 'Item 9', 'Missing', null, null, null);
+
+        $defectSelects = 0;
+        DB::listen(function ($query) use (&$defectSelects): void {
+            if (preg_match('/^\s*select\b.*\bfrom\s+"apparatus_defects"/is', $query->sql) === 1) {
+                $defectSelects++;
+            }
+        });
+        $this->process($apparatus, $inspection, $token);
+
+        // One batched lookup for the 60 submitted items, plus recordDefect()'s
+        // own lookup for the single newly reported finding (Item 3).
+        $this->assertSame(2, $defectSelects);
+        $observations = ApparatusDefectObservation::query()
+            ->join('apparatus_defects', 'apparatus_defects.id', '=', 'apparatus_defect_observations.apparatus_defect_id')
+            ->pluck('observation', 'apparatus_defects.item')->all();
+        ksort($observations);
+        $this->assertSame(['Item 3' => 'first_reported', 'Item 40' => 'confirmed_again', 'Item 7' => 'appears_corrected'], $observations);
+        $this->assertSame('missing', $confirmed->fresh()->issue_type);
+        $this->assertFalse($corrected->fresh()->resolved);
+        $this->assertDatabaseMissing('apparatus_defect_observations', ['apparatus_defect_id' => $unrelated->id]);
+    }
+
+    public function test_resolved_defects_are_not_matched_and_a_new_finding_is_recorded(): void
+    {
+        [$apparatus, $inspection, $token] = $this->fixture(null, null, 'Missing');
+        $resolved = ApparatusDefect::recordDefect($apparatus->id, 'Cab', 'Radio', 'Missing', null, null, null);
+        $resolved->update(['status' => 'resolved']);
+
+        $this->process($apparatus, $inspection, $token);
+
+        $this->assertDatabaseCount('apparatus_defects', 2);
+        $this->assertDatabaseMissing('apparatus_defect_observations', ['apparatus_defect_id' => $resolved->id]);
+        $this->assertSame(['first_reported'], ApparatusDefectObservation::query()->pluck('observation')->all());
+    }
+
     /** @return array{Apparatus, ApparatusInspection, string} */
     private function fixture(?float $hours, ?int $miles, string $status = 'Present'): array
     {

@@ -2,14 +2,15 @@
 
 namespace App\Filament\Resources\StationResource\RelationManagers;
 
+use Filament\Forms;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Filament\Forms;
 
 class StationInventoryItemsRelationManager extends RelationManager
 {
     protected static string $relationship = 'inventoryItems';
+
     protected static ?string $title = 'Inventory Items';
 
     public function table(Table $table): Table
@@ -27,11 +28,11 @@ class StationInventoryItemsRelationManager extends RelationManager
                 Tables\Columns\TextColumn::make('on_hand')
                     ->label('On Hand')
                     ->sortable()
-                    ->formatStateUsing(fn ($state, $record) => $state . ' ' . ($record->inventoryItem?->unit_label ?? '')),
+                    ->formatStateUsing(fn ($state, $record) => $state.' '.($record->inventoryItem?->unit_label ?? '')),
                 Tables\Columns\TextColumn::make('inventoryItem.par_quantity')
                     ->label('Expected (Par)')
                     ->sortable()
-                    ->formatStateUsing(fn ($state, $record) => $state . ' ' . ($record->inventoryItem?->unit_label ?? '')),
+                    ->formatStateUsing(fn ($state, $record) => $state.' '.($record->inventoryItem?->unit_label ?? '')),
                 Tables\Columns\BadgeColumn::make('status')
                     ->colors([
                         'success' => 'ok',
@@ -39,12 +40,12 @@ class StationInventoryItemsRelationManager extends RelationManager
                         'warning' => 'ordered',
                         'info' => 'overstocked',
                     ])
-                    ->formatStateUsing(fn ($state) => match ((string)$state) {
+                    ->formatStateUsing(fn ($state) => match ((string) $state) {
                         'ok' => 'OK',
                         'low' => 'Low Stock',
                         'ordered' => 'Ordered',
                         'overstocked' => 'Overstocked',
-                        default => ucfirst((string)$state),
+                        default => ucfirst((string) $state),
                     }),
                 Tables\Columns\TextColumn::make('last_updated_at')
                     ->label('Last Updated')
@@ -64,22 +65,25 @@ class StationInventoryItemsRelationManager extends RelationManager
             ])
             ->actions([
                 Tables\Actions\EditAction::make()
+                    ->visible(fn (): bool => $this->canManageInventory())
                     ->form([
                         Forms\Components\TextInput::make('on_hand')
                             ->required()
                             ->numeric()
                             ->minValue(0)
-                            ->suffix(fn($record) => $record->inventoryItem?->unit_label ?? '')
-                            ->helperText(fn($record) => 'Expected: ' . ($record->inventoryItem?->par_quantity ?? '?') . ' ' . ($record->inventoryItem?->unit_label ?? '')),
+                            ->suffix(fn ($record) => $record->inventoryItem?->unit_label ?? '')
+                            ->helperText(fn ($record) => 'Expected: '.($record->inventoryItem?->par_quantity ?? '?').' '.($record->inventoryItem?->unit_label ?? '')),
                     ])
                     ->using(function ($record, array $data) {
                         $record->updateCount((int) $data['on_hand']);
+
                         return $record;
                     }),
 
                 // Mark Ordered Action
                 Tables\Actions\Action::make('mark_ordered')
                     ->label('Mark Ordered')
+                    ->authorize(fn (): bool => $this->canManageInventory())
                     ->icon('heroicon-o-shopping-cart')
                     ->color('warning')
                     ->visible(fn ($record) => $record->status === 'low')
@@ -92,6 +96,7 @@ class StationInventoryItemsRelationManager extends RelationManager
                 // Replenish Action
                 Tables\Actions\Action::make('replenish')
                     ->label('Replenish')
+                    ->authorize(fn (): bool => $this->canManageInventory())
                     ->icon('heroicon-o-check-circle')
                     ->color('success')
                     ->visible(fn ($record) => in_array($record->status, ['low', 'ordered']))
@@ -101,10 +106,11 @@ class StationInventoryItemsRelationManager extends RelationManager
                             $record->updateCount($record->inventoryItem->par_quantity);
                         }
                     }),
-                
+
                 // Clear Overstock Alert
                 Tables\Actions\Action::make('clear_alert')
                     ->label('Clear Alert')
+                    ->authorize(fn (): bool => $this->canManageInventory())
                     ->icon('heroicon-o-x-circle')
                     ->color('gray')
                     ->visible(fn ($record) => $record->status === 'overstocked')
@@ -114,5 +120,14 @@ class StationInventoryItemsRelationManager extends RelationManager
                     }),
             ])
             ->bulkActions([]);
+    }
+
+    /**
+     * Stock corrections are station management actions; view-only admins see
+     * the inventory but never the actions, including on the view page.
+     */
+    private function canManageInventory(): bool
+    {
+        return auth()->user()?->can('admin.stations.manage') ?? false;
     }
 }

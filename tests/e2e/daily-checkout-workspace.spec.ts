@@ -186,7 +186,7 @@ test('remaining work, reported issues and the next required action stay distinct
   await page.getByRole('button', { name: /^Bag/ }).click();
   await page.getByRole('button', { name: 'Damaged', exact: true }).click();
   await page.getByRole('button', { name: /Checklist Equipment/ }).click();
-  const quick = page.getByRole('complementary', { name: 'Quick Checklist' });
+  const quick = page.getByRole('dialog', { name: 'Quick Checklist' });
   await expect(quick.getByRole('heading', { name: 'Equipment inspected', exact: true })).toBeVisible();
   await expect(quick.getByRole('heading', { name: 'Needs attention (1)', exact: true })).toBeVisible();
   await expect(quick.getByRole('button', { name: /Bag.*Damaged.*Reported/ })).toBeVisible();
@@ -244,7 +244,7 @@ test('Rescue keeps side-specific photo zones and central work in its issued chec
   await page.locator('.blueprint-zone[data-area-id="patient_compartment"]').click();
   await expect(page.getByRole('heading', { name: 'Patient Compartment' })).toBeVisible();
   await page.getByRole('button', { name: /Checklist.*remaining/ }).click();
-  const quick = page.getByRole('complementary', { name: 'Quick Checklist' });
+  const quick = page.getByRole('dialog', { name: 'Quick Checklist' });
   await quick.getByRole('button').last().click();
   await expect(page.getByRole('heading', { name: checklist.compartments.at(-1).title, exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
@@ -429,13 +429,13 @@ test('answers autosave before leaving a compartment and restore on reload', asyn
 test('Quick Checklist focuses the right item and batch confirmation preserves a reported issue', async ({ page }) => {
   await fixture(page);
   await page.getByRole('button', { name: /Checklist.*remaining/ }).click();
-  const quick = page.getByRole('complementary', { name: 'Quick Checklist' });
+  const quick = page.getByRole('dialog', { name: 'Quick Checklist' });
   await quick.getByRole('button', { name: /Officer R3.*Sledgehammer/ }).click();
   await expect(quick).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Officer R3', exact: true })).toBeVisible();
   await expect(page.locator('[data-item-id][aria-expanded=true]')).toBeFocused();
   await page.getByRole('button', { name: 'Missing', exact: true }).click();
-  await page.getByRole('button', { name: 'Mark all items in this compartment as present' }).click();
+  await page.getByRole('button', { name: 'Confirm all present' }).click();
   await expect(page.getByRole('button', { name: 'Missing', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.getByRole('button', { name: 'Pass Sledgehammer', exact: true })).toHaveAttribute('aria-pressed', 'false');
   await page.getByRole('button', { name: /Checklist.*remaining/ }).click();
@@ -459,12 +459,12 @@ async function inspectActualEquipment(page: Page, checklist: typeof sourceCheckl
   await page.getByRole('navigation', { name: 'Inspection workspace' }).getByRole('button', { name: 'Apparatus', exact: true }).click();
   for (const compartment of checklist.compartments) {
     await selectArea(page, checklist, compartment.id);
-    await page.getByRole('button', { name: 'Mark all items in this compartment as present' }).click();
+    await page.getByRole('button', { name: 'Confirm all present' }).click();
     for (const [index, item] of compartment.items.entries()) {
       if (!item.inputType || item.inputType === 'checkbox') continue;
-      await page.getByRole('button', { name: `Pass ${item.name}`, exact: true }).click();
+      await page.getByRole('button', { name: `Record ${item.name}`, exact: true }).click();
       await page.locator(`[id="value-${item.id ?? `${compartment.id}-item-${index + 1}`}"]`).fill('0007-RADIO');
-      await page.getByRole('button', { name: `Pass ${item.name}`, exact: true }).click();
+      await page.getByRole('button', { name: `Record ${item.name}`, exact: true }).click();
     }
   }
   const next = page.locator('.inspection-review-button');
@@ -574,7 +574,7 @@ test('paper text autosaves, survives refresh and offline editing, and queues the
   const closeNotification = page.getByRole('button', { name: 'Close notification' });
   if (await closeNotification.isVisible()) await closeNotification.click();
   await page.getByRole('button', { name: 'Submit Inspection', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Inspection Queued!' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspection saved on this device' })).toBeVisible();
   expect(await readDrafts(page)).toHaveLength(1);
   const rows = await queued(page);
   expect(rows).toHaveLength(1);
@@ -601,7 +601,7 @@ test('actual Engine 2 blank readings retain source IDs and queue an identical re
   const closeNotification = page.getByRole('button', { name: 'Close notification' });
   if (await closeNotification.isVisible()) await closeNotification.click();
   await page.getByRole('button', { name: 'Submit Inspection', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Inspection Queued!' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Inspection saved on this device' })).toBeVisible();
   const rows = await queued(page);
   expect(rows).toHaveLength(1);
   const payload = rows[0].data;
@@ -647,7 +647,7 @@ test('historical finding without a unique current location remains visible after
   await finding.locator('summary').click();
   await expect(finding).toContainText('Legacy Rescue Bag');
   await expect(finding).toContainText('Verify the recorded location or duty before acting.');
-  await page.getByRole('button', { name: 'Mark all items in this compartment as present' }).click();
+  await page.getByRole('button', { name: 'Confirm all present' }).click();
   await expect(finding).toContainText('Legacy Rescue Bag');
   await selectArea(page, sourceChecklist, 'comp_r2');
   await showAreaPicker(page);
@@ -670,7 +670,7 @@ test('known finding remains visible when reported corrected and keyboard actions
   const checklist = page.getByRole('button', { name: /Checklist.*remaining/ });
   await checklist.focus();
   await page.keyboard.press('Enter');
-  await expect(page.getByRole('complementary', { name: 'Quick Checklist' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Quick Checklist' })).toBeVisible();
   await page.getByRole('button', { name: 'Close Quick Checklist' }).focus();
   await page.keyboard.press('Escape');
   await expect(checklist).toBeFocused();

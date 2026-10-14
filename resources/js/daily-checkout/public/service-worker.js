@@ -1,9 +1,10 @@
-const CACHE_NAME = 'mbfd-checkout-v8';
+// v9: v8 could hold a sign-in page stored as the Daily shell; activating v9
+// deletes that cache and only verified Daily HTML is stored from now on.
+const CACHE_NAME = 'mbfd-checkout-v9';
 const API_CACHE_NAME = 'mbfd-api-cache-v7';
 const BUILD_ASSETS = /* DAILY_BUILD_ASSETS */ [];
+const DAILY_SHELL_KEYS = ['/daily/', '/daily/index.html'];
 const APP_SHELL_CACHE_KEYS = [
-  '/daily/',
-  '/daily/index.html',
   '/manifest.json',
   '/images/wallpapers/mbfd-smartphone-c13ce770.webp',
   '/images/wallpapers/mbfd-tablet-87f370c6.webp',
@@ -11,19 +12,106 @@ const APP_SHELL_CACHE_KEYS = [
   ...BUILD_ASSETS,
 ];
 
+function isDailyPath(pathname) {
+  return pathname === '/daily' || pathname.startsWith('/daily/');
+}
+
+// Only a direct, same-origin HTML response for a /daily/ URL that contains the
+// Daily mount point may become the offline app shell. A redirect (for example
+// to /login after the session expired) or any other page must never be stored
+// as the Daily app.
+async function isGenuineDailyShell(response) {
+  if (!response || !response.ok || response.redirected || response.type !== 'basic') {
+    return false;
+  }
+
+  let finalUrl;
+  try {
+    finalUrl = new URL(response.url);
+  } catch {
+    return false;
+  }
+
+  if (finalUrl.origin !== self.location.origin
+    || !isDailyPath(finalUrl.pathname)
+    || !(response.headers.get('Content-Type') || '').includes('text/html')) {
+    return false;
+  }
+
+  try {
+    return (await response.clone().text()).includes('<div id="root">');
+  } catch {
+    return false;
+  }
+}
+
+function isCacheableSameOriginResponse(response) {
+  return Boolean(response) && response.ok && !response.redirected && response.type === 'basic';
+}
+
+async function precacheDailyShell(cache) {
+  for (const key of DAILY_SHELL_KEYS) {
+    try {
+      const response = await fetch(key, { cache: 'no-store', credentials: 'same-origin' });
+      if (await isGenuineDailyShell(response)) {
+        await cache.put(key, response);
+      }
+    } catch {
+      // Signed out or offline during install: the next genuine navigation
+      // stores the shell instead.
+    }
+  }
+}
+
 // Install event - cache static assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL_CACHE_KEYS))
+    caches.open(CACHE_NAME).then(async (cache) => {
+      await cache.addAll(APP_SHELL_CACHE_KEYS);
+      await precacheDailyShell(cache);
+    })
   );
 
   self.skipWaiting();
 });
 
 // Activate event - clean up old caches
+// A worker installed while signed out has no shell. Before older caches are
+// deleted, keep a genuine older shell and the build assets it references, so
+// an offline launch still opens the app; the next online navigation replaces
+// it. A poisoned (non-Daily) shell is never carried over.
+async function carryOverGenuineShell(cacheNames) {
+  const current = await caches.open(CACHE_NAME);
+  if (await current.match('/daily/index.html')) return;
+
+  for (const name of cacheNames) {
+    if (!name.startsWith('mbfd-checkout-') || name === CACHE_NAME) continue;
+    const previous = await caches.open(name);
+    const shell = await previous.match('/daily/index.html');
+    if (!(await isGenuineDailyShell(shell))) continue;
+
+    await current.put('/daily/index.html', shell.clone());
+    await current.put('/daily/', shell.clone());
+    for (const request of await previous.keys()) {
+      const path = new URL(request.url, self.location.origin).pathname;
+      if (!path.startsWith('/daily/assets/') || await current.match(request)) continue;
+      const asset = await previous.match(request);
+      if (asset) await current.put(request, asset);
+    }
+    return;
+  }
+}
+
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
+    caches.keys().then(async (cacheNames) => {
+      try {
+        await carryOverGenuineShell(cacheNames);
+      } catch {
+        // Losing the carried-over shell only affects an offline launch.
+      }
+      return cacheNames;
+    }).then((cacheNames) => {
       return Promise.all(
         cacheNames
           .filter((name) => {
@@ -98,7 +186,7 @@ self.addEventListener('fetch', (event) => {
         try {
           const networkResponse = await fetch(request, { cache: 'no-store' });
 
-          if (networkResponse.ok) {
+          if (await isGenuineDailyShell(networkResponse)) {
             await cache.put('/daily/index.html', networkResponse.clone());
           }
 
@@ -126,7 +214,7 @@ self.addEventListener('fetch', (event) => {
         try {
           const networkResponse = await fetch(request, { cache: 'no-store' });
 
-          if (networkResponse.ok) {
+          if (isCacheableSameOriginResponse(networkResponse)) {
             await cache.put(request, networkResponse.clone());
           }
 
@@ -159,7 +247,7 @@ self.addEventListener('fetch', (event) => {
       }
 
       return fetch(request).then((response) => {
-        if (response.ok && isSameOrigin) {
+        if (isSameOrigin && !isNavigationRequest && isCacheableSameOriginResponse(response)) {
           const responseClone = response.clone();
           caches.open(CACHE_NAME).then((cache) => {
             cache.put(request, responseClone);

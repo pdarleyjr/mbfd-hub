@@ -1,5 +1,5 @@
 import { db } from './db';
-import { redirectToLoginAfterSessionExpiry } from '../utils/api';
+import { fetchWithTimeout, READ_TIMEOUT_MS, redirectToLoginAfterSessionExpiry } from '../utils/api';
 
 const CACHE_KEY = 'authenticated-offline-identity-v1';
 
@@ -26,13 +26,32 @@ const parseIdentity = (value: unknown): OfflineIdentity | null => {
     : null;
 };
 
-export async function refreshOfflineIdentity(): Promise<OfflineIdentity> {
-  const response = await fetch('/api/me/context', {
+/** The member is no longer signed in; saved work stays on this device. */
+export class OfflineIdentitySignInRequiredError extends Error {
+  constructor() {
+    super('Your sign-in expired. Saved work stays on this device; sign in again to send it.');
+    this.name = 'OfflineIdentitySignInRequiredError';
+  }
+}
+
+export interface RefreshOfflineIdentityOptions {
+  /**
+   * Member-initiated requests may send the member to sign in. Background
+   * replays pass false: they must never navigate away from open work.
+   */
+  redirectOnExpiry?: boolean;
+}
+
+export async function refreshOfflineIdentity({ redirectOnExpiry = true }: RefreshOfflineIdentityOptions = {}): Promise<OfflineIdentity> {
+  const response = await fetchWithTimeout('/api/me/context', {
     credentials: 'same-origin',
     headers: { Accept: 'application/json' },
-  });
-  if (response.status === 401 && (typeof navigator === 'undefined' || navigator.onLine)) {
-    redirectToLoginAfterSessionExpiry();
+  }, READ_TIMEOUT_MS);
+  if (response.status === 401) {
+    if (redirectOnExpiry && (typeof navigator === 'undefined' || navigator.onLine)) {
+      redirectToLoginAfterSessionExpiry();
+    }
+    throw new OfflineIdentitySignInRequiredError();
   }
   if (!response.ok) {
     throw new Error('The signed-in member could not be verified for offline synchronization.');
@@ -47,10 +66,10 @@ export async function refreshOfflineIdentity(): Promise<OfflineIdentity> {
   return identity;
 }
 
-export async function identityForQueueCapture(): Promise<OfflineIdentity> {
+export async function identityForQueueCapture(options: RefreshOfflineIdentityOptions = {}): Promise<OfflineIdentity> {
   if (typeof navigator === 'undefined' || navigator.onLine) {
     try {
-      return await refreshOfflineIdentity();
+      return await refreshOfflineIdentity(options);
     } catch {
       // A recent canonical context may still allow an offline capture. Replay
       // always refreshes the server context before sending anything.

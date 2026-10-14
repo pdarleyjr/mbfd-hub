@@ -51,11 +51,68 @@ export class ApiRequestError extends Error {
     message: string,
     readonly status: number,
     readonly code?: string,
+    /** Delay requested by a 429/503 `Retry-After` header, when present. */
+    readonly retryAfterMs?: number,
   ) {
     super(message);
     this.name = 'ApiRequestError';
   }
 }
+
+/**
+ * The request did not finish in time. For a submission the outcome is
+ * unknown: the server may have stored it, so the caller must keep the durable
+ * payload and replay it with the same client_submission_id.
+ */
+export class ApiTimeoutError extends Error {
+  constructor(message = 'The server did not respond in time.') {
+    super(message);
+    this.name = 'ApiTimeoutError';
+  }
+}
+
+/** Reads and small mutations. */
+export const READ_TIMEOUT_MS = 20_000;
+/**
+ * A Daily Checkout payload carries base64 photos and a signature (often a few
+ * MB). Allow a slow cellular upload to finish before declaring the outcome
+ * unknown; the queued record is replayed idempotently afterwards.
+ */
+export const SUBMISSION_TIMEOUT_MS = 60_000;
+
+/**
+ * `fetch` with an overall deadline. The deadline also covers reading the body:
+ * the timer is not cleared when headers arrive, and aborting a fully consumed
+ * response has no effect.
+ */
+export const fetchWithTimeout = async (
+  input: string,
+  init: RequestInit = {},
+  timeoutMs: number = (init.method ?? 'GET').toUpperCase() === 'GET' ? READ_TIMEOUT_MS : SUBMISSION_TIMEOUT_MS,
+): Promise<Response> => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    clearTimeout(timer);
+    if (controller.signal.aborted) throw new ApiTimeoutError();
+    throw error;
+  }
+};
+
+const STATION_REQUEST_PAGE_SIZE = 200;
+/** Safety bound: at most 2,000 requests of station history. */
+const STATION_REQUEST_MAX_PAGES = 10;
+
+/** Parse `Retry-After` (delta seconds or HTTP date), capped at 15 minutes. */
+export const parseRetryAfter = (value: string | null, now = Date.now()): number | undefined => {
+  if (!value) return undefined;
+  const trimmed = value.trim();
+  const milliseconds = /^\d+$/.test(trimmed) ? Number(trimmed) * 1000 : Date.parse(trimmed) - now;
+
+  return Number.isFinite(milliseconds) ? Math.min(Math.max(milliseconds, 0), 15 * 60 * 1000) : undefined;
+};
 
 let sessionExpiryRedirectStarted = false;
 
@@ -100,17 +157,17 @@ const responseMessage = async (response: Response, fallback: string): Promise<st
 
 export class ApiClient {
   static async getInspectionRevisions(): Promise<InspectionRevision[]> {
-    const response = await fetch(`${API_BASE}/public/inspection-revisions`, { headers: DEFAULT_HEADERS, cache: 'no-store' });
+    const response = await fetchWithTimeout(`${API_BASE}/public/inspection-revisions`, { headers: DEFAULT_HEADERS, cache: 'no-store' });
     if (!response.ok) throw new Error('Requested clarifications could not be loaded. Reconnect and try again.');
     return (await response.json()).data;
   }
 
   static async submitInspectionRevision(id: number, data: { reason: string; value?: number }): Promise<void> {
-    const response = await fetch(`${API_BASE}/public/inspection-exceptions/${id}/revision`, { method: 'POST', headers: mutationHeaders(), body: JSON.stringify(data) });
+    const response = await fetchWithTimeout(`${API_BASE}/public/inspection-exceptions/${id}/revision`, { method: 'POST', headers: mutationHeaders(), body: JSON.stringify(data) });
     if (!response.ok) throw new Error(await responseMessage(response, 'Your clarification was not sent. Your draft is saved on this device; try again.'));
   }
   static async getApparatuses(): Promise<Apparatus[]> {
-    const response = await fetch(`${API_BASE}/public/apparatuses`, {
+    const response = await fetchWithTimeout(`${API_BASE}/public/apparatuses`, {
     headers: { ...DEFAULT_HEADERS },
     });
     if (!response.ok) {
@@ -120,7 +177,7 @@ export class ApiClient {
   }
 
   static async getEmployees(): Promise<EmployeeOption[]> {
-    const response = await fetch(`${API_BASE}/public/employees/list`, {
+    const response = await fetchWithTimeout(`${API_BASE}/public/employees/list`, {
       headers: { ...DEFAULT_HEADERS },
     });
     if (!response.ok) {
@@ -167,7 +224,7 @@ export class ApiClient {
     body?: Record<string, string>,
     includesInspectionSession = false,
   ): Promise<ChecklistData> {
-    const response = await fetch(
+    const response = await fetchWithTimeout(
       `${API_BASE}/public/apparatuses/${apparatusId}/${endpoint}`,
       {
         ...(body ? {
@@ -380,28 +437,41 @@ export class ApiClient {
     apparatusId: number,
     data: InspectionSubmission,
   ): Promise<{ review_status?: 'approved' | 'pending_review'; processing_status?: 'accepted' | 'accepted_with_exception' }> {
-    const response = await fetch(`${API_BASE}/public/apparatuses/${apparatusId}/inspections`, {
-      method: 'POST',
-      credentials: 'same-origin',
-      headers: mutationHeaders(),
-      body: JSON.stringify(data),
-    });
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), SUBMISSION_TIMEOUT_MS);
+    try {
+      const response = await fetch(`${API_BASE}/public/apparatuses/${apparatusId}/inspections`, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: mutationHeaders(),
+        body: JSON.stringify(data),
+        signal: controller.signal,
+      });
 
-    if (!response.ok) {
-      const payload = await response.json().catch(() => null);
-      throw new ApiRequestError(
-        typeof payload?.message === 'string' ? payload.message : 'Failed to submit inspection',
-        response.status,
-        typeof payload?.code === 'string' ? payload.code : undefined,
-      );
+      if (!response.ok) {
+        const payload = await response.json().catch(() => null);
+        throw new ApiRequestError(
+          typeof payload?.message === 'string' ? payload.message : 'Failed to submit inspection',
+          response.status,
+          typeof payload?.code === 'string' ? payload.code : undefined,
+          parseRetryAfter(response.headers.get('Retry-After')),
+        );
+      }
+
+      return await response.json();
+    } catch (error) {
+      if (controller.signal.aborted) {
+        throw new ApiTimeoutError('The server did not confirm this inspection in time. It is saved on this device and will be sent again; the server ignores a duplicate.');
+      }
+      throw error;
+    } finally {
+      clearTimeout(timer);
     }
-
-    return response.json();
   }
 
   // Station API methods
   static async getStations(): Promise<Station[]> {
-    const response = await fetch(`${API_BASE}/public/stations`, {
+    const response = await fetchWithTimeout(`${API_BASE}/public/stations`, {
       headers: { ...DEFAULT_HEADERS },
       cache: 'no-store',
     });
@@ -413,7 +483,7 @@ export class ApiClient {
   }
 
   static async getStation(id: number): Promise<StationDetail> {
-    const response = await fetch(`${API_BASE}/public/stations/${id}`, {
+    const response = await fetchWithTimeout(`${API_BASE}/public/stations/${id}`, {
       headers: { ...DEFAULT_HEADERS },
       cache: 'no-store',
     });
@@ -424,7 +494,7 @@ export class ApiClient {
   }
 
   static async createStation(data: Partial<Station>): Promise<Station> {
-    const response = await fetch(`${API_BASE}/admin/stations`, {
+    const response = await fetchWithTimeout(`${API_BASE}/admin/stations`, {
       method: 'POST',
       credentials: 'same-origin',
       headers: mutationHeaders(),
@@ -437,7 +507,7 @@ export class ApiClient {
   }
 
   static async updateStation(id: number, data: Partial<Station>): Promise<Station> {
-    const response = await fetch(`${API_BASE}/admin/stations/${id}`, {
+    const response = await fetchWithTimeout(`${API_BASE}/admin/stations/${id}`, {
       method: 'PUT',
       headers: { ...DEFAULT_HEADERS },
       body: JSON.stringify(data),
@@ -449,7 +519,7 @@ export class ApiClient {
   }
 
   static async deleteStation(id: number): Promise<void> {
-    const response = await fetch(`${API_BASE}/admin/stations/${id}`, {
+    const response = await fetchWithTimeout(`${API_BASE}/admin/stations/${id}`, {
       method: 'DELETE',
       headers: { ...DEFAULT_HEADERS },
     });
@@ -460,7 +530,7 @@ export class ApiClient {
 
   // Alias methods for simpler usage in components
   static async getRoom(stationId: number, roomId: number): Promise<Room> {
-    const response = await fetch(`${API_BASE}/public/stations/${stationId}/rooms`, {
+    const response = await fetchWithTimeout(`${API_BASE}/public/stations/${stationId}/rooms`, {
       headers: { ...DEFAULT_HEADERS },
     });
     if (!response.ok) {
@@ -474,7 +544,7 @@ export class ApiClient {
   }
 
   static async getRoomAssets(stationId: number, roomId: number): Promise<RoomAsset[]> {
-    const response = await fetch(`${API_BASE}/public/stations/${stationId}/rooms/${roomId}/assets`, {
+    const response = await fetchWithTimeout(`${API_BASE}/public/stations/${stationId}/rooms/${roomId}/assets`, {
       headers: { ...DEFAULT_HEADERS },
     });
     if (!response.ok) {
@@ -485,7 +555,7 @@ export class ApiClient {
   }
 
   static async getRoomAudits(stationId: number, roomId: number): Promise<RoomAudit[]> {
-    const response = await fetch(`${API_BASE}/admin/stations/${stationId}/rooms/${roomId}/audits`, {
+    const response = await fetchWithTimeout(`${API_BASE}/admin/stations/${stationId}/rooms/${roomId}/audits`, {
       headers: { ...DEFAULT_HEADERS },
     });
     if (!response.ok) {
@@ -495,7 +565,7 @@ export class ApiClient {
   }
 
   static async createRoomAsset(stationId: number, roomId: number, data: Partial<RoomAsset>): Promise<RoomAsset> {
-    const response = await fetch(`${API_BASE}/admin/stations/${stationId}/rooms/${roomId}/assets`, {
+    const response = await fetchWithTimeout(`${API_BASE}/admin/stations/${stationId}/rooms/${roomId}/assets`, {
       method: 'POST',
       credentials: 'same-origin',
       headers: mutationHeaders(),
@@ -508,7 +578,7 @@ export class ApiClient {
   }
 
   static async createRoomAudit(stationId: number, roomId: number, data: Partial<RoomAudit>): Promise<RoomAudit> {
-    const response = await fetch(`${API_BASE}/admin/stations/${stationId}/rooms/${roomId}/audits`, {
+    const response = await fetchWithTimeout(`${API_BASE}/admin/stations/${stationId}/rooms/${roomId}/audits`, {
       method: 'POST',
       headers: { ...DEFAULT_HEADERS },
       body: JSON.stringify(data),
@@ -520,7 +590,7 @@ export class ApiClient {
   }
 
   static async completeRoomAudit(stationId: number, roomId: number, auditId: number, data: { items: any[] }): Promise<RoomAudit> {
-    const response = await fetch(`${API_BASE}/admin/stations/${stationId}/rooms/${roomId}/audits/${auditId}/complete`, {
+    const response = await fetchWithTimeout(`${API_BASE}/admin/stations/${stationId}/rooms/${roomId}/audits/${auditId}/complete`, {
       method: 'POST',
       headers: { ...DEFAULT_HEADERS },
       body: JSON.stringify(data),
@@ -536,7 +606,7 @@ export class ApiClient {
   // ============================================
 
   static async submitBigTicketRequest(data: BigTicketRequestFormData): Promise<BigTicketRequest> {
-    const response = await fetch(`${API_BASE}/big-ticket-requests`, {
+    const response = await fetchWithTimeout(`${API_BASE}/big-ticket-requests`, {
       method: 'POST',
       headers: { ...DEFAULT_HEADERS },
       body: JSON.stringify(data),
@@ -549,7 +619,7 @@ export class ApiClient {
   }
 
   static async getBigTicketRequests(stationId: number): Promise<BigTicketRequest[]> {
-    const response = await fetch(`${API_BASE}/stations/${stationId}/big-ticket-requests`, {
+    const response = await fetchWithTimeout(`${API_BASE}/stations/${stationId}/big-ticket-requests`, {
       headers: { ...DEFAULT_HEADERS },
     });
     if (!response.ok) {
@@ -563,7 +633,7 @@ export class ApiClient {
   // ============================================
 
   static async getInventoryCategories(): Promise<{ id: string; name: string; items: { id: string; name: string; unit: string; max_quantity: number }[] }[]> {
-    const response = await fetch(`${API_BASE}/station-inventory/categories`, {
+    const response = await fetchWithTimeout(`${API_BASE}/station-inventory/categories`, {
       headers: { ...DEFAULT_HEADERS },
     });
     if (!response.ok) {
@@ -580,7 +650,7 @@ export class ApiClient {
     employeeName?: string,
     shift?: string
   ): Promise<StationInventorySubmission> {
-    const response = await fetch(`${API_BASE}/station-inventory-submissions`, {
+    const response = await fetchWithTimeout(`${API_BASE}/station-inventory-submissions`, {
       method: 'POST',
       headers: { ...DEFAULT_HEADERS },
       body: JSON.stringify({ 
@@ -599,7 +669,7 @@ export class ApiClient {
   }
 
   static async downloadInventoryPdf(submissionId: number): Promise<Blob> {
-    const response = await fetch(`${API_BASE}/station-inventory-submissions/${submissionId}/pdf`, {
+    const response = await fetchWithTimeout(`${API_BASE}/station-inventory-submissions/${submissionId}/pdf`, {
       headers: { ...DEFAULT_HEADERS },
     });
     if (!response.ok) {
@@ -609,7 +679,7 @@ export class ApiClient {
   }
 
   static async getStationInventorySubmissions(stationId: number): Promise<StationInventorySubmission[]> {
-    const response = await fetch(`${API_BASE}/stations/${stationId}/station-inventory-submissions`, {
+    const response = await fetchWithTimeout(`${API_BASE}/stations/${stationId}/station-inventory-submissions`, {
       headers: { ...DEFAULT_HEADERS },
     });
     if (!response.ok) {
@@ -624,7 +694,7 @@ export class ApiClient {
   // ============================================
 
   static async getInventoryV2(stationId: number): Promise<InventoryV2Response> {
-    const response = await fetch(`${API_BASE}/v2/station-inventory/${stationId}`, {
+    const response = await fetchWithTimeout(`${API_BASE}/v2/station-inventory/${stationId}`, {
       headers: { ...DEFAULT_HEADERS },
     });
     if (!response.ok) {
@@ -638,7 +708,7 @@ export class ApiClient {
     stationInventoryItemId: number,
     data: UpdateItemRequest
   ): Promise<{ success: boolean; message: string }> {
-    const response = await fetch(`${API_BASE}/v2/station-inventory/${stationId}/item/${stationInventoryItemId}`, {
+    const response = await fetchWithTimeout(`${API_BASE}/v2/station-inventory/${stationId}/item/${stationInventoryItemId}`, {
       method: 'PUT',
       credentials: 'same-origin',
       headers: mutationHeaders(),
@@ -652,7 +722,7 @@ export class ApiClient {
   }
 
   static async getSupplyRequests(stationId: number): Promise<{ success: boolean; requests: SupplyRequest[] }> {
-    const response = await fetch(`${API_BASE}/v2/station-inventory/${stationId}/supply-requests`, {
+    const response = await fetchWithTimeout(`${API_BASE}/v2/station-inventory/${stationId}/supply-requests`, {
       headers: { ...DEFAULT_HEADERS },
     });
     if (!response.ok) {
@@ -662,7 +732,7 @@ export class ApiClient {
   }
 
   static async submitInventoryRecord(stationId: number, data: { actor_shift: Shift; client_submission_id: string; notes: string }): Promise<{ success: boolean; submission_id: number }> {
-    const response = await fetch(`${API_BASE}/v2/station-inventory/${stationId}/submissions`, {
+    const response = await fetchWithTimeout(`${API_BASE}/v2/station-inventory/${stationId}/submissions`, {
       method: 'POST', credentials: 'same-origin', headers: mutationHeaders(), body: JSON.stringify(data),
     });
     if (!response.ok) {
@@ -677,7 +747,7 @@ export class ApiClient {
   // ============================================
 
   static async getStationInspections(stationId: number): Promise<StationInspectionSummary[]> {
-    const response = await fetch(`${API_BASE}/public/stations/${stationId}/inspections`, {
+    const response = await fetchWithTimeout(`${API_BASE}/public/stations/${stationId}/inspections`, {
       headers: { ...DEFAULT_HEADERS },
     });
     if (!response.ok) {
@@ -688,7 +758,7 @@ export class ApiClient {
   }
 
   static async getEquipmentRequests(stationId: number): Promise<FireEquipmentRequestSummary[]> {
-    const response = await fetch(`${API_BASE}/public/stations/${stationId}/equipment-requests`, {
+    const response = await fetchWithTimeout(`${API_BASE}/public/stations/${stationId}/equipment-requests`, {
       headers: { ...DEFAULT_HEADERS },
     });
     if (!response.ok) {
@@ -699,18 +769,30 @@ export class ApiClient {
   }
 
   static async getStationRequests(stationId: number, scope: 'open' | 'all' = 'all'): Promise<StationRequestSummary[]> {
-    const response = await fetch(`${API_BASE}/public/stations/${stationId}/requests?scope=${scope}`, {
-      headers: { ...DEFAULT_HEADERS },
-    });
-    if (!response.ok) {
-      throw new Error('Failed to fetch station requests');
+    // Complete history is paginated; follow `meta` up to a safety bound. An
+    // older server without `meta` returns its single page as before.
+    const requests: StationRequestSummary[] = [];
+    for (let page = 1; page <= STATION_REQUEST_MAX_PAGES; page += 1) {
+      const response = await fetchWithTimeout(`${API_BASE}/public/stations/${stationId}/requests?scope=${scope}&per_page=${STATION_REQUEST_PAGE_SIZE}&page=${page}`, {
+        headers: { ...DEFAULT_HEADERS },
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch station requests');
+      }
+      const payload = await response.json();
+      requests.push(...(Array.isArray(payload?.data) ? payload.data as StationRequestSummary[] : []));
+      const currentPage = Number(payload?.meta?.current_page);
+      const lastPage = Number(payload?.meta?.last_page);
+      if (!Number.isInteger(currentPage) || !Number.isInteger(lastPage) || currentPage >= lastPage) {
+        break;
+      }
     }
-    const payload = await response.json();
-    return payload.data || [];
+
+    return requests;
   }
 
   static async getApparatusServiceTickets(stationId: number, scope: 'open' | 'all' = 'open'): Promise<ApparatusServiceTicketSummary[]> {
-    const response = await fetch(`${API_BASE}/public/stations/${stationId}/service-tickets?scope=${scope}&per_page=100`, {
+    const response = await fetchWithTimeout(`${API_BASE}/public/stations/${stationId}/service-tickets?scope=${scope}&per_page=100`, {
       cache: 'no-store',
       headers: { ...DEFAULT_HEADERS },
     });
@@ -722,7 +804,7 @@ export class ApiClient {
   }
 
   static async getOpenApparatusServiceTicketCount(stationId: number): Promise<number> {
-    const response = await fetch(`${API_BASE}/public/stations/${stationId}/service-tickets?scope=open&per_page=1`, {
+    const response = await fetchWithTimeout(`${API_BASE}/public/stations/${stationId}/service-tickets?scope=open&per_page=1`, {
       cache: 'no-store',
       headers: { ...DEFAULT_HEADERS },
     });
@@ -734,7 +816,7 @@ export class ApiClient {
   }
 
   static async getApparatusServiceNotices(apparatusId: number): Promise<ApparatusServiceTicketSummary[]> {
-    const response = await fetch(`${API_BASE}/public/apparatuses/${apparatusId}/service-notices`, {
+    const response = await fetchWithTimeout(`${API_BASE}/public/apparatuses/${apparatusId}/service-notices`, {
       cache: 'no-store',
       headers: { ...DEFAULT_HEADERS },
     });
@@ -746,7 +828,7 @@ export class ApiClient {
   }
 
   static async getStationActivity(stationId: number): Promise<StationActivityEntry[]> {
-    const response = await fetch(`${API_BASE}/public/stations/${stationId}/activity`, {
+    const response = await fetchWithTimeout(`${API_BASE}/public/stations/${stationId}/activity`, {
       headers: { ...DEFAULT_HEADERS },
     });
     if (!response.ok) {
@@ -757,7 +839,7 @@ export class ApiClient {
   }
 
   static async getRoomProfile(stationId: number, roomId: number): Promise<RoomProfile> {
-    const response = await fetch(`${API_BASE}/public/stations/${stationId}/rooms/${roomId}/profile`, {
+    const response = await fetchWithTimeout(`${API_BASE}/public/stations/${stationId}/rooms/${roomId}/profile`, {
       headers: { ...DEFAULT_HEADERS },
     });
     if (!response.ok) {
@@ -767,7 +849,7 @@ export class ApiClient {
   }
 
   static async getGasMeters(stationId: number): Promise<SingleGasMeterSummary[]> {
-    const response = await fetch(`${API_BASE}/public/stations/${stationId}/gas-meters`, {
+    const response = await fetchWithTimeout(`${API_BASE}/public/stations/${stationId}/gas-meters`, {
       headers: { ...DEFAULT_HEADERS },
     });
     if (!response.ok) {
@@ -781,7 +863,7 @@ export class ApiClient {
     stationId: number,
     request: CreateSupplyRequestRequest
   ): Promise<{ success: boolean; message: string }> {
-    const response = await fetch(`${API_BASE}/v2/station-inventory/${stationId}/supply-requests`, {
+    const response = await fetchWithTimeout(`${API_BASE}/v2/station-inventory/${stationId}/supply-requests`, {
       method: 'POST',
       credentials: 'same-origin',
       headers: mutationHeaders(),

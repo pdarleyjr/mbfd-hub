@@ -267,9 +267,11 @@ export interface Station {
   shop_works_count?: number;
   personnel_count?: number;
   dorm_beds_count?: number;
+  /** Station photo recorded in Admin (stations.image_url), when the API provides it. */
+  image_url?: string | null;
 }
 
-// Station image mapping (station_number → image path)
+// Station image mapping (station_number → image path), the fallback when no photo is recorded.
 export const STATION_IMAGES: Record<number, string> = {
   1: '/images/stations/station-1.png',
   2: '/images/stations/station-2.png',
@@ -277,6 +279,16 @@ export const STATION_IMAGES: Record<number, string> = {
   4: '/images/stations/station-4.png',
   6: '/images/stations/station-6.png',
 };
+
+/** Prefers the recorded station photo (same-origin path or https URL) and falls back to the bundled image. */
+export function stationImageUrl(station: Pick<Station, 'station_number' | 'image_url'>): string | null {
+  const recorded = station.image_url?.trim();
+  if (recorded && (/^\/(?!\/)[^\s\\]*$/.test(recorded) || /^https:\/\/[^\s\\]+$/i.test(recorded))) {
+    return recorded;
+  }
+
+  return STATION_IMAGES[station.station_number] ?? null;
+}
 
 export interface StationInspectionSummary {
   id: number;

@@ -366,12 +366,23 @@ class ApparatusController extends Controller
         $checklist = null;
         $expectedChecklistVersion = null;
         if ($hasInspectionSessionCredentials) {
-            $inspectionSession = $this->resolveInspectionSessionContract(
-                $validated,
-                $id,
-                $request,
-                $inspectionSessionService,
-            );
+            try {
+                $inspectionSession = $this->resolveInspectionSessionContract(
+                    $validated,
+                    $id,
+                    $request,
+                    $inspectionSessionService,
+                );
+            } catch (HttpResponseException $exception) {
+                // The original of this replay may have committed (and marked
+                // the session submitted) since the idempotency check above.
+                $committedMeanwhile = $this->findInspectionByClientSubmissionId($clientSubmissionId);
+                if ($committedMeanwhile !== null) {
+                    return $this->idempotentInspectionResponse($committedMeanwhile, $id, $submissionPayloadHash, $actor->userId());
+                }
+
+                throw $exception;
+            }
             $checklist = $inspectionSession->checklist_snapshot;
             $expectedChecklistVersion = $inspectionSession->checklist_hash;
         } else {
@@ -413,6 +424,14 @@ class ApparatusController extends Controller
                 }
 
                 $lockedApparatus = $this->lockApparatusForInspection($id);
+                // A replay of the same submission (timeout, Retry) may have
+                // waited on this lock while the original committed. Return that
+                // receipt instead of treating its now-submitted Fire Boat
+                // session as a conflict.
+                $committedWhileWaiting = $this->findInspectionByClientSubmissionId($clientSubmissionId, true);
+                if ($committedWhileWaiting !== null) {
+                    return ['inspection' => $committedWhileWaiting, 'created' => false];
+                }
                 if (! $lockedApparatus->isDailyCheckoutRequired()) {
                     abort(409, 'This apparatus is not configured for Daily Checkout.');
                 }

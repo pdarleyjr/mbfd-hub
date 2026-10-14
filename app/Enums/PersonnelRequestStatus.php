@@ -21,6 +21,28 @@ enum PersonnelRequestStatus: string
         return str($this->value)->replace('_', ' ')->title()->toString();
     }
 
+    /** One status meaning for member pages and the admin queue: success, danger, warning, info or neutral. */
+    public function tone(): string
+    {
+        return match ($this) {
+            self::Completed => 'success',
+            self::Denied, self::Cancelled => 'danger',
+            self::NeedsInformation => 'warning',
+            self::ReadyForPickup, self::Arrived => 'info',
+            default => 'neutral',
+        };
+    }
+
+    public function tagClass(): string
+    {
+        return $this->tone() === 'neutral' ? 'hub-tag' : 'hub-tag hub-tag--'.$this->tone();
+    }
+
+    public function filamentColor(): string
+    {
+        return $this->tone() === 'neutral' ? 'gray' : $this->tone();
+    }
+
     public function isTerminal(): bool
     {
         return in_array($this, [self::Completed, self::Denied, self::Cancelled], true);

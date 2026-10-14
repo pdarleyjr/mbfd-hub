@@ -23,7 +23,8 @@ class StoreStationRequestRequest extends FormRequest
     {
         return [
             'client_submission_id' => ['required', 'uuid'],
-            'station_id' => ['required', 'integer', 'exists:stations,id'],
+            // A deactivated station no longer accepts new requests; its history stays readable.
+            'station_id' => ['required', 'integer', Rule::exists('stations', 'id')->where('is_active', true)],
             'room_id' => ['nullable', 'integer', 'exists:rooms,id'],
             'room_name_snapshot' => ['nullable', 'string', 'max:255'],
             'requested_by_employee_id' => ['required', 'integer', 'exists:employees,id'],
@@ -82,5 +83,11 @@ class StoreStationRequestRequest extends FormRequest
                 }
             }
         }];
+    }
+
+    /** @return array<string, string> */
+    public function messages(): array
+    {
+        return ['station_id.exists' => 'This station is not accepting new requests. Contact Support Services.'];
     }
 }

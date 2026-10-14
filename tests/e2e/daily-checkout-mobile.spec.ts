@@ -114,7 +114,7 @@ test('E2 collapsed selection and explicit answers survive interruption with memb
     await expect(notes).toBeFocused();
     expect((await notes.boundingBox())!.y + (await notes.boundingBox())!.height).toBeLessThan((await page.locator('.inspection-action-bar').boundingBox())!.y);
   }
-  await page.getByRole('button', { name: 'Mark all items in this compartment as present', exact: true }).click();
+  await page.getByRole('button', { name: 'Confirm all present', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Damaged', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect.poll(async () => (await readDrafts(page))[0]?.data.compartments.find(area => area.id === 'comp_l1')?.items[0]?.notes).toBe('Observed during mobile inspection.');
   await context.setOffline(false);

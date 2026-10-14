@@ -539,16 +539,16 @@ test('station request and activity tabs filter history and preserve station and 
   await expect(firstHistory.getByText('Vendor contacted.', { exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Station Request' })).toHaveAttribute('href', '/daily/forms-hub/station-request?station_id=1&return_to=%2Fstations%2F1');
 
-  await page.getByRole('button', { name: 'Overview' }).click();
+  await page.getByRole('tab', { name: 'Overview' }).click();
   await expect(page.getByText('E1 · L1 · R1 · R11')).toBeVisible();
   await expect(page.getByText('4', { exact: true })).toBeVisible();
   await expect(page.getByText('14', { exact: true })).toHaveCount(2);
 
-  await page.getByRole('button', { name: 'Rooms' }).click();
+  await page.getByRole('tab', { name: 'Rooms' }).click();
   await expect(page.getByRole('heading', { name: 'Dorm', exact: true })).toBeVisible();
   await expect(page.getByText('14 dorm positions')).toBeVisible();
   await expect(page.getByRole('link', { name: /Kitchen/ })).toHaveAttribute('href', '/daily/stations/1/rooms/11');
-  await page.getByRole('button', { name: 'Activity' }).click();
+  await page.getByRole('tab', { name: 'Activity' }).click();
   await expect(page.getByText('SR-2026-000501 — Open refrigerator repair')).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });

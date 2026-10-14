@@ -1,7 +1,7 @@
 import { db, type DailyCheckoutQueuedSubmission } from '../lib/db';
-import type { InspectionSubmission } from '../types';
-import { createClientSubmissionId } from './storage';
-import { ApiClient, ApiRequestError, isChecklistVersion } from './api';
+import type { InspectionData, InspectionSubmission } from '../types';
+import { AUTOSAVE_STORAGE_PREFIX, createClientSubmissionId } from './storage';
+import { ApiClient, ApiRequestError, ApiTimeoutError, READ_TIMEOUT_MS, isChecklistVersion } from './api';
 import { identityForQueueCapture, refreshOfflineIdentity, type OfflineIdentity } from '../lib/offlineIdentity';
 
 const LEGACY_QUEUE_KEY = 'mbfd_submission_queue';
@@ -20,12 +20,60 @@ export interface DailyCheckoutQueueSyncResult {
   remaining: number;
 }
 
+/** What the member's receipt may truthfully say about one inspection. */
+export type InspectionReceiptOutcome = 'submitted' | 'pending_review' | 'accepted_with_exception' | 'queued';
+
+export interface InspectionReceiptState {
+  outcome: InspectionReceiptOutcome;
+  queuedSubmissionId?: string;
+  /** In-app path to return to (for example `/stations/1`). */
+  returnTo?: string;
+}
+
+/** The receipt outcome for one record in a replay result, if it was accepted. */
+export const receiptOutcomeForSync = (
+  result: DailyCheckoutQueueSyncResult,
+  queueId: string,
+): InspectionReceiptOutcome | null => {
+  if (!result.submittedQueueIds.includes(queueId)) return null;
+  if (result.exceptionQueueIds.includes(queueId)) return 'accepted_with_exception';
+
+  return result.pendingReviewQueueIds.includes(queueId) ? 'pending_review' : 'submitted';
+};
+
 export interface DailyCheckoutQueueSummary {
   total: number;
   pending: number;
   requiresAttention: number;
   firstAttentionError?: string;
   firstAttentionErrorCode?: string;
+  /** Earliest server-requested retry time (epoch ms) among pending records. */
+  nextAttemptAt?: number;
+}
+
+/** A record that needs a member or officer decision, without its payload. */
+export interface DailyCheckoutAttentionRecord {
+  id: string;
+  apparatusId: number;
+  operatorName?: string;
+  createdAt: Date;
+  lastError?: string;
+  lastErrorCode?: string;
+  lastErrorStatus?: number;
+  unitNumber?: string;
+  /** Only the signed-in owner may discard their own rejected inspection. */
+  canDiscard: boolean;
+}
+
+/**
+ * The server asked us to wait (429/503 Retry-After). The record stays pending
+ * and is replayed automatically after `retryAt`.
+ */
+export class DailyCheckoutRetryDeferredError extends Error {
+  constructor(readonly retryAt: number) {
+    super('The server asked the app to wait before sending again. This inspection stays saved on this device and will be sent automatically.');
+    this.name = 'DailyCheckoutRetryDeferredError';
+  }
 }
 
 export class DailyCheckoutQueueConflictError extends Error {
@@ -45,13 +93,90 @@ interface LegacyQueuedSubmission {
 }
 
 const inFlightSubmissions = new Map<string, Promise<QueuedInspectionSubmissionResult>>();
+/**
+ * Outcomes of records the server accepted during this page lifetime, keyed by
+ * queue id. A screen that sees its blocking record disappear consults this
+ * before assuming the record was discarded, so an accepted inspection is never
+ * mistaken for one that must be started again.
+ */
+const recentlyAcceptedOutcomes = new Map<string, InspectionReceiptOutcome>();
+const RECENTLY_ACCEPTED_LIMIT = 50;
+
+const rememberAcceptedOutcome = (queueId: string, outcome: InspectionReceiptOutcome): void => {
+  recentlyAcceptedOutcomes.delete(queueId);
+  recentlyAcceptedOutcomes.set(queueId, outcome);
+  while (recentlyAcceptedOutcomes.size > RECENTLY_ACCEPTED_LIMIT) {
+    const oldest = recentlyAcceptedOutcomes.keys().next().value;
+    if (oldest === undefined) break;
+    recentlyAcceptedOutcomes.delete(oldest);
+  }
+};
+
+/** The receipt outcome if this queued record was accepted by the server. */
+export const acceptedOutcomeFor = (queueId: string): InspectionReceiptOutcome | null => (
+  recentlyAcceptedOutcomes.get(queueId) ?? null
+);
 let activeQueueSynchronization: Promise<DailyCheckoutQueueSyncResult> | null = null;
 let legacyMigrationPromise: Promise<void> | null = null;
 
-const isPermanentSubmissionFailure = (error: unknown): error is ApiRequestError => (
+/**
+ * Statuses where the server did not reject the inspection itself: not signed
+ * in (401), request timeout (408), expired session/CSRF token (419), too early
+ * (425) and rate limited (429). The record stays pending and is replayed with
+ * its original payload; every replay first refreshes the member context, which
+ * renews the XSRF cookie or sends the member to sign in again.
+ */
+const RETRYABLE_CLIENT_STATUSES = new Set([401, 408, 419, 425, 429]);
+
+/**
+ * Only a genuine client rejection (validation 422, conflict 409, forbidden...)
+ * needs review. Network failures, timeouts and 5xx keep the record pending.
+ */
+export const isPermanentSubmissionFailure = (error: unknown): error is ApiRequestError => (
   error instanceof ApiRequestError
   && error.status >= 400
   && error.status < 500
+  && !RETRYABLE_CLIENT_STATUSES.has(error.status)
+);
+
+/** Plain-language explanation of why a pending record has not been sent. */
+export const describeSubmissionFailure = (error: unknown): string => {
+  if (error instanceof DailyCheckoutRetryDeferredError || error instanceof ApiTimeoutError) return error.message;
+  if (error instanceof ApiRequestError) {
+    if (error.status === 401 || error.status === 419) {
+      return 'Your sign-in expired before this inspection was sent. Sign in again; the inspection stays saved on this device and will be sent afterwards.';
+    }
+    if (error.status === 429 || error.status === 425) {
+      return 'The server is busy. This inspection stays saved on this device and will be sent automatically.';
+    }
+    if (error.status === 408 || error.status >= 500) {
+      return 'The server could not take this inspection right now. It stays saved on this device and will be sent automatically.';
+    }
+
+    return error.message;
+  }
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return 'This device is offline. The inspection stays saved on this device and will be sent when the connection returns.';
+  }
+
+  return 'The connection failed before the server confirmed this inspection. It stays saved on this device and will be sent again; the server ignores a duplicate.';
+};
+
+/** Bound a promise that cannot be cancelled (e.g. the member-context check). */
+export const withDeadline = <T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> => (
+  new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new ApiTimeoutError(message)), timeoutMs);
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (error: unknown) => { clearTimeout(timer); reject(error); },
+    );
+  })
+);
+
+const refreshIdentityWithDeadline = (): Promise<OfflineIdentity> => withDeadline(
+  refreshOfflineIdentity(),
+  READ_TIMEOUT_MS,
+  'Your sign-in could not be checked in time. The inspection stays saved on this device.',
 );
 
 const notifyQueueChanged = (): void => {
@@ -59,6 +184,12 @@ const notifyQueueChanged = (): void => {
     window.dispatchEvent(new Event(QUEUE_UPDATED_EVENT));
   }
 };
+
+/**
+ * Tell listeners (connection indicator, open wizard) that a saved-work queue
+ * changed outside this module, e.g. after the generic form queue replayed.
+ */
+export const announceSubmissionQueuesChanged = (): void => notifyQueueChanged();
 
 export const onDailyCheckoutQueueChanged = (listener: () => void): (() => void) => {
   window.addEventListener(QUEUE_UPDATED_EVENT, listener);
@@ -244,6 +375,8 @@ export const ensureDailyCheckoutQueueReady = (): Promise<void> => {
 export const queueSubmission = async (
   apparatusId: number,
   data: InspectionSubmission,
+  /** The member identity the caller already verified for this submission. */
+  verifiedOwner?: OfflineIdentity,
 ): Promise<string> => {
   await ensureDailyCheckoutQueueReady();
 
@@ -252,7 +385,7 @@ export const queueSubmission = async (
   }
 
   const now = new Date();
-  const owner = await identityForQueueCapture();
+  const owner = verifiedOwner ?? await identityForQueueCapture();
   const queuedSubmission: DailyCheckoutQueuedSubmission = {
     id: `daily_${data.client_submission_id}`,
     apparatusId,
@@ -346,17 +479,106 @@ export const getSubmissionQueue = async (): Promise<DailyCheckoutQueuedSubmissio
   return db.dailyCheckoutSubmissions.orderBy('createdAt').toArray();
 };
 
+const pendingAttemptTimes = async (): Promise<{ nextAttemptAt?: number; lastAttemptAt?: number }> => {
+  const now = Date.now();
+  let nextAttemptAt: number | undefined;
+  let lastAttemptAt: number | undefined;
+  // Pending records are few (one per apparatus and checklist version).
+  await db.dailyCheckoutSubmissions.where('status').equals('pending').each((submission) => {
+    const next = submission.nextAttemptAt instanceof Date ? submission.nextAttemptAt.getTime() : undefined;
+    if (next !== undefined && next > now && (nextAttemptAt === undefined || next < nextAttemptAt)) nextAttemptAt = next;
+    const last = submission.lastAttemptAt instanceof Date ? submission.lastAttemptAt.getTime() : undefined;
+    if (last !== undefined && (lastAttemptAt === undefined || last > lastAttemptAt)) lastAttemptAt = last;
+  });
+
+  return { nextAttemptAt, lastAttemptAt };
+};
+
+/**
+ * Counts come from the `status` index, so the photos and signatures inside
+ * stored payloads are not read for the connection indicator. Only the first
+ * record needing attention is loaded, for its message.
+ */
 export const getDailyCheckoutQueueSummary = async (): Promise<DailyCheckoutQueueSummary> => {
-  const submissions = await getSubmissionQueue();
-  const requiringAttention = submissions.filter((submission) => submission.status === 'requires_attention');
+  await ensureDailyCheckoutQueueReady();
+  const [total, requiresAttention, firstAttention] = await Promise.all([
+    db.dailyCheckoutSubmissions.count(),
+    db.dailyCheckoutSubmissions.where('status').equals('requires_attention').count(),
+    db.dailyCheckoutSubmissions.where('status').equals('requires_attention').first(),
+  ]);
 
   return {
-    total: submissions.length,
-    pending: submissions.length - requiringAttention.length,
-    requiresAttention: requiringAttention.length,
-    firstAttentionError: requiringAttention[0]?.lastError,
-    firstAttentionErrorCode: requiringAttention[0]?.lastErrorCode,
+    total,
+    pending: total - requiresAttention,
+    requiresAttention,
+    firstAttentionError: firstAttention?.lastError,
+    firstAttentionErrorCode: firstAttention?.lastErrorCode,
   };
+};
+
+export interface DailyCheckoutReplaySchedule {
+  pending: number;
+  /** Earliest time a Retry-After response allows (epoch ms), if in the future. */
+  nextAttemptAt?: number;
+  /** Most recent send attempt of any pending record (epoch ms). */
+  lastAttemptAt?: number;
+}
+
+/** When the next automatic replay is allowed, honouring Retry-After. */
+export const getDailyCheckoutReplaySchedule = async (): Promise<DailyCheckoutReplaySchedule> => {
+  await ensureDailyCheckoutQueueReady();
+  const [pending, times] = await Promise.all([
+    db.dailyCheckoutSubmissions.where('status').equals('pending').count(),
+    pendingAttemptTimes(),
+  ]);
+
+  return { pending, ...times };
+};
+
+/** Background replay found the member signed out (detail: boolean required). */
+export const DAILY_CHECKOUT_SIGN_IN_REQUIRED_EVENT = 'mbfd:daily-checkout-sign-in-required';
+
+/** Records needing a decision, newest first, without their photo payloads. */
+export const getDailyCheckoutAttentionRecords = async (currentUserId?: number): Promise<DailyCheckoutAttentionRecord[]> => {
+  await ensureDailyCheckoutQueueReady();
+  const records = await db.dailyCheckoutSubmissions.where('status').equals('requires_attention').toArray();
+
+  return records
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+    .map((record) => ({
+      id: record.id,
+      apparatusId: record.apparatusId,
+      operatorName: typeof record.data?.operator_name === 'string' ? record.data.operator_name : undefined,
+      createdAt: new Date(record.createdAt),
+      lastError: record.lastError,
+      lastErrorCode: record.lastErrorCode,
+      lastErrorStatus: record.lastErrorStatus,
+      unitNumber: typeof record.data?.unit_number === 'string' && record.data.unit_number !== '' ? record.data.unit_number : undefined,
+      canDiscard: currentUserId !== undefined
+        && record.ownershipState === 'owned'
+        && record.ownerUserId === currentUserId,
+    }));
+};
+
+/**
+ * Permanently remove one record that needs attention. Only called after the
+ * member explicitly confirms. Pending (unsent) records cannot be discarded,
+ * and nothing is ever discarded automatically.
+ */
+export const discardDailyCheckoutAttentionRecord = async (id: string, currentUserId: number): Promise<boolean> => {
+  await ensureDailyCheckoutQueueReady();
+  if (inFlightSubmissions.has(id)) return false;
+  const removed = await db.transaction('rw', db.dailyCheckoutSubmissions, async () => {
+    const record = await db.dailyCheckoutSubmissions.get(id);
+    if (!record || record.status !== 'requires_attention'
+      || record.ownershipState !== 'owned' || record.ownerUserId !== currentUserId) return false;
+    await db.dailyCheckoutSubmissions.delete(id);
+
+    return true;
+  });
+  if (removed) notifyQueueChanged();
+
+  return removed;
 };
 
 const equipmentEvidence = (areas: unknown): string | null => {
@@ -382,25 +604,63 @@ const equipmentEvidence = (areas: unknown): string | null => {
   return evidence.includes(null) ? null : JSON.stringify(evidence);
 };
 
-const removeFromQueue = async (submission: DailyCheckoutQueuedSubmission): Promise<void> => {
+const draftMatchesSubmission = (
+  draft: InspectionData | null | undefined,
+  submission: DailyCheckoutQueuedSubmission,
+  acceptedEvidence: string | null,
+): boolean => Boolean(draft) && acceptedEvidence !== null
+  && draft!.apparatusSnapshot?.id === submission.apparatusId
+  && draft!.checklist_version === submission.checklistVersion
+  && draft!.actorUserId === submission.ownerUserId
+  && draft!.actorSecurityVersion === submission.ownerSecurityVersion
+  && draft!.signature === submission.data.officer_signature
+  && draft!.officer?.shift === submission.data.shift
+  && JSON.stringify(draft!.fieldValues ?? []) === JSON.stringify(submission.data.field_values ?? [])
+  && JSON.stringify(draft!.scheduledTasks ?? []) === JSON.stringify(submission.data.scheduled_tasks ?? [])
+  && draft!.meter?.engine_hours === submission.data.engine_hours
+  && draft!.meter?.miles === submission.data.miles
+  && equipmentEvidence(draft!.compartments) === acceptedEvidence;
+
+/** Page-hide snapshots of the accepted draft must not be restored either. */
+const removeMatchingDraftSnapshots = (
+  submission: DailyCheckoutQueuedSubmission,
+  acceptedEvidence: string | null,
+  keys: string[],
+): void => {
+  try {
+    for (const key of keys) localStorage.removeItem(key);
+    const snapshotKeys = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
+      .filter((key): key is string => key !== null && key.startsWith(AUTOSAVE_STORAGE_PREFIX));
+    for (const key of snapshotKeys) {
+      let snapshot: InspectionData | null = null;
+      try {
+        snapshot = JSON.parse(localStorage.getItem(key) ?? 'null') as InspectionData | null;
+      } catch {
+        continue;
+      }
+      if (draftMatchesSubmission(snapshot, submission, acceptedEvidence)) localStorage.removeItem(key);
+    }
+  } catch (error) {
+    console.warn('Saved draft copies for an accepted inspection could not be removed:', error);
+  }
+};
+
+const removeFromQueue = async (
+  submission: DailyCheckoutQueuedSubmission,
+  outcome: InspectionReceiptOutcome,
+): Promise<void> => {
   const acceptedEvidence = equipmentEvidence(submission.data.compartments);
+  let removedDraftKeys: string[] = [];
   await db.transaction('rw', db.dailyCheckoutSubmissions, db.dailyCheckoutDrafts, async () => {
     const drafts = await db.dailyCheckoutDrafts.toArray();
-    const matching = drafts.filter(draft => acceptedEvidence !== null
-      && draft.data.apparatusSnapshot?.id === submission.apparatusId
-      && draft.data.checklist_version === submission.checklistVersion
-      && draft.data.actorUserId === submission.ownerUserId
-      && draft.data.actorSecurityVersion === submission.ownerSecurityVersion
-      && draft.data.signature === submission.data.officer_signature
-      && draft.data.officer.shift === submission.data.shift
-      && JSON.stringify(draft.data.fieldValues ?? []) === JSON.stringify(submission.data.field_values ?? [])
-      && JSON.stringify(draft.data.scheduledTasks ?? []) === JSON.stringify(submission.data.scheduled_tasks ?? [])
-      && draft.data.meter?.engine_hours === submission.data.engine_hours
-      && draft.data.meter?.miles === submission.data.miles
-      && equipmentEvidence(draft.data.compartments) === acceptedEvidence);
-    await db.dailyCheckoutDrafts.bulkDelete(matching.map(draft => draft.key));
+    const matching = drafts.filter(draft => draftMatchesSubmission(draft.data, submission, acceptedEvidence));
+    removedDraftKeys = matching.map(draft => draft.key);
+    await db.dailyCheckoutDrafts.bulkDelete(removedDraftKeys);
     await db.dailyCheckoutSubmissions.delete(submission.id);
   });
+  removeMatchingDraftSnapshots(submission, acceptedEvidence, removedDraftKeys);
+  // Record the outcome before listeners learn that the record is gone.
+  rememberAcceptedOutcome(submission.id, outcome);
   notifyQueueChanged();
 };
 
@@ -412,11 +672,15 @@ const recordSubmissionFailure = async (id: string, error: unknown): Promise<void
 
   const now = new Date();
   const permanentFailure = isPermanentSubmissionFailure(error);
+  const retryAfterMs = error instanceof ApiRequestError ? error.retryAfterMs : undefined;
   await db.dailyCheckoutSubmissions.update(id, {
     status: permanentFailure ? 'requires_attention' : 'pending',
     retryCount: queuedSubmission.retryCount + 1,
     lastAttemptAt: now,
-    lastError: error instanceof Error ? error.message : String(error),
+    // A rejection keeps the server's own message for review; a pending record
+    // keeps a plain explanation the member can act on.
+    lastError: permanentFailure ? error.message : describeSubmissionFailure(error),
+    nextAttemptAt: !permanentFailure && retryAfterMs !== undefined ? new Date(now.getTime() + retryAfterMs) : undefined,
     lastErrorStatus: error instanceof ApiRequestError ? error.status : undefined,
     lastErrorCode: error instanceof ApiRequestError ? error.code : undefined,
     lastErrorAt: now,
@@ -493,7 +757,12 @@ export const submitQueuedInspection = (
       return 'not_found' as const;
     }
 
-    const identity = currentIdentity ?? await refreshOfflineIdentity();
+    const deferredUntil = queuedSubmission.nextAttemptAt instanceof Date ? queuedSubmission.nextAttemptAt.getTime() : 0;
+    if (deferredUntil > Date.now()) {
+      throw new DailyCheckoutRetryDeferredError(deferredUntil);
+    }
+
+    const identity = currentIdentity ?? await refreshIdentityWithDeadline();
     if (await quarantineOwnerMismatch(queuedSubmission, identity)) {
       notifyQueueChanged();
       return 'not_found' as const;
@@ -507,11 +776,12 @@ export const submitQueuedInspection = (
 
     try {
       const receipt = await ApiClient.submitInspection(queuedSubmission.apparatusId, queuedSubmission.data);
-      await removeFromQueue(queuedSubmission);
+      const outcome = receipt.processing_status === 'accepted_with_exception' ? 'accepted_with_exception' as const
+        : receipt.processing_status === 'accepted' ? 'submitted' as const
+        : receipt.review_status === 'pending_review' ? 'pending_review' as const : 'submitted' as const;
+      await removeFromQueue(queuedSubmission, outcome);
 
-      if (receipt.processing_status === 'accepted_with_exception') return 'accepted_with_exception' as const;
-      if (receipt.processing_status === 'accepted') return 'submitted' as const;
-      return receipt.review_status === 'pending_review' ? 'pending_review' as const : 'submitted' as const;
+      return outcome;
     } catch (error) {
       await recordSubmissionFailure(queueId, error);
       throw error;
@@ -523,6 +793,33 @@ export const submitQueuedInspection = (
   inFlightSubmissions.set(queueId, submission);
 
   return submission;
+};
+
+/**
+ * Member-initiated "Retry now" for one pending record. It goes through the
+ * same replay path as reconnect: refresh the member context (renewing the XSRF
+ * cookie), then submit the exact durable payload. The in-flight map makes a
+ * concurrent background replay of the same record share this request.
+ */
+export const retryQueuedSubmission = async (queueId: string): Promise<QueuedInspectionSubmissionResult> => {
+  await ensureDailyCheckoutQueueReady();
+  const queuedSubmission = await db.dailyCheckoutSubmissions.get(queueId);
+  if (!queuedSubmission) {
+    return 'not_found';
+  }
+  if (queuedSubmission.status !== 'pending') {
+    throw new Error('This saved inspection needs review and cannot be sent again as it is.');
+  }
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    throw new Error('This device is offline. The inspection stays saved on this device and will be sent when the connection returns.');
+  }
+
+  const inFlight = inFlightSubmissions.get(queueId);
+  if (inFlight) {
+    return inFlight;
+  }
+
+  return submitQueuedInspection(queueId, await refreshIdentityWithDeadline());
 };
 
 /**
@@ -541,8 +838,12 @@ export const synchronizeDailyCheckoutQueue = (currentIdentity?: OfflineIdentity)
     const pendingReviewQueueIds: string[] = [];
     const exceptionQueueIds: string[] = [];
 
-    const identity = currentIdentity ?? await refreshOfflineIdentity();
-    for (const queuedSubmission of await getSubmissionQueue()) {
+    const identity = currentIdentity ?? await refreshIdentityWithDeadline();
+    await ensureDailyCheckoutQueueReady();
+    // Only pending records are replayed; records awaiting review (and their
+    // photos) are not read on every automatic pass.
+    const pendingSubmissions = await db.dailyCheckoutSubmissions.where('status').equals('pending').sortBy('createdAt');
+    for (const queuedSubmission of pendingSubmissions) {
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
         break;
       }
@@ -563,6 +864,9 @@ export const synchronizeDailyCheckoutQueue = (currentIdentity?: OfflineIdentity)
         }
         if (result === 'accepted_with_exception') exceptionQueueIds.push(queuedSubmission.id);
       } catch (error) {
+        if (error instanceof DailyCheckoutRetryDeferredError) {
+          continue;
+        }
         if (isPermanentSubmissionFailure(error)) {
           console.warn('A Daily Checkout submission needs review and remains saved locally.');
           continue;
@@ -577,7 +881,7 @@ export const synchronizeDailyCheckoutQueue = (currentIdentity?: OfflineIdentity)
       submittedQueueIds,
       pendingReviewQueueIds,
       exceptionQueueIds,
-      remaining: (await getSubmissionQueue()).length,
+      remaining: await db.dailyCheckoutSubmissions.count(),
     };
   })().finally(() => {
     activeQueueSynchronization = null;

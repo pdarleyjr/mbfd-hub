@@ -1,6 +1,9 @@
 @import '@fontsource-variable/plus-jakarta-sans/wght.css';
 @import "../../../css/mbfd-theme.css";
 @import "../../../css/hub-shell.css";
+/* Shared Hub product components (.hub-panel, .hub-well, .hub-tag, .hub-btn, .hub-empty, .hub-skeleton).
+   They apply inside a [data-hub-ui="2"] scope; Daily page roots and inspection steps set it. */
+@import "../../../css/hub-components.css";
 
 @tailwind base;
 @tailwind components;
@@ -40,34 +43,29 @@ code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
-/* Daily-only responsive workspace: reading and form surfaces stay bounded,
-   while selector grids gain useful density on command displays. */
+/* Daily workspace shares the Hub content maximum on every display. */
 .daily-workspace {
   width: 100%;
-  max-width: 80rem;
+  max-width: var(--hub-content-max);
 }
 
-@media (min-width: 1440px) {
-  .daily-workspace {
-    max-width: 110rem;
-  }
+/* Controls that Daily adds to the shared component set. */
+[data-hub-ui="2"] .hub-btn:disabled {
+  border-color: rgb(var(--hub-n-200));
+  background: rgb(var(--hub-n-100));
+  color: rgb(var(--hub-n-500));
+  cursor: not-allowed;
 }
 
-@media (min-width: 1920px) {
-  .daily-workspace {
-    max-width: 128rem;
-  }
+[data-hub-ui="2"] .hub-btn--wrap {
+  white-space: normal;
+  text-align: center;
 }
 
-@media (min-width: 2560px) {
-  .daily-workspace {
-    max-width: 144rem;
-  }
-}
-
-@media (min-width: 3840px) {
-  .daily-workspace {
-    max-width: 160rem;
+/* Phones and tablets: 16px inputs keep iOS from zooming the page on focus. */
+@media (pointer: coarse) {
+  :is(.daily-standard, .apparatus-inspection) :is(input:not([type="checkbox"], [type="radio"], [type="file"], [type="range"]), select, textarea):not([data-input-size="large"]) {
+    font-size: 16px;
   }
 }
 
@@ -117,7 +115,7 @@ code {
   animation: slide-up 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Pull to refresh indicator */
+/* Busy indicator */
 @keyframes spin {
   to {
     transform: rotate(360deg);

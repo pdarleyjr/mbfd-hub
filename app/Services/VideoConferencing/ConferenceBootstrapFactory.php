@@ -6,9 +6,19 @@ namespace App\Services\VideoConferencing;
 
 use App\Enums\VideoConferencing\ConferenceJoinRole;
 use App\Models\Employee;
+use App\Models\Station;
 
 class ConferenceBootstrapFactory
 {
+    /**
+     * Station ids keyed by station number, loaded once per factory instance.
+     * The member route /daily/stations/:id takes the database id, which is not
+     * the station number (production ids are 29-33 for stations 1-6).
+     *
+     * @var array<int, int>|null
+     */
+    private ?array $stationIdsByNumber = null;
+
     /** @return array<string, mixed> */
     public function make(
         string $entryMode,
@@ -35,7 +45,7 @@ class ConferenceBootstrapFactory
             'launch_context' => $launchContext,
             'navigation' => [
                 'back' => $role->isStation()
-                    ? '/daily/stations/'.substr($role->value, 3)
+                    ? $this->stationPath(substr($role->value, 3))
                     : $this->safeReturnTo($returnTo),
                 'home' => '/',
             ],
@@ -82,7 +92,46 @@ class ConferenceBootstrapFactory
             $returnTo = substr($returnTo, strlen($origin));
         }
 
-        return preg_match('#^/(?:daily/stations/[12346]|employee)?$#D', $returnTo) === 1
+        if (preg_match('#^/daily/stations/([0-9]{1,9})$#D', $returnTo, $matches) === 1) {
+            return $this->stationReturnPath((int) $matches[1]);
+        }
+
+        return preg_match('#^/(?:employee)?$#D', $returnTo) === 1
             ? $returnTo : '/';
+    }
+
+    /** Back link for a station endpoint: that station's page, or the station list. */
+    private function stationPath(string $stationNumber): string
+    {
+        $id = $this->stationIds()[(int) $stationNumber] ?? null;
+
+        return $id === null ? '/daily/stations' : '/daily/stations/'.$id;
+    }
+
+    /**
+     * A return destination naming a station. Database ids are kept; a station
+     * number (sent by clients that predate the id route) is translated to the
+     * station's id. Anything else is not a known destination.
+     */
+    private function stationReturnPath(int $value): string
+    {
+        $ids = $this->stationIds();
+        if (in_array($value, $ids, true)) {
+            return '/daily/stations/'.$value;
+        }
+
+        $id = $ids[$value] ?? null;
+
+        return $id === null ? '/' : '/daily/stations/'.$id;
+    }
+
+    /** @return array<int, int> */
+    private function stationIds(): array
+    {
+        return $this->stationIdsByNumber ??= Station::query()
+            ->pluck('id', 'station_number')
+            ->filter(fn (mixed $id, mixed $number): bool => ctype_digit((string) $number))
+            ->mapWithKeys(fn (mixed $id, mixed $number): array => [(int) $number => (int) $id])
+            ->all();
     }
 }

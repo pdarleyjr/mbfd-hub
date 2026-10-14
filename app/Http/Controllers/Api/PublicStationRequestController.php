@@ -18,6 +18,10 @@ use Illuminate\Validation\Rule;
 
 class PublicStationRequestController extends Controller
 {
+    private const DEFAULT_PER_PAGE = 50;
+
+    private const MAX_PER_PAGE = 200;
+
     public function store(
         StoreStationRequestRequest $request,
         StationRequestSubmissionService $submissions,
@@ -39,7 +43,8 @@ class PublicStationRequestController extends Controller
             'request_type' => ['nullable', 'in:repair_service,equipment'],
             'room_id' => ['nullable', 'integer'],
             'scope' => ['nullable', 'in:open,all'],
-            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:'.self::MAX_PER_PAGE],
+            'page' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $query = $station->stationRequests()
@@ -53,9 +58,13 @@ class PublicStationRequestController extends Controller
             ->when(filled($validated['status'] ?? null), fn ($query) => $query->where('status', $validated['status']))
             ->when(filled($validated['request_type'] ?? null), fn ($query) => $query->where('request_type', $validated['request_type']))
             ->when(filled($validated['room_id'] ?? null), fn ($query) => $query->where('room_id', $validated['room_id']))
-            ->latest('created_at');
+            ->latest('created_at')
+            // Stable order so walking pages never skips or repeats a request.
+            ->orderByDesc('id');
 
-        $records = $query->paginate((int) ($validated['per_page'] ?? 50));
+        // Paginated (default 50 for existing clients). For complete history,
+        // request per_page=200 and follow meta.current_page to meta.last_page.
+        $records = $query->paginate((int) ($validated['per_page'] ?? self::DEFAULT_PER_PAGE));
 
         return PublicStationRequestResource::collection($records)->response();
     }

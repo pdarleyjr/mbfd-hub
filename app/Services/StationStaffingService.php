@@ -8,9 +8,27 @@ use App\Models\Apparatus;
 use App\Models\Station;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
+use WeakMap;
 
 class StationStaffingService
 {
+    /**
+     * Apparatus columns the summary reads. Callers that eager-load apparatus
+     * only for staffing can select just these.
+     *
+     * @var list<string>
+     */
+    public const APPARATUS_COLUMNS = ['id', 'station_id', 'designation', 'unit_id', 'name', 'status'];
+
+    /**
+     * Summaries keyed by the eager-loaded apparatus collection they were built
+     * from. Entries disappear with the collection, so a memoized summary never
+     * outlives the request (or the loaded relation) that produced it.
+     *
+     * @var WeakMap<Collection<int, Apparatus>, array<mixed>>|null
+     */
+    private static ?WeakMap $loadedSummaries = null;
+
     /**
      * @return array{
      *   known: bool,
@@ -30,12 +48,23 @@ class StationStaffingService
      */
     public function summaryFor(Station $station): array
     {
-        /** @var Collection<int, Apparatus> $apparatuses */
-        $apparatuses = $station->relationLoaded('apparatuses')
-            ? $station->getRelation('apparatuses')
-            : $station->apparatuses()->get();
+        if (! $station->relationLoaded('apparatuses')) {
+            /** @var Collection<int, Apparatus> $apparatuses */
+            $apparatuses = $station->apparatuses()->get();
 
-        return $this->buildSummary((int) $station->station_number, $apparatuses);
+            return $this->buildSummary((int) $station->station_number, $apparatuses);
+        }
+
+        /** @var Collection<int, Apparatus> $apparatuses */
+        $apparatuses = $station->getRelation('apparatuses');
+        self::$loadedSummaries ??= new WeakMap;
+        $memo = self::$loadedSummaries[$apparatuses] ?? null;
+
+        if (is_array($memo) && $memo['station_number'] === (int) $station->station_number) {
+            return $memo;
+        }
+
+        return self::$loadedSummaries[$apparatuses] = $this->buildSummary((int) $station->station_number, $apparatuses);
     }
 
     /** @return array<string, mixed> */

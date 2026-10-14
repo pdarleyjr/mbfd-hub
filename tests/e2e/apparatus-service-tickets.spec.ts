@@ -90,7 +90,7 @@ test('station Service / Repair tab shows an open badge, safe history, and touch-
   });
 
   await page.goto('/daily/stations/1');
-  const serviceTab = page.getByRole('button', { name: /Service \/ Repair/ });
+  const serviceTab = page.getByRole('tab', { name: /Service \/ Repair/ });
   await expect(serviceTab).toContainText('1');
   expect((await serviceTab.boundingBox())?.height).toBeGreaterThanOrEqual(48);
   await serviceTab.click();
@@ -105,7 +105,7 @@ test('station Service / Repair tab shows an open badge, safe history, and touch-
   await expect(page.getByText('Prior PM service')).toBeVisible();
 
   await expect(page.getByRole('link', { name: 'Apparatus Service' })).toHaveAttribute('href', /\/employee\/apparatus-service-request\?station_id=1/);
-  await page.getByRole('button', { name: 'Apparatus' }).click();
+  await page.getByRole('tab', { name: 'Apparatus' }).click();
   await expect(page.getByRole('link', { name: 'Report Service Need' })).toHaveAttribute('href', /apparatus_id=10/);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });

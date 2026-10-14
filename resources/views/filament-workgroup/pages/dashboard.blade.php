@@ -85,7 +85,7 @@
             </a>
             <nav class="wg-workspace-resources" aria-label="Shared workgroup resources">
                 <a href="{{ \App\Filament\Workgroup\Pages\Files::getUrl() }}"><x-heroicon-o-document-duplicate /><span>Files</span><small>Session materials</small></a>
-                <a href="{{ \App\Filament\Workgroup\Pages\Notes::getUrl() }}"><x-heroicon-o-pencil-square /><span>Notes</span><small>Personal and shared</small></a>
+                @if(\App\Filament\Workgroup\Pages\Notes::canAccess())<a href="{{ \App\Filament\Workgroup\Pages\Notes::getUrl() }}"><x-heroicon-o-pencil-square /><span>Notes</span><small>Personal and shared</small></a>@endif
             </nav>
         </div>
     </section>

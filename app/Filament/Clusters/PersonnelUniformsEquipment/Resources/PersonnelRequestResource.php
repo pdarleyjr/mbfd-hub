@@ -44,13 +44,7 @@ class PersonnelRequestResource extends Resource
             TextColumn::make('type')->badge()->formatStateUsing(fn (PersonnelRequestType $state) => $state->label())->color(fn (PersonnelRequestType $state) => $state === PersonnelRequestType::Uniform ? 'info' : 'warning'),
             TextColumn::make('beneficiary_name')->label('Member')->description(fn (PersonnelRequest $record) => trim("{$record->beneficiary_rank} · {$record->beneficiary_employee_number}"))->searchable(['beneficiary_name', 'beneficiary_employee_number'])->sortable(),
             TextColumn::make('requester_name')->label('Submitted by')->description(fn (PersonnelRequest $record) => $record->requester_rank)->toggleable(),
-            TextColumn::make('status')->badge()->formatStateUsing(fn (PersonnelRequestStatus $state) => $state->label())->color(fn (PersonnelRequestStatus $state) => match ($state) {
-                PersonnelRequestStatus::Completed => 'success',
-                PersonnelRequestStatus::Denied, PersonnelRequestStatus::Cancelled => 'danger',
-                PersonnelRequestStatus::NeedsInformation => 'warning',
-                PersonnelRequestStatus::ReadyForPickup, PersonnelRequestStatus::Arrived => 'info',
-                default => 'gray',
-            }),
+            TextColumn::make('status')->badge()->formatStateUsing(fn (PersonnelRequestStatus $state) => $state->label())->color(fn (PersonnelRequestStatus $state) => $state->filamentColor()),
             TextColumn::make('items_count')->counts('items')->label('Items')->alignCenter(),
             TextColumn::make('created_at')->label('Submitted')->dateTime('M j, Y g:i A')->sortable(),
         ])->filters([
@@ -72,7 +66,7 @@ class PersonnelRequestResource extends Resource
                 Grid::make(3)->schema([
                     TextEntry::make('request_number')->label('Request number')->weight('bold'),
                     TextEntry::make('type')->formatStateUsing(fn (PersonnelRequestType $state) => $state->label()),
-                    TextEntry::make('status')->badge()->formatStateUsing(fn (PersonnelRequestStatus $state) => $state->label()),
+                    TextEntry::make('status')->badge()->formatStateUsing(fn (PersonnelRequestStatus $state) => $state->label())->color(fn (PersonnelRequestStatus $state) => $state->filamentColor()),
                     TextEntry::make('beneficiary_name')->label('Beneficiary')->formatStateUsing(fn ($state, PersonnelRequest $record) => "{$record->beneficiary_rank} — {$state} — {$record->beneficiary_employee_number}"),
                     TextEntry::make('requester_name')->label('Submitted by')->formatStateUsing(fn ($state, PersonnelRequest $record) => "{$record->requester_rank} — {$state} — {$record->requester_employee_number}"),
                     TextEntry::make('originatingStation.station_number')->label('Originating station')->formatStateUsing(fn ($state) => $state ? "Station {$state}" : '—'),
