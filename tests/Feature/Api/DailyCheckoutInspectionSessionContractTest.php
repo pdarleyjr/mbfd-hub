@@ -187,6 +187,47 @@ class DailyCheckoutInspectionSessionContractTest extends TestCase
         $this->assertDatabaseCount('apparatus_inspections', 1);
     }
 
+    public function test_replay_waiting_on_the_apparatus_lock_returns_the_receipt_written_by_the_first_request(): void
+    {
+        $apparatus = $this->makeFireBoat6();
+        $this->setTestTime('2026-08-31 09:00:00');
+        $contract = $this->startInspectionSession($apparatus);
+        $payload = $this->fireBoatSubmission($apparatus, $contract, '55555555-5555-4555-8555-555555555555');
+        $test = $this;
+        $firstResponse = null;
+
+        // Sequential simulation of the race: the replay has passed the early
+        // idempotency checks (no row yet), then waits on the apparatus lock
+        // while the original request commits its inspection.
+        $controller = new class(function () use ($test, $apparatus, $payload, &$firstResponse): void {
+            $firstResponse = $test->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", $payload);
+        }) extends \App\Http\Controllers\Api\ApparatusController
+        {
+
+            private bool $firstRequestCompleted = false;
+
+            public function __construct(private readonly \Closure $completeFirstRequest) {}
+
+            protected function lockApparatusForInspection(int $id): Apparatus
+            {
+                if (! $this->firstRequestCompleted) {
+                    $this->firstRequestCompleted = true;
+                    ($this->completeFirstRequest)();
+                }
+
+                return parent::lockApparatusForInspection($id);
+            }
+        };
+        $this->app->instance(\App\Http\Controllers\Api\ApparatusController::class, $controller);
+
+        $replay = $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", $payload);
+
+        $this->assertNotNull($firstResponse);
+        $firstResponse->assertCreated();
+        $replay->assertOk()->assertJsonPath('id', $firstResponse->json('id'));
+        $this->assertDatabaseCount('apparatus_inspections', 1);
+    }
+
     public function test_client_cannot_change_the_server_issued_duty_date(): void
     {
         $apparatus = $this->makeFireBoat6();
