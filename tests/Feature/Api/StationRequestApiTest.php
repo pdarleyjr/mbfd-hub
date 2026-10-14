@@ -172,6 +172,17 @@ class StationRequestApiTest extends TestCase
         $this->assertDatabaseCount('station_requests', 0);
     }
 
+    public function test_a_deactivated_station_accepts_no_new_requests(): void
+    {
+        $this->station->forceFill(['is_active' => false])->save();
+
+        $this->postJson('/api/public/station_request', $this->equipmentPayload())
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['station_id' => 'This station is not accepting new requests.']);
+
+        $this->assertDatabaseCount('station_requests', 0);
+    }
+
     public function test_unlisted_room_is_preserved_as_a_snapshot_without_creating_a_room(): void
     {
         $payload = $this->equipmentPayload();

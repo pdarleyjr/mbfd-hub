@@ -6,6 +6,7 @@ namespace Tests\Feature\VideoConferencing;
 
 use App\Contracts\VideoConferencing\ConferenceProvider;
 use App\Models\Employee;
+use App\Models\Station;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Log;
@@ -23,14 +24,16 @@ class ConferenceAccessTest extends TestCase
     {
         config(['video-conferencing.enabled' => true, 'app.url' => 'https://www.mbfdhub.com']);
         $this->withoutVite();
+        // Station ids differ from station numbers in production; /daily/stations/:id takes the id.
+        (new Station)->forceFill(['id' => 30, 'station_number' => 2, 'name' => 'Station 2', 'address' => '2 Test Street', 'is_active' => true])->save();
         $this->get('/video-conferencing/stations/2?return_to=https://evil.example')
             ->assertViewHas('conferenceBootstrap', fn (array $data): bool => $data['navigation'] === [
-                'back' => '/daily/stations/2', 'home' => '/',
+                'back' => '/daily/stations/30', 'home' => '/',
             ]);
         $this->actingAs($this->employee(), 'employee');
-        foreach (['/daily/stations/2', 'https://www.mbfdhub.com/daily/stations/2'] as $target) {
+        foreach (['/daily/stations/30', 'https://www.mbfdhub.com/daily/stations/30', '/daily/stations/2'] as $target) {
             $this->get('/employee/video-conferencing/command?'.http_build_query(['return_to' => $target]))
-                ->assertViewHas('conferenceBootstrap', fn (array $data): bool => $data['navigation']['back'] === '/daily/stations/2');
+                ->assertViewHas('conferenceBootstrap', fn (array $data): bool => $data['navigation']['back'] === '/daily/stations/30');
         }
         foreach (['https://evil.example', '//evil.example', '/\\evil.example', '/employee/video-conferencing', '/daily/stations/2?next=https://evil.example', '/daily/stations/5', ['/daily/stations/2']] as $target) {
             $this->get('/employee/video-conferencing/command?'.http_build_query(['return_to' => $target]))

@@ -4,15 +4,14 @@ namespace App\Filament\Resources\StationResource\RelationManagers;
 
 use App\Models\Apparatus;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
 
 class ApparatusesRelationManager extends RelationManager
 {
     protected static string $relationship = 'apparatuses';
+
     protected static ?string $title = 'Assigned Apparatus';
 
     public function table(Table $table): Table
@@ -66,6 +65,7 @@ class ApparatusesRelationManager extends RelationManager
                 Tables\Actions\Action::make('assignApparatus')
                     ->label('Assign Apparatus')
                     ->icon('heroicon-o-plus')
+                    ->authorize(fn (): bool => $this->canManageAssignments())
                     ->form([
                         Forms\Components\Select::make('apparatus_id')
                             ->label('Select Apparatus')
@@ -79,7 +79,7 @@ class ApparatusesRelationManager extends RelationManager
                     ->action(function (array $data) {
                         Apparatus::find($data['apparatus_id'])->update([
                             'station_id' => $this->getOwnerRecord()->id,
-                            'current_location' => 'Station ' . $this->getOwnerRecord()->station_number,
+                            'current_location' => 'Station '.$this->getOwnerRecord()->station_number,
                         ]);
                     }),
             ])
@@ -87,6 +87,7 @@ class ApparatusesRelationManager extends RelationManager
                 Tables\Actions\Action::make('reassign')
                     ->label('Reassign')
                     ->icon('heroicon-o-arrow-path')
+                    ->authorize(fn (): bool => $this->canManageAssignments())
                     ->form([
                         Forms\Components\Select::make('new_station_id')
                             ->label('New Station')
@@ -98,10 +99,24 @@ class ApparatusesRelationManager extends RelationManager
                         $station = \App\Models\Station::find($data['new_station_id']);
                         $record->update([
                             'station_id' => $data['new_station_id'],
-                            'current_location' => 'Station ' . $station->station_number,
+                            'current_location' => 'Station '.$station->station_number,
                         ]);
                     }),
             ])
             ->bulkActions([]);
+    }
+
+    /**
+     * Moving apparatus changes fleet records and the station roster, so both
+     * the station and fleet management capabilities are required. View-only
+     * admins never see these actions, including on the read-only view page.
+     */
+    private function canManageAssignments(): bool
+    {
+        $user = auth()->user();
+
+        return $user !== null
+            && $user->can('admin.stations.manage')
+            && $user->can('admin.fleet.manage');
     }
 }

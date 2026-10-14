@@ -5,30 +5,29 @@ namespace App\Filament\Resources\StationResource\RelationManagers;
 use App\Filament\Resources\Under25kProjectResource;
 use App\Models\Under25kProject;
 use Filament\Forms;
-use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
 
 class Under25kProjectsRelationManager extends RelationManager
 {
     protected static string $relationship = 'under25kProjects';
+
     protected static ?string $title = 'Under $25k Projects';
 
     public function table(Table $table): Table
     {
         return $table
-            ->recordTitleAttribute('project_name')
+            ->recordTitleAttribute('name')
             ->columns([
-                Tables\Columns\TextColumn::make('project_name')
+                Tables\Columns\TextColumn::make('name')
                     ->label('Project Name')
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('project_number')
                     ->label('Project #')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('budget')
+                Tables\Columns\TextColumn::make('budget_amount')
                     ->label('Budget')
                     ->money('USD')
                     ->sortable(),
@@ -41,7 +40,7 @@ class Under25kProjectsRelationManager extends RelationManager
                         'On Hold' => 'danger',
                         default => 'gray',
                     }),
-                Tables\Columns\TextColumn::make('completion_percentage')
+                Tables\Columns\TextColumn::make('percent_complete')
                     ->label('Progress')
                     ->suffix('%'),
             ])
@@ -58,6 +57,7 @@ class Under25kProjectsRelationManager extends RelationManager
                 Tables\Actions\Action::make('assignProject')
                     ->label('Assign Project')
                     ->icon('heroicon-o-plus')
+                    ->authorize(fn (): bool => $this->canAssignProjects())
                     ->form([
                         Forms\Components\Select::make('project_id')
                             ->label('Select Project')
@@ -79,5 +79,18 @@ class Under25kProjectsRelationManager extends RelationManager
                     ->openUrlInNewTab(false),
             ])
             ->bulkActions([]);
+    }
+
+    /**
+     * Assigning a project changes the project record and the station profile,
+     * so both the station and project management capabilities are required.
+     */
+    private function canAssignProjects(): bool
+    {
+        $user = auth()->user();
+
+        return $user !== null
+            && $user->can('admin.stations.manage')
+            && $user->can('admin.projects.manage');
     }
 }
