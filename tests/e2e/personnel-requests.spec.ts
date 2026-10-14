@@ -508,7 +508,7 @@ test('real station repair and equipment requests preserve signed submissions, ev
       await page.getByLabel('Internal Note', { exact: true }).fill('[QA TEST] Private station workflow note.');
       await submitAdminModal(page);
       await page.goto('/daily/stations/1');
-      await page.getByRole('button', { name: /^Requests/ }).click();
+      await page.getByRole('tab', { name: /^Requests/ }).click();
       if (status === 'completed') await page.getByRole('button', { name: 'All history', exact: true }).click();
       await expect(page.getByText(`[QA TEST] ${type}: ${status}`, { exact: false }).first()).toBeVisible();
       await expect(page.getByText('[QA TEST] Private station workflow note.', { exact: true })).toHaveCount(0);
@@ -559,7 +559,7 @@ test('real apparatus service request progresses through scheduling, parts, notes
   await page.getByLabel('Station-facing Status Message', { exact: false }).fill('[QA TEST] QA unit restored to its original status.');
   await submitAdminModal(page);
   await page.goto('/daily/stations/1');
-  await page.getByRole('button', { name: /Service \/ Repair/ }).click();
+  await page.getByRole('tab', { name: /Service \/ Repair/ }).click();
   await page.getByRole('button', { name: 'All history', exact: true }).click();
   await expect(page.getByText('[QA TEST] Browser apparatus service', { exact: true })).toBeVisible();
   await expect(page.getByText('[QA TEST] QA unit restored to its original status.', { exact: false }).first()).toBeVisible();

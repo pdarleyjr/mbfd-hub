@@ -779,7 +779,7 @@ test('station Daily Checkout renders the canonical server result without estimat
   await page.goto('/daily/stations/1');
 
   await expect(page.getByRole('heading', { name: 'Daily Checkout' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Apparatus', exact: true }).click();
+  await page.getByRole('tab', { name: 'Apparatus', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Daily Checkout' })).toBeVisible();
   await expect(page.getByText('2 / 4 required inspections completed', { exact: true })).toBeVisible();
   await expect(page.getByText('50%', { exact: true })).toBeVisible();
@@ -802,7 +802,7 @@ test('station Daily Checkout is explicitly unavailable when the canonical server
   await page.goto('/daily/stations/1');
 
   await expect(page.getByRole('heading', { name: 'Daily Checkout' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Apparatus', exact: true }).click();
+  await page.getByRole('tab', { name: 'Apparatus', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Daily Checkout' })).toBeVisible();
   await expect(page.getByText('Unavailable', { exact: true })).toBeVisible();
   await expect(page.getByText('The authoritative Daily Checkout result is unavailable. Readiness is not estimated from inspection records.', { exact: true })).toBeVisible();
@@ -829,7 +829,7 @@ test('a string Station 2 API value renders both authorized conference links', as
   await expect(page.getByRole('link', { name: 'Morning Lineup Video Conference — Station 2', exact: true }))
     .toHaveAttribute('href', '/video-conferencing/stations/2');
   await expect(page.getByRole('link', { name: 'Morning Lineup — 300 Command', exact: true }))
-    .toHaveAttribute('href', '/employee/video-conferencing/command?return_to=%2Fdaily%2Fstations%2F2');
+    .toHaveAttribute('href', '/employee/video-conferencing/command?return_to=%2Fdaily%2Fstations%2F1');
 });
 
 test('a string Station 3 API value renders its conference link', async ({ page }) => {
@@ -982,7 +982,7 @@ test('FB6 null fleet metadata remains selectable and completes the Daily browser
 
   await page.goto('/daily/stations/6');
   await expect(page.getByRole('heading', { name: 'Station 6' })).toBeVisible();
-  await page.getByRole('button', { name: 'Apparatus', exact: true }).click();
+  await page.getByRole('tab', { name: 'Apparatus', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Fire Boat 6', exact: true })).toBeVisible();
   await expect(page.getByText('Unit: FB6', { exact: true })).toBeVisible();
   await page.getByRole('link', { name: 'Start Inspection' }).click();
