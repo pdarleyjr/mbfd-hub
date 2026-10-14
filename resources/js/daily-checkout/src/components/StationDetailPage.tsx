@@ -496,7 +496,7 @@ function PanelHeading({ title, description, filter }: { title: string; descripti
 function ScopeFilter({ label, scope, onChange }: { label: string; scope: 'open' | 'all'; onChange: (scope: 'open' | 'all') => void }) {
   const option = (value: 'open' | 'all', text: string) => (
     <button type="button" aria-pressed={scope === value} onClick={() => onChange(value)}
-      className={`min-h-11 rounded-hub-control px-4 text-sm font-semibold transition-colors ${scope === value ? 'bg-hub-blue text-white' : 'text-hub-n-600 hover:bg-hub-n-50 hover:text-hub-ink'}`}>
+      className={`min-h-12 rounded-hub-control px-4 text-sm font-semibold transition-colors ${scope === value ? 'bg-hub-blue text-white' : 'text-hub-n-600 hover:bg-hub-n-50 hover:text-hub-ink'}`}>
       {text}
     </button>
   );
