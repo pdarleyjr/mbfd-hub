@@ -14,6 +14,7 @@ use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class StationResource extends Resource
@@ -98,17 +99,17 @@ class StationResource extends Resource
                     ->schema([
                         Infolists\Components\TextEntry::make('low_stock_count')
                             ->label('Low Stock')
-                            ->state(fn ($record) => $record->inventoryItems()->where('status', 'low')->count())
+                            ->state(fn (Station $record): int => (int) ($record->low_stock_count ?? $record->inventoryItems()->where('status', 'low')->count()))
                             ->badge()
                             ->color(fn ($state) => $state > 0 ? 'danger' : 'success'),
                         Infolists\Components\TextEntry::make('ordered_stock_count')
                             ->label('Ordered')
-                            ->state(fn ($record) => $record->inventoryItems()->where('status', 'ordered')->count())
+                            ->state(fn (Station $record): int => (int) ($record->ordered_stock_count ?? $record->inventoryItems()->where('status', 'ordered')->count()))
                             ->badge()
                             ->color(fn ($state) => $state > 0 ? 'warning' : 'gray'),
                         Infolists\Components\TextEntry::make('supply_request_count')
                             ->label('Supply Requests')
-                            ->state(fn ($record) => $record->supplyRequests()->active()->whereIn('status', ['open', 'ordered'])->count())
+                            ->state(fn ($record): int => (int) ($record->supply_request_count ?? $record->supplyRequests()->active()->whereIn('status', ['open', 'ordered'])->count()))
                             ->badge()
                             ->color(fn ($state) => $state > 0 ? 'warning' : 'gray'),
                         Infolists\Components\TextEntry::make('inventory_link')
@@ -144,16 +145,16 @@ class StationResource extends Resource
                     ->schema([
                         Infolists\Components\TextEntry::make('apparatuses_count')
                             ->label('Assigned Apparatus')
-                            ->state(fn ($record) => app(StationStaffingService::class)->summaryFor($record)['assigned_apparatus_count'] ?? 'Unknown'),
+                            ->state(fn (Station $record) => static::staffingValue($record, 'assigned_apparatus_count')),
                         Infolists\Components\TextEntry::make('assigned_personnel_count')
                             ->label('Assigned Personnel')
-                            ->state(fn ($record) => app(StationStaffingService::class)->summaryFor($record)['assigned_personnel_count'] ?? 'Unknown'),
+                            ->state(fn (Station $record) => static::staffingValue($record, 'assigned_personnel_count')),
                         Infolists\Components\TextEntry::make('dorm_beds_count')
                             ->label('Dorm Beds')
-                            ->state(fn ($record) => app(StationStaffingService::class)->summaryFor($record)['dorm_beds_count'] ?? 'Unknown'),
+                            ->state(fn (Station $record) => static::staffingValue($record, 'dorm_beds_count')),
                         Infolists\Components\TextEntry::make('rooms_count')
                             ->label('Rooms Count')
-                            ->state(fn ($record) => $record->rooms()->count()),
+                            ->state(fn (Station $record): int => (int) ($record->rooms_count ?? $record->rooms()->count())),
                     ])->columns(4),
                 Infolists\Components\Section::make('Notes')
                     ->schema([
@@ -166,6 +167,11 @@ class StationResource extends Resource
     public static function table(Table $table): Table
     {
         return self::applyEnterpriseDefaults($table)
+            // The three staffing columns share one memoized summary per station,
+            // built from apparatus loaded once for the whole page.
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with([
+                'apparatuses' => fn ($apparatus) => $apparatus->select(StationStaffingService::APPARATUS_COLUMNS),
+            ]))
             ->columns([
                 Tables\Columns\TextColumn::make('station_number')
                     ->wrap()
@@ -184,13 +190,13 @@ class StationResource extends Resource
                     ->searchable(),
                 Tables\Columns\TextColumn::make('apparatuses_count')->visibleFrom('md')
                     ->label('Assigned Apparatus')
-                    ->state(fn ($record) => app(StationStaffingService::class)->summaryFor($record)['assigned_apparatus_count'] ?? 'Unknown'),
+                    ->state(fn (Station $record) => static::staffingValue($record, 'assigned_apparatus_count')),
                 Tables\Columns\TextColumn::make('assigned_personnel')->visibleFrom('md')
                     ->label('Personnel')
-                    ->state(fn ($record) => app(StationStaffingService::class)->summaryFor($record)['assigned_personnel_count'] ?? 'Unknown'),
+                    ->state(fn (Station $record) => static::staffingValue($record, 'assigned_personnel_count')),
                 Tables\Columns\TextColumn::make('dorm_beds')->visibleFrom('md')
                     ->label('Beds')
-                    ->state(fn ($record) => app(StationStaffingService::class)->summaryFor($record)['dorm_beds_count'] ?? 'Unknown'),
+                    ->state(fn (Station $record) => static::staffingValue($record, 'dorm_beds_count')),
                 Tables\Columns\TextColumn::make('rooms_count')->visibleFrom('md')
                     ->counts('rooms')
                     ->label('Rooms'),
@@ -216,6 +222,17 @@ class StationResource extends Resource
             // No bulk delete: stations with inspection evidence must be deactivated,
             // and the single-record delete action already enforces canDelete().
             ->bulkActions([]);
+    }
+
+    /**
+     * One staffing figure for a station, or "Unknown" when the station has no
+     * authoritative complement. The summary is memoized per loaded apparatus set.
+     */
+    public static function staffingValue(Station $record, string $key): int|string
+    {
+        $value = app(StationStaffingService::class)->summaryFor($record)[$key] ?? null;
+
+        return is_int($value) ? $value : 'Unknown';
     }
 
     public static function getRelations(): array
