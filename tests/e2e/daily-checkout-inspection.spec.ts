@@ -1746,6 +1746,25 @@ test('the last edit is kept when the page is reloaded before the autosave pause 
   await expect(page.getByLabel('Notes (optional)')).toHaveValue('Noted just before the page closed.');
 });
 
+test('station request history follows every page of the complete history', async ({ page }) => {
+  await mockInspectionApi(page);
+  const requestedPages: string[] = [];
+  const summary = (id: number) => ({ id, title: `Station request ${id}`, status: 'open', type: 'equipment', created_at: '2026-10-01T12:00:00Z' });
+  await page.route('**/api/public/stations/1/requests**', async (route) => {
+    const url = new URL(route.request().url());
+    requestedPages.push(`${url.searchParams.get('scope')}:${url.searchParams.get('per_page')}:${url.searchParams.get('page')}`);
+    const current = Number(url.searchParams.get('page'));
+    return route.fulfill({ json: { data: [summary(current * 100 + 1), summary(current * 100 + 2)], meta: { current_page: current, last_page: 2, total: 4 } } });
+  });
+
+  await page.goto('/daily/stations/1');
+  await page.getByRole('button', { name: 'Requests', exact: true }).click();
+
+  await expect.poll(() => requestedPages).toEqual(['all:200:1', 'all:200:2']);
+  await page.waitForTimeout(300);
+  expect(requestedPages).toHaveLength(2);
+});
+
 test('a failed checklist load offers Try again without leaving the page', async ({ page }) => {
   await mockInspectionApi(page);
   let failChecklist = true;
