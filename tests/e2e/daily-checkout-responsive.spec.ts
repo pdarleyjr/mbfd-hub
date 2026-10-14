@@ -221,7 +221,9 @@ test('station selector stays visible, touchable, and horizontally contained at e
         columns: grid ? getComputedStyle(grid).gridTemplateColumns.split(' ').length : 0,
       };
     });
-    expect(layout.width).toBeGreaterThanOrEqual(1_760);
+    // The Daily workspace shares the Hub content maximum (--hub-content-max, 1600px) on every display.
+    expect(layout.width).toBeLessThanOrEqual(1_600);
+    expect(layout.width).toBeGreaterThanOrEqual(1_590);
     expect(layout.columns).toBeGreaterThanOrEqual(4);
   }
 
@@ -256,7 +258,7 @@ test('representative viewports preserve station navigation and fail closed for a
   await expect(page).toHaveURL(/\/daily\/stations\/1$/);
   await expect(page.getByRole('heading', { name: 'Station 1' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Apparatus' }).click();
+  await page.getByRole('tab', { name: 'Apparatus' }).click();
   await expect(page.getByRole('heading', { name: 'Daily Checkout' })).toBeVisible();
   await expect(page.getByText('Unclassified Unit', { exact: true })).toHaveCount(1);
   await expect(page.getByText('Daily Checkout policy needs confirmation')).toBeVisible();
@@ -284,6 +286,75 @@ test('representative viewports preserve station navigation and fail closed for a
     await testInfo.attach(`${testInfo.project.name} Forms Hub`, { path: formsScreenshot, contentType: 'image/png' });
   }
 
+  expect(quality.consoleErrors).toEqual([]);
+  expect(quality.failedRequests).toEqual([]);
+});
+
+// Production station DB ids (29-33) differ from station numbers (1, 2, 3, 4, 6); Station 2 here has id 31.
+const stationTwo = { ...stations[1], id: 31, station_number: 2, name: 'Station 2' };
+
+async function expectTouchTargets(page: Page, selector: string): Promise<void> {
+  const undersized = await page.locator(selector).evaluateAll((elements) => elements
+    .filter((element) => (element as HTMLElement).offsetParent !== null)
+    .map((element) => {
+      const box = element.getBoundingClientRect();
+      return { html: element.outerHTML.slice(0, 120), width: Math.round(box.width), height: Math.round(box.height) };
+    })
+    .filter(({ width, height }) => width < 44 || height < 44));
+  expect(undersized).toEqual([]);
+}
+
+test('station profile stays contained at 320px with 44px controls, keyboard tabs and id-based station links', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'daily-responsive-phone-320', 'The narrowest supported phone width covers the station profile contract.');
+
+  await mockDailySelectorApi(page);
+  await page.route('**/api/public/stations/31**', (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path === '/api/public/stations/31') return route.fulfill({ json: { ...stationTwo, apparatuses: [requiredApparatus], rooms: [] } });
+    if (path === '/api/public/stations/31/gas-meters') return route.fulfill({ json: { gas_meters: [] } });
+    if (path === '/api/public/stations/31/inspections') return route.fulfill({ json: { inspections: [] } });
+    if (path === '/api/public/stations/31/activity') return route.fulfill({ json: { activity: [] } });
+    return route.fulfill({ json: { data: [], meta: { total: 0 } } });
+  });
+  const quality = captureBrowserQuality(page);
+
+  await page.goto('/daily/stations/31');
+  await expect(page.getByRole('heading', { name: 'Station 2', exact: true })).toBeVisible();
+
+  const actions = page.getByRole('navigation', { name: 'Station actions' });
+  await expect(actions.getByRole('link', { name: 'Morning Lineup Video Conference — Station 2' })).toHaveAttribute('href', '/video-conferencing/stations/2');
+  await expect(actions.getByRole('link', { name: 'Morning Lineup — 300 Command' })).toHaveAttribute('href', `/employee/video-conferencing/command?return_to=${encodeURIComponent('/daily/stations/31')}`);
+  await expect(actions.getByRole('link', { name: 'Station Request' })).toHaveAttribute('href', '/daily/forms-hub/station-request?station_id=31&return_to=%2Fstations%2F31');
+  await expect(actions.getByRole('link', { name: 'Station Inspection' })).toHaveAttribute('href', '/daily/forms-hub/station-inspection?station_id=31&station_number=2&return_to=%2Fstations%2F31');
+  await expect(actions.getByRole('link', { name: 'Apparatus Service' })).toHaveAttribute('href', `/employee/apparatus-service-request?station_id=31&return_to=${encodeURIComponent('/daily/stations/31')}`);
+
+  await expectNoHorizontalOverflow(page);
+  await expectTouchTargets(page, '[data-hub-back], nav[aria-label="Station actions"] a, [role="tab"]');
+
+  // Arrow keys move between tabs and activate them; one tab stop for the tab list.
+  const tabs = page.getByRole('tab');
+  await expect(tabs).toHaveCount(8);
+  await expect(page.locator('[role="tab"][tabindex="0"]')).toHaveCount(1);
+  await page.getByRole('tab', { name: 'Overview' }).focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(page.getByRole('tab', { name: 'Requests' })).toBeFocused();
+  await expect(page.getByRole('tab', { name: 'Requests' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('tabpanel', { name: 'Requests' })).toBeVisible();
+  await page.keyboard.press('End');
+  await expect(page.getByRole('tab', { name: 'Activity' })).toHaveAttribute('aria-selected', 'true');
+
+  for (const name of ['Overview', 'Requests', 'Service / Repair', 'Rooms', 'Apparatus', 'Gas meters', 'Inspections', 'Activity']) {
+    await page.getByRole('tab', { name, exact: name !== 'Service / Repair' }).click();
+    const panel = page.getByRole('tabpanel');
+    await expect(panel).toBeVisible();
+    await expect(panel.locator('.hub-skeleton')).toHaveCount(0);
+    await expectNoHorizontalOverflow(page);
+    await expectTouchTargets(page, '[role="tabpanel"] a[href], [role="tabpanel"] button');
+  }
+
+  const screenshot = testInfo.outputPath('station-profile-320.png');
+  await page.screenshot({ path: screenshot, fullPage: true });
+  await testInfo.attach('station profile 320', { path: screenshot, contentType: 'image/png' });
   expect(quality.consoleErrors).toEqual([]);
   expect(quality.failedRequests).toEqual([]);
 });

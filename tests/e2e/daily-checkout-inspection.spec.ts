@@ -573,7 +573,7 @@ async function completeInspection(page: Page): Promise<void> {
 
   await expect(page.getByRole('region', { name: 'Compartment Inspection' })).toBeVisible();
   await expect(page.getByText('Portable Radio', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Mark all items in this compartment as present' }).click();
+  await page.getByRole('button', { name: 'Confirm all present' }).click();
   await page.getByRole('button', { name: 'Review & Sign', exact: true }).click();
 
   await expect(page.getByRole('heading', { name: 'Review & Sign Inspection' })).toBeVisible();
@@ -945,7 +945,7 @@ test('Fire Boat v2 preserves typed field values and submits only server-due recu
   await page.getByRole('button', { name: 'Continue: Apparatus' }).click();
 
   await expect(page.getByText(/Expected quantity: 3/)).toBeVisible();
-  await page.getByRole('button', { name: 'Mark all items in this compartment as present' }).click();
+  await page.getByRole('button', { name: 'Confirm all present' }).click();
   await page.getByRole('button', { name: 'Review & Sign', exact: true }).click();
   await drawInspectionSignature(page);
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
@@ -994,7 +994,7 @@ test('FB6 null fleet metadata remains selectable and completes the Daily browser
   await page.getByLabel('Port Engine Hours').fill('45.5');
   await page.getByRole('button', { name: 'Mark all due duties as present' }).click();
   await page.getByRole('button', { name: 'Continue: Apparatus' }).click();
-  await page.getByRole('button', { name: 'Mark all items in this compartment as present' }).click();
+  await page.getByRole('button', { name: 'Confirm all present' }).click();
   await page.getByRole('button', { name: 'Review & Sign', exact: true }).click();
   await drawInspectionSignature(page);
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
