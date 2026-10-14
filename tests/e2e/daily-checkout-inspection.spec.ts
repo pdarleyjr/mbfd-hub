@@ -1704,6 +1704,48 @@ test('queued receipt never claims the inspection was sent until the replay is ac
   await expect(page.locator('main')).not.toContainText('not been sent');
 });
 
+test('typing is written to the device after a pause, not on every keystroke', async ({ page }) => {
+  await page.addInitScript(() => {
+    const put = IDBObjectStore.prototype.put;
+    (window as unknown as { __draftWrites: number }).__draftWrites = 0;
+    IDBObjectStore.prototype.put = function (this: IDBObjectStore, ...args: Parameters<IDBObjectStore['put']>) {
+      if (this.name === 'dailyCheckoutDrafts') (window as unknown as { __draftWrites: number }).__draftWrites += 1;
+      return put.apply(this, args);
+    };
+  });
+  await mockInspectionApi(page);
+  await page.goto('/daily/apparatus/engine-1');
+  await expect(page.getByRole('status').filter({ hasText: 'Changes saved on this device' })).toBeVisible();
+
+  await page.getByRole('button', { name: /^Portable Radio/ }).click();
+  await page.getByRole('group', { name: 'Status for Portable Radio' }).getByRole('button', { name: /Damaged/ }).click();
+  const notes = page.getByLabel('Notes (optional)');
+  await notes.click();
+  await page.waitForTimeout(1_000);
+  const writesBeforeTyping = await page.evaluate(() => (window as unknown as { __draftWrites: number }).__draftWrites);
+  await notes.pressSequentially('Lens cracked on the left side', { delay: 15 });
+  await expect.poll(async () => (await readDrafts(page))[0]?.data.compartments[0]?.items[0]?.notes).toBe('Lens cracked on the left side');
+
+  const typingWrites = await page.evaluate(() => (window as unknown as { __draftWrites: number }).__draftWrites) - writesBeforeTyping;
+  expect(typingWrites).toBeGreaterThanOrEqual(1);
+  expect(typingWrites).toBeLessThanOrEqual(3);
+});
+
+test('the last edit is kept when the page is reloaded before the autosave pause ends', async ({ page }) => {
+  await mockInspectionApi(page);
+  await page.goto('/daily/apparatus/engine-1');
+  await expect(page.getByRole('status').filter({ hasText: 'Changes saved on this device' })).toBeVisible();
+
+  await page.getByRole('button', { name: /^Portable Radio/ }).click();
+  await page.getByRole('group', { name: 'Status for Portable Radio' }).getByRole('button', { name: /Damaged/ }).click();
+  await page.getByLabel('Notes (optional)').fill('Noted just before the page closed.');
+  await page.reload();
+
+  await expect(page.getByText(/Restored from autosave/)).toBeVisible();
+  await page.getByRole('button', { name: /^Portable Radio/ }).click();
+  await expect(page.getByLabel('Notes (optional)')).toHaveValue('Noted just before the page closed.');
+});
+
 test('a failed checklist load offers Try again without leaving the page', async ({ page }) => {
   await mockInspectionApi(page);
   let failChecklist = true;
