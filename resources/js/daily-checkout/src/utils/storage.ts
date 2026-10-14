@@ -20,6 +20,9 @@ export const createClientSubmissionId = (): string => {
   });
 };
 
+/** Every localStorage autosave key (legacy autosaves and page-hide snapshots). */
+export const AUTOSAVE_STORAGE_PREFIX = `${STORAGE_KEYS.AUTOSAVE}_`;
+
 const autosaveKey = (apparatusSlug: string, checklistVersion?: string): string => (
   checklistVersion && checklistVersion.trim() !== ''
     ? `${STORAGE_KEYS.AUTOSAVE}_${apparatusSlug}_${checklistVersion}`
@@ -43,11 +46,33 @@ export const DRAFT_MAX_AGE_MS = 24 * 60 * 60 * 1000;
  * on the device. Failure is logged and never blocks loading a draft.
  */
 export const pruneExpiredInspectionDrafts = async (now = Date.now()): Promise<number> => {
+  pruneExpiredDraftSnapshots(now);
   try {
     return await db.dailyCheckoutDrafts.where('timestamp').below(now - DRAFT_MAX_AGE_MS).delete();
   } catch (error) {
     console.warn('Expired inspection drafts could not be removed:', error);
     return 0;
+  }
+};
+
+/** The same rule for localStorage autosaves and page-hide snapshots. */
+const pruneExpiredDraftSnapshots = (now: number): void => {
+  try {
+    const keys = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
+      .filter((key): key is string => key !== null && key.startsWith(AUTOSAVE_STORAGE_PREFIX));
+    for (const key of keys) {
+      let timestamp = Number.NaN;
+      try {
+        const parsed = JSON.parse(localStorage.getItem(key) ?? 'null') as { timestamp?: unknown } | null;
+        timestamp = typeof parsed?.timestamp === 'number' ? parsed.timestamp : Number.NaN;
+      } catch {
+        // Unreadable copies are left for the loader's explicit error path.
+        continue;
+      }
+      if (!Number.isFinite(timestamp) || now - timestamp > DRAFT_MAX_AGE_MS) localStorage.removeItem(key);
+    }
+  } catch (error) {
+    console.warn('Expired inspection draft copies could not be removed:', error);
   }
 };
 
@@ -226,12 +251,17 @@ export const loadInspectionProgress = async (
       if (await saveInspectionProgress(apparatusSlug, legacyExact)) localStorage.removeItem(key);
       return legacyExact;
     }
-    if (drafts[0]) return drafts[0].data;
-
     const prefix = `${STORAGE_KEYS.AUTOSAVE}_${apparatusSlug}_`;
     const versioned = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
       .filter((key): key is string => key !== null && key.startsWith(prefix))
-      .map((key) => ({ key, data: readInspectionProgress(key) }))
+      .map((key) => {
+        try {
+          return { key, data: readInspectionProgress(key) };
+        } catch {
+          // One unreadable copy must not hide the IndexedDB draft.
+          return { key, data: null };
+        }
+      })
       .filter((entry): entry is { key: string; data: InspectionData } => entry.data !== null)
       .filter(entry => belongsToOwner(entry.data))
       .sort((left, right) => {
@@ -240,6 +270,12 @@ export const loadInspectionProgress = async (
 
         return rightTimestamp - leftTimestamp;
       });
+
+    // Without an exact key (first load, before the checklist version is
+    // known) the newest copy wins, so a page-hide snapshot newer than the
+    // IndexedDB draft is never ignored and then overwritten.
+    const newestSnapshotTimestamp = Number((versioned[0]?.data as (InspectionData & { timestamp?: unknown }) | undefined)?.timestamp) || 0;
+    if (drafts[0] && drafts[0].timestamp >= newestSnapshotTimestamp) return drafts[0].data;
 
     const legacy = versioned[0] ?? { key: autosaveKey(apparatusSlug), data: readInspectionProgress(autosaveKey(apparatusSlug)) };
     if (!legacy.data || !belongsToOwner(legacy.data)) return null;

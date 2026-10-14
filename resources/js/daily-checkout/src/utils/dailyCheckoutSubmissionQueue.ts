@@ -1,6 +1,6 @@
 import { db, type DailyCheckoutQueuedSubmission } from '../lib/db';
-import type { InspectionSubmission } from '../types';
-import { createClientSubmissionId } from './storage';
+import type { InspectionData, InspectionSubmission } from '../types';
+import { AUTOSAVE_STORAGE_PREFIX, createClientSubmissionId } from './storage';
 import { ApiClient, ApiRequestError, ApiTimeoutError, READ_TIMEOUT_MS, isChecklistVersion } from './api';
 import { identityForQueueCapture, refreshOfflineIdentity, type OfflineIdentity } from '../lib/offlineIdentity';
 
@@ -93,6 +93,29 @@ interface LegacyQueuedSubmission {
 }
 
 const inFlightSubmissions = new Map<string, Promise<QueuedInspectionSubmissionResult>>();
+/**
+ * Outcomes of records the server accepted during this page lifetime, keyed by
+ * queue id. A screen that sees its blocking record disappear consults this
+ * before assuming the record was discarded, so an accepted inspection is never
+ * mistaken for one that must be started again.
+ */
+const recentlyAcceptedOutcomes = new Map<string, InspectionReceiptOutcome>();
+const RECENTLY_ACCEPTED_LIMIT = 50;
+
+const rememberAcceptedOutcome = (queueId: string, outcome: InspectionReceiptOutcome): void => {
+  recentlyAcceptedOutcomes.delete(queueId);
+  recentlyAcceptedOutcomes.set(queueId, outcome);
+  while (recentlyAcceptedOutcomes.size > RECENTLY_ACCEPTED_LIMIT) {
+    const oldest = recentlyAcceptedOutcomes.keys().next().value;
+    if (oldest === undefined) break;
+    recentlyAcceptedOutcomes.delete(oldest);
+  }
+};
+
+/** The receipt outcome if this queued record was accepted by the server. */
+export const acceptedOutcomeFor = (queueId: string): InspectionReceiptOutcome | null => (
+  recentlyAcceptedOutcomes.get(queueId) ?? null
+);
 let activeQueueSynchronization: Promise<DailyCheckoutQueueSyncResult> | null = null;
 let legacyMigrationPromise: Promise<void> | null = null;
 
@@ -352,6 +375,8 @@ export const ensureDailyCheckoutQueueReady = (): Promise<void> => {
 export const queueSubmission = async (
   apparatusId: number,
   data: InspectionSubmission,
+  /** The member identity the caller already verified for this submission. */
+  verifiedOwner?: OfflineIdentity,
 ): Promise<string> => {
   await ensureDailyCheckoutQueueReady();
 
@@ -360,7 +385,7 @@ export const queueSubmission = async (
   }
 
   const now = new Date();
-  const owner = await identityForQueueCapture();
+  const owner = verifiedOwner ?? await identityForQueueCapture();
   const queuedSubmission: DailyCheckoutQueuedSubmission = {
     id: `daily_${data.client_submission_id}`,
     apparatusId,
@@ -454,16 +479,19 @@ export const getSubmissionQueue = async (): Promise<DailyCheckoutQueuedSubmissio
   return db.dailyCheckoutSubmissions.orderBy('createdAt').toArray();
 };
 
-const earliestDeferredAttempt = async (): Promise<number | undefined> => {
+const pendingAttemptTimes = async (): Promise<{ nextAttemptAt?: number; lastAttemptAt?: number }> => {
   const now = Date.now();
-  let earliest: number | undefined;
+  let nextAttemptAt: number | undefined;
+  let lastAttemptAt: number | undefined;
   // Pending records are few (one per apparatus and checklist version).
   await db.dailyCheckoutSubmissions.where('status').equals('pending').each((submission) => {
-    const at = submission.nextAttemptAt instanceof Date ? submission.nextAttemptAt.getTime() : undefined;
-    if (at !== undefined && at > now && (earliest === undefined || at < earliest)) earliest = at;
+    const next = submission.nextAttemptAt instanceof Date ? submission.nextAttemptAt.getTime() : undefined;
+    if (next !== undefined && next > now && (nextAttemptAt === undefined || next < nextAttemptAt)) nextAttemptAt = next;
+    const last = submission.lastAttemptAt instanceof Date ? submission.lastAttemptAt.getTime() : undefined;
+    if (last !== undefined && (lastAttemptAt === undefined || last > lastAttemptAt)) lastAttemptAt = last;
   });
 
-  return earliest;
+  return { nextAttemptAt, lastAttemptAt };
 };
 
 /**
@@ -488,16 +516,27 @@ export const getDailyCheckoutQueueSummary = async (): Promise<DailyCheckoutQueue
   };
 };
 
+export interface DailyCheckoutReplaySchedule {
+  pending: number;
+  /** Earliest time a Retry-After response allows (epoch ms), if in the future. */
+  nextAttemptAt?: number;
+  /** Most recent send attempt of any pending record (epoch ms). */
+  lastAttemptAt?: number;
+}
+
 /** When the next automatic replay is allowed, honouring Retry-After. */
-export const getDailyCheckoutReplaySchedule = async (): Promise<{ pending: number; nextAttemptAt?: number }> => {
+export const getDailyCheckoutReplaySchedule = async (): Promise<DailyCheckoutReplaySchedule> => {
   await ensureDailyCheckoutQueueReady();
-  const [pending, nextAttemptAt] = await Promise.all([
+  const [pending, times] = await Promise.all([
     db.dailyCheckoutSubmissions.where('status').equals('pending').count(),
-    earliestDeferredAttempt(),
+    pendingAttemptTimes(),
   ]);
 
-  return { pending, nextAttemptAt };
+  return { pending, ...times };
 };
+
+/** Background replay found the member signed out (detail: boolean required). */
+export const DAILY_CHECKOUT_SIGN_IN_REQUIRED_EVENT = 'mbfd:daily-checkout-sign-in-required';
 
 /** Records needing a decision, newest first, without their photo payloads. */
 export const getDailyCheckoutAttentionRecords = async (currentUserId?: number): Promise<DailyCheckoutAttentionRecord[]> => {
@@ -565,25 +604,63 @@ const equipmentEvidence = (areas: unknown): string | null => {
   return evidence.includes(null) ? null : JSON.stringify(evidence);
 };
 
-const removeFromQueue = async (submission: DailyCheckoutQueuedSubmission): Promise<void> => {
+const draftMatchesSubmission = (
+  draft: InspectionData | null | undefined,
+  submission: DailyCheckoutQueuedSubmission,
+  acceptedEvidence: string | null,
+): boolean => Boolean(draft) && acceptedEvidence !== null
+  && draft!.apparatusSnapshot?.id === submission.apparatusId
+  && draft!.checklist_version === submission.checklistVersion
+  && draft!.actorUserId === submission.ownerUserId
+  && draft!.actorSecurityVersion === submission.ownerSecurityVersion
+  && draft!.signature === submission.data.officer_signature
+  && draft!.officer?.shift === submission.data.shift
+  && JSON.stringify(draft!.fieldValues ?? []) === JSON.stringify(submission.data.field_values ?? [])
+  && JSON.stringify(draft!.scheduledTasks ?? []) === JSON.stringify(submission.data.scheduled_tasks ?? [])
+  && draft!.meter?.engine_hours === submission.data.engine_hours
+  && draft!.meter?.miles === submission.data.miles
+  && equipmentEvidence(draft!.compartments) === acceptedEvidence;
+
+/** Page-hide snapshots of the accepted draft must not be restored either. */
+const removeMatchingDraftSnapshots = (
+  submission: DailyCheckoutQueuedSubmission,
+  acceptedEvidence: string | null,
+  keys: string[],
+): void => {
+  try {
+    for (const key of keys) localStorage.removeItem(key);
+    const snapshotKeys = Array.from({ length: localStorage.length }, (_, index) => localStorage.key(index))
+      .filter((key): key is string => key !== null && key.startsWith(AUTOSAVE_STORAGE_PREFIX));
+    for (const key of snapshotKeys) {
+      let snapshot: InspectionData | null = null;
+      try {
+        snapshot = JSON.parse(localStorage.getItem(key) ?? 'null') as InspectionData | null;
+      } catch {
+        continue;
+      }
+      if (draftMatchesSubmission(snapshot, submission, acceptedEvidence)) localStorage.removeItem(key);
+    }
+  } catch (error) {
+    console.warn('Saved draft copies for an accepted inspection could not be removed:', error);
+  }
+};
+
+const removeFromQueue = async (
+  submission: DailyCheckoutQueuedSubmission,
+  outcome: InspectionReceiptOutcome,
+): Promise<void> => {
   const acceptedEvidence = equipmentEvidence(submission.data.compartments);
+  let removedDraftKeys: string[] = [];
   await db.transaction('rw', db.dailyCheckoutSubmissions, db.dailyCheckoutDrafts, async () => {
     const drafts = await db.dailyCheckoutDrafts.toArray();
-    const matching = drafts.filter(draft => acceptedEvidence !== null
-      && draft.data.apparatusSnapshot?.id === submission.apparatusId
-      && draft.data.checklist_version === submission.checklistVersion
-      && draft.data.actorUserId === submission.ownerUserId
-      && draft.data.actorSecurityVersion === submission.ownerSecurityVersion
-      && draft.data.signature === submission.data.officer_signature
-      && draft.data.officer.shift === submission.data.shift
-      && JSON.stringify(draft.data.fieldValues ?? []) === JSON.stringify(submission.data.field_values ?? [])
-      && JSON.stringify(draft.data.scheduledTasks ?? []) === JSON.stringify(submission.data.scheduled_tasks ?? [])
-      && draft.data.meter?.engine_hours === submission.data.engine_hours
-      && draft.data.meter?.miles === submission.data.miles
-      && equipmentEvidence(draft.data.compartments) === acceptedEvidence);
-    await db.dailyCheckoutDrafts.bulkDelete(matching.map(draft => draft.key));
+    const matching = drafts.filter(draft => draftMatchesSubmission(draft.data, submission, acceptedEvidence));
+    removedDraftKeys = matching.map(draft => draft.key);
+    await db.dailyCheckoutDrafts.bulkDelete(removedDraftKeys);
     await db.dailyCheckoutSubmissions.delete(submission.id);
   });
+  removeMatchingDraftSnapshots(submission, acceptedEvidence, removedDraftKeys);
+  // Record the outcome before listeners learn that the record is gone.
+  rememberAcceptedOutcome(submission.id, outcome);
   notifyQueueChanged();
 };
 
@@ -699,11 +776,12 @@ export const submitQueuedInspection = (
 
     try {
       const receipt = await ApiClient.submitInspection(queuedSubmission.apparatusId, queuedSubmission.data);
-      await removeFromQueue(queuedSubmission);
+      const outcome = receipt.processing_status === 'accepted_with_exception' ? 'accepted_with_exception' as const
+        : receipt.processing_status === 'accepted' ? 'submitted' as const
+        : receipt.review_status === 'pending_review' ? 'pending_review' as const : 'submitted' as const;
+      await removeFromQueue(queuedSubmission, outcome);
 
-      if (receipt.processing_status === 'accepted_with_exception') return 'accepted_with_exception' as const;
-      if (receipt.processing_status === 'accepted') return 'submitted' as const;
-      return receipt.review_status === 'pending_review' ? 'pending_review' as const : 'submitted' as const;
+      return outcome;
     } catch (error) {
       await recordSubmissionFailure(queueId, error);
       throw error;
