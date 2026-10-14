@@ -213,11 +213,9 @@ class StationResource extends Resource
                     Tables\Actions\EditAction::make(),
                 ])->label('Actions')->icon('heroicon-m-ellipsis-horizontal')->button()->color('gray'),
             ])
-            ->bulkActions([
-                Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
-                ]),
-            ]);
+            // No bulk delete: stations with inspection evidence must be deactivated,
+            // and the single-record delete action already enforces canDelete().
+            ->bulkActions([]);
     }
 
     public static function getRelations(): array

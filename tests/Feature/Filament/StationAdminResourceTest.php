@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature\Filament;
 
 use App\Filament\Resources\StationResource\Pages\EditStation;
+use App\Filament\Resources\StationResource\Pages\ListStations;
+use App\Models\StationInspection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Tests\TestCase;
@@ -64,5 +66,27 @@ final class StationAdminResourceTest extends TestCase
         $station->refresh();
         self::assertNull($station->getRawOriginal('name'));
         self::assertSame('Station 4', $station->name);
+    }
+
+    public function test_bulk_delete_is_not_offered_and_inspected_stations_cannot_be_deleted(): void
+    {
+        $this->actingAsSuperAdmin();
+        $inspected = $this->station(1);
+        StationInspection::query()->create([
+            'station_id' => $inspected->id,
+            'inspection_date' => '2026-10-01',
+            'inspection_type' => 'weekly',
+            'overall_status' => 'pass',
+            'form_data' => [],
+        ]);
+
+        Livewire::test(ListStations::class)
+            ->call('loadTable')
+            ->assertTableBulkActionDoesNotExist('delete');
+
+        Livewire::test(EditStation::class, ['record' => $inspected->getRouteKey()])
+            ->assertActionHidden('delete');
+
+        self::assertTrue($inspected->newQuery()->whereKey($inspected->id)->exists());
     }
 }
