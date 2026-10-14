@@ -105,6 +105,21 @@
                         <p>Correct the fields shown below, then submit again. Your selections are still here.</p>
                         @error('data.items') <p>{{ $message }}</p> @enderror
                         @error('data.idempotency_key') <p>{{ $message }}</p> @enderror
+                        @php
+                            $fieldErrors = collect($errors->getMessages())->filter(fn ($messages, $key) => preg_match('/^data\.items\.([a-z_]+)\.(quantity|metadata\.([a-z_]+))$/', $key));
+                        @endphp
+                        @if($fieldErrors->isNotEmpty())
+                            <ul class="uo-error-list">
+                                @foreach($fieldErrors as $key => $messages)
+                                    @php
+                                        preg_match('/^data\.items\.([a-z_]+)\.(quantity|metadata\.([a-z_]+))$/', $key, $parts);
+                                        $errorCode = $parts[1];
+                                        $errorTarget = $parts[2] === 'quantity' ? 'uo-qty-'.$errorCode : ($parts[3] === 'jacket_style' ? 'uo-product-'.$errorCode : 'uo-'.$errorCode.'-'.$parts[3]);
+                                    @endphp
+                                    <li><a href="#{{ $errorTarget }}" x-on:click.prevent="editItem(@js($errorCode))">{{ $products[$errorCode]['label'] ?? $errorCode }}: {{ $messages[0] }}</a></li>
+                                @endforeach
+                            </ul>
+                        @endif
                     </div>
                 @endif
                 @foreach(($context['marine'] ? $categories : ['work' => $categories['work']] + $categories) as $category => $categoryLabel)
@@ -144,12 +159,12 @@
                                         @endif
                                         <div class="uo-product-description">
                                             @if($badge)<span class="uo-chip">{{ $badge }}</span>@endif
-                                            <h3>{{ $product['label'] }}</h3>
+                                            <h3 id="uo-name-{{ $code }}">{{ $product['label'] }}</h3>
                                             <div class="uo-quantity">
                                                 <label for="uo-qty-{{ $code }}">Quantity</label>
                                                 <div class="uo-stepper">
                                                     <button type="button" aria-label="Remove one {{ $product['label'] }}" x-on:click="quantity = Math.max(0, Number(quantity || 0) - 1)" :disabled="@js($jacketBlocked) || Number(quantity) <= 0">−</button>
-                                                    <input id="uo-qty-{{ $code }}" type="number" min="0" max="{{ $quantityMax }}" step="1" inputmode="numeric" x-model.number="quantity" @disabled($jacketBlocked) aria-invalid="{{ $errors->has($path.'.quantity') ? 'true' : 'false' }}" aria-describedby="uo-qty-error-{{ $code }}">
+                                                    <input id="uo-qty-{{ $code }}" type="number" min="0" max="{{ $quantityMax }}" step="1" inputmode="numeric" x-model.number="quantity" @disabled($jacketBlocked) aria-invalid="{{ $errors->has($path.'.quantity') ? 'true' : 'false' }}" aria-describedby="uo-name-{{ $code }}{{ $errors->has($path.'.quantity') ? ' uo-qty-error-'.$code : '' }}">
                                                     <button type="button" aria-label="Add one {{ $product['label'] }}" x-on:click="quantity = Math.min({{ $quantityMax }}, Number(quantity || 0) + 1)" :disabled="@js($jacketBlocked) || Number(quantity) >= {{ $quantityMax }}">+</button>
                                                 </div>
                                             </div>
@@ -158,7 +173,7 @@
                                     </div>
                                     @if($code === 'jacket')
                                         <p class="uo-product-helper">{{ $jacketEligibility['reason'] }}</p>
-                                        <fieldset class="uo-jacket-options" aria-describedby="uo-jacket-jacket_style-error">
+                                        <fieldset class="uo-jacket-options" @error('data.items.jacket.metadata.jacket_style') aria-describedby="uo-jacket-jacket_style-error" @enderror>
                                             <legend>Choose one jacket style</legend>
                                             @foreach(config('uniform_orders.jacket_styles') as $styleCode => $style)
                                                 <label class="uo-jacket-option">
@@ -173,16 +188,20 @@
                                         <div class="uo-product-fields" x-show="Number(quantity) > 0" x-cloak>
                                             @foreach($product['fields'] as $field)
                                                 @continue($code === 'jacket' && $field['key'] === 'jacket_style')
-                                                @php $fieldPath = $path.'.metadata.'.$field['key']; $fieldId = 'uo-'.$code.'-'.$field['key']; @endphp
+                                                @php
+                                                    $fieldPath = $path.'.metadata.'.$field['key'];
+                                                    $fieldId = 'uo-'.$code.'-'.$field['key'];
+                                                    $describedBy = trim((($field['help'] ?? null) ? $fieldId.'-help ' : '').($errors->has($fieldPath) ? $fieldId.'-error' : ''));
+                                                @endphp
                                                 <div class="uo-field" wire:key="uniform-field-{{ $code }}-{{ $field['key'] }}">
                                                     <label for="{{ $fieldId }}">{{ $field['label'] }} @if(!($field['required'] ?? true)) <small>(optional)</small> @endif</label>
                                                     @if($field['type'] === 'select')
-                                                        <select id="{{ $fieldId }}" wire:model.live="{{ $fieldPath }}" aria-invalid="{{ $errors->has($fieldPath) ? 'true' : 'false' }}" aria-describedby="{{ $fieldId }}-help {{ $fieldId }}-error">
+                                                        <select id="{{ $fieldId }}" wire:model.live="{{ $fieldPath }}" aria-invalid="{{ $errors->has($fieldPath) ? 'true' : 'false' }}" @if($describedBy !== '') aria-describedby="{{ $describedBy }}" @endif>
                                                             <option value="">Select…</option>
                                                             @foreach($field['options'] as $value => $label) <option value="{{ $value }}">{{ $label }}</option> @endforeach
                                                         </select>
                                                     @else
-                                                        <input id="{{ $fieldId }}" type="{{ $field['type'] }}" wire:model.live.debounce.350ms="{{ $fieldPath }}" @if($field['type'] === 'number') inputmode="{{ ($field['step'] ?? 1) < 1 ? 'decimal' : 'numeric' }}" min="{{ $field['min'] }}" max="{{ $field['max'] }}" step="{{ $field['step'] ?? 1 }}" @else maxlength="{{ $field['max_length'] ?? 60 }}" @endif aria-invalid="{{ $errors->has($fieldPath) ? 'true' : 'false' }}" aria-describedby="{{ $fieldId }}-help {{ $fieldId }}-error">
+                                                        <input id="{{ $fieldId }}" type="{{ $field['type'] }}" wire:model.live.debounce.350ms="{{ $fieldPath }}" @if($field['type'] === 'number') inputmode="{{ ($field['step'] ?? 1) < 1 ? 'decimal' : 'numeric' }}" min="{{ $field['min'] }}" max="{{ $field['max'] }}" step="{{ $field['step'] ?? 1 }}" @else maxlength="{{ $field['max_length'] ?? 60 }}" @endif aria-invalid="{{ $errors->has($fieldPath) ? 'true' : 'false' }}" @if($describedBy !== '') aria-describedby="{{ $describedBy }}" @endif>
                                                     @endif
                                                     @if($field['help'] ?? null) <small id="{{ $fieldId }}-help">{{ $field['help'] }}</small> @endif
                                                     @error($fieldPath) <p class="uo-error" id="{{ $fieldId }}-error">{{ $message }}</p> @enderror
@@ -249,7 +268,7 @@
                             <summary>Notes for Support Services <small>(optional)</small></summary>
                             <label class="sr-only" for="uo-member-note">Notes for Support Services (optional)</label>
                             <p id="uo-notes-help">Replacement needs, special sizing, or additional context.</p>
-                            <textarea id="uo-member-note" wire:model="data.member_note" rows="2" maxlength="{{ config('uniform_orders.note_max') }}" aria-invalid="{{ $errors->has('data.member_note') ? 'true' : 'false' }}" aria-describedby="uo-notes-help uo-note-error"></textarea>
+                            <textarea id="uo-member-note" wire:model="data.member_note" rows="2" maxlength="{{ config('uniform_orders.note_max') }}" aria-invalid="{{ $errors->has('data.member_note') ? 'true' : 'false' }}" aria-describedby="uo-notes-help{{ $errors->has('data.member_note') ? ' uo-note-error' : '' }}"></textarea>
                             @error('data.member_note') <p class="uo-error" id="uo-note-error" x-init="$refs.notes.open = true; if (!desktop) openCart()">{{ $message }}</p> @enderror
                         </details>
                         <p class="uo-review-note">Support Services reviews your request. Assignment and sizing details are saved automatically.</p>
@@ -263,7 +282,7 @@
                     <summary>Recent requests</summary>
                     <header><a href="/employee/my-requests">View all requests</a></header>
                     @forelse($recentRequests as $request)
-                        <a class="uo-recent-request" href="/employee/my-requests/{{ $request->public_id }}"><strong>{{ $request->request_number }}</strong><span>{{ $request->items_count }} item(s) · {{ $request->created_at->format('M j, Y') }}</span><small>{{ $request->status->label() }}</small></a>
+                        <a class="uo-recent-request" href="/employee/my-requests/{{ $request->public_id }}"><strong>{{ $request->request_number }}</strong><span>{{ $request->items_count }} item(s) · {{ $request->created_at->format('M j, Y') }}</span><span class="{{ $request->status->tagClass() }}">{{ $request->status->label() }}</span></a>
                     @empty
                         <p>Your submitted uniform requests will appear here.</p>
                     @endforelse

@@ -7,9 +7,8 @@
     <div class="mr-list">
         @forelse($requests as $request)
             <a href="/employee/my-requests/{{ $request->public_id }}" class="mr-row">
-                <div class="mr-rail {{ $request->type->value === 'equipment' ? 'mr-rail-ppe' : '' }}"></div>
                 <div class="mr-main">
-                    <div class="mr-top"><strong>{{ $request->request_number }}</strong><span>{{ $request->status->label() }}</span></div>
+                    <div class="mr-top"><strong>{{ $request->request_number }}</strong><span class="{{ $request->status->tagClass() }}">{{ $request->status->label() }}</span></div>
                     <h3>{{ $request->type->label() }}</h3>
                     <p>{{ $request->items->pluck('item_name')->join(', ') }}</p>
                     <small>Submitted by {{ $request->requester_rank }} {{ $request->requester_name }} · {{ $request->created_at->format('M j, Y') }}</small>
@@ -17,7 +16,7 @@
                 <div class="mr-arrow" aria-hidden="true">→</div>
             </a>
         @empty
-            <div class="mr-empty"><strong>No personnel requests yet</strong><p>Your structured uniform and officer-submitted equipment requests will appear here.</p></div>
+            <div class="mr-empty hub-empty"><x-heroicon-o-inbox class="hub-empty__icon" aria-hidden="true" /><p class="hub-empty__title">No personnel requests yet</p><p class="hub-empty__body">Your structured uniform and officer-submitted equipment requests will appear here.</p></div>
         @endforelse
     </div>
     <div class="mt-4">{{ $requests->links() }}</div>

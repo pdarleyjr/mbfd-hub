@@ -1,0 +1,144 @@
+/*
+ * Personnel, Uniforms & Equipment cluster: overview (.pu-overview) and the
+ * employee equipment record page (.pu-record).
+ *
+ * Presentation only. Every colour, radius and shadow is a --hub-* token from
+ * mbfd-theme.css. Sections are level-1 glass on the white canvas; rows inside
+ * them are plain dividers; status uses the shared .hub-tag treatment.
+ */
+
+.pu-overview,
+.pu-record {
+    display: grid;
+    gap: 1rem;
+    min-width: 0;
+    color: rgb(var(--hub-n-900));
+    font-family: var(--hub-font-sans);
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Page introduction ---------- */
+
+:is(.pu-overview, .pu-record) .pu-intro {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+:is(.pu-overview, .pu-record) .pu-intro > div { flex: 1 1 24rem; min-width: 0; }
+:is(.pu-overview, .pu-record) .pu-eyebrow { color: rgb(var(--hub-n-600)); font-size: .75rem; font-weight: 600; letter-spacing: .025em; }
+:is(.pu-overview, .pu-record) .pu-intro h2 { margin: .25rem 0 0; color: rgb(var(--hub-header)); font-size: 1.125rem; font-weight: 700; line-height: 1.4; }
+:is(.pu-overview, .pu-record) .pu-intro p { max-width: 50rem; margin: .375rem 0 0; color: rgb(var(--hub-n-600)); font-size: .875rem; line-height: 1.6; }
+
+/* ---------- Glass sections ---------- */
+
+:is(.pu-overview, .pu-record) .pu-panel {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid rgb(var(--hub-glass-border));
+    border-radius: var(--hub-radius-card);
+    background: rgb(var(--hub-glass) / var(--hub-glass-alpha));
+    box-shadow: var(--hub-glass-highlight), var(--hub-shadow-card);
+}
+
+:is(.pu-overview, .pu-record) .pu-panel > header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: .5rem 1rem;
+    padding: .875rem 1rem;
+    border-bottom: 1px solid rgb(var(--hub-glass-border));
+}
+
+:is(.pu-overview, .pu-record) .pu-panel > header h3 { margin: 0; color: rgb(var(--hub-n-900)); font-size: .9375rem; font-weight: 700; }
+:is(.pu-overview, .pu-record) .pu-panel > header a { display: inline-flex; align-items: center; min-height: 44px; color: rgb(var(--hub-blue)); font-size: .8125rem; font-weight: 600; }
+:is(.pu-overview, .pu-record) .pu-count {
+    display: inline-grid;
+    place-items: center;
+    min-width: 1.75rem;
+    height: 1.75rem;
+    padding: 0 .375rem;
+    border: 1px solid rgb(var(--hub-neutral-border));
+    border-radius: var(--hub-radius-tag);
+    background: rgb(var(--hub-well));
+    color: rgb(var(--hub-n-800));
+    font-size: .75rem;
+    font-weight: 700;
+}
+
+:is(.pu-overview, .pu-record) .pu-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    min-height: 3.5rem;
+    padding: .75rem 1rem;
+    border-bottom: 1px solid rgb(var(--hub-glass-border));
+    color: rgb(var(--hub-n-900));
+    text-decoration: none;
+}
+
+:is(.pu-overview, .pu-record) .pu-row:last-child { border-bottom: 0; }
+:is(.pu-overview, .pu-record) .pu-row:hover { background: rgb(var(--hub-well) / .6); }
+:is(.pu-overview, .pu-record) .pu-row:focus-visible { outline: 2px solid rgb(var(--hub-focus)); outline-offset: -2px; }
+:is(.pu-overview, .pu-record) .pu-row > span { min-width: 0; }
+:is(.pu-overview, .pu-record) .pu-row strong,
+:is(.pu-overview, .pu-record) .pu-row small { display: block; overflow-wrap: anywhere; }
+:is(.pu-overview, .pu-record) .pu-row strong { font-size: .875rem; font-weight: 600; }
+:is(.pu-overview, .pu-record) .pu-row small { margin-top: .125rem; color: rgb(var(--hub-n-600)); font-size: .75rem; }
+:is(.pu-overview, .pu-record) .pu-row .pu-meta { flex-shrink: 0; color: rgb(var(--hub-n-600)); font-size: .75rem; text-align: right; }
+:is(.pu-overview, .pu-record) .pu-empty { margin: 0; padding: 1.25rem 1rem; color: rgb(var(--hub-n-600)); font-size: .875rem; }
+
+/* ---------- Overview ---------- */
+
+.pu-overview .pu-workstreams { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.pu-overview .pu-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid rgb(var(--hub-glass-border)); }
+.pu-overview .pu-metrics > div { padding: .875rem .5rem; border-right: 1px solid rgb(var(--hub-glass-border)); text-align: center; }
+.pu-overview .pu-metrics > div:last-child { border-right: 0; }
+.pu-overview .pu-metrics strong { display: block; color: rgb(var(--hub-n-900)); font-size: 1.5rem; font-weight: 700; line-height: 1.2; }
+.pu-overview .pu-metrics small { display: block; margin-top: .25rem; color: rgb(var(--hub-n-600)); font-size: .75rem; font-weight: 600; }
+
+.pu-overview .pu-ledger { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .75rem; }
+.pu-overview .pu-ledger a {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: .75rem;
+    min-height: 5.5rem;
+    padding: 1rem;
+    border: 1px solid rgb(var(--hub-glass-border));
+    border-radius: var(--hub-radius-card);
+    background: rgb(var(--hub-glass) / var(--hub-glass-alpha));
+    box-shadow: var(--hub-glass-highlight), var(--hub-shadow-card);
+    color: rgb(var(--hub-n-600));
+    text-decoration: none;
+}
+
+.pu-overview .pu-ledger a:hover { border-color: rgb(var(--hub-blue)); }
+.pu-overview .pu-ledger a:focus-visible { outline: 2px solid rgb(var(--hub-focus)); outline-offset: 2px; }
+.pu-overview .pu-ledger span { font-size: .8125rem; font-weight: 600; }
+.pu-overview .pu-ledger strong { color: rgb(var(--hub-n-900)); font-size: 1.25rem; font-weight: 700; }
+
+/* ---------- Employee record ---------- */
+
+.pu-record .pu-record-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.pu-record .pu-panel--attention > header { background: rgb(var(--hub-danger-bg)); }
+.pu-record .pu-panel--attention > header h3 { color: rgb(var(--hub-danger)); }
+
+@media (max-width: 1000px) {
+    .pu-overview .pu-workstreams,
+    .pu-record .pu-record-grid { grid-template-columns: minmax(0, 1fr); }
+    .pu-overview .pu-ledger { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+    .pu-overview .pu-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .pu-overview .pu-metrics > div:nth-child(2) { border-right: 0; }
+    .pu-overview .pu-metrics > div:nth-child(-n + 2) { border-bottom: 1px solid rgb(var(--hub-glass-border)); }
+    .pu-overview .pu-ledger { grid-template-columns: minmax(0, 1fr); }
+    :is(.pu-overview, .pu-record) .pu-row { flex-direction: column; align-items: flex-start; gap: .375rem; }
+    :is(.pu-overview, .pu-record) .pu-row .pu-meta { text-align: left; }
+}

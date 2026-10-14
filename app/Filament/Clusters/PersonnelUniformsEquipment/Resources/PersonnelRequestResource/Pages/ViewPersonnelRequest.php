@@ -106,7 +106,7 @@ class ViewPersonnelRequest extends ViewRecord
                 ->form([
                     $this->actionKey(),
                     $this->issueItemSelect($request),
-                    $this->inventorySelect()->required(),
+                    $this->inventorySelect($request)->required(),
                     $this->issueQuantity($request),
                     DatePicker::make('issued_at')->default(today())->required(),
                     DatePicker::make('expires_at')->label('Expiration date (optional)')->afterOrEqual('issued_at'),
@@ -223,12 +223,50 @@ class ViewPersonnelRequest extends ViewRecord
             ->maxValue(fn (Get $get): int => $this->actionQuantityLimit($request, $get('item_id')));
     }
 
-    private function inventorySelect(): Select
+    /**
+     * Stock that matches the selected request item is listed first so the wrong
+     * item or size is hard to pick; every in-stock row stays available.
+     */
+    private function inventorySelect(PersonnelRequest $request): Select
     {
-        return Select::make('uniform_id')->label('Uniform inventory')->options(function (): array {
-            return $this->inventoryChoices ??= Uniform::query()->where('quantity_on_hand', '>', 0)->orderBy('item_name')->get()
-                ->mapWithKeys(fn (Uniform $uniform): array => [$uniform->id => "{$uniform->item_name} — {$uniform->size} — {$uniform->quantity_on_hand} on hand"])->all();
-        })->searchable();
+        return Select::make('uniform_id')->label('Uniform inventory')->options(function (Get $get) use ($request): array {
+            $stock = $this->inventoryChoices ??= Uniform::query()->where('quantity_on_hand', '>', 0)->orderBy('item_name')->orderBy('size')->get()
+                ->map(fn (Uniform $uniform): array => [
+                    'id' => $uniform->id,
+                    'label' => "{$uniform->item_name} — {$uniform->size} — {$uniform->quantity_on_hand} on hand",
+                    'name' => $uniform->item_name,
+                    'size' => $uniform->size,
+                ])->all();
+            $itemId = $get('item_id');
+            $item = filter_var($itemId, FILTER_VALIDATE_INT) === false ? null : $request->items->firstWhere('id', (int) $itemId);
+
+            return self::groupInventoryChoices($stock, $item?->item_name, $item?->size);
+        })->searchable()->helperText('Stock matching the requested item and size is listed first.');
+    }
+
+    /**
+     * @param  list<array{id:int,label:string,name:?string,size:?string}>  $stock
+     * @return array<int|string, mixed>
+     */
+    public static function groupInventoryChoices(array $stock, ?string $itemName, ?string $size): array
+    {
+        $words = collect(preg_split('/[^a-z0-9]+/', strtolower((string) $itemName)) ?: [])
+            ->filter(fn (string $word): bool => strlen($word) > 2 && ! in_array($word, ['and', 'the', 'with', 'mbfd'], true))
+            ->values();
+        if ($words->isEmpty()) {
+            return collect($stock)->mapWithKeys(fn (array $row): array => [$row['id'] => $row['label']])->all();
+        }
+        $normalizedSize = strtolower(trim((string) $size));
+        $groups = ['Matches item and size' => [], 'Matches item' => [], 'Other stock' => []];
+        foreach ($stock as $row) {
+            $name = strtolower((string) $row['name']);
+            $matchesItem = $words->contains(fn (string $word): bool => str_contains($name, $word));
+            $matchesSize = $normalizedSize !== '' && str_contains(strtolower((string) $row['size']), $normalizedSize);
+            $group = $matchesItem ? ($matchesSize ? 'Matches item and size' : 'Matches item') : 'Other stock';
+            $groups[$group][$row['id']] = $row['label'];
+        }
+
+        return array_filter($groups);
     }
 
     private function batchIssueAction(PersonnelRequest $request): Action
@@ -247,7 +285,7 @@ class ViewPersonnelRequest extends ViewRecord
                         TextInput::make('quantity')->label('Issue now')->numeric()->integer()->minValue(0)->required()->live()
                             ->maxValue(fn (Get $get): int => $this->actionQuantityLimit($request, $get('item_id')))
                             ->helperText(fn (Get $get): string => $this->remaining($request, $get('item_id')).' remaining to issue'),
-                        $this->inventorySelect()->visible(fn (): bool => $request->type === PersonnelRequestType::Uniform)
+                        $this->inventorySelect($request)->visible(fn (): bool => $request->type === PersonnelRequestType::Uniform)
                             ->required(fn (Get $get): bool => (int) $get('quantity') > 0 && $request->type === PersonnelRequestType::Uniform)
                             ->disabled(fn (Get $get): bool => (int) $get('quantity') === 0),
                     ]),

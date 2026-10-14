@@ -5,14 +5,21 @@ declare(strict_types=1);
 namespace App\Filament\Employee\Pages;
 
 use App\Concerns\ResolvesCanonicalEmployee;
+use App\Models\PersonnelRequest;
 use App\Services\PersonnelRequests\PersonnelRequestSubmissionService;
 use App\Services\PersonnelRequests\UniformEntitlementService;
 use App\Services\PersonnelRequests\UniformOrderCatalog;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Computed;
 
+/**
+ * @property-read array{can_order:bool,reason:string} $jacketEligibility
+ * @property-read Collection<int, PersonnelRequest> $recentUniformRequests
+ */
 class RequestEquipmentPage extends Page
 {
     use ResolvesCanonicalEmployee;
@@ -111,6 +118,13 @@ class RequestEquipmentPage extends Page
         ], [], ['data.member_note' => 'Notes for Support Services', 'data.items.*.quantity' => 'quantity']);
 
         $items = array_filter($this->data['items'], fn ($item): bool => is_array($item) && (int) $item['quantity'] > 0);
+        // Only items this page offers may be ordered here; the others go through Support Services.
+        $unavailable = array_diff_key($items, $this->orderingProducts());
+        if ($unavailable !== []) {
+            throw ValidationException::withMessages([
+                'data.items' => 'Some selected items cannot be ordered here. Remove them or contact Support Services.',
+            ]);
+        }
         try {
             $request = $submissions->submitUniform(
                 $this->authenticatedEmployee(),
@@ -125,6 +139,7 @@ class RequestEquipmentPage extends Page
 
         $this->submittedRequestNumber = $request->request_number;
         $this->submittedRequestId = $request->public_id;
+        unset($this->jacketEligibility, $this->recentUniformRequests);
         $this->resetOrder();
         Notification::make()
             ->title('Uniform request submitted')
@@ -157,8 +172,28 @@ class RequestEquipmentPage extends Page
             'categories' => $categories,
             'selectedItems' => $selectedItems,
             'summary' => $entitlements->summarize($context, $selectedItems),
-            'jacketEligibility' => $entitlements->jacketEligibility($employee),
-            'recentRequests' => $employee->personnelRequests()->where('type', 'uniform')->withCount('items')->latest()->limit(5)->get(),
+            'jacketEligibility' => $this->jacketEligibility,
+            'recentRequests' => $this->recentUniformRequests,
         ];
+    }
+
+    /**
+     * Quantity steppers and size fields re-render the page on every change. These
+     * lookups do not depend on the selection, so they are read once per visit and
+     * refreshed after a submission. The jacket limit is still enforced at submit.
+     *
+     * @return array{can_order:bool,reason:string}
+     */
+    #[Computed(persist: true, seconds: 300)]
+    public function jacketEligibility(): array
+    {
+        return app(UniformEntitlementService::class)->jacketEligibility($this->authenticatedEmployee());
+    }
+
+    /** @return Collection<int, PersonnelRequest> */
+    #[Computed(persist: true, seconds: 300)]
+    public function recentUniformRequests(): Collection
+    {
+        return $this->authenticatedEmployee()->personnelRequests()->where('type', 'uniform')->withCount('items')->latest()->limit(5)->get();
     }
 }

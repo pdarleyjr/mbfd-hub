@@ -7,7 +7,7 @@
     <title>{{ $request->request_number }} · MBFD Employee Portal</title>
     @vite('resources/css/app.css')
 </head>
-<body data-hub-ui="2" data-hub-portal="employee" class="min-h-screen bg-white text-hub-ink">
+<body data-hub-ui="2" data-hub-portal="employee" class="min-h-screen bg-hub-canvas text-hub-ink">
     <main class="mx-auto max-w-5xl px-4 py-6 sm:px-6 lg:py-10">
         <x-hub-header back-href="/employee/my-requests" back-label="Back to My Requests" />
         @if(session('status'))
@@ -19,7 +19,7 @@
                 <p class="hub-portal-eyebrow">{{ $request->type->label() }}</p>
                 <div class="mt-2 flex flex-wrap items-center justify-between gap-3">
                     <h1 class="text-2xl font-bold text-hub-ink">{{ $request->request_number }}</h1>
-                    <span class="hub-tag hub-tag--info">{{ $request->status->label() }}</span>
+                    <span class="{{ $request->status->tagClass() }}" data-request-status>{{ $request->status->label() }}</span>
                 </div>
                 <p class="mt-2 text-sm text-hub-ink-secondary">Submitted by {{ $request->requester_rank }} {{ $request->requester_name }} on {{ $request->created_at->format('M j, Y \a\t g:i A') }}</p>
             </header>
@@ -32,7 +32,6 @@
                             @php
                                 $arrived = (int) $item->arrived_quantity;
                                 $issued = (int) $item->fulfilled_quantity;
-                                $itemStatus = $issued >= $item->quantity ? 'Issued' : ($issued > 0 ? 'Partially issued' : ($arrived >= $item->quantity ? 'Arrived' : ($arrived > 0 ? 'Partially arrived' : ($item->fulfillment_status === 'acknowledged' ? 'Acknowledged' : 'Awaiting arrival'))));
                                 $itemMessages = $request->updates->filter(fn ($update) => (int) data_get($update->metadata, 'item_id') === $item->id && filled($update->employee_visible_note));
                             @endphp
                             <div class="p-4" id="item-{{ $item->id }}" data-request-item="{{ $item->id }}">
@@ -41,7 +40,7 @@
                                     @if($item->size) Size {{ $item->size }} @endif
                                     @if($item->reason) · Reason: {{ str($item->reason)->title() }} @endif
                                 </p>
-                                <p class="mt-2 text-sm font-semibold">{{ $itemStatus }}</p>
+                                <p class="mt-2"><span class="{{ $item->memberProgressTagClass() }}">{{ $item->memberProgressLabel() }}</span></p>
                                 <dl class="mt-2 grid grid-cols-3 gap-2 text-sm">
                                     <div><dt class="text-hub-ink-secondary">Requested</dt><dd class="font-semibold">{{ $item->quantity }}</dd></div>
                                     <div><dt class="text-hub-ink-secondary">Arrived</dt><dd class="font-semibold" data-arrived-quantity>{{ $arrived }}</dd></div>
@@ -75,15 +74,15 @@
                                 <form method="post" action="{{ route('employee.personnel-requests.attachments.store', $request) }}" enctype="multipart/form-data" class="mt-4 space-y-3">
                                     @csrf
                                     <label class="block font-semibold" for="document_type">Document type</label>
-                                    <select id="document_type" name="document_type" class="min-h-12 w-full rounded-xl border-hub-border">
+                                    <select id="document_type" name="document_type" class="min-h-12 w-full rounded-lg border-hub-border bg-hub-surface">
                                         @foreach($request->information_requested as $type)
                                             <option value="{{ $type }}">{{ str($type)->replace('_', ' ')->title() }}</option>
                                         @endforeach
                                     </select>
                                     <label class="block font-semibold" for="attachment">PDF, JPEG, or PNG (maximum 10 MB)</label>
-                                    <input id="attachment" name="attachment" type="file" required accept=".pdf,.jpg,.jpeg,.png" class="block min-h-12 w-full rounded-xl border border-hub-border bg-white p-3">
-                                    @error('attachment') <p class="text-sm font-semibold text-red-700">{{ $message }}</p> @enderror
-                                    <button class="min-h-12 rounded-xl bg-hub-blue px-5 font-bold text-white hover:bg-hub-blue-strong focus:outline-none focus:ring-2 focus:ring-hub-focus focus:ring-offset-2">Upload securely</button>
+                                    <input id="attachment" name="attachment" type="file" required accept=".pdf,.jpg,.jpeg,.png" class="block min-h-12 w-full rounded-lg border border-hub-border bg-hub-surface p-3" @error('attachment') aria-invalid="true" aria-describedby="attachment-error" @enderror>
+                                    @error('attachment') <p id="attachment-error" class="text-sm font-semibold text-hub-danger">{{ $message }}</p> @enderror
+                                    <button class="hub-btn hub-btn--primary hub-btn--field">Upload securely</button>
                                 </form>
                             @endif
                         </div>
@@ -94,18 +93,18 @@
                             <input type="hidden" name="idempotency_key" value="{{ old('idempotency_key', (string) \Illuminate\Support\Str::uuid()) }}">
                             <h2 class="font-semibold">Message Support Services</h2>
                             <label class="block text-sm font-semibold" for="message-item">About</label>
-                            <select id="message-item" name="item_id" class="min-h-12 w-full rounded-md border-hub-border">
+                            <select id="message-item" name="item_id" class="min-h-12 w-full rounded-lg border-hub-border bg-hub-surface" @error('item_id') aria-invalid="true" aria-describedby="message-item-error" @enderror>
                                 <option value="">Entire order</option>
                                 @foreach($request->items as $messageItem)
                                     <option value="{{ $messageItem->id }}" @selected((string) old('item_id') === (string) $messageItem->id)>{{ $messageItem->item_name }}</option>
                                 @endforeach
                             </select>
-                            @error('item_id') <p class="text-sm font-semibold text-red-700">{{ $message }}</p> @enderror
+                            @error('item_id') <p id="message-item-error" class="text-sm font-semibold text-hub-danger">{{ $message }}</p> @enderror
                             <label class="block text-sm font-semibold" for="response">Your response</label>
-                            <textarea id="response" name="response" rows="3" required maxlength="4000" class="w-full rounded-md border-hub-border">{{ old('response') }}</textarea>
-                            @error('response') <p class="text-sm font-semibold text-red-700">{{ $message }}</p> @enderror
-                            @error('idempotency_key') <p class="text-sm font-semibold text-red-700">{{ $message }}</p> @enderror
-                            <button class="min-h-12 rounded-md bg-hub-blue px-5 font-bold text-white hover:bg-hub-blue-strong focus:outline-none focus:ring-2 focus:ring-hub-focus focus:ring-offset-2">{{ $request->status === \App\Enums\PersonnelRequestStatus::NeedsInformation ? 'Send response' : 'Send message' }}</button>
+                            <textarea id="response" name="response" rows="3" required maxlength="4000" class="w-full rounded-lg border-hub-border bg-hub-surface" @error('response') aria-invalid="true" aria-describedby="response-error" @enderror>{{ old('response') }}</textarea>
+                            @error('response') <p id="response-error" class="text-sm font-semibold text-hub-danger">{{ $message }}</p> @enderror
+                            @error('idempotency_key') <p class="text-sm font-semibold text-hub-danger">{{ $message }}</p> @enderror
+                            <button class="hub-btn hub-btn--primary hub-btn--field">{{ $request->status === \App\Enums\PersonnelRequestStatus::NeedsInformation ? 'Send response' : 'Send message' }}</button>
                         </form>
                     @endif
                 </section>
