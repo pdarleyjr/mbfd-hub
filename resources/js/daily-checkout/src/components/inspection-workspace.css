@@ -81,7 +81,7 @@
 .inspection-other-areas[open] summary svg { transform: rotate(180deg); }
 .area-state { color: var(--muted); font-size: 18px; } .area-state.is-complete { color: var(--green); }
 .inspection-unlocated-findings { margin-top: 16px; padding: 12px; border: 1px solid rgb(var(--hub-warning-border)); border-radius: var(--hub-radius-control); background: rgb(var(--hub-warning-bg)); color: rgb(var(--hub-warning-strong)); font-size: 14px; }
-.inspection-unlocated-findings summary { cursor: pointer; font-weight: 650; min-height: 24px; }
+.inspection-unlocated-findings summary { display: flex; align-items: center; cursor: pointer; font-weight: 650; min-height: 44px; }
 .inspection-unlocated-findings p { margin-top: 8px; }
 .inspection-unlocated-findings ul { display: grid; gap: 8px; margin-top: 8px; }
 .inspection-equipment { min-width: 0; padding: 16px; }

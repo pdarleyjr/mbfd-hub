@@ -41,6 +41,9 @@ export default function CompartmentStep({ checklistType, compartments, findings 
   const [pickerCollapsed, setPickerCollapsed] = useState(false);
   const [focusWorkspace, setFocusWorkspace] = useState(false);
   const [batchUndo, setBatchUndo] = useState<BatchUndo | null>(null);
+  const [announcement, setAnnouncement] = useState('');
+  // Bumped to clear a photo picker after a removal or a rejected file, so the same file can be chosen again.
+  const [photoResets, setPhotoResets] = useState<Record<string, number>>({});
   const workspaceRef = useRef<HTMLDivElement>(null);
   const quickButtonRef = useRef<HTMLButtonElement>(null);
   const quickDialogRef = useRef<HTMLElement>(null);
@@ -125,7 +128,11 @@ export default function CompartmentStep({ checklistType, compartments, findings 
 
   const confirmAllPresent = (area: Compartment) => {
     const changed = area.items.filter(item => batchEligible(item) && !(item.status === 'Present' && item.observed === true));
-    setBatchUndo(changed.length > 0 ? { compartmentId: area.id, previous: changed.map(({ id, status, observed }) => ({ id, status, observed })) } : null);
+    // A repeat tap that changes nothing keeps the existing Undo for the first batch.
+    if (changed.length > 0) {
+      setBatchUndo({ compartmentId: area.id, previous: changed.map(({ id, status, observed }) => ({ id, status, observed })) });
+      setAnnouncement(`${changed.length} ${changed.length === 1 ? 'item' : 'items'} marked present in ${area.name}.`);
+    }
     onChange(previous => previous.map(compartment => compartment.id === area.id ? { ...compartment, items: compartment.items.map(item => batchEligible(item) ? { ...item, status: 'Present', observed: true } : item) } : compartment));
   };
 
@@ -141,12 +148,24 @@ export default function CompartmentStep({ checklistType, compartments, findings 
       }),
     } : compartment));
     setBatchUndo(null);
+    setAnnouncement('Confirm all present was undone.');
+  };
+
+  const resetPhotoInput = (itemId: string) => setPhotoResets(previous => ({ ...previous, [itemId]: (previous[itemId] ?? 0) + 1 }));
+
+  const removePhoto = (compartmentId: string, itemId: string) => {
+    update(compartmentId, itemId, { photo: undefined });
+    resetPhotoInput(itemId);
+    setAnnouncement('Photo removed.');
+    // The Remove button unmounts with the preview; keep keyboard focus on the photo picker.
+    requestAnimationFrame(() => document.getElementById(`photo-${itemId}`)?.focus());
   };
 
   const capturePhoto = (compartmentId: string, itemId: string, file?: File) => {
     if (!file) return;
     if (!file.type.startsWith('image/') || file.size > 5_000_000) {
       setPhotoError('Choose an image smaller than 5 MB. Your inspection answers are still saved.');
+      resetPhotoInput(itemId);
       return;
     }
     setPhotoError(null);
@@ -207,8 +226,9 @@ export default function CompartmentStep({ checklistType, compartments, findings 
         <div><p className="inspection-eyebrow">{showBlueprint && !mappedIds.has(current.id) ? 'Other area · Not shown on vehicle image' : 'Compartment Inspection'}</p><h2>{current.name}</h2><p className="inspection-muted">{compartmentProgress.completed} of {compartmentProgress.total} inspected{compartmentProgress.issues > 0 ? ` · ${compartmentProgress.issues} reported` : ''}</p></div>
         <button type="button" className="hub-btn hub-btn--secondary hub-btn--wrap confirm-compartment" onClick={() => confirmAllPresent(current)}><Check size={18} aria-hidden="true" />Confirm all present</button>
       </header>
+      <p role="status" className="sr-only">{announcement}</p>
       {batchUndo?.compartmentId === current.id && <div className="inspection-batch-undo">
-        <p role="status">{batchUndo.previous.length} {batchUndo.previous.length === 1 ? 'item' : 'items'} marked present in {current.name}.</p>
+        <p>{batchUndo.previous.length} {batchUndo.previous.length === 1 ? 'item' : 'items'} marked present in {current.name}.</p>
         <button type="button" className="hub-btn hub-btn--tertiary" onClick={undoBatch}>Undo</button>
       </div>}
       {photoError && <p role="alert" className="inspection-alert">{photoError}</p>}
@@ -247,16 +267,16 @@ export default function CompartmentStep({ checklistType, compartments, findings 
                   aria-invalid={outOfRange || undefined}
                   value={item.value === null || item.value === undefined ? '' : String(item.value)}
                   onChange={event => update(current.id, item.id, { value: isNumeric(item) ? event.target.value === '' ? null : Number(event.target.value) : event.target.value, observed: true })} />
-                {item.inputType === 'percentage' && <span id={`value-hint-${item.id}`} className={`inspection-field-hint block ${outOfRange ? 'is-invalid' : ''}`}>{outOfRange ? 'Enter a percentage from 0 to 100.' : 'Percentage, 0 to 100.'}</span>}
               </label>}
+              {item.inputType === 'percentage' && <p id={`value-hint-${item.id}`} className={`inspection-field-hint ${outOfRange ? 'is-invalid' : ''}`}>{outOfRange ? 'Enter a percentage from 0 to 100.' : 'Percentage, 0 to 100.'}</p>}
               <label htmlFor={`note-${item.id}`}>Notes (optional)</label>
               <textarea id={`note-${item.id}`} rows={2} value={item.notes ?? ''} onChange={event => update(current.id, item.id, { notes: event.target.value })} maxLength={2000} />
               <label htmlFor={`photo-${item.id}`}>Photo (optional)</label>
               {/* No forced capture: phones offer the camera or the photo library. The key resets the picker after a change. */}
-              <input key={`photo-${item.id}-${item.photo ? 'set' : 'empty'}`} id={`photo-${item.id}`} type="file" accept="image/*" onChange={event => capturePhoto(current.id, item.id, event.target.files?.[0])} />
+              <input key={`photo-${item.id}-${photoResets[item.id] ?? 0}`} id={`photo-${item.id}`} type="file" accept="image/*" onChange={event => capturePhoto(current.id, item.id, event.target.files?.[0])} />
               {item.photo && <div className="inspection-photo-preview">
                 <img src={item.photo} alt={`Photo of ${item.name}`} className="inspection-photo" />
-                <button type="button" className="hub-btn hub-btn--destructive" aria-label={`Remove photo of ${item.name}`} onClick={() => update(current.id, item.id, { photo: undefined })}>Remove photo</button>
+                <button type="button" className="hub-btn hub-btn--destructive" aria-label={`Remove photo of ${item.name}`} onClick={() => removePhoto(current.id, item.id)}>Remove photo</button>
               </div>}
             </div>}
           </article>;

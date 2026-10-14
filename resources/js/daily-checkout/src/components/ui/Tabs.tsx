@@ -41,7 +41,7 @@ export default function Tabs<T extends string>({ tabs, active, onChange, label, 
       Home: 0,
       End: tabs.length - 1,
     };
-    if (!(event.key in targets)) return;
+    if (!(event.key in targets) || event.altKey || event.ctrlKey || event.metaKey) return;
     event.preventDefault();
     activate(tabs[targets[event.key]].id);
   };
