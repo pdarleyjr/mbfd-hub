@@ -63,6 +63,8 @@ test('the uniform toolbar sits under the shared shell bar, not a fixed offset', 
   const css = readFileSync('resources/css/filament/uniform-order-builder.css', 'utf8');
   assert.match(css, /--uo-toolbar-top: calc\(var\(--hub-shell-bar-height\)/);
   assert.doesNotMatch(css, /--uo-toolbar-top: \d+px/);
+});
+
 /*
  * Daily Checkout inspection and station surfaces consume mbfd-theme.css tokens and the shared
  * hub-components classes: no hex colours, no inline React style objects, no raw Tailwind palette families.

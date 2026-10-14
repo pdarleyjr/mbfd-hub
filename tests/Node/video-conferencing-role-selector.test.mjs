@@ -33,8 +33,10 @@ test("station polling and Reverb events share a single token request in flight",
 
 test("station detail launches fixed station context without bundling LiveKit", () => {
   assert.match(stationDetail, /const stationNumber = Number\(station\.station_number\);/);
-  assert.match(stationDetail, /\[1, 2, 3, 4, 6\]\.includes\(stationNumber\)/);
-  assert.match(stationDetail, /href=\{`\/video-conferencing\/stations\/\$\{stationNumber\}`\}/);
+  // The lineup stations may be listed inline or through a named constant.
+  assert.match(stationDetail, /(?:\[1, 2, 3, 4, 6\]|LINEUP_STATION_NUMBERS)\.includes\(stationNumber\)/);
+  if (/LINEUP_STATION_NUMBERS/.test(stationDetail)) assert.match(stationDetail, /LINEUP_STATION_NUMBERS[^=]*=\s*\[1, 2, 3, 4, 6\]/);
+  assert.match(stationDetail, /href(?:=\{|:\s*)`\/video-conferencing\/stations\/\$\{stationNumber\}`/);
   assert.match(stationDetail, /stationNumber === 2/);
   assert.match(stationDetail, /Morning Lineup Video Conference — Station 2/);
   assert.match(stationDetail, /\/employee\/video-conferencing\/command\?return_to=/);
