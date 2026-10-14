@@ -13,6 +13,10 @@ class Station extends Model
         'name',
         'station_number',
         'address',
+        'city',
+        'state',
+        'zip_code',
+        'captain_in_charge',
         'phone',
         'latitude',
         'longitude',
@@ -37,12 +41,15 @@ class Station extends Model
     }
 
     /**
-     * Get the station name (alias for station_number)
-     * This provides backward compatibility for code expecting 'name'
+     * Display name: the administrator-entered name, or "Station {number}" when
+     * no name has been set. Code that needs only the stored value should use
+     * getRawOriginal('name').
      */
-    public function getNameAttribute(): string
+    public function getNameAttribute(?string $value): string
     {
-        return 'Station '.$this->station_number;
+        $value = is_string($value) ? trim($value) : '';
+
+        return $value !== '' ? $value : 'Station '.$this->station_number;
     }
 
     /**

@@ -42,13 +42,25 @@ class StationResource extends Resource
                         Forms\Components\TextInput::make('station_number')
                             ->required()
                             ->maxLength(255)
+                            ->unique(ignoreRecord: true)
                             ->label('Station Number'),
+                        Forms\Components\TextInput::make('name')
+                            ->label('Display Name')
+                            ->maxLength(255)
+                            ->helperText('Shown to members. Leave blank to use "Station" and the station number.')
+                            ->afterStateHydrated(fn (Forms\Components\TextInput $component, ?Station $record) => $component->state($record?->getRawOriginal('name')))
+                            ->dehydrateStateUsing(fn (?string $state): ?string => filled($state) ? trim($state) : null),
                         Forms\Components\TextInput::make('captain_in_charge')
                             ->maxLength(255)
                             ->label('Captain in Charge'),
                         Forms\Components\TextInput::make('phone')
                             ->tel()
                             ->maxLength(255),
+                        Forms\Components\Toggle::make('is_active')
+                            ->label('Active station')
+                            ->helperText('Inactive stations keep their history in Admin but are hidden from member station lists.')
+                            ->default(true)
+                            ->inline(false),
                     ])->columns(3),
                 Forms\Components\Section::make('Address')
                     ->id('station-address-section')
@@ -110,10 +122,17 @@ class StationResource extends Resource
                     ->schema([
                         Infolists\Components\TextEntry::make('station_number')
                             ->label('Station Number'),
+                        Infolists\Components\TextEntry::make('name')
+                            ->label('Display Name'),
                         Infolists\Components\TextEntry::make('captain_in_charge')
                             ->label('Captain in Charge'),
                         Infolists\Components\TextEntry::make('phone'),
-                    ])->columns(4),
+                        Infolists\Components\TextEntry::make('is_active')
+                            ->label('Status')
+                            ->badge()
+                            ->formatStateUsing(fn ($state): string => $state ? 'Active' : 'Inactive')
+                            ->color(fn ($state): string => $state ? 'success' : 'gray'),
+                    ])->columns(5),
                 Infolists\Components\Section::make('Address')
                     ->schema([
                         Infolists\Components\TextEntry::make('address'),
@@ -175,13 +194,18 @@ class StationResource extends Resource
                 Tables\Columns\TextColumn::make('rooms_count')->visibleFrom('md')
                     ->counts('rooms')
                     ->label('Rooms'),
+                Tables\Columns\IconColumn::make('is_active')->visibleFrom('md')
+                    ->label('Active')
+                    ->boolean()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('updated_at')->visibleFrom('md')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
-                //
+                Tables\Filters\TernaryFilter::make('is_active')
+                    ->label('Active'),
             ])
             ->actions([
                 Tables\Actions\ActionGroup::make([
