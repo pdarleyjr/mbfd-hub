@@ -73,13 +73,23 @@ final class ApparatusInspectionProcessingService
         if (! empty($evidence['checklist_v2']['scheduled_tasks'])) {
             $observations[] = ['id' => 'scheduled_duties', 'name' => 'Scheduled duties', 'items' => $evidence['checklist_v2']['scheduled_tasks']];
         }
+        $paperFields = app(InspectionPaperFields::class);
+        $openDefects = $this->lockOpenDefects((int) $apparatus->id, $observations, $definitions);
         foreach ($observations as $compartment) {
             foreach ($compartment['items'] ?? [] as $item) {
                 $identity = $definitions[$compartment['id']][$item['id'] ?? ''] ?? null;
-                $existing = ApparatusDefect::query()->where('apparatus_id', $apparatus->id)
-                    ->whereIn('compartment', $identity['compartment_names'] ?? [$compartment['name']])->whereIn('item', $identity['item_names'] ?? [$item['name']])
-                    ->where('resolved', false)->lockForUpdate()->get()->first(fn (ApparatusDefect $defect): bool => $identity === null || count(app(InspectionPaperFields::class)->matchingEquipment($definitions, $defect->compartment, $defect->item)) === 1
-                    );
+                $compartmentNames = $this->lookupNames($identity['compartment_names'] ?? [$compartment['name']]);
+                $itemNames = $this->lookupNames($identity['item_names'] ?? [$item['name']]);
+                $existing = null;
+                foreach ($openDefects as $candidate) {
+                    if (! $candidate->resolved
+                        && $candidate->compartment !== null && in_array((string) $candidate->compartment, $compartmentNames, true)
+                        && $candidate->item !== null && in_array((string) $candidate->item, $itemNames, true)
+                        && ($identity === null || count($paperFields->matchingEquipment($definitions, $candidate->compartment, $candidate->item)) === 1)) {
+                        $existing = $candidate;
+                        break;
+                    }
+                }
                 $isIssue = in_array($item['status'], ['Missing', 'Damaged'], true);
                 if (! $isIssue && $existing === null) {
                     continue;
@@ -98,6 +108,10 @@ final class ApparatusInspectionProcessingService
                 if ($existing && $isIssue && $defect->issue_type !== strtolower($item['status'])) {
                     $defect->update(['issue_type' => strtolower($item['status'])]);
                 }
+                // Later items must see this row exactly as a fresh per-item
+                // query would, including a defect created a moment ago.
+                $openDefects[$defect->id] = $defect;
+                ksort($openDefects);
                 ApparatusDefectObservation::query()->create([
                     'apparatus_defect_id' => $defect->id,
                     'apparatus_inspection_id' => $inspection->id,
@@ -133,5 +147,56 @@ final class ApparatusInspectionProcessingService
                 AuditEquipmentAfterInspection::dispatch((int) $inspection->id, (int) $apparatus->id)->delay(now()->addSeconds(5));
             }
         });
+    }
+
+    /**
+     * Load and lock, in one query, every unresolved defect any submitted item
+     * could match. The apparatus row is already locked, so this replaces one
+     * locking query per checklist item (often 100+) while preserving which
+     * rows are considered and their id order.
+     *
+     * @param  array<int, array<string, mixed>>  $observations
+     * @param  array<string, array<string, array<string, mixed>>>  $definitions
+     * @return array<int, ApparatusDefect>
+     */
+    private function lockOpenDefects(int $apparatusId, array $observations, array $definitions): array
+    {
+        $compartmentNames = [];
+        $itemNames = [];
+        foreach ($observations as $compartment) {
+            foreach ($compartment['items'] ?? [] as $item) {
+                $identity = $definitions[$compartment['id']][$item['id'] ?? ''] ?? null;
+                array_push($compartmentNames, ...$this->lookupNames($identity['compartment_names'] ?? [$compartment['name']]));
+                array_push($itemNames, ...$this->lookupNames($identity['item_names'] ?? [$item['name']]));
+            }
+        }
+        if ($compartmentNames === [] || $itemNames === []) {
+            return [];
+        }
+
+        return ApparatusDefect::query()
+            ->where('apparatus_id', $apparatusId)
+            ->whereIn('compartment', array_values(array_unique($compartmentNames)))
+            ->whereIn('item', array_values(array_unique($itemNames)))
+            ->where('resolved', false)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get()
+            ->keyBy('id')
+            ->all();
+    }
+
+    /**
+     * SQL `IN` never matches NULL; scalar names compare as their string form.
+     *
+     * @param  array<int, mixed>  $names
+     * @return array<int, string>
+     */
+    private function lookupNames(array $names): array
+    {
+        return array_values(array_map(
+            static fn (mixed $name): string => (string) $name,
+            array_filter($names, static fn (mixed $name): bool => is_scalar($name)),
+        ));
     }
 }
