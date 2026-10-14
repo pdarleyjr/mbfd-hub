@@ -44,18 +44,35 @@ class StationController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $stations = Station::with(['apparatuses', 'rooms'])
-            ->withCount('apparatuses', 'rooms', 'capitalProjects', 'shopWorks')
-            ->get();
         $staffing = app(StationStaffingService::class);
-        $stations->each(fn (Station $station) => $station->setAttribute('staffing_summary', $staffing->summaryFor($station)));
 
         if ($this->isPublicRequest($request)) {
+            // Member station cards: active stations only, with the counts the
+            // cards show. Apparatus is read only for the staffing summary and
+            // rooms are never shipped with the list.
+            $stations = Station::query()
+                ->where('is_active', true)
+                ->with(['apparatuses' => fn ($query) => $query->select(StationStaffingService::APPARATUS_COLUMNS)])
+                ->withCount([
+                    'rooms' => fn ($query) => $this->onlyActiveRooms($query),
+                    'capitalProjects' => fn ($query) => $query->active(),
+                ])
+                ->get();
+            $stations->each(function (Station $station) use ($staffing): void {
+                $station->setAttribute('staffing_summary', $staffing->summaryFor($station));
+                $station->unsetRelation('apparatuses');
+            });
+
             return response()->json([
                 'stations' => PublicStationResource::collection($stations)->resolve($request),
                 'total' => $stations->count(),
             ]);
         }
+
+        $stations = Station::with(['apparatuses', 'rooms'])
+            ->withCount('apparatuses', 'rooms', 'capitalProjects', 'shopWorks')
+            ->get();
+        $stations->each(fn (Station $station) => $station->setAttribute('staffing_summary', $staffing->summaryFor($station)));
 
         return response()->json([
             'stations' => $stations,
@@ -68,6 +85,7 @@ class StationController extends Controller
      */
     public function show(Request $request, int $id): JsonResponse
     {
+        $isPublic = $this->isPublicRequest($request);
         $roomTypeColumn = Schema::hasColumn('rooms', 'room_type') ? 'room_type' : 'type';
         $roomsHaveIsActive = Schema::hasColumn('rooms', 'is_active');
         $roomsHaveBlueprintOrder = Schema::hasColumn('rooms', 'sort_order');
@@ -93,7 +111,7 @@ class StationController extends Controller
                 $query->orderBy('floor')->orderBy('name');
             },
         ])
-            ->withCount(['apparatuses', 'rooms', 'capitalProjects', 'under25kProjects'])
+            ->withCount('shopWorks')
             ->findOrFail($id);
 
         $staffing = app(StationStaffingService::class)->summaryFor($station);
@@ -104,35 +122,30 @@ class StationController extends Controller
         $dormBedsCount = $staffing['dorm_beds_count'];
         $personnelCount = $staffing['assigned_personnel_count'];
 
-        $roomsByType = $station->rooms()
-            ->select($roomTypeColumn)
-            ->selectRaw('COUNT(*) as count')
-            ->groupBy($roomTypeColumn)
-            ->pluck('count', $roomTypeColumn)
-            ->toArray();
-
-        $apparatusByType = $station->apparatuses()
-            ->select('type')
-            ->selectRaw('COUNT(*) as count')
-            ->groupBy('type')
-            ->pluck('count', 'type')
-            ->toArray();
-
+        // Every count and total below is derived from the same (active) records
+        // the response lists, so the summary cannot disagree with the lists.
+        $roomsByType = $station->rooms
+            ->countBy(fn ($room): string => (string) $room->getRawOriginal($roomTypeColumn))
+            ->all();
+        $apparatusByType = $stationApparatuses
+            ->countBy(fn (Apparatus $apparatus): string => (string) $apparatus->getRawOriginal('type'))
+            ->all();
         $projectTotals = [
             'capital_projects' => [
-                'active' => $station->capitalProjects()->count(),
-                'budget' => (float) $station->capitalProjects()->sum('budget_amount'),
+                'active' => $station->capitalProjects->count(),
+                'budget' => (float) $station->capitalProjects->sum('budget_amount'),
             ],
             'under_25k_projects' => [
-                'active' => $station->under25kProjects()->count(),
-                'budget' => (float) $station->under25kProjects()->sum('budget_amount'),
+                'active' => $station->under25kProjects->count(),
+                'budget' => (float) $station->under25kProjects->sum('budget_amount'),
             ],
         ];
 
-        $shopWorks = $station->shopWorks()
+        // Shop work detail is internal; members only receive the count, so the
+        // recent-work query only runs for the admin response.
+        $recentShopWorks = $station->shopWorks()
             ->orderBy('shop_works.created_at', 'desc')
-            ->limit(10)
-            ->get();
+            ->limit(10);
 
         $normalizeEnumValue = function ($value): string {
             if ($value instanceof \BackedEnum) {
@@ -193,10 +206,10 @@ class StationController extends Controller
             'unavailable_assigned_units' => $staffing['unavailable_assigned_units'],
             'unmatched_assigned_units' => $staffing['unmatched_assigned_units'],
             'staffing_known' => $staffing['known'],
-            'rooms_count' => (int) ($station->rooms_count ?? $station->rooms->count()),
-            'capital_projects_count' => (int) ($station->capital_projects_count ?? $station->capitalProjects->count()),
-            'under_25k_projects_count' => (int) ($station->under_25k_projects_count ?? $station->under25kProjects->count()),
-            'shop_works_count' => (int) $shopWorks->count(),
+            'rooms_count' => $station->rooms->count(),
+            'capital_projects_count' => $station->capitalProjects->count(),
+            'under_25k_projects_count' => $station->under25kProjects->count(),
+            'shop_works_count' => (int) $station->shop_works_count,
             'personnel_count' => $personnelCount,
             'assigned_personnel_count' => $personnelCount,
             'dorm_beds_count' => $dormBedsCount,
@@ -268,7 +281,7 @@ class StationController extends Controller
                     'updated_at' => $project->updated_at,
                 ];
             })->values()->all(),
-            'shop_works' => $shopWorks->map(function ($work) use ($normalizeProjectStatus) {
+            'shop_works' => $isPublic ? [] : $recentShopWorks->get()->map(function ($work) use ($normalizeProjectStatus) {
                 return [
                     'id' => $work->id,
                     'work_order_number' => 'SW-'.$work->id,
@@ -297,11 +310,23 @@ class StationController extends Controller
             ],
         ];
 
-        if ($this->isPublicRequest($request)) {
+        if ($isPublic) {
             return response()->json($this->redactStationShow($request, $station, $payload));
         }
 
         return response()->json($payload);
+    }
+
+    /**
+     * Restrict a rooms query to active rooms where the deployment tracks room
+     * activity (the column is not present on every schema).
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder<Room>  $query
+     * @return \Illuminate\Database\Eloquent\Builder<Room>
+     */
+    private function onlyActiveRooms($query)
+    {
+        return Schema::hasColumn('rooms', 'is_active') ? $query->where('is_active', true) : $query;
     }
 
     /**
