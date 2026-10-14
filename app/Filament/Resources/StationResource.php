@@ -99,12 +99,12 @@ class StationResource extends Resource
                     ->schema([
                         Infolists\Components\TextEntry::make('low_stock_count')
                             ->label('Low Stock')
-                            ->state(fn (Station $record): int => (int) ($record->low_stock_count ?? $record->inventoryItems()->where('status', 'low')->count()))
+                            ->state(fn (Station $record): int => (int) ($record->getAttribute('low_stock_count') ?? $record->inventoryItems()->where('status', 'low')->count()))
                             ->badge()
                             ->color(fn ($state) => $state > 0 ? 'danger' : 'success'),
                         Infolists\Components\TextEntry::make('ordered_stock_count')
                             ->label('Ordered')
-                            ->state(fn (Station $record): int => (int) ($record->ordered_stock_count ?? $record->inventoryItems()->where('status', 'ordered')->count()))
+                            ->state(fn (Station $record): int => (int) ($record->getAttribute('ordered_stock_count') ?? $record->inventoryItems()->where('status', 'ordered')->count()))
                             ->badge()
                             ->color(fn ($state) => $state > 0 ? 'warning' : 'gray'),
                         Infolists\Components\TextEntry::make('supply_request_count')

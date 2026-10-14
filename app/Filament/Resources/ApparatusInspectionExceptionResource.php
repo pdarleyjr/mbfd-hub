@@ -56,7 +56,8 @@ final class ApparatusInspectionExceptionResource extends Resource
             Tables\Columns\TextColumn::make('created_at')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)->label('Received')->dateTime()->sortable(),
         ])->filters([
             Tables\Filters\SelectFilter::make('station_id')->label('Station')
-                ->options(fn (): array => \App\Models\Station::query()->orderBy('station_number')->pluck('name', 'id')->all())
+                ->options(fn (): array => \App\Models\Station::query()->orderBy('station_number')->get(['id', 'name', 'station_number'])
+                    ->mapWithKeys(fn (\App\Models\Station $station): array => [$station->id => $station->name])->all())
                 ->query(fn (Builder $query, array $data): Builder => $query->when($data['value'] ?? null, fn (Builder $query, $stationId): Builder => $query->whereHas('apparatus', fn (Builder $apparatus): Builder => $apparatus->where('station_id', $stationId)))),
             Tables\Filters\SelectFilter::make('apparatus_id')->relationship('apparatus', 'designation')
                 ->getOptionLabelFromRecordUsing(fn (\App\Models\Apparatus $record): string => $record->designation ?: $record->name ?: $record->getAttribute('unit_id'))
