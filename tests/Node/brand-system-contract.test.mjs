@@ -99,35 +99,33 @@ test("six non-inspection Daily surfaces scope Plus Jakarta and avoid decorative 
   );
 });
 
-test("Station Detail quick actions share ordinary hub-blue treatment", () => {
+test("Station Detail quick actions share one ordinary hub-blue QuickLink treatment", () => {
   const source = read("resources/js/daily-checkout/src/components/StationDetailPage.tsx");
+  const quickLink = read("resources/js/daily-checkout/src/components/ui/QuickLink.tsx");
   const labels = [
     "Personnel Equipment Request",
+    "Station Request",
     "Apparatus Service",
     "Station Inspection",
     "Vehicle Inspection",
   ];
 
+  // Every quick action is data rendered through the single QuickLink component.
+  assert.match(source, /quickLinks\.map\(\(link\) => <li key=\{link\.label\}><QuickLink \{\.\.\.link\} \/><\/li>\)/);
   for (const label of labels) {
-    const labelIndex = source.indexOf(label);
-    assert.notEqual(labelIndex, -1, `Station Detail must retain the ${label} quick action`);
-    const openingIndex = Math.max(
-      source.lastIndexOf("<a", labelIndex),
-      source.lastIndexOf("<Link", labelIndex),
-    );
-    const openingTag = source.slice(openingIndex, source.indexOf(">", openingIndex) + 1);
-    const classes = openingTag.match(/className="(?<classes>[^"]+)"/)?.groups?.classes;
-    assert.ok(classes, `${label} must have a static className contract`);
-
-    for (const utility of ["bg-hub-blue/10", "ring-hub-blue/30", "hover:bg-hub-blue/20", "text-hub-blue"]) {
-      assert.match(classes, new RegExp(`(?:^|\\s)${utility.replace("/", "\\/")}(?:\\s|$)`), `${label} must use ${utility}`);
-    }
-    assert.doesNotMatch(
-      classes,
-      /(?:^|\s)(?:[^\s:]+:)*(?:bg|text|border|ring|outline)-(?:hub-(?:warning|success|danger|red)|red(?:-|\/))[^\s]*/,
-      `${label} is ordinary navigation and must not use warning, success, danger, or red decoration`,
-    );
+    assert.match(source, new RegExp(`label: '${label}'`), `Station Detail must retain the ${label} quick action`);
   }
+
+  const ordinary = quickLink.match(/const ORDINARY = `(?<classes>[^`]+)`/)?.groups?.classes;
+  assert.ok(ordinary, "QuickLink must keep a static ordinary className contract");
+  for (const utility of ["border-hub-blue/30", "text-hub-blue", "hover:bg-hub-blue-tint", "min-h-12"]) {
+    assert.ok(`${quickLink.match(/const BASE = '(?<base>[^']+)'/)?.groups?.base} ${ordinary}`.split(/\s+/).includes(utility), `Quick links must use ${utility}`);
+  }
+  assert.doesNotMatch(
+    quickLink,
+    /(?:^|\s)(?:[^\s:]+:)*(?:bg|text|border|ring|outline)-(?:hub-(?:warning|success|danger|red)|red(?:-|\/))[^\s]*/,
+    "Quick links are ordinary navigation and must not use warning, success, danger, or red decoration",
+  );
 });
 
 test("all four Filament panels use the centralized MBFD semantic palette", () => {
