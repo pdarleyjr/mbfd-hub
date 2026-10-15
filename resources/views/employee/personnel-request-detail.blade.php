@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <x-hub.head />
     <meta name="robots" content="noindex,nofollow">
-    <title>{{ $request->request_number }} · MBFD Employee Portal</title>
+    <title>{{ $request->request_number }} · MBFD Hub</title>
     @vite('resources/css/app.css')
 </head>
 <body data-hub-ui="2" data-hub-portal="employee" class="min-h-screen bg-hub-canvas text-hub-ink">

@@ -197,3 +197,15 @@ test('Home keeps its pinned layout hooks and puts Quick Access in a right rail',
   const css = readFileSync('resources/css/hub-components.css', 'utf8');
   assert.match(css, /@media \(min-width: 1280px\)[\s\S]*?\.home-layout \{ grid-template-columns: minmax\(0, 62fr\) minmax\(0, 38fr\)/);
 });
+
+/* Standalone Workgroup reports carry the shared Hub head (theme colour, manifest, app title) and the one product name. */
+test('standalone Workgroup reports include the shared Hub head and the product is named MBFD Hub', () => {
+  const reports = ['analysis-report', 'data-dashboard', 'evaluation-report', 'final-presentation', 'final-recommendations', 'l1-inventory', 'workgroup-summary']
+    .map((name) => `resources/views/workgroup/${name}.blade.php`)
+    .concat('resources/views/filament/workgroup/pages/saver-report.blade.php');
+  for (const view of reports) {
+    assert.match(readFileSync(view, 'utf8'), /<x-hub\.head \/>/, `${view} includes <x-hub.head />`);
+  }
+  assert.match(readFileSync('config/app.php', 'utf8'), /'name' => env\('APP_NAME', 'MBFD Hub'\)/);
+  assert.match(readFileSync('.env.example', 'utf8'), /^APP_NAME="MBFD Hub"$/m);
+});

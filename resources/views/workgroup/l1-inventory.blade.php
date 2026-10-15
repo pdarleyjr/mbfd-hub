@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <x-hub.head />
     <title>Ladder 1 Inventory Modernization Dashboard</title>
     
     <script src="{{ asset('vendor/sheetjs-0.20.0/xlsx.full.min.js') }}"></script>
