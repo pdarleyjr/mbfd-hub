@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\StationResource\Pages;
 use App\Filament\Resources\StationResource\RelationManagers;
+use App\Filament\Resources\StationResource\StationOperationsSection;
 use App\Models\Station;
 use App\Services\StationStaffingService;
 use Filament\Forms;
@@ -82,6 +83,20 @@ class StationResource extends Resource
                             ->required()
                             ->maxLength(255),
                     ])->columns(3),
+                Forms\Components\Section::make('Station Photo')
+                    ->description('Shown on the member station list and station profile. Without a photo, members see the standard station artwork.')
+                    ->schema([
+                        Forms\Components\FileUpload::make('image_path')
+                            ->label('Photo')
+                            ->disk(Station::IMAGE_DISK)
+                            ->directory(Station::IMAGE_DIRECTORY)
+                            ->visibility('public')
+                            ->image()
+                            ->acceptedFileTypes(Station::IMAGE_MIME_TYPES)
+                            ->maxSize(Station::IMAGE_MAX_KILOBYTES)
+                            ->helperText('JPEG, PNG, or WebP, up to 5 MB. A landscape photo of the station front works best.'),
+                    ])
+                    ->collapsible(),
                 Forms\Components\Section::make('Additional Information')
                     ->schema([
                         Forms\Components\Textarea::make('notes')
@@ -94,6 +109,18 @@ class StationResource extends Resource
     {
         return $infolist
             ->schema([
+                StationOperationsSection::make(),
+                Infolists\Components\Section::make('Station Photo')
+                    ->schema([
+                        Infolists\Components\ImageEntry::make('photo')
+                            ->hiddenLabel()
+                            ->state(fn (Station $record): string => url($record->photoOrPlaceholderUrl()))
+                            ->height(180)
+                            ->helperText(fn (Station $record): string => filled($record->image_path)
+                                ? 'Uploaded station photo.'
+                                : 'No photo uploaded. Members see this standard station artwork.'),
+                    ])
+                    ->collapsible(),
                 Infolists\Components\Section::make('Inventory Readiness')
                     ->description('Low stock, ordered items, and supply requests that need attention.')
                     ->schema([
@@ -173,6 +200,17 @@ class StationResource extends Resource
                 'apparatuses' => fn ($apparatus) => $apparatus->select(StationStaffingService::APPARATUS_COLUMNS),
             ]))
             ->columns([
+                Tables\Columns\ImageColumn::make('photo')
+                    ->label('Photo')
+                    ->state(fn (Station $record): string => url($record->photoOrPlaceholderUrl()))
+                    ->height(40)
+                    ->width(60)
+                    ->extraImgAttributes(fn (Station $record): array => [
+                        'alt' => filled($record->image_path) ? 'Station '.$record->station_number.' photo' : 'No photo uploaded for Station '.$record->station_number,
+                        'loading' => 'lazy',
+                        'class' => 'object-cover rounded',
+                    ])
+                    ->visibleFrom('sm'),
                 Tables\Columns\TextColumn::make('station_number')
                     ->wrap()
                     ->extraAttributes(['class' => 'hub-phone-summary'])
@@ -248,6 +286,9 @@ class StationResource extends Resource
             RelationManagers\StationSupplyRequestsRelationManager::class,
             RelationManagers\InventorySubmissionsRelationManager::class,
             RelationManagers\StationRequestsRelationManager::class,
+            RelationManagers\ApparatusServiceTicketsRelationManager::class,
+            RelationManagers\DailyCheckoutsRelationManager::class,
+            RelationManagers\EquipmentIssuesRelationManager::class,
             RelationManagers\StationInspectionsRelationManager::class,
         ];
     }

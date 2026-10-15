@@ -6,6 +6,7 @@ use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\InspectionResource\Pages;
 use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
+use App\Models\Station;
 use Filament\Forms;
 use Filament\Resources\Resource;
 use Filament\Tables;
@@ -17,9 +18,9 @@ use Illuminate\Database\Eloquent\Model;
 
 class InspectionResource extends Resource
 {
-    protected static ?int $navigationSort = 40;
+    protected static ?int $navigationSort = 15;
 
-    protected static ?string $navigationGroup = 'Operations';
+    protected static ?string $navigationGroup = 'Fleet';
 
     use EnterpriseTable;
 
@@ -27,12 +28,9 @@ class InspectionResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';
 
-    protected static ?string $navigationLabel = 'Inspections';
+    protected static ?string $navigationLabel = 'Daily Checkouts';
 
     protected static ?string $modelLabel = 'Inspection';
-
-    // Hide from main navigation - accessed via Apparatus relation
-    protected static bool $shouldRegisterNavigation = false;
 
     public static function canCreate(): bool
     {
@@ -86,6 +84,17 @@ class InspectionResource extends Resource
                         'success' => 'C',
                     ]),
 
+                Tables\Columns\TextColumn::make('inspection_status')->visibleFrom('md')
+                    ->label('Status')
+                    ->state(fn (ApparatusInspection $record): string => $record->displayStatus())
+                    ->badge()
+                    ->color(fn (string $state): string => match ($state) {
+                        'Pending review', 'Follow-up needed' => 'warning',
+                        'Approved', 'Accepted' => 'success',
+                        'Rejected' => 'danger',
+                        default => 'gray',
+                    }),
+
                 Tables\Columns\TextColumn::make('defects_count')->visibleFrom('md')
                     ->label('Issues')
                     ->counts('defects')
@@ -117,6 +126,26 @@ class InspectionResource extends Resource
                     ->options(fn (): array => self::apparatusOptions())
                     ->searchable()
                     ->preload(),
+
+                SelectFilter::make('station_id')
+                    ->label('Station')
+                    ->options(fn (): array => Station::query()->orderBy('station_number')->get(['id', 'name', 'station_number'])
+                        ->mapWithKeys(fn (Station $station): array => [$station->id => $station->name])->all())
+                    ->query(fn (Builder $query, array $data): Builder => $query->when(
+                        $data['value'] ?? null,
+                        fn (Builder $query, mixed $stationId): Builder => $query->whereHas('apparatus', fn (Builder $apparatus): Builder => $apparatus->where('station_id', (int) $stationId)),
+                    )),
+
+                Tables\Filters\TernaryFilter::make('needs_follow_up')
+                    ->label('Needs follow-up')
+                    ->queries(
+                        true: fn (Builder $query): Builder => $query->where(fn (Builder $nested): Builder => $nested
+                            ->where('processing_status', 'accepted_with_exception')
+                            ->orWhere('review_status', 'pending_review')),
+                        false: fn (Builder $query): Builder => $query
+                            ->where(fn (Builder $nested): Builder => $nested->whereNull('processing_status')->orWhere('processing_status', '!=', 'accepted_with_exception'))
+                            ->where(fn (Builder $nested): Builder => $nested->whereNull('review_status')->orWhere('review_status', '!=', 'pending_review')),
+                    ),
 
                 SelectFilter::make('shift')
                     ->options([

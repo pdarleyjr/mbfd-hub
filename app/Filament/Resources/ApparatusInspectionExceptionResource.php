@@ -8,6 +8,7 @@ use App\Filament\Resources\ApparatusInspectionExceptionResource\Pages\ListInspec
 use App\Models\ApparatusInspectionException;
 use App\Models\User;
 use App\Services\ApparatusInspectionExceptionService;
+use App\Services\StationOperationsSummaryService;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Select;
@@ -59,6 +60,18 @@ final class ApparatusInspectionExceptionResource extends Resource
                 ->options(fn (): array => \App\Models\Station::query()->orderBy('station_number')->get(['id', 'name', 'station_number'])
                     ->mapWithKeys(fn (\App\Models\Station $station): array => [$station->id => $station->name])->all())
                 ->query(fn (Builder $query, array $data): Builder => $query->when($data['value'] ?? null, fn (Builder $query, $stationId): Builder => $query->whereHas('apparatus', fn (Builder $apparatus): Builder => $apparatus->where('station_id', $stationId)))),
+            Tables\Filters\TernaryFilter::make('open')->label('Needs review')
+                ->queries(
+                    true: fn (Builder $query): Builder => $query->whereNotIn('status', StationOperationsSummaryService::CLOSED_EXCEPTION_STATUSES),
+                    false: fn (Builder $query): Builder => $query->whereIn('status', StationOperationsSummaryService::CLOSED_EXCEPTION_STATUSES),
+                ),
+            Tables\Filters\SelectFilter::make('status')->options([
+                'open' => 'Open',
+                'revision_requested' => 'Revision requested',
+                'revision_submitted' => 'Revision submitted',
+                'resolved' => 'Resolved',
+                'dismissed' => 'Dismissed',
+            ]),
             Tables\Filters\SelectFilter::make('apparatus_id')->relationship('apparatus', 'designation')
                 ->getOptionLabelFromRecordUsing(fn (\App\Models\Apparatus $record): string => $record->designation ?: $record->name ?: $record->getAttribute('unit_id'))
                 ->label('Apparatus'),

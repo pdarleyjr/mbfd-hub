@@ -240,6 +240,47 @@ test('station selector stays visible, touchable, and horizontally contained at e
   expect(quality.failedRequests).toEqual([]);
 });
 
+test('station list refresh re-fetches stations in place with a 44px control', async ({ page }, testInfo) => {
+  test.skip(!['daily-responsive-phone-320', 'daily-responsive-desktop-1280'].includes(testInfo.project.name), 'Refresh is exercised at the narrowest and a desktop viewport.');
+  await mockDailySelectorApi(page);
+  const quality = captureBrowserQuality(page);
+  let stationRequests = 0;
+  const addedStation = { ...stations[0], id: 7, station_number: 7, name: 'Station 7' };
+  await page.route('**/api/public/stations', (route) => {
+    stationRequests += 1;
+    return route.fulfill({ json: { stations: stationRequests === 1 ? stations : [...stations, addedStation] } });
+  });
+
+  await page.goto('/daily/stations');
+  await expect(page.getByTestId('daily-station-card')).toHaveCount(stations.length);
+
+  const refresh = page.getByTestId('daily-station-refresh');
+  await expect(refresh).toHaveAccessibleName('Refresh stations');
+  const box = await refresh.boundingBox();
+  expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
+  expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+
+  await refresh.click();
+  await expect(page.getByTestId('daily-station-card')).toHaveCount(stations.length + 1);
+  await expect(page.getByRole('status').filter({ hasText: 'Station list updated.' })).toHaveCount(1);
+  expect(stationRequests).toBe(2);
+  await expectNoHorizontalOverflow(page);
+
+  await page.unroute('**/api/public/stations');
+  await page.route('**/api/public/stations', (route) => route.fulfill({ status: 503, json: { message: 'Service unavailable' } }));
+  await refresh.click();
+  await expect(page.getByRole('alert')).toContainText('Stations could not be refreshed');
+  // A failed refresh keeps the cards the member already had.
+  await expect(page.getByTestId('daily-station-card')).toHaveCount(stations.length + 1);
+
+  await page.context().setOffline(true);
+  await expect(refresh).toBeDisabled();
+  await expect(refresh).toHaveAccessibleName('Refresh unavailable while offline');
+  await page.context().setOffline(false);
+
+  expect(quality.consoleErrors.filter((message) => !message.includes('503'))).toEqual([]);
+});
+
 test('representative viewports preserve station navigation and fail closed for an unknown apparatus', async ({ page }, testInfo) => {
   test.skip(![
     'daily-responsive-phone-390',

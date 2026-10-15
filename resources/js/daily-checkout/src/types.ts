@@ -51,6 +51,8 @@ export interface Apparatus {
   slug: string;
   status?: string;
   daily_checkout_requirement?: DailyCheckoutRequirement;
+  /** Unresolved missing/damaged equipment on this unit (station profile payload). */
+  current_defects_count?: number;
   // PM Maintenance fields
   current_engine_hours?: number | null;
   current_miles?: number | null;
