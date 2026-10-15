@@ -408,22 +408,30 @@ final class TrainingRosterService
 
     private function courseData(array $data): array
     {
+        if (is_array($data['classifications'] ?? null)) {
+            $data['classifications'] = TrainingCourse::normalizeClassifications($data['classifications']);
+        }
+
         return Validator::make($data, [
             'name' => ['required', 'string', 'max:200', 'regex:/\S/u'],
             'classifications' => ['required', 'array', 'min:1', 'max:16'],
-            'classifications.*' => ['required', Rule::in(TrainingCourse::CLASSIFICATIONS), 'distinct'],
+            'classifications.*' => ['bail', 'required', 'string', 'max:80', 'regex:/\S/u', 'distinct:ignore_case'],
             'description' => ['nullable', 'string', 'max:10000'], 'default_location' => ['nullable', 'string', 'max:255'],
         ])->validate();
     }
 
     private function sessionData(array $data): array
     {
+        if (is_array($data['classifications'] ?? null)) {
+            $data['classifications'] = TrainingCourse::normalizeClassifications($data['classifications']);
+        }
+
         return Validator::make($data, [
             'held_on' => ['required', 'date_format:Y-m-d'], 'starts_at' => ['nullable', 'date'],
             'location' => ['nullable', 'string', 'max:255'],
             'course_name' => ['sometimes', 'required', 'string', 'max:200', 'regex:/\S/u'],
             'classifications' => ['sometimes', 'required', 'array', 'min:1', 'max:16'],
-            'classifications.*' => ['required', Rule::in(TrainingCourse::CLASSIFICATIONS), 'distinct'],
+            'classifications.*' => ['bail', 'required', 'string', 'max:80', 'regex:/\S/u', 'distinct:ignore_case'],
             'oic_employee_profile_id' => ['nullable', 'integer', Rule::exists('employees', 'id')->where('roster_status', 'active')],
         ])->validate();
     }

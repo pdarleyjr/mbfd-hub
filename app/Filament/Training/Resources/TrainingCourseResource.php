@@ -6,7 +6,7 @@ namespace App\Filament\Training\Resources;
 
 use App\Filament\Training\Resources\TrainingCourseResource\Pages;
 use App\Models\Training\TrainingCourse;
-use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
@@ -33,8 +33,12 @@ class TrainingCourseResource extends Resource
         return $form->schema([
             TextInput::make('name')->label('Course name')->required()->maxLength(200),
             TextInput::make('default_location')->label('Default location')->maxLength(255),
-            CheckboxList::make('classifications')->options(array_combine(TrainingCourse::CLASSIFICATIONS, TrainingCourse::CLASSIFICATIONS))
-                ->required()->columns(2)->columnSpanFull(),
+            TagsInput::make('classifications')->suggestions(fn (): array => TrainingCourse::classificationSuggestions())
+                ->mutateStateForValidationUsing(fn ($state) => is_array($state) ? TrainingCourse::normalizeClassifications($state) : $state)
+                ->required()->rules(['array', 'min:1', 'max:16'])
+                ->nestedRecursiveRules(['bail', 'required', 'string', 'max:80', 'regex:/\S/u', 'distinct:ignore_case'])
+                ->helperText('Choose a suggestion or type a new classification and press Enter. Saved classifications are reusable and shown in the public class list. Up to 16 classifications, 80 characters each.')
+                ->columnSpanFull(),
             Textarea::make('description')->maxLength(5000)->columnSpanFull(),
         ]);
     }

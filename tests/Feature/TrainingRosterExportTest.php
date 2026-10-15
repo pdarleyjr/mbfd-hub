@@ -268,6 +268,79 @@ final class TrainingRosterExportTest extends TestCase
         }
     }
 
+    public function test_stc_and_other_custom_classifications_print_without_replacing_original_checkboxes(): void
+    {
+        $version = $this->version(16, false);
+        $snapshot = $version->snapshot;
+        $snapshot['session']['course_name'] = 'Primary Screener';
+        $snapshot['session']['classifications'] = ['EMS Training', 'STC', '=2+2'];
+        $custom = TrainingRosterVersion::query()->create(['training_session_id' => $version->training_session_id, 'revision' => 2, 'snapshot' => $snapshot]);
+        $service = app(TrainingRosterExportService::class);
+        $pdf = (new Parser)->parseContent($service->bytes($custom, 'pdf'));
+        self::assertCount(1, $pdf->getPages());
+        foreach (['Primary Screener', '[X] STC', '[X] =2+2', ...TrainingRosterExportService::CLASSIFICATIONS] as $label) {
+            self::assertStringContainsString($label, $pdf->getText());
+        }
+        $path = tempnam(sys_get_temp_dir(), 'training-stc-export-');
+        file_put_contents($path, $service->bytes($custom, 'xlsx'));
+        try {
+            $book = IOFactory::load($path);
+            self::assertStringContainsString('[X] STC', $book->getSheet(0)->getCell('A3')->getValue());
+            self::assertStringContainsString('[X] =2+2', $book->getSheet(0)->getCell('D3')->getValue());
+            self::assertSame(DataType::TYPE_STRING, $book->getSheet(0)->getCell('D3')->getDataType());
+            self::assertSame('EMS Training; STC; =2+2', $book->getSheet(1)->getCell('E2')->getValue());
+            self::assertCount(0, $book->getSheet(0)->getBreaks());
+            self::assertCount(17, $book->getSheet(0)->getDrawingCollection());
+            $book->disconnectWorksheets();
+        } finally {
+            unlink($path);
+        }
+    }
+
+    public function test_maximum_custom_labels_and_metadata_preserve_each_signature_and_footer(): void
+    {
+        $version = $this->version(2, true);
+        $snapshot = $version->snapshot;
+        $labels = array_map(fn (int $number): string => sprintf('%02d-', $number).str_repeat('W', 77), range(1, 16));
+        $snapshot['session']['classifications'] = $labels;
+        $snapshot['session']['course_name'] = str_repeat('W', 200);
+        $snapshot['session']['location'] = str_repeat('W', 255);
+        $snapshot['submission'] = ['submitted_at' => '2026-10-15T15:05:44+00:00', 'submitted_by' => 123];
+        foreach ($snapshot['attendance'] as &$entry) {
+            $entry['snapshot']['first_name'] = str_repeat('W', 100);
+            $entry['snapshot']['last_name'] = str_repeat('W', 100);
+        }
+        unset($entry);
+        $custom = TrainingRosterVersion::query()->create(['training_session_id' => $version->training_session_id, 'revision' => 2, 'snapshot' => $snapshot]);
+        $service = app(TrainingRosterExportService::class);
+        $pdf = (new Parser)->parseContent($service->bytes($custom, 'pdf'));
+        self::assertCount(2, $pdf->getPages());
+        foreach ($pdf->getPages() as $index => $page) {
+            $text = $page->getText();
+            foreach ($labels as $label) {
+                self::assertStringContainsString($label, preg_replace('/\s+/u', '', $text));
+            }
+            self::assertStringContainsString('SYNTHETIC OIC', $text);
+            self::assertStringContainsString('Submitted 2026-10-15T15:05:44+00:00', $text);
+            self::assertStringContainsString('Page '.($index + 1).' of 2', $text);
+        }
+        $path = tempnam(sys_get_temp_dir(), 'training-custom-export-');
+        file_put_contents($path, $service->bytes($custom, 'xlsx'));
+        try {
+            $book = IOFactory::load($path);
+            foreach ($labels as $index => $label) {
+                self::assertStringContainsString($label, $book->getSheet(0)->getCell($index < 8 ? 'A3' : 'D3')->getValue());
+            }
+            self::assertSame(implode('; ', $labels), $book->getSheet(1)->getCell('E2')->getValue());
+            self::assertSame(['A17'], array_keys($book->getSheet(0)->getBreaks()));
+            self::assertCount(6, $book->getSheet(0)->getDrawingCollection());
+            self::assertSame(3, $book->getSheet(1)->getHighestDataRow());
+            $book->disconnectWorksheets();
+        } finally {
+            unlink($path);
+        }
+    }
+
     private function version(int $count, bool $certified): TrainingRosterVersion
     {
         $user = User::factory()->create();

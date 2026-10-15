@@ -90,14 +90,21 @@ test('empty public catalog does not invent a course', async ({ page }) => {
 
 test('public catalog searches courses and starts today without exposing attendance', async ({ page }, info) => {
     let starts = 0;
-    await page.route('**/catalog', route => route.fulfill({ json: { courses: [{ id: 1, name: 'Ladder operations', default_location: 'Training classroom', sessions: [{ public_id: id, held_on: '2026-10-15', location: 'Training classroom' }] }, { id: 2, name: 'Marine operations', default_location: null, sessions: [] }], today: '2026-10-15', csrf_token: 'test' } }));
+    await page.route('**/catalog', route => route.fulfill({ json: { courses: [{ id: 1, name: 'Primary Screener', classifications: ['STC', 'Instructor-defined topic'], default_location: 'Training classroom', sessions: [{ public_id: id, held_on: '2026-10-15', location: 'Training classroom' }] }, { id: 2, name: 'Marine operations', classifications: ['Marine Training'], default_location: null, sessions: [] }], today: '2026-10-15', csrf_token: 'test' } }));
     await page.route('**/csrf', route => route.fulfill({ json: { csrf_token: 'fresh' } }));
     await page.route('**/courses/1/start', route => { starts++; expect(route.request().method()).toBe('POST'); expect(route.request().headers()['x-csrf-token']).toBe('fresh'); return route.fulfill({ json: { url: `/r/${id}`, csrf_token: 'opened' } }); });
     await page.goto('/');
     await expect(page.getByRole('heading', { name: 'Choose your class' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Marine operations' })).toBeVisible();
-    await page.getByLabel('Find a course').fill('ladder');
+    await page.getByLabel('Find a course').fill('primary');
     await expect(page.getByRole('heading', { name: 'Marine operations' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Primary Screener' })).toBeVisible();
+    await page.getByLabel('Find a course').fill('instructor-defined');
+    await expect(page.getByRole('heading', { name: 'Primary Screener' })).toBeVisible();
+    await page.getByLabel('Find a course').fill('stc');
+    await expect(page.getByRole('heading', { name: 'Primary Screener' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Marine operations' })).toHaveCount(0);
+    await expect(page.getByRole('list', { name: 'Classifications' }).getByText('STC', { exact: true })).toBeVisible();
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     await page.screenshot({ path: info.outputPath('public-classes.png'), fullPage: true });
     await page.getByRole('button', { name: /Start today’s roster/ }).click();
@@ -113,7 +120,7 @@ test('public direct roster opens an isolated device without a launch key', async
 });
 
 test('ambiguous class start explains how to choose the dated roster', async ({ page }) => {
-    await page.route('**/catalog', route => route.fulfill({ json: { courses: [{ id: 1, name: 'Ladder operations', default_location: null, sessions: [{ public_id: id, held_on: '2026-10-15', location: 'Station 1' }, { public_id: `${id}2`, held_on: '2026-10-15', location: 'Station 2' }] }], today: '2026-10-15', csrf_token: 'test' } }));
+    await page.route('**/catalog', route => route.fulfill({ json: { courses: [{ id: 1, name: 'Ladder operations', classifications: [], default_location: null, sessions: [{ public_id: id, held_on: '2026-10-15', location: 'Station 1' }, { public_id: `${id}2`, held_on: '2026-10-15', location: 'Station 2' }] }], today: '2026-10-15', csrf_token: 'test' } }));
     await page.route('**/csrf', route => route.fulfill({ json: { csrf_token: 'fresh' } }));
     await page.route('**/courses/1/start', route => route.fulfill({ status: 422, json: { errors: { session: ['More than one roster is open for this class today. Choose the dated roster and location from the class list.'] } } }));
     await page.goto('/');
@@ -127,7 +134,7 @@ test('catalog failure can recover and an existing dated roster opens by POST', a
     let opens = 0;
     await page.route('**/catalog', route => {
         reads++;
-        return reads === 1 ? route.abort('failed') : route.fulfill({ json: { courses: [{ id: 1, name: 'Ladder operations', default_location: null, sessions: [{ public_id: id, held_on: '2026-10-15', location: null }] }], today: '2026-10-15', csrf_token: 'test' } });
+        return reads === 1 ? route.abort('failed') : route.fulfill({ json: { courses: [{ id: 1, name: 'Ladder operations', classifications: [], default_location: null, sessions: [{ public_id: id, held_on: '2026-10-15', location: null }] }], today: '2026-10-15', csrf_token: 'test' } });
     });
     await page.route('**/csrf', route => route.fulfill({ json: { csrf_token: 'fresh' } }));
     await page.route(`**/r/${id}/open`, route => { opens++; expect(route.request().method()).toBe('POST'); return route.fulfill({ json: { authorized: true } }); });

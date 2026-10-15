@@ -126,6 +126,13 @@ final class TrainingRosterExportService
         }
         $submission = $snapshot['submission'] ?? null;
         $completion = $certification !== null ? 'Certified' : ($submission !== null ? 'Submitted' : 'Provisional');
+        $custom = array_values(array_diff($snapshot['session']['classifications'], self::CLASSIFICATIONS));
+        $customInline = mb_strlen(implode('; ', $custom)) <= 24 ? implode('; ', array_map(fn (string $label): string => '[X] '.$label, $custom)) : '';
+        $customColumns = $custom === [] ? [] : array_chunk($custom, (int) ceil(count($custom) / 2));
+        $customHeight = $custom === [] ? 0 : 4 + 9 * (1 + max(array_map(
+            fn (array $labels): int => (int) array_sum(array_map(fn (string $label): int => (int) ceil((mb_strlen($label) + 4) / 22), $labels)),
+            $customColumns,
+        )));
 
         $logo = $this->logoBytes();
         $longestName = max([0, ...array_map(fn (array $row): int => max(mb_strlen($row['snapshot']['first_name']), mb_strlen($row['snapshot']['last_name'])), $rows)]);
@@ -135,6 +142,9 @@ final class TrainingRosterExportService
         $rowsPerPage = $longestName > 28 ? max(1, min(16, (int) floor(280 / ($rowHeight + 5)))) : 16;
         if (max(mb_strlen($snapshot['session']['course_name']), mb_strlen($snapshot['session']['location'] ?? '')) > 120) {
             $rowsPerPage = min($rowsPerPage, 12);
+        }
+        if ($custom !== [] && $customInline === '') {
+            $rowsPerPage = max(1, $rowsPerPage - (int) ceil(($customHeight + 10) / max(25, $rowHeight + 5)));
         }
 
         return [
@@ -148,6 +158,9 @@ final class TrainingRosterExportService
             'completion' => $completion,
             'completion_label' => $completion === 'Provisional' ? 'PROVISIONAL — NOT CERTIFIED' : strtoupper($completion),
             'classifications' => self::CLASSIFICATIONS,
+            'custom_classification_columns' => $customColumns,
+            'custom_classification_height' => $customHeight,
+            'custom_classifications_inline' => $customInline,
             'revision' => $version->revision,
             'captured_at' => $snapshot['captured_at'],
             'logo_bytes' => $logo,
@@ -206,6 +219,17 @@ final class TrainingRosterExportService
             $this->text($print, 'B'.$start, 'MBFD TRAINING ROSTER');
             $print->getStyle('B'.$start)->getFont()->setBold(true)->setSize(19);
             $this->drawing($print, $data['logo_bytes'], 'A'.$start, 'MBFD logo', 45, 45);
+            if ($data['custom_classification_columns'] !== []) {
+                $customRow = $start + 2;
+                foreach (['A' => 'C', 'D' => 'E'] as $first => $last) {
+                    $print->mergeCells($first.$customRow.':'.$last.$customRow);
+                    $labels = $data['custom_classification_columns'][$first === 'A' ? 0 : 1] ?? [];
+                    $this->text($print, $first.$customRow, ($first === 'A' ? 'Additional selected classifications:' : '')."\n".implode("\n", array_map(fn (string $label): string => '[X] '.$label, $labels)));
+                    $print->getStyle($first.$customRow)->getAlignment()->setWrapText(true)->setVertical('top');
+                    $print->getStyle($first.$customRow)->getFont()->setSize(7);
+                }
+                $print->getRowDimension($customRow)->setRowHeight($data['custom_classification_height']);
+            }
             foreach (array_chunk(self::CLASSIFICATIONS, 4) as $classificationRow => $labels) {
                 $value = implode('   ', array_map(fn (string $label): string => (in_array($label, $data['session']['classifications'], true) ? '[X] ' : '[ ] ').$label, $labels));
                 $row = $start + 3 + $classificationRow;

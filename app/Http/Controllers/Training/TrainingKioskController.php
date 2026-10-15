@@ -32,6 +32,7 @@ final class TrainingKioskController extends Controller
         $courses = TrainingCourse::query()->with(['sessions' => fn ($query) => $query->where('status', 'open')->orderByDesc('held_on')->orderBy('id')])
             ->orderBy('name')->get()->map(fn (TrainingCourse $course): array => [
                 'id' => $course->id, 'name' => $course->name, 'default_location' => $course->default_location,
+                'classifications' => $course->classifications,
                 'sessions' => $course->sessions->map(fn (TrainingSession $session): array => [
                     'public_id' => $session->public_id, 'held_on' => $session->held_on->toDateString(), 'location' => $session->location,
                 ])->all(),

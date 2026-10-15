@@ -7,7 +7,7 @@ import './roster.css';
 type Member = { id: number; first_name: string; last_name: string; name: string; rank: string; shift: string; term_label: string; identifier_hint: string };
 type Roster = { course_name: string; held_on: string; location: string | null; status: string; revision: number; attendance: { name: string; rank: string | null; shift: string | null; signed_at: string }[]; csrf_token: string };
 type Step = 'roster' | 'shift' | 'rank' | 'name' | 'signature' | 'success' | 'submit';
-type Catalog = { courses: { id: number; name: string; default_location: string | null; sessions: { public_id: string; held_on: string; location: string | null }[] }[]; today: string; csrf_token: string };
+type Catalog = { courses: { id: number; name: string; classifications: string[]; default_location: string | null; sessions: { public_id: string; held_on: string; location: string | null }[] }[]; today: string; csrf_token: string };
 type Submission = { employee_profile_id: number; signature: string; client_submission_id: string };
 type Receipt = { recorded: boolean; status: 'recorded' | 'unknown' | 'corrected' | 'voided' };
 type ApprovalSummary = Pick<Roster, 'course_name' | 'held_on' | 'location' | 'revision'> & { count: number };
@@ -111,17 +111,17 @@ function Classes() {
             setBusy(false);
         }
     };
-    const courses = catalog?.courses.filter(course => course.name.toLocaleLowerCase().includes(query.toLocaleLowerCase())) ?? [];
+    const courses = catalog?.courses.filter(course => [course.name, ...course.classifications].join(' ').toLocaleLowerCase().includes(query.toLocaleLowerCase())) ?? [];
     return <div className="kiosk-shell"><Brand /><main>
         <section className="course-heading"><p className="eyebrow">Classroom attendance</p><h1>Choose your class</h1><p>Open a roster below or start today’s roster for your course.</p></section>
         {error && <div className="message error" role="alert">{error} <button className="text-button" disabled={busy} onClick={() => void refresh()}>Refresh classes</button></div>}
         {loading && <p role="status">Loading classes…</p>}
-        {catalog && <><p className="catalog-date">Today: {dateLabel(catalog.today)} · Eastern Time</p><label className="search-label" htmlFor="course-search">Find a course</label><input id="course-search" type="search" autoComplete="off" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search courses" />
+        {catalog && <><p className="catalog-date">Today: {dateLabel(catalog.today)} · Eastern Time</p><label className="search-label" htmlFor="course-search">Find a course</label><input id="course-search" type="search" autoComplete="off" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search courses or classifications" />
             <div className="course-list" aria-busy={busy}>{courses.map(course => <section className="course-card" key={course.id} aria-labelledby={`course-${course.id}`}>
-                <div className="course-card-heading"><div><h2 id={`course-${course.id}`}>{course.name}</h2>{course.default_location && <p>{course.default_location}</p>}</div><button className="primary" disabled={busy} onClick={() => void enter(`/courses/${course.id}/start`)}>Start today’s roster<span className="sr-only"> for {course.name}</span></button></div>
+                <div className="course-card-heading"><div><h2 id={`course-${course.id}`}>{course.name}</h2>{course.classifications.length > 0 && <ul className="classification-badges" aria-label="Classifications">{course.classifications.map(classification => <li key={classification}>{classification}</li>)}</ul>}{course.default_location && <p>{course.default_location}</p>}</div><button className="primary" disabled={busy} onClick={() => void enter(`/courses/${course.id}/start`)}>Start today’s roster<span className="sr-only"> for {course.name}</span></button></div>
                 {course.sessions.length > 0 && <ul className="session-list">{course.sessions.map(session => <li key={session.public_id}><div><strong>{dateLabel(session.held_on)}</strong><span>{session.location || 'Sign-in open'}</span></div><button className="secondary" disabled={busy} onClick={() => void enter(`/r/${session.public_id}/open`, `/r/${session.public_id}`)}>Open roster<span className="sr-only"> for {course.name} on {dateLabel(session.held_on)}{session.location ? ` at ${session.location}` : ''}</span></button></li>)}</ul>}
             </section>)}</div>
-            {!courses.length && <section className="empty-state"><h2>{query ? 'No matching courses' : 'No courses are available'}</h2><p>{query ? 'Try a different course name.' : 'Ask the training staff to add a course, then refresh this page.'}</p>{!query && <button className="secondary" onClick={() => void refresh()}>Refresh classes</button>}</section>}
+            {!courses.length && <section className="empty-state"><h2>{query ? 'No matching courses' : 'No courses are available'}</h2><p>{query ? 'Try a different course name or classification.' : 'Ask the training staff to add a course, then refresh this page.'}</p>{!query && <button className="secondary" onClick={() => void refresh()}>Refresh classes</button>}</section>}
         </>}
     </main></div>;
 }

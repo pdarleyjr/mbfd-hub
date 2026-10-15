@@ -51,6 +51,7 @@ final class TrainingPublicRosterTest extends TestCase
 
     public function test_public_catalog_lists_courses_and_only_open_dates_without_private_data(): void
     {
+        $this->course->update(['classifications' => ['STC', 'Custom classification']]);
         $open = $this->start();
         foreach (['draft', 'closed', 'submitted', 'certified', 'archived'] as $status) {
             $other = $open->replicate();
@@ -61,8 +62,9 @@ final class TrainingPublicRosterTest extends TestCase
         $response = $this->getJson($this->url('/catalog'))->assertOk()
             ->assertJsonCount(1, 'courses')->assertJsonCount(1, 'courses.0.sessions')
             ->assertJsonPath('courses.0.sessions.0.public_id', $open->public_id)
+            ->assertJsonPath('courses.0.classifications', ['STC', 'Custom classification'])
             ->assertJsonPath('today', '2026-10-15');
-        self::assertSame(['id', 'name', 'default_location', 'sessions'], array_keys($response->json('courses.0')));
+        self::assertSame(['id', 'name', 'default_location', 'classifications', 'sessions'], array_keys($response->json('courses.0')));
         self::assertSame(['public_id', 'held_on', 'location'], array_keys($response->json('courses.0.sessions.0')));
         $response->assertDontSee('Private instructor preparation notes')->assertDontSee('Synthetic Approver')->assertDontSee('PUBLIC-QA-1');
         self::assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));

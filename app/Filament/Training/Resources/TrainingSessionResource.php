@@ -9,10 +9,10 @@ use App\Models\Employee;
 use App\Models\Training\TrainingCourse;
 use App\Models\Training\TrainingSession;
 use App\Services\PersonnelRequests\PersonnelRosterSearch;
-use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Form;
 use Filament\Forms\Set;
@@ -61,8 +61,12 @@ class TrainingSessionResource extends Resource
             TextInput::make('location')->maxLength(255),
             self::employeeSelect('oic_employee_profile_id', 'Officer in charge')
                 ->helperText('The officer must sign in with their own Hub account to certify the roster.'),
-            CheckboxList::make('classifications')->options(array_combine(TrainingCourse::CLASSIFICATIONS, TrainingCourse::CLASSIFICATIONS))
-                ->required()->columns(2)->columnSpanFull(),
+            TagsInput::make('classifications')->suggestions(fn (): array => TrainingCourse::classificationSuggestions())
+                ->mutateStateForValidationUsing(fn ($state) => is_array($state) ? TrainingCourse::normalizeClassifications($state) : $state)
+                ->required()->rules(['array', 'min:1', 'max:16'])
+                ->nestedRecursiveRules(['bail', 'required', 'string', 'max:80', 'regex:/\S/u', 'distinct:ignore_case'])
+                ->helperText('Choose a suggestion or type a new classification and press Enter. Saved classifications are reusable and shown in the public class list. Up to 16 classifications, 80 characters each.')
+                ->columnSpanFull(),
         ];
     }
 
@@ -97,7 +101,7 @@ class TrainingSessionResource extends Resource
             ->filters([
                 Tables\Filters\SelectFilter::make('training_course_id')->label('Course')->relationship('course', 'name')->searchable()->preload(),
                 Tables\Filters\SelectFilter::make('status')->options(array_combine(['draft', 'open', 'closed', 'submitted', 'certified', 'archived'], ['Draft', 'Open', 'Closed', 'Submitted', 'Certified', 'Archived'])),
-                Tables\Filters\SelectFilter::make('classification')->options(array_combine(TrainingCourse::CLASSIFICATIONS, TrainingCourse::CLASSIFICATIONS))
+                Tables\Filters\SelectFilter::make('classification')->options(fn (): array => array_combine($labels = TrainingCourse::classificationSuggestions(), $labels))
                     ->query(fn (Builder $query, array $data): Builder => $query->when($data['value'] ?? null, fn (Builder $q, string $value) => $q->whereJsonContains('classifications', $value))),
                 Tables\Filters\Filter::make('dates')->form([DatePicker::make('from'), DatePicker::make('until')])
                     ->query(fn (Builder $query, array $data): Builder => $query

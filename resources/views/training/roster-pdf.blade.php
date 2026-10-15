@@ -13,6 +13,10 @@
         h1 { position: absolute; left: 65pt; top: 15pt; width: 487pt; text-align: center; font-family: "DejaVu Serif", serif; font-size: 21pt; text-decoration: underline; margin: 0; line-height: 26pt; white-space: nowrap; }
         table { border-collapse: collapse; width: 100%; table-layout: fixed; }
         .classes td { border: .6pt solid #222; padding: 2pt; font-size: 7.3pt; height: 10pt; }
+        .custom-classes { font-size: 6.5pt; line-height: 6.5pt; margin-bottom: 0; }
+        .custom-classes td { width: 50%; padding: 1pt; vertical-align: top; overflow-wrap: break-word; word-wrap: break-word; }
+        .custom-classes caption { font-size: 7pt; line-height: 8pt; }
+        .custom-classes div { font-size: 6.5pt; line-height: 6.5pt; margin: 0; }
         .course { background: #ff0; font-weight: bold; margin: 9pt 0 5pt; padding: 3pt 5pt; overflow-wrap: break-word; }
         .metadata { font-size: 8pt; margin: 0 0 7pt; overflow-wrap: break-word; word-wrap: break-word; }
         .roster th, .roster td { border: .6pt solid #222; padding: 2pt 5pt; }
@@ -31,13 +35,21 @@
 @foreach ($pages as $pageIndex => $entries)
     <div class="page">
         <div class="heading"><img class="logo" src="{{ $logo }}" alt="Miami Beach Fire Department"><h1>MBFD TRAINING ROSTER</h1></div>
+        @if ($custom_classification_columns !== [] && $custom_classifications_inline === '')
+            <table class="custom-classes"><caption style="text-align: left">Additional selected classifications:</caption><tr>
+                @foreach ($custom_classification_columns as $labels)
+                    <td>@foreach ($labels as $label)<div>[X] {{ $label }}</div>@endforeach</td>
+                @endforeach
+                @if (count($custom_classification_columns) === 1)<td></td>@endif
+            </tr></table>
+        @endif
         <table class="classes">
             @foreach (array_chunk($classifications, 4) as $labels)
                 <tr>@foreach ($labels as $label)<td>{{ in_array($label, $session['classifications'], true) ? '[X]' : '[ ]' }} {{ $label }}</td>@endforeach</tr>
             @endforeach
         </table>
         <div class="course">COURSE NAME: {{ $session['course_name'] }}</div>
-        <p class="metadata">Session: {{ $session['held_on'] }} @if ($session['location'] ?? null) · {{ $session['location'] }} @endif<br>{{ $completion_label }} · Revision {{ $revision }} · {{ count($rows) }} attendees</p>
+        <p class="metadata">Session: {{ $session['held_on'] }} @if ($session['location'] ?? null) · {{ $session['location'] }} @endif<br>{{ $completion_label }} · Revision {{ $revision }} · {{ count($rows) }} attendees @if ($custom_classifications_inline !== '') · Additional: {{ $custom_classifications_inline }} @endif</p>
         <table class="roster">
             <thead><tr><th style="width: 25%">Last Name</th><th style="width: 25%">First Name</th><th style="width: 13%">DATE</th><th style="width: 37%">SIGNATURE</th></tr></thead>
             <tbody>
