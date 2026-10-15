@@ -971,7 +971,7 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$actual_completion_date\.$#'
 			identifier: property.notFound
-			count: 2
+			count: 1
 			path: app/Http/Controllers/Api/StationController.php
 
 		-
@@ -2317,12 +2317,6 @@ parameters:
 			identifier: return.type
 			count: 1
 			path: app/Models/Apparatus.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\CapitalProject\:\:\$actual_completion_date\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Models/CapitalProject.php
 
 		-
 			message: '#^Access to an undefined property App\\Models\\EquipmentItem\:\:\$stock\.$#'
