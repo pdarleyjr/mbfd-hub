@@ -35,6 +35,7 @@ function uniformViews() {
     'resources/views/filament/clusters/personnel-uniforms-equipment/pages/overview.blade.php',
     'resources/views/filament/clusters/personnel-uniforms-equipment/resources/employee-record.blade.php',
     ...reportDeckViews(),
+    ...workgroupReportViews(),
   ];
 }
 
@@ -112,6 +113,11 @@ const normalisedStylesheets = [
   'resources/css/filament/admin/pages/personnel-uniforms.css',
   'resources/css/filament/hub-portals-v2.css',
   'resources/css/report-deck.css',
+  'resources/css/reports/evaluation-report.css',
+  'resources/css/reports/final-recommendations.css',
+  'resources/css/reports/workgroup-summary.css',
+  'resources/css/reports/saver-report.css',
+  'resources/css/filament/workgroup-pages.css',
 ];
 
 for (const sheet of normalisedStylesheets) {
@@ -208,4 +214,46 @@ test('standalone Workgroup reports include the shared Hub head and the product i
   }
   assert.match(readFileSync('config/app.php', 'utf8'), /'name' => env\('APP_NAME', 'MBFD Hub'\)/);
   assert.match(readFileSync('.env.example', 'utf8'), /^APP_NAME="MBFD Hub"$/m);
+});
+
+/* Every Workgroup report surface: shared stylesheets with tokens, no page CSS, no hex, no CDN scripts. */
+function workgroupReportViews() {
+  return [
+    'resources/views/workgroup/data-dashboard.blade.php',
+    'resources/views/workgroup/evaluation-report.blade.php',
+    'resources/views/workgroup/final-recommendations.blade.php',
+    'resources/views/workgroup/l1-inventory.blade.php',
+    'resources/views/workgroup/workgroup-summary.blade.php',
+    'resources/views/filament/workgroup/pages/saver-report.blade.php',
+    'resources/views/filament/workgroup/pages/partials/granular-tool-table.blade.php',
+  ];
+}
+
+for (const view of [...reportDeckViews(), ...workgroupReportViews()]) {
+  test(`${view} carries no hex, inline styles, gradients or third-party CDN scripts`, () => {
+    const source = readFileSync(view, 'utf8');
+    assert.doesNotMatch(source, /#[0-9a-fA-F]{3,8}\b/, 'no hex colour literals');
+    assert.doesNotMatch(source, /\sstyle="/, 'no inline style attributes');
+    assert.doesNotMatch(source, /<style[\s>]/, 'no page-private style block');
+    assert.doesNotMatch(source, /rgba?\(\s*\d/, 'no literal rgb() colours');
+    assert.doesNotMatch(source, /(?:linear|radial)-gradient/, 'no gradients');
+    assert.doesNotMatch(source, /<script[^>]+src="https?:\/\//, 'scripts are bundled or served from pinned local vendor copies');
+  });
+}
+
+test('report charts use the pinned local Chart.js copy and token colours, not a CDN', () => {
+  const vendored = readFileSync('public/vendor/chartjs-4.4.0/chart.umd.js', 'utf8');
+  assert.match(vendored.slice(0, 200), /Chart\.js v4\.4\.0/, 'the vendored file is exactly Chart.js 4.4.0');
+  assert.match(readFileSync('resources/js/report-charts.js', 'utf8'), /window\.hubColor = /);
+  assert.match(readFileSync('vite.config.js', 'utf8'), /'resources\/js\/report-charts\.js'/);
+  for (const name of ['analysis-report', 'final-presentation', 'evaluation-report', 'final-recommendations']) {
+    const source = readFileSync(`resources/views/workgroup/${name}.blade.php`, 'utf8');
+    assert.ok(source.includes(`<script src="{{ asset('vendor/chartjs-4.4.0/chart.umd.js') }}"></script>`), `${name} loads the pinned local Chart.js`);
+    assert.match(source, /@vite\(\[[^\]]*'resources\/js\/report-charts\.js'/, `${name} loads the token colour helper`);
+    assert.doesNotMatch(source, /<script>/, `${name} chart code runs as a module after the helper`);
+  }
+  for (const name of ['evaluation-report', 'final-recommendations', 'workgroup-summary']) {
+    const source = readFileSync(`resources/views/workgroup/${name}.blade.php`, 'utf8');
+    assert.ok(source.includes(`@vite(['resources/css/reports/${name}.css', 'resources/css/app.css'`), `${name} loads its token stylesheet before app.css`);
+  }
 });

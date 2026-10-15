@@ -18,6 +18,12 @@ export default defineConfig({
                 'resources/css/filament/admin/theme.css',
                 'resources/js/workgroup-data-dashboard.jsx',
                 'resources/js/workgroup-l1-inventory.jsx',
+                // Standalone Workgroup reports: bundled Chart.js and per-report token stylesheets.
+                'resources/js/report-charts.js',
+                'resources/css/reports/evaluation-report.css',
+                'resources/css/reports/final-recommendations.css',
+                'resources/css/reports/workgroup-summary.css',
+                'resources/css/reports/saver-report.css',
                 // Admin desktop-PWA bootstrap (registers /admin/ scoped SW,
                 // gates install prompt by matchMedia, prefetches lookups).
                 'resources/js/admin-pwa/main.ts',

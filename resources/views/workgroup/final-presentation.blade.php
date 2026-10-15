@@ -9,9 +9,8 @@
     <link rel="stylesheet" href="{{ asset('vendor/reveal-4.3.1/reset.css') }}">
     <link rel="stylesheet" href="{{ asset('vendor/reveal-4.3.1/reveal.css') }}">
 
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    @vite(['resources/css/app.css'])
+    <script src="{{ asset('vendor/chartjs-4.4.0/chart.umd.js') }}"></script>
+    @vite(['resources/css/app.css', 'resources/js/report-charts.js'])
 </head>
 <body data-hub-ui="2" data-hub-portal="report" class="hub-report hub-report--final-presentation">
     <div class="hub-report-navigation"><x-hub-header back-href="/workgroups/links" back-label="Back to Workgroup Links" max-width="max-w-7xl" /></div>
@@ -301,7 +300,7 @@
     <!-- Reveal.js Scripts -->
     <script src="{{ asset('vendor/reveal-4.3.1/reveal.js') }}"></script>
     
-    <script>
+    <script type="module">
         // Initialize Reveal.js
         const mobileDeck = window.matchMedia('(max-width: 640px)');
         Reveal.initialize({
@@ -320,9 +319,8 @@
         new ResizeObserver(() => Reveal.layout()).observe(document.querySelector('.hub-report-navigation'));
 
         // Global Chart.js Styling
-        // Chart colours come from the mbfd-theme.css tokens so the charts follow the Hub palette.
+        // Chart colours come from the mbfd-theme.css tokens (hubColor is provided by resources/js/report-charts.js).
         const rootStyle = getComputedStyle(document.documentElement);
-        const hubColor = (token, alpha = 1) => `rgb(${rootStyle.getPropertyValue(token).trim().split(/\s+/).join(', ')}, ${alpha})`;
         const chartColors = {
             series1: hubColor('--hub-chart-1'),
             series2: hubColor('--hub-chart-2'),

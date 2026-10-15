@@ -4,311 +4,8 @@
     <meta charset="UTF-8">
     <x-hub.head />
     <title>MBFD Workgroup Final Recommendations — Final Equipment Selection &amp; Implementation Report</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <style>
-        :root {
-            --navy: #0f172a;
-            --navy-mid: #1e293b;
-            --navy-light: #334155;
-            --slate-600: #475569;
-            --slate-500: #64748b;
-            --slate-400: #94a3b8;
-            --slate-200: #e2e8f0;
-            --slate-100: #f1f5f9;
-            --slate-50: #f8fafc;
-            --red: #dc2626;
-            --red-light: #fee2e2;
-            --emerald: #059669;
-            --emerald-light: #d1fae5;
-            --blue: #2563eb;
-            --blue-light: #dbeafe;
-            --amber: #d97706;
-            --amber-light: #fef3c7;
-            --gold: #b45309;
-            --gold-bg: #fffbeb;
-        }
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        body {
-            font-family: var(--hub-font-sans);
-            background: var(--slate-100);
-            color: #1a202c;
-            font-size: 15px;
-            line-height: 1.65;
-        }
-
-        /* ── PRINT BAR ── */
-        .print-bar {
-            position: sticky; top: 0; z-index: 100;
-            background: var(--navy);
-            padding: 0.625rem 2rem;
-            display: flex; align-items: center; justify-content: space-between;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-        }
-        .print-bar-title { color: rgba(255,255,255,0.7); font-size: 0.8125rem; font-weight: 500; letter-spacing: 0.05em; text-transform: uppercase; }
-        .print-btn {
-            display: inline-flex; align-items: center; gap: 0.5rem;
-            background: var(--red); color: white; border: none;
-            padding: 0.5rem 1.25rem; border-radius: 0.5rem;
-            font-family: inherit; font-size: 0.875rem; font-weight: 600;
-            cursor: pointer; transition: background 150ms;
-        }
-        .print-btn:hover { background: #b91c1c; }
-        .print-btn svg { width: 1rem; height: 1rem; }
-
-        /* ── WRAPPER ── */
-        .report-wrapper {
-            max-width: 900px; margin: 2rem auto;
-            background: white; border-radius: 0.75rem;
-            box-shadow: 0 4px 24px rgba(0,0,0,0.08); overflow: hidden;
-        }
-
-        /* ── COVER ── */
-        .report-cover {
-            background: linear-gradient(135deg, var(--navy) 0%, #1a3a5c 100%);
-            padding: 3rem 3.5rem 2.5rem; position: relative; overflow: hidden;
-        }
-        .report-cover::before {
-            content: ''; position: absolute; top: -40px; right: -40px;
-            width: 280px; height: 280px; background: rgba(220,38,38,0.1); border-radius: 50%;
-        }
-        .final-stamp {
-            display: inline-flex; align-items: center; gap: 0.5rem;
-            background: var(--red); color: white;
-            padding: 0.375rem 1rem; border-radius: 0.375rem;
-            font-size: 0.75rem; font-weight: 800; letter-spacing: 0.12em;
-            text-transform: uppercase; margin-bottom: 1.25rem;
-            position: relative; z-index: 1;
-        }
-        .cover-agency {
-            display: flex; align-items: center; gap: 1rem;
-            margin-bottom: 1.5rem; position: relative; z-index: 1;
-        }
-        .cover-badge {
-            width: 48px; height: 48px; background: rgba(255,255,255,0.1);
-            border: 1px solid rgba(255,255,255,0.2);
-            border-radius: 0.625rem; display: flex; align-items: center; justify-content: center;
-        }
-        .cover-agency-text { color: rgba(255,255,255,0.9); font-size: 0.875rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
-        .cover-agency-sub { color: rgba(255,255,255,0.5); font-size: 0.75rem; }
-        .cover-title { color: white; font-size: 2.125rem; font-weight: 800; line-height: 1.2; margin-bottom: 0.625rem; position: relative; z-index: 1; }
-        .cover-subtitle { color: rgba(255,255,255,0.65); font-size: 0.9375rem; margin-bottom: 1.75rem; position: relative; z-index: 1; }
-        .cover-recipients {
-            background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12);
-            border-radius: 0.5rem; padding: 1rem 1.25rem;
-            margin-bottom: 1.75rem; position: relative; z-index: 1;
-        }
-        .cover-recipients-label { color: rgba(255,255,255,0.4); font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.5rem; }
-        .cover-recipients ul { list-style: none; }
-        .cover-recipients li { color: rgba(255,255,255,0.85); font-size: 0.875rem; padding: 0.125rem 0; }
-        .cover-meta { display: flex; gap: 2rem; flex-wrap: wrap; position: relative; z-index: 1; }
-        .cover-meta-item { display: flex; flex-direction: column; gap: 0.25rem; }
-        .cover-meta-label { color: rgba(255,255,255,0.45); font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.1em; }
-        .cover-meta-value { color: rgba(255,255,255,0.9); font-size: 0.875rem; font-weight: 600; }
-
-        /* ── BODY ── */
-        .report-body { padding: 2.5rem 3.5rem; }
-
-        /* ── SELECTIONS SUMMARY ── */
-        .selections-summary {
-            background: linear-gradient(135deg, #fffbeb, #fef9c3);
-            border: 2px solid #fcd34d; border-radius: 0.75rem;
-            padding: 1.5rem; margin-bottom: 2.5rem;
-        }
-        .selections-summary-title {
-            font-size: 0.75rem; font-weight: 800; text-transform: uppercase;
-            letter-spacing: 0.1em; color: var(--gold); margin-bottom: 1rem;
-            display: flex; align-items: center; gap: 0.5rem;
-        }
-        .selections-summary-title::before { content: '✓'; font-size: 1rem; }
-
-        /* ── TOC ── */
-        .toc {
-            background: var(--slate-50); border: 1px solid var(--slate-200);
-            border-radius: 0.5rem; padding: 1.5rem; margin-bottom: 2.5rem;
-        }
-        .toc-title { font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--slate-500); margin-bottom: 1rem; }
-        .toc-list { list-style: none; display: grid; grid-template-columns: 1fr 1fr; gap: 0.375rem; }
-        .toc-list li a { color: var(--blue); text-decoration: none; font-size: 0.875rem; font-weight: 500; display: flex; gap: 0.5rem; }
-        .toc-list li a:hover { text-decoration: underline; }
-        .toc-num { color: var(--slate-600); min-width: 1.5rem; }
-
-        /* ── SECTIONS ── */
-        .section { margin-bottom: 2.5rem; }
-        .section + .section { border-top: 1px solid var(--slate-200); padding-top: 2.5rem; }
-        .section-title {
-            font-size: 1.5rem; font-weight: 800; color: var(--navy);
-            display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1.25rem;
-        }
-        .section-title .section-num {
-            background: var(--red); color: white; width: 2rem; height: 2rem;
-            border-radius: 0.375rem; display: flex; align-items: center; justify-content: center;
-            font-size: 0.875rem; font-weight: 700; flex-shrink: 0;
-        }
-        .subsection-title {
-            font-size: 1.0625rem; font-weight: 700; color: var(--navy-mid);
-            margin: 1.5rem 0 0.75rem; padding-bottom: 0.5rem;
-            border-bottom: 2px solid var(--slate-200);
-        }
-        h3.sub-subsection { font-size: 0.9375rem; font-weight: 700; color: var(--navy-light); margin: 1.25rem 0 0.5rem; }
-        p { color: #374151; margin-bottom: 0.875rem; }
-        p:last-child { margin-bottom: 0; }
-        strong { color: var(--navy); font-weight: 600; }
-
-        /* ── SELECTION CARD ── */
-        .selection-card {
-            border: 1px solid var(--slate-200); border-radius: 0.625rem;
-            overflow: hidden; margin: 1.25rem 0;
-        }
-        .selection-card-header {
-            display: flex; align-items: center; justify-content: space-between;
-            background: var(--navy); color: white; padding: 0.875rem 1.25rem;
-        }
-        .selection-card-label {
-            font-size: 0.6875rem; font-weight: 700; text-transform: uppercase;
-            letter-spacing: 0.1em; color: rgba(255,255,255,0.5); margin-bottom: 0.125rem;
-        }
-        .selection-card-name { font-size: 1.0625rem; font-weight: 700; }
-        .selection-status {
-            display: inline-flex; align-items: center; gap: 0.375rem;
-            padding: 0.25rem 0.75rem; border-radius: 9999px;
-            font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
-            flex-shrink: 0;
-        }
-        .status-selected { background: var(--emerald-light); color: #065f46; }
-        .status-trial { background: var(--amber-light); color: #92400e; }
-        .status-pending { background: var(--blue-light); color: #1e40af; }
-        .selection-card-body { padding: 1.125rem 1.25rem; background: white; }
-        .selection-card-image { width: 100%; max-height: 260px; object-fit: contain; background: var(--slate-50); display: block; }
-
-        /* ── DEPLOYMENT TIER ── */
-        .deployment-tier {
-            border: 1px solid var(--slate-200); border-radius: 0.625rem;
-            overflow: hidden; margin: 1rem 0;
-        }
-        .tier-header {
-            padding: 0.875rem 1.25rem;
-            display: flex; align-items: center; justify-content: space-between;
-        }
-        .tier-header.frontline { background: linear-gradient(135deg, #1e3a5f, #1e40af); }
-        .tier-header.command { background: linear-gradient(135deg, var(--navy), #374151); }
-        .tier-header.heavy { background: linear-gradient(135deg, #1c1917, #292524); }
-        .tier-title { color: white; font-weight: 700; font-size: 1rem; }
-        .tier-label { color: rgba(255,255,255,0.5); font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; }
-        .tier-badge {
-            background: rgba(255,255,255,0.15); color: white;
-            padding: 0.25rem 0.75rem; border-radius: 9999px;
-            font-size: 0.75rem; font-weight: 600;
-        }
-        .tier-body { padding: 1.125rem; background: white; }
-
-        /* ── TRAINING PHASES ── */
-        .phases { display: flex; flex-direction: column; gap: 0; margin: 1rem 0; }
-        .phase {
-            display: flex; gap: 1rem; padding: 1rem 1.25rem;
-            border: 1px solid var(--slate-200); border-radius: 0;
-            background: white;
-        }
-        .phase:first-child { border-radius: 0.5rem 0.5rem 0 0; }
-        .phase:last-child { border-radius: 0 0 0.5rem 0.5rem; }
-        .phase + .phase { border-top: none; }
-        .phase-num {
-            width: 2rem; height: 2rem; border-radius: 50%;
-            background: var(--navy); color: white;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 0.875rem; font-weight: 700; flex-shrink: 0;
-        }
-        .phase-title { font-weight: 700; color: var(--navy); margin-bottom: 0.25rem; font-size: 0.9375rem; }
-        .phase-desc { font-size: 0.875rem; color: #4b5563; }
-        .phase-list { list-style: none; margin-top: 0.375rem; }
-        .phase-list li { font-size: 0.875rem; color: #4b5563; padding: 0.125rem 0 0.125rem 1.25rem; position: relative; }
-        .phase-list li::before { content: '—'; color: var(--slate-400); position: absolute; left: 0; }
-
-        /* ── WORKGROUP TABLE ── */
-        .data-table {
-            width: 100%; border-collapse: collapse; font-size: 0.875rem;
-            border-radius: 0.5rem; overflow: hidden; border: 1px solid var(--slate-200);
-            margin: 1rem 0;
-        }
-        .data-table thead th {
-            background: var(--navy); color: white; padding: 0.75rem 1rem;
-            text-align: left; font-size: 0.75rem; font-weight: 600;
-            text-transform: uppercase; letter-spacing: 0.05em;
-        }
-        .data-table thead th.right { text-align: right; }
-        .data-table tbody td {
-            padding: 0.75rem 1rem; border-bottom: 1px solid var(--slate-100);
-            color: #374151; vertical-align: middle;
-        }
-        .data-table tbody td.right { text-align: right; font-weight: 600; }
-        .data-table tbody tr:hover { background: var(--slate-50); }
-        .data-table tfoot td {
-            padding: 0.75rem 1rem; background: var(--slate-100);
-            font-weight: 700; color: var(--navy); border-top: 2px solid var(--slate-300);
-        }
-        .score-badge { display: inline-block; padding: 0.25rem 0.625rem; border-radius: 9999px; font-weight: 700; font-size: 0.875rem; min-width: 4rem; text-align: center; }
-        .score-elite { background: #d1fae5; color: #065f46; }
-        .score-high { background: var(--blue-light); color: #1e40af; }
-        .score-mid { background: var(--amber-light); color: #92400e; }
-        .score-low { background: var(--red-light); color: #991b1b; }
-        .brand-pill { display: inline-block; padding: 0.125rem 0.5rem; border-radius: 0.25rem; font-size: 0.75rem; font-weight: 600; background: var(--slate-100); color: var(--navy-light); }
-
-        /* ── SPEC TABLE ── */
-        .spec-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; margin: 0.75rem 0; border: 1px solid var(--slate-200); border-radius: 0.375rem; overflow: hidden; }
-        .spec-table tr:nth-child(even) { background: var(--slate-50); }
-        .spec-table td { padding: 0.625rem 0.875rem; border-bottom: 1px solid var(--slate-100); color: #374151; }
-        .spec-table td:first-child { font-weight: 600; color: var(--navy); width: 40%; }
-        .spec-table tr:last-child td { border-bottom: none; }
-
-        /* ── CALLOUTS ── */
-        .callout { border-radius: 0.5rem; padding: 1.125rem 1.25rem; margin: 1.25rem 0; border-left: 4px solid; font-size: 0.9rem; }
-        .callout.success { background: #f0fdf4; border-color: var(--emerald); color: #14532d; }
-        .callout.warning { background: var(--amber-light); border-color: var(--amber); color: #713f12; }
-        .callout.info { background: var(--blue-light); border-color: var(--blue); color: #1e3a5f; }
-        .callout.note { background: var(--slate-50); border-color: var(--slate-400); color: var(--navy-light); }
-        .callout-label { font-size: 0.6875rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 0.375rem; opacity: 1; }
-
-        /* ── CHART ── */
-        .chart-section { background: var(--slate-50); border: 1px solid var(--slate-200); border-radius: 0.625rem; padding: 1.5rem; margin: 1.25rem 0; }
-        .chart-title { font-size: 0.8125rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--slate-500); margin-bottom: 1rem; }
-        .chart-container { position: relative; height: 240px; }
-        .chart-container.tall { height: 300px; }
-
-        /* ── IMAGES ── */
-        .report-image { width: 100%; border-radius: 0.5rem; border: 1px solid var(--slate-200); margin: 1.25rem 0; display: block; max-height: 320px; object-fit: contain; background: var(--slate-50); }
-        .image-caption { font-size: 0.75rem; color: var(--slate-500); text-align: center; font-style: italic; margin-top: -0.75rem; margin-bottom: 1.25rem; }
-        .image-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1.25rem 0; }
-        .image-grid .report-image { margin: 0; }
-        .image-grid .image-caption { margin-top: .5rem; }
-
-        /* ── HR ── */
-        hr.section-divider { border: none; border-top: 1px solid var(--slate-200); margin: 2rem 0; }
-
-        /* ── FOOTER ── */
-        .report-footer { background: var(--slate-50); border-top: 1px solid var(--slate-200); padding: 1.25rem 3.5rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.75rem; color: var(--slate-500); }
-
-        /* ── PRINT ── */
-        @@media print {
-            body { background: white; font-size: 13px; }
-            .print-bar { display: none; }
-            .report-wrapper { max-width: 100%; margin: 0; border-radius: 0; box-shadow: none; }
-            .report-body { padding: 1.5rem 2rem; }
-            .report-cover { padding: 2rem; }
-            .section + .section { page-break-inside: avoid; }
-            .selection-card { page-break-inside: avoid; }
-            .data-table { page-break-inside: avoid; }
-            .section-title, .subsection-title { page-break-after: avoid; }
-            .report-image { max-height: 260px; }
-            @@page { margin: 0.75in; size: letter; }
-        }
-        @@media (max-width: 640px) {
-            .report-body { padding: 1.5rem; }
-            .report-cover { padding: 2rem 1.5rem; }
-            .cover-title { font-size: 1.75rem; }
-            .toc-list { grid-template-columns: 1fr; }
-            .image-grid { grid-template-columns: 1fr; }
-        }
-    </style>
-    @vite(['resources/css/app.css'])
+    <script src="{{ asset('vendor/chartjs-4.4.0/chart.umd.js') }}"></script>
+    @vite(['resources/css/reports/final-recommendations.css', 'resources/css/app.css', 'resources/js/report-charts.js'])
 </head>
 <body data-hub-ui="2" data-hub-portal="report" class="hub-report hub-report--final-recommendations">
     <div class="hub-report-navigation"><x-hub-header back-href="/workgroups/links" back-label="Back to Workgroup Links" max-width="max-w-7xl" /></div>
@@ -351,7 +48,7 @@
             <div class="cover-meta">
                 <div class="cover-meta-item"><span class="cover-meta-label">Report Date</span><span class="cover-meta-value">March 18, 2026</span></div>
                 <div class="cover-meta-item"><span class="cover-meta-label">Products Selected</span><span class="cover-meta-value">9 Systems</span></div>
-                <div class="cover-meta-item"><span class="cover-meta-label">Status</span><span class="cover-meta-value" style="color:#4ade80">Final Determination</span></div>
+                <div class="cover-meta-item"><span class="cover-meta-label">Status</span><span class="cover-meta-value fr-u1">Final Determination</span></div>
             </div>
         </div>
 
@@ -361,7 +58,7 @@
             <!-- Final Selections Summary -->
             <div class="selections-summary">
                 <div class="selections-summary-title">Final Equipment Selections at a Glance</div>
-                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table" style="margin:0; border:none;">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table fr-u2">
                     <thead>
                         <tr>
                             <th scope="col">Category</th>
@@ -443,10 +140,10 @@
                         <span class="selection-status status-selected">✓ Selected</span>
                     </div>
                     <div class="selection-card-body">
-                        <ul style="list-style:none; margin-bottom:0.75rem;">
-                            <li style="padding:0.25rem 0; display:flex; gap:0.5rem; color:#374151;"><span style="color:var(--emerald); font-weight:700;">→</span> Bullet chain configuration</li>
-                            <li style="padding:0.25rem 0; display:flex; gap:0.5rem; color:#374151;"><span style="color:var(--emerald); font-weight:700;">→</span> Depth markings for ventilation operations</li>
-                            <li style="padding:0.25rem 0; display:flex; gap:0.5rem; color:#374151;"><span style="color:var(--emerald); font-weight:700;">→</span> Battery-powered — compatible with DeWalt CAPTIUM platform</li>
+                        <ul class="fr-u3">
+                            <li class="fr-u4"><span class="fr-u5">→</span> Bullet chain configuration</li>
+                            <li class="fr-u4"><span class="fr-u5">→</span> Depth markings for ventilation operations</li>
+                            <li class="fr-u4"><span class="fr-u5">→</span> Battery-powered — compatible with DeWalt CAPTIUM platform</li>
                         </ul>
                     </div>
                 </div>
@@ -483,7 +180,7 @@
                     <div class="selection-card-body">
                         <img class="report-image" src="/workgroup-report/images/Holmatro Pentheon Series USA-1_p10_i1.png"
                              alt="Extrication Tool System" onerror="this.style.display='none'">
-                        <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table" style="margin-top:0.75rem;">
+                        <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table fr-u6">
                             <thead><tr><th scope="col">Tool</th><th scope="col">Model</th><th scope="col">Role</th><th scope="col" class="right">Score</th></tr></thead>
                             <tbody>
                                 <tr><td>Spreader</td><td><strong>SP 777 E3 Connect</strong></td><td>Primary spreading</td><td class="right"><span class="score-badge score-elite">90.99</span></td></tr>
@@ -492,7 +189,7 @@
                                 <tr><td>Platform</td><td><strong>CAPTIUM</strong></td><td>Shared battery system</td><td class="right">—</td></tr>
                             </tbody>
                         </table></div>
-                        <p style="margin-top:0.75rem;">IP58 watertight design rated for saltwater operations — critical for MBFD's coastal deployment environment. E3 Connect Wi-Fi integration with Captium cloud provides fleet management capabilities.</p>
+                        <p class="fr-u6">IP58 watertight design rated for saltwater operations — critical for MBFD's coastal deployment environment. E3 Connect Wi-Fi integration with Captium cloud provides fleet management capabilities.</p>
                     </div>
                 </div>
 
@@ -506,11 +203,11 @@
                         <span class="selection-status status-trial">⚠ Trial</span>
                     </div>
                     <div class="selection-card-body">
-                        <div class="callout warning" style="margin-top:0;">
+                        <div class="callout warning fr-u7">
                             <div class="callout-label">Trial Status</div>
                             Authorized for trial deployment as a <strong>potential replacement candidate for the Rabbit tool</strong>. Final determination pending operational trial results.
                         </div>
-                        <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="spec-table" style="margin-top:0.75rem;">
+                        <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="spec-table fr-u6">
                             <tbody>
                                 <tr><td>Composite Score</td><td>82.23</td></tr>
                                 <tr><td>Weight</td><td>17.0 lbs (7.7 kg)</td></tr>
@@ -531,11 +228,11 @@
                         <span class="selection-status status-selected">✓ Selected</span>
                     </div>
                     <div class="selection-card-body">
-                        <ul style="list-style:none; margin-bottom:0.75rem;">
-                            <li style="padding:0.25rem 0; display:flex; gap:0.5rem; color:#374151;"><span style="color:var(--blue); font-weight:700;">→</span> Hurst M40 40" spreader</li>
-                            <li style="padding:0.25rem 0; display:flex; gap:0.5rem; color:#374151;"><span style="color:var(--blue); font-weight:700;">→</span> 2 × CAPTIUM batteries</li>
-                            <li style="padding:0.25rem 0; display:flex; gap:0.5rem; color:#374151;"><span style="color:var(--blue); font-weight:700;">→</span> Charging station</li>
-                            <li style="padding:0.25rem 0; display:flex; gap:0.5rem; color:#374151;"><span style="color:var(--blue); font-weight:700;">→</span> Assigned apparatus: <strong>300 (Battalion Chief)</strong></li>
+                        <ul class="fr-u3">
+                            <li class="fr-u4"><span class="fr-u8">→</span> Hurst M40 40" spreader</li>
+                            <li class="fr-u4"><span class="fr-u8">→</span> 2 × CAPTIUM batteries</li>
+                            <li class="fr-u4"><span class="fr-u8">→</span> Charging station</li>
+                            <li class="fr-u4"><span class="fr-u8">→</span> Assigned apparatus: <strong>300 (Battalion Chief)</strong></li>
                         </ul>
                         <p>Heavy rescue capability at command level. Composite score: <strong>78.80</strong> (Capability: 83.39). Not suitable for standard frontline apparatus due to physical footprint — dedicated command-level deployment only.</p>
                     </div>
@@ -577,7 +274,7 @@
                         <div class="tier-badge">Primary Response</div>
                     </div>
                     <div class="tier-body">
-                        <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table" style="margin:0;">
+                        <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table fr-u9">
                             <thead><tr><th scope="col">Equipment</th><th scope="col">Deployment Role</th></tr></thead>
                             <tbody>
                                 <tr><td><strong>Hurst SP 777 E3 Connect Spreader</strong></td><td>Primary extrication spreading</td></tr>
@@ -589,7 +286,7 @@
                                 <tr><td><strong>Holmatro T1 (trial)</strong></td><td>Multi-function access tool</td></tr>
                             </tbody>
                         </table></div>
-                        <p style="margin-top:0.75rem; font-size:0.875rem; color:var(--slate-500);"><strong>Operational Priority:</strong> Rapid deployment capability, compartment-optimized, battery-independent operation.</p>
+                        <p class="fr-u10"><strong>Operational Priority:</strong> Rapid deployment capability, compartment-optimized, battery-independent operation.</p>
                     </div>
                 </div>
 
@@ -603,7 +300,7 @@
                         <div class="tier-badge">Command Augmentation</div>
                     </div>
                     <div class="tier-body">
-                        <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table" style="margin:0;">
+                        <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table fr-u9">
                             <thead><tr><th scope="col">Equipment</th><th scope="col">Deployment Role</th></tr></thead>
                             <tbody>
                                 <tr><td><strong>Hurst M40 40" Spreader</strong></td><td>Heavy extrication capability</td></tr>
@@ -612,7 +309,7 @@
                                 <tr><td><strong>Lifting Struts (future)</strong></td><td>Vehicle lifting operations</td></tr>
                             </tbody>
                         </table></div>
-                        <p style="margin-top:0.75rem; font-size:0.875rem; color:var(--slate-500);"><strong>Operational Priority:</strong> Heavy rescue augmentation, command-level specialty capability.</p>
+                        <p class="fr-u10"><strong>Operational Priority:</strong> Heavy rescue augmentation, command-level specialty capability.</p>
                     </div>
                 </div>
 
@@ -626,8 +323,8 @@
                         <div class="tier-badge">Specialist Operations</div>
                     </div>
                     <div class="tier-body">
-                        <p style="color:#374151;">High-capacity rescue systems for extreme lifting and technical rescue scenarios.</p>
-                        <p style="margin-top:0.375rem; font-size:0.875rem; color:var(--slate-500);"><strong>Operational Priority:</strong> Maximum force, specialist operations, structural rescue scenarios.</p>
+                        <p class="fr-u11">High-capacity rescue systems for extreme lifting and technical rescue scenarios.</p>
+                        <p class="fr-u12"><strong>Operational Priority:</strong> Maximum force, specialist operations, structural rescue scenarios.</p>
                     </div>
                 </div>
             </section>
@@ -764,10 +461,10 @@
                     <caption id="recommendations-dimensions-data">Holmatro Pentheon and Hurst E3 dimension scores shown in the chart</caption>
                     <thead><tr><th scope="col">Dimension</th><th scope="col" class="right">Holmatro</th><th scope="col" class="right">Hurst</th><th scope="col" class="right">Δ Delta</th></tr></thead>
                     <tbody>
-                        <tr><td><strong>Capability</strong></td><td class="right">89.41</td><td class="right">87.56</td><td class="right" style="color:#065f46">+1.85</td></tr>
-                        <tr><td><strong>Usability</strong></td><td class="right">93.99</td><td class="right">85.76</td><td class="right" style="color:#065f46">+8.23</td></tr>
-                        <tr><td><strong>Maintainability</strong></td><td class="right">89.82</td><td class="right">82.58</td><td class="right" style="color:#065f46">+7.24</td></tr>
-                        <tr><td><strong>Deployability</strong></td><td class="right">89.69</td><td class="right">82.74</td><td class="right" style="color:#065f46">+6.95</td></tr>
+                        <tr><td><strong>Capability</strong></td><td class="right">89.41</td><td class="right">87.56</td><td class="right fr-u13">+1.85</td></tr>
+                        <tr><td><strong>Usability</strong></td><td class="right">93.99</td><td class="right">85.76</td><td class="right fr-u13">+8.23</td></tr>
+                        <tr><td><strong>Maintainability</strong></td><td class="right">89.82</td><td class="right">82.58</td><td class="right fr-u13">+7.24</td></tr>
+                        <tr><td><strong>Deployability</strong></td><td class="right">89.69</td><td class="right">82.74</td><td class="right fr-u13">+6.95</td></tr>
                     </tbody>
                 </table></div>
 
@@ -834,9 +531,9 @@
                 <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
                     <thead><tr><th scope="col">Category</th><th scope="col">Key Differentiator</th><th scope="col" class="right">Advantage</th></tr></thead>
                     <tbody>
-                        <tr><td>Saws</td><td>Gear-driven instant-start + 3-second electric brake (DeWalt)</td><td class="right" style="color:#065f46">+26.42 to +29.47 pts</td></tr>
-                        <tr><td>Frontline Tools</td><td>On-Tool Charging + cordless auto start/stop (Holmatro)</td><td class="right" style="color:#065f46">+6.95 pts Deployability</td></tr>
-                        <tr><td>Stabilization</td><td>15-second auto-lock (V-Strut vs. competitors)</td><td class="right" style="color:#065f46">+1.41 to +11.15 pts</td></tr>
+                        <tr><td>Saws</td><td>Gear-driven instant-start + 3-second electric brake (DeWalt)</td><td class="right fr-u13">+26.42 to +29.47 pts</td></tr>
+                        <tr><td>Frontline Tools</td><td>On-Tool Charging + cordless auto start/stop (Holmatro)</td><td class="right fr-u13">+6.95 pts Deployability</td></tr>
+                        <tr><td>Stabilization</td><td>15-second auto-lock (V-Strut vs. competitors)</td><td class="right fr-u13">+1.41 to +11.15 pts</td></tr>
                     </tbody>
                 </table></div>
             </section>
@@ -909,22 +606,22 @@
         </div>
     </div>
 
-    <script>
-        Chart.defaults.font.family = "'Plus Jakarta Sans', system-ui, sans-serif";
-        Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(15, 23, 42, 0.95)';
+    <script type="module">
+        Chart.defaults.font.family = getComputedStyle(document.documentElement).getPropertyValue('--hub-font-sans').trim();
+        Chart.defaults.plugins.tooltip.backgroundColor = hubColor('--hub-ink', 0.95);
         Chart.defaults.plugins.tooltip.padding = 10;
         Chart.defaults.plugins.tooltip.cornerRadius = 6;
 
-        const NAVY = '#0f172a', RED = '#dc2626', BLUE = '#2563eb';
-        const GREEN = '#059669', AMBER = '#d97706';
+        const NAVY = hubColor('--hub-ink'), RED = hubColor('--hub-red'), BLUE = hubColor('--hub-blue');
+        const GREEN = hubColor('--hub-success'), AMBER = hubColor('--hub-warning-solid');
 
         new Chart(document.getElementById('brandChart'), {
             type: 'bar',
             data: {
                 labels: ['DeWalt', 'Holmatro', 'Hurst', 'Paratech', 'Makita', 'Husqvarna'],
-                datasets: [{ label: 'Avg Composite Score', data: [91.25, 87.93, 84.60, 76.13, 64.83, 61.78], backgroundColor: [GREEN, BLUE, '#0ea5e9', AMBER, '#f87171', '#fca5a5'], borderRadius: 6, borderSkipped: false }]
+                datasets: [{ label: 'Avg Composite Score', data: [91.25, 87.93, 84.60, 76.13, 64.83, 61.78], backgroundColor: [GREEN, BLUE, hubColor('--hub-info'), AMBER, hubColor('--hub-red'), hubColor('--hub-chart-4')], borderRadius: 6, borderSkipped: false }]
             },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: false, min: 50, max: 100, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 12 } } }, x: { grid: { display: false }, ticks: { font: { size: 12, weight: '600' } } } } }
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: false, min: 50, max: 100, grid: { color: hubColor('--hub-chart-grid') }, ticks: { font: { size: 12 } } }, x: { grid: { display: false }, ticks: { font: { size: 12, weight: '600' } } } } }
         });
 
         new Chart(document.getElementById('dimensionChart'), {
@@ -933,19 +630,19 @@
                 labels: ['Capability', 'Usability', 'Maintainability', 'Deployability'],
                 datasets: [
                     { label: 'Holmatro Pentheon', data: [89.41, 93.99, 89.82, 89.69], backgroundColor: BLUE, borderRadius: 4 },
-                    { label: 'Hurst E3', data: [87.56, 85.76, 82.58, 82.74], backgroundColor: '#60a5fa', borderRadius: 4 }
+                    { label: 'Hurst E3', data: [87.56, 85.76, 82.58, 82.74], backgroundColor: hubColor('--hub-chart-2'), borderRadius: 4 }
                 ]
             },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { font: { size: 12 }, color: NAVY } } }, scales: { y: { beginAtZero: false, min: 75, max: 100, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 12 } } }, x: { grid: { display: false }, ticks: { font: { size: 12 } } } } }
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top', labels: { font: { size: 12 }, color: NAVY } } }, scales: { y: { beginAtZero: false, min: 75, max: 100, grid: { color: hubColor('--hub-chart-grid') }, ticks: { font: { size: 12 } } }, x: { grid: { display: false }, ticks: { font: { size: 12 } } } } }
         });
 
         new Chart(document.getElementById('frontlineChart'), {
             type: 'bar',
             data: {
                 labels: ['Spreader\n(Holmatro)', 'Spreader\n(Hurst)', 'Cutter\n(Holmatro)', 'Cutter\n(Hurst)', 'Ram\n(Holmatro)', 'Ram\n(Hurst)'],
-                datasets: [{ label: 'Composite Score', data: [92.02, 90.99, 88.86, 82.57, 91.29, 86.02], backgroundColor: [BLUE, '#93c5fd', BLUE, '#93c5fd', BLUE, '#93c5fd'], borderRadius: 6, borderSkipped: false }]
+                datasets: [{ label: 'Composite Score', data: [92.02, 90.99, 88.86, 82.57, 91.29, 86.02], backgroundColor: [BLUE, hubColor('--hub-chart-2'), BLUE, hubColor('--hub-chart-2'), BLUE, hubColor('--hub-chart-2')], borderRadius: 6, borderSkipped: false }]
             },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: false, min: 78, max: 95, grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 12 } } }, x: { grid: { display: false }, ticks: { font: { size: 11 }, maxRotation: 0, minRotation: 0 } } } }
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: false, min: 78, max: 95, grid: { color: hubColor('--hub-chart-grid') }, ticks: { font: { size: 12 } } }, x: { grid: { display: false }, ticks: { font: { size: 11 }, maxRotation: 0, minRotation: 0 } } } }
         });
     </script>
     @include('components.hub-support-widget')

@@ -5,8 +5,8 @@
     <x-hub.head />
     <title>2026 Technical Product Comparison Analysis · MBFD Hub</title>
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    @vite(['resources/css/app.css'])
+    <script src="{{ asset('vendor/chartjs-4.4.0/chart.umd.js') }}"></script>
+    @vite(['resources/css/app.css', 'resources/js/report-charts.js'])
 </head>
 <body data-hub-ui="2" data-hub-portal="report" class="hub-report hub-report--analysis-report antialiased">
     <div class="hub-report-navigation"><x-hub-header back-href="/workgroups/links" back-label="Back to Workgroup Links" max-width="max-w-7xl" /></div>
@@ -277,10 +277,9 @@
 
     </main>
 
-    <script>
-        // Chart colours come from the mbfd-theme.css tokens so the charts follow the Hub palette.
+    <script type="module">
+        // Chart colours come from the mbfd-theme.css tokens (hubColor is provided by resources/js/report-charts.js).
         const rootStyle = getComputedStyle(document.documentElement);
-        const hubColor = (token, alpha = 1) => `rgb(${rootStyle.getPropertyValue(token).trim().split(/\s+/).join(', ')}, ${alpha})`;
         const chartColors = {
             series1: hubColor('--hub-chart-1'),
             series2: hubColor('--hub-chart-2'),

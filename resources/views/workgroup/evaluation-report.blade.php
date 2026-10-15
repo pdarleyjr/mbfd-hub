@@ -4,623 +4,8 @@
     <meta charset="UTF-8">
     <x-hub.head />
     <title>MBFD Workgroup Evaluation Results — Hydraulic Rescue Tool Evaluation</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <style>
-        :root {
-            --color-navy: #0f172a;
-            --color-slate-800: #1e293b;
-            --color-slate-700: #334155;
-            --color-slate-500: #64748b;
-            --color-slate-400: #94a3b8;
-            --color-slate-200: #e2e8f0;
-            --color-slate-100: #f1f5f9;
-            --color-slate-50: #f8fafc;
-            --color-red: #dc2626;
-            --color-red-light: #fee2e2;
-            --color-emerald: #059669;
-            --color-blue: #2563eb;
-            --color-amber: #d97706;
-            --color-body: #1a202c;
-        }
-
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-
-        body {
-            font-family: var(--hub-font-sans);
-            background: var(--color-slate-100);
-            color: var(--color-body);
-            font-size: 15px;
-            line-height: 1.6;
-        }
-
-        /* ── PRINT BUTTON BAR ── */
-        .print-bar {
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            background: var(--color-navy);
-            padding: 0.625rem 2rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-        }
-        .print-bar-title {
-            color: rgba(255,255,255,0.7);
-            font-size: 0.8125rem;
-            font-weight: 500;
-            letter-spacing: 0.05em;
-            text-transform: uppercase;
-        }
-        .print-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            background: var(--color-red);
-            color: white;
-            border: none;
-            padding: 0.5rem 1.25rem;
-            border-radius: 0.5rem;
-            font-family: inherit;
-            font-size: 0.875rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 150ms;
-        }
-        .print-btn:hover { background: #b91c1c; }
-        .print-btn svg { width: 1rem; height: 1rem; }
-
-        /* ── REPORT WRAPPER ── */
-        .report-wrapper {
-            max-width: 900px;
-            margin: 2rem auto;
-            background: white;
-            border-radius: 0.75rem;
-            box-shadow: 0 4px 24px rgba(0,0,0,0.08);
-            overflow: hidden;
-        }
-
-        /* ── COVER HEADER ── */
-        .report-cover {
-            background: linear-gradient(135deg, var(--color-navy) 0%, #1e3a5f 100%);
-            padding: 3rem 3.5rem 2.5rem;
-            position: relative;
-            overflow: hidden;
-        }
-        .report-cover::before {
-            content: '';
-            position: absolute;
-            top: -60px; right: -60px;
-            width: 300px; height: 300px;
-            background: rgba(220, 38, 38, 0.12);
-            border-radius: 50%;
-        }
-        .report-cover::after {
-            content: '';
-            position: absolute;
-            bottom: -80px; left: 10%;
-            width: 200px; height: 200px;
-            background: rgba(37, 99, 235, 0.1);
-            border-radius: 50%;
-        }
-        .cover-agency {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            margin-bottom: 2rem;
-            position: relative;
-            z-index: 1;
-        }
-        .cover-badge {
-            width: 48px;
-            height: 48px;
-            background: var(--color-red);
-            border-radius: 0.625rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .cover-agency-text {
-            color: rgba(255,255,255,0.9);
-            font-size: 0.875rem;
-            font-weight: 600;
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
-        }
-        .cover-agency-sub {
-            color: rgba(255,255,255,0.5);
-            font-size: 0.75rem;
-            letter-spacing: 0.05em;
-        }
-        .cover-title {
-            color: white;
-            font-size: 2.25rem;
-            font-weight: 800;
-            line-height: 1.2;
-            margin-bottom: 0.75rem;
-            position: relative;
-            z-index: 1;
-        }
-        .cover-subtitle {
-            color: rgba(255,255,255,0.65);
-            font-size: 1rem;
-            font-weight: 400;
-            margin-bottom: 2rem;
-            position: relative;
-            z-index: 1;
-        }
-        .cover-meta {
-            display: flex;
-            gap: 2rem;
-            flex-wrap: wrap;
-            position: relative;
-            z-index: 1;
-        }
-        .cover-meta-item {
-            display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-        }
-        .cover-meta-label {
-            color: rgba(255,255,255,0.45);
-            font-size: 0.6875rem;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-        }
-        .cover-meta-value {
-            color: rgba(255,255,255,0.9);
-            font-size: 0.875rem;
-            font-weight: 600;
-        }
-        .cover-accent-line {
-            width: 64px;
-            height: 3px;
-            background: var(--color-red);
-            border-radius: 2px;
-            margin: 1.5rem 0;
-            position: relative;
-            z-index: 1;
-        }
-
-        /* ── REPORT BODY ── */
-        .report-body {
-            padding: 2.5rem 3.5rem;
-        }
-
-        /* ── TOC ── */
-        .toc {
-            background: var(--color-slate-50);
-            border: 1px solid var(--color-slate-200);
-            border-radius: 0.5rem;
-            padding: 1.5rem;
-            margin-bottom: 2.5rem;
-        }
-        .toc-title {
-            font-size: 0.75rem;
-            font-weight: 700;
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
-            color: var(--color-slate-500);
-            margin-bottom: 1rem;
-        }
-        .toc-list {
-            list-style: none;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.375rem;
-        }
-        .toc-list li a {
-            color: var(--color-blue);
-            text-decoration: none;
-            font-size: 0.875rem;
-            font-weight: 500;
-            display: flex;
-            gap: 0.5rem;
-        }
-        .toc-list li a:hover { text-decoration: underline; }
-        .toc-num {
-            color: var(--color-slate-400);
-            min-width: 1.5rem;
-        }
-
-        /* ── SECTIONS ── */
-        .section { margin-bottom: 2.5rem; }
-        .section + .section { border-top: 1px solid var(--color-slate-200); padding-top: 2.5rem; }
-
-        /* ── HEADINGS ── */
-        .section-title {
-            font-size: 1.5rem;
-            font-weight: 800;
-            color: var(--color-navy);
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            margin-bottom: 1.25rem;
-        }
-        .section-title .section-num {
-            background: var(--color-red);
-            color: white;
-            width: 2rem;
-            height: 2rem;
-            border-radius: 0.375rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.875rem;
-            font-weight: 700;
-            flex-shrink: 0;
-        }
-        .subsection-title {
-            font-size: 1.0625rem;
-            font-weight: 700;
-            color: var(--color-slate-800);
-            margin: 1.5rem 0 0.75rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 2px solid var(--color-slate-200);
-        }
-        .sub-subsection {
-            font-size: 0.9375rem;
-            font-weight: 700;
-            color: var(--color-slate-700);
-            margin: 1.25rem 0 0.5rem;
-        }
-
-        /* ── BODY TEXT ── */
-        p { color: #374151; margin-bottom: 0.875rem; }
-        p:last-child { margin-bottom: 0; }
-        strong { color: var(--color-navy); font-weight: 600; }
-
-        /* ── KEY FINDINGS ── */
-        .key-findings {
-            background: linear-gradient(135deg, #eff6ff, #f0fdf4);
-            border: 1px solid #bfdbfe;
-            border-left: 4px solid var(--color-blue);
-            border-radius: 0.5rem;
-            padding: 1.25rem 1.5rem;
-            margin: 1.25rem 0;
-        }
-        .key-findings-title {
-            font-size: 0.75rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: var(--color-blue);
-            margin-bottom: 0.75rem;
-        }
-        .key-findings ul {
-            list-style: none;
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-        .key-findings li {
-            position: relative;
-            padding-left: 1.25rem;
-            font-size: 0.9rem;
-            color: #1e3a5f;
-            line-height: 1.5;
-        }
-        .key-findings li::before {
-            position: absolute;
-            left: 0;
-            content: '→';
-            color: var(--color-blue);
-            font-weight: 700;
-        }
-
-        /* ── KPI CARDS ── */
-        .kpi-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 1rem;
-            margin: 1.25rem 0;
-        }
-        .kpi-card {
-            background: var(--color-slate-50);
-            border: 1px solid var(--color-slate-200);
-            border-radius: 0.625rem;
-            padding: 1.25rem;
-            text-align: center;
-        }
-        .kpi-value {
-            font-size: 2rem;
-            font-weight: 800;
-            color: var(--color-navy);
-            line-height: 1;
-            margin-bottom: 0.375rem;
-        }
-        .kpi-value.green { color: var(--color-emerald); }
-        .kpi-value.blue { color: var(--color-blue); }
-        .kpi-value.red { color: var(--color-red); }
-        .kpi-label {
-            font-size: 0.75rem;
-            color: var(--color-slate-500);
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        /* ── TABLES ── */
-        .data-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin: 1rem 0;
-            font-size: 0.875rem;
-            border-radius: 0.5rem;
-            overflow: hidden;
-            border: 1px solid var(--color-slate-200);
-        }
-        .data-table thead th {
-            background: var(--color-navy);
-            color: white;
-            padding: 0.75rem 1rem;
-            text-align: left;
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-        .data-table thead th.right { text-align: right; }
-        .data-table tbody td {
-            padding: 0.75rem 1rem;
-            border-bottom: 1px solid var(--color-slate-100);
-            color: #374151;
-            vertical-align: middle;
-        }
-        .data-table tbody td.right { text-align: right; font-weight: 600; }
-        .data-table tbody tr:hover { background: var(--color-slate-50); }
-        .data-table tfoot td {
-            padding: 0.75rem 1rem;
-            background: var(--color-slate-100);
-            font-weight: 700;
-            color: var(--color-navy);
-            border-top: 2px solid var(--color-slate-300);
-        }
-        .score-badge {
-            display: inline-block;
-            padding: 0.25rem 0.625rem;
-            border-radius: 9999px;
-            font-weight: 700;
-            font-size: 0.875rem;
-            min-width: 4rem;
-            text-align: center;
-        }
-        .score-elite { background: #d1fae5; color: #065f46; }
-        .score-high { background: #dbeafe; color: #1e40af; }
-        .score-mid { background: #fef3c7; color: #92400e; }
-        .score-low { background: #fee2e2; color: #991b1b; }
-        .brand-pill {
-            display: inline-block;
-            padding: 0.125rem 0.5rem;
-            border-radius: 0.25rem;
-            font-size: 0.75rem;
-            font-weight: 600;
-            background: var(--color-slate-100);
-            color: var(--color-slate-700);
-        }
-
-        /* ── CHART CONTAINERS ── */
-        .chart-section {
-            background: var(--color-slate-50);
-            border: 1px solid var(--color-slate-200);
-            border-radius: 0.625rem;
-            padding: 1.5rem;
-            margin: 1.25rem 0;
-        }
-        .chart-title {
-            font-size: 0.8125rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--color-slate-500);
-            margin-bottom: 1rem;
-        }
-        .chart-container {
-            position: relative;
-            height: 240px;
-        }
-        .chart-container.tall { height: 300px; }
-
-        /* ── IMAGES ── */
-        .report-image {
-            width: 100%;
-            border-radius: 0.5rem;
-            border: 1px solid var(--color-slate-200);
-            margin: 1.25rem 0;
-            display: block;
-            max-height: 360px;
-            object-fit: contain;
-            background: var(--color-slate-50);
-        }
-        .image-caption {
-            font-size: 0.75rem;
-            color: var(--color-slate-500);
-            text-align: center;
-            font-style: italic;
-            margin-top: -0.75rem;
-            margin-bottom: 1.25rem;
-        }
-        .image-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-            margin: 1.25rem 0;
-        }
-        .image-grid .report-image { margin: 0; }
-        .image-grid .image-caption { margin-top: .5rem; }
-
-        /* ── CALLOUTS ── */
-        .callout {
-            border-radius: 0.5rem;
-            padding: 1.125rem 1.25rem;
-            margin: 1.25rem 0;
-            border-left: 4px solid;
-            font-size: 0.9rem;
-        }
-        .callout.warning {
-            background: #fef9c3;
-            border-color: var(--color-amber);
-            color: #713f12;
-        }
-        .callout.info {
-            background: #eff6ff;
-            border-color: var(--color-blue);
-            color: #1e3a5f;
-        }
-        .callout.note {
-            background: var(--color-slate-50);
-            border-color: var(--color-slate-400);
-            color: var(--color-slate-700);
-        }
-        .callout-label {
-            font-size: 0.6875rem;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            margin-bottom: 0.375rem;
-            opacity: 0.7;
-        }
-
-        /* ── SPEC TABLE (attribute/value) ── */
-        .spec-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.875rem;
-            margin: 0.75rem 0;
-            border: 1px solid var(--color-slate-200);
-            border-radius: 0.375rem;
-            overflow: hidden;
-        }
-        .spec-table tr:nth-child(even) { background: var(--color-slate-50); }
-        .spec-table td {
-            padding: 0.625rem 0.875rem;
-            border-bottom: 1px solid var(--color-slate-100);
-            color: #374151;
-        }
-        .spec-table td:first-child {
-            font-weight: 600;
-            color: var(--color-navy);
-            width: 40%;
-        }
-        .spec-table tr:last-child td { border-bottom: none; }
-
-        /* ── WINNER BANNER ── */
-        .winner-banner {
-            background: linear-gradient(135deg, var(--color-navy), #1e3a5f);
-            border-radius: 0.625rem;
-            padding: 1.5rem;
-            margin: 1.25rem 0;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 1rem;
-        }
-        .winner-info { flex: 1; }
-        .winner-label {
-            font-size: 0.6875rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: var(--color-red);
-            margin-bottom: 0.25rem;
-        }
-        .winner-name {
-            font-size: 1.25rem;
-            font-weight: 800;
-            color: white;
-        }
-        .winner-desc {
-            font-size: 0.8125rem;
-            color: rgba(255,255,255,0.65);
-            margin-top: 0.25rem;
-        }
-        .winner-score-box {
-            text-align: center;
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.15);
-            border-radius: 0.5rem;
-            padding: 0.875rem 1.25rem;
-        }
-        .winner-score-value {
-            font-size: 2rem;
-            font-weight: 800;
-            color: #34d399;
-            line-height: 1;
-        }
-        .winner-score-label {
-            font-size: 0.625rem;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: rgba(255,255,255,0.4);
-            margin-top: 0.25rem;
-        }
-
-        /* ── HR / DIVIDER ── */
-        hr.section-divider {
-            border: none;
-            border-top: 1px solid var(--color-slate-200);
-            margin: 2rem 0;
-        }
-
-        /* ── APPENDIX TABLE ── */
-        .appendix-label {
-            font-size: 0.75rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            color: var(--color-slate-500);
-            margin-bottom: 0.75rem;
-        }
-
-        /* ── FOOTER ── */
-        .report-footer {
-            background: var(--color-slate-50);
-            border-top: 1px solid var(--color-slate-200);
-            padding: 1.25rem 3.5rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.75rem;
-            color: var(--color-slate-500);
-        }
-
-        /* ── PRINT STYLES ── */
-        @@media print {
-            body { background: white; font-size: 13px; }
-            .print-bar { display: none; }
-            .report-wrapper {
-                max-width: 100%;
-                margin: 0;
-                border-radius: 0;
-                box-shadow: none;
-                border: none;
-            }
-            .report-body { padding: 1.5rem 2rem; }
-            .report-cover { padding: 2rem; }
-            .section + .section { page-break-inside: avoid; }
-            .chart-section { page-break-inside: avoid; }
-            .data-table { page-break-inside: avoid; }
-            .winner-banner { page-break-inside: avoid; }
-            .section-title, .subsection-title { page-break-after: avoid; }
-            .report-image { max-height: 280px; }
-            @@page {
-                margin: 0.75in;
-                size: letter;
-            }
-            @@page :first { margin-top: 0; }
-        }
-
-        /* ── RESPONSIVE ── */
-        @@media (max-width: 640px) {
-            .report-body { padding: 1.5rem; }
-            .report-cover { padding: 2rem 1.5rem; }
-            .cover-title { font-size: 1.75rem; }
-            .toc-list { grid-template-columns: 1fr; }
-            .kpi-grid { grid-template-columns: 1fr; }
-            .image-grid { grid-template-columns: 1fr; }
-        }
-    </style>
-    @vite(['resources/css/app.css'])
+    <script src="{{ asset('vendor/chartjs-4.4.0/chart.umd.js') }}"></script>
+    @vite(['resources/css/reports/evaluation-report.css', 'resources/css/app.css', 'resources/js/report-charts.js'])
 </head>
 <body data-hub-ui="2" data-hub-portal="report" class="hub-report hub-report--evaluation-report">
     <div class="hub-report-navigation"><x-hub-header back-href="/workgroups/links" back-label="Back to Workgroup Links" max-width="max-w-7xl" /></div>
@@ -723,7 +108,7 @@
                 <img class="report-image" src="/workgroup-report/images/final_workgroup_results_p1_i7.png"
                      alt="Workgroup Evaluation Summary"
                      onerror="this.style.display='none'; this.nextElementSibling.style.display='block'">
-                <div style="display:none; background:var(--color-slate-50); border:1px solid var(--color-slate-200); border-radius:0.5rem; padding:1.5rem; text-align:center; color:var(--color-slate-400); font-size:0.875rem; margin:1.25rem 0;">
+                <div class="er-u1">
                     [Workgroup Evaluation Summary Chart — Image not available]
                 </div>
                 <div class="image-caption">Workgroup Evaluation Summary — Overall product performance overview</div>
@@ -888,25 +273,25 @@
                             <td><strong>Capability</strong></td>
                             <td class="right">89.41</td>
                             <td class="right">87.56</td>
-                            <td class="right" style="color:var(--color-emerald)">+1.85</td>
+                            <td class="right er-u2">+1.85</td>
                         </tr>
                         <tr>
                             <td><strong>Usability</strong></td>
                             <td class="right">93.99</td>
                             <td class="right">85.76</td>
-                            <td class="right" style="color:var(--color-emerald)">+8.23</td>
+                            <td class="right er-u2">+8.23</td>
                         </tr>
                         <tr>
                             <td><strong>Maintainability</strong></td>
                             <td class="right">89.82</td>
                             <td class="right">82.58</td>
-                            <td class="right" style="color:var(--color-emerald)">+7.24</td>
+                            <td class="right er-u2">+7.24</td>
                         </tr>
                         <tr>
                             <td><strong>Deployability</strong></td>
                             <td class="right">89.69</td>
                             <td class="right">82.74</td>
-                            <td class="right" style="color:var(--color-emerald)">+6.95</td>
+                            <td class="right er-u2">+6.95</td>
                         </tr>
                     </tbody>
                 </table></div>
@@ -1192,7 +577,7 @@
                     <tbody>
                         <tr><td>Composite Score</td><td><span class="score-badge score-mid">78.80</span></td></tr>
                         <tr><td>Capability Score</td><td>83.39</td></tr>
-                        <tr><td>Usability Score</td><td>79.29 <em style="color:var(--color-slate-400); font-size:0.8em">(lowest in dataset)</em></td></tr>
+                        <tr><td>Usability Score</td><td>79.29 <em class="er-u3">(lowest in dataset)</em></td></tr>
                         <tr><td>Spreading Distance</td><td>40 inches (vs. standard 32-inch frontline)</td></tr>
                         <tr><td>Power Source</td><td>Battery (eDRAULIC E3)</td></tr>
                         <tr><td>IP Rating</td><td>IP58 (watertight for saltwater ops)</td></tr>
@@ -1226,14 +611,14 @@
                     </div>
                 </div>
 
-                <div class="winner-banner" style="background: linear-gradient(135deg, #1e293b, #334155);">
+                <div class="winner-banner er-u4">
                     <div class="winner-info">
-                        <div class="winner-label" style="color:#60a5fa">#2 Brand — Frontline Hydraulic Tools</div>
+                        <div class="winner-label er-u5">#2 Brand — Frontline Hydraulic Tools</div>
                         <div class="winner-name">Hurst (eDRAULIC E3 Series)</div>
                         <div class="winner-desc">Competitive Capability (87.56) · IP58 watertight · E3 Connect Wi-Fi + Captium cloud management</div>
                     </div>
                     <div class="winner-score-box">
-                        <div class="winner-score-value" style="color:#60a5fa">86.53</div>
+                        <div class="winner-score-value er-u5">86.53</div>
                         <div class="winner-score-label">Frontline Average</div>
                     </div>
                 </div>
@@ -1301,17 +686,17 @@
                         <tr>
                             <td>Saws</td>
                             <td>Gear-driven instant-start + 3-second electric brake</td>
-                            <td class="right" style="color:var(--color-emerald)">+26.42 to +29.47 pts</td>
+                            <td class="right er-u2">+26.42 to +29.47 pts</td>
                         </tr>
                         <tr>
                             <td>Frontline Tools</td>
                             <td>On-Tool Charging + cordless auto start/stop (Holmatro vs. Hurst)</td>
-                            <td class="right" style="color:var(--color-emerald)">+6.95 pts (Deploy.)</td>
+                            <td class="right er-u2">+6.95 pts (Deploy.)</td>
                         </tr>
                         <tr>
                             <td>Stabilization</td>
                             <td>15-second auto-lock deployment (V-Strut vs. competitors)</td>
-                            <td class="right" style="color:var(--color-emerald)">+1.41 to +11.15 pts</td>
+                            <td class="right er-u2">+1.41 to +11.15 pts</td>
                         </tr>
                     </tbody>
                 </table></div>
@@ -1425,20 +810,20 @@
         </div>
     </div>
 
-    <script>
+    <script type="module">
         // Chart.js global defaults
-        Chart.defaults.font.family = "'Plus Jakarta Sans', system-ui, sans-serif";
+        Chart.defaults.font.family = getComputedStyle(document.documentElement).getPropertyValue('--hub-font-sans').trim();
         Chart.defaults.plugins.legend.labels.usePointStyle = true;
-        Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(15, 23, 42, 0.95)';
+        Chart.defaults.plugins.tooltip.backgroundColor = hubColor('--hub-ink', 0.95);
         Chart.defaults.plugins.tooltip.padding = 10;
         Chart.defaults.plugins.tooltip.cornerRadius = 6;
 
-        const NAVY = '#0f172a';
-        const RED = '#dc2626';
-        const BLUE = '#2563eb';
-        const GREEN = '#059669';
-        const AMBER = '#d97706';
-        const SLATE = '#64748b';
+        const NAVY = hubColor('--hub-ink');
+        const RED = hubColor('--hub-red');
+        const BLUE = hubColor('--hub-blue');
+        const GREEN = hubColor('--hub-success');
+        const AMBER = hubColor('--hub-warning-solid');
+        const SLATE = hubColor('--hub-muted');
 
         // 1. Brand Composite Scores
         new Chart(document.getElementById('brandChart'), {
@@ -1448,7 +833,7 @@
                 datasets: [{
                     label: 'Average Composite Score',
                     data: [91.25, 87.93, 84.60, 76.13, 64.83, 61.78],
-                    backgroundColor: [GREEN, BLUE, '#0ea5e9', AMBER, '#f87171', '#fca5a5'],
+                    backgroundColor: [GREEN, BLUE, hubColor('--hub-info'), AMBER, hubColor('--hub-red'), hubColor('--hub-chart-4')],
                     borderRadius: 6,
                     borderSkipped: false
                 }]
@@ -1462,7 +847,7 @@
                         beginAtZero: false,
                         min: 50,
                         max: 100,
-                        grid: { color: 'rgba(0,0,0,0.05)' },
+                        grid: { color: hubColor('--hub-chart-grid') },
                         ticks: { font: { size: 12 } }
                     },
                     x: {
@@ -1488,7 +873,7 @@
                     {
                         label: 'Hurst E3',
                         data: [87.56, 85.76, 82.58, 82.74],
-                        backgroundColor: '#60a5fa',
+                        backgroundColor: hubColor('--hub-chart-2'),
                         borderRadius: 4
                     }
                 ]
@@ -1507,7 +892,7 @@
                         beginAtZero: false,
                         min: 75,
                         max: 100,
-                        grid: { color: 'rgba(0,0,0,0.05)' },
+                        grid: { color: hubColor('--hub-chart-grid') },
                         ticks: { font: { size: 12 } }
                     },
                     x: {
@@ -1526,7 +911,7 @@
                 datasets: [{
                     label: 'Composite Score',
                     data: [92.02, 90.99, 88.86, 82.57, 91.29, 86.02],
-                    backgroundColor: [BLUE, '#93c5fd', BLUE, '#93c5fd', BLUE, '#93c5fd'],
+                    backgroundColor: [BLUE, hubColor('--hub-chart-2'), BLUE, hubColor('--hub-chart-2'), BLUE, hubColor('--hub-chart-2')],
                     borderRadius: 6,
                     borderSkipped: false
                 }]
@@ -1540,7 +925,7 @@
                         beginAtZero: false,
                         min: 78,
                         max: 95,
-                        grid: { color: 'rgba(0,0,0,0.05)' },
+                        grid: { color: hubColor('--hub-chart-grid') },
                         ticks: { font: { size: 12 } }
                     },
                     x: {

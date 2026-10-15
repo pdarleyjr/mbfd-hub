@@ -81,6 +81,7 @@
     --hub-radius-control: 8px;
     --hub-radius-card: 12px;
     --hub-radius-sheet: 16px;
+    --hub-radius-pill: 9999px;
 
     /* Strength of the white veil over the crest wallpaper; sign-in pages override it below. */
     --hub-wallpaper-veil: .90;

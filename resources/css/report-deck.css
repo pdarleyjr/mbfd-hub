@@ -163,3 +163,12 @@
     [data-hub-portal="report"].hub-report--analysis-report > nav { display: none; }
     [data-hub-portal="report"].hub-report--analysis-report .hub-panel { box-shadow: none; }
 }
+
+/* Ladder 1 Inventory dashboard (React root): Hub chrome over the dashboard's utility classes. */
+.hub-report--l1-inventory .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.hub-report--l1-inventory .hide-scrollbar::-webkit-scrollbar { display: none; }
+.hub-report--l1-inventory #root > div > .bg-slate-900 { background: rgb(var(--hub-header)); }
+.hub-report--l1-inventory #root button.bg-blue-600 { min-height: 44px; background: rgb(var(--hub-action-primary)); }
+.hub-report--l1-inventory #root button.bg-blue-600:hover { background: rgb(var(--hub-action-primary-hover)); }
+.hub-report--l1-inventory #root button.bg-blue-600:focus-visible { outline: 3px solid rgb(var(--hub-surface)); outline-offset: 3px; }
+.hub-report--l1-inventory #root .bg-purple-100.text-purple-700 { background: rgb(var(--hub-surface-muted)); color: rgb(var(--hub-action-primary)); }

@@ -4,500 +4,7 @@
     <meta charset="UTF-8">
     <x-hub.head />
     <title>MBFD Workgroup Summary — Mid-Mount Ladder Equipment Evaluation Report</title>
-    <style>
-        /* ── CSS Reset & Base ── */
-        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-        :root {
-            --color-primary: #1e293b;
-            --color-accent: #dc2626;
-            --color-accent-light: #fef2f2;
-            --color-blue: #2563eb;
-            --color-blue-light: #eff6ff;
-            --color-green: #059669;
-            --color-green-light: #ecfdf5;
-            --color-amber: #b45309;
-            --color-amber-light: #fffbeb;
-            --color-purple: #7c3aed;
-            --color-purple-light: #f5f3ff;
-            --color-text: #1e293b;
-            --color-text-secondary: #475569;
-            --color-text-muted: #94a3b8;
-            --color-border: #e2e8f0;
-            --color-bg: #ffffff;
-            --color-bg-alt: #f8fafc;
-            --font-sans: var(--hub-font-sans);
-            --font-serif: 'Source Serif 4', Georgia, 'Times New Roman', serif;
-        }
-
-        html { font-size: 16px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-
-        body {
-            font-family: var(--font-serif);
-            color: var(--color-text);
-            background: var(--color-bg-alt);
-            line-height: 1.75;
-            -webkit-font-smoothing: antialiased;
-        }
-
-        /* ── Print / PDF Styles ── */
-        @media print {
-            body { background: white; }
-            .no-print { display: none !important; }
-            .report-container { box-shadow: none; max-width: 100%; margin: 0; }
-            .cover-page { page-break-after: always; }
-            .toc-section { page-break-after: always; }
-            .report-section { page-break-before: always; }
-            .page-break { page-break-before: always; }
-            table { page-break-inside: avoid; }
-            .equipment-card { page-break-inside: avoid; }
-            img { max-width: 100% !important; }
-            @page {
-                size: letter;
-                margin: 0.75in 0.85in;
-            }
-        }
-
-        /* ── Report Container ── */
-        .report-container {
-            max-width: 52rem;
-            margin: 0 auto;
-            background: var(--color-bg);
-            box-shadow: 0 1px 3px rgba(0,0,0,0.08), 0 8px 32px rgba(0,0,0,0.06);
-        }
-
-        /* ── Print FAB ── */
-        .print-fab {
-            position: fixed;
-            bottom: 2rem;
-            right: 2rem;
-            z-index: 1000;
-            display: flex;
-            gap: 0.5rem;
-        }
-        .print-fab button {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.75rem 1.25rem;
-            border: none;
-            border-radius: 0.5rem;
-            font-family: var(--font-sans);
-            font-size: 0.875rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 150ms ease;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        }
-        .print-fab .btn-pdf {
-            background: var(--color-accent);
-            color: white;
-        }
-        .print-fab .btn-pdf:hover { background: #b91c1c; transform: translateY(-1px); }
-        .print-fab .btn-pdf svg { width: 1.125rem; height: 1.125rem; }
-
-        /* ══════════════════════════════════════════
-           COVER PAGE
-           ══════════════════════════════════════════ */
-        .cover-page {
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            padding: 3rem 2.5rem;
-            background: linear-gradient(160deg, #0f172a 0%, #1e293b 40%, #334155 100%);
-            color: white;
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-        }
-        .cover-page::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            right: -30%;
-            width: 80%;
-            height: 200%;
-            background: radial-gradient(ellipse, rgba(220,38,38,0.08) 0%, transparent 70%);
-            pointer-events: none;
-        }
-        .cover-page::after {
-            content: '';
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: var(--color-accent);
-        }
-        .cover-logo {
-            width: 120px;
-            height: auto;
-            margin-bottom: 1.5rem;
-            border-radius: 0.5rem;
-            filter: drop-shadow(0 4px 12px rgba(0,0,0,0.3));
-        }
-        .cover-hero-img {
-            width: 100%;
-            max-width: 36rem;
-            height: auto;
-            border-radius: 0.75rem;
-            margin-bottom: 2.5rem;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.4);
-            object-fit: cover;
-            max-height: 22rem;
-        }
-        .cover-title {
-            font-family: var(--font-sans);
-            font-size: 2.25rem;
-            font-weight: 800;
-            letter-spacing: -0.02em;
-            line-height: 1.2;
-            margin-bottom: 0.5rem;
-        }
-        .cover-subtitle {
-            font-family: var(--font-serif);
-            font-size: 1.125rem;
-            font-weight: 400;
-            color: #cbd5e1;
-            margin-bottom: 2rem;
-            max-width: 32rem;
-            line-height: 1.6;
-        }
-        .cover-divider {
-            width: 4rem;
-            height: 3px;
-            background: var(--color-accent);
-            border-radius: 2px;
-            margin: 0 auto 2rem;
-        }
-        .cover-meta {
-            font-family: var(--font-sans);
-            font-size: 0.8125rem;
-            color: #94a3b8;
-            line-height: 1.8;
-        }
-        .cover-meta strong { color: #e2e8f0; font-weight: 600; }
-        .cover-badge {
-            display: inline-block;
-            margin-top: 1.5rem;
-            padding: 0.375rem 1rem;
-            background: rgba(220,38,38,0.15);
-            border: 1px solid rgba(220,38,38,0.3);
-            border-radius: 0.25rem;
-            font-family: var(--font-sans);
-            font-size: 0.75rem;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: #fca5a5;
-        }
-
-        /* ══════════════════════════════════════════
-           TABLE OF CONTENTS
-           ══════════════════════════════════════════ */
-        .toc-section {
-            padding: 3rem 3.5rem;
-        }
-        .toc-title {
-            font-family: var(--font-sans);
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--color-primary);
-            margin-bottom: 1.5rem;
-            padding-bottom: 0.75rem;
-            border-bottom: 2px solid var(--color-accent);
-            display: inline-block;
-        }
-        .toc-list { list-style: none; }
-        .toc-list li {
-            display: flex;
-            align-items: baseline;
-            gap: 0.5rem;
-            padding: 0.5rem 0;
-            border-bottom: 1px dotted var(--color-border);
-        }
-        .toc-list .toc-num {
-            font-family: var(--font-sans);
-            font-weight: 700;
-            color: var(--color-accent);
-            min-width: 1.75rem;
-        }
-        .toc-list a {
-            color: var(--color-text);
-            text-decoration: none;
-            font-size: 1rem;
-        }
-        .toc-list a:hover { color: var(--color-accent); }
-
-        /* ══════════════════════════════════════════
-           REPORT CONTENT
-           ══════════════════════════════════════════ */
-        .report-body { padding: 0 3.5rem 3rem; }
-
-        .report-section { padding-top: 2.5rem; }
-
-        /* Section headings */
-        h2.section-heading {
-            font-family: var(--font-sans);
-            font-size: 1.625rem;
-            font-weight: 700;
-            color: var(--color-primary);
-            margin-bottom: 1.25rem;
-            padding-bottom: 0.5rem;
-            border-bottom: 2px solid var(--color-accent);
-            line-height: 1.3;
-        }
-        h2.section-heading .section-num {
-            color: var(--color-accent);
-            margin-right: 0.25rem;
-        }
-
-        h3.subsection-heading {
-            font-family: var(--font-sans);
-            font-size: 1.1875rem;
-            font-weight: 600;
-            color: var(--color-text);
-            margin: 2rem 0 0.75rem;
-            line-height: 1.4;
-        }
-
-        h4.sub-subsection-heading {
-            font-family: var(--font-sans);
-            font-size: 1.0625rem;
-            font-weight: 600;
-            color: var(--color-text-secondary);
-            margin: 1.5rem 0 0.5rem;
-        }
-
-        p { margin-bottom: 1rem; }
-
-        strong { font-weight: 600; }
-
-        /* ── Callout / Info Box ── */
-        .callout-box {
-            background: var(--color-bg-alt);
-            border-left: 4px solid var(--color-accent);
-            border-radius: 0 0.5rem 0.5rem 0;
-            padding: 1.25rem 1.5rem;
-            margin: 1.5rem 0;
-            font-size: 0.9375rem;
-        }
-        .callout-box p { margin-bottom: 0.25rem; }
-
-        /* ── Key Findings List ── */
-        .key-findings ul {
-            list-style: none;
-            padding: 0;
-            margin: 1rem 0;
-        }
-        .key-findings li {
-            position: relative;
-            padding: 0.75rem 0 0.75rem 1.75rem;
-            border-bottom: 1px solid var(--color-border);
-        }
-        .key-findings li::before {
-            content: '';
-            position: absolute;
-            left: 0;
-            top: 1.1rem;
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: var(--color-accent);
-        }
-        .key-findings li:last-child { border-bottom: none; }
-
-        /* ── Tables ── */
-        .report-table-wrap { overflow-x: auto; margin: 1.5rem 0; }
-        table.report-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 0.875rem;
-            font-family: var(--font-sans);
-        }
-        table.report-table thead th {
-            background: var(--color-primary);
-            color: white;
-            font-weight: 600;
-            padding: 0.75rem 1rem;
-            text-align: left;
-            white-space: nowrap;
-            font-size: 0.8125rem;
-            text-transform: uppercase;
-            letter-spacing: 0.03em;
-        }
-        table.report-table thead th:first-child { border-radius: 0.375rem 0 0 0; }
-        table.report-table thead th:last-child { border-radius: 0 0.375rem 0 0; }
-        table.report-table tbody td {
-            padding: 0.625rem 1rem;
-            border-bottom: 1px solid var(--color-border);
-            vertical-align: top;
-        }
-        table.report-table tbody tr:nth-child(even) { background: var(--color-bg-alt); }
-        table.report-table tbody tr:hover { background: #f1f5f9; }
-        .score-elite { color: #059669; font-weight: 700; }
-        .score-capable { color: #2563eb; font-weight: 700; }
-        .score-acceptable { color: #b45309; font-weight: 600; }
-        .score-deficient { color: #dc2626; font-weight: 600; }
-        .rank-badge {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 1.75rem;
-            height: 1.75rem;
-            border-radius: 50%;
-            font-size: 0.75rem;
-            font-weight: 700;
-        }
-        .rank-1 { background: #fef3c7; color: #92400e; }
-        .rank-2 { background: #e2e8f0; color: #334155; }
-        .rank-3 { background: #fed7aa; color: #9a3412; }
-        .rank-4 { background: #f1f5f9; color: #64748b; }
-
-        /* ── Equipment Cards ── */
-        .equipment-card {
-            display: flex;
-            gap: 1.5rem;
-            background: var(--color-bg-alt);
-            border: 1px solid var(--color-border);
-            border-radius: 0.75rem;
-            padding: 1.5rem;
-            margin: 1.5rem 0;
-            align-items: center;
-        }
-        .equipment-card img {
-            width: 180px;
-            height: 140px;
-            object-fit: contain;
-            border-radius: 0.5rem;
-            background: white;
-            padding: 0.5rem;
-            flex-shrink: 0;
-        }
-        .equipment-card-body { flex: 1; }
-        .equipment-card-body h4 {
-            font-family: var(--font-sans);
-            font-size: 1.0625rem;
-            font-weight: 700;
-            color: var(--color-primary);
-            margin-bottom: 0.25rem;
-        }
-        .equipment-card-body .eq-subtitle {
-            font-family: var(--font-sans);
-            font-size: 0.8125rem;
-            color: var(--color-text-muted);
-            margin-bottom: 0.5rem;
-        }
-        .equipment-card-body p {
-            font-size: 0.9375rem;
-            margin-bottom: 0.5rem;
-        }
-        .score-badge {
-            display: inline-block;
-            padding: 0.25rem 0.625rem;
-            border-radius: 0.25rem;
-            font-family: var(--font-sans);
-            font-size: 0.8125rem;
-            font-weight: 700;
-        }
-        .score-badge.elite { background: #ecfdf5; color: #059669; }
-        .score-badge.capable { background: #eff6ff; color: #2563eb; }
-        .score-badge.acceptable { background: #fffbeb; color: #b45309; }
-
-        /* ── Formula Block ── */
-        .formula-block {
-            background: var(--color-bg-alt);
-            border: 1px solid var(--color-border);
-            border-radius: 0.5rem;
-            padding: 1rem 1.5rem;
-            margin: 1.25rem 0;
-            font-family: 'Cambria Math', 'Times New Roman', serif;
-            font-size: 1rem;
-            text-align: center;
-            font-style: italic;
-        }
-
-        /* ── Scoring Tier Legend ── */
-        .tier-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 0.75rem;
-            margin: 1.25rem 0;
-        }
-        .tier-item {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.625rem 0.75rem;
-            border-radius: 0.375rem;
-            font-family: var(--font-sans);
-            font-size: 0.8125rem;
-            font-weight: 600;
-        }
-        .tier-item .tier-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            flex-shrink: 0;
-        }
-
-        /* ── Image Grid ── */
-        .image-pair {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1.5rem;
-            margin: 1.5rem 0;
-        }
-        .image-pair .img-card {
-            text-align: center;
-        }
-        .image-pair .img-card img {
-            width: 100%;
-            max-height: 200px;
-            object-fit: contain;
-            border-radius: 0.5rem;
-            background: white;
-            border: 1px solid var(--color-border);
-            padding: 0.75rem;
-        }
-        .image-pair .img-card .img-caption {
-            font-family: var(--font-sans);
-            font-size: 0.75rem;
-            color: var(--color-text-muted);
-            margin-top: 0.5rem;
-        }
-
-        /* ── Highlight Box ── */
-        .highlight-box {
-            background: linear-gradient(135deg, #fef2f2 0%, #fff7ed 100%);
-            border: 1px solid #fecaca;
-            border-radius: 0.75rem;
-            padding: 1.5rem;
-            margin: 1.5rem 0;
-        }
-        .highlight-box h4 {
-            font-family: var(--font-sans);
-            font-size: 1rem;
-            font-weight: 700;
-            color: var(--color-accent);
-            margin-bottom: 0.5rem;
-        }
-
-        /* ── Responsive ── */
-        @media (max-width: 768px) {
-            .report-body, .toc-section { padding-left: 1.5rem; padding-right: 1.5rem; }
-            .cover-page { padding: 2rem 1.5rem; }
-            .cover-title { font-size: 1.625rem; }
-            .equipment-card { flex-direction: column; }
-            .equipment-card img { width: 100%; max-width: 240px; height: auto; }
-            .tier-grid { grid-template-columns: 1fr 1fr; }
-            .image-pair { grid-template-columns: 1fr; }
-            table.report-table { font-size: 0.75rem; }
-        }
-    </style>
-    @vite(['resources/css/app.css'])
+    @vite(['resources/css/reports/workgroup-summary.css', 'resources/css/app.css'])
 </head>
 <body data-hub-ui="2" data-hub-portal="report" class="hub-report hub-report--workgroup-summary">
     <div class="hub-report-navigation"><x-hub-header back-href="/workgroups/links" back-label="Back to Workgroup Links" max-width="max-w-7xl" /></div>
@@ -591,7 +98,7 @@
             <p>Unlike rear-mount aerial platforms, a mid-mount configuration introduces asymmetrical compartment geometry that precludes direct transfer of existing equipment layouts. The workgroup was tasked with evaluating the commercial market, conducting structured hands-on testing, and delivering a consensus-driven "Top 3" finalist list for procurement authorization.</p>
 
             <h3 class="subsection-heading">2.2 Command Structure</h3>
-            <ul style="padding-left: 1.5rem; margin-bottom: 1rem;">
+            <ul class="ws-u1">
                 <li><strong>Consensus-driven model:</strong> All configuration decisions were driven by workgroup vote</li>
                 <li><strong>12 active workgroup members</strong> serving as tactical decision-makers</li>
                 <li><strong>Support Services</strong> provided logistics, intelligence, and data analysis</li>
@@ -600,7 +107,7 @@
             </ul>
 
             <h3 class="subsection-heading">2.3 Day 1 Objectives</h3>
-            <ol style="padding-left: 1.5rem; margin-bottom: 1rem;">
+            <ol class="ws-u1">
                 <li><strong>Evaluate, rank, and select</strong> loose equipment across all frontline operational categories</li>
                 <li><strong>Deliver a finalized procurement recommendation</strong> to the Health &amp; Safety Committee</li>
                 <li><strong>Assess platform ecosystem strategy</strong>—specifically whether to commit exclusively to the DeWalt battery platform to match the truck's existing charging infrastructure</li>
@@ -615,8 +122,8 @@
             <h2 class="section-heading"><span class="section-num">3.</span> Operational Context</h2>
 
             <h3 class="subsection-heading">3.1 The Mid-Mount Platform</h3>
-            <p>The subject apparatus—Pierce Velocity 100-foot Ascendant aerial tower, Job #41559AD—presents specific engineering constraints that shaped the workgroup's evaluation priorities:</p>
-            <ul style="padding-left: 1.5rem; margin-bottom: 1rem;">
+            <p>The subject apparatus—Pierce Velocity 100-foot Ascendant aerial tower, Job &#35;41559AD—presents specific engineering constraints that shaped the workgroup's evaluation priorities:</p>
+            <ul class="ws-u1">
                 <li><strong>TAK-4 independent suspension</strong> with 24,880 lb rating and low center of gravity</li>
                 <li><strong>2,000 GPM water output pump</strong> supporting high-flow aerial and handline operations</li>
                 <li><strong>Overall length of 528.50 inches</strong> (44 feet, 0.5 inches)</li>
@@ -641,7 +148,7 @@
 
             <h3 class="subsection-heading">3.3 Coastal and Environmental Factors</h3>
             <p>Miami Beach's barrier-island geography imposes environmental requirements on rescue equipment that inland departments do not face:</p>
-            <ul style="padding-left: 1.5rem; margin-bottom: 1rem;">
+            <ul class="ws-u1">
                 <li><strong>Saltwater exposure:</strong> Proximity to the Atlantic Ocean and Biscayne Bay subjects equipment to persistent salt air and potential submersion scenarios</li>
                 <li><strong>IP rating significance:</strong> Ingress Protection ratings became a differentiating evaluation factor, with IP58 (saltwater-rated) tools receiving operational preference over IP54/IP57 alternatives</li>
                 <li><strong>Corrosion lifecycle:</strong> Equipment lifecycle projections must account for accelerated metallic degradation in marine environments</li>
@@ -649,7 +156,7 @@
 
             <h3 class="subsection-heading">3.4 Platform Ecosystem Strategy</h3>
             <p>A foundational strategic question raised on Day 1 was whether MBFD should commit exclusively to the DeWalt battery platform to match the truck's integrated charging infrastructure. The workgroup identified this as a decision point across three categories:</p>
-            <ul style="padding-left: 1.5rem; margin-bottom: 1rem;">
+            <ul class="ws-u1">
                 <li><strong>Extrication tools:</strong> Proprietary battery ecosystems (Hurst eDRAULIC, Holmatro Pentheon) vs. COTS platforms (Amkus on DeWalt 60V)</li>
                 <li><strong>Forcible entry tools:</strong> Battery-powered vs. manual hydraulic options</li>
                 <li><strong>Saws:</strong> Multiple competing battery architectures (DeWalt POWERSHIFT, Makita XGT, Husqvarna 94V)</li>
@@ -663,7 +170,7 @@
 
             <h3 class="subsection-heading">4.1 Original Scoring Model</h3>
             <p>The workgroup's initial evaluation framework employed a five-dimension scoring model applied across all candidate products during hands-on testing sessions. Each dimension was scored on a 0–100 scale:</p>
-            <ol style="padding-left: 1.5rem; margin-bottom: 1rem;">
+            <ol class="ws-u1">
                 <li><strong>Capability</strong> — Raw performance: force output, cutting capacity, spreading distance, operational power</li>
                 <li><strong>Usability</strong> — Ergonomic design, control interface, operator comfort, learning curve</li>
                 <li><strong>Maintainability</strong> — Service requirements, durability, component accessibility, field-repairability</li>
@@ -680,7 +187,7 @@
 
             <h3 class="subsection-heading">4.3 Extrication Brand Scoring Standardization</h3>
             <p>Brand-level averages for extrication manufacturers were computed <strong>exclusively from the performance of the mandatory frontline tactical triad</strong>: the 32-inch spreader, cutter, and ram platforms. This standardization ensured that:</p>
-            <ul style="padding-left: 1.5rem; margin-bottom: 1rem;">
+            <ul class="ws-u1">
                 <li><strong>The Hurst M40</strong> (40-inch heavy spreader) was excluded from the Hurst baseline brand average</li>
                 <li><strong>The Holmatro T1</strong> (forcible entry tool) was excluded from the Holmatro baseline brand average</li>
                 <li>Both tools were isolated into <strong>standalone specialty analysis</strong></li>
@@ -688,20 +195,20 @@
 
             <h3 class="subsection-heading">4.4 Scoring Classification</h3>
             <div class="tier-grid">
-                <div class="tier-item" style="background: #ecfdf5;">
-                    <span class="tier-dot" style="background: #059669;"></span>
+                <div class="tier-item ws-u2">
+                    <span class="tier-dot ws-u3"></span>
                     <span>90+ Elite</span>
                 </div>
-                <div class="tier-item" style="background: #eff6ff;">
-                    <span class="tier-dot" style="background: #2563eb;"></span>
+                <div class="tier-item ws-u4">
+                    <span class="tier-dot ws-u5"></span>
                     <span>80–89 Highly Capable</span>
                 </div>
-                <div class="tier-item" style="background: #fffbeb;">
-                    <span class="tier-dot" style="background: #b45309;"></span>
+                <div class="tier-item ws-u6">
+                    <span class="tier-dot ws-u7"></span>
                     <span>70–79 Acceptable</span>
                 </div>
-                <div class="tier-item" style="background: #fef2f2;">
-                    <span class="tier-dot" style="background: #dc2626;"></span>
+                <div class="tier-item ws-u8">
+                    <span class="tier-dot ws-u9"></span>
                     <span>&lt; 70 Deficient</span>
                 </div>
             </div>
@@ -874,7 +381,7 @@
             <p>The most significant analytical finding in this report is the divergence between evaluation scoring leadership and the final workgroup selection for the primary extrication platform.</p>
             <p><strong>Holmatro (Pentheon Series)</strong> led every frontline scoring dimension and achieved the highest brand average (90.72), the highest individual tool score (PSP40 at 92.02), and Elite classification across the board.</p>
             <p><strong>The workgroup selected Hurst (eDRAULIC E3 CAPTIUM)</strong> as the primary extrication platform. This determination was not an error. The workgroup exercised its consensus-driven authority to weigh operational factors:</p>
-            <ol style="padding-left: 1.5rem; margin-bottom: 1rem;">
+            <ol class="ws-u1">
                 <li><strong>Saltwater certification (IP58):</strong> The Hurst E3 platform carries IP58 watertight certification rated for saltwater operations. For a barrier-island department, this represents a measurable operational advantage.</li>
                 <li><strong>Ecosystem interoperability with the M40:</strong> Selecting Hurst for both the frontline triad and the supplemental heavy spreader consolidates battery platform, maintenance pipeline, vendor relationship, and training requirements.</li>
                 <li><strong>Captium cloud integration:</strong> The E3 Connect platform with Wi-Fi data transfer provides fleet-management capabilities—tool usage tracking, battery health monitoring, and maintenance scheduling.</li>
@@ -965,7 +472,7 @@
 
             <h4 class="sub-subsection-heading">Phase 3 — Deep Familiarization</h4>
             <p>All personnel complete training covering:</p>
-            <ul style="padding-left: 1.5rem; margin-bottom: 1rem;">
+            <ul class="ws-u1">
                 <li>Tool operation and safety protocols for each selected system</li>
                 <li>Tactical application in vehicle extrication scenarios specific to the mid-mount platform</li>
                 <li>Battery management and field charging procedures across both Hurst CAPTIUM and DeWalt ecosystems</li>
@@ -1033,28 +540,28 @@
         <div class="report-section" id="sec-appendix-c">
             <h2 class="section-heading"><span class="section-num">C.</span> Appendix C — Scoring Key</h2>
             <div class="tier-grid">
-                <div class="tier-item" style="background: #ecfdf5;">
-                    <span class="tier-dot" style="background: #059669;"></span>
+                <div class="tier-item ws-u2">
+                    <span class="tier-dot ws-u3"></span>
                     <span><strong>90+</strong> — Elite — Exceeds all operational requirements with distinction</span>
                 </div>
-                <div class="tier-item" style="background: #eff6ff;">
-                    <span class="tier-dot" style="background: #2563eb;"></span>
+                <div class="tier-item ws-u4">
+                    <span class="tier-dot ws-u5"></span>
                     <span><strong>80–89</strong> — Highly Capable — Meets or exceeds operational requirements</span>
                 </div>
-                <div class="tier-item" style="background: #fffbeb;">
-                    <span class="tier-dot" style="background: #b45309;"></span>
+                <div class="tier-item ws-u6">
+                    <span class="tier-dot ws-u7"></span>
                     <span><strong>70–79</strong> — Acceptable — Meets minimum operational requirements</span>
                 </div>
-                <div class="tier-item" style="background: #fef2f2;">
-                    <span class="tier-dot" style="background: #dc2626;"></span>
+                <div class="tier-item ws-u8">
+                    <span class="tier-dot ws-u9"></span>
                     <span><strong>&lt; 70</strong> — Deficient — Falls below operational requirements</span>
                 </div>
             </div>
         </div>
 
         <!-- Footer -->
-        <div style="margin-top: 3rem; padding-top: 1.5rem; border-top: 2px solid var(--color-border); text-align: center;">
-            <p style="font-family: var(--font-sans); font-size: 0.75rem; color: var(--color-text-muted);">
+        <div class="ws-u10">
+            <p class="ws-u11">
                 MBFD-WG-EVAL-2026-001 · Miami Beach Fire Department · Support Services Division<br>
                 Approved for Internal Department Release · March 2026
             </p>
