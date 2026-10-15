@@ -61,6 +61,17 @@ trait ManagesEmployeeAccess
                 }));
         }
 
+        $actions[] = Action::make('manageUniformManager')->label('Uniform & PPE manager')
+            ->visible(fn (): bool => $this->canManageAccountAccess())
+            ->fillForm(fn (): array => ['enabled' => ApplicationAccessService::isUniformManager($this->targetAccount())])
+            ->form([
+                Forms\Toggle::make('enabled')->label('Uniform & PPE manager')
+                    ->helperText('Gives this account the admin panel with only Personnel Uniforms & Equipment: uniform and PPE requests, employee equipment records, and Firefighting PPE / Uniforms stock (add, edit, assign). Turning it off removes that access.'),
+                ...$this->securityFields(),
+            ])
+            ->action(fn (array $data) => $this->runProtected(fn () => app(ApplicationAccessService::class)->setUniformManager(
+                $this->actor(), $this->targetAccount(), (bool) ($data['enabled'] ?? false), $data['current_password'], $data['reason'])));
+
         $actions[] = Action::make('manageMeetingRole')->label('Meeting role')
             ->visible(fn (): bool => $this->canManageAccountAccess() && $this->targetAccount()->hasDirectWebPermission('app.meeting.access'))
             ->fillForm(fn (): array => ['meeting_role' => app(\App\Services\Security\ApplicationRoleResolver::class)->forUser($this->targetAccount()->fresh(), 'meeting') ?? 'viewer'])
