@@ -203,18 +203,7 @@ final class UniformEntitlementService
             $selectedTotal += $quantity;
         }
 
-        $allowed = $context['allowances'];
-        $swapRule = config('uniform_orders.swap');
-        $swaps = isset($allowed[$swapRule['from']])
-            ? max(0, $allowed[$swapRule['from']] - $quantities[$swapRule['from']]) * $swapRule['rate'] : 0;
-        foreach ($swapRule['to'] as $group) {
-            if (isset($allowed[$group])) {
-                $allowed[$group] += $swaps;
-            }
-        }
-        if (isset($allowed['work_sets'])) {
-            $allowed['work_sets'] += $swaps;
-        }
+        ['allowed' => $allowed, 'swaps' => $swaps] = $this->effectiveAllowances($context['allowances'], $quantities);
         $warnings = [];
         foreach ($quantities as $group => $quantity) {
             if (isset($allowed[$group]) && $quantity > $allowed[$group]) {
@@ -254,6 +243,31 @@ final class UniformEntitlementService
             'pricing_available' => false,
             'order_value' => null,
         ];
+    }
+
+    /**
+     * Apply the jumpsuit swap: each unused jumpsuit adds to the polo, pant and work-set allowances.
+     *
+     * @param  array<string, int>  $allowances
+     * @param  array<string, int>  $quantities  group => quantity counted against the allowance
+     * @return array{allowed: array<string, int>, swaps: int}
+     */
+    public function effectiveAllowances(array $allowances, array $quantities): array
+    {
+        $allowed = $allowances;
+        $swapRule = config('uniform_orders.swap');
+        $swaps = isset($allowed[$swapRule['from']])
+            ? max(0, $allowed[$swapRule['from']] - ($quantities[$swapRule['from']] ?? 0)) * $swapRule['rate'] : 0;
+        foreach ($swapRule['to'] as $group) {
+            if (isset($allowed[$group])) {
+                $allowed[$group] += $swaps;
+            }
+        }
+        if (isset($allowed['work_sets'])) {
+            $allowed['work_sets'] += $swaps;
+        }
+
+        return ['allowed' => $allowed, 'swaps' => $swaps];
     }
 
     /** Store the assignment and policy used for this request, independently of later bids. */

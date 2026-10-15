@@ -23,6 +23,14 @@ return [
     'form_version' => 'uniform-builder-v1',
     'quantity_max' => 999,
     'note_max' => 4000,
+    // Year-to-date allowance usage is counted from this date each year (calendar year by default).
+    // Denied and cancelled requests never count toward usage.
+    'allowance_year' => [
+        'start_month' => (int) env('UNIFORM_ALLOWANCE_YEAR_START_MONTH', 1),
+        'start_day' => (int) env('UNIFORM_ALLOWANCE_YEAR_START_DAY', 1),
+    ],
+    // Required, short reason when a request goes over the remaining annual allowance.
+    'allowance_justification_max' => 1000,
     'jacket_styles' => $jacketStyles,
     'legacy_jacket_stock_labels' => ['Winter Jacket', 'MBFD Vintage jacket'],
     'categories' => [

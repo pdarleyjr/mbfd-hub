@@ -21,6 +21,7 @@ final class PersonnelRequestSubmissionService
         private readonly SignatureImageService $signatures,
         private readonly PersonnelRequestNotifier $notifier,
         private readonly UniformEntitlementService $entitlements,
+        private readonly UniformAllowanceService $allowances,
     ) {}
 
     public function submitUniform(Employee $employee, array $items, string $idempotencyKey, array $metadata = []): PersonnelRequest
@@ -36,12 +37,15 @@ final class PersonnelRequestSubmissionService
             throw ValidationException::withMessages(['member_note' => 'Notes must be text of no more than '.number_format($noteMax).' characters.']);
         }
         $note = filled($note) ? trim($note) : null;
+        $justification = $this->validatedJustification($metadata['allowance_justification'] ?? null);
         $context = $this->entitlements->forEmployee($employee);
         $summary = $this->entitlements->summarize($context, $normalized);
         $snapshot = $this->entitlements->snapshot($context, $summary, $note);
+        // Runs after the member row is locked so concurrent submissions see each other's usage.
+        $allowanceGuard = fn (): array => $this->allowanceAttributes($employee, $context, $normalized, $justification);
 
         try {
-            return $this->persist(PersonnelRequestType::Uniform, $employee, $employee, null, $normalized, $idempotencyKey, metadata: $snapshot);
+            return $this->persist(PersonnelRequestType::Uniform, $employee, $employee, null, $normalized, $idempotencyKey, metadata: $snapshot, guard: $allowanceGuard);
         } catch (\Illuminate\Database\UniqueConstraintViolationException $exception) {
             return $this->existingSubmission($idempotencyKey, $employee, PersonnelRequestType::Uniform) ?? throw $exception;
         }
@@ -94,12 +98,14 @@ final class PersonnelRequestSubmissionService
         string $idempotencyKey,
         ?array $signature = null,
         array $metadata = [],
+        ?\Closure $guard = null,
     ): PersonnelRequest {
         if (! preg_match('/^[A-Za-z0-9._:-]{8,100}$/', $idempotencyKey)) {
             throw ValidationException::withMessages(['idempotency_key' => 'A valid submission key is required.']);
         }
 
-        $request = DB::transaction(function () use ($type, $beneficiary, $requester, $station, $items, $idempotencyKey, $signature, $metadata): PersonnelRequest {
+        $request = DB::transaction(function () use ($type, $beneficiary, $requester, $station, $items, $idempotencyKey, $signature, $metadata, $guard): PersonnelRequest {
+            $extra = [];
             if ($type === PersonnelRequestType::Uniform) {
                 Employee::query()->whereKey($beneficiary->id)->lockForUpdate()->firstOrFail();
                 if ($existing = $this->existingSubmission($idempotencyKey, $requester, $type)) {
@@ -111,6 +117,7 @@ final class PersonnelRequestSubmissionService
                         throw ValidationException::withMessages(['items.jacket.quantity' => $eligibility['reason']]);
                     }
                 }
+                $extra = $guard ? $guard() : [];
             }
             $publicId = (string) Str::ulid();
             $request = PersonnelRequest::query()->create([
@@ -133,7 +140,9 @@ final class PersonnelRequestSubmissionService
                 'officer_signature_sha256' => $signature['sha256'] ?? null,
                 'signed_at' => $signature ? now() : null,
                 'idempotency_key' => $idempotencyKey,
-                'metadata' => $metadata ?: null,
+                'metadata' => array_merge($metadata, $extra['metadata'] ?? []) ?: null,
+                'over_allowance' => $extra['over_allowance'] ?? false,
+                'allowance_justification' => $extra['allowance_justification'] ?? null,
             ]);
 
             foreach ($items as $item) {
@@ -152,6 +161,46 @@ final class PersonnelRequestSubmissionService
         });
 
         return $request->load('items', 'updates');
+    }
+
+    private function validatedJustification(mixed $value): ?string
+    {
+        $max = (int) config('uniform_orders.allowance_justification_max', 1000);
+        if ($value !== null && (! is_string($value) || mb_strlen(trim($value)) > $max)) {
+            throw ValidationException::withMessages(['allowance_justification' => 'Keep your reason to '.number_format($max).' characters or fewer.']);
+        }
+
+        return filled($value) ? trim($value) : null;
+    }
+
+    /**
+     * Soft annual-allowance enforcement: over the remaining allowance requires a
+     * reason and flags the request for Support Services; otherwise nothing changes.
+     *
+     * @param  array<string, mixed>  $context
+     * @param  list<array<string, mixed>>  $items
+     * @return array{over_allowance: bool, allowance_justification: string|null, metadata: array<string, mixed>}
+     */
+    private function allowanceAttributes(Employee $employee, array $context, array $items, ?string $justification): array
+    {
+        $assessment = $this->allowances->assess($context, $this->allowances->usedByGroup($employee), $items);
+        if (! $assessment['is_over']) {
+            return ['over_allowance' => false, 'allowance_justification' => null, 'metadata' => []];
+        }
+        if ($justification === null) {
+            throw ValidationException::withMessages([
+                'allowance_justification' => 'Your order is over your remaining annual allowance. Add a short reason so Support Services can review it.',
+            ]);
+        }
+
+        return [
+            'over_allowance' => true,
+            'allowance_justification' => $justification,
+            'metadata' => ['allowance_at_submission' => [
+                'period' => $assessment['period']['label'],
+                'over' => $this->allowances->overageMessages($assessment['over']),
+            ]],
+        ];
     }
 
     private function validateUniformItems(array $items): array

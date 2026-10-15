@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Exceptions\AIServiceUnavailable;
 use App\Models\CapitalProject;
 use App\Models\User;
 use App\Services\CloudflareAIService;
@@ -48,7 +49,15 @@ class GenerateWeeklySummary extends Command
 
             if ($aiService->canMakeRequest() && $activeProjects->isNotEmpty()) {
                 $this->info('Requesting AI-generated summary...');
-                $aiSummary = $aiService->generateWeeklySummary($activeProjects);
+                try {
+                    $aiSummary = $aiService->generateWeeklySummary($activeProjects);
+                } catch (AIServiceUnavailable $e) {
+                    // Send the statistics-only summary when the AI backend is down.
+                    $this->warn('AI service is temporarily unavailable. Sending the summary without AI insights.');
+                    Log::warning('Weekly summary AI insights skipped - AI service unavailable', [
+                        'reason' => $e->getMessage(),
+                    ]);
+                }
             }
 
             // Build summary message

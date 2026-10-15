@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Exceptions\AIServiceUnavailable;
 use App\Models\AIAnalysisLog;
 use App\Models\CapitalProject;
 use App\Models\NotificationTracking;
@@ -137,6 +138,15 @@ class AnalyzeProjectPriorities extends Command
 
             return Command::SUCCESS;
 
+        } catch (AIServiceUnavailable $e) {
+            // Backend busy/down is an expected operational state: keep the
+            // existing priorities, warn once, and let the scheduler succeed.
+            $this->warn('AI service is temporarily unavailable. Existing project priorities were kept.');
+            Log::warning('Scheduled task projects:analyze-priorities skipped - AI service unavailable', [
+                'reason' => $e->getMessage(),
+            ]);
+
+            return Command::SUCCESS;
         } catch (\Exception $e) {
             $this->error('Error during project analysis: '.$e->getMessage());
             Log::error('Project priority analysis error', [
