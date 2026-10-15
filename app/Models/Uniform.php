@@ -100,10 +100,20 @@ class Uniform extends Model
         return $description;
     }
 
-    /** Label for stock pickers: description plus how many are on hand. */
+    /** Label for stock pickers, e.g. "T-Shirt — L — 20 on hand" (type and serial added when known). */
     public function stockLabel(): string
     {
-        return $this->issueDescription()." — {$this->quantity_on_hand} on hand";
+        $label = (string) $this->item_name;
+        if (filled($this->item_type) && ! str_contains(strtolower($label), strtolower((string) $this->item_type))) {
+            $label .= " ({$this->item_type})";
+        }
+
+        return implode(' — ', array_filter([
+            $label,
+            $this->size,
+            filled($this->serial_number) ? "S/N {$this->serial_number}" : null,
+            "{$this->quantity_on_hand} on hand",
+        ], 'filled'));
     }
 
     public function isPpe(): bool
