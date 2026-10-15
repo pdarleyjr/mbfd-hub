@@ -10,7 +10,7 @@ final class TrainingTodoAdminResource extends \App\Filament\Training\Resources\T
 {
     protected static ?int $navigationSort = 50;
 
-    protected static ?string $navigationGroup = 'Programs';
+    protected static ?string $navigationGroup = 'Training';
 
     protected static ?string $navigationLabel = 'Training Todos';
 

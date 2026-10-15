@@ -11,8 +11,14 @@ use Illuminate\Validation\ValidationException;
 final class SignatureImageService
 {
     /** @return array{disk: string, path: string, mime: string, sha256: string} */
-    public function store(string $dataUrl): array
+    public function store(string $dataUrl, string $namespace = 'personnel-requests'): array
     {
+        if (! in_array($namespace, ['personnel-requests', 'training-rosters'], true)) {
+            throw new \InvalidArgumentException('Unknown signature namespace.');
+        }
+        if (strlen($dataUrl) > 1_400_000) {
+            throw ValidationException::withMessages(['signature' => 'The signature image is too large.']);
+        }
         if (! preg_match('/^data:image\/png;base64,([A-Za-z0-9+\/=]+)$/', $dataUrl, $matches)) {
             throw ValidationException::withMessages(['signature' => 'Please provide a valid signature.']);
         }
@@ -47,9 +53,16 @@ final class SignatureImageService
 
         $disk = (string) config('filesystems.private', 'private');
         $filename = Str::ulid().'.png';
-        $path = 'personnel-requests/signatures/'.now()->format('Y/m').'/'.$filename;
+        $path = $namespace.'/signatures/'.now()->format('Y/m').'/'.$filename;
         if (! Storage::disk($disk)->put($path, $bytes, ['visibility' => 'private'])) {
             throw ValidationException::withMessages(['signature' => 'The signature could not be stored. Please try again.']);
+        }
+
+        if ($namespace === 'training-rosters') {
+            $stored = Storage::disk($disk)->get($path);
+            if (! is_string($stored) || ! hash_equals(hash('sha256', $bytes), hash('sha256', $stored))) {
+                throw ValidationException::withMessages(['signature' => 'The stored signature could not be verified. Please try again.']);
+            }
         }
 
         return ['disk' => $disk, 'path' => $path, 'mime' => 'image/png', 'sha256' => hash('sha256', $bytes)];
