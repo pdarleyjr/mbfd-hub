@@ -49,6 +49,7 @@ class TrainingAssignmentProvider
             'members.*.effective_from' => ['present', 'nullable', 'date_format:Y-m-d'],
             'members.*.effective_to' => ['present', 'nullable', 'date_format:Y-m-d'],
             'members.*.eligible' => ['required', 'boolean'],
+            'members.*.employment_status' => ['required', Rule::in(['unknown', 'active', 'inactive', 'retired', 'separated'])],
         ];
         if (Validator::make($payload, $rules)->fails() || ($payload['schema_version'] ?? null) !== 1) {
             $this->unavailable();
@@ -67,7 +68,8 @@ class TrainingAssignmentProvider
                 $this->unavailable();
             }
             $employee = $matches?->first();
-            if ($member['eligible'] !== true || $employee === null || $employee->roster_status !== 'active') {
+            if ($member['eligible'] !== true || ! in_array($member['employment_status'], ['active', 'unknown'], true)
+                || $employee === null || $employee->roster_status !== 'active') {
                 continue;
             }
             // Missing placement/name evidence requires the supervised exception flow.
@@ -96,6 +98,7 @@ class TrainingAssignmentProvider
                 'as_of' => $asOf,
                 'source_generated_at' => $payload['generated_at'],
                 'source_updated_at' => $payload['source_updated_at'],
+                'source_employment_status' => $member['employment_status'],
                 'source_record_sha256' => hash('sha256', json_encode([$asOf, $member], JSON_THROW_ON_ERROR)),
             ];
         }

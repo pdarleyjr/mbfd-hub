@@ -60,6 +60,26 @@ final class TrainingAssignmentProviderTest extends TestCase
         self::assertSame([], app(TrainingAssignmentProvider::class)->candidates('2026-10-15'));
     }
 
+    public function test_unknown_bid_status_requires_active_hub_identity_and_is_preserved_as_unknown(): void
+    {
+        $payload = $this->payload();
+        $payload['members'][0]['employment_status'] = 'unknown';
+        Http::fake(['*' => Http::response($payload)]);
+        $candidates = app(TrainingAssignmentProvider::class)->candidates('2026-10-15');
+        self::assertCount(1, $candidates);
+        self::assertSame('unknown', $candidates[0]['source_employment_status']);
+        Employee::query()->firstOrFail()->update(['roster_status' => 'departed']);
+        self::assertSame([], app(TrainingAssignmentProvider::class)->candidates('2026-10-15'));
+    }
+
+    public function test_explicit_inactive_bid_status_is_excluded_even_when_bridge_marks_available(): void
+    {
+        $payload = $this->payload();
+        $payload['members'][0]['employment_status'] = 'inactive';
+        Http::fake(['*' => Http::response($payload)]);
+        self::assertSame([], app(TrainingAssignmentProvider::class)->candidates('2026-10-15'));
+    }
+
     public function test_missing_assignment_is_not_fabricated(): void
     {
         $payload = $this->payload();
@@ -88,6 +108,6 @@ final class TrainingAssignmentProviderTest extends TestCase
     {
         return ['schema_version' => 1, 'as_of' => '2026-10-15', 'generated_at' => now()->toIso8601String(), 'source_updated_at' => 1, 'term_label' => null,
             'members' => [['employee_id' => '000123', 'first_name' => 'Synthetic', 'last_name' => 'Fixture', 'rank' => 'Firefighter', 'shift' => 'Days',
-                'assignment_id' => 'synthetic-current', 'assignment_source' => 'TELESTAFF_IMPORT', 'effective_from' => '2026-01-01', 'effective_to' => null, 'eligible' => true]]];
+                'assignment_id' => 'synthetic-current', 'assignment_source' => 'TELESTAFF_IMPORT', 'effective_from' => '2026-01-01', 'effective_to' => null, 'eligible' => true, 'employment_status' => 'active']]];
     }
 }

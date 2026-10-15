@@ -166,6 +166,7 @@ final class TrainingRosterExportTest extends TestCase
             self::assertSame(str_repeat('W', 100), $book->getSheet(1)->getCell('I17')->getValue());
             self::assertCount(28, $book->getSheet(0)->getDrawingCollection());
             self::assertCount(5, $book->getSheet(0)->getBreaks());
+            self::assertSame(['A19', 'A38', 'A57', 'A76', 'A95'], array_keys($book->getSheet(0)->getBreaks()));
             $book->disconnectWorksheets();
         } finally {
             unlink($path);

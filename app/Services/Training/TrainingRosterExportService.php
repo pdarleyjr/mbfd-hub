@@ -182,13 +182,13 @@ final class TrainingRosterExportService
         $print = $book->getActiveSheet()->setTitle('Printable roster');
         $print->setShowGridlines(false);
         $book->getDefaultStyle()->getFont()->setName('Arial')->setSize(10);
-        foreach (['A' => 5, 'B' => 21, 'C' => 21, 'D' => 13, 'E' => 25] as $column => $width) {
+        foreach (['A' => 7, 'B' => 20, 'C' => 20, 'D' => 13, 'E' => 25] as $column => $width) {
             $print->getColumnDimension($column)->setWidth($width);
         }
         foreach ($data['pages'] as $pageIndex => $rows) {
             $start = $pageIndex * ($data['rows_per_page'] + 16) + 1;
             if ($pageIndex > 0) {
-                $print->setBreak('A'.$start, Worksheet::BREAK_ROW);
+                $print->setBreak('A'.($start - 1), Worksheet::BREAK_ROW);
             }
             $print->mergeCells('B'.$start.':E'.($start + 1));
             $this->text($print, 'B'.$start, 'MBFD TRAINING ROSTER');

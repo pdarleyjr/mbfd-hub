@@ -15,6 +15,8 @@ Validation date: 2026-10-15. This receipt is updated as checks finish; pending c
 - Clean frontend dependency installation completed in the task-local C: validation mirror. Full Vite production build passed. The interrupted D: installation is not used as build evidence.
 - Final browser contract run passed all 15 scenarios across desktop, tablet and iPhone WebKit (2.3 minutes, exit 0). Tablet handwriting uses actual Chromium touch events. Desktop/tablet/phone roster and signature screenshots were visually inspected. Evidence: `kiosk-browser-final-local.log` and the task-local browser output directory.
 - Disposable PostgreSQL 16.15 migration and concurrency gate passed (one test, ten assertions). Synthetic records were reconciled and the test-owned container removed. Evidence: `training-postgres-migrate.log` and `training-postgres-concurrency.log`.
+- Export regression suite passed all 14 tests and 577 assertions (176 MB peak), covering count boundaries, preserved artifacts, signature integrity and extreme-length rows. Final PDF renders were visually inspected with complete OIC/footer sections and no observed clipping. XLSX visual inspection is tracked separately.
+- Targeted assignment-provider suite passed nine tests and 16 assertions, including unknown Bid employment status with active canonical Hub identity and explicit inactive/departed exclusions. Evidence: `training-provider-eligibility.log`.
 - Existing build-advisory classifier regression: 12 tests passed after restoring the unchanged approved package manifest and invoking Playwright directly from the workflow.
 
 ## Hosted initial-candidate evidence
@@ -23,10 +25,12 @@ Hub PR 424 initial candidate `e8a9e6ad421af7449ce999e4c33d52004547cdc4`, CI run 
 
 Bid PR 270 candidate `bb0a30ae0ff426e6b51e7522c6d4274a85eb6bc3`: CI `38767586656` and CodeQL `38767586045` passed, including full typecheck, unit/integration, Workers runtime and Playwright E2E. Read-only production D1 migration guard passed all 72 existing migrations; this bridge adds none.
 
+Live read-only bridge validation found assigned personnel with Bid employment status `unknown`. The follow-up in Bid PR 271 preserves that status and allows training availability only through the Hub's mandatory active canonical identity gate. It does not modify Bid employment or assignment data. Hub candidate `54248221071971a582ced55b46f0939e50b921cc` reduced PHPStan findings to one redundant nullsafe access, corrected in the next candidate; security/configuration/generated-asset gates passed.
+
 ## Running or pending
 
 - Final candidate database-backed HTTP/domain/Livewire tests, historical assignment provider tests and existing personnel-signature regression.
-- Export count matrix, private file/hash verification, immutable versions, rendered PDF and spreadsheet visual inspection.
+- Final spreadsheet visual inspection.
 - Required hosted release gates on the exact candidate, including PHPStan, security, existing regressions, PHP compatibility, generated assets and image qualification.
 
 Local Windows dependency/class loading has shown substantial filesystem latency. Unfinished processes and partial logs are not accepted as successful checks. Task-local PHP configuration enables required extensions without altering global configuration. All test data is synthetic and confined to local disposable storage/databases; the supplied credential file was not loaded into tests.

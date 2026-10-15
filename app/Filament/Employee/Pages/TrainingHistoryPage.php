@@ -59,7 +59,7 @@ class TrainingHistoryPage extends Page implements HasTable
             Tables\Columns\TextColumn::make('attendance_status')->label('Attendance')->badge()
                 ->getStateUsing(fn (TrainingAttendance $record): string => $record->was_corrected ? 'Attendance corrected' : 'Attendance recorded'),
             Tables\Columns\TextColumn::make('certification_status')->label('Certification')->badge()
-                ->getStateUsing(fn (TrainingAttendance $record): string => $record->session?->latestVersion?->certified_at ? 'Roster certified' : 'Provisional roster')
+                ->getStateUsing(fn (TrainingAttendance $record): string => $record->session->latestVersion?->certified_at ? 'Roster certified' : 'Provisional roster')
                 ->color(fn (string $state): string => $state === 'Roster certified' ? 'success' : 'warning'),
             Tables\Columns\TextColumn::make('session.status')->label('Roster state')->badge()->toggleable(isToggledHiddenByDefault: true),
         ])->filters([

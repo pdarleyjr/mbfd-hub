@@ -59,6 +59,8 @@ Both exports consume exactly one captured snapshot. Renderers do not reread muta
 
 Bid bridge: authenticated read-only `GET /api/portal/training-roster?as_of=YYYY-MM-DD`. It reuses the effective operational projection, returns only required names/personnel identifiers/rank/shift/assignment provenance, and uses the existing reader credential server-to-server. Hub sets `TRAINING_ROSTER_BID_API_URL` explicitly to the verified Worker origin; no staging hostname heuristic. Invalid, stale, duplicate or unavailable source fails visibly. There is no fallback to latest award or a manually maintained shift roster.
 
+Training availability is distinct from permission to mutate Bid personnel. Bid's explicit inactive, retired and separated statuses are excluded. An effective assignment with Bid status `unknown` may be offered only when the same unique canonical Hub Employee is active; the original `unknown` status remains in the attendance snapshot. The bridge never relabels unknown employment as active and does not change Bid lifecycle rules. Live preflight exposed this distinction because operational A/B/C assignments were present while Bid employment status remained unknown.
+
 Preserve D Shift and Days where source distinguishes them. Person rank is distinct from the seat's applicable rank; Driver Engineer must not be invented as a rank when the source represents it as a qualification. A term label is shown only when established by source metadata. Otherwise the truthful label is “Current assignment.” The interface cannot manufacture a 2026–2027 effective term from today's year.
 
 ## D. Database and integrity design
