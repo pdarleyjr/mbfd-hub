@@ -91,12 +91,12 @@ class TrainingSessionResource extends Resource
                 Tables\Columns\TextColumn::make('classifications')->badge()->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('active_attendances_count')->label('Attendees'),
                 Tables\Columns\TextColumn::make('status')->badge()->color(fn (string $state): string => match ($state) {
-                    'open' => 'success', 'certified' => 'info', 'closed' => 'warning', default => 'gray',
+                    'open' => 'success', 'submitted', 'certified' => 'info', 'closed' => 'warning', default => 'gray',
                 }),
             ])->groups([Group::make('course.name')->label('Course')->collapsible()])->defaultGroup('course.name')
             ->filters([
                 Tables\Filters\SelectFilter::make('training_course_id')->label('Course')->relationship('course', 'name')->searchable()->preload(),
-                Tables\Filters\SelectFilter::make('status')->options(array_combine(['draft', 'open', 'closed', 'certified', 'archived'], ['Draft', 'Open', 'Closed', 'Certified', 'Archived'])),
+                Tables\Filters\SelectFilter::make('status')->options(array_combine(['draft', 'open', 'closed', 'submitted', 'certified', 'archived'], ['Draft', 'Open', 'Closed', 'Submitted', 'Certified', 'Archived'])),
                 Tables\Filters\SelectFilter::make('classification')->options(array_combine(TrainingCourse::CLASSIFICATIONS, TrainingCourse::CLASSIFICATIONS))
                     ->query(fn (Builder $query, array $data): Builder => $query->when($data['value'] ?? null, fn (Builder $q, string $value) => $q->whereJsonContains('classifications', $value))),
                 Tables\Filters\Filter::make('dates')->form([DatePicker::make('from'), DatePicker::make('until')])

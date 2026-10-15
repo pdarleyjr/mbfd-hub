@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Training;
 
 use App\Http\Controllers\Controller;
+use App\Models\Training\TrainingCourse;
 use App\Models\Training\TrainingSession;
 use App\Services\Training\TrainingAssignmentProvider;
 use App\Services\Training\TrainingKioskService;
 use App\Services\Training\TrainingRosterService;
+use App\Services\Training\TrainingRosterSubmissionAuthenticator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,6 +27,53 @@ final class TrainingKioskController extends Controller
         return response()->json(['csrf_token' => csrf_token()]);
     }
 
+    public function catalog(): JsonResponse
+    {
+        $courses = TrainingCourse::query()->with(['sessions' => fn ($query) => $query->where('status', 'open')->orderByDesc('held_on')->orderBy('id')])
+            ->orderBy('name')->get()->map(fn (TrainingCourse $course): array => [
+                'id' => $course->id, 'name' => $course->name, 'default_location' => $course->default_location,
+                'sessions' => $course->sessions->map(fn (TrainingSession $session): array => [
+                    'public_id' => $session->public_id, 'held_on' => $session->held_on->toDateString(), 'location' => $session->location,
+                ])->all(),
+            ]);
+
+        return response()->json(['courses' => $courses, 'today' => now('America/New_York')->toDateString(), 'csrf_token' => csrf_token()]);
+    }
+
+    public function startCourse(Request $request, TrainingCourse $course, TrainingRosterService $rosters, TrainingKioskService $kiosk): JsonResponse
+    {
+        $session = $rosters->startPublicSession($course);
+        $kiosk->openPublic($request, $session);
+
+        return response()->json(['url' => '/r/'.$session->public_id, 'csrf_token' => csrf_token()]);
+    }
+
+    public function openPublic(Request $request, TrainingSession $session, TrainingKioskService $kiosk): JsonResponse
+    {
+        $kiosk->openPublic($request, $session);
+
+        return response()->json(['url' => '/r/'.$session->public_id, 'csrf_token' => csrf_token()]);
+    }
+
+    public function submitRoster(Request $request, TrainingSession $session, TrainingKioskService $kiosk, TrainingRosterService $rosters, TrainingRosterSubmissionAuthenticator $authenticator): JsonResponse
+    {
+        $grantId = $kiosk->requireDevice($request, $session);
+        $data = $request->validate([
+            'email' => ['required', 'string', 'max:254'],
+            'password' => ['required', 'string', 'max:1024'],
+            'expected_revision' => ['required', 'integer', 'min:1'],
+            'client_submission_id' => ['required', 'uuid'],
+        ]);
+        $actor = $authenticator->authenticate($data['email'], $data['password'], (string) $request->ip());
+        unset($data['password']);
+        $session = $rosters->submit($session, $actor, (int) $data['expected_revision'], $data['client_submission_id'], $grantId);
+
+        return response()->json([
+            'submitted' => true, 'course_name' => $session->course_name,
+            'held_on' => $session->held_on->toDateString(), 'submitted_at' => $session->submitted_at->toIso8601String(),
+        ]);
+    }
+
     public function authorizeDevice(Request $request, TrainingSession $session, TrainingKioskService $kiosk): JsonResponse
     {
         $data = $request->validate(['token' => ['required', 'string', 'regex:/\A[a-f0-9]{64}\z/']]);
@@ -36,12 +85,13 @@ final class TrainingKioskController extends Controller
     public function state(Request $request, TrainingSession $session, TrainingKioskService $kiosk): JsonResponse
     {
         $kiosk->requireDevice($request, $session);
+        abort_unless($session->status === 'open', 403, 'This roster is no longer open. Return to classes.');
         $attendance = $session->attendances()->whereNull('voided_at')->orderBy('signed_at')->orderBy('id')
             ->get()->map(fn ($row): array => [
                 'name' => $row->snapshot['display_name'],
                 'rank' => $row->snapshot['rank'] ?? null,
                 'shift' => $row->snapshot['shift'] ?? null,
-                'signed_at' => $row->signed_at->toIso8601String(),
+                'signed_at' => ($row->signature_signed_at ?? $row->signed_at)->toIso8601String(),
             ]);
 
         return response()->json([

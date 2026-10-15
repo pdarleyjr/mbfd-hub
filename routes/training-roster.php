@@ -9,10 +9,15 @@ use Illuminate\Support\Facades\Route;
 
 Route::domain(config('training-roster.host'))->group(function (): void {
     Route::get('/', [TrainingKioskController::class, 'index'])->name('training.kiosk.home');
+    Route::get('/csrf', [TrainingKioskController::class, 'csrf']);
+    Route::get('/catalog', [TrainingKioskController::class, 'catalog'])->middleware('throttle:60,1,training-catalog:');
+    Route::post('/courses/{course}/start', [TrainingKioskController::class, 'startCourse'])->middleware('throttle:10,1,training-start:');
     Route::get('/r/{session:public_id}', [TrainingKioskController::class, 'index'])->name('training.kiosk.show');
     Route::prefix('/r/{session:public_id}')->middleware('throttle:120,1,training-global:')->group(function (): void {
         Route::get('/csrf', [TrainingKioskController::class, 'csrf']);
         Route::post('/authorize', [TrainingKioskController::class, 'authorizeDevice'])->middleware('throttle:10,1,training-authorize:');
+        Route::post('/open', [TrainingKioskController::class, 'openPublic'])->middleware('throttle:10,1,training-open:');
+        Route::post('/submit', [TrainingKioskController::class, 'submitRoster'])->middleware('throttle:10,1,training-submit:');
         Route::get('/state', [TrainingKioskController::class, 'state']);
         Route::get('/candidates', [TrainingKioskController::class, 'candidates'])->middleware('throttle:30,1,training-candidates:');
         Route::post('/attendance', [TrainingKioskController::class, 'sign'])->middleware('throttle:60,1,training-attendance:');

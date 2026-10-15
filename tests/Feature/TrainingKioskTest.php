@@ -43,9 +43,9 @@ final class TrainingKioskTest extends TestCase
         ]);
     }
 
-    public function test_blank_landing_is_public_but_has_no_employee_directory(): void
+    public function test_public_landing_shell_has_no_embedded_employee_directory(): void
     {
-        $this->get('https://roster.mbfdhub.com/')->assertOk()->assertSee('training-roster-root')->assertDontSee('Synthetic classroom test');
+        $this->get('https://rosters.mbfdhub.com/')->assertOk()->assertSee('training-roster-root')->assertDontSee('Synthetic classroom test');
         $csrf = $this->getJson($this->url('csrf'))->assertOk()->assertJsonStructure(['csrf_token']);
         self::assertSame(['csrf_token'], array_keys($csrf->json()));
         self::assertNotEmpty($csrf->json('csrf_token'));
@@ -59,7 +59,7 @@ final class TrainingKioskTest extends TestCase
     public function test_kiosk_host_cannot_expose_admin_login_or_private_exports(): void
     {
         foreach (['/admin', '/training', '/employee', '/login', '/api/employees', '/training-rosters/'.$this->roster->id.'/export/pdf'] as $path) {
-            $this->get('https://roster.mbfdhub.com'.$path)->assertNotFound();
+            $this->get('https://rosters.mbfdhub.com'.$path)->assertNotFound();
         }
     }
 
@@ -85,7 +85,7 @@ final class TrainingKioskTest extends TestCase
     {
         config(['session.domain' => '.mbfdhub.com']);
         $this->withServerVariables(['REMOTE_ADDR' => '127.0.0.1']);
-        $headers = ['X-Forwarded-Host' => 'roster.mbfdhub.com', 'X-Forwarded-Proto' => 'https'];
+        $headers = ['X-Forwarded-Host' => 'rosters.mbfdhub.com', 'X-Forwarded-Proto' => 'https'];
         $response = $this->get('http://internal.example/', $headers);
         $response->assertOk()->assertSee('training-roster-root');
         $cookie = $response->getCookie('mbfd_training_kiosk');
@@ -123,7 +123,7 @@ final class TrainingKioskTest extends TestCase
         $other = $this->roster->replicate();
         $other->public_id = (string) Str::ulid();
         $other->save();
-        $this->getJson('https://roster.mbfdhub.com/r/'.$other->public_id.'/state')->assertForbidden();
+        $this->getJson('https://rosters.mbfdhub.com/r/'.$other->public_id.'/state')->assertForbidden();
         $grant->update(['expires_at' => now()->subSecond()]);
         $this->getJson($this->url('state'))->assertForbidden();
         $grant->update(['expires_at' => now()->addHour(), 'revoked_at' => now()]);
@@ -197,7 +197,7 @@ final class TrainingKioskTest extends TestCase
 
     private function url(string $suffix): string
     {
-        return 'https://roster.mbfdhub.com/r/'.$this->roster->public_id.'/'.$suffix;
+        return 'https://rosters.mbfdhub.com/r/'.$this->roster->public_id.'/'.$suffix;
     }
 
     private function grant(): TrainingKioskGrant

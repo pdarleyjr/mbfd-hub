@@ -15,6 +15,28 @@ use Illuminate\Validation\ValidationException;
 
 final class TrainingKioskService
 {
+    /** Public entry grants no staff identity or access to completed records. */
+    public function openPublic(Request $request, TrainingSession $session): void
+    {
+        $grant = DB::transaction(function () use ($request, $session): TrainingKioskGrant {
+            $session = TrainingSession::query()->lockForUpdate()->findOrFail($session->getKey());
+            abort_unless($session->status === 'open', 403, 'This roster is no longer open. Return to classes.');
+            $current = $session->kioskGrants()->whereKey($request->session()->get('training_grants.'.$session->id))
+                ->whereNull('revoked_at')->where('expires_at', '>', now())->first();
+            if ($current !== null) {
+                return $current;
+            }
+
+            return $session->kioskGrants()->create([
+                'token_hash' => hash('sha256', random_bytes(32)),
+                'expires_at' => now()->addHours((int) config('training-roster.grant_hours', 12)),
+                'created_by' => null,
+            ]);
+        });
+        $request->session()->regenerate();
+        $request->session()->put('training_grants.'.$session->getKey(), $grant->getKey());
+    }
+
     public function issue(TrainingSession $session, User $actor): string
     {
         Gate::forUser($actor)->authorize('launch', $session);

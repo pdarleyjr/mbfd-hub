@@ -107,6 +107,7 @@ class ViewTrainingSession extends ViewRecord implements HasTable
                 Tables\Columns\TextColumn::make('snapshot.rank')->label('Rank'),
                 Tables\Columns\TextColumn::make('snapshot.shift')->label('Shift')->placeholder('Unassigned'),
                 Tables\Columns\TextColumn::make('signed_at')->label('Signed (Eastern)')->dateTime('M j, Y g:i A')->timezone('America/New_York')->sortable(),
+                Tables\Columns\TextColumn::make('signature_signed_at')->label('Signature collected (Eastern)')->dateTime('M j, Y g:i:s A')->timezone('America/New_York')->toggleable(),
                 Tables\Columns\ImageColumn::make('signature_preview')->label('Signature')
                     ->getStateUsing(fn (TrainingAttendance $record): string => route('training.rosters.attendance.signature', ['session' => $this->getRecord(), 'attendance' => $record]))
                     ->height(48)->width(130),
@@ -136,7 +137,7 @@ class ViewTrainingSession extends ViewRecord implements HasTable
         return [
             'session' => $this->getRecord(),
             'versions' => $this->getRecord()->versions()
-                ->where(fn ($query) => $query->whereNotNull('certified_at')->orWhere('revision', $this->getRecord()->revision))
+                ->where(fn ($query) => $query->whereNotNull('certified_at')->orWhere('snapshot->session->status', 'submitted')->orWhere('revision', $this->getRecord()->revision))
                 ->orderByDesc('revision')->get(),
             'audits' => $this->getRecord()->audits()->latest('created_at')->limit(100)->get(),
             'oic' => Employee::find($this->getRecord()->oic_employee_profile_id),

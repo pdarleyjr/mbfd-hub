@@ -9,6 +9,7 @@ use App\Models\Training\TrainingRosterVersion;
 use App\Models\Training\TrainingSession;
 use App\Models\User;
 use App\Services\Training\TrainingRosterExportService;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -51,7 +52,9 @@ final class TrainingRosterExportTest extends TestCase
         }
         for ($i = 1; $i <= $count; $i++) {
             self::assertStringContainsString('TESTLAST'.str_pad((string) $i, 3, '0', STR_PAD_LEFT), $text);
+            self::assertStringContainsString(CarbonImmutable::parse($version->snapshot['attendance'][$i - 1]['signed_at'])->setTimezone('America/New_York')->format('H:i:s T'), $text);
         }
+        self::assertStringContainsString('10/15/2026 11:00:00 EDT', $text);
 
         $xlsx = $service->bytes($version, 'xlsx');
         $path = tempnam(sys_get_temp_dir(), 'training-export-');
@@ -62,6 +65,14 @@ final class TrainingRosterExportTest extends TestCase
             $data = $book->getSheet(1);
             self::assertSame($count + 1, $data->getHighestDataRow());
             self::assertCount($count + $pages * 2, $book->getSheet(0)->getDrawingCollection());
+            foreach ($version->snapshot['attendance'] as $index => $entry) {
+                $printRow = intdiv($index, 16) * 32 + 11 + $index % 16;
+                self::assertSame(CarbonImmutable::parse($entry['signed_at'])->setTimezone('America/New_York')->format("m/d/Y\nH:i:s T"), $book->getSheet(0)->getCell('D'.$printRow)->getValue());
+                self::assertSame($entry['signed_at'], $data->getCell('Q'.($index + 2))->getValue());
+                self::assertSame($entry['signed_at'], $data->getCell('AB'.($index + 2))->getValue());
+                self::assertSame($entry['signature']['sha256'], $data->getCell('R'.($index + 2))->getValue());
+            }
+            self::assertSame('10/15/2026 11:00:00 EDT', $book->getSheet(0)->getCell('E29')->getValue());
             if ($count > 0) {
                 self::assertSame('00001', $data->getCell('H2')->getValue());
                 self::assertSame('=1+1', $data->getCell('J2')->getValue());
@@ -93,6 +104,74 @@ final class TrainingRosterExportTest extends TestCase
         self::assertStringContainsString('MBFD-Training-synthetic-export-verification-2026-10-15-', $response->headers->get('Content-Disposition'));
         self::assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
         self::assertStringContainsString('PROVISIONAL', (new Parser)->parseContent($response->getContent())->getText());
+    }
+
+    public static function submissionStates(): array
+    {
+        return [[false, 'Submitted'], [true, 'Certified']];
+    }
+
+    public function test_replacement_signature_prints_its_own_timestamp_without_changing_attendance_time(): void
+    {
+        $version = $this->version(1, false);
+        $snapshot = $version->snapshot;
+        $snapshot['attendance'][0]['signature_signed_at'] = '2026-11-05T16:23:45+00:00';
+        $corrected = TrainingRosterVersion::query()->create(['training_session_id' => $version->training_session_id, 'revision' => 2, 'snapshot' => $snapshot]);
+        $service = app(TrainingRosterExportService::class);
+        $text = (new Parser)->parseContent($service->bytes($corrected, 'pdf'))->getText();
+        self::assertStringContainsString('11/05/2026', $text);
+        self::assertStringContainsString('11:23:45 EST', $text);
+        $path = tempnam(sys_get_temp_dir(), 'training-corrected-export-');
+        file_put_contents($path, $service->bytes($corrected, 'xlsx'));
+        try {
+            $book = IOFactory::load($path);
+            self::assertSame("11/05/2026\n11:23:45 EST", $book->getSheet(0)->getCell('D11')->getValue());
+            self::assertSame($version->snapshot['attendance'][0]['signed_at'], $book->getSheet(1)->getCell('Q2')->getValue());
+            self::assertSame('2026-11-05T16:23:45+00:00', $book->getSheet(1)->getCell('AB2')->getValue());
+            self::assertSame('2026-10-15', $book->getSheet(1)->getCell('D2')->getValue());
+            $book->disconnectWorksheets();
+        } finally {
+            unlink($path);
+        }
+    }
+
+    #[DataProvider('submissionStates')]
+    public function test_submission_approval_is_distinct_from_handwritten_certification(bool $certified, string $completion): void
+    {
+        $version = $this->version(17, $certified);
+        $snapshot = $version->snapshot;
+        $snapshot['session']['status'] = $certified ? 'certified' : 'submitted';
+        $snapshot['submission'] = ['submitted_at' => '2026-10-15T15:05:44+00:00', 'submitted_by' => 123];
+        $submitted = TrainingRosterVersion::query()->create(['training_session_id' => $version->training_session_id, 'revision' => 2, 'snapshot' => $snapshot]);
+        $service = app(TrainingRosterExportService::class);
+        $pdf = (new Parser)->parseContent($service->bytes($submitted, 'pdf'));
+        self::assertCount(2, $pdf->getPages());
+        foreach ($pdf->getPages() as $page) {
+            self::assertStringContainsString(strtoupper($completion), $page->getText());
+            self::assertStringContainsString('Submitted 2026-10-15T15:05:44+00:00', $page->getText());
+            self::assertStringNotContainsString('PROVISIONAL', $page->getText());
+            if (! $certified) {
+                self::assertStringNotContainsString('CERTIFIED', $page->getText());
+                self::assertStringNotContainsString('SYNTHETIC OIC', $page->getText());
+            }
+        }
+        $path = tempnam(sys_get_temp_dir(), 'training-submitted-export-');
+        file_put_contents($path, $service->bytes($submitted, 'xlsx'));
+        try {
+            $book = IOFactory::load($path);
+            self::assertStringContainsString(strtoupper($completion), $book->getSheet(0)->getCell('A9')->getValue());
+            self::assertSame('Submitted 2026-10-15T15:05:44+00:00', $book->getSheet(0)->getCell('A31')->getValue());
+            self::assertSame('Submitted 2026-10-15T15:05:44+00:00', $book->getSheet(0)->getCell('A63')->getValue());
+            self::assertCount(17 + ($certified ? 4 : 2), $book->getSheet(0)->getDrawingCollection());
+            self::assertSame('Submitted at (UTC)', $book->getSheet(1)->getCell('AA1')->getValue());
+            for ($row = 2; $row <= 18; $row++) {
+                self::assertSame($completion, $book->getSheet(1)->getCell('S'.$row)->getValue());
+                self::assertSame('2026-10-15T15:05:44+00:00', $book->getSheet(1)->getCell('AA'.$row)->getValue());
+            }
+            $book->disconnectWorksheets();
+        } finally {
+            unlink($path);
+        }
     }
 
     public function test_corrupted_signature_blocks_export_instead_of_omitting_evidence(): void
@@ -208,7 +287,7 @@ final class TrainingRosterExportTest extends TestCase
         $signature = ['disk' => 'local', 'path' => 'training/test-signature.png', 'mime' => 'image/png', 'sha256' => hash('sha256', $bytes)];
         $attendance = [];
         for ($i = 1; $i <= $count; $i++) {
-            $attendance[] = ['id' => $i, 'employee_profile_id' => $i, 'snapshot' => ['employee_id' => str_pad((string) $i, 5, '0', STR_PAD_LEFT), 'first_name' => $i === 1 ? '=1+1' : 'SYNTHETIC', 'last_name' => 'TESTLAST'.str_pad((string) $i, 3, '0', STR_PAD_LEFT), 'display_name' => 'Synthetic test '.$i, 'rank' => 'Firefighter', 'shift' => 'A', 'term_label' => 'Synthetic test term', 'assignment_source' => 'test', 'assignment_id' => (string) $i, 'as_of' => '2026-10-15'], 'signature' => $signature, 'signed_at' => '2026-10-15T14:00:00+00:00'];
+            $attendance[] = ['id' => $i, 'employee_profile_id' => $i, 'snapshot' => ['employee_id' => str_pad((string) $i, 5, '0', STR_PAD_LEFT), 'first_name' => $i === 1 ? '=1+1' : 'SYNTHETIC', 'last_name' => 'TESTLAST'.str_pad((string) $i, 3, '0', STR_PAD_LEFT), 'display_name' => 'Synthetic test '.$i, 'rank' => 'Firefighter', 'shift' => 'A', 'term_label' => 'Synthetic test term', 'assignment_source' => 'test', 'assignment_id' => (string) $i, 'as_of' => '2026-10-15'], 'signature' => $signature, 'signed_at' => CarbonImmutable::parse('2026-10-15T14:00:00+00:00')->addSeconds($i)->toIso8601String()];
         }
 
         return TrainingRosterVersion::query()->create(['training_session_id' => $session->id, 'revision' => 1, 'snapshot' => ['schema_version' => 1, 'session' => ['id' => $session->id, 'public_id' => $session->public_id, 'course_name' => $course->name, 'classifications' => $course->classifications, 'held_on' => '2026-10-15', 'location' => null, 'starts_at' => null, 'status' => $session->status, 'revision' => 1], 'attendance' => $attendance, 'certification' => $certified ? ['oic_snapshot' => ['employee_id' => '00000', 'display_name' => 'SYNTHETIC OIC'], 'oic_signature' => $signature, 'certified_at' => '2026-10-15T15:00:00+00:00', 'certified_by' => $user->id] : null, 'captured_at' => '2026-10-15T15:00:00+00:00']]);

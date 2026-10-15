@@ -11,6 +11,7 @@
     <p>MIAMI BEACH FIRE DEPARTMENT · TRAINING</p>
     <h1>{{ $rosterSession->course_name }}</h1>
     <p>{{ $rosterSession->held_on->format('F j, Y') }}</p>
+    <p><a href="{{ config('training-roster.scheme').'://'.config('training-roster.host') }}" target="_blank" rel="noopener noreferrer">Open class selection</a> · Open classes are also available without a classroom link.</p>
     @if($kioskUrl)
         <p>This classroom link allows attendance signing for this session. Share it only with participants.</p>
         <p><a class="button" href="{{ $kioskUrl }}" target="_blank" rel="noopener noreferrer">Open roster</a></p>
@@ -24,6 +25,7 @@
         <p>Sign-in is {{ $rosterSession->status }}. New classroom links can only be issued while sign-in is open. You can end existing links below.</p>
     @endif
     <form method="post" action="{{ route('training.rosters.revoke', $rosterSession) }}">@csrf<button style="background:#6c2430">End all classroom links</button></form>
+    <p><small>Ending links disconnects existing devices. Close sign-in to remove this roster from public selection and prevent new devices from opening it.</small></p>
     <p><a href="{{ url('/training/training-rosters/'.$rosterSession->id) }}">Return to Training</a></p>
 </main></body>
 </html>

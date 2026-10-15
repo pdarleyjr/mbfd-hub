@@ -8,7 +8,7 @@ Extend the existing Hub modular application: Filament administration and Trainin
 
 The original assignment authorized read-only discovery and a complete plan. Peter subsequently authorized autonomous implementation and explicitly directed completion through live deployment, including creation of the Cloudflare subdomain. Implementation, validation, additive production migration, immutable deployment and the scoped roster DNS/Tunnel/cache changes are authorized. Actual execution and acceptance evidence is recorded separately in the validation receipt.
 
-The governing experience is simple: instructor opens a session; member selects current shift, rank and name, then signs; staff download PDF or Excel directly. The engineering absorbs identity, effective dates, concurrency, evidence retention and retries.
+The governing experience is simple: open `rosters.mbfdhub.com`, choose a course and open or start today's roster; members select their recent published-bid shift, rank and name, then sign. An authorized administrator enters fresh Hub credentials to submit the roster and close public sign-in. Staff review and download the completed roster privately. Submission approval and OIC handwritten certification are distinct records.
 
 ## B. Verified source findings and evidence boundaries
 
@@ -38,10 +38,13 @@ The supplied PDF was structurally inspected and rendered: one US Letter portrait
 ```mermaid
 flowchart LR
   A[Hub Admin / Training panel] --> S[Training roster service]
-  K[roster.mbfdhub.com kiosk] --> G[Session capability and CSRF]
+  K[rosters.mbfdhub.com class selector] --> G[Public open-session grant and CSRF]
   G --> S
-  B[Bid effective assignment projection] --> R[Read-only reader bridge]
+  K --> A2[Fresh Hub credentials and submit permission]
+  A2 --> S
+  B[Bid authoritative person details] --> R[Read-only reader bridge]
   R --> P[Hub assignment provider]
+  PB[Hub published bid selections] --> P
   E[Canonical Employee profiles] --> P
   P --> S
   S --> D[(PostgreSQL attendance and audit)]
@@ -70,31 +73,31 @@ Handwritten additive migration `2026_10_15_120000_create_training_roster_tables.
 | Table | Key fields and relationships |
 | --- | --- |
 | `training_courses` | name, classifications JSON, description, default location, creator User, timestamps |
-| `training_sessions` | unique public ULID, course FK, copied name/classifications, held_on, optional start/location/OIC Employee FK, status, revision, creator |
-| `training_attendances` | session FK, Employee FK, historical snapshot JSON, private signature descriptor, signed_at UTC, voided_at, submission UUID, request SHA256 |
-| `training_roster_versions` | unique session/revision, immutable snapshot JSON, certification actor/time/OIC snapshot/signature, immutable PDF/XLSX descriptors |
+| `training_sessions` | unique public ULID, course FK, copied name/classifications, held_on, optional start/location/OIC Employee FK, status, revision, nullable creator, submission actor/time/UUID |
+| `training_attendances` | session FK, Employee FK, historical snapshot JSON, private signature descriptor, original signed_at UTC, signature_signed_at UTC, voided_at, attendance submission UUID, request SHA256 |
+| `training_roster_versions` | unique session/revision, immutable snapshot JSON, submission actor/time, separate certification actor/time/OIC snapshot/signature, immutable PDF/XLSX descriptors |
 | `training_roster_audits` | session/attendance/actor references, event, complete prior/new values, reason, timestamp; nullable session for course events |
-| `training_kiosk_grants` | session FK, SHA256 capability token, expiry, revocation, creator; raw token never stored |
+| `training_kiosk_grants` | session FK, SHA256 capability token, expiry, revocation, nullable creator; raw token never stored |
 
 FKs restrict deletion of underlying evidence. Unique `(session, employee)` prevents duplicate attendance under concurrency; unique `(session, submission UUID)` binds retries to one request. Status/date and parent foreign-key indexes support listings and lookups. Employee history is indexed by its Employee FK. No hard-delete resource action is provided. Model guards prevent deletion of rosters, attendance, audit and versions; old evidence remains through voids/amendments. The migration down path deliberately refuses destruction; application rollback keeps additive tables.
 
 Mutations lock the session row, validate allowed state and the submitted expected revision, apply one change, append audit and advance/capture a revision in one transaction. This serializes close/certify/sign/correct races. Audit captures original values and signature descriptors. Files are private and content-hashed; exports reject missing/tampered evidence. Filesystem and SQL are not a distributed transaction, so failed publication artifacts must be handled by bounded cleanup without deleting referenced originals.
 
-State machine: draft → open → closed → certified; closed may reopen sign-in; certified may reopen to closed only with a reason; closed/certified may archive. Archived records remain downloadable and immutable. Certification is roster attestation, not completion/CE/qualification.
+State machine: staff-created draft → open; public start creates open directly. Open may become closed through staff management or submitted through fresh authorized credential approval. Closed or submitted may become certified with the authenticated OIC's own handwritten signature. Closed may reopen sign-in; submitted/certified may reopen to closed only with a reason. Closed/submitted/certified may archive. Submitted and archived submission versions retain the approver and timestamp; reopening preserves prior immutable versions while clearing the current submission approval. Submission is not OIC certification, and neither represents completion/CE/qualification. Completed and archived rosters remain private and downloadable by authorized staff.
 
-Signature-only correction preserves original attendance timestamp and assignment snapshot. Replacing the employee requires a freshly collected signature and authoritative assignment on the original attendance date, with audit. Instructor exceptions require an existing eligible canonical Employee, confirmed name parts, genuine signature and explanation; unknown assignment fields remain explicitly unverified, never fabricated.
+Signature-only correction preserves original attendance timestamp and assignment snapshot. Replacing the employee requires a freshly collected signature and authoritative assignment on the original attendance date, with audit. `signature_signed_at` records the actual collection time of the current handwritten mark separately from original `signed_at`; corrected signatures must not appear backdated in documents. Instructor exceptions require an existing eligible canonical Employee, confirmed name parts, genuine signature and explanation; unknown assignment fields remain explicitly unverified, never fabricated.
 
 An original request UUID remains associated with its recorded evidence even after correction. A delayed kiosk retry must not recreate a corrected-away identity. Receipts distinguish recorded, corrected, voided and unknown outcomes. A missing receipt after a transport failure is not proof the original write failed.
 
 ## E. Operational workflows
 
 1. **Create/reuse course:** Training → Courses; search existing name; create only when absent; select original classifications and optional default location.
-2. **Open session:** Training → Rosters; select course/date and optional start/location/OIC. Multiple same-day sessions are distinguished by public session ID and start. Open sign-in; obtain the classroom link.
-3. **Sign:** open authorized session link → Sign Roster → shift from the latest applicable published bid → relevant person rank → alphabetical searchable name → verify selected identity → draw → Complete. A screen-only reminder distinguishes the recent bid from the previous bid. Success appears only after persisted receipt. Auto-return clears prior member and signature.
-4. **Correct:** authorized staff opens attendance row, inspects actual signature, supplies reason and corrected identity/fresh signature where needed. Stale forms are rejected. Void preserves original evidence. Certified sessions require explicit reopen first.
-5. **Certify:** close sign-in, review attendance/download provisional exports, resolve exceptions, capture the authenticated OIC's own signature and certify. Preserve snapshot and all earlier revisions.
-6. **Download PDF / Excel:** visible actions on roster list and detail. Blank, open, partial, closed, certified, archived and historical versions all export directly without a report builder. Each filename includes course/date/session/revision to prevent collisions.
-7. **Employee history:** existing Employee Portal → Training Division Classes Attended; own canonical profile only. Search/filter/date/status. Attendance is not represented as course completion or credit. Voided entries must not count as valid attendance; corrections remain auditable to authorized staff.
+2. **Open/start publicly:** `rosters.mbfdhub.com` lists reusable courses and open sessions, with search and automatic refresh. Choose a dated open roster or Start today's roster. A course-row lock serializes anonymous starts: reuse the sole open session for that course on today's New York date, otherwise create a new open session; if multiple exist, require explicit session selection. Submitted or historical attendance is never reused. Anonymous creation records a null creator and a public-start audit event, not an invented staff identity. Staff can still create dated sessions in Training → Rosters.
+3. **Sign:** public open roster → Sign Roster → shift from the latest applicable published bid → relevant person rank → alphabetical searchable name → verify selected identity → draw → Complete. A screen-only reminder distinguishes the recent bid from the previous bid. Success appears only after persisted receipt. Auto-return clears prior member and signature.
+4. **Submit:** after everyone signs, select Submit roster and enter existing Hub email or employee ID and password. Fresh stateless verification requires current authentication eligibility, completed password setup, current admin entitlement and the explicit direct `training.rosters.submit` permission; active super_admin retains full access. The server rechecks current account/password/security version and permission under the submission transaction, requires the reviewed revision and at least one attendance, then captures the submitted version. The kiosk remains logged out, clears approval credentials, and returns to classes. Completed rosters disappear from the public catalog and cannot be reopened or read publicly.
+5. **Correct/certify:** authorized staff reviews attendance and actual signatures privately. Corrections require a reason and fresh signature where needed; stale forms are rejected. Submitted/certified rosters require explicit reopen for corrections, preserving prior versions. OIC certification is a separate action requiring the acting account's own linked Employee and genuine handwritten signature.
+6. **Download PDF / Excel:** visible staff actions on roster list and detail. Blank, open, partial, closed, submitted, certified, archived and historical versions export directly without a report builder. Each filename includes course/date/session/revision to prevent collisions. Submitted approval remains distinct from OIC evidence in both formats.
+7. **Employee history:** existing Employee Portal → Training Division Classes Attended; own canonical profile only. Search/filter/date/status, including submitted and archived history. Attendance is not represented as course completion or credit. Voided entries must not count as valid attendance; corrections remain auditable to authorized staff.
 
 ## F. Administration design
 
@@ -104,23 +107,25 @@ Detail includes roster metadata, active/voided attendance, signature review, per
 
 Training viewer can read and export but cannot alter sessions or certify. Training admin and super_admin manage rosters. Existing Training To-Do authorization is preserved independently. OIC certification requires the acting account's canonical employee profile; an administrator cannot silently sign as someone else.
 
+Public submission permission is managed through the existing audited Employees & Access → Access & capabilities → Edit direct administrative capabilities checkbox, “Training rosters — submit.” The effective status explains the separate admin-access requirement. The additive permission migration grants nobody this permission automatically. Existing protected access controls require the administrator's current password and a reason; ordinary role-inherited permissions cannot replace direct `admin.access` or direct `training.rosters.submit`. Super Administrator behavior follows the Hub's existing full-access rule.
+
 ## G. Kiosk design and recovery
 
-Dedicated bundle and page show current insignia, department/Training Division identity, course/date/location, count, attendance list and persistent green Sign Roster. No session means a clean blank state; never show a sample course in production.
+The dedicated homepage shows current insignia, department/Training Division identity and the public searchable class selector. It loads actual course definitions and only open sessions; an empty catalog says no courses are available. It never invents a sample course. An open session shows course/date/location, count, attendance list, persistent green Sign Roster and a separate instructor Submit roster action.
 
 Shift/rank choices derive from the verified feed. Name search is filtered to the selected shift/rank and alphabetized. Duplicate names use a minimal employee-number hint. The public list shows name/rank/shift/signed indicator, never signature PNGs, full employee numbers or export links. Controls are at least 48–56px, with larger classroom selections; viewport-specific layouts keep the main action reachable. Long attendance tables scroll independently.
 
 The signature canvas uses Pointer Events for finger/stylus/mouse, fixed bounded bitmap dimensions, Clear/Back/Complete, and server-side nonblank validation. Canvas drawing does not scroll the page; other areas remain scrollable. Keyboard users can navigate choices and request instructor assistance for handwriting. Respect reduced-motion preferences and visible focus.
 
-The session capability is in a URL fragment, removed before normal navigation and exchanged through CSRF-protected POST. Hash-only storage, expiry, explicit revocation and per-request session checks constrain access. The kiosk uses its own host-only HttpOnly SameSite cookie; Hub admin cookies are not reused. Unknown kiosk-host routes—including admin/API/login—fail closed. Do not set a broad cross-subdomain session cookie for this feature.
+Public open/start uses CSRF-protected POST to obtain a session-scoped, expiring device grant without creating a staff identity. The legacy instructor-issued fragment link remains supported; its fragment is removed before normal navigation and exchanged through CSRF-protected POST. Grants bind operations to a session and support expiry/revocation; they do not make open classroom attendance private from public visitors. The kiosk uses its own host-only HttpOnly SameSite cookie; Hub admin cookies are not reused. Unknown kiosk-host routes—including admin/general API/login—fail closed. Fresh submission credentials are checked with the existing canonical resolver and Laravel provider, generic denial and identity/IP throttling, without login, remember cookie or persistent admin session.
 
-Poll the small public roster every 15 seconds only while visible/idle, and refresh immediately after own save. This avoids a new realtime service and limits operational complexity. No full-page refresh polling. A lost response triggers receipt lookup; retry uses the same UUID/body. Keep only the pending receipt identifier in tab storage, not a persistent handwriting/personnel cache. Handwriting remains in memory until confirmed or deliberately resolved. Offline signing is not falsely presented as saved; the interface explains recovery and instructor assistance. A future offline queue would require a separately designed shared-device data lifecycle.
+Refresh the course/open-session catalog every 15 seconds while visible and when visibility returns. Poll the small open roster while visible/idle and refresh immediately after own save, without full-page reloads or a new realtime service. A lost attendance response triggers receipt lookup; retry uses the same UUID/body. Store only its receipt identifier and timestamp in tab storage; handwriting remains in memory until confirmed or deliberately resolved. For uncertain roster approval, retain the submission UUID, reviewed revision and minimal course/date/count summary in tab storage so reload can recover the same request; never store credentials, attendee lists or signatures there. Recovery requires fresh credentials from the same approver, and receipt recovery does not expose completed attendance. Offline signing is not falsely presented as saved. A future offline queue requires a separately designed shared-device data lifecycle.
 
 ## H. PDF specification
 
 US Letter portrait, source-faithful organization, proportionate current logo, MBFD Training Roster heading, course/date/classifications, numbered Last Name/First Name/Date/Signature rows, and OIC printed name/employee ID/actual signature. Use all sixteen original categories: Task Level/Company; Officer Training; ICS / NIMS / FFOG; Driver Training; Special Ops; RIT/MD/Survival; Hazmat Training; Extrication; Marine Training; Water Rescue; Fire Boat Operation; Night Drill; SIMM Training; EMS Training; Pre-Fire/Prevention; Equipment Inservice.
 
-Target sixteen attendance slots per page with explicit page partitioning; zero attendees yields a printable blank roster. Repeat branding/course/table headings and page X of Y. Continue numbering, never split a row/signature, preserve proportions, bound long titles/names without clipping. Certification is displayed from the captured version; provisional exports say uncertified. The implementation must render representative pages and inspect margins, typography, OIC block and signature placement; a PDF parser or HTTP 200 alone does not establish fidelity.
+Target sixteen attendance slots per page with explicit page partitioning; zero attendees yields a printable blank roster. Repeat branding/course/table headings and page X of Y. Continue numbering, never split a row/signature, preserve proportions, bound long titles/names without clipping. Display the current handwritten signature's collection timestamp separately from original attendance date where they differ. Submission approval and any OIC certification are displayed from the captured version; submitted alone must not claim OIC certification. The implementation must render representative pages and inspect margins, typography, OIC block and signature placement; a PDF parser or HTTP 200 alone does not establish fidelity.
 
 Original signatures persist independently of documents. Hash-verified PNG bytes enter the renderer; no cursive font substitution, remote logo fetch, or arbitrary HTML/image URL. Document status, version and capture time identify the exact attendance snapshot.
 
@@ -129,7 +134,7 @@ Original signatures persist independently of documents. Hash-verified PNG bytes 
 Genuine OpenXML `.xlsx`, generated by PhpSpreadsheet, with two worksheets:
 
 - **Printable roster:** branding, course/session/classifications/status, attendance cells plus embedded handwritten signature images, OIC evidence, explicit row heights/widths, repeatable page blocks and Letter print setup.
-- **Attendance data:** one actual spreadsheet row per valid attendee; sequence, first/last name, person rank, shift, string employee ID, attendance date and signed time, attendance status, signature confirmation, course/session/revision metadata. Freeze headings and enable filter/sort. Do not put movable signature drawings in the sortable data sheet.
+- **Attendance data:** one actual spreadsheet row per valid attendee; sequence, first/last name, person rank, shift, string employee ID, attendance date and original signed time, current signature collection timestamp, attendance status, signature confirmation, course/session/revision metadata. Freeze headings and enable filter/sort. Do not put movable signature drawings in the sortable data sheet.
 
 Text fields are explicit string cells so leading-zero identifiers and formula-like user text remain literal. Numeric sequence/counts and date/time cells use deliberate types and formats. Image count and placement must match the snapshot; no truncation at sixteen rows. Print sheets keep signatures aligned; structured data remains useful for imports without pretending drawings sort reliably with rows. Excel and a common alternate viewer must be visually reviewed when available. Automated XML/drawing checks supplement that inspection.
 
@@ -139,15 +144,16 @@ PhpSpreadsheet was selected over a larger Laravel Excel abstraction because the 
 
 | Actor | Allowed | Denied |
 | --- | --- | --- |
-| Unpaired visitor | Blank landing | Directory, attendance, signatures, mutations, exports |
-| Authorized session kiosk | Current session read, filtered candidates, new handwritten attendance, own submission receipt | Course/session administration, other sessions, corrections, certification, exports |
+| Public visitor | Course/open-session catalog; start/reuse today's roster or open a listed session through CSRF-protected POST | Completed/private roster reads, signatures, exports, course editing, approval without fresh authorized credentials |
+| Open-session kiosk | Open roster read, filtered candidates, handwritten attendance and receipt recovery within its session grant | Completed attendance reads, corrections, certification, exports, staff account session |
+| Freshly verified submitter | Submit reviewed revision with current admin entitlement and direct submit permission, or active super_admin; recover own submission UUID | Reuse of stored credentials, OIC certification by credential approval alone, public completed-roster access |
 | Training viewer | Authorized roster/version/signature review and exports | Writes and certification |
 | Training admin / super_admin | Audited management, supervised exception, OIC self-certification, preserved downloads | Silent evidence replacement, hard deletion, signing as another OIC |
 | Employee | Own history through canonical resolver | Other employee history and administrative roster exports |
 
 Every protected download checks policy and parent/session identity; possession of an object path is not authorization. CSRF protects browser writes. Grant exchange and submission have rate limits. Private/no-store and no-referrer headers protect session data; kiosk is not indexed or framed. Application checks remain required behind Cloudflare. Never log raw tokens, signature data URLs, cookies or credential files.
 
-A handwritten mark at a shared unauthenticated kiosk is supervised attendance evidence, not cryptographic identity proof. Low-friction control is instructor-controlled session/device access, short-lived links, visible identity confirmation, no unsigned administrator edits, exception audit, and OIC review. Individual member login is intentionally not required.
+A handwritten mark at a shared unauthenticated kiosk is supervised attendance evidence, not cryptographic identity proof. Public course/open-session discovery is intentional. Controls are session-scoped device grants, visible identity confirmation, validated actual signatures, fresh authorized approval to complete a roster, exception audit and separate OIC review. Individual member login is intentionally not required to sign attendance; credentials are required to approve roster submission.
 
 ## K. Cloudflare and hosting plan
 
@@ -155,7 +161,7 @@ Preferred: existing Cloudflare zone/Tunnel → current protected Hub origin → 
 
 Before any future change, read actual zone records, Tunnel identity/config/ingress ordering, origin Nginx server names, Access apps/policies, TLS and Cache Rules. Determine whether the tunnel is remotely or locally managed. Preserve exact current objects and config hashes. Add only roster hostname → verified origin service; do not replace catch-all ingress or alter existing hosts. Add origin host allowlist entry if required. Set `TRAINING_ROSTER_HOST`, scheme and exact Bid API origin; preserve Hub `APP_URL` and canonical authentication.
 
-Use explicit cache bypass for roster HTML/JSON and all private downloads; immutable compiled assets may retain normal asset caching. Verify no `CF-Cache-Status: HIT` for sensitive responses, no cached Set-Cookie, and host-only cookies in real browser. Do not place mandatory per-firefighter Access login on sign-in. Keep instructor/admin routes on canonical authenticated Hub and block unrelated routes on kiosk host. Verify TLS, forwarded host/proto trust, direct-origin protection and API authorization independently. Cloudflare documents that a published hostname maps to a local Tunnel service: https://developers.cloudflare.com/tunnel/concepts/routing/ . DNS creation alone does not prove Access, Nginx, application routing or cache behavior.
+Use explicit cache bypass for roster HTML/JSON and all private downloads; immutable compiled assets may retain normal asset caching. Verify no `CF-Cache-Status: HIT` for sensitive responses, no cached Set-Cookie, and host-only cookies in real browser. Do not place mandatory per-firefighter Access login on sign-in. Keep management, review and export routes on canonical authenticated Hub; the kiosk's fresh-credential submission endpoint grants no admin session. Block unrelated routes on the kiosk host. Verify TLS, forwarded host/proto trust, direct-origin protection and API authorization independently. Cloudflare documents that a published hostname maps to a local Tunnel service: https://developers.cloudflare.com/tunnel/concepts/routing/ . DNS creation alone does not prove Access, Nginx, application routing or cache behavior.
 
 Rollback only the added hostname/ingress/cache rule and application image/config, preserving all recorded data and original private files. No Cloudflare resources were provisioned by this implementation.
 
@@ -167,7 +173,7 @@ Rollback only the added hostname/ingress/cache rule and application image/config
 | 2 Domain | `Models/Training/Training{Course,Session,Attendance,KioskGrant}.php`, roster audit/version models; additive migration; `Services/Training/TrainingRosterService.php` | DB invariants, historical snapshots, rollback retention, PostgreSQL races |
 | 3 Published bid identity | `TrainingAssignmentProvider.php`, existing `EmployeeBidAssignment`; read-only Bid person-details bridge and tests | Correct published term, supersession/provenance, retained assignments, D/Days/person rank, unavailable evidence fails closed |
 | 4 Admin | Filament Training course/session resources/pages; TrainingRosterPolicy; panel registration; existing To-Do group change | Role-specific real create/open/correct/certify/archive/download workflow |
-| 5 Kiosk | `routes/training-roster.php`; host/private-response middleware; kiosk service/controllers; React `resources/js/training-roster`; Blade shell and launch page | Cross-session denial, CSRF, touch workflow, retry/privacy/responsive tests |
+| 5 Kiosk | `routes/training-roster.php`; host/private-response middleware; kiosk service/controllers; `TrainingRosterSubmissionAuthenticator.php`; explicit submit permission; React `resources/js/training-roster`; Blade shell and launch page | Public class refresh/start/reuse, completed-record privacy, stateless fresh approval, cross-session denial, CSRF, touch workflow, retry/privacy/responsive tests |
 | 6 Documents | `TrainingRosterExportService.php`, PDF Blade template, approved logo, PhpSpreadsheet lock | Actual PDF/XLSX, signatures, versions, visual rendering, count matrix |
 | 7 Employee | `TrainingHistoryPage.php`, employee Blade history and registration | Canonical own-history, void/correction behavior, no cross-employee access |
 | 8 Integration QA | PHPUnit, PostgreSQL, browser config/spec, build/typecheck, security checks | Exact evidence and no regression of existing panels/bid/identity |
@@ -186,10 +192,10 @@ Isolated local validation uses the candidate checkout, its lockfiles and test-on
 
 Required feature matrix:
 
-- Courses/sessions: repeated and same-day sessions, search/filter, valid and invalid state transitions, stale-form conflict, draft/open/closed/certified/archived exports.
+- Courses/sessions: public catalog refresh and open-only listing, course-lock start/reuse today, ambiguous multiple-open selection, null anonymous creator, repeated and same-day sessions, search/filter, valid and invalid state transitions, stale-form conflict, draft/open/closed/submitted/certified/archived exports.
 - Assignments: published bid selection differs from older operational shift, applicable term and publication history, midnight New York boundary, superseded/source revisions, retained/nonbiddable assignments, D/Days, person versus seat rank, promotion/transfer, inactive/missing employees, duplicate names/IDs, stale/unavailable feed and explicit exceptions.
-- Kiosk: no pairing, wrong session, expired/revoked grant, CSRF, invalid/blank/oversized PNG, duplicate UUID/body mismatch, duplicate employee, simultaneous submit/close, unknown save outcome, recovered receipt, corrected/voided receipt, reset/privacy, 150-row sticky action.
-- Administration: viewer cannot mutate; unauthorized direct HTTP/Livewire denied; OIC self-sign only; actual signature review; reason required for correction/reopen; old signed snapshots and document bytes retained.
+- Kiosk: public entry and scoped grant, wrong session, expired/revoked grant, completed-roster denial, CSRF, invalid/blank/oversized PNG, duplicate UUID/body mismatch, duplicate employee, simultaneous sign/submit/close, unknown attendance or approval outcome, reload recovery with the same UUID and fresh credentials, corrected/voided receipt, credential clearing/no persistent login, reset/privacy, 150-row sticky action.
+- Administration: direct submit grant plus current admin access; role-only/member/disabled/departed/forced-password-change denial; generic credential errors and throttling; audited permission grant/revoke; viewer cannot mutate; unauthorized direct HTTP/Livewire denied; OIC self-sign only; actual signature timestamp review; reason required for correction/reopen; submitted/archived approval and old signed snapshots/document bytes retained.
 - PDF counts: 0,1,16,17,32,33,50,100 plus long metadata; page counts, all names, proportionate signatures, categories/OIC, branding, no overlap, actual render inspection.
 - Excel: real ZIP/OpenXML, every row/signature drawing, string IDs including leading zeros, formula injection literals, filters/freeze/print areas, long lists, both worksheets and viewer inspection.
 - Cross-format: same session/revision/count/identities/status/OIC; no independent live queries; hash mismatch fails; concurrent export preserves one artifact identity.
@@ -212,6 +218,6 @@ Defer bulk ZIP/date-range export, QR generation, PDF inline preview, and realtim
 
 ## P. Readiness verdict
 
-The existing ecosystem supplies identity, panels, policies, private storage, signature validation and PDF rendering. The implementation adds normalized training records, immutable revisions, admin/history workflows, controlled kiosk access, current-assignment bridge, and genuine dual-format export. A source implementation is feasible without changing authentication or creating another operational database.
+The existing ecosystem supplies identity, panels, policies, private storage, signature validation and PDF rendering. The implementation adds normalized training records, immutable revisions, admin/history workflows, a public course/open-roster kiosk, stateless authorized submission, published-bid identity integration and genuine dual-format export. It reuses existing authentication and personnel authorities without creating another operational database.
 
-Activation still requires current infrastructure/role/assignment readback, exact-candidate validation, successful isolated restore/migration checks, Bid bridge deployment before enabling automatic candidate selection, explicit deployment scope, and human touchscreen/print acceptance. No invented credentials, effective dates, live records or production results substitute for these gates. See the accompanying validation receipt for checks actually executed and their results; this specification describes intended behavior and acceptance, not proof that every gate has passed.
+Activation still requires current infrastructure/role/assignment readback, exact-candidate validation, successful isolated restore/migration checks, verification of the separately deployed Bid bridge, and the authorized hostname/image changes. Actual public-entry and fresh-approval acceptance follows activation; human touchscreen/print acceptance remains an operator check. No invented credentials, effective dates, live records or production results substitute for these gates. See the accompanying validation receipt for checks actually executed and their results; this specification describes intended behavior and acceptance, not proof that every gate has passed.

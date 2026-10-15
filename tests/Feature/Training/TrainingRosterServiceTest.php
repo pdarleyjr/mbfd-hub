@@ -150,6 +150,8 @@ final class TrainingRosterServiceTest extends TestCase
         self::assertSame($snapshot, $corrected->snapshot);
         self::assertSame($signedAt, $corrected->signed_at->toIso8601String());
         self::assertSame($uuid, $corrected->client_submission_id);
+        self::assertTrue($corrected->signature_signed_at->greaterThan($corrected->signed_at));
+        self::assertSame($corrected->signature_signed_at->toIso8601String(), $this->service->snapshot($this->session)->snapshot['attendance'][0]['signature_signed_at']);
         $this->expectException(ValidationException::class);
         $this->service->sign($this->session, $this->employee->id, $signature, $uuid);
     }

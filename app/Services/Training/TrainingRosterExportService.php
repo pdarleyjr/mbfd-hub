@@ -106,12 +106,15 @@ final class TrainingRosterExportService
         $rows = [];
         foreach ($snapshot['attendance'] as $index => $entry) {
             $signature = $this->verifiedBytes($entry['signature']);
+            $signatureSignedAt = $entry['signature_signed_at'] ?? $entry['signed_at'];
             $rows[] = [
                 ...$entry,
                 'number' => $index + 1,
                 'signature_bytes' => $signature,
                 'signature_url' => 'data:image/png;base64,'.base64_encode($signature),
-                'date' => CarbonImmutable::parse($entry['signed_at'])->setTimezone('America/New_York')->format('m/d/Y'),
+                'signature_signed_at' => $signatureSignedAt,
+                'date' => CarbonImmutable::parse($signatureSignedAt)->setTimezone('America/New_York')->format('m/d/Y'),
+                'time' => CarbonImmutable::parse($signatureSignedAt)->setTimezone('America/New_York')->format('H:i:s T'),
             ];
         }
 
@@ -119,7 +122,10 @@ final class TrainingRosterExportService
         if ($certification !== null) {
             $certification['signature_bytes'] = $this->verifiedBytes($certification['oic_signature']);
             $certification['signature_url'] = 'data:image/png;base64,'.base64_encode($certification['signature_bytes']);
+            $certification['signed_at_local'] = CarbonImmutable::parse($certification['certified_at'])->setTimezone('America/New_York')->format('m/d/Y H:i:s T');
         }
+        $submission = $snapshot['submission'] ?? null;
+        $completion = $certification !== null ? 'Certified' : ($submission !== null ? 'Submitted' : 'Provisional');
 
         $logo = $this->logoBytes();
         $longestName = max([0, ...array_map(fn (array $row): int => max(mb_strlen($row['snapshot']['first_name']), mb_strlen($row['snapshot']['last_name'])), $rows)]);
@@ -138,6 +144,9 @@ final class TrainingRosterExportService
             'rows_per_page' => $rowsPerPage,
             'row_height' => $rowHeight,
             'certification' => $certification,
+            'submission' => $submission,
+            'completion' => $completion,
+            'completion_label' => $completion === 'Provisional' ? 'PROVISIONAL — NOT CERTIFIED' : strtoupper($completion),
             'classifications' => self::CLASSIFICATIONS,
             'revision' => $version->revision,
             'captured_at' => $snapshot['captured_at'],
@@ -212,7 +221,7 @@ final class TrainingRosterExportService
             $print->getRowDimension($courseRow)->setRowHeight(max(42, ceil((mb_strlen($data['session']['course_name']) + 13) / 45) * 12 + 8));
             $metaRow = $start + 8;
             $print->mergeCells('A'.$metaRow.':E'.$metaRow);
-            $this->text($print, 'A'.$metaRow, $data['session']['held_on'].' | '.($data['certification'] ? 'CERTIFIED' : 'PROVISIONAL — NOT CERTIFIED').' | Revision '.$data['revision'].' | '.count($data['rows']).' attendees'.(($data['session']['location'] ?? null) ? "\n".$data['session']['location'] : ''));
+            $this->text($print, 'A'.$metaRow, $data['session']['held_on'].' | '.$data['completion_label'].' | Revision '.$data['revision'].' | '.count($data['rows']).' attendees'.(($data['session']['location'] ?? null) ? "\n".$data['session']['location'] : ''));
             $print->getStyle('A'.$metaRow)->getAlignment()->setWrapText(true);
             $print->getRowDimension($metaRow)->setRowHeight(($data['session']['location'] ?? null) ? max(50, ceil(mb_strlen($data['session']['location']) / 45) * 12 + 17) : 17);
             $header = $start + 9;
@@ -228,7 +237,8 @@ final class TrainingRosterExportService
                     $print->setCellValue('A'.$row, $entry['number']);
                     $this->text($print, 'B'.$row, $entry['snapshot']['last_name']);
                     $this->text($print, 'C'.$row, $entry['snapshot']['first_name']);
-                    $this->text($print, 'D'.$row, $entry['date']);
+                    $this->text($print, 'D'.$row, $entry['date']."\n".$entry['time']);
+                    $print->getStyle('D'.$row)->getFont()->setSize(8);
                     $this->drawing($print, $entry['signature_bytes'], 'E'.$row, 'Signature '.$entry['number'], 150, 29);
                 }
             }
@@ -243,30 +253,37 @@ final class TrainingRosterExportService
             $print->getRowDimension($oicRow)->setRowHeight(30);
             if ($cert) {
                 $this->drawing($print, $cert['signature_bytes'], 'E'.$oicRow, 'OIC signature', 150, 30);
+                $this->text($print, 'E'.($oicRow + 1), $cert['signed_at_local']);
+                $print->getStyle('E'.($oicRow + 1))->getFont()->setSize(7);
             } else {
                 $this->text($print, 'E'.$oicRow, 'OIC SIGNATURE:');
             }
             $print->mergeCells('A'.($oicRow + 2).':E'.($oicRow + 2));
             $this->text($print, 'A'.($oicRow + 2), $data['session']['public_id'].' | '.$data['session']['status'].' | '.$data['captured_at'].' | Page '.($pageIndex + 1).' of '.count($data['pages']));
             $print->getStyle('A'.($oicRow + 2))->getFont()->setSize(8);
+            if ($data['submission']) {
+                $print->mergeCells('A'.($oicRow + 3).':E'.($oicRow + 3));
+                $this->text($print, 'A'.($oicRow + 3), 'Submitted '.$data['submission']['submitted_at']);
+                $print->getStyle('A'.($oicRow + 3))->getFont()->setSize(8);
+            }
         }
         $print->getPageSetup()->setOrientation(PageSetup::ORIENTATION_PORTRAIT)->setPaperSize(PageSetup::PAPERSIZE_LETTER)->setFitToWidth(1)->setFitToHeight(0)->setPrintArea('A1:E'.(count($data['pages']) * ($data['rows_per_page'] + 16)));
         $print->getPageMargins()->setTop(0.35)->setBottom(0.35)->setLeft(0.3)->setRight(0.3);
 
         $table = $book->createSheet()->setTitle('Attendance data');
-        $headers = ['Roster ID', 'Revision', 'Course', 'Session date', 'Classifications', 'Status', 'Number', 'Employee ID', 'Last name', 'First name', 'Rank', 'Shift', 'Bid term', 'Assignment source', 'Assignment ID', 'Assignment as of', 'Signed at (UTC)', 'Signature SHA256', 'Certification', 'OIC name', 'OIC employee ID', 'Certified at (UTC)', 'OIC signature SHA256', 'Location', 'Starts at (UTC)', 'Snapshot captured at (UTC)'];
+        $headers = ['Roster ID', 'Revision', 'Course', 'Session date', 'Classifications', 'Status', 'Number', 'Employee ID', 'Last name', 'First name', 'Rank', 'Shift', 'Bid term', 'Assignment source', 'Assignment ID', 'Assignment as of', 'Signed at (UTC)', 'Signature SHA256', 'Completion', 'OIC name', 'OIC employee ID', 'Certified at (UTC)', 'OIC signature SHA256', 'Location', 'Starts at (UTC)', 'Snapshot captured at (UTC)', 'Submitted at (UTC)', 'Signature signed at (UTC)'];
         $table->fromArray($headers, null, 'A1');
         foreach ($data['rows'] as $index => $entry) {
             $person = $entry['snapshot'];
             $cert = $data['certification'];
-            $values = [$data['session']['public_id'], (string) $data['revision'], $data['session']['course_name'], $data['session']['held_on'], implode('; ', $data['session']['classifications']), $data['session']['status'], (string) $entry['number'], $person['employee_id'], $person['last_name'], $person['first_name'], $person['rank'] ?? '', $person['shift'] ?? '', $person['term_label'] ?? '', $person['assignment_source'] ?? '', (string) ($person['assignment_id'] ?? ''), $person['as_of'] ?? '', $entry['signed_at'], $entry['signature']['sha256'], $cert ? 'Certified' : 'Provisional', $cert['oic_snapshot']['display_name'] ?? '', $cert['oic_snapshot']['employee_id'] ?? '', $cert['certified_at'] ?? '', $cert['oic_signature']['sha256'] ?? '', $data['session']['location'] ?? '', $data['session']['starts_at'] ?? '', $data['captured_at']];
+            $values = [$data['session']['public_id'], (string) $data['revision'], $data['session']['course_name'], $data['session']['held_on'], implode('; ', $data['session']['classifications']), $data['session']['status'], (string) $entry['number'], $person['employee_id'], $person['last_name'], $person['first_name'], $person['rank'] ?? '', $person['shift'] ?? '', $person['term_label'] ?? '', $person['assignment_source'] ?? '', (string) ($person['assignment_id'] ?? ''), $person['as_of'] ?? '', $entry['signed_at'], $entry['signature']['sha256'], $data['completion'], $cert['oic_snapshot']['display_name'] ?? '', $cert['oic_snapshot']['employee_id'] ?? '', $cert['certified_at'] ?? '', $cert['oic_signature']['sha256'] ?? '', $data['session']['location'] ?? '', $data['session']['starts_at'] ?? '', $data['captured_at'], $data['submission']['submitted_at'] ?? '', $entry['signature_signed_at']];
             foreach ($values as $column => $value) {
                 $table->getCell([$column + 1, $index + 2])->setValueExplicit((string) $value, DataType::TYPE_STRING);
             }
         }
-        $table->freezePane('A2')->setAutoFilter('A1:Z'.max(1, count($data['rows']) + 1));
-        $table->getStyle('A1:Z1')->getFont()->setBold(true);
-        foreach (range('A', 'Z') as $column) {
+        $table->freezePane('A2')->setAutoFilter('A1:AB'.max(1, count($data['rows']) + 1));
+        $table->getStyle('A1:AB1')->getFont()->setBold(true);
+        foreach ([...range('A', 'Z'), 'AA', 'AB'] as $column) {
             $table->getColumnDimension($column)->setWidth(22);
         }
         $book->setActiveSheetIndex(0);

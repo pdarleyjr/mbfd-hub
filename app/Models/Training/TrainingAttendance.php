@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property array<string, mixed> $snapshot
  * @property array{disk: string, path: string, mime: string, sha256: string} $signature
  * @property \Carbon\CarbonImmutable $signed_at
+ * @property \Carbon\CarbonImmutable|null $signature_signed_at
  * @property \Carbon\CarbonImmutable|null $voided_at
  * @property-read TrainingSession $session
  * @property-read bool $was_corrected
@@ -24,7 +25,7 @@ final class TrainingAttendance extends Model
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['snapshot' => 'array', 'signature' => 'array', 'signed_at' => 'immutable_datetime', 'voided_at' => 'immutable_datetime'];
+        return ['snapshot' => 'array', 'signature' => 'array', 'signed_at' => 'immutable_datetime', 'signature_signed_at' => 'immutable_datetime', 'voided_at' => 'immutable_datetime'];
     }
 
     protected static function booted(): void

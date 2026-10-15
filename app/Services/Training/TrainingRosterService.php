@@ -70,6 +70,66 @@ final class TrainingRosterService
         });
     }
 
+    /** Reuse the course, never the attendance from a previous completed class. */
+    public function startPublicSession(TrainingCourse $course): TrainingSession
+    {
+        return DB::transaction(function () use ($course): TrainingSession {
+            $course = TrainingCourse::query()->lockForUpdate()->findOrFail($course->id);
+            $today = now('America/New_York')->toDateString();
+            $open = $course->sessions()->whereDate('held_on', $today)->where('status', 'open')->orderBy('id')->limit(2)->get();
+            if ($open->count() > 1) {
+                $this->reject('session', 'More than one roster is open for this class today. Choose the dated roster and location from the class list.');
+            }
+            $session = $open->first();
+            if ($session !== null) {
+                return $session;
+            }
+            $session = $course->sessions()->create([
+                'public_id' => (string) Str::ulid(), 'course_name' => $course->name,
+                'classifications' => $course->classifications, 'location' => $course->default_location,
+                'held_on' => $today, 'starts_at' => now()->utc(), 'status' => 'open', 'revision' => 1,
+                'created_by' => null,
+            ]);
+            $this->audit($session, 'session.public_started', null, null, null, $session->toArray());
+            $this->capture($session);
+
+            return $session;
+        });
+    }
+
+    public function submit(TrainingSession $session, User $actor, int $expectedRevision, string $submissionId, int $kioskGrantId): TrainingSession
+    {
+        abort_unless($actor->canSubmitTrainingRosters(), 403);
+        Validator::make(['submission_id' => $submissionId], ['submission_id' => ['required', 'uuid']])->validate();
+
+        return DB::transaction(function () use ($session, $actor, $expectedRevision, $submissionId, $kioskGrantId): TrainingSession {
+            $session = $this->locked($session);
+            $freshActor = User::query()->lockForUpdate()->findOrFail($actor->id);
+            abort_unless($freshActor->canSubmitTrainingRosters()
+                && hash_equals($freshActor->getAuthPassword(), $actor->getAuthPassword())
+                && $freshActor->security_version === $actor->security_version, 403);
+            abort_unless($session->kioskGrants()->whereKey($kioskGrantId)->whereNull('revoked_at')->where('expires_at', '>', now())->exists(), 403, 'This screen authorization has ended. Return to classes.');
+            if ($session->submission_id === $submissionId && (int) $session->submitted_by === (int) $actor->id && $session->submitted_at !== null) {
+                return $session;
+            }
+            Validator::make(['submission_id' => $submissionId], ['submission_id' => [Rule::unique('training_sessions', 'submission_id')->ignore($session->id)]])->validate();
+            $this->editable($session, ['open']);
+            $this->expectedRevision($session, $expectedRevision);
+            if (! $session->attendances()->whereNull('voided_at')->exists()) {
+                $this->reject('attendance', 'At least one member must sign before you submit this roster.');
+            }
+            $before = $session->toArray();
+            $session->update([
+                'status' => 'submitted', 'submitted_at' => now()->utc(), 'submitted_by' => $actor->id,
+                'submission_id' => $submissionId, 'revision' => $session->revision + 1,
+            ]);
+            $this->capture($session);
+            $this->audit($session, 'session.submitted', $actor, null, $before, $session->toArray());
+
+            return $session;
+        });
+    }
+
     public function updateSession(TrainingSession $session, array $data, User $actor): TrainingSession
     {
         $this->authorize($actor, 'update', $session);
@@ -93,21 +153,22 @@ final class TrainingRosterService
         return DB::transaction(function () use ($session, $status, $actor, $reason, $expectedRevision): TrainingSession {
             $session = $this->locked($session);
             $this->expectedRevision($session, $expectedRevision);
-            $ability = $session->status === 'certified' && $status === 'closed' ? 'reopen'
+            $ability = in_array($session->status, ['certified', 'submitted'], true) && $status === 'closed' ? 'reopen'
                 : match ($status) {
                     'open' => 'open', 'closed' => 'close', 'archived' => 'archive', default => 'update'
                 };
             $this->authorize($actor, $ability, $session);
-            $allowed = ['draft' => ['open'], 'open' => ['closed'], 'closed' => ['open', 'archived'], 'certified' => ['closed', 'archived'], 'archived' => []];
+            $allowed = ['draft' => ['open'], 'open' => ['closed'], 'closed' => ['open', 'archived'], 'submitted' => ['closed', 'archived'], 'certified' => ['closed', 'archived'], 'archived' => []];
             if (! in_array($status, $allowed[$session->status] ?? [], true)) {
                 $this->reject('status', 'This roster cannot make that status change.');
             }
-            if ($session->status === 'certified' && $status === 'closed') {
+            if (in_array($session->status, ['certified', 'submitted'], true) && $status === 'closed') {
                 $reason = $this->reason($reason);
             }
             $before = $session->toArray();
             $certification = $status === 'archived' ? $session->versions()->where('revision', $session->revision)->first()?->snapshot['certification'] : null;
-            $session->update(['status' => $status, 'revision' => $session->revision + 1]);
+            $session->update(['status' => $status, 'revision' => $session->revision + 1]
+                + ($status === 'closed' ? ['submitted_at' => null, 'submitted_by' => null, 'submission_id' => null] : []));
             $this->audit($session, 'session.'.$status, $actor, null, $before, $session->toArray(), $reason);
             $this->capture($session, $certification);
 
@@ -147,7 +208,7 @@ final class TrainingRosterService
             $attendance = $session->attendances()->create([
                 'employee_profile_id' => $employeeProfileId, 'snapshot' => $snapshot,
                 'signature' => $this->signatures->store($signature, 'training-rosters'),
-                'signed_at' => now()->utc(), 'client_submission_id' => $submissionId, 'request_hash' => $hash,
+                'signed_at' => now()->utc(), 'signature_signed_at' => now()->utc(), 'client_submission_id' => $submissionId, 'request_hash' => $hash,
             ]);
             $this->audit($session, 'attendance.signed', null, $attendance, null, $attendance->toArray() + ['kiosk_grant_id' => $kioskGrantId]);
             $this->advance($session);
@@ -196,6 +257,7 @@ final class TrainingRosterService
             $attendance->update([
                 'employee_profile_id' => $data['employee_profile_id'], 'snapshot' => $snapshot,
                 'signature' => $this->signatures->store($data['signature'], 'training-rosters'),
+                'signature_signed_at' => now()->utc(),
                 'voided_at' => null,
             ]);
             $this->audit($session, 'attendance.corrected', $actor, $attendance, $before, $attendance->toArray(), $reason);
@@ -226,7 +288,7 @@ final class TrainingRosterService
                 'snapshot' => $names + ['employee_id' => (string) $employee->employee_id, 'display_name' => (string) $employee->name,
                     'rank' => $employee->rank, 'shift' => null, 'term_label' => null, 'assignment_source' => 'supervised_exception',
                     'assignment_id' => null, 'as_of' => now('America/New_York')->toDateString(), 'name_source' => 'instructor_confirmed'],
-                'signature' => $this->signatures->store($signature, 'training-rosters'), 'signed_at' => now()->utc(),
+                'signature' => $this->signatures->store($signature, 'training-rosters'), 'signed_at' => now()->utc(), 'signature_signed_at' => now()->utc(),
                 'voided_at' => null, 'client_submission_id' => (string) Str::uuid(),
                 'request_hash' => $this->requestHash($session->id, $employeeProfileId, $signature),
             ];
@@ -254,7 +316,7 @@ final class TrainingRosterService
         return DB::transaction(function () use ($session, $actor, $oicEmployeeProfileId, $signature, $expectedRevision): TrainingRosterVersion {
             $session = $this->locked($session);
             $this->expectedRevision($session, $expectedRevision);
-            $this->editable($session, ['closed']);
+            $this->editable($session, ['closed', 'submitted']);
             $employee = Employee::query()->where('roster_status', 'active')->where('employee_id', $actor->employee_id)->findOrFail($oicEmployeeProfileId);
             $certification = [
                 'oic_snapshot' => ['employee_id' => (string) $employee->employee_id, 'display_name' => (string) $employee->name, 'employee_profile_id' => $employee->id],
@@ -285,6 +347,7 @@ final class TrainingRosterService
             ->map(static fn (TrainingAttendance $item): array => [
                 'id' => $item->id, 'employee_profile_id' => $item->employee_profile_id, 'snapshot' => $item->snapshot,
                 'signature' => $item->signature, 'signed_at' => $item->signed_at->utc()->toIso8601String(),
+                'signature_signed_at' => ($item->signature_signed_at ?? $item->signed_at)->utc()->toIso8601String(),
             ])->all();
 
         return $session->versions()->create([
@@ -294,7 +357,9 @@ final class TrainingRosterService
                 'classifications' => $session->classifications, 'held_on' => $session->held_on->toDateString(),
                 'starts_at' => $session->starts_at?->utc()->toIso8601String(), 'location' => $session->location,
                 'status' => $session->status, 'revision' => $session->revision,
-            ], 'attendance' => $attendance, 'certification' => $certification, 'captured_at' => now()->utc()->toIso8601String()],
+            ], 'attendance' => $attendance, 'certification' => $certification,
+                'submission' => $session->submitted_at === null ? null : ['submitted_at' => $session->submitted_at->utc()->toIso8601String(), 'submitted_by' => $session->submitted_by],
+                'captured_at' => now()->utc()->toIso8601String()],
             'certified_at' => $certification['certified_at'] ?? null, 'certified_by' => $certification['certified_by'] ?? null,
             'oic_employee_profile_id' => $certification === null ? null : $session->oic_employee_profile_id,
             'oic_snapshot' => $certification['oic_snapshot'] ?? null, 'oic_signature' => $certification['oic_signature'] ?? null,

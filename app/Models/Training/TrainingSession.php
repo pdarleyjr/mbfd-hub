@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property list<string> $classifications
  * @property \Carbon\CarbonImmutable $held_on
  * @property \Carbon\CarbonImmutable|null $starts_at
+ * @property \Carbon\CarbonImmutable|null $submitted_at
  * @property int $revision
  * @property-read TrainingCourse $course
  * @property-read TrainingRosterVersion|null $latestVersion
@@ -25,7 +26,7 @@ final class TrainingSession extends Model
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['classifications' => 'array', 'held_on' => 'immutable_date', 'starts_at' => 'immutable_datetime', 'revision' => 'integer'];
+        return ['classifications' => 'array', 'held_on' => 'immutable_date', 'starts_at' => 'immutable_datetime', 'submitted_at' => 'immutable_datetime', 'revision' => 'integer'];
     }
 
     protected static function booted(): void

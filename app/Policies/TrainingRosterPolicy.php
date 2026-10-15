@@ -45,7 +45,7 @@ class TrainingRosterPolicy
 
     public function reopen(User $user, TrainingSession $record): bool
     {
-        return $this->create($user) && $record->status === 'certified';
+        return $this->create($user) && in_array($record->status, ['certified', 'submitted'], true);
     }
 
     public function correct(User $user, TrainingSession $record): bool
@@ -55,12 +55,12 @@ class TrainingRosterPolicy
 
     public function certify(User $user, TrainingSession $record): bool
     {
-        return $this->create($user) && $record->status === 'closed';
+        return $this->create($user) && in_array($record->status, ['closed', 'submitted'], true);
     }
 
     public function archive(User $user, TrainingSession $record): bool
     {
-        return $this->create($user) && in_array($record->status, ['closed', 'certified'], true);
+        return $this->create($user) && in_array($record->status, ['closed', 'submitted', 'certified'], true);
     }
 
     public function export(User $user, TrainingSession $record): bool

@@ -19,6 +19,7 @@
         .roster th { height: 21pt; font-family: "DejaVu Serif", serif; font-size: 10pt; }
         .roster td { height: {{ $row_height }}pt; font-size: 8pt; line-height: 9.6pt; overflow-wrap: break-word; word-wrap: break-word; vertical-align: middle; }
         .number { color: #555; font-size: 7pt; }
+        .signature-time { font-size: 6.5pt; line-height: 8pt; white-space: nowrap; }
         .signature { max-width: 165pt; max-height: 17pt; }
         .oic { margin-top: 11pt; font-size: 8pt; }
         .oic td { height: 34pt; vertical-align: middle; }
@@ -36,7 +37,7 @@
             @endforeach
         </table>
         <div class="course">COURSE NAME: {{ $session['course_name'] }}</div>
-        <p class="metadata">Session: {{ $session['held_on'] }} @if ($session['location'] ?? null) · {{ $session['location'] }} @endif<br>{{ $certification ? 'CERTIFIED' : 'PROVISIONAL — NOT CERTIFIED' }} · Revision {{ $revision }} · {{ count($rows) }} attendees</p>
+        <p class="metadata">Session: {{ $session['held_on'] }} @if ($session['location'] ?? null) · {{ $session['location'] }} @endif<br>{{ $completion_label }} · Revision {{ $revision }} · {{ count($rows) }} attendees</p>
         <table class="roster">
             <thead><tr><th style="width: 25%">Last Name</th><th style="width: 25%">First Name</th><th style="width: 13%">DATE</th><th style="width: 37%">SIGNATURE</th></tr></thead>
             <tbody>
@@ -45,7 +46,7 @@
                 <tr>
                     <td>@if ($entry)<span class="number">{{ $entry['number'] }}.</span> {{ $entry['snapshot']['last_name'] }}@endif</td>
                     <td>{{ $entry['snapshot']['first_name'] ?? '' }}</td>
-                    <td>{{ $entry['date'] ?? '' }}</td>
+                    <td>{{ $entry['date'] ?? '' }}@if ($entry)<br><span class="signature-time">{{ $entry['time'] }}</span>@endif</td>
                     <td>@if ($entry)<img class="signature" src="{{ $entry['signature_url'] }}" alt="Handwritten signature">@endif</td>
                 </tr>
             @endfor
@@ -53,9 +54,9 @@
         </table>
         <table class="oic"><tr>
             <td style="width: 52%"><strong>OIC NAME (PRINT):</strong> {{ $certification['oic_snapshot']['display_name'] ?? '____________________' }}<br><strong>ID#</strong> {{ $certification['oic_snapshot']['employee_id'] ?? '________' }}</td>
-            <td><strong>SIGNATURE:</strong> @if ($certification)<img class="signature" src="{{ $certification['signature_url'] }}" alt="OIC handwritten signature">@else ________________ @endif</td>
+            <td><strong>SIGNATURE:</strong> @if ($certification)<img class="signature" src="{{ $certification['signature_url'] }}" alt="OIC handwritten signature"><br><span class="signature-time">{{ $certification['signed_at_local'] }}</span>@else ________________ @endif</td>
         </tr></table>
-        <div class="footer">{{ $session['public_id'] }} · {{ $session['status'] }} · Page {{ $pageIndex + 1 }} of {{ count($pages) }}<br>Snapshot {{ $captured_at }}@if($certification) · Certified {{ $certification['certified_at'] }}@endif</div>
+        <div class="footer">{{ $session['public_id'] }} · {{ $session['status'] }} · Page {{ $pageIndex + 1 }} of {{ count($pages) }}<br>Snapshot {{ $captured_at }}@if($certification) · Certified {{ $certification['certified_at'] }}@endif @if($submission)<br>Submitted {{ $submission['submitted_at'] }}@endif</div>
     </div>
 @endforeach
 </body>

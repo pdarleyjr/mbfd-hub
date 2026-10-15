@@ -465,6 +465,14 @@ class User extends Authenticatable implements FilamentUser
         return $this->hasRole('super_admin') || $this->hasDirectWebPermission('admin.access');
     }
 
+    public function canSubmitTrainingRosters(): bool
+    {
+        return $this->isAuthenticationAllowed()
+            && ! $this->must_change_password
+            && $this->hasCurrentAdminPanelEntitlement()
+            && ($this->hasRole('super_admin') || $this->hasDirectWebPermission('training.rosters.submit'));
+    }
+
     public function hasCurrentMediaControlEntitlement(): bool
     {
         return $this->hasRole('super_admin') || $this->hasDirectWebPermission('app.media_control.access');

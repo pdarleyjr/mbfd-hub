@@ -6,8 +6,11 @@
             <div><p class="text-sm text-gray-500">Officer in charge</p><p>{{ $oic?->name ?: 'Not assigned' }}</p></div>
         </div>
         <p class="mt-4 text-sm">{{ implode(' · ', $session->classifications ?? []) }}</p>
-        @if ($session->status === 'certified' || $session->status === 'archived')
-            <p class="mt-4 text-sm text-gray-600">This roster is locked. Certified revisions remain available below. An authorized officer must reopen a certified roster with a reason before correcting attendance.</p>
+        @if ($session->submitted_at)
+            <p class="mt-4 text-sm">Submitted {{ $session->submitted_at->timezone('America/New_York')->format('M j, Y g:i:s A T') }} · approving account #{{ $session->submitted_by }}. The saved submission preserves every member's signature time.</p>
+        @endif
+        @if (in_array($session->status, ['submitted', 'certified', 'archived'], true))
+            <p class="mt-4 text-sm text-gray-600">This roster is locked. Saved submissions and certifications remain available below. Reopen with a reason before correcting attendance.</p>
         @else
             <p class="mt-4 text-sm text-gray-600">Downloads are provisional until the officer in charge certifies the roster. Close sign-in before certification.</p>
         @endif
@@ -19,7 +22,7 @@
         <div class="space-y-3">
             @forelse ($versions as $version)
                 <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 p-3">
-                    <div><strong>Revision {{ $version->revision }}</strong><span class="ml-2 text-sm">{{ $version->certified_at ? 'Certified' : 'Provisional' }} · {{ $version->created_at->timezone('America/New_York')->format('M j, Y g:i A') }}</span></div>
+                    <div><strong>Revision {{ $version->revision }}</strong><span class="ml-2 text-sm">{{ $version->certified_at ? 'Certified' : (!empty($version->snapshot['submission']) ? 'Submitted' : 'Provisional') }} · {{ $version->created_at->timezone('America/New_York')->format('M j, Y g:i A') }}</span></div>
                     <div class="flex gap-3">
                         <x-filament::link :href="route('training.rosters.versions.export', ['session' => $session, 'version' => $version, 'format' => 'pdf'])">Download PDF</x-filament::link>
                         <x-filament::link :href="route('training.rosters.versions.export', ['session' => $session, 'version' => $version, 'format' => 'xlsx'])">Download Excel</x-filament::link>

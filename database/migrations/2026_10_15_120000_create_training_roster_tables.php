@@ -31,7 +31,10 @@ return new class extends Migration
             $table->foreignId('oic_employee_profile_id')->nullable()->constrained('employees')->restrictOnDelete();
             $table->string('status', 16)->default('draft')->index();
             $table->unsignedInteger('revision')->default(1);
-            $table->foreignId('created_by')->constrained('users')->restrictOnDelete();
+            $table->foreignId('created_by')->nullable()->constrained('users')->restrictOnDelete();
+            $table->timestampTz('submitted_at')->nullable();
+            $table->foreignId('submitted_by')->nullable()->constrained('users')->restrictOnDelete();
+            $table->uuid('submission_id')->nullable()->unique();
             $table->timestampsTz();
         });
         Schema::create('training_attendances', function (Blueprint $table): void {
@@ -41,6 +44,7 @@ return new class extends Migration
             $table->json('snapshot');
             $table->json('signature');
             $table->timestampTz('signed_at');
+            $table->timestampTz('signature_signed_at')->nullable();
             $table->timestampTz('voided_at')->nullable();
             $table->uuid('client_submission_id');
             $table->char('request_hash', 64);
@@ -80,7 +84,7 @@ return new class extends Migration
             $table->char('token_hash', 64)->unique();
             $table->timestampTz('expires_at');
             $table->timestampTz('revoked_at')->nullable();
-            $table->foreignId('created_by')->constrained('users')->restrictOnDelete();
+            $table->foreignId('created_by')->nullable()->constrained('users')->restrictOnDelete();
             $table->timestampsTz();
         });
     }
