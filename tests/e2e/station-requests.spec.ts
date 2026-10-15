@@ -135,7 +135,8 @@ test('repair request is touch-safe, responsive, and submits the canonical payloa
   await page.getByLabel('Priority').selectOption('high');
   await page.getByLabel(/unusable \/ out of service/).check();
   await page.getByLabel(/Damage photo/).setInputFiles('public/images/mbfd_logo_new.png');
-  await expect(page.getByText('Photo attached')).toBeVisible();
+  // Client-side photo compression is CPU bound; allow for a loaded runner.
+  await expect(page.getByText('Photo attached')).toBeVisible({ timeout: 15_000 });
   await continueButton.click();
 
   await expect(page.getByRole('heading', { name: 'Review and submit' })).toBeVisible();

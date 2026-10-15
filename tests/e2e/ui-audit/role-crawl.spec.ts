@@ -200,7 +200,10 @@ async function inspect(page: Page) {
   });
 }
 
-test.describe.configure({ mode: 'serial' });
+// Personas are independent: one persona's findings must not skip the
+// remaining crawls (serial mode reported them as "did not run"). The config
+// already runs a single worker, so order is preserved.
+test.describe.configure({ mode: 'default' });
 
 if (inventoryResultsPath) {
   test('strict read-only linked GET acceptance from fresh inventory', async ({ browser }, info) => {
