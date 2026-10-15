@@ -323,7 +323,7 @@ for (const persona of inventoryResultsPath ? [] : Object.keys(personas)) {
         const { links: _links, ...summary } = facts;
         record = { ...record, finalPath: finalUrl.pathname, redirected: finalUrl.pathname !== new URL(target, origin).pathname,
           httpStatus: response?.status() ?? null, ...summary, overflow,
-          axe: axe.violations.map(v => ({ id: v.id, impact: v.impact, nodes: v.nodes.length })),
+          axe: axe.violations.map(v => ({ id: v.id, impact: v.impact, nodes: v.nodes.length, targets: v.nodes.slice(0, 3).map(node => node.target.join(' ')) })),
           consoleErrors: [...consoleErrors], failedResources: [...new Set(failedResources)], blockedWrites: blocked.slice(blockedBefore) };
       } catch (error) {
         record = { ...record, error: String(error).slice(0, 500) };
