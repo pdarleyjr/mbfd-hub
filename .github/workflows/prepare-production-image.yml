@@ -46,6 +46,12 @@ jobs:
 
   release-gates:
     needs: assert-main
+    # Read-only lookups for the release-gate proof reuse proposal.
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+      checks: read
     uses: ./.github/workflows/hub-release-gates.yml
     with:
       pint_base_sha: ${{ format('{0}^', github.sha) }}

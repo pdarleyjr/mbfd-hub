@@ -8,6 +8,16 @@ import {
   matrixLanes,
   partitionViolations,
 } from "../../scripts/ci/verify-daily-playwright-partition.mjs";
+import {
+  AGGREGATE_CHECK_NAME,
+  GITHUB_ACTIONS_APP_ID,
+  HOSTED_RUNNER_GROUP,
+  MAX_PROOF_AGE_HOURS,
+  PRODUCTION_EVENT,
+  PRODUCTION_REF,
+  PROOF_EVENTS,
+  PROOF_WORKFLOW_PATH,
+} from "../../scripts/ci/release-gate-proof.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -530,10 +540,66 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.match(aggregate, /^    if:\s*\$\{\{\s*!cancelled\(\)\s*\}\}\s*$/m);
   const confirmation = workflowStep(aggregate, "Confirm all required Hub release gates passed");
   assert.match(confirmation, /GATE_RESULTS:\s*\$\{\{\s*toJSON\(needs\)\s*\}\}/);
-  assert.match(confirmation, /set -euo pipefail/);
-  assert.match(confirmation, /jq -e 'length > 0 and all\(\.\[\]; \.result == "success"\)'/);
-  assert.match(confirmation, /exit 1/);
-  assert.doesNotMatch(confirmation, /\|\|\s*true\b/);
+  assert.match(confirmation, /PROOF_VERIFIED:\s*\$\{\{\s*needs\.reuse-proof\.outputs\.verified\s*\}\}/);
+  assert.match(confirmation, /run: node scripts\/ci\/verify-release-gate-results\.mjs\s*$/);
+  assert.doesNotMatch(confirmation, /\|\|\s*true\b|continue-on-error/);
+
+  // Proof reuse (owner-approval proposal) may skip only the listed expensive
+  // test jobs; the CI guard, actionlint, and every security scan always run.
+  const reusableGates = JSON.parse(confirmation.match(/REUSABLE_GATES:\s*'(?<list>\[[^']*\])'/)?.groups?.list ?? "null");
+  assert.ok(Array.isArray(reusableGates), "the aggregate must declare its reusable gates");
+  const alwaysRunGates = ["reuse-proof", "ci-configuration", "actionlint", "security-dependencies", "security-secrets", "security-filesystem"];
+  const proofCondition = "    needs: reuse-proof\n    if: ${{ !cancelled() && needs.reuse-proof.outputs.verified != 'true' }}\n";
+  for (const gateJob of definedJobs.filter((job) => job !== "release-gates")) {
+    const gate = workflowJob(gates, gateJob).replace(/\r\n/g, "\n");
+    const conditioned = gate.includes(proofCondition);
+    if (alwaysRunGates.includes(gateJob)) {
+      assert.ok(!conditioned && !reusableGates.includes(gateJob), `${gateJob} must always run`);
+      if (gateJob !== "reuse-proof") assert.doesNotMatch(gate, /reuse-proof/, `${gateJob} must not depend on proof reuse`);
+    } else {
+      assert.ok(conditioned, `${gateJob} must run unless proof reuse is verified`);
+      assert.equal((gate.match(/^    if:/gm) ?? []).length, 1, `${gateJob} must have exactly one job condition`);
+      if (!advisoryJobs.includes(gateJob)) assert.ok(reusableGates.includes(gateJob), `${gateJob} must be listed as reusable`);
+    }
+  }
+  assert.deepEqual(
+    [...reusableGates].sort(),
+    blockingJobs.filter((job) => !alwaysRunGates.includes(job)).sort(),
+  );
+
+  const proofJob = workflowJob(gates, "reuse-proof");
+  assert.match(
+    proofJob,
+    /^    permissions:\r?\n      contents: read\r?\n      pull-requests: read\r?\n      actions: read\r?\n      checks: read\r?$/m,
+  );
+  assert.doesNotMatch(proofJob, /: write\b|secrets\.|continue-on-error|\|\|\s*true\b/);
+  assert.match(proofJob, /verified:\s*\$\{\{\s*steps\.proof\.outputs\.verified\s*\}\}/);
+  const proofStep = workflowStep(proofJob, "Verify reusable gate proof for this exact tree");
+  assert.match(proofStep, /id: proof/);
+  assert.match(proofStep, /GITHUB_TOKEN:\s*\$\{\{\s*github\.token\s*\}\}/);
+  assert.match(proofStep, /run: node scripts\/ci\/release-gate-proof\.mjs/);
+
+  // The proof contract itself: production dispatches only, GitHub Actions
+  // app, the CI workflow, hosted runners, bounded age.
+  assert.equal(PRODUCTION_EVENT, "workflow_dispatch");
+  assert.equal(PRODUCTION_REF, "refs/heads/main");
+  assert.equal(AGGREGATE_CHECK_NAME, "release-gates / All required Hub release gates");
+  assert.equal(GITHUB_ACTIONS_APP_ID, 15368);
+  assert.equal(PROOF_WORKFLOW_PATH, ".github/workflows/ci.yml");
+  assert.deepEqual([...PROOF_EVENTS].sort(), ["pull_request", "push"]);
+  assert.equal(HOSTED_RUNNER_GROUP, "GitHub Actions");
+  assert.ok(MAX_PROOF_AGE_HOURS > 0 && MAX_PROOF_AGE_HOURS <= 72);
+  assert.match(aggregate, /^      - reuse-proof\r?$/m);
+
+  for (const path of [".github/workflows/ci.yml", ".github/workflows/prepare-production-image.yml", ".github/workflows/deploy.yml"]) {
+    const caller = workflowJob(readFileSync(resolve(root, path), "utf8"), "release-gates");
+    assert.match(
+      caller,
+      /^    permissions:\r?\n      contents: read\r?\n      pull-requests: read\r?\n      actions: read\r?\n      checks: read\r?$/m,
+      `${path} must grant the release gate only read permissions`,
+    );
+    assert.doesNotMatch(caller, /: write\b/);
+  }
 });
 
 test("the PHP server routes Daily SPA navigation through Laravel authentication", () => {

@@ -16,6 +16,37 @@ permissions:
   pull-requests: read
 
 jobs:
+  # PROPOSAL (requires owner approval): production-image and deployment
+  # dispatches from main may reuse a successful gate run for the identical git
+  # tree (see scripts/ci/release-gate-proof.mjs for every condition). Pull
+  # request and push runs never reuse anything. Security scans, the CI
+  # configuration guard, and actionlint always re-run. Any lookup failure or
+  # missing proof runs every gate as before.
+  reuse-proof:
+    name: Release gate proof reuse
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+      checks: read
+    outputs:
+      verified: ${{ steps.proof.outputs.verified }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Verify reusable gate proof for this exact tree
+        id: proof
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/ci/release-gate-proof.mjs
+
   ci-configuration:
     name: CI configuration guard
     runs-on: ubuntu-latest
@@ -41,6 +72,8 @@ jobs:
 
   php-quality:
     name: PHP and root frontend quality
+    needs: reuse-proof
+    if: ${{ !cancelled() && needs.reuse-proof.outputs.verified != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -102,6 +135,8 @@ jobs:
   # allowing unrelated existing debt to mask the candidate-scoped hard gate.
   repository-pint-debt:
     name: Repository-wide Pint debt (advisory)
+    needs: reuse-proof
+    if: ${{ !cancelled() && needs.reuse-proof.outputs.verified != 'true' }}
     runs-on: ubuntu-latest
     continue-on-error: true
     timeout-minutes: 20
@@ -126,6 +161,8 @@ jobs:
 
   static-analysis:
     name: PHPStan static analysis
+    needs: reuse-proof
+    if: ${{ !cancelled() && needs.reuse-proof.outputs.verified != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -159,6 +196,8 @@ jobs:
 
   phpunit-postgres:
     name: PHPUnit and PostgreSQL concurrency/integrity
+    needs: reuse-proof
+    if: ${{ !cancelled() && needs.reuse-proof.outputs.verified != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     services:
@@ -260,6 +299,8 @@ jobs:
   # every suite. Every job below is listed in the aggregate release-gates job.
   daily-contract-integrity:
     name: Daily Checkout contract and integrity
+    needs: reuse-proof
+    if: ${{ !cancelled() && needs.reuse-proof.outputs.verified != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -327,6 +368,8 @@ jobs:
 
   daily-authenticated-shell:
     name: Daily Checkout authenticated shell and Bid browsers
+    needs: reuse-proof
+    if: ${{ !cancelled() && needs.reuse-proof.outputs.verified != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -410,6 +453,8 @@ jobs:
 
   daily-authenticated-lifecycles:
     name: Daily Checkout member request and Operational Forms lifecycles
+    needs: reuse-proof
+    if: ${{ !cancelled() && needs.reuse-proof.outputs.verified != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -496,6 +541,8 @@ jobs:
   # project list, by scripts/ci/verify-daily-playwright-partition.mjs.
   daily-checkout-browser:
     name: Daily Checkout mocked Playwright (${{ matrix.lane }})
+    needs: reuse-proof
+    if: ${{ !cancelled() && needs.reuse-proof.outputs.verified != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:
@@ -558,6 +605,8 @@ jobs:
 
   generated-assets:
     name: Generated deployment assets
+    needs: reuse-proof
+    if: ${{ !cancelled() && needs.reuse-proof.outputs.verified != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -742,6 +791,8 @@ jobs:
   # as sufficient release evidence for the production runtime.
   php-85-compatibility:
     name: PHP 8.5 production-runtime compatibility
+    needs: reuse-proof
+    if: ${{ !cancelled() && needs.reuse-proof.outputs.verified != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     services:
@@ -834,6 +885,8 @@ jobs:
 
   ai-gateway-source:
     name: Canonical AI Gateway source and release safety
+    needs: reuse-proof
+    if: ${{ !cancelled() && needs.reuse-proof.outputs.verified != 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -892,6 +945,7 @@ jobs:
     name: All required Hub release gates
     if: ${{ !cancelled() }}
     needs:
+      - reuse-proof
       - ci-configuration
       - php-quality
       - static-analysis
@@ -910,14 +964,19 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
       - name: Confirm all required Hub release gates passed
         env:
           GATE_RESULTS: ${{ toJSON(needs) }}
-        run: |
-          set -euo pipefail
-          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<< "$GATE_RESULTS"
-          if ! jq -e 'length > 0 and all(.[]; .result == "success")' <<< "$GATE_RESULTS" > /dev/null; then
-            echo "One or more required Hub release gates did not succeed." >&2
-            exit 1
-          fi
-          echo "All required Hub release gates passed."
+          PROOF_VERIFIED: ${{ needs.reuse-proof.outputs.verified }}
+          REUSABLE_GATES: '["php-quality","static-analysis","phpunit-postgres","daily-contract-integrity","daily-authenticated-shell","daily-authenticated-lifecycles","daily-checkout-browser","generated-assets","php-85-compatibility","ai-gateway-source"]'
+        # A gate may be skipped only when reuse-proof verified a prior
+        # successful run for the identical tree, and only if it is listed in
+        # REUSABLE_GATES. Without verified proof every gate must succeed.
+        run: node scripts/ci/verify-release-gate-results.mjs
