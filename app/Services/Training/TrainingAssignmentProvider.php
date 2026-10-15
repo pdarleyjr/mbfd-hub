@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Training;
 
 use App\Models\Employee;
+use App\Models\EmployeeBidAssignment;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Validator;
@@ -17,6 +18,15 @@ class TrainingAssignmentProvider
     public function candidates(string $asOf): array
     {
         Validator::make(['as_of' => $asOf], ['as_of' => ['required', 'date_format:Y-m-d']])->validate();
+        $publishedBefore = CarbonImmutable::parse($asOf, 'America/New_York')->addDay()->startOfDay()->utc();
+        $published = EmployeeBidAssignment::query()->where('payload_version', 2)->where('created_at', '<', $publishedBefore)
+            ->where(fn ($query) => $query->whereNull('superseded_at')->orWhere('superseded_at', '>=', $publishedBefore));
+        $bidYear = (clone $published)->max('bid_year');
+        if ($bidYear === null) {
+            $this->unavailable();
+        }
+        $bidYear = (int) $bidYear;
+        $publishedAssignments = $published->where('bid_year', $bidYear)->get()->groupBy('employee_profile_id');
         $base = rtrim((string) config('training-roster.bid_api_url'), '/');
         $token = (string) config('services.bid.reader_token');
         if (! str_starts_with($base, 'https://') || $token === '') {
@@ -61,7 +71,6 @@ class TrainingAssignmentProvider
         $employees = Employee::query()->whereIn('employee_id', array_column($payload['members'], 'employee_id'))
             ->get(['id', 'employee_id', 'name', 'roster_status'])->groupBy('employee_id');
         $result = [];
-        $assignments = [];
         foreach ($payload['members'] as $member) {
             $matches = $employees->get($member['employee_id']);
             if ($matches !== null && $matches->count() !== 1) {
@@ -72,16 +81,32 @@ class TrainingAssignmentProvider
                 || $employee === null || $employee->roster_status !== 'active') {
                 continue;
             }
-            // Missing placement/name evidence requires the supervised exception flow.
-            if (blank($member['assignment_id']) || blank($member['assignment_source']) || blank($member['first_name'])
-                || blank($member['last_name']) || blank($member['rank']) || blank($member['shift']) || blank($member['effective_from'])) {
+            $matches = $publishedAssignments->get($employee->getKey());
+            if ($matches === null) {
                 continue;
             }
-            if ($member['effective_from'] > $asOf || ($member['effective_to'] !== null && $member['effective_to'] < $asOf)
-                || isset($assignments[$member['assignment_id']])) {
+            if ($matches->count() !== 1) {
                 $this->unavailable();
             }
-            $assignments[$member['assignment_id']] = true;
+            $assignment = $matches->firstOrFail();
+            if (Validator::make($assignment->getAttributes(), [
+                'term_label' => ['required', Rule::in([$bidYear.'–'.($bidYear + 1)])],
+                'shift_label' => ['required', Rule::in(['A Shift', 'B Shift', 'C Shift', 'D Shift', 'Days'])],
+                'assignment_source' => ['required', Rule::in(['bid_award', 'retained_nonbiddable'])],
+                'bid_session_id' => ['required', 'string', 'max:100'],
+                'source_sequence' => ['required', 'integer', 'min:0'],
+                'source_result_hash' => ['required', 'regex:/^[a-f0-9]{64}$/D'],
+                'source_workbook_sha256' => ['required', 'regex:/^[a-f0-9]{64}$/D'],
+                'payload_hash' => ['required', 'regex:/^[a-f0-9]{64}$/D'],
+            ])->fails()) {
+                $this->unavailable();
+            }
+            // Bid publishes the selected term/shift through the existing canonical
+            // receiver. Operational placement can still describe the previous bid.
+            // Only authoritative person names/rank come from the dated bridge.
+            if (blank($member['first_name']) || blank($member['last_name']) || blank($member['rank'])) {
+                continue;
+            }
             $result[] = [
                 'employee_profile_id' => (int) $employee->getKey(),
                 'employee_id' => (string) $employee->employee_id,
@@ -89,17 +114,24 @@ class TrainingAssignmentProvider
                 'last_name' => $member['last_name'],
                 'display_name' => (string) $employee->name,
                 'rank' => $member['rank'],
-                'shift' => $member['shift'],
-                'term_label' => $payload['term_label'] ?? 'Current assignment',
-                'assignment_source' => $member['assignment_source'],
-                'assignment_id' => $member['assignment_id'],
-                'effective_from' => $member['effective_from'],
-                'effective_to' => $member['effective_to'],
+                'shift' => $assignment->shift_label,
+                'term_label' => $assignment->term_label,
+                'assignment_source' => $assignment->assignment_source,
+                'assignment_id' => 'bid-published:'.$assignment->getKey(),
+                'assignment_basis' => 'published_bid_selection',
+                'bid_year' => $assignment->bid_year,
+                'bid_session_id' => $assignment->bid_session_id,
+                'source_sequence' => $assignment->source_sequence,
+                'source_result_hash' => $assignment->source_result_hash,
+                'source_workbook_sha256' => $assignment->source_workbook_sha256,
+                'published_payload_hash' => $assignment->payload_hash,
+                'effective_from' => null,
+                'effective_to' => null,
                 'as_of' => $asOf,
                 'source_generated_at' => $payload['generated_at'],
                 'source_updated_at' => $payload['source_updated_at'],
                 'source_employment_status' => $member['employment_status'],
-                'source_record_sha256' => hash('sha256', json_encode([$asOf, $member], JSON_THROW_ON_ERROR)),
+                'source_record_sha256' => hash('sha256', json_encode([$asOf, $member, $assignment->payload_hash], JSON_THROW_ON_ERROR)),
             ];
         }
         usort($result, static fn (array $a, array $b): int => strcasecmp($a['last_name'].' '.$a['first_name'].' '.$a['employee_id'], $b['last_name'].' '.$b['first_name'].' '.$b['employee_id']));
@@ -109,6 +141,6 @@ class TrainingAssignmentProvider
 
     private function unavailable(): never
     {
-        throw ValidationException::withMessages(['assignment' => 'Current assignments could not be verified. Ask the instructor for assistance.']);
+        throw ValidationException::withMessages(['assignment' => 'Published bid assignments could not be verified. Ask the instructor for assistance.']);
     }
 }

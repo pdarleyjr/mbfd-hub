@@ -30,8 +30,15 @@ Live read-only bridge validation found assigned personnel with Bid employment st
 ## Running or pending
 
 - Final candidate database-backed HTTP/domain/Livewire tests, historical assignment provider tests and existing personnel-signature regression.
-- Final spreadsheet visual inspection.
 - Required hosted release gates on the exact candidate, including PHPStan, security, existing regressions, PHP compatibility, generated assets and image qualification.
+
+## Published-bid clarification and final local checks
+
+The user's shift reminder clarified that sign-in must use the recent 2026–2027 bid selection. Live read-only comparison found 226 validated published Hub assignments (218 awards and eight retained assignments); 54 differed from older operational shifts and 21 had no comparable operational shift. The provider now uses the existing published Hub result for term/shift/provenance, with the authenticated bridge supplying person names/rank/employment only. No personnel or bid assignment records were modified.
+
+The rewritten provider passed 15 focused tests and 35 assertions, including publication/supersession, New York day boundaries, term advancement, selected versus older operational shift, retained assignments and fail-closed provenance. The screen-only reminder uses the published term dynamically and is absent from roster/export templates.
+
+Final PDF and actual LibreOffice-rendered XLSX pages passed visual inspection for normal, overflow, long-name and maximum metadata cases. The post-page-break targeted regression passed one test/24 assertions; the maximum metadata regression passed one test/seven assertions. The full export suite had previously passed 14 tests/577 assertions before those two narrow fixes. Final hosted regression remains the release gate.
 
 Local Windows dependency/class loading has shown substantial filesystem latency. Unfinished processes and partial logs are not accepted as successful checks. Task-local PHP configuration enables required extensions without altering global configuration. All test data is synthetic and confined to local disposable storage/databases; the supplied credential file was not loaded into tests.
 

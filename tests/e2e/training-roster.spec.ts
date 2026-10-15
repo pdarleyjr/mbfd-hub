@@ -3,8 +3,8 @@ import AxeBuilder from '@axe-core/playwright';
 
 const id = '01SYNTHETICTRAININGROSTER01';
 const members = [
-    { id: 1, first_name: 'Synthetic', last_name: 'Alpha', name: 'Synthetic Alpha', rank: 'Firefighter', shift: 'A Shift', term_label: 'Current assignment', identifier_hint: '0001' },
-    { id: 2, first_name: 'Synthetic', last_name: 'Bravo', name: 'Synthetic Bravo', rank: 'Lieutenant', shift: 'B Shift', term_label: 'Current assignment', identifier_hint: '0002' },
+    { id: 1, first_name: 'Synthetic', last_name: 'Alpha', name: 'Synthetic Alpha', rank: 'Firefighter', shift: 'A Shift', term_label: '2026–2027', identifier_hint: '0001' },
+    { id: 2, first_name: 'Synthetic', last_name: 'Bravo', name: 'Synthetic Bravo', rank: 'Lieutenant', shift: 'B Shift', term_label: '2026–2027', identifier_hint: '0002' },
 ];
 async function fixture(page: Page, options: { count?: number; lostResponse?: boolean; rejectOnce?: boolean; authorizeFailsOnce?: boolean } = {}) {
     let count = options.count ?? 0;
@@ -49,7 +49,9 @@ async function fixture(page: Page, options: { count?: number; lostResponse?: boo
 }
 async function selectAndSign(page: Page) {
     await page.getByRole('button', { name: /SIGN ROSTER/ }).click();
+    await expect(page.getByText('Use the shift you recently selected for the 2026–2027 bid, not your previous bid shift.', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'A Shift', exact: true }).click();
+    await expect(page.getByText(/not your previous bid shift/)).toHaveCount(0);
     await page.getByRole('button', { name: 'Firefighter', exact: true }).click();
     await expect(page.getByRole('button', { name: /Bravo/ })).toHaveCount(0);
     await page.getByRole('button', { name: /Alpha, Synthetic/ }).click();

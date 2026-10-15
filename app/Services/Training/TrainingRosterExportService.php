@@ -127,6 +127,9 @@ final class TrainingRosterExportService
         // rosters retain the original 16 rows; long names get complete taller rows.
         $rowHeight = $longestName > 28 ? ceil(($longestName + 4) / 14) * 9.6 : 18;
         $rowsPerPage = $longestName > 28 ? max(1, min(16, (int) floor(280 / ($rowHeight + 5)))) : 16;
+        if (max(mb_strlen($snapshot['session']['course_name']), mb_strlen($snapshot['session']['location'] ?? '')) > 120) {
+            $rowsPerPage = min($rowsPerPage, 12);
+        }
 
         return [
             'session' => $snapshot['session'],

@@ -173,6 +173,22 @@ final class TrainingRosterExportTest extends TestCase
         }
     }
 
+    public function test_maximum_metadata_with_ordinary_names_keeps_the_footer_with_each_roster(): void
+    {
+        $version = $this->version(16, true);
+        $snapshot = $version->snapshot;
+        $snapshot['session']['course_name'] = str_repeat('W', 200);
+        $snapshot['session']['location'] = str_repeat('W', 255);
+        $longVersion = TrainingRosterVersion::query()->create(['training_session_id' => $version->training_session_id, 'revision' => 2, 'snapshot' => $snapshot]);
+        $pdf = (new Parser)->parseContent(app(TrainingRosterExportService::class)->bytes($longVersion, 'pdf'));
+        self::assertCount(2, $pdf->getPages());
+        foreach ($pdf->getPages() as $index => $page) {
+            self::assertStringContainsString('COURSE NAME:', $page->getText());
+            self::assertStringContainsString('SYNTHETIC OIC', $page->getText());
+            self::assertStringContainsString('Page '.($index + 1).' of 2', $page->getText());
+        }
+    }
+
     private function version(int $count, bool $certified): TrainingRosterVersion
     {
         $user = User::factory()->create();
