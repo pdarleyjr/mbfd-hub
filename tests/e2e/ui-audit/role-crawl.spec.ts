@@ -70,6 +70,8 @@ function sourceRedirect(persona: string, from: string, to: string): boolean {
     '/employee': '/employee/dashboard', '/admin/personnel-uniforms-equipment': '/admin/personnel-uniforms-equipment/overview',
     '/daily': '/daily/stations', '/daily/forms-hub/big-ticket-request': '/daily/forms-hub/station-request',
     '/daily/forms-hub/equipment-request': '/daily/forms-hub/station-request',
+    // SessionResultsPage::mount sends someone with several workgroups and no choice to the chooser.
+    '/workgroups/session-results': '/workgroups',
   };
   return destinations[from] === to;
 }
