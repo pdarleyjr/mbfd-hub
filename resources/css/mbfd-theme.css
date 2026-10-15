@@ -176,6 +176,17 @@ body:has(.identity-strip, .fi-simple-layout) {
     --hub-duration-slow: 240ms;
 
     --hub-gutter: 16px;
+
+    /*
+     * Report chart series on light surfaces. Every series is at least 3:1 against white
+     * (WCAG 1.4.11); labels and grid lines use the secondary-text and border tokens.
+     */
+    --hub-chart-1: var(--hub-header);
+    --hub-chart-2: var(--hub-domain-logistics);
+    --hub-chart-3: var(--hub-gold);
+    --hub-chart-4: var(--hub-n-400);
+    --hub-chart-grid: var(--hub-n-200);
+    --hub-chart-label: var(--hub-n-600);
 }
 
 @media (min-width: 640px) {

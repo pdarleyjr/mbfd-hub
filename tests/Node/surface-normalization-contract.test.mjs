@@ -19,6 +19,14 @@ const normalisedViews = [
   ...uniformViews(),
 ];
 
+/* Workgroup report decks render on the light Hub surfaces; chart colours come from mbfd-theme.css. */
+function reportDeckViews() {
+  return [
+    'resources/views/workgroup/analysis-report.blade.php',
+    'resources/views/workgroup/final-presentation.blade.php',
+  ];
+}
+
 /* Views moved onto shared stylesheets: no page-private <style> blocks either. */
 function uniformViews() {
   return [
@@ -26,8 +34,63 @@ function uniformViews() {
     'resources/views/filament/employee/pages/my-requests.blade.php',
     'resources/views/filament/clusters/personnel-uniforms-equipment/pages/overview.blade.php',
     'resources/views/filament/clusters/personnel-uniforms-equipment/resources/employee-record.blade.php',
+    ...reportDeckViews(),
   ];
 }
+
+const arbitraryColourUtility = /\b(?:[a-z0-9-]+:)*(?:bg|text|border(?:-[lrtbxy])?|from|via|to|ring)-\[(?:#|rgb)/;
+const rawGreyUtility = /\b(?:[a-z0-9-]+:)*(?:bg|text|border)-(?:gray|slate|neutral|zinc)-\d{2,3}\b/;
+
+for (const view of reportDeckViews()) {
+  test(`${view} uses the light Hub design system with token-driven charts`, () => {
+    const source = readFileSync(view, 'utf8');
+    assert.doesNotMatch(source, arbitraryColourUtility, 'no arbitrary hex/rgb Tailwind colour utilities');
+    assert.doesNotMatch(source, rawGreyUtility, 'secondary text uses hub-* tokens, not raw grey families');
+    assert.doesNotMatch(source, /rgba?\(\s*\d/, 'no literal rgb() colours in chart code');
+    assert.doesNotMatch(source, /(?:linear|radial)-gradient|bg-gradient-to-|backdrop-blur/, 'no gradients or blur on working surfaces');
+    assert.doesNotMatch(source, /black\.css/, 'the dark Reveal theme is not loaded');
+    assert.doesNotMatch(source, /text-hub-muted\b/, 'muted slate fails AA on glass; use hub-ink-secondary');
+    assert.match(source, /\bhub-panel\b/, 'sections use the shared glass panel');
+    assert.match(source, /--hub-chart-1/, 'chart series read their colours from the theme tokens');
+  });
+}
+
+test('chart series tokens live in mbfd-theme.css and alias existing Hub colours', () => {
+  const theme = readFileSync('resources/css/mbfd-theme.css', 'utf8');
+  for (const token of ['--hub-chart-1', '--hub-chart-2', '--hub-chart-3', '--hub-chart-4', '--hub-chart-grid', '--hub-chart-label']) {
+    assert.match(theme, new RegExp(`${token}:\\s*var\\(--hub-[a-z0-9-]+\\);`), `${token} aliases a Hub token`);
+  }
+});
+
+test('the dark report-deck overrides are gone from the shared stylesheets', () => {
+  const app = readFileSync('resources/css/app.css', 'utf8');
+  const portals = readFileSync('resources/css/filament/hub-portals-v2.css', 'utf8');
+  for (const [name, css] of [['app.css', app], ['hub-portals-v2.css', portals]]) {
+    assert.doesNotMatch(css, /hub-report--(?:analysis-report|final-presentation)[^{]*\{[^}]*background(?:-color)?:\s*rgb\(var\(--hub-header/, `${name}: report decks no longer paint the navy canvas`);
+  }
+  assert.match(app, /@import '\.\/report-deck\.css';/, 'app.css loads the shared report-deck stylesheet');
+});
+
+/* One brand across the four Filament panels: identical name, mark, favicon, palette, font and theme. */
+test('all four Filament panel providers share one brand configuration', () => {
+  const providers = ['Admin', 'Employee', 'Training', 'Workgroup'].map((panel) => `app/Providers/Filament/${panel}PanelProvider.php`);
+  const brandCalls = ['brandName', 'brandLogo', 'brandLogoHeight', 'favicon', 'darkMode', 'colors', 'font', 'viteTheme'];
+  const configOf = (source) => Object.fromEntries(brandCalls.map((call) => {
+    const match = new RegExp(`->${call}\\((.*)\\)\\s*$`, 'm').exec(source);
+    return [call, match?.[1]?.trim() ?? null];
+  }));
+
+  const [reference, ...others] = providers.map((path) => ({ path, config: configOf(readFileSync(path, 'utf8')) }));
+  for (const call of brandCalls) {
+    assert.ok(reference.config[call], `${reference.path} declares ->${call}()`);
+  }
+  assert.equal(reference.config.brandName, "'MBFD Hub'");
+  assert.equal(reference.config.darkMode, 'false');
+  assert.match(reference.config.brandLogo, /components\.hub\.brand/);
+  for (const { path, config } of others) {
+    assert.deepEqual(config, reference.config, `${path} matches the Admin panel brand configuration`);
+  }
+});
 
 for (const view of uniformViews()) {
   test(`${view} has no page-private style block`, () => {
@@ -47,6 +110,8 @@ for (const view of normalisedViews) {
 const normalisedStylesheets = [
   'resources/css/filament/uniform-order-builder.css',
   'resources/css/filament/admin/pages/personnel-uniforms.css',
+  'resources/css/filament/hub-portals-v2.css',
+  'resources/css/report-deck.css',
 ];
 
 for (const sheet of normalisedStylesheets) {

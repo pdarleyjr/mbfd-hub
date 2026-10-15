@@ -2,164 +2,76 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2026 Technical Product Comparison Analysis - Extrication & Apparatus</title>
+    <x-hub.head />
+    <title>2026 Technical Product Comparison Analysis · MBFD Hub</title>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <style>
-        
-        /* * PALETTE SELECTION: "Deep Tech / Analytical"
-         * Navy: #0B132B | Slate: #1C2541 | Steel: #3A506B
-         * Vibrant Cyan: #00B4D8 | Electric Mint: #48E5C2 | Alert Coral: #FF5A5F
-         */
-        
-        body { 
-            font-family: var(--hub-font-sans);
-            background-color: #0B132B; 
-            color: #F8FAFC; 
-            overflow-x: hidden;
-        }
-        
-        h1, h2, h3, h4, h5 { 
-            font-family: var(--hub-font-sans);
-            text-transform: uppercase; 
-        }
-        
-        .glass-panel { 
-            background: linear-gradient(145deg, rgba(28, 37, 65, 0.9), rgba(11, 19, 43, 0.95));
-            border: 1px solid #3A506B; 
-            box-shadow: 0 15px 35px rgba(0,0,0,0.6); 
-            border-radius: 1rem;
-        }
-
-        .highlight-text {
-            background: -webkit-linear-gradient(45deg, #00B4D8, #48E5C2);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            font-weight: 800;
-        }
-
-        .metric-score {
-            font-family: var(--hub-font-sans);
-            font-weight: 700;
-            color: #48E5C2;
-            text-shadow: 0 0 15px rgba(72, 229, 194, 0.4);
-        }
-
-        .icon-box {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            width: 50px;
-            height: 50px;
-            border-radius: 12px;
-            background: linear-gradient(135deg, #1C2541, #3A506B);
-            color: #00B4D8;
-            font-size: 24px;
-            border: 1px solid rgba(0, 180, 216, 0.3);
-        }
-
-        /* Mandatory Chart Container Constraints */
-        .chart-container { 
-            position: relative; 
-            width: 100%; 
-            max-width: 800px; 
-            margin-left: auto; 
-            margin-right: auto; 
-            height: 350px; 
-            max-height: 400px; 
-        }
-        
-        .chart-container-large { 
-            position: relative; 
-            width: 100%; 
-            max-width: 1000px; 
-            margin-left: auto; 
-            margin-right: auto; 
-            height: 450px; 
-            max-height: 500px; 
-        }
-
-        @media (max-width: 768px) { 
-            .chart-container { height: 280px; } 
-            .chart-container-large { height: 350px; } 
-        }
-    </style>
     @vite(['resources/css/app.css'])
 </head>
-<body data-hub-ui="2" data-hub-portal="report" class="hub-report hub-report--analysis-report antialiased selection:bg-[#00B4D8] selection:text-white">
+<body data-hub-ui="2" data-hub-portal="report" class="hub-report hub-report--analysis-report antialiased">
     <div class="hub-report-navigation"><x-hub-header back-href="/workgroups/links" back-label="Back to Workgroup Links" max-width="max-w-7xl" /></div>
 
-    <!-- Navigation -->
-    <nav class="sticky top-0 z-50 bg-[#0B132B]/90 backdrop-blur-md border-b border-[#3A506B] px-6 py-4">
-        <div class="max-w-7xl mx-auto flex justify-between items-center">
-            <div class="flex items-center gap-4">
-                <div class="icon-box">&#9881;</div>
-                <div>
-                    <p class="text-xl md:text-2xl text-white tracking-widest leading-none">TECHNICAL EVALUATION <span class="text-[#00B4D8]">COMMAND</span></p>
-                    <span class="text-xs text-[#48E5C2] tracking-widest font-mono">Q1 2026 WORKGROUP REPORT</span>
-                </div>
+    <nav class="report-deck-nav px-4 py-3 sm:px-6" aria-label="Report sections">
+        <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-x-8 gap-y-2">
+            <div>
+                <p class="report-deck-heading">Technical Evaluation Command</p>
+                <p class="report-deck-eyebrow">Q1 2026 Workgroup Report</p>
             </div>
-            <div class="hidden lg:flex gap-8 text-sm font-semibold tracking-widest text-[#94A3B8]">
-                <a href="#executive" class="hover:text-[#00B4D8] transition-colors">EXECUTIVE BRIEF</a>
-                <a href="#brands" class="hover:text-[#00B4D8] transition-colors">MANUFACTURER MATRIX</a>
-                <a href="#tools" class="hover:text-[#00B4D8] transition-colors">FRONTLINE ASSETS</a>
-                <a href="#saws" class="hover:text-[#00B4D8] transition-colors">BREACHING & SAWS</a>
+            <div class="flex flex-wrap gap-x-6">
+                <a href="#executive">Executive brief</a>
+                <a href="#brands">Manufacturer matrix</a>
+                <a href="#tools">Frontline assets</a>
+                <a href="#saws">Breaching &amp; saws</a>
             </div>
         </div>
     </nav>
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-16">
+    <main class="mx-auto max-w-7xl space-y-12 px-4 py-10 sm:px-6 lg:px-8">
 
         <!-- Executive Summary -->
-        <section id="executive" class="glass-panel p-8 md:p-12 relative overflow-hidden">
-            <div class="absolute -top-32 -right-32 w-96 h-96 rounded-full bg-[#00B4D8] opacity-10 blur-[100px]"></div>
-            <div class="absolute -bottom-32 -left-32 w-96 h-96 rounded-full bg-[#48E5C2] opacity-10 blur-[100px]"></div>
-            
-            <div class="relative z-10 grid grid-cols-1 lg:grid-cols-3 gap-12 items-center">
+        <section id="executive" class="hub-panel p-6 md:p-10">
+            <div class="grid grid-cols-1 items-center gap-10 lg:grid-cols-3">
                 <div class="lg:col-span-2">
-                    <h2 class="text-[#00B4D8] tracking-widest text-sm mb-3 font-bold border-l-4 border-[#00B4D8] pl-3">FULL TECHNICAL PRODUCT COMPARISON ANALYSIS</h2>
-                    <h1 class="text-4xl md:text-5xl font-bold text-white mb-6 leading-tight uppercase">
-                        2026 Apparatus & Extrication <br> Performance Assessment
+                    <h2 class="report-deck-eyebrow mb-3">Full Technical Product Comparison Analysis</h2>
+                    <h1 class="mb-6 text-3xl font-bold leading-tight text-hub-header md:text-4xl">
+                        2026 Apparatus &amp; Extrication Performance Assessment
                     </h1>
-                    <p class="text-lg text-[#CBD5E1] leading-relaxed mb-6">
+                    <p class="report-deck-body mb-4">
                         This executive-level report delivers the definitive technical evaluation of next-generation fire apparatus, forcible entry equipment, vehicle stabilization systems, and battery-operated extrication tools. Conducted by a highly specialized workgroup of municipal fire and rescue professionals during the first quarter of 2026, this analysis represents a rigorous, hands-on operational assessment.
                     </p>
-                    <p class="text-lg text-[#CBD5E1] leading-relaxed">
+                    <p class="report-deck-body">
                         Data presented in this document reflects absolute, uncompromised tactical capabilities. The workgroup meticulously measured each asset against four stringent criteria: <strong>Capability, Usability, Maintainability, and Deployability</strong>. The resulting performance scores isolate pure engineering excellence and field reliability, providing command staff with an unambiguous roadmap for outfitting frontline responders with top-tier equipment.
                     </p>
                 </div>
-                
-                <div class="flex flex-col gap-6">
-                    <div class="bg-[#1C2541]/80 border border-[#3A506B] p-6 rounded-xl relative overflow-hidden group hover:border-[#48E5C2] transition-colors">
-                        <div class="absolute top-0 left-0 w-1 h-full bg-[#48E5C2]"></div>
-                        <div class="text-[#94A3B8] text-xs uppercase tracking-widest mb-1">Highest Brand Performance Avg</div>
-                        <div class="text-4xl metric-score">90.72</div>
-                        <div class="text-white font-bold mt-1 text-sm tracking-wider">HOLMATRO</div>
+
+                <div class="flex flex-col gap-4">
+                    <div class="hub-well p-5">
+                        <div class="report-deck-eyebrow mb-1">Highest Brand Performance Avg</div>
+                        <div class="report-deck-metric report-deck-metric--lead">90.72</div>
+                        <div class="mt-1 text-sm font-bold text-hub-ink">HOLMATRO</div>
                     </div>
-                    <div class="bg-[#1C2541]/80 border border-[#3A506B] p-6 rounded-xl relative overflow-hidden group hover:border-[#00B4D8] transition-colors">
-                        <div class="absolute top-0 left-0 w-1 h-full bg-[#00B4D8]"></div>
-                        <div class="text-[#94A3B8] text-xs uppercase tracking-widest mb-1">Highest Single Tool Score</div>
-                        <div class="text-4xl metric-score text-[#00B4D8]">92.02</div>
-                        <div class="text-white font-bold mt-1 text-sm tracking-wider">PSP40 SPREADER</div>
+                    <div class="hub-well p-5">
+                        <div class="report-deck-eyebrow mb-1">Highest Single Tool Score</div>
+                        <div class="report-deck-metric">92.02</div>
+                        <div class="mt-1 text-sm font-bold text-hub-ink">PSP40 SPREADER</div>
                     </div>
                 </div>
             </div>
         </section>
 
         <!-- Brand Manufacturer Analysis -->
-        <section id="brands" class="space-y-8">
-            <div class="border-b border-[#3A506B] pb-4 flex items-end justify-between">
+        <section id="brands" class="space-y-6">
+            <div class="report-deck-section-head flex items-end justify-between gap-4">
                 <div>
-                    <h2 class="text-3xl text-white">MANUFACTURER PERFORMANCE MATRIX</h2>
-                    <p class="text-[#94A3B8] mt-2 max-w-2xl">
+                    <h2 class="report-deck-title">Manufacturer Performance Matrix</h2>
+                    <p class="report-deck-body mt-2 max-w-2xl">
                         Aggregated operational scores for the top extrication brands. Averages are strictly derived from the performance of the mandatory frontline tactical triad: 32-inch Spreader, Cutter, and Ram platforms.
                     </p>
                 </div>
-                <div class="hidden md:block icon-box text-[#48E5C2] border-[#48E5C2]/30">&#128202;</div>
+                <x-heroicon-o-chart-bar class="report-deck-icon hidden md:block" aria-hidden="true" />
             </div>
 
-            <div class="glass-panel p-6 md:p-8">
+            <div class="hub-panel p-6 md:p-8">
                 <div class="chart-container">
                     <canvas id="brandChart" role="img" aria-label="Manufacturer performance comparison" aria-describedby="analysis-brand-description">Manufacturer performance comparison</canvas>
                 </div>
@@ -176,16 +88,16 @@
                         </tbody>
                     </table>
                 </div>
-                <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="bg-[#0B132B]/50 p-5 rounded-lg border-l-4 border-l-[#48E5C2]">
-                        <h4 class="text-white font-bold tracking-wide mb-2 uppercase text-sm">Tier 1 Leadership</h4>
-                        <p class="text-sm text-[#CBD5E1] leading-relaxed">
+                <div class="mt-8 grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div class="hub-well p-5">
+                        <h3 class="report-deck-heading mb-2">Tier 1 Leadership</h3>
+                        <p class="report-deck-body text-sm">
                             <strong>Holmatro</strong> achieved the highest overall technical standing across the workgroup evaluation, demonstrating exceptional engineering in usability and maintainability. <strong>Hurst</strong> follows closely, maintaining a formidable presence in the Tier 1 category with highly capable and deployable systems.
                         </p>
                     </div>
-                    <div class="bg-[#0B132B]/50 p-5 rounded-lg border-l-4 border-l-[#3A506B]">
-                        <h4 class="text-white font-bold tracking-wide mb-2 uppercase text-sm">Tier 2 Standing</h4>
-                        <p class="text-sm text-[#CBD5E1] leading-relaxed">
+                    <div class="hub-well p-5">
+                        <h3 class="report-deck-heading mb-2">Tier 2 Standing</h3>
+                        <p class="report-deck-body text-sm">
                             <strong>TNT</strong> and <strong>Amkus</strong> recorded operational averages in the mid-70s. While functionally adequate, workgroup feedback indicated notable performance gaps in maintainability and high-stress usability when compared directly against Tier 1 equivalents.
                         </p>
                     </div>
@@ -194,15 +106,15 @@
         </section>
 
         <!-- Frontline Tools Breakdown -->
-        <section id="tools" class="space-y-8">
-            <div class="border-b border-[#3A506B] pb-4">
-                <h2 class="text-3xl text-white">FRONTLINE ASSET BREAKDOWN</h2>
-                <p class="text-[#94A3B8] mt-2">
+        <section id="tools" class="space-y-6">
+            <div class="report-deck-section-head">
+                <h2 class="report-deck-title">Frontline Asset Breakdown</h2>
+                <p class="report-deck-body mt-2">
                     A granular comparison of the top-performing individual tools across the core extrication categories (Spreaders, Cutters, Rams) as evaluated by the specialized workgroup.
                 </p>
             </div>
 
-            <div class="glass-panel p-6 md:p-8">
+            <div class="hub-panel p-6 md:p-8">
                 <div class="chart-container-large">
                     <canvas id="toolsCategoryChart" role="img" aria-label="Tool category performance comparison" aria-describedby="analysis-tools-description">Tool category performance comparison</canvas>
                 </div>
@@ -218,26 +130,26 @@
                         </tbody>
                     </table>
                 </div>
-                
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-10">
-                    <div class="border border-[#3A506B] rounded-xl p-6 bg-gradient-to-b from-[#1C2541] to-[#0B132B]">
-                        <div class="text-[#00B4D8] text-2xl mb-2">&#128295;</div>
-                        <h3 class="text-white font-bold text-lg mb-3">SPREADER PLATFORMS</h3>
-                        <p class="text-sm text-[#A0AEC0] leading-relaxed">
+
+                <div class="mt-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <div class="hub-well p-5">
+                        <x-heroicon-o-wrench-screwdriver class="report-deck-icon mb-2" aria-hidden="true" />
+                        <h3 class="report-deck-heading mb-3">Spreader Platforms</h3>
+                        <p class="report-deck-body text-sm">
                             The <strong>Holmatro PSP40</strong> (92.02) set the benchmark for the entire evaluation, achieving near-perfect marks in speed, precision, and operator feedback. The <strong>Hurst SP 777 E3</strong> (90.99) performed exceptionally well, confirming its status as a highly reliable heavy-duty extrication asset.
                         </p>
                     </div>
-                    <div class="border border-[#3A506B] rounded-xl p-6 bg-gradient-to-b from-[#1C2541] to-[#0B132B]">
-                        <div class="text-[#48E5C2] text-2xl mb-2">&#9986;</div>
-                        <h3 class="text-white font-bold text-lg mb-3">CUTTER PLATFORMS</h3>
-                        <p class="text-sm text-[#A0AEC0] leading-relaxed">
+                    <div class="hub-well p-5">
+                        <x-heroicon-o-scissors class="report-deck-icon mb-2" aria-hidden="true" />
+                        <h3 class="report-deck-heading mb-3">Cutter Platforms</h3>
+                        <p class="report-deck-body text-sm">
                             The <strong>Holmatro PCU30CL</strong> (88.86) established a commanding lead in the cutting category, excelling in modern high-strength steel vehicle anatomy. The <strong>Hurst S 789 E3</strong> (82.57) delivered powerful baseline capabilities but tracked lower in ergonomic usability under continuous load.
                         </p>
                     </div>
-                    <div class="border border-[#3A506B] rounded-xl p-6 bg-gradient-to-b from-[#1C2541] to-[#0B132B]">
-                        <div class="text-[#00B4D8] text-2xl mb-2">&#9874;</div>
-                        <h3 class="text-white font-bold text-lg mb-3">RAM PLATFORMS</h3>
-                        <p class="text-sm text-[#A0AEC0] leading-relaxed">
+                    <div class="hub-well p-5">
+                        <x-heroicon-o-wrench class="report-deck-icon mb-2" aria-hidden="true" />
+                        <h3 class="report-deck-heading mb-3">Ram Platforms</h3>
+                        <p class="report-deck-body text-sm">
                             The <strong>Holmatro PRA40</strong> (91.29) dominated the ram evaluations, specifically achieving a 95.00 in operator Usability. <strong>Hurst's CR 522 E3</strong> (86.02) proved to be a highly rugged alternative, favored for its watertight saltwater deployment capabilities.
                         </p>
                     </div>
@@ -246,10 +158,10 @@
         </section>
 
         <!-- Saws and Breaching -->
-        <section id="saws" class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div class="glass-panel p-8 flex flex-col">
-                <h2 class="text-2xl text-white border-b border-[#3A506B] pb-3 mb-6">BATTERY FORCIBLE ENTRY SAWS</h2>
-                <p class="text-[#94A3B8] text-sm mb-6 flex-grow">
+        <section id="saws" class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div class="hub-panel flex flex-col p-6 md:p-8">
+                <h2 class="report-deck-title report-deck-section-head mb-6">Battery Forcible Entry Saws</h2>
+                <p class="report-deck-body mb-6 flex-grow text-sm">
                     Workgroup evaluation of battery-operated rotary cut-off saws for rapid breaching, concrete, and metal cutting. The assessment revealed a massive divergence in operational effectiveness between the leading 12-inch platform and competing 14-inch models.
                 </p>
                 <div class="chart-container">
@@ -270,17 +182,17 @@
             </div>
 
             <div class="flex flex-col gap-6">
-                <div class="glass-panel p-8 border-l-4 border-l-[#48E5C2] flex-1 flex flex-col justify-center">
-                    <div class="text-[#48E5C2] font-bold tracking-widest text-xs uppercase mb-2">Category Leader</div>
-                    <h3 class="text-3xl text-white font-bold mb-2">DEWALT 12-INCH <span class="text-xl font-normal text-[#94A3B8]">(DCPS612AG2)</span></h3>
-                    <div class="text-5xl metric-score my-4">91.25</div>
-                    <p class="text-[#CBD5E1] text-sm leading-relaxed">
+                <div class="hub-panel flex flex-1 flex-col justify-center p-6 md:p-8">
+                    <span class="hub-tag hub-tag--success mb-3 self-start">Category Leader</span>
+                    <h3 class="report-deck-title mb-2">DEWALT 12-INCH <span class="text-lg font-normal text-hub-ink-secondary">(DCPS612AG2)</span></h3>
+                    <div class="report-deck-metric report-deck-metric--lead my-4">91.25</div>
+                    <p class="report-deck-body text-sm">
                         The Dewalt platform established absolute superiority in this category. Evaluators scored it an unprecedented <strong>96.00 in Capability</strong> and <strong>92.00 in Deployability</strong>. Despite the smaller 12-inch blade diameter, its gear-driven power delivery, superior ergonomics, and immediate operational readiness rendered the larger 14-inch competitors functionally obsolete in high-speed tactical scenarios.
                     </p>
                 </div>
-                <div class="glass-panel p-6 border-l-4 border-l-[#3A506B] flex-none">
-                    <h3 class="text-xl text-white font-bold mb-2">MAKITA &amp; HUSQVARNA 14"</h3>
-                    <p class="text-[#94A3B8] text-sm leading-relaxed">
+                <div class="hub-panel flex-none p-6">
+                    <h3 class="report-deck-heading mb-2">MAKITA &amp; HUSQVARNA 14"</h3>
+                    <p class="report-deck-body text-sm">
                         The Makita GEC01PL4 (64.83) and Husqvarna K1 Pace (61.78) struggled significantly in workgroup evaluations. Evaluators noted substantial penalties in Deployability and Usability due to excessive bulk, balance issues, and slower power spin-up times compared to the Dewalt.
                     </p>
                 </div>
@@ -288,66 +200,65 @@
         </section>
 
         <!-- Stabilization & Standalone -->
-        <section class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            
+        <section class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+
             <!-- Stabilization -->
-            <div class="lg:col-span-1 glass-panel p-8">
-                <h2 class="text-xl text-white border-b border-[#3A506B] pb-3 mb-6">VEHICLE STABILIZATION</h2>
-                <p class="text-[#94A3B8] text-sm mb-6">
+            <div class="hub-panel p-6 md:p-8 lg:col-span-1">
+                <h2 class="report-deck-heading report-deck-section-head mb-6">Vehicle Stabilization</h2>
+                <p class="report-deck-body mb-6 text-sm">
                     Operational evaluation metrics for structural and vehicle stabilization systems, testing rapid deployment and load-bearing security.
                 </p>
-                <div class="space-y-4">
-                    <div class="bg-[#1C2541] p-4 rounded-lg border border-[#00B4D8]/30 flex justify-between items-center">
+                <ol class="space-y-3">
+                    <li class="hub-well flex items-center justify-between gap-4 p-4">
                         <div>
-                            <div class="text-[#00B4D8] text-xs font-bold tracking-wider">RANK 1</div>
-                            <div class="text-white font-bold">Holmatro V-Strut</div>
+                            <div class="report-deck-eyebrow">Rank 1</div>
+                            <div class="font-bold text-hub-ink">Holmatro V-Strut</div>
                         </div>
-                        <div class="text-2xl font-mono text-[#48E5C2] font-bold">87.28</div>
-                    </div>
-                    <div class="bg-[#1C2541] p-4 rounded-lg border border-[#3A506B] flex justify-between items-center">
+                        <div class="report-deck-metric report-deck-metric--sm report-deck-metric--lead">87.28</div>
+                    </li>
+                    <li class="hub-well flex items-center justify-between gap-4 p-4">
                         <div>
-                            <div class="text-[#94A3B8] text-xs font-bold tracking-wider">RANK 2</div>
-                            <div class="text-white font-bold">Holmatro OmniShore</div>
+                            <div class="report-deck-eyebrow">Rank 2</div>
+                            <div class="font-bold text-hub-ink">Holmatro OmniShore</div>
                         </div>
-                        <div class="text-2xl font-mono text-white font-bold">85.87</div>
-                    </div>
-                    <div class="bg-[#1C2541] p-4 rounded-lg border border-[#3A506B] flex justify-between items-center">
+                        <div class="report-deck-metric report-deck-metric--sm">85.87</div>
+                    </li>
+                    <li class="hub-well flex items-center justify-between gap-4 p-4">
                         <div>
-                            <div class="text-[#94A3B8] text-xs font-bold tracking-wider">RANK 3</div>
-                            <div class="text-white font-bold">Paratech Strut Driver</div>
+                            <div class="report-deck-eyebrow">Rank 3</div>
+                            <div class="font-bold text-hub-ink">Paratech Strut Driver</div>
                         </div>
-                        <div class="text-2xl font-mono text-white font-bold">76.13</div>
-                    </div>
-                </div>
+                        <div class="report-deck-metric report-deck-metric--sm">76.13</div>
+                    </li>
+                </ol>
             </div>
 
             <!-- Standalone Assets -->
-            <div class="lg:col-span-2 glass-panel p-8 relative overflow-hidden">
-                <div class="absolute top-0 right-0 p-8 text-8xl opacity-5 text-[#3A506B] font-bold">&#9888;</div>
-                <h2 class="text-2xl text-white border-b border-[#3A506B] pb-3 mb-6 relative z-10">SPECIALIZED TACTICAL ASSETS</h2>
-                <p class="text-[#94A3B8] text-sm mb-8 relative z-10">
+            <div class="hub-panel p-6 md:p-8 lg:col-span-2">
+                <h2 class="report-deck-title report-deck-section-head mb-6">Specialized Tactical Assets</h2>
+                <p class="report-deck-body mb-8 text-sm">
                     The workgroup isolated two specific tools for standalone analysis. Due to their unique engineering, dimensions, and tactical deployment profiles, comparing them against standard frontline tools yields mathematically inaccurate capability assessments.
                 </p>
-                
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
-                    <div class="bg-[#0B132B]/80 p-6 rounded-xl border border-[#00B4D8]/50">
-                        <div class="flex justify-between items-start mb-4">
-                            <h3 class="text-xl text-white font-bold">HOLMATRO T1</h3>
-                            <span class="bg-[#00B4D8]/20 text-[#00B4D8] text-xs px-2 py-1 rounded font-bold">SCORE: 82.23</span>
+
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div class="hub-well p-5">
+                        <div class="mb-4 flex flex-wrap items-start justify-between gap-2">
+                            <h3 class="report-deck-heading">HOLMATRO T1</h3>
+                            <span class="hub-tag hub-tag--info">SCORE: 82.23</span>
                         </div>
-                        <h4 class="text-xs text-[#48E5C2] uppercase tracking-widest mb-2">Multi-Purpose Forcible Entry</h4>
-                        <p class="text-sm text-[#CBD5E1] leading-relaxed">
+                        <h4 class="report-deck-eyebrow mb-2">Multi-Purpose Forcible Entry</h4>
+                        <p class="report-deck-body text-sm">
                             The T1 is an all-in-one breaching solution (cut, wedge, ram, spread, hammer). It scored a massive <strong>88.13 in Deployability</strong>. Workgroup consensus strongly recommends the T1 for rapid entry teams dealing with inward/outward doors and heavy rebar, operating outside standard extrication parameters.
                         </p>
                     </div>
 
-                    <div class="bg-[#0B132B]/80 p-6 rounded-xl border border-[#3A506B]">
-                        <div class="flex justify-between items-start mb-4">
-                            <h3 class="text-xl text-white font-bold">HURST M40</h3>
-                            <span class="bg-[#3A506B]/50 text-white text-xs px-2 py-1 rounded font-bold">SCORE: 78.80</span>
+                    <div class="hub-well p-5">
+                        <div class="mb-4 flex flex-wrap items-start justify-between gap-2">
+                            <h3 class="report-deck-heading">HURST M40</h3>
+                            <span class="hub-tag">SCORE: 78.80</span>
                         </div>
-                        <h4 class="text-xs text-[#94A3B8] uppercase tracking-widest mb-2">40-Inch Heavy Spreader</h4>
-                        <p class="text-sm text-[#CBD5E1] leading-relaxed">
+                        <h4 class="report-deck-eyebrow mb-2">40-Inch Heavy Spreader</h4>
+                        <p class="report-deck-body text-sm">
                             While possessing raw power (Capability: 83.39), the M40's immense physical footprint severely limits its standard Usability (79.29). The workgroup determined this is a highly specialized asset intended for heavy rescue apparatus, and should not be deployed as a primary tool on standard frontline engines.
                         </p>
                     </div>
@@ -357,9 +268,9 @@
         </section>
 
         <!-- Footer Recommendation -->
-        <footer class="text-center py-12 border-t border-[#3A506B]">
-            <h2 class="text-2xl text-white mb-4 tracking-wider">PROCUREMENT ADVISORY CONCLUSION</h2>
-            <p class="text-[#A0AEC0] max-w-3xl mx-auto text-sm leading-relaxed">
+        <footer class="border-t border-hub-border py-10 text-center">
+            <h2 class="report-deck-title mb-4">Procurement Advisory Conclusion</h2>
+            <p class="report-deck-body mx-auto max-w-3xl text-sm">
                 Based strictly on the quantitative and qualitative operational data extracted from the 2026 workgroup evaluation, <strong>Holmatro</strong> represents the pinnacle of modern extrication and stabilization engineering. For rotary cutting operations, the <strong>Dewalt 12-inch Powershift</strong> platform vastly outperforms traditional larger-diameter competitors. Procurement commands are advised to utilize these technical scores to ensure responding units are equipped with the highest echelon of capability and deployability available.
             </p>
         </footer>
@@ -367,23 +278,27 @@
     </main>
 
     <script>
+        // Chart colours come from the mbfd-theme.css tokens so the charts follow the Hub palette.
+        const rootStyle = getComputedStyle(document.documentElement);
+        const hubColor = (token, alpha = 1) => `rgb(${rootStyle.getPropertyValue(token).trim().split(/\s+/).join(', ')}, ${alpha})`;
         const chartColors = {
-            navy: '#0B132B',
-            slate: '#1C2541',
-            steel: '#3A506B',
-            cyan: '#00B4D8',
-            mint: '#48E5C2',
-            white: '#FFFFFF',
-            gray: '#94A3B8'
+            series1: hubColor('--hub-chart-1'),
+            series2: hubColor('--hub-chart-2'),
+            series3: hubColor('--hub-chart-3'),
+            series4: hubColor('--hub-chart-4'),
+            grid: hubColor('--hub-chart-grid'),
+            label: hubColor('--hub-chart-label'),
+            ink: hubColor('--hub-ink'),
+            surface: hubColor('--hub-surface'),
         };
 
-        const reportFont = getComputedStyle(document.documentElement).getPropertyValue('--hub-font-sans').trim();
-        Chart.defaults.color = chartColors.gray;
+        const reportFont = rootStyle.getPropertyValue('--hub-font-sans').trim();
+        Chart.defaults.color = chartColors.label;
         Chart.defaults.font.family = reportFont;
-        Chart.defaults.plugins.tooltip.backgroundColor = 'rgba(11, 19, 43, 0.95)';
-        Chart.defaults.plugins.tooltip.titleColor = chartColors.white;
-        Chart.defaults.plugins.tooltip.bodyColor = chartColors.mint;
-        Chart.defaults.plugins.tooltip.borderColor = chartColors.cyan;
+        Chart.defaults.plugins.tooltip.backgroundColor = hubColor('--hub-header');
+        Chart.defaults.plugins.tooltip.titleColor = chartColors.surface;
+        Chart.defaults.plugins.tooltip.bodyColor = chartColors.surface;
+        Chart.defaults.plugins.tooltip.borderColor = chartColors.grid;
         Chart.defaults.plugins.tooltip.borderWidth = 1;
         Chart.defaults.plugins.tooltip.padding = 12;
         Chart.defaults.plugins.tooltip.titleFont = { size: 14, family: reportFont };
@@ -392,23 +307,18 @@
             callbacks: {
                 title: function(tooltipItems) {
                     const item = tooltipItems[0];
-                    let label = item.chart.data.labels[item.dataIndex];
-                    if (Array.isArray(label)) {
-                        return label.join(' ');
-                    } else {
-                        return label;
-                    }
+                    const label = item.chart.data.labels[item.dataIndex];
+                    return Array.isArray(label) ? label.join(' ') : label;
                 }
             }
         };
 
         function wrapText(text, max = 16) {
-            if(typeof text !== 'string') return text;
+            if (typeof text !== 'string') return text;
             if (text.length <= max) return [text];
-            let words = text.split(' ');
-            let lines = [];
+            const lines = [];
             let currentLine = '';
-            words.forEach(word => {
+            text.split(' ').forEach(word => {
                 if ((currentLine + word).length > max) {
                     if (currentLine.length > 0) lines.push(currentLine.trim());
                     currentLine = word + ' ';
@@ -421,20 +331,14 @@
         }
 
         // 1. Brand Overall Chart (Horizontal Bar)
-        const brandCtx = document.getElementById('brandChart').getContext('2d');
-        new Chart(brandCtx, {
+        new Chart(document.getElementById('brandChart').getContext('2d'), {
             type: 'bar',
             data: {
                 labels: ['Holmatro', 'Hurst', 'TNT', 'Amkus'],
                 datasets: [{
                     label: 'Technical Performance Score',
                     data: [90.72, 86.53, 75.12, 73.56],
-                    backgroundColor: [
-                        chartColors.cyan, 
-                        chartColors.steel, 
-                        'rgba(58, 80, 107, 0.5)', 
-                        'rgba(58, 80, 107, 0.3)'
-                    ],
+                    backgroundColor: [chartColors.series1, chartColors.series2, chartColors.series3, chartColors.series4],
                     borderRadius: 4,
                     borderWidth: 0
                 }]
@@ -452,87 +356,57 @@
                         beginAtZero: false,
                         min: 65,
                         max: 95,
-                        grid: { color: 'rgba(58, 80, 107, 0.3)', drawBorder: false },
-                        ticks: { color: chartColors.gray }
+                        grid: { color: chartColors.grid, drawBorder: false },
+                        ticks: { color: chartColors.label }
                     },
                     y: {
                         grid: { display: false, drawBorder: false },
-                        ticks: { font: { family: reportFont, size: 16 }, color: chartColors.white }
+                        ticks: { font: { family: reportFont, size: 16 }, color: chartColors.ink }
                     }
                 }
             }
         });
 
         // 2. Frontline Tools (Grouped Bar)
-        const toolsCtx = document.getElementById('toolsCategoryChart').getContext('2d');
-        const labelsSpreader = wrapText('32" Spreader', 16);
-        const labelsCutter = wrapText('Cutter', 16);
-        const labelsRam = wrapText('Ram', 16);
-
-        new Chart(toolsCtx, {
+        new Chart(document.getElementById('toolsCategoryChart').getContext('2d'), {
             type: 'bar',
             data: {
-                labels: [labelsSpreader, labelsCutter, labelsRam],
+                labels: [wrapText('32" Spreader', 16), wrapText('Cutter', 16), wrapText('Ram', 16)],
                 datasets: [
-                    {
-                        label: 'Holmatro',
-                        data: [92.02, 88.86, 91.29],
-                        backgroundColor: chartColors.cyan,
-                        borderRadius: 4
-                    },
-                    {
-                        label: 'Hurst',
-                        data: [90.99, 82.57, 86.02],
-                        backgroundColor: chartColors.mint,
-                        borderRadius: 4
-                    },
-                    {
-                        label: 'TNT',
-                        data: [81.10, 67.11, 78.31],
-                        backgroundColor: chartColors.steel,
-                        borderRadius: 4
-                    },
-                    {
-                        label: 'Amkus',
-                        data: [78.91, 74.73, 72.29],
-                        backgroundColor: 'rgba(58, 80, 107, 0.4)',
-                        borderRadius: 4
-                    }
+                    { label: 'Holmatro', data: [92.02, 88.86, 91.29], backgroundColor: chartColors.series1, borderRadius: 4 },
+                    { label: 'Hurst', data: [90.99, 82.57, 86.02], backgroundColor: chartColors.series2, borderRadius: 4 },
+                    { label: 'TNT', data: [81.10, 67.11, 78.31], backgroundColor: chartColors.series3, borderRadius: 4 },
+                    { label: 'Amkus', data: [78.91, 74.73, 72.29], backgroundColor: chartColors.series4, borderRadius: 4 }
                 ]
             },
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
                 plugins: {
-                    legend: { 
-                        position: 'top', 
-                        labels: { color: chartColors.white, font: { family: reportFont, size: 14 } }
+                    legend: {
+                        position: 'top',
+                        labels: { color: chartColors.ink, font: { family: reportFont, size: 14 } }
                     },
-                    tooltip: {
-                        callbacks: {
-                            title: mandatoryTooltipConfig.callbacks.title
-                        }
-                    }
+                    tooltip: { callbacks: { title: mandatoryTooltipConfig.callbacks.title } }
                 },
                 scales: {
                     y: {
                         beginAtZero: false,
                         min: 60,
                         max: 100,
-                        grid: { color: 'rgba(58, 80, 107, 0.3)' },
-                        ticks: { color: chartColors.gray }
+                        grid: { color: chartColors.grid },
+                        ticks: { color: chartColors.label }
                     },
                     x: {
                         grid: { display: false },
-                        ticks: { color: chartColors.white, font: { family: reportFont, size: 14 } }
+                        ticks: { color: chartColors.ink, font: { family: reportFont, size: 14 } }
                     }
                 }
             }
         });
 
         // 3. Saws Performance (Bar)
-        const sawsCtx = document.getElementById('sawsChart').getContext('2d');
-        new Chart(sawsCtx, {
+        new Chart(document.getElementById('sawsChart').getContext('2d'), {
             type: 'bar',
             data: {
                 labels: [
@@ -543,11 +417,7 @@
                 datasets: [{
                     label: 'Technical Score',
                     data: [91.25, 64.83, 61.78],
-                    backgroundColor: [
-                        chartColors.mint, 
-                        chartColors.steel, 
-                        'rgba(58, 80, 107, 0.5)'
-                    ],
+                    backgroundColor: [chartColors.series2, chartColors.series3, chartColors.series4],
                     borderRadius: 6
                 }]
             },
@@ -562,12 +432,12 @@
                     y: {
                         beginAtZero: true,
                         max: 100,
-                        grid: { color: 'rgba(58, 80, 107, 0.3)' },
-                        ticks: { color: chartColors.gray }
+                        grid: { color: chartColors.grid },
+                        ticks: { color: chartColors.label }
                     },
                     x: {
                         grid: { display: false },
-                        ticks: { color: chartColors.white, font: { size: 12 } }
+                        ticks: { color: chartColors.ink, font: { size: 12 } }
                     }
                 }
             }
