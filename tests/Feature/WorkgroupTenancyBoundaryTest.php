@@ -195,8 +195,11 @@ class WorkgroupTenancyBoundaryTest extends TestCase
         $this->actingAs($member);
         Filament::setCurrentPanel(Filament::getPanel('workgroups'));
 
+        // No workgroup is guessed: the member is sent to the dashboard chooser
+        // (a navigation link must not end in a 404) and no session is selected.
         Livewire::test(SessionResultsPage::class)
-            ->assertStatus(404);
+            ->assertRedirect(Dashboard::getUrl())
+            ->assertSet('selectedSessionId', null);
     }
 
     public function test_session_progress_fallback_is_limited_to_the_selected_sessions_workgroup(): void
