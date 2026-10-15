@@ -297,7 +297,9 @@ for (const persona of inventoryResultsPath ? [] : Object.keys(personas)) {
       let record: Record<string, unknown> = { requested: target, pattern: key };
       try {
         await page.setViewportSize({ width: 1440, height: 900 });
-        const response = await page.goto(origin + target, { waitUntil: 'domcontentloaded', timeout: 20_000 });
+        // The local server is single-threaded: lazy Pulse cards requested by the previous
+        // page are still served before this navigation, which can exceed 20 seconds.
+        const response = await page.goto(origin + target, { waitUntil: 'domcontentloaded', timeout: 60_000 });
         await page.waitForLoadState('networkidle', { timeout: 3_000 }).catch(() => undefined);
         const finalUrl = new URL(page.url());
         const facts = await inspect(page);
