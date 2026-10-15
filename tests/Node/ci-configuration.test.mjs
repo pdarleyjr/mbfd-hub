@@ -950,7 +950,7 @@ test("Daily Checkout authenticated browser lanes keep every suite, project, and 
     const step = workflowStep(job, stepName);
     assert.match(step, new RegExp(`id: ${id}\\b`));
     assert.match(step, spec);
-    assert.match(step, new RegExp(`--config=${config.replace(/\./g, "\\.")}`));
+    assert.match(step, new RegExp(`--config=${escapeRegExp(config)}`));
     assert.match(step, /--reporter=list,json/);
     const selected = [...step.matchAll(/--project=([A-Za-z0-9_-]+)/g)].map((match) => match[1]);
     assert.deepEqual(selected, projects, `${stepName} must keep its browser projects`);
@@ -969,9 +969,13 @@ test("Daily Checkout authenticated browser lanes keep every suite, project, and 
     assert.match(step, new RegExp(`if: \\$\\{\\{ always\\(\\) && steps\\.${id}\\.outcome != 'skipped' \\}\\}`));
     assert.match(step, /actions\/upload-artifact@[0-9a-f]{40}/);
     assert.match(step, new RegExp(`name: ${artifact}\\r?$`, "m"));
-    assert.match(step, new RegExp(`path: ${path.replace(/\//g, "\\/")}\\r?$`, "m"));
+    assert.match(step, new RegExp(`path: ${escapeRegExp(path)}\\r?$`, "m"));
   }
 });
+
+function escapeRegExp(value) {
+  return value.replace(/[\\^$.*+?()[\]{}|/]/g, "\\$&");
+}
 
 test("Operational Forms browser acceptance includes real WebKit phone and tablet projects", () => {
   const config = readFileSync(resolve(root, "playwright.operational-forms.config.ts"), "utf8");

@@ -250,7 +250,7 @@ test('report charts use the pinned local Chart.js copy and token colours, not a 
     const source = readFileSync(`resources/views/workgroup/${name}.blade.php`, 'utf8');
     assert.ok(source.includes(`<script src="{{ asset('vendor/chartjs-4.4.0/chart.umd.js') }}"></script>`), `${name} loads the pinned local Chart.js`);
     assert.match(source, /@vite\(\[[^\]]*'resources\/js\/report-charts\.js'/, `${name} loads the token colour helper`);
-    assert.doesNotMatch(source, /<script>/, `${name} chart code runs as a module after the helper`);
+    assert.doesNotMatch(source, /<script\s*>/i, `${name} chart code runs as a module after the helper`);
   }
   for (const name of ['evaluation-report', 'final-recommendations', 'workgroup-summary']) {
     const source = readFileSync(`resources/views/workgroup/${name}.blade.php`, 'utf8');
