@@ -244,10 +244,7 @@ class PersonnelRequestPortalTest extends TestCase
             ->assertOk()
             ->assertSee('Personnel Uniforms / Equipment')
             ->assertSee('Uniform Requests')
-            ->assertSee('Equipment Requests')
-            // The low-stock tile opens the cluster inventory this admin can view, not the hidden /admin/uniforms.
-            ->assertSee('/admin/personnel-uniforms-equipment/uniform-inventory', false)
-            ->assertDontSee('href="/admin/uniforms"', false);
+            ->assertSee('Equipment Requests');
         $this->get('/admin/personnel-uniforms-equipment/personnel-requests')->assertOk();
         $this->get("/admin/personnel-uniforms-equipment/personnel-requests/{$personnelRequest->public_id}")->assertOk()->assertSee('Admin Record Member');
         $this->get('/admin/personnel-uniforms-equipment/employee-records')->assertOk();

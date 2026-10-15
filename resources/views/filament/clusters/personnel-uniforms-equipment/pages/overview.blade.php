@@ -41,9 +41,7 @@
             <a href="{{ \App\Filament\Clusters\PersonnelUniformsEquipment\Resources\PersonnelEmployeeResource::getUrl('index') }}"><span>Employee Equipment Records</span><strong>Search records</strong></a>
             <a href="{{ \App\Filament\Clusters\PersonnelUniformsEquipment\Resources\PersonnelAssignmentResource::getUrl('index', ['tableFilters' => ['expiration' => ['value' => 'soon']]]) }}"><span>Expiring Soon</span><strong>{{ $expiringSoon }}</strong></a>
             <a href="{{ \App\Filament\Clusters\PersonnelUniformsEquipment\Resources\PersonnelAssignmentResource::getUrl('index', ['tableFilters' => ['expiration' => ['value' => 'expired']]]) }}"><span>Expired</span><strong>{{ $expired }}</strong></a>
-            @if(\App\Filament\Clusters\PersonnelUniformsEquipment\Resources\PersonnelUniformResource::canViewAny())
-                <a href="{{ \App\Filament\Clusters\PersonnelUniformsEquipment\Resources\PersonnelUniformResource::getUrl('index') }}"><span>Uniform Inventory Low Stock</span><strong>{{ $lowStock }}</strong></a>
-            @endif
+            <a href="/admin/uniforms"><span>Uniform Inventory Low Stock</span><strong>{{ $lowStock }}</strong></a>
             <a href="/admin/employee-equipment-requests"><span>Active Legacy Requests</span><strong>{{ $legacyOpen }}</strong></a>
         </nav>
     </div>
