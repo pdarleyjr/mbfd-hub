@@ -174,6 +174,17 @@ final class MemberSelfServiceActivationTest extends TestCase
         self::assertSame(AccountStatus::Active, $member->fresh()->account_status);
     }
 
+    public function test_the_form_tells_members_to_use_the_new_bid_not_the_previous_one(): void
+    {
+        $member = $this->pending('SELF-NOTE', shift: 'C Shift', unit: 'Engine 4', bidYear: 2025);
+        $this->bid($member->employeeProfile, 'A Shift', 'Engine 1', 2026);
+
+        $this->get('/activate')->assertOk()
+            ->assertSee('Use your new 2026–27 bid.')
+            ->assertSee('not the assignment you held under the previous bid', false)
+            ->assertSee('Shift you bid (2026–27 bid)');
+    }
+
     public function test_a_member_whose_position_does_not_bid_activates_by_selecting_that_position(): void
     {
         $this->pending('SELF-BIDDER');

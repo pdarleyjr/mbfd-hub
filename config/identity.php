@@ -27,6 +27,8 @@ return [
         'enabled' => env('MBFD_SELF_SERVICE_ACTIVATION_ENABLED', false),
         'email_request_enabled' => env('MBFD_MEMBER_EMAIL_ACTIVATION_REQUEST_ENABLED', false),
         'max_failed_attempts' => 5,
+        // Named on the activation form so members pick the new bid, not the previous one.
+        'bid_cycle_label' => env('MBFD_ACTIVATION_BID_CYCLE_LABEL', '2026–27'),
     ],
     'canary_user_ids' => array_values(array_filter(array_map(
         static fn (string $value): ?int => ctype_digit(trim($value)) ? (int) trim($value) : null,

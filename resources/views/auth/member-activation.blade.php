@@ -27,7 +27,14 @@
         <input id="email" name="email" type="email" inputmode="email" maxlength="254" autocomplete="email" autocapitalize="none" spellcheck="false" placeholder="name@miamibeachfl.gov" value="{{ old('email') }}" required @error('email') aria-invalid="true" aria-describedby="email-error" @enderror>
         @error('email')<div id="email-error" class="error" role="alert">{{ $message }}</div>@enderror
 
-        <label for="shift">Shift you bid</label>
+        @php($bidCycle = (string) config('identity.self_service_activation.bid_cycle_label', '2026–27'))
+        <div id="bid-note" class="notice">
+            <strong>Use your new {{ $bidCycle }} bid.</strong>
+            Select the shift and unit you picked in the {{ $bidCycle }} bid, not the assignment you held under the previous bid.
+            Use the {{ $bidCycle }} results even if you have not moved to that shift or unit yet.
+        </div>
+
+        <label for="shift">Shift you bid ({{ $bidCycle }} bid)</label>
         <select id="shift" name="shift" aria-describedby="bid-hint" @error('shift') aria-invalid="true" @enderror>
             <option value="" @selected(old('shift') === null)>Select your shift</option>
             @foreach ($bidChoices['shifts'] as $shift)
@@ -36,14 +43,14 @@
         </select>
         @error('shift')<div class="error" role="alert">{{ $message }}</div>@enderror
 
-        <label for="unit">Unit you bid</label>
+        <label for="unit">Unit you bid ({{ $bidCycle }} bid)</label>
         <select id="unit" name="unit" aria-describedby="bid-hint" @error('unit') aria-invalid="true" @enderror>
             <option value="" @selected(old('unit') === null)>Select your unit</option>
             @foreach ($bidChoices['units'] as $unit)
                 <option value="{{ $unit }}" @selected(old('unit') === $unit)>{{ $unit }}</option>
             @endforeach
         </select>
-        <div id="bid-hint" class="hint">Use your most recent bid results, even if you have not moved yet.</div>
+        <div id="bid-hint" class="hint">From the {{ $bidCycle }} bid, not the previous bid.</div>
         @error('unit')<div class="error" role="alert">{{ $message }}</div>@enderror
 
         @if ($bidChoices['positions'] !== [])
