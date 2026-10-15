@@ -455,6 +455,7 @@ jobs:
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan config:cache
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan route:cache
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan view:cache
+          docker exec -u sail "$HUB_APP_CONTAINER" php artisan event:cache
           docker exec -u sail "$HUB_APP_CONTAINER" php artisan filament:clear-cached-components
           REMOTE
 

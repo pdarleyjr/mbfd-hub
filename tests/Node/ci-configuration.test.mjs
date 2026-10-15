@@ -519,6 +519,17 @@ test("the PHP server routes Daily SPA navigation through Laravel authentication"
   assert.match(server, /require_once\s+\$publicPath\s*\.\s*['"]\/index\.php['"]/);
 });
 
+test("the PHP server long-caches only content-hashed Vite assets and deploy caches events", () => {
+  const server = readFileSync(resolve(root, "server.php"), "utf8");
+  const deploy = readFileSync(resolve(root, ".github/workflows/deploy.yml"), "utf8");
+
+  assert.match(server, /\^\/\(\?:build\|daily\)\/assets\//);
+  assert.match(server, /Cache-Control: public, max-age=31536000, immutable/);
+  assert.match(server, /'js' => 'text\/javascript; charset=UTF-8'/);
+  assert.match(server, /X-Content-Type-Options: nosniff/);
+  assert.match(deploy, /php artisan view:cache\r?\n\s+docker exec -u sail "\$HUB_APP_CONTAINER" php artisan event:cache/);
+});
+
 test("the immutable image starts Supervisor without privilege-switch directives", () => {
   const dockerfile = readFileSync(resolve(root, "docker/production/Dockerfile"), "utf8");
   const supervisor = readFileSync(resolve(root, "docker/production/supervisord.conf"), "utf8");

@@ -13,6 +13,30 @@ $uri = urldecode(
 );
 
 if ($uri !== '/' && is_file($publicPath.$uri)) {
+    // Content-hashed Vite output never changes under its name. The built-in
+    // server sends no Cache-Control for files it serves itself, so the edge
+    // fell back to a four-hour TTL; serve these with a long immutable lifetime.
+    $immutableTypes = [
+        'css' => 'text/css; charset=UTF-8',
+        'js' => 'text/javascript; charset=UTF-8',
+        'mjs' => 'text/javascript; charset=UTF-8',
+        'woff2' => 'font/woff2',
+        'mp3' => 'audio/mpeg',
+        'png' => 'image/png',
+        'svg' => 'image/svg+xml',
+        'webp' => 'image/webp',
+    ];
+    if (preg_match('#^/(?:build|daily)/assets/[A-Za-z0-9._-]+-[A-Za-z0-9_-]{8,}\.([a-z0-9]+)$#', $uri, $asset) === 1
+        && isset($immutableTypes[$asset[1]])) {
+        header('Content-Type: '.$immutableTypes[$asset[1]]);
+        header('Cache-Control: public, max-age=31536000, immutable');
+        header('Content-Length: '.(string) filesize($publicPath.$uri));
+        header('X-Content-Type-Options: nosniff');
+        readfile($publicPath.$uri);
+
+        return true;
+    }
+
     return false;
 }
 
