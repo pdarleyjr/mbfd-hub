@@ -13,7 +13,7 @@ class PersonnelUniformResource extends \App\Filament\Resources\UniformResource
 
     protected static ?string $navigationIcon = 'heroicon-o-archive-box';
 
-    protected static ?string $navigationLabel = 'Uniform Inventory';
+    protected static ?string $navigationLabel = 'Firefighting PPE / Uniforms';
 
     protected static ?string $slug = 'uniform-inventory';
 

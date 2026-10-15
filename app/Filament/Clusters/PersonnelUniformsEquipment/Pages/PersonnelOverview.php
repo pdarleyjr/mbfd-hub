@@ -40,7 +40,7 @@ class PersonnelOverview extends Page
             'recentEquipment' => (clone $base)->where('type', 'equipment')->latest()->limit(5)->get(),
             'expiringSoon' => AssignedEquipment::query()->where('status', 'active')->whereBetween('expires_at', [today(), today()->addDays(60)])->count(),
             'expired' => AssignedEquipment::query()->where('status', 'active')->whereDate('expires_at', '<', today())->count(),
-            'lowStock' => Uniform::query()->whereColumn('quantity_on_hand', '<=', 'reorder_level')->count(),
+            'lowStock' => Uniform::query()->where('reorder_level', '>', 0)->whereColumn('quantity_on_hand', '<=', 'reorder_level')->count(),
             'legacyOpen' => EmployeeEquipmentRequest::query()->where('is_archived', false)->count(),
         ];
     }
