@@ -195,6 +195,7 @@ class StationController extends Controller
             'latitude' => $station->latitude,
             'longitude' => $station->longitude,
             'is_active' => (bool) $station->is_active,
+            'image_url' => $station->image_url,
             'notes' => $station->notes,
             'created_at' => $station->created_at,
             'updated_at' => $station->updated_at,
