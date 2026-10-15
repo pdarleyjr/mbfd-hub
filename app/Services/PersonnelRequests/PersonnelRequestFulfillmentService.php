@@ -25,17 +25,18 @@ final class PersonnelRequestFulfillmentService
 
     public function issueUniform(PersonnelRequestItem $item, Uniform $uniform, User $admin, string $issuedAt, ?string $expiresAt = null, ?string $notes = null, ?int $quantity = null, ?string $idempotencyKey = null): AssignedEquipment
     {
-        return $this->issue($item, $admin, $issuedAt, $expiresAt, $notes, $quantity, $idempotencyKey, $uniform);
+        return $this->issue($item, $admin, $issuedAt, $expiresAt, $notes, $quantity, $idempotencyKey, $uniform, 'uniform');
     }
 
-    public function issueEquipment(PersonnelRequestItem $item, User $admin, string $issuedAt, ?string $expiresAt = null, ?string $notes = null, ?int $quantity = null, ?string $idempotencyKey = null): AssignedEquipment
+    /** PPE may come from stock on hand (decrementing it) or be recorded as ordered gear handed over. */
+    public function issueEquipment(PersonnelRequestItem $item, User $admin, string $issuedAt, ?string $expiresAt = null, ?string $notes = null, ?int $quantity = null, ?string $idempotencyKey = null, ?Uniform $stock = null): AssignedEquipment
     {
-        return $this->issue($item, $admin, $issuedAt, $expiresAt, $notes, $quantity, $idempotencyKey);
+        return $this->issue($item, $admin, $issuedAt, $expiresAt, $notes, $quantity, $idempotencyKey, $stock, 'equipment');
     }
 
-    private function issue(PersonnelRequestItem $item, User $admin, string $issuedAt, ?string $expiresAt, ?string $notes, ?int $quantity, ?string $idempotencyKey, ?Uniform $uniform = null): AssignedEquipment
+    private function issue(PersonnelRequestItem $item, User $admin, string $issuedAt, ?string $expiresAt, ?string $notes, ?int $quantity, ?string $idempotencyKey, ?Uniform $uniform, string $expectedCategory): AssignedEquipment
     {
-        return DB::transaction(function () use ($item, $admin, $issuedAt, $expiresAt, $notes, $quantity, $idempotencyKey, $uniform): AssignedEquipment {
+        return DB::transaction(function () use ($item, $admin, $issuedAt, $expiresAt, $notes, $quantity, $idempotencyKey, $uniform, $expectedCategory): AssignedEquipment {
             $request = PersonnelRequest::query()->lockForUpdate()->with('beneficiary')->findOrFail($item->personnel_request_id);
             Gate::forUser($admin)->authorize('update', $request);
             if ($request->beneficiary_employee_id !== null) {
@@ -43,7 +44,7 @@ final class PersonnelRequestFulfillmentService
                 Employee::query()->whereKey($request->beneficiary_employee_id)->lockForUpdate()->firstOrFail();
             }
             $locked = $request->items()->lockForUpdate()->findOrFail($item->id);
-            if (! $request->beneficiary || $locked->category !== ($uniform ? 'uniform' : 'equipment')) {
+            if (! $request->beneficiary || $locked->category !== $expectedCategory || ($expectedCategory === 'uniform' && ! $uniform)) {
                 throw ValidationException::withMessages(['item' => 'Choose an inventory action appropriate to this beneficiary item.']);
             }
 
@@ -165,11 +166,11 @@ final class PersonnelRequestFulfillmentService
                 if ($item->category === 'uniform' && ! $uniform) {
                     throw ValidationException::withMessages(['uniform_id' => 'Choose inventory for every selected uniform item.']);
                 }
-                if ($item->category === 'equipment' && $line['uniform_id'] !== null) {
-                    throw ValidationException::withMessages(['uniform_id' => 'PPE items use their equipment issue action.']);
+                if ($line['uniform_id'] !== null && ! $uniform) {
+                    throw ValidationException::withMessages(['uniform_id' => 'The selected stock item no longer exists.']);
                 }
                 $key = 'batch:'.$idempotencyKey.':item:'.$item->id;
-                $assignments[] = $this->issue($item, $admin, $issuedAt, $expiresAt, $notes, (int) $line['quantity'], $key, $uniform);
+                $assignments[] = $this->issue($item, $admin, $issuedAt, $expiresAt, $notes, (int) $line['quantity'], $key, $uniform, $item->category);
             }
             $lockedRequest->updates()->create([
                 'event' => 'items_fulfilled',

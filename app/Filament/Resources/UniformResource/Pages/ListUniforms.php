@@ -72,6 +72,7 @@ class ListUniforms extends ListRecords
                 }),
 
             Actions\Action::make('assign_equipment')
+                ->visible(fn (): bool => UniformResource::canManageInventory())
                 ->label('Assign Gear/Uniform')
                 ->icon('heroicon-o-user-plus')
                 ->color('success')
@@ -92,22 +93,17 @@ class ListUniforms extends ListRecords
                         ->searchable()
                         ->required(),
                     Select::make('uniform_id')
-                        ->label('Tracked Uniform Inventory Item (optional)')
-                        ->options(
-                            Uniform::query()
-                                ->where('quantity_on_hand', '>', 0)
-                                ->orderBy('item_name')
-                                ->orderBy('size')
-                                ->get()
-                                ->mapWithKeys(fn (Uniform $uniform) => [
-                                    $uniform->id => $uniform->item_name
-                                        .($uniform->size ? " — {$uniform->size}" : '')
-                                        ." ({$uniform->quantity_on_hand} available)",
-                                ])
-                        )
+                        ->label('From PPE / uniform stock on hand (optional)')
+                        ->options(fn (): array => Uniform::query()
+                            ->where('quantity_on_hand', '>', 0)
+                            ->orderBy('item_name')
+                            ->orderBy('size')
+                            ->get()
+                            ->mapWithKeys(fn (Uniform $uniform): array => [$uniform->id => $uniform->stockLabel()])
+                            ->all())
                         ->searchable()
                         ->live()
-                        ->helperText('Selecting a tracked item decrements inventory atomically.'),
+                        ->helperText('Choosing stock takes it off the on-hand count automatically.'),
                     Select::make('category')
                         ->label('Category')
                         ->options(array_combine(
@@ -179,7 +175,13 @@ class ListUniforms extends ListRecords
                         ->success()
                         ->send();
                 }),
-            Actions\CreateAction::make(),
+            Actions\Action::make('open_requests')
+                ->label('Uniform & PPE requests')
+                ->icon('heroicon-o-clipboard-document-list')
+                ->color('gray')
+                ->url(fn (): string => \App\Filament\Clusters\PersonnelUniformsEquipment\Resources\PersonnelRequestResource::getUrl('index'))
+                ->visible(fn (): bool => \App\Filament\Clusters\PersonnelUniformsEquipment\Resources\PersonnelRequestResource::canViewAny()),
+            Actions\CreateAction::make()->label('Add PPE / uniform item'),
         ];
     }
 

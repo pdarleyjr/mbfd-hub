@@ -216,8 +216,10 @@ class EmployeeResource extends Resource
     {
         $actor = auth()->user();
 
+        // Uniform & PPE managers work inside Personnel Uniforms & Equipment only.
         return $actor instanceof User && $actor->isAuthenticationAllowed()
-            && ($actor->can('admin.personnel.view') || $actor->can('admin.members.view'));
+            && ($actor->can('admin.members.view')
+                || ($actor->can('admin.personnel.view') && ! \App\Services\Security\ApplicationAccessService::isUniformManagerOnly($actor)));
     }
 
     public static function canManagePersonnel(?Employee $record): bool
