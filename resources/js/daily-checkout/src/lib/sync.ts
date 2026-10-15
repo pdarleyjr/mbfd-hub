@@ -157,7 +157,25 @@ export async function submitOrQueueWithResponse(
   }
 }
 
-export async function processPendingSubmissions(
+let replayTail: Promise<unknown> = Promise.resolve();
+
+/**
+ * Replay passes run one at a time. Mount, `online`, interval and manual
+ * triggers can overlap; two concurrent passes would read the same pending
+ * rows and send each record twice. A queued pass re-reads the queue after the
+ * previous one settles, so no trigger is lost.
+ */
+export function processPendingSubmissions(
+  apiBaseUrl: string,
+  queryClient?: QueryClient,
+  currentIdentity?: OfflineIdentity,
+): Promise<{ processed: number; failed: number }> {
+  const pass = replayTail.then(() => runPendingSubmissionPass(apiBaseUrl, queryClient, currentIdentity));
+  replayTail = pass.catch(() => undefined);
+  return pass;
+}
+
+async function runPendingSubmissionPass(
   apiBaseUrl: string,
   queryClient?: QueryClient,
   currentIdentity?: OfflineIdentity,

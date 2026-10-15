@@ -72,6 +72,8 @@ class EvaluationSubmissionResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+            // The legacy score fallback reads each submission's scores and criteria.
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['scores.criterion']))
             ->columns([
                 Tables\Columns\TextColumn::make('member.user.name')
                     ->searchable()
@@ -98,7 +100,8 @@ class EvaluationSubmissionResource extends Resource
                 Tables\Columns\TextColumn::make('total_score')
                     ->label('Score')
                     ->formatStateUsing(fn ($state, $record) => $record->total_score !== null ? number_format($record->total_score, 2).'%' : '-')
-                    ->sortable(),
+                    // total_score is an accessor; sort by the stored rubric score it prefers.
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderBy('overall_score', $direction === 'desc' ? 'desc' : 'asc')),
                 Tables\Columns\TextColumn::make('submitted_at')
                     ->dateTime()
                     ->sortable()

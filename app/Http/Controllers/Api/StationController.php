@@ -259,7 +259,7 @@ class StationController extends Controller
                     'priority' => $normalizeProjectPriority($project->priority),
                     'start_date' => $project->start_date,
                     'estimated_completion' => $project->target_completion_date,
-                    'actual_completion' => $project->actual_completion_date,
+                    'actual_completion' => $project->getAttribute('actual_completion'),
                     'created_at' => $project->created_at,
                     'updated_at' => $project->updated_at,
                 ];

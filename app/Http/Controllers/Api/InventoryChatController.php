@@ -16,7 +16,7 @@ class InventoryChatController extends Controller
         ]);
 
         // Get inventory context for AI
-        $allItems = EquipmentItem::where('is_active', true)->get();
+        $allItems = EquipmentItem::withStockTotal(EquipmentItem::query())->where('is_active', true)->get();
         
         $context = [
             'low_stock_items' => $allItems

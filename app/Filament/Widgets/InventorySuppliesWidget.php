@@ -16,7 +16,7 @@ class InventorySuppliesWidget extends Widget
         $totalItems = EquipmentItem::where('is_active', true)->count();
         
         // Get all active equipment items
-        $allEquipment = EquipmentItem::where('is_active', true)->get();
+        $allEquipment = EquipmentItem::withStockTotal(EquipmentItem::query())->where('is_active', true)->get();
         
         // Calculate low stock items (stock <= reorder_min)
         $lowStockItems = $allEquipment->filter(fn($item) => $item->stock <= $item->reorder_min);

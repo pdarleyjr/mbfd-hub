@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\ProjectPriority;
 use App\Enums\ProjectStatus;
 use App\Services\CloudflareAIService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -22,7 +23,7 @@ class CapitalProject extends Model
         'priority',
         'start_date',
         'target_completion_date',
-        'actual_completion_date',
+        'actual_completion',
         'ai_priority_rank',
         'ai_priority_score',
         'ai_reasoning',
@@ -37,7 +38,7 @@ class CapitalProject extends Model
         'budget_amount' => 'decimal:2',
         'start_date' => 'date',
         'target_completion_date' => 'date',
-        'actual_completion_date' => 'date',
+        'actual_completion' => 'date',
         'last_ai_analysis' => 'datetime',
         'ai_priority_score' => 'integer',
         'ai_priority_rank' => 'integer',
@@ -85,46 +86,62 @@ class CapitalProject extends Model
     public function scopeOverdue($query)
     {
         return $query->where('target_completion_date', '<', now())
-            ->whereNull('actual_completion_date');
+            ->whereNull('actual_completion');
     }
 
     // Accessors
     public function getIsOverdueAttribute(): bool
     {
-        return $this->target_completion_date 
-            && $this->target_completion_date->isPast() 
-            && !$this->actual_completion_date;
+        return $this->target_completion_date
+            && $this->target_completion_date->isPast()
+            && ! $this->actual_completion;
+    }
+
+    /** Completed-milestone ratio (0..1) as a correlated subquery for sorting. */
+    public const COMPLETION_RATIO_SQL = '(select case when count(*) = 0 then 0 else sum(case when project_milestones.completed then 1 else 0 end) * 1.0 / count(*) end from project_milestones where project_milestones.capital_project_id = capital_projects.id)';
+
+    /** Load milestone totals with the list query so progress needs no per-row queries. */
+    /**
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
+    public static function withMilestoneProgress(Builder $query): Builder
+    {
+        return $query->withCount([
+            'milestones',
+            'milestones as completed_milestones_count' => fn ($milestones) => $milestones->where('completed', true),
+        ]);
     }
 
     public function getCompletionPercentageAttribute(): float
     {
-        $totalMilestones = $this->milestones()->count();
-        
+        $totalMilestones = (int) ($this->attributes['milestones_count'] ?? $this->milestones()->count());
+
         if ($totalMilestones === 0) {
             return 0;
         }
 
-        $completedMilestones = $this->milestones()->where('completed', true)->count();
-        
+        $completedMilestones = (int) ($this->attributes['completed_milestones_count']
+            ?? $this->milestones()->where('completed', true)->count());
+
         return round(($completedMilestones / $totalMilestones) * 100, 2);
     }
 
     /**
      * Analyze this project using Cloudflare AI and update AI fields
-     * 
-     * @return void
+     *
      * @throws \Exception
      */
     public function analyzeWithAI(): void
     {
         $service = app(CloudflareAIService::class);
-        
-        if (!$service->isEnabled()) {
+
+        if (! $service->isEnabled()) {
             throw new \Exception('Cloudflare AI service is not enabled. Please configure CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN.');
         }
-        
+
         $result = $service->analyzeProject($this);
-        
+
         $this->update([
             'ai_priority_rank' => $result['rank'] ?? null,
             'ai_priority_score' => $result['score'] ?? null,
@@ -135,16 +152,15 @@ class CapitalProject extends Model
 
     /**
      * Check if project needs AI analysis (hasn't been analyzed or is outdated)
-     * 
-     * @param int $daysThreshold Number of days before analysis is considered outdated
-     * @return bool
+     *
+     * @param  int  $daysThreshold  Number of days before analysis is considered outdated
      */
     public function needsAIAnalysis(int $daysThreshold = 7): bool
     {
-        if (!$this->last_ai_analysis) {
+        if (! $this->last_ai_analysis) {
             return true;
         }
-        
+
         return $this->last_ai_analysis->addDays($daysThreshold)->isPast();
     }
 }

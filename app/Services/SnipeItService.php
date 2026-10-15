@@ -2,11 +2,27 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class SnipeItService
 {
+    private const LOCATIONS_CACHE_KEY = 'snipeit:locations:v1';
+
+    private const LOCATIONS_CACHE_SECONDS = 300;
+
+    /** Static MBFD locations used when Snipe-IT cannot be reached. */
+    private const FALLBACK_LOCATIONS = [
+        1 => 'Station 1',
+        2 => 'Station 2',
+        3 => 'Station 3',
+        4 => 'Station 4',
+        5 => 'Supply Room',
+        6 => 'Station 6',
+        7 => 'Shop',
+    ];
+
     protected string $baseUrl;
     protected string $token;
     protected int $timeout;
@@ -330,13 +346,37 @@ class SnipeItService
      */
     public function createLocation(string $name): array
     {
-        return $this->post('/locations', ['name' => $name]);
+        $result = $this->post('/locations', ['name' => $name]);
+        Cache::forget(self::LOCATIONS_CACHE_KEY);
+
+        return $result;
     }
 
     /**
      * Get locations from Snipe-IT for dropdown.
+     *
+     * Equipment Intake reads this on every Livewire render, so a successful
+     * list is cached briefly; failures fall back without being cached.
      */
     public function getLocations(): array
+    {
+        $cached = Cache::get(self::LOCATIONS_CACHE_KEY);
+        if (is_array($cached) && $cached !== []) {
+            return $cached;
+        }
+
+        $locations = $this->fetchLocations();
+        if ($locations !== null) {
+            Cache::put(self::LOCATIONS_CACHE_KEY, $locations, self::LOCATIONS_CACHE_SECONDS);
+
+            return $locations;
+        }
+
+        return self::FALLBACK_LOCATIONS;
+    }
+
+    /** @return array<int|string, string>|null */
+    private function fetchLocations(): ?array
     {
         try {
             $response = Http::withToken($this->token)
@@ -356,16 +396,7 @@ class SnipeItService
             Log::error('Snipe-IT locations fetch error', ['message' => $e->getMessage()]);
         }
 
-        // Fallback static locations for MBFD
-        return [
-            1 => 'Station 1',
-            2 => 'Station 2',
-            3 => 'Station 3',
-            4 => 'Station 4',
-            5 => 'Supply Room',
-            6 => 'Station 6',
-            7 => 'Shop',
-        ];
+        return null;
     }
 
     /**

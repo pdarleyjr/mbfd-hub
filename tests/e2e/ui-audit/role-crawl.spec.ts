@@ -3,6 +3,7 @@ import { expect, test, type APIRequestContext, type BrowserContext, type Page } 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
 import { fixtureSessionRenewal } from '../support/fixture-session-renewal';
+import { signInPersona } from './persona-sign-in';
 
 const origin = 'http://127.0.0.1:8127';
 const widths = [320, 390, 820, 1024, 1280, 1440, 1920];
@@ -69,6 +70,8 @@ function sourceRedirect(persona: string, from: string, to: string): boolean {
     '/employee': '/employee/dashboard', '/admin/personnel-uniforms-equipment': '/admin/personnel-uniforms-equipment/overview',
     '/daily': '/daily/stations', '/daily/forms-hub/big-ticket-request': '/daily/forms-hub/station-request',
     '/daily/forms-hub/equipment-request': '/daily/forms-hub/station-request',
+    // SessionResultsPage::mount sends someone with several workgroups and no choice to the chooser.
+    '/workgroups/session-results': '/workgroups',
   };
   return destinations[from] === to;
 }
@@ -200,7 +203,10 @@ async function inspect(page: Page) {
   });
 }
 
-test.describe.configure({ mode: 'serial' });
+// Personas are independent: one persona's findings must not skip the
+// remaining crawls (serial mode reported them as "did not run"). The config
+// already runs a single worker, so order is preserved.
+test.describe.configure({ mode: 'default' });
 
 if (inventoryResultsPath) {
   test('strict read-only linked GET acceptance from fresh inventory', async ({ browser }, info) => {
@@ -257,9 +263,12 @@ if (inventoryResultsPath) {
 
 for (const persona of inventoryResultsPath ? [] : Object.keys(personas)) {
   test(`read-only crawl as ${persona}`, async ({ browser }) => {
-    test.setTimeout(45 * 60_000);
+    test.setTimeout(90 * 60_000);
     const statePath = `test-results/protected-ui-auth/persona-${persona}.json`;
     expect(existsSync(statePath), `Persona storage state for ${persona}`).toBe(true);
+    // Sessions end after an hour; earlier crawls can outlast the setup-time sign-in.
+    await signInPersona(browser, persona, personas[persona], statePath);
+    let signedInAt = performance.now();
     const blocked: string[] = [];
     const context = await browser.newContext({ storageState: statePath, serviceWorkers: 'block', viewport: { width: 1440, height: 900 } });
     const canonical = await context.request.get(`${origin}/api/me/context`, { headers: { Accept: 'application/json', Origin: origin, Referer: origin + '/' }, maxRedirects: 0 });
@@ -267,6 +276,16 @@ for (const persona of inventoryResultsPath ? [] : Object.keys(personas)) {
     recordProfileDestination(persona, (await canonical.json()).personnel?.employee_profile_id);
     await readOnlyGuard(context, blocked);
     const page = await context.newPage();
+    // A long crawl renews its session through the same sign-in before the hour ends.
+    const renewSessionIfStale = async () => {
+      if (performance.now() - signedInAt < 40 * 60_000) return;
+      await signInPersona(browser, persona, personas[persona], statePath);
+      const { cookies } = JSON.parse(readFileSync(statePath, 'utf8')) as { cookies: Parameters<BrowserContext['addCookies']>[0] };
+      await page.goto('about:blank');
+      await context.clearCookies();
+      await context.addCookies(cookies);
+      signedInAt = performance.now();
+    };
     let consoleErrors: string[] = [];
     let failedResources: string[] = [];
     page.on('pageerror', error => consoleErrors.push(`pageerror: ${error.message.slice(0, 300)}`));
@@ -282,6 +301,7 @@ for (const persona of inventoryResultsPath ? [] : Object.keys(personas)) {
 
     while (queue.length && pages.length < maxPagesPerPersona) {
       const target = queue.shift()!;
+      await renewSessionIfStale();
       const key = pattern(new URL(target, origin).pathname);
       if ((patternCounts.get(key) ?? 0) >= maxInstancesPerPattern) { browserPatternSamples.push(target); continue; }
       patternCounts.set(key, (patternCounts.get(key) ?? 0) + 1);
@@ -291,7 +311,9 @@ for (const persona of inventoryResultsPath ? [] : Object.keys(personas)) {
       let record: Record<string, unknown> = { requested: target, pattern: key };
       try {
         await page.setViewportSize({ width: 1440, height: 900 });
-        const response = await page.goto(origin + target, { waitUntil: 'domcontentloaded', timeout: 20_000 });
+        // The local server is single-threaded: lazy Pulse cards requested by the previous
+        // page are still served before this navigation, which can exceed 20 seconds.
+        const response = await page.goto(origin + target, { waitUntil: 'domcontentloaded', timeout: 60_000 });
         await page.waitForLoadState('networkidle', { timeout: 3_000 }).catch(() => undefined);
         const finalUrl = new URL(page.url());
         const facts = await inspect(page);
@@ -320,7 +342,7 @@ for (const persona of inventoryResultsPath ? [] : Object.keys(personas)) {
         const { links: _links, ...summary } = facts;
         record = { ...record, finalPath: finalUrl.pathname, redirected: finalUrl.pathname !== new URL(target, origin).pathname,
           httpStatus: response?.status() ?? null, ...summary, overflow,
-          axe: axe.violations.map(v => ({ id: v.id, impact: v.impact, nodes: v.nodes.length })),
+          axe: axe.violations.map(v => ({ id: v.id, impact: v.impact, nodes: v.nodes.length, targets: v.nodes.slice(0, 3).map(node => node.target.join(' ')) })),
           consoleErrors: [...consoleErrors], failedResources: [...new Set(failedResources)], blockedWrites: blocked.slice(blockedBefore) };
       } catch (error) {
         record = { ...record, error: String(error).slice(0, 500) };
@@ -330,6 +352,7 @@ for (const persona of inventoryResultsPath ? [] : Object.keys(personas)) {
 
     const links = [];
     for (const target of [...new Set([...seeds, ...linkTargets.keys()])].sort()) {
+      await renewSessionIfStale();
       links.push(await probeLink(context.request, persona, target, [...(linkTargets.get(target) ?? [])].sort()));
     }
     const brokenLinks = links.filter(link => 'error' in link);

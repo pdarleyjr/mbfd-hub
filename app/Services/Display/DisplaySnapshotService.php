@@ -350,7 +350,7 @@ final class DisplaySnapshotService
             ->limit(50)
             ->get(['id', 'apparatus_id', 'item', 'issue_type', 'status', 'reported_date', 'created_at']);
 
-        $stockItems = EquipmentItem::query()
+        $stockItems = EquipmentItem::withStockTotal(EquipmentItem::query())
             ->with('location')
             ->where('is_active', true)
             ->get()
@@ -662,7 +662,7 @@ final class DisplaySnapshotService
      */
     private function inventoryExceptions(): array
     {
-        $activeItems = EquipmentItem::query()->with('location')->where('is_active', true)->get();
+        $activeItems = EquipmentItem::withStockTotal(EquipmentItem::query())->with('location')->where('is_active', true)->get();
 
         $outOfStock = $activeItems->filter(fn (EquipmentItem $i): bool => $i->stock <= 0);
         $lowStock = $activeItems->filter(

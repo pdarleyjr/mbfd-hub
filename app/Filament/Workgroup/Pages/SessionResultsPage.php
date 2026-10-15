@@ -260,8 +260,21 @@ class SessionResultsPage extends Page
     {
         abort_unless(static::canAccess(), 404);
 
-        // No workgroup at all means nothing to show; an ambiguous context still must not be guessed.
-        $session = app(WorkgroupContext::class)->available($this->currentUser())->isEmpty()
+        $context = app(WorkgroupContext::class);
+        $user = $this->currentUser();
+
+        // Several workgroups and no choice yet: never guess one. Send the person to the
+        // dashboard chooser instead of a 404 behind a navigation link.
+        if ($context->current($user) === null && $context->available($user)->count() > 1) {
+            Notification::make()->info()->title('Choose a workgroup first')
+                ->body('Select a workgroup on the dashboard to see its session results.')->send();
+            $this->redirect(Dashboard::getUrl());
+
+            return;
+        }
+
+        // No workgroup at all means nothing to show.
+        $session = $context->available($user)->isEmpty()
             ? null
             : ($this->scopedSessions()->active()->orderBy('id')->first()
                 ?? $this->scopedSessions()->orderBy('id')->first());

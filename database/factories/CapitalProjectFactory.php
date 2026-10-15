@@ -23,14 +23,14 @@ class CapitalProjectFactory extends Factory
         $startImmutable = \DateTimeImmutable::createFromMutable($startDate);
 
         return [
-            'project_number' => 'CP-' . strtoupper($this->faker->bothify('??##')),
+            'project_number' => 'CP-'.strtoupper($this->faker->bothify('??##')),
             'name' => $this->faker->randomElement([
                 'Station',
                 'Apparatus Bay',
                 'Training Tower',
                 'Dispatch',
                 'EOC',
-            ]) . ' ' . $this->faker->randomElement([
+            ]).' '.$this->faker->randomElement([
                 'Upgrade',
                 'Renovation',
                 'Replacement',
@@ -42,8 +42,8 @@ class CapitalProjectFactory extends Factory
             'status' => $this->faker->randomElement(ProjectStatus::cases()),
             'priority' => $this->faker->randomElement(ProjectPriority::cases()),
             'start_date' => $startDate,
-            'target_completion_date' => $startImmutable->modify('+' . $this->faker->numberBetween(3, 18) . ' months'),
-            'actual_completion_date' => null,
+            'target_completion_date' => $startImmutable->modify('+'.$this->faker->numberBetween(3, 18).' months'),
+            'actual_completion' => null,
             'percent_complete' => $this->faker->numberBetween(0, 90),
             'notes' => null,
             'attachments' => [],
@@ -65,7 +65,7 @@ class CapitalProjectFactory extends Factory
     {
         return $this->state(fn () => [
             'status' => ProjectStatus::Completed,
-            'actual_completion_date' => $this->faker->dateTimeBetween('-3 months', 'now'),
+            'actual_completion' => $this->faker->dateTimeBetween('-3 months', 'now'),
             'percent_complete' => 100,
         ]);
     }
@@ -75,7 +75,7 @@ class CapitalProjectFactory extends Factory
         return $this->state(fn () => [
             'status' => ProjectStatus::InProgress,
             'target_completion_date' => $this->faker->dateTimeBetween('-90 days', '-1 day'),
-            'actual_completion_date' => null,
+            'actual_completion' => null,
         ]);
     }
 

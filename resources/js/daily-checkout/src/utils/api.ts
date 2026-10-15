@@ -155,6 +155,8 @@ const responseMessage = async (response: Response, fallback: string): Promise<st
   return typeof payload?.message === 'string' ? payload.message : fallback;
 };
 
+const sessionStartsInFlight = new Map<string, Promise<ChecklistData>>();
+
 export class ApiClient {
   static async getInspectionRevisions(): Promise<InspectionRevision[]> {
     const response = await fetchWithTimeout(`${API_BASE}/public/inspection-revisions`, { headers: DEFAULT_HEADERS, cache: 'no-store' });
@@ -191,12 +193,19 @@ export class ApiClient {
   }
 
   static async startInspectionSession(apparatusId: number, issuanceKey: string): Promise<ChecklistData> {
-    return this.fetchChecklist(
+    // Overlapping loads (a queue change or remount mid-request) share one
+    // issuance request per local key instead of sending a duplicate POST.
+    const flightKey = `${apparatusId}:${issuanceKey}`;
+    const existing = sessionStartsInFlight.get(flightKey);
+    if (existing) return existing;
+    const request = this.fetchChecklist(
       apparatusId,
       'inspection-sessions',
       { inspection_session_start_key: issuanceKey },
       true,
-    );
+    ).finally(() => sessionStartsInFlight.delete(flightKey));
+    sessionStartsInFlight.set(flightKey, request);
+    return request;
   }
 
   static async abandonInspectionSession(
