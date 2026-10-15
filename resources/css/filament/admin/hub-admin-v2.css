@@ -505,6 +505,18 @@ html:not(.dark) :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .
     color: rgb(var(--hub2-action));
 }
 
+/* FilePond renders the file-size line at 50% white on its grey item panel (about 2.3:1). */
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-fo-file-upload .filepond--file-info-sub {
+    opacity: .9;
+}
+
+/* Breadcrumb links are small inline text; give each at least the 24px WCAG 2.2 target. */
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-breadcrumbs-item-label {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.5rem;
+}
+
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-tabs-item {
     min-height: 2.75rem;
     border-radius: .375rem;
