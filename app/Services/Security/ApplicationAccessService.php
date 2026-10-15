@@ -41,6 +41,53 @@ final class ApplicationAccessService
         $this->sync($actor, $target, $capabilities, array_combine($keys, $keys), $currentPassword, $reason, 'change_admin_capabilities');
     }
 
+    /** Permissions granted together by the "Uniform & PPE manager" toggle. */
+    public const UNIFORM_MANAGER_PERMISSIONS = ['admin.access', 'admin.personnel.view', 'admin.personnel.manage'];
+
+    /**
+     * One switch for uniform and PPE staff: admin panel entry plus the personnel
+     * capabilities (requests, employee equipment records, PPE / uniform stock).
+     * Turning it off keeps admin entry only while another admin capability remains.
+     */
+    public function setUniformManager(User $actor, User $target, bool $enabled, string $currentPassword, string $reason): void
+    {
+        $scope = array_combine(self::UNIFORM_MANAGER_PERMISSIONS, self::UNIFORM_MANAGER_PERMISSIONS);
+        if ($enabled) {
+            $selected = self::UNIFORM_MANAGER_PERMISSIONS;
+        } else {
+            $otherCapabilities = $target->permissions()->where('guard_name', 'web')
+                ->where('name', 'like', 'admin.%')
+                ->whereNotIn('name', self::UNIFORM_MANAGER_PERMISSIONS)
+                ->exists();
+            $selected = $otherCapabilities && $target->hasDirectWebPermission('admin.access') ? ['admin.access'] : [];
+        }
+        $this->sync($actor, $target, $selected, $scope, $currentPassword, $reason, 'change_uniform_manager');
+    }
+
+    /** True when the account's only Hub administration is the uniform & PPE set (no admin role, no other capability). */
+    public static function isUniformManagerOnly(User $user): bool
+    {
+        if ($user->hasAnyRole(['super_admin', 'admin', 'logistics_admin'])) {
+            return false;
+        }
+
+        return self::isUniformManager($user) && ! $user->permissions()->where('guard_name', 'web')
+            ->where('name', 'like', 'admin.%')
+            ->whereNotIn('name', self::UNIFORM_MANAGER_PERMISSIONS)
+            ->exists();
+    }
+
+    public static function isUniformManager(User $user): bool
+    {
+        foreach (self::UNIFORM_MANAGER_PERMISSIONS as $permission) {
+            if (! $user->hasDirectWebPermission($permission)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     /** @param array<array-key, mixed> $applications */
     public function syncApplicationAdministrations(User $actor, User $target, array $applications, string $currentPassword, string $reason): void
     {

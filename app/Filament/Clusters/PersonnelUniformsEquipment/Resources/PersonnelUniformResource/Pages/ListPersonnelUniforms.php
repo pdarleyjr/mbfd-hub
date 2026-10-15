@@ -3,15 +3,10 @@
 namespace App\Filament\Clusters\PersonnelUniformsEquipment\Resources\PersonnelUniformResource\Pages;
 
 use App\Filament\Clusters\PersonnelUniformsEquipment\Resources\PersonnelUniformResource;
-use Filament\Actions\CreateAction;
-use Filament\Resources\Pages\ListRecords;
+use App\Filament\Resources\UniformResource\Pages\ListUniforms;
 
-class ListPersonnelUniforms extends ListRecords
+/** Same header actions as the stock list: add stock, assign stock to a member, open requests. */
+class ListPersonnelUniforms extends ListUniforms
 {
     protected static string $resource = PersonnelUniformResource::class;
-
-    protected function getHeaderActions(): array
-    {
-        return [CreateAction::make()];
-    }
 }

@@ -43,17 +43,12 @@ class UniformInventoryService
                 ]);
             }
 
-            $description = $inventory->item_name;
-            if (filled($inventory->size)) {
-                $description .= " — Size {$inventory->size}";
-            }
-
             $assignment = AssignedEquipment::create([
                 'user_id' => null,
                 'employee_portal_id' => $beneficiary->id,
                 'uniform_id' => $inventory->getKey(),
-                'category' => 'Uniform Inventory',
-                'item_description' => $description,
+                'category' => $inventory->isPpe() ? 'Personnel PPE' : 'Uniform Inventory',
+                'item_description' => $inventory->issueDescription(),
                 'quantity' => $quantity,
                 'issued_at' => $issuedAt,
                 'expires_at' => $expiresAt,

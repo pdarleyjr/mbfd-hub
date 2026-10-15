@@ -124,13 +124,16 @@ class ViewPersonnelRequest extends ViewRecord
                 ->form([
                     $this->actionKey(),
                     $this->issueItemSelect($request),
+                    $this->inventorySelect($request)->label('From PPE / uniform stock on hand (optional)')
+                        ->helperText('Choose stock to take it off the on-hand count. Leave empty for gear ordered for this member.'),
                     $this->issueQuantity($request),
                     DatePicker::make('issued_at')->default(today())->required(),
                     DatePicker::make('expires_at')->label('Expiration date (optional)')->afterOrEqual('issued_at'),
                     Textarea::make('notes')->maxLength(2000),
                 ])->action(function (array $data) use ($request): void {
                     $item = $request->items()->findOrFail($data['item_id']);
-                    $this->performItemAction(fn () => app(PersonnelRequestFulfillmentService::class)->issueEquipment($item, auth()->user(), $data['issued_at'], $data['expires_at'] ?? null, $data['notes'] ?? null, (int) $data['quantity'], $data['idempotency_key']), 'PPE assigned to employee record');
+                    $stock = filled($data['uniform_id'] ?? null) ? Uniform::findOrFail($data['uniform_id']) : null;
+                    $this->performItemAction(fn () => app(PersonnelRequestFulfillmentService::class)->issueEquipment($item, auth()->user(), $data['issued_at'], $data['expires_at'] ?? null, $data['notes'] ?? null, (int) $data['quantity'], $data['idempotency_key'], $stock), $stock ? 'PPE assigned and inventory updated' : 'PPE assigned to employee record');
                 }),
             $this->transitionAction('complete', 'Complete', PersonnelRequestStatus::Completed, 'success', 'heroicon-o-check-badge'),
             $this->transitionAction('deny', 'Deny', PersonnelRequestStatus::Denied, 'danger', 'heroicon-o-x-circle'),
@@ -229,11 +232,11 @@ class ViewPersonnelRequest extends ViewRecord
      */
     private function inventorySelect(PersonnelRequest $request): Select
     {
-        return Select::make('uniform_id')->label('Uniform inventory')->options(function (Get $get) use ($request): array {
+        return Select::make('uniform_id')->label('PPE / uniform stock on hand')->options(function (Get $get) use ($request): array {
             $stock = $this->inventoryChoices ??= Uniform::query()->where('quantity_on_hand', '>', 0)->orderBy('item_name')->orderBy('size')->get()
                 ->map(fn (Uniform $uniform): array => [
                     'id' => $uniform->id,
-                    'label' => "{$uniform->item_name} — {$uniform->size} — {$uniform->quantity_on_hand} on hand",
+                    'label' => $uniform->stockLabel(),
                     'name' => $uniform->item_name,
                     'size' => $uniform->size,
                 ])->all();
@@ -285,7 +288,8 @@ class ViewPersonnelRequest extends ViewRecord
                         TextInput::make('quantity')->label('Issue now')->numeric()->integer()->minValue(0)->required()->live()
                             ->maxValue(fn (Get $get): int => $this->actionQuantityLimit($request, $get('item_id')))
                             ->helperText(fn (Get $get): string => $this->remaining($request, $get('item_id')).' remaining to issue'),
-                        $this->inventorySelect($request)->visible(fn (): bool => $request->type === PersonnelRequestType::Uniform)
+                        $this->inventorySelect($request)
+                            ->label(fn (): string => $request->type === PersonnelRequestType::Uniform ? 'PPE / uniform stock on hand' : 'From stock on hand (optional)')
                             ->required(fn (Get $get): bool => (int) $get('quantity') > 0 && $request->type === PersonnelRequestType::Uniform)
                             ->disabled(fn (Get $get): bool => (int) $get('quantity') === 0),
                     ]),
@@ -300,7 +304,7 @@ class ViewPersonnelRequest extends ViewRecord
                     }
                     $item = $request->items()->findOrFail($line['item_id']);
                     $lines[] = ['item_id' => $item->id, 'quantity' => (int) $line['quantity']]
-                        + ($request->type === PersonnelRequestType::Uniform ? ['uniform_id' => (int) $line['uniform_id']] : []);
+                        + (filled($line['uniform_id'] ?? null) ? ['uniform_id' => (int) $line['uniform_id']] : []);
                 }
                 $this->performItemAction(fn () => app(PersonnelRequestFulfillmentService::class)->issueBatch($request, $lines, auth()->user(), $data['issued_at'], $data['idempotency_key'], $data['expires_at'] ?? null, $data['notes'] ?? null), 'Selected items issued');
             });
