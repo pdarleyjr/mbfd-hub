@@ -122,7 +122,7 @@ final class TrainingRosterExportTest extends TestCase
         app(TrainingRosterExportService::class)->bytes($version, 'xlsx');
     }
 
-    public function test_long_course_location_and_names_do_not_drop_content_or_add_overflow_pages(): void
+    public function test_long_course_location_and_names_use_planned_complete_rows(): void
     {
         $version = $this->version(16, false);
         $snapshot = $version->snapshot;
@@ -133,9 +133,43 @@ final class TrainingRosterExportTest extends TestCase
         // A new immutable snapshot fixture, never an update to an existing version.
         $longVersion = TrainingRosterVersion::query()->create(['training_session_id' => $version->training_session_id, 'revision' => 2, 'snapshot' => $snapshot]);
         $pdf = (new Parser)->parseContent(app(TrainingRosterExportService::class)->bytes($longVersion, 'pdf'));
-        self::assertCount(1, $pdf->getPages());
+        self::assertCount(3, $pdf->getPages());
         self::assertStringContainsString('FAMILY NAME TEST', $pdf->getText());
         self::assertStringContainsString('GIVEN NAME', $pdf->getText());
+    }
+
+    public function test_maximum_length_names_and_course_keep_certification_on_each_planned_page(): void
+    {
+        $version = $this->version(16, true);
+        $snapshot = $version->snapshot;
+        $snapshot['session']['course_name'] = str_repeat('W', 200);
+        $snapshot['session']['location'] = str_repeat('W', 200);
+        foreach ($snapshot['attendance'] as &$entry) {
+            $entry['snapshot']['first_name'] = str_repeat('W', 100);
+            $entry['snapshot']['last_name'] = str_repeat('W', 100);
+        }
+        unset($entry);
+        $longVersion = TrainingRosterVersion::query()->create(['training_session_id' => $version->training_session_id, 'revision' => 2, 'snapshot' => $snapshot]);
+        $service = app(TrainingRosterExportService::class);
+        $pdf = (new Parser)->parseContent($service->bytes($longVersion, 'pdf'));
+        self::assertCount(6, $pdf->getPages());
+        foreach ($pdf->getPages() as $index => $page) {
+            self::assertStringContainsString('COURSE NAME:', $page->getText());
+            self::assertStringContainsString('SYNTHETIC OIC', $page->getText());
+            self::assertStringContainsString('Page '.($index + 1).' of 6', $page->getText());
+        }
+        $path = tempnam(sys_get_temp_dir(), 'training-long-export-');
+        file_put_contents($path, $service->bytes($longVersion, 'xlsx'));
+        try {
+            $book = IOFactory::load($path);
+            self::assertSame(17, $book->getSheet(1)->getHighestDataRow());
+            self::assertSame(str_repeat('W', 100), $book->getSheet(1)->getCell('I17')->getValue());
+            self::assertCount(28, $book->getSheet(0)->getDrawingCollection());
+            self::assertCount(5, $book->getSheet(0)->getBreaks());
+            $book->disconnectWorksheets();
+        } finally {
+            unlink($path);
+        }
     }
 
     private function version(int $count, bool $certified): TrainingRosterVersion

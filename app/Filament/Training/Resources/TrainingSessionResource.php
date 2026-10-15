@@ -73,7 +73,7 @@ class TrainingSessionResource extends Resource
                 ->searchable()->required()->live()->afterStateUpdated(function ($state, Set $set): void {
                     $course = TrainingCourse::find($state);
                     $set('course_name', $course?->name);
-                    $set('classifications', $course?->classifications ?? []);
+                    $set('classifications', $course->classifications ?? []);
                     $set('location', $course?->default_location);
                 })->helperText('Create a course under Training → Courses if it is not listed.'),
             ...self::sessionFields(),

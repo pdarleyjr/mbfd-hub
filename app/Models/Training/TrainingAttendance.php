@@ -9,10 +9,19 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * @property array<string, mixed> $snapshot
+ * @property array{disk: string, path: string, mime: string, sha256: string} $signature
+ * @property \Carbon\CarbonImmutable $signed_at
+ * @property \Carbon\CarbonImmutable|null $voided_at
+ * @property-read TrainingSession $session
+ * @property-read bool $was_corrected
+ */
 final class TrainingAttendance extends Model
 {
     protected $guarded = ['id', 'created_at', 'updated_at'];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return ['snapshot' => 'array', 'signature' => 'array', 'signed_at' => 'immutable_datetime', 'voided_at' => 'immutable_datetime'];
@@ -23,16 +32,19 @@ final class TrainingAttendance extends Model
         self::deleting(fn () => throw new \LogicException('Training attendance cannot be deleted; use an audited void.'));
     }
 
+    /** @return BelongsTo<TrainingSession, $this> */
     public function session(): BelongsTo
     {
         return $this->belongsTo(TrainingSession::class, 'training_session_id');
     }
 
+    /** @return BelongsTo<Employee, $this> */
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class, 'employee_profile_id');
     }
 
+    /** @return HasMany<TrainingRosterAudit, $this> */
     public function audits(): HasMany
     {
         return $this->hasMany(TrainingRosterAudit::class, 'training_attendance_id');

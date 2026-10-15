@@ -14,8 +14,7 @@
         "test:video-conferencing-bundle": "node scripts/ci/check-video-conferencing-bundle.mjs",
         "test:video-conferencing-node": "node --test tests/Node/video-conferencing-*.test.mjs",
         "test:video-conferencing-e2e": "playwright test --config=playwright.video-conferencing.config.ts",
-        "test:personnel-requests-e2e": "playwright test --config=playwright.personnel-requests.config.ts",
-        "test:training-roster-browser": "playwright test --config=playwright.training-roster.config.ts"
+        "test:personnel-requests-e2e": "playwright test --config=playwright.personnel-requests.config.ts"
     },
     "devDependencies": {
         "@axe-core/playwright": "4.13.0",

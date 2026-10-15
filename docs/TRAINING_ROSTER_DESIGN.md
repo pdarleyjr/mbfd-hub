@@ -6,7 +6,7 @@ Engineering design and implementation specification · October 15, 2026
 
 Extend the existing Hub modular application: Filament administration and Training panel, canonical Employee profiles, PostgreSQL, private file storage, Dompdf, and a dedicated React kiosk bundle. Add PhpSpreadsheet for genuine Excel files containing actual signatures. Do not create another personnel directory, authentication service, LMS, or Worker-hosted training database.
 
-The original assignment authorized read-only discovery and a complete plan. Peter subsequently authorized autonomous implementation once the design was ready. Source implementation and isolated validation are therefore authorized. Production deployment, DNS/Tunnel changes, live data migration, and real attendance collection have not been performed under this work.
+The original assignment authorized read-only discovery and a complete plan. Peter subsequently authorized autonomous implementation and explicitly directed completion through live deployment, including creation of the Cloudflare subdomain. Implementation, validation, additive production migration, immutable deployment and the scoped roster DNS/Tunnel/cache changes are authorized. Actual execution and acceptance evidence is recorded separately in the validation receipt.
 
 The governing experience is simple: instructor opens a session; member selects current shift, rank and name, then signs; staff download PDF or Excel directly. The engineering absorbs identity, effective dates, concurrency, evidence retention and retries.
 
@@ -29,7 +29,7 @@ Audit baseline: Hub main `e5210909da407aa9514d285e8a0486ebcb5a4046`, obtained fr
 | Host routing | `CanonicalHostRedirect.php` normally returns foreign hosts to the canonical Hub. A dedicated kiosk hostname needs its own explicit routes and isolation before session/auth handling. |
 | Release | `hub-release-gates.yml`, `prepare-production-image.yml`, `deploy.yml`, production Dockerfile and image compose overlay define current immutable-image release. Old mutable server-pull procedures do not describe this baseline. |
 
-Source inspection is not production proof. No live Cloudflare zone/DNS/Tunnel/Access/cache export, serving image identity, production role membership, current employee counts, actual bid effective dates or private-disk readback was obtained. Before activation these require authenticated read-only preflight, retaining a redacted receipt. Credentials are not included in source or this document.
+Source inspection is not production proof. Subsequent authenticated preflight verified the GMKtec Hub runtime at `/opt/mbfd/mbfd-hub`, source `e5210909da407aa9514d285e8a0486ebcb5a4046`, immutable image digest `sha256:ed08be83659533c63092b4e2a1cc7b6cca90a4517a11b74ee40b8b3f85d048ac`, private local storage, and the existing remotely managed `mbfdhub-gmktec` Cloudflare tunnel. The roster hostname did not yet exist. Production role membership and effective assignment acceptance remain separate checks. Credentials are not included in source or this document.
 
 The supplied PDF was structurally inspected and rendered: one US Letter portrait page, 612 × 792 points, rotation 0, no AcroForm fields or annotations. It has a department logo, underlined title, four-column classification block, yellow course-name line, sixteen numbered rows, last/first/date/signature columns, and final OIC name/ID/signature line. The supplied current logo replaces the older insignia without distortion.
 
@@ -170,7 +170,7 @@ Rollback only the added hostname/ingress/cache rule and application image/config
 | 7 Employee | `TrainingHistoryPage.php`, employee Blade history and registration | Canonical own-history, void/correction behavior, no cross-employee access |
 | 8 Integration QA | PHPUnit, PostgreSQL, browser config/spec, build/typecheck, security checks | Exact evidence and no regression of existing panels/bid/identity |
 | 9 Release readiness | Existing required CI/image gates or explicit local equivalents; isolated restore and migration | No test/security failure waived; candidate source bound to artifacts |
-| 10 Future activation | Read-only infrastructure preflight, authorized immutable image deploy, hostname change | Runtime identity, signed-in operator acceptance, physical touchscreen and print acceptance |
+| 10 Activation | Read-only infrastructure preflight, authorized immutable image deploy, hostname change | Runtime identity, signed-in operator acceptance; physical touchscreen and print acceptance by the operator |
 
 After shared domain contracts, admin, kiosk and export work can proceed in parallel with nonoverlapping file ownership. Merge/rebase only after preserving other work and reconciling exact current main; do not reset dirty shared checkouts. Recheck source drift before release and repeat only affected checks.
 

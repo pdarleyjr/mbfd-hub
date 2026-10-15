@@ -8,16 +8,16 @@
         body { margin: 0; font-family: "DejaVu Sans", sans-serif; font-size: 9pt; color: #111; }
         .page { page-break-after: always; }
         .page:last-child { page-break-after: auto; }
-        .heading { width: 100%; height: 58pt; }
-        .logo { width: 52pt; height: 52pt; }
-        h1 { text-align: center; font-family: "DejaVu Serif", serif; font-size: 22pt; text-decoration: underline; margin: 0; }
+        .heading { position: relative; width: 100%; height: 58pt; }
+        .logo { position: absolute; left: 0; top: 0; width: 52pt; height: 52pt; }
+        h1 { position: absolute; left: 65pt; top: 15pt; width: 487pt; text-align: center; font-family: "DejaVu Serif", serif; font-size: 21pt; text-decoration: underline; margin: 0; line-height: 26pt; white-space: nowrap; }
         table { border-collapse: collapse; width: 100%; table-layout: fixed; }
         .classes td { border: .6pt solid #222; padding: 2pt; font-size: 7.3pt; height: 10pt; }
         .course { background: #ff0; font-weight: bold; margin: 9pt 0 5pt; padding: 3pt 5pt; overflow-wrap: break-word; }
-        .metadata { font-size: 8pt; margin: 0 0 7pt; }
+        .metadata { font-size: 8pt; margin: 0 0 7pt; overflow-wrap: break-word; word-wrap: break-word; }
         .roster th, .roster td { border: .6pt solid #222; padding: 2pt 5pt; }
         .roster th { height: 21pt; font-family: "DejaVu Serif", serif; font-size: 10pt; }
-        .roster td { height: 18pt; font-size: 8pt; overflow-wrap: break-word; vertical-align: middle; }
+        .roster td { height: {{ $row_height }}pt; font-size: 8pt; line-height: 9.6pt; overflow-wrap: break-word; word-wrap: break-word; vertical-align: middle; }
         .number { color: #555; font-size: 7pt; }
         .signature { max-width: 165pt; max-height: 17pt; }
         .oic { margin-top: 11pt; font-size: 8pt; }
@@ -29,7 +29,7 @@
 <body>
 @foreach ($pages as $pageIndex => $entries)
     <div class="page">
-        <table class="heading"><tr><td style="width: 65pt"><img class="logo" src="{{ $logo }}" alt="Miami Beach Fire Department"></td><td><h1>MBFD TRAINING ROSTER</h1></td></tr></table>
+        <div class="heading"><img class="logo" src="{{ $logo }}" alt="Miami Beach Fire Department"><h1>MBFD TRAINING ROSTER</h1></div>
         <table class="classes">
             @foreach (array_chunk($classifications, 4) as $labels)
                 <tr>@foreach ($labels as $label)<td>{{ in_array($label, $session['classifications'], true) ? '[X]' : '[ ]' }} {{ $label }}</td>@endforeach</tr>
@@ -40,7 +40,7 @@
         <table class="roster">
             <thead><tr><th style="width: 25%">Last Name</th><th style="width: 25%">First Name</th><th style="width: 13%">DATE</th><th style="width: 37%">SIGNATURE</th></tr></thead>
             <tbody>
-            @for ($i = 0; $i < 16; $i++)
+            @for ($i = 0; $i < $rows_per_page; $i++)
                 @php($entry = $entries[$i] ?? null)
                 <tr>
                     <td>@if ($entry)<span class="number">{{ $entry['number'] }}.</span> {{ $entry['snapshot']['last_name'] }}@endif</td>

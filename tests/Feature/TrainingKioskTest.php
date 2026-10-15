@@ -77,7 +77,7 @@ final class TrainingKioskTest extends TestCase
         self::assertNotNull($cookie);
         self::assertTrue($cookie->isHttpOnly());
         self::assertTrue($cookie->isSecure());
-        self::assertSame('', $cookie->getDomain());
+        self::assertNull($cookie->getDomain());
         $this->assertDatabaseMissing('training_kiosk_grants', ['token_hash' => $token]);
     }
 
@@ -90,7 +90,7 @@ final class TrainingKioskTest extends TestCase
         $response->assertOk()->assertSee('training-roster-root');
         $cookie = $response->getCookie('mbfd_training_kiosk');
         self::assertNotNull($cookie);
-        self::assertSame('', $cookie->getDomain());
+        self::assertNull($cookie->getDomain());
         self::assertStringContainsString("frame-ancestors 'none'", (string) $response->headers->get('Content-Security-Policy'));
         $this->get('http://internal.example/admin', $headers)->assertNotFound();
     }

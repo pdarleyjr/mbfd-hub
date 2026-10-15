@@ -153,7 +153,7 @@ class TrainingRosterAdministrationTest extends TestCase
         Storage::fake('local');
         $employee = Employee::query()->create(['employee_id' => 'TRAINING-ACTION-01', 'name' => 'Synthetic Officer', 'rank' => 'Captain', 'roster_status' => 'active']);
         $admin = $this->user('training_admin');
-        $admin->forceFill(['employee_profile_id' => $employee->id])->save();
+        $admin->forceFill(['employee_profile_id' => $employee->id, 'employee_id' => $employee->employee_id])->save();
         $session = $this->rosterSession();
         app(TrainingRosterService::class)->transition($session, 'open', $admin);
         $this->actingAs($admin);

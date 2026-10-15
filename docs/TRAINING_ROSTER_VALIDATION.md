@@ -12,13 +12,21 @@ Validation date: 2026-10-15. This receipt is updated as checks finish; pending c
 - PHP syntax checks on newly implemented domain, administration, kiosk and export files passed. Full formatting/static analysis are tracked separately.
 - Independent source review corrected launch reconnect handling, separate rate-limit buckets, trusted-proxy host ordering, and lifecycle-independent kiosk revocation.
 - Original one-page Letter PDF was rendered and visually inspected before export design. Generated export fidelity is a separate pending check.
+- Clean frontend dependency installation completed in the task-local C: validation mirror. Full Vite production build passed. The interrupted D: installation is not used as build evidence.
+- Final browser contract run passed all 15 scenarios across desktop, tablet and iPhone WebKit (2.3 minutes, exit 0). Tablet handwriting uses actual Chromium touch events. Desktop/tablet/phone roster and signature screenshots were visually inspected. Evidence: `kiosk-browser-final-local.log` and the task-local browser output directory.
+- Disposable PostgreSQL 16.15 migration and concurrency gate passed (one test, ten assertions). Synthetic records were reconciled and the test-owned container removed. Evidence: `training-postgres-migrate.log` and `training-postgres-concurrency.log`.
+- Existing build-advisory classifier regression: 12 tests passed after restoring the unchanged approved package manifest and invoking Playwright directly from the workflow.
+
+## Hosted initial-candidate evidence
+
+Hub PR 424 initial candidate `e8a9e6ad421af7449ce999e4c33d52004547cdc4`, CI run `38766294348`: PHP/root frontend quality, production asset build, generated assets, workflow lint, configuration, filesystem security and canonical AI gates passed. PHP 8.4 and 8.5 each reported 2,162 passing tests, 11 failing tests and one skip. Failures exposed two host-only cookie assertions, one invalid canonical-identity fixture, and eight PDF heading assertions. These are being corrected and rerun; this run is not release-qualified. Static analysis identified missing Eloquent type information, and the manifest hash guard correctly rejected an unnecessary npm script change. Neither failure is treated as an Actions billing outage.
+
+Bid PR 270 candidate `bb0a30ae0ff426e6b51e7522c6d4274a85eb6bc3`: CI `38767586656` and CodeQL `38767586045` passed, including full typecheck, unit/integration, Workers runtime and Playwright E2E. Read-only production D1 migration guard passed all 72 existing migrations; this bridge adds none.
 
 ## Running or pending
 
-- Real database-backed HTTP/domain/Livewire tests, historical assignment provider tests, existing personnel-signature regression, and disposable PostgreSQL concurrency.
+- Final candidate database-backed HTTP/domain/Livewire tests, historical assignment provider tests and existing personnel-signature regression.
 - Export count matrix, private file/hash verification, immutable versions, rendered PDF and spreadsheet visual inspection.
-- Actual kiosk bundle browser contract checks in Chromium desktop/tablet and iPhone WebKit, including accessibility, sticky action, handwriting, duplicate-response recovery and reset.
-- Completed clean dependency installation and full production build. An early Vite attempt while npm was still extracting packages failed to resolve `@fluentui/react-icons`; this is not a passed build.
 - Required hosted release gates on the exact candidate, including PHPStan, security, existing regressions, PHP compatibility, generated assets and image qualification.
 
 Local Windows dependency/class loading has shown substantial filesystem latency. Unfinished processes and partial logs are not accepted as successful checks. Task-local PHP configuration enables required extensions without altering global configuration. All test data is synthetic and confined to local disposable storage/databases; the supplied credential file was not loaded into tests.
@@ -29,4 +37,4 @@ The browser contract harness serves the real built kiosk with test-owned API res
 
 Hosted Actions was observed executing current repository jobs. Use the attached-instruction fallback only when the exact candidate has an evidenced provider/billing block; never waive executed test/security failures or fabricate GitHub statuses. The existing workflows remain authoritative and now include kiosk browser checks.
 
-This is a draft implementation, not an activated service. No production database migration, deployment, DNS/Tunnel/Access/cache rule change, staff permission assignment or live attendance write has been performed. Activation requires companion Bid bridge deployment, current infrastructure readback, exact-candidate gates, an isolated backup/restore/migration rehearsal, explicit deployment scope, and authenticated operator plus physical touchscreen/print acceptance. See `TRAINING_ROSTER_DESIGN.md` for the full design and rollback boundaries.
+The user explicitly authorized live activation and creation of `roster.mbfdhub.com`. The Hub remains unactivated while final gates run. Production preflight verified the current GMKtec immutable baseline and existing Cloudflare tunnel; the proposed DNS record, ingress addition and cache bypass preserve existing routes. Activation requires companion Bid bridge deployment, exact-candidate gates, an isolated backup/restore/migration rehearsal and authenticated browser acceptance. Physical touchscreen/stylus and printer acceptance remains an operator check after delivery. See `TRAINING_ROSTER_DESIGN.md` for the full design and rollback boundaries.

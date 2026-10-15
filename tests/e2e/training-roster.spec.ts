@@ -49,8 +49,8 @@ async function fixture(page: Page, options: { count?: number; lostResponse?: boo
 }
 async function selectAndSign(page: Page) {
     await page.getByRole('button', { name: /SIGN ROSTER/ }).click();
-    await page.getByRole('button', { name: 'A Shift →', exact: true }).click();
-    await page.getByRole('button', { name: 'Firefighter →', exact: true }).click();
+    await page.getByRole('button', { name: 'A Shift', exact: true }).click();
+    await page.getByRole('button', { name: 'Firefighter', exact: true }).click();
     await expect(page.getByRole('button', { name: /Bravo/ })).toHaveCount(0);
     await page.getByRole('button', { name: /Alpha, Synthetic/ }).click();
     await expect(page.getByRole('button', { name: 'Complete sign-in' })).toBeDisabled();
@@ -58,7 +58,16 @@ async function selectAndSign(page: Page) {
 }
 async function draw(page: Page) {
     const pad = page.locator('canvas');
+    await pad.scrollIntoViewIfNeeded();
     const box = (await pad.boundingBox())!;
+    if (page.context().browser()?.browserType().name() === 'chromium' && await page.evaluate(() => navigator.maxTouchPoints > 0)) {
+        const touch = await page.context().newCDPSession(page);
+        await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: box.x + box.width * .1, y: box.y + box.height * .7 }] });
+        for (let i = 1; i <= 20; i++) await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: box.x + box.width * (.1 + i * .035), y: box.y + box.height * (i % 2 ? .3 : .7) }] });
+        await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        await touch.detach();
+        return;
+    }
     await page.mouse.move(box.x + box.width * .1, box.y + box.height * .7);
     await page.mouse.down();
     for (let i = 1; i <= 20; i++) await page.mouse.move(box.x + box.width * (.1 + i * .035), box.y + box.height * (i % 2 ? .3 : .7));

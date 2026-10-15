@@ -10,10 +10,19 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
+/**
+ * @property list<string> $classifications
+ * @property \Carbon\CarbonImmutable $held_on
+ * @property \Carbon\CarbonImmutable|null $starts_at
+ * @property int $revision
+ * @property-read TrainingCourse $course
+ * @property-read TrainingRosterVersion|null $latestVersion
+ */
 final class TrainingSession extends Model
 {
     protected $guarded = ['id', 'created_at', 'updated_at'];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return ['classifications' => 'array', 'held_on' => 'immutable_date', 'starts_at' => 'immutable_datetime', 'revision' => 'integer'];
@@ -24,36 +33,43 @@ final class TrainingSession extends Model
         self::deleting(fn () => throw new \LogicException('Training sessions cannot be deleted.'));
     }
 
+    /** @return BelongsTo<TrainingCourse, $this> */
     public function course(): BelongsTo
     {
         return $this->belongsTo(TrainingCourse::class, 'training_course_id');
     }
 
+    /** @return BelongsTo<Employee, $this> */
     public function oic(): BelongsTo
     {
         return $this->belongsTo(Employee::class, 'oic_employee_profile_id');
     }
 
+    /** @return HasMany<TrainingAttendance, $this> */
     public function attendances(): HasMany
     {
         return $this->hasMany(TrainingAttendance::class);
     }
 
+    /** @return HasMany<TrainingRosterVersion, $this> */
     public function versions(): HasMany
     {
         return $this->hasMany(TrainingRosterVersion::class);
     }
 
+    /** @return HasOne<TrainingRosterVersion, $this> */
     public function latestVersion(): HasOne
     {
         return $this->hasOne(TrainingRosterVersion::class)->latestOfMany('revision');
     }
 
+    /** @return HasMany<TrainingRosterAudit, $this> */
     public function audits(): HasMany
     {
         return $this->hasMany(TrainingRosterAudit::class);
     }
 
+    /** @return HasMany<TrainingKioskGrant, $this> */
     public function kioskGrants(): HasMany
     {
         return $this->hasMany(TrainingKioskGrant::class);

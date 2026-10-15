@@ -7,6 +7,7 @@ namespace App\Filament\Training\Resources\TrainingSessionResource\Pages;
 use App\Filament\Training\Resources\TrainingSessionResource;
 use App\Models\Employee;
 use App\Models\Training\TrainingAttendance;
+use App\Models\Training\TrainingSession;
 use App\Services\Training\TrainingRosterService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Hidden;
@@ -30,6 +31,14 @@ class ViewTrainingSession extends ViewRecord implements HasTable
     protected static string $resource = TrainingSessionResource::class;
 
     protected static string $view = 'filament.training.pages.view-training-session';
+
+    public function getRecord(): TrainingSession
+    {
+        $record = parent::getRecord();
+        assert($record instanceof TrainingSession);
+
+        return $record;
+    }
 
     public function getTitle(): string
     {

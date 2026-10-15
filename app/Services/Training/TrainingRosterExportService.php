@@ -121,16 +121,48 @@ final class TrainingRosterExportService
             $certification['signature_url'] = 'data:image/png;base64,'.base64_encode($certification['signature_bytes']);
         }
 
+        $logo = $this->logoBytes();
+        $longestName = max([0, ...array_map(fn (array $row): int => max(mb_strlen($row['snapshot']['first_name']), mb_strlen($row['snapshot']['last_name'])), $rows)]);
+        // Reserve enough vertical space even for wide, unbroken names. Ordinary
+        // rosters retain the original 16 rows; long names get complete taller rows.
+        $rowHeight = $longestName > 28 ? ceil(($longestName + 4) / 14) * 9.6 : 18;
+        $rowsPerPage = $longestName > 28 ? max(1, min(16, (int) floor(280 / ($rowHeight + 5)))) : 16;
+
         return [
             'session' => $snapshot['session'],
             'rows' => $rows,
-            'pages' => $rows === [] ? [[]] : array_chunk($rows, 16),
+            'pages' => $rows === [] ? [[]] : array_chunk($rows, $rowsPerPage),
+            'rows_per_page' => $rowsPerPage,
+            'row_height' => $rowHeight,
             'certification' => $certification,
             'classifications' => self::CLASSIFICATIONS,
             'revision' => $version->revision,
             'captured_at' => $snapshot['captured_at'],
-            'logo' => 'data:image/png;base64,'.base64_encode((string) file_get_contents(public_path('images/training/mbfd-logo.png'))),
+            'logo_bytes' => $logo,
+            'logo' => 'data:image/png;base64,'.base64_encode($logo),
         ];
+    }
+
+    private function logoBytes(): string
+    {
+        $source = imagecreatefrompng(public_path('images/training/mbfd-logo.png'));
+        if ($source === false) {
+            throw new RuntimeException('The Training roster logo could not be loaded.');
+        }
+        // 256 pixels retains over 300 dpi at the printed size without embedding
+        // the full-resolution transparent asset into every export renderer.
+        $height = (int) round(256 * imagesy($source) / imagesx($source));
+        $thumbnail = imagecreatetruecolor(256, $height);
+        if ($thumbnail === false) {
+            throw new RuntimeException('The Training roster logo could not be prepared.');
+        }
+        imagealphablending($thumbnail, false);
+        imagesavealpha($thumbnail, true);
+        imagecopyresampled($thumbnail, $source, 0, 0, 0, 0, 256, $height, imagesx($source), imagesy($source));
+        ob_start();
+        imagepng($thumbnail);
+
+        return (string) ob_get_clean();
     }
 
     /** @param array<string,mixed> $data */
@@ -154,14 +186,14 @@ final class TrainingRosterExportService
             $print->getColumnDimension($column)->setWidth($width);
         }
         foreach ($data['pages'] as $pageIndex => $rows) {
-            $start = $pageIndex * 32 + 1;
+            $start = $pageIndex * ($data['rows_per_page'] + 16) + 1;
             if ($pageIndex > 0) {
                 $print->setBreak('A'.$start, Worksheet::BREAK_ROW);
             }
             $print->mergeCells('B'.$start.':E'.($start + 1));
             $this->text($print, 'B'.$start, 'MBFD TRAINING ROSTER');
             $print->getStyle('B'.$start)->getFont()->setBold(true)->setSize(19);
-            $this->drawing($print, (string) file_get_contents(public_path('images/training/mbfd-logo.png')), 'A'.$start, 'MBFD logo', 45, 45);
+            $this->drawing($print, $data['logo_bytes'], 'A'.$start, 'MBFD logo', 45, 45);
             foreach (array_chunk(self::CLASSIFICATIONS, 4) as $classificationRow => $labels) {
                 $value = implode('   ', array_map(fn (string $label): string => (in_array($label, $data['session']['classifications'], true) ? '[X] ' : '[ ] ').$label, $labels));
                 $row = $start + 3 + $classificationRow;
@@ -174,20 +206,20 @@ final class TrainingRosterExportService
             $this->text($print, 'A'.$courseRow, 'COURSE NAME: '.$data['session']['course_name']);
             $print->getStyle('A'.$courseRow)->getFill()->setFillType(Fill::FILL_SOLID)->getStartColor()->setARGB('FFFFFF00');
             $print->getStyle('A'.$courseRow)->getAlignment()->setWrapText(true);
-            $print->getRowDimension($courseRow)->setRowHeight(42);
+            $print->getRowDimension($courseRow)->setRowHeight(max(42, ceil((mb_strlen($data['session']['course_name']) + 13) / 45) * 12 + 8));
             $metaRow = $start + 8;
             $print->mergeCells('A'.$metaRow.':E'.$metaRow);
             $this->text($print, 'A'.$metaRow, $data['session']['held_on'].' | '.($data['certification'] ? 'CERTIFIED' : 'PROVISIONAL — NOT CERTIFIED').' | Revision '.$data['revision'].' | '.count($data['rows']).' attendees'.(($data['session']['location'] ?? null) ? "\n".$data['session']['location'] : ''));
             $print->getStyle('A'.$metaRow)->getAlignment()->setWrapText(true);
-            $print->getRowDimension($metaRow)->setRowHeight(($data['session']['location'] ?? null) ? 50 : 17);
+            $print->getRowDimension($metaRow)->setRowHeight(($data['session']['location'] ?? null) ? max(50, ceil(mb_strlen($data['session']['location']) / 45) * 12 + 17) : 17);
             $header = $start + 9;
             foreach (['A' => '#', 'B' => 'Last Name', 'C' => 'First Name', 'D' => 'DATE', 'E' => 'SIGNATURE'] as $column => $label) {
                 $this->text($print, $column.$header, $label);
             }
             $print->getStyle('A'.$header.':E'.$header)->getFont()->setBold(true);
-            for ($i = 0; $i < 16; $i++) {
+            for ($i = 0; $i < $data['rows_per_page']; $i++) {
                 $row = $header + 1 + $i;
-                $print->getRowDimension($row)->setRowHeight(25);
+                $print->getRowDimension($row)->setRowHeight(max(25, $data['row_height'] + 5));
                 if (isset($rows[$i])) {
                     $entry = $rows[$i];
                     $print->setCellValue('A'.$row, $entry['number']);
@@ -197,10 +229,10 @@ final class TrainingRosterExportService
                     $this->drawing($print, $entry['signature_bytes'], 'E'.$row, 'Signature '.$entry['number'], 150, 29);
                 }
             }
-            $print->getStyle('A'.$header.':E'.($header + 16))->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
-            $print->getStyle('A'.$header.':E'.($header + 16))->getAlignment()->setWrapText(true)->setVertical('center');
-            $print->getStyle('B'.($header + 1).':C'.($header + 16))->getFont()->setSize(9);
-            $oicRow = $start + 27;
+            $print->getStyle('A'.$header.':E'.($header + $data['rows_per_page']))->getBorders()->getAllBorders()->setBorderStyle(Border::BORDER_THIN);
+            $print->getStyle('A'.$header.':E'.($header + $data['rows_per_page']))->getAlignment()->setWrapText(true)->setVertical('center');
+            $print->getStyle('B'.($header + 1).':C'.($header + $data['rows_per_page']))->getFont()->setSize($data['rows_per_page'] < 16 ? 8 : 9);
+            $oicRow = $start + $data['rows_per_page'] + 11;
             $print->mergeCells('A'.$oicRow.':D'.$oicRow);
             $cert = $data['certification'];
             $this->text($print, 'A'.$oicRow, 'OIC NAME (PRINT): '.($cert['oic_snapshot']['display_name'] ?? '').'   ID# '.($cert['oic_snapshot']['employee_id'] ?? ''));
@@ -211,11 +243,11 @@ final class TrainingRosterExportService
             } else {
                 $this->text($print, 'E'.$oicRow, 'OIC SIGNATURE:');
             }
-            $print->mergeCells('A'.($start + 29).':E'.($start + 29));
-            $this->text($print, 'A'.($start + 29), $data['session']['public_id'].' | '.$data['session']['status'].' | '.$data['captured_at'].' | Page '.($pageIndex + 1).' of '.count($data['pages']));
-            $print->getStyle('A'.($start + 29))->getFont()->setSize(8);
+            $print->mergeCells('A'.($oicRow + 2).':E'.($oicRow + 2));
+            $this->text($print, 'A'.($oicRow + 2), $data['session']['public_id'].' | '.$data['session']['status'].' | '.$data['captured_at'].' | Page '.($pageIndex + 1).' of '.count($data['pages']));
+            $print->getStyle('A'.($oicRow + 2))->getFont()->setSize(8);
         }
-        $print->getPageSetup()->setOrientation(PageSetup::ORIENTATION_PORTRAIT)->setPaperSize(PageSetup::PAPERSIZE_LETTER)->setFitToWidth(1)->setFitToHeight(0)->setPrintArea('A1:E'.(count($data['pages']) * 32));
+        $print->getPageSetup()->setOrientation(PageSetup::ORIENTATION_PORTRAIT)->setPaperSize(PageSetup::PAPERSIZE_LETTER)->setFitToWidth(1)->setFitToHeight(0)->setPrintArea('A1:E'.(count($data['pages']) * ($data['rows_per_page'] + 16)));
         $print->getPageMargins()->setTop(0.35)->setBottom(0.35)->setLeft(0.3)->setRight(0.3);
 
         $table = $book->createSheet()->setTitle('Attendance data');

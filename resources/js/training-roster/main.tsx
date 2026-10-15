@@ -229,7 +229,7 @@ function App() {
                     {roster.location && <p>{roster.location}</p>}
                     <div className="roster-meta"><span className={`status ${roster.status === 'open' ? 'open' : ''}`}>{roster.status === 'open' ? 'Sign-in open' : 'Sign-in closed'}</span><span>{roster.attendance.length} {roster.attendance.length === 1 ? 'member' : 'members'} signed</span></div>
                 </section>
-                <section className="attendance-list" aria-label="Members who have signed">
+                <section className="attendance-list" aria-label="Members who have signed" tabIndex={0}>
                     {roster.attendance.length === 0 ? <div className="first-sign"><h2>Be the first to sign</h2><p>Select your current shift, rank, and name. Then add your signature.</p></div>
                         : <table><thead><tr><th scope="col">#</th><th scope="col">Member</th><th scope="col" className="wide">Rank / shift</th><th scope="col">Attendance</th></tr></thead><tbody>
                             {roster.attendance.map((row, index) => <tr key={`${row.name}-${row.signed_at}-${index}`}><td>{index + 1}</td><td><strong>{row.name}</strong><span className="narrow">{[row.rank, row.shift].filter(Boolean).join(' · ')}</span></td><td className="wide">{[row.rank, row.shift].filter(Boolean).join(' · ')}</td><td><span className="signed">Signed</span></td></tr>)}
