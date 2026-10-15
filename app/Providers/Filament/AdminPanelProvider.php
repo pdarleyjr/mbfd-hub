@@ -104,6 +104,7 @@ class AdminPanelProvider extends PanelProvider
                 EquipmentIntake::class,
                 TrtTrailerInventory::class,
                 BidAccessPin::class,
+                \App\Filament\Admin\Pages\MediaControlMedia::class,
                 KnowledgeBase::class,
             ])
             ->widgets([

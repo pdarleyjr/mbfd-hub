@@ -132,6 +132,12 @@ return [
     ],
 
     'media_control' => [
+        // Outbound Hub -> Media Control media ingest (/api/hub-ingest/v1).
+        // ingest_token is a dedicated secret (MC env HUB_INGEST_TOKEN); it is
+        // distinct from the federation token below, which verifies calls FROM MC.
+        'base_url' => env('MEDIA_CONTROL_BASE_URL', 'https://media.mbfdhub.com'),
+        'ingest_token' => env('MEDIA_CONTROL_INGEST_TOKEN'),
+        'ingest_timeout' => (int) env('MEDIA_CONTROL_INGEST_TIMEOUT', 10),
         'authorization' => [
             'issuer' => env('MEDIA_CONTROL_AUTH_ISSUER', 'https://www.mbfdhub.com'),
             'service_token' => env('MEDIA_CONTROL_FEDERATION_TOKEN'),

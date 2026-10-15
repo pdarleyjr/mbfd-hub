@@ -66,6 +66,13 @@ class SecurityHeaders
         } else {
             $connectSources[] = 'wss:';
         }
+        if ($request->is('admin/media-control/media')) {
+            // The browser uploads media straight to Media Control (tus); only
+            // this admin page may connect to that origin.
+            $connectSources = array_merge($connectSources, array_filter([
+                $this->origin((string) config('services.media_control.base_url', '')),
+            ]));
+        }
         $connectSources = implode(' ', array_unique(array_merge($connectSources, [
             'https://static.cloudflareinsights.com',
         ])));
