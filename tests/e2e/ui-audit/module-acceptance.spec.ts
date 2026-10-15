@@ -20,7 +20,7 @@ const surfaces: Surface[] = [
   ...['/employee', '/employee/my-requests', '/employee/request-equipment', '/employee/apparatus-service-request', '/employee/forms'].map(path => ({ module: 'employee', persona: 'member', path, migrated: true })),
   { module: 'employee', persona: 'officer', path: '/employee/personnel-equipment-request', migrated: true },
   ...['/workgroups', '/workgroups/evaluations', '/workgroups/surveys', '/workgroups/files', '/workgroups/profile'].map(path => ({ module: 'workgroups', persona: 'workgroup-member', path, migrated: true })),
-  ...['/workgroups/analysis-report', '/workgroups/data-dashboard', '/workgroups/l1-inventory', '/workgroups/final-recommendations'].map(path => ({ module: 'workgroups', persona: 'super-admin', path, migrated: true })),
+  ...['/workgroups/analysis-report', '/workgroups/final-presentation', '/workgroups/data-dashboard', '/workgroups/l1-inventory', '/workgroups/final-recommendations'].map(path => ({ module: 'workgroups', persona: 'super-admin', path, migrated: true })),
   { module: 'training', persona: 'training-viewer', path: '/training', migrated: true },
   { module: 'training', persona: 'training-admin', path: '/training/training-todos', migrated: true },
   { module: 'training', persona: 'training-admin', path: '/training/settings', migrated: true },
