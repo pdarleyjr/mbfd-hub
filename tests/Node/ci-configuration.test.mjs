@@ -3,6 +3,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
+import {
+  declaredProjects,
+  matrixLanes,
+  partitionViolations,
+} from "../../scripts/ci/verify-daily-playwright-partition.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -150,11 +155,15 @@ test("production activation is manual, main-only, and blocked by every Hub relea
     "actionlint",
     "phpunit-postgres",
     "daily-contract-integrity",
+    "daily-authenticated-shell",
+    "daily-authenticated-lifecycles",
+    "daily-checkout-browser",
     "generated-assets",
     "security-dependencies",
     "security-secrets",
     "security-filesystem",
     "php-85-compatibility",
+    "ai-gateway-source",
   ];
 
   assert.match(deploy, /^on:\r?\n  workflow_dispatch:/m);
@@ -501,11 +510,30 @@ test("production activation is manual, main-only, and blocked by every Hub relea
   assert.doesNotMatch(aggregate, /if:\s*\$\{\{\s*always\(\)\s*\}\}/);
   assert.doesNotMatch(aggregate, /continue-on-error:\s*(?:true|["']true["'])/);
 
+  const aggregateNeeds = [...(aggregate.match(/^    needs:\r?\n(?<body>(?:^      - [A-Za-z0-9_-]+\r?\n)+)/m)?.groups?.body ?? "")
+    .matchAll(/- ([A-Za-z0-9_-]+)/g)].map((match) => match[1]);
   for (const gateJob of requiredGateJobs) {
-    assert.match(aggregate, new RegExp(`- ${gateJob}\\b`));
+    assert.ok(aggregateNeeds.includes(gateJob), `the aggregate release gate must need ${gateJob}`);
     const gate = workflowJob(gates, gateJob);
     assert.doesNotMatch(gate, /continue-on-error:\s*(?:true|["']true["'])/);
   }
+
+  // Every gate job except the explicitly advisory Pint debt report must block
+  // the aggregate, so a newly added or split-out job cannot be silently optional.
+  const definedJobs = [...gates.split(/^jobs:\r?$/m)[1].matchAll(/^  ([A-Za-z0-9_-]+):\r?$/gm)].map((match) => match[1]);
+  const advisoryJobs = ["repository-pint-debt"];
+  const blockingJobs = definedJobs.filter((job) => job !== "release-gates" && !advisoryJobs.includes(job));
+  assert.deepEqual([...aggregateNeeds].sort(), [...blockingJobs].sort());
+
+  // A job skipped because a dependency failed is reported to branch
+  // protection as passing, so the aggregate must run and verify every result.
+  assert.match(aggregate, /^    if:\s*\$\{\{\s*!cancelled\(\)\s*\}\}\s*$/m);
+  const confirmation = workflowStep(aggregate, "Confirm all required Hub release gates passed");
+  assert.match(confirmation, /GATE_RESULTS:\s*\$\{\{\s*toJSON\(needs\)\s*\}\}/);
+  assert.match(confirmation, /set -euo pipefail/);
+  assert.match(confirmation, /jq -e 'length > 0 and all\(\.\[\]; \.result == "success"\)'/);
+  assert.match(confirmation, /exit 1/);
+  assert.doesNotMatch(confirmation, /\|\|\s*true\b/);
 });
 
 test("the PHP server routes Daily SPA navigation through Laravel authentication", () => {
@@ -551,6 +579,10 @@ test("the shared release gate has hard-failing quality, Daily, PostgreSQL, asset
 
   const ciConfiguration = workflowJob(gates, "ci-configuration");
   assert.match(workflowStep(ciConfiguration, "Verify CI configuration"), /npm run test:ci-configuration/);
+  assert.match(
+    workflowStep(ciConfiguration, "Verify mocked Daily Playwright lanes run every test exactly once"),
+    /node scripts\/ci\/verify-daily-playwright-partition\.mjs/,
+  );
 
   const phpQuality = workflowJob(gates, "php-quality");
   const lint = workflowStep(phpQuality, "PHP lint");
@@ -581,6 +613,8 @@ test("the shared release gate has hard-failing quality, Daily, PostgreSQL, asset
     "static-analysis",
     "phpunit-postgres",
     "daily-contract-integrity",
+    "daily-authenticated-shell",
+    "daily-authenticated-lifecycles",
     "generated-assets",
     "security-dependencies",
     "php-85-compatibility",
@@ -620,6 +654,7 @@ test("the shared release gate has hard-failing quality, Daily, PostgreSQL, asset
     /DailyCheckoutIntegrityTest\.php/,
   );
   for (const testFile of [
+    "AuditDailyCheckoutReadinessTest.php",
     "ActivateDailyCheckoutLedgerTest.php",
     "AuditDailyCheckoutPreactivationTest.php",
     "DailyCheckoutComplianceServiceTest.php",
@@ -695,6 +730,22 @@ test("the shared release gate has hard-failing quality, Daily, PostgreSQL, asset
 
   const aggregate = workflowJob(gates, "release-gates");
   assert.match(aggregate, /^\s+- ai-gateway-source\s*$/m);
+});
+
+test("CI cancels only superseded pull-request runs, never main validation", () => {
+  const ci = readFileSync(resolve(root, ".github/workflows/ci.yml"), "utf8");
+  const concurrency = ci.match(/^concurrency:\r?\n(?<body>(?:^  .*\r?\n)+)/m)?.groups?.body ?? "";
+
+  assert.match(
+    concurrency,
+    /^  group: \$\{\{ github\.event_name == 'pull_request' && format\('ci-pr-\{0\}', github\.ref\) \|\| format\('ci-\{0\}-\{1\}', github\.ref, github\.run_id\) \}\}\r?$/m,
+  );
+  assert.match(concurrency, /^  cancel-in-progress: \$\{\{ github\.event_name == 'pull_request' \}\}\r?$/m);
+
+  for (const path of [".github/workflows/prepare-production-image.yml", ".github/workflows/deploy.yml"]) {
+    const workflow = readFileSync(resolve(root, path), "utf8");
+    assert.match(workflow, /^concurrency:\r?\n  group: [a-z-]+\r?\n  cancel-in-progress: false\r?$/m, `${path} must never cancel an in-flight release`);
+  }
 });
 
 test("CI invokes the deploy-free shared release gate for main and pull requests", () => {
@@ -799,7 +850,7 @@ test("Daily Checkout browser acceptance uses a mocked isolated loopback build", 
   const dailySpec = readFileSync(resolve(root, "tests/e2e/daily-checkout-inspection.spec.ts"), "utf8");
   const packageJson = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
   const gates = readFileSync(resolve(root, ".github/workflows/hub-release-gates.yml"), "utf8");
-  const daily = workflowJob(gates, "daily-contract-integrity");
+  const daily = workflowJob(gates, "daily-checkout-browser");
 
   assert.equal(
     packageJson.scripts["test:daily-checkout-e2e"],
@@ -818,7 +869,87 @@ test("Daily Checkout browser acceptance uses a mocked isolated loopback build", 
   assert.match(dailySpec, /page\.route\('\*\*\/api\/\*\*'/);
   assert.match(workflowStep(daily, "Install root browser test dependencies"), /npm ci --ignore-scripts --legacy-peer-deps/);
   assert.match(workflowStep(daily, "Install Chromium and WebKit for Daily Checkout Playwright"), /npx playwright install --with-deps chromium webkit/);
-  assert.match(workflowStep(daily, "Run mocked Daily Checkout Playwright"), /npm run test:daily-checkout-e2e/);
+  const mocked = workflowStep(daily, "Run mocked Daily Checkout Playwright");
+  assert.match(mocked, /DAILY_CHECKOUT_E2E_BASE_URL:\s*http:\/\/127\.0\.0\.1:4176/);
+  assert.match(mocked, /DAILY_PLAYWRIGHT_PROJECTS:\s*\$\{\{\s*matrix\.projects\s*\}\}/);
+  assert.match(mocked, /set -euo pipefail/);
+  assert.match(mocked, /test "\$\{#project_args\[@\]\}" -gt 0/);
+  assert.match(mocked, /npm run test:daily-checkout-e2e -- "\$\{project_args\[@\]\}"/);
+  assert.doesNotMatch(daily, /--shard|--grep|--pass-with-no-tests|--last-failed|--only-changed|\|\|\s*true\b/);
+  assert.doesNotMatch(daily, /continue-on-error/);
+  assert.match(daily, /^    strategy:\r?\n      fail-fast: false\r?$/m);
+
+  // The lanes must partition the configured projects exactly; the CI
+  // configuration job re-proves this against Playwright's resolved test list.
+  const lanes = matrixLanes(gates);
+  const projects = declaredProjects(config);
+  assert.ok(projects.length >= 19, "the Daily Playwright config project list must resolve");
+  assert.deepEqual(partitionViolations(lanes, projects), []);
+  assert.ok(
+    partitionViolations(lanes.slice(1), projects).some((violation) => violation.includes("not assigned")),
+    "dropping a lane must be detected",
+  );
+  assert.ok(
+    partitionViolations([...lanes, { lane: "duplicate", projects: [projects[0]] }], projects)
+      .some((violation) => violation.includes("runs in both")),
+    "running a project twice must be detected",
+  );
+});
+
+test("Daily Checkout authenticated browser lanes keep every suite, project, and evidence upload", () => {
+  const gates = readFileSync(resolve(root, ".github/workflows/hub-release-gates.yml"), "utf8");
+  const core = workflowJob(gates, "daily-contract-integrity");
+  const shell = workflowJob(gates, "daily-authenticated-shell");
+  const lifecycles = workflowJob(gates, "daily-authenticated-lifecycles");
+
+  assert.match(workflowStep(core, "Install Chromium and WebKit for Daily Checkout browser checks"), /npx playwright install --with-deps chromium webkit/);
+  assert.match(workflowStep(core, "Verify first-login Bid handoff under enforced CSP"), /node --test tests\/Browser\/bid-login-handoff\.mjs/);
+  const sessionExpiry = workflowStep(core, "Verify shared panel session-expiry handling");
+  assert.match(sessionExpiry, /node --test tests\/Node\/panel-session-expiry\.test\.mjs/);
+  assert.match(sessionExpiry, /node --test tests\/Browser\/panel-session-expiry\.mjs/);
+
+  for (const job of [shell, lifecycles]) {
+    assert.match(workflowStep(job, "Install root browser test dependencies"), /npm ci --ignore-scripts --legacy-peer-deps/);
+    assert.match(workflowStep(job, "Daily production build"), /DAILY_CHECKOUT_OUT_DIR:\s*\.\.\/\.\.\/\.\.\/public\/daily/);
+    assert.match(workflowStep(job, "Build Hub assets for authenticated mobile navigation"), /npx vite build/);
+    assert.match(workflowStep(job, "Build Hub assets for authenticated mobile navigation"), /SENTRY_AUTH_TOKEN:\s*""/);
+    assert.match(workflowStep(job, "Publish Filament assets for authenticated browser workflows"), /php artisan filament:assets/);
+    assert.doesNotMatch(job, /continue-on-error|\|\|\s*true\b|--pass-with-no-tests/);
+  }
+  assert.match(workflowStep(shell, "Install Chromium and WebKit for authenticated browsers"), /npx playwright install --with-deps chromium webkit/);
+  assert.match(workflowStep(lifecycles, "Install Chromium for authenticated lifecycle browsers"), /npx playwright install --with-deps chromium/);
+
+  const suites = [
+    [shell, "Verify Home and Daily member shell in Chromium and true iPhone WebKit", "mobile-shell", /tests\/e2e\/mobile-shell\.spec\.ts/, ["phone-touch", "hub-shell-webkit-iphone", "desktop"], "playwright.personnel-requests.config.ts"],
+    [shell, "Verify final Bid assignments in authenticated responsive browsers", "bid-assignments", /tests\/e2e\/employee-bid-assignment\.spec\.ts/, ["phone-touch", "tablet-touch", "desktop", "hub-shell-webkit-iphone"], "playwright.personnel-requests.config.ts"],
+    [lifecycles, "Verify real member submissions and Admin request lifecycles", "member-requests", /tests\/e2e\/personnel-requests\.spec\.ts[\s\S]*--grep 'real '/, ["desktop"], "playwright.personnel-requests.config.ts"],
+    [lifecycles, "Verify Operational Forms evidence retention", "operational-evidence", /tests\/e2e\/operational-forms\.spec\.ts[\s\S]*--grep '\(admin archives, finds\|desktop employee previews\)'/, ["desktop"], "playwright.operational-forms.config.ts"],
+  ];
+  for (const [job, stepName, id, spec, projects, config] of suites) {
+    const step = workflowStep(job, stepName);
+    assert.match(step, new RegExp(`id: ${id}\\b`));
+    assert.match(step, spec);
+    assert.match(step, new RegExp(`--config=${config.replace(/\./g, "\\.")}`));
+    assert.match(step, /--reporter=list,json/);
+    const selected = [...step.matchAll(/--project=([A-Za-z0-9_-]+)/g)].map((match) => match[1]);
+    assert.deepEqual(selected, projects, `${stepName} must keep its browser projects`);
+  }
+  assert.match(workflowStep(shell, "Verify final Bid assignments in authenticated responsive browsers"), /if: \$\{\{ !cancelled\(\) && steps\.mobile-shell\.outcome != 'skipped' \}\}/);
+  assert.match(workflowStep(lifecycles, "Verify Operational Forms evidence retention"), /if: \$\{\{ !cancelled\(\) && steps\.member-requests\.outcome != 'skipped' \}\}/);
+
+  const evidence = [
+    [shell, "Retain authenticated mobile shell evidence", "mobile-shell", "authenticated-mobile-shell-evidence", "test-results/personnel-requests"],
+    [shell, "Retain final Bid assignment browser evidence", "bid-assignments", "final-bid-assignment-browser-evidence", "test-results/bid-assignments"],
+    [lifecycles, "Retain member request lifecycle evidence", "member-requests", "member-request-lifecycle-evidence", "test-results/personnel-requests"],
+    [lifecycles, "Retain Operational Forms lifecycle evidence", "operational-evidence", "operational-forms-lifecycle-evidence", "test-results/operational-forms-lifecycle"],
+  ];
+  for (const [job, stepName, id, artifact, path] of evidence) {
+    const step = workflowStep(job, stepName);
+    assert.match(step, new RegExp(`if: \\$\\{\\{ always\\(\\) && steps\\.${id}\\.outcome != 'skipped' \\}\\}`));
+    assert.match(step, /actions\/upload-artifact@[0-9a-f]{40}/);
+    assert.match(step, new RegExp(`name: ${artifact}\\r?$`, "m"));
+    assert.match(step, new RegExp(`path: ${path.replace(/\//g, "\\/")}\\r?$`, "m"));
+  }
 });
 
 test("Operational Forms browser acceptance includes real WebKit phone and tablet projects", () => {
