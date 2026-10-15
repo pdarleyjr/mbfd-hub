@@ -6,9 +6,11 @@ namespace App\Services\Identity;
 
 use App\Exceptions\PasswordChangeRequired;
 use App\Models\AuthenticationSession;
+use App\Models\Employee;
 use App\Models\User;
 use App\Models\Workgroup;
 use App\Models\WorkgroupMember;
+use App\Services\PersonnelRequests\OfficerAuthorizationService;
 use App\Support\Workgroups\WorkgroupAccess;
 use App\Support\Workgroups\WorkgroupContext;
 use Carbon\CarbonImmutable;
@@ -98,6 +100,12 @@ final readonly class AuthenticatedMemberContextResolver
             abilities: $abilities,
             workgroups: $workgroups,
             activeWorkgroup: $activeWorkgroup,
+            capabilities: [
+                // Mirrors PersonnelEquipmentRequestPage::canAccess so the Daily SPA never links to a 403.
+                'personnel_equipment_request' => ! $user->must_change_password
+                    && $employee instanceof Employee
+                    && app(OfficerAuthorizationService::class)->isAuthorized($employee),
+            ],
         );
 
         $request->attributes->set(self::REQUEST_ATTRIBUTE, $context);

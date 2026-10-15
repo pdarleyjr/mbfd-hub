@@ -115,6 +115,9 @@ class StationResource extends Resource
                         Infolists\Components\ImageEntry::make('photo')
                             ->hiddenLabel()
                             ->state(fn (Station $record): string => url($record->photoOrPlaceholderUrl()))
+                            ->extraImgAttributes(fn (Station $record): array => ['alt' => filled($record->image_path)
+                                ? "Station {$record->station_number} photo"
+                                : 'Standard station artwork'])
                             ->height(180)
                             ->helperText(fn (Station $record): string => filled($record->image_path)
                                 ? 'Uploaded station photo.'

@@ -1,9 +1,11 @@
 @php
     // Training todo updates are soft-deleted and stay visible as trashed; plain todo updates are not.
     $updatesQuery = $getRecord()->updates();
-    if (in_array(\Illuminate\Database\Eloquent\SoftDeletes::class, class_uses_recursive($updatesQuery->getRelated()), true)) {
+    $updatesSoftDelete = in_array(\Illuminate\Database\Eloquent\SoftDeletes::class, class_uses_recursive($updatesQuery->getRelated()), true);
+    if ($updatesSoftDelete) {
         $updatesQuery = $updatesQuery->withTrashed();
     }
+    $recordTrashed = method_exists($getRecord(), 'trashed') && $getRecord()->trashed();
 @endphp
 <div class="space-y-4">
     @forelse($updatesQuery->orderBy('created_at', 'desc')->get() as $update)
@@ -20,11 +22,11 @@
                 </div>
                 <div class="flex items-center gap-2">
                     <span class="text-xs text-gray-400">{{ $update->created_at->format('M d, Y g:i A') }}</span>
-                    @if($update->trashed())
+                    @if($updatesSoftDelete && $update->trashed())
                         <span class="text-xs text-gray-500">Trash</span>
                     @endif
-                    @if(! $getRecord()->trashed() && auth()->user()?->can('update', $getRecord()))
-                        @if($update->trashed())
+                    @if(! $recordTrashed && auth()->user()?->can('update', $getRecord()))
+                        @if($updatesSoftDelete && $update->trashed())
                             <button type="button" wire:click="restoreUpdate({{ $update->id }})" wire:confirm="Restore this update?" class="text-primary-600 p-2" aria-label="Restore update">Restore</button>
                         @else
                         <button 

@@ -17,6 +17,7 @@ import {
 } from '../types';
 import { ApiClient, isApiAuthenticationError, redirectToLoginAfterSessionExpiry } from '../utils/api';
 import PreviousPageButton from './PreviousPageButton';
+import { identityForQueueCapture } from '../lib/offlineIdentity';
 import { groupRoomsByArea, stationComplement } from '../utils/stationRoomBlueprint';
 import Tabs, { type TabItem } from './ui/Tabs';
 import QuickLink, { type QuickLinkProps } from './ui/QuickLink';
@@ -47,6 +48,15 @@ export default function StationDetailPage() {
   const [stationInspections, setStationInspections] = useState<StationInspectionSummary[]>([]);
   const [stationRequests, setStationRequests] = useState<StationRequestSummary[]>([]);
   const [requestScope, setRequestScope] = useState<'open' | 'all'>('open');
+  // Only officers may open the Personnel Equipment Request; the server says who they are.
+  const [canRequestPersonnelEquipment, setCanRequestPersonnelEquipment] = useState(false);
+  useEffect(() => {
+    let active = true;
+    identityForQueueCapture({ redirectOnExpiry: false })
+      .then((identity) => { if (active) setCanRequestPersonnelEquipment(identity.capabilities?.personnelEquipmentRequest === true); })
+      .catch(() => { if (active) setCanRequestPersonnelEquipment(false); });
+    return () => { active = false; };
+  }, []);
   const [serviceTickets, setServiceTickets] = useState<ApparatusServiceTicketSummary[]>([]);
   const [serviceTicketScope, setServiceTicketScope] = useState<'open' | 'all'>('open');
   const [openServiceTicketCount, setOpenServiceTicketCount] = useState(0);
@@ -234,7 +244,7 @@ export default function StationDetailPage() {
       icon: <ClipboardCheck size={20} />,
       emphasis: true,
     }] : []),
-    { label: 'Personnel Equipment Request', href: `/employee/personnel-equipment-request?station_id=${station.id}&return_to=${hubStationReturn}`, icon: <ShieldCheck size={20} /> },
+    ...(canRequestPersonnelEquipment ? [{ label: 'Personnel Equipment Request', href: `/employee/personnel-equipment-request?station_id=${station.id}&return_to=${hubStationReturn}`, icon: <ShieldCheck size={20} /> }] : []),
     { label: 'Station Request', to: stationRequestPath, icon: <ClipboardList size={20} /> },
     { label: 'Apparatus Service', href: apparatusServicePath, icon: <Wrench size={20} /> },
     { label: 'Station Inspection', to: stationInspectionPath, icon: <ClipboardCheck size={20} /> },

@@ -519,6 +519,16 @@ test("the PHP server routes Daily SPA navigation through Laravel authentication"
   assert.match(server, /require_once\s+\$publicPath\s*\.\s*['"]\/index\.php['"]/);
 });
 
+test("the production web server runs several PHP workers under Supervisor", () => {
+  const supervisor = readFileSync(resolve(root, "docker/production/supervisord.conf"), "utf8");
+  const compose = readFileSync(resolve(root, "compose.prod.image.yaml"), "utf8");
+
+  // artisan serve only honours PHP_CLI_SERVER_WORKERS with LARAVEL_SAIL=1 (or --no-reload).
+  assert.match(compose, /PHP_CLI_SERVER_WORKERS: "\$\{HUB_PHP_CLI_SERVER_WORKERS:-8\}"/);
+  assert.match(supervisor, /environment=LARAVEL_SAIL="1"/);
+  assert.match(compose, /LARAVEL_SAIL: 1/);
+});
+
 test("the PHP server long-caches only content-hashed Vite assets and deploy caches events", () => {
   const server = readFileSync(resolve(root, "server.php"), "utf8");
   const deploy = readFileSync(resolve(root, ".github/workflows/deploy.yml"), "utf8");
