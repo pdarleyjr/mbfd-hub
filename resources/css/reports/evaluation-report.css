@@ -518,7 +518,7 @@ strong { color: var(--color-navy); font-weight: 600; }
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    color: var(--color-red);
+    color: rgb(var(--hub-danger-border));
     margin-bottom: 0.25rem;
 }
 .winner-name {
@@ -548,7 +548,7 @@ strong { color: var(--color-navy); font-weight: 600; }
     font-size: 0.625rem;
     text-transform: uppercase;
     letter-spacing: 0.1em;
-    color: rgb(var(--hub-n-0) / 0.4);
+    color: rgb(var(--hub-border));
     margin-top: 0.25rem;
 }
 

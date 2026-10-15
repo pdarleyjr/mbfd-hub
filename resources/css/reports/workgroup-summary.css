@@ -479,7 +479,7 @@ table.report-table tbody tr:hover { background: rgb(var(--hub-surface-muted)); }
     font-family: var(--font-sans);
     font-size: 1rem;
     font-weight: 700;
-    color: var(--color-accent);
+    color: rgb(var(--hub-danger));
     margin-bottom: 0.5rem;
 }
 
