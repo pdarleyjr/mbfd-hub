@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\StationResource\Pages;
 use App\Filament\Resources\StationResource\RelationManagers;
+use App\Filament\Resources\StationResource\StationOperationsSection;
 use App\Models\Station;
 use App\Services\StationStaffingService;
 use Filament\Forms;
@@ -82,6 +83,20 @@ class StationResource extends Resource
                             ->required()
                             ->maxLength(255),
                     ])->columns(3),
+                Forms\Components\Section::make('Station Photo')
+                    ->description('Shown on the member station list and station profile. Without a photo, members see the standard station artwork.')
+                    ->schema([
+                        Forms\Components\FileUpload::make('image_path')
+                            ->label('Photo')
+                            ->disk(Station::IMAGE_DISK)
+                            ->directory(Station::IMAGE_DIRECTORY)
+                            ->visibility('public')
+                            ->image()
+                            ->acceptedFileTypes(Station::IMAGE_MIME_TYPES)
+                            ->maxSize(Station::IMAGE_MAX_KILOBYTES)
+                            ->helperText('JPEG, PNG, or WebP, up to 5 MB. A landscape photo of the station front works best.'),
+                    ])
+                    ->collapsible(),
                 Forms\Components\Section::make('Additional Information')
                     ->schema([
                         Forms\Components\Textarea::make('notes')
@@ -94,6 +109,17 @@ class StationResource extends Resource
     {
         return $infolist
             ->schema([
+                StationOperationsSection::make(),
+                Infolists\Components\Section::make('Station Photo')
+                    ->schema([
+                        Infolists\Components\ImageEntry::make('image_path')
+                            ->hiddenLabel()
+                            ->disk(Station::IMAGE_DISK)
+                            ->visibility('public')
+                            ->height(180)
+                            ->placeholder('No photo uploaded. Members see the standard station artwork.'),
+                    ])
+                    ->collapsible(),
                 Infolists\Components\Section::make('Inventory Readiness')
                     ->description('Low stock, ordered items, and supply requests that need attention.')
                     ->schema([
@@ -248,6 +274,9 @@ class StationResource extends Resource
             RelationManagers\StationSupplyRequestsRelationManager::class,
             RelationManagers\InventorySubmissionsRelationManager::class,
             RelationManagers\StationRequestsRelationManager::class,
+            RelationManagers\ApparatusServiceTicketsRelationManager::class,
+            RelationManagers\DailyCheckoutsRelationManager::class,
+            RelationManagers\EquipmentIssuesRelationManager::class,
             RelationManagers\StationInspectionsRelationManager::class,
         ];
     }
