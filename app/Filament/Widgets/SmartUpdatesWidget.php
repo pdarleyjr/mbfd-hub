@@ -2,38 +2,44 @@
 
 namespace App\Filament\Widgets;
 
-use Filament\Widgets\Widget;
-use App\Services\CloudflareAIService;
-use App\Services\CommandCenterAiService;
-use App\Models\CapitalProject;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
-use App\Models\ShopWork;
+use App\Models\CapitalProject;
 use App\Models\EquipmentItem;
-use Illuminate\Support\Facades\Log;
+use App\Models\ShopWork;
+use App\Services\CloudflareAIService;
+use App\Services\CommandCenterAiService;
+use Filament\Widgets\Widget;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Livewire\Attributes\On;
 
 class SmartUpdatesWidget extends Widget
 {
     protected static string $view = 'filament.widgets.smart-updates-widget';
+
     protected static ?int $sort = 4;
 
-    protected int | string | array $columnSpan = 'full';
+    protected int|string|array $columnSpan = 'full';
 
     // Instant data - no AI delay
     public ?array $bulletSummary = null;
+
     public ?array $rawMetrics = null;
 
     // Chat state - collapsible
     public string $chatInput = '';
+
     public array $chatMessages = [];
+
     public bool $chatLoading = false;
+
     public bool $isExpanded = false; // Start collapsed
 
     // AI brief — regenerated asynchronously, and ONLY when the operational
     // data fingerprint changes (see CommandCenterAiService).
     public ?array $aiSummary = null;
+
     public ?string $aiSummaryAt = null;
 
     public function mount(): void
@@ -60,42 +66,42 @@ class SmartUpdatesWidget extends Widget
         $bullets = [];
 
         // Out of Service Vehicles (CRITICAL - show first)
-        if (!empty($metrics['out_of_service'])) {
+        if (! empty($metrics['out_of_service'])) {
             $bullets['out_of_service'] = [
                 'icon' => '🚨',
                 'title' => 'Out of Service',
                 'color' => 'red',
-                'items' => array_map(fn($v) => "{$v['unit']} - {$v['vehicle']}" . ($v['notes'] ? " ({$v['notes']})" : ''), $metrics['out_of_service']),
+                'items' => array_map(fn ($v) => "{$v['unit']} - {$v['vehicle']}".($v['notes'] ? " ({$v['notes']})" : ''), $metrics['out_of_service']),
             ];
         }
 
         // Open Defects
-        if (!empty($metrics['apparatus_issues'])) {
+        if (! empty($metrics['apparatus_issues'])) {
             $bullets['defects'] = [
                 'icon' => '🔧',
                 'title' => 'Open Defects',
                 'color' => 'orange',
-                'items' => array_map(fn($d) => "{$d['unit']}: {$d['issue']}", array_slice($metrics['apparatus_issues'], 0, 5)),
+                'items' => array_map(fn ($d) => "{$d['unit']}: {$d['issue']}", array_slice($metrics['apparatus_issues'], 0, 5)),
             ];
         }
 
         // Low Stock Equipment
-        if (!empty($metrics['equipment_inventory']['low_stock_items'])) {
+        if (! empty($metrics['equipment_inventory']['low_stock_items'])) {
             $bullets['low_stock'] = [
                 'icon' => '📦',
                 'title' => 'Low Stock Items',
                 'color' => 'yellow',
-                'items' => array_map(fn($i) => "{$i['name']} ({$i['current_stock']}/{$i['reorder_min']})", $metrics['equipment_inventory']['low_stock_items']),
+                'items' => array_map(fn ($i) => "{$i['name']} ({$i['current_stock']}/{$i['reorder_min']})", $metrics['equipment_inventory']['low_stock_items']),
             ];
         }
 
         // Active Shop Work
-        if (!empty($metrics['shop_work'])) {
+        if (! empty($metrics['shop_work'])) {
             $bullets['shop_work'] = [
                 'icon' => '🛠️',
                 'title' => 'Active Shop Work',
                 'color' => 'purple',
-                'items' => array_map(fn($w) => "{$w['project']} - {$w['status']}", array_slice($metrics['shop_work'], 0, 5)),
+                'items' => array_map(fn ($w) => "{$w['project']} - {$w['status']}", array_slice($metrics['shop_work'], 0, 5)),
             ];
         }
 
@@ -107,7 +113,7 @@ class SmartUpdatesWidget extends Widget
         if (($metrics['capital_projects']['at_risk'] ?? 0) > 0) {
             $projectAlerts[] = "{$metrics['capital_projects']['at_risk']} at-risk project(s)";
         }
-        if (!empty($projectAlerts)) {
+        if (! empty($projectAlerts)) {
             $bullets['projects'] = [
                 'icon' => '📋',
                 'title' => 'Project Alerts',
@@ -123,7 +129,7 @@ class SmartUpdatesWidget extends Widget
             'color' => 'green',
             'items' => [
                 "{$metrics['vehicle_inventory']['total']} total apparatus",
-                ($metrics['vehicle_inventory']['by_status']['In Service'] ?? 0) . " in service",
+                ($metrics['vehicle_inventory']['by_status']['In Service'] ?? 0).' in service',
             ],
         ];
 
@@ -151,8 +157,8 @@ class SmartUpdatesWidget extends Widget
 
         try {
             $aiService = app(CloudflareAIService::class);
-            
-            if (!$aiService->isEnabled()) {
+
+            if (! $aiService->isEnabled()) {
                 $this->chatMessages[] = [
                     'role' => 'assistant',
                     'content' => 'AI service is not configured.',
@@ -160,7 +166,7 @@ class SmartUpdatesWidget extends Widget
                 ];
             } else {
                 $response = $aiService->chat($userMessage, $this->rawMetrics ?? []);
-                
+
                 $this->chatMessages[] = [
                     'role' => 'assistant',
                     'content' => $response['message'],
@@ -170,7 +176,7 @@ class SmartUpdatesWidget extends Widget
         } catch (\Exception $e) {
             $this->chatMessages[] = [
                 'role' => 'assistant',
-                'content' => 'Error: ' . $e->getMessage(),
+                'content' => 'Error: '.$e->getMessage(),
                 'time' => now()->format('g:i A'),
             ];
         }
@@ -189,23 +195,23 @@ class SmartUpdatesWidget extends Widget
             ->groupBy('status')
             ->pluck('count', 'status')
             ->toArray();
-        
+
         // Out of service vehicles
         $outOfService = Apparatus::where('status', 'Out of Service')
             ->orWhere('status', 'out_of_service')
             ->get(['unit_id', 'make', 'model', 'notes']);
-        
+
         // Overdue inspections - optimized query
-        $overdueInspections = Apparatus::whereDoesntHave('inspections', function($q) {
+        $overdueInspections = Apparatus::whereDoesntHave('inspections', function ($q) {
             $q->where('created_at', '>=', today()->subDay());
         })->count();
-        
+
         // Open defects/apparatus issues
         $openDefects = ApparatusDefect::where('resolved', false)
             ->with('apparatus:id,unit_id')
             ->limit(10)
             ->get(['id', 'apparatus_id', 'item', 'status', 'notes', 'created_at']);
-        
+
         // Shop work (active projects)
         $activeShopWork = [];
         try {
@@ -216,24 +222,24 @@ class SmartUpdatesWidget extends Widget
         } catch (\Exception $e) {
             // ShopWork table may not exist
         }
-        
+
         // Equipment inventory
         $equipmentData = [];
         try {
             $totalEquipment = EquipmentItem::where('is_active', true)->count();
             $allEquipment = EquipmentItem::withStockTotal(EquipmentItem::query())->where('is_active', true)->get();
-            
+
             // Calculate low stock items (stock <= reorder_min)
-            $lowStockItems = $allEquipment->filter(fn($item) => $item->stock <= $item->reorder_min);
-            
+            $lowStockItems = $allEquipment->filter(fn ($item) => $item->stock <= $item->reorder_min);
+
             // Group by category
             $byCategory = $allEquipment->groupBy('category')->map->count()->toArray();
-            
+
             $equipmentData = [
                 'total_items' => $totalEquipment,
                 'low_stock_count' => $lowStockItems->count(),
                 'by_category' => $byCategory,
-                'low_stock_items' => $lowStockItems->take(5)->map(fn($item) => [
+                'low_stock_items' => $lowStockItems->take(5)->map(fn ($item) => [
                     'name' => $item->name,
                     'current_stock' => $item->stock,
                     'reorder_min' => $item->reorder_min,
@@ -242,18 +248,17 @@ class SmartUpdatesWidget extends Widget
             ];
         } catch (\Exception $e) {
             // EquipmentItem table may not exist
-            Log::debug('Equipment metrics unavailable: ' . $e->getMessage());
+            Log::debug('Equipment metrics unavailable: '.$e->getMessage());
         }
-        
+
         // Capital projects
         $capitalProjects = CapitalProject::with(['milestones', 'updates'])
             ->orderBy('priority')
             ->limit(10)
             ->get();
-        
-        $overdueProjects = $capitalProjects->filter(fn($p) => $p->is_overdue ?? false);
-        $atRiskProjects = $capitalProjects->filter(fn($p) => 
-            ($p->status->value ?? $p->status) === 'at_risk'
+
+        $overdueProjects = $capitalProjects->filter(fn ($p) => $p->is_overdue ?? false);
+        $atRiskProjects = $capitalProjects->filter(fn ($p) => ($p->status->value ?? $p->status) === 'at_risk'
         );
 
         return [
@@ -262,17 +267,17 @@ class SmartUpdatesWidget extends Widget
                 'by_status' => $apparatusByStatus,
                 'overdue_inspections' => $overdueInspections,
             ],
-            'out_of_service' => $outOfService->map(fn($a) => [
+            'out_of_service' => $outOfService->map(fn ($a) => [
                 'unit' => $a->unit_id,
                 'vehicle' => "{$a->make} {$a->model}",
                 'notes' => $a->notes,
             ])->toArray(),
-            'apparatus_issues' => $openDefects->map(fn($d) => [
+            'apparatus_issues' => $openDefects->map(fn ($d) => [
                 'unit' => $d->apparatus?->unit_id ?? 'Unknown',
                 'issue' => $d->item,
                 'severity' => $d->status,
             ])->toArray(),
-            'shop_work' => collect($activeShopWork)->map(fn($w) => [
+            'shop_work' => collect($activeShopWork)->map(fn ($w) => [
                 'project' => $w->project_name,
                 'status' => $w->status,
                 'unit' => $w->apparatus?->unit_id ?? 'N/A',
@@ -282,7 +287,7 @@ class SmartUpdatesWidget extends Widget
                 'total' => $capitalProjects->count(),
                 'overdue' => $overdueProjects->count(),
                 'at_risk' => $atRiskProjects->count(),
-                'recent' => $capitalProjects->take(5)->map(fn($p) => [
+                'recent' => $capitalProjects->take(5)->map(fn ($p) => [
                     'name' => $p->name,
                     'status' => $p->status->value ?? $p->status,
                     'priority' => $p->priority->value ?? $p->priority,

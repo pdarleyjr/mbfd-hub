@@ -17,12 +17,12 @@ class InventoryChatController extends Controller
 
         // Get inventory context for AI
         $allItems = EquipmentItem::withStockTotal(EquipmentItem::query())->where('is_active', true)->get();
-        
+
         $context = [
             'low_stock_items' => $allItems
-                ->filter(fn($item) => $item->stock <= $item->reorder_min)
+                ->filter(fn ($item) => $item->stock <= $item->reorder_min)
                 ->take(20)
-                ->map(fn($item) => [
+                ->map(fn ($item) => [
                     'id' => $item->id,
                     'name' => $item->name,
                     'stock' => $item->stock,
@@ -31,9 +31,9 @@ class InventoryChatController extends Controller
                 ->values()
                 ->toArray(),
             'top_items' => $allItems
-                ->sortByDesc(fn($item) => $item->stock)
+                ->sortByDesc(fn ($item) => $item->stock)
                 ->take(10)
-                ->map(fn($item) => [
+                ->map(fn ($item) => [
                     'id' => $item->id,
                     'name' => $item->name,
                     'stock' => $item->stock,
@@ -45,12 +45,12 @@ class InventoryChatController extends Controller
         // Call Cloudflare Worker
         $response = Http::withHeaders([
             'x-api-secret' => config('cloudflare.worker_api_secret'),
-        ])->post(config('cloudflare.worker_url') . '/ai/inventory-chat', [
+        ])->post(config('cloudflare.worker_url').'/ai/inventory-chat', [
             'message' => $request->message,
             'inventory_context' => $context,
         ]);
 
-        if (!$response->successful()) {
+        if (! $response->successful()) {
             return response()->json([
                 'error' => 'Failed to process request',
             ], 500);
@@ -59,10 +59,10 @@ class InventoryChatController extends Controller
         $aiResponse = $response->json();
 
         // Validate proposed actions (ensure item IDs exist)
-        if (!empty($aiResponse['proposed_actions'])) {
+        if (! empty($aiResponse['proposed_actions'])) {
             foreach ($aiResponse['proposed_actions'] as &$action) {
                 $item = EquipmentItem::find($action['equipment_item_id'] ?? null);
-                if (!$item) {
+                if (! $item) {
                     $action['valid'] = false;
                     $action['error'] = 'Item not found';
                 } else {
@@ -89,13 +89,13 @@ class InventoryChatController extends Controller
 
         switch ($request->action) {
             case 'increase_stock':
-                $item->increaseStock($request->qty, $request->reason, 'CHAT-' . auth()->id());
+                $item->increaseStock($request->qty, $request->reason, 'CHAT-'.auth()->id());
                 break;
             case 'decrease_stock':
-                $item->decreaseStock($request->qty, $request->reason, 'CHAT-' . auth()->id());
+                $item->decreaseStock($request->qty, $request->reason, 'CHAT-'.auth()->id());
                 break;
             case 'set_stock':
-                $item->setStock($request->qty, $request->reason, 'CHAT-' . auth()->id());
+                $item->setStock($request->qty, $request->reason, 'CHAT-'.auth()->id());
                 break;
             case 'move_location':
                 $item->update(['location_id' => $request->location_id]);

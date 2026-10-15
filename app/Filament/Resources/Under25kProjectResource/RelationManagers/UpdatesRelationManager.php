@@ -7,8 +7,6 @@ use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
 
 class UpdatesRelationManager extends RelationManager
@@ -57,7 +55,7 @@ class UpdatesRelationManager extends RelationManager
                     ->searchable()
                     ->label('Update'),
                 Tables\Columns\TextColumn::make('percent_complete_snapshot')
-                    ->formatStateUsing(fn ($state) => $state ? $state . '%' : 'N/A')
+                    ->formatStateUsing(fn ($state) => $state ? $state.'%' : 'N/A')
                     ->label('Progress')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('user.name')
@@ -75,6 +73,7 @@ class UpdatesRelationManager extends RelationManager
                 Tables\Actions\CreateAction::make()
                     ->mutateFormDataUsing(function (array $data): array {
                         $data['user_id'] = Auth::id();
+
                         return $data;
                     }),
             ])

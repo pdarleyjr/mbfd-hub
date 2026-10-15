@@ -41,7 +41,7 @@ final class EmployeeContextualControlsTest extends TestCase
             'profile-save' => ['Save profile changes'],
             'login-recovery' => ['Issue temporary password', 'Change city email', 'Disable account'],
             'hub-roles' => ['Edit advanced system access'],
-            'hub-capabilities' => ['Edit direct administrative capabilities'],
+            'hub-capabilities' => ['Uniform and PPE manager (one switch)', 'Edit direct administrative capabilities'],
             'ecosystem' => ['Edit application access', 'Edit application administrator roles'],
             'workgroups' => ['Manage workgroups'],
         ] as $context => $labels) {
@@ -51,7 +51,7 @@ final class EmployeeContextualControlsTest extends TestCase
         self::assertSame(['cancel'], array_map(fn ($action) => $action->getName(), $page->instance()->getCachedFormActions()));
         $page->assertSee('Role-inherited capabilities are maintained through advanced system access.');
 
-        foreach (['manageRoles', 'manageAdministrationCapabilities', 'manageApplicationAccess', 'manageApplicationAdministration', 'manageWorkgroups', 'resetPassword', 'correctEmployeeId'] as $action) {
+        foreach (['manageRoles', 'manageUniformManager', 'manageAdministrationCapabilities', 'manageApplicationAccess', 'manageApplicationAdministration', 'manageWorkgroups', 'resetPassword', 'correctEmployeeId'] as $action) {
             $page->mountAction($action)->assertActionMounted($action)
                 ->assertSee('Your current administrator password')->assertSee('Reason for this change')
                 ->call('unmountAction');

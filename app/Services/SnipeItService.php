@@ -24,7 +24,9 @@ class SnipeItService
     ];
 
     protected string $baseUrl;
+
     protected string $token;
+
     protected int $timeout;
 
     public function __construct()
@@ -49,10 +51,10 @@ class SnipeItService
         $type = $data['scan_type'] ?? 'hardware';
 
         return match ($type) {
-            'accessory'  => $this->createAccessory($data),
+            'accessory' => $this->createAccessory($data),
             'consumable' => $this->createConsumable($data),
-            'component'  => $this->createComponent($data),
-            default      => $this->createHardwareAsset($data),
+            'component' => $this->createComponent($data),
+            default => $this->createHardwareAsset($data),
         };
     }
 
@@ -65,7 +67,7 @@ class SnipeItService
         // Asset Name: use item_name if provided, otherwise fall back to brand + model
         $assetName = trim($data['item_name'] ?? '');
         if ($assetName === '') {
-            $assetName = trim(($data['brand'] ?? '') . ' ' . ($data['model'] ?? ''));
+            $assetName = trim(($data['brand'] ?? '').' '.($data['model'] ?? ''));
         }
         if ($assetName === '' || $assetName === ' ') {
             $assetName = 'Unknown Equipment';
@@ -76,24 +78,26 @@ class SnipeItService
 
         // Resolve or create manufacturer + category + model chain
         $manufacturerId = null;
-        if (!empty($data['brand'])) {
+        if (! empty($data['brand'])) {
             $manufacturerId = $this->resolveOrCreateManufacturer($data['brand']);
         }
 
         $categoryId = $this->resolveOrCreateCategory($categoryName, 'asset');
 
         // Model name uses brand + model number for lookup/creation
-        $modelName = trim(($data['brand'] ?? '') . ' ' . ($data['model'] ?? ''));
-        if ($modelName === '' || $modelName === ' ') $modelName = $assetName;
+        $modelName = trim(($data['brand'] ?? '').' '.($data['model'] ?? ''));
+        if ($modelName === '' || $modelName === ' ') {
+            $modelName = $assetName;
+        }
         $modelId = $this->resolveOrCreateModel($modelName, $manufacturerId, $categoryId);
 
         $payload = [
-            'name'           => $assetName,
-            'serial'         => $data['serial'] ?? null,
-            'status_id'      => $data['status_id'] ?? 2,  // Ready to Deploy
-            'rtd_location_id'=> $data['location_id'] ?? null,
-            'asset_tag'      => $data['asset_tag'] ?? $this->generateAssetTag(),
-            'notes'          => $data['notes'] ?? null,
+            'name' => $assetName,
+            'serial' => $data['serial'] ?? null,
+            'status_id' => $data['status_id'] ?? 2,  // Ready to Deploy
+            'rtd_location_id' => $data['location_id'] ?? null,
+            'asset_tag' => $data['asset_tag'] ?? $this->generateAssetTag(),
+            'notes' => $data['notes'] ?? null,
         ];
 
         if ($modelId) {
@@ -109,15 +113,15 @@ class SnipeItService
 
     protected function createAccessory(array $data): array
     {
-        $name       = $data['name'] ?? (trim(($data['brand'] ?? '') . ' ' . ($data['model'] ?? '')) ?: 'Unknown Accessory');
+        $name = $data['name'] ?? (trim(($data['brand'] ?? '').' '.($data['model'] ?? '')) ?: 'Unknown Accessory');
         $categoryId = $this->resolveOrCreateCategory($data['category'] ?? 'General', 'accessory');
 
         $payload = [
-            'name'        => $name,
+            'name' => $name,
             'category_id' => $categoryId,
-            'qty'         => max(1, (int) ($data['qty'] ?? 1)),
+            'qty' => max(1, (int) ($data['qty'] ?? 1)),
             'location_id' => $data['location_id'] ?? null,
-            'notes'       => $data['notes'] ?? null,
+            'notes' => $data['notes'] ?? null,
         ];
 
         return $this->post('/accessories', $payload);
@@ -129,15 +133,15 @@ class SnipeItService
 
     protected function createConsumable(array $data): array
     {
-        $name       = $data['name'] ?? (trim(($data['brand'] ?? '') . ' ' . ($data['model'] ?? '')) ?: 'Unknown Consumable');
+        $name = $data['name'] ?? (trim(($data['brand'] ?? '').' '.($data['model'] ?? '')) ?: 'Unknown Consumable');
         $categoryId = $this->resolveOrCreateCategory($data['category'] ?? 'General', 'consumable');
 
         $payload = [
-            'name'        => $name,
+            'name' => $name,
             'category_id' => $categoryId,
-            'qty'         => max(1, (int) ($data['qty'] ?? 1)),
+            'qty' => max(1, (int) ($data['qty'] ?? 1)),
             'location_id' => $data['location_id'] ?? null,
-            'notes'       => $data['notes'] ?? null,
+            'notes' => $data['notes'] ?? null,
         ];
 
         return $this->post('/consumables', $payload);
@@ -149,16 +153,16 @@ class SnipeItService
 
     protected function createComponent(array $data): array
     {
-        $name       = $data['name'] ?? (trim(($data['brand'] ?? '') . ' ' . ($data['model'] ?? '')) ?: 'Unknown Component');
+        $name = $data['name'] ?? (trim(($data['brand'] ?? '').' '.($data['model'] ?? '')) ?: 'Unknown Component');
         $categoryId = $this->resolveOrCreateCategory($data['category'] ?? 'General', 'component');
 
         $payload = [
-            'name'        => $name,
+            'name' => $name,
             'category_id' => $categoryId,
-            'qty'         => max(1, (int) ($data['qty'] ?? 1)),
+            'qty' => max(1, (int) ($data['qty'] ?? 1)),
             'location_id' => $data['location_id'] ?? null,
-            'serial'      => $data['serial'] ?? null,
-            'notes'       => $data['notes'] ?? null,
+            'serial' => $data['serial'] ?? null,
+            'notes' => $data['notes'] ?? null,
         ];
 
         return $this->post('/components', $payload);
@@ -231,7 +235,7 @@ class SnipeItService
                 ->timeout($this->timeout)
                 ->accept('application/json')
                 ->post("{$this->baseUrl}/categories", [
-                    'name'          => $name,
+                    'name' => $name,
                     'category_type' => $type,
                 ]);
 
@@ -267,8 +271,12 @@ class SnipeItService
 
             // Not found — create it
             $payload = ['name' => $name];
-            if ($manufacturerId) $payload['manufacturer_id'] = $manufacturerId;
-            if ($categoryId)     $payload['category_id']     = $categoryId;
+            if ($manufacturerId) {
+                $payload['manufacturer_id'] = $manufacturerId;
+            }
+            if ($categoryId) {
+                $payload['category_id'] = $categoryId;
+            }
 
             $create = Http::withToken($this->token)
                 ->timeout($this->timeout)
@@ -292,7 +300,7 @@ class SnipeItService
     protected function post(string $endpoint, array $payload): array
     {
         // Strip null values to avoid Snipe-IT validation errors
-        $payload = array_filter($payload, fn($v) => $v !== null && $v !== '');
+        $payload = array_filter($payload, fn ($v) => $v !== null && $v !== '');
 
         try {
             $response = Http::withToken($this->token)
@@ -302,21 +310,23 @@ class SnipeItService
 
             if ($response->successful()) {
                 Log::info("Snipe-IT {$endpoint} created", ['response' => $response->json()]);
+
                 return ['success' => true, 'data' => $response->json()];
             }
 
             Log::warning("Snipe-IT {$endpoint} creation failed", [
                 'status' => $response->status(),
-                'body'   => $response->body(),
+                'body' => $response->body(),
             ]);
 
             return [
                 'success' => false,
-                'error'   => $response->json('messages') ?? $response->body(),
-                'status'  => $response->status(),
+                'error' => $response->json('messages') ?? $response->body(),
+                'status' => $response->status(),
             ];
         } catch (\Exception $e) {
             Log::error("Snipe-IT API error on {$endpoint}", ['message' => $e->getMessage()]);
+
             return ['success' => false, 'error' => $e->getMessage()];
         }
     }
@@ -334,6 +344,7 @@ class SnipeItService
         foreach ($items as $index => $item) {
             $results[$index] = $this->createAsset($item);
         }
+
         return $results;
     }
 
@@ -390,6 +401,7 @@ class SnipeItService
                 foreach ($rows as $row) {
                     $locations[$row['id']] = $row['name'];
                 }
+
                 return $locations;
             }
         } catch (\Exception $e) {
@@ -416,6 +428,7 @@ class SnipeItService
                 foreach ($rows as $row) {
                     $models[$row['id']] = $row['name'];
                 }
+
                 return $models;
             }
         } catch (\Exception $e) {
@@ -540,7 +553,7 @@ class SnipeItService
 
     protected function put(string $endpoint, array $payload): array
     {
-        $payload = array_filter($payload, fn($v) => $v !== null && $v !== '');
+        $payload = array_filter($payload, fn ($v) => $v !== null && $v !== '');
 
         try {
             $response = Http::withToken($this->token)
@@ -564,6 +577,7 @@ class SnipeItService
             ];
         } catch (\Exception $e) {
             Log::error("Snipe-IT API error on PUT {$endpoint}", ['message' => $e->getMessage()]);
+
             return ['success' => false, 'error' => $e->getMessage()];
         }
     }
@@ -573,6 +587,6 @@ class SnipeItService
      */
     protected function generateAssetTag(): string
     {
-        return 'MBFD-' . strtoupper(substr(md5(uniqid()), 0, 8));
+        return 'MBFD-'.strtoupper(substr(md5(uniqid()), 0, 8));
     }
 }

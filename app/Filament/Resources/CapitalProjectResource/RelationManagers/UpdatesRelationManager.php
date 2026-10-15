@@ -7,8 +7,6 @@ use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
 
 class UpdatesRelationManager extends RelationManager
@@ -54,6 +52,7 @@ class UpdatesRelationManager extends RelationManager
                 Tables\Actions\CreateAction::make()
                     ->mutateFormDataUsing(function (array $data): array {
                         $data['user_id'] = Auth::id();
+
                         return $data;
                     }),
             ])
