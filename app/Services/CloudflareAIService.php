@@ -2,20 +2,26 @@
 
 namespace App\Services;
 
+use App\Exceptions\AIServiceUnavailable;
 use App\Models\AIAnalysisLog;
 use App\Models\CapitalProject;
+use Carbon\Carbon;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-use Carbon\Carbon;
 
 class CloudflareAIService
 {
     protected string $accountId;
+
     protected string $apiToken;
+
     protected array $config;
+
     protected bool $enabled;
+
     protected ?string $gatewayUrl;
 
     public function __construct()
@@ -29,31 +35,32 @@ class CloudflareAIService
 
     public function isEnabled(): bool
     {
-        return $this->enabled && !empty($this->accountId) && !empty($this->apiToken);
+        return $this->enabled && ! empty($this->accountId) && ! empty($this->apiToken);
     }
 
     public function runModel(string $model, array $messages, array $options = []): array
     {
-        if (!$this->isEnabled()) {
+        if (! $this->isEnabled()) {
             throw new \Exception('Cloudflare AI service is not enabled or not properly configured.');
         }
 
-        if (!$this->checkRateLimit()) {
+        if (! $this->checkRateLimit()) {
             throw new \Exception('Daily rate limit exceeded. Please try again tomorrow.');
         }
 
         // Route through AI Gateway if configured, otherwise use direct Cloudflare API
         if ($this->gatewayUrl) {
             $modelPath = ltrim(str_replace('@cf/', '', $model), '/');
-            $url = rtrim($this->gatewayUrl, '/') . '/' . $modelPath;
+            $url = rtrim($this->gatewayUrl, '/').'/'.$modelPath;
         } else {
             $url = "https://api.cloudflare.com/client/v4/accounts/{$this->accountId}/ai/run/{$model}";
         }
-        
+
         $attempts = 0;
         $maxAttempts = $this->config['rate_limit']['retry_attempts'] ?? 3;
         $retryDelay = $this->config['rate_limit']['retry_delay'] ?? 1000;
         $lastException = null;
+        $lastStatus = null;
 
         while ($attempts < $maxAttempts) {
             $attempts++;
@@ -63,11 +70,11 @@ class CloudflareAIService
                     'Authorization' => "Bearer {$this->apiToken}",
                     'Content-Type' => 'application/json',
                 ])
-                ->timeout($this->config['timeouts']['request'] ?? 30)
-                ->connectTimeout($this->config['timeouts']['connect'] ?? 10)
-                ->post($url, array_merge([
-                    'messages' => $messages,
-                ], $options));
+                    ->timeout($this->config['timeouts']['request'] ?? 30)
+                    ->connectTimeout($this->config['timeouts']['connect'] ?? 10)
+                    ->post($url, array_merge([
+                        'messages' => $messages,
+                    ], $options));
 
                 if ($response->successful()) {
                     return $response->json();
@@ -75,26 +82,39 @@ class CloudflareAIService
 
                 if ($response->status() === 429) {
                     $retryAfter = $response->header('Retry-After', $retryDelay / 1000);
-                    $waitTime = is_numeric($retryAfter) ? (int)$retryAfter * 1000 : $retryDelay;
+                    $waitTime = is_numeric($retryAfter) ? (int) $retryAfter * 1000 : $retryDelay;
                     if ($attempts < $maxAttempts) {
                         usleep($waitTime * 1000);
+
                         continue;
                     }
                 }
 
+                $lastStatus = $response->status();
                 throw new \Exception("API request failed: {$response->status()}");
-
             } catch (\Exception $e) {
                 $lastException = $e;
+                if ($e instanceof ConnectionException) {
+                    $lastStatus = null;
+                }
                 if ($attempts < $maxAttempts) {
                     $waitTime = $retryDelay * pow(2, $attempts - 1);
                     usleep($waitTime * 1000);
+
                     continue;
                 }
             }
         }
 
-        throw new \Exception("Failed after {$maxAttempts} attempts: " . $lastException->getMessage());
+        if ($lastException instanceof ConnectionException) {
+            throw AIServiceUnavailable::unreachable($lastException);
+        }
+
+        if ($lastStatus !== null && ($lastStatus === 429 || $lastStatus >= 500)) {
+            throw AIServiceUnavailable::fromStatus($lastStatus, 'Cloudflare AI request', $lastException);
+        }
+
+        throw new \Exception("Failed after {$maxAttempts} attempts: ".$lastException->getMessage());
     }
 
     public function checkRateLimit(): bool
@@ -102,7 +122,7 @@ class CloudflareAIService
         $cacheKey = $this->config['rate_limit']['cache_key'] ?? 'cloudflare_ai_requests';
         $dailyLimit = $this->config['rate_limit']['daily_neurons'] ?? 9900;
         $currentCount = Cache::get($cacheKey, 0);
-        
+
         if ($currentCount >= $dailyLimit) {
             return false;
         }
@@ -111,7 +131,7 @@ class CloudflareAIService
         $midnight = $now->copy()->endOfDay();
         $secondsUntilMidnight = $midnight->diffInSeconds($now);
         Cache::put($cacheKey, $currentCount + 1, $secondsUntilMidnight);
-        
+
         return true;
     }
 
@@ -120,7 +140,7 @@ class CloudflareAIService
         $cacheKey = $this->config['rate_limit']['cache_key'] ?? 'cloudflare_ai_requests';
         $dailyLimit = $this->config['rate_limit']['daily_neurons'] ?? 9900;
         $currentCount = Cache::get($cacheKey, 0);
-        
+
         return [
             'used' => $currentCount,
             'limit' => $dailyLimit,
@@ -136,19 +156,19 @@ class CloudflareAIService
         $startTime = now();
 
         try {
-            $systemPrompt = "You are a fire department operations assistant. Generate ONLY valid JSON with brief bullet points (max 10 words each). No markdown, no paragraphs.";
+            $systemPrompt = 'You are a fire department operations assistant. Generate ONLY valid JSON with brief bullet points (max 10 words each). No markdown, no paragraphs.';
 
-            $userPrompt = "Based on this operational data, create a compact summary:\n\n" .
-                json_encode($metrics, JSON_PRETTY_PRINT) . "\n\n" .
-                "Respond with ONLY this JSON structure (no other text):\n" .
-                "{\n" .
-                "  \"vehicle_inventory\": [\"bullet1\", \"bullet2\"],\n" .
-                "  \"out_of_service\": [\"bullet1\"],\n" .
-                "  \"apparatus_issues\": [\"bullet1\"],\n" .
-                "  \"equipment_alerts\": [\"bullet1\"],\n" .
-                "  \"capital_projects\": [\"bullet1\"]\n" .
-                "}\n" .
-                "Rules: 3-10 words per bullet. Use empty arrays [] if no items.";
+            $userPrompt = "Based on this operational data, create a compact summary:\n\n".
+                json_encode($metrics, JSON_PRETTY_PRINT)."\n\n".
+                "Respond with ONLY this JSON structure (no other text):\n".
+                "{\n".
+                "  \"vehicle_inventory\": [\"bullet1\", \"bullet2\"],\n".
+                "  \"out_of_service\": [\"bullet1\"],\n".
+                "  \"apparatus_issues\": [\"bullet1\"],\n".
+                "  \"equipment_alerts\": [\"bullet1\"],\n".
+                "  \"capital_projects\": [\"bullet1\"]\n".
+                "}\n".
+                'Rules: 3-10 words per bullet. Use empty arrays [] if no items.';
 
             $messages = [
                 ['role' => 'system', 'content' => $systemPrompt],
@@ -170,7 +190,7 @@ class CloudflareAIService
             return $result;
 
         } catch (\Exception $e) {
-            Log::error('Admin bullet summary generation failed', ['error' => $e->getMessage()]);
+            $this->reportFailure('Admin bullet summary generation failed', $e);
             throw $e;
         }
     }
@@ -178,7 +198,7 @@ class CloudflareAIService
     public function prioritizeProjects(Collection $projects): array
     {
         $startTime = now();
-        
+
         try {
             $projectData = $projects->map(function ($project) {
                 return [
@@ -192,11 +212,11 @@ class CloudflareAIService
                 ];
             })->toArray();
 
-            $systemPrompt = "You are an AI assistant specialized in capital project prioritization.";
+            $systemPrompt = 'You are an AI assistant specialized in capital project prioritization.';
 
-            $userPrompt = "Analyze these capital projects:\n\n" .
-                json_encode($projectData, JSON_PRETTY_PRINT) . "\n\n" .
-                "Provide JSON response: {\"priorities\": [{\"id\": X, \"rank\": Y, \"score\": Z, \"risk_level\": \"low|medium|high\"}], \"summary\": \"brief\"}";
+            $userPrompt = "Analyze these capital projects:\n\n".
+                json_encode($projectData, JSON_PRETTY_PRINT)."\n\n".
+                'Provide JSON response: {"priorities": [{"id": X, "rank": Y, "score": Z, "risk_level": "low|medium|high"}], "summary": "brief"}';
 
             $messages = [
                 ['role' => 'system', 'content' => $systemPrompt],
@@ -206,7 +226,7 @@ class CloudflareAIService
             $model = $this->config['models']['default'] ?? '@cf/meta/llama-3-8b-instruct';
             $response = $this->runModel($model, $messages);
             $result = $this->parseAIResponse($response);
-            
+
             AIAnalysisLog::create([
                 'type' => 'project_prioritization',
                 'projects_analyzed' => $projects->count(),
@@ -217,7 +237,7 @@ class CloudflareAIService
             return $result;
 
         } catch (\Exception $e) {
-            Log::error('Project prioritization failed', ['error' => $e->getMessage()]);
+            $this->reportFailure('Project prioritization failed', $e);
             throw $e;
         }
     }
@@ -225,7 +245,7 @@ class CloudflareAIService
     public function analyzeProject(CapitalProject $project): array
     {
         $startTime = now();
-        
+
         try {
             $projectData = [
                 'id' => $project->id,
@@ -238,11 +258,11 @@ class CloudflareAIService
                 'is_overdue' => $project->is_overdue ?? false,
             ];
 
-            $systemPrompt = "You are an AI assistant for capital project analysis.";
+            $systemPrompt = 'You are an AI assistant for capital project analysis.';
 
-            $userPrompt = "Analyze this project:\n\n" .
-                json_encode($projectData, JSON_PRETTY_PRINT) . "\n\n" .
-                "Respond as JSON: {\"score\": 1-100, \"risk_level\": \"low|medium|high\", \"recommendations\": [\"item1\"]}";
+            $userPrompt = "Analyze this project:\n\n".
+                json_encode($projectData, JSON_PRETTY_PRINT)."\n\n".
+                'Respond as JSON: {"score": 1-100, "risk_level": "low|medium|high", "recommendations": ["item1"]}';
 
             $messages = [
                 ['role' => 'system', 'content' => $systemPrompt],
@@ -252,7 +272,7 @@ class CloudflareAIService
             $model = $this->config['models']['default'] ?? '@cf/meta/llama-3-8b-instruct';
             $response = $this->runModel($model, $messages);
             $result = $this->parseAIResponse($response);
-            
+
             AIAnalysisLog::create([
                 'type' => 'single_project_analysis',
                 'projects_analyzed' => 1,
@@ -263,7 +283,7 @@ class CloudflareAIService
             return $result;
 
         } catch (\Exception $e) {
-            Log::error('Single project analysis failed', ['error' => $e->getMessage()]);
+            $this->reportFailure('Single project analysis failed', $e);
             throw $e;
         }
     }
@@ -271,7 +291,7 @@ class CloudflareAIService
     public function generateWeeklySummary(Collection $projects): string
     {
         $startTime = now();
-        
+
         try {
             $projectData = $projects->map(function ($project) {
                 return [
@@ -284,11 +304,11 @@ class CloudflareAIService
                 ];
             })->toArray();
 
-            $systemPrompt = "You are an AI assistant creating executive summaries. Be concise.";
+            $systemPrompt = 'You are an AI assistant creating executive summaries. Be concise.';
 
-            $userPrompt = "Create a weekly summary for these projects:\n\n" .
-                json_encode($projectData, JSON_PRETTY_PRINT) . "\n\n" .
-                "Format as brief professional summary (2-3 paragraphs max).";
+            $userPrompt = "Create a weekly summary for these projects:\n\n".
+                json_encode($projectData, JSON_PRETTY_PRINT)."\n\n".
+                'Format as brief professional summary (2-3 paragraphs max).';
 
             $messages = [
                 ['role' => 'system', 'content' => $systemPrompt],
@@ -298,7 +318,7 @@ class CloudflareAIService
             $model = $this->config['models']['default'] ?? '@cf/meta/llama-3-8b-instruct';
             $response = $this->runModel($model, $messages);
             $summary = $this->extractTextFromResponse($response);
-            
+
             AIAnalysisLog::create([
                 'type' => 'weekly_summary',
                 'projects_analyzed' => $projects->count(),
@@ -309,22 +329,35 @@ class CloudflareAIService
             return $summary;
 
         } catch (\Exception $e) {
-            Log::error('Weekly summary generation failed', ['error' => $e->getMessage()]);
+            $this->reportFailure('Weekly summary generation failed', $e);
             throw $e;
         }
+    }
+
+    /**
+     * An unavailable backend is an expected operational state (already logged
+     * once as a warning by the transport); anything else is a real error.
+     */
+    protected function reportFailure(string $message, \Throwable $e): void
+    {
+        if ($e instanceof AIServiceUnavailable) {
+            return;
+        }
+
+        Log::error($message, ['error' => $e->getMessage()]);
     }
 
     protected function parseAIResponse(array $response): array
     {
         $text = $response['result']['response'] ?? '';
-        
+
         if (preg_match('/\{[\s\S]*\}/', $text, $matches)) {
             $json = json_decode($matches[0], true);
             if (json_last_error() === JSON_ERROR_NONE) {
                 return $json;
             }
         }
-        
+
         return ['raw_response' => $text];
     }
 
@@ -341,21 +374,22 @@ class CloudflareAIService
     public function chat(string $message, array $metrics = []): array
     {
         $response = Http::withHeaders([
-            'x-api-secret' => config('cloudflare.worker_api_secret')
+            'x-api-secret' => config('cloudflare.worker_api_secret'),
         ])->timeout(10)->post(config('cloudflare.worker_url').'/ai/inventory-chat', [
             'message' => $message,
-            'inventory_context' => $metrics
+            'inventory_context' => $metrics,
         ]);
-        
+
         if ($response->failed()) {
             Log::error('Cloudflare AI chat failed', ['response' => $response->body()]);
             throw new \Exception($response->json()['message'] ?? 'AI chat failed');
         }
-        
+
         $result = $response->json();
+
         return [
             'message' => $result['assistant_message'] ?? '',
-            'actions' => $result['proposed_actions'] ?? []
+            'actions' => $result['proposed_actions'] ?? [],
         ];
     }
 }

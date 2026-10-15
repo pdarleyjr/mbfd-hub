@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Unit\Services;
 
+use App\Exceptions\AIServiceUnavailable;
 use App\Services\LocalAIService;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
@@ -209,7 +211,7 @@ class LocalAIServiceTest extends TestCase
         });
     }
 
-    public function test_failed_responses_log_metadata_without_response_body(): void
+    public function test_unavailable_backend_logs_one_warning_without_response_body(): void
     {
         Http::fakeSequence()
             ->push('sensitive provider response', 503)
@@ -221,16 +223,52 @@ class LocalAIServiceTest extends TestCase
                 ['role' => 'user', 'content' => 'test'],
             ]);
             $this->fail('Expected the provider failure to be raised.');
-        } catch (\RuntimeException $exception) {
+        } catch (AIServiceUnavailable $exception) {
             $this->assertSame('Local AI request failed: 503', $exception->getMessage());
         }
 
         Http::assertSentCount(2);
-        Log::shouldHaveReceived('error')->once()->withArgs(
-            fn (string $message, array $context): bool => $message === 'Local AI request failed'
+        Log::shouldNotHaveReceived('error');
+        Log::shouldHaveReceived('warning')->once()->withArgs(
+            fn (string $message, array $context): bool => $message === 'Local AI request unavailable'
                 && $context['status'] === 503
                 && $context['attempts'] === 2
                 && ! array_key_exists('body', $context)
+                && ! str_contains(json_encode($context, JSON_THROW_ON_ERROR), 'sensitive'),
+        );
+    }
+
+    public function test_unreachable_gateway_raises_unavailable_after_one_retry(): void
+    {
+        Http::fake(fn () => throw new ConnectionException('connection refused'));
+        Log::spy();
+
+        $this->expectException(AIServiceUnavailable::class);
+
+        try {
+            (new LocalAIService)->runModel('ignored', [['role' => 'user', 'content' => 'test']]);
+        } finally {
+            Log::shouldNotHaveReceived('error');
+        }
+    }
+
+    public function test_client_errors_remain_real_failures_logged_as_errors(): void
+    {
+        Http::fake(['*' => Http::response('sensitive provider response', 400)]);
+        Log::spy();
+
+        try {
+            (new LocalAIService)->runModel('ignored', [['role' => 'user', 'content' => 'test']]);
+            $this->fail('Expected the provider failure to be raised.');
+        } catch (\RuntimeException $exception) {
+            $this->assertNotInstanceOf(AIServiceUnavailable::class, $exception);
+            $this->assertSame('Local AI request failed: 400', $exception->getMessage());
+        }
+
+        Http::assertSentCount(1);
+        Log::shouldHaveReceived('error')->once()->withArgs(
+            fn (string $message, array $context): bool => $message === 'Local AI request failed'
+                && $context['status'] === 400
                 && ! str_contains(json_encode($context, JSON_THROW_ON_ERROR), 'sensitive'),
         );
     }
