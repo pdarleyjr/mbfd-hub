@@ -19,5 +19,5 @@
         "allowSyntheticDefaultImports": true,
         "forceConsistentCasingInFileNames": true
     },
-    "include": ["resources/js/pump-simulator/**/*"]
+    "include": ["resources/js/pump-simulator/**/*", "resources/js/training-roster/**/*"]
 }

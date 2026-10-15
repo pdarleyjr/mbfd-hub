@@ -61,7 +61,7 @@ class TrainingPanelProvider extends PanelProvider
                     ->icon('heroicon-o-academic-cap')
                     ->collapsible(false),
                 NavigationGroup::make()
-                    ->label('Training Tasks')
+                    ->label('Training')
                     ->icon('heroicon-o-clipboard-document-list')
                     ->collapsible(false),
             ])

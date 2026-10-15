@@ -66,9 +66,19 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        Gate::policy(\App\Models\Training\TrainingCourse::class, \App\Policies\TrainingRosterPolicy::class);
+        Gate::policy(\App\Models\Training\TrainingSession::class, \App\Policies\TrainingRosterPolicy::class);
+
         RateLimiter::for('member-onboarding-invitations', static fn () => Limit::perMinute(4)->by('member-onboarding-global'));
 
         Gate::before(function (User $user, string $ability, array $arguments): ?bool {
+            $subject = $arguments[0] ?? null;
+            $model = is_object($subject) ? $subject::class : $subject;
+            if (in_array($model, [\App\Models\Training\TrainingCourse::class, \App\Models\Training\TrainingSession::class], true)) {
+                // Retention and lifecycle rules apply even to super administrators.
+                return null;
+            }
+
             if ($user->hasRole('super_admin')) {
                 return true;
             }

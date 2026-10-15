@@ -23,6 +23,7 @@ export default defineConfig({
                 'resources/js/admin-pwa/main.ts',
                 'resources/js/operational-forms/main.tsx',
                 'resources/js/video-conferencing/main.tsx',
+                'resources/js/training-roster/main.tsx',
             ],
             refresh: true,
         }),
