@@ -111,6 +111,7 @@ class EquipmentItemResource extends Resource
     public static function table(Table $table): Table
     {
         return self::applyEnterpriseDefaults($table)
+            ->modifyQueryUsing(fn (Builder $query): Builder => EquipmentItem::withStockTotal($query))
             ->columns([
                 Tables\Columns\TextColumn::make('name')
                     ->wrap()
@@ -128,8 +129,8 @@ class EquipmentItemResource extends Resource
                 Tables\Columns\TextColumn::make('current_stock')->visibleFrom('md')
                     ->label('Stock')
                     ->badge()
-                    ->color(fn (EquipmentItem $record): string => $record->stock == 0 ? 'danger' :
-                        ($record->stock <= $record->reorder_min ? 'warning' : 'success')
+                    ->color(fn (EquipmentItem $record): string => $record->current_stock == 0 ? 'danger' :
+                        ($record->current_stock <= $record->reorder_min ? 'warning' : 'success')
                     ),
                 Tables\Columns\TextColumn::make('location.full_location')->visibleFrom('md')
                     ->label('Location')

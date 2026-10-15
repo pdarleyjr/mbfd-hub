@@ -39,11 +39,11 @@ class AdminMetricsController extends Controller
             // NEW: Fire Equipment Inventory metrics
             'inventory' => [
                 'total_items' => EquipmentItem::where('is_active', true)->count(),
-                'out_of_stock' => EquipmentItem::where('is_active', true)
+                'out_of_stock' => EquipmentItem::withStockTotal(EquipmentItem::query())->where('is_active', true)
                     ->get()
                     ->filter(fn($item) => $item->stock == 0)
                     ->count(),
-                'low_stock' => EquipmentItem::where('is_active', true)
+                'low_stock' => EquipmentItem::withStockTotal(EquipmentItem::query())->where('is_active', true)
                     ->get()
                     ->filter(fn($item) => $item->stock <= $item->reorder_min && $item->stock > 0)
                     ->count(),
@@ -62,7 +62,7 @@ class AdminMetricsController extends Controller
                 ->pluck('frequency', 'item'),
             
             // NEW: Critical low stock items with locations
-            'critical_stock_items' => EquipmentItem::where('is_active', true)
+            'critical_stock_items' => EquipmentItem::withStockTotal(EquipmentItem::query())->where('is_active', true)
                 ->with('location')
                 ->get()
                 ->filter(fn($item) => $item->stock <= $item->reorder_min)

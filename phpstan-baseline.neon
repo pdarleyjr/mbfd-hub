@@ -219,7 +219,7 @@ parameters:
 		-
 			message: '#^Access to an undefined property App\\Models\\EquipmentItem\:\:\$stock\.$#'
 			identifier: property.notFound
-			count: 2
+			count: 1
 			path: app/Filament/Resources/EquipmentItemResource.php
 
 		-

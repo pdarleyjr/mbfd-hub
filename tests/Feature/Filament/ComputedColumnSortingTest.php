@@ -6,9 +6,11 @@ namespace Tests\Feature\Filament;
 
 use App\Enums\AccountStatus;
 use App\Filament\Resources\CapitalProjectResource\Pages\ListCapitalProjects;
+use App\Filament\Resources\EquipmentItemResource\Pages\ListEquipmentItems;
 use App\Filament\Resources\Workgroup\Pages\ListEvaluationSubmissions;
 use App\Models\CandidateProduct;
 use App\Models\CapitalProject;
+use App\Models\EquipmentItem;
 use App\Models\EvaluationCategory;
 use App\Models\EvaluationSubmission;
 use App\Models\ProjectMilestone;
@@ -97,6 +99,20 @@ final class ComputedColumnSortingTest extends TestCase
             ->assertCanSeeTableRecords([$submissions[2], $submissions[0], $submissions[1]], inOrder: true)
             ->sortTable('total_score', 'desc')
             ->assertCanSeeTableRecords([$submissions[1], $submissions[0], $submissions[2]], inOrder: true);
+    }
+
+    public function test_equipment_item_stock_does_not_query_per_row(): void
+    {
+        foreach (range(1, 6) as $index) {
+            EquipmentItem::query()->create(['name' => "Stock fixture {$index}", 'reorder_min' => 1])->increaseStock(3);
+        }
+
+        DB::enableQueryLog();
+        Livewire::test(ListEquipmentItems::class)->loadTable()->assertSee('Stock: 3');
+        $stockQueries = collect(DB::getQueryLog())
+            ->filter(fn (array $query): bool => str_contains($query['query'], 'stock_mutations'));
+
+        $this->assertLessThanOrEqual(2, $stockQueries->count(), 'Stock must come from one aggregate query, not per row.');
     }
 
     private function projectWithMilestones(string $name, int $completed, int $open): CapitalProject
