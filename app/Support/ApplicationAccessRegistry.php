@@ -75,6 +75,7 @@ final class ApplicationAccessRegistry
         $options['admin.communications.send'] = 'Communications — send email';
         $options['files.manage'] = 'Policy library — manage';
         $options['training.rosters.submit'] = 'Training rosters — submit (requires Hub administration access)';
+        $options['app.media_control.media'] = 'Media Control — upload and manage media';
 
         return $options;
     }
