@@ -7,12 +7,15 @@ export interface OfflineIdentity {
   userId: number;
   securityVersion: number;
   personnel?: { employee_profile_id: number; employee_number: string; name: string; rank: string };
+  /** Server-derived entry points; absent in identities cached before this field existed. */
+  capabilities?: { personnelEquipmentRequest: boolean };
 }
 
 interface MemberContextResponse {
   identity?: { user_id?: unknown };
   offline?: { security_version?: unknown };
   personnel?: OfflineIdentity['personnel'];
+  authorization?: { capabilities?: { personnel_equipment_request?: unknown } };
 }
 
 const parseIdentity = (value: unknown): OfflineIdentity | null => {
@@ -22,7 +25,12 @@ const parseIdentity = (value: unknown): OfflineIdentity | null => {
   const securityVersion = context.offline?.security_version;
 
   return Number.isInteger(userId) && Number.isInteger(securityVersion)
-    ? { userId: userId as number, securityVersion: securityVersion as number, personnel: context.personnel }
+    ? {
+        userId: userId as number,
+        securityVersion: securityVersion as number,
+        personnel: context.personnel,
+        capabilities: { personnelEquipmentRequest: context.authorization?.capabilities?.personnel_equipment_request === true },
+      }
     : null;
 };
 
