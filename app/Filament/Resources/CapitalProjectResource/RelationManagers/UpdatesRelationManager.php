@@ -65,7 +65,7 @@ class UpdatesRelationManager extends RelationManager
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make()
-                        ->visible(fn () => Auth::user()->isAdmin ?? false),
+                        ->visible(fn (): bool => Auth::user()?->can('admin.projects.manage') ?? false),
                 ]),
             ])
             ->defaultSort('created_at', 'desc');
