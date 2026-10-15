@@ -32,6 +32,14 @@ const stationSixRooms = [
 ];
 const asset = { id: 101, room_id: 11, name: 'Refrigerator', category: 'appliance', quantity: 1, condition: 'needs_repair' };
 
+const memberContext = {
+  version: 1,
+  identity: { user_id: 101, has_personnel_profile: true },
+  personnel: { employee_profile_id: 41, employee_number: 'E41', name: employee.name, rank: employee.rank },
+  offline: { security_version: 1 },
+  session: { authenticated: true },
+};
+
 interface MockApiOptions {
   submitStatus?: number;
   submitBody?: Record<string, unknown>;
@@ -47,6 +55,10 @@ async function mockStationRequestApi(page: Page, options: MockApiOptions = {}): 
     const request = route.request();
     const path = new URL(request.url()).pathname;
 
+    if (path === '/api/me/context') {
+      // Offline capture records the canonical owner before queueing work.
+      return route.fulfill({ json: memberContext });
+    }
     if (path === '/api/public/stations') {
       stationOptionRequests += 1;
       if (options.failInitialOptionsOnce && stationOptionRequests === 1) {
@@ -130,12 +142,12 @@ test('repair request is touch-safe, responsive, and submits the canonical payloa
   await expect(page.getByText('1× Refrigerator')).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('station-request-review.png'), fullPage: true });
   const submitButton = page.getByRole('button', { name: 'Submit station request' });
-  await expect(submitButton).toHaveClass(/bg-orange-600/);
+  await expect(submitButton).toHaveClass(/bg-hub-blue/);
   await submitButton.click();
 
   await expect(page.getByRole('heading', { name: 'Request submitted' })).toBeVisible();
   await expect(page.getByText(/SR-2026-000501/)).toBeVisible();
-  await page.getByRole('button', { name: 'Back to previous page' }).click();
+  await page.getByRole('button', { name: 'Back to station' }).click();
   await expect(page).toHaveURL(/\/daily\/stations\/1$/);
 
   const payload = submittedPayload();
@@ -351,7 +363,7 @@ test('legacy entry replaces history and rejects an external return target', asyn
   expect(redirected.searchParams.get('type')).toBe('repair_service');
   expect(redirected.searchParams.get('return_to')).toBe('/stations/1');
   expect(page.url()).not.toContain('example.com');
-  await expect(page.getByRole('button', { name: 'Back to previous page' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Back to station' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Repair / service Report a facility, room, or asset issue.' })).toHaveAttribute('aria-pressed', 'true');
 
   await page.goto('/daily/forms-hub/equipment-request?station_id=1');
@@ -361,7 +373,7 @@ test('legacy entry replaces history and rejects an external return target', asyn
   await expect(page.getByRole('button', { name: 'Equipment Request one or more station equipment items.' })).toHaveAttribute('aria-pressed', 'true');
 
   await page.goto('/daily/forms-hub/station-request?station_id=1');
-  await expect(page.getByRole('button', { name: 'Back to previous page' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Back to station' })).toBeVisible();
 });
 
 test('generic entry retries option loading and exposes keyboard-safe selectors and type toggles', async ({ page }) => {
@@ -385,8 +397,9 @@ test('generic entry retries option loading and exposes keyboard-safe selectors a
   await repair.focus();
   await page.keyboard.press('Space');
   await expect(repair).toHaveAttribute('aria-pressed', 'true');
-  await page.getByRole('button', { name: 'Back to previous page' }).click();
-  await expect(page).toHaveURL(/\/daily\/stations$/);
+  // Without station context the canonical parent is the Forms Hub.
+  await page.getByRole('button', { name: 'Back to Forms Hub' }).click();
+  await expect(page).toHaveURL(/\/daily\/forms-hub$/);
 
   const unnamedControls = await page.locator('button, a[href], input, select, textarea').evaluateAll((elements) => elements
     .filter((element) => {
@@ -527,9 +540,12 @@ test('station request and activity tabs filter history and preserve station and 
 
   await page.goto('/daily/stations?view=active');
   await page.getByRole('link', { name: /Station 1/ }).click();
-  await page.getByRole('button', { name: 'Back to previous page' }).click();
-  await expect(page).toHaveURL(/\/daily\/stations\?view=active$/);
+  // Contextual Back follows the canonical parent, not unrelated browser history.
+  await page.getByRole('button', { name: 'Back to stations' }).click();
+  await expect(page).toHaveURL(/\/daily\/stations$/);
   await page.getByRole('link', { name: /Station 1/ }).click();
+  // The station profile opens on Overview; requests live in their own tab.
+  await page.getByRole('tab', { name: 'Requests' }).click();
   await expect(page.getByText('Open refrigerator repair')).toBeVisible();
   await expect(page.getByText('Closed radio request')).toHaveCount(0);
   await page.getByRole('button', { name: 'All history' }).click();
@@ -591,7 +607,7 @@ test('room profile retries failures and every asset request and event tab works'
   await page.getByRole('tab', { name: 'Asset events 1' }).click();
   await expect(page.getByText('repair completed')).toBeVisible();
   await expect(page.getByRole('link', { name: 'New room request' })).toHaveAttribute('href', '/daily/forms-hub/station-request?station_id=1&return_to=%2Fstations%2F1%2Frooms%2F11');
-  await expect(page.getByRole('button', { name: 'Back to previous page' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Back to station' })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
