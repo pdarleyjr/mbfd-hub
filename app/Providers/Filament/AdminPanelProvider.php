@@ -81,6 +81,10 @@ class AdminPanelProvider extends PanelProvider
             // proven safe and we can move on to bisect step 2.
             ->globalSearchKeyBindings(['command+k', 'ctrl+k'])
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\\Resources')
+            ->resources([
+                \App\Filament\Training\Resources\TrainingCourseResource::class,
+                \App\Filament\Training\Resources\TrainingSessionResource::class,
+            ])
             ->discoverClusters(in: app_path('Filament/Clusters'), for: 'App\\Filament\\Clusters')
             ->pages([
                 // The primary Admin dashboard is intentionally explicit. Registering
@@ -113,6 +117,7 @@ class AdminPanelProvider extends PanelProvider
                 NavigationGroup::make()->label('Logistics')->icon('heroicon-o-cube')->collapsed(),
                 NavigationGroup::make()->label('Personnel')->icon('heroicon-o-user-group')->collapsed(),
                 NavigationGroup::make()->label('Programs')->icon('heroicon-o-folder-open')->collapsed(),
+                NavigationGroup::make()->label('Training')->icon('heroicon-o-academic-cap')->collapsed(),
                 NavigationGroup::make()->label('Communications')->icon('heroicon-o-envelope')->collapsed(),
                 NavigationGroup::make()->label('System')->icon('heroicon-o-cog-6-tooth')->collapsed(),
                 NavigationGroup::make()->label('Workgroup Management')->icon('heroicon-o-user-group')->collapsed(),

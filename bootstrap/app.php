@@ -14,6 +14,9 @@ $app = Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Resolve trusted forwarded hosts before selecting the kiosk cookie boundary.
+        // Global middleware still runs before route-level StartSession/auth middleware.
+        $middleware->append(\App\Http\Middleware\TrainingKioskHostBoundary::class);
         // Trust Cloudflare Tunnel proxy (runs on localhost) and Docker bridge network
         $middleware->trustProxies(
             at: ['127.0.0.1', '::1', '10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'],

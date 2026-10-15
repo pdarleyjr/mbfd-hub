@@ -62,6 +62,7 @@ class EmployeePanelProvider extends PanelProvider
             ->viteTheme('resources/css/filament/admin/theme.css')
             ->pages([
                 EmployeeDashboard::class,
+                \App\Filament\Employee\Pages\TrainingHistoryPage::class,
                 OperationalForms::class,
                 VideoConferencing::class,
                 MyEquipmentPage::class,

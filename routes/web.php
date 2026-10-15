@@ -61,6 +61,8 @@ use App\Support\Workgroups\WorkgroupReportSessionResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
+require __DIR__.'/training-roster.php';
+
 Route::get('/', HomeController::class)->middleware('auth:web');
 
 Route::view('/install', 'install')->name('install');

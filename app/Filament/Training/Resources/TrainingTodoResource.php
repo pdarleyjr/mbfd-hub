@@ -22,7 +22,7 @@ class TrainingTodoResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-list-bullet';
 
-    protected static ?string $navigationGroup = 'Training Tasks';
+    protected static ?string $navigationGroup = 'Training';
 
     protected static ?string $navigationLabel = 'Training Todos';
 

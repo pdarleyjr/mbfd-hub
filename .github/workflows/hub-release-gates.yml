@@ -368,6 +368,16 @@ jobs:
         run: npx vite build
       - name: Publish Filament assets for authenticated browser workflows
         run: php artisan filament:assets
+      - name: Verify training roster kiosk browser contracts
+        id: training-roster
+        run: npx playwright test --config=playwright.training-roster.config.ts
+      - name: Retain training roster browser evidence
+        if: ${{ always() && steps.training-roster.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: training-roster-browser-evidence
+          path: test-results/training-roster
+          retention-days: 7
       - name: Verify Home and Daily member shell in Chromium and true iPhone WebKit
         id: mobile-shell
         env:

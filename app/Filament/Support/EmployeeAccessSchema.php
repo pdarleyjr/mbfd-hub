@@ -99,9 +99,14 @@ final class EmployeeAccessSchema
                         }
                         $labels = app(ApplicationAccessRegistry::class)->capabilityOptions();
 
-                        return $user?->getAllPermissions()->pluck('name')->filter(fn (string $name): bool => isset($labels[$name]))
+                        return $user?->getAllPermissions()->pluck('name')->filter(fn (string $name): bool => isset($labels[$name])
+                            && ($name !== 'training.rosters.submit' || $user->canSubmitTrainingRosters()))
                             ->map(fn (string $name): string => $labels[$name])->implode('; ') ?: 'No administrative capabilities';
                     }),
+                Forms\Placeholder::make('training_roster_submission')->label('Training roster submission')
+                    ->content(fn (?Model $record): string => self::account($record)?->canSubmitTrainingRosters()
+                        ? 'Enabled — fresh Hub credentials are required for every submission.'
+                        : 'Disabled — requires an active account, completed password setup, Hub administration access, and the direct Training rosters — submit capability. Super Administrators retain full access.'),
                 self::controls('hub-roles', 'Advanced system access', ['manageRoles' => 'Edit advanced system access'], 'Framework role assignments are an advanced system function. Use application access and capabilities for routine administration.'),
                 Forms\Placeholder::make('authorized_roles')->label('Advanced system roles')
                     ->content(fn (?Model $record): string => self::account($record)?->roles->pluck('name')->implode(', ') ?: 'No assigned roles'),
