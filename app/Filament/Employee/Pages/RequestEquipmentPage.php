@@ -7,6 +7,7 @@ namespace App\Filament\Employee\Pages;
 use App\Concerns\ResolvesCanonicalEmployee;
 use App\Models\PersonnelRequest;
 use App\Services\PersonnelRequests\PersonnelRequestSubmissionService;
+use App\Services\PersonnelRequests\UniformAllowanceService;
 use App\Services\PersonnelRequests\UniformEntitlementService;
 use App\Services\PersonnelRequests\UniformOrderCatalog;
 use Filament\Notifications\Notification;
@@ -19,6 +20,7 @@ use Livewire\Attributes\Computed;
 /**
  * @property-read array{can_order:bool,reason:string} $jacketEligibility
  * @property-read Collection<int, PersonnelRequest> $recentUniformRequests
+ * @property-read array<string, int> $allowanceUsage
  */
 class RequestEquipmentPage extends Page
 {
@@ -77,7 +79,7 @@ class RequestEquipmentPage extends Page
                 ),
             ];
         }
-        $this->data = ['items' => $items, 'member_note' => '', 'idempotency_key' => (string) Str::uuid()];
+        $this->data = ['items' => $items, 'member_note' => '', 'allowance_justification' => '', 'idempotency_key' => (string) Str::uuid()];
         $this->resetValidation();
     }
 
@@ -113,9 +115,10 @@ class RequestEquipmentPage extends Page
             'data.items.*.item_code' => ['required', 'string'],
             'data.items.*.metadata' => ['present', 'array'],
             'data.member_note' => ['nullable', 'string', 'max:'.config('uniform_orders.note_max')],
+            'data.allowance_justification' => ['nullable', 'string', 'max:'.config('uniform_orders.allowance_justification_max')],
             'data.idempotency_key' => ['required', 'string', 'max:100'],
             'data.items.*.quantity' => ['required', 'integer', 'min:0', 'max:'.config('uniform_orders.quantity_max')],
-        ], [], ['data.member_note' => 'Notes for Support Services', 'data.items.*.quantity' => 'quantity']);
+        ], [], ['data.member_note' => 'Notes for Support Services', 'data.allowance_justification' => 'reason', 'data.items.*.quantity' => 'quantity']);
 
         $items = array_filter($this->data['items'], fn ($item): bool => is_array($item) && (int) $item['quantity'] > 0);
         // Only items this page offers may be ordered here; the others go through Support Services.
@@ -130,7 +133,10 @@ class RequestEquipmentPage extends Page
                 $this->authenticatedEmployee(),
                 $items,
                 $this->data['idempotency_key'],
-                ['member_note' => $this->data['member_note'] ?? ''],
+                [
+                    'member_note' => $this->data['member_note'] ?? '',
+                    'allowance_justification' => $this->data['allowance_justification'] ?? null,
+                ],
             );
         } catch (ValidationException $exception) {
             throw ValidationException::withMessages(collect($exception->errors())
@@ -139,7 +145,7 @@ class RequestEquipmentPage extends Page
 
         $this->submittedRequestNumber = $request->request_number;
         $this->submittedRequestId = $request->public_id;
-        unset($this->jacketEligibility, $this->recentUniformRequests);
+        unset($this->jacketEligibility, $this->recentUniformRequests, $this->allowanceUsage);
         $this->resetOrder();
         Notification::make()
             ->title('Uniform request submitted')
@@ -172,6 +178,7 @@ class RequestEquipmentPage extends Page
             'categories' => $categories,
             'selectedItems' => $selectedItems,
             'summary' => $entitlements->summarize($context, $selectedItems),
+            'allowance' => app(UniformAllowanceService::class)->assess($context, $this->allowanceUsage, $selectedItems),
             'jacketEligibility' => $this->jacketEligibility,
             'recentRequests' => $this->recentUniformRequests,
         ];
@@ -188,6 +195,18 @@ class RequestEquipmentPage extends Page
     public function jacketEligibility(): array
     {
         return app(UniformEntitlementService::class)->jacketEligibility($this->authenticatedEmployee());
+    }
+
+    /**
+     * Year-to-date usage for the remaining-allowance display. Submission recomputes
+     * it on the server under a lock, so this cached copy is display-only.
+     *
+     * @return array<string, int>
+     */
+    #[Computed(persist: true, seconds: 300)]
+    public function allowanceUsage(): array
+    {
+        return app(UniformAllowanceService::class)->usedByGroup($this->authenticatedEmployee());
     }
 
     /** @return Collection<int, PersonnelRequest> */

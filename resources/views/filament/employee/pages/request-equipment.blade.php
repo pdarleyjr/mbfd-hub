@@ -86,6 +86,15 @@
                     </ul>
                     <p class="uo-exchange-rule">1 unused jumpsuit = {{ config('uniform_orders.swap.rate') }} additional polo + {{ config('uniform_orders.swap.rate') }} additional 5.11 pant.</p>
                 @endif
+                @if($allowance['allowed'])
+                    <h3>Remaining for {{ $allowance['period']['label'] }}</h3>
+                    <ul class="uo-allowance-list" data-allowance-remaining>
+                        @foreach($allowance['allowed'] as $group => $allowedCount)
+                            <li data-allowance-group="{{ $group }}"><strong>{{ $allowance['remaining'][$group] }}</strong> of {{ $allowedCount }} {{ config('uniform_orders.groups.'.$group) }}</li>
+                        @endforeach
+                    </ul>
+                    <p class="uo-exchange-rule">Counts requests submitted this allowance year. Denied and cancelled requests are not counted.</p>
+                @endif
             </details>
         </section>
 
@@ -105,6 +114,7 @@
                         <p>Correct the fields shown below, then submit again. Your selections are still here.</p>
                         @error('data.items') <p>{{ $message }}</p> @enderror
                         @error('data.idempotency_key') <p>{{ $message }}</p> @enderror
+                        @error('data.allowance_justification') <p>{{ $message }}</p> @enderror
                         @php
                             $fieldErrors = collect($errors->getMessages())->filter(fn ($messages, $key) => preg_match('/^data\.items\.([a-z_]+)\.(quantity|metadata\.([a-z_]+))$/', $key));
                         @endphp
@@ -169,6 +179,9 @@
                                                 </div>
                                             </div>
                                             @error($path.'.quantity') <p class="uo-error" id="uo-qty-error-{{ $code }}">{{ $message }}</p> @enderror
+                                            @isset($allowance['allowed'][$group])
+                                                <p class="uo-product-helper" data-allowance-remaining-for="{{ $code }}">{{ $allowance['remaining'][$group] }} of {{ $allowance['allowed'][$group] }} {{ strtolower(config('uniform_orders.groups.'.$group)) }} remaining this year</p>
+                                            @endisset
                                         </div>
                                     </div>
                                     @if($code === 'jacket')
@@ -246,15 +259,19 @@
                             <details class="uo-allocation-details" wire:ignore.self>
                                 <summary>Allocation details</summary>
                             <div class="uo-counters">
-                                <p><strong>Standard allowance</strong></p>
+                                <p><strong>This year, including this order</strong></p>
                                 @foreach(app(\App\Services\PersonnelRequests\UniformOrderCatalog::class)->groupLabels() as $group => $label)
                                     @continue(in_array($group, ['footwear', 'class_a_coats', 'uniform_shirts'], true))
                                     @continue(!isset($summary['allowed'][$group]) || ($summary['allowed'][$group] === 0 && ($summary['quantities'][$group] ?? 0) === 0))
-                                    <div class="uo-counter {{ ($summary['quantities'][$group] ?? 0) > $summary['allowed'][$group] ? 'uo-counter-advisory' : '' }}"><span>{{ $label }}</span><strong>{{ $summary['quantities'][$group] ?? 0 }} / {{ $summary['allowed'][$group] }}</strong></div>
+                                    @php
+                                        $counterAllowed = $allowance['allowed'][$group] ?? $summary['allowed'][$group];
+                                        $counterTotal = ($allowance['used'][$group] ?? 0) + ($summary['quantities'][$group] ?? 0);
+                                    @endphp
+                                    <div class="uo-counter {{ $counterTotal > $counterAllowed ? 'uo-counter-advisory' : '' }}" data-allowance-counter="{{ $group }}"><span>{{ $label }}</span><strong>{{ $counterTotal }} / {{ $counterAllowed }}</strong></div>
                                 @endforeach
                                 @if($context['profile'] !== 'day_other') <div class="uo-counter"><span>Complete work sets</span><strong>{{ $summary['work_sets']['selected'] }} / {{ $summary['work_sets']['allowed'] }}</strong></div> @endif
                             </div>
-                            @if($context['profile'] !== 'day_other') <div class="uo-swap" data-swap-credits><strong>Jumpsuit Swap Credits: {{ $summary['swaps'] }}</strong><p>Work-set allowance: {{ $summary['work_sets']['allowed'] }}</p><small>Based on the jumpsuits in this order. Prior issues are reviewed by Support Services.</small></div> @endif
+                            @if($context['profile'] !== 'day_other') <div class="uo-swap" data-swap-credits><strong>Jumpsuit Swap Credits: {{ $allowance['allowed'] ? $allowance['swaps'] : $summary['swaps'] }}</strong><small>Based on jumpsuits requested this year, including this order. Earlier off-system issues are reviewed by Support Services.</small></div> @endif
                             </details>
                         @endif
                         @if($summary['warnings'])
@@ -262,6 +279,19 @@
                                 <strong>For Support Services review</strong>
                                 <p>This selection is outside your standard annual allocation. You may still submit it for Support Services review.</p>
                                 <ul>@foreach($summary['warnings'] as $warning) <li>{{ $warning }}</li> @endforeach</ul>
+                            </div>
+                        @endif
+                        @if($allowance['is_over'])
+                            <div class="uo-advisories" data-over-allowance>
+                                <strong>Over your annual allowance</strong>
+                                <p>Some items go past what remains for {{ $allowance['period']['label'] }}. You can still submit; tell Support Services why you need them.</p>
+                                <ul>@foreach(app(\App\Services\PersonnelRequests\UniformAllowanceService::class)->overageMessages($allowance['over']) as $overage) <li>{{ $overage }}</li> @endforeach</ul>
+                            </div>
+                            <div class="uo-notes" wire:key="uniform-allowance-justification">
+                                <label for="uo-allowance-justification"><strong>Reason for the extra items</strong> <small>(required)</small></label>
+                                <p id="uo-justification-help">For example: damaged items, a size change, or a new assignment.</p>
+                                <textarea id="uo-allowance-justification" wire:model="data.allowance_justification" rows="2" required maxlength="{{ config('uniform_orders.allowance_justification_max') }}" aria-invalid="{{ $errors->has('data.allowance_justification') ? 'true' : 'false' }}" aria-describedby="uo-justification-help{{ $errors->has('data.allowance_justification') ? ' uo-justification-error' : '' }}"></textarea>
+                                @error('data.allowance_justification') <p class="uo-error" id="uo-justification-error" x-init="if (!desktop) openCart()">{{ $message }}</p> @enderror
                             </div>
                         @endif
                         <details class="uo-notes" id="uo-notes" wire:ignore.self x-ref="notes">
