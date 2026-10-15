@@ -97,20 +97,36 @@ final class TrainingRosterService
         });
     }
 
-    public function submit(TrainingSession $session, User $actor, int $expectedRevision, string $submissionId, int $kioskGrantId): TrainingSession
+    public function submit(TrainingSession $session, User $actor, int $expectedRevision, string $submissionId, int $kioskGrantId, array $leadSignoff = [], bool $recoveryOnly = false): TrainingSession
     {
         abort_unless($actor->canSubmitTrainingRosters(), 403);
         Validator::make(['submission_id' => $submissionId], ['submission_id' => ['required', 'uuid']])->validate();
+        if ($recoveryOnly && $leadSignoff !== []) {
+            $this->reject('recovery_only', 'A receipt check cannot replace the recorded lead or signature.');
+        }
 
-        return DB::transaction(function () use ($session, $actor, $expectedRevision, $submissionId, $kioskGrantId): TrainingSession {
+        return DB::transaction(function () use ($session, $actor, $expectedRevision, $submissionId, $kioskGrantId, $leadSignoff, $recoveryOnly): TrainingSession {
             $session = $this->locked($session);
             $freshActor = User::query()->lockForUpdate()->findOrFail($actor->id);
             abort_unless($freshActor->canSubmitTrainingRosters()
                 && hash_equals($freshActor->getAuthPassword(), $actor->getAuthPassword())
                 && $freshActor->security_version === $actor->security_version, 403);
             abort_unless($session->kioskGrants()->whereKey($kioskGrantId)->whereNull('revoked_at')->where('expires_at', '>', now())->exists(), 403, 'This screen authorization has ended. Return to classes.');
-            if ($session->submission_id === $submissionId && (int) $session->submitted_by === (int) $actor->id && $session->submitted_at !== null) {
+            if ($session->submission_id === $submissionId && $session->submitted_at !== null) {
+                abort_unless((int) $session->submitted_by === (int) $actor->id, 403);
+                $saved = $session->versions()->where('revision', $session->revision)->firstOrFail()->snapshot['instructor_signoff'] ?? null;
+                if (! is_array($saved)) {
+                    $this->reject('needs_signoff', 'This roster has no recorded lead signature. Ask training staff to reopen and complete it.');
+                }
+                if (! $recoveryOnly && ! hash_equals((string) ($saved['request_hash'] ?? ''), $this->signoffRequestHash($session, $actor, $expectedRevision, $this->leadSignoffData($leadSignoff)))) {
+                    $this->reject('client_submission_id', 'This submission identifier was already used for a different lead or signature. The recorded signoff has not changed.');
+                }
+
                 return $session;
+            }
+            if ($recoveryOnly) {
+                abort_unless($session->status === 'open', 409, 'This roster is no longer open and this request was not recorded. Return to classes.');
+                $this->reject('needs_signoff', 'This request was not recorded. Select the lead instructor and collect their signature before submitting.');
             }
             Validator::make(['submission_id' => $submissionId], ['submission_id' => [Rule::unique('training_sessions', 'submission_id')->ignore($session->id)]])->validate();
             $this->editable($session, ['open']);
@@ -118,13 +134,30 @@ final class TrainingRosterService
             if (! $session->attendances()->whereNull('voided_at')->exists()) {
                 $this->reject('attendance', 'At least one member must sign before you submit this roster.');
             }
+            $data = $this->leadSignoffData($leadSignoff);
+            $lead = Employee::query()->where('roster_status', 'active')->lockForUpdate()->find($data['lead_employee_profile_id']);
+            if ($lead === null || blank($lead->employee_id) || blank($lead->name)
+                || Employee::query()->where('employee_id', $lead->employee_id)->count() !== 1) {
+                $this->reject('lead_employee_profile_id', 'Select an active lead instructor with a unique personnel identity.');
+            }
+            try {
+                $signature = $this->signatures->store($data['lead_signature'], 'training-rosters');
+            } catch (ValidationException $exception) {
+                throw ValidationException::withMessages(['lead_signature' => $exception->errors()['signature'] ?? ['Please provide a valid lead instructor signature.']]);
+            }
+            $signoff = [
+                'lead_snapshot' => ['employee_profile_id' => $lead->id, 'employee_id' => (string) $lead->employee_id, 'display_name' => (string) $lead->name],
+                'signature' => $signature,
+                'signed_at' => now()->utc()->toIso8601String(), 'recorded_by' => $actor->id,
+                'request_hash' => $this->signoffRequestHash($session, $actor, $expectedRevision, $data),
+            ];
             $before = $session->toArray();
             $session->update([
                 'status' => 'submitted', 'submitted_at' => now()->utc(), 'submitted_by' => $actor->id,
-                'submission_id' => $submissionId, 'revision' => $session->revision + 1,
+                'submission_id' => $submissionId, 'revision' => $session->revision + 1, 'oic_employee_profile_id' => $lead->id,
             ]);
-            $this->capture($session);
-            $this->audit($session, 'session.submitted', $actor, null, $before, $session->toArray());
+            $version = $this->capture($session, instructorSignoff: $signoff);
+            $this->audit($session, 'session.submitted', $actor, null, $before, $session->toArray() + ['version_id' => $version->id, 'instructor_signoff' => $signoff]);
 
             return $session;
         });
@@ -166,11 +199,13 @@ final class TrainingRosterService
                 $reason = $this->reason($reason);
             }
             $before = $session->toArray();
-            $certification = $status === 'archived' ? $session->versions()->where('revision', $session->revision)->first()?->snapshot['certification'] : null;
+            $priorSnapshot = $session->versions()->where('revision', $session->revision)->first()?->snapshot;
+            $certification = $status === 'archived' ? ($priorSnapshot['certification'] ?? null) : null;
+            $signoff = $status === 'archived' ? ($priorSnapshot['instructor_signoff'] ?? null) : null;
             $session->update(['status' => $status, 'revision' => $session->revision + 1]
                 + ($status === 'closed' ? ['submitted_at' => null, 'submitted_by' => null, 'submission_id' => null] : []));
             $this->audit($session, 'session.'.$status, $actor, null, $before, $session->toArray(), $reason);
-            $this->capture($session, $certification);
+            $this->capture($session, $certification, $signoff);
 
             return $session;
         });
@@ -324,8 +359,9 @@ final class TrainingRosterService
                 'certified_at' => now()->utc()->toIso8601String(), 'certified_by' => $actor->id,
             ];
             $before = $session->toArray();
+            $signoff = $session->versions()->where('revision', $session->revision)->first()?->snapshot['instructor_signoff'] ?? null;
             $session->update(['status' => 'certified', 'oic_employee_profile_id' => $employee->id, 'revision' => $session->revision + 1]);
-            $version = $this->capture($session, $certification);
+            $version = $this->capture($session, $certification, $signoff);
             $this->audit($session, 'session.certified', $actor, null, $before, ['version_id' => $version->id, 'certification' => $certification]);
 
             return $version;
@@ -337,7 +373,7 @@ final class TrainingRosterService
         return DB::transaction(fn (): TrainingRosterVersion => $this->capture($this->locked($session)));
     }
 
-    private function capture(TrainingSession $session, ?array $certification = null): TrainingRosterVersion
+    private function capture(TrainingSession $session, ?array $certification = null, ?array $instructorSignoff = null): TrainingRosterVersion
     {
         $existing = $session->versions()->where('revision', $session->revision)->first();
         if ($existing !== null) {
@@ -357,7 +393,7 @@ final class TrainingRosterService
                 'classifications' => $session->classifications, 'held_on' => $session->held_on->toDateString(),
                 'starts_at' => $session->starts_at?->utc()->toIso8601String(), 'location' => $session->location,
                 'status' => $session->status, 'revision' => $session->revision,
-            ], 'attendance' => $attendance, 'certification' => $certification,
+            ], 'attendance' => $attendance, 'certification' => $certification, 'instructor_signoff' => $instructorSignoff,
                 'submission' => $session->submitted_at === null ? null : ['submitted_at' => $session->submitted_at->utc()->toIso8601String(), 'submitted_by' => $session->submitted_by],
                 'captured_at' => now()->utc()->toIso8601String()],
             'certified_at' => $certification['certified_at'] ?? null, 'certified_by' => $certification['certified_by'] ?? null,
@@ -404,6 +440,23 @@ final class TrainingRosterService
     {
         abort_unless($actor->isAuthenticationAllowed(), 403);
         Gate::forUser($actor)->authorize($ability, $subject);
+    }
+
+    /** @return array{lead_employee_profile_id: int|string, lead_signature: string, lead_confirmed: mixed} */
+    private function leadSignoffData(array $data): array
+    {
+        return Validator::make($data, [
+            'lead_employee_profile_id' => ['required', 'integer', 'min:1'],
+            'lead_signature' => ['required', 'string', 'max:1400000'],
+            'lead_confirmed' => ['required', 'accepted'],
+        ])->validate();
+    }
+
+    private function signoffRequestHash(TrainingSession $session, User $actor, int $expectedRevision, array $data): string
+    {
+        return hash('sha256', json_encode([
+            $session->id, $actor->id, $expectedRevision, (int) $data['lead_employee_profile_id'], $data['lead_signature'], true,
+        ], JSON_THROW_ON_ERROR));
     }
 
     private function courseData(array $data): array

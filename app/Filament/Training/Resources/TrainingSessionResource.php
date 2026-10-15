@@ -59,8 +59,8 @@ class TrainingSessionResource extends Resource
             DatePicker::make('held_on')->label('Class date')->required()->default(fn (): string => now('America/New_York')->toDateString()),
             DateTimePicker::make('starts_at')->label('Start time (Eastern)')->timezone('America/New_York')->seconds(false),
             TextInput::make('location')->maxLength(255),
-            self::employeeSelect('oic_employee_profile_id', 'Officer in charge')
-                ->helperText('The officer must sign in with their own Hub account to certify the roster.'),
+            self::employeeSelect('oic_employee_profile_id', 'Lead instructor / OIC')
+                ->helperText('Optional suggested lead for this session. Confirm or change the lead and collect their signature when submitting the roster.'),
             TagsInput::make('classifications')->suggestions(fn (): array => TrainingCourse::classificationSuggestions())
                 ->mutateStateForValidationUsing(fn ($state) => is_array($state) ? TrainingCourse::normalizeClassifications($state) : $state)
                 ->required()->rules(['array', 'min:1', 'max:16'])

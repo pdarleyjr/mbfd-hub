@@ -2,6 +2,7 @@ import { test, expect, Page, Route } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
 const id = '01SYNTHETICTRAININGROSTER01';
+const submissionReceipt = { submitted: true, held_on: '2026-10-15', course_name: 'Ladder operations', submitted_at: '2026-10-15T14:35:00Z', lead: { id: 11, name: 'Synthetic Lead One' }, lead_signed_at: '2026-10-15T14:34:00Z' };
 const members = [
     { id: 1, first_name: 'Synthetic', last_name: 'Alpha', name: 'Synthetic Alpha', rank: 'Firefighter', shift: 'A Shift', term_label: '2026–2027', identifier_hint: '0001' },
     { id: 2, first_name: 'Synthetic', last_name: 'Bravo', name: 'Synthetic Bravo', rank: 'Lieutenant', shift: 'B Shift', term_label: '2026–2027', identifier_hint: '0002' },
@@ -19,6 +20,7 @@ async function fixture(page: Page, options: { count?: number; lostResponse?: boo
         const path = new URL(route.request().url()).pathname.split('/').pop();
         const json = (data: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(data) });
         if (path === 'csrf') return json({ csrf_token: 'synthetic-bootstrap-csrf' });
+        if (path === 'leads') return json({ leads: [{ id: 11, name: 'Synthetic Lead One', identifier_hint: '0011' }, { id: 12, name: 'Synthetic Lead Two', identifier_hint: '0012' }], selected_lead_id: null });
         if (path === 'open') { opened = true; return json({ authorized: true, csrf_token: 'synthetic-refreshed-csrf' }); }
         if (path === 'authorize') {
             authorizations++;
@@ -79,6 +81,12 @@ async function draw(page: Page) {
     await page.mouse.down();
     for (let i = 1; i <= 20; i++) await page.mouse.move(box.x + box.width * (.1 + i * .035), box.y + box.height * (i % 2 ? .3 : .7));
     await page.mouse.up();
+}
+
+async function leadSignoff(page: Page) {
+    await page.getByLabel('Actual lead instructor for this session').selectOption('11');
+    await draw(page);
+    await page.getByRole('checkbox', { name: /selected lead instructor personally signed/ }).check();
 }
 
 test('empty public catalog does not invent a course', async ({ page }) => {
@@ -149,10 +157,11 @@ test('catalog failure can recover and an existing dated roster opens by POST', a
 test('roster approval clears credentials and confirms before returning to classes', async ({ page }, info) => {
     await fixture(page, { count: 3 });
     await page.route(`**/r/${id}/submit`, route => {
-        expect(route.request().postDataJSON()).toMatchObject({ email: '12345', password: 'synthetic-password', expected_revision: 4, client_submission_id: expect.any(String) });
-        return route.fulfill({ json: { submitted: true, held_on: '2026-10-15', course_name: 'Ladder operations', submitted_at: '2026-10-15T14:35:00Z' } });
+        expect(route.request().postDataJSON()).toMatchObject({ email: '12345', password: 'synthetic-password', expected_revision: 4, client_submission_id: expect.any(String), lead_employee_profile_id: 11, lead_signature: expect.stringMatching(/^data:image\/png;base64,/), lead_confirmed: true });
+        return route.fulfill({ json: submissionReceipt });
     });
     await page.getByRole('button', { name: 'Submit roster', exact: true }).click();
+    await leadSignoff(page);
     await expect(page.getByText('3 members signed', { exact: true })).toBeVisible();
     await page.getByLabel('Email or employee ID').fill('12345');
     await page.getByLabel('Hub password', { exact: true }).fill('synthetic-password');
@@ -160,9 +169,47 @@ test('roster approval clears credentials and confirms before returning to classe
     await page.screenshot({ path: info.outputPath('approve-roster.png'), fullPage: true });
     await page.getByRole('button', { name: 'Approve and submit' }).click();
     await expect(page.getByRole('heading', { name: 'Roster submitted', exact: true })).toBeVisible();
+    await expect(page.getByText('Synthetic Lead One', { exact: true })).toBeVisible();
+    await expect(page.getByText('Signed Oct 15, 2026, 10:34 AM EDT', { exact: true })).toBeVisible();
     await expect(page.getByLabel('Hub password', { exact: true })).toHaveCount(0);
     expect(await page.evaluate(() => JSON.stringify({ ...sessionStorage, ...localStorage }))).not.toContain('synthetic-password');
     await expect(page).toHaveURL(/\/$/, { timeout: 9000 });
+});
+
+test('submission requires the actual lead signature and changing the lead clears it', async ({ page }) => {
+    await fixture(page, { count: 1 });
+    await page.route(`**/r/${id}/submit`, route => {
+        expect(route.request().postDataJSON()).toMatchObject({ lead_employee_profile_id: 12, lead_signature: expect.stringMatching(/^data:image\/png;base64,/), lead_confirmed: true, email: 'different.admin@example.test' });
+        return route.fulfill({ json: { ...submissionReceipt, lead: { id: 12, name: 'Synthetic Lead Two' } } });
+    });
+    await page.getByRole('button', { name: 'Submit roster', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Approve and submit' })).toBeDisabled();
+    await leadSignoff(page);
+    await page.getByLabel('Actual lead instructor for this session').selectOption('12');
+    await expect(page.getByRole('button', { name: 'Clear signature' })).toBeDisabled();
+    await expect(page.getByRole('checkbox', { name: /selected lead instructor personally signed/ })).not.toBeChecked();
+    await expect(page.getByRole('button', { name: 'Approve and submit' })).toBeDisabled();
+    await draw(page);
+    await page.getByRole('checkbox', { name: /selected lead instructor personally signed/ }).check();
+    await page.getByLabel('Email or employee ID').fill('different.admin@example.test');
+    await page.getByLabel('Hub password', { exact: true }).fill('synthetic-password');
+    await page.getByRole('button', { name: 'Approve and submit' }).click();
+    await expect(page.getByRole('heading', { name: 'Roster submitted', exact: true })).toBeVisible();
+});
+
+test('lead signature validation shows correction guidance and preserves the selected lead', async ({ page }) => {
+    await fixture(page, { count: 1 });
+    await page.route(`**/r/${id}/submit`, route => route.fulfill({ status: 422, json: { errors: { lead_signature: ['Draw a complete lead instructor signature.'] } } }));
+    await page.getByRole('button', { name: 'Submit roster', exact: true }).click();
+    await leadSignoff(page);
+    await page.getByLabel('Email or employee ID').fill('synthetic@example.test');
+    await page.getByLabel('Hub password', { exact: true }).fill('synthetic-password');
+    await page.getByRole('button', { name: 'Approve and submit' }).click();
+    await expect(page.getByRole('alert')).toContainText('Draw a complete lead instructor signature');
+    await expect(page.getByLabel('Actual lead instructor for this session')).toHaveValue('11');
+    await expect(page.getByRole('button', { name: 'Clear signature' })).toBeEnabled();
+    await page.getByRole('button', { name: 'Clear signature' }).click();
+    await expect(page.getByRole('button', { name: 'Approve and submit' })).toBeDisabled();
 });
 
 test('unconfirmed approval keeps request identity and requires fresh credentials to retry', async ({ page }) => {
@@ -170,9 +217,10 @@ test('unconfirmed approval keeps request identity and requires fresh credentials
     const attempts: Record<string, unknown>[] = [];
     await page.route(`**/r/${id}/submit`, route => {
         attempts.push(route.request().postDataJSON());
-        return attempts.length === 1 ? route.abort('failed') : route.fulfill({ json: { submitted: true } });
+        return attempts.length === 1 ? route.abort('failed') : route.fulfill({ json: submissionReceipt });
     });
     await page.getByRole('button', { name: 'Submit roster', exact: true }).click();
+    await leadSignoff(page);
     await page.getByLabel('Email or employee ID').fill('synthetic@example.test');
     await page.getByLabel('Hub password', { exact: true }).fill('synthetic-password');
     await page.getByRole('button', { name: 'Approve and submit' }).click();
@@ -180,6 +228,8 @@ test('unconfirmed approval keeps request identity and requires fresh credentials
     await expect(page.getByRole('heading', { name: 'Roster submitted', exact: true })).toHaveCount(0);
     await expect(page.getByLabel('Hub password', { exact: true })).toHaveValue('');
     await expect(page.getByRole('button', { name: 'Return to roster' })).toBeDisabled();
+    await page.locator('canvas').dispatchEvent('pointerup');
+    await expect(page.getByRole('checkbox', { name: /selected lead instructor personally signed/ })).toBeChecked();
     await page.getByLabel('Hub password', { exact: true }).fill('synthetic-password');
     await page.getByRole('button', { name: 'Retry submission' }).click();
     await expect(page.getByRole('heading', { name: 'Roster submitted', exact: true })).toBeVisible();
@@ -191,6 +241,7 @@ test('denied approval stays private and allows credential correction', async ({ 
     await fixture(page, { count: 1 });
     await page.route(`**/r/${id}/submit`, route => route.fulfill({ status: 403, json: { message: 'Sensitive internal detail that must not be displayed' } }));
     await page.getByRole('button', { name: 'Submit roster', exact: true }).click();
+    await leadSignoff(page);
     await page.getByLabel('Email or employee ID').fill('synthetic@example.test');
     await page.getByLabel('Hub password', { exact: true }).fill('synthetic-password');
     await page.getByRole('button', { name: 'Approve and submit' }).click();
@@ -208,6 +259,7 @@ test('uncertain approval recovers for review only after an authoritative stale r
         return attempts === 1 ? route.abort('failed') : route.fulfill({ status: 422, json: { errors: { expected_revision: ['Attendance changed.'] } } });
     });
     await page.getByRole('button', { name: 'Submit roster', exact: true }).click();
+    await leadSignoff(page);
     await page.getByLabel('Email or employee ID').fill('synthetic@example.test');
     await page.getByLabel('Hub password', { exact: true }).fill('synthetic-password');
     await page.getByRole('button', { name: 'Approve and submit' }).click();
@@ -215,6 +267,7 @@ test('uncertain approval recovers for review only after an authoritative stale r
     await page.getByLabel('Hub password', { exact: true }).fill('synthetic-password');
     await page.getByRole('button', { name: 'Retry submission' }).click();
     await expect(page.getByRole('alert')).toContainText('Attendance changed before approval');
+    await expect(page.getByRole('button', { name: 'Approve and submit' })).toBeDisabled();
     await page.getByRole('button', { name: 'Return to roster' }).click();
     await expect(page.getByRole('button', { name: /SIGN ROSTER/ })).toBeVisible();
 });
@@ -224,9 +277,10 @@ test('reload after a lost approval response recovers the same request without st
     const attempts: Record<string, unknown>[] = [];
     await page.route(`**/r/${id}/submit`, route => {
         attempts.push(route.request().postDataJSON());
-        return attempts.length === 1 ? route.abort('failed') : route.fulfill({ json: { submitted: true } });
+        return attempts.length === 1 ? route.abort('failed') : route.fulfill({ json: submissionReceipt });
     });
     await page.getByRole('button', { name: 'Submit roster', exact: true }).click();
+    await leadSignoff(page);
     await page.getByLabel('Email or employee ID').fill('synthetic@example.test');
     await page.getByLabel('Hub password', { exact: true }).fill('synthetic-password');
     await page.getByRole('button', { name: 'Approve and submit' }).click();
@@ -235,6 +289,9 @@ test('reload after a lost approval response recovers the same request without st
     expect(stored).not.toContain('synthetic-password');
     expect(stored).not.toContain('synthetic@example.test');
     expect(stored).not.toContain('Synthetic attendee');
+    expect(stored).not.toContain('Synthetic Lead');
+    expect(stored).not.toContain('lead_employee_profile_id');
+    expect(stored).not.toContain('data:image');
     expect(stored).not.toContain('signature');
     await page.route(`**/r/${id}/state`, route => route.fulfill({ status: 403, json: { message: 'Roster is no longer open.' } }));
     await page.reload();
@@ -242,13 +299,36 @@ test('reload after a lost approval response recovers the same request without st
     await expect(page.getByRole('heading', { name: 'Roster submitted', exact: true })).toHaveCount(0);
     await expect(page.getByLabel('Email or employee ID')).toHaveValue('');
     await expect(page.getByLabel('Hub password', { exact: true })).toHaveValue('');
+    await expect(page.getByLabel('Actual lead instructor for this session')).toHaveCount(0);
     await page.getByLabel('Email or employee ID').fill('synthetic@example.test');
     await page.getByLabel('Hub password', { exact: true }).fill('synthetic-password');
     await page.getByRole('button', { name: 'Retry submission' }).click();
     await expect(page.getByRole('heading', { name: 'Roster submitted', exact: true })).toBeVisible();
     expect(attempts).toHaveLength(2);
-    expect(attempts[1]).toEqual(attempts[0]);
+    expect(attempts[1]).toMatchObject({ client_submission_id: attempts[0].client_submission_id, expected_revision: attempts[0].expected_revision, recovery_only: true });
+    expect(attempts[1]).not.toHaveProperty('lead_signature');
+    expect(attempts[1]).not.toHaveProperty('lead_employee_profile_id');
     expect(await page.evaluate(() => Object.keys(sessionStorage).some(key => key.endsWith('.approval')))).toBe(false);
+});
+
+test('closed roster recovery clears an unrecorded request without claiming success', async ({ page }) => {
+    await fixture(page, { count: 1 });
+    await page.evaluate(({ rosterId }) => sessionStorage.setItem(`mbfd.training.pending./r/${rosterId}.approval`, JSON.stringify({ client_submission_id: '11111111-1111-4111-8111-111111111111', expected_revision: 2, at: Date.now(), summary: { course_name: 'Synthetic classroom', held_on: '2026-10-15', location: null, revision: 2, count: 1 } })), { rosterId: id });
+    await page.route(`**/r/${id}/state`, route => route.fulfill({ status: 403, json: { message: 'Roster is no longer open.' } }));
+    await page.route(`**/r/${id}/submit`, route => {
+        expect(route.request().postDataJSON()).toMatchObject({ recovery_only: true });
+        return route.fulfill({ status: 409, json: { message: 'This roster is no longer open and this request was not recorded. Return to classes.' } });
+    });
+    await page.reload();
+    await page.getByLabel('Email or employee ID').fill('synthetic@example.test');
+    await page.getByLabel('Hub password', { exact: true }).fill('synthetic-password');
+    await page.getByRole('button', { name: 'Retry submission' }).click();
+    await expect(page.getByRole('heading', { name: 'Submission not recorded' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Roster submitted', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Retry submission' })).toHaveCount(0);
+    await expect(page.getByLabel('Hub password', { exact: true })).toHaveCount(0);
+    expect(await page.evaluate(() => Object.keys(sessionStorage).some(key => key.endsWith('.approval')))).toBe(false);
+    await expect(page.getByRole('link', { name: 'Return to classes' })).toHaveAttribute('href', '/');
 });
 
 test('a previous roster poll cannot dismiss an in-flight approval confirmation', async ({ page }) => {
@@ -262,15 +342,51 @@ test('a previous roster poll cannot dismiss an in-flight approval confirmation',
     await page.clock.fastForward(15000);
     await expect.poll(() => Boolean(poll)).toBe(true);
     await page.getByRole('button', { name: 'Submit roster', exact: true }).click();
+    await leadSignoff(page);
     await page.route(`**/r/${id}/submit`, async route => {
         await poll!.fulfill({ status: 403, json: { message: 'Roster is no longer open.' } });
         await new Promise(resolve => setTimeout(resolve, 100));
-        await route.fulfill({ json: { submitted: true } });
+        await route.fulfill({ json: submissionReceipt });
     });
     await page.getByLabel('Email or employee ID').fill('synthetic@example.test');
     await page.getByLabel('Hub password', { exact: true }).fill('synthetic-password');
     await page.getByRole('button', { name: 'Approve and submit' }).click();
     await expect(page.getByRole('heading', { name: 'Roster submitted', exact: true })).toBeVisible();
+});
+
+test('unrecorded reload recovery requires a fresh lead signature and reviews the current roster', async ({ page }) => {
+    await fixture(page, { count: 1 });
+    const attempts: Record<string, unknown>[] = [];
+    await page.route(`**/r/${id}/submit`, route => {
+        attempts.push(route.request().postDataJSON());
+        if (attempts.length === 1) return route.abort('failed');
+        if (attempts.length === 2) return route.fulfill({ status: 422, json: { errors: { needs_signoff: ['This request was not recorded.'] } } });
+        return route.fulfill({ json: submissionReceipt });
+    });
+    await page.getByRole('button', { name: 'Submit roster', exact: true }).click();
+    await leadSignoff(page);
+    await page.getByLabel('Email or employee ID').fill('synthetic@example.test');
+    await page.getByLabel('Hub password', { exact: true }).fill('synthetic-password');
+    await page.getByRole('button', { name: 'Approve and submit' }).click();
+    await expect(page.getByRole('alert')).toContainText('Submission could not be confirmed');
+    await page.route(`**/r/${id}/state`, route => route.fulfill({ json: { course_name: 'Synthetic classroom', held_on: '2026-10-15', location: null, status: 'open', revision: 3, csrf_token: 'test', attendance: [{ name: 'Synthetic attendee 1' }, { name: 'Synthetic attendee 2' }] } }));
+    await page.reload();
+    await page.getByLabel('Email or employee ID').fill('synthetic@example.test');
+    await page.getByLabel('Hub password', { exact: true }).fill('synthetic-password');
+    await page.getByRole('button', { name: 'Retry submission' }).click();
+    await expect(page.getByRole('alert')).toContainText('This request was not recorded');
+    await expect(page.getByText('2 members signed', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('Actual lead instructor for this session')).toHaveValue('');
+    await expect(page.getByRole('button', { name: 'Approve and submit' })).toBeDisabled();
+    await leadSignoff(page);
+    await page.getByLabel('Hub password', { exact: true }).fill('synthetic-password');
+    await page.getByRole('button', { name: 'Approve and submit' }).click();
+    await expect(page.getByRole('heading', { name: 'Roster submitted', exact: true })).toBeVisible();
+    expect(attempts).toHaveLength(3);
+    expect(attempts[1]).toMatchObject({ client_submission_id: attempts[0].client_submission_id, recovery_only: true });
+    expect(attempts[1]).not.toHaveProperty('lead_signature');
+    expect(attempts[2]).toMatchObject({ client_submission_id: attempts[0].client_submission_id, expected_revision: 3, lead_employee_profile_id: 11, lead_confirmed: true });
+    expect(attempts[2]).not.toHaveProperty('recovery_only');
 });
 
 test('failed launch can reconnect without losing the private launch key', async ({ page }) => {

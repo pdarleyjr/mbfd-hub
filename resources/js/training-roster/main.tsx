@@ -12,6 +12,9 @@ type Submission = { employee_profile_id: number; signature: string; client_submi
 type Receipt = { recorded: boolean; status: 'recorded' | 'unknown' | 'corrected' | 'voided' };
 type ApprovalSummary = Pick<Roster, 'course_name' | 'held_on' | 'location' | 'revision'> & { count: number };
 type ApprovalRequest = { client_submission_id: string; expected_revision: number; summary: ApprovalSummary; at: number };
+type Lead = { id: number; name: string; identifier_hint: string };
+type LeadSignoff = { lead_employee_profile_id: number; lead_signature: string; lead_confirmed: true };
+type ApprovalReceipt = { submitted: true; course_name: string; held_on: string; submitted_at: string; lead: { id: number; name: string }; lead_signed_at: string };
 const base = window.location.pathname.replace(/\/$/, '');
 const storageKey = `mbfd.training.pending.${base}`;
 const approvalKey = `${storageKey}.approval`;
@@ -132,9 +135,31 @@ function SubmitRoster({ summary, recovery, onCancel, onSubmitted }: { summary: A
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState('');
     const [uncertain, setUncertain] = useState(Boolean(recovery));
-    const [confirmed, setConfirmed] = useState(false);
+    const [reviewRequired, setReviewRequired] = useState(false);
+    const [closedWithoutReceipt, setClosedWithoutReceipt] = useState(false);
+    const [confirmed, setConfirmed] = useState<ApprovalReceipt | null>(null);
+    const [reviewedSummary, setReviewedSummary] = useState(summary);
+    const [recoveryOnly, setRecoveryOnly] = useState(Boolean(recovery));
+    const [leads, setLeads] = useState<Lead[]>([]);
+    const [leadId, setLeadId] = useState('');
+    const [leadSignature, setLeadSignature] = useState('');
+    const [leadConfirmed, setLeadConfirmed] = useState(false);
+    const [leadsLoading, setLeadsLoading] = useState(false);
+    const [leadError, setLeadError] = useState('');
+    const pendingSignoff = useRef<LeadSignoff | null>(null);
     const request = useRef<ApprovalRequest>(recovery ?? { client_submission_id: crypto.randomUUID(), expected_revision: summary.revision, summary, at: Date.now() });
     const heading = useRef<HTMLHeadingElement>(null);
+    const loadLeads = async () => {
+        setLeadsLoading(true); setLeadError('');
+        try {
+            const result = await api<{ leads: Lead[]; selected_lead_id: number | null }>('leads');
+            setLeads(result.leads);
+            setLeadId(result.leads.some(lead => lead.id === result.selected_lead_id) ? String(result.selected_lead_id) : '');
+            if (!result.leads.length) setLeadError('No lead instructors are available. Ask training staff to check the personnel directory.');
+        } catch { setLeadError('Lead instructors could not be loaded. Check your connection and try again.'); }
+        finally { setLeadsLoading(false); }
+    };
+    useEffect(() => { if (!recoveryOnly) void loadLeads(); }, [recoveryOnly]);
     useEffect(() => { heading.current?.focus(); }, [confirmed]);
     useEffect(() => {
         if (!confirmed) return;
@@ -143,54 +168,88 @@ function SubmitRoster({ summary, recovery, onCancel, onSubmitted }: { summary: A
     }, [confirmed]);
     const submitRoster = async (event: React.FormEvent) => {
         event.preventDefault();
-        if (busy) return;
+        if (busy || reviewRequired) return;
+        if (!recoveryOnly && !pendingSignoff.current && (!leadId || !leadSignature || !leadConfirmed)) return;
         setBusy(true); setError('');
         const credentials = { email, password };
+        const signoff = recoveryOnly ? { recovery_only: true } : (pendingSignoff.current ?? { lead_employee_profile_id: Number(leadId), lead_signature: leadSignature, lead_confirmed: true as const });
+        if (!recoveryOnly) pendingSignoff.current = signoff as LeadSignoff;
         setPassword('');
         rememberApproval(request.current);
         try {
             await api('csrf');
-            const result = await api<{ submitted: boolean }>('submit', { ...credentials, client_submission_id: request.current.client_submission_id, expected_revision: request.current.expected_revision });
-            if (result.submitted !== true) throw new Error('Submission unconfirmed');
+            const result = await api<ApprovalReceipt>('submit', { ...credentials, ...signoff, client_submission_id: request.current.client_submission_id, expected_revision: request.current.expected_revision });
+            if (result.submitted !== true || !Number.isInteger(result.lead?.id) || typeof result.lead?.name !== 'string' || !result.lead.name.trim()
+                || typeof result.course_name !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(result.held_on)
+                || !Number.isFinite(Date.parse(`${result.held_on}T12:00:00Z`)) || !Number.isFinite(Date.parse(result.lead_signed_at)) || !Number.isFinite(Date.parse(result.submitted_at))) throw new Error('Submission unconfirmed');
             rememberApproval();
-            setEmail(''); setConfirmed(true); onSubmitted();
+            setEmail(''); setLeads([]); setLeadId(''); setLeadSignature(''); pendingSignoff.current = null; setConfirmed(result); onSubmitted();
         } catch (err) {
+            if (err instanceof ApiError && recoveryOnly && err.status === 409) {
+                rememberApproval(); pendingSignoff.current = null; setEmail(''); setLeadSignature(''); setClosedWithoutReceipt(true);
+                return;
+            }
             const unknown = !(err instanceof ApiError) || err.status >= 500;
             setUncertain(previous => previous || unknown);
             setError(unknown ? 'Submission could not be confirmed. Keep this screen open, re-enter your credentials and retry. The same request will be checked.' : 'The roster was not submitted by this request. Check your authorized Hub credentials and try again. If attendance changed, return to the roster and review it first.');
+            if (!unknown && !uncertain) pendingSignoff.current = null;
+            if (err instanceof ApiError && err.status === 422) {
+                const signoffErrors = ['lead_employee_profile_id', 'lead_signature', 'lead_confirmed', 'attendance'].flatMap(field => err.fields[field] ?? []);
+                if (signoffErrors.length) setError(signoffErrors.join(' '));
+            }
+            if (err instanceof ApiError && err.status === 422 && err.fields.needs_signoff) {
+                try {
+                    const current = await api<Roster>('state');
+                    if (current.status !== 'open') throw new Error('Roster is closed');
+                    const updated = { course_name: current.course_name, held_on: current.held_on, location: current.location, revision: current.revision, count: current.attendance.length };
+                    setReviewedSummary(updated); request.current = { ...request.current, expected_revision: current.revision, summary: updated }; rememberApproval(request.current);
+                    pendingSignoff.current = null; setLeadId(''); setLeadSignature(''); setLeadConfirmed(false); setUncertain(false); setRecoveryOnly(false);
+                    setError('This request was not recorded. Review the updated attendance count, select the actual lead instructor and collect their signature before submitting.');
+                } catch { setError('The request was not recorded, but the open roster could not be refreshed. Check your connection and retry to confirm its status.'); }
+            }
             if (err instanceof ApiError && err.status === 422 && err.fields.expected_revision) {
                 try {
                     const current = await api<Roster>('state');
                     if (current.status === 'open') {
-                        setUncertain(false);
+                        setUncertain(false); setReviewRequired(true); pendingSignoff.current = null;
                         setError('Attendance changed before approval. Return to the roster to review the latest attendance, then submit again.');
                     }
                 } catch { /* Keep uncertain requests on screen until their outcome can be confirmed. */ }
             }
         } finally { credentials.password = ''; setBusy(false); }
     };
-    if (confirmed) return <section className="success-state" role="status"><div className="success-mark" aria-hidden="true">✓</div><h1 ref={heading} tabIndex={-1}>Roster submitted</h1><p>{summary.course_name}<br />{dateLabel(summary.held_on)}</p><p>This class is closed. Returning to classes shortly.</p><a className="secondary button-link" href="/">Return to classes</a></section>;
-    return <section className="wizard submission-panel"><button className="text-button" disabled={busy || uncertain} onClick={() => { rememberApproval(); onCancel(); }}>← Return to roster</button><p className="eyebrow">Instructor approval</p><h1 ref={heading} tabIndex={-1}>{uncertain ? 'Confirm roster submission' : 'Submit roster'}</h1><div className="submission-summary"><h2>{summary.course_name}</h2><p>{dateLabel(summary.held_on)}<br /><strong>{summary.count} {summary.count === 1 ? 'member' : 'members'} signed</strong></p></div><p>{uncertain ? 'The previous submission has not been confirmed on this screen. Re-enter the same approver’s credentials to check and complete that request.' : 'Submit after everyone has signed. This closes sign-in and keeps the completed roster private. An authorized administrator must enter their Hub credentials to approve it.'}</p>
+    if (confirmed) return <section className="success-state" role="status"><div className="success-mark" aria-hidden="true">✓</div><h1 ref={heading} tabIndex={-1}>Roster submitted</h1><p>{confirmed.course_name}<br />{dateLabel(confirmed.held_on)}</p><p>Lead instructor: <strong>{confirmed.lead.name}</strong><br /><time dateTime={confirmed.lead_signed_at}>Signed {signedLabel(confirmed.lead_signed_at)}</time></p><p>This class is closed. Returning to classes shortly.</p><a className="secondary button-link" href="/">Return to classes</a></section>;
+    if (closedWithoutReceipt) return <section className="empty-state"><h1>Submission not recorded</h1><p>This roster is no longer open and this request was not recorded. Ask training staff to review the completed roster if needed.</p><a className="secondary button-link" href="/">Return to classes</a></section>;
+    return <section className="wizard submission-panel"><button className="text-button" disabled={busy || uncertain} onClick={() => { rememberApproval(); onCancel(); }}>← Return to roster</button><p className="eyebrow">Instructor sign-off and approval</p><h1 ref={heading} tabIndex={-1}>{uncertain ? 'Confirm roster submission' : 'Submit roster'}</h1><div className="submission-summary"><h2>{reviewedSummary.course_name}</h2><p>{dateLabel(reviewedSummary.held_on)}<br /><strong>{reviewedSummary.count} {reviewedSummary.count === 1 ? 'member' : 'members'} signed</strong></p></div><p>{uncertain ? 'The previous submission has not been confirmed on this screen. Re-enter the same submitting administrator’s credentials to check and complete that request.' : 'After everyone has signed, select the actual lead instructor for this class and have them sign below. An authorized administrator then approves the completed roster with their own Hub credentials.'}</p>
         {error && <div role="alert" className="message error">{error}</div>}
-        <form onSubmit={event => void submitRoster(event)} autoComplete="off"><label className="search-label" htmlFor="approver-email">Email or employee ID</label><input id="approver-email" type="text" autoComplete="username" required value={email} disabled={busy} onChange={event => setEmail(event.target.value)} /><label className="search-label" htmlFor="approver-password">Hub password</label><input id="approver-password" type="password" autoComplete="off" required value={password} disabled={busy} onChange={event => setPassword(event.target.value)} /><p className="hint">Approval does not sign you into this shared screen. Your password is cleared when you submit.</p><button className="primary" type="submit" disabled={busy}>{busy ? 'Submitting roster…' : uncertain ? 'Retry submission' : 'Approve and submit'}</button></form>
+        <form onSubmit={event => void submitRoster(event)} autoComplete="off">
+            {!recoveryOnly && <fieldset className="lead-signoff"><legend>Lead instructor / OIC</legend>
+                {leadsLoading && <p role="status">Loading lead instructors…</p>}
+                {leadError && <div role="alert" className="message error">{leadError} <button type="button" className="text-button" disabled={busy || uncertain || leadsLoading} onClick={() => void loadLeads()}>Retry lead instructors</button></div>}
+                <label className="search-label" htmlFor="lead-instructor">Actual lead instructor for this session</label><select id="lead-instructor" required value={leadId} disabled={busy || uncertain || reviewRequired || leadsLoading} onChange={event => { setLeadId(event.target.value); setLeadSignature(''); setLeadConfirmed(false); pendingSignoff.current = null; }}><option value="">Select the lead instructor</option>{leads.map(lead => <option key={lead.id} value={lead.id}>{lead.name} · ID ending {lead.identifier_hint}</option>)}</select>
+                {leadId && <><p className="search-label">Lead instructor’s signature</p><Signature key={leadId} onChange={image => { setLeadSignature(image); setLeadConfirmed(false); }} hideSubmit busy={busy} locked={uncertain || reviewRequired} label="Lead instructor signature" /><label className="lead-confirmation"><input type="checkbox" checked={leadConfirmed} disabled={busy || uncertain || reviewRequired || !leadSignature} onChange={event => setLeadConfirmed(event.target.checked)} />I confirm the selected lead instructor personally signed above and the roster is complete.</label></>}
+            </fieldset>}
+            <h2>Submitting administrator</h2><label className="search-label" htmlFor="approver-email">Email or employee ID</label><input id="approver-email" type="text" autoComplete="username" required value={email} disabled={busy} onChange={event => setEmail(event.target.value)} /><label className="search-label" htmlFor="approver-password">Hub password</label><input id="approver-password" type="password" autoComplete="off" required value={password} disabled={busy} onChange={event => setPassword(event.target.value)} /><p className="hint">The submitting administrator may be different from the lead instructor. Approval does not sign you into this shared screen. Your password is cleared when you submit.</p><button className="primary" type="submit" disabled={busy || reviewRequired || (!recoveryOnly && (leadsLoading || !leadId || !leadSignature || !leadConfirmed))}>{busy ? 'Submitting roster…' : uncertain ? 'Retry submission' : 'Approve and submit'}</button></form>
     </section>;
 }
 
-function Signature({ onSubmit, busy, locked }: { onSubmit: (image: string) => void; busy: boolean; locked: boolean }) {
+function Signature({ onSubmit, busy, locked, onChange, hideSubmit = false, label = 'Draw your signature with a finger, stylus, or mouse' }: { onSubmit?: (image: string) => void; busy: boolean; locked: boolean; onChange?: (image: string) => void; hideSubmit?: boolean; label?: string }) {
     const canvas = useRef<HTMLCanvasElement>(null);
     const drawing = useRef(false);
     const [ink, setInk] = useState(false);
+    const hasInk = useRef(false);
     const point = (event: React.PointerEvent<HTMLCanvasElement>) => {
         const rect = event.currentTarget.getBoundingClientRect();
         return [(event.clientX - rect.left) * 1000 / rect.width, (event.clientY - rect.top) * 500 / rect.height];
     };
     const clear = () => {
         canvas.current?.getContext('2d')?.clearRect(0, 0, 1000, 500);
-        setInk(false);
+        setInk(false); hasInk.current = false; onChange?.('');
     };
+    const finish = () => { drawing.current = false; if (!busy && !locked && hasInk.current && canvas.current) onChange?.(canvas.current.toDataURL('image/png')); };
     return <>
         <div className="signature-frame">
-            <canvas ref={canvas} width={1000} height={500} aria-label="Draw your signature with a finger, stylus, or mouse"
+            <canvas ref={canvas} width={1000} height={500} aria-label={label}
                 onPointerDown={event => {
                     if (busy || locked) return;
                     event.currentTarget.setPointerCapture(event.pointerId);
@@ -206,19 +265,19 @@ function Signature({ onSubmit, busy, locked }: { onSubmit: (image: string) => vo
                     if (!drawing.current || busy || locked) return;
                     const context = event.currentTarget.getContext('2d');
                     const [x, y] = point(event);
-                    context?.lineTo(x, y); context?.stroke(); setInk(true);
+                    context?.lineTo(x, y); context?.stroke(); setInk(true); hasInk.current = true;
                 }}
-                onPointerUp={() => { drawing.current = false; }}
-                onPointerCancel={() => { drawing.current = false; }}
+                onPointerUp={finish}
+                onPointerCancel={finish}
             />
             <span aria-hidden="true">Sign here</span>
         </div>
         <p className="hint">Use your finger, stylus, or mouse. Ask the instructor if you need assistance.</p>
         <div className="signature-actions">
-            <button className="secondary" disabled={busy || locked || !ink} onClick={clear}>Clear signature</button>
-            <button className="primary" disabled={!ink || busy || locked} onClick={() => { if (canvas.current) onSubmit(canvas.current.toDataURL('image/png')); }}>
+            <button type="button" className="secondary" disabled={busy || locked || !ink} onClick={clear}>Clear signature</button>
+            {!hideSubmit && <button type="button" className="primary" disabled={!ink || busy || locked} onClick={() => { if (canvas.current) onSubmit?.(canvas.current.toDataURL('image/png')); }}>
                 {busy ? 'Saving attendance…' : 'Complete sign-in'}
-            </button>
+            </button>}
         </div>
     </>;
 }

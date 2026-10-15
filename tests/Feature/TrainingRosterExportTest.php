@@ -174,6 +174,91 @@ final class TrainingRosterExportTest extends TestCase
         }
     }
 
+    public static function instructorSignoffStates(): array
+    {
+        return [[false, 'submitted'], [false, 'archived'], [true, 'certified']];
+    }
+
+    #[DataProvider('instructorSignoffStates')]
+    public function test_selected_instructor_is_distinct_from_submitting_admin_and_later_certification(bool $certified, string $status): void
+    {
+        $version = $this->version(17, $certified);
+        $snapshot = $version->snapshot;
+        $snapshot['session']['status'] = $status;
+        $snapshot['session']['classifications'] = ['STC'];
+        $snapshot['submission'] = ['submitted_at' => '2026-11-05T16:24:00+00:00', 'submitted_by' => 123];
+        $snapshot['instructor_signoff'] = [
+            'lead_snapshot' => ['employee_profile_id' => 42, 'employee_id' => '00142', 'display_name' => 'SYNTHETIC LEAD'],
+            'signature' => $snapshot['attendance'][0]['signature'],
+            'signed_at' => '2026-11-05T16:23:45+00:00',
+            'recorded_by' => 123,
+            'request_hash' => str_repeat('a', 64),
+        ];
+        $signed = TrainingRosterVersion::query()->create(['training_session_id' => $version->training_session_id, 'revision' => 2, 'snapshot' => $snapshot]);
+        $service = app(TrainingRosterExportService::class);
+        $pdfBytes = $service->bytes($signed, 'pdf');
+        $pdf = (new Parser)->parseContent($pdfBytes);
+        self::assertCount(2, $pdf->getPages());
+        foreach ($pdf->getPages() as $page) {
+            $text = $page->getText();
+            self::assertStringContainsString($certified ? 'CERTIFIED' : 'SUBMITTED', $text);
+            self::assertStringContainsString($certified ? 'SYNTHETIC OIC' : 'SYNTHETIC LEAD', $text);
+            self::assertStringContainsString($certified ? '10/15/2026 11:00:00 EDT' : '11/05/2026 11:23:45 EST', $text);
+            self::assertStringContainsString('Submitted 2026-11-05T16:24:00+00:00', $text);
+            self::assertStringNotContainsString('PROVISIONAL', $text);
+            self::assertStringNotContainsString($snapshot['instructor_signoff']['request_hash'], $text);
+            if (! $certified) {
+                self::assertStringContainsString('00142', $text);
+                self::assertStringNotContainsString('CERTIFIED', $text);
+            }
+        }
+        $xlsx = $service->bytes($signed, 'xlsx');
+        $path = tempnam(sys_get_temp_dir(), 'training-instructor-export-');
+        file_put_contents($path, $xlsx);
+        try {
+            $book = IOFactory::load($path);
+            self::assertCount(21, $book->getSheet(0)->getDrawingCollection());
+            self::assertStringContainsString($certified ? 'SYNTHETIC OIC' : 'SYNTHETIC LEAD', $book->getSheet(0)->getCell('A28')->getValue());
+            self::assertSame($certified ? '10/15/2026 11:00:00 EDT' : '11/05/2026 11:23:45 EST', $book->getSheet(0)->getCell('E29')->getValue());
+            $data = $book->getSheet(1);
+            foreach (range(2, 18) as $row) {
+                self::assertSame($certified ? 'Certified' : 'Submitted', $data->getCell('S'.$row)->getValue());
+                self::assertSame($certified ? '00000' : '00142', $data->getCell('U'.$row)->getValue());
+                self::assertSame($certified ? $snapshot['certification']['certified_at'] : null, $data->getCell('V'.$row)->getValue());
+                self::assertSame('SYNTHETIC LEAD', $data->getCell('AC'.$row)->getValue());
+                self::assertSame('00142', $data->getCell('AD'.$row)->getValue());
+                self::assertSame(DataType::TYPE_STRING, $data->getCell('AD'.$row)->getDataType());
+                self::assertSame('2026-11-05T16:23:45+00:00', $data->getCell('AE'.$row)->getValue());
+                self::assertSame($snapshot['instructor_signoff']['signature']['sha256'], $data->getCell('AF'.$row)->getValue());
+                self::assertSame('123', $data->getCell('AG'.$row)->getValue());
+            }
+            $book->disconnectWorksheets();
+        } finally {
+            unlink($path);
+        }
+        self::assertSame($pdfBytes, $service->bytes($signed->fresh(), 'pdf'));
+        self::assertSame($xlsx, $service->bytes($signed->fresh(), 'xlsx'));
+        self::assertSame($snapshot, $signed->fresh()->snapshot);
+    }
+
+    public function test_corrupted_instructor_signature_blocks_submitted_export(): void
+    {
+        $version = $this->version(1, false);
+        $snapshot = $version->snapshot;
+        $signature = $snapshot['attendance'][0]['signature'];
+        $signature['path'] = 'training/instructor-signature.png';
+        Storage::disk('local')->put($signature['path'], 'corrupt');
+        $snapshot['instructor_signoff'] = [
+            'lead_snapshot' => ['employee_profile_id' => 42, 'employee_id' => '00142', 'display_name' => 'SYNTHETIC LEAD'],
+            'signature' => $signature, 'signed_at' => '2026-10-15T15:05:44+00:00', 'recorded_by' => 123,
+        ];
+        $snapshot['submission'] = ['submitted_at' => '2026-10-15T15:05:44+00:00', 'submitted_by' => 123];
+        $signed = TrainingRosterVersion::query()->create(['training_session_id' => $version->training_session_id, 'revision' => 2, 'snapshot' => $snapshot]);
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('integrity check');
+        app(TrainingRosterExportService::class)->bytes($signed, 'xlsx');
+    }
+
     public function test_corrupted_signature_blocks_export_instead_of_omitting_evidence(): void
     {
         $version = $this->version(1, false);
@@ -299,13 +384,18 @@ final class TrainingRosterExportTest extends TestCase
 
     public function test_maximum_custom_labels_and_metadata_preserve_each_signature_and_footer(): void
     {
-        $version = $this->version(2, true);
+        $version = $this->version(2, false);
         $snapshot = $version->snapshot;
         $labels = array_map(fn (int $number): string => sprintf('%02d-', $number).str_repeat('W', 77), range(1, 16));
         $snapshot['session']['classifications'] = $labels;
         $snapshot['session']['course_name'] = str_repeat('W', 200);
         $snapshot['session']['location'] = str_repeat('W', 255);
         $snapshot['submission'] = ['submitted_at' => '2026-10-15T15:05:44+00:00', 'submitted_by' => 123];
+        $snapshot['session']['status'] = 'submitted';
+        $snapshot['instructor_signoff'] = [
+            'lead_snapshot' => ['employee_profile_id' => 42, 'employee_id' => str_repeat('M', 255), 'display_name' => str_repeat('W', 255)],
+            'signature' => $snapshot['attendance'][0]['signature'], 'signed_at' => '2026-10-15T15:05:44+00:00', 'recorded_by' => 123,
+        ];
         foreach ($snapshot['attendance'] as &$entry) {
             $entry['snapshot']['first_name'] = str_repeat('W', 100);
             $entry['snapshot']['last_name'] = str_repeat('W', 100);
@@ -320,7 +410,10 @@ final class TrainingRosterExportTest extends TestCase
             foreach ($labels as $label) {
                 self::assertStringContainsString($label, preg_replace('/\s+/u', '', $text));
             }
-            self::assertStringContainsString('SYNTHETIC OIC', $text);
+            self::assertStringContainsString(str_repeat('W', 255), preg_replace('/\s+/u', '', $text));
+            self::assertStringContainsString(str_repeat('M', 255), preg_replace('/\s+/u', '', $text));
+            self::assertStringContainsString('10/15/2026 11:05:44 EDT', $text);
+            self::assertStringNotContainsString('CERTIFIED', $text);
             self::assertStringContainsString('Submitted 2026-10-15T15:05:44+00:00', $text);
             self::assertStringContainsString('Page '.($index + 1).' of 2', $text);
         }

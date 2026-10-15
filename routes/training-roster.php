@@ -20,6 +20,7 @@ Route::domain(config('training-roster.host'))->group(function (): void {
         Route::post('/submit', [TrainingKioskController::class, 'submitRoster'])->middleware('throttle:10,1,training-submit:');
         Route::get('/state', [TrainingKioskController::class, 'state']);
         Route::get('/candidates', [TrainingKioskController::class, 'candidates'])->middleware('throttle:30,1,training-candidates:');
+        Route::get('/leads', [TrainingKioskController::class, 'leads'])->middleware('throttle:30,1,training-leads:');
         Route::post('/attendance', [TrainingKioskController::class, 'sign'])->middleware('throttle:60,1,training-attendance:');
         Route::post('/receipt', [TrainingKioskController::class, 'receipt']);
     });

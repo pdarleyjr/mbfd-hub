@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Training;
 
 use App\Http\Controllers\Controller;
+use App\Models\Employee;
 use App\Models\Training\TrainingCourse;
 use App\Models\Training\TrainingSession;
 use App\Services\Training\TrainingAssignmentProvider;
@@ -64,15 +65,35 @@ final class TrainingKioskController extends Controller
             'password' => ['required', 'string', 'max:1024'],
             'expected_revision' => ['required', 'integer', 'min:1'],
             'client_submission_id' => ['required', 'uuid'],
+            'recovery_only' => ['sometimes', 'boolean'],
+            'lead_employee_profile_id' => ['sometimes', 'integer', 'min:1'],
+            'lead_signature' => ['sometimes', 'string', 'max:1400000'],
+            'lead_confirmed' => ['sometimes', 'boolean'],
         ]);
         $actor = $authenticator->authenticate($data['email'], $data['password'], (string) $request->ip());
         unset($data['password']);
-        $session = $rosters->submit($session, $actor, (int) $data['expected_revision'], $data['client_submission_id'], $grantId);
+        $signoffData = array_intersect_key($data, array_flip(['lead_employee_profile_id', 'lead_signature', 'lead_confirmed']));
+        $session = $rosters->submit($session, $actor, (int) $data['expected_revision'], $data['client_submission_id'], $grantId, $signoffData, (bool) ($data['recovery_only'] ?? false));
+        $signoff = $session->versions()->where('revision', $session->revision)->firstOrFail()->snapshot['instructor_signoff'];
 
         return response()->json([
             'submitted' => true, 'course_name' => $session->course_name,
             'held_on' => $session->held_on->toDateString(), 'submitted_at' => $session->submitted_at->toIso8601String(),
+            'lead' => ['id' => $signoff['lead_snapshot']['employee_profile_id'], 'name' => $signoff['lead_snapshot']['display_name']],
+            'lead_signed_at' => $signoff['signed_at'],
         ]);
+    }
+
+    public function leads(Request $request, TrainingSession $session, TrainingKioskService $kiosk): JsonResponse
+    {
+        $kiosk->requireDevice($request, $session);
+        abort_unless($session->status === 'open', 403, 'This roster is no longer open. Return to classes.');
+        $identityCounts = Employee::query()->pluck('employee_id')->countBy();
+        $leads = Employee::query()->where('roster_status', 'active')->orderBy('name')->orderBy('id')->get(['id', 'employee_id', 'name'])
+            ->filter(fn (Employee $employee): bool => filled($employee->employee_id) && filled($employee->name) && ($identityCounts[$employee->employee_id] ?? 0) === 1)
+            ->map(fn (Employee $employee): array => ['id' => $employee->id, 'name' => $employee->name, 'identifier_hint' => substr((string) $employee->employee_id, -4)])->values();
+
+        return response()->json(['leads' => $leads, 'selected_lead_id' => $leads->contains('id', $session->oic_employee_profile_id) ? $session->oic_employee_profile_id : null]);
     }
 
     public function authorizeDevice(Request $request, TrainingSession $session, TrainingKioskService $kiosk): JsonResponse
