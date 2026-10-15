@@ -17,6 +17,10 @@ services:
       WWWUSER: "${HUB_WWWUSER:?HUB_WWWUSER must match the mounted storage owner}"
       WWWGROUP: "${HUB_WWWGROUP:?HUB_WWWGROUP must match the mounted storage group}"
       LARAVEL_SAIL: 1
+      # The PHP built-in server otherwise handles one request at a time, so one slow
+      # page blocks every member. artisan serve honours this because LARAVEL_SAIL=1;
+      # sessions and cache use Redis in production, so workers share no file locks.
+      PHP_CLI_SERVER_WORKERS: "${HUB_PHP_CLI_SERVER_WORKERS:-8}"
       XDEBUG_MODE: "off"
     volumes:
       - "${HUB_APP_ENV_FILE:?HUB_APP_ENV_FILE must point to the host-managed Laravel environment file}:/var/www/html/.env:ro"
