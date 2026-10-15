@@ -31,6 +31,9 @@ class Station extends Model
 
     public const IMAGE_DIRECTORY = 'stations/photos';
 
+    /** Shown when a station has neither an uploaded photo nor bundled artwork. */
+    public const PLACEHOLDER_IMAGE = '/images/mbfd-official-seal-256.png';
+
     /** @var list<string> */
     public const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -62,6 +65,25 @@ class Station extends Model
                 Storage::disk(self::IMAGE_DISK)->delete($previous);
             }
         });
+    }
+
+    /**
+     * Uploaded photo, else the bundled station artwork the member SPA also
+     * falls back to, else the department seal. Always a same-origin path.
+     */
+    public function photoOrPlaceholderUrl(): string
+    {
+        $uploaded = $this->image_url;
+        if ($uploaded !== null) {
+            return $uploaded;
+        }
+
+        $number = (string) preg_replace('/\D/', '', (string) $this->getAttribute('station_number'));
+        $bundled = '/images/stations/station-'.$number.'.png';
+
+        return $number !== '' && is_file(public_path(ltrim($bundled, '/')))
+            ? $bundled
+            : self::PLACEHOLDER_IMAGE;
     }
 
     /**

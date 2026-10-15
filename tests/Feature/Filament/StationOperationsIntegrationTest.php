@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace Tests\Feature\Filament;
 
 use App\Filament\Resources\ApparatusInspectionExceptionResource\Pages\ListInspectionExceptions;
+use App\Filament\Resources\DefectResource\Pages\ListDefects;
 use App\Filament\Resources\InspectionResource\Pages\ListInspections;
+use App\Filament\Resources\StationResource\Pages\ListStations;
 use App\Filament\Resources\StationResource\Pages\ViewStation;
 use App\Filament\Resources\StationResource\RelationManagers\ApparatusServiceTicketsRelationManager;
 use App\Filament\Resources\StationResource\RelationManagers\DailyCheckoutsRelationManager;
 use App\Filament\Resources\StationResource\RelationManagers\EquipmentIssuesRelationManager;
+use App\Filament\Resources\StationResource\StationOperationsSection;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
@@ -173,6 +176,77 @@ final class StationOperationsIntegrationTest extends TestCase
             ->assertDontSee('Unresolved equipment issues');
     }
 
+    public function test_unresolved_equipment_issue_link_lists_exactly_the_counted_issues(): void
+    {
+        $station = $this->station(1);
+        $other = $this->station(2);
+        $engine = $this->apparatus($station, 'E1');
+        $open = $this->defect($engine, false);
+        $inProgress = $this->defect($engine, false, 'in_progress');
+        $resolved = $this->defect($engine, true);
+        $foreign = $this->defect($this->apparatus($other, 'E2'), false);
+        $this->actingAsSuperAdmin();
+
+        $url = StationOperationsSection::equipmentIssuesUrl($station);
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+        self::assertSame((string) $station->id, $query['tableFilters']['station_id']['value'] ?? null);
+
+        $count = app(StationOperationsSummaryService::class)->summaryFor($station->fresh())['open_equipment_issues'];
+        self::assertSame(2, $count);
+
+        Livewire::withQueryParams($query)
+            ->test(ListDefects::class)
+            ->call('loadTable')
+            ->assertCanSeeTableRecords([$open, $inProgress])
+            ->assertCanNotSeeTableRecords([$resolved, $foreign])
+            ->assertCountTableRecords($count);
+    }
+
+    public function test_unresolved_filter_on_the_equipment_issue_list_excludes_only_resolved_issues(): void
+    {
+        $engine = $this->apparatus($this->station(1), 'E1');
+        $open = $this->defect($engine, false);
+        $inProgress = $this->defect($engine, false, 'in_progress');
+        $resolved = $this->defect($engine, true);
+        $this->actingAsSuperAdmin();
+
+        Livewire::test(ListDefects::class)
+            ->call('loadTable')
+            ->resetTableFilters()
+            ->filterTable('status', null)
+            ->filterTable('unresolved', true)
+            ->assertCanSeeTableRecords([$open, $inProgress])
+            ->assertCanNotSeeTableRecords([$resolved])
+            ->filterTable('unresolved', false)
+            ->assertCanSeeTableRecords([$resolved])
+            ->assertCanNotSeeTableRecords([$open, $inProgress]);
+    }
+
+    public function test_station_table_and_profile_show_a_photo_or_placeholder(): void
+    {
+        $withPhoto = $this->station(1, ['image_path' => 'stations/photos/front.jpg']);
+        $bundled = $this->station(2);
+        $noArtwork = $this->station(9);
+        $this->actingAsSuperAdmin();
+
+        self::assertSame('/storage/stations/photos/front.jpg', $withPhoto->photoOrPlaceholderUrl());
+        self::assertSame('/images/stations/station-2.png', $bundled->photoOrPlaceholderUrl());
+        self::assertSame(Station::PLACEHOLDER_IMAGE, $noArtwork->photoOrPlaceholderUrl());
+
+        Livewire::test(ListStations::class)
+            ->call('loadTable')
+            ->assertTableColumnExists('photo')
+            ->assertSee('/storage/stations/photos/front.jpg', false)
+            ->assertSee('/images/stations/station-2.png', false)
+            ->assertSee(Station::PLACEHOLDER_IMAGE, false)
+            ->assertSee('No photo uploaded for Station 9', false);
+
+        Livewire::test(ViewStation::class, ['record' => $noArtwork->getRouteKey()])
+            ->assertSuccessful()
+            ->assertSee(Station::PLACEHOLDER_IMAGE, false)
+            ->assertSee('No photo uploaded. Members see this standard station artwork.');
+    }
+
     public function test_admin_lists_filter_daily_checkouts_and_exceptions_by_station(): void
     {
         $station = $this->station(1);
@@ -254,14 +328,14 @@ final class StationOperationsIntegrationTest extends TestCase
         ]);
     }
 
-    private function defect(Apparatus $apparatus, bool $resolved): ApparatusDefect
+    private function defect(Apparatus $apparatus, bool $resolved, ?string $status = null): ApparatusDefect
     {
         return ApparatusDefect::query()->create([
             'apparatus_id' => $apparatus->id,
             'compartment' => 'Cab',
             'item' => 'Fixture radio '.uniqid(),
             'issue_type' => 'missing',
-            'status' => $resolved ? 'resolved' : 'open',
+            'status' => $status ?? ($resolved ? 'resolved' : 'open'),
             'resolved' => $resolved,
             'reported_date' => now()->toDateString(),
         ]);

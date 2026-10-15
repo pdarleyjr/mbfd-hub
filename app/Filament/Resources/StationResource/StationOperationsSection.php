@@ -35,7 +35,7 @@ final class StationOperationsSection
                 self::countEntry('open_service_tickets', 'Open apparatus service', ApparatusServiceTicketResource::canViewAny(...),
                     fn (Station $record): string => ApparatusServiceTicketResource::getUrl('index', self::filters($record, ['open' => ['value' => true]]))),
                 self::countEntry('open_equipment_issues', 'Unresolved equipment issues', DefectResource::canViewAny(...),
-                    fn (Station $record): string => DefectResource::getUrl('index', self::filters($record, ['status' => ['value' => null]]))),
+                    fn (Station $record): string => self::equipmentIssuesUrl($record)),
                 self::countEntry('open_inspection_exceptions', 'Checkout exceptions to review', ApparatusInspectionExceptionResource::canViewAny(...),
                     fn (Station $record): string => ApparatusInspectionExceptionResource::getUrl('index', self::filters($record, ['open' => ['value' => true]]))),
                 TextEntry::make('checkouts_last_24h')
@@ -53,6 +53,20 @@ final class StationOperationsSection
                     ->visible(fn (): bool => auth()->user()?->can('viewAny', ApparatusInspection::class) ?? false),
             ])
             ->columns(['default' => 1, 'sm' => 2, 'xl' => 5]);
+    }
+
+    /**
+     * Equipment-issue list showing exactly what the "Unresolved equipment
+     * issues" count counts: this station, not resolved (open or in progress).
+     * The status filter is cleared so its "open only" default cannot hide
+     * in-progress issues.
+     */
+    public static function equipmentIssuesUrl(Station $record): string
+    {
+        return DefectResource::getUrl('index', self::filters($record, [
+            'status' => ['value' => null],
+            'unresolved' => ['value' => true],
+        ]));
     }
 
     /**

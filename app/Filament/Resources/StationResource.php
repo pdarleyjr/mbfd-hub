@@ -112,12 +112,13 @@ class StationResource extends Resource
                 StationOperationsSection::make(),
                 Infolists\Components\Section::make('Station Photo')
                     ->schema([
-                        Infolists\Components\ImageEntry::make('image_path')
+                        Infolists\Components\ImageEntry::make('photo')
                             ->hiddenLabel()
-                            ->disk(Station::IMAGE_DISK)
-                            ->visibility('public')
+                            ->state(fn (Station $record): string => url($record->photoOrPlaceholderUrl()))
                             ->height(180)
-                            ->placeholder('No photo uploaded. Members see the standard station artwork.'),
+                            ->helperText(fn (Station $record): string => filled($record->image_path)
+                                ? 'Uploaded station photo.'
+                                : 'No photo uploaded. Members see this standard station artwork.'),
                     ])
                     ->collapsible(),
                 Infolists\Components\Section::make('Inventory Readiness')
@@ -199,6 +200,17 @@ class StationResource extends Resource
                 'apparatuses' => fn ($apparatus) => $apparatus->select(StationStaffingService::APPARATUS_COLUMNS),
             ]))
             ->columns([
+                Tables\Columns\ImageColumn::make('photo')
+                    ->label('Photo')
+                    ->state(fn (Station $record): string => url($record->photoOrPlaceholderUrl()))
+                    ->height(40)
+                    ->width(60)
+                    ->extraImgAttributes(fn (Station $record): array => [
+                        'alt' => filled($record->image_path) ? 'Station '.$record->station_number.' photo' : 'No photo uploaded for Station '.$record->station_number,
+                        'loading' => 'lazy',
+                        'class' => 'object-cover rounded',
+                    ])
+                    ->visibleFrom('sm'),
                 Tables\Columns\TextColumn::make('station_number')
                     ->wrap()
                     ->extraAttributes(['class' => 'hub-phone-summary'])
