@@ -10,6 +10,24 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  *
  * Every descriptive field is optional; item_name is derived from the type,
  * make and model when the person entering stock leaves it blank.
+ *
+ * @property int $id
+ * @property string $item_name
+ * @property string|null $category
+ * @property string|null $item_type
+ * @property string|null $manufacturer
+ * @property string|null $model
+ * @property string|null $size
+ * @property string|null $color
+ * @property string|null $serial_number
+ * @property \Illuminate\Support\Carbon|null $manufacture_date
+ * @property string|null $condition
+ * @property string|null $storage_location
+ * @property int $quantity_on_hand
+ * @property int $reorder_level
+ * @property string|null $unit_cost
+ * @property string|null $supplier
+ * @property string|null $notes
  */
 class Uniform extends Model
 {
