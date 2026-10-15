@@ -3,6 +3,7 @@ import { expect, test, type APIRequestContext, type BrowserContext, type Page } 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { isAbsolute, relative, resolve } from 'node:path';
 import { fixtureSessionRenewal } from '../support/fixture-session-renewal';
+import { signInPersona } from './persona-sign-in';
 
 const origin = 'http://127.0.0.1:8127';
 const widths = [320, 390, 820, 1024, 1280, 1440, 1920];
@@ -263,6 +264,8 @@ for (const persona of inventoryResultsPath ? [] : Object.keys(personas)) {
     test.setTimeout(45 * 60_000);
     const statePath = `test-results/protected-ui-auth/persona-${persona}.json`;
     expect(existsSync(statePath), `Persona storage state for ${persona}`).toBe(true);
+    // Sessions end after an hour; earlier crawls can outlast the setup-time sign-in.
+    await signInPersona(browser, persona, personas[persona], statePath);
     const blocked: string[] = [];
     const context = await browser.newContext({ storageState: statePath, serviceWorkers: 'block', viewport: { width: 1440, height: 900 } });
     const canonical = await context.request.get(`${origin}/api/me/context`, { headers: { Accept: 'application/json', Origin: origin, Referer: origin + '/' }, maxRedirects: 0 });
