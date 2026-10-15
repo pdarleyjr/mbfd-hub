@@ -52,6 +52,15 @@ final class StationAdminResourceTest extends TestCase
         self::assertFalse($station->is_active);
     }
 
+    public function test_station_photo_has_alternative_text(): void
+    {
+        $this->actingAsSuperAdmin();
+        $station = $this->station(5);
+
+        Livewire::test(\App\Filament\Resources\StationResource\Pages\ViewStation::class, ['record' => $station->getRouteKey()])
+            ->assertSeeHtml('alt="Standard station artwork"');
+    }
+
     public function test_blank_display_name_falls_back_to_the_station_number_label(): void
     {
         $this->actingAsSuperAdmin();

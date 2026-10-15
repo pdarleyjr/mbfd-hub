@@ -125,6 +125,11 @@ function pushNotificationWidget() {
                         scope: '/',
                         updateViaCache: 'none'
                     });
+                    // Managed or automated browsers may resolve without a registration.
+                    if (!registration) {
+                        console.warn('[PushWidget] Service Worker registration was not available in this browser');
+                        return null;
+                    }
                     console.log('[PushWidget] Service Worker registered successfully with scope:', registration.scope);
                     // Force update check to ensure seamless background updates
                     await registration.update().catch(() => {});
@@ -195,7 +200,8 @@ function pushNotificationWidget() {
                     setTimeout(() => this.checkStatus(), 500);
                     return;
                 }
-                console.error('[PushWidget] Could not register service worker:', error);
+                // The widget shows this state to the member; it is an environment limit, not an app fault.
+                console.warn('[PushWidget] Could not register service worker:', error);
                 this.hideAllSections();
                 this.show(this.sections.errorSection);
                 this.controls.errorMessage.textContent = 'Could not register service worker: ' + error.message;

@@ -29,6 +29,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Pulse\Facades\Pulse;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -70,6 +71,10 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(\App\Models\Training\TrainingSession::class, \App\Policies\TrainingRosterPolicy::class);
 
         RateLimiter::for('member-onboarding-invitations', static fn () => Limit::perMinute(4)->by('member-onboarding-global'));
+
+        // Pulse defaults to Gravatar URLs built from hashed member emails; keep
+        // dashboard user cards local instead of disclosing them to a third party.
+        Pulse::user(static fn (User $user): array => ['name' => $user->name, 'extra' => (string) $user->email]);
 
         Gate::before(function (User $user, string $ability, array $arguments): ?bool {
             $subject = $arguments[0] ?? null;

@@ -15,6 +15,7 @@ use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class CapitalProjectResource extends Resource
 {
@@ -77,7 +78,8 @@ class CapitalProjectResource extends Resource
                         Forms\Components\DatePicker::make('target_completion_date')
                             ->displayFormat('M d, Y')
                             ->native(false),
-                        Forms\Components\DatePicker::make('actual_completion_date')
+                        Forms\Components\DatePicker::make('actual_completion')
+                            ->label('Actual completion date')
                             ->displayFormat('M d, Y')
                             ->native(false)
                             ->disabled(fn ($get) => $get('status') !== 'completed'),
@@ -136,6 +138,7 @@ class CapitalProjectResource extends Resource
     public static function table(Table $table): Table
     {
         return self::applyEnterpriseDefaults($table)
+            ->modifyQueryUsing(fn (Builder $query): Builder => CapitalProject::withMilestoneProgress($query))
             ->columns([
                 Tables\Columns\TextColumn::make('project_number')
                     ->searchable()
@@ -183,7 +186,10 @@ class CapitalProjectResource extends Resource
                         ($state ?? 0) >= 25 => 'info',
                         default => 'danger',
                     })
-                    ->sortable(),
+                    // Progress is derived from milestones; sort by the same ratio in SQL.
+                    ->sortable(query: fn (Builder $query, string $direction): Builder => $query->orderByRaw(
+                        CapitalProject::COMPLETION_RATIO_SQL.' '.($direction === 'desc' ? 'desc' : 'asc'),
+                    )),
             ])
             ->filters([
                 Tables\Filters\SelectFilter::make('station')
@@ -249,7 +255,8 @@ class CapitalProjectResource extends Resource
                             ->date('M d, Y'),
                         Infolists\Components\TextEntry::make('target_completion_date')
                             ->date('M d, Y'),
-                        Infolists\Components\TextEntry::make('actual_completion_date')
+                        Infolists\Components\TextEntry::make('actual_completion')
+                            ->label('Actual completion date')
                             ->date('M d, Y'),
                         Infolists\Components\TextEntry::make('completion_percentage')
                             ->suffix('%'),

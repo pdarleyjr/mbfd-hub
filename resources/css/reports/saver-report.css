@@ -1,0 +1,219 @@
+/*
+ * saver-report.blade.php: page styles moved out of the view.
+ * Colours, radii and layers come only from mbfd-theme.css tokens. Loaded before app.css so the
+ * shared Hub report chrome keeps precedence, as it did over the former inline <style> block.
+ */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+    font-family: var(--hub-font-sans);
+    color: rgb(var(--hub-ink));
+    line-height: 1.6;
+    background: rgb(var(--hub-n-0));
+}
+
+.report-container {
+    max-width: 8.5in;
+    margin: 0 auto;
+    padding: 0.75in 1in;
+}
+
+/* Header */
+.report-header {
+    text-align: center;
+    border-bottom: 3px solid rgb(var(--hub-header));
+    padding-bottom: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.report-header .org-name {
+    font-size: 0.875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: rgb(var(--hub-header));
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+}
+
+.report-header .report-type {
+    font-size: 0.6875rem;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: rgb(var(--hub-muted));
+    margin-bottom: 0.75rem;
+}
+
+.report-header h1 {
+    font-size: 1.75rem;
+    color: rgb(var(--hub-header));
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+}
+
+.report-header .meta {
+    font-size: 0.8125rem;
+    color: rgb(var(--hub-muted));
+}
+
+.report-header .meta span {
+    margin: 0 0.5rem;
+}
+
+/* SAVER Badge Row */
+.saver-badges {
+    display: flex;
+    justify-content: center;
+    gap: 0.5rem;
+    margin: 1rem 0;
+}
+
+.saver-badge {
+    background: rgb(var(--hub-surface-muted));
+    color: rgb(var(--hub-ink-secondary));
+    border: 1px solid rgb(var(--hub-border));
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 2rem;
+    font-size: 0.6875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+
+/* Section headings */
+h2 {
+    font-size: 1.25rem;
+    color: rgb(var(--hub-header));
+    margin-top: 2rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.375rem;
+    border-bottom: 1px solid rgb(var(--hub-border));
+}
+
+h3 {
+    font-size: 1rem;
+    color: rgb(var(--hub-ink-secondary));
+    margin-top: 1.25rem;
+    margin-bottom: 0.5rem;
+}
+
+p { margin-bottom: 0.75rem; font-size: 0.9375rem; }
+
+ul, ol {
+    margin-left: 1.5rem;
+    margin-bottom: 0.75rem;
+}
+
+li { margin-bottom: 0.375rem; font-size: 0.9375rem; }
+
+/* Tables */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.875rem;
+}
+
+th {
+    background: rgb(var(--hub-n-50));
+    color: rgb(var(--hub-ink-secondary));
+    font-weight: 600;
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 2px solid rgb(var(--hub-border));
+}
+
+td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid rgb(var(--hub-border-soft));
+}
+
+tr:nth-child(even) { background: rgb(var(--hub-n-25)); }
+
+strong { color: rgb(var(--hub-ink)); }
+
+/* Print button */
+.print-controls {
+    position: fixed;
+    top: 1rem;
+    right: 1rem;
+    display: flex;
+    gap: 0.5rem;
+    z-index: var(--hub-z-sticky);
+}
+
+.print-btn {
+    padding: 0.5rem 1.25rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+}
+
+.print-btn--primary {
+    background: rgb(var(--hub-header));
+    color: rgb(var(--hub-n-0));
+}
+
+.print-btn--primary:hover { background: rgb(var(--hub-blue)); }
+
+.print-btn--secondary {
+    background: rgb(var(--hub-n-50));
+    color: rgb(var(--hub-ink-secondary));
+    border: 1px solid rgb(var(--hub-border));
+}
+
+.print-btn--secondary:hover { background: rgb(var(--hub-border-soft)); }
+
+/* Disclaimer */
+.report-footer {
+    margin-top: 3rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgb(var(--hub-border));
+    font-size: 0.75rem;
+    color: rgb(var(--hub-ink-secondary));
+    text-align: center;
+}
+
+/* Print styles */
+@media print {
+    .print-controls { display: none; }
+
+    body { font-size: 11pt; }
+
+    .report-container { padding: 0; max-width: none; }
+
+    h2 { page-break-after: avoid; }
+
+    table { page-break-inside: avoid; }
+
+    .report-header { border-bottom-color: rgb(var(--hub-ink)); }
+
+    .saver-badges {
+        display: flex;
+        gap: 0.25rem;
+    }
+
+    .saver-badge {
+    background: rgb(var(--hub-surface-muted));
+    color: rgb(var(--hub-ink-secondary));
+    border: 1px solid rgb(var(--hub-border));
+        border: 1px solid rgb(var(--hub-n-400));
+        background: none;
+        color: rgb(var(--hub-ink));
+    }
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Former inline style attributes, kept at inline precedence. */
+.sv-u1 { text-align: center !important; padding: 3rem 0 !important; color: rgb(var(--hub-muted)) !important; }
+.sv-u2 { font-size: 0.8125rem !important; }

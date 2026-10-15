@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services;
 
+use App\Exceptions\AIServiceUnavailable;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
@@ -251,7 +252,12 @@ class LocalAIService extends CloudflareAIService
                     ->post($url, $payload);
             } catch (ConnectionException $exception) {
                 if ($attempt >= 2) {
-                    throw $exception;
+                    Log::warning('Local AI gateway unreachable', [
+                        'attempts' => $attempt,
+                        'request_id' => $requestId,
+                    ]);
+
+                    throw AIServiceUnavailable::unreachable($exception);
                 }
 
                 usleep(250_000);
@@ -264,6 +270,19 @@ class LocalAIService extends CloudflareAIService
                 usleep(250_000);
 
                 continue;
+            }
+
+            if ($retryable) {
+                // Expected operational condition (backend busy/down): one
+                // warning, no stack trace; callers decide how to degrade.
+                Log::warning('Local AI request unavailable', [
+                    'status' => $response->status(),
+                    'response_bytes' => strlen($response->body()),
+                    'attempts' => $attempt,
+                    'request_id' => $response->header('X-Request-ID') ?: $requestId,
+                ]);
+
+                throw AIServiceUnavailable::fromStatus($response->status(), 'Local AI request');
             }
 
             if (! $response->successful()) {

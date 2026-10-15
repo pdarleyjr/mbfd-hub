@@ -36,6 +36,8 @@ jobs:
           npm run test:changed-php-files
       - name: Verify read-only rendering guard
         run: node --test tests/Node/ui-readonly/*.test.mjs
+      - name: Verify mocked Daily Playwright lanes run every test exactly once
+        run: node scripts/ci/verify-daily-playwright-partition.mjs
 
   php-quality:
     name: PHP and root frontend quality
@@ -253,10 +255,13 @@ jobs:
           DISPOSABLE_POSTGRES_PASSWORD: ""
         run: php artisan test --group=postgres
 
+  # The Daily Checkout release evidence is split across parallel jobs so the
+  # gate wall-clock is bounded by its slowest browser lane instead of the sum of
+  # every suite. Every job below is listed in the aggregate release-gates job.
   daily-contract-integrity:
     name: Daily Checkout contract and integrity
     runs-on: ubuntu-latest
-    timeout-minutes: 65
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -283,10 +288,72 @@ jobs:
         env:
           DAILY_CHECKOUT_OUT_DIR: ../../../public/daily
         run: npm run build
-      - name: Install Chromium and WebKit for Daily Checkout Playwright
+      - name: Install Chromium and WebKit for Daily Checkout browser checks
         run: npx playwright install --with-deps chromium webkit
       - name: Verify first-login Bid handoff under enforced CSP
         run: node --test tests/Browser/bid-login-handoff.mjs
+      - name: Install PHP dependencies
+        id: php-dependencies
+        env:
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
+        run: composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
+      - name: Build Hub assets for Daily contract tests
+        id: hub-assets
+        env:
+          SENTRY_AUTH_TOKEN: ""
+          SENTRY_ORG: ""
+          SENTRY_PROJECT_FRONTEND: ""
+          VITE_SENTRY_DSN: ""
+          VITE_SENTRY_RELEASE: ""
+        run: |
+          npx vite build
+          php artisan filament:assets
+      - name: Verify shared panel session-expiry handling
+        if: ${{ !cancelled() && steps.php-dependencies.outcome == 'success' }}
+        # The browser test uses the installed Livewire client from Composer.
+        run: |
+          node --test tests/Node/panel-session-expiry.test.mjs
+          node --test tests/Browser/panel-session-expiry.mjs
+      - name: Run Daily Checkout contract and integrity tests
+        if: ${{ !cancelled() && steps.hub-assets.outcome == 'success' }}
+        run: >-
+          php artisan test
+          tests/Feature/Api/DailyCheckoutIntegrityTest.php
+          tests/Feature/Console/AuditDailyCheckoutReadinessTest.php
+          tests/Feature/Console/ActivateDailyCheckoutLedgerTest.php
+          tests/Feature/Console/AuditDailyCheckoutPreactivationTest.php
+          tests/Unit/Services/DailyCheckoutComplianceServiceTest.php
+          tests/Feature/Api/PublicStationDailyCheckoutContractTest.php
+
+  daily-authenticated-shell:
+    name: Daily Checkout authenticated shell and Bid browsers
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2
+        with:
+          php-version: '8.4'
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pdo_pgsql, bcmath, soap, intl, gd, exif, iconv, fileinfo
+          coverage: none
+      - name: Install root browser test dependencies
+        run: npm ci --ignore-scripts --legacy-peer-deps
+      - name: Install Daily Checkout dependencies
+        working-directory: resources/js/daily-checkout
+        run: npm ci --ignore-scripts --legacy-peer-deps
+      - name: Daily production build
+        working-directory: resources/js/daily-checkout
+        env:
+          DAILY_CHECKOUT_OUT_DIR: ../../../public/daily
+        run: npm run build
+      - name: Install Chromium and WebKit for authenticated browsers
+        run: npx playwright install --with-deps chromium webkit
       - name: Install PHP dependencies
         env:
           COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
@@ -350,9 +417,52 @@ jobs:
           name: final-bid-assignment-browser-evidence
           path: test-results/bid-assignments
           retention-days: 7
+
+  daily-authenticated-lifecycles:
+    name: Daily Checkout member request and Operational Forms lifecycles
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+      - uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2
+        with:
+          php-version: '8.4'
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pdo_pgsql, bcmath, soap, intl, gd, exif, iconv, fileinfo
+          coverage: none
+      - name: Install root browser test dependencies
+        run: npm ci --ignore-scripts --legacy-peer-deps
+      - name: Install Daily Checkout dependencies
+        working-directory: resources/js/daily-checkout
+        run: npm ci --ignore-scripts --legacy-peer-deps
+      - name: Daily production build
+        working-directory: resources/js/daily-checkout
+        env:
+          DAILY_CHECKOUT_OUT_DIR: ../../../public/daily
+        run: npm run build
+      - name: Install Chromium for authenticated lifecycle browsers
+        run: npx playwright install --with-deps chromium
+      - name: Install PHP dependencies
+        env:
+          COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
+        run: composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
+      - name: Build Hub assets for authenticated mobile navigation
+        env:
+          SENTRY_AUTH_TOKEN: ""
+          SENTRY_ORG: ""
+          SENTRY_PROJECT_FRONTEND: ""
+          VITE_SENTRY_DSN: ""
+          VITE_SENTRY_RELEASE: ""
+        run: npx vite build
+      - name: Publish Filament assets for authenticated browser workflows
+        run: php artisan filament:assets
       - name: Verify real member submissions and Admin request lifecycles
         id: member-requests
-        if: ${{ !cancelled() && steps.mobile-shell.outcome != 'skipped' }}
         env:
           PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/personnel-requests/report.json
         run: >-
@@ -370,7 +480,7 @@ jobs:
           retention-days: 7
       - name: Verify Operational Forms evidence retention
         id: operational-evidence
-        if: ${{ !cancelled() && steps.mobile-shell.outcome != 'skipped' }}
+        if: ${{ !cancelled() && steps.member-requests.outcome != 'skipped' }}
         env:
           PLAYWRIGHT_JSON_OUTPUT_NAME: test-results/operational-forms-lifecycle/report.json
         run: >-
@@ -387,27 +497,74 @@ jobs:
           name: operational-forms-lifecycle-evidence
           path: test-results/operational-forms-lifecycle
           retention-days: 7
+
+  # Mocked Daily Checkout Playwright is partitioned by Playwright project, so
+  # every project runs exactly as it did serially (same files, grep, retries
+  # and ordering inside the project). The partition must cover every project
+  # in playwright.daily-checkout.config.ts exactly once; this is enforced by
+  # tests/Node/ci-configuration.test.mjs and, against the resolved Playwright
+  # project list, by scripts/ci/verify-daily-playwright-partition.mjs.
+  daily-checkout-browser:
+    name: Daily Checkout mocked Playwright (${{ matrix.lane }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - lane: workspace-webkit-iphone
+            projects: >-
+              --project=daily-workspace-webkit-iphone
+          - lane: webkit-ipad-and-issue-report
+            projects: >-
+              --project=daily-workspace-webkit-ipad
+              --project=daily-webkit-iphone
+              --project=daily-webkit-ipad
+              --project=daily-issue-report-chromium
+              --project=daily-issue-report-webkit
+          - lane: chromium-pwa-and-displays
+            projects: >-
+              --project=daily-checkout-chromium
+              --project=daily-pwa-chromium
+              --project=daily-responsive-display-3840
+              --project=daily-responsive-display-2560
+          - lane: responsive-mid
+            projects: >-
+              --project=daily-responsive-wide-1440
+              --project=daily-responsive-tablet-768
+              --project=daily-responsive-phone-390
+              --project=daily-responsive-tablet-landscape-1024
+          - lane: responsive-edge
+            projects: >-
+              --project=daily-responsive-phone-430
+              --project=daily-responsive-wide-1920
+              --project=daily-responsive-desktop-1280
+              --project=daily-responsive-phone-320
+              --project=daily-responsive-phone-360
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install root browser test dependencies
+        run: npm ci --ignore-scripts --legacy-peer-deps
+      - name: Install Daily Checkout dependencies
+        working-directory: resources/js/daily-checkout
+        run: npm ci --ignore-scripts --legacy-peer-deps
+      - name: Install Chromium and WebKit for Daily Checkout Playwright
+        run: npx playwright install --with-deps chromium webkit
       - name: Run mocked Daily Checkout Playwright
-        if: ${{ !cancelled() && steps.mobile-shell.outcome != 'skipped' }}
         env:
           DAILY_CHECKOUT_E2E_BASE_URL: http://127.0.0.1:4176
-        run: npm run test:daily-checkout-e2e
-      - name: Verify shared panel session-expiry handling
-        if: ${{ !cancelled() && steps.mobile-shell.outcome != 'skipped' }}
-        # The browser test uses the installed Livewire client from Composer.
+          DAILY_PLAYWRIGHT_PROJECTS: ${{ matrix.projects }}
         run: |
-          node --test tests/Node/panel-session-expiry.test.mjs
-          node --test tests/Browser/panel-session-expiry.mjs
-      - name: Run Daily Checkout contract and integrity tests
-        if: ${{ !cancelled() && steps.mobile-shell.outcome != 'skipped' }}
-        run: >-
-          php artisan test
-          tests/Feature/Api/DailyCheckoutIntegrityTest.php
-          tests/Feature/Console/AuditDailyCheckoutReadinessTest.php
-          tests/Feature/Console/ActivateDailyCheckoutLedgerTest.php
-          tests/Feature/Console/AuditDailyCheckoutPreactivationTest.php
-          tests/Unit/Services/DailyCheckoutComplianceServiceTest.php
-          tests/Feature/Api/PublicStationDailyCheckoutContractTest.php
+          set -euo pipefail
+          read -r -a project_args <<< "$DAILY_PLAYWRIGHT_PROJECTS"
+          test "${#project_args[@]}" -gt 0
+          npm run test:daily-checkout-e2e -- "${project_args[@]}"
 
   generated-assets:
     name: Generated deployment assets
@@ -738,8 +895,12 @@ jobs:
             scripts/operations/provision-mbfd-ai-gateway-consumers.sh \
             scripts/operations/verify-ollama-ai-proxy.sh
 
+  # Branch protection reports a job that was skipped because a dependency
+  # failed as a passing required check. This aggregate therefore runs whenever
+  # the workflow was not cancelled and fails unless every gate succeeded.
   release-gates:
     name: All required Hub release gates
+    if: ${{ !cancelled() }}
     needs:
       - ci-configuration
       - php-quality
@@ -747,6 +908,9 @@ jobs:
       - actionlint
       - phpunit-postgres
       - daily-contract-integrity
+      - daily-authenticated-shell
+      - daily-authenticated-lifecycles
+      - daily-checkout-browser
       - generated-assets
       - security-dependencies
       - security-secrets
@@ -754,6 +918,16 @@ jobs:
       - php-85-compatibility
       - ai-gateway-source
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Confirm all required Hub release gates passed
-        run: echo "All required Hub release gates passed."
+        env:
+          GATE_RESULTS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<< "$GATE_RESULTS"
+          if ! jq -e 'length > 0 and all(.[]; .result == "success")' <<< "$GATE_RESULTS" > /dev/null; then
+            echo "One or more required Hub release gates did not succeed." >&2
+            exit 1
+          fi
+          echo "All required Hub release gates passed."

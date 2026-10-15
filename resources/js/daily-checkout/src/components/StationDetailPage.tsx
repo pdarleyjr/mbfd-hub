@@ -1,7 +1,7 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 import {
-  Activity, ChevronRight, ClipboardCheck, ClipboardList, DoorOpen, Gauge, Phone, ShieldCheck, Truck, Video, Wrench,
+  Activity, ChevronRight, ClipboardCheck, ClipboardList, DoorOpen, Gauge, House, Phone, ShieldCheck, Truck, Video, Wrench,
 } from 'lucide-react';
 import {
   StationDetail,
@@ -13,9 +13,11 @@ import {
   ApparatusServiceTicketSummary,
   StationActivityEntry,
   SingleGasMeterSummary,
+  stationImageUrl,
 } from '../types';
 import { ApiClient, isApiAuthenticationError, redirectToLoginAfterSessionExpiry } from '../utils/api';
 import PreviousPageButton from './PreviousPageButton';
+import { identityForQueueCapture } from '../lib/offlineIdentity';
 import { groupRoomsByArea, stationComplement } from '../utils/stationRoomBlueprint';
 import Tabs, { type TabItem } from './ui/Tabs';
 import QuickLink, { type QuickLinkProps } from './ui/QuickLink';
@@ -46,6 +48,15 @@ export default function StationDetailPage() {
   const [stationInspections, setStationInspections] = useState<StationInspectionSummary[]>([]);
   const [stationRequests, setStationRequests] = useState<StationRequestSummary[]>([]);
   const [requestScope, setRequestScope] = useState<'open' | 'all'>('open');
+  // Only officers may open the Personnel Equipment Request; the server says who they are.
+  const [canRequestPersonnelEquipment, setCanRequestPersonnelEquipment] = useState(false);
+  useEffect(() => {
+    let active = true;
+    identityForQueueCapture({ redirectOnExpiry: false })
+      .then((identity) => { if (active) setCanRequestPersonnelEquipment(identity.capabilities?.personnelEquipmentRequest === true); })
+      .catch(() => { if (active) setCanRequestPersonnelEquipment(false); });
+    return () => { active = false; };
+  }, []);
   const [serviceTickets, setServiceTickets] = useState<ApparatusServiceTicketSummary[]>([]);
   const [serviceTicketScope, setServiceTicketScope] = useState<'open' | 'all'>('open');
   const [openServiceTicketCount, setOpenServiceTicketCount] = useState(0);
@@ -233,7 +244,7 @@ export default function StationDetailPage() {
       icon: <ClipboardCheck size={20} />,
       emphasis: true,
     }] : []),
-    { label: 'Personnel Equipment Request', href: `/employee/personnel-equipment-request?station_id=${station.id}&return_to=${hubStationReturn}`, icon: <ShieldCheck size={20} /> },
+    ...(canRequestPersonnelEquipment ? [{ label: 'Personnel Equipment Request', href: `/employee/personnel-equipment-request?station_id=${station.id}&return_to=${hubStationReturn}`, icon: <ShieldCheck size={20} /> }] : []),
     { label: 'Station Request', to: stationRequestPath, icon: <ClipboardList size={20} /> },
     { label: 'Apparatus Service', href: apparatusServicePath, icon: <Wrench size={20} /> },
     { label: 'Station Inspection', to: stationInspectionPath, icon: <ClipboardCheck size={20} /> },
@@ -443,18 +454,23 @@ export default function StationDetailPage() {
 
       {/* Station identity and quick links */}
       <section className="hub-panel p-4 sm:p-6" aria-labelledby="station-heading">
-        <h1 id="station-heading" className="text-2xl font-bold text-hub-ink font-heading sm:text-3xl">
-          Station {station.station_number}
-        </h1>
-        <p className="mt-1 text-hub-n-600">
-          {station.address}, {station.city}, {station.state} {station.zip_code}
-        </p>
-        {station.phone && (
-          <p className="mt-1 flex items-center gap-2 tabular-nums text-hub-n-600">
-            <Phone className="h-4 w-4" aria-hidden="true" />
-            {station.phone}
-          </p>
-        )}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+          <StationPhoto station={station} />
+          <div className="min-w-0">
+            <h1 id="station-heading" className="text-2xl font-bold text-hub-ink font-heading sm:text-3xl">
+              Station {station.station_number}
+            </h1>
+            <p className="mt-1 text-hub-n-600">
+              {station.address}, {station.city}, {station.state} {station.zip_code}
+            </p>
+            {station.phone && (
+              <p className="mt-1 flex items-center gap-2 tabular-nums text-hub-n-600">
+                <Phone className="h-4 w-4" aria-hidden="true" />
+                {station.phone}
+              </p>
+            )}
+          </div>
+        </div>
         <nav aria-label="Station actions" className="mt-5">
           <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {quickLinks.map((link) => <li key={link.label}><QuickLink {...link} /></li>)}
@@ -471,6 +487,26 @@ export default function StationDetailPage() {
 }
 
 // ===== Helper Components =====
+
+/** Recorded station photo (or bundled artwork); a branded placeholder when neither exists or the image fails. */
+function StationPhoto({ station }: { station: StationDetail }) {
+  const imageUrl = stationImageUrl(station);
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const showImage = imageUrl !== null && failedUrl !== imageUrl;
+
+  return (
+    <div data-testid="station-profile-photo" className="relative h-40 w-full shrink-0 overflow-hidden rounded-hub-control border border-hub-glass-border bg-hub-n-100 sm:h-32 sm:w-48 lg:h-36 lg:w-56">
+      {showImage ? (
+        <img src={imageUrl} alt={`Station ${station.station_number} exterior`} className="h-full w-full object-cover" onError={() => setFailedUrl(imageUrl)} />
+      ) : (
+        <div className="flex h-full flex-col items-center justify-center gap-2 text-hub-n-600" role="img" aria-label={`No photo recorded for Station ${station.station_number}`}>
+          <House className="h-10 w-10 text-hub-n-400" strokeWidth={1.5} aria-hidden="true" />
+          <span className="rounded-hub-tag bg-hub-header px-2.5 py-1 text-[13px] font-bold leading-5 text-white">Station {station.station_number}</span>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function DetailRow({ label, value, numeric = false, stacked = false }: { label: string; value: ReactNode; numeric?: boolean; stacked?: boolean }) {
   return (
@@ -547,7 +583,12 @@ function ApparatusCard({ apparatus, checkoutRow, stationId, hubStationReturn }: 
             : 'Excluded from required total'}
         </p>
       )}
-      {checkoutRow?.revision_requested && <p className="mt-1 text-[13px] font-medium text-hub-warning">Your input is requested for this inspection.</p>}
+      {(apparatus.current_defects_count ?? 0) > 0 && (
+        <p className="mt-1 text-[13px] font-medium text-hub-warning">
+          {apparatus.current_defects_count} open equipment {apparatus.current_defects_count === 1 ? 'issue' : 'issues'}
+        </p>
+      )}
+      {checkoutRow?.revision_requested &&<p className="mt-1 text-[13px] font-medium text-hub-warning">Your input is requested for this inspection.</p>}
       {checkoutRow?.return_checkout_required && <p className="mt-1 text-[13px] font-medium text-hub-warning">Post-return checkout {checkoutRow.return_checkout_verified ? 'verified' : 'required'}.</p>}
       {apparatus.daily_checkout_requirement === 'unknown' && (
         <p className="mt-2 text-[13px] font-medium text-hub-warning">Daily Checkout policy needs confirmation</p>

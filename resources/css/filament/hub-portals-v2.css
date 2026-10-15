@@ -207,12 +207,12 @@
 [data-hub-portal="training"] .training-profile-facts p { overflow-wrap: anywhere; }
 
 /* Report content keeps its existing shared shell, chart series and print layout. */
-[data-hub-portal="report"] :is(.print-btn, .print-fab button) { min-width: 44px; border-radius: 6px; font-weight: 600; }
-[data-hub-portal="report"] :is(.report-wrapper, .report-container) { border: 1px solid rgb(var(--hub-border)); border-radius: 6px; box-shadow: none; }
+[data-hub-portal="report"] :is(.print-btn, .print-fab button) { min-width: 44px; border-radius: var(--hub-radius-md); font-weight: 600; }
+[data-hub-portal="report"] :is(.report-wrapper, .report-container) { border: 1px solid rgb(var(--hub-border)); border-radius: var(--hub-radius-md); box-shadow: none; }
 [data-hub-portal="report"] .cover-title { font-size: clamp(1.625rem, 4vw, 2.25rem); font-weight: 650; }
 [data-hub-portal="report"] .toc-list a { align-items: center; min-height: 44px; }
-[data-hub-portal="report"] .section-num { background: rgb(var(--hub-action-primary)); color: white; }
-[data-hub-portal="report"].hub-report--workgroup-summary h2.section-heading .section-num { color: white; }
+[data-hub-portal="report"] .section-num { background: rgb(var(--hub-action-primary)); color: rgb(var(--hub-n-0)); }
+[data-hub-portal="report"].hub-report--workgroup-summary h2.section-heading .section-num { color: rgb(var(--hub-n-0)); }
 [data-hub-portal="report"].hub-report--workgroup-summary :is(.score-elite, .score-badge.elite) { color: rgb(var(--hub-success)); }
 [data-hub-portal="report"].hub-report--workgroup-summary .rank-4 { color: rgb(var(--hub-ink-secondary)); }
 [data-hub-portal="report"].hub-report--evaluation-report { --color-slate-400: rgb(var(--hub-n-600)); --color-emerald: rgb(var(--hub-success)); }
@@ -220,8 +220,6 @@
 [data-hub-portal="report"] th { font-weight: 650; }
 [data-hub-portal="report"] :is(.section-title, .subsection-title) { scroll-margin-top: 8rem; }
 [data-hub-portal="report"].hub-report--analysis-report nav a { display: inline-flex; align-items: center; min-height: 44px; }
-[data-hub-portal="report"].hub-report--analysis-report .glass-panel,
-[data-hub-portal="report"].hub-report--final-presentation .glass-panel { border-radius: 6px; }
 [data-hub-portal="report"].hub-report--l1-inventory .table-container { box-shadow: none; border: 1px solid rgb(var(--hub-border)); }
 [data-hub-portal="report"].hub-report--l1-inventory #root button { min-height: 44px; }
 [data-hub-portal="report"] .hub-chart-description { margin-top: .75rem; font-size: .8125rem; line-height: 1.65; }
@@ -232,9 +230,6 @@
 [data-hub-portal="report"] .hub-chart-data caption { padding-block: .5rem; font-weight: 650; text-align: left; }
 [data-hub-portal="report"] .hub-chart-data :is(th, td) { padding: .625rem .75rem; border-bottom: 1px solid rgb(var(--hub-border)); text-align: left; }
 [data-hub-portal="report"] .hub-chart-data th { font-weight: 650; }
-[data-hub-portal="report"].hub-report--analysis-report .hub-chart-data :is(th, td) { border-color: #4d6a85; color: #f8fafc; }
-[data-hub-portal="report"].hub-report--analysis-report .hub-chart-description { color: #e2e8f0; }
-[data-hub-portal="report"].hub-report--final-presentation .reveal .hub-chart-description { color: #e2e8f0; font-size: .75rem; line-height: 1.5; margin-bottom: 0; }
 
 @media print {
     [data-hub-portal="report"] :is(.report-wrapper, .report-container) { border: 0; border-radius: 0; box-shadow: none; overflow: visible; }
@@ -250,12 +245,8 @@
     [data-hub-portal="report"] :is(.chart-container, .chart-container-large) { height: auto; max-height: none; break-inside: avoid; }
     [data-hub-portal="report"] canvas { display: block; max-width: 100% !important; height: auto !important; }
 
-    [data-hub-portal="report"].hub-report--analysis-report { background: rgb(var(--hub-header)); color: rgb(var(--hub-surface)); print-color-adjust: exact; }
-    [data-hub-portal="report"].hub-report--analysis-report > nav { display: none; }
     [data-hub-portal="report"].hub-report--analysis-report > main { padding: 1rem; }
     [data-hub-portal="report"].hub-report--analysis-report #executive { padding: 1.5rem; }
-    [data-hub-portal="report"].hub-report--analysis-report .glass-panel { box-shadow: none; }
-    [data-hub-portal="report"].hub-report--analysis-report caption { color: rgb(var(--hub-surface)); }
 
     [data-hub-portal="report"].hub-report--data-dashboard main { display: block; padding: .75rem .5rem; }
     [data-hub-portal="report"].hub-report--data-dashboard aside { width: auto; margin-bottom: .75rem; }

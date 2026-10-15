@@ -242,6 +242,9 @@ export default function InspectionWizard() {
   }, [autosaver]);
 
   useEffect(() => {
+    // A superseded load (remount, queue change) must not issue a session or
+    // overwrite the state of the load that replaced it.
+    let superseded = false;
     const fetchData = async () => {
       if (!slug) return;
 
@@ -374,6 +377,7 @@ export default function InspectionWizard() {
                 throw new Error('A server-issued Fire Boat inspection session is required before this checkout can be submitted. Reconnect before starting a new Fire Boat inspection.');
               }
 
+              if (superseded) return;
               checklistData = await ApiClient.startInspectionSession(
                 foundApparatus.id,
                 getOrCreateInspectionSessionStartKey(slug, checklistData.checklist_version),
@@ -469,13 +473,16 @@ export default function InspectionWizard() {
           }
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load data');
+        if (!superseded) setError(err instanceof Error ? err.message : 'Failed to load data');
       } finally {
-        setLoading(false);
+        if (!superseded) setLoading(false);
       }
     };
 
     fetchData();
+    return () => {
+      superseded = true;
+    };
   }, [slug, queueRevision, isOffline, loadAttempt]);
 
   // Autosave progress: debounced while editing, immediate on a step change.

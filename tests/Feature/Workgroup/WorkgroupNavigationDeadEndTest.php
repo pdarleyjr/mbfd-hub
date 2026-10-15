@@ -9,6 +9,8 @@ use App\Filament\Workgroup\Pages\Notes;
 use App\Filament\Workgroup\Pages\SessionResultsPage;
 use App\Filament\Workgroup\Pages\SharedUploads;
 use App\Models\User;
+use App\Models\Workgroup;
+use App\Models\WorkgroupSession;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Role;
@@ -44,6 +46,23 @@ final class WorkgroupNavigationDeadEndTest extends TestCase
     {
         $superAdmin = User::factory()->create();
         $superAdmin->assignRole(Role::findOrCreate('super_admin', 'web'));
+        $this->actingAs($superAdmin);
+        Filament::setCurrentPanel(Filament::getPanel('workgroups'));
+
+        $this->get(SessionResultsPage::getUrl())->assertRedirect(Dashboard::getUrl());
+    }
+
+    public function test_session_results_with_several_workgroups_and_no_choice_returns_to_the_chooser(): void
+    {
+        $superAdmin = User::factory()->create();
+        $superAdmin->assignRole(Role::findOrCreate('super_admin', 'web'));
+        foreach (['Alpha', 'Bravo'] as $name) {
+            $workgroup = Workgroup::create(['name' => "Workgroup {$name}", 'created_by' => $superAdmin->id]);
+            WorkgroupSession::create([
+                'workgroup_id' => $workgroup->id, 'name' => "Session {$name}", 'status' => 'active',
+                'start_date' => now()->toDateString(), 'end_date' => now()->addDay()->toDateString(),
+            ]);
+        }
         $this->actingAs($superAdmin);
         Filament::setCurrentPanel(Filament::getPanel('workgroups'));
 

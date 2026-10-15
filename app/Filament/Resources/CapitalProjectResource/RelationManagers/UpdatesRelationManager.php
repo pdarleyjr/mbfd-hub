@@ -7,8 +7,6 @@ use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Auth;
 
 class UpdatesRelationManager extends RelationManager
@@ -54,6 +52,7 @@ class UpdatesRelationManager extends RelationManager
                 Tables\Actions\CreateAction::make()
                     ->mutateFormDataUsing(function (array $data): array {
                         $data['user_id'] = Auth::id();
+
                         return $data;
                     }),
             ])
@@ -65,7 +64,7 @@ class UpdatesRelationManager extends RelationManager
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make()
-                        ->visible(fn () => Auth::user()->isAdmin ?? false),
+                        ->visible(fn (): bool => Auth::user()?->can('admin.projects.manage') ?? false),
                 ]),
             ])
             ->defaultSort('created_at', 'desc');

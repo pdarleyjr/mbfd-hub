@@ -330,6 +330,12 @@
     body:has(.hub-member-nav) { padding-bottom: calc(var(--hub-member-nav-height) + 16px + env(safe-area-inset-bottom, 0px)); }
 }
 
+/* At 320px the brand, a long module name ("Workgroups") and two controls overflow the bar and push
+   the account menu off screen. The switcher keeps its accessible name and becomes icon-only. */
+@media (max-width: 374.98px) {
+    .hub-app-switcher > .hub-shell-control > span { position: absolute; width: 1px; height: 1px; margin: -1px; clip: rect(0, 0, 0, 0); overflow: hidden; }
+}
+
 @media print {
     .hub-shell-bar,
     .hub-shell-header,

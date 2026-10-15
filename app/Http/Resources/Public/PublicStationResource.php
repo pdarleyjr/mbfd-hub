@@ -29,6 +29,7 @@ class PublicStationResource extends JsonResource
             'zip_code' => $this->zip_code ?? '',
             'phone' => $this->phone ?? '',
             'is_active' => (bool) $this->is_active,
+            'image_url' => $this->resource->image_url,
             'apparatuses_count' => is_array($staffing) ? $staffing['assigned_apparatus_count'] : $this->whenCounted('apparatuses'),
             'assigned_apparatus_count' => is_array($staffing) ? $staffing['assigned_apparatus_count'] : null,
             'in_service_assigned_count' => is_array($staffing) ? $staffing['in_service_assigned_count'] : null,

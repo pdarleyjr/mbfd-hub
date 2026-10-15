@@ -3,14 +3,16 @@
 namespace App\Models;
 
 use Appstract\Stock\HasStock;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class EquipmentItem extends Model
 {
-    use HasStock;
+    use HasStock {
+        createStockMutation as protected createLedgerStockMutation;
+    }
 
     protected $fillable = [
         'name',
@@ -54,7 +56,7 @@ class EquipmentItem extends Model
         $normalized = strtolower(trim($name));
         $normalized = preg_replace('/\s+/', ' ', $normalized);
         $normalized = preg_replace('/[^\w\s]/', '', $normalized);
-        
+
         return $normalized;
     }
 
@@ -96,5 +98,41 @@ class EquipmentItem extends Model
     public function getCurrentStockAttribute(): int
     {
         return $this->stock ?? 0;
+    }
+
+    /**
+     * Current stock. Lists and dashboards preload it with withStockTotal();
+     * otherwise laravel-stock sums the ledger on each access.
+     */
+    public function getStockAttribute(): int
+    {
+        if (array_key_exists('stock_total', $this->attributes)) {
+            return (int) $this->attributes['stock_total'];
+        }
+
+        return $this->stock();
+    }
+
+    /** A new ledger entry makes any preloaded total stale. */
+    protected function createStockMutation($amount, $arguments = [])
+    {
+        unset($this->attributes['stock_total']);
+
+        return $this->createLedgerStockMutation($amount, $arguments);
+    }
+
+    /**
+     * Preload each item's current stock in the list query (laravel-stock otherwise
+     * runs one SUM query per access).
+     *
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
+    public static function withStockTotal(Builder $query): Builder
+    {
+        return $query->withSum(
+            ['stockMutations as stock_total' => fn ($mutations) => $mutations->where('created_at', '<=', now())],
+            'amount',
+        );
     }
 }

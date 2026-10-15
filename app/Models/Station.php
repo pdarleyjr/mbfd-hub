@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Support\Facades\Storage;
 use LogicException;
 
 class Station extends Model
@@ -22,8 +23,22 @@ class Station extends Model
         'longitude',
         'is_active',
         'notes',
-        'image_url',
+        'image_path',
     ];
+
+    /** Station photos are non-sensitive building images served from the public disk. */
+    public const IMAGE_DISK = 'public';
+
+    public const IMAGE_DIRECTORY = 'stations/photos';
+
+    /** Shown when a station has neither an uploaded photo nor bundled artwork. */
+    public const PLACEHOLDER_IMAGE = '/images/mbfd-official-seal-256.png';
+
+    /** @var list<string> */
+    public const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+    /** Upload limit in kilobytes. */
+    public const IMAGE_MAX_KILOBYTES = 5120;
 
     protected $casts = [
         'is_active' => 'boolean',
@@ -38,6 +53,54 @@ class Station extends Model
                 throw new LogicException('Stations with submitted inspection evidence cannot be deleted. Deactivate the station instead.');
             }
         });
+
+        // A replaced or removed photo is no longer referenced anywhere.
+        static::updated(function (Station $station): void {
+            if (! $station->wasChanged('image_path')) {
+                return;
+            }
+
+            $previous = $station->getOriginal('image_path');
+            if (is_string($previous) && $previous !== '' && $previous !== $station->getAttribute('image_path')) {
+                Storage::disk(self::IMAGE_DISK)->delete($previous);
+            }
+        });
+    }
+
+    /**
+     * Uploaded photo, else the bundled station artwork the member SPA also
+     * falls back to, else the department seal. Always a same-origin path.
+     */
+    public function photoOrPlaceholderUrl(): string
+    {
+        $uploaded = $this->image_url;
+        if ($uploaded !== null) {
+            return $uploaded;
+        }
+
+        $number = (string) preg_replace('/\D/', '', (string) $this->getAttribute('station_number'));
+        $bundled = '/images/stations/station-'.$number.'.png';
+
+        return $number !== '' && is_file(public_path(ltrim($bundled, '/')))
+            ? $bundled
+            : self::PLACEHOLDER_IMAGE;
+    }
+
+    /**
+     * Same-origin URL path of the uploaded station photo, or null when none is
+     * recorded. Root-relative so the member SPA can use it on any host.
+     */
+    public function getImageUrlAttribute(): ?string
+    {
+        $path = $this->getAttribute('image_path');
+        if (! is_string($path) || trim($path) === '' || str_contains($path, '..')) {
+            return null;
+        }
+
+        $url = Storage::disk(self::IMAGE_DISK)->url(ltrim($path, '/'));
+        $relative = parse_url($url, PHP_URL_PATH);
+
+        return is_string($relative) && str_starts_with($relative, '/') ? $relative : null;
     }
 
     /**
@@ -234,6 +297,36 @@ class Station extends Model
     public function apparatusServiceTickets(): HasMany
     {
         return $this->hasMany(ApparatusServiceTicket::class);
+    }
+
+    /**
+     * Daily Checkout / vehicle inspections for apparatus assigned to this station.
+     *
+     * @return HasManyThrough<ApparatusInspection, Apparatus, $this>
+     */
+    public function apparatusInspections(): HasManyThrough
+    {
+        return $this->hasManyThrough(ApparatusInspection::class, Apparatus::class);
+    }
+
+    /**
+     * Missing / damaged equipment reported against this station's apparatus.
+     *
+     * @return HasManyThrough<ApparatusDefect, Apparatus, $this>
+     */
+    public function apparatusDefects(): HasManyThrough
+    {
+        return $this->hasManyThrough(ApparatusDefect::class, Apparatus::class);
+    }
+
+    /**
+     * Daily Checkout processing exceptions for this station's apparatus.
+     *
+     * @return HasManyThrough<ApparatusInspectionException, Apparatus, $this>
+     */
+    public function apparatusInspectionExceptions(): HasManyThrough
+    {
+        return $this->hasManyThrough(ApparatusInspectionException::class, Apparatus::class);
     }
 
     /**

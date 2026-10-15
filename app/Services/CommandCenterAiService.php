@@ -118,7 +118,7 @@ class CommandCenterAiService
         $equipmentData = [];
         try {
             $totalEquipment = EquipmentItem::where('is_active', true)->count();
-            $allEquipment = EquipmentItem::where('is_active', true)->get();
+            $allEquipment = EquipmentItem::withStockTotal(EquipmentItem::query())->where('is_active', true)->get();
             $lowStockItems = $allEquipment->filter(fn ($item) => $item->stock <= $item->reorder_min);
             $byCategory = $allEquipment->groupBy('category')->map->count()->toArray();
 

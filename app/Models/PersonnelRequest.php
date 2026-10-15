@@ -15,6 +15,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property \Illuminate\Support\Carbon|null $archived_at
  * @property int|null $archived_by
  * @property string|null $archive_reason
+ * @property bool|null $over_allowance
+ * @property string|null $allowance_justification
  */
 class PersonnelRequest extends Model
 {
@@ -32,6 +34,7 @@ class PersonnelRequest extends Model
         'denied_at' => 'datetime',
         'cancelled_at' => 'datetime',
         'signed_at' => 'datetime',
+        'over_allowance' => 'boolean',
     ];
 
     public function getRouteKeyName(): string

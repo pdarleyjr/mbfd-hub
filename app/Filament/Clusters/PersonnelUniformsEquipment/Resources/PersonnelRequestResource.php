@@ -20,8 +20,10 @@ use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class PersonnelRequestResource extends Resource
 {
@@ -45,12 +47,17 @@ class PersonnelRequestResource extends Resource
             TextColumn::make('beneficiary_name')->label('Member')->description(fn (PersonnelRequest $record) => trim("{$record->beneficiary_rank} · {$record->beneficiary_employee_number}"))->searchable(['beneficiary_name', 'beneficiary_employee_number'])->sortable(),
             TextColumn::make('requester_name')->label('Submitted by')->description(fn (PersonnelRequest $record) => $record->requester_rank)->toggleable(),
             TextColumn::make('status')->badge()->formatStateUsing(fn (PersonnelRequestStatus $state) => $state->label())->color(fn (PersonnelRequestStatus $state) => $state->filamentColor()),
+            TextColumn::make('allowance_flag')->label('Allowance')->badge()->color('warning')
+                ->state(fn (PersonnelRequest $record): ?string => $record->over_allowance ? 'Over annual allowance' : null)
+                ->placeholder('—'),
             TextColumn::make('items_count')->counts('items')->label('Items')->alignCenter(),
             TextColumn::make('created_at')->label('Submitted')->dateTime('M j, Y g:i A')->sortable(),
         ])->filters([
             ArchiveFilter::make(),
             SelectFilter::make('type')->options(['uniform' => 'Uniform', 'equipment' => 'Personnel Equipment']),
             SelectFilter::make('status')->options(collect(PersonnelRequestStatus::cases())->mapWithKeys(fn ($status) => [$status->value => $status->label()])->all())->multiple(),
+            Filter::make('over_allowance')->label('Over annual allowance')->toggle()
+                ->query(fn (Builder $query): Builder => $query->where('over_allowance', true)),
         ])->actions([ViewAction::make()])->bulkActions([])->defaultSort('created_at', 'desc')->poll('30s');
     }
 
@@ -97,6 +104,12 @@ class PersonnelRequestResource extends Resource
             Section::make('Notes for Support Services')->schema([
                 TextEntry::make('metadata.member_note')->hiddenLabel()->placeholder('No member note provided')->columnSpanFull(),
             ])->visible(fn (PersonnelRequest $record): bool => filled(data_get($record->metadata, 'member_note'))),
+            Section::make('Over annual allowance')
+                ->description(fn (PersonnelRequest $record): string => 'The member went over the remaining allowance for '.(data_get($record->metadata, 'allowance_at_submission.period') ?? 'this year').' and gave this reason.')
+                ->schema([
+                    TextEntry::make('allowance_justification')->label('Member reason')->placeholder('No reason recorded')->columnSpanFull(),
+                    TextEntry::make('metadata.allowance_at_submission.over')->label('Over by item group')->listWithLineBreaks()->color('warning')->placeholder('—')->columnSpanFull(),
+                ])->visible(fn (PersonnelRequest $record): bool => (bool) $record->over_allowance),
             Section::make('Allocation advisories at submission')->description('These are review advisories. The member was able to submit this selection.')->schema([
                 TextEntry::make('metadata.warnings_at_submission')->hiddenLabel()->listWithLineBreaks()->color('warning'),
             ])->visible(fn (PersonnelRequest $record): bool => filled(data_get($record->metadata, 'warnings_at_submission'))),

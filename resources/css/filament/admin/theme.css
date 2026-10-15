@@ -971,18 +971,18 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
 }
 
 .wg-brand-rank--gold .wg-rank-medal {
-    background-color: #C5A55A;
-    color: #ffffff;
+    background-color: rgb(var(--hub-warning-border));
+    color: rgb(var(--hub-warning-strong));
 }
 
 .wg-brand-rank--silver .wg-rank-medal {
-    background-color: #A8A8A8;
-    color: #ffffff;
+    background-color: rgb(var(--hub-n-100));
+    color: rgb(var(--hub-ink-secondary));
 }
 
 .wg-brand-rank--bronze .wg-rank-medal {
-    background-color: #CD7F32;
-    color: #ffffff;
+    background-color: rgb(var(--hub-warning-solid));
+    color: rgb(var(--hub-ink));
 }
 
 .wg-rank-medal {

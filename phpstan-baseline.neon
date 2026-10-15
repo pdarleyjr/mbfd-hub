@@ -219,7 +219,7 @@ parameters:
 		-
 			message: '#^Access to an undefined property App\\Models\\EquipmentItem\:\:\$stock\.$#'
 			identifier: property.notFound
-			count: 2
+			count: 1
 			path: app/Filament/Resources/EquipmentItemResource.php
 
 		-
@@ -362,40 +362,10 @@ parameters:
 			path: app/Filament/Resources/TodoResource/Pages/ViewTodo.php
 
 		-
-			message: '#^Access to an undefined property App\\Models\\User\:\:\$role\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Filament/Resources/TodoResource/Pages/ViewTodo.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\User\:\:\$isAdmin\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Filament/Resources/Under25kProjectResource.php
-
-		-
-			message: '#^Using nullsafe property access "\?\-\>isAdmin" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
-			count: 1
-			path: app/Filament/Resources/Under25kProjectResource.php
-
-		-
 			message: '#^Using nullsafe property access "\?\-\>value" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
 			count: 4
 			path: app/Filament/Resources/Under25kProjectResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\User\:\:\$isAdmin\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Filament/Resources/Under25kProjectResource/RelationManagers/UpdatesRelationManager.php
-
-		-
-			message: '#^Using nullsafe property access "\?\-\>isAdmin" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
-			identifier: nullsafe.neverNull
-			count: 1
-			path: app/Filament/Resources/Under25kProjectResource/RelationManagers/UpdatesRelationManager.php
 
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$workgroup_id\.$#'
@@ -971,7 +941,7 @@ parameters:
 		-
 			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$actual_completion_date\.$#'
 			identifier: property.notFound
-			count: 2
+			count: 1
 			path: app/Http/Controllers/Api/StationController.php
 
 		-
@@ -2163,120 +2133,6 @@ parameters:
 			path: app/Http/Resources/StationResource.php
 
 		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$actual_completion\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Under25kProjectResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$approved_at\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Under25kProjectResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$approved_by\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Under25kProjectResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$budget\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Under25kProjectResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$created_at\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Under25kProjectResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$description\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Under25kProjectResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$estimated_completion\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Under25kProjectResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Under25kProjectResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$is_approved\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Under25kProjectResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$priority\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Under25kProjectResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$project_lead\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Under25kProjectResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$project_number\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Under25kProjectResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$spent\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Under25kProjectResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$start_date\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Under25kProjectResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$station_id\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Under25kProjectResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$status\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Under25kProjectResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$title\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Under25kProjectResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$updated_at\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Under25kProjectResource.php
-
-		-
-			message: '#^Access to an undefined property App\\Http\\Resources\\Under25kProjectResource\:\:\$vendor\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Http/Resources/Under25kProjectResource.php
-
-		-
 			message: '#^Using nullsafe property access "\?\-\>employee_id" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
 			count: 1
@@ -2317,12 +2173,6 @@ parameters:
 			identifier: return.type
 			count: 1
 			path: app/Models/Apparatus.php
-
-		-
-			message: '#^Access to an undefined property App\\Models\\CapitalProject\:\:\$actual_completion_date\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Models/CapitalProject.php
 
 		-
 			message: '#^Access to an undefined property App\\Models\\EquipmentItem\:\:\$stock\.$#'

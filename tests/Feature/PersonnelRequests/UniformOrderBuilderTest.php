@@ -38,6 +38,7 @@ final class UniformOrderBuilderTest extends TestCase
         $request = app(PersonnelRequestSubmissionService::class)->submitUniform(
             $employee, [$this->item('t_shirt', ['size' => 'XXXL'], 12)], 'structured-overage-1', [
                 'member_note' => '  Replacement shirts after an assignment change.  ',
+                'allowance_justification' => 'Assignment change needs extra shirts.',
                 'entitlement_profile' => 'combat', 'warnings_at_submission' => [],
                 'bid_assignment_snapshot' => ['unit_label' => 'Engine 2'],
             ],
@@ -140,7 +141,7 @@ final class UniformOrderBuilderTest extends TestCase
         $employee = $this->employee('UNIFORM-IDEMPOTENT');
         $this->assignment($employee, 'Engine 2', 2027);
         $service = app(PersonnelRequestSubmissionService::class);
-        $first = $service->submitUniform($employee, [$this->item('t_shirt', ['size' => 'L'], 5)], 'uniform-repeat-1', ['member_note' => 'First note']);
+        $first = $service->submitUniform($employee, [$this->item('t_shirt', ['size' => 'L'], 5)], 'uniform-repeat-1', ['member_note' => 'First note', 'allowance_justification' => 'Worn out.']);
         $this->assignment($employee, 'Rescue Float', 2028);
         $retry = $service->submitUniform($employee, [], 'uniform-repeat-1', ['member_note' => 'Retry note']);
 
@@ -209,6 +210,7 @@ final class UniformOrderBuilderTest extends TestCase
             ->set('data.items.t_shirt.quantity', 5)
             ->set('data.items.t_shirt.metadata.size', 'L')
             ->set('data.member_note', 'Extra replacements requested for review.')
+            ->set('data.allowance_justification', 'Shirts were damaged on duty.')
             ->call('submit')->assertHasNoErrors();
 
         $request = PersonnelRequest::query()->sole();
@@ -306,7 +308,7 @@ final class UniformOrderBuilderTest extends TestCase
         $this->assignment($employee, 'Rescue 11', 2027);
         $request = app(PersonnelRequestSubmissionService::class)->submitUniform($employee, [
             $this->item('uniform_pants', ['waist' => 36, 'inseam' => 32, 'cut' => 'mens'], 6),
-        ], 'uniform-admin-1', ['member_note' => 'Replacement needed. <script>alert(1)</script>']);
+        ], 'uniform-admin-1', ['member_note' => 'Replacement needed. <script>alert(1)</script>', 'allowance_justification' => 'Pants were damaged.']);
         $this->actingAs($this->admin());
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         Livewire::test(ListPersonnelRequests::class)->assertCanSeeTableRecords([$request]);
@@ -354,7 +356,7 @@ final class UniformOrderBuilderTest extends TestCase
         $employee = $this->employee('UNIFORM-QUERIES');
         $this->assignment($employee, 'Engine 2', 2027);
         foreach (range(1, 5) as $index) {
-            app(PersonnelRequestSubmissionService::class)->submitUniform($employee, [$this->item('t_shirt', ['size' => 'L'])], 'uniform-query-'.$index);
+            app(PersonnelRequestSubmissionService::class)->submitUniform($employee, [$this->item('t_shirt', ['size' => 'L'])], 'uniform-query-'.$index, ['allowance_justification' => 'Extra shirt.']);
         }
         $this->actingAs($employee, 'employee');
         DB::enableQueryLog();

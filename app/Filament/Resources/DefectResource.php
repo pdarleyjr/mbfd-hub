@@ -12,6 +12,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class DefectResource extends Resource
 {
@@ -154,6 +155,17 @@ class DefectResource extends Resource
                         'resolved' => 'Resolved',
                     ])
                     ->default('open'),
+
+                // Matches the station profile's "Unresolved equipment issues"
+                // count: open and in-progress issues (resolved = false).
+                Tables\Filters\TernaryFilter::make('unresolved')
+                    ->label('Unresolved')
+                    ->trueLabel('Unresolved (open or in progress)')
+                    ->falseLabel('Resolved')
+                    ->queries(
+                        true: fn (Builder $query): Builder => $query->where('resolved', false),
+                        false: fn (Builder $query): Builder => $query->where('resolved', true),
+                    ),
 
                 SelectFilter::make('issue_type')
                     ->label('Issue Type')

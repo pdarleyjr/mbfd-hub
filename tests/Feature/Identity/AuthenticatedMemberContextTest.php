@@ -351,6 +351,29 @@ final class AuthenticatedMemberContextTest extends TestCase
         ];
     }
 
+    /** @return array<string, array{string, bool}> */
+    public static function personnelRequestRanks(): array
+    {
+        return ['firefighter' => ['Firefighter', false], 'captain' => ['Captain', true]];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('personnelRequestRanks')]
+    public function test_context_reports_whether_the_member_may_open_the_personnel_equipment_request(string $rank, bool $expected): void
+    {
+        $employee = $this->employee('20801');
+        $employee->forceFill(['rank' => $rank])->save();
+        $user = User::factory()->create([
+            'account_status' => AccountStatus::Active,
+            'employee_profile_id' => $employee->id,
+            'employee_id' => $employee->employee_id,
+        ]);
+        $this->authenticateWithRegisteredSession($user);
+
+        $this->getJson('/api/me/context', $this->sameOriginHeaders())
+            ->assertOk()
+            ->assertJsonPath('authorization.capabilities.personnel_equipment_request', $expected);
+    }
+
     private function employee(string $employeeId): Employee
     {
         return Employee::query()->create([
