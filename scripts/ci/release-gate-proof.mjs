@@ -189,11 +189,21 @@ async function main() {
   }
 
   const verified = result.verified === true ? "true" : "false";
-  console.log(`release-gate proof verified=${verified}: ${result.reason}`);
+  const reason = summaryText(result.reason);
+  console.log(`release-gate proof verified=${verified}: ${reason}`);
   if (env.GITHUB_OUTPUT) appendFileSync(env.GITHUB_OUTPUT, `verified=${verified}\n`);
   if (env.GITHUB_STEP_SUMMARY) {
-    appendFileSync(env.GITHUB_STEP_SUMMARY, `Release gate proof reuse: **${verified}**\n\n${result.reason}\n`);
+    appendFileSync(env.GITHUB_STEP_SUMMARY, `Release gate proof reuse: **${verified}**\n\n${reason}\n`);
   }
+}
+
+/** The reason can quote API data; keep only plain single-line text before it reaches logs or files. */
+export function summaryText(value) {
+  return String(value ?? "")
+    .replace(/[^A-Za-z0-9 .,:;()#=/_-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 400);
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
