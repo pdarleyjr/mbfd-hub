@@ -193,7 +193,11 @@ async function main() {
   console.log(`release-gate proof verified=${verified}: ${reason}`);
   if (env.GITHUB_OUTPUT) appendFileSync(env.GITHUB_OUTPUT, `verified=${verified}\n`);
   if (env.GITHUB_STEP_SUMMARY) {
-    appendFileSync(env.GITHUB_STEP_SUMMARY, `Release gate proof reuse: **${verified}**\n\n${reason}\n`);
+    // Only fixed text reaches the file; the API-derived reason stays in the job log above.
+    const note = verified === "true"
+      ? "A verified passing result for this exact tree was reused; expensive gates were skipped."
+      : "No reusable proof; every gate ran. See the job log for the reason.";
+    appendFileSync(env.GITHUB_STEP_SUMMARY, `Release gate proof reuse: **${verified}**\n\n${note}\n`);
   }
 }
 
