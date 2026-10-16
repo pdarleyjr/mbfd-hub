@@ -22,11 +22,11 @@
         .roster td { height: {{ $row_height }}pt; font-size: 8pt; line-height: 9.6pt; overflow-wrap: break-word; word-wrap: break-word; vertical-align: middle; }
         .number { color: #555; font-size: 7pt; }
         .signature-time { font-size: 6.5pt; line-height: 8pt; white-space: nowrap; }
-        .signature { max-width: 165pt; max-height: 17pt; }
+        .signature-cell { line-height: 0 !important; }
+        .signature { vertical-align: middle; }
         .oic { margin-top: {{ $oic_height > 34 ? 3 : 11 }}pt; font-size: 8pt; }
         .oic td { height: {{ $oic_height }}pt; vertical-align: middle; overflow-wrap: break-word; word-wrap: break-word; }
         .oic-person { font-size: {{ $oic_height > 34 ? 6.5 : 8 }}pt; line-height: {{ $oic_height > 34 ? 7.5 : 9.6 }}pt; }
-        .oic .signature { max-width: 150pt; max-height: 28pt; }
         .footer { font-size: 7pt; text-align: center; margin-top: {{ $oic_height > 34 ? 3 : 7 }}pt; }
     </style>
 </head>
@@ -57,14 +57,14 @@
                     <td>@if ($entry)<span class="number">{{ $entry['number'] }}.</span> {{ $entry['snapshot']['last_name'] }}@endif</td>
                     <td>{{ $entry['snapshot']['first_name'] ?? '' }}</td>
                     <td>{{ $entry['date'] ?? '' }}@if ($entry)<br><span class="signature-time">{{ $entry['time'] }}</span>@endif</td>
-                    <td>@if ($entry)<img class="signature" src="{{ $entry['signature_url'] }}" alt="Handwritten signature">@endif</td>
+                    <td class="signature-cell">@if ($entry)<img class="signature" src="{{ $entry['pdf_signature']['url'] }}" style="width: {{ $entry['pdf_signature']['width'] }}pt; height: {{ $entry['pdf_signature']['height'] }}pt" alt="Handwritten signature">@endif</td>
                 </tr>
             @endfor
             </tbody>
         </table>
         <table class="oic"><tr>
             <td class="oic-person" style="width: 52%"><strong>OIC NAME (PRINT):</strong> {{ $oic['person']['display_name'] ?? '____________________' }}<br><strong>ID#</strong> {{ $oic['person']['employee_id'] ?? '________' }}</td>
-            <td><strong>SIGNATURE:</strong> @if ($oic)<img class="signature" src="{{ $oic['signature_url'] }}" alt="OIC handwritten signature"><br><span class="signature-time">{{ $oic['signed_at_local'] }}</span>@else ________________ @endif</td>
+            <td><strong>SIGNATURE:</strong> @if ($oic)<img class="signature" src="{{ $oic['pdf_signature']['url'] }}" style="width: {{ $oic['pdf_signature']['width'] }}pt; height: {{ $oic['pdf_signature']['height'] }}pt" alt="OIC handwritten signature"><br><span class="signature-time">{{ $oic['signed_at_local'] }}</span>@else ________________ @endif</td>
         </tr></table>
         <div class="footer">{{ $session['public_id'] }} · {{ $session['status'] }} · Page {{ $pageIndex + 1 }} of {{ count($pages) }}<br>Snapshot {{ $captured_at }}@if($certification) · Certified {{ $certification['certified_at'] }}@endif @if($submission)@if($oic_height > 34) · @else<br>@endif Submitted {{ $submission['submitted_at'] }}@endif</div>
     </div>

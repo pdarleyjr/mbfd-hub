@@ -9,6 +9,7 @@ use App\Models\Training\TrainingRosterVersion;
 use App\Models\Training\TrainingSession;
 use App\Models\User;
 use App\Services\Training\TrainingRosterExportService;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -277,6 +278,111 @@ final class TrainingRosterExportTest extends TestCase
         app(TrainingRosterExportService::class)->bytes($version->fresh(), 'xlsx');
     }
 
+    public function test_new_pdf_records_layout_version_and_reuses_verified_bytes(): void
+    {
+        $version = $this->version(1, true);
+        $service = app(TrainingRosterExportService::class);
+        $bytes = $service->bytes($version, 'pdf');
+        $stored = $version->fresh();
+
+        self::assertSame(2, $stored->pdf_artifact['layout_version']);
+        self::assertSame(hash('sha256', $bytes), $stored->pdf_artifact['sha256']);
+        self::assertSame($bytes, Storage::disk('local')->get($stored->pdf_artifact['path']));
+        self::assertSame($bytes, $service->bytes($stored, 'pdf'));
+        self::assertSame($version->snapshot, $stored->snapshot);
+    }
+
+    public function test_legacy_pdf_is_redrawn_from_immutable_snapshot_without_replacing_evidence(): void
+    {
+        $version = $this->version(1, true);
+        $legacy = $this->cacheLegacyPdf($version);
+        $original = $version->fresh()->getRawOriginal();
+        $signature = $version->snapshot['attendance'][0]['signature'];
+        $originalInk = Storage::disk('local')->get($signature['path']);
+        $files = Storage::disk('local')->allFiles();
+        // Later edits to the session must never leak into this signed version.
+        $version->session->update(['course_name' => 'LATER SESSION EDIT']);
+
+        $service = app(TrainingRosterExportService::class);
+        foreach (range(1, 2) as $attempt) {
+            $pdf = $service->bytes($version->fresh(), 'pdf');
+            $text = (new Parser)->parseContent($pdf)->getText();
+            self::assertNotSame($legacy, $pdf);
+            self::assertStringContainsString('SYNTHETIC export verification', $text);
+            self::assertStringContainsString('SYNTHETIC OIC', $text);
+            self::assertStringContainsString('TESTLAST001', $text);
+            self::assertStringNotContainsString('LATER SESSION EDIT', $text);
+            self::assertSame($original, $version->fresh()->getRawOriginal());
+            self::assertSame($legacy, Storage::disk('local')->get($version->pdf_artifact['path']));
+            self::assertSame($originalInk, Storage::disk('local')->get($signature['path']));
+            self::assertSame($signature['sha256'], hash('sha256', $originalInk));
+            self::assertSame($files, Storage::disk('local')->allFiles());
+        }
+    }
+
+    public function test_corrupt_legacy_pdf_blocks_redraw_instead_of_bypassing_integrity(): void
+    {
+        $version = $this->version(1, true);
+        $this->cacheLegacyPdf($version);
+        Storage::disk('local')->put($version->pdf_artifact['path'], 'corrupt');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('integrity check');
+        app(TrainingRosterExportService::class)->bytes($version->fresh(), 'pdf');
+    }
+
+    public function test_corrupt_original_ink_blocks_legacy_pdf_redraw(): void
+    {
+        $version = $this->version(1, true);
+        $this->cacheLegacyPdf($version);
+        Storage::disk('local')->put($version->snapshot['attendance'][0]['signature']['path'], 'corrupt');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('integrity check');
+        app(TrainingRosterExportService::class)->bytes($version->fresh(), 'pdf');
+    }
+
+    public function test_corrupt_oic_ink_blocks_legacy_pdf_redraw_without_attendance(): void
+    {
+        $version = $this->version(0, true);
+        $this->cacheLegacyPdf($version);
+        Storage::disk('local')->put($version->snapshot['certification']['oic_signature']['path'], 'corrupt');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('integrity check');
+        app(TrainingRosterExportService::class)->bytes($version->fresh(), 'pdf');
+    }
+
+    public function test_corrupt_lead_ink_blocks_legacy_pdf_redraw(): void
+    {
+        $version = $this->version(1, false);
+        $snapshot = $version->snapshot;
+        $signature = $snapshot['attendance'][0]['signature'];
+        $snapshot['attendance'] = [];
+        $snapshot['instructor_signoff'] = [
+            'lead_snapshot' => ['employee_profile_id' => 42, 'employee_id' => '00142', 'display_name' => 'SYNTHETIC LEAD'],
+            'signature' => $signature, 'signed_at' => '2026-10-15T15:05:44+00:00', 'recorded_by' => 123,
+        ];
+        $snapshot['submission'] = ['submitted_at' => '2026-10-15T15:05:44+00:00', 'submitted_by' => 123];
+        $signed = TrainingRosterVersion::query()->create(['training_session_id' => $version->training_session_id, 'revision' => 2, 'snapshot' => $snapshot]);
+        $this->cacheLegacyPdf($signed);
+        Storage::disk('local')->put($signature['path'], 'corrupt');
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('integrity check');
+        app(TrainingRosterExportService::class)->bytes($signed->fresh(), 'pdf');
+    }
+
+    public function test_unknown_future_pdf_layout_is_not_replaced_by_an_older_renderer(): void
+    {
+        $version = $this->version(1, false);
+        $bytes = $this->cacheLegacyPdf($version, 999);
+        $original = $version->fresh()->getRawOriginal();
+
+        self::assertSame($bytes, app(TrainingRosterExportService::class)->bytes($version->fresh(), 'pdf'));
+        self::assertSame($original, $version->fresh()->getRawOriginal());
+    }
+
     public function test_corrupted_oic_signature_blocks_certified_export(): void
     {
         $version = $this->version(0, true);
@@ -432,6 +538,20 @@ final class TrainingRosterExportTest extends TestCase
         } finally {
             unlink($path);
         }
+    }
+
+    private function cacheLegacyPdf(TrainingRosterVersion $version, ?int $layoutVersion = null): string
+    {
+        $bytes = Pdf::loadHTML('<html><body>LEGACY LAYOUT FIXTURE</body></html>')->output();
+        $path = 'training/legacy-'.$version->id.'.pdf';
+        Storage::disk('local')->put($path, $bytes);
+        $artifact = ['disk' => 'local', 'path' => $path, 'sha256' => hash('sha256', $bytes), 'mime' => 'application/pdf'];
+        if ($layoutVersion !== null) {
+            $artifact['layout_version'] = $layoutVersion;
+        }
+        $version->update(['pdf_artifact' => $artifact]);
+
+        return $bytes;
     }
 
     private function version(int $count, bool $certified): TrainingRosterVersion
