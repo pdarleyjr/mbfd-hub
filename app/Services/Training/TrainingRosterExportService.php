@@ -54,7 +54,7 @@ final class TrainingRosterExportService
 
         $attribute = $format.'_artifact';
         if ($version->{$attribute}) {
-            return $this->verifiedBytes($version->{$attribute});
+            return $this->cachedBytes($version, $format);
         }
 
         $data = $this->renderData($version);
@@ -62,6 +62,9 @@ final class TrainingRosterExportService
         $disk = (string) config('filesystems.private', 'local');
         $path = 'training/rosters/'.$version->training_session_id.'/'.$version->revision.'/'.Str::ulid().'.'.$format;
         $artifact = ['disk' => $disk, 'path' => $path, 'sha256' => hash('sha256', $bytes), 'mime' => $format === 'pdf' ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
+        if ($format === 'pdf') {
+            $artifact['layout_version'] = 2;
+        }
         if (! Storage::disk($disk)->put($path, $bytes, ['visibility' => 'private'])) {
             throw new RuntimeException('The roster export could not be stored. Please try again.');
         }
@@ -69,12 +72,12 @@ final class TrainingRosterExportService
         try {
             $this->verifiedBytes($artifact);
 
-            return DB::transaction(function () use ($version, $attribute, $artifact, $bytes, $disk, $path): string {
+            return DB::transaction(function () use ($version, $format, $attribute, $artifact, $bytes, $disk, $path): string {
                 $locked = TrainingRosterVersion::query()->lockForUpdate()->findOrFail($version->getKey());
                 if ($locked->{$attribute}) {
                     Storage::disk($disk)->delete($path);
 
-                    return $this->verifiedBytes($locked->{$attribute});
+                    return $this->cachedBytes($locked, $format);
                 }
                 $locked->{$attribute} = $artifact;
                 $locked->save();
@@ -86,6 +89,19 @@ final class TrainingRosterExportService
             Storage::disk($disk)->delete($path);
             throw $exception;
         }
+    }
+
+    private function cachedBytes(TrainingRosterVersion $version, string $format): string
+    {
+        $artifact = $version->{$format.'_artifact'};
+        $bytes = $this->verifiedBytes($artifact);
+        // Legacy PDFs remain immutable evidence. Serve the improved presentation
+        // from the same snapshot without replacing the stored original or its hash.
+        if ($format === 'pdf' && ! isset($artifact['layout_version'])) {
+            return $this->pdf($this->renderData($version));
+        }
+
+        return $bytes;
     }
 
     /** @param array{disk:string,path:string,sha256:string} $file */
@@ -210,6 +226,18 @@ final class TrainingRosterExportService
     /** @param array<string,mixed> $data */
     private function pdf(array $data): string
     {
+        $signatures = new TrainingPdfSignature;
+        foreach ($data['pages'] as &$page) {
+            foreach ($page as &$entry) {
+                $entry['pdf_signature'] = $signatures->fit($entry['signature_bytes'], 180, 20);
+            }
+            unset($entry);
+        }
+        unset($page);
+        if ($data['oic'] !== null) {
+            $data['oic']['pdf_signature'] = $signatures->fit($data['oic']['signature_bytes'], 165, 30);
+        }
+
         return Pdf::loadView('training.roster-pdf', $data)
             ->setPaper('letter', 'portrait')
             ->setOptions(['isRemoteEnabled' => false, 'isPhpEnabled' => false, 'defaultFont' => 'DejaVu Sans'])
