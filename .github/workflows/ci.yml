@@ -20,6 +20,12 @@ permissions:
 
 jobs:
   release-gates:
+    # Read-only lookups for the release-gate proof reuse proposal.
+    permissions:
+      contents: read
+      pull-requests: read
+      actions: read
+      checks: read
     uses: ./.github/workflows/hub-release-gates.yml
     with:
       pint_base_sha: ${{ github.event.pull_request.base.sha || github.event.before }}
