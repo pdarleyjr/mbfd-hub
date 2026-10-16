@@ -72,6 +72,20 @@ final class MediaControlMediaPageTest extends TestCase
         self::assertStringContainsString(self::BASE, (string) $response->headers->get('Content-Security-Policy'));
     }
 
+    public function test_uploader_accepts_the_finished_item_on_the_last_chunk(): void
+    {
+        // Media Control answers the last tus PATCH with 200 and the finished
+        // library item (content_id) instead of 204; the uploader must treat
+        // that as complete, not as "Media Control stopped the upload".
+        $this->fakeMediaControl();
+        $this->actingAs($this->adminMember(withMediaPermission: true));
+
+        $html = (string) $this->get('/admin/media-control/media')->assertOk()->getContent();
+
+        self::assertStringContainsString('xhr.status === 200 && end >= entry.size', $html);
+        self::assertStringContainsString("typeof body.content_id === 'string'", $html);
+    }
+
     public function test_other_admin_pages_do_not_allow_media_control_in_connect_src(): void
     {
         $this->actingAs($this->adminMember(withMediaPermission: true));
