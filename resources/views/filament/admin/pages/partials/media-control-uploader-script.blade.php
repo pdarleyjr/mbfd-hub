@@ -306,6 +306,19 @@
                             resolve(offset);
                             return;
                         }
+                        // The last chunk is answered 200 with the finished library
+                        // item instead of 204: the upload is complete.
+                        if (xhr.status === 200 && end >= entry.size) {
+                            try {
+                                const body = JSON.parse(xhr.responseText || '{}');
+                                if (body && typeof body.content_id === 'string' && body.content_id !== '') {
+                                    resolve(entry.size);
+                                    return;
+                                }
+                            } catch (error) {
+                                // Not the finished item: report it as a stopped upload below.
+                            }
+                        }
                         let message = 'Media Control stopped the upload (status ' + xhr.status + ').';
                         try {
                             const body = JSON.parse(xhr.responseText || '{}');
