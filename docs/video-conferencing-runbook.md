@@ -88,6 +88,15 @@ For a production TURN/TLS acceptance run, set the production fixture's `VIDEO_CO
 
 Physical acceptance remains separate: repeat on the 300 device, representative station devices, iPad/Safari, actual USB camera/microphone/speaker hardware, and a restricted-network/TURN-only path. Confirm speaker routing, hot-plug recovery, intelligibility, echo suppression, camera framing, touch targets, takeover messaging, and a sustained 30-minute lineup.
 
+## Gallery layout, capacity and reconnect behavior
+
+- **Tile order.** In a Morning Lineup the gallery always shows `300 Command`, `Station 1`, `2`, `3`, `4`, `6` in that order. An endpoint that has not connected (or has left) keeps its position as a dashed "Waiting to join" placeholder, so tiles never reshuffle when a station joins. Direct calls show only 300 and the called station. Individual members (`mbfd:member:<employee id>`) follow the core six, ordered by join time.
+- **Tile shape.** Every tile media box is an exact 16:9 box with `object-fit: contain`. Tile size is computed in `gallery-layout.ts` from the gallery container's width and height (largest tiles that fit); minimum 200 px wide on desktop, 150 px on phones (1 or 2 columns). If tiles would fall below the minimum the gallery scrolls vertically instead of shrinking. Presentation (screen share or pin) shows a large 16:9 focus tile plus a scrolling filmstrip: a vertical rail on wide screens, a horizontal strip on narrow or landscape-short screens.
+- **Capacity.** `LIVEKIT_MAX_PARTICIPANTS` is 12. A full lineup is 6 (300 plus five stations), leaving 6 slots for individual members. This is sufficient for the planned physical test; raise it only if more than six members will join one lineup, remembering that every extra participant increases participant-minute and downstream usage on LiveKit Cloud.
+- **Reconnect.** The LiveKit SDK handles short network blips itself. If a connection is lost completely: stations re-acquire camera and microphone and rejoin automatically through the existing status poll; 300 and members retry up to three times (after 2 s, 6 s and 12 s) and only while the same lineup is still active, otherwise they return to the device-check screen. An endpoint closed because another device took it over never rejoins automatically. A lineup is never started or restarted by an automatic rejoin.
+- **Lineup-ended detection.** `ROOM_DELETED` still sends endpoints back immediately. A status poll reporting an inactive session must be repeated (at least two polls, at least 1.5 s apart) before a station, 300 or member is navigated away, so one transient server error cannot drop an endpoint.
+- **Same member in two places.** A second join with the same `mbfd:member:<id>` identity returns HTTP 409 `endpoint_in_use`. The page offers to join here and disconnect the other tab or device; the older connection receives a clear "connected from another device" message.
+
 ## Load smoke
 
 Install a pinned LiveKit CLI release on a test VM with adequate bandwidth, add the self-hosted project, then run:
