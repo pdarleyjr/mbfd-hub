@@ -288,7 +288,8 @@ body:has(> main > #video-conferencing-root) .vc-shell {
 /* The outline is an overlay so the media box stays an exact 16:9. */
 .vc-tile::after,
 .vc-placeholder::after { border: 1px solid #26364d; border-radius: inherit; content: ''; inset: 0; pointer-events: none; position: absolute; z-index: 2; }
-.vc-tile__focus { aspect-ratio: 16 / 9; background: transparent; border: 0; cursor: pointer; display: block; padding: 0; position: relative; width: 100%; }
+.vc-tile__focus { aspect-ratio: 16 / 9; container-type: inline-size; background: transparent; border: 0; cursor: pointer; display: block; padding: 0; position: relative; width: 100%; }
+.vc-placeholder { container-type: inline-size; }
 .vc-placeholder__media { align-items: center; aspect-ratio: 16 / 9; background: repeating-linear-gradient(135deg, #131c2e 0 14px, #17223a 14px 28px); color: #94a3b8; display: flex; flex-direction: column; gap: .35rem; justify-content: center; position: relative; width: 100%; }
 .vc-placeholder__status { font-size: .74rem; font-weight: 650; }
 .vc-placeholder .vc-tile__name { color: #e2e8f0; }
@@ -426,9 +427,23 @@ body:has(> main > #video-conferencing-root) .vc-shell {
     .vc-shell:is([data-phase="connected"], [data-phase="reconnecting"]) .vc-header { flex-direction: row; flex-wrap: wrap; gap: .4rem; }
     .vc-shell:is([data-phase="connected"], [data-phase="reconnecting"]) .vc-eyebrow { display: none; }
     .vc-header { gap: .65rem; }
-    .vc-placeholder__media { justify-content: flex-start; padding-top: .55rem; }
-    .vc-placeholder__status { font-size: .66rem; }
     .vc-tile__name { font-size: .65rem; left: .4rem; bottom: 1.9rem; max-width: calc(100% - .8rem); }
     .vc-mic { bottom: .35rem; right: .35rem; font-size: .55rem; }
     .vc-avatar { height: 3rem; width: 3rem; font-size: 1rem; }
+}
+
+/* Small tiles: scale the avatar and keep it clear of the two-row label strip (name above mic badge). */
+@container (max-width: 239px) {
+    .vc-avatar { border-width: 2px; font-size: .8rem; height: 2.25rem; top: calc((100% - 2.6rem) / 2); width: 2.25rem; }
+    .vc-tile__name { bottom: 1.7rem; font-size: .65rem; left: .4rem; max-width: calc(100% - .8rem); }
+    .vc-mic { bottom: .35rem; font-size: .55rem; right: .35rem; }
+    .vc-placeholder__media { justify-content: flex-start; padding-top: .5rem; }
+    .vc-placeholder__status { font-size: .66rem; }
+}
+
+/* Filmstrip thumbnails: tighter still. */
+@container (max-width: 149px) {
+    .vc-avatar { font-size: .65rem; height: 1.6rem; top: calc((100% - 2.3rem) / 2); width: 1.6rem; }
+    .vc-tile__name { bottom: 1.35rem; font-size: .6rem; }
+    .vc-mic { bottom: .25rem; font-size: .5rem; padding: .15rem .35rem; }
 }
