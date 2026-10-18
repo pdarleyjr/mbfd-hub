@@ -34,6 +34,15 @@ class ApparatusServiceTicketPolicy
         return false;
     }
 
+    /**
+     * Opening a service ticket from a reported equipment issue is an explicit
+     * administrative decision, restricted to the ticket-managing roles.
+     */
+    public function createFromDefect(User $user): bool
+    {
+        return $this->manage($user);
+    }
+
     public function delete(User $user, ApparatusServiceTicket $ticket): bool
     {
         return false;

@@ -207,6 +207,46 @@ class PublicApparatusInspectionGateTest extends TestCase
         $this->assertDatabaseCount('apparatus_inspection_review_events', 0);
     }
 
+    public function test_approving_a_critical_defect_inspection_without_the_flag_leaves_the_unit_in_service(): void
+    {
+        $apparatus = $this->makeApparatus('In Service');
+
+        $this->postJson(
+            "/api/public/apparatuses/{$apparatus->id}/inspections",
+            $this->criticalDefectPayload($apparatus)
+        )->assertStatus(201);
+
+        $inspection = ApparatusInspection::latest('id')->first();
+        $this->actingAsAdmin();
+
+        $this->postJson("/api/apparatus-inspections/{$inspection->id}/approve", ['mark_out_of_service' => false])
+            ->assertOk();
+
+        $this->assertSame('In Service', $apparatus->fresh()->status);
+        $this->assertSame('approved', $inspection->fresh()->review_status);
+        $this->assertSame($inspection->id, ApparatusDefect::sole()->apparatus_inspection_id);
+        $this->assertDatabaseCount('apparatus_operational_status_events', 0);
+    }
+
+    public function test_the_out_of_service_flag_must_be_boolean(): void
+    {
+        $apparatus = $this->makeApparatus('In Service');
+
+        $this->postJson(
+            "/api/public/apparatuses/{$apparatus->id}/inspections",
+            $this->criticalDefectPayload($apparatus)
+        )->assertStatus(201);
+
+        $inspection = ApparatusInspection::latest('id')->first();
+        $this->actingAsAdmin();
+
+        $this->postJson("/api/apparatus-inspections/{$inspection->id}/approve", ['mark_out_of_service' => 'maybe'])
+            ->assertStatus(422);
+
+        $this->assertSame('pending_review', $inspection->fresh()->review_status);
+        $this->assertSame('In Service', $apparatus->fresh()->status);
+    }
+
     public function test_authorized_user_can_approve_pending_inspection_and_set_out_of_service(): void
     {
         $apparatus = $this->makeApparatus('In Service');
@@ -220,10 +260,17 @@ class PublicApparatusInspectionGateTest extends TestCase
 
         $reviewer = $this->actingAsAdmin();
 
-        $response = $this->postJson("/api/apparatus-inspections/{$inspection->id}/approve");
+        $response = $this->postJson("/api/apparatus-inspections/{$inspection->id}/approve", [
+            'mark_out_of_service' => true,
+        ]);
 
         $response->assertStatus(200);
         $this->assertSame('Out of Service', $apparatus->fresh()->status);
+        $this->assertDatabaseHas('apparatus_operational_status_events', [
+            'apparatus_id' => $apparatus->id,
+            'previous_status' => 'In Service',
+            'status' => 'Out of Service',
+        ]);
         $this->assertSame('approved', $inspection->fresh()->review_status);
         $this->assertSame($inspection->id, ApparatusDefect::sole()->apparatus_inspection_id);
         $this->assertDatabaseHas('apparatus_inspection_review_events', [

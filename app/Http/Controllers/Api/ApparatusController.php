@@ -620,10 +620,10 @@ class ApparatusController extends Controller
     /**
      * Approve a pending-review inspection (authenticated/authorized only).
      *
-     * SECURITY (H-01): this is the only path that may flip an apparatus to
-     * "Out of Service" as a result of a reported critical defect. The public
-     * submission endpoint records the inspection as 'pending_review'; an
-     * authorized reviewer confirms it here, which applies the operational hold.
+     * SECURITY (H-01): the public submission endpoint records the inspection
+     * as 'pending_review'; only an authorized reviewer can apply it here. The
+     * apparatus goes "Out of Service" only when the reviewer explicitly sends
+     * mark_out_of_service=true; approving never does it implicitly.
      */
     public function approveInspection(
         Request $request,
@@ -633,7 +633,18 @@ class ApparatusController extends Controller
         $reviewer = $request->user();
         abort_unless($reviewer instanceof User && $reviewer->can('approve', $inspection), 403);
 
-        $inspection = $approvalService->approve((int) $inspection->getKey(), $reviewer);
+        // Approval never takes a unit Out of Service on its own; the reviewer
+        // must ask for it explicitly. No bundled client calls this endpoint
+        // without the flag, so the safe default is false.
+        $validated = $request->validate([
+            'mark_out_of_service' => ['sometimes', 'boolean'],
+        ]);
+
+        $inspection = $approvalService->approve(
+            (int) $inspection->getKey(),
+            $reviewer,
+            (bool) ($validated['mark_out_of_service'] ?? false),
+        );
 
         return response()->json($inspection->fresh()->load('apparatus'));
     }

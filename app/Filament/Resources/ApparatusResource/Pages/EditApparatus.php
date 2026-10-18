@@ -10,6 +10,16 @@ class EditApparatus extends EditRecord
 {
     protected static string $resource = ApparatusResource::class;
 
+    public function hasCombinedRelationManagerTabsWithContent(): bool
+    {
+        return true;
+    }
+
+    public function getContentTabLabel(): ?string
+    {
+        return 'Overview';
+    }
+
     protected function getHeaderActions(): array
     {
         return [
