@@ -96,7 +96,8 @@ class ConferenceBootstrapFactory
             return $this->stationReturnPath((int) $matches[1]);
         }
 
-        return preg_match('#^/(?:employee)?$#D', $returnTo) === 1
+        // Query strings, fragments and sub-paths are deliberately not accepted.
+        return preg_match('#^/(?:employee|daily/command-300)?$#D', $returnTo) === 1
             ? $returnTo : '/';
     }
 

@@ -24,7 +24,8 @@ for (const [name, item] of Object.entries({ entry, mount, livekit, echo, pusher 
 
 const limits = [
     ['entry', entry.file, 5_000, 3_000],
-    ['mount', mount.file, 45_000, 15_000],
+    // Raised from 45_000 / 15_000 for the fixed-order gallery, best-fit layout and bounded rejoin.
+    ['mount', mount.file, 52_000, 16_000],
     ['livekit', livekit.file, 500_000, 140_000],
     ['echo', echo.file, 15_000, 5_000],
     ['pusher', pusher.file, 70_000, 22_000],
@@ -41,7 +42,7 @@ for (const [name, file, rawLimit, gzipLimit] of limits) {
 
 for (const cssFile of mount.css ?? []) {
     const size = fs.statSync(path.join(buildDir, cssFile)).size;
-    if (size > 18_000) throw new Error(`Conference CSS exceeds budget: ${size} bytes.`);
+    if (size > 19_000) throw new Error(`Conference CSS exceeds budget: ${size} bytes.`);
     process.stdout.write(`css: ${size} raw bytes\n`);
 }
 

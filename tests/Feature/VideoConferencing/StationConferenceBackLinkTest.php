@@ -73,6 +73,14 @@ final class StationConferenceBackLinkTest extends TestCase
             '/daily/stations/999' => '/',
             '/daily/stations/30?next=https://evil.example' => '/',
             '/employee' => '/employee',
+            '/daily/command-300' => '/daily/command-300',
+            'https://www.mbfdhub.com/daily/command-300' => '/daily/command-300',
+            '/daily/command-300/' => '/',
+            '/daily/command-300?next=https://evil.example' => '/',
+            '/daily/command-300/extra' => '/',
+            '/daily/command-3000' => '/',
+            '//evil.example/daily/command-300' => '/',
+            'https://evil.example/daily/command-300' => '/',
         ];
 
         foreach ($cases as $target => $expected) {

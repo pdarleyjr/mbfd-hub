@@ -283,8 +283,16 @@ body:has(> main > #video-conferencing-root) .vc-shell {
 .vc-focus-bar span { color: var(--vc-muted); font-size: .7rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .vc-focus-bar button { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; color: #1d4ed8; cursor: pointer; font-size: .68rem; font-weight: 800; min-height: 36px; padding: .25rem .7rem; }
 
-.vc-tile { background: #111827; border: 1px solid #26364d; border-radius: 15px; min-width: 0; overflow: hidden; }
-.vc-tile__focus { background: transparent; border: 0; cursor: pointer; display: block; padding: 0; position: relative; width: 100%; }
+.vc-tile,
+.vc-placeholder { background: #111827; border-radius: 12px; min-width: 0; overflow: hidden; position: relative; }
+/* The outline is an overlay so the media box stays an exact 16:9. */
+.vc-tile::after,
+.vc-placeholder::after { border: 1px solid #26364d; border-radius: inherit; content: ''; inset: 0; pointer-events: none; position: absolute; z-index: 2; }
+.vc-tile__focus { aspect-ratio: 16 / 9; background: transparent; border: 0; cursor: pointer; display: block; padding: 0; position: relative; width: 100%; }
+.vc-placeholder__media { align-items: center; aspect-ratio: 16 / 9; background: repeating-linear-gradient(135deg, #131c2e 0 14px, #17223a 14px 28px); color: #94a3b8; display: flex; flex-direction: column; gap: .35rem; justify-content: center; position: relative; width: 100%; }
+.vc-placeholder__status { font-size: .74rem; font-weight: 650; }
+.vc-placeholder .vc-tile__name { color: #e2e8f0; }
+.vc-placeholder::after { border-style: dashed; border-color: #3f5273; }
 .vc-tile video { height: 100%; inset: 0; object-fit: contain; position: absolute; width: 100%; }
 .vc-tile__scrim { background: linear-gradient(180deg, transparent 50%, rgba(0, 0, 0, .76)); inset: 0; position: absolute; }
 .vc-avatar { align-items: center; background: #253858; border: 3px solid #47668f; border-radius: 999px; color: #e7e5e4; display: flex; font-size: 1.6rem; font-weight: 750; height: 5rem; justify-content: center; left: 50%; position: absolute; top: 50%; transform: translate(-50%, -50%); width: 5rem; }
@@ -370,23 +378,35 @@ body:has(> main > #video-conferencing-root) .vc-shell {
 .vc-shell:is([data-phase="connected"], [data-phase="reconnecting"]) { position: fixed; inset: 0; z-index: 50; margin: 0; display: flex; flex-direction: column; height: 100dvh; min-height: 0; padding: .65rem; background: #101827; }
 .vc-shell:is([data-phase="connected"], [data-phase="reconnecting"]) .vc-header { flex-shrink: 0; }
 .vc-header > div { flex: 1; }
-.vc-navigation { display: flex; gap: .35rem; position: relative; z-index: 1; }
-.vc-navigation button { background: #263853; border: 1px solid #58708f; color: #fafaf9; border-radius: 8px; padding: .35rem .65rem; cursor: pointer; }
+.vc-navigation { display: flex; gap: .5rem; position: relative; z-index: 1; }
+.vc-navigation button { align-items: center; background: rgb(var(--hub-blue, 30 78 140)); border: 1px solid rgba(255, 255, 255, .38); border-radius: 10px; color: #fff; cursor: pointer; display: inline-flex; font-size: .85rem; font-weight: 650; gap: .4rem; justify-content: center; min-height: 44px; min-width: 44px; padding: 0 .85rem; }
+.vc-navigation button[data-nav="home"] { background: transparent; }
+.vc-navigation button:hover { background: rgb(var(--hub-blue-strong, 29 78 216)); }
 .vc-conference { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: .5rem; }
 .vc-meeting { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: .35rem; }
 .vc-focus-bar { flex-shrink: 0; }
 .vc-focus-bar span { color: #cbd5e1; }
-.vc-gallery { display: grid; flex: 1; min-height: 0; gap: .55rem; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: minmax(0, 1fr); }
-.vc-gallery[data-count="1"] { grid-template-columns: minmax(0, 1fr); }
-.vc-gallery:is([data-count="2"], [data-count="3"], [data-count="4"]) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.vc-gallery .vc-tile { min-height: 0; border-radius: 10px; box-shadow: none; }
-.vc-gallery .vc-tile__focus { aspect-ratio: auto; height: 100%; min-height: 0; }
-.vc-tile--speaking { border-color: #7cc4a6; box-shadow: inset 0 0 0 2px #7cc4a6 !important; }
-.vc-gallery--presentation { grid-template-columns: minmax(0, 3fr) minmax(12rem, 1fr); grid-template-rows: repeat(5, minmax(0, 1fr)); }
-.vc-gallery--presentation .vc-tile--focused { grid-column: 1; grid-row: 1 / -1; }
-.vc-gallery--presentation .vc-tile:not(.vc-tile--focused) { grid-column: 2; }
-.vc-gallery--presentation[data-count="2"] { grid-template-rows: 1fr; grid-template-columns: minmax(0, 3fr) minmax(12rem, 1fr); }
-.vc-gallery--presentation:is([data-count="3"], [data-count="4"]) { grid-template-columns: minmax(0, 3fr) minmax(12rem, 1fr); grid-template-rows: repeat(3, minmax(0, 1fr)); }
+/* Tile size is computed in React (ConferenceStage) from the container's width AND height. */
+.vc-gallery { flex: 1; min-height: 0; overflow: hidden; }
+.vc-gallery--grid { align-content: center; display: grid; gap: 8px; grid-template-columns: repeat(var(--vc-cols, 1), var(--vc-tile-w, 0)); justify-content: center; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
+.vc-gallery--grid[data-scroll="true"] { align-content: start; }
+.vc-gallery--grid .vc-tile,
+.vc-gallery--grid .vc-placeholder { width: var(--vc-tile-w); }
+.vc-tile--speaking::after { border: 2px solid #7cc4a6; }
+.vc-stage { display: flex; gap: 8px; margin: 0 auto; }
+.vc-stage--rail { flex-direction: row; justify-content: center; }
+.vc-stage--strip,
+.vc-stage--solo { flex-direction: column; }
+.vc-stage__focus { align-items: center; display: flex; flex: 1 1 0; justify-content: center; min-height: 0; min-width: 0; }
+.vc-stage__focus .vc-tile { width: var(--vc-focus-w); }
+.vc-filmstrip { display: flex; flex: none; gap: 8px; }
+.vc-filmstrip .vc-tile,
+.vc-filmstrip .vc-placeholder { flex: none; width: var(--vc-thumb-w); }
+.vc-stage--rail .vc-filmstrip { flex-direction: column; overflow-x: hidden; overflow-y: auto; }
+.vc-stage--strip .vc-filmstrip { align-items: flex-start; flex-direction: row; overflow-x: auto; overflow-y: hidden; width: 100%; }
+/* Centre a short strip without making the overflowing start unreachable. */
+.vc-stage--strip .vc-filmstrip > :first-child { margin-inline-start: auto; }
+.vc-stage--strip .vc-filmstrip > :last-child { margin-inline-end: auto; }
 .vc-controls { flex-shrink: 0; position: static; flex-wrap: wrap; }
 .vc-station-mic { flex-shrink: 0; min-height: 36px; padding: .3rem; font-size: .8rem; }
 .vc-meeting-status { display: flex; flex-wrap: wrap; justify-content: center; gap: .4rem 1.25rem; color: #cbd5e1; font-size: .72rem; flex-shrink: 0; }
@@ -402,19 +422,13 @@ body:has(> main > #video-conferencing-root) .vc-shell {
 .vc-dialog__heading button { border: 1px solid #a8a29e; border-radius: 8px; padding: .4rem .75rem; cursor: pointer; }
 .vc-dialog__actions { display: flex; gap: .6rem; margin-top: 1rem; }
 .vc-dialog .vc-command { padding: 0; border: 0; background: transparent; }
-@media (max-width: 1100px) {
-    .vc-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .vc-gallery--presentation { grid-template-columns: minmax(0, 3fr) minmax(10rem, 1fr); }
-}
 @media (max-width: 640px) {
     .vc-shell:is([data-phase="connected"], [data-phase="reconnecting"]) .vc-header { flex-direction: row; flex-wrap: wrap; gap: .4rem; }
     .vc-shell:is([data-phase="connected"], [data-phase="reconnecting"]) .vc-eyebrow { display: none; }
     .vc-header { gap: .65rem; }
-    .vc-gallery { gap: .35rem; }
+    .vc-placeholder__media { justify-content: flex-start; padding-top: .55rem; }
+    .vc-placeholder__status { font-size: .66rem; }
     .vc-tile__name { font-size: .65rem; left: .4rem; bottom: 1.9rem; max-width: calc(100% - .8rem); }
     .vc-mic { bottom: .35rem; right: .35rem; font-size: .55rem; }
     .vc-avatar { height: 3rem; width: 3rem; font-size: 1rem; }
-    .vc-gallery--presentation { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; grid-template-rows: minmax(0, 3fr) repeat(3, minmax(0, 1fr)) !important; }
-    .vc-gallery--presentation .vc-tile--focused { grid-column: 1 / -1; grid-row: 1; }
-    .vc-gallery--presentation .vc-tile:not(.vc-tile--focused) { grid-column: auto; }
 }
