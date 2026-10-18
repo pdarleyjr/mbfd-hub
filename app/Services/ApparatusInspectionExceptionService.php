@@ -20,7 +20,6 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use Ramsey\Uuid\Uuid;
 
 final class ApparatusInspectionExceptionService
 {
@@ -99,7 +98,9 @@ final class ApparatusInspectionExceptionService
                         Gate::forUser($reviewer)->authorize('viewAny', ApparatusServiceTicket::class);
                         $result = app(ApparatusServiceTicketWorkflowService::class)->createFleetTicket($apparatus, $reviewer, [
                             ...$validated['service_ticket'],
-                            'client_submission_id' => Uuid::uuid5(Uuid::NAMESPACE_URL, 'mbfd:inspection-defect:'.$defect->id)->toString(),
+                            // One id per defect, shared with the explicit admin
+                            // "Create Service Ticket" action, so either path is idempotent.
+                            'client_submission_id' => ApparatusDefectServiceTicketService::clientSubmissionId($defect),
                         ]);
                         if ((int) $result->ticket->apparatus_id !== (int) $apparatus->id) {
                             throw ValidationException::withMessages(['service_ticket' => 'The service ticket belongs to a different apparatus.']);

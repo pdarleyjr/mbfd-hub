@@ -190,18 +190,19 @@ final class ApparatusProfileAccessibilityTest extends TestCase
 
         $this->get($profileUrl)
             ->assertOk()
-            ->assertSee('Vehicle Inspections')
-            ->assertSee('Missing / Damaged Equipment')
-            ->assertSee('Service Tickets');
+            ->assertSee('Overview')
+            ->assertSee('Inspections')
+            ->assertSee('Service Tickets')
+            ->assertSee('Defects');
         $this->get(ApparatusResource::getUrl('edit', ['record' => $apparatus]))->assertOk();
 
         $component = Livewire::test(ViewApparatus::class, ['record' => $apparatus->getRouteKey()]);
         $component->assertSuccessful();
 
         foreach ([
-            '0' => 'Vehicle Inspections',
-            '1' => 'Missing / Damaged Equipment',
-            '2' => 'Service / Maintenance History',
+            '0' => 'Inspections',
+            '1' => 'Service Tickets',
+            '2' => 'Defects',
         ] as $relationManager => $title) {
             $component->set('activeRelationManager', $relationManager);
             $component->assertSuccessful();

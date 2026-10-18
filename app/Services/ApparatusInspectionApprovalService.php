@@ -22,10 +22,15 @@ final class ApparatusInspectionApprovalService
 
     private const POSTGRES_LOCK_TIMEOUT_BACKOFF_MICROSECONDS = 125_000;
 
-    public function approve(int $inspectionId, User $reviewer): ApparatusInspection
+    /**
+     * Approving evidence never changes the unit's operational status by itself.
+     * Taking the unit Out of Service is an explicit reviewer decision passed in
+     * $markOutOfService; reported critical defects only inform that decision.
+     */
+    public function approve(int $inspectionId, User $reviewer, bool $markOutOfService = false): ApparatusInspection
     {
-        return $this->retryPostgresLockTimeout(function () use ($inspectionId, $reviewer): ApparatusInspection {
-            return DB::transaction(function () use ($inspectionId, $reviewer): ApparatusInspection {
+        return $this->retryPostgresLockTimeout(function () use ($inspectionId, $reviewer, $markOutOfService): ApparatusInspection {
+            return DB::transaction(function () use ($inspectionId, $reviewer, $markOutOfService): ApparatusInspection {
                 $inspection = ApparatusInspection::query()
                     ->lockForUpdate()
                     ->findOrFail($inspectionId);
@@ -42,6 +47,9 @@ final class ApparatusInspectionApprovalService
                 $previousHealth = 'green';
                 $shouldDispatchPmAlert = false;
                 $hasSnipeItAsset = false;
+                $criticalDefectsReported = $isLegacyPendingInspection
+                    || (bool) ($pendingEffects['has_critical_defects'] ?? false);
+                $markedOutOfService = false;
 
                 if ($apparatus !== null) {
                     if (! $isLegacyPendingInspection) {
@@ -63,16 +71,20 @@ final class ApparatusInspectionApprovalService
                         ] = $this->applyApprovedInspectionMeters($apparatus, $inspection);
                     }
 
-                    $hasCriticalDefects = $isLegacyPendingInspection
-                        || (bool) ($pendingEffects['has_critical_defects'] ?? false);
-                    if ($hasCriticalDefects && $apparatus->getAttribute('status') !== 'Out of Service') {
+                    if ($markOutOfService && $apparatus->getAttribute('status') !== 'Out of Service') {
+                        // The model's status observer records the ledger event.
                         $apparatus->update(['status' => 'Out of Service']);
+                        $markedOutOfService = true;
                     }
 
                     $hasSnipeItAsset = filled($apparatus->snipeit_asset_id);
                 }
 
-                $this->recordReviewEvent($inspection, $reviewer, 'approved');
+                $this->recordReviewEvent($inspection, $reviewer, 'approved', null, [
+                    'out_of_service_requested' => $markOutOfService,
+                    'marked_out_of_service' => $markedOutOfService,
+                    'critical_defects_reported' => $criticalDefectsReported,
+                ]);
                 $inspection->update([
                     'review_status' => 'approved',
                     'pending_effects' => null,
@@ -156,6 +168,7 @@ final class ApparatusInspectionApprovalService
         User $reviewer,
         string $status,
         ?string $reviewNotes = null,
+        array $decision = [],
     ): void {
         ApparatusInspectionReviewEvent::query()->create([
             'apparatus_inspection_id' => $inspection->getKey(),
@@ -167,6 +180,7 @@ final class ApparatusInspectionApprovalService
             // append-only decision record even when approval clears it from
             // the inspection after downstream records are created.
             'metadata' => [
+                ...$decision,
                 'reviewer_name' => $reviewer->name,
                 'submitted_effects' => $inspection->pending_effects,
                 'reported_engine_hours' => $inspection->engine_hours,

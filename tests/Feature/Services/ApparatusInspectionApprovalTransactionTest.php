@@ -51,8 +51,8 @@ final class ApparatusInspectionApprovalTransactionTest extends TestCase
         $connection->beginTransaction();
 
         try {
-            $service->approve($inspection->id, $reviewer);
-            $service->approve($inspection->id, $reviewer);
+            $service->approve($inspection->id, $reviewer, markOutOfService: true);
+            $service->approve($inspection->id, $reviewer, markOutOfService: true);
 
             Queue::assertNothingPushed();
             $this->assertDisplayCacheWasPreserved();
@@ -75,6 +75,59 @@ final class ApparatusInspectionApprovalTransactionTest extends TestCase
         Queue::assertPushed(PmAlertNotificationJob::class, 1);
         Queue::assertPushed(AuditEquipmentAfterInspection::class, 1);
         $this->assertDisplayCacheWasInvalidated();
+    }
+
+    public function test_approval_with_critical_defects_leaves_the_unit_in_service_unless_the_reviewer_chooses_otherwise(): void
+    {
+        [$inspection, $reviewer] = $this->pendingInspection();
+        Queue::fake();
+
+        app(ApparatusInspectionApprovalService::class)->approve($inspection->id, $reviewer);
+
+        $apparatus = $inspection->apparatus->fresh();
+        $this->assertSame('approved', $inspection->fresh()->review_status);
+        $this->assertSame('In Service', $apparatus->status);
+        $this->assertSame('300.0', $apparatus->current_engine_hours);
+        $this->assertDatabaseCount('apparatus_defects', 1);
+        $this->assertDatabaseCount('apparatus_operational_status_events', 0);
+        $event = ApparatusInspectionReviewEvent::sole();
+        $this->assertFalse($event->metadata['out_of_service_requested']);
+        $this->assertFalse($event->metadata['marked_out_of_service']);
+        $this->assertTrue($event->metadata['critical_defects_reported']);
+    }
+
+    public function test_an_explicit_out_of_service_choice_updates_the_unit_and_the_status_ledger_once(): void
+    {
+        [$inspection, $reviewer] = $this->pendingInspection();
+        Queue::fake();
+
+        $service = app(ApparatusInspectionApprovalService::class);
+        $service->approve($inspection->id, $reviewer, markOutOfService: true);
+        $service->approve($inspection->id, $reviewer, markOutOfService: true);
+
+        $this->assertSame('Out of Service', $inspection->apparatus->fresh()->status);
+        $this->assertDatabaseCount('apparatus_operational_status_events', 1);
+        $this->assertDatabaseHas('apparatus_operational_status_events', [
+            'apparatus_id' => $inspection->apparatus_id,
+            'previous_status' => 'In Service',
+            'status' => 'Out of Service',
+        ]);
+        $event = ApparatusInspectionReviewEvent::sole();
+        $this->assertTrue($event->metadata['out_of_service_requested']);
+        $this->assertTrue($event->metadata['marked_out_of_service']);
+    }
+
+    public function test_legacy_evidence_without_prepared_effects_never_changes_status_on_its_own(): void
+    {
+        [$inspection, $reviewer] = $this->pendingInspection();
+        $inspection->update(['pending_effects' => null]);
+        Queue::fake();
+
+        app(ApparatusInspectionApprovalService::class)->approve($inspection->id, $reviewer);
+
+        $this->assertSame('approved', $inspection->fresh()->review_status);
+        $this->assertSame('In Service', $inspection->apparatus->fresh()->status);
+        $this->assertDatabaseCount('apparatus_operational_status_events', 0);
     }
 
     public function test_an_approve_then_reject_collision_keeps_the_first_terminal_decision_and_one_set_of_effects(): void

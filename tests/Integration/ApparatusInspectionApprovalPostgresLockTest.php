@@ -54,7 +54,7 @@ final class ApparatusInspectionApprovalPostgresLockTest extends TestCase
 
             $connection->statement("SET lock_timeout = '75ms'");
             $startedAt = hrtime(true);
-            $approved = $service->approve($approvalInspection->id, $reviewer);
+            $approved = $service->approve($approvalInspection->id, $reviewer, markOutOfService: true);
             $elapsedSeconds = (hrtime(true) - $startedAt) / 1_000_000_000;
             $connection->statement('SET lock_timeout = DEFAULT');
 

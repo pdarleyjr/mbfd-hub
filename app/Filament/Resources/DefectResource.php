@@ -4,8 +4,10 @@ namespace App\Filament\Resources;
 
 use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\DefectResource\Pages;
+use App\Filament\Support\DefectServiceTicketActions;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
+use App\Support\Fleet\DefectFollowUpState;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -95,6 +97,7 @@ class DefectResource extends Resource
     public static function table(Table $table): Table
     {
         return self::applyEnterpriseDefaults($table)
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('serviceTicket'))
             ->columns([
                 Tables\Columns\TextColumn::make('apparatus.name')
                     ->wrap()
@@ -132,6 +135,17 @@ class DefectResource extends Resource
                         'success' => 'resolved',
                     ]),
 
+                Tables\Columns\TextColumn::make('follow_up')->visibleFrom('md')
+                    ->label('Follow-up')
+                    ->badge()
+                    ->getStateUsing(fn (ApparatusDefect $record): string => DefectFollowUpState::for($record))
+                    ->formatStateUsing(fn (string $state): string => DefectFollowUpState::label($state))
+                    ->color(fn (string $state): string => DefectFollowUpState::color($state)),
+
+                Tables\Columns\TextColumn::make('serviceTicket.ticket_number')->visibleFrom('md')
+                    ->label('Ticket')
+                    ->placeholder('—'),
+
                 Tables\Columns\TextColumn::make('issue_type')->visibleFrom('md')
                     ->label('Issue Type')
                     ->formatStateUsing(fn ($state) => str_replace('_', ' ', ucfirst($state))),
@@ -167,6 +181,14 @@ class DefectResource extends Resource
                         false: fn (Builder $query): Builder => $query->where('resolved', true),
                     ),
 
+                SelectFilter::make('follow_up')
+                    ->label('Follow-up')
+                    ->options(DefectFollowUpState::options())
+                    ->query(fn (Builder $query, array $data): Builder => DefectFollowUpState::applyFilter(
+                        $query,
+                        $data['value'] ?? null,
+                    )),
+
                 SelectFilter::make('issue_type')
                     ->label('Issue Type')
                     ->options([
@@ -183,6 +205,15 @@ class DefectResource extends Resource
             ])
             ->actions([
                 Tables\Actions\ActionGroup::make([
+                    DefectServiceTicketActions::configureView(
+                        Tables\Actions\Action::make(DefectServiceTicketActions::VIEW),
+                        fn (Tables\Actions\Action $action): ?ApparatusDefect => $action->getRecord(),
+                    ),
+                    DefectServiceTicketActions::configureCreate(
+                        Tables\Actions\Action::make(DefectServiceTicketActions::CREATE),
+                        fn (Tables\Actions\Action $action): ?ApparatusDefect => $action->getRecord(),
+                    ),
+
                     Tables\Actions\Action::make('mark_resolved')
                         ->label('Mark Resolved')
                         ->icon('heroicon-o-check-circle')
