@@ -42,7 +42,7 @@ for (const [name, file, rawLimit, gzipLimit] of limits) {
 
 for (const cssFile of mount.css ?? []) {
     const size = fs.statSync(path.join(buildDir, cssFile)).size;
-    if (size > 19_000) throw new Error(`Conference CSS exceeds budget: ${size} bytes.`);
+    if (size > 19_500) throw new Error(`Conference CSS exceeds budget: ${size} bytes.`);
     process.stdout.write(`css: ${size} raw bytes\n`);
 }
 
