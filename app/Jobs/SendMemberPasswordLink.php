@@ -56,7 +56,7 @@ final class SendMemberPasswordLink implements ShouldBeUnique, ShouldQueue
             }
             $recipient = $emails->recoveryAddress($user);
             // The broker's own throttle stops back-to-back links for one account.
-            if ($recipient === null || $this->broker()->recentlyCreatedToken($user)) {
+            if ($recipient === null || $this->broker()->getRepository()->recentlyCreatedToken($user)) {
                 return null;
             }
 

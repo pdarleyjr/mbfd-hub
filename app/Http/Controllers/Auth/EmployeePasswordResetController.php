@@ -65,12 +65,12 @@ final class EmployeePasswordResetController extends Controller
             return back()->with('status', self::GENERIC_STATUS);
         }
 
+        // MBFD Identity (authentik) authority keeps its upstream recovery flow unchanged.
         /** @var Employee|null $employee */
         $employee = Employee::query()->where('employee_id', $employeeId)->first();
         $user = $employee?->user;
         if (! $user instanceof User
-            && $employee instanceof Employee
-            && config('identity.credential_authority') === 'authentik') {
+            && $employee instanceof Employee) {
             try {
                 $user = $provisioner->create(
                     (int) $employee->getKey(),
@@ -83,8 +83,7 @@ final class EmployeePasswordResetController extends Controller
         }
         if ($user instanceof User) {
             try {
-                if (config('identity.credential_authority') === 'authentik'
-                    && $identities->enabledFor($user)) {
+                if ($identities->enabledFor($user)) {
                     $recipient = $emails->recoveryAddress($user);
                     if ($recipient === null || ! $user->isUpstreamIdentityEnabled()) {
                         return back()->with('status', self::GENERIC_STATUS);

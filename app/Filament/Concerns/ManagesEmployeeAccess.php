@@ -185,6 +185,7 @@ trait ManagesEmployeeAccess
                     ->body($sent ? 'It goes only to the address on file.' : app(MemberAccessEmail::class)->diagnose($record)['message'])
                     ->send();
             });
+
         return [
             Action::make('manageWorkgroups')->label('Workgroups')->color('gray')
                 ->visible(fn (): bool => $this->accountOrNull() !== null && ! $this->targetAccount()->is($this->actor()) && $this->actor()->can('admin.workgroups.manage'))
