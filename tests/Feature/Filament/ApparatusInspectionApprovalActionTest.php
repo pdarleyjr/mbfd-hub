@@ -52,6 +52,24 @@ final class ApparatusInspectionApprovalActionTest extends TestCase
         $this->assertSame('Approved', (new ApparatusInspection(['review_status' => 'approved']))->displayStatus());
     }
 
+    public function test_admin_sees_download_pdf_action_linking_to_the_inspection_pdf(): void
+    {
+        $inspection = $this->pendingInspection();
+        $this->actingAs($this->userWithRole('logistics_admin'));
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->withoutVite();
+
+        Livewire::test(ViewInspection::class, [
+            'record' => $inspection->apparatus,
+            'inspection' => $inspection,
+        ])
+            ->assertSuccessful()
+            ->assertActionVisible('downloadPdf')
+            ->assertActionHasUrl('downloadPdf', route('employee.vehicle-inspections.pdf', $inspection))
+            ->assertActionShouldOpenUrlInNewTab('downloadPdf')
+            ->assertActionVisible('print');
+    }
+
     public function test_authorized_reviewer_can_see_pending_evidence_and_approve_from_the_apparatus_inspection_view(): void
     {
         $inspection = $this->pendingInspection();

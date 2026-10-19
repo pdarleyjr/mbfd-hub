@@ -848,15 +848,15 @@ test('a string Station 1 API value renders its conference link', async ({ page }
   await expect(page.getByRole('link', { name: 'Morning Lineup — 300 Command', exact: true })).toHaveCount(0);
 });
 
-test('a string Station 2 API value renders both authorized conference links', async ({ page }) => {
+test('a string Station 2 API value renders its own conference link and no 300 Command shortcut', async ({ page }) => {
   await mockInspectionApi(page, { stationNumber: '2' });
 
   await page.goto('/daily/stations/1');
 
   await expect(page.getByRole('link', { name: 'Morning Lineup Video Conference — Station 2', exact: true }))
     .toHaveAttribute('href', '/video-conferencing/stations/2');
-  await expect(page.getByRole('link', { name: 'Morning Lineup — 300 Command', exact: true }))
-    .toHaveAttribute('href', '/employee/video-conferencing/command?return_to=%2Fdaily%2Fstations%2F1');
+  // 300 Command has its own profile (/daily/command-300); Station 2 no longer links to it.
+  await expect(page.getByRole('link', { name: 'Morning Lineup — 300 Command', exact: true })).toHaveCount(0);
 });
 
 test('a string Station 3 API value renders its conference link', async ({ page }) => {

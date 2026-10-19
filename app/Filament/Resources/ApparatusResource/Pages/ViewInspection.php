@@ -120,6 +120,13 @@ class ViewInspection extends Page
                 ->extraAttributes([
                     'onclick' => 'window.print(); return false;',
                 ]),
+            Action::make('downloadPdf')
+                ->label('Download PDF')
+                ->icon('heroicon-o-arrow-down-tray')
+                ->color('gray')
+                ->url(fn (): string => route('employee.vehicle-inspections.pdf', $this->inspection))
+                ->openUrlInNewTab()
+                ->visible(fn (): bool => (bool) auth()->user()?->can('view', $this->inspection)),
             Action::make('back')
                 ->label('Back to Apparatus')
                 ->icon('heroicon-o-arrow-left')
