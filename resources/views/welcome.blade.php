@@ -21,7 +21,20 @@
         $greeting = $now->hour < 12 ? 'Good morning' : ($now->hour < 18 ? 'Good afternoon' : 'Good evening');
         $displayName = (string) ($currentUser?->display_name ?: $currentUser?->name);
         $firstName = trim((string) strtok($displayName, ' '));
+        // Fleet staff land on Home; their tools should be one obvious tap away.
+        $showFleetOperations = $currentUser instanceof \App\Models\User
+            && $currentUser->canAccessPanel(\Filament\Facades\Filament::getPanel('admin'))
+            && $currentUser->can('viewAny', \App\Models\Apparatus::class);
         $quickAccessItems = [
+            [
+                'title' => 'Fleet operations',
+                'description' => 'Apparatus, defects, service tickets, shop work, and preventative maintenance',
+                'href' => url('/admin/apparatuses'),
+                'icon' => 'M8 17a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm12 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM3 5h11v10H3zM14 9h4l3 3v3h-7',
+                'external' => false,
+                'visible' => $showFleetOperations,
+                'domain' => 'operations',
+            ],
             [
                 'title' => 'Station / Vehicles / Equipment',
                 'description' => 'Apparatus checkout, vehicle inspections, station inventory, and station requests',

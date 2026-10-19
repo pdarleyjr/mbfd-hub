@@ -135,6 +135,17 @@ final class FleetOperationsManagerRoleTest extends TestCase
             ->assertFailed();
     }
 
+    public function test_home_puts_the_fleet_tools_one_tap_away_only_for_fleet_staff(): void
+    {
+        $this->withoutVite();
+        $this->actingAsCanonicalFixture('FLEET-ORDINARY');
+        $this->get('/')->assertOk()->assertDontSee('Fleet operations');
+
+        $manager = $this->actingAsCanonicalFixture('FLEET-HOME');
+        app(FleetOperationsManagerAssignment::class)->apply($this->superAdmin(), $manager, true, 'fleet duties');
+        $this->get('/')->assertOk()->assertSee('Fleet operations')->assertSee(url('/admin/apparatuses'), false);
+    }
+
     private function member(string $employeeId = 'FLEET-MEMBER'): User
     {
         return User::factory()->create(['employee_id' => $employeeId, 'account_status' => AccountStatus::Active]);
