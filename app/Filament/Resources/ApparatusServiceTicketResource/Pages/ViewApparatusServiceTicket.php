@@ -73,6 +73,7 @@ class ViewApparatusServiceTicket extends ViewRecord
                 default => 'heroicon-o-arrow-path-rounded-square',
             })
             ->color($status->color())
+            ->authorize(fn (): bool => auth()->user()?->can('update', $this->ticket()) ?? false)
             ->visible(fn (): bool => ApparatusServiceTicketStatus::from($this->ticket()->status)->canTransitionTo($status))
             ->modalHeading("{$status->label()} {$this->ticket()->ticket_number}")
             ->form([
@@ -148,6 +149,7 @@ class ViewApparatusServiceTicket extends ViewRecord
             ->label('Change Unit Status')
             ->icon('heroicon-o-truck')
             ->color('gray')
+            ->authorize(fn (): bool => auth()->user()?->can('manageService', $this->apparatus()) ?? false)
             ->form([
                 Forms\Components\Select::make('status')
                     ->label('Official Apparatus Status')

@@ -16,6 +16,7 @@ use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -42,6 +43,7 @@ class ApparatusServiceTicketWorkflowService
     /** @param array<string, mixed> $data */
     public function createFleetTicket(Apparatus $apparatus, User $actor, array $data): ApparatusServiceTicketSubmissionResult
     {
+        Gate::forUser($actor)->authorize('manageService', $apparatus);
         $validated = Validator::make($data, array_merge($this->creationRules(), [
             'status' => ['nullable', Rule::in([
                 ApparatusServiceTicketStatus::Submitted->value,
@@ -85,6 +87,7 @@ class ApparatusServiceTicketWorkflowService
         ApparatusServiceTicketStatus $target,
         array $data,
     ): ApparatusServiceTicket {
+        Gate::forUser($actor)->authorize('update', $ticket);
         $validated = Validator::make($data, [
             'public_note' => ['nullable', 'string', 'max:5000'],
             'internal_note' => ['nullable', 'string', 'max:10000'],
@@ -204,6 +207,7 @@ class ApparatusServiceTicketWorkflowService
     /** @param array<string, mixed> $data */
     public function logPmService(Apparatus $apparatus, User $actor, array $data): ApparatusServiceTicketSubmissionResult
     {
+        Gate::forUser($actor)->authorize('manageService', $apparatus);
         $validated = Validator::make($data, [
             'client_submission_id' => ['required', 'uuid'],
             'service_date' => ['required', 'date'],
@@ -297,6 +301,7 @@ class ApparatusServiceTicketWorkflowService
         ?string $publicNote = null,
         ?string $internalNote = null,
     ): Apparatus {
+        Gate::forUser($actor)->authorize('manageService', $apparatus);
         $validated = Validator::make([
             'status' => $status,
             'public_note' => $publicNote,

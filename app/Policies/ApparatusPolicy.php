@@ -2,8 +2,8 @@
 
 namespace App\Policies;
 
-use App\Models\User;
 use App\Models\Apparatus;
+use App\Models\User;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
 class ApparatusPolicy
@@ -40,6 +40,17 @@ class ApparatusPolicy
     public function update(User $user, Apparatus $apparatus): bool
     {
         return $user->can('update_apparatus');
+    }
+
+    /**
+     * Fleet service work on the unit: operational status, scheduled service
+     * and PM logs. Admin-panel members reach this through the capability gate
+     * (admin.fleet.manage, the same grant as editing); the legacy
+     * ticket-managing roles keep the access they already have.
+     */
+    public function manageService(User $user, Apparatus $apparatus): bool
+    {
+        return $user->can('update_apparatus') || $user->hasAnyRole(['admin', 'logistics_admin']);
     }
 
     /**
