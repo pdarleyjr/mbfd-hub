@@ -35,11 +35,34 @@ final class PageNav
         }
 
         return [
-            'back' => $panelId === 'employee' ? self::employeeBack() : self::panelBack($scopes, $panel->getUrl()),
+            'back' => self::declaredParent($scopes)
+                ?? ($panelId === 'employee' ? self::employeeBack() : self::panelBack($scopes, $panel->getUrl())),
             'adminHome' => $panelId === 'admin' ? '/admin' : null,
             'hubHome' => '/',
             'panel' => $panelId,
         ];
+    }
+
+    /**
+     * Back for a page that declares its own parent (see HasNavigationParent).
+     * HubNavigation::backUrl() still lets a validated return_to, such as the
+     * parent list with its filters and page, win over the declared parent.
+     *
+     * @param  array<int, mixed>  $scopes
+     * @return array{url: string, label: string}|null
+     */
+    private static function declaredParent(array $scopes): ?array
+    {
+        $page = $scopes[0] ?? null;
+        if (! is_string($page) || ! is_a($page, HasNavigationParent::class, true)) {
+            return null;
+        }
+
+        $parent = $page::navigationParentPath();
+        $url = HubNavigation::backUrl($parent);
+        $atParent = parse_url($url, PHP_URL_PATH) === parse_url($parent, PHP_URL_PATH);
+
+        return ['url' => $url, 'label' => $atParent ? $page::navigationParentLabel() : 'Back to previous page'];
     }
 
     /** @return array{url: string, label: string} */

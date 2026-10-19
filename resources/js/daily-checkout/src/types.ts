@@ -273,14 +273,35 @@ export interface Station {
   image_url?: string | null;
 }
 
-// Station image mapping (station_number → image path), the fallback when no photo is recorded.
+// Bundled station artwork (station_number → image path), the fallback when no photo is recorded.
+// WebP derivatives (max 1200px wide, about 30-170 KB) of the original PNGs, which stay in the repo.
 export const STATION_IMAGES: Record<number, string> = {
-  1: '/images/stations/station-1.png',
-  2: '/images/stations/station-2.png',
-  3: '/images/stations/station-3.png',
-  4: '/images/stations/station-4.png',
-  6: '/images/stations/station-6.png',
+  1: '/images/stations/station-1.webp',
+  2: '/images/stations/station-2.webp',
+  3: '/images/stations/station-3.webp',
+  4: '/images/stations/station-4.webp',
+  6: '/images/stations/station-6.webp',
 };
+
+export interface ImageSize {
+  width: number;
+  height: number;
+}
+
+/** Intrinsic size of each bundled image, so cards reserve their box before the image loads. */
+export const BUNDLED_IMAGE_SIZES: Record<string, ImageSize> = {
+  '/images/stations/station-1.webp': { width: 1200, height: 1200 },
+  '/images/stations/station-2.webp': { width: 1200, height: 470 },
+  '/images/stations/station-3.webp': { width: 1200, height: 742 },
+  '/images/stations/station-4.webp': { width: 1200, height: 680 },
+  '/images/stations/station-6.webp': { width: 1200, height: 506 },
+  '/images/stations/command-300-wide.webp': { width: 1200, height: 800 },
+};
+
+/** Size of a bundled image; null for an uploaded photo whose dimensions are unknown. */
+export function bundledImageSize(url: string | null): ImageSize | null {
+  return url ? BUNDLED_IMAGE_SIZES[url] ?? null : null;
+}
 
 /** Prefers the recorded station photo (same-origin path or https URL) and falls back to the bundled image. */
 export function stationImageUrl(station: Pick<Station, 'station_number' | 'image_url'>): string | null {
@@ -292,9 +313,9 @@ export function stationImageUrl(station: Pick<Station, 'station_number' | 'image
   return STATION_IMAGES[station.station_number] ?? null;
 }
 
-/** 300 Command is a unit profile, not a station row: it never has a station id or number. */
-export const COMMAND_300_IMAGE = '/images/stations/command-300.webp';
-
+/** 300 Command is a unit profile, not a station row: it never has a station id or number.
+ *  3:2 framing of the command SUV with margin on every side, so the cover crop used from xl up never clips the vehicle. */
+export const COMMAND_300_IMAGE = '/images/stations/command-300-wide.webp';
 export interface CommandOverviewApparatus {
   id: number;
   name: string | null;

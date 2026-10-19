@@ -75,6 +75,12 @@ import type {
 
 interface ConferenceAppProps {
     bootstrap: ConferenceBootstrap;
+    /**
+     * True when the app is hosted inside a Filament page that already renders the
+     * shared Back / Hub Home group. The app then omits its own navigation so the
+     * page shows exactly one set. Standalone pages keep the built-in navigation.
+     */
+    embedded?: boolean;
 }
 
 const emptyDevices: MediaDevices = { cameras: [], microphones: [], speakers: [] };
@@ -105,7 +111,7 @@ function stationLabel(role: StationRole): string {
     return stationOptions.find((station) => station.value === role)?.label ?? role;
 }
 
-export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
+export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProps) {
     const forceRelay = useMemo(
         () => new URLSearchParams(window.location.search).get('force_relay') === '1',
         [],
@@ -1100,10 +1106,10 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
     return (
         <div className="vc-shell" data-phase={phase} data-entry-mode={bootstrap.entry_mode} data-ice-policy={forceRelay ? 'relay' : 'all'}>
             <header className="vc-header">
-                <nav className="vc-navigation" aria-label="Conference navigation">
+                {!embedded && <nav className="vc-navigation" aria-label="Conference navigation">
                     <button type="button" data-nav="back" aria-label="Back to previous page" onClick={() => void returnFromConference(bootstrap.navigation.back, false)}><ArrowLeft size={18} aria-hidden="true" /><span>Back</span></button>
                     <button type="button" data-nav="home" aria-label="Go to Hub Home" onClick={() => void returnFromConference(bootstrap.navigation.home, false)}><House size={18} aria-hidden="true" /><span>Hub Home</span></button>
-                </nav>
+                </nav>}
                 <div>
                     <span className="vc-eyebrow"><ShieldCheck size={15} /> MBFD secure conference</span>
                     <h1>{bootstrap.entry_mode === 'command' ? 'Morning Lineup — 300' : bootstrap.display_name}</h1>
@@ -1158,13 +1164,13 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                     </section>
 
                     <section className="vc-card vc-entry-card" aria-labelledby="entry-title">
-                        <div className="vc-section-heading"><div><span>{bootstrap.entry_mode === 'station' ? 'Morning Lineup' : bootstrap.entry_mode === 'command' ? 'Admin' : 'Employee Portal'}</span><h2 id="entry-title">{bootstrap.display_name}</h2></div></div>
+                        <div className="vc-section-heading"><div><span>{bootstrap.entry_mode === 'station' ? 'Morning Lineup' : bootstrap.entry_mode === 'command' ? '300 Command' : 'Employee Portal'}</span><h2 id="entry-title">{bootstrap.display_name}</h2></div></div>
 
                         {bootstrap.entry_mode === 'station' && <div className="vc-standby" data-ready={phase === 'standing_by'}>
                             <Radio size={34} />
                             <strong>{phase === 'standing_by' ? 'READY — STANDING BY' : 'Preparing station…'}</strong>
                             <span>{lineup.active ? '300 has started. Joining automatically…' : 'Waiting for 300 to start Morning Lineup.'}</span>
-                            <small>No LiveKit connection or participant minutes are used while standing by.</small>
+                            <small>Not connected to the conference yet. Standing by uses no call minutes.</small>
                         </div>}
 
                         {bootstrap.entry_mode === 'command' && !commandAuthorized && <form className="vc-command-login" onSubmit={(event) => { event.preventDefault(); void authorizeCommand(); }}>

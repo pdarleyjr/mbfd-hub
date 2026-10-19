@@ -1,6 +1,7 @@
 import { Link } from 'react-router';
 import { ChevronRight } from 'lucide-react';
-import { COMMAND_300_IMAGE } from '../types';
+import { COMMAND_300_IMAGE, bundledImageSize } from '../types';
+import StationCardMedia from './StationCardMedia';
 
 /**
  * Peer of StationCard on the stations list. 300 Command is a unit profile with
@@ -14,19 +15,11 @@ export default function Command300Card() {
       aria-label="Open 300 Command"
       className="daily-selector-card hub-panel group block overflow-hidden text-hub-ink transition-colors hover:border-hub-blue/40 touch-manipulation font-hub"
     >
-      <div className="relative overflow-hidden border-b border-hub-glass-border bg-hub-n-100 xl:h-48 2xl:h-56">
-        <img
-          src={COMMAND_300_IMAGE}
-          alt="Miami Beach Fire Rescue Command SUV"
-          width="1200"
-          height="1200"
-          className="h-auto w-full object-contain xl:h-full"
-          loading="lazy"
-        />
+      <StationCardMedia src={COMMAND_300_IMAGE} alt="Miami Beach Fire Rescue Command SUV" size={bundledImageSize(COMMAND_300_IMAGE)}>
         <span className="absolute left-3 top-3 rounded-hub-tag bg-hub-header px-2.5 py-1 text-[13px] font-bold leading-5 text-white">
           Command
         </span>
-      </div>
+      </StationCardMedia>
 
       <div className="p-4 sm:p-5 2xl:p-6">
         <h3 className="mb-3 text-lg font-bold text-hub-ink font-heading 2xl:text-xl">300 Command</h3>

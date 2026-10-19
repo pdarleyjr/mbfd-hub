@@ -140,8 +140,9 @@ export default function Command300Page() {
             src={COMMAND_300_IMAGE}
             alt="Miami Beach Fire Rescue Command SUV"
             width="1200"
-            height="1200"
-            className="h-auto w-full max-w-[14rem] flex-none self-center rounded-hub-control bg-hub-n-100 object-contain sm:self-start"
+            height="800"
+            decoding="async"
+            className="aspect-[3/2] h-auto w-full max-w-[20rem] flex-none self-center rounded-hub-control bg-hub-n-100 object-cover sm:self-start"
           />
           <div className="min-w-0 flex-1">
             <p className="text-[13px] font-semibold text-hub-n-600">Command unit</p>

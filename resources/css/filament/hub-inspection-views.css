@@ -1,0 +1,171 @@
+/*
+ * Inspection views shared by the Employee portal (My Vehicle Inspections) and the
+ * Admin apparatus profile: summary facts, stat row, status badges, photo thumbnails,
+ * checklist tables and the list-row card.
+ *
+ * These use semantic classes on purpose. The Filament theme imports the PREBUILT
+ * vendor/filament/filament/dist/theme.css and Tailwind does not scan app views, so
+ * Tailwind utilities in app Blade views (grid-cols-*, md:*, bg-emerald-50 ...) are
+ * not generated unless Filament itself happens to use them. Keep layout and colour
+ * for these views here, on --hub-* tokens, with container queries so the grid follows
+ * the width of the content area (sidebar open or closed) rather than the viewport.
+ * Plain element selectors only; never add pseudo-elements to table cells (ERROR-081).
+ */
+
+.hub-insp { container-type: inline-size; min-width: 0; color: rgb(var(--hub-ink)); }
+.hub-insp :is(h2, h3, p, li, dd, dt) { overflow-wrap: anywhere; }
+.hub-insp-stack { display: grid; gap: 1.5rem; min-width: 0; }
+
+/* Cards that stand in for fi-section where a view is not built from Filament sections. */
+.hub-insp-card { min-width: 0; padding: 1.5rem; border: 1px solid rgb(var(--hub-glass-border)); border-radius: var(--hub-radius-card); background: rgb(var(--hub-surface)); box-shadow: var(--hub-shadow-card); }
+.hub-insp-card--warning { border-color: rgb(var(--hub-warning-border)); background: rgb(var(--hub-warning-bg)); }
+.hub-insp-card--danger { border-color: rgb(var(--hub-danger-border)); background: rgb(var(--hub-danger-bg)); }
+.hub-insp-card__title { margin: 0 0 1rem; color: rgb(var(--hub-header)); font-size: 1rem; font-weight: 650; line-height: 1.5; }
+.hub-insp-card--warning .hub-insp-card__title { color: rgb(var(--hub-warning-strong)); }
+.hub-insp-card--danger .hub-insp-card__title { color: rgb(var(--hub-danger)); }
+
+/* Heading row: title and subtitle on the left, review badge on the right. */
+.hub-insp-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: .75rem; }
+.hub-insp-head__main { min-width: 0; }
+.hub-insp-title { margin: 0; color: rgb(var(--hub-header)); font-size: 1.125rem; font-weight: 650; line-height: 1.5; }
+.hub-insp-title small { color: rgb(var(--hub-muted)); font-size: .875rem; font-weight: 500; }
+.hub-insp-sub { margin: .125rem 0 0; color: rgb(var(--hub-ink-secondary)); font-size: .875rem; line-height: 1.5; }
+
+/* Summary facts: 4 columns when the content area is wide, 2 on tablets and phones, 1 on very narrow ones. */
+.hub-insp-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem 1.25rem; margin: 1rem 0 0; font-size: .875rem; }
+.hub-insp-facts > div { min-width: 0; }
+.hub-insp-facts dt { color: rgb(var(--hub-ink-secondary)); font-size: .8125rem; }
+.hub-insp-facts dd { margin: .125rem 0 0; color: rgb(var(--hub-ink)); font-weight: 600; }
+.hub-insp-facts dd small { display: block; color: rgb(var(--hub-ink-secondary)); font-size: .75rem; font-weight: 400; }
+.hub-insp-facts--plain { margin-top: 0; }
+@container (min-width: 44rem) {
+    .hub-insp-facts { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@container (max-width: 19rem) {
+    .hub-insp-facts { grid-template-columns: minmax(0, 1fr); }
+}
+.hub-insp-fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; font-size: .875rem; }
+.hub-insp-fields dt { color: rgb(var(--hub-ink-secondary)); font-size: .8125rem; }
+.hub-insp-fields dd { margin: .125rem 0 0; color: rgb(var(--hub-ink)); font-weight: 600; white-space: pre-wrap; }
+@container (min-width: 36rem) {
+    .hub-insp-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Pass / Missing / Damaged: one compact horizontal row of coloured counts. */
+.hub-insp-stats { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1rem 0 0; padding: 0; list-style: none; }
+.hub-insp-stat { display: inline-flex; align-items: baseline; gap: .5rem; padding: .375rem .875rem; border: 1px solid rgb(var(--hub-neutral-border)); border-radius: var(--hub-radius-control); background: rgb(var(--hub-neutral-bg)); color: rgb(var(--hub-ink-secondary)); font-size: .875rem; font-weight: 600; }
+.hub-insp-stat__value { font-size: 1.125rem; font-weight: 700; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.hub-insp-stat--pass { border-color: rgb(var(--hub-success-border)); background: rgb(var(--hub-success-bg)); color: rgb(var(--hub-success)); }
+.hub-insp-stat--missing { border-color: rgb(var(--hub-warning-border)); background: rgb(var(--hub-warning-bg)); color: rgb(var(--hub-warning-strong)); }
+.hub-insp-stat--damaged { border-color: rgb(var(--hub-danger-border)); background: rgb(var(--hub-danger-bg)); color: rgb(var(--hub-danger)); }
+
+/* Count cards (admin report summary): 2 columns, 4 when wide. */
+.hub-insp-statcards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin: 0; padding: 0; list-style: none; }
+@container (min-width: 36rem) {
+    .hub-insp-statcards { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+.hub-insp-statcard { padding: 1rem; border: 1px solid rgb(var(--hub-neutral-border)); border-radius: var(--hub-radius-control); background: rgb(var(--hub-surface-muted)); text-align: center; }
+.hub-insp-statcard__value { margin: 0; color: rgb(var(--hub-ink)); font-size: 1.5rem; font-weight: 700; line-height: 1.4; font-variant-numeric: tabular-nums; }
+.hub-insp-statcard__label { margin: 0; color: rgb(var(--hub-ink-secondary)); font-size: .75rem; }
+.hub-insp-statcard--pass { border-color: rgb(var(--hub-success-border)); background: rgb(var(--hub-success-bg)); }
+.hub-insp-statcard--pass .hub-insp-statcard__value { color: rgb(var(--hub-success)); }
+.hub-insp-statcard--missing { border-color: rgb(var(--hub-warning-border)); background: rgb(var(--hub-warning-bg)); }
+.hub-insp-statcard--missing .hub-insp-statcard__value { color: rgb(var(--hub-warning-strong)); }
+.hub-insp-statcard--damaged { border-color: rgb(var(--hub-danger-border)); background: rgb(var(--hub-danger-bg)); }
+.hub-insp-statcard--damaged .hub-insp-statcard__value { color: rgb(var(--hub-danger)); }
+
+/* Apparatus overview metrics: 1 column on narrow content, 3 when wide. */
+.hub-insp-metrics { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+@container (min-width: 40rem) {
+    .hub-insp-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+.hub-insp-metric { min-width: 0; padding: 1rem; border: 1px solid rgb(var(--hub-neutral-border)); border-radius: var(--hub-radius-control); background: rgb(var(--hub-surface-muted)); }
+.hub-insp-metric--danger { border-color: rgb(var(--hub-danger-border)); background: rgb(var(--hub-danger-bg)); }
+.hub-insp-metric--warning { border-color: rgb(var(--hub-warning-border)); background: rgb(var(--hub-warning-bg)); }
+.hub-insp-metric__value { margin: 0; color: rgb(var(--hub-ink)); font-size: 1.5rem; font-weight: 700; line-height: 1.4; font-variant-numeric: tabular-nums; }
+.hub-insp-metric__value--text { font-size: 1rem; font-weight: 650; }
+.hub-insp-metric__value a { color: rgb(var(--hub-action-primary)); text-decoration: underline; text-underline-offset: 3px; }
+.hub-insp-metric__label { margin: .125rem 0 0; color: rgb(var(--hub-ink-secondary)); font-size: .75rem; }
+.hub-insp-overview-head { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
+.hub-insp-overview-head h2 { margin: 0; color: rgb(var(--hub-header)); font-size: 1.125rem; font-weight: 650; }
+
+/* Status badges: text always names the status; colour only reinforces it. */
+.hub-insp-badge { display: inline-flex; align-items: center; gap: .25rem; padding: .125rem .625rem; border: 1px solid rgb(var(--hub-neutral-border)); border-radius: var(--hub-radius-pill); background: rgb(var(--hub-neutral-bg)); color: rgb(var(--hub-ink-secondary)); font-size: .75rem; font-weight: 600; line-height: 1.25rem; white-space: nowrap; }
+.hub-insp-badge--lg { padding: .25rem .75rem; font-size: .875rem; }
+.hub-insp-badge--success { border-color: rgb(var(--hub-success-border)); background: rgb(var(--hub-success-bg)); color: rgb(var(--hub-success)); }
+.hub-insp-badge--warning { border-color: rgb(var(--hub-warning-border)); background: rgb(var(--hub-warning-bg)); color: rgb(var(--hub-warning-strong)); }
+.hub-insp-badge--danger { border-color: rgb(var(--hub-danger-border)); background: rgb(var(--hub-danger-bg)); color: rgb(var(--hub-danger)); }
+
+/* Findings list with follow-up status and photo thumbnails. */
+.hub-insp-note { margin: 0 0 .75rem; color: rgb(var(--hub-ink-secondary)); font-size: .875rem; line-height: 1.6; }
+.hub-insp-findings { margin: 0; padding: 0; list-style: none; }
+.hub-insp-finding { padding: .875rem 0; border-top: 1px solid rgb(var(--hub-border-soft)); }
+.hub-insp-finding:first-child { border-top: 0; padding-top: 0; }
+.hub-insp-finding__head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: .5rem; }
+.hub-insp-finding__name { margin: 0; color: rgb(var(--hub-ink)); font-size: .9375rem; font-weight: 650; }
+.hub-insp-finding__where { margin: 0; color: rgb(var(--hub-ink-secondary)); font-size: .8125rem; }
+.hub-insp-finding__notes { margin: .375rem 0 0; color: rgb(var(--hub-ink)); font-size: .875rem; white-space: pre-wrap; }
+.hub-insp-finding__follow { margin: .5rem 0 0; color: rgb(var(--hub-ink)); font-size: .875rem; }
+.hub-insp-finding__follow strong { font-weight: 650; }
+.hub-insp-finding__done { color: rgb(var(--hub-success)); font-weight: 650; }
+.hub-insp-photos { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .625rem; }
+.hub-insp-photo { display: block; width: 8rem; height: 6.5rem; overflow: hidden; border: 1px solid rgb(var(--hub-border)); border-radius: var(--hub-radius-control); background: rgb(var(--hub-surface-muted)); }
+.hub-insp-photo:hover { border-color: rgb(var(--hub-action-primary)); }
+.hub-insp-photo:focus-visible { outline: 2px solid rgb(var(--hub-focus)); outline-offset: 2px; }
+.hub-insp-photo img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.hub-insp-signature { display: inline-block; max-width: 100%; border: 1px solid rgb(var(--hub-border)); border-radius: var(--hub-radius-control); background: rgb(var(--hub-n-0)); }
+.hub-insp-signature img { display: block; width: auto; max-width: 100%; height: 6rem; object-fit: contain; }
+
+/* Checklist tables. A long table scrolls inside its own wrapper, never the page. */
+.hub-insp-table-wrap { max-width: 100%; overflow-x: auto; }
+.hub-insp-table { width: 100%; border-collapse: collapse; font-size: .875rem; text-align: left; }
+.hub-insp-table th { padding: .5rem .75rem; border-bottom: 1px solid rgb(var(--hub-border)); color: rgb(var(--hub-ink-secondary)); font-size: .8125rem; font-weight: 650; }
+.hub-insp-table td { padding: .5rem .75rem; border-bottom: 1px solid rgb(var(--hub-border-soft)); color: rgb(var(--hub-ink)); vertical-align: top; }
+.hub-insp-table tr:last-child td { border-bottom: 0; }
+.hub-insp-table tr.is-finding td { background: rgb(var(--hub-warning-bg) / .6); }
+.hub-insp-table th.is-center, .hub-insp-table td.is-center { text-align: center; }
+.hub-insp-table td.is-muted { color: rgb(var(--hub-ink-secondary)); }
+.hub-insp-table .is-value { display: block; margin-top: .125rem; color: rgb(var(--hub-ink-secondary)); font-size: .75rem; font-weight: 600; white-space: pre-wrap; }
+.hub-insp-table-link { display: inline-block; margin-top: .125rem; color: rgb(var(--hub-action-primary)); font-size: .75rem; text-decoration: underline; text-underline-offset: 3px; }
+
+/* Admin report: print-only letterhead, review history and defect cards. */
+.hub-insp-print-only { display: none; }
+.hub-insp-letterhead { text-align: center; }
+.hub-insp-letterhead img { display: block; width: 5rem; height: 5rem; margin: 0 auto .5rem; object-fit: contain; }
+.hub-insp-letterhead h1 { margin: 0; color: rgb(var(--hub-ink)); font-size: 1.5rem; font-weight: 700; }
+.hub-insp-letterhead p { margin: .25rem 0 0; color: rgb(var(--hub-ink-secondary)); font-size: .875rem; }
+.hub-insp-summary { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; }
+.hub-insp-summary img { width: 4rem; height: 4rem; flex: none; object-fit: contain; }
+.hub-insp-summary h2 { margin: 0; color: rgb(var(--hub-header)); font-size: 1.25rem; font-weight: 700; line-height: 1.4; }
+.hub-insp-summary p { margin: .125rem 0 0; color: rgb(var(--hub-ink-secondary)); font-size: .875rem; }
+.hub-insp-summary p.hub-insp-summary__status { color: rgb(var(--hub-ink)); font-weight: 600; }
+.hub-insp-items { display: grid; gap: .75rem; }
+.hub-insp-item { padding: 1rem; border: 1px solid rgb(var(--hub-border)); border-radius: var(--hub-radius-control); background: rgb(var(--hub-surface)); }
+.hub-insp-card--warning .hub-insp-item { border-color: rgb(var(--hub-warning-border)); }
+.hub-insp-card--danger .hub-insp-item { border-color: rgb(var(--hub-danger-border)); }
+.hub-insp-item__head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: .75rem; }
+.hub-insp-item__title { margin: 0; color: rgb(var(--hub-ink)); font-weight: 650; }
+.hub-insp-item__sub { margin: 0; color: rgb(var(--hub-ink-secondary)); font-size: .875rem; }
+.hub-insp-item__text { margin: .5rem 0 0; color: rgb(var(--hub-ink-secondary)); font-size: .875rem; }
+.hub-insp-twocol { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; margin-bottom: 1rem; font-size: .875rem; }
+@container (min-width: 36rem) {
+    .hub-insp-twocol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.hub-insp-twocol span { color: rgb(var(--hub-warning-strong)); }
+.hub-insp-twocol p { margin: .125rem 0 0; color: rgb(var(--hub-ink)); font-weight: 600; }
+.hub-insp-card__lead { margin: 0 0 1rem; color: rgb(var(--hub-warning-strong)); font-size: .875rem; }
+
+@media print {
+    .hub-insp-print-only { display: block; }
+    .hub-insp-card { box-shadow: none; }
+}
+
+/* Inspection list: phone card shown in place of the desktop columns below md. */
+.hub-insp-row { display: grid; gap: .25rem; min-width: 0; padding-block: .125rem; }
+.hub-insp-row__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .375rem .5rem; }
+.hub-insp-row__title { color: rgb(var(--hub-ink)); font-size: .9375rem; font-weight: 650; }
+.hub-insp-row__meta { margin: 0; color: rgb(var(--hub-ink-secondary)); font-size: .8125rem; white-space: normal; }
+.hub-insp-row__findings { display: flex; flex-wrap: wrap; align-items: center; gap: .375rem .5rem; margin: .125rem 0 0; color: rgb(var(--hub-ink-secondary)); font-size: .8125rem; white-space: normal; }
+
+/* Follow-up stage tabs wrap instead of clipping the last tab. */
+[data-defect-follow-up-tabs] .fi-tabs { flex-wrap: wrap; overflow-x: visible; }

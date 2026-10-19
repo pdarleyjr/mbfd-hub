@@ -90,7 +90,10 @@ test('employee can enter the controlled forms workspace and start an ICS 214', a
   await expect(page.locator('.fi-sidebar')).toBeHidden();
   await expect(page.locator('.fi-topbar')).toBeHidden();
   await expect(page.locator('.fi-sidebar-close-overlay')).toBeHidden();
-  await expect(page.getByRole('link', { name: 'MBFD Hub home', exact: true })).toHaveAttribute('href', '/');
+  // One shared nav set from the Filament page; the embedded app adds no second Back / Hub Home.
+  await expect(page.locator('[data-hub-home]')).toHaveCount(1);
+  await expect(page.locator('[data-hub-home]')).toHaveAttribute('href', '/');
+  await expect(page.locator('[data-hub-back]')).toHaveCount(1);
   await expect(page.getByText('ICS 214 — Activity Log')).toBeVisible();
   await expect(page.getByText(/FROC-LOG-001-FF/)).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath(`operational-forms-library-${testInfo.project.name}.png`), fullPage: true });
