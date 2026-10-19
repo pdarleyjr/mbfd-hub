@@ -45,11 +45,14 @@ test("the admin report letterhead is print-only and Back lives only in the share
   assert.doesNotMatch(read("app/Filament/Employee/Pages/MyVehicleInspectionView.php"), /Back to my inspections'\)\s*->icon/);
 });
 
-test("station cards share one fixed aspect box and the Daily pages without Hub Home use the shared nav", () => {
+test("station cards keep the responsive media contract and the Daily pages without Hub Home use the shared nav", () => {
+  // Natural, contained aspect below xl; cover crop at fixed 192px (224px at 2xl) from xl up.
   const media = read("resources/js/daily-checkout/src/components/StationCardMedia.tsx");
-  assert.match(media, /aspect-\[16\/10\]/);
-  assert.match(media, /object-cover/);
-  assert.doesNotMatch(media, /xl:h-48|object-contain|h-auto/);
+  assert.match(media, /xl:h-48 2xl:h-56/);
+  assert.match(media, /h-auto w-full object-contain xl:h-full xl:object-cover/);
+  assert.match(media, /decoding="async"/);
+  assert.match(read("resources/js/daily-checkout/src/components/Command300Card.tsx"), /StationCardMedia/);
+  assert.match(read("resources/js/daily-checkout/src/components/StationCard.tsx"), /StationCardMedia/);
 
   const components = "resources/js/daily-checkout/src/components/";
   for (const file of ["VehicleInspectionSelect.tsx", "ApparatusList.tsx", "forms/StationRequestWizard.tsx"]) {
