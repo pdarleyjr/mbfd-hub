@@ -6,6 +6,7 @@ namespace App\Filament\Resources\ApparatusResource\RelationManagers;
 
 use App\Enums\ApparatusServiceTicketStatus;
 use App\Filament\Resources\ApparatusServiceTicketResource;
+use App\Models\Apparatus;
 use App\Models\ApparatusServiceTicket;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
@@ -21,7 +22,7 @@ class ServiceTicketsRelationManager extends RelationManager
     /** Badge shows tickets still open, matching the Overview tab count. */
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {
-        $count = $ownerRecord->serviceTickets()->open()->count();
+        $count = $ownerRecord instanceof Apparatus ? $ownerRecord->serviceTickets()->open()->count() : 0;
 
         return $count > 0 ? (string) $count : null;
     }

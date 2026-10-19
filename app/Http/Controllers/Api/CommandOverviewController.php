@@ -32,8 +32,7 @@ final class CommandOverviewController extends Controller
             ->orderBy('id')
             ->get();
 
-        /** @var Collection<int, Apparatus> $apparatuses */
-        $apparatuses = $stations->flatMap(fn (Station $station) => $station->apparatuses)->values();
+        $apparatuses = $stations->flatMap(fn (Station $station): Collection => $this->apparatusesOf($station))->values();
         $apparatusIds = $apparatuses->pluck('id')->map(fn ($id): int => (int) $id)->all();
         $stationIds = $stations->pluck('id')->map(fn ($id): int => (int) $id)->all();
 
@@ -74,15 +73,15 @@ final class CommandOverviewController extends Controller
             $summary = $summaries[(int) $station->id] ?? [];
             $states = collect($summary['matrix'] ?? [])->pluck('state', 'apparatus_id');
 
-            $rows = $station->apparatuses
+            $rows = $this->apparatusesOf($station)
                 ->sortBy(fn (Apparatus $apparatus): string => (string) $apparatus->vehicle_number)
                 ->map(fn (Apparatus $apparatus): array => [
                     'id' => (int) $apparatus->id,
-                    'name' => $apparatus->designation ?: $apparatus->name ?: $apparatus->unit_id,
-                    'unit_id' => $apparatus->unit_id,
+                    'name' => $apparatus->designation ?: $apparatus->name ?: $apparatus->getAttribute('unit_id'),
+                    'unit_id' => $apparatus->getAttribute('unit_id'),
                     'type' => strtolower((string) $apparatus->type),
-                    'status' => $apparatus->status,
-                    'service_state' => $this->serviceState($apparatus->status),
+                    'status' => $apparatus->getAttribute('status'),
+                    'service_state' => $this->serviceState($apparatus->getAttribute('status')),
                     'open_defects' => (int) ($defectCounts[$apparatus->id] ?? 0),
                     'open_service_tickets' => (int) ($ticketCounts[$apparatus->id] ?? 0),
                     'daily_checkout_state' => $states[(int) $apparatus->id] ?? null,
@@ -119,6 +118,19 @@ final class CommandOverviewController extends Controller
     }
 
     /** in_service | out_of_service | unknown (never inferred from a missing status). */
+    /** @return Collection<int, Apparatus> */
+    private function apparatusesOf(Station $station): Collection
+    {
+        $apparatuses = [];
+        foreach ($station->apparatuses as $apparatus) {
+            if ($apparatus instanceof Apparatus) {
+                $apparatuses[] = $apparatus;
+            }
+        }
+
+        return collect($apparatuses);
+    }
+
     private function serviceState(mixed $status): string
     {
         $normalized = str_replace([' ', '-'], '_', strtolower(trim((string) $status)));

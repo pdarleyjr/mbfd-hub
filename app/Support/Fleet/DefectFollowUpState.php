@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support\Fleet;
 
 use App\Models\ApparatusDefect;
+use App\Models\ApparatusServiceTicket;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
@@ -70,9 +71,9 @@ final class DefectFollowUpState
         }
 
         if ($defect->service_ticket_id !== null) {
-            $ticket = $defect->serviceTicket;
+            $ticket = $defect->getRelationValue('serviceTicket');
 
-            return $ticket !== null && ! $ticket->is_open
+            return $ticket instanceof ApparatusServiceTicket && ! $ticket->is_open
                 ? self::TICKET_CLOSED
                 : self::SERVICE_FOLLOW_UP;
         }
@@ -98,10 +99,10 @@ final class DefectFollowUpState
         return match ($state) {
             self::RESOLVED => $query->where('resolved', true),
             self::SERVICE_FOLLOW_UP => $query->where('resolved', false)
-                ->whereHas('serviceTicket', fn (Builder $ticket) => $ticket->open()),
+                ->whereHas('serviceTicket', fn (Builder $ticket) => $ticket->scopes('open')),
             self::TICKET_CLOSED => $query->where('resolved', false)
                 ->whereNotNull('service_ticket_id')
-                ->whereDoesntHave('serviceTicket', fn (Builder $ticket) => $ticket->open()),
+                ->whereDoesntHave('serviceTicket', fn (Builder $ticket) => $ticket->scopes('open')),
             self::AWAITING_REVIEW => $query->where('resolved', false)
                 ->whereNull('service_ticket_id')
                 ->where('operational_impact', self::REVIEW_PENDING_IMPACT),

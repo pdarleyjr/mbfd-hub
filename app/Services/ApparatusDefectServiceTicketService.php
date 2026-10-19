@@ -9,6 +9,7 @@ use App\Enums\ApparatusServiceTicketCategory;
 use App\Enums\ApparatusServiceTicketPriority;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
+use App\Models\ApparatusInspection;
 use App\Models\ApparatusServiceTicket;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -44,7 +45,8 @@ final class ApparatusDefectServiceTicketService
     public function defaults(ApparatusDefect $defect): array
     {
         $defect->loadMissing(['apparatus', 'inspection']);
-        $unit = $this->unitLabel($defect->apparatus);
+        $apparatus = $defect->getRelationValue('apparatus');
+        $unit = $this->unitLabel($apparatus instanceof Apparatus ? $apparatus : null);
         $issue = str((string) $defect->issue_type)->replace('_', ' ')->lower()->toString();
         $lines = [
             sprintf('%s reported %s in %s on %s.', $defect->item, $issue !== '' ? $issue : 'as an issue', $defect->compartment, $unit),
@@ -151,7 +153,8 @@ final class ApparatusDefectServiceTicketService
         if ($defect->apparatus_inspection_id === null) {
             return '';
         }
-        $reference = $defect->inspection?->inspection_reference;
+        $inspection = $defect->getRelationValue('inspection');
+        $reference = $inspection instanceof ApparatusInspection ? $inspection->inspection_reference : null;
 
         return ', inspection '.($reference ?: '#'.$defect->apparatus_inspection_id);
     }

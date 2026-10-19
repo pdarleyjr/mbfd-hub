@@ -66,8 +66,7 @@ class MyVehicleInspections extends Page implements HasTable
     private function listQuery(): Builder
     {
         return $this->history()->withFollowUpCounts(
-            $this->history()->ownedQuery($this->member())
-                ->with(['apparatus:id,name,designation,vehicle_number,station_id', 'apparatus.station:id,name,station_number']),
+            $this->history()->ownedQuery($this->member()),
         );
     }
 
@@ -77,6 +76,7 @@ class MyVehicleInspections extends Page implements HasTable
 
         return $table
             ->query(fn (): Builder => $this->listQuery())
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['apparatus:id,name,designation,vehicle_number,station_id', 'apparatus.station:id,name,station_number']))
             ->columns([
                 Tables\Columns\TextColumn::make('completed_at')
                     ->label('Submitted (Eastern)')
@@ -85,8 +85,13 @@ class MyVehicleInspections extends Page implements HasTable
                 Tables\Columns\TextColumn::make('designation_at_time')
                     ->label('Apparatus')
                     ->weight('semibold')
-                    ->getStateUsing(fn (ApparatusInspection $record): string => $record->designation_at_time
-                        ?: ($record->apparatus?->designation ?: ($record->apparatus?->name ?: 'Apparatus')))
+                    ->getStateUsing(function (ApparatusInspection $record): string {
+                        $apparatus = $record->getRelationValue('apparatus');
+                        $apparatus = $apparatus instanceof Apparatus ? $apparatus : null;
+
+                        return $record->designation_at_time
+                            ?: ($apparatus?->designation ?: ($apparatus?->name ?: 'Apparatus'));
+                    })
                     ->description(fn (ApparatusInspection $record): ?string => $record->vehicle_number ? 'Vehicle #'.$record->vehicle_number : null),
                 Tables\Columns\TextColumn::make('apparatus.station.name')
                     ->label('Station')

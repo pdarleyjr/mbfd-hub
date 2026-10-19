@@ -5,6 +5,7 @@ namespace App\Filament\Resources\ApparatusResource\RelationManagers;
 use App\Filament\Resources\RecommendationResource;
 use App\Filament\Support\DefectServiceTicketActions;
 use App\Models\AdminAlertEvent;
+use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusDefectRecommendation;
 use App\Support\Fleet\DefectFollowUpState;
@@ -15,6 +16,7 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 
 class DefectsRelationManager extends RelationManager
@@ -29,7 +31,7 @@ class DefectsRelationManager extends RelationManager
     /** Badge shows unresolved issues, matching the Overview tab count. */
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {
-        $count = $ownerRecord->openDefects()->count();
+        $count = $ownerRecord instanceof Apparatus ? $ownerRecord->openDefects()->count() : 0;
 
         return $count > 0 ? (string) $count : null;
     }
@@ -149,11 +151,11 @@ class DefectsRelationManager extends RelationManager
             ->actions([
                 DefectServiceTicketActions::configureView(
                     Tables\Actions\Action::make(DefectServiceTicketActions::VIEW),
-                    fn (Tables\Actions\Action $action): ?ApparatusDefect => $action->getRecord(),
+                    fn (Tables\Actions\Action $action): ?ApparatusDefect => DefectServiceTicketActions::defectFrom($action->getRecord()),
                 ),
                 DefectServiceTicketActions::configureCreate(
                     Tables\Actions\Action::make(DefectServiceTicketActions::CREATE),
-                    fn (Tables\Actions\Action $action): ?ApparatusDefect => $action->getRecord(),
+                    fn (Tables\Actions\Action $action): ?ApparatusDefect => DefectServiceTicketActions::defectFrom($action->getRecord()),
                 ),
 
                 Tables\Actions\Action::make('mark_resolved')
@@ -224,7 +226,8 @@ class DefectsRelationManager extends RelationManager
      */
     private function followUpTabs(): array
     {
-        $counts = $this->getOwnerRecord()->defects()->with('serviceTicket')->get()
+        $owner = $this->getOwnerRecord();
+        $counts = ($owner instanceof Apparatus ? $owner->defects()->with('serviceTicket')->get() : new Collection)
             ->countBy(fn (ApparatusDefect $defect): string => DefectFollowUpState::for($defect));
 
         $tabs = [['key' => 'all', 'label' => 'All', 'count' => $counts->sum()]];

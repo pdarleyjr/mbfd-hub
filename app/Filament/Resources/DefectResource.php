@@ -207,11 +207,11 @@ class DefectResource extends Resource
                 Tables\Actions\ActionGroup::make([
                     DefectServiceTicketActions::configureView(
                         Tables\Actions\Action::make(DefectServiceTicketActions::VIEW),
-                        fn (Tables\Actions\Action $action): ?ApparatusDefect => $action->getRecord(),
+                        fn (Tables\Actions\Action $action): ?ApparatusDefect => DefectServiceTicketActions::defectFrom($action->getRecord()),
                     ),
                     DefectServiceTicketActions::configureCreate(
                         Tables\Actions\Action::make(DefectServiceTicketActions::CREATE),
-                        fn (Tables\Actions\Action $action): ?ApparatusDefect => $action->getRecord(),
+                        fn (Tables\Actions\Action $action): ?ApparatusDefect => DefectServiceTicketActions::defectFrom($action->getRecord()),
                     ),
 
                     Tables\Actions\Action::make('mark_resolved')

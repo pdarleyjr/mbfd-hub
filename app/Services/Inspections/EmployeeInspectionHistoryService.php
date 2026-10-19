@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace App\Services\Inspections;
 
 use App\Enums\ApparatusServiceTicketStatus;
+use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
+use App\Models\ApparatusServiceTicket;
+use App\Models\Station;
 use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -104,7 +107,7 @@ final class EmployeeInspectionHistoryService
      */
     public function whereHasFindings(Builder $query, bool $has = true): Builder
     {
-        $driver = $query->getConnection()->getDriverName();
+        $driver = $query->getModel()->getConnection()->getDriverName();
 
         if ($driver === 'pgsql') {
             $expression = "(apparatus_inspections.results::text ~ '\"status\"\\s*:\\s*\"(Missing|Damaged)\"')";
@@ -282,14 +285,16 @@ final class EmployeeInspectionHistoryService
         ], $unmatchedDefects);
 
         $signaturePath = $this->safeImagePath($inspection->officer_signature);
-        $apparatus = $inspection->apparatus;
+        $apparatus = $inspection->getRelationValue('apparatus');
+        $apparatus = $apparatus instanceof Apparatus ? $apparatus : null;
+        $station = $apparatus?->getRelationValue('station');
 
         return [
             'inspection' => $inspection,
             'reference' => $inspection->inspection_reference ?: 'Inspection #'.$inspection->getKey(),
             'apparatus_label' => $inspection->designation_at_time ?: ($apparatus?->designation ?: ($apparatus?->name ?: 'Apparatus')),
             'vehicle_number' => $inspection->vehicle_number ?: $apparatus?->vehicle_number,
-            'station_label' => $apparatus?->station?->name,
+            'station_label' => $station instanceof Station ? $station->name : null,
             'submitted_at' => $this->eastern($inspection->completed_at ?? $inspection->created_at),
             'inspector_name' => (string) $inspection->operator_name,
             'inspector_rank' => (string) $inspection->rank,
@@ -452,7 +457,8 @@ final class EmployeeInspectionHistoryService
             ];
         }
 
-        $ticket = $defect->service_ticket_id !== null ? $defect->serviceTicket : null;
+        $ticket = $defect->service_ticket_id !== null ? $defect->getRelationValue('serviceTicket') : null;
+        $ticket = $ticket instanceof ApparatusServiceTicket ? $ticket : null;
 
         return [
             'stage' => $this->defectStageLabel($defect),

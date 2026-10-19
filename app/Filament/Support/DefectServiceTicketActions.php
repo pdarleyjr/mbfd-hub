@@ -121,11 +121,17 @@ final class DefectServiceTicketActions
             ->label('View ticket')
             ->icon('heroicon-o-eye')
             ->color('gray')
-            ->visible(fn ($action): bool => ($resolveRecord($action)?->service_ticket_id ?? null) !== null
+            ->visible(fn ($action): bool => $resolveRecord($action)?->service_ticket_id !== null
                 && (auth()->user()?->can('viewAny', ApparatusServiceTicket::class) ?? false))
             ->url(fn ($action): ?string => ($ticketId = $resolveRecord($action)?->service_ticket_id) === null
                 ? null
                 : ApparatusServiceTicketResource::getUrl('view', ['record' => $ticketId]));
+    }
+
+    /** Narrows a Filament action record (a generic Model) to an equipment issue. */
+    public static function defectFrom(mixed $record): ?ApparatusDefect
+    {
+        return $record instanceof ApparatusDefect ? $record : null;
     }
 
     public static function canCreateFor(ApparatusDefect $defect): bool

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\ApparatusResource\RelationManagers;
 
+use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
@@ -16,7 +17,7 @@ class InspectionsRelationManager extends RelationManager
 
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {
-        $count = $ownerRecord->inspections()->count();
+        $count = $ownerRecord instanceof Apparatus ? $ownerRecord->inspections()->count() : 0;
 
         return $count > 0 ? (string) $count : null;
     }

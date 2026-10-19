@@ -49,7 +49,7 @@ test("station detail launches fixed station context without bundling LiveKit", (
 test("300 Command profile owns the Command lineup entry through the employee route", () => {
   assert.match(command300, /\/employee\/video-conferencing\/command\?return_to=%2Fdaily%2Fcommand-300/);
   assert.match(command300, /Morning Lineup — Command/);
-  assert.match(command300, /https:\/\/cmd\.mbfdhub\.com/);
+  assert.ok(command300.includes("https://cmd.mbfdhub.com"), "300 Command links to the Command video host");
   assert.match(command300, /target="_blank" rel="noopener noreferrer"/);
   assert.doesNotMatch(command300, /<iframe/);
   assert.match(readFileSync(resolve(root, "resources/js/daily-checkout/src/App.tsx"), "utf8"), /path="\/command-300"/);
