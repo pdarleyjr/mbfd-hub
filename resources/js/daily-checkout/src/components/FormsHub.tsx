@@ -1,10 +1,11 @@
 import { Link } from 'react-router';
-import PreviousPageButton from './PreviousPageButton';
+import DailyPageNav from './DailyPageNav';
 import { HubPageHeader } from '../../../hub-ui/HubShell';
 
 export default function FormsHub() {
   return (
     <div className="mx-auto max-w-6xl font-hub">
+      <DailyPageNav />
       <HubPageHeader eyebrow="Operational forms" title="Forms Hub" description="Select the workflow that matches the work you need to complete." />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -120,13 +121,6 @@ export default function FormsHub() {
             </div>
           </div>
         </Link>
-      </div>
-
-      {/* Back to Home */}
-      <div className="mt-8 text-center">
-        <PreviousPageButton contextual
-          className="inline-flex min-h-11 items-center px-4 py-2 font-semibold text-hub-ink-secondary hover:text-hub-ink"
-        />
       </div>
     </div>
   );

@@ -3,21 +3,47 @@
 namespace App\Filament\Resources\ApparatusResource\RelationManagers;
 
 use App\Filament\Resources\RecommendationResource;
+use App\Filament\Support\DefectServiceTicketActions;
 use App\Models\AdminAlertEvent;
+use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusDefectRecommendation;
+use App\Support\Fleet\DefectFollowUpState;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
 
 class DefectsRelationManager extends RelationManager
 {
     protected static string $relationship = 'defects';
 
-    protected static ?string $title = 'Missing / Damaged Equipment';
+    protected static ?string $title = 'Defects';
+
+    /** Selected follow-up tab: "all" or a DefectFollowUpState key. */
+    public string $followUpTab = 'all';
+
+    /** Badge shows unresolved issues, matching the Overview tab count. */
+    public static function getBadge(Model $ownerRecord, string $pageClass): ?string
+    {
+        $count = $ownerRecord instanceof Apparatus ? $ownerRecord->openDefects()->count() : 0;
+
+        return $count > 0 ? (string) $count : null;
+    }
+
+    public function updatedFollowUpTab(): void
+    {
+        if ($this->followUpTab !== 'all' && ! array_key_exists($this->followUpTab, DefectFollowUpState::options())) {
+            $this->followUpTab = 'all';
+        }
+
+        $this->resetPage();
+    }
 
     public function form(Form $form): Form
     {
@@ -66,6 +92,14 @@ class DefectsRelationManager extends RelationManager
     {
         return $table
             ->recordTitleAttribute('item')
+            ->modifyQueryUsing(fn (Builder $query): Builder => DefectFollowUpState::applyFilter(
+                $query->with('serviceTicket'),
+                $this->followUpTab === 'all' ? null : $this->followUpTab,
+            ))
+            ->header(fn () => view('filament.resources.apparatus-resource.partials.defect-follow-up-tabs', [
+                'tabs' => $this->followUpTabs(),
+                'active' => $this->followUpTab,
+            ]))
             ->columns([
                 Tables\Columns\ImageColumn::make('photo_path')
                     ->label('Photo')
@@ -87,14 +121,16 @@ class DefectsRelationManager extends RelationManager
                 Tables\Columns\TextColumn::make('item')
                     ->searchable(),
 
-                Tables\Columns\TextColumn::make('status')
+                Tables\Columns\TextColumn::make('follow_up')
+                    ->label('Follow-up')
                     ->badge()
-                    ->color(fn (string $state): string => match ($state) {
-                        'open' => 'danger',
-                        'in_progress' => 'warning',
-                        'resolved' => 'success',
-                        default => 'gray',
-                    }),
+                    ->getStateUsing(fn (ApparatusDefect $record): string => DefectFollowUpState::for($record))
+                    ->formatStateUsing(fn (string $state): string => DefectFollowUpState::label($state))
+                    ->color(fn (string $state): string => DefectFollowUpState::color($state)),
+
+                Tables\Columns\TextColumn::make('serviceTicket.ticket_number')
+                    ->label('Ticket')
+                    ->placeholder('—'),
 
                 Tables\Columns\TextColumn::make('issue_type')
                     ->label('Issue Type')
@@ -113,6 +149,15 @@ class DefectsRelationManager extends RelationManager
                 Tables\Actions\CreateAction::make(),
             ])
             ->actions([
+                DefectServiceTicketActions::configureView(
+                    Tables\Actions\Action::make(DefectServiceTicketActions::VIEW),
+                    fn (Tables\Actions\Action $action): ?ApparatusDefect => DefectServiceTicketActions::defectFrom($action->getRecord()),
+                ),
+                DefectServiceTicketActions::configureCreate(
+                    Tables\Actions\Action::make(DefectServiceTicketActions::CREATE),
+                    fn (Tables\Actions\Action $action): ?ApparatusDefect => DefectServiceTicketActions::defectFrom($action->getRecord()),
+                ),
+
                 Tables\Actions\Action::make('mark_resolved')
                     ->label('Resolve')
                     ->icon('heroicon-o-check-circle')
@@ -171,5 +216,25 @@ class DefectsRelationManager extends RelationManager
                 Tables\Actions\EditAction::make(),
             ])
             ->defaultSort('reported_date', 'desc');
+    }
+
+    /**
+     * Tab label and count for each follow-up stage, counted from the same
+     * resolver the badges use so tabs and rows can never disagree.
+     *
+     * @return list<array{key: string, label: string, count: int}>
+     */
+    private function followUpTabs(): array
+    {
+        $owner = $this->getOwnerRecord();
+        $counts = ($owner instanceof Apparatus ? $owner->defects()->with('serviceTicket')->get() : new Collection)
+            ->countBy(fn (ApparatusDefect $defect): string => DefectFollowUpState::for($defect));
+
+        $tabs = [['key' => 'all', 'label' => 'All', 'count' => $counts->sum()]];
+        foreach (DefectFollowUpState::options() as $key => $label) {
+            $tabs[] = ['key' => $key, 'label' => $label, 'count' => (int) ($counts[$key] ?? 0)];
+        }
+
+        return $tabs;
     }
 }

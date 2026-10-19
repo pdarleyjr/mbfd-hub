@@ -2,11 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     Camera,
     CameraOff,
+    ArrowLeft,
     Cast,
     Check,
     CircleAlert,
     Clock3,
     Headphones,
+    House,
     LoaderCircle,
     Mic,
     MicOff,
@@ -46,8 +48,10 @@ import {
     testSpeakerOutput,
     type MediaDevices,
 } from './media';
-import { ParticipantTile } from './ParticipantTile';
+import { ConferenceStage } from './ConferenceStage';
 import { ConferenceDialog } from './ConferenceDialog';
+import { buildGallerySlots, expectedEndpointIdentities } from './gallery-order';
+import { InactiveConfirmation } from './inactive-confirmation';
 import { LineupStartAlert } from './session-transition';
 import lineupStartTone from './lineup-start.mp3';
 import {
@@ -82,6 +86,13 @@ const stationOptions: Array<{ value: StationRole; label: string }> = [
     { value: 'sta6', label: 'Station 6' },
 ];
 const emptyLineup: LineupState = { active: false, session_id: null, started_at: null, ends_at: null };
+
+const MAX_REJOIN_ATTEMPTS = 3;
+const REJOIN_DELAYS_MS = [2_000, 6_000, 12_000];
+/** A connection this old is considered healthy, so the next drop gets a fresh set of attempts. */
+const STABLE_CONNECTION_MS = 60_000;
+const DROPPED_MESSAGE = 'The conference connection ended. Check your Internet connection and try again.';
+const SUPERSEDED_MESSAGE = 'This endpoint connected from another device or browser tab, so this connection was closed.';
 
 // SDK debug/info output includes signaling URLs. Never emit it in production.
 if (import.meta.env.PROD) setLogLevel('warn');
@@ -149,6 +160,14 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
     const connectedSessionRef = useRef<string | null>(null);
     const alertRef = useRef(new LineupStartAlert());
     const inboundRtcAccumulatorRef = useRef(emptyInboundRtcAccumulator());
+    const stationInactiveRef = useRef(new InactiveConfirmation());
+    const commandInactiveRef = useRef(new InactiveConfirmation());
+    const selfInactiveRef = useRef(new InactiveConfirmation());
+    const rejoinAttemptsRef = useRef(0);
+    const connectedAtRef = useRef(0);
+    const userLeftRef = useRef(false);
+    const firstSeenRef = useRef(new Map<string, number>());
+    const recoverRef = useRef<(superseded: boolean, isRetry?: boolean) => Promise<void>>(async () => undefined);
 
     const refreshDevices = useCallback(async (requestPermissions = false) => {
         try {
@@ -266,14 +285,14 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                 void returnFromConference();
                 return;
             }
-            if (!isLeavingRef.current) {
-                setError('The conference connection ended. Check your Internet connection and try again.');
-                void cleanupRoom(true).finally(() => {
-                    setPhase(bootstrap.entry_mode === 'station' ? 'standing_by' : 'ready');
-                });
-            }
+            if (isLeavingRef.current) return;
+            // Another device taking over this endpoint must not trigger a rejoin,
+            // or the two devices would keep evicting each other.
+            const superseded = reason === DisconnectReason.DUPLICATE_IDENTITY
+                || reason === DisconnectReason.PARTICIPANT_REMOVED;
+            void cleanupRoom(true).finally(() => void recoverRef.current(superseded));
         });
-    }, [bootstrap.entry_mode, cleanupRoom, refreshDevices, returnFromConference]);
+    }, [cleanupRoom, refreshDevices, returnFromConference]);
 
     const connectWithCredentials = useCallback(async (credentials: TokenResponse, confirmedTakeover = false) => {
         if (terminatingRef.current || joiningRef.current || roomRef.current) return;
@@ -284,9 +303,10 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
         joiningRef.current = true;
         setTakeover(false);
         setError(null);
-        setNotice('Connecting securely to LiveKit Cloud…');
+        setNotice('Connecting securely…');
         setPhase('joining');
         let nextRoom: Room | null = null;
+        let preparedTracks: LocalTrack[] = [];
         try {
             nextRoom = new Room({
                 adaptiveStream: true,
@@ -334,7 +354,7 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
             });
             if (terminatingRef.current) return;
 
-            const preparedTracks = [...previewTracksRef.current];
+            preparedTracks = [...previewTracksRef.current];
             previewTracksRef.current = [];
             for (const track of preparedTracks) {
                 if (terminatingRef.current) {
@@ -361,9 +381,15 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
             setMicrophoneEnabled(bootstrap.entry_mode !== 'station' && microphoneEnabled);
             setCommandPin('');
             setNotice(null);
+            connectedAtRef.current = Date.now();
+            userLeftRef.current = false;
+            [stationInactiveRef, commandInactiveRef, selfInactiveRef].forEach((ref) => ref.current.reset());
             setPhase('connected');
         } catch (joinError) {
             if (terminatingRef.current) return;
+            // Tracks already handed to the room were taken from the preview list; stop any
+            // that were never published so the camera light does not stay on.
+            preparedTracks.forEach((track) => track.stop());
             if (nextRoom) {
                 nextRoom.removeAllListeners();
                 await nextRoom.disconnect(true).catch(() => undefined);
@@ -429,7 +455,9 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
             setLineup(status.lineup);
             const current = roomMode === 'direct' ? status.direct : status.lineup;
             if (connectedSessionRef.current && (!current.active || current.session_id !== connectedSessionRef.current)) {
-                await returnFromConference();
+                // A single inactive reading may be a transient blip; only a
+                // repeated one sends the station away. ROOM_DELETED stays immediate.
+                if (stationInactiveRef.current.observe(true, Date.now())) await returnFromConference();
                 return;
             }
             if (alertRef.current.observe(status.lineup.active, status.lineup.session_id,
@@ -440,17 +468,21 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                 });
             }
             if (status.lineup.active) {
+                stationInactiveRef.current.reset();
                 activeLineupSeenRef.current = true;
                 if (!stationOptedOutRef.current && !roomRef.current && !joiningRef.current) await requestStationToken('lineup', false);
             } else if (status.direct.active) {
+                stationInactiveRef.current.reset();
                 activeDirectSeenRef.current = true;
                 setNotice('300 is calling this station directly. Joining automatically…');
                 if (!stationOptedOutRef.current && !roomRef.current && !joiningRef.current) await requestStationToken('direct', false);
             } else if (activeLineupSeenRef.current && roomRef.current && roomMode === 'lineup') {
-                await returnFromConference();
+                if (stationInactiveRef.current.observe(true, Date.now())) await returnFromConference();
             } else if (activeDirectSeenRef.current && roomRef.current && roomMode === 'direct') {
-                activeDirectSeenRef.current = false;
-                await returnFromConference();
+                if (stationInactiveRef.current.observe(true, Date.now())) {
+                    activeDirectSeenRef.current = false;
+                    await returnFromConference();
+                }
             }
         } catch (statusError) {
             setError(statusError instanceof Error ? statusError.message : 'Unable to refresh lineup status.');
@@ -469,9 +501,8 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
             setStationReadiness(status.stations);
             setUsage(status.usage);
             if (status.lineup.active) activeLineupSeenRef.current = true;
-            if (!status.lineup.active && activeLineupSeenRef.current && roomRef.current && roomMode === 'lineup') {
-                await returnFromConference();
-            }
+            const lineupEnded = !status.lineup.active && activeLineupSeenRef.current && roomRef.current !== null && roomMode === 'lineup';
+            if (commandInactiveRef.current.observe(lineupEnded, Date.now())) await returnFromConference();
         } catch (statusError) {
             if (statusError instanceof ApiError && statusError.status === 403) setCommandAuthorized(false);
             else setError(statusError instanceof Error ? statusError.message : 'Unable to refresh station readiness.');
@@ -480,12 +511,7 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
         }
     }, [bootstrap.endpoints.command_status, returnFromConference, commandAuthorized, roomMode]);
 
-    const prepareMedia = useCallback(async () => {
-        setError(null);
-        setNotice('Requesting camera and microphone access…');
-        stationOptedOutRef.current = false;
-        setPhase('requesting_media');
-        stopPreview();
+    const acquireTracks = useCallback(async (): Promise<{ tracks: LocalTrack[]; primaryError: unknown }> => {
         let tracks: LocalTrack[] = [];
         let primaryError: unknown = null;
         try {
@@ -507,6 +533,18 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                 tracks = partialTracks.flatMap((result) => result.status === 'fulfilled' ? result.value : []);
             }
         }
+
+        return { tracks, primaryError };
+    }, [cameraId, microphoneId]);
+
+    /** `keepOptedOut` re-arms the camera but leaves a superseded station from auto-rejoining. */
+    const prepareMedia = useCallback(async (options: { keepOptedOut?: boolean } = {}) => {
+        setError(null);
+        setNotice('Requesting camera and microphone access…');
+        if (!options.keepOptedOut) stationOptedOutRef.current = false;
+        setPhase('requesting_media');
+        stopPreview();
+        const { tracks, primaryError } = await acquireTracks();
         if (tracks.length === 0) {
             setNotice(null);
             setError(mediaErrorMessage(primaryError));
@@ -547,7 +585,7 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
         } else {
             setPhase('ready');
         }
-    }, [bootstrap, cameraId, microphoneId, refreshDevices, stopPreview]);
+    }, [acquireTracks, bootstrap, refreshDevices, stopPreview]);
 
     useEffect(() => {
         if (autoMediaStartedRef.current) return;
@@ -632,18 +670,20 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
 
     // Exact-session status also covers self joins, direct calls and a missed
     // ROOM_DELETED event after a network interruption.
+    // Keyed on the connected session, not the phase, so reconnect blips do not
+    // re-register the timer.
     useEffect(() => {
-        if (bootstrap.entry_mode === 'station' || !connectedSessionRef.current) return;
+        if (bootstrap.entry_mode === 'station' || !sessionId) return;
         const poll = async () => {
             if (terminatingRef.current) return;
             try {
-                const status = await getJson<{ active: boolean }>(`${bootstrap.endpoints.api_base}/sessions/${connectedSessionRef.current}/status`);
-                if (!status.active) await returnFromConference();
+                const status = await getJson<{ active: boolean }>(`${bootstrap.endpoints.api_base}/sessions/${sessionId}/status`);
+                if (selfInactiveRef.current.observe(!status.active, Date.now())) await returnFromConference();
             } catch { /* Transient status failures leave LiveKit reconnect in control. */ }
         };
         const timer = window.setInterval(() => void poll(), bootstrap.status_poll_ms);
         return () => window.clearInterval(timer);
-    }, [bootstrap, phase, returnFromConference]);
+    }, [bootstrap, returnFromConference, sessionId]);
 
     const participants = useMemo(
         () => room ? [room.localParticipant, ...Array.from(room.remoteParticipants.values())] : [],
@@ -655,7 +695,22 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
         ))?.identity ?? null, [participantRefresh, participants]);
     const focusedIdentity = screenShareIdentity ?? manualPin;
     const focusedParticipant = participants.find((participant) => participant.identity === focusedIdentity);
-    const thumbnailParticipants = participants.filter((participant) => participant.identity !== focusedParticipant?.identity);
+    const directStation = roomMode === 'direct'
+        ? (bootstrap.entry_mode === 'station' ? bootstrap.join_as : pendingDirectStation)
+        : null;
+    const gallerySlots = useMemo(() => buildGallerySlots(
+        participants,
+        expectedEndpointIdentities(roomMode, directStation),
+        (participant) => {
+            const joined = participant.joinedAt?.getTime();
+            if (joined !== undefined) return joined;
+            const known = firstSeenRef.current.get(participant.identity);
+            if (known !== undefined) return known;
+            firstSeenRef.current.set(participant.identity, Date.now());
+
+            return firstSeenRef.current.get(participant.identity);
+        },
+    ), [directStation, participants, roomMode]);
 
     useEffect(() => {
         if (!room) return;
@@ -811,7 +866,7 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
         }
     };
 
-    const joinAsSelf = async () => {
+    const joinAsSelf = async (confirmedTakeover = false) => {
         setActionBusy('join-self');
         setError(null);
         try {
@@ -819,17 +874,125 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
             const credentials = await postJson<TokenResponse>(
                 `${bootstrap.endpoints.api_base}/sessions/${active.session.id}/token`,
                 bootstrap.csrf_token,
-                { join_as: 'self' },
+                { join_as: 'self', confirmed_takeover: confirmedTakeover },
             );
             setLineup({ ...emptyLineup, active: true, session_id: active.session.id });
-            await connectWithCredentials({ ...credentials, session: active.session });
+            await connectWithCredentials({ ...credentials, session: active.session }, confirmedTakeover);
         } catch (joinError) {
-            setError(joinError instanceof Error ? joinError.message : 'No active Morning Lineup is available.');
+            if (joinError instanceof ApiError && joinError.status === 409 && joinError.payload.code === 'endpoint_in_use') {
+                // The same member is already in this lineup (another tab or device).
+                setTakeover(true);
+                setError('You are already connected to this Morning Lineup from another tab or device.');
+            } else {
+                setError(joinError instanceof Error ? joinError.message : 'No active Morning Lineup is available.');
+            }
             setPhase('ready');
         } finally {
             setActionBusy(null);
         }
     };
+
+    /**
+     * Credentials for rejoining the lineup this endpoint was in, or null when the
+     * lineup has ended in the meantime (never starts a new one).
+     */
+    const requestRejoinCredentials = async (lineupSessionId: string): Promise<TokenResponse | null> => {
+        const session: SessionResponse['session'] = {
+            id: lineupSessionId,
+            type: 'lineup',
+            target_station: null,
+            scheduled_for: null,
+            lineup_time_configured: false,
+        };
+        if (bootstrap.entry_mode === 'command') {
+            const status = await getJson<CommandStatusResponse>(bootstrap.endpoints.command_status);
+            setLineup(status.lineup);
+            if (!status.lineup.active || status.lineup.session_id !== lineupSessionId) return null;
+            const credentials = await postJson<TokenResponse>(
+                bootstrap.endpoints.command_start,
+                bootstrap.csrf_token,
+                { confirmed_takeover: false },
+            );
+            if (credentials.session?.id !== lineupSessionId) {
+                // The lineup ended between the check and the start call, so a new one was
+                // created. Do not silently continue in it: release the seat and stop.
+                notifyLeave(credentials.participation_id);
+
+                return null;
+            }
+
+            return credentials;
+        }
+        const status = await getJson<{ active: boolean }>(`${bootstrap.endpoints.api_base}/sessions/${lineupSessionId}/status`);
+        if (!status.active) return null;
+        const credentials = await postJson<TokenResponse>(
+            `${bootstrap.endpoints.api_base}/sessions/${lineupSessionId}/token`,
+            bootstrap.csrf_token,
+            { join_as: 'self' },
+        );
+
+        return { ...credentials, session };
+    };
+
+    /**
+     * Runs after an unexpected disconnect (never after an explicit leave).
+     * Stations re-arm their media and let the status poll rejoin. Command and
+     * self retry a bounded number of times with backoff, and only while the same
+     * lineup is still active. A superseded endpoint never rejoins on its own.
+     */
+    const recoverFromDisconnect = async (superseded: boolean, isRetry = false) => {
+        if (terminatingRef.current || userLeftRef.current) return;
+        const station = bootstrap.entry_mode === 'station';
+        const lineupSessionId = connectedSessionRef.current;
+        // Only a fresh drop after a stable connection earns new attempts; our own retries must not.
+        if (!isRetry && Date.now() - connectedAtRef.current > STABLE_CONNECTION_MS) rejoinAttemptsRef.current = 0;
+        const canRejoin = !superseded && !station && roomMode === 'lineup' && lineupSessionId !== null
+            && rejoinAttemptsRef.current < MAX_REJOIN_ATTEMPTS;
+        if (!canRejoin || lineupSessionId === null) {
+            if (station && superseded) stationOptedOutRef.current = true;
+            await prepareMedia({ keepOptedOut: station && superseded });
+            setError(superseded ? SUPERSEDED_MESSAGE : DROPPED_MESSAGE);
+
+            return;
+        }
+
+        const delay = REJOIN_DELAYS_MS[Math.min(rejoinAttemptsRef.current, REJOIN_DELAYS_MS.length - 1)];
+        rejoinAttemptsRef.current += 1;
+        setError(null);
+        setNotice('Connection lost. Rejoining Morning Lineup…');
+        setPhase('reconnecting');
+        await new Promise((resolve) => window.setTimeout(resolve, delay));
+        if (terminatingRef.current || userLeftRef.current) return;
+
+        // The dropped room stopped its tracks, so capture fresh ones.
+        stopPreview();
+        const { tracks } = await acquireTracks();
+        if (terminatingRef.current || userLeftRef.current) {
+            tracks.forEach((track) => track.stop());
+
+            return;
+        }
+        previewTracksRef.current = tracks;
+        try {
+            const credentials = tracks.length > 0 ? await requestRejoinCredentials(lineupSessionId) : undefined;
+            if (credentials === null) {
+                await returnFromConference();
+
+                return;
+            }
+            if (credentials) {
+                await connectWithCredentials(credentials);
+                if (roomRef.current) return;
+            }
+        } catch { /* Counted as a failed attempt; the next one follows. */ }
+        if (!terminatingRef.current && !userLeftRef.current) {
+            setPhase('reconnecting');
+            await recoverRef.current(false, true);
+        }
+    };
+    useEffect(() => {
+        recoverRef.current = recoverFromDisconnect;
+    });
 
     const endConference = async () => {
         setActionBusy('end');
@@ -938,8 +1101,8 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
         <div className="vc-shell" data-phase={phase} data-entry-mode={bootstrap.entry_mode} data-ice-policy={forceRelay ? 'relay' : 'all'}>
             <header className="vc-header">
                 <nav className="vc-navigation" aria-label="Conference navigation">
-                    <button type="button" onClick={() => void returnFromConference(bootstrap.navigation.back, false)}>Back</button>
-                    <button type="button" onClick={() => void returnFromConference(bootstrap.navigation.home, false)}>Home</button>
+                    <button type="button" data-nav="back" aria-label="Back to previous page" onClick={() => void returnFromConference(bootstrap.navigation.back, false)}><ArrowLeft size={18} aria-hidden="true" /><span>Back</span></button>
+                    <button type="button" data-nav="home" aria-label="Go to Hub Home" onClick={() => void returnFromConference(bootstrap.navigation.home, false)}><House size={18} aria-hidden="true" /><span>Hub Home</span></button>
                 </nav>
                 <div>
                     <span className="vc-eyebrow"><ShieldCheck size={15} /> MBFD secure conference</span>
@@ -955,7 +1118,7 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                 </span>
             </header>
 
-            {phase === 'reconnecting' && <div className="vc-banner vc-banner--warning" role="status"><RefreshCw size={18} className="vc-spin" /> Network interrupted. LiveKit is reconnecting automatically.</div>}
+            {phase === 'reconnecting' && <div className="vc-banner vc-banner--warning" role="status"><RefreshCw size={18} className="vc-spin" /> Network interrupted. Reconnecting automatically…</div>}
             {audioBlocked && connected && <button className="vc-banner vc-banner--action" type="button" onClick={async () => {
                 await room?.startAudio().then(() => setAudioBlocked(false)).catch(() => setAudioBlocked(true));
             }}><Volume2 size={18} /> Tap to enable conference audio</button>}
@@ -1013,7 +1176,7 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                         {bootstrap.entry_mode === 'command' && commandAuthorized && <div className="vc-ready-dashboard">
                             <div className={`vc-banner ${providerApiHealthy === false ? 'vc-banner--error' : 'vc-banner--info'}`} role="status">
                                 {providerApiHealthy === null ? <LoaderCircle size={18} className="vc-spin" /> : providerApiHealthy ? <Check size={18} /> : <CircleAlert size={18} />}
-                                LiveKit Cloud API: {providerApiHealthy === null ? 'Checking…' : providerApiHealthy ? 'Healthy' : 'Unavailable — Start is disabled'}
+                                Conference service: {providerApiHealthy === null ? 'Checking…' : providerApiHealthy ? 'Healthy' : 'Unavailable — Start is disabled'}
                             </div>
                             <div className="vc-room-summary"><Users size={22} /><div><strong>Station readiness</strong><span>Start when operations are ready. Late stations can join automatically.</span></div></div>
                             <div className="vc-ready-list">{stationOptions.map((station) => {
@@ -1025,7 +1188,7 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
 
                         {bootstrap.entry_mode === 'self' && <div className="vc-self-entry">
                             <div className="vc-room-summary"><Sparkles size={22} /><div><strong>Join as {bootstrap.display_name}</strong><span>Your server-derived employee identity and display name will be used.</span></div></div>
-                            <button className="vc-button vc-button--primary" type="button" onClick={() => void joinAsSelf()} disabled={actionBusy !== null || !microphoneReady}>{actionBusy === 'join-self' ? <LoaderCircle size={20} className="vc-spin" /> : <Video size={20} />} Join active Morning Lineup</button>
+                            <button className="vc-button vc-button--primary" type="button" onClick={() => void joinAsSelf(false)} disabled={actionBusy !== null || !microphoneReady}>{actionBusy === 'join-self' ? <LoaderCircle size={20} className="vc-spin" /> : <Video size={20} />} Join active Morning Lineup</button>
                         </div>}
                     </section>
                 </div>
@@ -1033,9 +1196,14 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                 <div className={`vc-conference ${bootstrap.entry_mode === 'command' ? 'vc-conference--command' : ''}`}>
                     <main className={`vc-meeting ${focusedParticipant ? 'vc-meeting--presentation' : ''}`}>
                         <div className="vc-focus-bar"><span>{screenShareIdentity ? 'Screen share' : manualPin ? 'Pinned' : 'Gallery'} · {participants.length} participants</span>{manualPin && <button type="button" onClick={() => setManualPin(null)}>Return to Gallery</button>}</div>
-                        <div className={`vc-gallery ${focusedParticipant ? 'vc-gallery--presentation' : ''}`} data-count={participants.length} aria-label={focusedParticipant ? 'Presentation layout' : 'Participant gallery'}>
-                            {(focusedParticipant ? [focusedParticipant, ...thumbnailParticipants] : participants).map((participant) => <ParticipantTile key={participant.identity} participant={participant} local={participant === room?.localParticipant} refreshKey={participantRefresh} focused={participant === focusedParticipant} onFocus={() => setManualPin((current) => current === participant.identity ? null : participant.identity)} />)}
-                        </div>
+                        <ConferenceStage
+                            slots={gallerySlots}
+                            focusedIdentity={focusedParticipant?.identity ?? null}
+                            localIdentity={room?.localParticipant.identity}
+                            refreshKey={participantRefresh}
+                            liveCount={participants.length}
+                            onToggleFocus={(identity) => setManualPin((current) => current === identity ? null : identity)}
+                        />
                     </main>
 
                     {bootstrap.entry_mode === 'command' && controlsOpen && <ConferenceDialog title="300 Controls" onClose={() => setControlsOpen(false)} drawer><aside className="vc-command" aria-label="300 station microphone controls">
@@ -1061,6 +1229,7 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                             <button type="button" className="vc-controls__leave" onClick={() => setConfirmEnd(true)} disabled={actionBusy !== null}><PhoneOff /><span>{endLabel}</span></button>
                         </>}
                         {bootstrap.entry_mode !== 'command' && <button type="button" className="vc-controls__leave" onClick={async () => {
+                            userLeftRef.current = true;
                             setPhase('leaving');
                             if (bootstrap.entry_mode === 'station') stationOptedOutRef.current = true;
                             await cleanupRoom(true);
@@ -1069,6 +1238,10 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                                 notifyStandDown();
                                 setStationReadiness([]);
                             }
+                            // Leaving stops the camera and microphone; joining again needs a fresh device check.
+                            setCameraReady(false);
+                            setMicrophoneReady(false);
+                            setNotice('You left the conference. Press Test Camera & Microphone to join again.');
                             setPhase('ready');
                         }}><PhoneOff /><span>Leave</span></button>}
                     </nav>
@@ -1090,7 +1263,7 @@ export function ConferenceApp({ bootstrap }: ConferenceAppProps) {
                     <button type="button" className="vc-button vc-button--danger" disabled={actionBusy !== null} onClick={() => void endConference()}>{endLabel}</button>
                 </div>
             </ConferenceDialog>}
-            {takeover && <div className="vc-modal-backdrop" role="presentation"><div className="vc-modal" role="alertdialog" aria-modal="true" aria-labelledby="takeover-title" aria-describedby="takeover-description"><CircleAlert size={28} /><h2 id="takeover-title">Endpoint already in use</h2><p id="takeover-description">Taking over will disconnect the existing {isStationRole(bootstrap.join_as) ? stationLabel(bootstrap.join_as) : '300'} connection.</p><div><button type="button" autoFocus className="vc-button vc-button--secondary" onClick={() => setTakeover(false)}>Cancel</button><button type="button" className="vc-button vc-button--danger" onClick={() => bootstrap.entry_mode === 'station' ? void requestStationToken(roomMode, true) : pendingDirectStation ? void startDirectCall(pendingDirectStation, true) : void startLineup(true)}>Confirm takeover</button></div></div></div>}
+            {takeover && <div className="vc-modal-backdrop" role="presentation"><div className="vc-modal" role="alertdialog" aria-modal="true" aria-labelledby="takeover-title" aria-describedby="takeover-description"><CircleAlert size={28} /><h2 id="takeover-title">{bootstrap.entry_mode === 'self' ? 'Already connected' : 'Endpoint already in use'}</h2><p id="takeover-description">{bootstrap.entry_mode === 'self' ? 'You are already in this Morning Lineup from another tab or device. Joining here will disconnect that connection.' : `Taking over will disconnect the existing ${isStationRole(bootstrap.join_as) ? stationLabel(bootstrap.join_as) : '300'} connection.`}</p><div><button type="button" autoFocus className="vc-button vc-button--secondary" onClick={() => setTakeover(false)}>Cancel</button><button type="button" className="vc-button vc-button--danger" onClick={() => bootstrap.entry_mode === 'station' ? void requestStationToken(roomMode, true) : bootstrap.entry_mode === 'self' ? void joinAsSelf(true) : pendingDirectStation ? void startDirectCall(pendingDirectStation, true) : void startLineup(true)}>Confirm takeover</button></div></div></div>}
         </div>
     );
 }

@@ -55,14 +55,26 @@ class ViewInspection extends Page
                 ->icon('heroicon-o-check-circle')
                 ->color('success')
                 ->requiresConfirmation()
-                ->modalDescription('This applies the reported meter readings and defects to the apparatus. Critical defects will place it Out of Service.')
+                ->modalDescription('This applies the reported meter readings and defects to the apparatus. It does not change the unit\'s operational status unless you choose to below.')
+                ->form([
+                    Forms\Components\Toggle::make('mark_out_of_service')
+                        ->label('Mark unit Out of Service')
+                        ->helperText(fn (): string => $this->reportsCriticalDefects()
+                            ? 'Missing or damaged equipment was reported. Review it, then confirm whether this unit should be taken Out of Service.'
+                            : 'No missing or damaged equipment was reported. Leave off unless you have another reason to take the unit out of service.')
+                        ->default(fn (): bool => $this->reportsCriticalDefects()),
+                ])
                 ->visible(fn (): bool => $this->inspection->review_status === 'pending_review'
                     && $this->canApproveInspection())
-                ->action(function (ApparatusInspectionApprovalService $approvalService): void {
+                ->action(function (array $data, ApparatusInspectionApprovalService $approvalService): void {
                     $reviewer = auth()->user();
                     abort_unless($reviewer instanceof User && $this->canApproveInspection(), 403);
 
-                    $approvalService->approve((int) $this->inspection->getKey(), $reviewer);
+                    $approvalService->approve(
+                        (int) $this->inspection->getKey(),
+                        $reviewer,
+                        (bool) ($data['mark_out_of_service'] ?? false),
+                    );
                     $this->inspection->refresh()->load(['defects', 'reviewEvents.changedByUser']);
 
                     Notification::make()
@@ -108,6 +120,13 @@ class ViewInspection extends Page
                 ->extraAttributes([
                     'onclick' => 'window.print(); return false;',
                 ]),
+            Action::make('downloadPdf')
+                ->label('Download PDF')
+                ->icon('heroicon-o-arrow-down-tray')
+                ->color('gray')
+                ->url(fn (): string => route('employee.vehicle-inspections.pdf', $this->inspection))
+                ->openUrlInNewTab()
+                ->visible(fn (): bool => (bool) auth()->user()?->can('view', $this->inspection)),
             Action::make('back')
                 ->label('Back to Apparatus')
                 ->icon('heroicon-o-arrow-left')
@@ -163,6 +182,14 @@ class ViewInspection extends Page
             'missingCount' => $missingCount,
             'damagedCount' => $damagedCount,
         ];
+    }
+
+    /** Unprepared (legacy) evidence is treated as reporting critical defects. */
+    private function reportsCriticalDefects(): bool
+    {
+        $pendingEffects = $this->inspection->pending_effects;
+
+        return $pendingEffects === null || (bool) ($pendingEffects['has_critical_defects'] ?? false);
     }
 
     private function canApproveInspection(): bool

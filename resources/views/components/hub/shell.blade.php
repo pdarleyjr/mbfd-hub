@@ -10,7 +10,10 @@
         default => 'Home',
     };
     $destination = $backHref === null ? null : \App\Support\HubNavigation::backUrl($backHref);
+    // Standard labels: "Back" (long form "Back to X"), "Hub Home". Going home is the Hub Home control's job.
+    $backLabel = in_array(strtolower($backLabel), ['hub home', 'back to hub home'], true) ? 'Back' : $backLabel;
     $resolvedBackLabel = $destination !== null && parse_url($destination, PHP_URL_PATH) !== parse_url($backHref, PHP_URL_PATH) ? 'Back to previous page' : $backLabel;
+    $showHubHome = $module !== 'Home';
 @endphp
 <header class="hub-shell-bar" data-hub-shell>
     <div class="hub-shell-bar__inner">
@@ -21,6 +24,11 @@
         @if($destination !== null)
             <a href="{{ $destination }}" class="hub-shell-control" data-hub-back aria-label="{{ $resolvedBackLabel }}">
                 <x-heroicon-o-arrow-left class="hub-shell-icon" aria-hidden="true" /><span class="hub-back-short" aria-hidden="true">Back</span><span class="hub-back-label">{{ $resolvedBackLabel }}</span>
+            </a>
+        @endif
+        @if($showHubHome)
+            <a href="{{ url('/') }}" class="hub-shell-control" data-hub-home aria-label="Hub Home">
+                <x-heroicon-o-home class="hub-shell-icon" aria-hidden="true" /><span class="hub-shell-home-label">Hub Home</span>
             </a>
         @endif
         @if($navigation['account'] !== null)

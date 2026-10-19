@@ -27,6 +27,8 @@ use App\Http\Controllers\Employee\PersonnelRequestAttachmentController;
 use App\Http\Controllers\Employee\PersonnelRequestDetailController;
 use App\Http\Controllers\Employee\PersonnelRequestResponseController;
 use App\Http\Controllers\Employee\PersonnelRosterSearchController;
+use App\Http\Controllers\Employee\VehicleInspectionImageController;
+use App\Http\Controllers\Employee\VehicleInspectionPdfController;
 use App\Http\Controllers\Employee\VideoConferencing\CommandAuthorizationController;
 use App\Http\Controllers\Employee\VideoConferencing\CommandLineupStatusController;
 use App\Http\Controllers\Employee\VideoConferencing\ConferenceConnectivityFailureController;
@@ -240,6 +242,24 @@ Route::prefix('employee')
         Route::get('/personnel-request-attachments/{attachment}', [PersonnelRequestAttachmentController::class, 'download'])
             ->middleware('throttle:30,1')
             ->name('attachments.download');
+    });
+
+// Daily Checkout history exports. Authenticated users only (not employee-only,
+// so Fleet administrators without an employee profile can print any record);
+// the controllers authorize the submitting user or the inspection `view` policy.
+Route::prefix('employee/vehicle-inspections')
+    ->middleware('auth:web')
+    ->name('employee.vehicle-inspections.')
+    ->group(function (): void {
+        Route::get('/{inspection}/pdf', VehicleInspectionPdfController::class)
+            ->middleware('throttle:30,1')
+            ->whereNumber('inspection')
+            ->name('pdf');
+        Route::get('/{inspection}/images/{key}', VehicleInspectionImageController::class)
+            ->middleware('throttle:240,1')
+            ->whereNumber('inspection')
+            ->where('key', 'signature|photo-[a-f0-9]{24}')
+            ->name('image');
     });
 
 Route::get('/admin/video-conferencing/health', VideoConferenceHealthController::class)

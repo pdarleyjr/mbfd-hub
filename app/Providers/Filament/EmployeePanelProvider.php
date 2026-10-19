@@ -25,7 +25,6 @@ use Filament\Navigation\MenuItem;
 use Filament\Navigation\NavigationGroup;
 use Filament\Panel;
 use Filament\PanelProvider;
-use Filament\View\PanelsRenderHook;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
@@ -63,6 +62,7 @@ class EmployeePanelProvider extends PanelProvider
             ->pages([
                 EmployeeDashboard::class,
                 \App\Filament\Employee\Pages\TrainingHistoryPage::class,
+                \App\Filament\Employee\Pages\MyVehicleInspections::class, \App\Filament\Employee\Pages\MyVehicleInspectionView::class,
                 OperationalForms::class,
                 VideoConferencing::class,
                 MyEquipmentPage::class,
@@ -135,10 +135,6 @@ class EmployeePanelProvider extends PanelProvider
             ])
             ->databaseNotifications()
             ->databaseNotificationsPolling('60s')
-            ->renderHook(
-                PanelsRenderHook::PAGE_START,
-                fn () => auth('web')->check() ? view('filament.employee.partials.back-button') : '',
-            )
             ->sidebarCollapsibleOnDesktop()
             ->sidebarWidth('18rem')
             ->collapsedSidebarWidth('4rem');

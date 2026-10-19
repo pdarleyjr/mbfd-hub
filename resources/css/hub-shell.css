@@ -204,7 +204,8 @@
     .hub-shell-account .hub-shell-popover,
     .hub-shell-header .hub-shell-popover { left: 12px; right: 12px; }
     .hub-panel-shell { gap: 4px; }
-    .hub-shell-account .hub-shell-control > span:not(.hub-shell-icon) { position: absolute; width: 1px; height: 1px; margin: -1px; clip: rect(0, 0, 0, 0); overflow: hidden; }
+    .hub-shell-account .hub-shell-control > span:not(.hub-shell-icon),
+    .hub-shell-home-label { position: absolute; width: 1px; height: 1px; margin: -1px; clip: rect(0, 0, 0, 0); overflow: hidden; }
 
     .hub-member-nav,
     .hub-member-navigation {

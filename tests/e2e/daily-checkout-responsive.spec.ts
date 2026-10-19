@@ -364,7 +364,7 @@ test('station profile stays contained at 320px with 44px controls, keyboard tabs
 
   const actions = page.getByRole('navigation', { name: 'Station actions' });
   await expect(actions.getByRole('link', { name: 'Morning Lineup Video Conference — Station 2' })).toHaveAttribute('href', '/video-conferencing/stations/2');
-  await expect(actions.getByRole('link', { name: 'Morning Lineup — 300 Command' })).toHaveAttribute('href', `/employee/video-conferencing/command?return_to=${encodeURIComponent('/daily/stations/31')}`);
+  await expect(actions.getByRole('link', { name: 'Morning Lineup — 300 Command' })).toHaveCount(0);
   await expect(actions.getByRole('link', { name: 'Station Request' })).toHaveAttribute('href', '/daily/forms-hub/station-request?station_id=31&return_to=%2Fstations%2F31');
   await expect(actions.getByRole('link', { name: 'Station Inspection' })).toHaveAttribute('href', '/daily/forms-hub/station-inspection?station_id=31&station_number=2&return_to=%2Fstations%2F31');
   await expect(actions.getByRole('link', { name: 'Apparatus Service' })).toHaveAttribute('href', `/employee/apparatus-service-request?station_id=31&return_to=${encodeURIComponent('/daily/stations/31')}`);

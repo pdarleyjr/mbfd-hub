@@ -55,7 +55,7 @@ export function ParticipantTile({ participant, local = false, refreshKey, focuse
         .toUpperCase();
 
     return (
-        <article className={`vc-tile ${focused ? 'vc-tile--focused' : ''} ${participant.isSpeaking ? 'vc-tile--speaking' : ''}`} aria-label={`${participant.name || 'Participant'} video`}>
+        <article data-identity={participant.identity} className={`vc-tile ${focused ? 'vc-tile--focused' : ''} ${participant.isSpeaking ? 'vc-tile--speaking' : ''}`} aria-label={`${participant.name || 'Participant'} video`}>
             <button type="button" className="vc-tile__focus" onClick={onFocus} aria-pressed={focused} aria-label={`${focused ? 'Unpin' : 'Pin'} ${participant.name || 'participant'}`}>
                 {videoPublication?.track && !videoPublication.isMuted ? (
                     <video ref={videoRef} autoPlay playsInline muted={local} />

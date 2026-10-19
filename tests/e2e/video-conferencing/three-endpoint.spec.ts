@@ -156,7 +156,7 @@ async function prepareCommand(browser: Browser, baseURL: string): Promise<Endpoi
     await expect(endpoint.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'ready');
     await endpoint.page.getByLabel('300 command PIN').fill(commandPin!);
     await endpoint.page.getByRole('button', { name: 'Continue as 300' }).click();
-    await expect(endpoint.page.getByText(/LiveKit Cloud API: Healthy/)).toBeVisible();
+    await expect(endpoint.page.getByText(/Conference service: Healthy/)).toBeVisible();
 
     return endpoint;
 }
@@ -292,10 +292,21 @@ test('five stations wait without LiveKit, then all join 300 and floor controls w
             await expect(command.page.locator('.vc-gallery')).toHaveAttribute('aria-label', 'Participant gallery');
             const tiles = await command.page.locator('.vc-gallery .vc-tile').evaluateAll(elements => elements.map(el => {
                 const bounds = el.getBoundingClientRect();
+                const media = el.querySelector('.vc-tile__focus')!.getBoundingClientRect();
                 const video = el.querySelector('video');
-                return { width: bounds.width, height: bounds.height, fit: video && getComputedStyle(video).objectFit };
+                return {
+                    width: bounds.width,
+                    height: bounds.height,
+                    mediaRatio: media.width / media.height,
+                    fit: video && getComputedStyle(video).objectFit,
+                    identity: el.getAttribute('data-identity'),
+                };
             }));
             expect(tiles.every(tile => tile.width > 130 && tile.height > 90 && tile.fit === 'contain')).toBe(true);
+            // Every media box is 16:9 (within 2%) at every viewport, never stretched by the layout.
+            expect(tiles.every(tile => Math.abs(tile.mediaRatio / (16 / 9) - 1) <= 0.02)).toBe(true);
+            // The six core endpoints keep a fixed order: 300 Command, then Stations 1, 2, 3, 4, 6.
+            expect(tiles.map(tile => tile.identity)).toEqual(['mbfd:300', 'mbfd:sta1', 'mbfd:sta2', 'mbfd:sta3', 'mbfd:sta4', 'mbfd:sta6']);
             await expect.poll(() => command.page.locator('.vc-gallery video').evaluateAll(videos => videos.every(video => (video as HTMLVideoElement).readyState >= 2 && (video as HTMLVideoElement).videoWidth > 0))).toBe(true);
             await command.page.screenshot({path: 'test-results/video-conferencing/gallery-' + viewport.width + '.png'});
         }
@@ -328,9 +339,17 @@ test('five stations wait without LiveKit, then all join 300 and floor controls w
         await command.page.getByRole('button', {name:'End Conference', exact:true}).click();
         await command.page.getByRole('dialog', {name:'End Morning Lineup?'}).getByRole('button', {name:'Cancel', exact:true}).click();
         await expect(command.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'connected');
-        await stations[4].page.getByRole('button', {name:'Back', exact:true}).click();
+        await stations[4].page.getByRole('button', {name:'Back to previous page', exact:true}).click();
         await expect.poll(() => stations[4].navigations.some(path => /^\/daily\/stations\/\d+$/.test(path))).toBe(true);
         await expect(command.page.locator('.vc-tile')).toHaveCount(5);
+        // The station that left keeps its position as a labelled waiting placeholder.
+        const waiting = command.page.locator('.vc-gallery .vc-placeholder');
+        await expect(waiting).toHaveCount(1);
+        await expect(waiting).toHaveAttribute('data-identity', 'mbfd:sta6');
+        await expect(waiting).toContainText('Station 6');
+        const placeholderRatio = await waiting.locator('.vc-placeholder__media').evaluate(el => { const box = el.getBoundingClientRect(); return box.width / box.height; });
+        expect(Math.abs(placeholderRatio / (16 / 9) - 1)).toBeLessThanOrEqual(0.02);
+        expect(await command.page.locator('.vc-gallery article').evaluateAll(els => els.at(-1)?.getAttribute('data-identity'))).toBe('mbfd:sta6');
         if (forceRelay) {
             await expectRelayOnly(command.page);
             for (const station of stations.slice(0,4)) await expectRelayOnly(station.page);
@@ -360,6 +379,8 @@ test('300 can place and end a direct Station 1 call', async ({ browser, baseURL 
         await expect(command.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'connected');
         await expect(station.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'connected');
         await expect(command.page.locator('.vc-tile')).toHaveCount(2);
+        // A direct call involves two parties, so no waiting placeholders for the other stations.
+        await expect(command.page.locator('.vc-placeholder')).toHaveCount(0);
         if (forceRelay) {
             await expectRelayOnly(command.page);
             await expectRelayOnly(station.page);

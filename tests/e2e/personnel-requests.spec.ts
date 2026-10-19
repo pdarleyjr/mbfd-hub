@@ -52,9 +52,10 @@ test('employee uniform, request ledger, and expiration pages are responsive and 
   await expect(page.getByRole('button', { name: 'Submit Uniform Request' })).toBeVisible();
   await page.locator('.uo-recent summary').click();
   await expect(page.getByText('Structural firefighting PPE is handled by an authorized officer')).toBeVisible();
-  await expect(page.locator('.employee-global-back a')).toBeVisible();
+  await expect(page.locator('.employee-global-back [data-hub-back]')).toBeVisible();
+  await expect(page.locator('.employee-global-back [data-hub-home]')).toBeVisible();
   await expectViewportFit(page);
-  for (const target of await page.locator('.employee-global-back a, .pr-primary-action').evaluateAll((elements) => elements.map((element) => {
+  for (const target of await page.locator('.employee-global-back [data-hub-back], .employee-global-back [data-hub-home], .pr-primary-action').evaluateAll((elements) => elements.map((element) => {
     const rect = element.getBoundingClientRect();
     return { width: rect.width, height: rect.height };
   }))) {
@@ -80,7 +81,7 @@ test('officer PPE page preserves station return target and supports pointer sign
   await expect(page.getByRole('heading', { name: 'Personnel Equipment Request' })).toBeVisible();
   await expect(page.getByLabel('Authenticated officer Captain').getByText('Captain — Avery Officer — 99001')).toBeVisible();
   await expect(page.getByText('Every station searches the same complete department roster.')).toBeVisible();
-  const back = page.locator('.employee-global-back a');
+  const back = page.locator('.employee-global-back [data-hub-back]');
   await expect(back).toHaveAttribute('href', '/daily/stations/1');
   await expect(back).toContainText('Back to Station');
 

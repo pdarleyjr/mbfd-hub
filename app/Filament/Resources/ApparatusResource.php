@@ -15,6 +15,7 @@ use App\Models\Apparatus;
 use App\Models\Station;
 use App\Models\User;
 use App\Services\ApparatusServiceTicketWorkflowService;
+use App\Support\Fleet\ApparatusOverview;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -47,6 +48,15 @@ class ApparatusResource extends Resource
     {
         return $form
             ->schema([
+                Forms\Components\Section::make('Overview')
+                    ->schema([
+                        Forms\Components\View::make('filament.resources.apparatus-resource.partials.overview')
+                            ->viewData(fn (?Apparatus $record): array => [
+                                'apparatus' => $record,
+                                'overview' => $record?->exists ? ApparatusOverview::for($record) : null,
+                            ]),
+                    ])
+                    ->visible(fn (?Apparatus $record): bool => $record?->exists === true),
                 Forms\Components\Section::make('Operational Information')
                     ->schema([
                         Forms\Components\TextInput::make('designation')
@@ -700,8 +710,8 @@ class ApparatusResource extends Resource
     {
         return [
             RelationManagers\InspectionsRelationManager::class,
-            RelationManagers\DefectsRelationManager::class,
             RelationManagers\ServiceTicketsRelationManager::class,
+            RelationManagers\DefectsRelationManager::class,
         ];
     }
 

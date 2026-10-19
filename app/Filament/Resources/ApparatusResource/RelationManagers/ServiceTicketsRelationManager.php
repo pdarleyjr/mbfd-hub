@@ -6,21 +6,32 @@ namespace App\Filament\Resources\ApparatusResource\RelationManagers;
 
 use App\Enums\ApparatusServiceTicketStatus;
 use App\Filament\Resources\ApparatusServiceTicketResource;
+use App\Models\Apparatus;
 use App\Models\ApparatusServiceTicket;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 
 class ServiceTicketsRelationManager extends RelationManager
 {
     protected static string $relationship = 'serviceTickets';
 
-    protected static ?string $title = 'Service / Maintenance History';
+    protected static ?string $title = 'Service Tickets';
+
+    /** Badge shows tickets still open, matching the Overview tab count. */
+    public static function getBadge(Model $ownerRecord, string $pageClass): ?string
+    {
+        $count = $ownerRecord instanceof Apparatus ? $ownerRecord->serviceTickets()->open()->count() : 0;
+
+        return $count > 0 ? (string) $count : null;
+    }
 
     public function table(Table $table): Table
     {
         return $table
             ->recordTitleAttribute('ticket_number')
+            ->recordUrl(fn (ApparatusServiceTicket $record): ?string => self::ticketUrl($record))
             ->columns([
                 Tables\Columns\TextColumn::make('ticket_number')->label('Ticket')->searchable()->sortable(),
                 Tables\Columns\TextColumn::make('title')->limit(55)->searchable(),
@@ -39,7 +50,16 @@ class ServiceTicketsRelationManager extends RelationManager
                 Tables\Actions\Action::make('view_ticket')
                     ->label('View')
                     ->icon('heroicon-o-eye')
-                    ->url(fn (ApparatusServiceTicket $record): string => ApparatusServiceTicketResource::getUrl('view', ['record' => $record])),
+                    ->visible(fn (ApparatusServiceTicket $record): bool => self::ticketUrl($record) !== null)
+                    ->url(fn (ApparatusServiceTicket $record): ?string => self::ticketUrl($record)),
             ]);
+    }
+
+    /** Only administrators who may open the ticket get a link to it. */
+    private static function ticketUrl(ApparatusServiceTicket $record): ?string
+    {
+        return auth()->user()?->can('view', $record)
+            ? ApparatusServiceTicketResource::getUrl('view', ['record' => $record])
+            : null;
     }
 }

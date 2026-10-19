@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\Bid\AuthorizationCodeExchangeController as BidAutho
 use App\Http\Controllers\Api\Bid\CredentialsController as BidCredentialsController;
 use App\Http\Controllers\Api\Bid\IdentityRevalidationController as BidIdentityRevalidationController;
 use App\Http\Controllers\Api\BigTicketRequestController;
+use App\Http\Controllers\Api\CommandOverviewController;
 use App\Http\Controllers\Api\DatabaseAuditController;
 use App\Http\Controllers\Api\Display\DisplayController;
 use App\Http\Controllers\Api\FireEquipmentRequestController;
@@ -83,6 +84,9 @@ Route::prefix('public')->middleware(['auth:sanctum', 'canonical.api', 'throttle:
     Route::get('stations/{station}/rooms/{room}/profile', [StationContextController::class, 'roomProfile']);
     Route::get('station-requests/{stationRequest}', [PublicStationRequestController::class, 'show']);
     Route::get('stations/{station}/gas-meters', [\App\Http\Controllers\Api\StationController::class, 'gasMeters']);
+
+    // 300 Command profile: read-only, allowlisted overview of every active station.
+    Route::get('command/overview', CommandOverviewController::class);
 
 });
 

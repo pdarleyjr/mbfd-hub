@@ -2,21 +2,31 @@
 
 namespace App\Filament\Resources\ApparatusResource\RelationManagers;
 
+use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 
 class InspectionsRelationManager extends RelationManager
 {
     protected static string $relationship = 'inspections';
 
-    protected static ?string $title = 'Vehicle Inspections';
+    protected static ?string $title = 'Inspections';
+
+    public static function getBadge(Model $ownerRecord, string $pageClass): ?string
+    {
+        $count = $ownerRecord instanceof Apparatus ? $ownerRecord->inspections()->count() : 0;
+
+        return $count > 0 ? (string) $count : null;
+    }
 
     public function table(Table $table): Table
     {
         return $table
             ->recordTitleAttribute('completed_at')
+            ->recordUrl(fn (ApparatusInspection $record): string => self::resultsUrl($record))
             ->columns([
                 Tables\Columns\TextColumn::make('completed_at')
                     ->label('Date')
@@ -78,12 +88,17 @@ class InspectionsRelationManager extends RelationManager
                     ->label('View Results')
                     ->icon('heroicon-o-eye')
                     ->color('info')
-                    ->url(fn (ApparatusInspection $record): string => route('filament.admin.resources.apparatuses.view-inspection', [
-                        'record' => $record->apparatus_id,
-                        'inspection' => $record->id,
-                    ]))
-                    ->openUrlInNewTab(),
+                    ->url(fn (ApparatusInspection $record): string => self::resultsUrl($record)),
             ])
             ->defaultSort('completed_at', 'desc');
+    }
+
+    /** Same-tab navigation: ContextualBack on the results page returns here. */
+    private static function resultsUrl(ApparatusInspection $record): string
+    {
+        return route('filament.admin.resources.apparatuses.view-inspection', [
+            'record' => $record->apparatus_id,
+            'inspection' => $record->id,
+        ]);
     }
 }

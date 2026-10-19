@@ -52,6 +52,24 @@ final class ApparatusInspectionApprovalActionTest extends TestCase
         $this->assertSame('Approved', (new ApparatusInspection(['review_status' => 'approved']))->displayStatus());
     }
 
+    public function test_admin_sees_download_pdf_action_linking_to_the_inspection_pdf(): void
+    {
+        $inspection = $this->pendingInspection();
+        $this->actingAs($this->userWithRole('logistics_admin'));
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->withoutVite();
+
+        Livewire::test(ViewInspection::class, [
+            'record' => $inspection->apparatus,
+            'inspection' => $inspection,
+        ])
+            ->assertSuccessful()
+            ->assertActionVisible('downloadPdf')
+            ->assertActionHasUrl('downloadPdf', route('employee.vehicle-inspections.pdf', $inspection))
+            ->assertActionShouldOpenUrlInNewTab('downloadPdf')
+            ->assertActionVisible('print');
+    }
+
     public function test_authorized_reviewer_can_see_pending_evidence_and_approve_from_the_apparatus_inspection_view(): void
     {
         $inspection = $this->pendingInspection();
@@ -69,12 +87,17 @@ final class ApparatusInspectionApprovalActionTest extends TestCase
             ->assertSee('Reported pending defects')
             ->assertSee('Portable radio')
             ->assertActionVisible('approveInspection')
-            ->callAction('approveInspection')
+            ->callAction('approveInspection', data: ['mark_out_of_service' => true])
             ->assertHasNoActionErrors();
 
         $this->assertSame('approved', $inspection->fresh()->review_status);
         $this->assertNull($inspection->fresh()->pending_effects);
         $this->assertSame('Out of Service', $inspection->apparatus->fresh()->status);
+        $this->assertDatabaseHas('apparatus_operational_status_events', [
+            'apparatus_id' => $inspection->apparatus_id,
+            'previous_status' => 'In Service',
+            'status' => 'Out of Service',
+        ]);
         $this->assertSame($inspection->id, ApparatusDefect::sole()->apparatus_inspection_id);
         $this->assertDatabaseHas('apparatus_inspection_review_events', [
             'apparatus_inspection_id' => $inspection->id,
@@ -82,6 +105,57 @@ final class ApparatusInspectionApprovalActionTest extends TestCase
             'status' => 'approved',
             'changed_by_user_id' => $reviewer->id,
         ]);
+    }
+
+    public function test_reviewer_can_approve_critical_defects_without_taking_the_unit_out_of_service(): void
+    {
+        $inspection = $this->pendingInspection();
+        $reviewer = $this->userWithRole('logistics_admin');
+
+        $this->actingAs($reviewer);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->withoutVite();
+
+        Livewire::test(ViewInspection::class, [
+            'record' => $inspection->apparatus,
+            'inspection' => $inspection,
+        ])
+            ->callAction('approveInspection', data: ['mark_out_of_service' => false])
+            ->assertHasNoActionErrors();
+
+        $this->assertSame('approved', $inspection->fresh()->review_status);
+        $this->assertSame('In Service', $inspection->apparatus->fresh()->status);
+        $this->assertDatabaseCount('apparatus_operational_status_events', 0);
+        $this->assertSame($inspection->id, ApparatusDefect::sole()->apparatus_inspection_id);
+        $this->assertSame('10010', (string) $inspection->apparatus->fresh()->current_miles);
+    }
+
+    public function test_approve_form_defaults_the_out_of_service_choice_on_only_when_critical_defects_were_reported(): void
+    {
+        $withDefects = $this->pendingInspection();
+        $reviewer = $this->userWithRole('logistics_admin');
+
+        $this->actingAs($reviewer);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->withoutVite();
+
+        Livewire::test(ViewInspection::class, [
+            'record' => $withDefects->apparatus,
+            'inspection' => $withDefects,
+        ])
+            ->mountAction('approveInspection')
+            ->assertActionDataSet(['mark_out_of_service' => true]);
+
+        $withDefects->update([
+            'pending_effects' => ['defects' => [], 'has_critical_defects' => false],
+        ]);
+
+        Livewire::test(ViewInspection::class, [
+            'record' => $withDefects->apparatus,
+            'inspection' => $withDefects->fresh(),
+        ])
+            ->mountAction('approveInspection')
+            ->assertActionDataSet(['mark_out_of_service' => false]);
     }
 
     public function test_authorized_reviewer_can_reject_pending_evidence_without_applying_operational_effects(): void
