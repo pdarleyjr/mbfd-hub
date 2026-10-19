@@ -1,5 +1,6 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { resolve } from 'node:path';
+import type { CommandOverview } from '../../resources/js/daily-checkout/src/types';
 
 const stations = [1, 2, 3, 4, 6].map((stationNumber) => ({
   id: stationNumber,
@@ -161,6 +162,132 @@ async function expectNoHorizontalOverflow(page: Page): Promise<void> {
 
   expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth);
 }
+
+function commandOverview(): CommandOverview {
+  return {
+    generated_at: new Date().toISOString(),
+    total: stations.length,
+    stations: stations.map((station, index) => ({
+      ...station,
+      id: 29 + index,
+      apparatus_count: 1,
+      open_defects: index,
+      open_service_tickets: 1,
+      last_checkout_at: null,
+      daily_checkout: { required_total: 1, completed: 0, not_checked: 1, review_pending: 0, out_of_service: 0, completion_percent: 0 },
+      apparatuses: [{
+        id: 100 + index, name: `Command test unit ${station.station_number}`, unit_id: `T${station.station_number}`,
+        type: 'engine', status: 'In Service', service_state: 'in_service', open_defects: index,
+        open_service_tickets: 1, daily_checkout_state: 'not_checked', last_checkout_at: null,
+      }],
+    })),
+  };
+}
+
+test('Command 300 station tabs show one station and preserve selection through refresh and profile navigation', async ({ page }, testInfo) => {
+  await mockDailySelectorApi(page);
+  const quality = captureBrowserQuality(page);
+  const data = commandOverview();
+  let requests = 0;
+  await page.route('**/api/public/command/overview', route => {
+    requests += 1;
+    return route.fulfill({ json: data });
+  });
+  await page.route('**/api/public/stations/29', route => route.fulfill({ json: { ...stations[0], id: 29, apparatuses: [], rooms: [] } }));
+
+  await page.goto('/daily/command-300');
+  await expect(page.getByRole('heading', { name: '300 Command', exact: true })).toBeVisible();
+  const tabs = page.getByRole('tablist', { name: 'Station overview' });
+  await expect(tabs.getByRole('tab')).toHaveCount(5);
+  await expect(page.getByTestId('command-stations')).toHaveCount(1);
+  await expect(page.getByTestId('command-station')).toHaveCount(1);
+  await expect(page.getByRole('tabpanel', { name: 'Station 1', exact: true })).toBeVisible();
+  await expectTouchTargets(page, '[role="tab"]');
+
+  for (const station of data.stations) {
+    const tab = tabs.getByRole('tab', { name: station.name, exact: true });
+    if (testInfo.project.use.hasTouch) await tab.tap();
+    else await tab.click();
+    await expect(tab).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('tabpanel')).toHaveCount(1);
+    const panel = page.getByRole('tabpanel', { name: station.name, exact: true });
+    await expect(panel.getByRole('heading', { name: station.name, exact: true })).toBeVisible();
+    await expect(panel).toContainText(station.apparatuses[0].name!);
+    await expect(panel).toContainText('0 of 1 checked today');
+    await expect(panel).toContainText('1 open service ticket');
+    await expect(panel.getByRole('link', { name: `Open ${station.name}`, exact: true })).toHaveAttribute('href', `/daily/stations/${station.id}?return_to=${encodeURIComponent(`/daily/command-300?station=${station.id}`)}`);
+    await expectNoHorizontalOverflow(page);
+  }
+  expect(requests).toBe(1); // Tab switches use the loaded overview, without extra API calls.
+  await page.getByTestId('command-overview-refresh').click();
+  await expect.poll(() => requests).toBe(2);
+  await expect(tabs.getByRole('tab', { name: 'Station 6', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await page.reload();
+  await expect(page.getByRole('tabpanel', { name: 'Station 6', exact: true })).toBeVisible();
+
+  const last = tabs.getByRole('tab', { name: 'Station 6', exact: true });
+  await last.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(tabs.getByRole('tab', { name: 'Station 1', exact: true })).toBeFocused();
+  await expect(tabs.getByRole('tab', { name: 'Station 1', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('ArrowLeft');
+  await expect(last).toBeFocused();
+  await expect(last).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('Home');
+  await expect(tabs.getByRole('tab', { name: 'Station 1', exact: true })).toBeFocused();
+  await expect(tabs.getByRole('tab', { name: 'Station 1', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('End');
+  await expect(last).toBeFocused();
+  await expect(last).toHaveAttribute('aria-selected', 'true');
+  await expect(tabs.locator('[tabindex="0"]')).toHaveCount(1);
+
+  await tabs.getByRole('tab', { name: 'Station 1', exact: true }).click();
+  await page.getByRole('link', { name: 'Open Station 1', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Station 1', exact: true })).toBeVisible();
+  await page.locator('[data-hub-back]').click();
+  await expect(page).toHaveURL(/\/daily\/command-300\?station=29$/);
+  await expect(page.getByRole('tabpanel', { name: 'Station 1', exact: true })).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+  await page.screenshot({ path: testInfo.outputPath('command300-station-tabs.png'), fullPage: true });
+  expect(quality.consoleErrors).toEqual([]);
+  expect(quality.failedRequests).toEqual([]);
+});
+
+test('Command 300 station tabs handle changed station lists, empty data, refresh errors and offline state', async ({ page }, testInfo) => {
+  test.skip(!['daily-responsive-phone-320', 'daily-responsive-wide-1440'].includes(testInfo.project.name), 'Data transitions at phone and desktop widths.');
+  await mockDailySelectorApi(page);
+  const data = commandOverview();
+  let fail = false;
+  await page.route('**/api/public/command/overview', route => fail
+    ? route.fulfill({ status: 503, json: { message: 'Service unavailable' } })
+    : route.fulfill({ json: data }));
+  await page.goto('/daily/command-300?station=invalid');
+  await expect(page.getByRole('tabpanel', { name: 'Station 1', exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: 'Station 6', exact: true }).click();
+  data.stations.pop();
+  const refresh = page.getByTestId('command-overview-refresh');
+  await refresh.click();
+  await expect(page.getByRole('tab')).toHaveCount(4);
+  await expect(page.getByRole('tabpanel', { name: 'Station 1', exact: true })).toBeVisible();
+  fail = true;
+  await refresh.click();
+  await expect(page.getByRole('alert')).toContainText('The overview could not be refreshed');
+  await expect(page.getByRole('tabpanel', { name: 'Station 1', exact: true })).toBeVisible();
+  await page.context().setOffline(true);
+  await expect(refresh).toBeDisabled();
+  await page.getByRole('tab', { name: 'Station 4', exact: true }).click();
+  await expect(page.getByRole('tabpanel', { name: 'Station 4', exact: true })).toBeVisible();
+  await page.context().setOffline(false);
+  fail = false;
+  data.stations = [{ ...data.stations[0], apparatuses: [], apparatus_count: 0 }];
+  await refresh.click();
+  await expect(page.getByRole('tab')).toHaveCount(1);
+  await expect(page.getByText('No apparatus is assigned to this station.')).toBeVisible();
+  data.stations = [];
+  await refresh.click();
+  await expect(page.getByText('No active stations', { exact: true })).toBeVisible();
+  await expect(page.getByRole('tablist')).toHaveCount(0);
+});
 
 test('station selector stays visible, touchable, and horizontally contained at every required viewport', async ({ page }, testInfo) => {
   await mockDailySelectorApi(page);

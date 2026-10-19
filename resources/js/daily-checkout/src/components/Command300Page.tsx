@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useSearchParams } from 'react-router';
 import { ClipboardCheck, ExternalLink, RefreshCw } from 'lucide-react';
 import { COMMAND_300_IMAGE } from '../types';
 import type { CommandOverview, CommandOverviewApparatus, CommandOverviewStation } from '../types';
 import { ApiClient, isApiAuthenticationError, redirectToLoginAfterSessionExpiry } from '../utils/api';
 import { useOffline } from '../hooks/useOffline';
 import DailyPageNav from './DailyPageNav';
+import Tabs from './ui/Tabs';
 import Tag, { StatusTag } from './ui/Tag';
 import { EmptyState, LoadError } from './ui/StateViews';
 import type { Tone } from './ui/status';
@@ -14,7 +15,6 @@ import type { Tone } from './ui/status';
 export const COMMAND_LINEUP_HREF = '/employee/video-conferencing/command?return_to=%2Fdaily%2Fcommand-300';
 export const COMMAND_BOARD_HREF = 'https://cmd.mbfdhub.com';
 
-const COMMAND_RETURN = encodeURIComponent('/daily/command-300');
 /** A checkout older than this is stale, not healthy. */
 const STALE_AFTER_HOURS = 36;
 
@@ -64,7 +64,7 @@ function StationSection({ station }: { station: CommandOverviewStation }) {
   const checkout = freshness(station.last_checkout_at);
   const { daily_checkout: summary } = station;
   return (
-    <section className="hub-panel p-4 sm:p-5" aria-labelledby={`command-station-${station.id}`} data-testid="command-station">
+    <section aria-labelledby={`command-station-${station.id}`} data-testid="command-station">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h3 id={`command-station-${station.id}`} className="font-heading text-lg font-bold text-hub-ink">{station.name}</h3>
@@ -73,7 +73,7 @@ function StationSection({ station }: { station: CommandOverviewStation }) {
             {summary.required_total > 0 ? ` · ${summary.completed} of ${summary.required_total} checked today` : ' · No daily checkouts required'}
           </p>
         </div>
-        <Link to={`/stations/${station.id}?return_to=${COMMAND_RETURN}`} className="hub-btn hub-btn--secondary !min-h-11" aria-label={`Open ${station.name}`}>
+        <Link to={`/stations/${station.id}?return_to=${encodeURIComponent(`/daily/command-300?station=${station.id}`)}`} className="hub-btn hub-btn--secondary !min-h-11" aria-label={`Open ${station.name}`}>
           View station
         </Link>
       </div>
@@ -95,10 +95,30 @@ function StationSection({ station }: { station: CommandOverviewStation }) {
 }
 
 function Overview({ data }: { data: CommandOverview }) {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeStation = data.stations.find((station) => String(station.id) === searchParams.get('station')) ?? data.stations[0];
+
   if (data.stations.length === 0) {
     return <EmptyState title="No active stations" body="Active stations appear here once they are set up in Administration." />;
   }
-  return <div className="space-y-4">{data.stations.map((station) => <StationSection key={station.id} station={station} />)}</div>;
+
+  return (
+    <div className="hub-panel overflow-hidden" data-testid="command-stations">
+      <Tabs
+        tabs={data.stations.map((station) => ({ id: String(station.id), label: station.name }))}
+        active={String(activeStation.id)}
+        onChange={(id) => {
+          const next = new URLSearchParams(searchParams);
+          next.set('station', id);
+          setSearchParams(next, { replace: true, preventScrollReset: true });
+        }}
+        label="Station overview"
+        idPrefix="command-stations"
+        panelClassName="p-4 sm:p-5"
+        renderPanel={() => <StationSection station={activeStation} />}
+      />
+    </div>
+  );
 }
 
 export default function Command300Page() {
