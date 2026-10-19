@@ -229,12 +229,16 @@ test('Command 300 station tabs show one station and preserve selection through r
   await last.focus();
   await page.keyboard.press('ArrowRight');
   await expect(tabs.getByRole('tab', { name: 'Station 1', exact: true })).toBeFocused();
+  await expect(tabs.getByRole('tab', { name: 'Station 1', exact: true })).toHaveAttribute('aria-selected', 'true');
   await page.keyboard.press('ArrowLeft');
   await expect(last).toBeFocused();
+  await expect(last).toHaveAttribute('aria-selected', 'true');
   await page.keyboard.press('Home');
   await expect(tabs.getByRole('tab', { name: 'Station 1', exact: true })).toBeFocused();
+  await expect(tabs.getByRole('tab', { name: 'Station 1', exact: true })).toHaveAttribute('aria-selected', 'true');
   await page.keyboard.press('End');
   await expect(last).toBeFocused();
+  await expect(last).toHaveAttribute('aria-selected', 'true');
   await expect(tabs.locator('[tabindex="0"]')).toHaveCount(1);
 
   await tabs.getByRole('tab', { name: 'Station 1', exact: true }).click();
@@ -281,7 +285,7 @@ test('Command 300 station tabs handle changed station lists, empty data, refresh
   await expect(page.getByText('No apparatus is assigned to this station.')).toBeVisible();
   data.stations = [];
   await refresh.click();
-  await expect(page.getByRole('heading', { name: 'No active stations' })).toBeVisible();
+  await expect(page.getByText('No active stations', { exact: true })).toBeVisible();
   await expect(page.getByRole('tablist')).toHaveCount(0);
 });
 
