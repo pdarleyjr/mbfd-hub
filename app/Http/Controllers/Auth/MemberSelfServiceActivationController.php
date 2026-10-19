@@ -10,6 +10,7 @@ use App\Rules\SafeNewPassword;
 use App\Services\Identity\CanonicalLoginDestination;
 use App\Services\Identity\CanonicalSessionIssuer;
 use App\Services\Identity\FederationLoginAttempt;
+use App\Services\Identity\MemberAccessEmail;
 use App\Services\Identity\MemberSelfServiceActivation;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
@@ -31,7 +32,7 @@ final class MemberSelfServiceActivationController extends Controller
 
     private const THROTTLED = 'Too many attempts. Wait a few minutes before trying again, or contact MBFD Hub support.';
 
-    private const EMAIL_STATUS = 'If your account is ready for activation, we sent a setup link to the City email on file. It expires in 30 minutes, so check your inbox and Junk folder now.';
+    public const EMAIL_STATUS = 'If this Employee ID is eligible, we have emailed a private link to the address on file. Open it within 30 minutes, and check your Junk folder too.';
 
     public function show(Request $request, MemberSelfServiceActivation $activation): Response
     {
@@ -143,7 +144,7 @@ final class MemberSelfServiceActivationController extends Controller
         return $this->page('auth.member-activation-email', $request, $activation);
     }
 
-    public function requestEmail(Request $request, MemberSelfServiceActivation $activation): RedirectResponse
+    public function requestEmail(Request $request, MemberSelfServiceActivation $activation, MemberAccessEmail $accessEmail): RedirectResponse
     {
         abort_unless($activation->emailRequestEnabled(), 404);
         $data = $request->validate(['employee_id' => ['required', 'string', 'max:64']], [], ['employee_id' => 'Employee ID']);
@@ -157,7 +158,7 @@ final class MemberSelfServiceActivationController extends Controller
 
         try {
             if ($employeeId !== '') {
-                $activation->requestEmailInvitation($employeeId);
+                $accessEmail->request($employeeId);
             }
         } catch (Throwable $exception) {
             Log::error('member_email_activation_request_failed', ['exception_class' => $exception::class]);

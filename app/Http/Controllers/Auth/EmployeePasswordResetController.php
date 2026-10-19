@@ -13,6 +13,7 @@ use App\Services\Identity\AccountSecurityService;
 use App\Services\Identity\CanonicalUserProvisioner;
 use App\Services\Identity\CityEmailVerificationService;
 use App\Services\Identity\IdentityProviderService;
+use App\Services\Identity\MemberAccessEmail;
 use Illuminate\Auth\Passwords\PasswordBroker;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -28,7 +29,7 @@ use Throwable;
 
 final class EmployeePasswordResetController extends Controller
 {
-    private const GENERIC_STATUS = 'If the Employee ID has an active linked account and an authoritative recovery address, account recovery instructions will be sent.';
+    private const GENERIC_STATUS = MemberSelfServiceActivationController::EMAIL_STATUS;
 
     public function requestForm(): View
     {
@@ -41,6 +42,7 @@ final class EmployeePasswordResetController extends Controller
         CityEmailVerificationService $emails,
         IdentityProviderService $identities,
         CanonicalUserProvisioner $provisioner,
+        MemberAccessEmail $accessEmail,
     ): RedirectResponse {
         $validated = $request->validate(['employee_id' => ['required', 'string', 'max:64']]);
         $employeeId = trim((string) $validated['employee_id']);
@@ -49,6 +51,19 @@ final class EmployeePasswordResetController extends Controller
             return back()->with('status', self::GENERIC_STATUS);
         }
         RateLimiter::hit($key, 900);
+
+        // Local accounts share the activation page's decision: setup or reset, sent only to the address on record.
+        if (config('identity.credential_authority') !== 'authentik') {
+            try {
+                if ($employeeId !== '') {
+                    $accessEmail->request($employeeId);
+                }
+            } catch (Throwable $exception) {
+                Log::error('employee_password_reset_request_failed', ['exception_class' => $exception::class]);
+            }
+
+            return back()->with('status', self::GENERIC_STATUS);
+        }
 
         /** @var Employee|null $employee */
         $employee = Employee::query()->where('employee_id', $employeeId)->first();
@@ -160,7 +175,7 @@ final class EmployeePasswordResetController extends Controller
             return back()->withErrors(['employee_id' => 'This password reset link is invalid or expired.']);
         }
 
-        return redirect()->route('login')->with('status', 'Your password has been reset.');
+        return redirect()->route('login')->with('status', 'Your password is set. Sign in with your Employee ID and new password.');
     }
 
     private function passwordBroker(): PasswordBroker
