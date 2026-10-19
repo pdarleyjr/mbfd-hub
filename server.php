@@ -37,6 +37,19 @@ if ($uri !== '/' && is_file($publicPath.$uri)) {
         return true;
     }
 
+    // The Daily service workers are unhashed, so without a Cache-Control the edge
+    // applied its four-hour default and kept serving a retired worker after a
+    // release. Always revalidate; browsers already do for the worker script.
+    if ($uri === '/daily/sw.js' || $uri === '/daily/service-worker.js') {
+        header('Content-Type: text/javascript; charset=UTF-8');
+        header('Cache-Control: no-cache, must-revalidate');
+        header('Content-Length: '.(string) filesize($publicPath.$uri));
+        header('X-Content-Type-Options: nosniff');
+        readfile($publicPath.$uri);
+
+        return true;
+    }
+
     return false;
 }
 
