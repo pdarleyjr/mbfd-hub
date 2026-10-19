@@ -4,6 +4,7 @@
 @import '../../hub-components.css';
 @import '../../hub-shell.css';
 @import '../hub-portals-v2.css';
+@import '../hub-inspection-views.css';
 @import '../uniform-order-builder.css';
 @import './hub-admin-v2.css';
 @import './pages/equipment-intake.css';

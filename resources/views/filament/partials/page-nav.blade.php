@@ -3,11 +3,11 @@
         @include('filament.partials.contextual-back', ['destination' => $nav['back']])
         @if ($nav['adminHome'])
             <x-filament::button tag="a" :href="$nav['adminHome']" color="gray" icon="heroicon-o-squares-2x2" class="min-h-11 hub-page-nav__home" aria-label="Admin Home" data-hub-admin-home>
-                Admin Home
+                <span class="hub-page-nav__label">Admin Home</span>
             </x-filament::button>
         @endif
         <x-filament::button tag="a" :href="$nav['hubHome']" color="gray" icon="heroicon-o-home" class="min-h-11 hub-page-nav__home" aria-label="Hub Home" data-hub-home>
-            Hub Home
+            <span class="hub-page-nav__label">Hub Home</span>
         </x-filament::button>
     </div>
 @endif

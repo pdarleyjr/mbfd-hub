@@ -682,3 +682,15 @@ html:not(.dark) :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .
         animation-iteration-count: 1 !important;
     }
 }
+
+/*
+ * Shared page navigation (Back / Admin Home / Hub Home) inside Filament pages: breathing room
+ * under the top bar, matching the page header rhythm, and a one-row phone layout where the two
+ * home buttons drop to icon-only (their aria-label keeps the name) below ~420px.
+ */
+.fi-page > .hub-page-nav { margin-block: 1rem .75rem; }
+@media (max-width: 26.25rem) {
+    .fi-page > .hub-page-nav { flex-wrap: nowrap; gap: .375rem; }
+    .fi-page > .hub-page-nav > * { flex: none; padding-inline: .625rem; }
+    .fi-page > .hub-page-nav .hub-page-nav__label { display: none; }
+}

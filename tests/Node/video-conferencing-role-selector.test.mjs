@@ -19,8 +19,10 @@ test("conference entry mode is server-bound and all controls remain touch safe",
   assert.match(css, /env\(safe-area-inset-bottom\)/);
 });
 
-test("command entry uses the Admin presentation label and participant tiles render issued names", () => {
-  assert.match(app, /bootstrap\.entry_mode === 'command' \? 'Admin' : 'Employee Portal'/);
+test("command entry uses the 300 Command presentation label and participant tiles render issued names", () => {
+  assert.match(app, /bootstrap\.entry_mode === 'command' \? '300 Command' : 'Employee Portal'/);
+  assert.doesNotMatch(app, /'command' \? 'Admin'/);
+  assert.doesNotMatch(app, /No LiveKit connection/);
   assert.match(participantTile, /vc-tile__name">\{participant\.name \|\| 'MBFD participant'\}/);
 });
 
@@ -57,4 +59,16 @@ test("300 Command profile owns the Command lineup entry through the employee rou
   assert.doesNotMatch(command300, /<iframe/);
   assert.match(readFileSync(resolve(root, "resources/js/daily-checkout/src/App.tsx"), "utf8"), /path="\/command-300"/);
   assert.match(readFileSync(resolve(root, "resources/js/daily-checkout/src/utils/contextualBack.ts"), "utf8"), /Back to 300 Command/);
+});
+
+test("the conference app drops its own Back / Hub Home when a Filament page already renders them", () => {
+  const mount = readFileSync(resolve(root, "resources/js/video-conferencing/mount.tsx"), "utf8");
+  const page = readFileSync(resolve(root, "resources/views/filament/employee/pages/video-conferencing.blade.php"), "utf8");
+  const standalone = readFileSync(resolve(root, "resources/views/video-conferencing.blade.php"), "utf8");
+
+  assert.match(app, /embedded = false/);
+  assert.match(app, /\{!embedded && <nav className="vc-navigation"/);
+  assert.match(mount, /embedded=\{element\.dataset\.embedded === 'true'\}/);
+  assert.match(page, /data-embedded="true"/);
+  assert.doesNotMatch(standalone, /data-embedded/, "standalone station / command pages keep the app's own navigation");
 });

@@ -6,6 +6,7 @@ import { createClientSubmissionId, submitOrQueueWithResponse, type SubmissionOut
 import { ApiClient } from '../../utils/api';
 import { availableRoomAreas, roomDetailPrompt, roomsForArea, type RoomArea } from '../../utils/stationRoomBlueprint';
 import PreviousPageButton from '../PreviousPageButton';
+import DailyPageNav from '../DailyPageNav';
 
 type Priority = 'low' | 'normal' | 'high' | 'critical';
 type Reason = 'Damaged/Broken' | 'Lost' | 'Stolen' | 'Needed' | 'Replacement' | 'End of Service Life' | 'Other';
@@ -333,8 +334,8 @@ export default function StationRequestWizard() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-5 pb-[max(2rem,env(safe-area-inset-bottom))]">
-      <div className="flex items-center justify-between gap-4">
-        <PreviousPageButton contextual fallback={returnTo} className="inline-flex min-h-12 items-center gap-2 rounded-lg px-2 text-sm font-semibold text-hub-ink-secondary hover:text-hub-ink" />
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <DailyPageNav fallback={returnTo} className="!mb-0" />
         <span className="rounded-full bg-hub-surface-muted px-3 py-1 text-xs font-bold uppercase tracking-wide text-hub-blue">Station request</span>
       </div>
 

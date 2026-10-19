@@ -7,7 +7,7 @@ import './video-conferencing.css';
 export function mountConferenceApp(element: HTMLElement): () => void {
     const bootstrap = JSON.parse(element.dataset.bootstrap || '{}') as ConferenceBootstrap;
     const root = createRoot(element);
-    root.render(<StrictMode><ConferenceApp bootstrap={bootstrap} /></StrictMode>);
+    root.render(<StrictMode><ConferenceApp bootstrap={bootstrap} embedded={element.dataset.embedded === 'true'} /></StrictMode>);
 
     return () => root.unmount();
 }

@@ -14,19 +14,23 @@ interface StationCardMediaProps {
 
 /**
  * Media area shared by every card on the stations list (StationCard and
- * Command300Card) so all of them frame their photo identically: natural
- * aspect on narrow screens, a fixed-height cover crop from xl up.
+ * Command300Card) so all of them frame their photo identically: one fixed
+ * 16:10 box at every breakpoint with a cover crop, so card heights never
+ * depend on the source image's own aspect ratio.
  */
 export default function StationCardMedia({ src, alt, size, children }: StationCardMediaProps) {
   return (
-    <div className={`relative overflow-hidden border-b border-hub-glass-border bg-hub-n-100 ${src ? 'xl:h-48 2xl:h-56' : 'h-40 sm:h-48 2xl:h-56'}`}>
+    <div
+      data-testid="daily-station-card-media"
+      className="relative aspect-[16/10] w-full overflow-hidden border-b border-hub-glass-border bg-hub-n-100"
+    >
       {src ? (
         <img
           src={src}
           alt={alt}
           width={size?.width}
           height={size?.height}
-          className="h-auto w-full object-contain xl:h-full xl:object-cover"
+          className="absolute inset-0 h-full w-full object-cover"
           loading="lazy"
           decoding="async"
         />

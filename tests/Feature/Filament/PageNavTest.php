@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament;
 
+use App\Filament\Employee\Pages\MyVehicleInspections;
+use App\Filament\Employee\Pages\MyVehicleInspectionView;
+use App\Filament\Employee\Pages\VideoConferencing;
 use App\Filament\Pages\Dashboard as AdminDashboard;
 use App\Filament\Resources\StationResource\Pages\EditStation;
 use App\Filament\Resources\StationResource\Pages\ListStations;
@@ -13,6 +16,7 @@ use App\Models\Station;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Request;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -76,6 +80,50 @@ final class PageNavTest extends TestCase
         $this->assertSame('/', $nav['hubHome']);
         $this->assertSame('/', $nav['back']['url']);
         $this->assertStringNotContainsString('data-hub-admin-home', view('filament.partials.page-nav', ['nav' => $nav])->render());
+    }
+
+    public function test_a_child_page_declares_its_parent_so_back_returns_to_the_list_not_the_dashboard(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('employee'));
+        $this->requestAt('/employee/my-vehicle-inspections/5');
+
+        $nav = PageNav::resolve([MyVehicleInspectionView::class]);
+
+        $this->assertSame('/employee/my-vehicle-inspections', $nav['back']['url']);
+        $this->assertSame('Back to my inspections', $nav['back']['label']);
+        $this->assertNotSame('/employee/dashboard', $nav['back']['url']);
+        $this->assertSame('/employee/my-vehicle-inspections', MyVehicleInspectionView::navigationParentPath());
+        $this->assertSame('/employee/my-vehicle-inspections', parse_url(MyVehicleInspections::getUrl(panel: 'employee'), PHP_URL_PATH));
+    }
+
+    public function test_a_validated_return_to_restores_the_list_filters_and_page_and_unsafe_ones_fall_back_to_the_parent(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('employee'));
+        $list = '/employee/my-vehicle-inspections?tableFilters[review_status][value]=pending_review&page=2';
+
+        $this->requestAt('/employee/my-vehicle-inspections/5?return_to='.rawurlencode($list));
+        $this->assertSame($list, PageNav::resolve([MyVehicleInspectionView::class])['back']['url']);
+        $this->assertSame('Back to my inspections', PageNav::resolve([MyVehicleInspectionView::class])['back']['label']);
+
+        foreach (['https://evil.test/employee/dashboard', '//evil.test', 'javascript:alert(1)', '/employee/my-vehicle-inspections/5'] as $unsafe) {
+            $this->requestAt('/employee/my-vehicle-inspections/5?return_to='.rawurlencode($unsafe));
+            $this->assertSame('/employee/my-vehicle-inspections', PageNav::resolve([MyVehicleInspectionView::class])['back']['url'], $unsafe);
+        }
+    }
+
+    public function test_pages_that_do_not_declare_a_parent_keep_the_existing_employee_and_panel_behaviour(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('employee'));
+        $this->requestAt('/employee/video-conferencing');
+
+        $this->assertSame('/employee/dashboard', PageNav::resolve([VideoConferencing::class])['back']['url']);
+    }
+
+    private function requestAt(string $uri): void
+    {
+        $request = Request::create('http://localhost'.$uri);
+        $request->setLaravelSession($this->app['session.store']);
+        $this->app->instance('request', $request);
     }
 
     public function test_excluded_and_guest_contexts_render_nothing(): void

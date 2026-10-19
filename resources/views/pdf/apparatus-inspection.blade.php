@@ -167,9 +167,12 @@
         </table>
     @endif
 
-    <h2>Checklist results</h2>
     @forelse($detail['compartments'] as $compartment)
-        <table class="grid" style="margin-bottom:8px;">
+        {{-- The section heading travels with the first compartment table, and no compartment table is split
+             across pages, so the heading and table header are never stranded at the bottom of a page. --}}
+        <div class="avoid-break">
+        @if($loop->first)<h2>Checklist results</h2>@endif
+        <table class="grid avoid-break" style="margin-bottom:8px;">
             <thead>
                 <tr><th colspan="3" style="background:#dbe4f0; color:#14284b; font-size:9px;">{{ $compartment['name'] }}</th></tr>
                 <tr><th style="width:44%;">Item</th><th style="width:14%;">Status</th><th>Notes</th></tr>
@@ -191,7 +194,9 @@
             @endforeach
             </tbody>
         </table>
+        </div>
     @empty
+        <h2>Checklist results</h2>
         <p class="muted">No detailed checklist results were recorded for this inspection.</p>
     @endforelse
 
