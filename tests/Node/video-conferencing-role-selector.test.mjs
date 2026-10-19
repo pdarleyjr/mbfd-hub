@@ -8,6 +8,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const css = readFileSync(resolve(root, "resources/js/video-conferencing/video-conferencing.css"), "utf8");
 const app = readFileSync(resolve(root, "resources/js/video-conferencing/ConferenceApp.tsx"), "utf8");
 const participantTile = readFileSync(resolve(root, "resources/js/video-conferencing/ParticipantTile.tsx"), "utf8");
+const command300 = readFileSync(resolve(root, "resources/js/daily-checkout/src/components/Command300Page.tsx"), "utf8");
 const stationDetail = readFileSync(resolve(root, "resources/js/daily-checkout/src/components/StationDetailPage.tsx"), "utf8");
 
 test("conference entry mode is server-bound and all controls remain touch safe", () => {
@@ -39,6 +40,18 @@ test("station detail launches fixed station context without bundling LiveKit", (
   assert.match(stationDetail, /href(?:=\{|:\s*)`\/video-conferencing\/stations\/\$\{stationNumber\}`/);
   assert.match(stationDetail, /stationNumber === 2/);
   assert.match(stationDetail, /Morning Lineup Video Conference — Station 2/);
-  assert.match(stationDetail, /\/employee\/video-conferencing\/command\?return_to=/);
+  // 300 Command has its own profile; Station 2 no longer carries a Command shortcut.
+  assert.doesNotMatch(stationDetail, /\/employee\/video-conferencing\/command/);
+  assert.doesNotMatch(stationDetail, /300 Command/);
   assert.doesNotMatch(stationDetail, /from ['"]livekit-client['"]/);
+});
+
+test("300 Command profile owns the Command lineup entry through the employee route", () => {
+  assert.match(command300, /\/employee\/video-conferencing\/command\?return_to=%2Fdaily%2Fcommand-300/);
+  assert.match(command300, /Morning Lineup — Command/);
+  assert.match(command300, /https:\/\/cmd\.mbfdhub\.com/);
+  assert.match(command300, /target="_blank" rel="noopener noreferrer"/);
+  assert.doesNotMatch(command300, /<iframe/);
+  assert.match(readFileSync(resolve(root, "resources/js/daily-checkout/src/App.tsx"), "utf8"), /path="\/command-300"/);
+  assert.match(readFileSync(resolve(root, "resources/js/daily-checkout/src/utils/contextualBack.ts"), "utf8"), /Back to 300 Command/);
 });

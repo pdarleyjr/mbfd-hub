@@ -1,0 +1,89 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Feature\Filament;
+
+use App\Filament\Pages\Dashboard as AdminDashboard;
+use App\Filament\Resources\StationResource\Pages\EditStation;
+use App\Filament\Resources\StationResource\Pages\ListStations;
+use App\Filament\Support\PageNav;
+use App\Filament\Training\Pages\Dashboard as TrainingDashboard;
+use App\Models\Station;
+use App\Models\User;
+use Filament\Facades\Filament;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
+use Spatie\Permission\Models\Role;
+use Tests\TestCase;
+
+/** Shared page navigation contract: Back + Hub Home everywhere, plus Admin Home in the Admin panel. */
+final class PageNavTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->withoutVite();
+        $actor = User::factory()->create(['account_status' => 'active']);
+        $actor->assignRole(Role::findOrCreate('super_admin', 'web'));
+        $this->actingAs($actor);
+    }
+
+    public function test_admin_dashboard_list_and_resource_pages_render_back_admin_home_and_hub_home(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $station = Station::query()->create(['station_number' => 1, 'name' => 'Station 1', 'address' => '1 Main St', 'city' => 'Miami Beach', 'state' => 'FL', 'zip_code' => '33139', 'is_active' => true]);
+
+        foreach ([
+            [AdminDashboard::class, []],
+            [ListStations::class, []],
+            [EditStation::class, ['record' => $station->id]],
+        ] as [$page, $params]) {
+            $html = Livewire::test($page, $params)->html();
+            $this->assertStringContainsString('data-hub-page-nav', $html, $page);
+            $this->assertStringContainsString('data-hub-back', $html, $page);
+            // Filament renders valueless data attributes as name="name".
+            $this->assertSame(1, substr_count($html, 'data-hub-admin-home="'), $page);
+            $this->assertSame(1, substr_count($html, 'data-hub-home="'), $page);
+            $this->assertSame(1, substr_count($html, 'data-hub-page-nav'), $page);
+            $this->assertStringContainsString('aria-label="Admin Home"', $html, $page);
+            $this->assertStringContainsString('aria-label="Hub Home"', $html, $page);
+        }
+    }
+
+    public function test_back_never_points_at_the_current_page_and_parents_are_logical(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $dashboard = PageNav::resolve([AdminDashboard::class]);
+        $this->assertSame('/', $dashboard['back']['url']);
+        $this->assertSame('Back', $dashboard['back']['label']);
+        $this->assertSame('/admin', $dashboard['adminHome']);
+        $this->assertSame('/', $dashboard['hubHome']);
+
+        $list = PageNav::resolve([ListStations::class]);
+        $this->assertSame('/admin', $list['back']['url']);
+    }
+
+    public function test_non_admin_panels_get_back_and_hub_home_without_admin_home(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('training'));
+        $nav = PageNav::resolve([TrainingDashboard::class]);
+
+        $this->assertNull($nav['adminHome']);
+        $this->assertSame('/', $nav['hubHome']);
+        $this->assertSame('/', $nav['back']['url']);
+        $this->assertStringNotContainsString('data-hub-admin-home', view('filament.partials.page-nav', ['nav' => $nav])->render());
+    }
+
+    public function test_excluded_and_guest_contexts_render_nothing(): void
+    {
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        auth('web')->logout();
+
+        $this->assertNull(PageNav::resolve([AdminDashboard::class]));
+        $this->assertSame('', trim(view('filament.partials.page-nav', ['nav' => null])->render()));
+    }
+}

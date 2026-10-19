@@ -294,3 +294,37 @@ body:has(.identity-strip, .fi-simple-layout) {
     [data-hub-back] .hub-back-short { display: none; }
     [data-hub-back] .hub-back-label { display: inline; }
 }
+
+/*
+ * Shared page navigation group: Back, Admin Home (Admin panel only) and Hub Home.
+ * One treatment for Filament (page-nav.blade.php) and React (hub-ui/PageNav.tsx):
+ * compact, 44px touch targets, MBFD tokens, visible focus ring. Plain element
+ * selectors only; never add pseudo-elements to table elements here.
+ */
+.hub-page-nav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    margin-block-end: 12px;
+}
+.hub-page-nav > * { min-height: 44px; min-width: 44px; }
+.hub-page-nav__link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 14px;
+    border: 1px solid rgb(var(--hub-border));
+    border-radius: var(--hub-radius-md);
+    color: rgb(var(--hub-header));
+    background: rgb(var(--hub-surface));
+    font-size: 14px;
+    font-weight: 650;
+    line-height: 20px;
+    text-decoration: none;
+    cursor: pointer;
+}
+.hub-page-nav__link:hover { background: rgb(var(--hub-surface-muted)); color: rgb(var(--hub-blue)); }
+.hub-page-nav__link:focus-visible { outline: 2px solid rgb(var(--hub-focus)); outline-offset: 2px; }
+.hub-page-nav__link svg { width: 20px; height: 20px; flex: none; }
