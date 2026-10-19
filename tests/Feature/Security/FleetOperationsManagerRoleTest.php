@@ -22,15 +22,23 @@ final class FleetOperationsManagerRoleTest extends TestCase
 
     private const ACTOR_PASSWORD = 'Super-Admin-Current-2026!';
 
-    public function test_the_migration_provisions_one_role_with_the_whole_fleet_set(): void
+    public function test_the_first_assignment_provisions_one_role_with_the_whole_fleet_set(): void
     {
-        $role = Role::findByName(FleetOperationsManagerAssignment::ROLE, 'web');
+        self::assertTrue(Permission::query()->where('name', 'manage_pm_settings')->where('guard_name', 'web')->exists());
+        self::assertFalse(Role::query()->where('name', FleetOperationsManagerAssignment::ROLE)->exists(), 'Migrations create no roles.');
+        $service = app(FleetOperationsManagerAssignment::class);
+        $actor = $this->superAdmin();
 
+        $service->apply($actor, $this->member('FLEET-FIRST'), true, 'first');
+        $service->apply($actor, $this->member('FLEET-SECOND'), true, 'second');
+
+        $role = Role::findByName(FleetOperationsManagerAssignment::ROLE, 'web');
+        self::assertSame(1, Role::query()->where('name', FleetOperationsManagerAssignment::ROLE)->count());
         self::assertEqualsCanonicalizing(
             ['admin.access', 'admin.fleet.view', 'admin.fleet.manage', 'admin.stations.view', 'manage_pm_settings'],
             $role->permissions->pluck('name')->all(),
         );
-        self::assertSame(0, $role->users()->count(), 'Provisioning assigns no one.');
+        self::assertSame(2, $role->users()->count());
     }
 
     public function test_the_assignment_unlocks_fleet_tools_and_maintenance_controls_only(): void

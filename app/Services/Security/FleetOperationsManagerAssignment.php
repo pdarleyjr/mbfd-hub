@@ -90,11 +90,14 @@ final class FleetOperationsManagerAssignment
      */
     public function apply(User $actor, User $target, bool $enabled, string $reason): array
     {
-        $role = Role::query()->where('guard_name', 'web')->where('name', self::ROLE)->first();
-        $known = Permission::query()->where('guard_name', 'web')->whereIn('name', self::DIRECT_PERMISSIONS)->pluck('id', 'name');
-        if (! $role instanceof Role || $known->count() !== count(self::DIRECT_PERMISSIONS)) {
-            throw new AuthorizationException('The Fleet Operations Manager role has not been provisioned.');
+        $known = Permission::query()->where('guard_name', 'web')->whereIn('name', self::rolePermissions())->pluck('id', 'name');
+        if ($known->count() !== count(self::rolePermissions())) {
+            throw new AuthorizationException('The fleet permissions have not been provisioned.');
         }
+        // Provisioned here rather than in a migration: migrations create no roles.
+        $role = Role::findOrCreate(self::ROLE, 'web');
+        $role->givePermissionTo($known->keys()->all());
+        $known = $known->only(self::DIRECT_PERMISSIONS);
         $before = $target->permissions()->where('guard_name', 'web')->whereIn('name', self::DIRECT_PERMISSIONS)->pluck('name')->all();
         $hadRole = $target->hasRole(self::ROLE);
 
