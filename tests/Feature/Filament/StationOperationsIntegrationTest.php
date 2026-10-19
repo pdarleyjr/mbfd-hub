@@ -230,14 +230,14 @@ final class StationOperationsIntegrationTest extends TestCase
         $this->actingAsSuperAdmin();
 
         self::assertSame('/storage/stations/photos/front.jpg', $withPhoto->photoOrPlaceholderUrl());
-        self::assertSame('/images/stations/station-2.png', $bundled->photoOrPlaceholderUrl());
+        self::assertSame('/images/stations/station-2.webp', $bundled->photoOrPlaceholderUrl());
         self::assertSame(Station::PLACEHOLDER_IMAGE, $noArtwork->photoOrPlaceholderUrl());
 
         Livewire::test(ListStations::class)
             ->call('loadTable')
             ->assertTableColumnExists('photo')
             ->assertSee('/storage/stations/photos/front.jpg', false)
-            ->assertSee('/images/stations/station-2.png', false)
+            ->assertSee('/images/stations/station-2.webp', false)
             ->assertSee(Station::PLACEHOLDER_IMAGE, false)
             ->assertSee('No photo uploaded for Station 9', false);
 

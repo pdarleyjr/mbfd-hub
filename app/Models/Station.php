@@ -79,11 +79,19 @@ class Station extends Model
         }
 
         $number = (string) preg_replace('/\D/', '', (string) $this->getAttribute('station_number'));
-        $bundled = '/images/stations/station-'.$number.'.png';
+        if ($number === '') {
+            return self::PLACEHOLDER_IMAGE;
+        }
 
-        return $number !== '' && is_file(public_path(ltrim($bundled, '/')))
-            ? $bundled
-            : self::PLACEHOLDER_IMAGE;
+        // Optimized WebP first (browser-rendered only); the PNG original is the fallback.
+        foreach (['webp', 'png'] as $extension) {
+            $bundled = '/images/stations/station-'.$number.'.'.$extension;
+            if (is_file(public_path(ltrim($bundled, '/')))) {
+                return $bundled;
+            }
+        }
+
+        return self::PLACEHOLDER_IMAGE;
     }
 
     /**

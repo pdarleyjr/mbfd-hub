@@ -1,6 +1,7 @@
 import { Link } from 'react-router';
-import { ChevronRight, House, MapPin, Phone } from 'lucide-react';
-import { Station, stationImageUrl } from '../types';
+import { ChevronRight, MapPin, Phone } from 'lucide-react';
+import { Station, bundledImageSize, stationImageUrl } from '../types';
+import StationCardMedia from './StationCardMedia';
 
 interface StationCardProps {
   station: Station;
@@ -18,19 +19,7 @@ export default function StationCard({ station }: StationCardProps) {
       className="daily-selector-card hub-panel group block overflow-hidden text-hub-ink transition-colors hover:border-hub-blue/40 touch-manipulation font-hub"
     >
       {/* Station Image */}
-      <div className={`relative overflow-hidden border-b border-hub-glass-border bg-hub-n-100 ${imageUrl ? 'xl:h-48 2xl:h-56' : 'h-40 sm:h-48 2xl:h-56'}`}>
-        {imageUrl ? (
-          <img
-            src={imageUrl}
-            alt={`Station ${station.station_number}`}
-            className="h-auto w-full object-contain xl:h-full xl:object-cover"
-            loading="lazy"
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center">
-            <House className="h-12 w-12 text-hub-n-400" strokeWidth={1.5} aria-hidden="true" />
-          </div>
-        )}
+      <StationCardMedia src={imageUrl} alt={`Station ${station.station_number}`} size={bundledImageSize(imageUrl)}>
         {/* Station number: an opaque label on the photo, no blur on a level-1 surface. */}
         <span className="absolute left-3 top-3 rounded-hub-tag bg-hub-header px-2.5 py-1 text-[13px] font-bold leading-5 text-white">
           Station {station.station_number}
@@ -38,7 +27,7 @@ export default function StationCard({ station }: StationCardProps) {
         {!station.is_active && (
           <span className="hub-tag absolute right-3 top-3">Inactive</span>
         )}
-      </div>
+      </StationCardMedia>
 
       {/* Card Content */}
       <div className="p-4 sm:p-5 2xl:p-6">
