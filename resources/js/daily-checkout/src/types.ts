@@ -292,6 +292,49 @@ export function stationImageUrl(station: Pick<Station, 'station_number' | 'image
   return STATION_IMAGES[station.station_number] ?? null;
 }
 
+/** 300 Command is a unit profile, not a station row: it never has a station id or number. */
+export const COMMAND_300_IMAGE = '/images/stations/command-300.webp';
+
+export interface CommandOverviewApparatus {
+  id: number;
+  name: string | null;
+  unit_id: string | null;
+  type: string;
+  status: string | null;
+  service_state: 'in_service' | 'out_of_service' | 'unknown';
+  open_defects: number;
+  open_service_tickets: number;
+  daily_checkout_state: string | null;
+  last_checkout_at: string | null;
+}
+
+export interface CommandOverviewStation {
+  /** Station database id: the /daily/stations/:id route key. */
+  id: number;
+  station_number: number | string;
+  name: string;
+  is_active: boolean;
+  apparatus_count: number;
+  open_defects: number;
+  open_service_tickets: number;
+  last_checkout_at: string | null;
+  daily_checkout: {
+    required_total: number;
+    completed: number;
+    not_checked: number;
+    review_pending: number;
+    out_of_service: number;
+    completion_percent: number | null;
+  };
+  apparatuses: CommandOverviewApparatus[];
+}
+
+export interface CommandOverview {
+  generated_at: string;
+  total: number;
+  stations: CommandOverviewStation[];
+}
+
 export interface StationInspectionSummary {
   id: number;
   inspection_date: string;

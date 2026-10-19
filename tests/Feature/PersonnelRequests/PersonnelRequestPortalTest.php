@@ -141,6 +141,10 @@ class PersonnelRequestPortalTest extends TestCase
             ->assertDontSee('window.history.back()', false)
             ->assertDontSee('evil.example');
         $this->assertSame('/', $backTarget($dashboard->getContent()));
+        // One shared Hub Home control; the old dashboard-only button is gone.
+        $this->assertSame(1, substr_count($dashboard->getContent(), 'data-hub-home="'));
+        $this->assertStringNotContainsString('ep-home-btn', $dashboard->getContent());
+        $this->assertStringNotContainsString('data-hub-admin-home', $dashboard->getContent());
 
         $requestForm = $this->get('/employee/request-equipment')
             ->assertOk()

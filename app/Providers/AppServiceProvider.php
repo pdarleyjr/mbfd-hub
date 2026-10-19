@@ -189,9 +189,9 @@ class AppServiceProvider extends ServiceProvider
             fn (): \Illuminate\Contracts\View\View => view('filament.partials.navigation-state'),
         );
         \Filament\Support\Facades\FilamentView::registerRenderHook(
-            \Filament\View\PanelsRenderHook::PAGE_HEADER_ACTIONS_BEFORE,
-            fn (array $scopes): \Illuminate\Contracts\View\View => view('filament.partials.contextual-back', [
-                'destination' => \App\Filament\Support\ContextualBack::destination($scopes),
+            \Filament\View\PanelsRenderHook::PAGE_START,
+            fn (array $scopes): \Illuminate\Contracts\View\View => view('filament.partials.page-nav', [
+                'nav' => \App\Filament\Support\PageNav::resolve($scopes),
             ]),
         );
         // All Filament panels share one session-expiry boundary, including polls.

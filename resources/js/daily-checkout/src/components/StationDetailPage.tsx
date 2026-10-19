@@ -17,6 +17,7 @@ import {
 } from '../types';
 import { ApiClient, isApiAuthenticationError, redirectToLoginAfterSessionExpiry } from '../utils/api';
 import PreviousPageButton from './PreviousPageButton';
+import DailyPageNav from './DailyPageNav';
 import { identityForQueueCapture } from '../lib/offlineIdentity';
 import { groupRoomsByArea, stationComplement } from '../utils/stationRoomBlueprint';
 import Tabs, { type TabItem } from './ui/Tabs';
@@ -238,12 +239,6 @@ export default function StationDetailPage() {
       href: `/video-conferencing/stations/${stationNumber}`,
       icon: <Video size={20} />,
     }] : []),
-    ...(stationNumber === 2 ? [{
-      label: 'Morning Lineup — 300 Command',
-      href: `/employee/video-conferencing/command?return_to=${hubStationReturn}`,
-      icon: <ClipboardCheck size={20} />,
-      emphasis: true,
-    }] : []),
     ...(canRequestPersonnelEquipment ? [{ label: 'Personnel Equipment Request', href: `/employee/personnel-equipment-request?station_id=${station.id}&return_to=${hubStationReturn}`, icon: <ShieldCheck size={20} /> }] : []),
     { label: 'Station Request', to: stationRequestPath, icon: <ClipboardList size={20} /> },
     { label: 'Apparatus Service', href: apparatusServicePath, icon: <Wrench size={20} /> },
@@ -447,8 +442,8 @@ export default function StationDetailPage() {
 
   return (
     <div data-hub-ui="2" className="space-y-6 font-hub">
-      <div className="flex items-center justify-between gap-3">
-        <PreviousPageButton contextual className="-ml-2 px-2" />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <DailyPageNav className="!mb-0" />
         <Tag tone={station.is_active ? 'success' : 'neutral'}>{station.is_active ? 'Active' : 'Inactive'}</Tag>
       </div>
 

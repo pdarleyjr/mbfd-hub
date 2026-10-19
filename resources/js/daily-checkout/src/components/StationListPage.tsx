@@ -4,6 +4,8 @@ import { Station } from '../types';
 import { ApiClient, isApiAuthenticationError, redirectToLoginAfterSessionExpiry } from '../utils/api';
 import { useOffline } from '../hooks/useOffline';
 import StationCard from './StationCard';
+import Command300Card from './Command300Card';
+import DailyPageNav from './DailyPageNav';
 import { HubPageHeader } from '../../../hub-ui/HubShell';
 import { EmptyState, LoadError } from './ui/StateViews';
 
@@ -61,6 +63,7 @@ export default function StationListPage() {
   if (loading) {
     return (
       <div data-hub-ui="2" className="space-y-6 font-hub" role="status" aria-label="Loading stations">
+        <DailyPageNav fallback="/" />
         <div className="border-b border-hub-border pb-5">
           <span className="hub-skeleton mb-3 !h-7 w-56" />
           <span className="hub-skeleton !h-4 w-80 max-w-full" />
@@ -84,9 +87,8 @@ export default function StationListPage() {
   if (error) {
     return (
       <div data-hub-ui="2" className="mx-auto max-w-lg font-hub">
-        <LoadError title="Failed to load stations" message={error} onRetry={() => fetchStations()}>
-          <a href="/" className="hub-btn hub-btn--secondary text-hub-ink">Hub home</a>
-        </LoadError>
+        <DailyPageNav fallback="/" />
+        <LoadError title="Failed to load stations" message={error} onRetry={() => fetchStations()} />
       </div>
     );
   }
@@ -95,6 +97,7 @@ export default function StationListPage() {
 
   return (
     <div data-hub-ui="2" className="font-hub">
+      <DailyPageNav fallback="/" />
       <HubPageHeader
         eyebrow="Station operations"
         title="MBFD Stations"
@@ -126,19 +129,18 @@ export default function StationListPage() {
         </div>
       )}
 
-      {stations.length > 0 ? (
-        <div data-testid="daily-station-grid" className={GRID}>
-          {stations.map((station) => (
-            <StationCard key={station.id} station={station} />
-          ))}
-        </div>
-      ) : (
-        <div className="hub-panel">
+      <div data-testid="daily-station-grid" className={GRID}>
+        <Command300Card />
+        {stations.map((station) => (
+          <StationCard key={station.id} station={station} />
+        ))}
+      </div>
+      {stations.length === 0 && (
+        <div className="hub-panel mt-6">
           <EmptyState
             icon={<House className="hub-empty__icon" aria-hidden="true" />}
             title="No stations available"
             body="Stations appear here once they are set up in Administration."
-            action={<a href="/" className="hub-btn hub-btn--secondary">Hub home</a>}
           />
         </div>
       )}

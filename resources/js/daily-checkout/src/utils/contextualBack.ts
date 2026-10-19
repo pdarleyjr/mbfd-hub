@@ -1,4 +1,4 @@
-const DAILY_PATH = /^\/(?:stations|forms-hub|vehicle-inspections|apparatuses|apparatus|success)(?:\/|$)/;
+const DAILY_PATH = /^\/(?:stations|command-300|forms-hub|vehicle-inspections|apparatuses|apparatus|success)(?:\/|$)/;
 const HUB_PATH = /^\/(?:$|(?:admin|employee|training|workgroups|daily|updates|account|security-standards)(?:\/|$)|support\/issues(?:\/|$))/;
 
 export function safeContextualPath(candidate: string | null, origin: string): string | null {
@@ -28,7 +28,8 @@ export function contextualBackPath(search: string, fallback: string, origin: str
 
 export function contextualBackLabel(path: string): string {
   const pathname = path.split(/[?#]/)[0];
-  if (pathname === '/') return 'Back to Hub home';
+  if (pathname === '/') return 'Back';
+  if (pathname === '/daily/command-300') return 'Back to 300 Command';
   if (/^\/daily\/stations\/\d+\/rooms\/\d+$/.test(pathname)) return 'Back to room';
   if (/^\/daily\/stations\/\d+$/.test(pathname)) return 'Back to station';
   if (pathname === '/daily/stations') return 'Back to stations';

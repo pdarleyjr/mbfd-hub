@@ -1,5 +1,5 @@
 import {
-  Apparatus, ChecklistData, ChecklistField, ChecklistInputType, InspectionSubmission, InspectionRevision, EmployeeOption, ScheduledChecklistTask, Station, StationDetail,
+  Apparatus, CommandOverview, ChecklistData, ChecklistField, ChecklistInputType, InspectionSubmission, InspectionRevision, EmployeeOption, ScheduledChecklistTask, Station, StationDetail,
   Room, RoomAsset, RoomAudit, BigTicketRequest, BigTicketRequestFormData,
   StationInventorySubmission, InventorySubmissionItem, Shift,
   InventoryV2Response, SupplyRequest, UpdateItemRequest, CreateSupplyRequestRequest,
@@ -489,6 +489,18 @@ export class ApiClient {
     }
     const data = await response.json();
     return data.stations || data; // Extract stations array from response
+  }
+
+  /** Read-only, server-shaped overview of every active station for the 300 Command profile. */
+  static async getCommandOverview(): Promise<CommandOverview> {
+    const response = await fetchWithTimeout(`${API_BASE}/public/command/overview`, {
+      headers: { ...DEFAULT_HEADERS },
+      cache: 'no-store',
+    });
+    if (!response.ok) {
+      throw new ApiRequestError(await responseMessage(response, 'Failed to load the station overview'), response.status);
+    }
+    return response.json();
   }
 
   static async getStation(id: number): Promise<StationDetail> {

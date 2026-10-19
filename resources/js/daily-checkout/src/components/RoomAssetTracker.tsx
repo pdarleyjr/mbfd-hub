@@ -4,6 +4,7 @@ import { Boxes, ClipboardList, History } from 'lucide-react';
 import type { RoomProfile, StationRequestSummary } from '../types';
 import { ApiClient } from '../utils/api';
 import PreviousPageButton from './PreviousPageButton';
+import DailyPageNav from './DailyPageNav';
 import Tabs, { type TabItem } from './ui/Tabs';
 import Tag, { StatusTag } from './ui/Tag';
 import { EmptyState, LoadError, SkeletonRows } from './ui/StateViews';
@@ -80,7 +81,7 @@ export default function RoomAssetTracker() {
   return (
     <div data-hub-ui="2" className="space-y-5 font-hub">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <PreviousPageButton contextual fallback={`/stations/${stationId}`} className="-ml-2 px-2" />
+        <DailyPageNav fallback={`/stations/${stationId}`} className="!mb-0" />
         <Link to={newRequestPath} className="hub-btn hub-btn--primary">New room request</Link>
       </div>
 
