@@ -138,7 +138,7 @@ $request = Illuminate\Http\Request::create('/reset-password', 'POST', [
 $kernel = $app->make(Illuminate\Contracts\Http\Kernel::class);
 $response = $kernel->handle($request);
 $errors = $request->session()->get('errors');
-$status = $response->getStatusCode() === 302 && $request->session()->get('status') === 'Your password has been reset.'
+$status = $response->getStatusCode() === 302 && $request->session()->get('status') === 'Your password is set. Sign in with your Employee ID and new password.'
     ? 'won' : ($response->getStatusCode() === 302 && $errors?->has('employee_id') ? 'rejected' : 'unexpected');
 echo json_encode(['status' => $status, 'http_status' => $response->getStatusCode()], JSON_THROW_ON_ERROR);
 $kernel->terminate($request, $response);
