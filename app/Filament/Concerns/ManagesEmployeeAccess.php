@@ -9,8 +9,10 @@ use App\Exceptions\CurrentPasswordMismatch;
 use App\Filament\Support\EmployeeAccessSchema;
 use App\Models\User;
 use App\Rules\SafeNewPassword;
+use App\Services\Identity\MemberAccessEmail;
 use App\Services\Security\AccountSecurityService;
 use App\Services\Security\ApplicationAccessService;
+use App\Services\Security\FleetOperationsManagerAssignment;
 use App\Support\ApplicationAccessRegistry;
 use Filament\Actions\Action;
 use Filament\Forms\Components as Forms;
@@ -72,6 +74,16 @@ trait ManagesEmployeeAccess
             ->action(fn (array $data) => $this->runProtected(fn () => app(ApplicationAccessService::class)->setUniformManager(
                 $this->actor(), $this->targetAccount(), (bool) ($data['enabled'] ?? false), $data['current_password'], $data['reason'])));
 
+        $actions[] = Action::make('manageFleetOperationsManager')->label('Fleet Operations Manager')
+            ->visible(fn (): bool => $this->canManageAccountAccess())
+            ->fillForm(fn (): array => ['enabled' => FleetOperationsManagerAssignment::isAssigned($this->targetAccount())])
+            ->form([
+                Forms\Toggle::make('enabled')->label('Fleet Operations Manager')
+                    ->helperText('Gives this account the admin panel with the fleet tools: apparatus, defects, checkouts and their exceptions, service tickets, shop work, and preventative-maintenance settings, plus the station pages that show them. Turning it off removes the fleet access it granted.'),
+                ...$this->securityFields(),
+            ])
+            ->action(fn (array $data) => $this->runProtected(fn () => app(FleetOperationsManagerAssignment::class)->set(
+                $this->actor(), $this->targetAccount(), (bool) ($data['enabled'] ?? false), $data['current_password'], $data['reason'])));
         $actions[] = Action::make('manageMeetingRole')->label('Meeting role')
             ->visible(fn (): bool => $this->canManageAccountAccess() && $this->targetAccount()->hasDirectWebPermission('app.meeting.access'))
             ->fillForm(fn (): array => ['meeting_role' => app(\App\Services\Security\ApplicationRoleResolver::class)->forUser($this->targetAccount()->fresh(), 'meeting') ?? 'viewer'])
@@ -143,6 +155,36 @@ trait ManagesEmployeeAccess
                     }
                 }));
         }
+
+        $actions[] = Action::make('sendAccessEmail')->label('Email setup or reset link')
+            ->visible(function (): bool {
+                $target = $this->accountOrNull();
+                $record = $this->getRecord();
+
+                return $target !== null && $record instanceof \App\Models\Employee
+                    && app(AccountSecurityService::class)->canPerform($this->actor(), $target, AccountSecurityAction::AdministrativeRecovery)
+                    && app(MemberAccessEmail::class)->diagnose($record)['can_send'];
+            })
+            ->requiresConfirmation()
+            ->modalHeading('Email a setup or reset link?')
+            ->modalDescription(function (): string {
+                $record = $this->getRecord();
+
+                return $record instanceof \App\Models\Employee
+                    ? app(MemberAccessEmail::class)->diagnose($record)['message'].' The member chooses their own password; no access changes.'
+                    : '';
+            })
+            ->modalSubmitActionLabel('Send link')
+            ->action(function (): void {
+                $record = $this->getRecord();
+                abort_unless($record instanceof \App\Models\Employee, 404);
+                $status = app(MemberAccessEmail::class)->request((string) $record->employee_id, $this->actor());
+                $sent = in_array($status, ['setup_queued', 'reset_queued'], true);
+                Notification::make()->{$sent ? 'success' : 'warning'}()
+                    ->title($sent ? 'Link queued for delivery' : 'Link not sent')
+                    ->body($sent ? 'It goes only to the address on file.' : app(MemberAccessEmail::class)->diagnose($record)['message'])
+                    ->send();
+            });
 
         return [
             Action::make('manageWorkgroups')->label('Workgroups')->color('gray')

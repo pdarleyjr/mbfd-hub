@@ -6,7 +6,6 @@ namespace App\Services\Identity;
 
 use App\Enums\AccountStatus;
 use App\Exceptions\MemberBootstrapStateChanged;
-use App\Jobs\IssueMemberOnboardingInvitation;
 use App\Models\Employee;
 use App\Models\EmployeeBidAssignment;
 use App\Models\MemberActivationAttempt;
@@ -18,7 +17,6 @@ use App\Services\Security\SecurityAuditRecorder;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\RateLimiter;
 use Throwable;
 
 /**
@@ -33,7 +31,6 @@ final class MemberSelfServiceActivation
 {
     public function __construct(
         private readonly AccountSecurityService $security,
-        private readonly MemberOnboardingInvitationService $invitations,
         private readonly SecurityAuditRecorder $audit,
         private readonly CloudflareEmailDispatcher $email,
     ) {}
@@ -137,42 +134,6 @@ final class MemberSelfServiceActivation
         }
 
         return $activated;
-    }
-
-    /**
-     * Ask the existing invitation pipeline to email the member's approved City
-     * address. The caller never learns whether anything was sent.
-     */
-    public function requestEmailInvitation(string $employeeId): void
-    {
-        $identity = $this->soleIdentity($employeeId);
-        if ($identity === null || config('queue.default') === 'sync') {
-            return;
-        }
-        $employee = Employee::query()->find($identity['employee_profile_id']);
-        $user = User::query()->find($identity['user_id']);
-        if (! $employee instanceof Employee || ! $user instanceof User
-            || $this->hasElevatedAccess($user)
-            || $this->invitations->assess($employee)['status'] !== 'ready') {
-            return;
-        }
-        // Bound what a stranger who knows an Employee ID can make the Hub send:
-        // two links a day per member, and a ceiling across all members that
-        // leaves the shared email budget for administrators and recovery.
-        $memberKey = 'member-activation-email:member:'.$user->id;
-        $globalKey = 'member-activation-email:global';
-        if (RateLimiter::tooManyAttempts($memberKey, 2) || RateLimiter::tooManyAttempts($globalKey, 40)) {
-            return;
-        }
-        RateLimiter::hit($memberKey, 86400);
-        RateLimiter::hit($globalKey, 3600);
-
-        $this->audit->record($user, $user, 'member_onboarding_invitation_self_requested', 'allowed', null, [
-            'employee_profile_id' => $employee->id,
-        ]);
-        IssueMemberOnboardingInvitation::dispatch($user->id, null, IssueMemberOnboardingInvitation::bindingHash(
-            $user->id, $employee->employee_id, (string) $employee->city_email, $user->security_version,
-        ));
     }
 
     public function eligible(User $user, Employee $employee): bool

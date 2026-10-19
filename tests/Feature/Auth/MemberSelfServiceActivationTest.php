@@ -19,6 +19,7 @@ use App\Models\User;
 use App\Services\Identity\AccountSecurityService;
 use App\Services\Identity\CityEmailVerificationService;
 use App\Services\Identity\EstablishedAccountIntegritySnapshot;
+use App\Services\Identity\MemberAccessEmail;
 use App\Services\Identity\MemberSelfServiceActivation;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -443,7 +444,7 @@ final class MemberSelfServiceActivationTest extends TestCase
 
         $this->get('/login')->assertOk()->assertSee('Activate Your Account');
         $this->get('/activate')->assertRedirect('/activate/email');
-        $this->get('/activate/email')->assertOk()->assertSee('Email my setup link')->assertDontSee('bid shift and unit');
+        $this->get('/activate/email')->assertOk()->assertSee('Email my link')->assertDontSee('bid shift and unit');
         $this->post('/activate', $this->form('ANY'))->assertNotFound();
     }
 
@@ -463,7 +464,7 @@ final class MemberSelfServiceActivationTest extends TestCase
                 $member->id, 'EMAIL-REQ', 'email-req@miamibeachfl.gov', 1,
             )));
         self::assertDatabaseHas('security_action_events', [
-            'target_user_id' => $member->id, 'action' => 'member_onboarding_invitation_self_requested',
+            'target_user_id' => $member->id, 'action' => 'member_access_email_requested', 'reason' => 'setup_queued',
         ]);
     }
 
@@ -499,24 +500,29 @@ final class MemberSelfServiceActivationTest extends TestCase
         $this->post('/activate/email', ['employee_id' => 'EMAIL-LIMIT'])->assertSessionHasErrors('employee_id');
     }
 
-    public function test_member_requested_email_is_capped_per_member_and_refused_for_privileged_accounts(): void
+    public function test_member_requested_email_is_capped_per_member_and_includes_privileged_accounts(): void
     {
         config()->set('queue.default', 'database');
         Queue::fake();
         $member = $this->pending('EMAIL-CAP');
         $admin = $this->pending('EMAIL-ADMIN');
         $admin->assignRole(Role::findOrCreate('admin', 'web'));
-        $activation = app(MemberSelfServiceActivation::class);
+        $accessEmail = app(MemberAccessEmail::class);
 
         for ($attempt = 0; $attempt < 4; $attempt++) {
-            $activation->requestEmailInvitation('EMAIL-CAP');
+            $accessEmail->request('EMAIL-CAP');
         }
-        $activation->requestEmailInvitation('EMAIL-ADMIN');
+        // A setup link proves control of the approved City mailbox, exactly as
+        // password reset does; it grants nothing, so administrators get one too.
+        $accessEmail->request('EMAIL-ADMIN');
 
         // The job is unique per member, and the daily cap bounds repeats after it runs.
-        Queue::assertPushed(IssueMemberOnboardingInvitation::class, 1);
+        Queue::assertPushed(IssueMemberOnboardingInvitation::class, 2);
         Queue::assertPushed(fn (IssueMemberOnboardingInvitation $job): bool => $job->userId === $member->id);
-        self::assertSame(2, SecurityActionEvent::query()->where('action', 'member_onboarding_invitation_self_requested')->count());
+        Queue::assertPushed(fn (IssueMemberOnboardingInvitation $job): bool => $job->userId === $admin->id);
+        self::assertSame(3, SecurityActionEvent::query()->where('target_user_id', $member->id)->where('result', 'allowed')->count());
+        self::assertSame('throttled', SecurityActionEvent::query()->where('target_user_id', $member->id)->latest('id')->value('reason'));
+        self::assertSame(['admin'], $admin->fresh()->getRoleNames()->all());
     }
 
     public function test_activation_continues_a_pending_connected_application_sign_in(): void
