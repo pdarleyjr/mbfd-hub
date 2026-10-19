@@ -545,6 +545,7 @@ class ApparatusResource extends Resource
                         ->tooltip('View all inspections for this apparatus')
                         ->url(fn (Apparatus $record): string => static::getUrl('edit', ['record' => $record])),
                     Tables\Actions\Action::make('updateStatus')
+                        ->authorize(fn (Apparatus $record): bool => auth()->user()?->can('manageService', $record) ?? false)
                         ->label('Status')
                         ->icon('heroicon-m-arrow-path')
                         ->color('info')
@@ -572,6 +573,7 @@ class ApparatusResource extends Resource
                                 ->send();
                         }),
                     Tables\Actions\Action::make('scheduleService')
+                        ->authorize(fn (Apparatus $record): bool => auth()->user()?->can('manageService', $record) ?? false)
                         ->label('Schedule Service')
                         ->icon('heroicon-o-calendar-days')
                         ->color('primary')
@@ -643,6 +645,7 @@ class ApparatusResource extends Resource
                                 ->send();
                         }),
                     Tables\Actions\Action::make('logPmService')
+                        ->authorize(fn (Apparatus $record): bool => auth()->user()?->can('manageService', $record) ?? false)
                         ->label('Log PM')
                         ->icon('heroicon-o-wrench-screwdriver')
                         ->color(fn (Apparatus $record): string => $record->isPmDue() ? 'danger' : 'gray')
