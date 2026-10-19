@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\ApparatusInspection;
 use App\Models\User;
+use App\Services\Inspections\EmployeeInspectionHistoryService;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
 class ApparatusInspectionPolicy
@@ -24,6 +25,16 @@ class ApparatusInspectionPolicy
     public function view(User $user, ApparatusInspection $apparatusInspection): bool
     {
         return $user->can('view_inspection');
+    }
+
+    /**
+     * Determine whether the user submitted this inspection. Attribution is by
+     * foreign key only (authenticated user or linked employee); the free-text
+     * operator_name snapshot never grants access.
+     */
+    public function viewOwn(User $user, ApparatusInspection $apparatusInspection): bool
+    {
+        return app(EmployeeInspectionHistoryService::class)->owns($user, $apparatusInspection);
     }
 
     /**

@@ -63,6 +63,7 @@ class EmployeePanelProvider extends PanelProvider
             ->pages([
                 EmployeeDashboard::class,
                 \App\Filament\Employee\Pages\TrainingHistoryPage::class,
+                \App\Filament\Employee\Pages\MyVehicleInspections::class, \App\Filament\Employee\Pages\MyVehicleInspectionView::class,
                 OperationalForms::class,
                 VideoConferencing::class,
                 MyEquipmentPage::class,
