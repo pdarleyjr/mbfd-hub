@@ -103,6 +103,51 @@ final class MyVehicleInspectionsTest extends TestCase
             ->assertCanNotSeeTableRecords(array_slice(array_reverse($rows), 0, 10));
     }
 
+    public function test_rows_link_to_the_detail_with_this_lists_filters_and_page_as_return_to(): void
+    {
+        [$me] = $this->member('M-105', 'Alex Member');
+        $inspection = $this->inspection($this->apparatus(), ['actor_user_id' => $me->id, 'review_status' => 'pending_review']);
+        $detail = '/employee/my-vehicle-inspections/'.$inspection->id;
+
+        $plain = $this->livewireAs($me)->instance()->getTable()->getRecordUrl($inspection);
+        parse_str((string) parse_url($plain, PHP_URL_QUERY), $query);
+        $this->assertSame($detail, parse_url($plain, PHP_URL_PATH));
+        $this->assertSame('/employee/my-vehicle-inspections', $query['return_to']);
+
+        $filtered = $this->livewireAs($me)
+            ->filterTable('review_status', 'pending_review')
+            ->instance()->getTable()->getRecordUrl($inspection);
+        parse_str((string) parse_url($filtered, PHP_URL_QUERY), $query);
+        $this->assertStringStartsWith('/employee/my-vehicle-inspections?', $query['return_to']);
+        parse_str((string) parse_url($query['return_to'], PHP_URL_QUERY), $restored);
+        $this->assertSame('pending_review', $restored['tableFilters']['review_status']['value']);
+    }
+
+    public function test_list_collapses_to_a_phone_card_and_four_desktop_columns_with_actions_always_present(): void
+    {
+        [$me] = $this->member('M-106', 'Alex Member');
+        $this->inspection($this->apparatus(), [
+            'actor_user_id' => $me->id,
+            'review_status' => 'pending_review',
+            'processing_status' => 'accepted_with_exception',
+            'results' => $this->results('Missing'),
+        ]);
+
+        $page = $this->livewireAs($me);
+        $table = $page->instance()->getTable();
+        $columns = collect($table->getColumns());
+
+        $this->assertTrue($columns->get('summary')->getHiddenFrom() === 'md', 'the phone card hides from md up');
+        $this->assertSame('md', $columns->get('review_status')->getVisibleFrom());
+        $this->assertTrue($columns->get('inspection_reference')->isToggleable());
+        $this->assertTrue($columns->get('inspection_reference')->isToggledHiddenByDefault());
+        $this->assertNull($columns->get('processing_status'), 'processing is folded into one status column');
+
+        // The long processing label becomes a short note plus a tooltip, never a wide badge.
+        $page->assertSee('Pending review')->assertSee('Meter flagged')->assertDontSee('Accepted, meter reading flagged</span>', false);
+        $page->assertSee('View')->assertSee('PDF');
+    }
+
     public function test_list_query_count_does_not_grow_with_the_number_of_rows(): void
     {
         [$me] = $this->member('M-103', 'Alex Member');
@@ -130,6 +175,23 @@ final class MyVehicleInspectionsTest extends TestCase
             ->assertSee('Hose bundle is short one length');
 
         $this->actingAs($other)->get("/employee/my-vehicle-inspections/{$inspection->id}")->assertForbidden();
+    }
+
+    public function test_detail_has_one_back_to_the_list_and_no_duplicate_header_button(): void
+    {
+        [$me] = $this->member('M-107', 'Alex Member');
+        $inspection = $this->inspection($this->apparatus(), ['actor_user_id' => $me->id]);
+        $this->actingAs($me);
+        $this->bindCanonicalSessionToLivewireTestRequests();
+        Filament::setCurrentPanel(Filament::getPanel('employee'));
+
+        $page = Livewire::test(\App\Filament\Employee\Pages\MyVehicleInspectionView::class, ['inspection' => $inspection->id]);
+        $this->assertSame(['pdf', 'print'], array_map(fn ($action) => $action->getName(), array_values($page->instance()->getCachedHeaderActions())));
+
+        $html = $this->get("/employee/my-vehicle-inspections/{$inspection->id}")->assertOk()->getContent();
+        $this->assertSame(1, substr_count($html, 'data-hub-back="'));
+        $this->assertStringContainsString('Back to my inspections', $html);
+        $this->assertMatchesRegularExpression('#href="[^"]*/employee/my-vehicle-inspections"[^>]*aria-label="Back to my inspections"|aria-label="Back to my inspections"[^>]*href="[^"]*/employee/my-vehicle-inspections"#', $html);
     }
 
     public function test_detail_follow_up_maps_real_defect_and_ticket_state_without_fabricating(): void

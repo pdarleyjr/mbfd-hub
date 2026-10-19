@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { readDrafts } from './support/daily-checkout-drafts';
 
 declare global {
@@ -73,7 +73,7 @@ async function waitForCachedDailyShell(page: Page): Promise<string[]> {
   expect(emittedAssets.filter(asset => asset.endsWith('.png')).length).toBeGreaterThanOrEqual(15);
 
   await expect.poll(async () => page.evaluate(async expectedAssets => {
-    const cache = await caches.open('mbfd-checkout-v9');
+    const cache = await caches.open('mbfd-checkout-v10');
     const cachedPaths = (await cache.keys()).map(request => new URL(request.url).pathname);
 
     return Boolean(await cache.match('/daily/index.html'))
@@ -151,10 +151,10 @@ test('installed Daily worker caches the shell and an offline queue survives relo
 
   const cacheEvidence = await page.evaluate(async () => ({
     names: await caches.keys(),
-    shell: Boolean(await (await caches.open('mbfd-checkout-v9')).match('/daily/index.html')),
-    assets: (await (await caches.open('mbfd-checkout-v9')).keys()).map(request => new URL(request.url).pathname),
+    shell: Boolean(await (await caches.open('mbfd-checkout-v10')).match('/daily/index.html')),
+    assets: (await (await caches.open('mbfd-checkout-v10')).keys()).map(request => new URL(request.url).pathname),
   }));
-  expect(cacheEvidence.names).toContain('mbfd-checkout-v9');
+  expect(cacheEvidence.names).toContain('mbfd-checkout-v10');
   expect(cacheEvidence.names).not.toContain('mbfd-checkout-v6');
   expect(cacheEvidence.names).not.toContain('mbfd-api-cache-v6');
   expect(cacheEvidence.shell).toBe(true);
@@ -309,4 +309,55 @@ test('a worker update check does not erase unresolved legacy work', async ({ pag
   });
 
   expect(await queuedInspections(page)).toHaveLength(1);
+});
+
+const stationImagePath = '/images/stations/station-1.webp';
+const stationImageBytes = readFileSync('public/images/stations/station-1.webp');
+
+/** Decodes the image through the page (and so through the worker); resolves its natural size. */
+async function decodeStationImage(page: Page): Promise<{ width: number; height: number }> {
+  return page.evaluate(async path => {
+    const image = new Image();
+    image.src = path;
+    await image.decode();
+    return { width: image.naturalWidth, height: image.naturalHeight };
+  }, stationImagePath);
+}
+
+test('a truncated station photo left in the old cache is purged, and a corrupt current copy is replaced from the network', async ({ page, context }) => {
+  let imageRequests = 0;
+  await context.route(`**${stationImagePath}`, route => {
+    imageRequests += 1;
+    return route.fulfill({ body: stationImageBytes, contentType: 'image/webp', headers: { 'content-length': String(stationImageBytes.length) } });
+  });
+  // The previous release cached images forever; seed a truncated copy exactly where it lived.
+  await page.goto('/daily/manifest.json');
+  await page.evaluate(async ({ path, bytes }) => {
+    const truncated = new Response(new Uint8Array(bytes).slice(0, 1024), { headers: { 'Content-Type': 'image/webp' } });
+    await (await caches.open('mbfd-checkout-v9')).put(path, truncated);
+  }, { path: stationImagePath, bytes: [...stationImageBytes.subarray(0, 1024)] });
+
+  await installApiFixture(page);
+  await page.goto('/daily/');
+  await waitForControlledWorker(page);
+  await waitForCachedDailyShell(page);
+  expect(await page.evaluate(() => caches.keys())).not.toContain('mbfd-checkout-v9');
+
+  // Even a corrupt entry in the current cache must not be served while the network is up.
+  await page.evaluate(async ({ path, bytes }) => {
+    await (await caches.open('mbfd-checkout-v10')).put(path, new Response(new Uint8Array(bytes), { headers: { 'Content-Type': 'image/webp' } }));
+  }, { path: stationImagePath, bytes: [...stationImageBytes.subarray(0, 1024)] });
+  const before = imageRequests;
+
+  const size = await decodeStationImage(page);
+
+  expect(size).toEqual({ width: 1200, height: 1200 });
+  expect(imageRequests).toBeGreaterThan(before);
+  await expect.poll(() => page.evaluate(async path => (await (await (await caches.open('mbfd-checkout-v10')).match(path))?.arrayBuffer())?.byteLength, stationImagePath), { timeout: 10_000 }).toBe(stationImageBytes.length);
+
+  // The verified copy is the offline fallback (drop the network mock so offline is real).
+  await context.unroute(`**${stationImagePath}`);
+  await context.setOffline(true);
+  expect(await decodeStationImage(page)).toEqual({ width: 1200, height: 1200 });
+  await context.setOffline(false);
 });

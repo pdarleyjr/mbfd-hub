@@ -3,7 +3,7 @@ import { Link } from 'react-router';
 import { ChevronRight, Search, Truck } from 'lucide-react';
 import { Apparatus } from '../types';
 import { ApiClient } from '../utils/api';
-import PreviousPageButton from './PreviousPageButton';
+import DailyPageNav from './DailyPageNav';
 import InspectionRevisions from './InspectionRevisions';
 import { HubPageHeader } from '../../../hub-ui/HubShell';
 import Tag from './ui/Tag';
@@ -67,6 +67,7 @@ export default function VehicleInspectionSelect() {
   if (loading) {
     return (
       <div data-hub-ui="2" className="space-y-6 font-hub" role="status" aria-label="Loading vehicles">
+        <DailyPageNav />
         <div className="border-b border-hub-border pb-5">
           <span className="hub-skeleton mb-3 !h-7 w-56" />
           <span className="hub-skeleton !h-4 w-72 max-w-full" />
@@ -90,15 +91,15 @@ export default function VehicleInspectionSelect() {
   if (error) {
     return (
       <div data-hub-ui="2" className="mx-auto max-w-lg font-hub">
-        <LoadError title="Failed to load vehicles" message={error} onRetry={fetchApparatuses}>
-          <PreviousPageButton contextual className="hub-btn hub-btn--secondary" />
-        </LoadError>
+        <DailyPageNav />
+        <LoadError title="Failed to load vehicles" message={error} onRetry={fetchApparatuses} />
       </div>
     );
   }
 
   return (
     <div data-hub-ui="2" className="font-hub">
+      <DailyPageNav />
       <InspectionRevisions />
       <HubPageHeader eyebrow="Daily Checkout" title="Vehicle Inspections" description="Select a vehicle to begin the daily inspection." />
 
@@ -170,10 +171,6 @@ export default function VehicleInspectionSelect() {
           />
         </div>
       )}
-
-      <div className="mt-8 text-center">
-        <PreviousPageButton contextual className="px-2" />
-      </div>
     </div>
   );
 }

@@ -48,8 +48,8 @@ async function mockDailySelectorApi(page: Page): Promise<void> {
     if (path === '/images/icons/checkout-apparatus.svg') {
       return route.fulfill({ path: resolve('public/images/icons/checkout-apparatus.svg'), contentType: 'image/svg+xml' });
     }
-    if (/^\/images\/stations\/station-(1|2|3|4|6)\.png$/.test(path)) {
-      return route.fulfill({ path: resolve('public', path.slice(1)), contentType: 'image/png' });
+    if (/^\/images\/stations\/(station-(1|2|3|4|6)|command-300-wide)\.webp$/.test(path)) {
+      return route.fulfill({ path: resolve('public', path.slice(1)), contentType: 'image/webp' });
     }
 
     return route.fulfill({ status: 204 });
@@ -210,6 +210,32 @@ test('station selector stays visible, touchable, and horizontally contained at e
       return hit !== null && element.closest('[data-testid="daily-station-card"]') === hit.closest('[data-testid="daily-station-card"]');
     })).toBe(true);
   }
+  // 300 Command frames its photo exactly like the station cards: same fit, same frame height.
+  const commandPhoto = page.getByTestId('daily-command-card').getByRole('img');
+  await commandPhoto.scrollIntoViewIfNeeded();
+  await expect.poll(() => commandPhoto.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
+  const commandComposition = await commandPhoto.evaluate((image: HTMLImageElement) => {
+    const box = image.getBoundingClientRect();
+    const frame = image.parentElement!.getBoundingClientRect();
+    return {
+      naturalRatio: image.naturalWidth / image.naturalHeight,
+      displayedRatio: box.width / box.height,
+      fit: getComputedStyle(image).objectFit,
+      frameHeight: frame.height,
+      frameWidth: frame.width,
+      boxWidth: box.width,
+      src: image.currentSrc,
+    };
+  });
+  expect(commandComposition.src).toContain('/images/stations/command-300-wide.webp');
+  expect(commandComposition.boxWidth).toBeCloseTo(commandComposition.frameWidth, 0);
+  if (viewportWidth < 1_280) {
+    expect(Math.abs(commandComposition.displayedRatio - commandComposition.naturalRatio)).toBeLessThan(0.01);
+  } else {
+    expect(commandComposition.fit).toBe('cover');
+    expect(commandComposition.frameHeight).toBe(viewportWidth >= 1_536 ? 224 : 192);
+  }
+
   await page.getByTestId('daily-station-card').first().scrollIntoViewIfNeeded();
   await expectNoHorizontalOverflow(page);
 

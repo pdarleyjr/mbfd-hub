@@ -33,17 +33,34 @@ class ServiceTicketsRelationManager extends RelationManager
             ->recordTitleAttribute('ticket_number')
             ->recordUrl(fn (ApparatusServiceTicket $record): ?string => self::ticketUrl($record))
             ->columns([
-                Tables\Columns\TextColumn::make('ticket_number')->label('Ticket')->searchable()->sortable(),
-                Tables\Columns\TextColumn::make('title')->limit(55)->searchable(),
-                Tables\Columns\TextColumn::make('category')->badge(),
-                Tables\Columns\TextColumn::make('priority')->badge(),
+                // The title wraps under the ticket number instead of taking a column; category and the
+                // schedule dates are one click away in the column toggle, so View is never clipped.
+                Tables\Columns\TextColumn::make('ticket_number')
+                    ->label('Ticket')
+                    ->searchable(['ticket_number', 'title'])
+                    ->sortable()
+                    ->weight('semibold')
+                    ->description(fn (ApparatusServiceTicket $record): string => (string) $record->title)
+                    ->wrap()
+                    ->visibleFrom('md'),
+                // Phones: ticket, status and title in one column so View stays on screen.
+                Tables\Columns\TextColumn::make('ticket_phone')
+                    ->label('Ticket')
+                    ->getStateUsing(fn (ApparatusServiceTicket $record): string => (string) $record->ticket_number)
+                    ->weight('semibold')
+                    ->description(fn (ApparatusServiceTicket $record): string => ApparatusServiceTicketStatus::from($record->status)->label().' · '.$record->title)
+                    ->wrap()
+                    ->hiddenFrom('md'),
+                Tables\Columns\TextColumn::make('priority')->badge()->visibleFrom('md'),
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
                     ->formatStateUsing(fn (string $state): string => ApparatusServiceTicketStatus::from($state)->label())
-                    ->color(fn (string $state): string => ApparatusServiceTicketStatus::from($state)->color()),
-                Tables\Columns\TextColumn::make('created_at')->dateTime()->sortable(),
-                Tables\Columns\TextColumn::make('scheduled_for')->dateTime()->placeholder('Not scheduled')->sortable(),
-                Tables\Columns\TextColumn::make('completed_at')->dateTime()->placeholder('Open')->sortable(),
+                    ->color(fn (string $state): string => ApparatusServiceTicketStatus::from($state)->color())
+                    ->visibleFrom('md'),
+                Tables\Columns\TextColumn::make('created_at')->label('Created')->date('M j, Y')->sortable()->visibleFrom('md'),
+                Tables\Columns\TextColumn::make('category')->badge()->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('scheduled_for')->dateTime()->placeholder('Not scheduled')->sortable()->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('completed_at')->dateTime()->placeholder('Open')->sortable()->toggleable(isToggledHiddenByDefault: true),
             ])
             ->defaultSort('created_at', 'desc')
             ->actions([

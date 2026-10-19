@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Employee\Pages;
 
 use App\Concerns\ResolvesCanonicalEmployee;
+use App\Filament\Support\HasNavigationParent;
 use App\Models\ApparatusInspection;
 use App\Models\User;
 use App\Services\Inspections\EmployeeInspectionHistoryService;
@@ -15,7 +16,7 @@ use Filament\Pages\Page;
  * Read-only detail of one Daily Checkout the signed-in member submitted.
  * There are no edit or delete actions: submitted evidence is immutable.
  */
-class MyVehicleInspectionView extends Page
+class MyVehicleInspectionView extends Page implements HasNavigationParent
 {
     use ResolvesCanonicalEmployee;
 
@@ -36,6 +37,16 @@ class MyVehicleInspectionView extends Page
     public function getTitle(): string
     {
         return 'Vehicle Inspection';
+    }
+
+    public static function navigationParentPath(): string
+    {
+        return parse_url(MyVehicleInspections::getUrl(panel: 'employee'), PHP_URL_PATH) ?: '/employee/my-vehicle-inspections';
+    }
+
+    public static function navigationParentLabel(): string
+    {
+        return 'Back to my inspections';
     }
 
     /** @return array<string, string> */
@@ -61,11 +72,6 @@ class MyVehicleInspectionView extends Page
                 ->color('gray')
                 ->url(route('employee.vehicle-inspections.pdf', ['inspection' => $this->inspectionId, 'inline' => 1]))
                 ->openUrlInNewTab(),
-            Action::make('back')
-                ->label('Back to my inspections')
-                ->icon('heroicon-o-arrow-left')
-                ->color('gray')
-                ->url(MyVehicleInspections::getUrl(panel: 'employee')),
         ];
     }
 

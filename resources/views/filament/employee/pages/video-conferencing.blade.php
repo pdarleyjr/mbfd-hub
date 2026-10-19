@@ -15,6 +15,7 @@
         <div
             id="video-conferencing-root"
             data-bootstrap='@json($conferenceBootstrap)'
+            data-embedded="true"
             aria-label="MBFD video conferencing workspace"
             x-data
             x-init="window.matchMedia('(max-width: 1023px)').matches && $store.sidebar.close()"

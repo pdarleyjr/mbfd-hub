@@ -105,42 +105,66 @@ class DefectsRelationManager extends RelationManager
                     ->label('Photo')
                     ->getStateUsing(fn (ApparatusDefect $record): ?string => $record->availablePhotoPath())
                     ->disk('public')
-                    ->width(60)
-                    ->height(60),
-                Tables\Columns\TextColumn::make('photo_availability')
-                    ->label('Photo status')
-                    ->getStateUsing(fn (ApparatusDefect $record): ?string => $record->hasMissingPhotoReference()
-                        ? 'Photo unavailable'
-                        : null)
-                    ->placeholder('—'),
+                    ->width(48)
+                    ->height(48)
+                    ->square()
+                    ->visibleFrom('md'),
 
-                Tables\Columns\TextColumn::make('compartment')
-                    ->searchable()
-                    ->sortable(),
+                // Phones: one column carries the item, where it is and its follow-up, so the row actions stay on screen.
+                Tables\Columns\TextColumn::make('item_phone')
+                    ->label('Item')
+                    ->getStateUsing(fn (ApparatusDefect $record): string => (string) $record->item)
+                    ->weight('semibold')
+                    ->wrap()
+                    ->description(fn (ApparatusDefect $record): string => collect([
+                        $record->compartment,
+                        str_replace('_', ' ', ucfirst((string) $record->issue_type)),
+                        DefectFollowUpState::label(DefectFollowUpState::for($record)),
+                        data_get($record, 'serviceTicket.ticket_number'),
+                    ])->filter()->implode(' · '))
+                    ->hiddenFrom('md'),
 
+                // Compartment and "photo unavailable" ride under the item instead of taking columns of their own.
                 Tables\Columns\TextColumn::make('item')
-                    ->searchable(),
+                    ->searchable(['item', 'compartment'])
+                    ->weight('semibold')
+                    ->wrap()
+                    ->description(fn (ApparatusDefect $record): ?string => collect([
+                        $record->compartment,
+                        $record->hasMissingPhotoReference() ? 'Photo unavailable' : null,
+                    ])->filter()->implode(' · ') ?: null)
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('follow_up')
                     ->label('Follow-up')
                     ->badge()
                     ->getStateUsing(fn (ApparatusDefect $record): string => DefectFollowUpState::for($record))
                     ->formatStateUsing(fn (string $state): string => DefectFollowUpState::label($state))
-                    ->color(fn (string $state): string => DefectFollowUpState::color($state)),
-
-                Tables\Columns\TextColumn::make('serviceTicket.ticket_number')
-                    ->label('Ticket')
-                    ->placeholder('—'),
+                    ->color(fn (string $state): string => DefectFollowUpState::color($state))
+                    ->description(fn (ApparatusDefect $record): ?string => data_get($record, 'serviceTicket.ticket_number'))
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('issue_type')
-                    ->label('Issue Type')
+                    ->label('Issue')
                     ->badge()
-                    ->formatStateUsing(fn ($state) => str_replace('_', ' ', ucfirst($state))),
+                    ->formatStateUsing(fn ($state) => str_replace('_', ' ', ucfirst($state)))
+                    ->visibleFrom('md'),
 
                 Tables\Columns\TextColumn::make('reported_date')
                     ->label('Reported')
-                    ->date()
-                    ->sortable(),
+                    ->date('M j, Y')
+                    ->sortable()
+                    ->visibleFrom('md'),
+
+                // Secondary detail, one click away in the column toggle.
+                Tables\Columns\TextColumn::make('compartment')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
+                Tables\Columns\TextColumn::make('serviceTicket.ticket_number')
+                    ->label('Ticket')
+                    ->placeholder('—')
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
                 //
@@ -149,71 +173,78 @@ class DefectsRelationManager extends RelationManager
                 Tables\Actions\CreateAction::make(),
             ])
             ->actions([
+                // The ticket step stays one tap away as an icon button (tooltip and screen-reader label carry the words);
+                // everything else lives in the row menu, so nothing is clipped at 1024px.
                 DefectServiceTicketActions::configureView(
-                    Tables\Actions\Action::make(DefectServiceTicketActions::VIEW),
+                    Tables\Actions\Action::make(DefectServiceTicketActions::VIEW)->iconButton()->tooltip('View service ticket'),
                     fn (Tables\Actions\Action $action): ?ApparatusDefect => DefectServiceTicketActions::defectFrom($action->getRecord()),
                 ),
                 DefectServiceTicketActions::configureCreate(
-                    Tables\Actions\Action::make(DefectServiceTicketActions::CREATE),
+                    Tables\Actions\Action::make(DefectServiceTicketActions::CREATE)->iconButton(),
                     fn (Tables\Actions\Action $action): ?ApparatusDefect => DefectServiceTicketActions::defectFrom($action->getRecord()),
                 ),
 
-                Tables\Actions\Action::make('mark_resolved')
-                    ->label('Resolve')
-                    ->icon('heroicon-o-check-circle')
-                    ->color('success')
-                    ->visible(fn (ApparatusDefect $record) => $record->status !== 'resolved')
-                    ->form([
-                        Forms\Components\Textarea::make('resolution_notes')
-                            ->label('Resolution Notes')
-                            ->required()
-                            ->rows(3),
-                    ])
-                    ->action(function (ApparatusDefect $record, array $data) {
-                        $record->update([
-                            'status' => 'resolved',
-                            'resolution_notes' => $data['resolution_notes'],
-                            'resolved_at' => now(),
-                        ]);
-                    }),
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\Action::make('mark_resolved')
+                        ->label('Resolve')
+                        ->icon('heroicon-o-check-circle')
+                        ->color('success')
+                        ->visible(fn (ApparatusDefect $record) => $record->status !== 'resolved')
+                        ->form([
+                            Forms\Components\Textarea::make('resolution_notes')
+                                ->label('Resolution Notes')
+                                ->required()
+                                ->rows(3),
+                        ])
+                        ->action(function (ApparatusDefect $record, array $data) {
+                            $record->update([
+                                'status' => 'resolved',
+                                'resolution_notes' => $data['resolution_notes'],
+                                'resolved_at' => now(),
+                            ]);
+                        }),
 
-                Tables\Actions\Action::make('request_replacement')
-                    ->label('Request Replacement')
-                    ->icon('heroicon-o-shopping-cart')
-                    ->color('info')
-                    ->visible(fn ($record) => $record->status !== 'resolved' && $record->issue_type === 'missing')
-                    ->action(function ($record) {
-                        // Create a manual recommendation (will be enhanced by AI later)
-                        $recommendation = ApparatusDefectRecommendation::create([
-                            'apparatus_defect_id' => $record->id,
-                            'equipment_item_id' => null, // Manual mapping required
-                            'match_method' => 'manual',
-                            'match_confidence' => 0,
-                            'recommended_qty' => 1,
-                            'reasoning' => 'Manual replacement request from defect management',
-                            'status' => 'pending',
-                            'created_by_user_id' => auth()->id(),
-                        ]);
+                    Tables\Actions\Action::make('request_replacement')
+                        ->label('Request Replacement')
+                        ->icon('heroicon-o-shopping-cart')
+                        ->color('info')
+                        ->visible(fn ($record) => $record->status !== 'resolved' && $record->issue_type === 'missing')
+                        ->action(function ($record) {
+                            // Create a manual recommendation (will be enhanced by AI later)
+                            $recommendation = ApparatusDefectRecommendation::create([
+                                'apparatus_defect_id' => $record->id,
+                                'equipment_item_id' => null, // Manual mapping required
+                                'match_method' => 'manual',
+                                'match_confidence' => 0,
+                                'recommended_qty' => 1,
+                                'reasoning' => 'Manual replacement request from defect management',
+                                'status' => 'pending',
+                                'created_by_user_id' => auth()->id(),
+                            ]);
 
-                        AdminAlertEvent::create([
-                            'type' => 'recommendation_created',
-                            'severity' => 'info',
-                            'message' => "Replacement request created for {$record->item} on {$record->apparatus->unit_id}",
-                            'related_type' => 'apparatus_defect_recommendation',
-                            'related_id' => $recommendation->id,
-                            'created_by_user_id' => auth()->id(),
-                        ]);
+                            AdminAlertEvent::create([
+                                'type' => 'recommendation_created',
+                                'severity' => 'info',
+                                'message' => "Replacement request created for {$record->item} on {$record->apparatus->unit_id}",
+                                'related_type' => 'apparatus_defect_recommendation',
+                                'related_id' => $recommendation->id,
+                                'created_by_user_id' => auth()->id(),
+                            ]);
 
-                        Notification::make()
-                            ->success()
-                            ->title('Replacement request created')
-                            ->body('Go to Recommendations to assign an item')
-                            ->send();
+                            Notification::make()
+                                ->success()
+                                ->title('Replacement request created')
+                                ->body('Go to Recommendations to assign an item')
+                                ->send();
 
-                        return redirect()->to(RecommendationResource::getUrl('edit', ['record' => $recommendation]));
-                    }),
+                            return redirect()->to(RecommendationResource::getUrl('edit', ['record' => $recommendation]));
+                        }),
 
-                Tables\Actions\EditAction::make(),
+                    Tables\Actions\EditAction::make(),
+                ])
+                    ->label('More actions')
+                    ->icon('heroicon-m-ellipsis-vertical')
+                    ->tooltip('More actions'),
             ])
             ->defaultSort('reported_date', 'desc');
     }

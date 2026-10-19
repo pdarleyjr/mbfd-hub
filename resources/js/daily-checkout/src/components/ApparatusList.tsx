@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router';
 import { Apparatus } from '../types';
 import { ApiClient } from '../utils/api';
 import { ApparatusListSkeleton } from './SkeletonLoader';
+import DailyPageNav from './DailyPageNav';
 
 const enableApparatusForms = import.meta.env.VITE_ENABLE_APPARATUS_FORMS === 'true';
 
@@ -63,12 +64,18 @@ export default function ApparatusList() {
   };
 
   if (loading) {
-    return <ApparatusListSkeleton />;
+    return (
+      <>
+        <DailyPageNav />
+        <ApparatusListSkeleton />
+      </>
+    );
   }
 
   if (error) {
     return (
       <div className="text-center text-red-600 p-4">
+        <div className="text-left"><DailyPageNav /></div>
         <p>Error: {error}</p>
         <button
           onClick={() => {
@@ -91,6 +98,8 @@ export default function ApparatusList() {
       onTouchEnd={handleTouchEnd}
       className="relative"
     >
+      <DailyPageNav />
+
       {/* Navigation Tabs */}
       <div className="flex justify-center mb-6">
         <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1">

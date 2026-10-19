@@ -127,10 +127,6 @@ class ViewInspection extends Page
                 ->url(fn (): string => route('employee.vehicle-inspections.pdf', $this->inspection))
                 ->openUrlInNewTab()
                 ->visible(fn (): bool => (bool) auth()->user()?->can('view', $this->inspection)),
-            Action::make('back')
-                ->label('Back to Apparatus')
-                ->icon('heroicon-o-arrow-left')
-                ->url(ApparatusResource::getUrl('edit', ['record' => $this->record])),
         ];
     }
 

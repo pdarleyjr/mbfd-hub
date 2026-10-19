@@ -9,18 +9,20 @@ const source = readFileSync(resolve(process.cwd(), 'resources/js/daily-checkout/
 const DAILY_SHELL = '<!doctype html><html><head><title>Daily Checkout | MBFD Hub</title></head><body><div id="root"></div></body></html>';
 const LOGIN_PAGE = '<!doctype html><html><head><title>Sign in | MBFD Hub</title></head><body><form action="/login"></form></body></html>';
 
-const fakeResponse = ({ body = '', status = 200, url, redirected = false, type = 'basic', contentType = 'text/html; charset=UTF-8' }) => ({
+const fakeResponse = ({ body = '', status = 200, url, redirected = false, type = 'basic', contentType = 'text/html; charset=UTF-8', contentLength }) => ({
   ok: status >= 200 && status < 300,
   status,
+  statusText: 'OK',
   url,
   redirected,
   type,
-  headers: new Headers({ 'Content-Type': contentType }),
+  headers: new Headers({ 'Content-Type': contentType, ...(contentLength === undefined ? {} : { 'Content-Length': String(contentLength) }) }),
   text: async () => body,
-  clone() { return fakeResponse({ body, status, url, redirected, type, contentType }); },
+  blob: async () => new Blob([body]),
+  clone() { return fakeResponse({ body, status, url, redirected, type, contentType, contentLength }); },
 });
 
-function loadWorker(networkFor) {
+function loadWorker(networkFor, { failCachePut = false } = {}) {
   const listeners = {};
   const stores = new Map();
   const keyOf = (request) => new URL(typeof request === 'string' ? request : request.url, ORIGIN).pathname;
@@ -28,7 +30,10 @@ function loadWorker(networkFor) {
     if (!stores.has(name)) stores.set(name, new Map());
     const store = stores.get(name);
     return {
-      put: async (request, response) => { store.set(keyOf(request), response); },
+      put: async (request, response) => {
+        if (failCachePut && name === mbfd-checkout-v10 && !keyOf(request).startsWith('/daily/')) throw new Error('quota exceeded');
+        store.set(keyOf(request), response);
+      },
       match: async (request) => store.get(keyOf(request)),
       keys: async () => [...store.keys()].map((path) => ({ url: `${ORIGIN}${path}` })),
       addAll: async (keys) => { for (const key of keys) store.set(keyOf(key), fakeResponse({ url: `${ORIGIN}${key}` })); },
@@ -50,7 +55,8 @@ function loadWorker(networkFor) {
         return undefined;
       },
     },
-    fetch: async (request) => networkFor(typeof request === 'string' ? new URL(request, ORIGIN).toString() : request.url),
+    fetch: async (request, init) => networkFor(typeof request === 'string' ? new URL(request, ORIGIN).toString() : request.url, init),
+    Blob,
     URL,
     Headers,
     Response,
@@ -93,8 +99,8 @@ const cachedShell = async (worker) => {
   return response ? response.text() : null;
 };
 
-test('the shell cache version is bumped past the release that could store a sign-in page', () => {
-  assert.match(source, /const CACHE_NAME = 'mbfd-checkout-v9'/);
+test('the shell cache version is bumped past the releases that stored a sign-in page and truncated images', () => {
+  assert.match(source, /const CACHE_NAME = 'mbfd-checkout-v10'/);
 });
 
 test('install does not store a redirected sign-in page as the Daily shell', async () => {
@@ -180,4 +186,124 @@ test('activation keeps the new shell when the install stored one', async () => {
 
   assert.match(await cachedShell(worker), /Daily Checkout v9/);
   assert.equal(worker.stores.get(worker.cacheName).has('/daily/assets/index-old.js'), false);
+});
+
+// ---- Static image / asset caching (production bug: truncated station-1.png served forever) ----
+
+const GOOD_IMAGE = 'PNG-FULL-BODY-0123456789';
+const IMAGE = '/images/stations/station-1.png';
+
+const staticFetch = async (worker, path, { range = false } = {}) => {
+  let responded;
+  const waiting = [];
+  worker.listeners.fetch({
+    request: { method: 'GET', mode: 'no-cors', url: `${ORIGIN}${path}`, headers: new Headers(range ? { Range: 'bytes=0-9' } : {}) },
+    respondWith: (promise) => { responded = promise; },
+    waitUntil: (promise) => { waiting.push(promise); },
+  });
+  const response = responded ? await responded : undefined;
+  await Promise.all(waiting);
+  return response;
+};
+
+const cachedBody = async (worker, path) => {
+  const entry = worker.stores.get(worker.cacheName)?.get(path);
+  return entry ? entry.clone().text() : null;
+};
+
+test('activating the new worker deletes the old cache that may hold a corrupt station image', async () => {
+  const worker = loadWorker((url) => fakeResponse({ body: DAILY_SHELL, url }));
+  const v9 = await worker.caches.open('mbfd-checkout-v9');
+  await v9.put(IMAGE, fakeResponse({ body: 'PNG-TRUNC', url: `${ORIGIN}${IMAGE}`, contentType: 'image/png' }));
+  await install(worker);
+
+  await activate(worker);
+
+  assert.equal(worker.stores.has('mbfd-checkout-v9'), false);
+  assert.equal(await cachedBody(worker, IMAGE), null, 'the corrupt image is not carried over');
+});
+
+test('images are network-first and revalidated: a corrupt cached copy is replaced when the network answers', async () => {
+  const seen = [];
+  const worker = loadWorker((url, init) => {
+    seen.push({ url, cache: init?.cache });
+    return fakeResponse({ body: GOOD_IMAGE, url, contentType: 'image/png', contentLength: GOOD_IMAGE.length });
+  });
+  await install(worker);
+  await (await worker.caches.open(worker.cacheName)).put(IMAGE, fakeResponse({ body: 'PNG-TRUNC', url: `${ORIGIN}${IMAGE}`, contentType: 'image/png' }));
+
+  const response = await staticFetch(worker, IMAGE);
+
+  assert.equal(await response.text(), GOOD_IMAGE, 'the page gets the network copy, not the stored one');
+  assert.deepEqual(seen.filter((entry) => entry.url.endsWith(IMAGE)), [{ url: `${ORIGIN}${IMAGE}`, cache: 'no-cache' }]);
+  assert.equal(await cachedBody(worker, IMAGE), GOOD_IMAGE, 'the corrupt entry was overwritten with the verified body');
+});
+
+test('an image body shorter than its declared Content-Length is returned but never stored', async () => {
+  let network = (url) => fakeResponse({ body: GOOD_IMAGE, url, contentType: 'image/png', contentLength: GOOD_IMAGE.length });
+  const worker = loadWorker((url) => network(url));
+  await install(worker);
+  await staticFetch(worker, IMAGE);
+  assert.equal(await cachedBody(worker, IMAGE), GOOD_IMAGE);
+
+  network = (url) => fakeResponse({ body: 'PNG-TRUNC', url, contentType: 'image/png', contentLength: GOOD_IMAGE.length });
+  const response = await staticFetch(worker, IMAGE);
+
+  assert.equal(await response.text(), 'PNG-TRUNC');
+  assert.equal(await cachedBody(worker, IMAGE), GOOD_IMAGE, 'a truncated body does not replace a good stored copy');
+});
+
+test('partial, redirected and failed image responses are not stored', async () => {
+  for (const overrides of [{ status: 206 }, { redirected: true }, { status: 404 }, { type: 'opaque' }]) {
+    const worker = loadWorker((url) => fakeResponse({ body: GOOD_IMAGE, url, contentType: 'image/png', ...overrides }));
+    await install(worker);
+
+    await staticFetch(worker, IMAGE);
+
+    assert.equal(await cachedBody(worker, IMAGE), null, JSON.stringify(overrides));
+  }
+});
+
+test('the stored image is only an offline fallback; with neither network nor copy the answer is 503', async () => {
+  let network = (url) => fakeResponse({ body: GOOD_IMAGE, url, contentType: 'image/png', contentLength: GOOD_IMAGE.length });
+  const worker = loadWorker((url) => network(url));
+  await install(worker);
+  await staticFetch(worker, IMAGE);
+
+  network = () => { throw new TypeError('offline'); };
+  assert.equal(await (await staticFetch(worker, IMAGE)).text(), GOOD_IMAGE);
+  assert.equal((await staticFetch(worker, '/images/stations/station-9.png')).status, 503);
+});
+
+test('a failing cache write never breaks the image response', async () => {
+  const worker = loadWorker((url) => fakeResponse({ body: GOOD_IMAGE, url, contentType: 'image/png', contentLength: GOOD_IMAGE.length }), { failCachePut: true });
+  await install(worker);
+
+  const response = await staticFetch(worker, IMAGE);
+
+  assert.equal(await response.text(), GOOD_IMAGE);
+});
+
+test('hashed build assets and the precache list stay cache-first', async () => {
+  let calls = 0;
+  const worker = loadWorker((url) => { calls += 1; return fakeResponse({ body: 'network', url, contentType: 'text/javascript' }); });
+  const cache = await worker.caches.open(worker.cacheName);
+  await cache.put('/daily/assets/index-abc.js', fakeResponse({ body: 'cached', url: `${ORIGIN}/daily/assets/index-abc.js`, contentType: 'text/javascript' }));
+  await cache.put('/manifest.json', fakeResponse({ body: 'cached-manifest', url: `${ORIGIN}/manifest.json`, contentType: 'application/json' }));
+
+  assert.equal(await (await staticFetch(worker, '/daily/assets/index-abc.js')).text(), 'cached');
+  assert.equal(await (await staticFetch(worker, '/manifest.json')).text(), 'cached-manifest');
+  assert.equal(calls, 0);
+});
+
+test('byte-range and cross-origin requests are left to the browser', async () => {
+  const worker = loadWorker((url) => fakeResponse({ body: GOOD_IMAGE, url }));
+  assert.equal(await staticFetch(worker, IMAGE, { range: true }), undefined);
+
+  let responded = false;
+  worker.listeners.fetch({
+    request: { method: 'GET', mode: 'no-cors', url: 'https://cdn.example/font.woff2', headers: new Headers() },
+    respondWith: () => { responded = true; },
+  });
+  assert.equal(responded, false);
 });

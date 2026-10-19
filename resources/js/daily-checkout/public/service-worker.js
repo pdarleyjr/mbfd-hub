@@ -1,6 +1,11 @@
 // v9: v8 could hold a sign-in page stored as the Daily shell; activating v9
 // deletes that cache and only verified Daily HTML is stored from now on.
-const CACHE_NAME = 'mbfd-checkout-v9';
+// v10: v9 served every same-origin GET (including 1.6-5 MB station photos)
+// cache-first forever, so one truncated image write was shown permanently
+// ("Image corrupt or truncated"). Activating v10 deletes that cache; only
+// immutable build assets and the precache list are cache-first now, and other
+// static GETs are network-first and only stored after their body is verified.
+const CACHE_NAME = 'mbfd-checkout-v10';
 const API_CACHE_NAME = 'mbfd-api-cache-v7';
 const BUILD_ASSETS = /* DAILY_BUILD_ASSETS */ [];
 const DAILY_SHELL_KEYS = ['/daily/', '/daily/index.html'];
@@ -47,6 +52,81 @@ async function isGenuineDailyShell(response) {
 
 function isCacheableSameOriginResponse(response) {
   return Boolean(response) && response.ok && !response.redirected && response.type === 'basic';
+}
+
+const PRECACHED_PATHS = new Set(APP_SHELL_CACHE_KEYS);
+
+// Hashed build output never changes under the same URL, and the precache list
+// is installed with the worker; only these may be served cache-first.
+function isImmutablePath(pathname) {
+  return pathname.startsWith('/daily/assets/') || PRECACHED_PATHS.has(pathname);
+}
+
+// A full 200 only: a 206 partial or a redirect is never a complete file.
+function isStorableStaticResponse(response) {
+  return isCacheableSameOriginResponse(response) && response.status === 200;
+}
+
+// Stores a complete copy of a static response. The body is read in full first,
+// and when the server declared a Content-Length (and sent the body unencoded)
+// the bytes received must match it, so a short or interrupted body is never
+// written. The stored response is rebuilt from the verified blob.
+async function storeVerifiedStatic(request, response) {
+  const declared = response.headers.get('Content-Length');
+  const encoded = response.headers.get('Content-Encoding');
+  const body = await response.blob();
+  if (!encoded && declared !== null && /^\d+$/.test(declared) && body.size !== Number(declared)) {
+    return false;
+  }
+
+  const cache = await caches.open(CACHE_NAME);
+  await cache.put(request, new Response(body, {
+    status: 200,
+    statusText: response.statusText,
+    headers: response.headers,
+  }));
+  return true;
+}
+
+// Cache writes happen after the response is returned and must never break it.
+function storeStaticInBackground(event, request, response) {
+  if (!isStorableStaticResponse(response)) return;
+  const write = storeVerifiedStatic(request, response.clone()).catch(() => false);
+  if (typeof event.waitUntil === 'function') event.waitUntil(write);
+}
+
+// Immutable assets: cache first, store on a miss.
+async function cacheFirstImmutable(event, request, ignoreVary) {
+  const cached = await caches.match(request, { ignoreVary });
+  if (cached) return cached;
+
+  try {
+    const response = await fetch(request);
+    storeStaticInBackground(event, request, response);
+    return response;
+  } catch {
+    return new Response('Offline', { status: 503 });
+  }
+}
+
+// Everything else that is static (station photos, icons, wallpapers not in the
+// precache list): always revalidate with the network so a stale or damaged
+// stored copy is replaced; the stored copy is only an offline fallback.
+async function networkFirstStatic(event, request, isNavigationRequest) {
+  try {
+    const response = await fetch(request, { cache: 'no-cache' });
+    if (!isNavigationRequest) storeStaticInBackground(event, request, response);
+    return response;
+  } catch {
+    const cache = await caches.open(CACHE_NAME);
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    if (isNavigationRequest) {
+      const shell = await cache.match('/daily/index.html');
+      if (shell) return shell;
+    }
+    return new Response('Offline', { status: 503 });
+  }
 }
 
 async function precacheDailyShell(cache) {
@@ -237,33 +317,21 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  event.respondWith(
-    // Build assets are immutable and same-origin. Their precache request has
-    // no Origin header, while module requests can carry one; Vary: Origin must
-    // not hide the already-cached asset during an offline reload.
-    caches.match(request, { ignoreVary: isSameOrigin && url.pathname.startsWith('/daily/assets/') }).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
+  // Cross-origin requests and byte-range requests (a stored full copy would be
+  // the wrong answer to a partial request) go straight to the browser.
+  if (!isSameOrigin || request.headers?.has('range')) {
+    return;
+  }
 
-      return fetch(request).then((response) => {
-        if (isSameOrigin && !isNavigationRequest && isCacheableSameOriginResponse(response)) {
-          const responseClone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(request, responseClone);
-          });
-        }
+  // Build assets are immutable and same-origin. Their precache request has
+  // no Origin header, while module requests can carry one; Vary: Origin must
+  // not hide the already-cached asset during an offline reload.
+  if (isImmutablePath(url.pathname)) {
+    event.respondWith(cacheFirstImmutable(event, request, url.pathname.startsWith('/daily/assets/')));
+    return;
+  }
 
-        return response;
-      }).catch(() => {
-        if (isNavigationRequest) {
-          return caches.match('/daily/index.html');
-        }
-
-        return new Response('Offline', { status: 503 });
-      });
-    })
-  );
+  event.respondWith(networkFirstStatic(event, request, isNavigationRequest));
 });
 
 // ─── Push Notification Handlers (ERROR-036 fix) ───────────────────────────────

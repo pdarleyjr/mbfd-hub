@@ -2,125 +2,121 @@
     {{-- Print-only styles --}}
     <style media="print">
         .fi-sidebar, .fi-topbar, .fi-header-actions, .fi-breadcrumbs,
-        nav, [data-turbo-permanent], .fi-page-header-actions,
+        nav, [data-turbo-permanent], .fi-page-header-actions, [data-hub-page-nav],
         button, .fi-btn { display: none !important; }
         body { background: white !important; }
         .fi-page { padding: 0 !important; }
-        .print-only { display: block !important; }
+        .hub-insp-print-only { display: block !important; }
     </style>
 
-    <div class="space-y-6">
-        {{-- Logo & Header --}}
-        <div class="text-center print-only" style="display: block;">
-            <img src="/images/mbfd_logo-256.png" alt="MBFD Logo" class="mx-auto h-20 w-20 object-contain mb-2" width="80" height="80">
-            <h1 class="text-2xl font-bold text-gray-900">Miami Beach Fire Department</h1>
-            <p class="text-sm text-gray-500">Daily Vehicle Inspection Report</p>
+    {{-- Layout and colour: semantic hub-insp-* classes in resources/css/filament/hub-inspection-views.css. --}}
+    <div class="hub-insp hub-insp-stack">
+        {{-- Letterhead: shown only when printing. --}}
+        <div class="hub-insp-print-only hub-insp-letterhead">
+            <img src="/images/mbfd_logo-256.png" alt="MBFD Logo" width="80" height="80">
+            <h1>Miami Beach Fire Department</h1>
+            <p>Daily Vehicle Inspection Report</p>
         </div>
 
         {{-- Inspection Summary Card --}}
-        <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 p-6 dark:bg-gray-900 dark:ring-white/10">
-            <div class="flex items-center gap-4 mb-6">
-                <img src="/images/mbfd_logo-256.png" alt="MBFD Logo" class="h-16 w-16 object-contain" width="64" height="64">
+        <div class="hub-insp-card">
+            <div class="hub-insp-summary">
+                <img src="/images/mbfd_logo-256.png" alt="MBFD Logo" width="64" height="64">
                 <div>
-                    <h2 class="text-xl font-bold text-gray-900 dark:text-white">
-                        Inspection Report: {{ $currentDesignation }}
-                    </h2>
-                    <p class="text-sm text-gray-500 dark:text-gray-400">
+                    <h2>Inspection Report: {{ $currentDesignation }}</h2>
+                    <p>
                         Vehicle #{{ $inspection->vehicle_number ?? $apparatus->vehicle_number }}
                         &bull; {{ $inspection->completed_at?->format('F j, Y \a\t g:i A') ?? 'N/A' }}
                     </p>
-                    <p class="text-sm font-medium">{{ $inspection->displayStatus() }}</p>
+                    <p class="hub-insp-summary__status">{{ $inspection->displayStatus() }}</p>
                 </div>
             </div>
 
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div class="rounded-lg bg-gray-50 dark:bg-gray-800 p-4 text-center">
-                    <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ $totalItems }}</p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">Total Items</p>
-                </div>
-                <div class="rounded-lg bg-emerald-50 dark:bg-emerald-900/20 p-4 text-center">
-                    <p class="text-2xl font-bold text-emerald-600">{{ $presentCount }}</p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">Present</p>
-                </div>
-                <div class="rounded-lg bg-amber-50 dark:bg-amber-900/20 p-4 text-center">
-                    <p class="text-2xl font-bold text-amber-600">{{ $missingCount }}</p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">Missing</p>
-                </div>
-                <div class="rounded-lg bg-red-50 dark:bg-red-900/20 p-4 text-center">
-                    <p class="text-2xl font-bold text-red-600">{{ $damagedCount }}</p>
-                    <p class="text-xs text-gray-500 dark:text-gray-400">Damaged</p>
-                </div>
-            </div>
+            <ul class="hub-insp-statcards" aria-label="Checklist totals">
+                <li class="hub-insp-statcard">
+                    <p class="hub-insp-statcard__value">{{ $totalItems }}</p>
+                    <p class="hub-insp-statcard__label">Total Items</p>
+                </li>
+                <li class="hub-insp-statcard hub-insp-statcard--pass">
+                    <p class="hub-insp-statcard__value">{{ $presentCount }}</p>
+                    <p class="hub-insp-statcard__label">Present</p>
+                </li>
+                <li class="hub-insp-statcard hub-insp-statcard--missing">
+                    <p class="hub-insp-statcard__value">{{ $missingCount }}</p>
+                    <p class="hub-insp-statcard__label">Missing</p>
+                </li>
+                <li class="hub-insp-statcard hub-insp-statcard--damaged">
+                    <p class="hub-insp-statcard__value">{{ $damagedCount }}</p>
+                    <p class="hub-insp-statcard__label">Damaged</p>
+                </li>
+            </ul>
         </div>
 
         {{-- Officer Info --}}
-        <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 p-6 dark:bg-gray-900 dark:ring-white/10">
-            <h3 class="text-base font-semibold text-gray-900 dark:text-white mb-4">Officer Information</h3>
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+        <div class="hub-insp-card">
+            <h3 class="hub-insp-card__title">Officer Information</h3>
+            <dl class="hub-insp-facts hub-insp-facts--plain">
                 <div>
-                    <span class="text-gray-500 dark:text-gray-400">Operator</span>
-                    <p class="font-medium text-gray-900 dark:text-white">{{ $inspection->operator_name }}</p>
+                    <dt>Operator</dt>
+                    <dd>{{ $inspection->operator_name }}</dd>
                 </div>
                 <div>
-                    <span class="text-gray-500 dark:text-gray-400">Rank</span>
-                    <p class="font-medium text-gray-900 dark:text-white">{{ $inspection->rank }}</p>
+                    <dt>Rank</dt>
+                    <dd>{{ $inspection->rank }}</dd>
                 </div>
                 <div>
-                    <span class="text-gray-500 dark:text-gray-400">Shift</span>
-                    <p class="font-medium text-gray-900 dark:text-white">{{ $inspection->shift }} Shift</p>
+                    <dt>Shift</dt>
+                    <dd>{{ $inspection->shift }} Shift</dd>
                 </div>
                 <div>
-                    <span class="text-gray-500 dark:text-gray-400">Physical vehicle #</span>
-                    <p class="font-medium text-gray-900 dark:text-white">{{ $inspection->unit_number ?? '—' }}</p>
+                    <dt>Physical vehicle #</dt>
+                    <dd>{{ $inspection->unit_number ?? '—' }}</dd>
                 </div>
-            </div>
+            </dl>
         </div>
 
         {{-- Compartment Results --}}
         @if(count($inspection->checklist_evidence ?? []) > 0)
-            <section class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 p-6 dark:bg-gray-900 dark:ring-white/10">
-                <h3 class="text-base font-semibold mb-4">Recorded paper checkout fields</h3>
-                <dl class="grid gap-4 sm:grid-cols-2">
+            <section class="hub-insp-card">
+                <h3 class="hub-insp-card__title">Recorded paper checkout fields</h3>
+                <dl class="hub-insp-fields">
                     @foreach($inspection->checklist_evidence as $field)
-                        <div><dt class="text-sm text-gray-500">{{ $field['name'] }}</dt><dd class="whitespace-pre-wrap break-words">{{ is_bool($field['value']) ? ($field['value'] ? 'Yes' : 'No') : ($field['value'] === null || $field['value'] === '' ? 'Not entered' : $field['value']) }}</dd></div>
+                        <div><dt>{{ $field['name'] }}</dt><dd>{{ is_bool($field['value']) ? ($field['value'] ? 'Yes' : 'No') : ($field['value'] === null || $field['value'] === '' ? 'Not entered' : $field['value']) }}</dd></div>
                     @endforeach
                 </dl>
             </section>
         @endif
         @if(count($results) > 0)
             @foreach($results as $compartment)
-                <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 p-6 dark:bg-gray-900 dark:ring-white/10">
-                    <h3 class="text-base font-semibold text-gray-900 dark:text-white mb-4">
-                        {{ $compartment['name'] ?? 'Compartment' }}
-                    </h3>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm">
+                <div class="hub-insp-card">
+                    <h3 class="hub-insp-card__title">{{ $compartment['name'] ?? 'Compartment' }}</h3>
+                    <div class="hub-insp-table-wrap">
+                        <table class="hub-insp-table">
                             <thead>
-                                <tr class="border-b border-gray-200 dark:border-gray-700">
-                                    <th class="text-left py-2 px-3 text-gray-500 dark:text-gray-400 font-medium">Item</th>
-                                    <th class="text-center py-2 px-3 text-gray-500 dark:text-gray-400 font-medium w-32">Status</th>
-                                    <th class="text-left py-2 px-3 text-gray-500 dark:text-gray-400 font-medium">Notes</th>
+                                <tr>
+                                    <th>Item</th>
+                                    <th class="is-center">Status</th>
+                                    <th>Notes</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 @foreach($compartment['items'] ?? [] as $item)
-                                    <tr class="border-b border-gray-100 dark:border-gray-800">
-                                        <td class="py-2 px-3 text-gray-900 dark:text-white">{{ $item['name'] ?? '—' }}
+                                    @php
+                                        $status = $item['status'] ?? 'Present';
+                                        $tone = $status === 'Present' ? 'success' : ($status === 'Missing' ? 'warning' : 'danger');
+                                    @endphp
+                                    <tr>
+                                        <td>{{ $item['name'] ?? '—' }}
                                             @if(isset($item['value']) && $item['value'] !== '')
-                                                <p class="whitespace-pre-wrap break-words text-sm font-medium">{{ $item['value'] }}</p>
+                                                <span class="is-value">{{ $item['value'] }}</span>
                                             @endif
                                         </td>
-                                        <td class="py-2 px-3 text-center">
-                                            @php $status = $item['status'] ?? 'Present'; @endphp
-                                            <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
-                                                {{ $status === 'Present' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : '' }}
-                                                {{ $status === 'Missing' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : '' }}
-                                                {{ $status === 'Damaged' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : '' }}
-                                            ">
+                                        <td class="is-center">
+                                            <span class="hub-insp-badge hub-insp-badge--{{ $tone }}">
                                                 {{ $status === 'Present' ? '✓ Pass' : ($status === 'Missing' ? '✕ Missing' : '⚠ Damaged') }}
                                             </span>
                                         </td>
-                                        <td class="py-2 px-3 text-gray-500 dark:text-gray-400">{{ $item['notes'] ?? '—' }}</td>
+                                        <td class="is-muted">{{ $item['notes'] ?? '—' }}</td>
                                     </tr>
                                 @endforeach
                             </tbody>
@@ -129,26 +125,26 @@
                 </div>
             @endforeach
         @else
-            <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 p-6 dark:bg-gray-900 dark:ring-white/10 text-center">
-                <p class="text-gray-500 dark:text-gray-400">No detailed checklist results recorded for this inspection.</p>
+            <div class="hub-insp-card">
+                <p class="hub-insp-note">No detailed checklist results recorded for this inspection.</p>
             </div>
         @endif
 
         {{-- Pending-review evidence has not changed apparatus readiness, defects, or meters. --}}
         @if($inspection->review_status === 'pending_review')
-            <div class="fi-section rounded-xl bg-amber-50 shadow-sm ring-1 ring-amber-200 p-6 dark:bg-amber-900/10 dark:ring-amber-800">
-                <h3 class="text-base font-semibold text-amber-900 dark:text-amber-200 mb-2">Pending officer review</h3>
-                <p class="text-sm text-amber-800 dark:text-amber-300 mb-4">
+            <div class="hub-insp-card hub-insp-card--warning">
+                <h3 class="hub-insp-card__title">Pending officer review</h3>
+                <p class="hub-insp-card__lead">
                     This submission is evidence only until an authorized reviewer approves it. Approval applies the reported meter readings and defects to the apparatus.
                 </p>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-4">
+                <div class="hub-insp-twocol">
                     <div>
-                        <span class="text-amber-800 dark:text-amber-300">Reported engine hours</span>
-                        <p class="font-medium text-gray-900 dark:text-white">{{ $inspection->engine_hours ?? 'Not reported' }}</p>
+                        <span>Reported engine hours</span>
+                        <p>{{ $inspection->engine_hours ?? 'Not reported' }}</p>
                     </div>
                     <div>
-                        <span class="text-amber-800 dark:text-amber-300">Reported miles</span>
-                        <p class="font-medium text-gray-900 dark:text-white">{{ $inspection->miles ?? 'Not reported' }}</p>
+                        <span>Reported miles</span>
+                        <p>{{ $inspection->miles ?? 'Not reported' }}</p>
                     </div>
                 </div>
 
@@ -157,48 +153,46 @@
                 @endif
 
                 @if(count($pendingDefects) > 0)
-                    <h4 class="text-sm font-semibold text-amber-900 dark:text-amber-200 mb-3">Reported pending defects ({{ count($pendingDefects) }})</h4>
-                    <div class="space-y-3">
+                    <h4 class="hub-insp-card__title">Reported pending defects ({{ count($pendingDefects) }})</h4>
+                    <div class="hub-insp-items">
                         @foreach($pendingDefects as $defect)
-                            <div class="rounded-lg bg-white dark:bg-gray-900 p-4 border border-amber-200 dark:border-amber-800">
-                                <div class="flex items-start justify-between gap-4">
+                            <div class="hub-insp-item">
+                                <div class="hub-insp-item__head">
                                     <div>
-                                        <p class="font-medium text-gray-900 dark:text-white">{{ $defect['item'] ?? 'Unknown item' }}</p>
-                                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ $defect['compartment'] ?? 'Unknown compartment' }}</p>
+                                        <p class="hub-insp-item__title">{{ $defect['item'] ?? 'Unknown item' }}</p>
+                                        <p class="hub-insp-item__sub">{{ $defect['compartment'] ?? 'Unknown compartment' }}</p>
                                     </div>
-                                    <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                                        {{ $defect['status'] ?? 'Reported' }}
-                                    </span>
+                                    <span class="hub-insp-badge hub-insp-badge--warning">{{ $defect['status'] ?? 'Reported' }}</span>
                                 </div>
                                 @if(filled($defect['notes'] ?? null))
-                                    <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">{{ $defect['notes'] }}</p>
+                                    <p class="hub-insp-item__text">{{ $defect['notes'] }}</p>
                                 @endif
                             </div>
                         @endforeach
                     </div>
                 @else
-                    <p class="text-sm text-amber-800 dark:text-amber-300">No defects were reported with this pending submission.</p>
+                    <p class="hub-insp-card__lead">No defects were reported with this pending submission.</p>
                 @endif
             </div>
         @endif
 
         @if($reviewEvents->isNotEmpty())
-            <div class="fi-section rounded-xl bg-white shadow-sm ring-1 ring-gray-950/5 p-6 dark:bg-gray-900 dark:ring-white/10">
-                <h3 class="text-base font-semibold text-gray-900 dark:text-white mb-4">Review History</h3>
-                <div class="space-y-4">
+            <div class="hub-insp-card">
+                <h3 class="hub-insp-card__title">Review History</h3>
+                <div class="hub-insp-items">
                     @foreach($reviewEvents as $reviewEvent)
-                        <div class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
-                            <div class="flex flex-wrap items-center justify-between gap-3">
-                                <p class="font-medium text-gray-900 dark:text-white">
+                        <div class="hub-insp-item">
+                            <div class="hub-insp-item__head">
+                                <p class="hub-insp-item__title">
                                     {{ ucfirst(str_replace('_', ' ', $reviewEvent->previous_status)) }} → {{ ucfirst(str_replace('_', ' ', $reviewEvent->status)) }}
                                 </p>
-                                <p class="text-sm text-gray-500 dark:text-gray-400">{{ $reviewEvent->created_at?->format('M j, Y g:i A') }}</p>
+                                <p class="hub-insp-item__sub">{{ $reviewEvent->created_at?->format('M j, Y g:i A') }}</p>
                             </div>
-                            <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                            <p class="hub-insp-item__text">
                                 Reviewer: {{ $reviewEvent->changedByUser?->name ?? data_get($reviewEvent->metadata, 'reviewer_name', 'User no longer active') }}
                             </p>
                             @if(filled($reviewEvent->internal_note))
-                                <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">{{ $reviewEvent->internal_note }}</p>
+                                <p class="hub-insp-item__text">{{ $reviewEvent->internal_note }}</p>
                             @endif
                             @php($reviewChecklistV2 = data_get($reviewEvent->metadata, 'submitted_effects.checklist_v2'))
                             @if(is_array($reviewChecklistV2))
@@ -212,24 +206,22 @@
 
         {{-- Defects Section --}}
         @if($defects->count() > 0)
-            <div class="fi-section rounded-xl bg-red-50 shadow-sm ring-1 ring-red-200 p-6 dark:bg-red-900/10 dark:ring-red-800">
-                <h3 class="text-base font-semibold text-red-800 dark:text-red-300 mb-4">
-                    ⚠ Reported Defects ({{ $defects->count() }})
-                </h3>
-                <div class="space-y-3">
+            <div class="hub-insp-card hub-insp-card--danger">
+                <h3 class="hub-insp-card__title">⚠ Reported Defects ({{ $defects->count() }})</h3>
+                <div class="hub-insp-items">
                     @foreach($defects as $defect)
-                        <div class="rounded-lg bg-white dark:bg-gray-900 p-4 border border-red-200 dark:border-red-800">
-                            <div class="flex items-start justify-between">
+                        <div class="hub-insp-item">
+                            <div class="hub-insp-item__head">
                                 <div>
-                                    <p class="font-medium text-gray-900 dark:text-white">{{ $defect->item ?? 'Unknown Item' }}</p>
-                                    <p class="text-sm text-gray-500 dark:text-gray-400">{{ $defect->compartment ?? '—' }}</p>
+                                    <p class="hub-insp-item__title">{{ $defect->item ?? 'Unknown Item' }}</p>
+                                    <p class="hub-insp-item__sub">{{ $defect->compartment ?? '—' }}</p>
                                 </div>
-                                <span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium {{ $defect->resolved ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700' }}">
+                                <span class="hub-insp-badge hub-insp-badge--{{ $defect->resolved ? 'success' : 'danger' }}">
                                     {{ $defect->resolved ? 'Resolved' : 'Open' }}
                                 </span>
                             </div>
                             @if($defect->notes)
-                                <p class="mt-2 text-sm text-gray-600 dark:text-gray-300">{{ $defect->notes }}</p>
+                                <p class="hub-insp-item__text">{{ $defect->notes }}</p>
                             @endif
                         </div>
                     @endforeach
