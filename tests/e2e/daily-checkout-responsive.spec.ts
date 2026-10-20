@@ -248,8 +248,9 @@ test('Command 300 station tabs show one station and preserve selection through r
 
   await tabs.getByRole('tab', { name: 'Station 1', exact: true }).click();
   await page.getByRole('link', { name: 'Open Station 1', exact: true }).click();
+  await expect(page).toHaveURL(/\/daily\/stations\/29\?return_to=%2Fdaily%2Fcommand-300%3Fstation%3D29$/);
   await expect(page.getByRole('heading', { name: 'Station 1', exact: true })).toBeVisible();
-  await page.locator('[data-hub-back]').click();
+  await page.getByRole('button', { name: 'Back to 300 Command', exact: true }).click();
   await expect(page).toHaveURL(/\/daily\/command-300\?station=29$/);
   await expect(page.getByRole('tabpanel', { name: 'Station 1', exact: true })).toBeVisible();
   await expectNoHorizontalOverflow(page);
