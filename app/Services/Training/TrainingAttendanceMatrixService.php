@@ -7,6 +7,7 @@ namespace App\Services\Training;
 use App\Models\Training\TrainingAttendance;
 use App\Models\Training\TrainingCourse;
 use App\Models\Training\TrainingModule;
+use App\Models\Training\TrainingRosterVersion;
 use App\Models\Training\TrainingSession;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -55,15 +56,19 @@ final class TrainingAttendanceMatrixService
         usort($sessions, static fn (array $left, array $right): int => ($moduleOrder[$left['module_id']] ?? PHP_INT_MAX) <=> ($moduleOrder[$right['module_id']] ?? PHP_INT_MAX));
         $sessionById = array_column($sessions, null, 'id');
         $sessionsByModule = collect($sessions)->groupBy('module_id');
+        $archivedProofs = $this->archivedProofs($sessions);
         $entries = [];
         $exceptions = [];
         foreach (TrainingAttendance::query()->whereIn('training_session_id', array_keys($sessionById))->whereNull('voided_at')->get() as $attendance) {
             $session = $sessionById[$attendance->training_session_id];
             $signature = $attendance->getAttribute('signature');
-            $valid = is_array($signature) && filled($signature['disk'] ?? null) && filled($signature['path'] ?? null)
-                && in_array($signature['mime'] ?? null, ['image/png', 'image/jpeg'], true)
-                && preg_match('/^[a-f0-9]{64}$/D', (string) ($signature['sha256'] ?? ''));
-            $status = ! $valid ? 'review' : (in_array($session['status'], ['submitted', 'certified'], true) ? 'digital' : 'provisional');
+            $valid = $this->validSignature($signature);
+            $proof = $archivedProofs[$session['id']][$attendance->id] ?? null;
+            $finalized = in_array($session['status'], ['submitted', 'certified'], true)
+                || ($session['status'] === 'archived' && $proof !== null
+                    && $proof['employee_profile_id'] === (int) $attendance->employee_profile_id
+                    && $valid && hash_equals($proof['signature_sha256'], $signature['sha256']));
+            $status = ! $valid ? 'review' : ($finalized ? 'digital' : 'provisional');
             $entries[(int) $attendance->employee_profile_id][$session['id']][] = [
                 'status' => $status, 'source' => 'digital', 'attendance_id' => (int) $attendance->id,
                 'roster_status' => $session['status'], 'signed_at' => $attendance->signed_at->toIso8601String(),
@@ -276,6 +281,56 @@ final class TrainingAttendanceMatrixService
             (in_array('review', $statuses, true) ? 'review' : (in_array('provisional', $statuses, true) ? 'provisional' : 'missing'))));
 
         return ['status' => $status, 'label' => self::LABELS[$status], 'covered' => $digital || $paper, 'sources' => $evidence];
+    }
+
+    /** Archiving retains finalized evidence; an archived closed roster is still provisional. */
+    private function archivedProofs(array $sessions): array
+    {
+        $ids = array_column(array_filter($sessions, static fn (array $session): bool => $session['status'] === 'archived'), 'id');
+        if ($ids === []) {
+            return [];
+        }
+        $versions = TrainingRosterVersion::query()->join('training_sessions as session', 'session.id', '=', 'training_roster_versions.training_session_id')
+            ->whereIn('training_roster_versions.training_session_id', $ids)
+            ->whereColumn('training_roster_versions.revision', 'session.revision')->select('training_roster_versions.*')->get();
+        $proofs = [];
+        foreach ($versions as $version) {
+            $snapshot = $version->snapshot;
+            if (($snapshot['session']['status'] ?? null) !== 'archived'
+                || (int) ($snapshot['session']['id'] ?? 0) !== (int) $version->training_session_id
+                || (int) ($snapshot['session']['revision'] ?? 0) !== $version->revision) {
+                continue;
+            }
+            $certification = $snapshot['certification'] ?? [];
+            $signoff = $snapshot['instructor_signoff'] ?? [];
+            $submission = $snapshot['submission'] ?? [];
+            $certified = filled($certification['certified_at'] ?? null) && (int) ($certification['certified_by'] ?? 0) > 0
+                && (int) ($certification['oic_snapshot']['employee_profile_id'] ?? 0) > 0
+                && $this->validSignature($certification['oic_signature'] ?? null);
+            $submitted = filled($submission['submitted_at'] ?? null) && (int) ($submission['submitted_by'] ?? 0) > 0
+                && (int) ($signoff['recorded_by'] ?? 0) === (int) $submission['submitted_by']
+                && (int) ($signoff['lead_snapshot']['employee_profile_id'] ?? 0) > 0
+                && filled($signoff['signed_at'] ?? null) && $this->validSignature($signoff['signature'] ?? null);
+            if (! $certified && ! $submitted) {
+                continue;
+            }
+            foreach ($snapshot['attendance'] ?? [] as $entry) {
+                if ($this->validSignature($entry['signature'] ?? null)) {
+                    $proofs[$version->training_session_id][(int) $entry['id']] = [
+                        'employee_profile_id' => (int) $entry['employee_profile_id'], 'signature_sha256' => $entry['signature']['sha256'],
+                    ];
+                }
+            }
+        }
+
+        return $proofs;
+    }
+
+    private function validSignature(mixed $signature): bool
+    {
+        return is_array($signature) && filled($signature['disk'] ?? null) && filled($signature['path'] ?? null)
+            && in_array($signature['mime'] ?? null, ['image/png', 'image/jpeg'], true)
+            && (bool) preg_match('/^[a-f0-9]{64}$/D', (string) ($signature['sha256'] ?? ''));
     }
 
     private function exception(string $type, array $session, int|string|null $employee, string $reason, ?object $entry = null): array

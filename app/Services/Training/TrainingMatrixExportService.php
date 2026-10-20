@@ -85,7 +85,7 @@ final class TrainingMatrixExportService
                 ['Personnel', $snapshot['totals']['personnel']], ['Covered required modules', $snapshot['totals']['covered']],
                 ['Applicable required modules', $snapshot['totals']['required']], ['Data exceptions', $snapshot['totals']['exceptions']],
                 ['Coverage meaning', 'Documented attendance only; no qualification, proficiency, training credit or certification is inferred.'],
-                ['Digital', 'Nonvoid signed attendance on a submitted or certified roster. Open, draft or closed rosters remain provisional.'],
+                ['Digital', 'Nonvoid signed attendance on a submitted or certified roster, or preserved finalized attendance in the current archived version. Archiving a provisional roster does not finalize it.'],
                 ['Paper', 'Reviewed approved identified paper evidence; original ink is available only through protected source documents.'],
                 ['N/A and review', 'N/A is outside the module audience. Unknown audience applicability needs review and is excluded from the denominator.'],
                 ['Current personnel', 'Canonical active Employee rank and latest published bid term as of the displayed date. Attendance-time context is retained separately.'],

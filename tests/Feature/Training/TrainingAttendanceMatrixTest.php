@@ -15,14 +15,17 @@ use App\Models\Training\TrainingSession;
 use App\Models\User;
 use App\Services\Training\TrainingAttendanceMatrixService;
 use App\Services\Training\TrainingMatrixExportService;
+use App\Services\Training\TrainingRosterService;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\TestCase;
@@ -238,6 +241,50 @@ final class TrainingAttendanceMatrixTest extends TestCase
         self::assertSame([$firstDelivery->id, $repeatDelivery->id, $secondDelivery->id, $unassigned->id], array_column($this->snapshot()['sessions'], 'id'));
     }
 
+    public function test_archiving_retains_submitted_and_certified_coverage_without_finalizing_closed_attendance(): void
+    {
+        Storage::fake('local');
+        config(['filesystems.private' => 'local']);
+        $employee = $this->employee('ARCHIVE');
+        $this->admin->forceFill(['employee_profile_id' => $employee->id, 'employee_id' => $employee->employee_id])->save();
+        foreach (['admin.access', 'training.rosters.submit'] as $permission) {
+            $this->admin->givePermissionTo(Permission::findOrCreate($permission, 'web'));
+        }
+        $service = app(TrainingRosterService::class);
+        $module = $this->module('Archived attendance');
+        $sessions = [];
+        foreach (['submitted', 'certified', 'closed', 'reopened'] as $previous) {
+            $session = $this->trainingSession($module, $previous === 'submitted' ? 'open' : 'closed');
+            $this->digital($employee, $session);
+            if ($previous === 'submitted') {
+                $grant = $session->kioskGrants()->create(['token_hash' => hash('sha256', (string) Str::uuid()), 'expires_at' => now()->addHour()]);
+                $session = $service->submit($session, $this->admin, $session->revision, (string) Str::uuid(), $grant->id, [
+                    'lead_employee_profile_id' => $employee->id, 'lead_signature' => $this->syntheticSignature(), 'lead_confirmed' => true,
+                ]);
+            } elseif (in_array($previous, ['certified', 'reopened'], true)) {
+                $service->certify($session, $this->admin, $employee->id, $this->syntheticSignature());
+                $session->refresh();
+                if ($previous === 'reopened') {
+                    $session = $service->transition($session, 'closed', $this->admin, 'Reopened for additional review.');
+                }
+            }
+            $sessions[$previous] = $service->transition($session, 'archived', $this->admin);
+        }
+        $row = $this->snapshot()['rows'][0];
+        self::assertSame('digital', $row['session_cells'][$sessions['submitted']->id]['status']);
+        self::assertSame('digital', $row['session_cells'][$sessions['certified']->id]['status']);
+        self::assertSame('provisional', $row['session_cells'][$sessions['closed']->id]['status']);
+        self::assertSame('provisional', $row['session_cells'][$sessions['reopened']->id]['status']);
+        self::assertSame(1, $row['covered_count']);
+        self::assertTrue($row['has_provisional']);
+        // An archived approval only covers the immutable attendance it actually contains.
+        $later = $this->employee('AFTER-ARCHIVE');
+        $this->digital($later, $sessions['submitted']);
+        $row = collect($this->snapshot()['rows'])->firstWhere('employee_id', 'AFTER-ARCHIVE');
+        self::assertSame('provisional', $row['session_cells'][$sessions['submitted']->id]['status']);
+        self::assertSame(0, $row['covered_count']);
+    }
+
     public function test_report_and_export_enforce_existing_training_authorization(): void
     {
         $this->actingAs(User::factory()->create(['account_status' => 'active']));
@@ -381,7 +428,7 @@ final class TrainingAttendanceMatrixTest extends TestCase
         return TrainingSession::query()->create(array_replace(['training_course_id' => $this->course->id, 'training_module_id' => $module?->id,
             'public_id' => (string) Str::ulid(), 'course_name' => $this->course->name, 'classifications' => ['STC'],
             'held_on' => '2026-10-20', 'status' => $status, 'attendance_source' => $status === 'paper' ? 'paper' : 'digital',
-            'created_by' => $this->admin->id], $overrides));
+            'revision' => 1, 'created_by' => $this->admin->id], $overrides));
     }
 
     private function digital(Employee $employee, TrainingSession $session): TrainingAttendance
@@ -414,5 +461,19 @@ final class TrainingAttendanceMatrixTest extends TestCase
         } finally {
             unlink($path);
         }
+    }
+
+    private function syntheticSignature(): string
+    {
+        $image = imagecreatetruecolor(300, 100);
+        imagefill($image, 0, 0, imagecolorallocate($image, 255, 255, 255));
+        imagesetthickness($image, 5);
+        imageline($image, 20, 70, 270, 20, imagecolorallocate($image, 0, 0, 0));
+        ob_start();
+        imagepng($image);
+        $bytes = ob_get_clean();
+        imagedestroy($image);
+
+        return 'data:image/png;base64,'.base64_encode($bytes);
     }
 }
