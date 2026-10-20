@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\ApparatusInspectionProcessingService;
 use App\Services\DailyCheckoutChecklistResolver;
 use App\Services\Display\DisplaySnapshotService;
+use App\Services\InspectionMeterBaseline;
 use App\Support\Fleet\FleetVehicleCatalog;
 use App\Support\Fleet\VehicleNumber;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -49,6 +50,9 @@ final class VehicleSwapService
     public const DEMOTE_RESERVE = 'Reserve';
 
     public const DEMOTE_OUT_OF_SERVICE = 'Out of Service';
+
+    /** What makes a row the unit: its identity, station and frontline role. Never the truck's own attributes. */
+    private const IDENTITY_FIELDS = ['unit_id', 'designation', 'name', 'slug', 'station_id', 'assignment', 'daily_checkout_requirement', 'daily_checkout_template'];
 
     public function __construct(
         private readonly FleetVehicleCatalog $catalog,
@@ -152,6 +156,12 @@ final class VehicleSwapService
      * Apply one Fleet decision. Idempotent: repeating the same decision returns
      * the recorded outcome; a different decision on a decided report is refused.
      *
+     * An apparatus row is the physical truck. A decision never moves a truck's
+     * vehicle number, VIN, meters, defects, inspections or tickets; it moves the
+     * unit designation (with its station and frontline role) between truck rows.
+     *
+     * @param  int|null  $mappedApparatusId  the existing truck record the member's vehicle is, when it was not on the fleet list
+     *
      * @throws AuthorizationException when the actor lacks Fleet manage access
      * @throws VehicleSwapDecisionException when the report cannot take this decision
      */
@@ -161,6 +171,7 @@ final class VehicleSwapService
         string $decision,
         ?string $note = null,
         ?string $demoteTo = null,
+        ?int $mappedApparatusId = null,
     ): ApparatusVehicleSwapRequest {
         if (! $actor->can('decide', ApparatusVehicleSwapRequest::class)) {
             throw new AuthorizationException('Fleet manage access is required to decide a vehicle swap.');
@@ -178,7 +189,7 @@ final class VehicleSwapService
             $demoteTo = null;
         }
 
-        return DB::transaction(function () use ($requestId, $actor, $decision, $note, $demoteTo): ApparatusVehicleSwapRequest {
+        return DB::transaction(function () use ($requestId, $actor, $decision, $note, $demoteTo, $mappedApparatusId): ApparatusVehicleSwapRequest {
             $request = ApparatusVehicleSwapRequest::query()->lockForUpdate()->findOrFail($requestId);
             if (! $request->isPending()) {
                 if ($request->status === $this->statusFor($decision)) {
@@ -188,32 +199,55 @@ final class VehicleSwapService
             }
 
             $inspection = ApparatusInspection::query()->lockForUpdate()->findOrFail($request->apparatus_inspection_id);
-            [$unit, $holders] = $this->lockUnits($request);
-            $holder = $holders->first();
-            $before = ['unit' => $this->snapshot($unit), 'other_unit' => $holder ? $this->snapshot($holder) : null];
-
-            $retiredVehicle = null;
-            if ($decision !== self::DECISION_REJECT) {
-                $retiredVehicle = $this->applyApproval($request, $unit, $holders, $decision, $demoteTo);
+            $truckId = $decision === self::DECISION_REJECT ? null : ($request->reported_apparatus_id ?? $mappedApparatusId);
+            if ($decision !== self::DECISION_REJECT && $truckId === null) {
+                throw new VehicleSwapDecisionException('Vehicle '.$request->reported_vehicle_number.' is not on the fleet list. Choose the existing truck record it is, or reject the report.');
+            }
+            if ($truckId !== null && $truckId === (int) $request->apparatus_id) {
+                throw new VehicleSwapDecisionException('The reported truck is the one already assigned to this unit.');
             }
 
-            $unit->refresh();
-            $holder?->refresh();
-            $after = ['unit' => $this->snapshot($unit), 'other_unit' => $holder ? $this->snapshot($holder) : null];
+            // Lock both truck rows in id order so two decisions can never interleave.
+            $ids = array_values(array_unique(array_filter([(int) $request->apparatus_id, $truckId])));
+            sort($ids);
+            $locked = Apparatus::query()->whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
+            /** @var Apparatus|null $assigned */
+            $assigned = $locked->get((int) $request->apparatus_id);
+            /** @var Apparatus|null $truck */
+            $truck = $truckId === null ? null : $locked->get($truckId);
+            if ($assigned === null || ($truckId !== null && $truck === null)) {
+                throw new VehicleSwapDecisionException('A truck record in this report no longer exists.');
+            }
+
+            $before = ['assigned_truck' => $this->snapshot($assigned), 'reported_truck' => $truck ? $this->snapshot($truck) : null];
+            $confirmed = $assigned;
+            $baselineToken = $request->meter_baseline_token;
+            if ($truck !== null) {
+                $this->assertStillCurrent($request, $assigned, $truck);
+                $this->moveUnitIdentity($assigned, $truck, $decision, $demoteTo);
+                // The report's baseline described the assigned truck; judge the reading against the confirmed truck's own meters.
+                $confirmed = $truck;
+                $baselineToken = app(InspectionMeterBaseline::class)->issue($truck->refresh());
+            }
+
+            $assigned->refresh();
+            $truck?->refresh();
             $audit = [
                 'decision' => $decision,
                 'decided_by' => ['id' => $actor->getKey(), 'name' => $actor->name],
                 'decided_at' => now()->toIso8601String(),
                 'before' => $before,
-                'after' => $after,
-                'old_vehicle_without_unit' => $retiredVehicle,
-                'old_vehicle_demoted_to' => $demoteTo,
+                'after' => ['assigned_truck' => $this->snapshot($assigned), 'reported_truck' => $truck ? $this->snapshot($truck) : null],
+                'old_truck_demoted_to' => $demoteTo,
+                'findings_applied_to_apparatus_id' => $confirmed->getKey(),
+                'mapped_by_admin' => $request->reported_apparatus_id === null && $truck !== null,
             ];
 
-            $this->applyHeldFindings($inspection, $unit, $request, $actor, $decision, $note, $audit);
+            $this->applyHeldFindings($inspection, $confirmed, $request, $actor, $decision, $note, $audit, $baselineToken);
 
             $request->update([
                 'status' => $this->statusFor($decision),
+                'confirmed_apparatus_id' => $confirmed->getKey(),
                 'decided_by_user_id' => $actor->getKey(),
                 'decided_at' => now(),
                 'decision_note' => $note,
@@ -238,80 +272,75 @@ final class VehicleSwapService
         };
     }
 
-    /**
-     * Lock the checked-out unit and every unit carrying the reported vehicle in
-     * id order, so two decisions can never deadlock or interleave.
-     *
-     * @return array{0: Apparatus, 1: Collection<int, Apparatus>}
-     */
-    private function lockUnits(ApparatusVehicleSwapRequest $request): array
+    /** Refuse to approve against records that moved since the member reported. */
+    private function assertStillCurrent(ApparatusVehicleSwapRequest $request, Apparatus $assigned, Apparatus $truck): void
     {
-        $ids = $this->catalog->otherHolders($request->reported_vehicle_number, (int) $request->apparatus_id)
-            ->pluck('id')->push($request->apparatus_id)->unique()->sort()->values()->all();
-        $locked = Apparatus::query()->whereIn('id', $ids)->orderBy('id')->lockForUpdate()->get();
-
-        /** @var Apparatus $unit */
-        $unit = $locked->firstWhere('id', $request->apparatus_id);
-        $holders = $locked
-            ->filter(fn (Apparatus $row): bool => $row->getKey() !== $unit->getKey() && VehicleNumber::same($row->vehicle_number, $request->reported_vehicle_number))
-            ->values();
-
-        return [$unit, $holders];
+        if (($assigned->designation ?: $assigned->name) !== $request->unit_designation) {
+            throw new VehicleSwapDecisionException('Unit '.$request->unit_designation.' moved to a different truck record after this report. Reject it, or review the fleet records first.');
+        }
+        if ($request->reported_apparatus_id !== null && ! VehicleNumber::same($truck->vehicle_number, $request->reported_vehicle_number)) {
+            throw new VehicleSwapDecisionException('The reported truck record no longer carries vehicle '.$request->reported_vehicle_number.'. Reject it, or review the fleet records first.');
+        }
     }
 
     /**
-     * Change vehicle IDs only. Returns the old vehicle ID when no unit is left to carry it.
-     *
-     * @param  Collection<int, Apparatus>  $holders
+     * Move the unit designation, its station and its frontline role from the
+     * assigned truck row to the confirmed truck row. vehicle_number, VIN,
+     * meters, defects, inspections and tickets never move. Unique unit_id and
+     * slug values are parked on placeholders so both updates happen in this one
+     * locked transaction without a collision.
      */
-    private function applyApproval(
-        ApparatusVehicleSwapRequest $request,
-        Apparatus $unit,
-        Collection $holders,
-        string $decision,
-        ?string $demoteTo,
-    ): ?string {
-        if (! VehicleNumber::same($unit->vehicle_number, $request->assigned_vehicle_number)) {
-            throw new VehicleSwapDecisionException('The vehicle assigned to '.($unit->designation ?: 'this unit').' changed after this report. Reject it, or review the unit in Fleet first.');
-        }
-        if ($holders->count() > 1) {
-            throw new VehicleSwapDecisionException('More than one unit carries vehicle '.$request->reported_vehicle_number.'. Correct the fleet records before approving.');
-        }
-        $holder = $holders->first();
-        if ($decision === self::DECISION_APPROVE_SWAP && $holder === null) {
-            throw new VehicleSwapDecisionException('Vehicle '.$request->reported_vehicle_number.' is not on any unit, so there is nothing to trade. Use the option where the new vehicle takes the unit.');
+    private function moveUnitIdentity(Apparatus $assigned, Apparatus $truck, string $decision, ?string $demoteTo): void
+    {
+        $identity = static fn (Apparatus $row): array => collect(self::IDENTITY_FIELDS)
+            ->mapWithKeys(static fn (string $field): array => [$field => $row->getRawOriginal($field)])->all();
+        $unitIdentity = $identity($assigned);
+        $truckIdentity = $identity($truck);
+        $assignedRole = FleetVehicleCatalog::roleFor($assigned->getAttribute('status'));
+        $truckRole = FleetVehicleCatalog::roleFor($truck->getAttribute('status'));
+        $assignedStatus = $assigned->getAttribute('status');
+        $truckStatus = $truck->getAttribute('status');
+        $swapRoles = in_array($assignedRole, [FleetVehicleCatalog::ROLE_FRONTLINE, FleetVehicleCatalog::ROLE_RESERVE], true)
+            && in_array($truckRole, [FleetVehicleCatalog::ROLE_FRONTLINE, FleetVehicleCatalog::ROLE_RESERVE], true)
+            && $assignedRole !== $truckRole;
+
+        $assigned->forceFill(['unit_id' => 'swap-hold-'.$assigned->getKey(), 'slug' => 'swap-hold-'.$assigned->getKey()])->save();
+        $truck->forceFill([...$unitIdentity, ...($swapRoles ? ['status' => $assignedStatus] : [])])->save();
+
+        if ($decision === self::DECISION_APPROVE_SWAP) {
+            $assigned->forceFill([...$truckIdentity, ...($swapRoles ? ['status' => $truckStatus] : [])])->save();
+
+            return;
         }
 
-        $oldVehicle = VehicleNumber::normalize($unit->vehicle_number);
-        $newVehicle = VehicleNumber::normalize($holder?->vehicle_number) ?? $request->reported_vehicle_number;
-
-        $unit->update(['vehicle_number' => $newVehicle]);
-        if ($holder === null) {
-            return $oldVehicle;
-        }
-        $holder->vehicle_number = $oldVehicle;
-        if ($decision === self::DECISION_APPROVE_REPLACE && $demoteTo !== null && $holder->getAttribute('status') !== $demoteTo) {
-            $holder->setAttribute('status', $demoteTo);
-        }
-        $holder->save();
-
-        return null;
+        // Replace: the previously assigned truck loses the frontline designation and becomes a reserve or out-of-service truck.
+        $assigned->forceFill([
+            'unit_id' => 'reserve-'.$assigned->getKey(),
+            // Never null: existing screens and filters label units by designation.
+            'designation' => 'Reserve '.($assigned->vehicle_number ?: $assigned->getKey()),
+            'slug' => 'reserve-'.$assigned->getKey(),
+            'name' => 'Reserve (was '.($unitIdentity['designation'] ?: $unitIdentity['name'] ?: 'unit').')',
+            'assignment' => null,
+            'daily_checkout_requirement' => 'reserve',
+            'status' => $demoteTo,
+        ])->save();
     }
 
     /**
      * Release the held checkout into the normal processing path, against the
-     * unit it was saved under, and record the decision on its review history.
+     * confirmed truck row, and record the decision on its review history.
      *
      * @param  array<string, mixed>  $audit
      */
     private function applyHeldFindings(
         ApparatusInspection $inspection,
-        Apparatus $unit,
+        Apparatus $confirmed,
         ApparatusVehicleSwapRequest $request,
         User $actor,
         string $decision,
         ?string $note,
         array $audit,
+        ?string $baselineToken,
     ): void {
         $inspection->update(['processing_status' => null]);
 
@@ -332,29 +361,34 @@ final class VehicleSwapService
             ],
         ]);
 
-        $this->processing->process($inspection, $unit, $request->meter_baseline_token, $this->checklistFor($inspection, $unit));
+        $this->processing->process($inspection, $confirmed, $baselineToken, $this->checklistFor($inspection, $confirmed));
     }
 
     /** @return array<string, mixed> */
-    private function checklistFor(ApparatusInspection $inspection, Apparatus $unit): array
+    private function checklistFor(ApparatusInspection $inspection, Apparatus $confirmed): array
     {
         $session = DailyCheckoutInspectionSession::query()->where('submitted_inspection_id', $inspection->getKey())->first();
         if ($session !== null && is_array($session->checklist_snapshot)) {
             return $session->checklist_snapshot;
         }
-        $resolution = $this->checklistResolver->resolve($unit);
+        $resolution = $this->checklistResolver->resolve($confirmed);
 
         return $resolution['usable'] && is_array($resolution['checklist']) ? $resolution['checklist'] : [];
     }
 
-    /** @return array{id: mixed, designation: string|null, vehicle_number: string|null, status: string|null} */
-    private function snapshot(Apparatus $unit): array
+    /** @return array<string, mixed> */
+    private function snapshot(Apparatus $truck): array
     {
         return [
-            'id' => $unit->getKey(),
-            'designation' => $unit->designation ?: $unit->name,
-            'vehicle_number' => $unit->vehicle_number,
-            'status' => $unit->getAttribute('status'),
+            'id' => $truck->getKey(),
+            'designation' => $truck->designation,
+            'unit_id' => $truck->getAttribute('unit_id'),
+            'station_id' => $truck->station_id,
+            'status' => $truck->getAttribute('status'),
+            'vehicle_number' => $truck->vehicle_number,
+            'vin' => $truck->getAttribute('vin'),
+            'current_miles' => $truck->current_miles,
+            'current_engine_hours' => $truck->current_engine_hours,
         ];
     }
 }

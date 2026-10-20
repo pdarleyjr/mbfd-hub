@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Support;
 
+use App\Models\Apparatus;
 use App\Models\ApparatusVehicleSwapRequest;
 use App\Models\User;
 use App\Services\Fleet\VehicleSwapDecisionException;
@@ -47,6 +48,7 @@ final class VehicleSwapDecisionAction
                         (string) $data['decision'],
                         $data['note'] ?? null,
                         $data['demote_to'] ?? null,
+                        isset($data['mapped_apparatus_id']) ? (int) $data['mapped_apparatus_id'] : null,
                     );
                 } catch (VehicleSwapDecisionException $exception) {
                     Notification::make()->danger()->title('Decision not recorded')->body($exception->getMessage())->persistent()->send();
@@ -68,10 +70,15 @@ final class VehicleSwapDecisionAction
         return auth()->user()?->can('decide', ApparatusVehicleSwapRequest::class) ?? false;
     }
 
+    private static function truckLabel(Apparatus $truck): string
+    {
+        return trim(($truck->vehicle_number ?: 'No vehicle ID').' · '.($truck->designation ?: $truck->name ?: $truck->getAttribute('unit_id') ?: 'no unit').' ('.($truck->getAttribute('status') ?: 'no status').')');
+    }
+
     /** @return list<Forms\Components\Component> */
     private static function form(ApparatusVehicleSwapRequest $record): array
     {
-        $nothingToTrade = app(VehicleSwapService::class)->otherUnitsHolding($record)->isEmpty();
+        $noTruckRecord = $record->reported_apparatus_id === null;
 
         return [
             Forms\Components\Radio::make('decision')
@@ -79,20 +86,32 @@ final class VehicleSwapDecisionAction
                 ->required()
                 ->live()
                 ->options([
-                    VehicleSwapService::DECISION_APPROVE_SWAP => 'Approve swap: trade the two units\' vehicle IDs',
-                    VehicleSwapService::DECISION_APPROVE_REPLACE => 'Approve: the reported vehicle takes this unit, the old vehicle is demoted',
-                    VehicleSwapService::DECISION_REJECT => 'Reject: no change, findings go to the assigned vehicle',
+                    VehicleSwapService::DECISION_APPROVE_SWAP => 'Approve swap: the two trucks trade unit designations',
+                    VehicleSwapService::DECISION_APPROVE_REPLACE => 'Approve: the reported truck takes this unit, the old truck is demoted',
+                    VehicleSwapService::DECISION_REJECT => 'Reject: no change, findings go to the assigned truck',
                 ])
                 ->descriptions([
-                    VehicleSwapService::DECISION_APPROVE_SWAP => $nothingToTrade
-                        ? 'Not available: the reported vehicle is not on any other unit.'
-                        : 'The other unit receives this unit\'s current vehicle ID.',
-                    VehicleSwapService::DECISION_APPROVE_REPLACE => 'Mark the old vehicle Reserve or Out of Service below.',
-                    VehicleSwapService::DECISION_REJECT => 'No vehicle ID or status changes.',
-                ])
-                ->disableOptionWhen(fn (string $value): bool => $nothingToTrade && $value === VehicleSwapService::DECISION_APPROVE_SWAP),
+                    VehicleSwapService::DECISION_APPROVE_SWAP => 'Each truck keeps its own vehicle ID, VIN, meters, defects and history; only the unit designation, station and frontline role move.',
+                    VehicleSwapService::DECISION_APPROVE_REPLACE => 'The old truck loses the designation and becomes Reserve or Out of Service below.',
+                    VehicleSwapService::DECISION_REJECT => 'No designation or status changes.',
+                ]),
+            Forms\Components\Select::make('mapped_apparatus_id')
+                ->label('Which truck record is vehicle '.$record->reported_vehicle_number.'?')
+                ->helperText('This vehicle ID is not on a truck record. Pick the existing record it is, or reject the report. No record is created.')
+                ->searchable()
+                ->getSearchResultsUsing(fn (string $search): array => Apparatus::query()
+                    ->where('id', '!=', $record->apparatus_id)
+                    ->where(fn ($query) => $query->where('vehicle_number', 'like', "%{$search}%")->orWhere('designation', 'like', "%{$search}%")->orWhere('name', 'like', "%{$search}%"))
+                    ->orderBy('vehicle_number')->limit(50)->get()
+                    ->mapWithKeys(fn (Apparatus $truck): array => [$truck->getKey() => self::truckLabel($truck)])->all())
+                ->options(fn (): array => Apparatus::query()
+                    ->where('id', '!=', $record->apparatus_id)->orderBy('vehicle_number')->limit(50)->get()
+                    ->mapWithKeys(fn (Apparatus $truck): array => [$truck->getKey() => self::truckLabel($truck)])->all())
+                ->getOptionLabelUsing(fn ($value): string => ($truck = Apparatus::query()->find($value)) ? self::truckLabel($truck) : (string) $value)
+                ->visible(fn (Forms\Get $get): bool => $noTruckRecord && in_array($get('decision'), [VehicleSwapService::DECISION_APPROVE_SWAP, VehicleSwapService::DECISION_APPROVE_REPLACE], true))
+                ->required(fn (Forms\Get $get): bool => $noTruckRecord && in_array($get('decision'), [VehicleSwapService::DECISION_APPROVE_SWAP, VehicleSwapService::DECISION_APPROVE_REPLACE], true)),
             Forms\Components\Select::make('demote_to')
-                ->label('Old vehicle becomes')
+                ->label('Old truck becomes')
                 ->options([
                     VehicleSwapService::DEMOTE_RESERVE => 'Reserve',
                     VehicleSwapService::DEMOTE_OUT_OF_SERVICE => 'Out of Service',

@@ -36,7 +36,7 @@
             <dd>{{ $swap->note ?: 'No note' }}</dd>
         </div>
         <div>
-            <dt>Other units carrying vehicle {{ $swap->reported_vehicle_number }}</dt>
+            <dt>Unit the reported truck (vehicle {{ $swap->reported_vehicle_number }}) holds now</dt>
             @php
                 $otherUnitsLabel = $otherUnits->map(function ($other): string {
                     $status = $other->getAttribute('status');
@@ -46,7 +46,7 @@
                 })->implode('; ');
             @endphp
             {{-- One line on purpose: this definition list preserves white space. --}}
-            <dd>{{ $otherUnitsLabel !== '' ? $otherUnitsLabel : 'None. It is not assigned to any unit.' }}</dd>
+            <dd>{{ $otherUnitsLabel !== '' ? $otherUnitsLabel : 'None. This vehicle ID is not on a truck record.' }}</dd>
         </div>
     </dl>
 </div>

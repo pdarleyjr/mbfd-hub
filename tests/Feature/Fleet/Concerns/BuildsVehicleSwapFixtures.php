@@ -8,6 +8,7 @@ use App\Enums\AccountStatus;
 use App\Models\Apparatus;
 use App\Models\ApparatusVehicleSwapRequest;
 use App\Models\Employee;
+use App\Models\Station;
 use App\Models\User;
 use App\Services\DailyCheckoutChecklistResolver;
 use App\Services\InspectionMeterBaseline;
@@ -46,18 +47,23 @@ trait BuildsVehicleSwapFixtures
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
         $this->member = $this->actingAsCanonicalFixture('SWAP-001', 'Swap Reporter', 'Firefighter');
+        $station2 = Station::query()->create(['station_number' => 2, 'name' => 'Station 2', 'address' => '2300 Pine Tree Drive', 'is_active' => true]);
+        $station3 = Station::query()->create(['station_number' => 3, 'name' => 'Station 3', 'address' => '1 Test Way', 'is_active' => true]);
         $this->unit = Apparatus::query()->create([
+            'station_id' => $station2->id, 'vin' => 'VIN-202', 'assignment' => 'Station 2',
             'unit_id' => 'E2', 'designation' => 'E2', 'name' => 'Engine 2', 'type' => 'Engine',
             'vehicle_number' => 'V-202', 'status' => 'In Service',
             'daily_checkout_requirement' => 'required', 'daily_checkout_template' => 'engine2',
             'current_engine_hours' => 400, 'current_miles' => 1000,
         ]);
         $this->frontline = Apparatus::query()->create([
+            'station_id' => $station3->id, 'vin' => 'VIN-303', 'assignment' => 'Station 3', 'daily_checkout_requirement' => 'required', 'daily_checkout_template' => 'engine',
             'unit_id' => 'E3', 'designation' => 'E3', 'name' => 'Engine 3', 'type' => 'Engine',
             'vehicle_number' => 'V-303', 'status' => 'In Service',
             'current_engine_hours' => 900, 'current_miles' => 5000,
         ]);
         $this->reserve = Apparatus::query()->create([
+            'station_id' => $station3->id, 'vin' => 'VIN-909', 'daily_checkout_requirement' => 'reserve', 'daily_checkout_template' => 'default',
             'unit_id' => 'RE1', 'designation' => 'RE1', 'name' => 'Reserve Engine 1', 'type' => 'Engine',
             'vehicle_number' => 'V-909', 'status' => 'Reserve',
             'current_engine_hours' => 1200, 'current_miles' => 8000,

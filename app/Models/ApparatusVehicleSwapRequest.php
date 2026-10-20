@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $apparatus_inspection_id
  * @property int $apparatus_id
  * @property int|null $reported_apparatus_id
+ * @property int|null $confirmed_apparatus_id
  * @property string $reporter_name
  * @property string|null $unit_designation
  * @property string|null $assigned_vehicle_number
@@ -31,10 +32,10 @@ class ApparatusVehicleSwapRequest extends Model
 {
     public const STATUS_PENDING = 'pending';
 
-    /** Both units trade vehicle IDs. */
+    /** The two truck records trade the unit designation, station and frontline role. */
     public const STATUS_APPROVED_SWAP = 'approved_swap';
 
-    /** The reported vehicle takes the unit; the old vehicle is demoted to reserve or out of service. */
+    /** The reported truck takes the unit designation; the old truck loses it and becomes reserve or out of service. */
     public const STATUS_APPROVED_REPLACE = 'approved_replace';
 
     public const STATUS_REJECTED = 'rejected';
@@ -49,6 +50,7 @@ class ApparatusVehicleSwapRequest extends Model
         'apparatus_inspection_id',
         'apparatus_id',
         'reported_apparatus_id',
+        'confirmed_apparatus_id',
         'reporter_user_id',
         'reporter_name',
         'unit_designation',
@@ -86,8 +88,8 @@ class ApparatusVehicleSwapRequest extends Model
     {
         return match ($status) {
             self::STATUS_PENDING => 'Pending decision',
-            self::STATUS_APPROVED_SWAP => 'Approved, vehicles traded',
-            self::STATUS_APPROVED_REPLACE => 'Approved, old vehicle demoted',
+            self::STATUS_APPROVED_SWAP => 'Approved, trucks traded',
+            self::STATUS_APPROVED_REPLACE => 'Approved, old truck demoted',
             self::STATUS_REJECTED => 'Rejected, no change',
             default => str($status)->headline()->toString(),
         };
@@ -118,6 +120,12 @@ class ApparatusVehicleSwapRequest extends Model
     public function reportedApparatus(): BelongsTo
     {
         return $this->belongsTo(Apparatus::class, 'reported_apparatus_id');
+    }
+
+    /** @return BelongsTo<Apparatus, $this> */
+    public function confirmedApparatus(): BelongsTo
+    {
+        return $this->belongsTo(Apparatus::class, 'confirmed_apparatus_id');
     }
 
     /** @return BelongsTo<User, $this> */

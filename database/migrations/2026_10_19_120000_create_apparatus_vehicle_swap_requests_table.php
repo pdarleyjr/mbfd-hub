@@ -22,6 +22,8 @@ return new class extends Migration
             $table->foreignId('apparatus_inspection_id')->unique()->constrained('apparatus_inspections')->restrictOnDelete();
             $table->foreignId('apparatus_id')->constrained('apparatuses')->restrictOnDelete();
             $table->foreignId('reported_apparatus_id')->nullable()->constrained('apparatuses')->nullOnDelete();
+            // The truck record the held findings were applied to once decided (the confirmed physical truck).
+            $table->foreignId('confirmed_apparatus_id')->nullable()->constrained('apparatuses')->nullOnDelete();
             $table->foreignId('reporter_user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->string('reporter_name', 255);
             $table->string('unit_designation', 100)->nullable();
