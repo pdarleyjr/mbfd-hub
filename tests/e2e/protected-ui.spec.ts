@@ -1,5 +1,24 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 
+const wallpaperPattern = /\/images\/wallpapers\/mbfd-(?:smartphone|tablet|desktop)-[0-9a-f]+\.webp$/;
+const wallpaperFor = (width: number) => (width < 768 ? 'smartphone' : width < 1024 ? 'tablet' : 'desktop');
+
+test('each width requests only its own wallpaper', async ({ page }, info) => {
+  const width = page.viewportSize()!.width;
+  const requested: string[] = [];
+  page.on('request', request => { if (wallpaperPattern.test(request.url().split('?')[0])) requested.push(request.url().split('/').pop()!.split('?')[0]); });
+  const failed: string[] = [];
+  page.on('requestfailed', request => { if (wallpaperPattern.test(request.url().split('?')[0])) failed.push(request.url()); });
+  await page.goto('/admin/apparatuses');
+  await expect(page.locator('main')).toBeVisible();
+  await page.waitForLoadState('networkidle', { timeout: 10_000 }).catch(() => undefined);
+  await page.waitForTimeout(1_000);
+  await info.attach('wallpaper-requests', { body: JSON.stringify({ width, requested, failed }, null, 2), contentType: 'application/json' });
+  expect(requested.length, `${width}px: exactly one wallpaper`).toBe(1);
+  expect(requested[0], `${width}px: the ${wallpaperFor(width)} wallpaper`).toMatch(new RegExp(`^mbfd-${wallpaperFor(width)}-`));
+  expect(failed, 'no wallpaper request fails or aborts on a plain load').toEqual([]);
+});
 const pages = [
   { name: 'hub', path: '/', back: false },
   { name: 'account', path: '/account', back: true },
@@ -252,7 +271,16 @@ for (const route of pages) test(`authenticated ${route.name} fits and remains na
       info.annotations.push({ type: 'harness-warning', description: message.text() });
     } else if (['error', 'warning'].includes(message.type())) failures.push(`console ${message.type()}: ${message.text()}`);
   });
-  page.on('requestfailed', request => failures.push(`requestfailed: ${request.url().split('?')[0]} ${request.failure()?.errorText}`));
+  page.on('requestfailed', request => {
+    // A full-page capture lays the page out at a transient narrow width (matchMedia flips), so Chromium
+    // starts the smartphone wallpaper and cancels it when the viewport is restored. Only that cancellation
+    // of a wallpaper that does NOT belong to the current width is tolerated; the width's own wallpaper
+    // failing, or any other failure, still counts. The 'each width requests only its own wallpaper' test
+    // below proves a normal load never requests the wrong one.
+    const own = wallpaperFor(page.viewportSize()!.width);
+    if (request.failure()?.errorText === 'net::ERR_ABORTED' && wallpaperPattern.test(request.url().split('?')[0]) && !request.url().includes(`mbfd-${own}-`)) return;
+    failures.push(`requestfailed: ${request.url().split('?')[0]} ${request.failure()?.errorText}`);
+  });
   page.on('response', response => { if (response.status() >= 400) failures.push(`HTTP ${response.status()}: ${response.url().split('?')[0]}`); });
     await test.step(route.path, async () => {
       if (route.name === 'workgroups') {
@@ -408,6 +436,19 @@ test('keyboard focus remains visible including beside the Report Issue launcher'
   await screenshot(page, info, 'keyboard-focus');
   expect(checked).toBeGreaterThan(0);
   expect.soft(occluded).toEqual([]);
+});
+
+test('Daily room profile labels meet 4.5:1 against their surface', async ({ page }, info) => {
+  test.skip(!['width-390', 'width-1440'].includes(info.project.name), 'Phone and desktop Daily room acceptance.');
+  const fixtureRoutes = JSON.parse(readFileSync('test-results/protected-ui-auth/fixture-routes.json', 'utf8'));
+  const roomPath = fixtureRoutes['/daily/stations/:stationId/rooms/:roomId'];
+  expect(roomPath, 'Protected UI seeder supplies a real local room').toMatch(/^\/daily\/stations\/\d+\/rooms\/\d+$/);
+  await page.goto(roomPath);
+  await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 20_000 });
+  await expect(page.locator('dl dt').first()).toBeVisible();
+  const contrast = await measureContrast(page, { statLabel: 'dl dt', eyebrow: 'header > p:first-child' });
+  await info.attach('daily-room-label-contrast', { body: JSON.stringify(contrast, null, 2), contentType: 'application/json' });
+  for (const item of contrast) expect(item.ratio, JSON.stringify(item)).toBeGreaterThanOrEqual(4.5);
 });
 
 function measureContrast(page: Page, selections: Record<string, string>, pseudoSelectors: Record<string, string> = {}) {

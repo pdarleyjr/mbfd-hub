@@ -1,8 +1,6 @@
 /* Compact employee ordering; existing Hub palette, type and touch targets. */
 .fi-page:has(.uo-builder) { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: .75rem; padding-top: .75rem; }
 .fi-page:has(.uo-builder) > .employee-global-back { margin: 0; }
-.fi-page:has(.uo-builder) > .employee-global-back .hub-back-label { display: none; }
-.fi-page:has(.uo-builder) > .employee-global-back .hub-back-short { display: inline; }
 .fi-page:has(.uo-builder) > section { display: contents; }
 .fi-page:has(.uo-builder) > section > .fi-header { grid-column: 2; align-self: center; }
 .fi-page:has(.uo-builder) > section > .fi-header .fi-header-heading { font-size: 1.25rem; line-height: 1.5; }

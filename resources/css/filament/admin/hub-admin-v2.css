@@ -505,9 +505,19 @@ html:not(.dark) :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .
     color: rgb(var(--hub2-action));
 }
 
-/* FilePond renders the file-size line at 50% white on its grey item panel (about 2.3:1). */
-:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-fo-file-upload .filepond--file-info-sub {
+/* FilePond paints the file name and size in white on a state-coloured item panel: grey #64605e (5.9:1),
+   success #369763 (3.5:1) and error #c44e47 (4.6:1, 4.1:1 once the size line is dimmed). Keep the size
+   line at 90% white and give the success and error panels the Hub tokens, which clear 4.5:1 with it. */
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-fo-file-upload .filepond--item :is(.filepond--file-info-sub, .filepond--file-status-sub) {
     opacity: .9;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-fo-file-upload [data-filepond-item-state='processing-complete'] .filepond--item-panel {
+    background-color: rgb(var(--hub-success));
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-fo-file-upload :is([data-filepond-item-state*='error'], [data-filepond-item-state*='invalid']) .filepond--item-panel {
+    background-color: rgb(var(--hub-danger));
 }
 
 /* Breadcrumb links are small inline text (24px tall); every other touch control in the Hub is 44px.
