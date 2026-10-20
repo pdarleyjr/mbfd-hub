@@ -9,6 +9,7 @@ use App\Filament\Resources\ApparatusResource\Pages\ViewApparatus;
 use App\Filament\Resources\ApparatusResource\RelationManagers\DefectsRelationManager;
 use App\Filament\Resources\ApparatusResource\RelationManagers\InspectionsRelationManager;
 use App\Filament\Resources\ApparatusResource\RelationManagers\ServiceTicketsRelationManager;
+use App\Filament\Resources\ApparatusResource\RelationManagers\VehicleSwapReportsRelationManager;
 use App\Filament\Resources\ApparatusServiceTicketResource;
 use App\Filament\Resources\DefectResource\Pages\EditDefect;
 use App\Filament\Resources\DefectResource\Pages\ListDefects;
@@ -423,7 +424,7 @@ final class ApparatusDefectServiceTicketTest extends TestCase
         $this->assertSame($latest->id, $overview->lastInspection?->id);
     }
 
-    public function test_apparatus_profile_shows_overview_and_the_three_tabs_in_order(): void
+    public function test_apparatus_profile_shows_overview_and_the_relation_tabs_in_order(): void
     {
         $this->actAsPanelUser('logistics_admin');
         $this->ticket('submitted');
@@ -437,8 +438,9 @@ final class ApparatusDefectServiceTicketTest extends TestCase
         $this->assertSame([
             InspectionsRelationManager::class,
             ServiceTicketsRelationManager::class,
+            VehicleSwapReportsRelationManager::class,
             DefectsRelationManager::class,
-        ], array_values(ApparatusResource::getRelations()));
+        ], array_values(ApparatusResource::getRelations()), 'Vehicle swaps is the fourth tab, shown only to Fleet staff who can view swap reports.');
         $this->assertSame('Overview', $component->instance()->getContentTabLabel());
     }
 
