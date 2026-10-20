@@ -32,7 +32,7 @@ final class HubShellNavigation
             'media_control' => ['label' => 'Media Control', 'href' => 'https://media.mbfdhub.com/api/auth/hub/start'],
             'meeting' => ['label' => 'Meeting Intelligence', 'href' => 'https://meet.mbfdhub.com/'],
         ] as $key => $application) {
-            if ($application['href'] !== '' && self::launchable($key, $states)) {
+            if (self::launchable($key, $states)) {
                 $navigation['applications'][] = ['key' => $key, ...$application];
             }
         }

@@ -59,7 +59,7 @@ final class CommandBoardLauncherTest extends TestCase
         $inherited->assignRole($role);
         $plain = $this->actingAsCanonicalFixture('E01-CMD-PLAIN');
         foreach ([$plain, $direct, $inherited, $superAdmin] as $user) {
-            $this->actingAs($user->fresh(), 'web');
+            $this->actingAsCanonicalUser($user->fresh());
             self::assertNotContains('cmd', $this->keys($user->fresh()));
             $this->get('/')->assertOk()
                 ->assertSee('Quick Access')
