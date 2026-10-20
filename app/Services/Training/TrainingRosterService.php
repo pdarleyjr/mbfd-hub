@@ -92,9 +92,9 @@ final class TrainingRosterService
             if ($moduleId !== null || $course->modules()->exists()) {
                 $this->reject('session', 'Choose the module and dated roster below. Ask training staff to create a session if none is open.');
             }
-            $todaySessions = $course->sessions()->whereDate('held_on', $today)->orderBy('id')->limit(2)->get();
+            $todaySessions = $course->sessions()->whereDate('held_on', $today)->where('status', 'open')->where('attendance_source', 'digital')->orderBy('id')->limit(2)->get();
             if ($todaySessions->count() > 1) {
-                $this->reject('session', 'More than one roster exists for this class today. Choose the dated roster and location from the class list.');
+                $this->reject('session', 'More than one roster is open for this class today. Choose the dated roster and location from the class list.');
             }
             $session = $todaySessions->first();
             if ($session !== null) {
@@ -103,6 +103,9 @@ final class TrainingRosterService
                 }
 
                 return $session;
+            }
+            if ($course->sessions()->whereDate('held_on', $today)->where(fn ($query) => $query->whereNotNull('created_by')->orWhereNotNull('training_module_id')->orWhere('attendance_source', 'paper'))->exists()) {
+                $this->reject('session', 'Training staff manage this course’s sessions today. Choose an open dated roster below.');
             }
             $session = $course->sessions()->create([
                 'public_id' => (string) Str::ulid(), 'course_name' => $course->name,
