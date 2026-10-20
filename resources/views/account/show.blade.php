@@ -10,7 +10,7 @@
     <a href="#main" class="hub-skip-link">Skip to content</a>
     <x-hub-header back-label="Hub home" max-width="max-w-5xl" />
     <main id="main" class="hub-page__main mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
-        <x-hub.page-header title="My account" eyebrow="MBFD Identity" description="Manage your Hub identity, security, and granted application access." />
+        <x-hub.page-header title="My account" eyebrow="MBFD Identity" description="Manage your Hub identity, security, and application access." />
         <section class="overflow-hidden hub-panel" aria-labelledby="identity-heading">
             <div class="border-b border-hub-border px-5 py-4"><h2 id="identity-heading" class="text-lg font-bold">Identity & security</h2><p class="mt-1 text-sm text-hub-muted">Your department identity and current security readiness.</p></div>
             <dl class="grid gap-px bg-hub-border sm:grid-cols-2">
@@ -37,7 +37,7 @@
         </section>
 
         <section class="hub-panel" aria-labelledby="access-heading">
-            <div class="border-b border-hub-border px-5 py-4"><h2 id="access-heading" class="text-lg font-bold">Application access</h2><p class="mt-1 text-sm text-hub-muted">Only applications currently granted by the Hub are shown as available.</p></div>
+            <div class="border-b border-hub-border px-5 py-4"><h2 id="access-heading" class="text-lg font-bold">Application access</h2><p class="mt-1 text-sm text-hub-muted">Availability reflects your Hub account and each application's access requirements.</p></div>
             <ul class="divide-y divide-hub-border-soft">
                 @foreach($applications as $key => $application)
                     @php($state = $applicationStates[$key])

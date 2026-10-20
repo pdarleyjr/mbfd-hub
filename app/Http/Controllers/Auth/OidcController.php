@@ -72,7 +72,7 @@ final class OidcController
             }
             $policy->user((string) $user->id, $authorization->getClient()->getIdentifier());
             // These are explicitly configured, confidential first-party clients.
-            // Hub app grants are the authorization; no untrusted dynamic client.
+            // The shared identity policy authorizes access; CMD also requires its board PIN.
             $authorization->setUser(new \Laravel\Passport\Bridge\User((string) $user->id));
             $authorization->setAuthorizationApproved(true);
 

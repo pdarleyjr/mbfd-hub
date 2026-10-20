@@ -24,8 +24,6 @@
         // Fleet tools only for super administrators and members with the Fleet manage switch on.
         $showFleetOperations = $currentUser instanceof \App\Models\User && $currentUser->canManageFleetSwaps();
         $hubNavigation = \App\Support\HubShellNavigation::forUser($currentUser, $applicationStates);
-        // Same rule as the app switcher: current cmd access, a configured client, and verified sign-in.
-        $commandBoardHref = collect($hubNavigation['applications'])->firstWhere('key', 'cmd')['href'] ?? null;
         $quickAccessItems = [
             [
                 'title' => 'Fleet operations',
@@ -98,15 +96,6 @@
                 'external' => true,
                 'visible' => $showMediaControl,
                 'domain' => 'training',
-            ],
-            [
-                'title' => 'Command Board',
-                'description' => 'Command staff board. Sign in with your Hub account, then enter the command PIN',
-                'href' => $commandBoardHref ?? '',
-                'icon' => 'M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z',
-                'external' => true,
-                'visible' => $commandBoardHref !== null,
-                'domain' => 'operations',
             ],
         ];
     @endphp

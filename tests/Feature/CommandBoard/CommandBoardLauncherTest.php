@@ -18,8 +18,6 @@ final class CommandBoardLauncherTest extends TestCase
 
     private const URL = 'https://cmd.mbfdhub.com';
 
-    private const ENTRY = ['key' => 'cmd', 'label' => 'Command Board', 'href' => self::URL];
-
     protected function setUp(): void
     {
         parent::setUp();
@@ -29,12 +27,12 @@ final class CommandBoardLauncherTest extends TestCase
         ]);
     }
 
-    public function test_launcher_entry_requires_current_access_verified_sign_in_and_an_https_url(): void
+    public function test_shared_launcher_never_lists_command_board_regardless_of_access_or_configuration(): void
     {
         $user = $this->actingAsCanonicalFixture();
         $allowed = ['cmd' => ['allowed' => true]];
 
-        self::assertContains(self::ENTRY, HubShellNavigation::forUser($user, $allowed)['applications']);
+        self::assertNotContains('cmd', $this->keys($user, $allowed));
         self::assertNotContains('cmd', $this->keys($user, ['cmd' => ['allowed' => false]]));
 
         config(['application_access.runtime_verified.cmd' => false]);
@@ -44,57 +42,43 @@ final class CommandBoardLauncherTest extends TestCase
         self::assertNotContains('cmd', $this->keys($user, $allowed));
     }
 
-    public function test_launcher_follows_the_cmd_oidc_policy_for_real_accounts(): void
+    public function test_home_and_shared_launcher_omit_command_board_for_every_account_type(): void
     {
+        $this->withoutVite();
         $this->configureClient();
 
         $superAdmin = $this->actingAsCanonicalFixture('E01-CMD-SUPER');
         $superAdmin->assignRole(Role::findOrCreate('super_admin', 'web'));
-        self::assertContains(self::ENTRY, HubShellNavigation::forUser($superAdmin->fresh())['applications']);
 
         $direct = $this->actingAsCanonicalFixture('E01-CMD-DIRECT');
         $direct->givePermissionTo(Permission::findOrCreate('app.cmd.access', 'web'));
-        self::assertContains(self::ENTRY, HubShellNavigation::forUser($direct->fresh())['applications']);
 
         $inherited = $this->actingAsCanonicalFixture('E01-CMD-ROLE');
         $role = Role::findOrCreate('cmd-launcher-role-test', 'web');
         $role->givePermissionTo(Permission::findOrCreate('app.cmd.access', 'web'));
         $inherited->assignRole($role);
-        self::assertNotContains('cmd', $this->keys($inherited->fresh()));
-
         $plain = $this->actingAsCanonicalFixture('E01-CMD-PLAIN');
-        self::assertNotContains('cmd', $this->keys($plain->fresh()));
-
-        $direct->forceFill(['must_change_password' => true])->save();
-        self::assertNotContains('cmd', $this->keys($direct->fresh()));
+        foreach ([$plain, $direct, $inherited, $superAdmin] as $user) {
+            $this->actingAs($user->fresh(), 'web');
+            self::assertNotContains('cmd', $this->keys($user->fresh()));
+            $this->get('/')->assertOk()
+                ->assertSee('Quick Access')
+                ->assertDontSee('Command Board')
+                ->assertDontSee('href="'.self::URL.'"', false);
+        }
     }
 
-    public function test_launcher_hides_the_board_until_its_oidc_client_is_configured(): void
+    public function test_configuring_the_cmd_client_does_not_add_a_home_link(): void
     {
+        $this->withoutVite();
         $user = $this->actingAsCanonicalFixture();
         $user->givePermissionTo(Permission::findOrCreate('app.cmd.access', 'web'));
 
         self::assertNotContains('cmd', $this->keys($user->fresh()));
-        $this->configureClient();
-        self::assertContains('cmd', $this->keys($user->fresh()));
-    }
-
-    public function test_home_quick_access_shows_the_command_board_tile_only_to_entitled_members(): void
-    {
-        $this->withoutVite();
-        $this->configureClient();
-        $plain = $this->actingAsCanonicalFixture('E01-CMD-HOME-PLAIN');
-
         $this->get('/')->assertOk()->assertDontSee('href="'.self::URL.'"', false);
-
-        $member = $this->actingAsCanonicalFixture('E01-CMD-HOME');
-        $member->givePermissionTo(Permission::findOrCreate('app.cmd.access', 'web'));
-
-        $this->get('/')->assertOk()
-            ->assertSeeInOrder(['Quick Access', 'Command Board'])
-            ->assertSee('Sign in with your Hub account, then enter the command PIN')
-            ->assertSee('href="'.self::URL.'"', false);
-        self::assertNotContains('cmd', $this->keys($plain->fresh()));
+        $this->configureClient();
+        self::assertNotContains('cmd', $this->keys($user->fresh()));
+        $this->get('/')->assertOk()->assertDontSee('href="'.self::URL.'"', false);
     }
 
     private function configureClient(): void

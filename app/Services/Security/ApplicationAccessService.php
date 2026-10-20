@@ -174,7 +174,7 @@ final class ApplicationAccessService
                     $currentTarget = app(\App\Services\Identity\AccountSecurityService::class)
                         ->revokeAll($currentTarget, 'Bid administrator role removed', now());
                 }
-                foreach (['cmd', 'cloud', 'meeting'] as $application) {
+                foreach (['cloud', 'meeting'] as $application) {
                     if (in_array('app.'.$application.'.access', $remove, true)) {
                         app(\App\Services\Oidc\OidcSessionRevoker::class)->revoke($currentTarget, $application);
                     }
