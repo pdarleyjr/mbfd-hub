@@ -103,17 +103,24 @@ test('actual Excel downloads distinguish current filters from complete course wo
     expect(JSON.stringify(completeBook)).not.toContain('synthetic/not-read.png');
 });
 
-test('viewer cannot manage modules and unrelated admin cannot open a matrix', async ({ page }) => {
+test('viewer cannot manage modules and unrelated admin cannot open a matrix', async ({ page, browser }) => {
     await matrix(page);
     await page.getByRole('link', { name: 'Modules', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Synthetic matrix course — Modules', exact: true })).toBeVisible();
     await expect(page.getByRole('cell', { name: 'Synthetic ladders', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: /Add module|Create module|^Edit$/ })).toHaveCount(0);
     await expect(page.getByRole('link', { name: 'Course settings', exact: true })).toHaveCount(0);
-    await page.context().clearCookies();
-    await login(page, 'admin');
-    const response = await page.goto('/training/training-courses/1/matrix');
-    expect([403, 404]).toContain(response?.status());
-    await expect(page.getByRole('region', { name: 'Training attendance matrix', exact: true })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Complete workbook', exact: true })).toHaveCount(0);
+    // Livewire responses on the viewer page may refresh its session cookies.
+    // A separate context keeps the two authenticated identities independent.
+    const adminContext = await browser.newContext({ baseURL: new URL(page.url()).origin });
+    try {
+        const adminPage = await adminContext.newPage();
+        await login(adminPage, 'admin');
+        const response = await adminPage.goto('/training/training-courses/1/matrix');
+        expect([403, 404]).toContain(response?.status());
+        await expect(adminPage.getByRole('region', { name: 'Training attendance matrix', exact: true })).toHaveCount(0);
+        await expect(adminPage.getByRole('button', { name: 'Complete workbook', exact: true })).toHaveCount(0);
+    } finally {
+        await adminContext.close();
+    }
 });
