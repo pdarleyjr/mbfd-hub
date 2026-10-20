@@ -202,7 +202,7 @@ final class TrainingPaperRosterService
         try {
             $pages = count((new Parser)->parseContent($bytes)->getPages());
         } catch (\Throwable) {
-            $this->check(false, 'The original PDF could not be parsed.');
+            throw ValidationException::withMessages(['paper' => 'The original PDF could not be parsed.']);
         }
         $this->check($pages === $document['page_count'], 'The original PDF page count does not match.');
 

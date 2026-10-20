@@ -12,6 +12,7 @@ final class TrainingPaperReviewAudit extends Model
 
     protected $guarded = ['id'];
 
+    /** @return array<string, string> */
     protected function casts(): array
     {
         return ['before' => 'array', 'after' => 'array', 'created_at' => 'immutable_datetime'];
