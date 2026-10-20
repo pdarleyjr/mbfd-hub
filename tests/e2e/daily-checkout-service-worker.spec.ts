@@ -42,6 +42,7 @@ async function installApiFixture(page: Page): Promise<void> {
       if (url.pathname === '/api/public/stations') {
         return Response.json({ stations: [] });
       }
+      if (url.pathname === '/api/public/fleet-vehicles') return Response.json({ vehicles: [] });
       if (url.pathname === '/api/public/apparatuses') {
         return Response.json([{ id: 101, name: 'Offline Fixture Apparatus', slug: 'offline-fixture', designation: 'TEST', type: 'rescue', vehicle_number: 'TEST-101', status: 'In Service' }]);
       }
@@ -264,7 +265,7 @@ test('multiple camera-sized photos survive a real offline reload and queue repla
     await expect(rows.nth(index).locator('img')).toHaveAttribute('src', photo);
   }
   await rows.last().getByLabel('Notes (optional)').fill('Verified offline after reload.');
-  await page.getByRole('button', { name: 'Continue: Shift', exact: true }).click();
+  await page.getByRole('button', { name: 'Continue: Vehicle & Shift', exact: true }).click();
   await page.getByRole('combobox', { name: 'Shift', exact: true }).selectOption('B');
   await page.getByRole('button', { name: 'Review & Sign', exact: true }).click();
   const canvas = page.locator('canvas');

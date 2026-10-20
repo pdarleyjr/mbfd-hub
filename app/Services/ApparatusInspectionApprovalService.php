@@ -12,6 +12,8 @@ use App\Models\ApparatusInspection;
 use App\Models\ApparatusInspectionReviewEvent;
 use App\Models\User;
 use App\Services\Display\DisplaySnapshotService;
+use App\Services\Fleet\VehicleSwapDecisionException;
+use App\Services\Fleet\VehicleSwapService;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -38,6 +40,7 @@ final class ApparatusInspectionApprovalService
                 if ($inspection->review_status !== 'pending_review') {
                     return $inspection;
                 }
+                $this->refuseWhileHeldForVehicleSwap($inspection);
 
                 $apparatus = Apparatus::query()
                     ->lockForUpdate()
@@ -121,6 +124,7 @@ final class ApparatusInspectionApprovalService
                 if ($inspection->review_status !== 'pending_review') {
                     return $inspection;
                 }
+                $this->refuseWhileHeldForVehicleSwap($inspection);
 
                 // Keep pending_effects on rejected rows: before approval it is the
                 // sole persisted location for prepared defect photo paths. The
@@ -136,6 +140,18 @@ final class ApparatusInspectionApprovalService
                 return $inspection;
             }, 3);
         });
+    }
+
+    /**
+     * A checkout held for a possible truck swap is released only by the Fleet
+     * swap decision, which applies its findings to the vehicle Fleet confirms.
+     * The ordinary review path must not bypass that hold.
+     */
+    private function refuseWhileHeldForVehicleSwap(ApparatusInspection $inspection): void
+    {
+        if ($inspection->processing_status === VehicleSwapService::HELD_PROCESSING_STATUS) {
+            throw new VehicleSwapDecisionException('This checkout is held for a possible vehicle swap. Decide it from Pending vehicle swaps.');
+        }
     }
 
     /** @param callable(): ApparatusInspection $operation */

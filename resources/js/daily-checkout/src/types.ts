@@ -75,12 +75,42 @@ export interface EmployeeOption {
   rank: string | null;
 }
 
+export type SwapAnswer = 'swap_completed' | 'unknown';
+
+/** One vehicle on the fleet list offered by the "confirm the physical vehicle" dropdown. */
+export interface FleetVehicle {
+  vehicle_number: string;
+  designation: string | null;
+  role: 'frontline' | 'reserve' | 'out_of_service';
+}
+
+/** The member's confirmation of the truck they are standing at; kept in the draft. */
+export interface VehicleConfirmation {
+  /** The vehicle assigned to the unit when this was confirmed. */
+  assignedVehicle: string;
+  /** Selected vehicle ID, or the "Not listed" marker. */
+  choice: string;
+  /** Typed ID when the vehicle is not listed. */
+  typedVehicle: string;
+  swapAnswer: SwapAnswer | '';
+  note: string;
+  confirmed: boolean;
+}
+
+/** Reported with the checkout; the server decides whether it differs from the assignment. */
+export interface PhysicalVehicleReport {
+  vehicle_number: string;
+  swap_answer?: SwapAnswer;
+  note?: string;
+}
+
 export interface OfficerInfo {
   name: string;
   rank: Rank;
   shift: Shift | '';
   unitNumber: string;
   employeeId?: number;
+  vehicleConfirmation?: VehicleConfirmation;
 }
 
 export type ItemStatus = 'Present' | 'Missing' | 'Damaged';
@@ -183,6 +213,8 @@ export interface InspectionSubmission {
   shift: string;
   unit_number: string;
   employee_id?: number;
+  /** The member's confirmed physical vehicle. Older queued submissions do not have it. */
+  physical_vehicle?: PhysicalVehicleReport;
   engine_hours?: number | null;
   miles?: number | null;
   defects: Defect[];

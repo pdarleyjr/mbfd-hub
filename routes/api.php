@@ -61,6 +61,7 @@ Route::prefix('public')->middleware(['auth:sanctum', 'canonical.api', 'throttle:
     Route::get('inspection-revisions', [ApparatusInspectionExceptionController::class, 'index']);
     Route::post('inspection-exceptions/{exception}/revision', [ApparatusInspectionExceptionController::class, 'revision'])->middleware('throttle:30,1');
     Route::get('apparatuses', [ApparatusController::class, 'index']);
+    Route::get('fleet-vehicles', [ApparatusController::class, 'fleetVehicles']);
     Route::get('apparatuses/{apparatus}/checklist', [ApparatusController::class, 'checklist']);
     Route::post('apparatuses/{apparatus}/inspection-sessions', [ApparatusController::class, 'startInspectionSession'])->middleware(['throttle:30,1']);
     Route::post('apparatuses/{apparatus}/inspection-sessions/{session}/abandon', [ApparatusController::class, 'abandonInspectionSession'])->middleware(['throttle:30,1']);

@@ -17,6 +17,18 @@ final class UserNotificationSubscription extends Model
         'email_enabled' => false,
     ];
 
+    /**
+     * The admin queue is the page itself; the in-app inbox and the city email
+     * are on by default, web push is opt-in per device.
+     *
+     * @var array{database_enabled: bool, webpush_enabled: bool, email_enabled: bool}
+     */
+    public const VEHICLE_SWAP_DEFAULTS = [
+        'database_enabled' => true,
+        'webpush_enabled' => false,
+        'email_enabled' => true,
+    ];
+
     protected $fillable = [
         'user_id',
         'event_key',
@@ -45,6 +57,21 @@ final class UserNotificationSubscription extends Model
             'user_id' => $userId,
             'event_key' => User::NOTIFICATION_PREFERENCE_DEPARTMENT_UPDATES,
             ...self::DEPARTMENT_UPDATE_DEFAULTS,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+    }
+
+    /**
+     * Fleet managers are subscribed to "Vehicle swap reported" the first time
+     * it is needed. insertOrIgnore never overwrites a choice the member made.
+     */
+    public static function ensureVehicleSwapForUser(int $userId): void
+    {
+        DB::table((new self)->getTable())->insertOrIgnore([
+            'user_id' => $userId,
+            'event_key' => User::NOTIFICATION_PREFERENCE_VEHICLE_SWAP_REPORTED,
+            ...self::VEHICLE_SWAP_DEFAULTS,
             'created_at' => now(),
             'updated_at' => now(),
         ]);

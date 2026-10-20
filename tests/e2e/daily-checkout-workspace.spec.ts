@@ -48,6 +48,7 @@ async function fixture(page: Page, options: { checklist?: typeof sourceChecklist
   await page.route('**/api/**', route => {
     const path = new URL(route.request().url()).pathname;
     if (path === '/api/me/context') return route.fulfill({ json: { identity: { user_id: userId, has_personnel_profile: true }, personnel: { employee_profile_id: userId + 100, employee_number: `TEST-${userId + 100}`, name: userId === 401 ? 'Browser Member' : 'Other Browser Member', rank: 'Captain' }, offline: { security_version: 1 } } });
+    if (path === '/api/public/fleet-vehicles') return route.fulfill({ json: { vehicles: [] } });
     if (path === '/api/public/apparatuses') return route.fulfill({ json: [vehicle] });
     if (path.endsWith('/checklist')) return route.fulfill({ json: { inspection_date: inspectionDate, checklist_version: version, checklist_type: checklistType, checklist, due_tasks: [], open_findings: options.findings ?? [] } });
     if (path.endsWith('/inspection-sessions')) return route.fulfill({ status: 201, json: {
@@ -192,7 +193,7 @@ test('remaining work, reported issues and the next required action stay distinct
   await expect(quick.getByRole('button', { name: /Bag.*Damaged.*Reported/ })).toBeVisible();
   await expect(quick.getByRole('heading', { name: /Remaining/ })).toHaveCount(0);
   await page.getByRole('button', { name: 'Close Quick Checklist' }).click();
-  await page.getByRole('button', { name: 'Continue: Shift', exact: true }).click();
+  await page.getByRole('button', { name: 'Continue: Vehicle & Shift', exact: true }).click();
   await page.getByRole('combobox', { name: 'Shift', exact: true }).selectOption('A');
   await page.getByRole('button', { name: 'Review & Sign', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Review & Sign Inspection', exact: true })).toBeVisible();

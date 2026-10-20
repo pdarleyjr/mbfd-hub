@@ -299,6 +299,7 @@ async function mockInspectionApi(
       });
     }
 
+    if (path === '/api/public/fleet-vehicles') return route.fulfill({ json: { vehicles: [] } });
     if (path === '/api/public/apparatuses') {
       return route.fulfill({ json: [apparatus] });
     }
@@ -453,6 +454,7 @@ async function mockFireBoatInspectionApi(
       });
     }
 
+    if (path === '/api/public/fleet-vehicles') return route.fulfill({ json: { vehicles: [] } });
     if (path === '/api/public/apparatuses') {
       return route.fulfill({ json: [presentedFireBoat] });
     }
@@ -605,6 +607,24 @@ async function completeInspection(page: Page): Promise<void> {
 
   await expect(page.getByRole('heading', { name: 'Review & Sign Inspection' })).toBeVisible();
   await drawInspectionSignature(page);
+}
+
+/**
+ * The Member step asks the member to confirm the physical vehicle. The
+ * dropdown is preset to the unit's assigned vehicle, so the normal case is
+ * opening the step; the next action's own button (Review & Sign) is the confirm tap.
+ */
+async function confirmPhysicalVehicle(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Member / Vehicle Info', exact: true }).first().click();
+  await expect(page.getByRole('combobox', { name: 'Physical vehicle', exact: true })).toBeVisible();
+}
+
+/** A unit with no recorded vehicle ID: the member names the truck and says the assignment is unknown. */
+async function confirmUnrecordedVehicle(page: Page): Promise<void> {
+  await confirmPhysicalVehicle(page);
+  await page.getByRole('combobox', { name: 'Physical vehicle', exact: true }).selectOption('__not_listed__');
+  await page.getByLabel('Vehicle ID on the truck').fill('FB6-1');
+  await page.getByRole('radio', { name: 'Unknown, not sure why' }).check();
 }
 
 async function drawInspectionSignature(page: Page): Promise<void> {
@@ -973,6 +993,7 @@ test('Fire Boat v2 preserves typed field values and submits only server-due recu
 
   await expect(page.getByText(/Expected quantity: 3/)).toBeVisible();
   await page.getByRole('button', { name: 'Confirm all present' }).click();
+  await confirmPhysicalVehicle(page);
   await page.getByRole('button', { name: 'Review & Sign', exact: true }).click();
   await drawInspectionSignature(page);
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
@@ -1022,6 +1043,7 @@ test('FB6 null fleet metadata remains selectable and completes the Daily browser
   await page.getByRole('button', { name: 'Mark all due duties as present' }).click();
   await page.getByRole('button', { name: 'Continue: Apparatus' }).click();
   await page.getByRole('button', { name: 'Confirm all present' }).click();
+  await confirmUnrecordedVehicle(page);
   await page.getByRole('button', { name: 'Review & Sign', exact: true }).click();
   await drawInspectionSignature(page);
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
@@ -1108,6 +1130,7 @@ test('Fire Boat v2 reload restores same-version typed fields, due-duty status, a
   await page.getByRole('group', { name: 'Status for Flashlights' })
     .getByRole('button', { name: /Damaged/ })
     .click();
+  await confirmPhysicalVehicle(page);
   await page.getByRole('button', { name: 'Review & Sign', exact: true }).click();
 
   await page.reload();
@@ -1170,6 +1193,7 @@ test('Fire Boat online reload uses current apparatus and service notices over it
   await page.route('**/api/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
 
+    if (path === '/api/public/fleet-vehicles') return route.fulfill({ json: { vehicles: [] } });
     if (path === '/api/public/apparatuses') {
       return route.fulfill({ json: [{ ...fireBoatApparatus, vehicle_number: 'FB6-LIVE', status: 'Out of Service' }] });
     }

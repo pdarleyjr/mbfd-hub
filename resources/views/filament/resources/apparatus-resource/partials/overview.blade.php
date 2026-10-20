@@ -19,6 +19,18 @@
         <span class="hub-insp-badge hub-insp-badge--lg hub-insp-badge--{{ $statusTone }}">{{ $status }}</span>
     </div>
 
+    @php
+        $pendingSwaps = auth()->user()?->can('viewAny', \App\Models\ApparatusVehicleSwapRequest::class)
+            ? $apparatus->vehicleSwapRequests()->where('status', \App\Models\ApparatusVehicleSwapRequest::STATUS_PENDING)->count()
+            : 0;
+    @endphp
+    @if ($pendingSwaps > 0)
+        <div class="hub-insp-card hub-insp-card--warning hub-swap-notice" data-vehicle-swap-notice>
+            <p>{{ $pendingSwaps }} possible vehicle {{ $pendingSwaps === 1 ? 'swap is' : 'swaps are' }} waiting for a Fleet decision on this unit.</p>
+            <a href="{{ \App\Filament\Resources\VehicleSwapRequestResource::getUrl('index') }}">Open Pending vehicle swaps</a>
+        </div>
+    @endif
+
     <dl class="hub-insp-facts hub-insp-facts--plain">
         <div>
             <dt>Vehicle #</dt>

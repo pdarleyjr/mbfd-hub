@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router';
-import { Apparatus, ApparatusServiceTicketSummary, OfficerInfo, ChecklistData, ChecklistFieldValue, Compartment, Defect, InspectionData, MeterData, InspectionSubmission, ScheduledChecklistTaskResult } from '../types';
+import { Apparatus, ApparatusServiceTicketSummary, FleetVehicle, OfficerInfo, ChecklistData, ChecklistFieldValue, Compartment, Defect, InspectionData, MeterData, InspectionSubmission, ScheduledChecklistTaskResult } from '../types';
 import { ApiClient, READ_TIMEOUT_MS } from '../utils/api';
 import {
   DAILY_CHECKOUT_QUEUE_SYNC_EVENT,
@@ -31,6 +31,7 @@ import SubmitStep from './SubmitStep';
 import PreviousPageButton from './PreviousPageButton';
 import { inspectionProgress, inspectionReadiness } from '../utils/inspectionProgress';
 import { identityForQueueCapture, type OfflineIdentity } from '../lib/offlineIdentity';
+import { defaultVehicleConfirmation, paperVehicleValue, reconcileVehicleConfirmation, toPhysicalVehicleReport } from '../utils/vehicleConfirmation';
 import { ClipboardList, Gauge, Truck, Users } from 'lucide-react';
 
 type Step = 'officer' | 'meter' | 'details' | 'compartments' | 'submit';
@@ -108,6 +109,7 @@ const readinessExplanation = (readiness: ReadinessSummary): string => {
     return `${readiness.equipment.remaining} ${readiness.equipment.remaining === 1 ? 'item still needs' : 'items still need'} a status under Apparatus.`;
   }
   if (readiness.missingFields.length > 0 || readiness.missingDuties.length > 0) return 'Complete the required checklist details.';
+  if (readiness.missingVehicle) return 'Confirm the physical vehicle under Member / Vehicle Info.';
   if (readiness.missingShift) return 'Select your shift under Member / Vehicle Info.';
   if (readiness.invalidMeters) return 'Correct the vehicle readings.';
 
@@ -150,6 +152,7 @@ export default function InspectionWizard() {
     engine_hours: null,
     miles: null,
   });
+  const [fleetVehicles, setFleetVehicles] = useState<FleetVehicle[]>([]);
   const [compartments, setCompartments] = useState<Compartment[]>([]);
   const [fieldValues, setFieldValues] = useState<Array<{ id: string; value: ChecklistFieldValue }>>([]);
   const [scheduledTasks, setScheduledTasks] = useState<ScheduledChecklistTaskResult[]>([]);
@@ -183,6 +186,17 @@ export default function InspectionWizard() {
   const loadedContractRef = useRef<{ slug: string; apparatus: Apparatus; checklist: ChecklistData } | null>(null);
   const readiness = inspectionReadiness(checklist, compartments, fieldValues, scheduledTasks, officerInfo, meterData);
   const continueLabel = readiness.nextStep === 'compartments' ? 'Continue: Apparatus' : readiness.label;
+  // On the Member step the Continue button is the vehicle confirmation, so its label
+  // names what comes after confirming (Shift, Readings, Review & Sign), not the confirmation itself.
+  const officerReadiness = inspectionReadiness(
+    checklist,
+    compartments,
+    fieldValues,
+    scheduledTasks,
+    officerInfo.vehicleConfirmation ? { ...officerInfo, vehicleConfirmation: { ...officerInfo.vehicleConfirmation, confirmed: true } } : officerInfo,
+    meterData,
+  );
+  const officerContinueLabel = officerReadiness.nextStep === 'compartments' ? 'Continue: Apparatus' : officerReadiness.label;
   const backFallback = returnTo ?? '/vehicle-inspections';
 
   if (autosaverRef.current === null) {
@@ -205,6 +219,17 @@ export default function InspectionWizard() {
   useEffect(() => onDailyCheckoutQueueChanged(() => {
     setQueueRevision((revision) => revision + 1);
   }), []);
+
+  // The fleet list feeds the "confirm the physical vehicle" dropdown. It never
+  // blocks the checkout: offline it falls back to the last list kept on this device.
+  useEffect(() => {
+    let cancelled = false;
+    void ApiClient.getFleetVehicles().then((vehicles) => {
+      if (!cancelled) setFleetVehicles(vehicles);
+    });
+
+    return () => { cancelled = true; };
+  }, [isOffline]);
 
   // A background replay (reconnect, return to the app, backoff timer) may
   // send the record blocking this checkout; show its receipt.
@@ -332,7 +357,11 @@ export default function InspectionWizard() {
         }
 
         setApparatus(foundApparatus);
-        setOfficerInfo(prev => ({ ...prev, unitNumber: foundApparatus.vehicle_number ?? foundApparatus.unit_id ?? '' }));
+        setOfficerInfo(prev => ({
+          ...prev,
+          unitNumber: foundApparatus.vehicle_number ?? foundApparatus.unit_id ?? '',
+          vehicleConfirmation: reconcileVehicleConfirmation(prev.vehicleConfirmation, foundApparatus.vehicle_number ?? ''),
+        }));
 
         // Service status is intentionally secondary. A network or API failure
         // must never prevent the inspection checklist from loading.
@@ -414,6 +443,7 @@ export default function InspectionWizard() {
           shift: '',
           unitNumber: foundApparatus.vehicle_number ?? foundApparatus.unit_id ?? '',
           employeeId: identity.personnel.employee_profile_id,
+          vehicleConfirmation: defaultVehicleConfirmation(foundApparatus.vehicle_number ?? ''),
         });
         setMeterData({ engine_hours: null, miles: null });
         setSignature(null);
@@ -449,14 +479,16 @@ export default function InspectionWizard() {
             // Keep the issued baseline with the observation, even after a newer
             // checkout changed the live fleet meters while this draft was offline.
             setApparatus({ ...foundApparatus, meter_baseline_token: saved.apparatusSnapshot?.meter_baseline_token });
-            setOfficerInfo({ ...saved.officer, name: identity.personnel.name, rank: identity.personnel.rank as OfficerInfo['rank'], employeeId: identity.personnel.employee_profile_id, unitNumber: foundApparatus.vehicle_number ?? '' });
+            // A saved confirmation only counts against the vehicle assigned today.
+            const restoredVehicle = reconcileVehicleConfirmation(saved.officer.vehicleConfirmation, foundApparatus.vehicle_number ?? '');
+            setOfficerInfo({ ...saved.officer, name: identity.personnel.name, rank: identity.personnel.rank as OfficerInfo['rank'], employeeId: identity.personnel.employee_profile_id, unitNumber: foundApparatus.vehicle_number ?? '', vehicleConfirmation: restoredVehicle });
             if (saved.meter) {
               setMeterData(saved.meter);
             }
             setCompartments(saved.compartments);
             {
               if (saved.fieldValues) {
-                setFieldValues(saved.fieldValues);
+                setFieldValues(saved.fieldValues.map(field => field.id === 'vehicle_num' ? { ...field, value: paperVehicleValue(restoredVehicle) } : field));
               }
               if (saved.scheduledTasks) {
                 setScheduledTasks(saved.scheduledTasks);
@@ -532,12 +564,19 @@ export default function InspectionWizard() {
 
   const handleOfficerChange = (info: OfficerInfo) => {
     setOfficerInfo(info);
-    setFieldValues(previous => previous.map(field => field.id === 'fb6-shift' ? { ...field, value: info.shift } : field));
+    setFieldValues(previous => previous.map(field => {
+      if (field.id === 'fb6-shift') return { ...field, value: info.shift };
+      // The paper "vehicle number" field follows the confirmed physical vehicle.
+      if (field.id === 'vehicle_num' && info.vehicleConfirmation) return { ...field, value: paperVehicleValue(info.vehicleConfirmation) };
+
+      return field;
+    }));
   };
 
   const handleOfficerSubmit = (info: OfficerInfo) => {
     handleOfficerChange(info);
-    setCurrentStep(readiness.nextStep);
+    // Continue confirms the vehicle, so the next step is judged on the confirmed answer.
+    setCurrentStep(inspectionReadiness(checklist, compartments, fieldValues, scheduledTasks, info, meterData).nextStep);
   };
 
   const handleMetersChange = (data: MeterData) => {
@@ -602,6 +641,7 @@ export default function InspectionWizard() {
         employeeId: memberIdentity?.personnel?.employee_profile_id,
         shift: '',
         unitNumber: apparatus.vehicle_number ?? apparatus.unit_id ?? '',
+        vehicleConfirmation: defaultVehicleConfirmation(apparatus.vehicle_number ?? ''),
       });
       setMeterData({ engine_hours: null, miles: null });
       setSignature(null);
@@ -687,6 +727,7 @@ export default function InspectionWizard() {
         shift: officerInfo.shift,
         unit_number: officerInfo.unitNumber,
         employee_id: officerInfo.employeeId,
+        ...(officerInfo.vehicleConfirmation ? { physical_vehicle: toPhysicalVehicleReport(officerInfo.vehicleConfirmation) } : {}),
         engine_hours: meterData.engine_hours,
         miles: meterData.miles,
         compartments: compartments.map(c => ({
@@ -1024,10 +1065,12 @@ export default function InspectionWizard() {
 
       {currentStep === 'officer' && (
         <OfficerStep
-          continueLabel={continueLabel}
+          continueLabel={officerContinueLabel}
           initialData={officerInfo}
           onSubmit={handleOfficerSubmit}
           onChange={handleOfficerChange}
+          fleetVehicles={fleetVehicles}
+          assignedDesignation={apparatus.designation ?? apparatus.name}
         />
       )}
 

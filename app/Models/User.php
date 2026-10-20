@@ -61,6 +61,8 @@ class User extends Authenticatable implements FilamentUser
 
     public const NOTIFICATION_PREFERENCE_MEMBER_REQUEST_UPDATES = 'member_request_updates';
 
+    public const NOTIFICATION_PREFERENCE_VEHICLE_SWAP_REPORTED = 'vehicle_swap_reports';
+
     /**
      * The current roles that grant access to the Filament admin panel.
      *
@@ -103,6 +105,7 @@ class User extends Authenticatable implements FilamentUser
         self::NOTIFICATION_PREFERENCE_UNIFORM_REQUESTS => true,
         self::NOTIFICATION_PREFERENCE_PERSONNEL_EQUIPMENT_REQUESTS => true,
         self::NOTIFICATION_PREFERENCE_MEMBER_REQUEST_UPDATES => true,
+        self::NOTIFICATION_PREFERENCE_VEHICLE_SWAP_REPORTED => true,
     ];
 
     /**
@@ -378,7 +381,28 @@ class User extends Authenticatable implements FilamentUser
                 'description' => 'Messages, item arrivals, and issue updates for your own requests. In-app alerts remain enabled.',
                 'essential_in_app' => true,
             ],
+            self::NOTIFICATION_PREFERENCE_VEHICLE_SWAP_REPORTED => [
+                'label' => 'Vehicle swap reported',
+                'description' => 'A member reported a different physical vehicle than the one assigned to a unit at Daily Checkout. Fleet managers only.',
+                'requires_fleet_manage' => true,
+            ],
         ];
+    }
+
+    /** Preference keys this member can actually receive, so settings never show alerts they cannot act on. */
+    public function visibleNotificationPreferenceKeys(): array
+    {
+        return collect(self::notificationPreferenceDefinitions())
+            ->reject(fn (array $definition): bool => ($definition['requires_fleet_manage'] ?? false) && ! $this->canManageFleetSwaps())
+            ->keys()
+            ->all();
+    }
+
+    /** Server-side Fleet manage access: super administrators and the admin.fleet.manage capability. */
+    public function canManageFleetSwaps(): bool
+    {
+        return $this->isAuthenticationAllowed() && ($this->hasRole('super_admin')
+            || ($this->hasDirectWebPermission('admin.access') && $this->hasDirectWebPermission('admin.fleet.manage')));
     }
 
     public static function preferenceKeyForSubmissionType(string $submissionType): ?string
@@ -395,6 +419,7 @@ class User extends Authenticatable implements FilamentUser
             'uniform_request' => self::NOTIFICATION_PREFERENCE_UNIFORM_REQUESTS,
             'personnel_equipment_request' => self::NOTIFICATION_PREFERENCE_PERSONNEL_EQUIPMENT_REQUESTS,
             'member_request_update' => self::NOTIFICATION_PREFERENCE_MEMBER_REQUEST_UPDATES,
+            'vehicle_swap_reported' => self::NOTIFICATION_PREFERENCE_VEHICLE_SWAP_REPORTED,
             default => null,
         };
     }
@@ -411,7 +436,7 @@ class User extends Authenticatable implements FilamentUser
 
     public function canManageNotificationSettings(): bool
     {
-        return $this->isAuthenticationAllowed() && ($this->hasDirectWebPermission('admin.support.view') || $this->hasAnyRole([
+        return $this->isAuthenticationAllowed() && ($this->hasDirectWebPermission('admin.support.view') || $this->canManageFleetSwaps() || $this->hasAnyRole([
             'super_admin',
             'admin',
             'logistics_admin',
