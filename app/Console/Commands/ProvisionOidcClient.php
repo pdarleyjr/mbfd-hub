@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Laravel\Passport\Client;
 use RuntimeException;
@@ -33,6 +35,13 @@ final class ProvisionOidcClient extends Command
         'meeting' => ['name' => 'MBFD Meeting Intelligence', 'client_env' => 'OIDC_MEETING_CLIENT_ID', 'verified_env' => 'MEETING_IDENTITY_RUNTIME_VERIFIED'],
     ];
 
+    /** Applications whose redirect URI must stay on the host of a configured origin. */
+    private const PINNED_REDIRECT_HOSTS = [
+        'cmd' => ['config' => 'services.command_board.url', 'env' => 'COMMAND_BOARD_URL'],
+    ];
+
+    private const FAILURE_LOG = 'oidc.provision_client.failed';
+
     private const GRANT = 'authorization_code';
 
     private const SECRET_LENGTH = 40;
@@ -49,6 +58,12 @@ final class ProvisionOidcClient extends Command
         $redirect = trim((string) $this->option('redirect'));
         if (! self::isAcceptableRedirect($redirect)) {
             $this->error('--redirect must be an absolute https URL with a host and no credentials or fragment.');
+
+            return self::INVALID;
+        }
+        $hostError = self::pinnedHostError($application, $redirect);
+        if ($hostError !== null) {
+            $this->error($hostError);
 
             return self::INVALID;
         }
@@ -122,7 +137,12 @@ final class ProvisionOidcClient extends Command
             if ($written) {
                 @unlink($secretFile);
             }
-            $this->error('The client was not created: '.$exception->getMessage());
+            Log::error(self::FAILURE_LOG, [
+                'client' => $definition['name'],
+                'exception' => $exception::class,
+                'detail' => self::redactedDetail($exception, $secret),
+            ]);
+            $this->error('The client was not created and no secret file was kept. The cause was written to the application log ('.self::FAILURE_LOG.').');
 
             return self::FAILURE;
         }
@@ -170,6 +190,44 @@ final class ProvisionOidcClient extends Command
         $uris = $client->getAttribute('redirect_uris');
 
         return is_array($uris) ? array_values(array_filter($uris, 'is_string')) : [];
+    }
+
+    /** The cmd redirect must stay on COMMAND_BOARD_URL's host (and port), so a typo or hostile value cannot receive codes. */
+    private static function pinnedHostError(string $application, string $redirect): ?string
+    {
+        $pin = self::PINNED_REDIRECT_HOSTS[$application] ?? null;
+        if ($pin === null) {
+            return null;
+        }
+        $expected = self::authority((string) config($pin['config']));
+        if ($expected === null) {
+            return $pin['env'].' is not a valid https URL, so the '.$application.' redirect URI cannot be checked. Nothing was changed.';
+        }
+        $actual = self::authority($redirect);
+
+        return $actual === $expected
+            ? null
+            : 'The '.$application.' redirect URI must be on '.$expected.' (the host in '.$pin['env'].'), not '.($actual ?? 'an invalid host').'. Nothing was changed.';
+    }
+
+    private static function authority(string $url): ?string
+    {
+        $parts = parse_url(trim($url));
+        if (! is_array($parts) || strtolower((string) ($parts['scheme'] ?? '')) !== 'https' || ($parts['host'] ?? '') === '') {
+            return null;
+        }
+
+        return strtolower($parts['host']).(isset($parts['port']) ? ':'.$parts['port'] : '');
+    }
+
+    /** Failure detail for the log: driver text instead of SQL with bindings, and never the plaintext secret. */
+    private static function redactedDetail(Throwable $exception, string $secret): string
+    {
+        $detail = $exception instanceof QueryException
+            ? 'Database error '.$exception->getCode().': '.($exception->getPrevious()?->getMessage() ?? 'no driver detail')
+            : $exception->getMessage();
+
+        return str_replace($secret, '[redacted]', $detail);
     }
 
     private static function isAcceptableRedirect(string $redirect): bool

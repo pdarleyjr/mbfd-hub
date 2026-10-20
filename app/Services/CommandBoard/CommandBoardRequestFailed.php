@@ -31,6 +31,8 @@ final class CommandBoardRequestFailed extends RuntimeException
 
     public const INVALID_RESPONSE = 'invalid_response';
 
+    public const REDIRECTED = 'redirected';
+
     public const UNEXPECTED = 'unexpected';
 
     private const OUTCOME_UNKNOWN = ' Refresh the status to see whether the PIN changed before trying again.';
@@ -81,6 +83,11 @@ final class CommandBoardRequestFailed extends RuntimeException
             $status === 503 => new self(
                 'The Command Board is temporarily unavailable. Try again in a few minutes.'.$notChanged,
                 self::UNAVAILABLE,
+                $status,
+            ),
+            $status >= 300 && $status < 400 => new self(
+                'The Command Board answered with a redirect (HTTP '.$status.') instead of a result. The Hub never follows redirects with its service token; check that COMMAND_BOARD_URL points straight at the board.'.$notChanged,
+                self::REDIRECTED,
                 $status,
             ),
             default => new self(

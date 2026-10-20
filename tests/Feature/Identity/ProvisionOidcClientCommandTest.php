@@ -10,8 +10,10 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Laravel\Passport\Client;
+use RuntimeException;
 use Symfony\Component\Console\Command\Command;
 use Tests\TestCase;
 
@@ -86,11 +88,65 @@ final class ProvisionOidcClientCommandTest extends TestCase
     {
         $this->provision('cmd', self::REDIRECT, $this->directory.'/secret');
 
-        [$exit, $output] = $this->provision('cmd', 'https://cmd.example.test/auth/callback', null);
+        [$exit, $output] = $this->provision('cmd', 'https://cmd.mbfdhub.com/oidc/callback', null);
 
         self::assertSame(Command::FAILURE, $exit);
         self::assertStringContainsString('different redirect URI', $output);
         self::assertSame([self::REDIRECT], Client::query()->sole()->redirect_uris);
+    }
+
+    public function test_cmd_redirect_is_pinned_to_the_command_board_host(): void
+    {
+        foreach (['https://evil.example.test/auth/callback', 'https://cmd.mbfdhub.com.evil.example.test/auth/callback', 'https://cmd.mbfdhub.com:8443/auth/callback'] as $redirect) {
+            [$exit, $output] = $this->provision('cmd', $redirect, $this->directory.'/refused');
+
+            self::assertSame(Command::INVALID, $exit, $redirect);
+            self::assertStringContainsString('must be on cmd.mbfdhub.com', $output);
+        }
+        self::assertSame(0, Client::query()->count());
+        self::assertFileDoesNotExist($this->directory.'/refused');
+
+        config(['services.command_board.url' => 'https://CMD.example.test/']);
+        [$exit, $output] = $this->provision('cmd', 'https://cmd.example.test/auth/callback', $this->directory.'/moved');
+        self::assertSame(Command::SUCCESS, $exit, $output);
+
+        [$exit, $output] = $this->provision('cloud', 'https://cloud.mbfdhub.com/apps/user_oidc/code', $this->directory.'/cloud');
+        self::assertSame(Command::SUCCESS, $exit, $output);
+    }
+
+    public function test_cmd_redirect_is_refused_when_the_command_board_url_is_unusable(): void
+    {
+        config(['services.command_board.url' => 'http://cmd.mbfdhub.com']);
+
+        [$exit, $output] = $this->provision('cmd', self::REDIRECT, $this->directory.'/secret');
+
+        self::assertSame(Command::INVALID, $exit);
+        self::assertStringContainsString('COMMAND_BOARD_URL', $output);
+        self::assertSame(0, Client::query()->count());
+    }
+
+    public function test_failure_prints_a_generic_message_and_logs_detail_without_the_secret(): void
+    {
+        Log::spy();
+        $secret = null;
+        Client::creating(function (Client $client) use (&$secret): void {
+            $secret = $client->plainSecret;
+
+            throw new RuntimeException('insert rejected for secret '.$client->plainSecret);
+        });
+
+        [$exit, $output] = $this->provision('cmd', self::REDIRECT, $this->directory.'/secret');
+
+        self::assertSame(Command::FAILURE, $exit);
+        self::assertIsString($secret);
+        self::assertStringNotContainsString('insert rejected', $output);
+        self::assertStringNotContainsString($secret, $output);
+        self::assertStringContainsString('oidc.provision_client.failed', $output);
+        self::assertFileDoesNotExist($this->directory.'/secret');
+        self::assertSame(0, Client::query()->count());
+        Log::shouldHaveReceived('error')->once()->withArgs(fn (string $message, array $context = []): bool => $message === 'oidc.provision_client.failed'
+            && str_contains((string) ($context['detail'] ?? ''), 'insert rejected for secret [redacted]')
+            && ! str_contains((string) json_encode($context), $secret));
     }
 
     public function test_revoked_client_is_replaced_instead_of_reused(): void

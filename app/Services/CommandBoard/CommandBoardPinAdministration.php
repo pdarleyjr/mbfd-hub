@@ -10,8 +10,10 @@ use App\Services\Security\SecurityAuditRecorder;
 use Closure;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 /**
  * Sets the Command Board's command PIN from the Hub. The PIN is hashed here
@@ -82,7 +84,7 @@ final class CommandBoardPinAdministration
             : 'The 300 camera PIN is stored in a format the Command Board does not accept (it needs a bcrypt hash with cost 10 to 14), so it cannot be copied.';
     }
 
-    public function setNewPin(User $actor, string $pin, string $currentPassword, string $reason): CommandBoardPinStatus
+    public function setNewPin(User $actor, string $pin, string $currentPassword, string $reason): CommandBoardPinChange
     {
         return $this->push($actor, self::METHOD_NEW_PIN, $currentPassword, $reason, function () use ($pin): string {
             if (preg_match(self::PIN_PATTERN, $pin) !== 1) {
@@ -94,7 +96,7 @@ final class CommandBoardPinAdministration
     }
 
     /** One-time copy: afterwards the Command Board PIN and the 300 camera PIN change independently. */
-    public function copyCameraPin(User $actor, string $currentPassword, string $reason): CommandBoardPinStatus
+    public function copyCameraPin(User $actor, string $currentPassword, string $reason): CommandBoardPinChange
     {
         return $this->push($actor, self::METHOD_CAMERA_PIN, $currentPassword, $reason, function (): string {
             $unavailable = $this->cameraPinUnavailableReason();
@@ -109,7 +111,7 @@ final class CommandBoardPinAdministration
     /**
      * @param  Closure(): string  $pinHash  Resolves the bcrypt hash to send; runs only after re-authentication.
      */
-    private function push(User $actor, string $method, string $currentPassword, string $reason, Closure $pinHash): CommandBoardPinStatus
+    private function push(User $actor, string $method, string $currentPassword, string $reason, Closure $pinHash): CommandBoardPinChange
     {
         $reason = trim($reason);
         $current = $this->reauthenticate($actor, $method, $currentPassword, $reason);
@@ -121,18 +123,43 @@ final class CommandBoardPinAdministration
                 'name' => (string) ($current->display_name ?: $current->name),
             ]);
         } catch (CommandBoardRequestFailed $exception) {
-            $this->audit->record($current, $current, self::AUDIT_ACTION, 'failed', $reason, [
+            $this->recordAfterBoardCall($current, 'failed', $reason, [
                 'method' => $method, 'error' => $exception->kind, 'status' => $exception->status,
             ]);
 
             throw $exception;
         }
 
-        $this->audit->record($current, $current, self::AUDIT_ACTION, 'allowed', $reason, [
+        $audited = $this->recordAfterBoardCall($current, 'allowed', $reason, [
             'method' => $method, 'pin_version' => $status->pinVersion, 'source' => $status->source,
         ]);
 
-        return $status;
+        return new CommandBoardPinChange($status, $audited);
+    }
+
+    /**
+     * Once the board has answered, a broken audit store must not change what
+     * the admin is told about the PIN. The failure is logged without the PIN,
+     * the hash, or the exception message (which may echo SQL bindings).
+     *
+     * @param  array<string, mixed>  $metadata
+     */
+    private function recordAfterBoardCall(User $actor, string $result, string $reason, array $metadata): bool
+    {
+        try {
+            $this->audit->record($actor, $actor, self::AUDIT_ACTION, $result, $reason, $metadata);
+
+            return true;
+        } catch (Throwable $exception) {
+            Log::error('command_board.pin.audit_failed', [
+                'actor_user_id' => $actor->getKey(),
+                'result' => $result,
+                'metadata' => $metadata,
+                'exception' => $exception::class,
+            ]);
+
+            return false;
+        }
     }
 
     private function reauthenticate(User $actor, string $method, string $currentPassword, string $reason): User

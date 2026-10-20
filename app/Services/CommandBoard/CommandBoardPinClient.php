@@ -94,10 +94,12 @@ final class CommandBoardPinClient
         return $status;
     }
 
+    /** Redirects are never followed, so the bearer token and PIN hash only ever go to COMMAND_BOARD_URL. */
     private function request(string $token): PendingRequest
     {
         return Http::timeout(self::TIMEOUT_SECONDS)
             ->connectTimeout(self::CONNECT_TIMEOUT_SECONDS)
+            ->withoutRedirecting()
             ->withToken($token)
             ->acceptJson()
             ->asJson();

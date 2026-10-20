@@ -203,6 +203,58 @@ final class CommandBoardPinPageTest extends TestCase
             ->assertActionEnabled('setPin');
     }
 
+    public function test_redirects_from_the_board_are_reported_and_never_followed(): void
+    {
+        Http::fake(function (Request $request) {
+            if (str_starts_with($request->url(), self::BASE)) {
+                return Http::response('', $request->method() === 'PUT' ? 307 : 302, ['Location' => 'https://elsewhere.example.test/collect']);
+            }
+
+            return Http::response(['configured' => true, 'source' => 'hub_admin', 'pinVersion' => 9, 'updatedAt' => null, 'updatedBy' => null]);
+        });
+        $this->actingAs($this->superAdmin());
+
+        $component = Livewire::test(CommandBoardPin::class)
+            ->assertSet('status', null)
+            ->assertSee('answered with a redirect (HTTP 302)')
+            ->callAction('setPin', data: $this->setPinData());
+
+        $this->assertNotificationBody('answered with a redirect (HTTP 307)');
+        $component->assertNotified('Command Board PIN not changed');
+        Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), 'elsewhere.example.test'));
+        self::assertSame('redirected', SecurityActionEvent::query()->where('action', CommandBoardPinAdministration::AUDIT_ACTION)->sole()->metadata['error']);
+    }
+
+    public function test_audit_failure_after_the_board_accepted_the_pin_still_reports_the_change(): void
+    {
+        $this->fakeBoard();
+        Log::spy();
+        SecurityActionEvent::creating(function (SecurityActionEvent $event): void {
+            if ($event->result === 'allowed') {
+                throw new \RuntimeException('audit store unavailable');
+            }
+        });
+        $this->actingAs($this->superAdmin());
+
+        $component = Livewire::test(CommandBoardPin::class)
+            ->callAction('setPin', data: $this->setPinData())
+            ->assertHasNoActionErrors()
+            ->assertSet('status.pin_version', 4);
+
+        $this->assertNotificationBody('could not write its audit record');
+        $component->assertNotified('Command Board PIN updated');
+        self::assertTrue(Hash::check(self::NEW_PIN, (string) $this->sentPut()['pinHash']));
+        self::assertSame(0, SecurityActionEvent::query()->count());
+        Log::shouldHaveReceived('error')->once()->withArgs(function (string $message, array $context = []): bool {
+            $encoded = (string) json_encode($context);
+
+            return $message === 'command_board.pin.audit_failed'
+                && ($context['result'] ?? null) === 'allowed'
+                && ! str_contains($encoded, self::NEW_PIN)
+                && ! str_contains($encoded, '$2y$');
+        });
+    }
+
     public function test_setting_a_pin_sends_only_a_bcrypt_hash_and_audits_without_the_pin(): void
     {
         $this->fakeBoard(put: ['configured' => true, 'source' => 'hub_admin', 'pinVersion' => 4, 'updatedAt' => '2026-10-19T15:00:00Z', 'updatedBy' => 'Capt. Pat Example']);

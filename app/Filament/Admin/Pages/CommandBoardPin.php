@@ -7,6 +7,7 @@ namespace App\Filament\Admin\Pages;
 use App\Exceptions\CurrentPasswordMismatch;
 use App\Models\User;
 use App\Services\CommandBoard\CommandBoardPinAdministration;
+use App\Services\CommandBoard\CommandBoardPinChange;
 use App\Services\CommandBoard\CommandBoardPinStatus;
 use App\Services\CommandBoard\CommandBoardRequestFailed;
 use Carbon\CarbonImmutable;
@@ -46,6 +47,8 @@ class CommandBoardPin extends Page
     protected static string $view = 'filament.admin.pages.command-board-pin';
 
     private const TIMEZONE = 'America/New_York';
+
+    private const AUDIT_FAILED_NOTE = 'The Hub could not write its audit record for this change. The failure was logged; let a Hub administrator know so the change can be recorded.';
 
     #[Locked]
     public bool $linkConfigured = false;
@@ -108,7 +111,7 @@ class CommandBoardPin extends Page
                 ...$this->reauthenticationFields(),
             ])
             ->action(function (array $data, Action $action): void {
-                $this->changePin($action, fn (User $actor): CommandBoardPinStatus => $this->administration()->setNewPin(
+                $this->changePin($action, fn (User $actor): CommandBoardPinChange => $this->administration()->setNewPin(
                     $actor, (string) $data['pin'], (string) $data['current_password'], (string) $data['reason'],
                 ), 'Command Board PIN updated', 'Members will need the new PIN the next time the Command Board asks for it.');
             });
@@ -128,7 +131,7 @@ class CommandBoardPin extends Page
             ->modalSubmitActionLabel('Copy the 300 camera PIN')
             ->form($this->reauthenticationFields())
             ->action(function (array $data, Action $action): void {
-                $this->changePin($action, fn (User $actor): CommandBoardPinStatus => $this->administration()->copyCameraPin(
+                $this->changePin($action, fn (User $actor): CommandBoardPinChange => $this->administration()->copyCameraPin(
                     $actor, (string) $data['current_password'], (string) $data['reason'],
                 ), 'Command Board PIN now matches the 300 camera PIN', 'This was a one-time copy. Changing either PIN later will not change the other.');
             });
@@ -204,13 +207,13 @@ class CommandBoardPin extends Page
     }
 
     /**
-     * @param  Closure(User): CommandBoardPinStatus  $change
+     * @param  Closure(User): CommandBoardPinChange  $change
      */
     private function changePin(Action $action, Closure $change, string $successTitle, string $successBody): void
     {
         $actor = $this->authorizeAccess();
         try {
-            $status = $change($actor);
+            $result = $change($actor);
         } catch (CurrentPasswordMismatch) {
             throw ValidationException::withMessages([$this->actionField('current_password') => 'Your current password is incorrect.']);
         } catch (AuthorizationException) {
@@ -234,8 +237,15 @@ class CommandBoardPin extends Page
             return;
         }
 
-        $this->applyStatus($status);
-        Notification::make()->success()->title($successTitle)->body($successBody)->send();
+        $this->applyStatus($result->status);
+        $notification = Notification::make()
+            ->success()
+            ->title($successTitle)
+            ->body($result->audited ? $successBody : $successBody.' '.self::AUDIT_FAILED_NOTE);
+        if (! $result->audited) {
+            $notification->persistent();
+        }
+        $notification->send();
     }
 
     /** Field errors go back onto the modal form; anything else becomes a notification. */
