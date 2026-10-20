@@ -119,6 +119,45 @@ final class ApplicationAccessAdministrationTest extends TestCase
         self::assertFalse($registry->states($target)['cloud']['operational']);
     }
 
+    public function test_command_board_is_automatic_for_active_members_and_not_a_delegated_application(): void
+    {
+        [, $target] = $this->members();
+        $employee = \App\Models\Employee::query()->create(['name' => 'Command member', 'employee_id' => $target->employee_id, 'password' => Hash::make('Command-test-only!')]);
+        $target->forceFill(['employee_profile_id' => $employee->id, 'must_change_password' => false])->save();
+        $client = \Laravel\Passport\Client::query()->create(['name' => 'Command access test', 'secret' => 'test-client-secret', 'provider' => 'users',
+            'redirect_uris' => ['https://cmd.mbfdhub.com/auth/callback'], 'grant_types' => ['authorization_code'], 'revoked' => false]);
+        config(['oidc.clients.cmd' => $client->id]);
+        $registry = app(ApplicationAccessRegistry::class);
+
+        self::assertArrayNotHasKey('cmd', $registry->applicationOptions());
+        self::assertNotContains('cmd', $registry->selectedApplications($target));
+        self::assertFalse($target->hasDirectWebPermission('app.cmd.access'));
+        self::assertTrue($registry->states($target)['cmd']['allowed']);
+        self::assertSame('Available to active Hub members — PIN required', $registry->states($target)['cmd']['grant_status']);
+        self::assertArrayHasKey('app.cmd.admin', $registry->capabilityOptions());
+
+        $target->givePermissionTo(Permission::findOrCreate('app.cmd.access', 'web'));
+        self::assertNotContains('cmd', $registry->selectedApplications($target));
+        $target->revokePermissionTo('app.cmd.access');
+        self::assertTrue($registry->states($target)['cmd']['allowed']);
+
+        foreach ([
+            ['account_status' => 'disabled'],
+            ['account_status' => 'active', 'must_change_password' => true],
+            ['must_change_password' => false, 'employee_profile_id' => null],
+        ] as $blocked) {
+            User::query()->whereKey($target->id)->update($blocked);
+            self::assertFalse($registry->states($target)['cmd']['allowed']);
+        }
+    }
+
+    public function test_legacy_command_board_access_cannot_be_submitted_as_a_member_grant(): void
+    {
+        [$actor, $target] = $this->members();
+        $this->expectException(AuthorizationException::class);
+        app(ApplicationAccessService::class)->syncApplications($actor, $target, ['cmd'], 'Access-test-password!', 'Obsolete Command grant');
+    }
+
     public function test_cloud_enforcement_status_distinguishes_disabled_unlinked_pending_verified_and_mapping_conflict(): void
     {
         [, $target] = $this->members();

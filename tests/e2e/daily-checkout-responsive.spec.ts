@@ -197,6 +197,11 @@ test('Command 300 station tabs show one station and preserve selection through r
 
   await page.goto('/daily/command-300');
   await expect(page.getByRole('heading', { name: '300 Command', exact: true })).toBeVisible();
+  const commandBoard = page.getByRole('link', { name: /^Open Command Board/ });
+  await expect(commandBoard).toHaveCount(1);
+  await expect(commandBoard).toHaveAttribute('href', 'https://cmd.mbfdhub.com');
+  await expect(commandBoard).toHaveAttribute('target', '_blank');
+  await expect(commandBoard).toHaveAttribute('rel', 'noopener noreferrer');
   const tabs = page.getByRole('tablist', { name: 'Station overview' });
   await expect(tabs.getByRole('tab')).toHaveCount(5);
   await expect(page.getByTestId('command-stations')).toHaveCount(1);
@@ -243,8 +248,9 @@ test('Command 300 station tabs show one station and preserve selection through r
 
   await tabs.getByRole('tab', { name: 'Station 1', exact: true }).click();
   await page.getByRole('link', { name: 'Open Station 1', exact: true }).click();
+  await expect(page).toHaveURL(/\/daily\/stations\/29\?return_to=%2Fdaily%2Fcommand-300%3Fstation%3D29$/);
   await expect(page.getByRole('heading', { name: 'Station 1', exact: true })).toBeVisible();
-  await page.locator('[data-hub-back]').click();
+  await page.getByRole('button', { name: 'Back to 300 Command', exact: true }).click();
   await expect(page).toHaveURL(/\/daily\/command-300\?station=29$/);
   await expect(page.getByRole('tabpanel', { name: 'Station 1', exact: true })).toBeVisible();
   await expectNoHorizontalOverflow(page);

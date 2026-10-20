@@ -30,10 +30,9 @@ final class HubShellNavigation
             'admin' => ['label' => 'Admin', 'href' => '/admin'],
             'bid' => ['label' => 'Bid', 'href' => 'https://bid.mbfdhub.com/api/auth/start'],
             'media_control' => ['label' => 'Media Control', 'href' => 'https://media.mbfdhub.com/api/auth/hub/start'],
-            'cmd' => ['label' => 'Command Board', 'href' => self::commandBoardUrl() ?? ''],
             'meeting' => ['label' => 'Meeting Intelligence', 'href' => 'https://meet.mbfdhub.com/'],
         ] as $key => $application) {
-            if ($application['href'] !== '' && self::launchable($key, $states)) {
+            if (self::launchable($key, $states)) {
                 $navigation['applications'][] = ['key' => $key, ...$application];
             }
         }
@@ -58,14 +57,6 @@ final class HubShellNavigation
         return $navigation;
     }
 
-    /** The Command Board origin members are sent to (COMMAND_BOARD_URL), or null when it is not a usable https URL. */
-    public static function commandBoardUrl(): ?string
-    {
-        $url = trim((string) config('services.command_board.url'));
-
-        return str_starts_with(strtolower($url), 'https://') && is_string(parse_url($url, PHP_URL_HOST)) ? $url : null;
-    }
-
     /**
      * Applications whose consumer enforcement is still being rolled out stay
      * hidden until deployment marks their Hub sign-in as verified.
@@ -78,6 +69,6 @@ final class HubShellNavigation
             return false;
         }
 
-        return ! in_array($key, ['cmd', 'meeting'], true) || config('application_access.runtime_verified.'.$key) === true;
+        return $key !== 'meeting' || config('application_access.runtime_verified.'.$key) === true;
     }
 }
