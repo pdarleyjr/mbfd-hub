@@ -26,7 +26,7 @@ final class TrainingSession extends Model
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['classifications' => 'array', 'held_on' => 'immutable_date', 'starts_at' => 'immutable_datetime', 'submitted_at' => 'immutable_datetime', 'revision' => 'integer'];
+        return ['classifications' => 'array', 'held_on' => 'immutable_date', 'starts_at' => 'immutable_datetime', 'submitted_at' => 'immutable_datetime', 'revision' => 'integer', 'training_module_id' => 'integer'];
     }
 
     protected static function booted(): void
@@ -38,6 +38,17 @@ final class TrainingSession extends Model
     public function course(): BelongsTo
     {
         return $this->belongsTo(TrainingCourse::class, 'training_course_id');
+    }
+
+    /** @return BelongsTo<TrainingModule, $this> */
+    public function module(): BelongsTo
+    {
+        return $this->belongsTo(TrainingModule::class, 'training_module_id');
+    }
+
+    public function isPaper(): bool
+    {
+        return $this->attendance_source === 'paper' || $this->status === 'paper';
     }
 
     /** @return BelongsTo<Employee, $this> */
