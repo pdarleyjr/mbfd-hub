@@ -5,9 +5,9 @@ import '../../css/mbfd-theme.css';
 import './roster.css';
 
 type Member = { id: number; first_name: string; last_name: string; name: string; rank: string; shift: string; term_label: string; identifier_hint: string };
-type Roster = { course_name: string; held_on: string; location: string | null; status: string; revision: number; attendance: { name: string; rank: string | null; shift: string | null; signed_at: string }[]; csrf_token: string };
+type Roster = { course_name: string; held_on: string; location: string | null; module_name?: string | null; starts_at?: string | null; status: string; revision: number; attendance: { name: string; rank: string | null; shift: string | null; signed_at: string }[]; csrf_token: string };
 type Step = 'roster' | 'shift' | 'rank' | 'name' | 'signature' | 'success' | 'submit';
-type Catalog = { courses: { id: number; name: string; classifications: string[]; default_location: string | null; sessions: { public_id: string; held_on: string; location: string | null }[] }[]; today: string; csrf_token: string };
+type Catalog = { courses: { id: number; name: string; classifications: string[]; default_location: string | null; requires_session_selection: boolean; modules: { id: number; name: string }[]; sessions: { public_id: string; held_on: string; starts_at: string | null; location: string | null; module_id: number | null; module_name: string | null; staff_managed: boolean }[] }[]; today: string; csrf_token: string };
 type Submission = { employee_profile_id: number; signature: string; client_submission_id: string };
 type Receipt = { recorded: boolean; status: 'recorded' | 'unknown' | 'corrected' | 'voided' };
 type ApprovalSummary = Pick<Roster, 'course_name' | 'held_on' | 'location' | 'revision'> & { count: number };
@@ -73,6 +73,7 @@ function rememberApproval(item?: ApprovalRequest) {
 }
 const dateLabel = (date: string) => new Intl.DateTimeFormat('en-US', { dateStyle: 'full', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`));
 const signedLabel = (date: string) => new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short', timeZone: 'America/New_York' }).format(new Date(date));
+const timeLabel = (date: string) => new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short', timeZone: 'America/New_York' }).format(new Date(date));
 
 function Brand() {
     return <header className="brand-bar">
@@ -88,6 +89,7 @@ function Classes() {
     const [error, setError] = useState('');
     const [busy, setBusy] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [modules, setModules] = useState<Record<number, string>>({});
     const refresh = async () => {
         try { setCatalog(await api<Catalog>('/catalog')); setError(''); }
         catch { setError('Classes could not be refreshed. Check your connection and try again.'); }
@@ -116,13 +118,15 @@ function Classes() {
     };
     const courses = catalog?.courses.filter(course => [course.name, ...course.classifications].join(' ').toLocaleLowerCase().includes(query.toLocaleLowerCase())) ?? [];
     return <div className="kiosk-shell"><Brand /><main>
-        <section className="course-heading"><p className="eyebrow">Classroom attendance</p><h1>Choose your class</h1><p>Open a roster below or start today’s roster for your course.</p></section>
+        <section className="course-heading"><p className="eyebrow">Classroom attendance</p><h1>Choose your class</h1><p>Choose your module, date, time and location to open the correct roster.</p></section>
         {error && <div className="message error" role="alert">{error} <button className="text-button" disabled={busy} onClick={() => void refresh()}>Refresh classes</button></div>}
         {loading && <p role="status">Loading classes…</p>}
         {catalog && <><p className="catalog-date">Today: {dateLabel(catalog.today)} · Eastern Time</p><label className="search-label" htmlFor="course-search">Find a course</label><input id="course-search" type="search" autoComplete="off" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search courses or classifications" />
             <div className="course-list" aria-busy={busy}>{courses.map(course => <section className="course-card" key={course.id} aria-labelledby={`course-${course.id}`}>
-                <div className="course-card-heading"><div><h2 id={`course-${course.id}`}>{course.name}</h2>{course.classifications.length > 0 && <ul className="classification-badges" aria-label="Classifications">{course.classifications.map(classification => <li key={classification}>{classification}</li>)}</ul>}{course.default_location && <p>{course.default_location}</p>}</div><button className="primary" disabled={busy} onClick={() => void enter(`/courses/${course.id}/start`)}>Start today’s roster<span className="sr-only"> for {course.name}</span></button></div>
-                {course.sessions.length > 0 && <ul className="session-list">{course.sessions.map(session => <li key={session.public_id}><div><strong>{dateLabel(session.held_on)}</strong><span>{session.location || 'Sign-in open'}</span></div><button className="secondary" disabled={busy} onClick={() => void enter(`/r/${session.public_id}/open`, `/r/${session.public_id}`)}>Open roster<span className="sr-only"> for {course.name} on {dateLabel(session.held_on)}{session.location ? ` at ${session.location}` : ''}</span></button></li>)}</ul>}
+                <div className="course-card-heading"><div><h2 id={`course-${course.id}`}>{course.name}</h2>{course.classifications.length > 0 && <ul className="classification-badges" aria-label="Classifications">{course.classifications.map(classification => <li key={classification}>{classification}</li>)}</ul>}{course.default_location && <p>{course.default_location}</p>}</div>{!course.requires_session_selection && <button className="primary" disabled={busy} onClick={() => void enter(`/courses/${course.id}/start`)}>Start today’s roster<span className="sr-only"> for {course.name}</span></button>}</div>
+                {course.requires_session_selection && <><label className="search-label" htmlFor={`module-${course.id}`}>Module</label><select className="module-select" id={`module-${course.id}`} value={modules[course.id] ?? ''} onChange={event => setModules(current => ({ ...current, [course.id]: event.target.value }))}><option value="">All modules</option>{course.modules.map(module => <option key={module.id} value={module.id}>{module.name}</option>)}<option value="unassigned">Unassigned</option></select><p>Open a session below. Training staff manage separate deliveries and new sessions.</p></>}
+                {course.sessions.length > 0 && <ul className="session-list">{course.sessions.filter(session => !modules[course.id] || (modules[course.id] === 'unassigned' ? session.module_id === null : String(session.module_id) === modules[course.id])).map((session, index) => <li key={session.public_id}><div><strong>{session.module_name || (course.requires_session_selection ? 'Unassigned' : course.name)}</strong><span>{dateLabel(session.held_on)} · {session.starts_at ? timeLabel(session.starts_at) : 'Time not specified'}</span><span>{session.location || 'Location not specified'} · Session {index + 1}{session.staff_managed ? ' · Managed by training staff' : ''}</span></div><button className="secondary" disabled={busy} onClick={() => void enter(`/r/${session.public_id}/open`, `/r/${session.public_id}`)}>Open roster<span className="sr-only"> for {course.name}{session.module_name ? ` · ${session.module_name}` : ''} on {dateLabel(session.held_on)}{session.starts_at ? ` at ${timeLabel(session.starts_at)}` : ''}{session.location ? ` · ${session.location}` : ''} · Session {index + 1}</span></button></li>)}</ul>}
+                {!course.sessions.length && course.requires_session_selection && <p>No sessions are open. Ask training staff to open the dated roster for this class.</p>}
             </section>)}</div>
             {!courses.length && <section className="empty-state"><h2>{query ? 'No matching courses' : 'No courses are available'}</h2><p>{query ? 'Try a different course name or classification.' : 'Ask the training staff to add a course, then refresh this page.'}</p>{!query && <button className="secondary" onClick={() => void refresh()}>Refresh classes</button>}</section>}
         </>}
@@ -431,6 +435,8 @@ function App() {
             </section>}
             {roster && step === 'roster' && <>
                 <section className="course-heading"><a className="text-button" href="/">← Classes</a><p className="eyebrow">{dateLabel(roster.held_on)}</p><h1 ref={heading} tabIndex={-1}>{roster.course_name}</h1>
+                    {roster.module_name && <h2>{roster.module_name}</h2>}
+                    {roster.starts_at && <p className="catalog-date">{timeLabel(roster.starts_at)}</p>}
                     {roster.location && <p>{roster.location}</p>}
                     <div className="roster-meta"><span className={`status ${roster.status === 'open' ? 'open' : ''}`}>{roster.status === 'open' ? 'Sign-in open' : 'Sign-in closed'}</span><span>{roster.attendance.length} {roster.attendance.length === 1 ? 'member' : 'members'} signed</span></div>
                 </section>

@@ -20,7 +20,7 @@ final class TrainingKioskService
     {
         $grant = DB::transaction(function () use ($request, $session): TrainingKioskGrant {
             $session = TrainingSession::query()->lockForUpdate()->findOrFail($session->getKey());
-            abort_unless($session->status === 'open', 403, 'This roster is no longer open. Return to classes.');
+            abort_unless(! $session->isPaper() && $session->status === 'open', 403, 'This roster is no longer open. Return to classes.');
             $current = $session->kioskGrants()->whereKey($request->session()->get('training_grants.'.$session->id))
                 ->whereNull('revoked_at')->where('expires_at', '>', now())->first();
             if ($current !== null) {
@@ -43,7 +43,7 @@ final class TrainingKioskService
 
         return DB::transaction(function () use ($session, $actor): string {
             $session = TrainingSession::query()->lockForUpdate()->findOrFail($session->getKey());
-            if ($session->status !== 'open') {
+            if ($session->isPaper() || $session->status !== 'open') {
                 throw ValidationException::withMessages(['session' => 'Open sign-in before launching the roster.']);
             }
             $token = bin2hex(random_bytes(32));
@@ -72,13 +72,14 @@ final class TrainingKioskService
             ->where('training_session_id', $session->getKey())
             ->where('token_hash', hash('sha256', $token))
             ->whereNull('revoked_at')->where('expires_at', '>', now())->first();
-        abort_unless($grant !== null && $session->status === 'open', 403, 'This sign-in link has ended. Ask the instructor to open a new link.');
+        abort_unless($grant !== null && ! $session->isPaper() && $session->status === 'open', 403, 'This sign-in link has ended. Ask the instructor to open a new link.');
         $request->session()->regenerate();
         $request->session()->put('training_grants.'.$session->getKey(), $grant->getKey());
     }
 
     public function requireDevice(Request $request, TrainingSession $session): int
     {
+        abort_if($session->isPaper(), 403, 'Paper roster evidence is not available on classroom screens.');
         $id = $request->session()->get('training_grants.'.$session->getKey());
         $valid = is_numeric($id) && TrainingKioskGrant::query()->whereKey($id)
             ->where('training_session_id', $session->getKey())

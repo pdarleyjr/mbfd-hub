@@ -73,8 +73,8 @@ final class TrainingPublicRosterTest extends TestCase
             ->assertJsonPath('courses.0.sessions.0.public_id', $open->public_id)
             ->assertJsonPath('courses.0.classifications', ['STC', 'Custom classification'])
             ->assertJsonPath('today', '2026-10-15');
-        self::assertSame(['id', 'name', 'default_location', 'classifications', 'sessions'], array_keys($response->json('courses.0')));
-        self::assertSame(['public_id', 'held_on', 'location'], array_keys($response->json('courses.0.sessions.0')));
+        self::assertSame(['id', 'name', 'default_location', 'classifications', 'requires_session_selection', 'modules', 'sessions'], array_keys($response->json('courses.0')));
+        self::assertSame(['public_id', 'held_on', 'location', 'starts_at', 'module_id', 'module_name', 'staff_managed'], array_keys($response->json('courses.0.sessions.0')));
         $response->assertDontSee('Private instructor preparation notes')->assertDontSee('Synthetic Approver')->assertDontSee('PUBLIC-QA-1');
         self::assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
     }

@@ -96,6 +96,30 @@ test('empty public catalog does not invent a course', async ({ page }) => {
     await expect(page.getByRole('button', { name: /SIGN ROSTER/ })).toHaveCount(0);
 });
 
+test('modular catalog requires an explicit dated delivery and filters modules', async ({ page }) => {
+    const second = '01SYNTHETICTRAININGROSTER02';
+    await page.route('**/catalog', route => route.fulfill({ json: {
+        courses: [{ id: 1, name: 'Synthetic modular course', classifications: ['Driver Training'], default_location: 'Training classroom', requires_session_selection: true,
+            modules: [{ id: 10, name: 'Module 1 — Aerial' }, { id: 20, name: 'Module 2 — Pump' }],
+            sessions: [
+                { public_id: id, held_on: '2026-10-20', starts_at: '2026-10-20T13:00:00Z', location: 'North classroom', module_id: 10, module_name: 'Module 1 — Aerial', staff_managed: true },
+                { public_id: second, held_on: '2026-10-20', starts_at: '2026-10-20T17:00:00Z', location: 'South classroom', module_id: 20, module_name: 'Module 2 — Pump', staff_managed: true },
+            ] }], today: '2026-10-20', csrf_token: 'synthetic',
+    } }));
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: /Start today/ })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Open roster/ })).toHaveCount(2);
+    await expect(page.getByText(/9:00 AM EDT/)).toBeVisible();
+    await expect(page.getByText(/1:00 PM EDT/)).toBeVisible();
+    await page.getByLabel('Module', { exact: true }).selectOption('20');
+    await expect(page.getByRole('button', { name: /Open roster/ })).toHaveCount(1);
+    await expect(page.getByText('South classroom · Session 1 · Managed by training staff')).toBeVisible();
+    await expect(page.getByText('North classroom', { exact: false })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Module 2 — Pump/ })).toBeVisible();
+    const violations = await new AxeBuilder({ page }).analyze();
+    expect(violations.violations).toEqual([]);
+});
+
 test('public catalog searches courses and starts today without exposing attendance', async ({ page }, info) => {
     let starts = 0;
     await page.route('**/catalog', route => route.fulfill({ json: { courses: [{ id: 1, name: 'Primary Screener', classifications: ['STC', 'Instructor-defined topic'], default_location: 'Training classroom', sessions: [{ public_id: id, held_on: '2026-10-15', location: 'Training classroom' }] }, { id: 2, name: 'Marine operations', classifications: ['Marine Training'], default_location: null, sessions: [] }], today: '2026-10-15', csrf_token: 'test' } }));
