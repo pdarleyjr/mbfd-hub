@@ -39,9 +39,11 @@ final class HubOidcProviderTest extends TestCase
         $this->assertDatabaseCount('oidc_account_links', 0);
     }
 
-    public function test_code_exchange_and_userinfo_preserve_identity_and_recheck_revocation(): void
+    public function test_cmd_code_exchange_and_userinfo_need_no_role_or_grant_and_recheck_revocation(): void
     {
         [$user, $client] = $this->fixture();
+        self::assertSame([], $user->getRoleNames()->all());
+        self::assertFalse($user->hasDirectWebPermission('app.cmd.access'));
         $identity = $user->fresh()->getAttributes();
         $query = $this->authorizationQuery($client);
         $response = $this->actingAs($user)->get('/oauth/authorize?'.http_build_query($query))->assertRedirect();
@@ -58,10 +60,23 @@ final class HubOidcProviderTest extends TestCase
         self::assertSame(300, $claims['exp'] - $claims['iat']);
         self::assertSame(28800, $token['expires_in']);
         $this->withToken($token['access_token'])->getJson('/oauth/userinfo')->assertOk()
-            ->assertJsonPath('sub', $claims['sub'])->assertJsonPath('security_version', 1)->assertJsonMissingPath('email');
+            ->assertJsonPath('sub', $claims['sub'])->assertJsonPath('application', 'cmd')
+            ->assertJsonPath('security_version', 1)->assertJsonMissingPath('email')->assertJsonMissingPath('role');
         self::assertSame($identity, $user->fresh()->getAttributes());
-        $user->revokePermissionTo('app.cmd.access');
+        self::assertFalse($user->fresh()->hasDirectWebPermission('app.cmd.access'));
+        app(\App\Services\Oidc\OidcSessionRevoker::class)->revoke($user, 'cmd');
         $this->withToken($token['access_token'])->getJson('/oauth/userinfo')->assertUnauthorized();
+    }
+
+    public function test_legacy_cmd_grant_removal_does_not_block_pending_codes_or_current_sessions(): void
+    {
+        [$user, $client] = $this->fixture();
+        $user->givePermissionTo(Permission::findOrCreate('app.cmd.access', 'web'));
+        $token = $this->exchange($client, $this->code($user, $client))->assertOk()->json('access_token');
+        $pending = $this->code($user, $client);
+        $user->revokePermissionTo('app.cmd.access');
+        $this->exchange($client, $pending)->assertOk();
+        $this->withToken($token)->getJson('/oauth/userinfo')->assertOk()->assertJsonPath('application', 'cmd');
     }
 
     public function test_confidential_basic_client_auth_nonce_signature_and_single_use(): void
@@ -93,7 +108,7 @@ final class HubOidcProviderTest extends TestCase
         $this->withToken($token)->getJson('/oauth/userinfo')->assertOk()->assertJsonPath('email', 'different@miamibeachfl.gov')->assertJsonPath('email_verified', false);
     }
 
-    public function test_wrong_pkce_callback_client_and_missing_entitlement_are_denied(): void
+    public function test_wrong_pkce_callback_client_and_revoked_client_are_denied(): void
     {
         [$user, $client] = $this->fixture();
         foreach ([['code_challenge_method' => 'plain'], ['nonce' => '']] as $bad) {
@@ -103,7 +118,7 @@ final class HubOidcProviderTest extends TestCase
         $code = $this->code($user, $client);
         $this->exchange($client, $code, ['code_verifier' => str_repeat('x', 64)])->assertStatus(400);
         $this->exchange($client, $code, ['client_secret' => 'bad'])->assertUnauthorized();
-        $user->revokePermissionTo('app.cmd.access');
+        $client->update(['revoked' => true]);
         $this->exchange($client, $code)->assertStatus(400);
         $this->actingAs($user)->get('/oauth/authorize?'.http_build_query($this->authorizationQuery($client)))->assertUnauthorized();
     }
@@ -118,11 +133,13 @@ final class HubOidcProviderTest extends TestCase
         $this->withToken($token)->getJson('/oauth/userinfo')->assertUnauthorized();
     }
 
-    public function test_disabled_account_swapped_employee_or_revoked_client_cannot_use_token(): void
+    public function test_password_setup_disabled_account_swapped_employee_or_revoked_client_cannot_use_token(): void
     {
         [$user, $client] = $this->fixture();
         $token = $this->exchange($client, $this->code($user, $client))->assertOk()->json('access_token');
-        User::query()->whereKey($user->id)->update(['account_status' => 'disabled']);
+        User::query()->whereKey($user->id)->update(['must_change_password' => true]);
+        $this->withToken($token)->getJson('/oauth/userinfo')->assertUnauthorized();
+        User::query()->whereKey($user->id)->update(['must_change_password' => false, 'account_status' => 'disabled']);
         $this->withToken($token)->getJson('/oauth/userinfo')->assertUnauthorized();
         User::query()->whereKey($user->id)->update(['account_status' => 'active', 'employee_profile_id' => null]);
         $this->withToken($token)->getJson('/oauth/userinfo')->assertUnauthorized();
@@ -227,13 +244,13 @@ final class HubOidcProviderTest extends TestCase
 
     public function test_audited_app_revoke_cannot_resurrect_old_tokens_when_access_is_regranted(): void
     {
-        [$user, $client] = $this->fixture();
+        [$user, $client] = $this->fixture('meeting');
         $actor = User::factory()->create(['account_status' => 'active', 'password' => bcrypt('Test-admin-password!')]);
         $actor->assignRole(\Spatie\Permission\Models\Role::findOrCreate('super_admin', 'web'));
         $token = $this->exchange($client, $this->code($user, $client))->assertOk()->json('access_token');
         $service = app(\App\Services\Security\ApplicationAccessService::class);
         $service->syncApplications($actor, $user, [], 'Test-admin-password!', 'Access removed');
-        $service->syncApplications($actor, $user, ['cmd'], 'Test-admin-password!', 'Access restored');
+        $service->syncApplications($actor, $user, ['meeting'], 'Test-admin-password!', 'Access restored');
         $this->withToken($token)->getJson('/oauth/userinfo')->assertUnauthorized();
         $newToken = $this->exchange($client, $this->code($user, $client))->assertOk()->json('access_token');
         $this->withToken($newToken)->getJson('/oauth/userinfo')->assertOk();
@@ -252,6 +269,7 @@ final class HubOidcProviderTest extends TestCase
     public function test_super_admin_removal_persistently_revokes_tokens_without_changing_direct_grants(): void
     {
         [$user, $client] = $this->fixture();
+        $user->givePermissionTo(Permission::findOrCreate('app.cmd.access', 'web'));
         $super = \Spatie\Permission\Models\Role::findOrCreate('super_admin', 'web');
         $user->assignRole($super);
         $actor = User::factory()->create(['account_status' => 'active']);
@@ -321,7 +339,6 @@ final class HubOidcProviderTest extends TestCase
     {
         [$user, $client] = $this->fixture('meeting');
         $user->givePermissionTo(Permission::findOrCreate('app.meeting.operator', 'web'));
-        $user->givePermissionTo(Permission::findOrCreate('app.cmd.access', 'web'));
         $cmd = Client::query()->create(['name' => 'CMD isolation test', 'secret' => 'test-client-secret', 'provider' => 'users',
             'redirect_uris' => ['https://cmd.mbfdhub.com/auth/callback'], 'grant_types' => ['authorization_code'], 'revoked' => false]);
         config(['oidc.clients.cmd' => $cmd->id]);
@@ -402,7 +419,9 @@ final class HubOidcProviderTest extends TestCase
         $employee = Employee::query()->create(['name' => 'OIDC Test', 'employee_id' => 'OIDC-99001', 'city_email' => 'oidctest@miamibeachfl.gov', 'password' => bcrypt('Test-password-only!')]);
         $user = User::factory()->create(['employee_profile_id' => $employee->id, 'employee_id' => $employee->employee_id,
             'email' => $employee->city_email, 'account_status' => 'active', 'security_version' => 1, 'must_change_password' => false]);
-        $user->givePermissionTo(Permission::findOrCreate('app.'.$application.'.access', 'web'));
+        if ($application !== 'cmd') {
+            $user->givePermissionTo(Permission::findOrCreate('app.'.$application.'.access', 'web'));
+        }
         $callback = $application === 'meeting' ? 'https://meet.mbfdhub.com/auth/callback' : 'https://cmd.mbfdhub.com/auth/callback';
         $client = Client::query()->create(['name' => $application.' test', 'secret' => 'test-client-secret', 'provider' => 'users',
             'redirect_uris' => [$callback], 'grant_types' => ['authorization_code'], 'revoked' => false]);

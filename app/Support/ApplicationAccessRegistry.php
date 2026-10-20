@@ -15,7 +15,7 @@ final class ApplicationAccessRegistry
             'admin' => ['label' => 'Hub administration', 'permission' => 'admin.access', 'description' => 'Admin panel access. Individual administration capabilities and application administrator roles are managed separately.'],
             'bid' => ['label' => 'Bid', 'permission' => 'app.bid.access', 'description' => 'Member access to Bid. Its administrator role requires a separate explicit grant.'],
             'media_control' => ['label' => 'Media Control', 'permission' => 'app.media_control.access', 'description' => 'Allows this member to use Media Control.'],
-            'cmd' => ['label' => 'CMD — cmd.mbfdhub.com', 'permission' => 'app.cmd.access', 'description' => 'Hub sign-in through the configured CMD client. Current account status and CMD access are checked during use.'],
+            'cmd' => ['label' => 'Command Board', 'permission' => null, 'description' => 'Available through the 300 / Command profile to active Hub members. The Command Board PIN protects entry.'],
             'cloud' => ['label' => 'Cloud — cloud.mbfdhub.com', 'permission' => 'app.cloud.access', 'description' => 'Requires a separately approved link to the existing Cloud account. Account and device-token changes synchronize through the audited Cloud lifecycle.'],
             'meeting' => ['label' => 'Meeting Intelligence', 'permission' => 'app.meeting.access', 'description' => 'Viewer access to meetings. Participant, Operator, and Admin roles are assigned separately.'],
         ];
@@ -128,7 +128,7 @@ final class ApplicationAccessRegistry
                 'admin' => $current->hasCurrentAdminPanelEntitlement(),
                 'bid' => $current->hasCurrentBidEntitlement(),
                 'media_control' => $current->hasCurrentMediaControlEntitlement(),
-                'cmd' => $current->hasRole('super_admin') || $current->hasDirectWebPermission('app.cmd.access'),
+                'cmd' => $current->employee_profile_id !== null,
                 'cloud' => app(\App\Services\Oidc\CloudIdentityAccess::class)->forUser($current) !== null,
                 'meeting' => app(\App\Services\Security\ApplicationRoleResolver::class)->forUser($current, 'meeting') !== null,
                 default => false,
@@ -138,13 +138,14 @@ final class ApplicationAccessRegistry
             $states[$key] = [
                 'allowed' => $entitled && $active && $operational,
                 'operational' => $operational,
-                'grant_status' => $current?->hasRole('super_admin') ? 'Inherited from Super Administrator' : ($current !== null && $application['permission'] !== null && $current->hasDirectWebPermission($application['permission']) ? 'Access granted' : 'Not granted'),
-                'status' => ! $operational ? 'SSO client not configured or unavailable — access unavailable' : (! $active ? 'Account inactive or password setup required — access blocked' : ($key === 'cloud' && ! $entitled ? 'Cloud grant or approved account link missing' : ($current->hasRole('super_admin') ? 'Inherited from Super Administrator — managed through roles' : ($entitled ? 'Direct Hub access granted' : 'No direct access')))),
+                'grant_status' => $key === 'cmd' ? 'Available to active Hub members — PIN required' : ($current?->hasRole('super_admin') ? 'Inherited from Super Administrator' : ($current !== null && $application['permission'] !== null && $current->hasDirectWebPermission($application['permission']) ? 'Access granted' : 'Not granted')),
+                'status' => ! $operational ? 'SSO client not configured or unavailable — access unavailable' : (! $active ? 'Account inactive or password setup required — access blocked' : ($key === 'cmd' ? ($entitled ? 'Open from 300 / Command and enter the Command Board PIN' : 'Personnel identity missing — access blocked') : ($key === 'cloud' && ! $entitled ? 'Cloud grant or approved account link missing' : ($current->hasRole('super_admin') ? 'Inherited from Super Administrator — managed through roles' : ($entitled ? 'Direct Hub access granted' : 'No direct access'))))),
                 'role' => $role,
                 'role_status' => match ($key) {
                     'bid', 'media_control' => $role === null ? 'No application access — administrator role inactive' : 'Hub application role: '.$role,
                     'meeting' => $role === null ? 'No application access — Meeting role inactive' : 'Hub application role: '.$role,
                     'admin' => 'Individual Hub administration capabilities are managed separately.',
+                    'cmd' => 'The PIN protects board access. Changing the PIN requires a separate administration capability.',
                     default => 'No Hub-managed administrator role is supported. App-local roles are not changed.',
                 },
                 'runtime_status' => $key === 'admin' ? 'Enforced by the Hub.' : (config('application_access.runtime_verified.'.$key) === true

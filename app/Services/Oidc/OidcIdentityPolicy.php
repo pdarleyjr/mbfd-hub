@@ -36,7 +36,7 @@ final class OidcIdentityPolicy
         if ($client === null || $client->revoked || ! $client->confidential()
             || $user === null || ! $user->isAuthenticationAllowed() || $user->must_change_password
             || $employee === null || $user->employee_id !== $employee->employee_id
-            || (! $user->hasRole('super_admin') && ! $user->hasDirectWebPermission('app.'.$application.'.access'))
+            || ($application !== 'cmd' && ! $user->hasRole('super_admin') && ! $user->hasDirectWebPermission('app.'.$application.'.access'))
             || ($session !== null && ($session->revoked_at !== null || $session->user_id !== $user->id
                 || $session->employee_profile_id !== $employee->id || $session->security_version !== (int) $user->security_version
                 || $session->client_id !== $clientId || $session->application !== $application))) {
