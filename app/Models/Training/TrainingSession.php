@@ -63,6 +63,12 @@ final class TrainingSession extends Model
         return $this->hasMany(TrainingAttendance::class);
     }
 
+    /** @return HasMany<TrainingPaperAttendance, $this> */
+    public function paperAttendances(): HasMany
+    {
+        return $this->hasMany(TrainingPaperAttendance::class);
+    }
+
     /** @return HasMany<TrainingRosterVersion, $this> */
     public function versions(): HasMany
     {

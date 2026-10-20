@@ -7,6 +7,7 @@ namespace App\Filament\Employee\Pages;
 use App\Concerns\ResolvesCanonicalEmployee;
 use App\Models\Training\TrainingAttendance;
 use App\Models\Training\TrainingCourse;
+use App\Models\Training\TrainingPaperAttendance;
 use Filament\Forms\Components\DatePicker;
 use Filament\Pages\Page;
 use Filament\Tables;
@@ -44,6 +45,15 @@ class TrainingHistoryPage extends Page implements HasTable
                 $audit->whereIn('action', ['attendance.corrected', 'attendance.resigned'])
                     ->orWhere(fn (Builder $exception) => $exception->where('action', 'attendance.exception')->whereNotNull('before'));
             })]);
+    }
+
+    protected function getViewData(): array
+    {
+        return ['paperAttendance' => TrainingPaperAttendance::query()
+            ->where('employee_profile_id', $this->authenticatedEmployee()->id)
+            ->where('review_status', 'approved')->where('evidence_present', true)
+            ->whereNotNull('reviewed_by')->whereNotNull('reviewed_at')
+            ->with(['session.course', 'session.module'])->orderByDesc('training_session_id')->get()];
     }
 
     public function table(Table $table): Table

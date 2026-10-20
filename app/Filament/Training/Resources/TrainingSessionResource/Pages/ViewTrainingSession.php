@@ -7,11 +7,16 @@ namespace App\Filament\Training\Resources\TrainingSessionResource\Pages;
 use App\Filament\Training\Resources\TrainingSessionResource;
 use App\Models\Employee;
 use App\Models\Training\TrainingAttendance;
+use App\Models\Training\TrainingModule;
+use App\Models\Training\TrainingPaperAttendance;
+use App\Models\Training\TrainingPaperRosterImport;
 use App\Models\Training\TrainingSession;
+use App\Services\Training\TrainingCourseModuleService;
 use App\Services\Training\TrainingRosterService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Placeholder;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\ViewField;
@@ -49,9 +54,38 @@ class ViewTrainingSession extends ViewRecord implements HasTable
     {
         return [
             Action::make('pdf')->label('Download PDF')->icon('heroicon-o-document-arrow-down')
+                ->visible(fn (): bool => $this->getRecord()->attendance_source !== 'paper')
                 ->url(fn (): string => route('training.rosters.export', ['session' => $this->getRecord(), 'format' => 'pdf'])),
             Action::make('xlsx')->label('Download Excel')->icon('heroicon-o-table-cells')->color('gray')
+                ->visible(fn (): bool => $this->getRecord()->attendance_source !== 'paper')
                 ->url(fn (): string => route('training.rosters.export', ['session' => $this->getRecord(), 'format' => 'xlsx'])),
+            Action::make('paperSource')->label('Original paper PDF')->icon('heroicon-o-document')
+                ->visible(fn (): bool => $this->getRecord()->attendance_source === 'paper')
+                ->url(fn (): string => route('training.paper.source', ['import' => TrainingPaperRosterImport::query()->where('training_session_id', $this->getRecord()->id)->value('id') ?? 0])),
+            Action::make('paperReview')->label('Review paper entries')->color('gray')
+                ->visible(fn (): bool => $this->getRecord()->attendance_source === 'paper')
+                ->url(fn (): string => \App\Filament\Training\Resources\TrainingCourseResource::getUrl('paper', ['record' => $this->getRecord()->training_course_id])),
+            Action::make('mapModule')->label('Assign module')->color('gray')
+                ->visible(fn (): bool => Gate::allows('update', $this->getRecord()->course))
+                ->fillForm(fn (): array => ['training_module_id' => $this->getRecord()->training_module_id, 'expected_module_id' => $this->getRecord()->training_module_id, 'expected_revision' => $this->getRecord()->revision])
+                ->form([
+                    Select::make('training_module_id')->label('Module')->placeholder('Unassigned')
+                        ->options(fn (): array => $this->getRecord()->course->modules()->orderBy('sort_order')->pluck('name', 'id')->all()),
+                    self::reasonField(), $this->revisionField(), Hidden::make('expected_module_id'),
+                ])->action(function (array $data): void {
+                    Gate::authorize('update', $this->getRecord()->course);
+                    $module = filled($data['training_module_id'] ?? null) ? TrainingModule::findOrFail($data['training_module_id']) : null;
+                    $this->mutate(fn () => app(TrainingCourseModuleService::class)->mapSession($this->getRecord(), $module, auth()->user(), $data['reason'], (int) $data['expected_revision'], filled($data['expected_module_id'] ?? null) ? (int) $data['expected_module_id'] : null), 'Module assignment updated');
+                }),
+            Action::make('nextSession')->label('Create next session')->color('gray')
+                ->visible(fn (): bool => Gate::allows('create', TrainingSession::class))
+                ->form(TrainingSessionResource::sessionFields())
+                ->fillForm(fn (): array => $this->getRecord()->only(['course_name', 'location', 'oic_employee_profile_id', 'classifications']) + ['held_on' => now('America/New_York')->toDateString()])
+                ->action(function (array $data): void {
+                    Gate::authorize('create', TrainingSession::class);
+                    $next = app(TrainingRosterService::class)->createSession($this->getRecord()->course, $data + ['training_module_id' => $this->getRecord()->training_module_id], auth()->user());
+                    $this->redirect(TrainingSessionResource::getUrl('view', ['record' => $next]));
+                }),
             Action::make('launch')->label('Classroom links')->icon('heroicon-o-computer-desktop')
                 ->visible(fn (): bool => Gate::allows('manageKiosk', $this->getRecord()))
                 ->url(fn (): string => route('training.rosters.launch', ['session' => $this->getRecord()]))->openUrlInNewTab(),
@@ -100,6 +134,16 @@ class ViewTrainingSession extends ViewRecord implements HasTable
 
     public function table(Table $table): Table
     {
+        if ($this->getRecord()->attendance_source === 'paper') {
+            return $table->query(TrainingPaperAttendance::query()->where('training_session_id', $this->getRecord()->id)->with('employee'))
+                ->columns([
+                    Tables\Columns\TextColumn::make('employee.name')->label('Verified member')->placeholder('Pending identity review'),
+                    Tables\Columns\TextColumn::make('source_page')->label('Original page'),
+                    Tables\Columns\TextColumn::make('source_row')->label('Row / region'),
+                    Tables\Columns\TextColumn::make('review_status')->label('Paper review')->badge(),
+                ])->defaultSort('id')->paginationPageOptions([25, 50, 100]);
+        }
+
         return $table->query(fn () => TrainingAttendance::query()->where('training_session_id', $this->getRecord()->id))
             ->columns([
                 Tables\Columns\TextColumn::make('snapshot.display_name')->label('Employee')->searchable(query: fn ($query, string $search) => $query->where('snapshot->display_name', 'like', '%'.$search.'%')),

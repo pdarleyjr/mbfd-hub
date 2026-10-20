@@ -30,37 +30,37 @@ class TrainingRosterPolicy
     public function update(User $user, TrainingCourse|TrainingSession $record): bool
     {
         return $this->create($user)
-            && (! $record instanceof TrainingSession || in_array($record->status, ['draft', 'open', 'closed'], true));
+            && (! $record instanceof TrainingSession || ($this->digital($record) && in_array($record->status, ['draft', 'open', 'closed'], true)));
     }
 
     public function open(User $user, TrainingSession $record): bool
     {
-        return $this->create($user) && in_array($record->status, ['draft', 'closed'], true);
+        return $this->create($user) && $this->digital($record) && in_array($record->status, ['draft', 'closed'], true);
     }
 
     public function close(User $user, TrainingSession $record): bool
     {
-        return $this->create($user) && $record->status === 'open';
+        return $this->create($user) && $this->digital($record) && $record->status === 'open';
     }
 
     public function reopen(User $user, TrainingSession $record): bool
     {
-        return $this->create($user) && in_array($record->status, ['certified', 'submitted'], true);
+        return $this->create($user) && $this->digital($record) && in_array($record->status, ['certified', 'submitted'], true);
     }
 
     public function correct(User $user, TrainingSession $record): bool
     {
-        return $this->create($user) && in_array($record->status, ['open', 'closed'], true);
+        return $this->create($user) && $this->digital($record) && in_array($record->status, ['open', 'closed'], true);
     }
 
     public function certify(User $user, TrainingSession $record): bool
     {
-        return $this->create($user) && in_array($record->status, ['closed', 'submitted'], true);
+        return $this->create($user) && $this->digital($record) && in_array($record->status, ['closed', 'submitted'], true);
     }
 
     public function archive(User $user, TrainingSession $record): bool
     {
-        return $this->create($user) && in_array($record->status, ['closed', 'submitted', 'certified'], true);
+        return $this->create($user) && $this->digital($record) && in_array($record->status, ['closed', 'submitted', 'certified'], true);
     }
 
     public function export(User $user, TrainingSession $record): bool
@@ -70,12 +70,17 @@ class TrainingRosterPolicy
 
     public function launch(User $user, TrainingSession $record): bool
     {
-        return $this->create($user) && $record->status === 'open';
+        return $this->create($user) && $this->digital($record) && $record->status === 'open';
     }
 
     public function manageKiosk(User $user, TrainingSession $record): bool
     {
-        return $this->create($user);
+        return $this->create($user) && $this->digital($record);
+    }
+
+    private function digital(TrainingSession $record): bool
+    {
+        return $record->attendance_source !== 'paper' && $record->status !== 'paper';
     }
 
     public function delete(User $user, TrainingCourse|TrainingSession $record): bool

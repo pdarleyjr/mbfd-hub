@@ -38,9 +38,9 @@ final class TrainingKioskController extends Controller
                 'id' => $course->id, 'name' => $course->name, 'default_location' => $course->default_location,
                 'classifications' => $course->classifications,
                 'requires_session_selection' => $course->modules->isNotEmpty()
-                    || $course->staff_session_today
-                    || $course->today_session_count > 1
-                    || ((int) $course->today_session_count === 1 && ! $course->sessions->contains(fn (TrainingSession $session): bool => $session->held_on->toDateString() === $today && $session->created_by === null && $session->training_module_id === null)),
+                    || $course->getAttribute('staff_session_today')
+                    || $course->getAttribute('today_session_count') > 1
+                    || ((int) $course->getAttribute('today_session_count') === 1 && ! $course->sessions->contains(fn (TrainingSession $session): bool => $session->held_on->toDateString() === $today && $session->created_by === null && $session->training_module_id === null)),
                 'modules' => $course->modules->map(fn ($module): array => ['id' => $module->id, 'name' => $module->name])->all(),
                 'sessions' => $course->sessions->map(fn (TrainingSession $session): array => [
                     'public_id' => $session->public_id, 'held_on' => $session->held_on->toDateString(), 'location' => $session->location,
