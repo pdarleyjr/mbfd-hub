@@ -99,7 +99,8 @@ final class TrainingAttendanceMatrixTest extends TestCase
         $json = json_encode($data, JSON_THROW_ON_ERROR);
         self::assertStringNotContainsString('PRIVATE_TRANSCRIPTION', $json);
         self::assertStringNotContainsString('private/source', $json);
-        self::assertStringNotContainsString('signature', $json);
+        self::assertStringNotContainsString('"signature":', $json);
+        self::assertStringNotContainsString(str_repeat('d', 64), $json);
     }
 
     public function test_audience_applicability_and_optional_modules_control_denominators(): void
@@ -226,6 +227,17 @@ final class TrainingAttendanceMatrixTest extends TestCase
         self::assertCount(1, $this->snapshot()['sessions']);
     }
 
+    public function test_session_columns_follow_module_order_and_keep_distinct_deliveries_on_the_same_date(): void
+    {
+        $first = $this->module('Module 1');
+        $second = $this->module('Module 2');
+        $secondDelivery = $this->trainingSession($second, 'submitted');
+        $firstDelivery = $this->trainingSession($first, 'submitted');
+        $repeatDelivery = $this->trainingSession($first, 'submitted');
+        $unassigned = $this->trainingSession(null, 'submitted');
+        self::assertSame([$firstDelivery->id, $repeatDelivery->id, $secondDelivery->id, $unassigned->id], array_column($this->snapshot()['sessions'], 'id'));
+    }
+
     public function test_report_and_export_enforce_existing_training_authorization(): void
     {
         $this->actingAs(User::factory()->create(['account_status' => 'active']));
@@ -246,7 +258,8 @@ final class TrainingAttendanceMatrixTest extends TestCase
         $this->employee('OTHER');
         $module = $this->module('Required');
         $session = $this->trainingSession($module, 'submitted', ['starts_at' => '2026-10-20T14:30:00Z', 'location' => 'Synthetic classroom']);
-        $this->digital($employee, $session);
+        $attendance = $this->digital($employee, $session);
+        $attendance->update(['signature_signed_at' => CarbonImmutable::parse('2026-10-20T16:00:00Z')]);
         $filters = ['de_bid' => true];
         $snapshot = $this->snapshot($filters);
         $bytes = app(TrainingMatrixExportService::class)->bytes($this->course, $filters, false, 'sessions');
@@ -262,6 +275,9 @@ final class TrainingAttendanceMatrixTest extends TestCase
             self::assertSame(DataType::TYPE_NUMERIC, $sheet->getCell('G2')->getDataType());
             self::assertSame(DataType::TYPE_NUMERIC, $book->getSheetByName('Sessions')->getCell('C2')->getDataType());
             self::assertSame('2026-10-20 10:30', $book->getSheetByName('Sessions')->getCell('D2')->getFormattedValue());
+            self::assertSame('2026-10-20 16:00', $book->getSheetByName('Attendance Evidence')->getCell('H2')->getFormattedValue());
+            self::assertSame('A Shift', $book->getSheetByName('Attendance Evidence')->getCell('N2')->getValue());
+            self::assertSame('2026-10-20 14:00', $book->getSheetByName('Attendance Evidence')->getCell('O2')->getFormattedValue());
             self::assertSame('C2', $sheet->getFreezePane());
             foreach ($book->getAllSheets() as $tab) {
                 self::assertCount(0, $tab->getDrawingCollection());
@@ -280,12 +296,17 @@ final class TrainingAttendanceMatrixTest extends TestCase
         $this->assignment($employee);
         $module = $this->module('Required');
         $this->paper(null, $this->trainingSession($module, 'paper'));
+        $accepted = $this->paper($employee, $this->trainingSession($module, 'paper'));
         $book = $this->readWorkbook(app(TrainingMatrixExportService::class)->bytes($this->course, ['search' => 'NO_MATCH'], true));
         try {
             self::assertSame(['Overview', 'All Personnel', 'Officers', 'Captains', 'Lieutenants', 'Rescue Officers', 'Combat Officers',
-                'All Firefighters', 'Rescue FF', 'Combat FF', 'DE Bid', 'Missing Training', 'Session Detail', 'Sessions', 'Import-Data Exceptions'], $book->getSheetNames());
+                'All Firefighters', 'Rescue FF', 'Combat FF', 'DE Bid', 'Missing Training', 'Session Detail', 'Sessions', 'Attendance Evidence', 'Import-Data Exceptions'], $book->getSheetNames());
             self::assertSame('BOOK', $book->getSheetByName('All Personnel')->getCell('A2')->getValue());
             self::assertSame('paper_pending', $book->getSheetByName('Import-Data Exceptions')->getCell('A2')->getValue());
+            self::assertSame('Verified paper roster', $book->getSheetByName('Attendance Evidence')->getCell('F2')->getValue());
+            self::assertSame($accepted->sourceImport->source_sha256, $book->getSheetByName('Attendance Evidence')->getCell('I2')->getValue());
+            self::assertSame(2, $book->getSheetByName('Attendance Evidence')->getCell('J2')->getValue());
+            self::assertSame('overflow-1', $book->getSheetByName('Attendance Evidence')->getCell('K2')->getValue());
             foreach ($book->getAllSheets() as $sheet) {
                 self::assertStringNotContainsString('PRIVATE_TRANSCRIPTION', json_encode($sheet->toArray(), JSON_THROW_ON_ERROR));
             }
@@ -359,7 +380,8 @@ final class TrainingAttendanceMatrixTest extends TestCase
     {
         return TrainingSession::query()->create(array_replace(['training_course_id' => $this->course->id, 'training_module_id' => $module?->id,
             'public_id' => (string) Str::ulid(), 'course_name' => $this->course->name, 'classifications' => ['STC'],
-            'held_on' => '2026-10-20', 'status' => $status, 'created_by' => $this->admin->id], $overrides));
+            'held_on' => '2026-10-20', 'status' => $status, 'attendance_source' => $status === 'paper' ? 'paper' : 'digital',
+            'created_by' => $this->admin->id], $overrides));
     }
 
     private function digital(Employee $employee, TrainingSession $session): TrainingAttendance

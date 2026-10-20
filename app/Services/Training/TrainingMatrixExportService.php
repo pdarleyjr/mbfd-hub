@@ -46,6 +46,23 @@ final class TrainingMatrixExportService
                 $session['starts_at'] === null ? null : CarbonImmutable::parse($session['starts_at'])->setTimezone('America/New_York'),
                 $session['location'], $session['status'], $session['source']];
         }
+        $sheets['Attendance Evidence'] = [['Employee ID', 'Session ID', 'Module', 'Class date', 'Evidence source', 'Evidence status',
+            'Digital roster status', 'Digitally signed at (UTC)', 'Paper source SHA-256', 'Source page', 'Source row', 'Paper reviewed at (UTC)', 'Recorded rank', 'Recorded shift', 'Attendance recorded at (UTC)']];
+        $sessions = array_column($snapshot['sessions'], null, 'id');
+        foreach ($snapshot['rows'] as $person) {
+            foreach ($person['session_cells'] as $sessionId => $cell) {
+                $session = $sessions[$sessionId];
+                foreach ($cell['sources'] as $source) {
+                    $sheets['Attendance Evidence'][] = [$person['employee_id'], $sessionId, $session['module_name'], CarbonImmutable::parse($session['held_on']),
+                        $source['source'], TrainingAttendanceMatrixService::LABELS[$source['status']], $source['roster_status'] ?? null,
+                        isset($source['signature_signed_at']) ? CarbonImmutable::parse($source['signature_signed_at'])->utc() : null,
+                        $source['source_sha256'] ?? null, $source['source_page'] ?? null, $source['source_row'] ?? null,
+                        isset($source['reviewed_at']) ? CarbonImmutable::parse($source['reviewed_at'])->utc() : null,
+                        $source['attendance_snapshot']['rank'] ?? null, $source['attendance_snapshot']['shift'] ?? null,
+                        isset($source['signed_at']) ? CarbonImmutable::parse($source['signed_at'])->utc() : null];
+                }
+            }
+        }
         $sheets['Import-Data Exceptions'] = [['Type', 'Employee profile ID', 'Session ID', 'Module ID', 'Source SHA-256', 'Page', 'Source row', 'Reason']];
         foreach ($snapshot['exceptions'] as $exception) {
             $sheets['Import-Data Exceptions'][] = [$exception['type'], $exception['employee_profile_id'], $exception['session_id'],
@@ -135,10 +152,12 @@ final class TrainingMatrixExportService
                 $address = Coordinate::stringFromColumnIndex($columnIndex + 1).($rowIndex + 1);
                 if ($value instanceof \DateTimeInterface) {
                     $sheet->setCellValueExplicit($address, Date::dateTimeToExcel($value), DataType::TYPE_NUMERIC);
-                    $sheet->getStyle($address)->getNumberFormat()->setFormatCode($sheet->getTitle() === 'Sessions' && $columnIndex === 3 ? 'yyyy-mm-dd hh:mm' : 'yyyy-mm-dd');
+                    $hasTime = ($sheet->getTitle() === 'Sessions' && $columnIndex === 3)
+                        || ($sheet->getTitle() === 'Attendance Evidence' && in_array($columnIndex, [7, 11, 14], true));
+                    $sheet->getStyle($address)->getNumberFormat()->setFormatCode($hasTime ? 'yyyy-mm-dd hh:mm' : 'yyyy-mm-dd');
                 } elseif (is_int($value) || is_float($value)) {
                     $sheet->setCellValueExplicit($address, $value, DataType::TYPE_NUMERIC);
-                    if ($columnIndex === 9 && $rowIndex > 0 && ! in_array($sheet->getTitle(), ['Overview', 'Sessions', 'Import-Data Exceptions'], true)) {
+                    if ($columnIndex === 9 && $rowIndex > 0 && ! in_array($sheet->getTitle(), ['Overview', 'Sessions', 'Import-Data Exceptions', 'Attendance Evidence'], true)) {
                         $sheet->getStyle($address)->getNumberFormat()->setFormatCode('0.0%');
                     }
                 } else {

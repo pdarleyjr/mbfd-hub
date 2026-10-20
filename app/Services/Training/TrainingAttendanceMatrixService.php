@@ -51,6 +51,8 @@ final class TrainingAttendanceMatrixService
             'held_on' => $session->held_on->toDateString(), 'starts_at' => $session->starts_at?->toIso8601String(),
             'location' => $session->location, 'status' => $session->status, 'source' => $session->attendance_source ?? 'digital',
         ])->all();
+        $moduleOrder = array_flip(array_column($modules, 'id'));
+        usort($sessions, static fn (array $left, array $right): int => ($moduleOrder[$left['module_id']] ?? PHP_INT_MAX) <=> ($moduleOrder[$right['module_id']] ?? PHP_INT_MAX));
         $sessionById = array_column($sessions, null, 'id');
         $sessionsByModule = collect($sessions)->groupBy('module_id');
         $entries = [];
@@ -65,6 +67,7 @@ final class TrainingAttendanceMatrixService
             $entries[(int) $attendance->employee_profile_id][$session['id']][] = [
                 'status' => $status, 'source' => 'digital', 'attendance_id' => (int) $attendance->id,
                 'roster_status' => $session['status'], 'signed_at' => $attendance->signed_at->toIso8601String(),
+                'signature_signed_at' => ($attendance->signature_signed_at ?? $attendance->signed_at)->toIso8601String(),
                 'attendance_snapshot' => array_intersect_key($attendance->snapshot ?? [], array_flip(['rank', 'shift', 'assignment_id', 'as_of'])),
             ];
             if (! $valid) {
