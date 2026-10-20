@@ -11,7 +11,11 @@ export const mobileApparatus = [
 ] as const;
 
 /** Local authenticated-identity/API fixture; this does not prove production authentication. */
-export async function mobileInspectionFixture(page: Page, model: typeof mobileApparatus[number]) {
+export async function mobileInspectionFixture(
+  page: Page,
+  model: typeof mobileApparatus[number],
+  options: { fleetVehicles?: Array<{ vehicle_number: string; designation: string | null; role: string }> } = {},
+) {
   const checklist = JSON.parse(readFileSync(`storage/checklists/${model.checklistType}_checklist.json`, 'utf8'));
   const inspectionDate = '2026-09-21';
   const version = 'e'.repeat(64);
@@ -27,6 +31,7 @@ export async function mobileInspectionFixture(page: Page, model: typeof mobileAp
       personnel: { employee_profile_id: userId + 100, employee_number: `TEST-${userId + 100}`, name: userId === 401 ? 'Browser Member' : 'Other Browser Member', rank: 'Captain' },
       offline: { security_version: 1 }, session: { authenticated: true },
     } });
+    if (path === '/api/public/fleet-vehicles') return route.fulfill({ json: { vehicles: options.fleetVehicles ?? [] } });
     if (path === '/api/public/apparatuses') return route.fulfill({ json: [vehicle] });
     const contract = { inspection_date: inspectionDate, checklist_version: version, checklist_type: model.checklistType, checklist, due_tasks: [], open_findings: [] };
     if (path.endsWith('/checklist')) return route.fulfill({ json: contract });

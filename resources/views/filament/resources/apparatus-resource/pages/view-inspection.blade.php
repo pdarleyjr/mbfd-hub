@@ -131,7 +131,27 @@
         @endif
 
         {{-- Pending-review evidence has not changed apparatus readiness, defects, or meters. --}}
-        @if($inspection->review_status === 'pending_review')
+        @php($swapReport = $inspection->vehicleSwapRequest)
+        @if($swapReport)
+            <div class="hub-insp-card {{ $swapReport->isPending() ? 'hub-insp-card--warning' : '' }}" data-vehicle-swap-report>
+                <h3 class="hub-insp-card__title">Physical vehicle reported: {{ $swapReport->reported_vehicle_number }}</h3>
+                <p class="hub-insp-card__lead">
+                    @if($swapReport->isPending())
+                        The member reported a different vehicle than the one assigned to this unit ({{ $swapReport->assigned_vehicle_number ?: 'none recorded' }}). The findings below are on hold until Fleet decides it from Pending vehicle swaps.
+                    @else
+                        {{ \App\Models\ApparatusVehicleSwapRequest::statusLabel($swapReport->status) }}
+                        by {{ $swapReport->decidedBy?->name ?? 'Fleet' }}{{ $swapReport->decided_at ? ' on '.$swapReport->decided_at->format('M j, Y g:i A') : '' }}.
+                        The vehicle ID recorded at checkout was {{ $swapReport->assigned_vehicle_number ?: 'none' }}.
+                    @endif
+                </p>
+                <dl class="hub-insp-fields">
+                    <div><dt>Was a truck swap completed?</dt><dd>{{ \App\Models\ApparatusVehicleSwapRequest::answerLabel($swapReport->answer) }}</dd></div>
+                    <div><dt>Note from the member</dt><dd>{{ $swapReport->note ?: 'No note' }}</dd></div>
+                </dl>
+            </div>
+        @endif
+
+        @if($inspection->review_status === 'pending_review' && ! $inspection->isHeldForVehicleSwap())
             <div class="hub-insp-card hub-insp-card--warning">
                 <h3 class="hub-insp-card__title">Pending officer review</h3>
                 <p class="hub-insp-card__lead">

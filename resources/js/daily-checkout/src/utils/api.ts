@@ -4,7 +4,7 @@ import {
   StationInventorySubmission, InventorySubmissionItem, Shift,
   InventoryV2Response, SupplyRequest, UpdateItemRequest, CreateSupplyRequestRequest,
   StationInspectionSummary, FireEquipmentRequestSummary,
-  SingleGasMeterSummary, StationRequestSummary, ApparatusServiceTicketSummary, StationActivityEntry, RoomProfile,
+  SingleGasMeterSummary, StationRequestSummary, ApparatusServiceTicketSummary, StationActivityEntry, RoomProfile, FleetVehicle,
 } from '../types';
 
 const API_BASE = '/api';
@@ -176,6 +176,33 @@ export class ApiClient {
       throw new Error('Failed to fetch apparatuses');
     }
     return response.json();
+  }
+
+  /**
+   * Every physical vehicle ID (frontline and reserve) for the checkout's
+   * "confirm the physical vehicle" dropdown. The last good list is kept on
+   * this device so the dropdown still works offline; with neither, the caller
+   * falls back to the assigned vehicle plus "Not listed".
+   */
+  static async getFleetVehicles(): Promise<FleetVehicle[]> {
+    const cacheKey = 'mbfd.daily.fleetVehicles.v1';
+    const valid = (value: unknown): FleetVehicle[] => (Array.isArray(value) ? value : []).filter((entry): entry is FleetVehicle => (
+      typeof entry === 'object' && entry !== null && typeof (entry as FleetVehicle).vehicle_number === 'string' && (entry as FleetVehicle).vehicle_number !== ''
+    )).map((entry) => ({
+      vehicle_number: entry.vehicle_number,
+      designation: typeof entry.designation === 'string' ? entry.designation : null,
+      role: entry.role === 'reserve' || entry.role === 'out_of_service' ? entry.role : 'frontline',
+    }));
+    try {
+      const response = await fetchWithTimeout(`${API_BASE}/public/fleet-vehicles`, { headers: { ...DEFAULT_HEADERS } });
+      if (!response.ok) throw new Error('Failed to fetch fleet vehicles');
+      const vehicles = valid(((await response.json()) as { vehicles?: unknown }).vehicles);
+      try { localStorage.setItem(cacheKey, JSON.stringify(vehicles)); } catch { /* storage unavailable */ }
+
+      return vehicles;
+    } catch {
+      try { return valid(JSON.parse(localStorage.getItem(cacheKey) ?? '[]')); } catch { return []; }
+    }
   }
 
   static async getEmployees(): Promise<EmployeeOption[]> {

@@ -1,4 +1,5 @@
 import type { ChecklistData, ChecklistFieldValue, ChecklistItem, Compartment, MeterData, OfficerInfo, ScheduledChecklistTaskResult } from '../types';
+import { vehicleConfirmationComplete } from './vehicleConfirmation';
 
 export function itemIsComplete(item: ChecklistItem) {
   if (item.observed !== true) return false;
@@ -27,15 +28,17 @@ export function inspectionReadiness(checklist: ChecklistData | null, compartment
   }) ?? [];
   const missingDuties = checklist?.due_tasks.filter(task => !scheduledTasks.find(answer => answer.id === task.id)?.observed) ?? [];
   const missingShift = !['A', 'B', 'C'].includes(officer.shift);
+  // The physical vehicle must be confirmed (and any different vehicle explained) before submitting.
+  const missingVehicle = !vehicleConfirmationComplete(officer.vehicleConfirmation);
   const maxMiles = checklist?.fields.some(field => field.id === 'mileage') ? 999999999 : 2147483647;
   const invalidMeters = (meters.engine_hours !== null && (!Number.isFinite(meters.engine_hours) || meters.engine_hours < 0 || meters.engine_hours > 9999999.9 || !/^\d+(\.\d)?$/.test(String(meters.engine_hours))))
     || (meters.miles !== null && (!Number.isInteger(meters.miles) || meters.miles < 0 || meters.miles > maxMiles));
   const nextStep = equipment.remaining > 0 || equipment.total === 0 ? 'compartments'
     : missingFields.length > 0 || missingDuties.length > 0 ? 'details'
-    : missingShift ? 'officer' : invalidMeters ? 'meter' : 'submit';
+    : missingShift || missingVehicle ? 'officer' : invalidMeters ? 'meter' : 'submit';
   const label = nextStep === 'compartments' ? `${equipment.remaining} ${equipment.remaining === 1 ? 'item' : 'items'} remaining`
     : nextStep === 'details' ? 'Continue: Required details'
-    : nextStep === 'officer' ? 'Continue: Shift'
+    : nextStep === 'officer' ? (missingVehicle ? (missingShift ? 'Continue: Vehicle & Shift' : 'Continue: Vehicle') : 'Continue: Shift')
     : nextStep === 'meter' ? 'Continue: Readings' : 'Review & Sign';
-  return { equipment, missingFields, missingDuties, missingShift, invalidMeters, nextStep, label, ready: nextStep === 'submit' } as const;
+  return { equipment, missingFields, missingDuties, missingShift, missingVehicle, invalidMeters, nextStep, label, ready: nextStep === 'submit' } as const;
 }

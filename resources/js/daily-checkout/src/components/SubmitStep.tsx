@@ -3,6 +3,7 @@ import SignatureCanvas from 'react-signature-canvas';
 import type { OfficerInfo, Compartment, ChecklistData, ChecklistFieldValue, MeterData, ScheduledChecklistTaskResult } from '../types';
 import { ArrowLeft, Send, TriangleAlert, Undo2 } from 'lucide-react';
 import { inspectionProgress } from '../utils/inspectionProgress';
+import { isVehicleMismatch, reportedVehicle } from '../utils/vehicleConfirmation';
 import './inspection-workspace.css';
 
 interface SubmitStepProps {
@@ -60,6 +61,7 @@ export default function SubmitStep({
   }, []);
 
   const { total: totalItems, issues: issuesCount } = inspectionProgress(compartments);
+  const vehicle = officerInfo.vehicleConfirmation;
 
   const handleSubmit = () => {
     if (!officerInfo.shift) return;
@@ -99,7 +101,12 @@ export default function SubmitStep({
           </div>
           <div>
             <p className={LABEL}>Physical vehicle</p>
-            <p className="font-medium tabular-nums">{officerInfo.unitNumber}</p>
+            <p className="font-medium tabular-nums">{vehicle ? reportedVehicle(vehicle) || officerInfo.unitNumber : officerInfo.unitNumber}</p>
+            {vehicle && isVehicleMismatch(vehicle) && (
+              <p data-vehicle-swap-summary className="mt-1 text-sm text-hub-ink">
+                Assigned {vehicle.assignedVehicle || 'none recorded'}. Fleet reviews this possible swap before the findings are applied.
+              </p>
+            )}
           </div>
         </div>
 

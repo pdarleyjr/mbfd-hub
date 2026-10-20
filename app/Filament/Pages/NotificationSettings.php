@@ -38,12 +38,15 @@ class NotificationSettings extends Page implements HasForms
 
         if ($user instanceof User) {
             UserNotificationSubscription::ensurePersonnelRequestsForUser($user);
+            if ($user->canManageFleetSwaps()) {
+                UserNotificationSubscription::ensureVehicleSwapForUser((int) $user->id);
+            }
         }
 
         $subscriptions = $user instanceof User
             ? $user->notificationSubscriptions()->get()->keyBy('event_key')
             : collect();
-        $state = collect(array_keys(User::notificationPreferenceDefinitions()))
+        $state = collect($user instanceof User ? $user->visibleNotificationPreferenceKeys() : [])
             ->mapWithKeys(function (string $key) use ($subscriptions): array {
                 $subscription = $subscriptions->get($key);
 
@@ -66,7 +69,9 @@ class NotificationSettings extends Page implements HasForms
 
     public function form(Form $form): Form
     {
-        $definitions = User::notificationPreferenceDefinitions();
+        $user = Auth::user();
+        $visible = $user instanceof User ? $user->visibleNotificationPreferenceKeys() : [];
+        $definitions = collect(User::notificationPreferenceDefinitions())->only($visible)->all();
 
         return $form
             ->schema([
@@ -94,7 +99,7 @@ class NotificationSettings extends Page implements HasForms
 
         $data = $this->form->getState();
 
-        foreach (array_keys(User::notificationPreferenceDefinitions()) as $key) {
+        foreach ($user->visibleNotificationPreferenceKeys() as $key) {
             $channels = (array) ($data[$key] ?? []);
             $user->notificationSubscriptions()->updateOrCreate(['event_key' => $key], [
                 'database_enabled' => $key === User::NOTIFICATION_PREFERENCE_MEMBER_REQUEST_UPDATES || (bool) ($channels['database'] ?? false),

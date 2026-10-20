@@ -20,7 +20,7 @@
             <div class="mt-6 grid gap-4 border-t border-hub-border pt-5 text-sm text-hub-muted sm:grid-cols-3 sm:gap-6">
                 <div class="space-y-1">
                     <p class="text-xs font-semibold uppercase tracking-[0.16em] text-hub-muted">Default behavior</p>
-                    <p>Email starts off. Existing in-app and push recipients were preserved during migration.</p>
+                    <p>Email starts off, except Vehicle swap reported, which starts on for Fleet managers. Existing in-app and push recipients were preserved during migration.</p>
                 </div>
                 <div class="space-y-1">
                     <p class="text-xs font-semibold uppercase tracking-[0.16em] text-hub-muted">Device subscriptions</p>

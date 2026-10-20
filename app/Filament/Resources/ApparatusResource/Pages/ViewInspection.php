@@ -65,6 +65,7 @@ class ViewInspection extends Page
                         ->default(fn (): bool => $this->reportsCriticalDefects()),
                 ])
                 ->visible(fn (): bool => $this->inspection->review_status === 'pending_review'
+                    && ! $this->inspection->isHeldForVehicleSwap()
                     && $this->canApproveInspection())
                 ->action(function (array $data, ApparatusInspectionApprovalService $approvalService): void {
                     $reviewer = auth()->user();
@@ -96,6 +97,7 @@ class ViewInspection extends Page
                         ->rows(4),
                 ])
                 ->visible(fn (): bool => $this->inspection->review_status === 'pending_review'
+                    && ! $this->inspection->isHeldForVehicleSwap()
                     && $this->canRejectInspection())
                 ->action(function (array $data, ApparatusInspectionApprovalService $approvalService): void {
                     $reviewer = auth()->user();

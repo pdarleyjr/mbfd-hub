@@ -181,6 +181,7 @@ final class EmployeeInspectionHistoryService
         return match ($status) {
             'accepted' => 'Accepted',
             'accepted_with_exception' => 'Accepted, meter reading flagged',
+            'pending_vehicle_swap' => 'Saved, waiting for Fleet to confirm the vehicle',
             default => 'Submitted',
         };
     }

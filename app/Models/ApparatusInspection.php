@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use LogicException;
 
 class ApparatusInspection extends Model
@@ -67,6 +68,7 @@ class ApparatusInspection extends Model
         return match ($this->processing_status) {
             'accepted' => 'Accepted',
             'accepted_with_exception' => 'Follow-up needed',
+            'pending_vehicle_swap' => 'Held: vehicle swap',
             default => match ($this->review_status) {
                 'pending_review' => 'Pending review',
                 'approved' => 'Approved',
@@ -89,6 +91,17 @@ class ApparatusInspection extends Model
     public function actorUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'actor_user_id');
+    }
+
+    /** @return HasOne<ApparatusVehicleSwapRequest, $this> */
+    public function vehicleSwapRequest(): HasOne
+    {
+        return $this->hasOne(ApparatusVehicleSwapRequest::class);
+    }
+
+    public function isHeldForVehicleSwap(): bool
+    {
+        return $this->processing_status === 'pending_vehicle_swap';
     }
 
     public function defects(): HasMany
