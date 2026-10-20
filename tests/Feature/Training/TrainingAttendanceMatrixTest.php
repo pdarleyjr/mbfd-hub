@@ -176,6 +176,19 @@ final class TrainingAttendanceMatrixTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_numbered_float_keeps_published_shift_and_floating_status_without_guessing_division_from_a_suffix(): void
+    {
+        $employee = $this->employee('FLOAT');
+        $this->assignment($employee, ['unit_label' => 'Float 2', 'bid_selection_label' => 'Float 2', 'position_label' => 'Firefighter #2 (R)']);
+        $row = $this->snapshot(['floating' => true])['rows'][0];
+        self::assertSame('B Shift', $row['shift']);
+        self::assertTrue($row['assignment_verified']);
+        self::assertTrue($row['is_floating']);
+        self::assertSame('unverified', $row['assignment_category']);
+        self::assertTrue($row['has_review']);
+        self::assertCount(0, $this->snapshot(['assignment' => 'rescue'])['rows']);
+    }
+
     public function test_paper_review_provenance_is_required_and_inactive_attendees_remain_exceptions(): void
     {
         $employee = $this->employee('NO_REVIEW');

@@ -57,14 +57,14 @@ final class TrainingAttendanceMatrixService
         $exceptions = [];
         foreach (TrainingAttendance::query()->whereIn('training_session_id', array_keys($sessionById))->whereNull('voided_at')->get() as $attendance) {
             $session = $sessionById[$attendance->training_session_id];
-            $signature = $attendance->signature;
+            $signature = $attendance->getAttribute('signature');
             $valid = is_array($signature) && filled($signature['disk'] ?? null) && filled($signature['path'] ?? null)
                 && in_array($signature['mime'] ?? null, ['image/png', 'image/jpeg'], true)
-                && preg_match('/^[a-f0-9]{64}$/D', (string) ($signature['sha256'] ?? '')) && $attendance->signed_at !== null;
+                && preg_match('/^[a-f0-9]{64}$/D', (string) ($signature['sha256'] ?? ''));
             $status = ! $valid ? 'review' : (in_array($session['status'], ['submitted', 'certified'], true) ? 'digital' : 'provisional');
             $entries[(int) $attendance->employee_profile_id][$session['id']][] = [
                 'status' => $status, 'source' => 'digital', 'attendance_id' => (int) $attendance->id,
-                'roster_status' => $session['status'], 'signed_at' => $attendance->signed_at?->toIso8601String(),
+                'roster_status' => $session['status'], 'signed_at' => $attendance->signed_at->toIso8601String(),
                 'attendance_snapshot' => array_intersect_key($attendance->snapshot ?? [], array_flip(['rank', 'shift', 'assignment_id', 'as_of'])),
             ];
             if (! $valid) {
@@ -140,9 +140,9 @@ final class TrainingAttendanceMatrixService
                 }
                 $row['module_cells'][$module['id']] = $cell;
             }
-            if (! $person['assignment_verified']) {
+            if (! $person['assignment_verified'] || $person['assignment_category'] === 'unverified') {
                 $exceptions[] = ['type' => 'assignment_unverified', 'session_id' => null, 'module_id' => null,
-                    'employee_profile_id' => $person['employee_profile_id'], 'reason' => 'Current published assignment could not be verified.'];
+                    'employee_profile_id' => $person['employee_profile_id'], 'reason' => 'Current published assignment or its personnel category needs review.'];
             }
             $rows[] = $row;
         }
@@ -191,7 +191,7 @@ final class TrainingAttendanceMatrixService
             $row['percent'] = $required === 0 ? null : round($covered / $required * 100, 1);
             $row['status'] = $required === 0 ? 'not_applicable' : ($covered === $required ? 'all' : ($covered === 0 ? 'none' : 'partial'));
             $row['has_provisional'] = in_array('provisional', $statuses, true);
-            $row['has_review'] = ! $row['assignment_verified'] || in_array('review', $statuses, true);
+            $row['has_review'] = ! $row['assignment_verified'] || $row['assignment_category'] === 'unverified' || in_array('review', $statuses, true);
             if ($this->matches($row, $filters)) {
                 $rows[] = $row;
             }

@@ -29,6 +29,12 @@ final class TrainingPersonnelClassificationService
                 $verified = $assignment !== null && $this->valid($assignment);
                 $fields = $verified ? $assignment->getAttributes() : [];
                 $classification = $this->uniforms->classify($fields);
+                $category = $verified ? $classification['profile'] : 'unverified';
+                $selection = trim((string) ($fields['bid_selection_label'] ?? $fields['unit_label'] ?? ''));
+                // Float 2 seat suffixes do not establish Rescue/Combat without an authoritative mapping.
+                if ($category === 'day_other' && preg_match('/^Float\s*\d+$/iD', $selection)) {
+                    $category = 'unverified';
+                }
                 $rank = trim((string) $employee->rank);
                 $rank = match (mb_strtolower($rank)) {
                     'captain' => 'Captain', 'lieutenant' => 'Lieutenant', 'firefighter' => 'Firefighter', default => $rank,
@@ -39,12 +45,13 @@ final class TrainingPersonnelClassificationService
                     'name' => (string) $employee->name, 'rank' => $rank,
                     'shift' => $fields['shift_label'] ?? null,
                     'assignment' => $fields['bid_selection_label'] ?? 'Assignment unverified',
-                    'assignment_category' => $verified ? $classification['profile'] : 'unverified',
+                    'assignment_category' => $category,
                     'assignment_verified' => $verified,
                     // The actual published seat is "Firefighter DE #2", not the rank or a certification.
                     'is_de_bid' => $verified && $rank === 'Firefighter' && $fields['assignment_source'] === 'bid_award'
                         && (bool) preg_match('/^(?:Firefighter\s+)?(?:DE|Driver\s+Engineer)(?:\s*#\s*\d+)?$/iD', trim((string) ($fields['position_label'] ?? ''))),
-                    'is_floating' => $verified && ($fields['assignment_type'] ?? null) === 'Floating',
+                    'is_floating' => $verified && (($fields['assignment_type'] ?? null) === 'Floating'
+                        || (bool) preg_match('/\bFloat(?:ing)?\b/i', $selection)),
                     'term_label' => $fields['term_label'] ?? null, 'bid_year' => $fields['bid_year'] ?? null,
                     'assignment_as_of' => $asOf,
                 ];
