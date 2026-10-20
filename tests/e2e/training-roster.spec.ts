@@ -109,8 +109,12 @@ test('modular catalog requires an explicit dated delivery and filters modules', 
     await page.goto('/');
     await expect(page.getByRole('button', { name: /Start today/ })).toHaveCount(0);
     await expect(page.getByRole('button', { name: /Open roster/ })).toHaveCount(2);
-    await expect(page.getByText(/9:00 AM EDT/)).toBeVisible();
-    await expect(page.getByText(/1:00 PM EDT/)).toBeVisible();
+    const aerialDelivery = page.locator('.session-list > li').filter({ has: page.getByText('Module 1 — Aerial', { exact: true }) });
+    const pumpDelivery = page.locator('.session-list > li').filter({ has: page.getByText('Module 2 — Pump', { exact: true }) });
+    await expect(aerialDelivery).toHaveCount(1);
+    await expect(pumpDelivery).toHaveCount(1);
+    await expect(aerialDelivery.getByText('Tuesday, October 20, 2026 · 9:00 AM EDT', { exact: true })).toBeVisible();
+    await expect(pumpDelivery.getByText('Tuesday, October 20, 2026 · 1:00 PM EDT', { exact: true })).toBeVisible();
     await page.getByLabel('Module', { exact: true }).selectOption('20');
     await expect(page.getByRole('button', { name: /Open roster/ })).toHaveCount(1);
     await expect(page.getByText('South classroom · Session 1 · Managed by training staff')).toBeVisible();
