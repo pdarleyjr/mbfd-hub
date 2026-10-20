@@ -26,6 +26,7 @@ return new class extends Migration
             $table->string('importer_version', 40);
             $table->foreignId('imported_by')->constrained('users')->restrictOnDelete();
             $table->timestampTz('imported_at');
+            $table->unique(['id', 'training_session_id'], 'paper_import_session_identity');
         });
         Schema::create('training_paper_attendances', function (Blueprint $table): void {
             $table->id();
@@ -44,6 +45,8 @@ return new class extends Migration
             $table->timestampsTz();
             $table->unique(['training_paper_roster_import_id', 'source_page', 'source_row'], 'paper_source_location_unique');
             $table->unique(['training_session_id', 'employee_profile_id'], 'paper_session_employee_unique');
+            $table->foreign(['training_paper_roster_import_id', 'training_session_id'], 'paper_entry_import_session_fk')
+                ->references(['id', 'training_session_id'])->on('training_paper_roster_imports')->restrictOnDelete();
         });
         Schema::create('training_paper_review_audits', function (Blueprint $table): void {
             $table->id();

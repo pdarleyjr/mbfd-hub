@@ -85,6 +85,37 @@ def reconcile(transcription: dict, canonical: dict) -> dict:
     return {"identity_approval": "NOT_PERFORMED", "rows": result}
 
 
+def build_manifest(source_inventory: dict, reviewed: dict, source_dir: Path,
+                   course_id: int, module_id: int, reviewer_id: int) -> dict:
+    if min(course_id, module_id, reviewer_id) < 1:
+        raise ValueError("Confirmed positive course, module and reviewer IDs required")
+    sources = source_inventory.get("documents", source_inventory.get("source_files", []))
+    documents = []
+    for source in sources:
+        filename = source["source_filename"]
+        if filename not in EXPECTED:
+            raise ValueError("Unexpected source document")
+        day = next(day for day in ("13", "14", "15") if f"Oct {day}.pdf" in filename)
+        rows = []
+        for observed in reviewed["rows"]:
+            if observed["day"] != day:
+                continue
+            row = {key: observed[key] for key in ["page", "row", "raw_transcription", "evidence_present",
+                                                   "review_status", "employee_profile_id", "identity_confirmed", "review_reason"]}
+            row["raw_transcription"] += " | written date: " + str(observed.get("written_date", "unreadable"))
+            if row["review_status"] == "approved" and (not row["identity_confirmed"] or not row["employee_profile_id"] or not row["evidence_present"]):
+                raise ValueError("Unconfirmed approval in reviewed ledger")
+            rows.append(row)
+        documents.append({"source_path": str(source_dir / filename), "source_filename": filename,
+                          "source_sha256": source.get("source_sha256", source.get("pdf_sha256")),
+                          "page_count": source["page_count"], "held_on": f"2026-10-{day}",
+                          "course_id": course_id, "module_id": module_id, "rows": rows})
+    if len(documents) != 3:
+        raise ValueError("All three sources are required")
+    return {"schema_version": 1, "archive_sha256": source_inventory["archive_sha256"],
+            "reviewer_id": reviewer_id, "documents": documents}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="operation", required=True)
@@ -93,15 +124,27 @@ def main() -> int:
     match = sub.add_parser("reconcile")
     match.add_argument("--transcription", required=True, type=Path)
     match.add_argument("--employees", required=True, type=Path)
+    manifest = sub.add_parser("manifest")
+    manifest.add_argument("--inventory", required=True, type=Path)
+    manifest.add_argument("--reviewed", required=True, type=Path)
+    manifest.add_argument("--source-dir", required=True, type=Path)
+    manifest.add_argument("--course-id", required=True, type=int)
+    manifest.add_argument("--module-id", required=True, type=int)
+    manifest.add_argument("--reviewer-id", required=True, type=int)
     parser.add_argument("--out", required=True, type=Path)
     args = parser.parse_args()
     try:
         if not args.out.parent.is_dir() or args.out.exists():
             raise ValueError("A private existing output directory and new filename are required")
-        result = inventory(args.archive) if args.operation == "inventory" else reconcile(
-            json.loads(args.transcription.read_text(encoding="utf-8-sig")),
-            json.loads(args.employees.read_text(encoding="utf-8-sig")),
-        )
+        if args.operation == "inventory":
+            result = inventory(args.archive)
+        elif args.operation == "reconcile":
+            result = reconcile(json.loads(args.transcription.read_text(encoding="utf-8-sig")),
+                               json.loads(args.employees.read_text(encoding="utf-8-sig")))
+        else:
+            result = build_manifest(json.loads(args.inventory.read_text(encoding="utf-8-sig")),
+                                    json.loads(args.reviewed.read_text(encoding="utf-8-sig")), args.source_dir,
+                                    args.course_id, args.module_id, args.reviewer_id)
         with args.out.open("x", encoding="utf-8") as output:
             json.dump(result, output, indent=2)
         print(json.dumps({"operation": args.operation, "status": "PASS", "documents": len(result.get("documents", [])),

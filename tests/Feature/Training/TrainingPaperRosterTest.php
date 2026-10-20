@@ -188,6 +188,18 @@ final class TrainingPaperRosterTest extends TestCase
         self::assertSame(1, app(TrainingPaperRosterService::class)->importManifest($manifest, $this->reviewer)['approved']);
     }
 
+    public function test_database_rejects_entry_linked_to_a_different_import_session(): void
+    {
+        app(TrainingPaperRosterService::class)->importManifest($this->manifest, $this->reviewer, true);
+        $session = TrainingSession::query()->firstOrFail();
+        $other = $session->replicate()->forceFill(['public_id' => (string) \Illuminate\Support\Str::ulid()]);
+        $other->save();
+        $entry = TrainingPaperAttendance::query()->firstOrFail()->replicate();
+        $entry->forceFill(['training_session_id' => $other->id, 'source_row' => 'wrong-session']);
+        $this->expectException(\Illuminate\Database\QueryException::class);
+        $entry->save();
+    }
+
     public function test_private_original_requires_training_role_and_rejects_tampering(): void
     {
         $service = app(TrainingPaperRosterService::class);

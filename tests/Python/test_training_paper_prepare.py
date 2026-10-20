@@ -85,6 +85,21 @@ class PreparationTest(unittest.TestCase):
         self.assertTrue(all(row["review_status"] == "pending" for row in result["rows"]))
         self.assertTrue(all(row["employee_profile_id"] is None for row in result["rows"]))
 
+    def test_manifest_uses_only_reviewed_rows_and_explicit_authority(self):
+        sources = {"archive_sha256": "a" * 64, "documents": [
+            {"source_filename": name, "source_sha256": str(index) * 64, "page_count": 2}
+            for index, name in enumerate(sorted(PREPARE.EXPECTED), 1)]}
+        rows = [{"day": day, "page": 2, "row": "addendum-1", "raw_transcription": "Synthetic Member",
+                 "evidence_present": True, "review_status": "pending", "employee_profile_id": None,
+                 "identity_confirmed": False, "review_reason": "Review needed", "candidate_employee_ids": [99]}
+                for day in ("13", "14", "15")]
+        result = PREPARE.build_manifest(sources, {"rows": rows}, Path("private"), 6, 2, 3)
+        self.assertEqual(3, len(result["documents"]))
+        self.assertNotIn("candidate_employee_ids", result["documents"][0]["rows"][0])
+        self.assertIsNone(result["documents"][0]["rows"][0]["employee_profile_id"])
+        with self.assertRaises(ValueError):
+            PREPARE.build_manifest(sources, {"rows": rows}, Path("private"), 6, 0, 3)
+
 
 if __name__ == "__main__":
     unittest.main()
