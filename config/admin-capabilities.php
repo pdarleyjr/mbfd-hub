@@ -9,6 +9,7 @@ return [
         App\Models\ApparatusDefect::class => 'admin.fleet',
         App\Models\ApparatusDefectRecommendation::class => 'admin.fleet',
         App\Models\ApparatusInspection::class => 'admin.fleet',
+        App\Models\ApparatusInspectionException::class => 'admin.fleet',
         App\Models\ApparatusServiceTicket::class => 'admin.fleet',
         App\Models\ApparatusVehicleSwapRequest::class => 'admin.fleet',
         App\Models\HubSupportTicket::class => 'admin.support',

@@ -147,10 +147,37 @@ final class FleetOperationsManagerRoleTest extends TestCase
     {
         $this->withoutVite();
         $this->actingAsCanonicalFixture('FLEET-ORDINARY');
-        $this->get('/')->assertOk()->assertDontSee('Fleet operations');
+        $this->get('/')->assertOk()->assertDontSee('Fleet operations')->assertDontSee(url('/admin/apparatuses'), false);
+        $this->get('/admin/apparatuses')->assertForbidden();
 
         $manager = $this->actingAsCanonicalFixture('FLEET-HOME');
         app(FleetOperationsManagerAssignment::class)->apply($this->superAdmin(), $manager, true, 'fleet duties');
+        $this->get('/')->assertOk()->assertSee('Fleet operations')->assertSee(url('/admin/apparatuses'), false);
+    }
+
+    public function test_the_legacy_admin_role_alone_opens_no_fleet_page(): void
+    {
+        $member = $this->member('FLEET-LEGACY-ADMIN');
+        $member->assignRole(Role::findOrCreate('admin', 'web'));
+        $member->givePermissionTo(Permission::findOrCreate('admin.access', 'web'), Permission::findOrCreate('admin.stations.manage', 'web'));
+
+        self::assertFalse($member->can('viewAny', Apparatus::class));
+        self::assertFalse($member->can('viewAny', ApparatusInspectionException::class));
+    }
+
+    public function test_home_shows_fleet_operations_only_to_super_admins_and_the_fleet_manage_toggle(): void
+    {
+        $this->withoutVite();
+        $viewer = $this->actingAsCanonicalFixture('FLEET-VIEW-ONLY');
+        $viewer->givePermissionTo(Permission::findOrCreate('admin.access', 'web'), Permission::findOrCreate('admin.fleet.view', 'web'));
+        $this->get('/')->assertOk()->assertDontSee('Fleet operations')->assertDontSee(url('/admin/apparatuses'), false);
+
+        $manager = $this->actingAsCanonicalFixture('FLEET-MANAGE-TOGGLE');
+        $manager->givePermissionTo(Permission::findOrCreate('admin.access', 'web'), Permission::findOrCreate('admin.fleet.view', 'web'), Permission::findOrCreate('admin.fleet.manage', 'web'));
+        $this->get('/')->assertOk()->assertSee('Fleet operations')->assertSee(url('/admin/apparatuses'), false);
+
+        $super = $this->actingAsCanonicalFixture('FLEET-HOME-SUPER');
+        $super->assignRole(Role::findOrCreate('super_admin', 'web'));
         $this->get('/')->assertOk()->assertSee('Fleet operations')->assertSee(url('/admin/apparatuses'), false);
     }
 
