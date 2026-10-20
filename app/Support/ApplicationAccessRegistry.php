@@ -76,6 +76,7 @@ final class ApplicationAccessRegistry
         $options['files.manage'] = 'Policy library — manage';
         $options['training.rosters.submit'] = 'Training rosters — submit (requires Hub administration access)';
         $options['app.media_control.media'] = 'Media Control — upload and manage media';
+        $options['app.cmd.admin'] = 'Command Board — set and change the command PIN (requires Hub administration access)';
 
         return $options;
     }
