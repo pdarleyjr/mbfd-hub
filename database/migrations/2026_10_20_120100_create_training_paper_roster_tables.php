@@ -37,6 +37,7 @@ return new class extends Migration
             $table->text('raw_transcription');
             $table->boolean('evidence_present');
             $table->string('review_status', 16)->default('pending')->index();
+            $table->unsignedInteger('review_version')->default(1);
             $table->foreignId('reviewed_by')->nullable()->constrained('users')->restrictOnDelete();
             $table->timestampTz('reviewed_at')->nullable();
             $table->text('reason')->nullable();

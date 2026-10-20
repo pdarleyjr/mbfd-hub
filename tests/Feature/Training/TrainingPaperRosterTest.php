@@ -141,15 +141,15 @@ final class TrainingPaperRosterTest extends TestCase
         $service->importManifest($this->manifest, $this->reviewer, true);
         $entry = TrainingPaperAttendance::query()->where('review_status', 'approved')->firstOrFail();
         $raw = $entry->raw_transcription;
-        $service->review($entry, $this->reviewer, 'voided', null, 'Synthetic wrong match');
+        $service->review($entry, $this->reviewer, 'voided', null, 'Synthetic wrong match', 1);
         self::assertNull($entry->fresh()->employee_profile_id);
         self::assertSame('voided', $entry->fresh()->review_status);
-        $service->review($entry, $this->reviewer, 'approved', $this->employee->id, 'Synthetic evidence rechecked');
+        $service->review($entry, $this->reviewer, 'approved', $this->employee->id, 'Synthetic evidence rechecked', 2);
         self::assertSame($raw, $entry->fresh()->raw_transcription);
         self::assertSame(3, $entry->audits()->count());
         $unsigned = TrainingPaperAttendance::query()->where('review_status', 'pending')->firstOrFail();
         $this->expectException(ValidationException::class);
-        $service->review($unsigned, $this->reviewer, 'approved', $this->employee->id, 'Cannot invent ink');
+        $service->review($unsigned, $this->reviewer, 'approved', $this->employee->id, 'Cannot invent ink', 1);
     }
 
     public function test_changed_manifest_cannot_silently_rewrite_import(): void
@@ -160,6 +160,32 @@ final class TrainingPaperRosterTest extends TestCase
         $changed['documents'][0]['rows'][0]['raw_transcription'] = 'Changed source claim';
         $this->expectException(ValidationException::class);
         $service->importManifest($changed, $this->reviewer, true);
+    }
+
+    public function test_stale_review_cannot_overwrite_a_newer_decision(): void
+    {
+        $service = app(TrainingPaperRosterService::class);
+        $service->importManifest($this->manifest, $this->reviewer, true);
+        $entry = TrainingPaperAttendance::query()->where('review_status', 'approved')->firstOrFail();
+        $service->review($entry, $this->reviewer, 'voided', null, 'First reviewer correction', 1);
+        try {
+            $service->review($entry, $this->reviewer, 'approved', $this->employee->id, 'Stale second review', 1);
+            self::fail('Stale review overwrote a decision');
+        } catch (ValidationException) {
+            self::assertSame('voided', $entry->fresh()->review_status);
+            self::assertSame(2, $entry->fresh()->review_version);
+            self::assertSame(2, $entry->audits()->count());
+        }
+    }
+
+    public function test_validated_json_numeric_and_boolean_strings_are_normalized(): void
+    {
+        $manifest = $this->manifest;
+        $manifest['documents'][0]['page_count'] = '1';
+        $manifest['documents'][0]['rows'][0]['employee_profile_id'] = (string) $this->employee->id;
+        $manifest['documents'][0]['rows'][0]['identity_confirmed'] = '1';
+        $manifest['documents'][0]['rows'][0]['evidence_present'] = '1';
+        self::assertSame(1, app(TrainingPaperRosterService::class)->importManifest($manifest, $this->reviewer)['approved']);
     }
 
     public function test_private_original_requires_training_role_and_rejects_tampering(): void

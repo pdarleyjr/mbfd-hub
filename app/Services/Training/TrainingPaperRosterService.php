@@ -57,6 +57,19 @@ final class TrainingPaperRosterService
             'documents.*.rows.*.identity_confirmed' => ['required', 'boolean'],
             'documents.*.rows.*.review_reason' => ['required', 'string', 'max:4000'],
         ])->validate();
+        foreach ($manifest['documents'] as &$document) {
+            foreach (['course_id', 'module_id', 'page_count'] as $field) {
+                $document[$field] = (int) $document[$field];
+            }
+            foreach ($document['rows'] as &$row) {
+                $row['page'] = (int) $row['page'];
+                $row['employee_profile_id'] = isset($row['employee_profile_id']) ? (int) $row['employee_profile_id'] : null;
+                $row['evidence_present'] = (bool) $row['evidence_present'];
+                $row['identity_confirmed'] = (bool) $row['identity_confirmed'];
+            }
+            unset($row);
+        }
+        unset($document);
         $digest = hash('sha256', json_encode($manifest, JSON_THROW_ON_ERROR));
 
         return DB::transaction(function () use ($manifest, $reviewer, $apply, $digest): array {
@@ -140,16 +153,17 @@ final class TrainingPaperRosterService
         }, 3);
     }
 
-    public function review(TrainingPaperAttendance $entry, User $actor, string $decision, ?int $employeeProfileId, string $reason): TrainingPaperAttendance
+    public function review(TrainingPaperAttendance $entry, User $actor, string $decision, ?int $employeeProfileId, string $reason, int $expectedVersion): TrainingPaperAttendance
     {
         $this->authorize($actor);
         Validator::make(['decision' => $decision, 'reason' => $reason], [
             'decision' => ['required', Rule::in(['approved', 'excluded', 'voided'])], 'reason' => ['required', 'string', 'max:4000'],
         ])->validate();
 
-        return DB::transaction(function () use ($entry, $actor, $decision, $employeeProfileId, $reason): TrainingPaperAttendance {
+        return DB::transaction(function () use ($entry, $actor, $decision, $employeeProfileId, $reason, $expectedVersion): TrainingPaperAttendance {
             TrainingSession::query()->whereKey($entry->training_session_id)->lockForUpdate()->firstOrFail();
             $entry = TrainingPaperAttendance::query()->lockForUpdate()->findOrFail($entry->id);
+            $this->check($entry->review_version === $expectedVersion, 'This entry was reviewed elsewhere. Reload it before deciding.');
             $this->authorize($actor);
             $this->sourceBytes($entry->sourceImport, $actor);
             $this->validateDecision($decision, $employeeProfileId, $entry->evidence_present, true);
@@ -157,8 +171,8 @@ final class TrainingPaperRosterService
                 $this->check(! TrainingPaperAttendance::query()->where('training_session_id', $entry->training_session_id)
                     ->where('employee_profile_id', $employeeProfileId)->whereKeyNot($entry->id)->exists(), 'That employee already has a paper entry for this session.');
             }
-            $before = $entry->only(['review_status', 'employee_profile_id', 'reviewed_by', 'reviewed_at', 'reason']);
-            $entry->update(['review_status' => $decision, 'employee_profile_id' => $decision === 'approved' ? $employeeProfileId : null,
+            $before = $entry->only(['review_status', 'review_version', 'employee_profile_id', 'reviewed_by', 'reviewed_at', 'reason']);
+            $entry->update(['review_status' => $decision, 'review_version' => $entry->review_version + 1, 'employee_profile_id' => $decision === 'approved' ? $employeeProfileId : null,
                 'reviewed_by' => $actor->id, 'reviewed_at' => now(), 'reason' => $reason]);
             $this->audit($entry, $actor, $before, $reason);
 
@@ -210,7 +224,7 @@ final class TrainingPaperRosterService
     {
         TrainingPaperReviewAudit::query()->create(['training_paper_attendance_id' => $entry->id,
             'actor_user_id' => $actor->id, 'before' => $before,
-            'after' => $entry->only(['review_status', 'employee_profile_id', 'reviewed_by', 'reviewed_at', 'reason']),
+            'after' => $entry->only(['review_status', 'review_version', 'employee_profile_id', 'reviewed_by', 'reviewed_at', 'reason']),
             'reason' => $reason, 'created_at' => now()]);
     }
 

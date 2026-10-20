@@ -15,7 +15,7 @@ final class TrainingPaperAttendance extends Model
 
     protected function casts(): array
     {
-        return ['evidence_present' => 'boolean', 'reviewed_at' => 'immutable_datetime'];
+        return ['evidence_present' => 'boolean', 'reviewed_at' => 'immutable_datetime', 'review_version' => 'integer'];
     }
 
     protected static function booted(): void
