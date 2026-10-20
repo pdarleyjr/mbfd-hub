@@ -7,6 +7,7 @@ namespace Tests\Integration;
 use App\Models\Employee;
 use App\Models\Training\TrainingAttendance;
 use App\Models\Training\TrainingCourse;
+use App\Models\Training\TrainingModule;
 use App\Models\Training\TrainingSession;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -177,7 +178,76 @@ final class TrainingRosterPostgresConcurrencyTest extends TestCase
         }
     }
 
-    private function publicStarter(TrainingCourse $course, string $application): Process
+    public function test_concurrent_explicit_starts_preserve_separate_same_day_module_deliveries(): void
+    {
+        if (getenv('MBFD_ALLOW_DISPOSABLE_POSTGRES') !== '1' || DB::connection()->getDriverName() !== 'pgsql') {
+            $this->markTestSkipped('Requires the explicitly configured disposable PostgreSQL database.');
+        }
+        self::assertTrue(app()->environment('testing'));
+        self::assertSame('127.0.0.1', DB::connection()->getConfig('host'));
+        self::assertMatchesRegularExpression('/^mbfd_hub_test_[a-z0-9_]+$/', DB::connection()->getDatabaseName());
+        $suffix = bin2hex(random_bytes(6));
+        $user = User::factory()->create();
+        $course = TrainingCourse::query()->create(['name' => 'Synthetic module race '.$suffix, 'classifications' => ['EMS Training'], 'created_by' => $user->id]);
+        $module = TrainingModule::query()->create(['training_course_id' => $course->id, 'name' => 'Synthetic module', 'created_by' => $user->id]);
+        $children = [];
+        $sessions = [];
+        $applications = ['training-module-'.$suffix.'-1', 'training-module-'.$suffix.'-2'];
+        try {
+            foreach ([9, 13] as $hour) {
+                $sessions[] = $course->sessions()->create(['public_id' => (string) Str::ulid(), 'training_module_id' => $module->id,
+                    'course_name' => $course->name, 'classifications' => $course->classifications,
+                    'held_on' => '2026-10-15', 'starts_at' => '2026-10-15 '.$hour.':00:00+00', 'status' => 'open', 'revision' => 1, 'created_by' => $user->id]);
+            }
+            DB::beginTransaction();
+            TrainingCourse::query()->whereKey($course->id)->lockForUpdate()->firstOrFail();
+            foreach ($applications as $index => $application) {
+                $children[] = $child = $this->publicStarter($course, $application, $sessions[$index]->public_id, $module->id);
+                $child->start();
+            }
+            $deadline = microtime(true) + 30;
+            do {
+                DB::select('select pg_stat_clear_snapshot()');
+                $blocked = DB::select('select application_name from pg_stat_activity where application_name in (?, ?) and wait_event_type = ?', [...$applications, 'Lock']);
+                if (count($blocked) === 2) {
+                    break;
+                }
+                foreach ($children as $child) {
+                    if (! $child->isRunning() || microtime(true) >= $deadline) {
+                        self::fail('Both selected-session starters must reach the course lock: '.$child->getErrorOutput());
+                    }
+                }
+                usleep(10_000);
+            } while (true);
+            DB::commit();
+            foreach ($children as $index => $child) {
+                $child->wait();
+                self::assertTrue($child->isSuccessful(), $child->getErrorOutput());
+                self::assertSame((string) $sessions[$index]->id, trim($child->getOutput()));
+            }
+            self::assertSame(2, $course->sessions()->count());
+            self::assertNotSame(trim($children[0]->getOutput()), trim($children[1]->getOutput()));
+            foreach ($sessions as $session) {
+                self::assertSame(0, $session->attendances()->count());
+                self::assertSame(1, $session->fresh()->revision);
+            }
+        } finally {
+            while (DB::transactionLevel() > 0) {
+                DB::rollBack();
+            }
+            foreach ($children as $child) {
+                if ($child->isRunning()) {
+                    $child->stop();
+                }
+            }
+            DB::table('training_sessions')->where('training_course_id', $course->id)->delete();
+            DB::table('training_modules')->where('id', $module->id)->delete();
+            DB::table('training_courses')->where('id', $course->id)->delete();
+            DB::table('users')->where('id', $user->id)->delete();
+        }
+    }
+
+    private function publicStarter(TrainingCourse $course, string $application, ?string $publicId = null, ?int $moduleId = null): Process
     {
         $script = <<<'PHP'
 require getcwd().'/tests/bootstrap.php';
@@ -188,11 +258,11 @@ if (! $app->environment('testing') || getenv('MBFD_ALLOW_DISPOSABLE_POSTGRES') !
 Illuminate\Support\Facades\DB::select("select set_config('application_name', ?, false)", [$argv[2]]);
 Illuminate\Support\Carbon::setTestNow(Carbon\CarbonImmutable::parse('2026-10-15T14:00:00+00:00'));
 $course = App\Models\Training\TrainingCourse::query()->findOrFail((int) $argv[1]);
-$session = app(App\Services\Training\TrainingRosterService::class)->startPublicSession($course);
+$session = app(App\Services\Training\TrainingRosterService::class)->startPublicSession($course, ($argv[3] ?? '') ?: null, ! empty($argv[4]) ? (int) $argv[4] : null);
 echo $session->id;
 PHP;
 
-        return new Process([PHP_BINARY, '-r', $script, (string) $course->id, $application], base_path(), timeout: 60);
+        return new Process([PHP_BINARY, '-r', $script, (string) $course->id, $application, $publicId ?? '', (string) ($moduleId ?? '')], base_path(), timeout: 60);
     }
 
     private function writer(TrainingSession $session, Employee $employee, string $uuid, string $application, string $diskRoot): Process

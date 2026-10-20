@@ -30,12 +30,22 @@ final class TrainingKioskController extends Controller
 
     public function catalog(): JsonResponse
     {
-        $courses = TrainingCourse::query()->with(['sessions' => fn ($query) => $query->where('status', 'open')->orderByDesc('held_on')->orderBy('id')])
+        $today = now('America/New_York')->toDateString();
+        $courses = TrainingCourse::query()->with(['modules:id,training_course_id,name', 'sessions' => fn ($query) => $query->where('status', 'open')->where('attendance_source', 'digital')->with('module:id,name')->orderByDesc('held_on')->orderBy('starts_at')->orderBy('id')])
+            ->withCount(['sessions as today_session_count' => fn ($query) => $query->whereDate('held_on', $today)->where('status', 'open')->where('attendance_source', 'digital')])
+            ->withExists(['sessions as staff_session_today' => fn ($query) => $query->whereDate('held_on', $today)->where(fn ($staff) => $staff->whereNotNull('created_by')->orWhereNotNull('training_module_id')->orWhere('attendance_source', 'paper'))])
             ->orderBy('name')->get()->map(fn (TrainingCourse $course): array => [
                 'id' => $course->id, 'name' => $course->name, 'default_location' => $course->default_location,
                 'classifications' => $course->classifications,
+                'requires_session_selection' => $course->modules->isNotEmpty()
+                    || $course->getAttribute('staff_session_today')
+                    || $course->getAttribute('today_session_count') > 1
+                    || ((int) $course->getAttribute('today_session_count') === 1 && ! $course->sessions->contains(fn (TrainingSession $session): bool => $session->held_on->toDateString() === $today && $session->created_by === null && $session->training_module_id === null)),
+                'modules' => $course->modules->map(fn ($module): array => ['id' => $module->id, 'name' => $module->name])->all(),
                 'sessions' => $course->sessions->map(fn (TrainingSession $session): array => [
                     'public_id' => $session->public_id, 'held_on' => $session->held_on->toDateString(), 'location' => $session->location,
+                    'starts_at' => $session->starts_at?->toIso8601String(), 'module_id' => $session->training_module_id,
+                    'module_name' => $session->module?->name, 'staff_managed' => $session->created_by !== null,
                 ])->all(),
             ]);
 
@@ -44,7 +54,11 @@ final class TrainingKioskController extends Controller
 
     public function startCourse(Request $request, TrainingCourse $course, TrainingRosterService $rosters, TrainingKioskService $kiosk): JsonResponse
     {
-        $session = $rosters->startPublicSession($course);
+        $data = $request->validate([
+            'session_public_id' => ['sometimes', 'required', 'string', 'size:26', 'alpha_num:ascii'],
+            'training_module_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
+        ]);
+        $session = $rosters->startPublicSession($course, $data['session_public_id'] ?? null, isset($data['training_module_id']) ? (int) $data['training_module_id'] : null);
         $kiosk->openPublic($request, $session);
 
         return response()->json(['url' => '/r/'.$session->public_id, 'csrf_token' => csrf_token()]);
@@ -120,6 +134,8 @@ final class TrainingKioskController extends Controller
             'course_name' => $session->course_name,
             'held_on' => $session->held_on->format('Y-m-d'),
             'location' => $session->location,
+            'module_name' => $session->module?->name,
+            'starts_at' => $session->starts_at?->toIso8601String(),
             'status' => $session->status,
             'revision' => $session->revision,
             'attendance' => $attendance,

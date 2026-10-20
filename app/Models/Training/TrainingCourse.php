@@ -48,7 +48,7 @@ final class TrainingCourse extends Model
     /** @return array<string, string> */
     protected function casts(): array
     {
-        return ['classifications' => 'array'];
+        return ['classifications' => 'array', 'track_attendance_matrix' => 'boolean'];
     }
 
     protected static function booted(): void
@@ -60,5 +60,11 @@ final class TrainingCourse extends Model
     public function sessions(): HasMany
     {
         return $this->hasMany(TrainingSession::class);
+    }
+
+    /** @return HasMany<TrainingModule, $this> */
+    public function modules(): HasMany
+    {
+        return $this->hasMany(TrainingModule::class)->orderBy('sort_order')->orderBy('id');
     }
 }

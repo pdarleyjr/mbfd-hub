@@ -17,7 +17,10 @@
         @if ($instructorSignoff)
             <p class="mt-2 text-sm">Lead signature: {{ $instructorSignoff['lead_snapshot']['display_name'] }} · {{ \Carbon\CarbonImmutable::parse($instructorSignoff['signed_at'])->timezone('America/New_York')->format('M j, Y g:i:s A T') }}. Recorded with confirmation by submitting account #{{ $instructorSignoff['recorded_by'] }}.</p>
         @endif
-        @if (in_array($session->status, ['submitted', 'certified', 'archived'], true))
+        <p class="mt-4 text-sm">Module: {{ $session->module?->name ?: 'Unassigned' }}</p>
+        @if ($session->attendance_source === 'paper')
+            <p class="mt-4 text-sm text-stone-600">Historical paper evidence. The original scan is authoritative. Verified entries count as paper attendance; unresolved entries remain pending. No electronic signature or historical electronic certification has been created.</p>
+        @elseif (in_array($session->status, ['submitted', 'certified', 'archived'], true))
             <p class="mt-4 text-sm text-gray-600">This roster is locked. Saved submissions and certifications remain available below. Reopen with a reason before correcting attendance.</p>
         @else
             <p class="mt-4 text-sm text-gray-600">Downloads are provisional until submission or certification. Public submission requires the lead instructor's signature and an authorized administrator's approval.</p>
@@ -26,6 +29,7 @@
 
     {{ $this->table }}
 
+    @if ($session->attendance_source !== 'paper')
     <x-filament::section heading="Saved roster versions" description="The current roster and previous submissions and certifications. Each version preserves the attendance and signatures captured at that time; intermediate audit snapshots are also retained.">
         <div class="space-y-3">
             @forelse ($versions as $version)
@@ -41,6 +45,7 @@
             @endforelse
         </div>
     </x-filament::section>
+    @endif
 
     <x-filament::section heading="Recent audit history" description="The latest 100 changes. Complete history is retained with the roster." collapsible collapsed>
         <ol class="space-y-3">

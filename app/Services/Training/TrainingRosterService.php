@@ -7,11 +7,13 @@ namespace App\Services\Training;
 use App\Models\Employee;
 use App\Models\Training\TrainingAttendance;
 use App\Models\Training\TrainingCourse;
+use App\Models\Training\TrainingModule;
 use App\Models\Training\TrainingRosterAudit;
 use App\Models\Training\TrainingRosterVersion;
 use App\Models\Training\TrainingSession;
 use App\Models\User;
 use App\Services\PersonnelRequests\SignatureImageService;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
@@ -58,6 +60,7 @@ final class TrainingRosterService
 
         return DB::transaction(function () use ($course, $attributes, $actor): TrainingSession {
             $course = TrainingCourse::query()->lockForUpdate()->findOrFail($course->id);
+            $this->validateModule($course, $attributes['training_module_id'] ?? null);
             $session = TrainingSession::query()->create($attributes + [
                 'public_id' => (string) Str::ulid(), 'training_course_id' => $course->id,
                 'course_name' => $course->name, 'classifications' => $course->classifications,
@@ -71,18 +74,38 @@ final class TrainingRosterService
     }
 
     /** Reuse the course, never the attendance from a previous completed class. */
-    public function startPublicSession(TrainingCourse $course): TrainingSession
+    public function startPublicSession(TrainingCourse $course, ?string $sessionPublicId = null, ?int $moduleId = null): TrainingSession
     {
-        return DB::transaction(function () use ($course): TrainingSession {
+        return DB::transaction(function () use ($course, $sessionPublicId, $moduleId): TrainingSession {
             $course = TrainingCourse::query()->lockForUpdate()->findOrFail($course->id);
             $today = now('America/New_York')->toDateString();
-            $open = $course->sessions()->whereDate('held_on', $today)->where('status', 'open')->orderBy('id')->limit(2)->get();
-            if ($open->count() > 1) {
+            if ($sessionPublicId !== null) {
+                $session = $course->sessions()->where('public_id', $sessionPublicId)->lockForUpdate()->first();
+                if ($session === null || $session->isPaper() || $session->status !== 'open'
+                    || $session->held_on->toDateString() !== $today
+                    || ($moduleId !== null && (int) $session->training_module_id !== $moduleId)) {
+                    $this->reject('session', 'This roster is unavailable for this course and module today. Refresh the class list and choose an open roster.');
+                }
+
+                return $session;
+            }
+            if ($moduleId !== null || $course->modules()->exists()) {
+                $this->reject('session', 'Choose the module and dated roster below. Ask training staff to create a session if none is open.');
+            }
+            $todaySessions = $course->sessions()->whereDate('held_on', $today)->where('status', 'open')->where('attendance_source', 'digital')->orderBy('id')->limit(2)->get();
+            if ($todaySessions->count() > 1) {
                 $this->reject('session', 'More than one roster is open for this class today. Choose the dated roster and location from the class list.');
             }
-            $session = $open->first();
+            $session = $todaySessions->first();
             if ($session !== null) {
+                if ($session->isPaper() || $session->status !== 'open' || $session->created_by !== null || $session->training_module_id !== null) {
+                    $this->reject('session', 'Choose an open dated roster below. Ask training staff to create the next session if needed.');
+                }
+
                 return $session;
+            }
+            if ($course->sessions()->whereDate('held_on', $today)->where(fn ($query) => $query->whereNotNull('created_by')->orWhereNotNull('training_module_id')->orWhere('attendance_source', 'paper'))->exists()) {
+                $this->reject('session', 'Training staff manage this course’s sessions today. Choose an open dated roster below.');
             }
             $session = $course->sessions()->create([
                 'public_id' => (string) Str::ulid(), 'course_name' => $course->name,
@@ -171,6 +194,9 @@ final class TrainingRosterService
         return DB::transaction(function () use ($session, $attributes, $actor, $data): TrainingSession {
             $session = $this->locked($session);
             $this->expectedRevision($session, isset($data['expected_revision']) ? (int) $data['expected_revision'] : null);
+            if (array_key_exists('training_module_id', $attributes) && $attributes['training_module_id'] !== $session->training_module_id) {
+                $this->reject('training_module_id', 'Use the audited module mapping action to change this roster’s module.');
+            }
             $this->editable($session, ['draft', 'open', 'closed']);
             $before = $session->toArray();
             $session->update($attributes + ['revision' => $session->revision + 1]);
@@ -419,7 +445,10 @@ final class TrainingRosterService
 
     private function locked(TrainingSession $session): TrainingSession
     {
-        return TrainingSession::query()->lockForUpdate()->findOrFail($session->id);
+        $session = TrainingSession::query()->lockForUpdate()->findOrFail($session->id);
+        $this->digital($session);
+
+        return $session;
     }
 
     private function expectedRevision(TrainingSession $session, ?int $expected): void
@@ -470,6 +499,7 @@ final class TrainingRosterService
             'classifications' => ['required', 'array', 'min:1', 'max:16'],
             'classifications.*' => ['bail', 'required', 'string', 'max:80', 'regex:/\S/u', 'distinct:ignore_case'],
             'description' => ['nullable', 'string', 'max:10000'], 'default_location' => ['nullable', 'string', 'max:255'],
+            'track_attendance_matrix' => ['sometimes', 'boolean'],
         ])->validate();
     }
 
@@ -479,19 +509,43 @@ final class TrainingRosterService
             $data['classifications'] = TrainingCourse::normalizeClassifications($data['classifications']);
         }
 
-        return Validator::make($data, [
+        $attributes = Validator::make($data, [
             'held_on' => ['required', 'date_format:Y-m-d'], 'starts_at' => ['nullable', 'date'],
+            'training_module_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
             'location' => ['nullable', 'string', 'max:255'],
             'course_name' => ['sometimes', 'required', 'string', 'max:200', 'regex:/\S/u'],
             'classifications' => ['sometimes', 'required', 'array', 'min:1', 'max:16'],
             'classifications.*' => ['bail', 'required', 'string', 'max:80', 'regex:/\S/u', 'distinct:ignore_case'],
             'oic_employee_profile_id' => ['nullable', 'integer', Rule::exists('employees', 'id')->where('roster_status', 'active')],
         ])->validate();
+
+        if (isset($attributes['training_module_id'])) {
+            $attributes['training_module_id'] = (int) $attributes['training_module_id'];
+        }
+        if (isset($attributes['starts_at'])) {
+            $attributes['starts_at'] = CarbonImmutable::parse($attributes['starts_at'])->utc();
+        }
+
+        return $attributes;
     }
 
     private function reason(?string $reason): string
     {
         return Validator::make(['reason' => $reason], ['reason' => ['required', 'string', 'min:3', 'max:2000', 'regex:/\S/u']])->validate()['reason'];
+    }
+
+    private function validateModule(TrainingCourse $course, mixed $moduleId): void
+    {
+        if ($moduleId !== null && ! TrainingModule::query()->whereKey($moduleId)->where('training_course_id', $course->id)->exists()) {
+            $this->reject('training_module_id', 'Choose a module belonging to this course.');
+        }
+    }
+
+    private function digital(TrainingSession $session): void
+    {
+        if ($session->isPaper()) {
+            $this->reject('session', 'Paper roster evidence is managed through the paper review workflow.');
+        }
     }
 
     private function requestHash(int $sessionId, int $employeeId, string $signature): string
