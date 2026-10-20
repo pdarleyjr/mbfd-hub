@@ -33,7 +33,7 @@
     "postcss": "8.5.23",
     "tailwindcss": "^3.4.19",
     "typescript": "5.9.3",
-    "vite": "8.1.5"
+    "vite": "8.3.4"
   },
   "overrides": {
     "fast-uri": "3.1.4",
