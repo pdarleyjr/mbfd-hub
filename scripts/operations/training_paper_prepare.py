@@ -7,6 +7,7 @@ Matching proposes identities only; it never approves a row.
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 import hashlib
 import io
 import json
@@ -26,6 +27,7 @@ def inventory(archive: Path) -> dict:
     if archive.stat().st_size > 80 * 1024 * 1024:
         raise ValueError("Archive size limit exceeded")
     sources = []
+    expanded = 0
     with zipfile.ZipFile(archive) as package:
         members = package.infolist()
         if len(members) != 3 or {m.filename for m in members} != EXPECTED:
@@ -37,6 +39,9 @@ def inventory(archive: Path) -> dict:
                 raise ValueError("Unsafe member path")
             if member.flag_bits & 1 or not 0 < member.file_size <= MAX_SIZE:
                 raise ValueError("Encrypted or oversized member")
+            expanded += member.file_size
+            if expanded > 80 * 1024 * 1024:
+                raise ValueError("Total expansion limit exceeded")
             if member.compress_size <= 0 or member.file_size > 100 * member.compress_size:
                 raise ValueError("Expansion limit exceeded")
             with package.open(member) as source:
@@ -50,8 +55,12 @@ def inventory(archive: Path) -> dict:
             pages = len(PdfReader(io.BytesIO(data)).pages)
             if pages != 2:
                 raise ValueError("Expected two pages per original")
-            sources.append({"source_filename": member.filename, "source_sha256": digest, "page_count": pages})
-    return {"archive_sha256": hashlib.sha256(archive.read_bytes()).hexdigest(), "documents": sources, "page_total": 6}
+            sources.append({"source_filename": member.filename, "source_sha256": digest, "page_count": pages,
+                            "pages": [{"page": page, "source_id": f"{digest}:{page}", "visual_review": "REQUIRED"}
+                                      for page in range(1, pages + 1)]})
+    return {"archive_sha256": hashlib.sha256(archive.read_bytes()).hexdigest(), "documents": sources, "page_total": 6,
+            "created_utc": datetime.now(timezone.utc).isoformat(), "program": "training_paper_prepare-v1",
+            "python_version": sys.version, "attendance_verified": False, "identity_verified": False}
 
 
 def normalize(value: str) -> str:

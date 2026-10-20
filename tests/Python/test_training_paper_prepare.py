@@ -26,11 +26,11 @@ def pdf_bytes(tag):
 
 
 class PreparationTest(unittest.TestCase):
-    def archive(self, members):
+    def archive(self, members, compression=zipfile.ZIP_STORED):
         folder = tempfile.TemporaryDirectory()
         self.addCleanup(folder.cleanup)
         path = Path(folder.name) / "synthetic.zip"
-        with zipfile.ZipFile(path, "w") as package:
+        with zipfile.ZipFile(path, "w", compression=compression) as package:
             for name, data in members:
                 package.writestr(name, data)
         return path
@@ -72,6 +72,12 @@ class PreparationTest(unittest.TestCase):
         path.write_bytes(b"not-a-zip")
         with self.assertRaises(zipfile.BadZipFile):
             PREPARE.inventory(path)
+
+    def test_excessive_compression_expansion_is_rejected_before_pdf_parse(self):
+        valid = self.members()
+        valid[0] = (valid[0][0], b"%PDF-" + b"0" * 1024 * 1024)
+        with self.assertRaises(ValueError):
+            PREPARE.inventory(self.archive(valid, zipfile.ZIP_DEFLATED))
 
     def test_ambiguous_names_and_false_positive_substrings_never_approve(self):
         employees = {"employees": [{"id": 1, "name": "Synthetic Alpha"},
