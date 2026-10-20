@@ -44,7 +44,7 @@ final class TrainingModularKioskTest extends TestCase
 
     public function test_modular_start_requires_explicit_session_and_never_creates_a_roster(): void
     {
-        $session = $this->session($this->module);
+        $session = $this->createOpenSession($this->module);
         $this->postJson($this->url('/courses/'.$this->course->id.'/start'))->assertUnprocessable()->assertJsonValidationErrors('session');
         $this->postJson($this->url('/courses/'.$this->course->id.'/start'), ['session_public_id' => $session->public_id, 'training_module_id' => $this->module->id])->assertOk()->assertJsonPath('url', '/r/'.$session->public_id);
         self::assertSame(1, $this->course->sessions()->count());
@@ -52,7 +52,7 @@ final class TrainingModularKioskTest extends TestCase
 
     public function test_explicit_start_never_crosses_course_module_or_date(): void
     {
-        $session = $this->session($this->module);
+        $session = $this->createOpenSession($this->module);
         $otherModule = app(TrainingCourseModuleService::class)->createModule($this->course, ['name' => 'Module 2'], $this->actor);
         $path = '/courses/'.$this->course->id.'/start';
         $this->postJson($this->url($path), ['session_public_id' => $session->public_id, 'training_module_id' => $otherModule->id])->assertUnprocessable();
@@ -64,9 +64,9 @@ final class TrainingModularKioskTest extends TestCase
 
     public function test_catalog_distinguishes_same_day_modules_and_deliveries_without_paper_evidence(): void
     {
-        $first = $this->session($this->module, '2026-10-20T09:00:00-04:00');
-        $second = $this->session($this->module, '2026-10-20T13:00:00-04:00');
-        $paper = $this->session($this->module);
+        $first = $this->createOpenSession($this->module, '2026-10-20T09:00:00-04:00');
+        $second = $this->createOpenSession($this->module, '2026-10-20T13:00:00-04:00');
+        $paper = $this->createOpenSession($this->module);
         $paper->update(['status' => 'paper', 'attendance_source' => 'paper']);
         $response = $this->getJson($this->url('/catalog'))->assertOk()
             ->assertJsonPath('courses.0.requires_session_selection', true)
@@ -79,7 +79,7 @@ final class TrainingModularKioskTest extends TestCase
 
     public function test_paper_session_cannot_be_opened_or_signed_even_if_its_status_is_accidentally_open(): void
     {
-        $paper = $this->session($this->module);
+        $paper = $this->createOpenSession($this->module);
         $paper->update(['attendance_source' => 'paper']);
         $this->postJson($this->url('/r/'.$paper->public_id.'/open'))->assertForbidden();
         $this->expectException(ValidationException::class);
@@ -88,8 +88,8 @@ final class TrainingModularKioskTest extends TestCase
 
     public function test_distinct_same_day_sessions_recover_only_the_selected_session(): void
     {
-        $first = $this->session($this->module);
-        $second = $this->session($this->module);
+        $first = $this->createOpenSession($this->module);
+        $second = $this->createOpenSession($this->module);
         foreach ([$first, $second, $first] as $session) {
             self::assertSame($session->id, $this->rosters->startPublicSession($this->course, $session->public_id, $this->module->id)->id);
         }
@@ -97,7 +97,7 @@ final class TrainingModularKioskTest extends TestCase
         self::assertSame(0, $second->attendances()->count());
     }
 
-    private function session(TrainingModule $module, ?string $startsAt = null): TrainingSession
+    private function createOpenSession(TrainingModule $module, ?string $startsAt = null): TrainingSession
     {
         $session = $this->rosters->createSession($this->course, ['held_on' => '2026-10-20', 'starts_at' => $startsAt, 'training_module_id' => $module->id], $this->actor);
 
