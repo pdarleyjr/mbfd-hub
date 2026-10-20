@@ -21,10 +21,8 @@
         $greeting = $now->hour < 12 ? 'Good morning' : ($now->hour < 18 ? 'Good afternoon' : 'Good evening');
         $displayName = (string) ($currentUser?->display_name ?: $currentUser?->name);
         $firstName = trim((string) strtok($displayName, ' '));
-        // Fleet staff land on Home; their tools should be one obvious tap away.
-        $showFleetOperations = $currentUser instanceof \App\Models\User
-            && $currentUser->canAccessPanel(\Filament\Facades\Filament::getPanel('admin'))
-            && $currentUser->can('viewAny', \App\Models\Apparatus::class);
+        // Fleet tools only for super administrators and members with the Fleet manage switch on.
+        $showFleetOperations = $currentUser instanceof \App\Models\User && $currentUser->canManageFleetSwaps();
         $hubNavigation = \App\Support\HubShellNavigation::forUser($currentUser, $applicationStates);
         // Same rule as the app switcher: current cmd access, a configured client, and verified sign-in.
         $commandBoardHref = collect($hubNavigation['applications'])->firstWhere('key', 'cmd')['href'] ?? null;
