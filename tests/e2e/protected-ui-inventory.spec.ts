@@ -336,7 +336,12 @@ test('inventory records every route and renders available protected surfaces at 
           const viewport = document.documentElement.clientWidth;
           const visible = (el: Element) => {
             const style = getComputedStyle(el);
-            return style.display !== 'none' && style.visibility !== 'hidden' && el.getClientRects().length > 0 && !el.closest('[aria-hidden="true"], [inert]');
+            // The content of a closed <details> keeps its boxes (content-visibility: hidden) but is not
+            // rendered, reports an empty innerText and is not reachable by users or assistive technology.
+            // checkVisibility() is false for it, so such menu items are not "visible unnamed controls".
+            // Open menus and everything on screen still pass, so a genuinely unnamed control is caught.
+            const rendered = typeof el.checkVisibility === 'function' ? el.checkVisibility({ contentVisibilityAuto: true, visibilityProperty: true }) : true;
+            return rendered && style.display !== 'none' && style.visibility !== 'hidden' && el.getClientRects().length > 0 && !el.closest('[aria-hidden="true"], [inert]');
           };
           // Supplemental DOM label facts; Axe below performs semantic name checks.
           const controlName = (el: Element) => {

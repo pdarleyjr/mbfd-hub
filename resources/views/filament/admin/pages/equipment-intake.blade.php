@@ -110,8 +110,8 @@
                     <h3 class="ei-title ei-title--loose">Asset Details</h3>
                     {{-- Item Type Selector --}}
                     <div class="mb-4">
-                        <label class="ei-label">Item Type</label>
-                        <select wire:model.live="scan_type" aria-label="Item type"
+                        <label class="ei-label" for="ei-scan-type">Item Type</label>
+                        <select id="ei-scan-type" wire:model.live="scan_type"
                             class="ei-control ei-control--narrow">
                             <option value="hardware">Hardware Asset (tracked, has serial)</option>
                             <option value="accessory">Accessory (consumable add-on)</option>
@@ -123,36 +123,36 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                            <label class="ei-label">Brand / Manufacturer</label>
-                            <input type="text" :value="aiField_brand" @input="aiField_brand=$event.target.value; $wire.set('scan_brand',$event.target.value)"
+                            <label class="ei-label" for="ei-scan-brand">Brand / Manufacturer</label>
+                            <input type="text" id="ei-scan-brand" :value="aiField_brand" @input="aiField_brand=$event.target.value; $wire.set('scan_brand',$event.target.value)"
                                 class="ei-control" placeholder="e.g. Scott, MSA, Motorola" />
                         </div>
                         <div>
-                            <label class="ei-label">Model</label>
-                            <input type="text" :value="aiField_model" @input="aiField_model=$event.target.value; $wire.set('scan_model',$event.target.value)"
+                            <label class="ei-label" for="ei-scan-model">Model</label>
+                            <input type="text" id="ei-scan-model" :value="aiField_model" @input="aiField_model=$event.target.value; $wire.set('scan_model',$event.target.value)"
                                 class="ei-control" placeholder="e.g. Air-Pak X3 Pro" />
                         </div>
                         <div>
-                            <label class="ei-label">Serial Number</label>
-                            <input type="text" :value="aiField_serial" @input="aiField_serial=$event.target.value; $wire.set('scan_serial',$event.target.value)"
+                            <label class="ei-label" for="ei-scan-serial">Serial Number</label>
+                            <input type="text" id="ei-scan-serial" :value="aiField_serial" @input="aiField_serial=$event.target.value; $wire.set('scan_serial',$event.target.value)"
                                 class="ei-control" placeholder="e.g. SN-2024-00123" />
                         </div>
                         <div>
-                            <label class="ei-label">Item / Device Name <span class="ei-help text-xs">(AI-suggested)</span></label>
-                            <input type="text" :value="aiField_item_name" @input="aiField_item_name=$event.target.value"
+                            <label class="ei-label" for="ei-scan-item-name">Item / Device Name <span class="ei-help text-xs">(AI-suggested)</span></label>
+                            <input type="text" id="ei-scan-item-name" :value="aiField_item_name" @input="aiField_item_name=$event.target.value"
                                 class="ei-control" placeholder="e.g. 18 inch chainsaw, hydraulic spreader" />
                         </div>
                         <div>
-                            <label class="ei-label">Category <span class="ei-help text-xs">(AI-suggested)</span></label>
-                            <input type="text" :value="aiField_category" @input="aiField_category=$event.target.value"
+                            <label class="ei-label" for="ei-scan-category">Category <span class="ei-help text-xs">(AI-suggested)</span></label>
+                            <input type="text" id="ei-scan-category" :value="aiField_category" @input="aiField_category=$event.target.value"
                                 class="ei-control" placeholder="e.g. Saw, Rescue Tool, SCBA, Fan" />
                         </div>
                         <div x-data="{ showNewLoc: false }">
-                            <label class="ei-label">
+                            <label class="ei-label" for="ei-scan-location">
                                 Location <span class="ei-required">*</span>
                             </label>
                             <div x-show="!showNewLoc">
-                                <select wire:model="scan_location" aria-label="Location"
+                                <select id="ei-scan-location" wire:model="scan_location"
                                     class="ei-control" required>
                                     <option value="">Select location...</option>
                                     @foreach($this->locations as $id => $name)
@@ -162,7 +162,7 @@
                                 <button type="button" @click="showNewLoc = true" class="ei-link">+ New location</button>
                             </div>
                             <div x-show="showNewLoc" class="space-y-2">
-                                <input type="text" wire:model="new_location_name"
+                                <input type="text" aria-label="New location name" wire:model="new_location_name"
                                     class="ei-control" placeholder="New location name..." />
                                 <div class="flex gap-3">
                                     <button type="button" wire:click="createNewLocation" class="ei-link ei-link--success">Save</button>
@@ -172,8 +172,8 @@
                         </div>
                     </div>
                     <div class="mt-4">
-                        <label class="ei-label">Notes (optional)</label>
-                        <textarea wire:model="scan_notes" rows="2"
+                        <label class="ei-label" for="ei-scan-notes">Notes (optional)</label>
+                        <textarea id="ei-scan-notes" wire:model="scan_notes" rows="2"
                             class="ei-control"
                             placeholder="Any additional notes..."></textarea>
                     </div>
@@ -212,9 +212,9 @@
                     <h3 class="ei-title ei-title--tight">Manual Bulk Entry</h3>
                     <p class="ei-lede">For items without photos or serial numbers. Select location then fill the grid.</p>
                     <div x-data="{ showNewLoc2: false }">
-                        <label class="ei-label">Location <span class="ei-required">*</span></label>
+                        <label class="ei-label" for="ei-bulk-location">Location <span class="ei-required">*</span></label>
                         <div x-show="!showNewLoc2">
-                            <select wire:model="bulk_location" aria-label="Location for manual bulk entry"
+                            <select id="ei-bulk-location" wire:model="bulk_location"
                                 class="ei-control ei-control--narrow">
                                 <option value="">Select location...</option>
                                 @foreach($this->locations as $id => $name)
@@ -224,7 +224,7 @@
                             <button type="button" @click="showNewLoc2 = true" class="ei-link">+ New location</button>
                         </div>
                         <div x-show="showNewLoc2" class="space-y-2">
-                            <input type="text" wire:model="new_location_name"
+                            <input type="text" aria-label="New location name" wire:model="new_location_name"
                                 class="ei-control ei-control--narrow" placeholder="New location name..." />
                             <div class="flex gap-3">
                                 <button type="button" wire:click="createNewLocation" class="ei-link ei-link--success">Save</button>
@@ -249,12 +249,12 @@
                                 <div class="ei-bulk-grid">
                                     <div class="ei-bulk-cell">
                                         <label class="ei-label ei-label--sm sm:hidden">Item Name</label>
-                                        <input type="text" wire:model="bulk_items.{{ $index }}.name"
+                                        <input type="text" aria-label="Item name for item {{ $index + 1 }}" wire:model="bulk_items.{{ $index }}.name"
                                             class="ei-control" placeholder="e.g. Flashlight batteries" />
                                     </div>
                                     <div class="ei-bulk-cell">
                                         <label class="ei-label ei-label--sm sm:hidden">Qty</label>
-                                        <input type="number" wire:model="bulk_items.{{ $index }}.quantity" min="1"
+                                        <input type="number" aria-label="Qty for item {{ $index + 1 }}" wire:model="bulk_items.{{ $index }}.quantity" min="1"
                                             class="ei-control" />
                                     </div>
                                     <div class="ei-bulk-cell">
@@ -273,7 +273,7 @@
                                     </div>
                                     <div class="ei-bulk-cell">
                                         <label class="ei-label ei-label--sm sm:hidden">Notes</label>
-                                        <input type="text" wire:model="bulk_items.{{ $index }}.notes"
+                                        <input type="text" aria-label="Notes for item {{ $index + 1 }}" wire:model="bulk_items.{{ $index }}.notes"
                                             class="ei-control" placeholder="Optional" />
                                     </div>
                                     <div class="ei-bulk-actions">
@@ -347,11 +347,11 @@
                     <div class="ei-card">
                         <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
                             <div x-data="{ showNewLoc3: false }" class="ei-loc-field">
-                                <label class="ei-label">
+                                <label class="ei-label" for="ei-ai-bulk-location">
                                     Bulk Location <span class="ei-required">*</span>
                                 </label>
                                 <div x-show="!showNewLoc3">
-                                    <select wire:model="ai_bulk_global_location" aria-label="Location for AI bulk entry"
+                                    <select id="ei-ai-bulk-location" wire:model="ai_bulk_global_location"
                                         class="ei-control">
                                         <option value="">Select location...</option>
                                         @foreach($this->locations as $id => $name)
@@ -361,7 +361,7 @@
                                     <button type="button" @click="showNewLoc3 = true" class="ei-link">+ New location</button>
                                 </div>
                                 <div x-show="showNewLoc3" class="space-y-2">
-                                    <input type="text" wire:model="new_location_name"
+                                    <input type="text" aria-label="New location name" wire:model="new_location_name"
                                         class="ei-control" placeholder="New location name..." />
                                     <div class="flex gap-3">
                                         <button type="button" wire:click="createNewLocation" class="ei-link ei-link--success">Save</button>
@@ -421,18 +421,18 @@
                                         {{-- Editable fields --}}
                                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             <div>
-                                                <label class="ei-label ei-label--sm">Brand</label>
-                                                <input type="text" wire:model="ai_bulk_items.{{ $idx }}.brand"
+                                                <label class="ei-label ei-label--sm" for="ei-ai-brand-{{ $idx }}">Brand</label>
+                                                <input type="text" id="ei-ai-brand-{{ $idx }}" wire:model="ai_bulk_items.{{ $idx }}.brand"
                                                     class="ei-control ei-control--compact" />
                                             </div>
                                             <div>
-                                                <label class="ei-label ei-label--sm">Model</label>
-                                                <input type="text" wire:model="ai_bulk_items.{{ $idx }}.model"
+                                                <label class="ei-label ei-label--sm" for="ei-ai-model-{{ $idx }}">Model</label>
+                                                <input type="text" id="ei-ai-model-{{ $idx }}" wire:model="ai_bulk_items.{{ $idx }}.model"
                                                     class="ei-control ei-control--compact" />
                                             </div>
                                             <div>
-                                                <label class="ei-label ei-label--sm">Serial #</label>
-                                                <input type="text" wire:model="ai_bulk_items.{{ $idx }}.serial"
+                                                <label class="ei-label ei-label--sm" for="ei-ai-serial-{{ $idx }}">Serial #</label>
+                                                <input type="text" id="ei-ai-serial-{{ $idx }}" wire:model="ai_bulk_items.{{ $idx }}.serial"
                                                     class="ei-control ei-control--compact" />
                                             </div>
                                             <div>

@@ -510,11 +510,12 @@ html:not(.dark) :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .
     opacity: .9;
 }
 
-/* Breadcrumb links are small inline text; give each at least the 24px WCAG 2.2 target. */
+/* Breadcrumb links are small inline text (24px tall); every other touch control in the Hub is 44px.
+   The row grows to hold the 44px target and the labels stay vertically centred in it. */
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-breadcrumbs-item-label {
     display: inline-flex;
     align-items: center;
-    min-height: 1.5rem;
+    min-height: 2.75rem;
 }
 
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-tabs-item {

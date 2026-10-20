@@ -287,10 +287,11 @@ for (const route of pages) test(`authenticated ${route.name} fits and remains na
         await info.attach('employee-rendering', { body: JSON.stringify(rendering, null, 2), contentType: 'application/json' });
       }
       if (route.name === 'uniform-request') {
-        const contrast = await measureContrast(page, {
-          primary: '.pr-primary-action', choicesPlaceholder: '.choices__placeholder',
-          sizePlaceholder: 'input[placeholder="Examples: L, 34x32, 10.5"]',
-        }, { sizePlaceholder: '::placeholder' });
+        // The single-page order builder replaced the wizard (.pr-primary-action, Choices placeholder):
+        // its primary action is the cart's "Submit order" button, and the Cart toggle opens that cart.
+        await expect(page.locator('.uo-builder .uo-cart-button'), 'Cart toggle is present').toBeAttached();
+        await expect(page.locator('.uo-builder .uo-submit'), 'Primary "Submit order" action is present').toBeAttached();
+        const contrast = await measureContrast(page, { primary: '.uo-builder .uo-submit', cart: '.uo-builder .uo-cart-button' });
         await info.attach('uniform-primary-contrast', { body: JSON.stringify(contrast, null, 2), contentType: 'application/json' });
         for (const item of contrast) expect.soft(item.ratio, JSON.stringify(item)).toBeGreaterThanOrEqual(4.5);
         const placeholders = await page.locator('input[placeholder]:not([disabled]):not([readonly]), textarea[placeholder]:not([disabled]):not([readonly]), .choices__placeholder').evaluateAll(elements => elements.map(element => {
