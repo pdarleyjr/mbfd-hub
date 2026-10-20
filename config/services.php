@@ -152,4 +152,21 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | MBFD Command Board (cmd.mbfdhub.com)
+    |--------------------------------------------------------------------------
+    |
+    | Members reach the Command Board through the Hub OIDC client `cmd`
+    | (config/oidc.php). The service token authenticates the Hub's calls to
+    | the board's internal command-PIN API; it must equal the board's own
+    | COMMAND_BOARD_SERVICE_TOKEN. Without it the admin PIN page is read-only
+    | and says the link is not configured.
+    |
+    */
+    'command_board' => [
+        'url' => env('COMMAND_BOARD_URL', 'https://cmd.mbfdhub.com'),
+        'service_token' => env('COMMAND_BOARD_SERVICE_TOKEN'),
+    ],
+
 ];
