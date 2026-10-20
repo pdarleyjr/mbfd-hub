@@ -182,7 +182,10 @@ async function inspect(page: Page) {
   return page.evaluate(() => {
     const name = (el: Element) => (el.getAttribute('aria-label') || el.getAttribute('title') || (el as HTMLElement).innerText
       || el.querySelector('img[alt]')?.getAttribute('alt') || (el.getAttribute('aria-labelledby') ? 'labelledby' : '')).trim();
-    const visible = (el: Element) => (el as HTMLElement).offsetParent !== null || getComputedStyle(el).position === 'fixed';
+    // Content of a closed <details> menu keeps its boxes (content-visibility: hidden) but is not rendered,
+    // so innerText is empty. checkVisibility() excludes it; open menus and on-screen controls still count.
+    const rendered = (el: Element) => typeof el.checkVisibility !== 'function' || el.checkVisibility({ contentVisibilityAuto: true, visibilityProperty: true });
+    const visible = (el: Element) => rendered(el) && ((el as HTMLElement).offsetParent !== null || getComputedStyle(el).position === 'fixed');
     const links = [...document.querySelectorAll('a[href]')] as HTMLAnchorElement[];
     return {
       title: document.title,

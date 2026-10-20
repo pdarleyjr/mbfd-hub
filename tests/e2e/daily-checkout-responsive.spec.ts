@@ -562,3 +562,36 @@ test('station profile stays contained at 320px with 44px controls, keyboard tabs
   expect(quality.consoleErrors).toEqual([]);
   expect(quality.failedRequests).toEqual([]);
 });
+
+test('room profile labels meet 4.5:1 against their surface at every width', async ({ page }, testInfo) => {
+  await mockDailySelectorApi(page);
+  await page.route('**/api/public/stations/31/rooms/7/profile', (route) => route.fulfill({ json: {
+    room: { id: 7, station_id: 31, name: 'Day Room', floor: 'First', type: 'common_area', is_active: true },
+    current_assets: [{ id: 1, room_id: 7, name: 'Recliner', quantity: 2, unit: 'each', condition: 'fair', category: 'furniture' }],
+    open_requests: [], request_history: [], asset_events: [],
+  } }));
+  await page.goto('/daily/stations/31/rooms/7');
+  await expect(page.getByRole('heading', { level: 1, name: 'Day Room' })).toBeVisible();
+  const results = await page.evaluate(() => {
+    const channel = (value: number) => { const c = value / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+    const luminance = (rgb: number[]) => 0.2126 * channel(rgb[0]) + 0.7152 * channel(rgb[1]) + 0.0722 * channel(rgb[2]);
+    const parse = (value: string) => (value.match(/[\d.]+/g) ?? []).map(Number);
+    return [...document.querySelectorAll('dl dt, header > p:first-child')].map((element) => {
+      let background = [255, 255, 255];
+      const layers: Element[] = [];
+      for (let node: Element | null = element; node; node = node.parentElement) layers.unshift(node);
+      for (const node of layers) {
+        const color = parse(getComputedStyle(node).backgroundColor);
+        if (color.length >= 3) { const alpha = color[3] ?? 1; background = background.map((base, i) => color[i] * alpha + base * (1 - alpha)); }
+      }
+      const text = parse(getComputedStyle(element).color);
+      const alpha = text[3] ?? 1;
+      const foreground = text.slice(0, 3).map((value, i) => value * alpha + background[i] * (1 - alpha));
+      const [light, dark] = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+      return { label: element.textContent?.trim(), ratio: Number(((light + 0.05) / (dark + 0.05)).toFixed(2)) };
+    });
+  });
+  await testInfo.attach('room-label-contrast', { body: JSON.stringify(results, null, 2), contentType: 'application/json' });
+  expect(results.length).toBeGreaterThanOrEqual(4);
+  for (const item of results) expect(item.ratio, JSON.stringify(item)).toBeGreaterThanOrEqual(4.5);
+});
