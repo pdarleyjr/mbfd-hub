@@ -23,6 +23,7 @@ final class TrainingRosterDocumentController extends Controller
     public function signature(TrainingSession $session, TrainingAttendance $attendance): Response
     {
         Gate::authorize('view', $session);
+        abort_if($session->attendance_source === 'paper', 409, 'Use the protected original paper roster.');
         abort_unless($attendance->training_session_id === $session->getKey(), 404);
         $artifact = $attendance->signature;
         $bytes = Storage::disk($artifact['disk'])->get($artifact['path']);
@@ -34,6 +35,7 @@ final class TrainingRosterDocumentController extends Controller
     public function export(TrainingSession $session, string $format, TrainingRosterService $rosters, TrainingRosterExportService $exports): Response
     {
         Gate::authorize('export', $session);
+        abort_if($session->attendance_source === 'paper', 409, 'Use the protected original paper roster.');
         abort_unless(in_array($format, ['pdf', 'xlsx'], true), 404);
 
         return $exports->download($rosters->snapshot($session), $format);
@@ -42,6 +44,7 @@ final class TrainingRosterDocumentController extends Controller
     public function version(TrainingSession $session, TrainingRosterVersion $version, string $format, TrainingRosterExportService $exports): Response
     {
         Gate::authorize('export', $session);
+        abort_if($session->attendance_source === 'paper', 409, 'Use the protected original paper roster.');
         abort_unless($version->training_session_id === $session->getKey() && in_array($format, ['pdf', 'xlsx'], true), 404);
 
         return $exports->download($version, $format);
