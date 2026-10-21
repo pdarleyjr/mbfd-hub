@@ -78,16 +78,44 @@ function initTakeHomeInspection(form) {
         window.clearTimeout(saveTimer);
         saveTimer = window.setTimeout(() => {
             state.savedAt = Date.now();
-            storageSet(DRAFT_KEY, state);
+            storageSet(DRAFT_KEY, draftSnapshot());
         }, 250);
     }
+    /** Personnel details (driver, current driver) are never written to device storage. */
+    function draftSnapshot() {
+        return {
+            savedAt: state.savedAt,
+            clientSubmissionId: state.clientSubmissionId,
+            startedAt: state.startedAt,
+            step: state.step,
+            vehicle: state.vehicle ? { ...state.vehicle, current_driver: null, assigned: null } : null,
+            vehicleFields: state.vehicleFields,
+            odometer: state.odometer,
+            odometerNone: state.odometerNone,
+            checks: state.checks,
+            photos: Object.fromEntries(Object.entries(state.photos).map(([key, photo]) => [key, { uuid: photo.uuid }])),
+            issuePhotos: Object.fromEntries(Object.entries(state.issuePhotos).map(([key, photos]) => [key, photos.map((photo) => ({ uuid: photo.uuid }))])),
+            keys: state.keys,
+            acceptable: state.acceptable,
+            comments: state.comments,
+            ack: state.ack,
+        };
+    }
+
+    const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+    /** Photo URLs are always rebuilt from the server route template and a validated id. */
+    function photoSrc(photo) {
+        return photo && UUID_PATTERN.test(String(photo.uuid)) ? config.urls.photo.replace('__UUID__', photo.uuid) : '';
+    }
+
     function restoreDraft() {
         const draft = storageGet(DRAFT_KEY);
         if (!draft || typeof draft !== 'object' || !draft.clientSubmissionId) return false;
         if (Date.now() - (draft.savedAt || 0) > DRAFT_MAX_AGE_MS) { storageRemove(DRAFT_KEY); return false; }
-        const hasContent = draft.vehicle || draft.driver || Object.keys(draft.photos || {}).length > 0;
+        const hasContent = draft.vehicle || Object.keys(draft.photos || {}).length > 0;
         if (!hasContent) return false;
-        Object.assign(state, draft);
+        Object.assign(state, draft, { driver: null, driverManual: false, driverName: '', driverNumber: '' });
         config.checks.forEach((check) => {
             state.checks[check.key] = Object.assign({ status: null, issue_description: '', notes: '' }, state.checks?.[check.key] || {});
             state.issuePhotos[check.key] = Array.isArray(state.issuePhotos?.[check.key]) ? state.issuePhotos[check.key] : [];
@@ -675,7 +703,7 @@ function initTakeHomeInspection(form) {
             const holder = document.createElement('div');
             holder.className = 'thvi-thumb';
             const img = document.createElement('img');
-            img.src = photo.preview || photo.url;
+            img.src = photoSrc(photo);
             img.alt = `Issue photo ${index + 1}`;
             const remove = document.createElement('button');
             remove.type = 'button';
@@ -701,7 +729,7 @@ function initTakeHomeInspection(form) {
         try {
             const prepared = await preparePhoto(file);
             const result = await uploadPhoto(prepared, 'issue', key, (percent) => { status.textContent = `Uploading ${percent}%`; });
-            state.issuePhotos[key].push({ uuid: result.uuid, url: result.url, preview: null });
+            state.issuePhotos[key].push({ uuid: result.uuid });
             status.className = 'thvi-photo__status is-ok';
             status.textContent = 'Issue photo uploaded.';
             renderCheck(key);
@@ -764,7 +792,7 @@ function initTakeHomeInspection(form) {
         if (photo || preview) {
             const img = document.createElement('img');
             img.alt = `${config.angles.find((angle) => angle.key === key)?.label} photo`;
-            img.src = preview || photo.url;
+            img.src = preview || photoSrc(photo);
             frame.append(img);
         } else {
             const empty = document.createElement('span');
@@ -813,7 +841,7 @@ function initTakeHomeInspection(form) {
                 status.textContent = `Uploading ${percent}%`;
                 bar.firstElementChild.style.width = `${percent}%`;
             });
-            state.photos[key] = { uuid: result.uuid, url: result.url };
+            state.photos[key] = { uuid: result.uuid };
             pendingFiles.delete(key);
             photoSlots[key].busy = false;
             renderPhoto(key, previewUrl);

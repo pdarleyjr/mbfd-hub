@@ -64,6 +64,7 @@ final class TakeHomeInspectionController extends Controller
                     'storeVehicle' => route('take-home-inspections.vehicles.store'),
                     'employees' => route('take-home-inspections.employees.search'),
                     'photos' => route('take-home-inspections.photos.store'),
+                    'photo' => url('/take-home-vehicle-inspections/photos/__UUID__'),
                     'submit' => route('take-home-inspections.store'),
                     'index' => route('take-home-inspections.index'),
                 ],
