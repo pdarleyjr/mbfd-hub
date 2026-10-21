@@ -29,6 +29,7 @@
             @error('courseId') <p role="alert">{{ $message }}</p> @enderror
             @if ($draft['course_id'])
                 <p class="mt-3 text-sm">The proposal excludes members with verified attendance in {{ $draft['module_id'] ? 'the selected module' : 'any session of this course' }}. Courses without prior sessions work without creating a class.</p>
+                <p class="mt-2 text-sm">Attendance is checked against current verified Hub records{{ !empty($all['as_of']) ? ' as of '.\Carbon\CarbonImmutable::parse($all['as_of'])->setTimezone('America/New_York')->format('M j, Y g:i A T') : '' }}; the uploaded roster supplies the dated staffing snapshot.</p>
             @endif
         </x-filament::section>
 
@@ -111,11 +112,20 @@
                 @forelse (array_slice($visible, 0, 250, true) as $id => $person)
                     @php($eligible = ! empty($person['eligible_slots']) && ($candidateSlot === '' || in_array($candidateSlot, $person['eligible_slots'], true)))
                     @php($candidateContext = app(\App\Services\Training\CrewPlanner\TrainingCrewPlannerDutyContext::class)->project($person['observed_unit_context'] ?? [], collect($draft['slots'])->firstWhere('id', $candidateSlot)))
+                    @php($attendanceLabel = match ($person['attendance_status'] ?? '') { 'VERIFIED_ATTENDED' => 'Already attended this training scope', 'UNVERIFIED_OR_PROVISIONAL' => 'Attendance evidence needs verification', 'NOT_APPLICABLE' => "Outside this module's training audience", 'IDENTITY_OR_EVIDENCE_REVIEW' => 'Identity or attendance evidence needs verification', default => 'Needs training · staffing requires verification' })
+                    @php($reviewReasons = $candidateSlot !== '' ? ($person['slot_review_reasons'][$candidateSlot] ?? $person['needs_review'] ?? []) : ($person['needs_review'] ?? []))
                     <li wire:key="candidate-{{ $id }}" class="py-3">
                         <label class="flex items-start gap-3">
                             <input type="checkbox" wire:model="candidateSelection" value="{{ $id }}" @disabled(! $eligible) aria-label="Propose {{ $person['name'] }}" />
                             <span class="min-w-0"><strong>{{ $person['name'] }}</strong> · {{ $person['rank'] ?? '' }} · {{ $person['employee_id'] }}<br />
-                                <span class="text-sm">{{ $eligible ? 'Needs training · scheduled for a complete classroom time' : str_replace('_', ' ', $person['attendance_status'] ?? 'Requires verification') }}</span><br />
+                                <span class="text-sm">{{ $eligible ? 'Needs training · scheduled for a complete classroom time' : $attendanceLabel }}</span><br />
+                                @if (!$eligible)
+                                    @forelse ($reviewReasons as $reason)
+                                        @if (is_string($reason))<span class="block text-sm">{{ $reason }}</span>@endif
+                                    @empty
+                                        @if (($person['attendance_status'] ?? '') === 'NO_PRIOR_ATTENDANCE')<span class="block text-sm">Not scheduled for a complete saved classroom time.</span>@endif
+                                    @endforelse
+                                @endif
                                 <span class="text-sm">Published bid: {{ $person['assignment'] ?? 'Not verified' }}{{ !empty($person['is_de_bid']) ? ' · DE seat' : '' }}. Today's duty: {{ $candidateContext['label'] }}.</span>
                             </span>
                         </label>
@@ -125,6 +135,17 @@
                 @endforelse
             </ul>
             @if (count($visible) > 250)<p class="mt-3">Showing the first 250 members. Narrow your search to find a specific person. Add all eligible uses the full result set.</p>@endif
+            @if ($showReview && !empty($all['review']))
+                <h3 class="mt-4 font-semibold">Unmatched schedule identities — verify before proposing</h3>
+                <p class="mt-2 text-sm">These schedule identities have no unique active Hub match. They cannot be selected or included in the proposal automatically.</p>
+                <ul class="mt-2 divide-y divide-gray-200">
+                    @foreach ($all['review'] as $identity)
+                        <li class="py-3"><strong>{{ $identity['raw_name'] ?: 'Name not reported' }}</strong> · Employee ID {{ $identity['raw_employee_id'] ?: 'not reported' }}
+                            @foreach ($identity['needs_review'] ?? [] as $reason)@if (is_string($reason))<span class="block text-sm">{{ $reason }}</span>@endif @endforeach
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
             @if (!empty($all['review']) || !empty($all['exceptions']))<p class="mt-3 text-warning-700">Some identities or staffing facts require verification and are excluded from automatic selection.</p>@endif
         </x-filament::section>
 
