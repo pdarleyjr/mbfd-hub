@@ -63,7 +63,8 @@ final class TrainingCrewPlannerIsolationTest extends TestCase
         try {
             $file = UploadedFile::fake()->createWithContent('synthetic-daily.pdf', $this->pdf());
             $path = $file->getPathname();
-            $this->post(route('training.crew-planner.upload'), ['draft_id' => $draftId, 'version' => $version, 'roster_pdf' => $file])->assertRedirect();
+            $this->post(route('training.crew-planner.upload'), ['draft_id' => $draftId, 'version' => $version, 'roster_pdf' => $file])
+                ->assertRedirect()->assertSessionHasNoErrors();
             self::assertFileDoesNotExist($path);
             $component->call('reloadProposal')->call('saveSlots')->assertHasNoErrors();
             $slots = $this->draft($draftId)['slots'];
