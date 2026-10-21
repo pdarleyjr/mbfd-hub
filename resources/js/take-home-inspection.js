@@ -783,20 +783,20 @@ function initTakeHomeInspection(form) {
         renderPhoto(angle.key);
     });
 
-    function renderPhoto(key, preview = null) {
+    function renderPhoto(key, uploading = false) {
         const card = $(`.thvi-photo[data-angle="${key}"]`);
         const photo = state.photos[key];
         const frame = $('[data-frame]', card);
         const status = $('[data-status]', card);
         frame.innerHTML = '';
-        if (photo || preview) {
+        if (photo) {
             const img = document.createElement('img');
             img.alt = `${config.angles.find((angle) => angle.key === key)?.label} photo`;
-            img.src = preview || photoSrc(photo);
+            img.src = photoSrc(photo);
             frame.append(img);
         } else {
             const empty = document.createElement('span');
-            empty.textContent = 'No photo yet';
+            empty.textContent = uploading ? 'Uploading photo…' : 'No photo yet';
             frame.append(empty);
         }
         if (photo) {
@@ -828,13 +828,11 @@ function initTakeHomeInspection(form) {
         status.textContent = isRetry ? 'Retrying…' : 'Preparing photo…';
         const previous = state.photos[key];
         delete state.photos[key];
-        let previewUrl = null;
         try {
             const prepared = isRetry && file.prepared ? file : await preparePhoto(file);
             prepared.prepared = true;
             pendingFiles.set(key, prepared);
-            previewUrl = URL.createObjectURL(prepared.blob);
-            renderPhoto(key, previewUrl);
+            renderPhoto(key, true);
             bar.hidden = false;
             bar.firstElementChild.style.width = '0%';
             const result = await uploadPhoto(prepared, key, null, (percent) => {
@@ -844,12 +842,12 @@ function initTakeHomeInspection(form) {
             state.photos[key] = { uuid: result.uuid };
             pendingFiles.delete(key);
             photoSlots[key].busy = false;
-            renderPhoto(key, previewUrl);
+            renderPhoto(key);
             saveDraft();
         } catch (error) {
             photoSlots[key].busy = false;
             if (previous && !pendingFiles.has(key)) state.photos[key] = previous;
-            renderPhoto(key, previewUrl);
+            renderPhoto(key);
             status.className = 'thvi-photo__status is-error';
             status.textContent = error.message;
             card.classList.add('has-error');
