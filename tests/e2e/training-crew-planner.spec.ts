@@ -36,9 +36,19 @@ async function uploadBeforeScope(page: Page) {
     const submitted = clickButton(page, 'Read daily report');
     try {
         await uploadStarted;
-        await expect(page.getByRole('status').filter({ hasText: 'Reading daily report. Please wait while the schedule is checked.' })).toBeVisible();
-        await expect(page.getByRole('button', { name: 'Reading daily report…', exact: true })).toBeDisabled();
-        await expect(page.getByRole('button', { name: 'Clear file selection', exact: true })).toBeDisabled();
+        // Locator actions wait for a native navigation to finish. Read the still-visible
+        // old document directly while this request is deliberately held before commit.
+        await expect.poll(() => page.evaluate(() => {
+            const form = document.querySelector<HTMLFormElement>('.crew-planner form[enctype="multipart/form-data"]')!;
+            const status = form.querySelector<HTMLElement>('[role="status"]')!;
+            return {
+                busy: form.getAttribute('aria-busy'),
+                statusVisible: status.getBoundingClientRect().height > 0 && getComputedStyle(status).display !== 'none',
+                statusText: status.textContent?.trim(),
+                submitDisabled: form.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled,
+                resetDisabled: form.querySelector<HTMLButtonElement>('button[type="reset"]')!.disabled,
+            };
+        })).toEqual({ busy: 'true', statusVisible: true, statusText: 'Reading daily report. Please wait while the schedule is checked.', submitDisabled: true, resetDisabled: true });
         if (test.info().title.startsWith('review results')) await page.screenshot({ path: test.info().outputPath('synthetic-reading-report.png') });
     } finally {
         releaseUpload();
