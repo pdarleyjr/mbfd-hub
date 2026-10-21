@@ -10,17 +10,25 @@
 <body>
 <main class="identity-narrow">
     <div class="identity-strip"><img src="/images/mbfd_logo-256.png" alt="" width="32" height="32">Miami Beach Fire Department</div>
-    <h1>Activate your account</h1>
-    <p>First time using MBFD Hub? Confirm who you are and choose a password. It takes about a minute.</p>
+    <h1>Set up with employee details</h1>
+    <p>This option completes first-time setup for eligible accounts. If you already have a password, sign in. To choose or reset a password by email, request a private link.</p>
+    <a class="help" href="{{ $loginAttempt ? '/login?login_attempt='.$loginAttempt : route('login') }}">Already have a password? Sign in</a>
+    @if ($emailEnabled)
+        <a class="identity-secondary" href="{{ route('member-activation.email', array_filter(['login_attempt' => $loginAttempt])) }}">Get a private email link</a>
+    @endif
 
     @error('activation')
         <div class="notice error" role="alert">{{ $message }}</div>
     @enderror
 
-    <form method="POST" action="{{ route('member-activation.store', array_filter(['login_attempt' => $loginAttempt])) }}">
+    <form method="POST" action="{{ route('member-activation.store', array_filter(['method' => 'details', 'login_attempt' => $loginAttempt])) }}">
         @csrf
+        <input type="hidden" name="method" value="details">
+        @if ($loginAttempt)
+            <input type="hidden" name="login_attempt" value="{{ $loginAttempt }}">
+        @endif
         <label for="employee_id">Employee ID</label>
-        <input id="employee_id" name="employee_id" type="text" maxlength="64" autocomplete="username" autocapitalize="characters" spellcheck="false" value="{{ old('employee_id') }}" required autofocus @error('employee_id') aria-invalid="true" aria-describedby="employee_id-error" @enderror>
+        <input id="employee_id" name="employee_id" type="text" maxlength="64" autocomplete="username" autocapitalize="none" spellcheck="false" value="{{ old('employee_id') }}" required autofocus @error('employee_id') aria-invalid="true" aria-describedby="employee_id-error" @enderror>
         @error('employee_id')<div id="employee_id-error" class="error" role="alert">{{ $message }}</div>@enderror
 
         <label for="email">City email</label>
@@ -78,12 +86,7 @@
         <button type="submit">Activate account</button>
     </form>
 
-    @if ($emailEnabled)
-        <a class="help" href="{{ route('member-activation.email', array_filter(['login_attempt' => $loginAttempt])) }}">Use email activation instead</a>
-    @else
-        <p class="help small">Having trouble? Contact MBFD Hub support for an email setup link.</p>
-    @endif
-    <a class="help" href="{{ $loginAttempt ? '/login?login_attempt='.$loginAttempt : route('login') }}">Already activated? Sign in</a>
+    <p class="help small">Having trouble or missing your position? Contact MBFD Hub support to check your account and email on file. Do not create another account.</p>
 </main>
 </body>
 </html>

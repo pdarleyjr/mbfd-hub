@@ -17,7 +17,8 @@ final class ImportAuthoritativeCityEmailRoster extends Command
 {
     protected $signature = 'identity:import-authoritative-city-emails
         {file : Complete authoritative CSV containing Employee ID and Email Address columns}
-        {--apply : Import only unambiguous pending canonical accounts}
+        {--apply : Apply the selected pending-onboarding import or explicit missing-only repairs}
+        {--fill-missing : Fill missing City emails or approvals from Exact source matches without replacing existing addresses}
         {--confirm= : Required literal confirmation when using --apply}
         {--source-sha256= : SHA-256 of the exact owner-approved CSV required when using --apply}
         {--backup= : Current protected PostgreSQL backup required when using --apply}
@@ -31,7 +32,7 @@ final class ImportAuthoritativeCityEmailRoster extends Command
     public function handle(AuthoritativeCityEmailRosterImporter $importer, EstablishedAccountIntegritySnapshot $snapshots): int
     {
         try {
-            $preview = $importer->preview((string) $this->argument('file'));
+            $preview = $importer->preview((string) $this->argument('file'), (bool) $this->option('fill-missing'));
         } catch (Throwable) {
             $this->error('The roster CSV could not be validated. No identities were changed.');
 
@@ -39,14 +40,15 @@ final class ImportAuthoritativeCityEmailRoster extends Command
         }
         $summary = [
             'source_sha256' => $preview['source_sha256'],
+            'fill_missing' => $preview['fill_missing'],
             'requested' => count($preview['records']),
             'statuses' => $preview['statuses'],
             'exceptions' => collect($preview['records'])
-                ->filter(static fn (array $row): bool => ! in_array($row['status'], ['ready', 'unchanged'], true))
+                ->filter(static fn (array $row): bool => ! in_array($row['status'], ['ready', 'ready_binding', 'unchanged'], true))
                 ->map(static fn (array $row): array => ['employee_id' => $row['employee_id'], 'status' => $row['status']])
                 ->values()->all(),
         ];
-        $blocked = array_diff(array_keys($preview['statuses']), ['ready', 'unchanged', 'established_skipped', 'inactive_skipped', 'missing_city_email']);
+        $blocked = $importer->blockedStatuses($preview);
         if (! $this->option('apply')) {
             $this->report($summary + ['mode' => 'dry_run']);
 
@@ -70,11 +72,12 @@ final class ImportAuthoritativeCityEmailRoster extends Command
         }
 
         try {
+            $expected = $preview['fill_missing'] ? $this->expectedEmailRepairs($baseline, $preview) : $baseline;
             $applied = $importer->apply($preview);
-            $comparison = $snapshots->compare($baseline, $snapshots->capture());
+            $comparison = $snapshots->compare($expected, $snapshots->capture());
             $verified = 0;
             foreach ($preview['records'] as $row) {
-                if (! in_array($row['status'], ['ready', 'unchanged'], true)) {
+                if (! in_array($row['status'], ['ready', 'ready_binding', 'unchanged'], true)) {
                     continue;
                 }
                 $employee = Employee::query()->find($row['employee_profile_id']);
@@ -91,7 +94,7 @@ final class ImportAuthoritativeCityEmailRoster extends Command
             }
             $success = $comparison['unexpected_changes'] === 0
                 && $comparison['newly_established_accounts'] === 0
-                && $verified === ($preview['statuses']['ready'] ?? 0) + ($preview['statuses']['unchanged'] ?? 0);
+                && $verified === ($preview['statuses']['ready'] ?? 0) + ($preview['statuses']['ready_binding'] ?? 0) + ($preview['statuses']['unchanged'] ?? 0);
             $this->report($summary + ['mode' => 'apply', 'applied' => $applied, 'post_run_verified' => $verified,
                 'established_account_integrity' => $success ? 'preserved' : 'failed']);
 
@@ -101,6 +104,36 @@ final class ImportAuthoritativeCityEmailRoster extends Command
 
             return self::FAILURE;
         }
+    }
+
+    /** Allow only the exact source-approved email columns; every security field still compares byte-for-byte. */
+    private function expectedEmailRepairs(array $baseline, array $preview): array
+    {
+        $repairs = collect($preview['records'])->where('status', 'ready')->keyBy('user_id');
+        foreach ($baseline['accounts'] as &$account) {
+            $repair = $repairs->get($account['user_id']);
+            if ($repair === null) {
+                continue;
+            }
+            if ($account['employee_id'] !== $repair['employee_id']
+                || $account['employee_profile_id'] !== $repair['employee_profile_id']
+                || trim((string) $account['employee_city_email']) !== ''
+                || ($account['user_email'] !== $repair['city_email']
+                    && (preg_match('/\A[^@\s]+@canonical\.mbfdhub\.invalid\z/', $account['user_email']) !== 1
+                        || $account['email_verified_at'] !== null))) {
+                throw new \RuntimeException('The approved missing-email repair does not match the integrity baseline.');
+            }
+            $account['user_email'] = $repair['city_email'];
+            $account['employee_city_email'] = $repair['city_email'];
+            $account['email_fingerprint'] = hash('sha256', json_encode([
+                'user_email' => $account['user_email'],
+                'email_verified_at' => $account['email_verified_at'],
+                'employee_city_email' => $account['employee_city_email'],
+            ], JSON_THROW_ON_ERROR));
+        }
+        unset($account);
+
+        return $baseline;
     }
 
     /** @return array<string,mixed>|null */
