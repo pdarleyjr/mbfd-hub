@@ -22,11 +22,14 @@ async function login(page: Page, role = 'training_admin') {
 
 async function freshProposal(page: Page) {
     await login(page);
-    await page.goto('/training/crew-planner');
+    const plannerResponse = await page.goto('/training/crew-planner');
+    expect(plannerResponse?.headers()['content-security-policy']).toContain("form-action 'self'");
     await expect(page.getByRole('heading', { name: 'Crew Planner', exact: true })).toBeVisible();
     await page.getByRole('combobox', { name: 'Course', exact: true }).selectOption({ label: 'Synthetic new course' });
     await clickButton(page, 'Use this scope');
     await expect(page.getByText('The proposal excludes members with verified attendance', { exact: false })).toBeVisible();
+    // Recheck after the Livewire render, when an absolute URL could switch to the apex host.
+    await expect(page.locator('.crew-planner form[enctype="multipart/form-data"]')).toHaveAttribute('action', '/training/crew-planner/upload');
     const baseline = await (await page.request.get('/__crew_domain_fingerprint')).json();
     const pdf = await page.request.get('/__synthetic_daily.pdf');
     await page.getByLabel('Daily TeleStaff PDF', { exact: true }).setInputFiles({ name: 'synthetic-daily.pdf', mimeType: 'application/pdf', buffer: await pdf.body() });
