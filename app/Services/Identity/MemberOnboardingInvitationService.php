@@ -82,7 +82,7 @@ final class MemberOnboardingInvitationService
         $latestDeliveries = OutboundEmail::query()
             ->where('source_type', 'member_onboarding_invitation')
             ->whereIn('source_id', $invitations->pluck('id')->map((fn ($id): string => (string) $id))->all())
-            ->orderByDesc('id')->get(['id', 'source_id', 'status'])->unique('source_id')->keyBy('source_id');
+            ->orderByDesc('id')->get(['id', 'source_id', 'status', 'queued_at', 'created_at'])->unique('source_id')->keyBy('source_id');
         $emails = $employees->map(fn (Employee $employee): string => $this->authoritativeCityEmail($employee))->unique()->all();
         $collidingEmployees = Employee::query()
             ->whereIn('employee_id', $employees->pluck('employee_id')->all())
@@ -298,7 +298,8 @@ final class MemberOnboardingInvitationService
 
     private function deliveryNeedsReconciliation(?OutboundEmail $delivery): bool
     {
-        return $delivery !== null && in_array($delivery->status, ['pending', 'reserved', 'submitted', 'acceptance_unknown', 'unknown'], true);
+        return $delivery !== null && in_array($delivery->status, ['pending', 'reserved', 'submitted', 'acceptance_unknown', 'unknown'], true)
+            && ($delivery->queued_at ?? $delivery->created_at)->copy()->addMinutes(30)->isFuture();
     }
 
     private function invitationIsCurrent(MemberOnboardingInvitation $invitation, User $user, Employee $employee, CarbonImmutable $at): bool

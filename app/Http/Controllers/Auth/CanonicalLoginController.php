@@ -10,6 +10,7 @@ use App\Services\Identity\AuthentikOidcClient;
 use App\Services\Identity\CanonicalLoginDestination;
 use App\Services\Identity\CanonicalSessionIssuer;
 use App\Services\Identity\CanonicalUserResolver;
+use App\Services\Identity\EmployeeIdentifier;
 use App\Services\Identity\FederationLoginAttempt;
 use App\Services\Identity\MemberSelfServiceActivation;
 use App\Services\Identity\SessionRegistry;
@@ -80,7 +81,7 @@ final class CanonicalLoginController extends Controller
             return redirect($attempts->loginUrl($request))->withErrors($validator);
         }
         $credentials = $validator->validate();
-        $employeeId = trim($credentials['employee_id']);
+        $employeeId = EmployeeIdentifier::normalize($credentials['employee_id']);
         $throttleKey = $this->throttleKey($employeeId, (string) $request->ip());
         $maxAttempts = max(1, (int) config('security.canonical_login.max_attempts', 5));
         $decaySeconds = max(1, (int) config('security.canonical_login.decay_seconds', 60));

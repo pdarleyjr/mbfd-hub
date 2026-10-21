@@ -7,6 +7,7 @@ namespace App\Services\Identity;
 use App\Enums\AccountStatus;
 use App\Models\CityEmailVerification;
 use App\Models\Employee;
+use App\Models\MemberOnboardingRosterBinding;
 use App\Models\User;
 use App\Services\Communications\CloudflareEmailDispatcher;
 use Illuminate\Database\QueryException;
@@ -78,9 +79,9 @@ final class CityEmailVerificationService
     }
 
     /**
-     * New member accounts obtain recovery authority only by consuming their
-     * invitation at the roster's authoritative City address. Established
-     * accounts retain their deliberately grandfathered recovery behavior.
+     * Recovery goes to a verified mailbox or an approved authoritative roster
+     * address. Sending a reset link does not itself mark a mailbox verified.
+     * Established accounts retain their grandfathered recovery behavior.
      */
     public function recoveryAddress(User $user): ?string
     {
@@ -97,7 +98,16 @@ final class CityEmailVerificationService
         $employee = $current->employeeProfile;
         $authoritative = $employee instanceof Employee ? strtolower(trim((string) $employee->city_email)) : '';
 
-        return $current->email_verified_at !== null
+        $approvedRosterAddress = $employee instanceof Employee
+            && $employee->employee_id === $current->employee_id
+            && $this->validCityEmail($authoritative)
+            && MemberOnboardingRosterBinding::query()
+                ->where('employee_profile_id', $employee->id)
+                ->where('employee_id', $current->employee_id)
+                ->where('city_email', $authoritative)
+                ->whereNotNull('approved_at')->exists();
+
+        return ($current->email_verified_at !== null || $approvedRosterAddress)
             && is_string($current->email)
             && hash_equals($authoritative, $address)
             && hash_equals($current->email, $address)

@@ -6,6 +6,7 @@ namespace Tests\Feature\Auth;
 
 use App\Enums\AccountStatus;
 use App\Exceptions\EmailBudgetExhausted;
+use App\Jobs\IssueMemberOnboardingInvitation;
 use App\Models\CloudflareUsageBudget;
 use App\Models\Employee;
 use App\Models\MemberOnboardingInvitation;
@@ -257,10 +258,11 @@ final class MemberBootstrapOnboardingTest extends TestCase
         self::assertSame(AccountStatus::PendingActivation, $memberB->fresh()->account_status);
     }
 
-    public function test_new_member_recovery_requires_the_verified_authoritative_city_address(): void
+    public function test_new_member_recovery_can_use_the_approved_authoritative_city_address(): void
     {
         $member = $this->pending('ONBOARD-RECOVERY');
         $member->forceFill([
+            'email' => $member->employeeProfile->city_email,
             'account_status' => AccountStatus::Active,
             'bootstrap_onboarding_eligible' => false,
             'bootstrap_onboarding_completed_at' => now(),
@@ -268,8 +270,9 @@ final class MemberBootstrapOnboardingTest extends TestCase
         ])->save();
 
         $this->post('/forgot-password', ['employee_id' => $member->employee_id])->assertRedirect()->assertSessionHas('status');
-        Http::assertNothingSent();
-        self::assertDatabaseCount('password_reset_tokens', 0);
+        Http::assertSentCount(1);
+        self::assertDatabaseCount('password_reset_tokens', 1);
+        self::assertNull($member->fresh()->email_verified_at);
     }
 
     public function test_administrator_assisted_activation_does_not_verify_recovery_email(): void
@@ -288,6 +291,7 @@ final class MemberBootstrapOnboardingTest extends TestCase
         $this->post('/forgot-password', ['employee_id' => $member->employee_id])->assertRedirect()->assertSessionHas('status');
         Http::assertNothingSent();
         self::assertDatabaseCount('password_reset_tokens', 0);
+        self::assertNull($member->fresh()->email_verified_at);
     }
 
     public function test_multiple_invites_use_independent_private_single_recipient_messages_and_delivery_links(): void
@@ -352,22 +356,47 @@ final class MemberBootstrapOnboardingTest extends TestCase
         }
     }
 
-    public function test_uncertain_provider_acceptance_preserves_token_and_blocks_automatic_resend(): void
+    public function test_uncertain_provider_acceptance_preserves_the_link_and_a_new_request_can_follow_expiry(): void
     {
         $startedAt = CarbonImmutable::now();
         CarbonImmutable::setTestNow($startedAt);
         try {
             $member = $this->pending('ONBOARD-UNKNOWN');
+            $job = new IssueMemberOnboardingInvitation($member->id, null, IssueMemberOnboardingInvitation::bindingHash(
+                $member->id, $member->employee_id, (string) $member->employeeProfile->city_email, $member->security_version,
+            ));
             Http::fake(fn () => throw new \RuntimeException('Lost provider response'));
-            self::assertSame('queued', app(MemberOnboardingInvitationService::class)->issue($member, $startedAt));
+            $job->handle(app(MemberOnboardingInvitationService::class));
             $invitation = MemberOnboardingInvitation::query()->sole();
             self::assertNotNull($invitation->token_hash);
             self::assertSame('acceptance_unknown', $invitation->outboundEmail->status);
+            $originalHash = $invitation->token_hash;
+
+            CarbonImmutable::setTestNow($startedAt->addMinutes(29));
+            self::assertSame('already_invited', app(MemberOnboardingInvitationService::class)->assess($member->employeeProfile)['status']);
+            self::assertSame('already_invited', app(MemberOnboardingInvitationService::class)->issue($member, CarbonImmutable::now()));
+            self::assertSame($originalHash, $invitation->fresh()->token_hash);
 
             CarbonImmutable::setTestNow($startedAt->addMinutes(31));
-            self::assertSame('delivery_reconciliation_required', app(MemberOnboardingInvitationService::class)->assess($member->employeeProfile)['status']);
-            self::assertSame('already_invited', app(MemberOnboardingInvitationService::class)->issue($member, CarbonImmutable::now()));
+            self::assertSame('ready', app(MemberOnboardingInvitationService::class)->assess($member->employeeProfile)['status']);
+            self::assertSame('ready', app(MemberOnboardingInvitationService::class)->assessMany(Employee::query()->whereKey($member->employee_profile_id)->get())[$member->employee_profile_id]['status']);
+            // Retrying the original queued send never replaces its link.
+            $job->handle(app(MemberOnboardingInvitationService::class));
             self::assertDatabaseCount('outbound_emails', 1);
+
+            CloudflareUsageBudget::query()->update(['reconciled_at' => now(), 'provider_daily_reconciled_at' => now()]);
+            Http::swap(new \Illuminate\Http\Client\Factory);
+            Http::fake(fn (Request $request) => Http::response([
+                'success' => true,
+                'result' => ['message_id' => 'replacement-onboarding-test-message', 'delivered' => $request['to']],
+            ]));
+            $newRequest = new IssueMemberOnboardingInvitation($member->id, null, $job->expectedBindingHash);
+            $newRequest->handle(app(MemberOnboardingInvitationService::class));
+
+            self::assertDatabaseCount('outbound_emails', 2);
+            self::assertSame('delivered', OutboundEmail::query()->orderByDesc('id')->first()->status);
+            self::assertNotSame($originalHash, $invitation->fresh()->token_hash);
+            self::assertSame($startedAt->addMinutes(61)->getTimestamp(), $invitation->fresh()->expires_at->getTimestamp());
         } finally {
             CarbonImmutable::setTestNow();
         }

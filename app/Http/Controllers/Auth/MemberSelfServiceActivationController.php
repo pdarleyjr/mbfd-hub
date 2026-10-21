@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Rules\SafeNewPassword;
 use App\Services\Identity\CanonicalLoginDestination;
 use App\Services\Identity\CanonicalSessionIssuer;
+use App\Services\Identity\EmployeeIdentifier;
 use App\Services\Identity\FederationLoginAttempt;
 use App\Services\Identity\MemberAccessEmail;
 use App\Services\Identity\MemberSelfServiceActivation;
@@ -25,24 +26,25 @@ use Throwable;
 
 final class MemberSelfServiceActivationController extends Controller
 {
-    private const FAILURE = 'We could not activate an account with that information. Check your Employee ID, City email, and the shift and unit you bid (or your position), then try again or use email activation.';
+    private const FAILURE = 'We could not complete setup with those details. If you already have a password, sign in. Otherwise, request a private email link or contact MBFD Hub support to check your account and email on file.';
 
     /** Answers a member should not have to re-enter after a refusal. */
     private const REMEMBERED = ['employee_id', 'email', 'shift', 'unit', 'position'];
 
     private const THROTTLED = 'Too many attempts. Wait a few minutes before trying again, or contact MBFD Hub support.';
 
-    public const EMAIL_STATUS = 'If this Employee ID is eligible, we have emailed a private link to the address on file. Open it within 30 minutes, and check your Junk folder too.';
+    public const EMAIL_STATUS = 'If this Employee ID is eligible, a private link will be sent to the address on file. Check Inbox and Junk; the email states when the link expires.';
 
     public function show(Request $request, MemberSelfServiceActivation $activation): Response
     {
         if ($request->user('web') instanceof User) {
             return redirect('/');
         }
+        if ($activation->emailRequestEnabled() && (! $activation->enabled() || $request->query('method') !== 'details')) {
+            return redirect()->route('member-activation.email', $request->only('login_attempt'));
+        }
         if (! $activation->enabled()) {
-            return $activation->emailRequestEnabled()
-                ? redirect()->route('member-activation.email', $request->only('login_attempt'))
-                : redirect('/login');
+            return redirect('/login');
         }
 
         return $this->page('auth.member-activation', $request, $activation);
@@ -60,6 +62,9 @@ final class MemberSelfServiceActivationController extends Controller
         if (! $request->query->has('login_attempt') && is_string($request->input('login_attempt'))) {
             $request->query->set('login_attempt', $request->input('login_attempt'));
         }
+        if (is_string($request->input('employee_id'))) {
+            $request->merge(['employee_id' => EmployeeIdentifier::normalize($request->input('employee_id'))]);
+        }
         $validator = Validator::make($request->all(), [
             'employee_id' => ['required', 'string', 'max:64'],
             'email' => ['required', 'string', 'max:254'],
@@ -75,11 +80,12 @@ final class MemberSelfServiceActivationController extends Controller
             'position' => 'position',
         ]);
         if ($validator->fails()) {
-            return back()->withErrors($validator)->withInput($request->only(self::REMEMBERED));
+            return redirect()->route('member-activation.show', ['method' => 'details'] + $request->only('login_attempt'))
+                ->withErrors($validator)->withInput($request->only(self::REMEMBERED));
         }
         $data = $validator->validated();
 
-        $employeeId = trim($data['employee_id']);
+        $employeeId = $data['employee_id'];
         $keys = $this->throttleKeys('claim', $employeeId, (string) $request->ip());
         if (RateLimiter::tooManyAttempts($keys['identity'], 5) || RateLimiter::tooManyAttempts($keys['source'], 20)) {
             return $this->refused($request, 'rate_limited', $employeeId, self::THROTTLED);
@@ -138,7 +144,9 @@ final class MemberSelfServiceActivationController extends Controller
             return redirect('/');
         }
         if (! $activation->emailRequestEnabled()) {
-            return redirect($activation->enabled() ? route('member-activation.show') : '/login');
+            return $activation->enabled()
+                ? redirect()->route('member-activation.show', $request->only('login_attempt'))
+                : redirect('/login');
         }
 
         return $this->page('auth.member-activation-email', $request, $activation);
@@ -147,8 +155,17 @@ final class MemberSelfServiceActivationController extends Controller
     public function requestEmail(Request $request, MemberSelfServiceActivation $activation, MemberAccessEmail $accessEmail): RedirectResponse
     {
         abort_unless($activation->emailRequestEnabled(), 404);
+        if ($request->user('web') instanceof User) {
+            return redirect('/');
+        }
+        if (! $request->query->has('login_attempt') && is_string($request->input('login_attempt'))) {
+            $request->query->set('login_attempt', $request->input('login_attempt'));
+        }
+        if (is_string($request->input('employee_id'))) {
+            $request->merge(['employee_id' => EmployeeIdentifier::normalize($request->input('employee_id'))]);
+        }
         $data = $request->validate(['employee_id' => ['required', 'string', 'max:64']], [], ['employee_id' => 'Employee ID']);
-        $employeeId = trim($data['employee_id']);
+        $employeeId = $data['employee_id'];
         $keys = $this->throttleKeys('email', $employeeId, (string) $request->ip());
         if (RateLimiter::tooManyAttempts($keys['identity'], 3) || RateLimiter::tooManyAttempts($keys['source'], 10)) {
             return back()->withErrors(['employee_id' => self::THROTTLED]);
@@ -164,7 +181,8 @@ final class MemberSelfServiceActivationController extends Controller
             Log::error('member_email_activation_request_failed', ['exception_class' => $exception::class]);
         }
 
-        return redirect()->route('member-activation.email', $request->only('login_attempt'))->with('status', self::EMAIL_STATUS);
+        return redirect()->route('member-activation.email', $request->only('login_attempt'))
+            ->with('status', self::EMAIL_STATUS)->withInput($request->only('employee_id'));
     }
 
     private function page(string $view, Request $request, MemberSelfServiceActivation $activation): Response
@@ -187,7 +205,8 @@ final class MemberSelfServiceActivationController extends Controller
             'source_fingerprint' => hash_hmac('sha256', (string) $request->ip(), (string) config('app.key')),
         ]);
 
-        return back()->withErrors(['activation' => $message])->withInput($request->only(self::REMEMBERED));
+        return redirect()->route('member-activation.show', ['method' => 'details'] + $request->only('login_attempt'))
+            ->withErrors(['activation' => $message])->withInput($request->only(self::REMEMBERED));
     }
 
     /** @return array{identity:string,source:string} */

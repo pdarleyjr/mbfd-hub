@@ -20,10 +20,15 @@ class SecurityHeaders
         // express "self + cloud.mbfdhub.com". The CSP `frame-ancestors` directive
         // below covers the same use case and supersedes this header in all modern
         // browsers, so we omit it intentionally.
-        $cityEmailPage = $request->is('account/city-email', 'account/city-email/*');
-        $loginPage = $request->is('login');
-        $response->headers->set('Referrer-Policy', $cityEmailPage || $loginPage ? 'no-referrer' : 'strict-origin-when-cross-origin');
-        if ($cityEmailPage || $loginPage) {
+        // Authentication URLs can contain private bearer tokens or a bound
+        // sign-in continuation. Never forward them through referrers or CSP reports.
+        $identityPage = $request->is(
+            'login', 'activate', 'activate/*', 'forgot-password', 'reset-password', 'reset-password/*',
+            'member-onboarding', 'member-onboarding/*', 'account/city-email', 'account/city-email/*',
+            'auth/*', 'oauth/*',
+        );
+        $response->headers->set('Referrer-Policy', $identityPage ? 'no-referrer' : 'strict-origin-when-cross-origin');
+        if ($identityPage) {
             $response->headers->set('Cache-Control', 'no-store, private');
         }
         $conferencePath = $request->is('video-conferencing/*')
@@ -98,7 +103,7 @@ class SecurityHeaders
             // header and isn't supported by Safari yet; report-uri is enough for
             // an enforcement CSP.
         ];
-        if (! $cityEmailPage) {
+        if (! $identityPage) {
             $cspParts[] = 'report-uri /_csp-report';
         }
         if ($request->secure()) {

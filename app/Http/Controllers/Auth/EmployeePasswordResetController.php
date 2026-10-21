@@ -12,6 +12,7 @@ use App\Services\Communications\CloudflareEmailDispatcher;
 use App\Services\Identity\AccountSecurityService;
 use App\Services\Identity\CanonicalUserProvisioner;
 use App\Services\Identity\CityEmailVerificationService;
+use App\Services\Identity\EmployeeIdentifier;
 use App\Services\Identity\IdentityProviderService;
 use App\Services\Identity\MemberAccessEmail;
 use Illuminate\Auth\Passwords\PasswordBroker;
@@ -45,7 +46,7 @@ final class EmployeePasswordResetController extends Controller
         MemberAccessEmail $accessEmail,
     ): RedirectResponse {
         $validated = $request->validate(['employee_id' => ['required', 'string', 'max:64']]);
-        $employeeId = trim((string) $validated['employee_id']);
+        $employeeId = EmployeeIdentifier::normalize((string) $validated['employee_id']);
         $key = 'employee-password-reset:'.hash_hmac('sha256', $employeeId.'|'.$request->ip(), (string) config('app.key'));
         if (RateLimiter::tooManyAttempts($key, 3)) {
             return back()->with('status', self::GENERIC_STATUS);
@@ -151,7 +152,7 @@ final class EmployeePasswordResetController extends Controller
             'token' => ['required', 'string'],
             'password' => ['required', 'confirmed', PasswordRule::defaults(), new SafeNewPassword],
         ]);
-        $employee = Employee::query()->where('employee_id', trim($validated['employee_id']))->first();
+        $employee = Employee::query()->where('employee_id', EmployeeIdentifier::normalize($validated['employee_id']))->first();
         $user = $employee?->user;
         $reset = $user instanceof User && DB::transaction(function () use ($user, $validated, $security): bool {
             $current = User::query()->lockForUpdate()->find($user->id);

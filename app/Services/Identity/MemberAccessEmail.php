@@ -8,6 +8,7 @@ use App\Enums\AccountStatus;
 use App\Jobs\IssueMemberOnboardingInvitation;
 use App\Jobs\SendMemberPasswordLink;
 use App\Models\Employee;
+use App\Models\OutboundEmail;
 use App\Models\User;
 use App\Services\Security\SecurityAuditRecorder;
 use Illuminate\Support\Facades\Log;
@@ -39,9 +40,9 @@ final class MemberAccessEmail
         self::SETUP_READY => 'Has not finished setup. A setup link can be emailed to :email.',
         self::RESET_READY => 'Can sign in. A password reset link can be emailed to :email.',
         'recently_sent' => 'A setup link was sent recently and is still valid. Ask the member to check Inbox and Junk.',
-        'delivery_pending' => 'The last setup email is still being confirmed by the mail service. Try again in a few minutes.',
+        'delivery_pending' => 'The last account email is still being confirmed by the mail service. Check Inbox and Junk before requesting another link.',
         'no_email_on_record' => 'Cannot send: there is no deliverable email on record. Add the member\'s City email first.',
-        'email_not_approved' => 'Cannot send: the City email on file has not been approved for first-time setup yet.',
+        'email_not_approved' => 'Cannot send: confirm the City email against the approved employee directory before sending an account link.',
         'email_conflict' => 'Cannot send: another account uses the same City email. Resolve the duplicate first.',
         'setup_not_available' => 'Cannot send: this account is waiting for an administrator to finish provisioning it.',
         'no_login_account' => 'Cannot send: no login account is linked to this personnel record.',
@@ -81,6 +82,7 @@ final class MemberAccessEmail
      */
     public function request(string $employeeId, ?User $administrator = null): string
     {
+        $employeeId = EmployeeIdentifier::normalize($employeeId);
         $employees = Employee::query()->where('employee_id', $employeeId)->limit(2)->get();
         if ($employees->count() !== 1 || $employees->first()->employee_id !== $employeeId) {
             $this->log($employeeId, $employees->isEmpty() ? 'unknown_employee_id' : 'identity_conflict', null);
@@ -158,6 +160,19 @@ final class MemberAccessEmail
             return ['identity_conflict', $user, null];
         }
         $recipient = $this->emails->recoveryAddress($user);
+        if ($recipient === null && $this->emails->connectedEmail($user) !== null) {
+            return ['email_not_approved', $user, null];
+        }
+
+        if ($recipient !== null) {
+            $latest = OutboundEmail::query()->where('source_type', 'password_reset')
+                ->where('source_id', (string) $user->id)->orderByDesc('id')->first();
+            if ($latest !== null
+                && in_array($latest->status, ['pending', 'reserved', 'submitted', 'acceptance_unknown', 'unknown'], true)
+                && ($latest->queued_at ?? $latest->created_at)?->addMinutes((int) config('auth.passwords.users.expire', 60))->isFuture()) {
+                return ['delivery_pending', $user, $recipient];
+            }
+        }
 
         return $recipient === null ? ['no_email_on_record', $user, null] : [self::RESET_READY, $user, $recipient];
     }

@@ -10,7 +10,7 @@ final class CanonicalUserResolver
 {
     public function byIdentifier(string $identifier): ?User
     {
-        $employeeId = trim($identifier);
+        $employeeId = EmployeeIdentifier::normalize($identifier);
         $matches = User::query()
             ->whereHas('employeeProfile', static function ($query) use ($employeeId): void {
                 $query->where('employee_id', $employeeId);
