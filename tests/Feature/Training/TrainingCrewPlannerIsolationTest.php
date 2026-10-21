@@ -56,6 +56,23 @@ final class TrainingCrewPlannerIsolationTest extends TestCase
         }
     }
 
+    public function test_upload_action_stays_same_origin_when_livewire_uses_another_url_root(): void
+    {
+        // A Livewire render may use the configured apex URL while the browser is on www.
+        // form-action 'self' must still allow the native multipart upload.
+        \Illuminate\Support\Facades\URL::forceRootUrl('https://mbfdhub.com');
+        try {
+            Livewire::test(TrainingCrewPlanner::class)
+                ->assertSeeHtml('action="/training/crew-planner/upload"')
+                ->set('courseId', $this->course->id)
+                ->call('applyScope')
+                ->assertHasNoErrors()
+                ->assertSeeHtml('action="/training/crew-planner/upload"');
+        } finally {
+            \Illuminate\Support\Facades\URL::forceRootUrl(null);
+        }
+    }
+
     public function test_real_http_upload_cumulative_livewire_plan_and_both_downloads_leave_every_domain_table_unchanged(): void
     {
         $component = Livewire::test(TrainingCrewPlanner::class)->set('courseId', $this->course->id)->call('applyScope')->assertHasNoErrors();
