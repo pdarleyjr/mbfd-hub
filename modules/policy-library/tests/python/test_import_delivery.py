@@ -54,9 +54,15 @@ class WholeDeliveryLinkTests(unittest.TestCase):
         with pymupdf.open(self.source) as pdf:
             pdf.xref_set_key(links[0]["annotation_xref"], "A", f"<< /S /URI /URI ({links[0]['uri']}) >>")
             pdf.save(served, garbage=0, deflate=False, no_new_id=True)
-        proof = verify_derivative(self.source, served, links, True)
+        contacts = self.root / "contacts"
+        proof = verify_derivative(self.source, served, links, True, contacts, "SYNTHETIC-100")
         self.assertEqual(len(proof), 1)
         self.assertEqual(proof[0]["canonical_render_sha256"], proof[0]["served_render_sha256"])
+        from PIL import Image
+        with Image.open(contacts / "synthetic-100-01.jpg") as contact:
+            self.assertEqual(contact.format, "JPEG")
+            self.assertEqual(contact.mode, "RGB")
+            self.assertEqual(contact.size, (1440, 1360))
         with pymupdf.open(served) as pdf:
             self.assertEqual([link["kind"] for link in pdf[0].get_links()], [pymupdf.LINK_URI, pymupdf.LINK_GOTO])
 
