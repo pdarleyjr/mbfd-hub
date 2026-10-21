@@ -220,23 +220,71 @@ final class TakeHomeVehicleInspectionTest extends TestCase
         $this->assertSame(1, TakeHomeVehicleInspection::query()->count());
     }
 
-    public function test_incomplete_submissions_are_rejected_with_specific_messages(): void
+    public function test_only_the_vehicle_acknowledgment_and_signature_are_required(): void
+    {
+        $user = $this->member();
+        $vehicle = $this->vehicle(['veh_number' => '22514']);
+
+        $response = $this->actingAs($user)->postJson(self::BASE, [
+            'client_submission_id' => (string) Str::uuid(),
+            'vehicle_id' => $vehicle->id,
+            'acknowledged' => true,
+            'signature' => $this->signature(true),
+        ])->assertCreated();
+
+        $inspection = TakeHomeVehicleInspection::query()->where('reference', $response->json('reference'))->firstOrFail();
+        $this->assertNull($inspection->driver_name);
+        $this->assertNull($inspection->odometer);
+        $this->assertNull($inspection->keys_present);
+        $this->assertNull($inspection->acceptable_for_use);
+        $this->assertCount(0, $inspection->photos);
+        $this->assertSame([null], array_values(array_unique(array_column($inspection->checks, 'status'), SORT_REGULAR)));
+        // Unanswered is never reported as an all-clear.
+        $this->assertFalse($inspection->has_issues);
+        $this->assertTrue($inspection->has_not_checked);
+        $this->assertTrue($inspection->needsAttention());
+
+        $this->actingAs($user)->get(self::BASE.'/'.$inspection->reference)->assertOk()
+            ->assertSee('Not answered')
+            ->assertSee('Not recorded')
+            ->assertSee('Not provided')
+            ->assertSee('Acceptability for use was not answered.');
+        $pdf = $this->actingAs($user)->get(self::BASE.'/'.$inspection->reference.'/pdf')->assertOk();
+        $this->assertStringStartsWith('%PDF', (string) $pdf->getContent());
+    }
+
+    public function test_only_missing_vehicle_acknowledgment_or_signature_block_submission(): void
+    {
+        $user = $this->member();
+        $this->vehicle(['veh_number' => '22514']);
+
+        $response = $this->actingAs($user)->postJson(self::BASE, [
+            'client_submission_id' => (string) Str::uuid(),
+            'acknowledged' => false,
+        ])->assertUnprocessable()
+            ->assertJsonValidationErrors(['vehicle_id', 'acknowledged', 'signature']);
+
+        $this->assertSame(['acknowledged', 'signature', 'vehicle_id'], collect($response->json('errors'))->keys()->sort()->values()->all());
+        $this->assertSame(0, TakeHomeVehicleInspection::query()->count());
+    }
+
+    public function test_an_issue_without_a_description_and_partial_photos_are_accepted(): void
     {
         $user = $this->member();
         $vehicle = $this->vehicle(['veh_number' => '22514']);
         $payload = $this->payload($user, $vehicle);
-        unset($payload['photos']['dashboard']);
+        unset($payload['photos']['dashboard'], $payload['photos']['interior']);
         $payload['checks']['exterior_body'] = ['status' => 'issue', 'issue_description' => '', 'notes' => null];
         unset($payload['checks']['windows_mirrors']);
-        $payload['acknowledged'] = false;
-        $payload['odometer'] = null;
+        $payload['keys_present'] = null;
 
-        $this->actingAs($user)->postJson(self::BASE, $payload)
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors([
-                'photos.dashboard', 'checks.exterior_body.issue_description', 'checks.windows_mirrors', 'acknowledged', 'odometer',
-            ]);
-        $this->assertSame(0, TakeHomeVehicleInspection::query()->count());
+        $response = $this->actingAs($user)->postJson(self::BASE, $payload)->assertCreated();
+
+        $inspection = TakeHomeVehicleInspection::query()->where('reference', $response->json('reference'))->firstOrFail();
+        $this->assertCount(4, $inspection->photos);
+        $this->assertTrue($inspection->has_issues);
+        $this->assertTrue($inspection->has_not_checked);
+        $this->assertNull($inspection->keys_present);
     }
 
     public function test_blank_signature_and_another_members_photo_are_refused(): void

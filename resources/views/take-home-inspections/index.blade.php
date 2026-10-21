@@ -17,7 +17,7 @@
         @if($receipt)
             <div class="hub-callout" role="status">
                 <p class="font-bold">Inspection submitted · {{ $receipt->reference }}</p>
-                <p class="mt-1 text-sm">Vehicle {{ $receipt->vehicleLabel() }} · {{ $receipt->submittedAtLocal() }} · Acceptable for use: {{ $receipt->acceptable_for_use ? 'Yes' : 'No' }}</p>
+                <p class="mt-1 text-sm">Vehicle {{ $receipt->vehicleLabel() }} · {{ $receipt->submittedAtLocal() }} · Acceptable for use: {{ $receipt->acceptableLabel() }}</p>
                 @if($receipt->needsAttention())
                     <p class="mt-1 text-sm">Fleet will see the flagged items on this report.</p>
                 @endif
@@ -39,7 +39,7 @@
                 @if($inspections->isEmpty())
                     <div class="py-6 text-center">
                         <p class="font-semibold">You have not submitted a take-home inspection yet.</p>
-                        <p class="mt-1 text-sm text-hub-muted">Start one with New inspection. It takes about five minutes, including six photos.</p>
+                        <p class="mt-1 text-sm text-hub-muted">Start one with New inspection. Only the vehicle and your signature are required.</p>
                     </div>
                 @else
                     <ul class="thvi-history">
@@ -51,13 +51,15 @@
                                 </div>
                                 <div class="min-w-0">
                                     <p class="font-semibold">{{ $inspection->vehicleLabel() }}</p>
-                                    <p class="text-sm text-hub-muted">Driver: {{ $inspection->driver_name }}</p>
+                                    <p class="text-sm text-hub-muted">Driver: {{ $inspection->driverLabel() }}</p>
                                 </div>
                                 <div>
-                                    @if($inspection->acceptable_for_use)
+                                    @if($inspection->acceptable_for_use === true)
                                         <span class="hub-tag hub-tag--success">Acceptable</span>
-                                    @else
+                                    @elseif($inspection->acceptable_for_use === false)
                                         <span class="hub-tag hub-tag--danger">Not acceptable</span>
+                                    @else
+                                        <span class="hub-tag hub-tag--warning">Acceptability not answered</span>
                                     @endif
                                     @if($inspection->has_issues)<span class="hub-tag hub-tag--danger">Issues</span>@endif
                                     @if($inspection->has_not_checked)<span class="hub-tag hub-tag--warning">Not checked</span>@endif

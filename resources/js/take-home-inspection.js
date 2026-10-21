@@ -189,27 +189,22 @@ function initTakeHomeInspection(form) {
         const errors = {};
         if (step === 0) {
             if (!state.vehicle) errors.vehicle_id = 'Choose the vehicle you are inspecting.';
-            if (state.vehicleFields.year && !/^\d{4}$/.test(state.vehicleFields.year)) errors['vehicle.year'] = 'Enter a four-digit model year.';
-            if (!state.driver && !(state.driverManual && state.driverName.trim())) errors.driver_name = 'Choose the assigned driver, or select "Driver not listed" and enter their full name.';
-            if (!state.odometerNone && !/^\d{1,7}$/.test(state.odometer)) errors.odometer = 'Enter the odometer reading in miles, or check the no-odometer box.';
-            else if (!state.odometerNone && Number(state.odometer) > 2000000) errors.odometer = 'Check the odometer reading; it cannot be more than 2,000,000 miles.';
+            // Only the vehicle is required here; other entries are format-checked when filled in.
+            if (state.vehicleFields.year && !/^\d{4}$/.test(state.vehicleFields.year)) errors['vehicle.year'] = 'Enter a four-digit model year, or leave it blank.';
+            if (!state.odometerNone && state.odometer && Number(state.odometer) > 2000000) errors.odometer = 'Check the odometer reading; it cannot be more than 2,000,000 miles.';
         }
         if (step === 1) {
             config.checks.forEach((check) => {
-                const answer = state.checks[check.key];
-                if (!answer.status) errors[`checks.${check.key}.status`] = `Choose Good, Issue found or Not checked for ${check.label}.`;
-                else if (answer.status === 'issue' && !answer.issue_description.trim()) errors[`checks.${check.key}.issue_description`] = `Describe the issue found for ${check.label}.`;
                 if (photosBusy(check.key)) errors[`checks.${check.key}.status`] = 'Wait for the issue photo to finish uploading.';
             });
         }
         if (step === 2) {
             config.angles.forEach((angle) => {
-                if (!state.photos[angle.key]) errors[`photos.${angle.key}`] = photoSlots[angle.key]?.busy ? 'Still uploading. Please wait.' : `The ${angle.label} photo is required.`;
+                if (!state.photos[angle.key] && photoSlots[angle.key]?.busy) errors[`photos.${angle.key}`] = 'Still uploading. Please wait, or remove it.';
             });
         }
         if (step === 3) {
-            if (state.keys === null) errors.keys_present = 'Answer whether the keys are present.';
-            if (state.acceptable === null) errors.acceptable_for_use = 'Answer whether the vehicle is acceptable for use.';
+            // Required: acknowledgment and signature. Everything else is optional.
             if (!state.ack) errors.acknowledged = 'Check the acknowledgment box.';
             if (!signature.hasInk()) errors.signature = 'Sign in the box above.';
         }
@@ -672,13 +667,15 @@ function initTakeHomeInspection(form) {
         checksHolder.append(card);
 
         $$('.thvi-segment button', card).forEach((button) => button.addEventListener('click', () => {
-            state.checks[check.key].status = button.dataset.value;
+            // Tapping the selected answer again clears it (every check is optional).
+            const current = state.checks[check.key].status;
+            state.checks[check.key].status = current === button.dataset.value ? null : button.dataset.value;
             renderCheck(check.key);
             const error = $(`[data-error="checks.${check.key}"]`);
             if (error) error.textContent = '';
             card.classList.remove('has-error');
             saveDraft();
-            if (button.dataset.value === 'issue') $('[data-issue-text]', card).focus();
+            if (state.checks[check.key].status === 'issue') $('[data-issue-text]', card).focus();
         }));
         $('[data-issue-text]', card).addEventListener('input', (event) => { state.checks[check.key].issue_description = event.target.value; saveDraft(); });
         $('[data-issue-notes]', card).addEventListener('input', (event) => { state.checks[check.key].notes = event.target.value; saveDraft(); });
@@ -752,7 +749,7 @@ function initTakeHomeInspection(form) {
             <span class="thvi-label">${escapeHtml(angle.label)}</span>
             <div class="thvi-photo__frame" data-frame><span>No photo yet</span></div>
             <div class="thvi-bar" data-bar hidden><span></span></div>
-            <div class="thvi-photo__status" data-status role="status" aria-live="polite">Required</div>
+            <div class="thvi-photo__status" data-status role="status" aria-live="polite">Optional</div>
             <p class="thvi-error" data-error="photos.${angle.key}"></p>
             <div class="thvi-photo__actions">
                 <label class="hub-btn hub-btn--secondary"><span data-take-label>Take photo</span><input class="thvi-visually-hidden-input" type="file" accept="image/*" capture="environment" data-photo-input aria-label="Take ${escapeHtml(angle.label)} photo with the camera"></label>
@@ -805,7 +802,7 @@ function initTakeHomeInspection(form) {
             $('[data-take-label]', card).textContent = 'Retake';
         } else if (!photoSlots[key]?.busy && !pendingFiles.has(key)) {
             status.className = 'thvi-photo__status';
-            status.textContent = 'Required';
+            status.textContent = 'Optional';
             $('[data-take-label]', card).textContent = 'Take photo';
         }
         $('[data-remove]', card).hidden = !photo;
@@ -927,7 +924,9 @@ function initTakeHomeInspection(form) {
     $$('[data-final]').forEach((group) => {
         $$('button', group).forEach((button) => button.addEventListener('click', () => {
             const value = button.dataset.value === 'yes';
-            if (group.dataset.final === 'keys_present') state.keys = value; else state.acceptable = value;
+            // Optional answers: tapping the selected one again clears it.
+            if (group.dataset.final === 'keys_present') state.keys = state.keys === value ? null : value;
+            else state.acceptable = state.acceptable === value ? null : value;
             renderFinal();
             const error = $(`[data-error="${group.dataset.final}"]`);
             if (error) error.textContent = '';
@@ -1068,9 +1067,9 @@ function initTakeHomeInspection(form) {
             vehicle_id: state.vehicle.id,
             vehicle,
             driver_employee_id: state.driver ? state.driver.id : null,
-            driver_name: state.driver ? null : state.driverName.trim(),
-            driver_employee_number: state.driver ? null : state.driverNumber.trim(),
-            odometer: state.odometerNone ? null : Number(state.odometer),
+            driver_name: state.driver ? null : (state.driverName.trim() || null),
+            driver_employee_number: state.driver ? null : (state.driverNumber.trim() || null),
+            odometer: state.odometerNone || !state.odometer ? null : Number(state.odometer),
             odometer_exception: state.odometerNone ? (state.vehicle.nonroad ? 'nonroad' : 'not_equipped') : null,
             checks: state.checks,
             photos,

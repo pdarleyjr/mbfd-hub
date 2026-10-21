@@ -191,7 +191,7 @@ final class UnitMasterRosterExporter
             (string) ($driver->employee_id ?? ''),
             (string) $vehicle->location,
             $this->inspectionDate($inspection),
-            $inspection === null ? '' : ($inspection->acceptable_for_use ? 'Yes' : 'No'),
+            $inspection === null ? '' : $inspection->acceptableLabel(),
             (string) ($inspection->reference ?? ''),
             (int) ($vehicle->pending_changes_count ?? 0),
             $vehicle->needs_fleet_review ? 'Yes' : 'No',
@@ -207,7 +207,9 @@ final class UnitMasterRosterExporter
 
         $inspectionText = $inspection === null
             ? 'None'
-            : $this->inspectionDate($inspection).' ('.($inspection->acceptable_for_use ? 'acceptable' : 'NOT acceptable').')';
+            : $this->inspectionDate($inspection).' ('.match ($inspection->acceptable_for_use) {
+                true => 'acceptable', false => 'NOT acceptable', default => 'acceptability not answered'
+            }.')';
 
         return [
             'veh' => (string) $vehicle->veh_number,
