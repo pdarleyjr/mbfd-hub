@@ -1,6 +1,6 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page, Route } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 async function clickButton(page: Page, name: string) {
     const button = page.getByRole('button', { name, exact: true });
@@ -20,26 +20,74 @@ async function login(page: Page, role = 'training_admin') {
     expect(response.headers().location).not.toContain('/login');
 }
 
+async function uploadBeforeScope(page: Page) {
+    await expect(page.getByRole('combobox', { name: 'Course', exact: true })).toHaveValue('');
+    await expect(page.locator('.crew-planner form[enctype="multipart/form-data"]')).toHaveAttribute('action', '/training/crew-planner/upload');
+    const baseline = await (await page.request.get('/__crew_domain_fingerprint')).json();
+    const pdf = await page.request.get('/__synthetic_daily.pdf');
+    await page.getByLabel('Daily TeleStaff PDF', { exact: true }).setInputFiles({ name: 'synthetic-daily.pdf', mimeType: 'application/pdf', buffer: await pdf.body() });
+    let releaseUpload!: () => void;
+    const heldUpload = new Promise<void>(resolve => { releaseUpload = resolve; });
+    const uploadPattern = '**/training/crew-planner/upload';
+    const holdRequest = async (route: Route) => { await heldUpload; await route.continue(); };
+    await page.route(uploadPattern, holdRequest);
+    let pendingReceipt: unknown = null;
+    await page.exposeFunction('__crewPlannerPending', (receipt: unknown) => { pendingReceipt = receipt; });
+    // Capture controls/text before navigation; compositor pixels prove the visible
+    // announcement separately, without timing Alpine's deferred x-show transition.
+    await page.evaluate(() => {
+        const form = document.querySelector<HTMLFormElement>('.crew-planner form[enctype="multipart/form-data"]')!;
+        form.addEventListener('submit', () => queueMicrotask(() => {
+            const status = form.querySelector<HTMLElement>('[role="status"]')!;
+            (window as unknown as { __crewPlannerPending: (receipt: unknown) => void }).__crewPlannerPending({
+                announcementBlockedByBusy: status.closest('[aria-busy="true"]') !== null,
+                statusText: status.textContent?.trim(),
+                submitDisabled: form.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled,
+                resetDisabled: form.querySelector<HTMLButtonElement>('button[type="reset"]')!.disabled,
+            });
+        }), { once: true });
+    });
+    const uploadStarted = page.waitForRequest(request => request.method() === 'POST' && new URL(request.url()).pathname === '/training/crew-planner/upload');
+    const upload = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/training/crew-planner/upload');
+    const submitted = clickButton(page, 'Read daily report');
+    let compositor: import('@playwright/test').CDPSession | undefined;
+    try {
+        await uploadStarted;
+        if (test.info().title.startsWith('review results')) {
+            compositor = await page.context().newCDPSession(page);
+            const { data } = await compositor.send('Page.captureScreenshot', { format: 'png' });
+            writeFileSync(test.info().outputPath('synthetic-reading-report.png'), Buffer.from(data, 'base64'));
+        }
+        await expect.poll(() => pendingReceipt).toEqual({ announcementBlockedByBusy: false, statusText: 'Reading daily report. Please wait while the schedule is checked.', submitDisabled: true, resetDisabled: true });
+    } finally {
+        releaseUpload();
+    }
+    await submitted;
+    await compositor?.detach();
+    expect((await upload).status(), 'Native daily-report upload must redirect successfully').toBe(302);
+    await page.waitForLoadState('load');
+    await page.waitForFunction('window.Livewire && window.Livewire.all().length > 0');
+    await expect(page.getByText('Roster date: 2026-10-21', { exact: false })).toBeVisible();
+    await page.unroute(uploadPattern, holdRequest);
+    await expect(page.getByText('This snapshot was generated before its roster date.', { exact: false })).toBeVisible();
+    await expect(page.getByText('Daily report read successfully.', { exact: true })).toBeVisible();
+    await expect(page.getByText('Next, choose a course above and select Use this scope to check attendance.', { exact: true })).toBeVisible();
+    expect(await (await page.request.get('/__crew_domain_fingerprint')).json()).toEqual(baseline);
+    return baseline;
+}
+
 async function freshProposal(page: Page) {
     await login(page);
     const plannerResponse = await page.goto('/training/crew-planner');
     expect(plannerResponse?.headers()['content-security-policy']).toContain("form-action 'self'");
     await expect(page.getByRole('heading', { name: 'Crew Planner', exact: true })).toBeVisible();
+    const baseline = await uploadBeforeScope(page);
     await page.getByRole('combobox', { name: 'Course', exact: true }).selectOption({ label: 'Synthetic new course' });
     await clickButton(page, 'Use this scope');
     await expect(page.getByText('The proposal excludes members with verified attendance', { exact: false })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Save classroom times above to show eligible members.', exact: true })).toBeVisible();
     // Recheck after the Livewire render, when an absolute URL could switch to the apex host.
     await expect(page.locator('.crew-planner form[enctype="multipart/form-data"]')).toHaveAttribute('action', '/training/crew-planner/upload');
-    const baseline = await (await page.request.get('/__crew_domain_fingerprint')).json();
-    const pdf = await page.request.get('/__synthetic_daily.pdf');
-    await page.getByLabel('Daily TeleStaff PDF', { exact: true }).setInputFiles({ name: 'synthetic-daily.pdf', mimeType: 'application/pdf', buffer: await pdf.body() });
-    const upload = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/training/crew-planner/upload');
-    await clickButton(page, 'Read daily report');
-    expect((await upload).status(), 'Native daily-report upload must redirect successfully').toBe(302);
-    await page.waitForLoadState('load');
-    await page.waitForFunction('window.Livewire && window.Livewire.all().length > 0');
-    await expect(page.getByText('Roster date: 2026-10-21', { exact: false })).toBeVisible();
-    await expect(page.getByText('This snapshot was generated before its roster date.', { exact: false })).toBeVisible();
     await clickButton(page, 'Save classroom times');
     await expect(page.getByRole('checkbox', { name: /^Propose Synthetic/ })).toHaveCount(3);
     return baseline;
@@ -149,18 +197,38 @@ test('review results explain unavailable duty and keep unmatched identities non-
     await expect(page.getByRole('heading', { name: 'Unmatched schedule identities — verify before proposing', exact: true })).toBeVisible();
     await expect(page.getByText('SYNTHETIC, 90099', { exact: true })).toBeVisible();
     await expect(page.getByRole('checkbox', { name: /90099/ })).toHaveCount(0);
+    const beforeRejectedUpload = await (await page.request.get('/__crew_domain_fingerprint')).json();
+    await page.getByLabel('Daily TeleStaff PDF', { exact: true }).setInputFiles({ name: 'synthetic-invalid.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\ninvalid synthetic report') });
+    const rejectedUpload = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/training/crew-planner/upload');
+    await clickButton(page, 'Read daily report');
+    expect((await rejectedUpload).status()).toBe(302);
+    await expect(page.getByRole('alert')).toBeVisible();
+    await expect(page.getByText('The previous report remains saved.', { exact: true })).toBeVisible();
+    await expect(page.getByText('Daily report read successfully.', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Roster date: 2026-10-21', { exact: false })).toBeVisible();
+    expect(await (await page.request.get('/__crew_domain_fingerprint')).json()).toEqual(beforeRejectedUpload);
 });
 
 test('authorized administrator finds the same independent planner through the Admin Training menu', async ({ page }) => {
     await login(page, 'super_admin');
     const response = await page.goto('/admin/crew-planner');
     expect(response?.status()).toBe(200);
+    expect(response?.headers()['content-security-policy']).toContain("form-action 'self'");
     await expect(page.getByRole('heading', { name: 'Crew Planner', exact: true })).toBeVisible();
     const openSidebar = page.getByRole('button', { name: 'Expand sidebar', exact: true }).locator('visible=true');
     if (await openSidebar.isVisible()) await openSidebar.click();
     await page.locator('.fi-sidebar-group-label').filter({ hasText: /^\s*Training\s*$/ }).click();
-    await expect(page.locator('.fi-sidebar').getByRole('link', { name: 'Crew Planner', exact: true })).toHaveAttribute('href', /\/admin\/crew-planner$/);
+    const plannerLink = page.locator('.fi-sidebar').getByRole('link', { name: 'Crew Planner', exact: true });
+    await expect(plannerLink).toHaveAttribute('href', /\/admin\/crew-planner$/);
+    await plannerLink.click();
+    await expect(page.getByRole('heading', { name: 'Crew Planner', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Read daily report', exact: true })).toBeVisible();
+    const baseline = await uploadBeforeScope(page);
+    await page.getByRole('combobox', { name: 'Course', exact: true }).selectOption({ label: 'Synthetic new course' });
+    await clickButton(page, 'Use this scope');
+    await clickButton(page, 'Save classroom times');
+    await expect(page.getByRole('checkbox', { name: /^Propose Synthetic/ })).toHaveCount(3);
+    expect(await (await page.request.get('/__crew_domain_fingerprint')).json()).toEqual(baseline);
 });
 
 test('flexible classroom and proposal fields retain readable widths on touch screens', async ({ page }, info) => {

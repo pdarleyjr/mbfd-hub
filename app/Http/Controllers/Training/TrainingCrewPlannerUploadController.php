@@ -10,11 +10,14 @@ use App\Models\Training\TrainingCourse;
 use App\Models\User;
 use App\Policies\TrainingRosterPolicy;
 use App\Services\Training\CrewPlanner\TeleStaffDutyResolver;
+use App\Services\Training\CrewPlanner\TeleStaffPdfProcessingException;
 use App\Services\Training\CrewPlanner\TeleStaffPdfSandbox;
 use App\Services\Training\CrewPlanner\TrainingCrewPlannerDraftStore;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 final class TrainingCrewPlannerUploadController extends Controller
@@ -33,14 +36,18 @@ final class TrainingCrewPlannerUploadController extends Controller
             ]);
             $draft = $drafts->get($actor, $input['draft_id']);
             abort_if($draft['version'] !== (int) $input['version'], 409, 'The proposal changed in another tab. Reload it before uploading.');
-            $course = TrainingCourse::query()->findOrFail($draft['course_id']);
-            abort_unless(app(TrainingRosterPolicy::class)->view($actor, $course), 403);
+            if ($draft['course_id'] !== null) {
+                $course = TrainingCourse::query()->findOrFail($draft['course_id']);
+                abort_unless(app(TrainingRosterPolicy::class)->view($actor, $course), 403);
+            }
             abort_unless($file instanceof UploadedFile, 422);
             try {
                 $snapshot = $parser->parse($file->getPathname());
                 $staff = $resolver->resolve($snapshot, []);
+            } catch (TeleStaffPdfProcessingException $exception) {
+                $this->rejectReport($exception->reason);
             } catch (\Throwable) {
-                throw ValidationException::withMessages(['roster_pdf' => 'The report could not be safely read. Your saved proposal is safe. Choose a complete daily TeleStaff PDF and try again.']);
+                $this->rejectReport('staffing_analysis_failed');
             }
             $metadata = array_intersect_key($snapshot, array_flip(['schedule_date', 'shift', 'printed_at', 'page_count', 'source_sha256', 'warnings']));
             $drafts->update($actor, $draft['id'], (int) $input['version'], static function (array $current) use ($metadata, $staff): array {
@@ -50,13 +57,29 @@ final class TrainingCrewPlannerUploadController extends Controller
                 return $current;
             });
             $request->session()->put('training_crew_planner_draft.'.$actor->id, $draft['id']);
+            $notice = match (true) {
+                $draft['course_id'] === null => 'Daily report read. Choose a course and use its training scope, then save classroom times to show eligible members.',
+                $draft['slots'] === [] => 'Daily report read. Save classroom times to show eligible members, then build your planning list.',
+                default => 'Daily report read. Review the results and your planning list.',
+            };
 
             return redirect(TrainingCrewPlanner::getUrl(panel: 'training'))
-                ->with('crew_planner_notice', 'Daily snapshot processed. Confirm the date and shift, then review classroom times and your proposal.');
+                ->with('crew_planner_notice', $notice);
         } finally {
             if ($file instanceof UploadedFile && is_file($file->getPathname())) {
                 unlink($file->getPathname());
             }
         }
+    }
+
+    private function rejectReport(string $reason): never
+    {
+        $reference = (string) Str::uuid();
+        Log::warning('training_crew_planner_upload_failed', ['reason' => $reason, 'reference' => $reference]);
+        $message = $reason === TeleStaffPdfProcessingException::INVALID_REPORT
+            ? 'Hub could not recognize this as a complete daily TeleStaff report. Check the report and retry, or contact Hub support.'
+            : 'A server processing problem prevented reading the report. Try again or contact Hub support.';
+
+        throw ValidationException::withMessages(['roster_pdf' => $message.' Your saved proposal is safe. Reference: '.$reference]);
     }
 }
