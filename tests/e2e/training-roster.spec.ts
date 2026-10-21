@@ -96,7 +96,7 @@ test('empty public catalog does not invent a course', async ({ page }) => {
     await expect(page.getByRole('button', { name: /SIGN ROSTER/ })).toHaveCount(0);
 });
 
-test('modular catalog requires an explicit dated delivery and filters modules', async ({ page }) => {
+test('modular catalog selects a module and offers today’s roster directly', async ({ page }) => {
     const second = '01SYNTHETICTRAININGROSTER02';
     await page.route('**/catalog', route => route.fulfill({ json: {
         courses: [{ id: 1, name: 'Synthetic modular course', classifications: ['Driver Training'], default_location: 'Training classroom', requires_session_selection: true,
@@ -107,7 +107,7 @@ test('modular catalog requires an explicit dated delivery and filters modules', 
             ] }], today: '2026-10-20', csrf_token: 'synthetic',
     } }));
     await page.goto('/');
-    await expect(page.getByRole('button', { name: /Start today/ })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /Open today’s roster/ })).toBeDisabled();
     await expect(page.getByRole('button', { name: /Open roster/ })).toHaveCount(2);
     const aerialDelivery = page.locator('.session-list > li').filter({ has: page.getByText('Module 1 — Aerial', { exact: true }) });
     const pumpDelivery = page.locator('.session-list > li').filter({ has: page.getByText('Module 2 — Pump', { exact: true }) });
@@ -115,9 +115,9 @@ test('modular catalog requires an explicit dated delivery and filters modules', 
     await expect(pumpDelivery).toHaveCount(1);
     await expect(aerialDelivery.getByText('Tuesday, October 20, 2026 · 9:00 AM EDT', { exact: true })).toBeVisible();
     await expect(pumpDelivery.getByText('Tuesday, October 20, 2026 · 1:00 PM EDT', { exact: true })).toBeVisible();
-    await page.getByLabel('Module', { exact: true }).selectOption('20');
+    await page.getByLabel('Module for Synthetic modular course', { exact: true }).selectOption('20');
     await expect(page.getByRole('button', { name: /Open roster/ })).toHaveCount(1);
-    await expect(page.getByText('South classroom · Session 1 · Managed by training staff')).toBeVisible();
+    await expect(page.getByText('South classroom · Session 1', { exact: true })).toBeVisible();
     await expect(page.getByText('North classroom', { exact: false })).toHaveCount(0);
     await expect(page.getByRole('button', { name: /Module 2 — Pump/ })).toBeVisible();
     const violations = await new AxeBuilder({ page }).analyze();
@@ -143,7 +143,7 @@ test('public catalog searches courses and starts today without exposing attendan
     await expect(page.getByRole('list', { name: 'Classifications' }).getByText('STC', { exact: true })).toBeVisible();
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     await page.screenshot({ path: info.outputPath('public-classes.png'), fullPage: true });
-    await page.getByRole('button', { name: /Start today’s roster/ }).click();
+    await page.getByRole('button', { name: /Open today’s roster/ }).click();
     await expect(page).toHaveURL(new RegExp(`/r/${id}$`));
     expect(starts).toBe(1);
 });
@@ -155,14 +155,81 @@ test('public direct roster opens an isolated device without a launch key', async
     await expect(page.locator('time')).toContainText('Oct 15, 2026, 10:30 AM EDT');
 });
 
-test('ambiguous class start explains how to choose the dated roster', async ({ page }) => {
-    await page.route('**/catalog', route => route.fulfill({ json: { courses: [{ id: 1, name: 'Ladder operations', classifications: [], default_location: null, sessions: [{ public_id: id, held_on: '2026-10-15', location: 'Station 1' }, { public_id: `${id}2`, held_on: '2026-10-15', location: 'Station 2' }] }], today: '2026-10-15', csrf_token: 'test' } }));
-    await page.route('**/csrf', route => route.fulfill({ json: { csrf_token: 'fresh' } }));
-    await page.route('**/courses/1/start', route => route.fulfill({ status: 422, json: { errors: { session: ['More than one roster is open for this class today. Choose the dated roster and location from the class list.'] } } }));
+test('multiple rosters for today require a time and location choice', async ({ page }) => {
+    await page.route('**/catalog', route => route.fulfill({ json: { courses: [{ id: 1, name: 'Ladder operations', classifications: [], default_location: null, modules: [], sessions: [{ public_id: id, held_on: '2026-10-15', location: 'Station 1' }, { public_id: `${id}2`, held_on: '2026-10-15', location: 'Station 2' }] }], today: '2026-10-15', csrf_token: 'test' } }));
     await page.goto('/');
-    await page.getByRole('button', { name: /Start today’s roster/ }).click();
-    await expect(page.getByRole('alert')).toContainText('Choose the dated roster and location');
+    await expect(page.getByRole('button', { name: /Open today’s roster/ })).toBeDisabled();
+    await expect(page.getByText('More than one roster is open today. Choose the correct time and location below.')).toBeVisible();
     await expect(page.getByRole('button', { name: /Open roster for Ladder operations/ })).toHaveCount(2);
+});
+
+async function modularCatalog(page: Page, options: { modules?: { id: number; name: string }[]; sessions?: unknown[] } = {}) {
+    await page.route('**/catalog', route => route.fulfill({ json: { courses: [{ id: 1, name: 'Synthetic modular course', classifications: ['Training'], default_location: null, modules: options.modules ?? [{ id: 10, name: 'Module 1' }], sessions: options.sessions ?? [] }], today: '2026-10-21', csrf_token: 'test' } }));
+    await page.route('**/csrf', route => route.fulfill({ json: { csrf_token: 'fresh' } }));
+}
+
+test('single existing module opens a signable roster without admin credentials', async ({ page }) => {
+    await modularCatalog(page);
+    let body: unknown;
+    await page.route('**/courses/1/start', route => { body = route.request().postDataJSON(); return route.fulfill({ json: { url: `/r/${id}` } }); });
+    await page.goto('/');
+    await expect(page.getByLabel('Module for Synthetic modular course', { exact: true })).toHaveValue('10');
+    await expect(page.getByLabel('Hub password')).toHaveCount(0);
+    await page.getByRole('button', { name: /Open today’s roster/ }).click();
+    await expect(page).toHaveURL(new RegExp(`/r/${id}$`));
+    expect(body).toEqual({ training_module_id: 10 });
+});
+
+test('new module creates and opens today’s roster from a course with no modules', async ({ page }) => {
+    await modularCatalog(page, { modules: [] });
+    let body: unknown;
+    await page.route('**/courses/1/start', route => { body = route.request().postDataJSON(); return route.fulfill({ json: { url: `/r/${id}` } }); });
+    await page.goto('/');
+    await page.getByLabel('Module for Synthetic modular course', { exact: true }).selectOption('new');
+    await page.getByLabel('New module name').fill('Module 1');
+    await page.getByLabel('Email or employee ID').fill('12345');
+    await page.getByLabel('Hub password').fill('synthetic-module-password');
+    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    await page.getByRole('button', { name: /Create module & open today’s roster/ }).click();
+    await expect(page).toHaveURL(new RegExp(`/r/${id}$`));
+    expect(body).toEqual({ new_module_name: 'Module 1', email: '12345', password: 'synthetic-module-password' });
+    expect(await page.evaluate(() => JSON.stringify({ ...sessionStorage, ...localStorage }))).not.toContain('synthetic-module-password');
+});
+
+test('new module failure clears password and catalog refresh preserves the error', async ({ page }) => {
+    await modularCatalog(page);
+    await page.route('**/courses/1/start', route => route.fulfill({ status: 422, json: { errors: { credentials: ['These credentials cannot add a module.'] } } }));
+    await page.goto('/');
+    await page.getByLabel('Module for Synthetic modular course', { exact: true }).selectOption('new');
+    await page.getByLabel('New module name').fill('Module 2');
+    await page.getByLabel('Email or employee ID').fill('12345');
+    await page.getByLabel('Hub password').fill('synthetic-module-password');
+    await page.getByRole('button', { name: /Create module & open today’s roster/ }).click();
+    await expect(page.getByRole('alert')).toContainText('These credentials cannot add a module.');
+    await expect(page.getByLabel('Hub password')).toHaveValue('');
+    const refreshed = page.waitForResponse('**/catalog');
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await refreshed;
+    await expect(page.getByRole('alert')).toContainText('These credentials cannot add a module.');
+    await expect(page.getByLabel('New module name')).toHaveValue('Module 2');
+});
+
+test('yesterday’s open roster stays collapsed while today can start', async ({ page }) => {
+    await modularCatalog(page, { sessions: [{ public_id: id, held_on: '2026-10-20', starts_at: '2026-10-20T13:00:00Z', location: 'Training classroom', module_id: 10, module_name: 'Module 1' }] });
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: /Open today’s roster/ })).toBeEnabled();
+    await expect(page.getByRole('button', { name: /Open roster for Synthetic/ })).not.toBeVisible();
+    await page.locator('summary').click();
+    await expect(page.getByRole('button', { name: /Open roster for Synthetic/ })).toBeVisible();
+    await expect(page.getByText('Tuesday, October 20, 2026 · 9:00 AM EDT', { exact: true })).toBeVisible();
+});
+
+test('existing unassigned rosters remain accessible when a course has one module', async ({ page }) => {
+    await modularCatalog(page, { sessions: [{ public_id: id, held_on: '2026-10-21', location: 'Training classroom', module_id: null, module_name: null }] });
+    await page.goto('/');
+    await page.getByLabel('Module for Synthetic modular course', { exact: true }).selectOption('unassigned');
+    await expect(page.getByRole('button', { name: /Open today’s roster/ })).toBeDisabled();
+    await expect(page.getByRole('button', { name: /Open roster for Synthetic modular course/ })).toBeVisible();
 });
 
 test('catalog failure can recover and an existing dated roster opens by POST', async ({ page }) => {

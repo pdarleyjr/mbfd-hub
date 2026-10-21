@@ -52,13 +52,22 @@ final class TrainingKioskController extends Controller
         return response()->json(['courses' => $courses, 'today' => now('America/New_York')->toDateString(), 'csrf_token' => csrf_token()]);
     }
 
-    public function startCourse(Request $request, TrainingCourse $course, TrainingRosterService $rosters, TrainingKioskService $kiosk): JsonResponse
+    public function startCourse(Request $request, TrainingCourse $course, TrainingRosterService $rosters, TrainingKioskService $kiosk, TrainingRosterSubmissionAuthenticator $authenticator): JsonResponse
     {
         $data = $request->validate([
-            'session_public_id' => ['sometimes', 'required', 'string', 'size:26', 'alpha_num:ascii'],
-            'training_module_id' => ['sometimes', 'nullable', 'integer', 'min:1'],
+            'session_public_id' => ['sometimes', 'required', 'string', 'size:26', 'alpha_num:ascii', 'prohibited_with:new_module_name'],
+            'training_module_id' => ['sometimes', 'nullable', 'integer', 'min:1', 'prohibited_with:new_module_name'],
+            'new_module_name' => ['sometimes', 'required', 'string', 'max:200', 'regex:/\S/u'],
+            'email' => ['required_with:new_module_name', 'string', 'max:254'],
+            'password' => ['required_with:new_module_name', 'string', 'max:1024'],
         ]);
-        $session = $rosters->startPublicSession($course, $data['session_public_id'] ?? null, isset($data['training_module_id']) ? (int) $data['training_module_id'] : null);
+        if (isset($data['new_module_name'])) {
+            $actor = $authenticator->authenticate($data['email'], $data['password'], (string) $request->ip());
+            unset($data['password']);
+            $session = $rosters->startPublicModuleSession($course, $data['new_module_name'], $actor);
+        } else {
+            $session = $rosters->startPublicSession($course, $data['session_public_id'] ?? null, isset($data['training_module_id']) ? (int) $data['training_module_id'] : null);
+        }
         $kiosk->openPublic($request, $session);
 
         return response()->json(['url' => '/r/'.$session->public_id, 'csrf_token' => csrf_token()]);
