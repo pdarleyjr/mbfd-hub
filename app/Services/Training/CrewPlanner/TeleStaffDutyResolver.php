@@ -58,7 +58,8 @@ final class TeleStaffDutyResolver
         }
 
         foreach ($staff as &$person) {
-            // A verified exchange-on may override an A-Day only for its actual interval.
+            // Explicit verified overtime or exchange-on overrides an A-Day only
+            // for its actual interval. A regular-duty base row does not override it.
             // Other simultaneous absences always subtract from positive coverage.
             foreach ($person['_events'] as $row) {
                 if (($row['code_class'] ?? '') !== 'NOT_WORKING' || ($row['approval_state'] ?? '') !== 'VERIFIED_EFFECTIVE') {
@@ -67,7 +68,7 @@ final class TeleStaffDutyResolver
                 $absences = [$this->interval($row)];
                 if (($row['normalized_code'] ?? '') === 'ADONIS DAY') {
                     foreach ($person['_events'] as $override) {
-                        if (($override['normalized_code'] ?? '') === '2WXON' && ($override['approval_state'] ?? '') === 'VERIFIED_EFFECTIVE' && ($override['code_class'] ?? '') === 'WORKING') {
+                        if (in_array($override['normalized_code'] ?? '', ['+OT', 'OT', '2WXON'], true) && ($override['approval_state'] ?? '') === 'VERIFIED_EFFECTIVE' && ($override['code_class'] ?? '') === 'WORKING') {
                             $absences = $this->subtract($absences, $this->interval($override));
                         }
                     }
