@@ -23,7 +23,7 @@ use Illuminate\Validation\ValidationException;
 
 final class TrainingRosterService
 {
-    public function __construct(private TrainingAssignmentProvider $assignments, private SignatureImageService $signatures) {}
+    public function __construct(private TrainingAssignmentProvider $assignments, private SignatureImageService $signatures, private TrainingCourseModuleService $modules) {}
 
     public function createCourse(array $data, User $actor): TrainingCourse
     {
@@ -73,12 +73,22 @@ final class TrainingRosterService
         });
     }
 
-    /** Reuse the course, never the attendance from a previous completed class. */
+    public function startPublicModuleSession(TrainingCourse $course, string $name, User $actor): TrainingSession
+    {
+        return DB::transaction(function () use ($course, $name, $actor): TrainingSession {
+            $module = $this->modules->findOrCreateModule($course, $name, $actor);
+
+            return $this->startPublicSession($course, null, (int) $module->id);
+        });
+    }
+
+    /** Reuse today's open delivery, never attendance from a completed or earlier class. */
     public function startPublicSession(TrainingCourse $course, ?string $sessionPublicId = null, ?int $moduleId = null): TrainingSession
     {
         return DB::transaction(function () use ($course, $sessionPublicId, $moduleId): TrainingSession {
             $course = TrainingCourse::query()->lockForUpdate()->findOrFail($course->id);
             $today = now('America/New_York')->toDateString();
+            $this->validateModule($course, $moduleId);
             if ($sessionPublicId !== null) {
                 $session = $course->sessions()->where('public_id', $sessionPublicId)->lockForUpdate()->first();
                 if ($session === null || $session->isPaper() || $session->status !== 'open'
@@ -89,26 +99,22 @@ final class TrainingRosterService
 
                 return $session;
             }
-            if ($moduleId !== null || $course->modules()->exists()) {
-                $this->reject('session', 'Choose the module and dated roster below. Ask training staff to create a session if none is open.');
+            if ($moduleId === null && $course->modules()->exists()) {
+                $this->reject('training_module_id', 'Choose an existing module or add a new module to start today’s roster.');
             }
-            $todaySessions = $course->sessions()->whereDate('held_on', $today)->where('status', 'open')->where('attendance_source', 'digital')->orderBy('id')->limit(2)->get();
+            $todaySessions = $course->sessions()->whereDate('held_on', $today)
+                ->where('training_module_id', $moduleId)->where('status', 'open')->where('attendance_source', 'digital')
+                ->orderBy('id')->limit(2)->get();
             if ($todaySessions->count() > 1) {
-                $this->reject('session', 'More than one roster is open for this class today. Choose the dated roster and location from the class list.');
+                $this->reject('session', 'More than one roster is open for this module or class today. Choose the matching time and location from the open rosters below.');
             }
             $session = $todaySessions->first();
             if ($session !== null) {
-                if ($session->isPaper() || $session->status !== 'open' || $session->created_by !== null || $session->training_module_id !== null) {
-                    $this->reject('session', 'Choose an open dated roster below. Ask training staff to create the next session if needed.');
-                }
-
                 return $session;
-            }
-            if ($course->sessions()->whereDate('held_on', $today)->where(fn ($query) => $query->whereNotNull('created_by')->orWhereNotNull('training_module_id')->orWhere('attendance_source', 'paper'))->exists()) {
-                $this->reject('session', 'Training staff manage this course’s sessions today. Choose an open dated roster below.');
             }
             $session = $course->sessions()->create([
                 'public_id' => (string) Str::ulid(), 'course_name' => $course->name,
+                'training_module_id' => $moduleId,
                 'classifications' => $course->classifications, 'location' => $course->default_location,
                 'held_on' => $today, 'starts_at' => now()->utc(), 'status' => 'open', 'revision' => 1,
                 'created_by' => null,
