@@ -186,6 +186,8 @@
             .crew-planner input:not([type=checkbox]), .crew-planner select, .crew-planner button, .crew-planner summary { min-height: 44px !important; }
             .crew-planner input[type=checkbox] { width: 24px; height: 24px; flex-shrink: 0; }
             .crew-planner label:has(input[type=checkbox]) { min-height: 44px; padding-block: 10px; }
+            .crew-planner label.flex-1 { flex-basis: 12rem; min-width: min(12rem, 100%) !important; }
+            @media (max-width: 640px) { .crew-planner label.flex-1 { flex-basis: 100%; } }
             .crew-planner { overflow-wrap: anywhere; }
         </style>
 </x-filament-panels::page>
