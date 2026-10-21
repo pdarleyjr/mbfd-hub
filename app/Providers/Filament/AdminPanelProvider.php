@@ -106,6 +106,7 @@ class AdminPanelProvider extends PanelProvider
                 BidAccessPin::class,
                 \App\Filament\Admin\Pages\CommandBoardPin::class,
                 \App\Filament\Admin\Pages\MediaControlMedia::class,
+                \App\Filament\Training\Pages\TrainingCrewPlanner::class,
                 KnowledgeBase::class,
             ])
             ->widgets([

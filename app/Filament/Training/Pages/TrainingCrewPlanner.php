@@ -34,6 +34,8 @@ final class TrainingCrewPlanner extends Page
 
     protected static ?string $slug = 'crew-planner';
 
+    protected static string|array $routeMiddleware = [\App\Http\Middleware\TrainingRosterPrivateResponse::class];
+
     protected static string $view = 'filament.training.pages.crew-planner';
 
     #[Locked]
