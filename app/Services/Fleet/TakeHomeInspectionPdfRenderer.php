@@ -28,7 +28,7 @@ final class TakeHomeInspectionPdfRenderer
         $standard = [];
         foreach (TakeHomeVehicleInspection::PHOTO_ANGLES as $angle => $label) {
             $photo = $inspection->photos->firstWhere('angle', $angle);
-            $standard[] = ['label' => $label, 'src' => $photo ? $this->printable($disk, $photo) : null];
+            $standard[] = ['label' => $label, 'provided' => $photo !== null, 'src' => $photo ? $this->printable($disk, $photo) : null];
         }
         $issues = $inspection->photos
             ->where('angle', TakeHomeVehicleInspection::ISSUE_ANGLE)

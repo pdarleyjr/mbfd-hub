@@ -76,9 +76,10 @@ final class TakeHomeInspectionSubmitter
                     'odometer_note' => $odometerNote,
                     'checks' => $checks,
                     'has_issues' => collect($checks)->contains('status', TakeHomeVehicleInspection::STATUS_ISSUE),
-                    'has_not_checked' => collect($checks)->contains('status', TakeHomeVehicleInspection::STATUS_NOT_CHECKED),
-                    'keys_present' => (bool) $data['keys_present'],
-                    'acceptable_for_use' => (bool) $data['acceptable_for_use'],
+                    // Unanswered checks count as not checked so a report can never read as an all-clear.
+                    'has_not_checked' => collect($checks)->contains(fn (array $check): bool => $check['status'] !== TakeHomeVehicleInspection::STATUS_GOOD && $check['status'] !== TakeHomeVehicleInspection::STATUS_ISSUE),
+                    'keys_present' => isset($data['keys_present']) ? (bool) $data['keys_present'] : null,
+                    'acceptable_for_use' => isset($data['acceptable_for_use']) ? (bool) $data['acceptable_for_use'] : null,
                     'comments' => $this->text($data['comments'] ?? null),
                     'acknowledged_at' => $now,
                     'signature_path' => $signature['path'],
@@ -123,7 +124,11 @@ final class TakeHomeInspectionSubmitter
         $ids = [];
         $references = 0;
         foreach (array_keys(TakeHomeVehicleInspection::PHOTO_ANGLES) as $angle) {
-            $ids[(string) $data['photos'][$angle]] = ['angle' => $angle, 'check_key' => null];
+            $uuid = $data['photos'][$angle] ?? null;
+            if (! is_string($uuid) || $uuid === '') {
+                continue; // Photos are optional.
+            }
+            $ids[$uuid] = ['angle' => $angle, 'check_key' => null];
             $references++;
         }
         foreach (array_keys(TakeHomeVehicleInspection::CHECKS) as $key) {
@@ -188,7 +193,7 @@ final class TakeHomeInspectionSubmitter
         return $photos->values();
     }
 
-    /** @return array{id: ?int, name: string, number: ?string, verified: bool} */
+    /** @return array{id: ?int, name: ?string, number: ?string, verified: bool} */
     private function resolveDriver(array $data): array
     {
         if (! empty($data['driver_employee_id'])) {
@@ -204,7 +209,7 @@ final class TakeHomeInspectionSubmitter
 
         return [
             'id' => null,
-            'name' => (string) $this->clean($data['driver_name'] ?? null),
+            'name' => $this->clean($data['driver_name'] ?? null),
             'number' => $this->clean($data['driver_employee_number'] ?? null),
             'verified' => false,
         ];
@@ -234,12 +239,12 @@ final class TakeHomeInspectionSubmitter
         return [false, null];
     }
 
-    /** @return list<array{key: string, label: string, status: string, issue_description: ?string, notes: ?string}> */
+    /** @return list<array{key: string, label: string, status: ?string, issue_description: ?string, notes: ?string}> */
     private function normalizedChecks(array $data): array
     {
         $checks = [];
         foreach (TakeHomeVehicleInspection::CHECKS as $key => [$label]) {
-            $status = (string) $data['checks'][$key]['status'];
+            $status = $data['checks'][$key]['status'] ?? null; // null = not answered
             $checks[] = [
                 'key' => $key,
                 'label' => $label,

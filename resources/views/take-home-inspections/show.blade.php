@@ -3,7 +3,7 @@
     $snapshot = $inspection->vehicle_snapshot ?? [];
     $value = fn ($v): string => filled($v) ? (string) $v : 'Not recorded';
     $local = fn ($date): string => $date->clone()->timezone('America/New_York')->format('M j, Y g:i A T');
-    $tag = fn (string $status): string => match ($status) { 'good' => 'hub-tag--success', 'issue' => 'hub-tag--danger', default => 'hub-tag--warning' };
+    $tag = fn (?string $status): string => match ($status) { 'good' => 'hub-tag--success', 'issue' => 'hub-tag--danger', default => 'hub-tag--warning' };
 @endphp
 <!DOCTYPE html>
 <html lang="en">
@@ -24,8 +24,10 @@
             @endif
         </x-hub.page-header>
 
-        @if(! $inspection->acceptable_for_use)
+        @if($inspection->acceptable_for_use === false)
             <div class="hub-callout hub-callout--warning" role="note"><p class="font-bold">Reported not acceptable for use.</p></div>
+        @elseif($inspection->acceptable_for_use === null)
+            <div class="hub-callout hub-callout--warning" role="note"><p class="font-bold">Acceptability for use was not answered.</p></div>
         @elseif($inspection->has_issues || $inspection->has_not_checked)
             <div class="hub-callout hub-callout--warning" role="note"><p class="font-bold">Acceptable for use, with {{ $inspection->has_issues ? 'issues found' : 'items not checked' }}{{ $inspection->has_issues && $inspection->has_not_checked ? ' and items not checked' : '' }}.</p></div>
         @endif
@@ -44,10 +46,10 @@
                     @if($inspection->odometer !== null){{ number_format($inspection->odometer) }} mi @else {{ Inspection::ODOMETER_EXCEPTIONS[$inspection->odometer_exception] ?? 'Not recorded' }} @endif
                     @if($inspection->odometer_flagged)<span class="block text-sm text-hub-muted">Flagged: {{ $inspection->odometer_note }}</span>@endif
                 </dd></div>
-                <div><dt>Assigned driver</dt><dd>{{ $inspection->driver_name }}<span class="block text-sm font-normal text-hub-muted">{{ $inspection->driver_employee_number ? 'Employee ID '.$inspection->driver_employee_number.' · ' : '' }}{{ $inspection->driver_verified ? 'Verified personnel record' : 'Entered manually, not verified' }}</span></dd></div>
+                <div><dt>Assigned driver</dt><dd>{{ $inspection->driverLabel() }}@if(filled($inspection->driver_name))<span class="block text-sm font-normal text-hub-muted">{{ $inspection->driver_employee_number ? 'Employee ID '.$inspection->driver_employee_number.' · ' : '' }}{{ $inspection->driver_verified ? 'Verified personnel record' : 'Entered manually, not verified' }}</span>@endif</dd></div>
                 <div><dt>Inspector</dt><dd>{{ $inspection->inspector_name }}</dd></div>
-                <div><dt>Keys present</dt><dd>{{ $inspection->keys_present ? 'Yes' : 'No' }}</dd></div>
-                <div><dt>Acceptable for use</dt><dd>@if($inspection->acceptable_for_use)<span class="hub-tag hub-tag--success">Yes</span>@else<span class="hub-tag hub-tag--danger">No</span>@endif</dd></div>
+                <div><dt>Keys present</dt><dd>{{ $inspection->keysLabel() }}</dd></div>
+                <div><dt>Acceptable for use</dt><dd><span class="hub-tag hub-tag--{{ Inspection::answerColor($inspection->acceptable_for_use) }}">{{ $inspection->acceptableLabel() }}</span></dd></div>
             </dl>
         </section>
 
@@ -58,7 +60,7 @@
                     <li class="hub-well p-3">
                         <div class="flex flex-wrap items-center justify-between gap-2">
                             <span class="font-bold">{{ $check['label'] }}</span>
-                            <span class="hub-tag {{ $tag($check['status']) }}">{{ Inspection::STATUS_LABELS[$check['status']] ?? $check['status'] }}</span>
+                            <span class="hub-tag {{ $tag($check['status']) }}">{{ Inspection::statusLabel($check['status']) }}</span>
                         </div>
                         @if($check['issue_description'])<p class="mt-2 whitespace-pre-line text-sm">{{ $check['issue_description'] }}</p>@endif
                         @if($check['notes'])<p class="mt-1 whitespace-pre-line text-sm text-hub-muted">Notes: {{ $check['notes'] }}</p>@endif
@@ -84,7 +86,7 @@
                         @if($photo)
                             <a href="{{ route('take-home-inspections.photo', $photo) }}" target="_blank" rel="noopener"><img src="{{ route('take-home-inspections.photo', $photo) }}" alt="{{ $label }}" loading="lazy"></a>
                         @else
-                            <p class="hub-well p-6 text-center text-sm">Photo unavailable</p>
+                            <p class="hub-well p-6 text-center text-sm">Not provided</p>
                         @endif
                         <figcaption>{{ $label }}</figcaption>
                     </figure>

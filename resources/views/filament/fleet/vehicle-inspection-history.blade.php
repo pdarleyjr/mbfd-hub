@@ -15,7 +15,7 @@
                     <th>Odometer</th>
                     <th>Acceptable</th>
                     <th class="is-center">Issues</th>
-                    <th class="is-center">Not checked</th>
+                    <th class="is-center">Not checked / unanswered</th>
                     <th></th>
                 </tr>
             </thead>
@@ -28,7 +28,7 @@
                         <td>{{ $inspection->submittedAtLocal() }}</td>
                         <td>{{ $inspection->reference }}</td>
                         <td>{{ $inspection->inspector_name }}</td>
-                        <td>{{ $inspection->driver_name }}</td>
+                        <td>{{ $inspection->driverLabel() }}</td>
                         <td>
                             @if ($inspection->odometer !== null)
                                 {{ number_format($inspection->odometer) }}
@@ -37,12 +37,12 @@
                             @endif
                         </td>
                         <td>
-                            <x-filament::badge :color="$inspection->acceptable_for_use ? 'success' : 'danger'">
-                                {{ $inspection->acceptable_for_use ? 'Yes' : 'No' }}
+                            <x-filament::badge :color="\App\Models\TakeHomeVehicleInspection::answerColor($inspection->acceptable_for_use)">
+                                {{ $inspection->acceptableLabel() }}
                             </x-filament::badge>
                         </td>
                         <td class="is-center">{{ $checks->where('status', \App\Models\TakeHomeVehicleInspection::STATUS_ISSUE)->count() }}</td>
-                        <td class="is-center">{{ $checks->where('status', \App\Models\TakeHomeVehicleInspection::STATUS_NOT_CHECKED)->count() }}</td>
+                        <td class="is-center">{{ $inspection->uncheckedChecks()->count() }}</td>
                         <td>
                             <x-filament::link :href="route('take-home-inspections.show', $inspection->reference)" size="sm">View</x-filament::link>
                             <x-filament::link :href="route('take-home-inspections.pdf', $inspection->reference)" size="sm">PDF</x-filament::link>

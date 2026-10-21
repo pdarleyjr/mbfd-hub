@@ -29,6 +29,8 @@ class TakeHomeVehicleInspection extends Model
         'not_checked' => 'Not checked',
     ];
 
+    public const NOT_ANSWERED = 'Not answered';
+
     /** The six condition checks, in order. */
     public const CHECKS = [
         'exterior_body' => ['Exterior body', 'Dents, scratches, bumpers or body damage.'],
@@ -161,10 +163,50 @@ class TakeHomeVehicleInspection extends Model
             ->values();
     }
 
-    /** Needs Fleet attention: an issue, an unchecked item, or not acceptable for use. */
+    /** Needs Fleet attention: an issue, an unchecked or unanswered item, or not confirmed acceptable. */
     public function needsAttention(): bool
     {
-        return ! $this->acceptable_for_use || $this->has_issues || $this->has_not_checked || $this->odometer_flagged;
+        return $this->acceptable_for_use !== true || $this->has_issues || $this->has_not_checked || $this->odometer_flagged;
+    }
+
+    public static function statusLabel(?string $status): string
+    {
+        return self::STATUS_LABELS[$status ?? ''] ?? self::NOT_ANSWERED;
+    }
+
+    /** Yes / No / Not answered for an optional yes-no answer. */
+    public static function answerLabel(?bool $answer): string
+    {
+        return $answer === null ? self::NOT_ANSWERED : ($answer ? 'Yes' : 'No');
+    }
+
+    /** success / danger / warning colour for an optional yes-no answer. */
+    public static function answerColor(?bool $answer): string
+    {
+        return $answer === null ? 'warning' : ($answer ? 'success' : 'danger');
+    }
+
+    public function acceptableLabel(): string
+    {
+        return self::answerLabel($this->acceptable_for_use);
+    }
+
+    public function keysLabel(): string
+    {
+        return self::answerLabel($this->keys_present);
+    }
+
+    /** Checks left Not checked or unanswered (neither Good nor Issue found). */
+    public function uncheckedChecks(): \Illuminate\Support\Collection
+    {
+        return collect($this->checks ?? [])
+            ->reject(fn (array $check): bool => in_array($check['status'] ?? null, [self::STATUS_GOOD, self::STATUS_ISSUE], true))
+            ->values();
+    }
+
+    public function driverLabel(): string
+    {
+        return filled($this->driver_name) ? (string) $this->driver_name : 'Not recorded';
     }
 
     public function submittedAtLocal(): string

@@ -79,25 +79,26 @@ class TakeHomeVehicleInspectionResource extends Resource
                     ->searchable(),
                 Tables\Columns\TextColumn::make('driver_name')
                     ->label('Driver')
+                    ->placeholder('Not recorded')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('acceptable_for_use')
                     ->label('Acceptable')
                     ->badge()
-                    ->formatStateUsing(fn ($state): string => $state ? 'Yes' : 'No')
-                    ->color(fn ($state): string => $state ? 'success' : 'danger'),
+                    ->getStateUsing(fn (TakeHomeVehicleInspection $record): string => $record->acceptableLabel())
+                    ->color(fn (TakeHomeVehicleInspection $record): string => TakeHomeVehicleInspection::answerColor($record->acceptable_for_use)),
                 Tables\Columns\TextColumn::make('issues')
                     ->label('Issues')
                     ->getStateUsing(fn (TakeHomeVehicleInspection $record): int => self::countChecks($record, TakeHomeVehicleInspection::STATUS_ISSUE))
                     ->badge()
                     ->color(fn (int $state): string => $state > 0 ? 'danger' : 'gray'),
                 Tables\Columns\TextColumn::make('not_checked')
-                    ->label('Not checked')
-                    ->getStateUsing(fn (TakeHomeVehicleInspection $record): int => self::countChecks($record, TakeHomeVehicleInspection::STATUS_NOT_CHECKED))
+                    ->label('Not checked / unanswered')
+                    ->getStateUsing(fn (TakeHomeVehicleInspection $record): int => $record->uncheckedChecks()->count())
                     ->badge()
                     ->color(fn (int $state): string => $state > 0 ? 'warning' : 'gray'),
-                Tables\Columns\IconColumn::make('keys_present')
+                Tables\Columns\TextColumn::make('keys_present')
                     ->label('Keys present')
-                    ->boolean(),
+                    ->getStateUsing(fn (TakeHomeVehicleInspection $record): string => $record->keysLabel()),
             ])
             ->filters([
                 Tables\Filters\Filter::make('needs_attention')
@@ -105,13 +106,19 @@ class TakeHomeVehicleInspectionResource extends Resource
                     ->toggle()
                     ->query(fn (Builder $query): Builder => $query->where(fn (Builder $q) => $q
                         ->where('acceptable_for_use', false)
+                        ->orWhereNull('acceptable_for_use')
                         ->orWhere('has_issues', true)
                         ->orWhere('has_not_checked', true)
                         ->orWhere('odometer_flagged', true))),
-                Tables\Filters\TernaryFilter::make('acceptable_for_use')
+                Tables\Filters\SelectFilter::make('acceptable_for_use')
                     ->label('Acceptable for use')
-                    ->trueLabel('Yes')
-                    ->falseLabel('No'),
+                    ->options(['yes' => 'Yes', 'no' => 'No', 'unanswered' => 'Not answered'])
+                    ->query(fn (Builder $query, array $data): Builder => match ($data['value'] ?? null) {
+                        'yes' => $query->where('acceptable_for_use', true),
+                        'no' => $query->where('acceptable_for_use', false),
+                        'unanswered' => $query->whereNull('acceptable_for_use'),
+                        default => $query,
+                    }),
                 Tables\Filters\Filter::make('submitted')
                     ->form([
                         DatePicker::make('from')->label('Submitted from'),

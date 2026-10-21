@@ -33,7 +33,7 @@
                 <div class="hub-panel__header"><h2 id="step1-title" class="text-lg font-bold" tabindex="-1">1. Vehicle and driver</h2></div>
                 <div class="thvi-step__body">
                     <div class="thvi-field" data-vehicle-picker>
-                        <label class="thvi-label" for="thvi-vehicle-search">Vehicle</label>
+                        <label class="thvi-label" for="thvi-vehicle-search">Vehicle (required)</label>
                         <p class="thvi-hint" id="thvi-vehicle-hint">Type the vehicle number and press Go, or search by make, model or plate.</p>
                         <div class="thvi-search">
                             <input id="thvi-vehicle-search" class="thvi-input" type="search" inputmode="search" enterkeyhint="go" autocomplete="off" aria-describedby="thvi-vehicle-hint" placeholder="Vehicle number, e.g. 22514">
@@ -89,7 +89,7 @@
                     </div>
 
                     <div class="thvi-field" data-driver-picker>
-                        <label class="thvi-label" for="thvi-driver-search">Driver assigned to this take-home vehicle</label>
+                        <label class="thvi-label" for="thvi-driver-search">Driver assigned to this take-home vehicle (optional)</label>
                         <p class="thvi-hint" id="thvi-driver-hint">Search by name or employee ID. The driver can be someone other than you.</p>
                         <div data-driver-chosen hidden class="thvi-chosen">
                             <div><p class="font-bold" data-driver-name></p><p class="thvi-hint" data-driver-meta></p></div>
@@ -115,7 +115,7 @@
                     </div>
 
                     <div class="thvi-field">
-                        <label class="thvi-label" for="thvi-odometer">Odometer (miles)</label>
+                        <label class="thvi-label" for="thvi-odometer">Odometer in miles (optional)</label>
                         <input id="thvi-odometer" class="thvi-input" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" placeholder="Current reading" data-odometer>
                         <p class="thvi-hint" data-odometer-hint></p>
                         <label class="thvi-check-row"><input type="checkbox" data-odometer-none> <span data-odometer-none-label>This vehicle has no working odometer</span></label>
@@ -127,14 +127,14 @@
             {{-- Step 2: six condition checks --}}
             <section class="thvi-step hub-panel" data-step="1" aria-labelledby="step2-title" hidden>
                 <div class="hub-panel__header"><h2 id="step2-title" class="text-lg font-bold" tabindex="-1">2. Condition</h2></div>
-                <div class="thvi-step__body" data-checks></div>
+                <div class="thvi-step__body" data-checks><p class="thvi-hint">Optional. Answer what you checked; anything left blank is reported as Not answered.</p></div>
             </section>
 
             {{-- Step 3: six required photos --}}
             <section class="thvi-step hub-panel" data-step="2" aria-labelledby="step3-title" hidden>
                 <div class="hub-panel__header"><h2 id="step3-title" class="text-lg font-bold" tabindex="-1">3. Photos</h2><span class="hub-tag" data-photo-count>0 of 6</span></div>
                 <div class="thvi-step__body">
-                    <p class="thvi-hint">All six photos are required. Use Take photo for the camera, or Choose existing to pick from your photos. Make sure the dashboard photo shows the odometer and any warning lights.</p>
+                    <p class="thvi-hint">Optional, but photos help Fleet. Use Take photo for the camera, or Choose existing to pick from your photos. A dashboard photo should show the odometer and any warning lights.</p>
                     <div class="thvi-photos" data-photos></div>
                 </div>
             </section>
@@ -144,7 +144,7 @@
                 <div class="hub-panel__header"><h2 id="step4-title" class="text-lg font-bold" tabindex="-1">4. Sign and submit</h2></div>
                 <div class="thvi-step__body">
                     <div class="thvi-field">
-                        <span class="thvi-label" id="keys-label">Are the vehicle keys present?</span>
+                        <span class="thvi-label" id="keys-label">Are the vehicle keys present? (optional)</span>
                         <div class="thvi-segment thvi-segment--two" role="radiogroup" aria-labelledby="keys-label" data-final="keys_present">
                             <button type="button" role="radio" aria-checked="false" data-value="yes">Yes</button>
                             <button type="button" role="radio" aria-checked="false" data-value="no">No</button>
@@ -152,7 +152,7 @@
                         <p class="thvi-error" data-error="keys_present"></p>
                     </div>
                     <div class="thvi-field">
-                        <span class="thvi-label" id="acceptable-label">Is the vehicle acceptable for use?</span>
+                        <span class="thvi-label" id="acceptable-label">Is the vehicle acceptable for use? (optional)</span>
                         <div class="thvi-segment thvi-segment--two" role="radiogroup" aria-labelledby="acceptable-label" data-final="acceptable_for_use">
                             <button type="button" role="radio" aria-checked="false" data-value="yes">Yes</button>
                             <button type="button" role="radio" aria-checked="false" data-value="no">No</button>
@@ -165,11 +165,11 @@
                     </div>
                     <label class="thvi-ack">
                         <input type="checkbox" data-ack>
-                        <span>I inspected this vehicle and this report is accurate to the best of my knowledge. I understand this is not a mechanical safety certification.</span>
+                        <span><strong>Required:</strong> I inspected this vehicle and this report is accurate to the best of my knowledge. I understand this is not a mechanical safety certification.</span>
                     </label>
                     <p class="thvi-error" data-error="acknowledged"></p>
                     <div class="thvi-field">
-                        <span class="thvi-label" id="sig-label">Signature</span>
+                        <span class="thvi-label" id="sig-label">Signature (required)</span>
                         <p class="thvi-hint">Sign with your finger, stylus or mouse.</p>
                         <div class="thvi-signature" data-signature-wrap>
                             <canvas data-signature aria-labelledby="sig-label" role="img"></canvas>

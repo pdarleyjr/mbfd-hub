@@ -45,9 +45,9 @@
 </head>
 <body>
 @php
-    $statusClass = fn (string $status): string => match ($status) { 'good' => 'good', 'issue' => 'issue', default => 'unchecked' };
-    $statusText = fn (string $status): string => \App\Models\TakeHomeVehicleInspection::STATUS_LABELS[$status] ?? $status;
-    $yesNo = fn (bool $value): string => $value ? 'Yes' : 'No';
+    $statusClass = fn (?string $status): string => match ($status) { 'good' => 'good', 'issue' => 'issue', default => 'unchecked' };
+    $statusText = fn (?string $status): string => \App\Models\TakeHomeVehicleInspection::statusLabel($status);
+    $yesNo = fn (?bool $value): string => \App\Models\TakeHomeVehicleInspection::answerLabel($value);
     $field = fn (?string $value): string => filled($value) ? $value : 'Not recorded';
 @endphp
 <div class="page-header">
@@ -72,7 +72,9 @@
 <h1>Take Home Vehicle Inspection</h1>
 <div class="muted">Submitted {{ $inspection->submittedAtLocal() }}@if($inspection->started_at) · Started {{ $inspection->started_at->clone()->timezone('America/New_York')->format('g:i A T') }}@endif</div>
 
-@if(! $inspection->acceptable_for_use)
+@if($inspection->acceptable_for_use === null)
+    <div class="callout">Acceptability for use was not answered.</div>
+@elseif(! $inspection->acceptable_for_use)
     <div class="callout">Vehicle reported NOT acceptable for use.</div>
 @elseif($inspection->has_issues || $inspection->has_not_checked)
     <div class="callout">Reported acceptable for use, with {{ $inspection->has_issues ? 'issues found' : '' }}{{ $inspection->has_issues && $inspection->has_not_checked ? ' and ' : '' }}{{ $inspection->has_not_checked ? 'items not checked' : '' }}.</div>
@@ -94,7 +96,7 @@
         <td><span class="label">Department</span><span class="value">{{ $field($snapshot['dept_code'] ?? null) }}</span></td>
     </tr>
     <tr>
-        <td colspan="2"><span class="label">Assigned driver</span><span class="value">{{ $inspection->driver_name }}</span>
+        <td colspan="2"><span class="label">Assigned driver</span><span class="value">{{ $inspection->driverLabel() }}</span>
             <span class="muted">{{ $inspection->driver_employee_number ? '· Employee ID '.$inspection->driver_employee_number : '' }} · {{ $inspection->driver_verified ? 'Verified personnel record' : 'Entered manually (not verified)' }}</span></td>
         <td colspan="2"><span class="label">Inspector (signed-in account)</span><span class="value">{{ $inspection->inspector_name }}</span></td>
     </tr>
@@ -118,7 +120,7 @@
             <td>
                 @if($check['issue_description'])<div class="pre">{{ $check['issue_description'] }}</div>@endif
                 @if($check['notes'])<div class="muted pre">Notes: {{ $check['notes'] }}</div>@endif
-                @if($check['status'] === 'not_checked')<div class="muted">Not checked. No condition reported.</div>@endif
+                @if($check['status'] === 'not_checked')<div class="muted">Not checked. No condition reported.</div>@elseif($check['status'] === null)<div class="muted">Not answered. No condition reported.</div>@endif
                 @if(! $check['issue_description'] && ! $check['notes'] && $check['status'] === 'good')<span class="muted">No findings.</span>@endif
             </td>
         </tr>
@@ -146,7 +148,7 @@
         <tr>
             @foreach($row as $photo)
                 <td><div class="frame">
-                    @if($photo['src'])<img src="{{ $photo['src'] }}" alt="{{ $photo['label'] }}">@else<div class="missing">Photo could not be loaded</div>@endif
+                    @if($photo['src'])<img src="{{ $photo['src'] }}" alt="{{ $photo['label'] }}">@elseif($photo['provided'] ?? true)<div class="missing">Photo could not be loaded</div>@else<div class="muted" style="padding: 40px 0;">Not provided</div>@endif
                     <div class="cap">{{ $photo['label'] }}</div>
                 </div></td>
             @endforeach
@@ -161,7 +163,7 @@
             <tr>
                 @foreach($row as $photo)
                     <td><div class="frame">
-                        @if($photo['src'])<img src="{{ $photo['src'] }}" alt="{{ $photo['label'] }}">@else<div class="missing">Photo could not be loaded</div>@endif
+                        @if($photo['src'])<img src="{{ $photo['src'] }}" alt="{{ $photo['label'] }}">@elseif($photo['provided'] ?? true)<div class="missing">Photo could not be loaded</div>@else<div class="muted" style="padding: 40px 0;">Not provided</div>@endif
                         <div class="cap">{{ $photo['label'] }}</div>
                     </div></td>
                 @endforeach
