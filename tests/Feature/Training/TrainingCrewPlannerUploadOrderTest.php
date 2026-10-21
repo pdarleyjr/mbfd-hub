@@ -8,15 +8,19 @@ use App\Filament\Training\Pages\TrainingCrewPlanner;
 use App\Models\Employee;
 use App\Models\Training\TrainingCourse;
 use App\Models\User;
+use App\Services\Training\CrewPlanner\TeleStaffPdfSandbox;
 use App\Services\Training\CrewPlanner\TrainingCrewPlannerDraftStore;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Spatie\Permission\Models\Role;
+use Symfony\Component\Process\Process;
 use Tests\TestCase;
 
 /** Independent native-upload regressions; all PDFs and identities are synthetic. */
@@ -73,7 +77,8 @@ final class TrainingCrewPlannerUploadOrderTest extends TestCase
             $this->post(route('training.crew-planner.upload'), ['draft_id' => $id,
                 'version' => $component->get('version'), 'roster_pdf' => $file])
                 ->assertRedirect()->assertSessionHasNoErrors()
-                ->assertSessionHas('crew_planner_notice', fn (string $notice): bool => str_contains($notice, 'Choose a course'));
+                ->assertSessionHas('crew_planner_notice', fn (string $notice): bool => str_contains($notice, 'Choose a course')
+                    && str_contains($notice, 'save classroom times'));
             self::assertFileDoesNotExist($path);
             $uploaded = $store->get($this->actor, $id);
             self::assertNull($uploaded['course_id']);
@@ -107,6 +112,83 @@ final class TrainingCrewPlannerUploadOrderTest extends TestCase
             $path = $file->getPathname();
             $this->post(route('training.crew-planner.upload'), ['draft_id' => $draft['id'],
                 'version' => $draft['version'], 'roster_pdf' => $file])->assertForbidden();
+            self::assertFileDoesNotExist($path);
+            self::assertSame($draft, $store->get($this->actor, $draft['id']));
+            self::assertSame($before, $this->sourceHashes());
+        } finally {
+            DB::statement('PRAGMA query_only = OFF');
+        }
+    }
+
+    public static function processingFailures(): array
+    {
+        return [
+            'invalid report' => [20, 'invalid_report'],
+            'failed server process' => [255, 'process_failed'],
+            'unexpected staffing analysis failure' => [0, 'staffing_analysis_failed'],
+        ];
+    }
+
+    #[DataProvider('processingFailures')]
+    public function test_processing_failure_has_private_fixed_diagnostics_and_preserves_the_proposal(int $exit, string $reason): void
+    {
+        $this->signIn('training_admin');
+        $store = app(TrainingCrewPlannerDraftStore::class);
+        $draft = $store->create($this->actor);
+        $draft = $store->update($this->actor, $draft['id'], 1, fn (array $row): array => [...$row,
+            'course_id' => $this->course->id, 'metadata' => ['schedule_date' => '2026-10-20', 'shift' => 'A'],
+            'selections' => ['501' => ['slot_id' => null]]]);
+        $file = UploadedFile::fake()->createWithContent('DO-NOT-LOG-90001.pdf', $this->pdf());
+        $path = $file->getPathname();
+        $sourceHash = hash_file('sha256', $path);
+        $process = $this->createMock(Process::class);
+        $process->method('setTimeout')->willReturnSelf();
+        $process->expects(self::once())->method('run')->willReturn($exit);
+        $process->method('isSuccessful')->willReturn($exit === 0);
+        $process->method('getExitCode')->willReturn($exit);
+        $process->method('isRunning')->willReturn(false);
+        $process->expects(self::never())->method('getErrorOutput');
+        $process->expects(self::never())->method('getCommandLine');
+        if ($exit === 0) {
+            // Valid sandbox envelope, unusable row: exercise the resolver's unexpected-error path.
+            $process->method('getOutput')->willReturn(json_encode(['schedule_date' => '2026-10-21', 'shift' => 'B',
+                'source_sha256' => $sourceHash, 'parsed_assignments' => [['raw_employee_id' => '90001',
+                    'raw_name' => ['DO-NOT-LOG-PRIVATE-IDENTITY']]]], JSON_THROW_ON_ERROR));
+        } else {
+            $process->expects(self::never())->method('getOutput');
+        }
+        $this->app->instance(TeleStaffPdfSandbox::class, new TeleStaffPdfSandbox(static fn (): Process => $process));
+        Log::spy();
+        $before = $this->sourceHashes();
+        DB::statement('PRAGMA query_only = ON');
+        try {
+            $response = $this->post(route('training.crew-planner.upload'), ['draft_id' => $draft['id'],
+                'version' => $draft['version'], 'roster_pdf' => $file]);
+            $response->assertRedirect()->assertSessionHasErrors('roster_pdf');
+            $reference = null;
+            $recordedContext = null;
+            Log::shouldHaveReceived('warning')->once()->withArgs(function (string $event, array $context) use ($reason, &$reference, &$recordedContext): bool {
+                self::assertSame('training_crew_planner_upload_failed', $event);
+                self::assertSame(['reason', 'reference'], array_keys($context));
+                self::assertSame($reason, $context['reason']);
+                self::assertTrue(Str::isUuid($context['reference']));
+                $reference = $context['reference'];
+                $recordedContext = $context;
+
+                return true;
+            });
+            Log::shouldNotHaveReceived('error');
+            $message = session('errors')->first('roster_pdf');
+            self::assertStringContainsString('Your saved proposal is safe.', $message);
+            self::assertStringContainsString('Reference: '.$reference, $message);
+            self::assertStringContainsString($exit === 20 ? 'recognize' : 'server processing problem', $message);
+            if ($exit !== 20) {
+                self::assertStringNotContainsString('Choose a complete', $message);
+            }
+            $diagnostics = json_encode([$message, $recordedContext], JSON_THROW_ON_ERROR);
+            foreach (['DO-NOT-LOG', $path, $sourceHash, 'raw_employee_id', 'exception', 'trace'] as $private) {
+                self::assertStringNotContainsString($private, $diagnostics);
+            }
             self::assertFileDoesNotExist($path);
             self::assertSame($draft, $store->get($this->actor, $draft['id']));
             self::assertSame($before, $this->sourceHashes());
