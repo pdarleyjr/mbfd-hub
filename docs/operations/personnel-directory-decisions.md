@@ -1,6 +1,6 @@
 # Personnel directory and administrative tables
 
-Baseline: `07973feb028925c7633a79e71051b9554903d0a7`. The locked dependencies are Laravel 12.69.1, Filament 3.3.54, Livewire 3.8.7, PhpSpreadsheet 5.10.0, and Dompdf 3.1.2. Production Compose pins PostgreSQL 16.13; deployment must verify the running version separately. No framework upgrade is required.
+Baseline: `07973feb028925c7633a79e71051b9554903d0a7`. The locked dependencies are Laravel 12.69.1, Filament 3.3.54, Livewire 3.8.7, PhpSpreadsheet 5.10.0, Dompdf 3.1.6 and its Laravel adapter 3.1.2. Production Compose pins PostgreSQL 16.13; deployment must verify the running version separately. No framework upgrade is required.
 
 ## Authoritative data
 
@@ -26,7 +26,7 @@ Metadata and per-member version checks detect conflicting saves. Transactions co
 
 Existing Hub authentication and administrator entitlement remain mandatory. Service authorization is repeated for table reads, mutations and exports; table ownership/visibility and employee membership are checked server-side. Public action arguments and component state are untrusted. Columns, filters, sort keys, option values, payload sizes and export formats are allowlisted. Text renders escaped. See [Laravel authorization](https://laravel.com/docs/12.x/authorization), [validation](https://laravel.com/docs/12.x/validation), [Livewire 3 security](https://livewire.laravel.com/docs/3.x/security), [OWASP IDOR](https://cheatsheetseries.owasp.org/cheatsheets/Insecure_Direct_Object_Reference_Prevention_Cheat_Sheet.html), [mass assignment](https://cheatsheetseries.owasp.org/cheatsheets/Mass_Assignment_Cheat_Sheet.html), and [XSS](https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html).
 
-Native Filament [CSV/XLSX exports](https://filamentphp.com/docs/3.x/actions/prebuilt-actions/export) were evaluated; they use queued batches and database notifications. For this roster of a few hundred members, the existing vehicle-roster pattern with the already-installed PhpSpreadsheet and Dompdf produces immediate scoped downloads without new infrastructure. Export service authorization re-reads requested members from the permitted table query. XLSX text is explicitly typed, identifiers retain leading zeroes, checkbox values are Boolean and numeric tracking stays numeric. CSV strings that can start formulas are neutralized; exports are private and not cached. See [OWASP CSV injection](https://owasp.org/www-community/attacks/CSV_Injection).
+Native Filament [CSV/XLSX exports](https://filamentphp.com/docs/3.x/actions/prebuilt-actions/export) were evaluated; they use queued batches and database notifications. For this roster of a few hundred members, the existing vehicle-roster pattern with the already-installed PhpSpreadsheet and Dompdf produces immediate scoped downloads without new infrastructure. Export service authorization re-reads requested members from the permitted table query. XLSX text is explicitly typed, identifiers retain leading zeroes, checkbox values are Boolean, numeric tracking stays numeric and date tracking uses native Excel date cells with ISO formatting. CSV strings that can start formulas are neutralized; exports are private and not cached. See [OWASP CSV injection](https://owasp.org/www-community/attacks/CSV_Injection).
 
 ## Release boundary
 

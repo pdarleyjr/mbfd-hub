@@ -44,6 +44,17 @@
                     </div>
                     @if ($row['flags'] !== [])<ul class="mt-2 list-inside list-disc text-sm">@foreach ($row['flags'] as $flag)<li>{{ $flag }}</li>@endforeach</ul>@endif
                     @if ($row['qa_note'])<p class="mt-2 text-sm">{{ $row['qa_note'] }}</p>@endif
+                    @if (!empty($row['qa_status']))<p class="mt-2 text-sm">Directory email status: {{ $row['workbook']['email_match_status'] ?? 'Not supplied' }} · Email QA status: {{ $row['qa_status'] }}</p>@endif
+                    @if (!empty($row['assignment_override']))
+                        <details class="mt-2 text-sm">
+                            <summary class="min-h-11 cursor-pointer py-3">Review workbook assignment override</summary>
+                            <dl class="grid gap-2 sm:grid-cols-2">
+                                @foreach ($row['assignment_override'] as $field => $value)
+                                    <div><dt class="font-medium">{{ str($field)->headline() }}</dt><dd>{{ $value !== '' ? $value : 'Not supplied' }}</dd></div>
+                                @endforeach
+                            </dl>
+                        </details>
+                    @endif
                     @php($detailFields = $row['differences'] !== [] ? $row['differences'] : (empty($row['live']) ? array_keys($row['workbook']) : []))
                     @if ($detailFields !== [])
                         <details class="mt-2 text-sm">

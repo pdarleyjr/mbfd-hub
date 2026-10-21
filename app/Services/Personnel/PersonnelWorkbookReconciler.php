@@ -7,6 +7,7 @@ namespace App\Services\Personnel;
 use App\Models\PersonnelReconciliation;
 use App\Models\User;
 use App\Services\Roster\RosterHtmlParser;
+use App\Services\Security\ApplicationAccessService;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
@@ -20,17 +21,17 @@ final class PersonnelWorkbookReconciler
 {
     public const HEADERS = ['Name', 'Employee ID', 'Email Address', 'Rank / Position', 'Shift', 'A Day', 'Station / Division', 'Seat / Unit', 'Bid Position', 'Email Match Status'];
 
-    public static function canView(?User $actor): bool
+    public static function canView(?User $actor, bool $refreshActor = true): bool
     {
-        $actor = $actor?->fresh();
+        $actor = $refreshActor ? $actor?->fresh() : $actor;
 
         return $actor !== null && $actor->isAuthenticationAllowed()
             && $actor->hasCurrentAdminPanelEntitlement()
-            && ($actor->hasRole('super_admin') || $actor->hasDirectWebPermission('admin.personnel.view')
+            && ($actor->hasRole('super_admin') || $actor->hasDirectWebPermission('personnel.directory.view')
                 || $actor->hasDirectWebPermission('admin.members.view')
-                || $actor->hasDirectWebPermission('admin.personnel.manage')
                 || $actor->hasDirectWebPermission('admin.members.manage')
-                || $actor->hasDirectWebPermission('personnel.directory.view'));
+                || (($actor->hasDirectWebPermission('admin.personnel.view') || $actor->hasDirectWebPermission('admin.personnel.manage'))
+                    && ! ApplicationAccessService::isUniformManagerOnly($actor)));
     }
 
     public static function canReconcile(?User $actor): bool
@@ -38,9 +39,9 @@ final class PersonnelWorkbookReconciler
         $actor = $actor?->fresh();
 
         return self::canView($actor) && ($actor->hasRole('super_admin')
-            || $actor->hasDirectWebPermission('admin.personnel.manage')
             || $actor->hasDirectWebPermission('admin.members.manage')
-            || $actor->hasDirectWebPermission('personnel.directory.edit'));
+            || $actor->hasDirectWebPermission('personnel.directory.edit')
+            || ($actor->hasDirectWebPermission('admin.personnel.manage') && ! ApplicationAccessService::isUniformManagerOnly($actor)));
     }
 
     public static function canExport(?User $actor): bool
@@ -48,9 +49,9 @@ final class PersonnelWorkbookReconciler
         $actor = $actor?->fresh();
 
         return self::canView($actor) && ($actor->hasRole('super_admin')
-            || $actor->hasDirectWebPermission('admin.personnel.manage')
             || $actor->hasDirectWebPermission('admin.members.manage')
-            || $actor->hasDirectWebPermission('personnel.directory.export'));
+            || $actor->hasDirectWebPermission('personnel.directory.export')
+            || ($actor->hasDirectWebPermission('admin.personnel.manage') && ! ApplicationAccessService::isUniformManagerOnly($actor)));
     }
 
     /** @return array{summary:array<string,mixed>,rows:list<array<string,mixed>>,workbook_sha256:string} */
@@ -122,7 +123,7 @@ final class PersonnelWorkbookReconciler
                 foreach ($overrideRows as $row) {
                     $id = trim((string) ($row[$idColumn] ?? ''));
                     if ($id !== '') {
-                        $overrides[$id] = array_values(array_filter(array_map(fn ($value): string => mb_substr(trim((string) $value), 0, 1000), $row), fn ($value): bool => $value !== ''));
+                        $overrides[$id] = array_combine($overrideHeaders, array_map(fn ($value): string => mb_substr(trim((string) $value), 0, 1000), $row));
                     }
                 }
             }
@@ -176,6 +177,9 @@ final class PersonnelWorkbookReconciler
                 }
                 if (isset($overrides[$id])) {
                     $flags[] = 'Assignment override in workbook; permanent and temporary placements must be reviewed separately.';
+                    if (preg_match('/unconfirm|not\s+confirmed|uncertain|unverified|pending/i', $overrides[$id]['reason / source'] ?? '')) {
+                        $flags[] = 'The assignment override contains an unconfirmed value; review its source notes.';
+                    }
                 }
                 $assignment = $assignmentById[$id] ?? null;
                 if ($assignment !== [$shift, $station, $unit, $bidPosition, $name, $rank, $id, $email, $aDay]) {
@@ -205,7 +209,7 @@ final class PersonnelWorkbookReconciler
                 if ($classification === 'conflict') {
                     $summary['conflicts']++;
                 }
-                $report[] = ['employee_id' => $id, 'profile_id' => $employee?->id, 'name' => $employee->name ?? $name, 'classification' => $classification, 'workbook_row' => $index + 2, 'workbook' => $workbook, 'live' => $current, 'differences' => $differences, 'flags' => $flags, 'qa_note' => $qaRow['note'] ?? '', 'assignment_override' => $overrides[$id] ?? []];
+                $report[] = ['employee_id' => $id, 'profile_id' => $employee?->id, 'name' => $employee->name ?? $name, 'classification' => $classification, 'workbook_row' => $index + 2, 'workbook' => $workbook, 'live' => $current, 'differences' => $differences, 'flags' => $flags, 'qa_note' => $qaRow['note'] ?? '', 'qa_status' => $qaRow['status'] ?? '', 'assignment_override' => $overrides[$id] ?? []];
             }
             foreach ($live as $employee) {
                 if (! isset($seen[(string) $employee->employee_id])) {

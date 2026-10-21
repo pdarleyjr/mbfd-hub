@@ -16,6 +16,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 final class PersonnelTableServiceTest extends TestCase
@@ -289,6 +290,7 @@ final class PersonnelTableServiceTest extends TestCase
     private function manager(): User
     {
         $actor = User::factory()->create(['account_status' => 'active']);
+        $actor->assignRole(Role::findOrCreate('admin', 'web'));
         foreach (['admin.access', 'admin.personnel.view', 'admin.personnel.manage'] as $permission) {
             $actor->givePermissionTo(Permission::findOrCreate($permission, 'web'));
         }

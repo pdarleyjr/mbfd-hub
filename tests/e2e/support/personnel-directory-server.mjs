@@ -7,7 +7,7 @@ const directory = mkdtempSync(resolve('test-results/personnel-directory-server-'
 const env = { ...process.env, PERSONNEL_DIRECTORY_TEST_DIRECTORY: directory };
 const php = process.env.PHP_BINARY || 'php';
 // Bound cold Filament compilation on the Windows test host; production settings are untouched.
-const options = [...(process.platform === 'win32' ? ['-d', 'extension=php_sodium.dll'] : []), '-d', 'max_execution_time=120'];
+const options = [...(process.platform === 'win32' ? ['-d', 'extension=php_sodium.dll'] : []), '-d', 'max_execution_time=120', '-d', 'opcache.enable_cli=1'];
 const fixture = 'tests/e2e/support/personnel-directory-fixture.php';
 const seeded = spawnSync(php, [...options, fixture, '--seed'], { env, stdio: 'inherit' });
 if (seeded.status !== 0) process.exit(seeded.status ?? 1);

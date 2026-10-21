@@ -37,12 +37,12 @@ final class CustomPersonnelTables extends Page implements HasTable
 
     public static function canAccess(): bool
     {
-        return auth()->user() instanceof User && app(PersonnelTableService::class)->canViewTables(auth()->user());
+        return auth()->user() instanceof User && app(PersonnelTableService::class)->canViewTables(auth()->user(), refreshActor: false);
     }
 
     public function mount(): void
     {
-        abort_unless(self::canAccess(), 403);
+        abort_unless(auth()->user() instanceof User && app(PersonnelTableService::class)->canViewTables(auth()->user()), 403);
     }
 
     public function table(Table $table): Table

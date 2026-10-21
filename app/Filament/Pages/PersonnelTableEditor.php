@@ -79,7 +79,7 @@ final class PersonnelTableEditor extends Page implements HasTable
 
     public function getTitle(): string
     {
-        return $this->personnelTable()->name;
+        return isset($this->personnelTableId) ? $this->personnelTable()->name : 'Personnel Table';
     }
 
     public function getSubheading(): string
@@ -121,13 +121,7 @@ final class PersonnelTableEditor extends Page implements HasTable
             ->query(fn (): Builder => app(PersonnelTableService::class)->members(auth()->user(), $this->personnelTable()))
             ->columns([...$columns, ...$this->trackingColumns($definition)])
             ->recordClasses(fn (Employee $record): string => $this->trackingRecordClasses($record))
-            ->defaultSort(function (Builder $query): Builder {
-                foreach ($this->validatedSort($this->personnelSortRules) as $rule) {
-                    $this->orderSource($query, $rule['field'], $rule['direction']);
-                }
-
-                return $query->orderBy('employees.id');
-            })
+            ->defaultSort(fn (Builder $query): Builder => $this->applyPersonnelSort($query))
             ->filters([
                 ...collect(['shift', 'rank', 'station', 'division', 'unit', 'bid_position', 'roster_status'])
                     ->map(fn (string $field) => Tables\Filters\SelectFilter::make($field)->label($source->fields()[$field])
@@ -307,6 +301,18 @@ final class PersonnelTableEditor extends Page implements HasTable
             'sorts.*.field' => ['required', Rule::in(array_keys($this->sortOptions()))],
             'sorts.*.direction' => ['required', Rule::in(['asc', 'desc'])],
         ])->validate()['sorts'];
+    }
+
+    private function applyPersonnelSort(Builder $query): Builder
+    {
+        $allowed = array_keys($this->sortOptions());
+        $sorts = array_values(array_filter($this->personnelSortRules, fn ($sort): bool => is_array($sort)
+            && in_array($sort['field'] ?? null, $allowed, true)));
+        foreach ($this->validatedSort($sorts ?: [['field' => 'name', 'direction' => 'asc']]) as $sort) {
+            $this->orderSource($query, $sort['field'], $sort['direction']);
+        }
+
+        return $query->orderBy('employees.id');
     }
 
     private function orderSource(Builder $query, string $field, string $direction): Builder

@@ -19,6 +19,7 @@ use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use Spatie\Permission\Models\Role;
 use Tests\Feature\Filament\StationAdminFixtures;
 use Tests\TestCase;
 
@@ -48,7 +49,7 @@ final class MasterPersonnelDirectoryTest extends TestCase
     public function test_profile_edit_uses_established_service_and_protected_identity_stays_unchanged(): void
     {
         $employee = $this->employee('Taylor Fixture', '00125', 'Lieutenant');
-        $this->actingAsAdminWith(['admin.personnel.view', 'admin.personnel.manage']);
+        $this->actingAsPersonnelManager();
 
         Livewire::test(MasterPersonnelDirectory::class)
             ->call('updateTableColumnState', 'rank', (string) $employee->id, 'Captain')
@@ -88,7 +89,7 @@ final class MasterPersonnelDirectoryTest extends TestCase
     {
         $first = $this->employee('Alex Fixture', '00125');
         $second = $this->employee('Zoe Fixture', '00126');
-        $actor = $this->actingAsAdminWith(['admin.personnel.view', 'admin.personnel.manage']);
+        $actor = $this->actingAsPersonnelManager();
         $service = app(PersonnelTableService::class);
         $table = $service->master($actor);
         $number = (string) Str::uuid();
@@ -110,19 +111,24 @@ final class MasterPersonnelDirectoryTest extends TestCase
     public function test_csv_and_xlsx_export_use_persisted_data_and_safe_cell_types(): void
     {
         $employee = $this->employee('=1+1', '00125');
-        $actor = $this->actingAsAdminWith(['admin.personnel.view', 'admin.personnel.manage']);
+        $actor = $this->actingAsPersonnelManager();
         $service = app(PersonnelTableService::class);
         $table = $service->master($actor);
         $checkbox = (string) Str::uuid();
         $number = (string) Str::uuid();
+        $date = (string) Str::uuid();
+        $untouchedCheckbox = (string) Str::uuid();
         $table = $service->update($actor, $table, ['columns' => [
             ['id' => $checkbox, 'label' => '@Completed', 'type' => 'checkbox', 'options' => [], 'hidden' => false, 'color' => ''],
             ['id' => $number, 'label' => 'Quantity', 'type' => 'number', 'options' => [], 'hidden' => false, 'color' => ''],
+            ['id' => $date, 'label' => 'Completion date', 'type' => 'date', 'options' => [], 'hidden' => false, 'color' => ''],
+            ['id' => $untouchedCheckbox, 'label' => 'Untouched checkbox', 'type' => 'checkbox', 'options' => [], 'hidden' => false, 'color' => ''],
         ]], $table->version);
         $entry = $service->setCell($actor, $table, $employee, $checkbox, true, 0);
-        $service->setCell($actor, $table, $employee, $number, 3, $entry->version);
+        $entry = $service->setCell($actor, $table, $employee, $number, 3, $entry->version);
+        $service->setCell($actor, $table, $employee, $date, '2026-10-21', $entry->version);
         $employee->name = 'UNSAVED SPOOF';
-        $columns = ['employee_id', 'name', $checkbox, $number];
+        $columns = ['employee_id', 'name', $checkbox, $number, $date, $untouchedCheckbox];
         $exporter = app(PersonnelTableExporter::class);
 
         $csv = $this->bytes($exporter->export($actor, $table, new Collection([$employee]), $columns, 'csv', 'selected'));
@@ -130,6 +136,7 @@ final class MasterPersonnelDirectoryTest extends TestCase
         self::assertStringContainsString("'@Completed", $csv);
         self::assertStringNotContainsString('UNSAVED SPOOF', $csv);
         self::assertStringContainsString('00125', $csv);
+        self::assertStringContainsString(',No', $csv);
 
         $bytes = $this->bytes($exporter->export($actor, $table, new Collection([$employee]), $columns, 'xlsx', 'selected'));
         $path = tempnam(sys_get_temp_dir(), 'personnel-test-');
@@ -145,6 +152,11 @@ final class MasterPersonnelDirectoryTest extends TestCase
             self::assertSame(DataType::TYPE_BOOL, $sheet->getCell('C2')->getDataType());
             self::assertEquals(3, $sheet->getCell('D2')->getValue());
             self::assertSame(DataType::TYPE_NUMERIC, $sheet->getCell('D2')->getDataType());
+            self::assertSame(DataType::TYPE_NUMERIC, $sheet->getCell('E2')->getDataType());
+            self::assertSame('yyyy-mm-dd', $sheet->getCell('E2')->getStyle()->getNumberFormat()->getFormatCode());
+            self::assertSame('2026-10-21', $sheet->getCell('E2')->getFormattedValue());
+            self::assertFalse($sheet->getCell('F2')->getValue());
+            self::assertSame(DataType::TYPE_BOOL, $sheet->getCell('F2')->getDataType());
             self::assertSame('selected', $book->getSheetByName('About this export')->getCell('B2')->getValue());
             $book->disconnectWorksheets();
         } finally {
@@ -167,7 +179,7 @@ final class MasterPersonnelDirectoryTest extends TestCase
     public function test_export_rejects_unapproved_columns(): void
     {
         $employee = $this->employee('Taylor Fixture', '00125');
-        $actor = $this->actingAsAdminWith(['admin.personnel.view', 'admin.personnel.manage']);
+        $actor = $this->actingAsPersonnelManager();
         $table = app(PersonnelTableService::class)->master($actor);
 
         $this->expectException(ValidationException::class);
@@ -199,6 +211,14 @@ final class MasterPersonnelDirectoryTest extends TestCase
         self::assertStringStartsWith('%PDF-', $pdf);
         self::assertStringContainsString('%%EOF', $pdf);
         self::assertSame('<script>fixture</script>', $employee->fresh()->name);
+    }
+
+    private function actingAsPersonnelManager(): User
+    {
+        $actor = $this->actingAsAdminWith(['admin.personnel.view', 'admin.personnel.manage']);
+        $actor->assignRole(Role::findOrCreate('admin', 'web'));
+
+        return $actor;
     }
 
     private function employee(string $name, string $id, string $rank = 'Firefighter', string $station = '1'): Employee

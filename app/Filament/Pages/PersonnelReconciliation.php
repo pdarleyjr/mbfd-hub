@@ -39,12 +39,12 @@ final class PersonnelReconciliation extends Page
 
     public static function canAccess(): bool
     {
-        return PersonnelWorkbookReconciler::canView(auth()->user());
+        return PersonnelWorkbookReconciler::canView(auth()->user(), refreshActor: false);
     }
 
     public function mount(): void
     {
-        abort_unless(self::canAccess(), 403);
+        abort_unless(PersonnelWorkbookReconciler::canView(auth()->user()), 403);
         $this->reportId = Report::query()->latest('id')->value('id');
     }
 
@@ -75,7 +75,7 @@ final class PersonnelReconciliation extends Page
 
     public function report(): ?Report
     {
-        abort_unless(self::canAccess(), 403);
+        abort_unless(PersonnelWorkbookReconciler::canView(auth()->user()), 403);
 
         return $this->reportId === null ? null : Report::query()->findOrFail($this->reportId);
     }

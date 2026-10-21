@@ -61,7 +61,7 @@ final class MasterPersonnelDirectory extends Page implements HasTable
     {
         $actor = auth()->user();
 
-        return $actor instanceof User && app(PersonnelTableService::class)->canViewDirectory($actor);
+        return $actor instanceof User && app(PersonnelTableService::class)->canViewDirectory($actor, refreshActor: false);
     }
 
     public function mount(): void
@@ -96,6 +96,7 @@ final class MasterPersonnelDirectory extends Page implements HasTable
 
         return self::applyEnterpriseDefaults($table)
             ->deferLoading(false)
+            ->searchable()
             ->query(fn (): Builder => app(PersonnelTableService::class)->members($this->actor(), $this->personnelTable()))
             ->columns([...$columns, ...$this->trackingColumns($definition)])
             ->recordClasses(fn (Employee $record): string => $this->trackingRecordClasses($record))
@@ -117,9 +118,11 @@ final class MasterPersonnelDirectory extends Page implements HasTable
             ->actions([
                 Tables\Actions\Action::make('details')->label('Details')->icon('heroicon-o-eye')
                     ->modalHeading(fn (Employee $record): string => $record->name)
-                    ->modalContent(fn (Employee $record) => view('filament.pages.personnel-directory-details', [
+                    ->modalContent(fn (Employee $record) => view('filament.pages.partials.personnel-table-member-details', [
                         'fields' => $source->fields(), 'record' => $record, 'source' => $source,
                         'emailStatus' => $this->statuses()[$record->getKey()] ?? '',
+                        'trackingColumns' => $this->personnelTable()->columns ?? [],
+                        'trackingValues' => $this->trackingEntry($record)->values ?? [],
                     ]))->modalSubmitAction(false)->modalCancelActionLabel('Close'),
                 Tables\Actions\Action::make('employee')->label('Edit profile / employment')->icon('heroicon-o-pencil-square')
                     ->visible(fn (Employee $record): bool => EmployeeResource::canEdit($record))
@@ -136,6 +139,11 @@ final class MasterPersonnelDirectory extends Page implements HasTable
                         ->export($this->actor(), $this->personnelTable(), $records, $this->exportColumns(), $data['format'], 'selected')),
             ])
             ->searchPlaceholder('Search name, employee ID, email or profile');
+    }
+
+    protected function applySearchToTableQuery(Builder $query): Builder
+    {
+        return app(PersonnelSource::class)->filter($query, ['search' => (string) $this->getTableSearch()]);
     }
 
     protected function getHeaderActions(): array

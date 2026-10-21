@@ -17,6 +17,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 final class CustomPersonnelTablesTest extends TestCase
@@ -307,6 +308,7 @@ final class CustomPersonnelTablesTest extends TestCase
     private function loginManager(): User
     {
         $user = User::factory()->create(['account_status' => 'active']);
+        $user->assignRole(Role::findOrCreate('admin', 'web'));
         foreach (['admin.access', 'admin.personnel.view', 'admin.personnel.manage'] as $permission) {
             $user->givePermissionTo(Permission::findOrCreate($permission, 'web'));
         }

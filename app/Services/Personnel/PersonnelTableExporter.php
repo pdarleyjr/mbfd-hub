@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\Shared\Date;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -67,7 +68,7 @@ final class PersonnelTableExporter
                     ? ($key === 'email_match_status' ? ($emailStatuses[$id] ?? null) : $source->value($employee, $key))
                     : ($values[$key] ?? null);
                 $row[] = match (true) {
-                    $definition['type'] === 'checkbox' => $value === null ? null : (bool) $value,
+                    $definition['type'] === 'checkbox' => (bool) $value,
                     $definition['type'] === 'number' && $value !== null => (float) $value,
                     is_array($value) => implode('; ', $value),
                     default => $value === null ? '' : (string) $value,
@@ -80,7 +81,7 @@ final class PersonnelTableExporter
         $generated = now('America/New_York')->format('M j, Y g:i A T');
         $bytes = match ($format) {
             'csv' => $this->csv($headers, $rows),
-            'xlsx' => $this->xlsx($title, $headers, $rows, $scope, $generated),
+            'xlsx' => $this->xlsx($title, $headers, $rows, $scope, $generated, array_map(fn (string $key): string => $definitions[$key]['type'], $columns)),
             'pdf' => Pdf::loadView('pdf.personnel-table', compact('title', 'headers', 'rows', 'scope', 'generated'))
                 ->setPaper('letter', 'landscape')->output(),
         };
@@ -124,13 +125,19 @@ final class PersonnelTableExporter
         return $bytes;
     }
 
-    private function xlsx(string $title, array $headers, array $rows, string $scope, string $generated): string
+    private function xlsx(string $title, array $headers, array $rows, string $scope, string $generated, array $columnTypes): string
     {
         $book = new Spreadsheet;
         $sheet = $book->getActiveSheet();
         $sheet->setTitle('Personnel');
         foreach ([$headers, ...$rows] as $rowIndex => $row) {
             foreach ($row as $index => $value) {
+                if ($rowIndex > 0 && $columnTypes[$index] === 'date' && $value !== '') {
+                    $sheet->setCellValueExplicit([$index + 1, $rowIndex + 1], Date::PHPToExcel(new \DateTimeImmutable($value)), DataType::TYPE_NUMERIC);
+                    $sheet->getStyle([$index + 1, $rowIndex + 1])->getNumberFormat()->setFormatCode('yyyy-mm-dd');
+
+                    continue;
+                }
                 $type = is_bool($value) ? DataType::TYPE_BOOL : (is_float($value) || is_int($value) ? DataType::TYPE_NUMERIC : DataType::TYPE_STRING);
                 $sheet->setCellValueExplicit([$index + 1, $rowIndex + 1], $value ?? '', $type);
             }

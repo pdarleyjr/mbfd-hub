@@ -120,6 +120,19 @@ final class PersonnelWorkbookReconcilerTest extends TestCase
         self::assertSame('Roster Test', $result['rows'][0]['live']['name']);
     }
 
+    public function test_assignment_override_source_and_uncertainty_remain_available_for_review(): void
+    {
+        $file = $this->workbook([
+            ['Roster Test', '01234', '', '', 'A', '1', 'Station 1', 'Engine 1', 'Driver', 'Unresolved'],
+        ], [], null, [['01234', 'Roster Test', 'Topology resolution', 'A', 'Station 1', 'Engine 1', '', 'A', 'Station 1', 'Engine 1', 'Driver', 'Bid position unconfirmed; review source chart.']]);
+        $result = app(PersonnelWorkbookReconciler::class)->analyze($this->administrator(), $file);
+
+        self::assertSame(1, $result['summary']['assignment_overrides']);
+        self::assertSame('Bid position unconfirmed; review source chart.', $result['rows'][0]['assignment_override']['reason / source']);
+        self::assertStringContainsString('unconfirmed value', implode(' ', $result['rows'][0]['flags']));
+        self::assertSame(0, Employee::query()->count());
+    }
+
     private function administrator(): User
     {
         Role::findOrCreate('super_admin', 'web');
@@ -129,7 +142,7 @@ final class PersonnelWorkbookReconcilerTest extends TestCase
         return $actor;
     }
 
-    private function workbook(array $rows, array $qa = [], ?array $headers = null): string
+    private function workbook(array $rows, array $qa = [], ?array $headers = null, array $overrides = []): string
     {
         $book = new Spreadsheet;
         $book->getActiveSheet()->setTitle('Summary')->setCellValue('A1', 'Synthetic test workbook');
@@ -138,7 +151,7 @@ final class PersonnelWorkbookReconcilerTest extends TestCase
         $assignment = $book->createSheet()->setTitle('By Assignment');
         $assignment->fromArray([['Shift', 'Station / Division', 'Seat / Unit', 'Bid Position', 'Name', 'Rank / Position', 'Employee ID', 'Email Address', 'A Day'], ...array_map(fn ($row): array => [$row[4], $row[6], $row[7], $row[8], $row[0], $row[3], $row[1], $row[2], $row[5]], $rows)], null, 'A1', true);
         $book->createSheet()->setTitle('Email QA')->fromArray([['Employee ID', 'Assignment Name', 'Directory Display Name', 'Email Address', 'Match Status', 'Review Note'], ...$qa], null, 'A1', true);
-        $book->createSheet()->setTitle('Assignment Overrides')->fromArray([['Employee ID', 'Name', 'Override Type', 'Original Shift', 'Original Station', 'Original Seat / Unit', 'Original Position', 'Applied Shift', 'Applied Station', 'Applied Seat / Unit', 'Applied Position', 'Reason / Source']], null, 'A1');
+        $book->createSheet()->setTitle('Assignment Overrides')->fromArray([['Employee ID', 'Name', 'Override Type', 'Original Shift', 'Original Station', 'Original Seat / Unit', 'Original Position', 'Applied Shift', 'Applied Station', 'Applied Seat / Unit', 'Applied Position', 'Reason / Source'], ...$overrides], null, 'A1');
         $path = tempnam(sys_get_temp_dir(), 'mbfd-personnel-test-');
         $this->files[] = $path;
         (new Xlsx($book))->save($path);

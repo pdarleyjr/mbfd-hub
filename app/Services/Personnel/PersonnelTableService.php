@@ -10,6 +10,7 @@ use App\Models\PersonnelTableEntry;
 use App\Models\PersonnelTableEvent;
 use App\Models\PersonnelTableView;
 use App\Models\User;
+use App\Services\Security\ApplicationAccessService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -29,14 +30,14 @@ final class PersonnelTableService
 
     public function __construct(private readonly PersonnelSource $source) {}
 
-    public function canViewDirectory(User $actor): bool
+    public function canViewDirectory(User $actor, bool $refreshActor = true): bool
     {
-        return $this->has($actor, ['personnel.directory.view', 'admin.personnel.view', 'admin.members.view', ...self::LEGACY_MANAGERS]);
+        return $this->has($actor, ['personnel.directory.view', 'admin.personnel.view', 'admin.members.view', ...self::LEGACY_MANAGERS], $refreshActor);
     }
 
-    public function canViewTables(User $actor): bool
+    public function canViewTables(User $actor, bool $refreshActor = true): bool
     {
-        return $this->has($actor, ['personnel.tables.view', 'admin.personnel.view', ...self::LEGACY_MANAGERS]);
+        return $this->has($actor, ['personnel.tables.view', 'admin.personnel.view', ...self::LEGACY_MANAGERS], $refreshActor);
     }
 
     public function canCreate(User $actor): bool
@@ -536,9 +537,10 @@ final class PersonnelTableService
         return $current !== null && $current->isAuthenticationAllowed() && $current->hasCurrentAdminPanelEntitlement() && $current->hasRole('super_admin');
     }
 
-    private function has(User $actor, array $permissions): bool
+    private function has(User $actor, array $permissions, bool $refreshActor = true): bool
     {
-        $current = User::query()->find($actor->getKey());
+        // Navigation reuses the authenticated request identity; service/data checks always refresh by default.
+        $current = $refreshActor ? User::query()->find($actor->getKey()) : $actor;
         if ($current === null || ! $current->isAuthenticationAllowed() || ! $current->hasCurrentAdminPanelEntitlement()) {
             return false;
         }
@@ -547,7 +549,7 @@ final class PersonnelTableService
         }
         foreach ($permissions as $permission) {
             if ($current->hasDirectWebPermission($permission)) {
-                return true;
+                return ! str_starts_with($permission, 'admin.personnel.') || ! ApplicationAccessService::isUniformManagerOnly($current);
             }
         }
 
