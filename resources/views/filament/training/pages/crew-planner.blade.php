@@ -53,14 +53,14 @@
                         <strong>The previous report remains saved.</strong>
                         <p>The latest upload was not read. The roster details below belong to your previously saved report.</p>
                     @else
-                    <strong>Daily report read successfully.</strong>
-                    @if (empty($draft['course_id']))
-                        <p>Next, choose a course above and select Use this scope to check attendance.</p>
-                    @elseif (empty($draft['slots']))
-                        <p>Next, <a href="#crew-planner-classroom-times" class="font-semibold underline">save classroom times</a> to show eligible members. The displayed times are suggestions until saved.</p>
-                    @else
-                        <p>Confirm the roster date and shift, then review eligible members and your planning list below.</p>
-                    @endif
+                        <strong>Daily report read successfully.</strong>
+                        @if (empty($draft['course_id']))
+                            <p>Next, choose a course above and select Use this scope to check attendance.</p>
+                        @elseif (empty($draft['slots']))
+                            <p>Next, <a href="#crew-planner-classroom-times" class="font-semibold underline">save classroom times</a> to show eligible members. The displayed times are suggestions until saved.</p>
+                        @else
+                            <p>Confirm the roster date and shift, then review eligible members and your planning list below.</p>
+                        @endif
                     @endif
                 </div>
                 <p class="mt-3 font-semibold">Roster date: {{ $draft['metadata']['schedule_date'] ?? 'Unconfirmed' }} · {{ $draft['metadata']['shift'] ?? 'Unconfirmed' }} Shift · {{ $draft['metadata']['page_count'] ?? '?' }} pages</p>
