@@ -4,12 +4,15 @@ namespace App\Filament\Resources;
 
 use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\UnitMasterVehicleResource\Pages;
+use App\Models\Employee;
 use App\Models\UnitMasterVehicle;
+use App\Models\UnitMasterVehicleChange;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 class UnitMasterVehicleResource extends Resource
 {
@@ -39,7 +42,7 @@ class UnitMasterVehicleResource extends Resource
                             ->label('Veh #')
                             ->nullable(),
                         Forms\Components\TextInput::make('tag_number')
-                            ->label('Tag #')
+                            ->label('License plate / Tag #')
                             ->nullable(),
                         Forms\Components\TextInput::make('make')
                             ->nullable(),
@@ -47,10 +50,35 @@ class UnitMasterVehicleResource extends Resource
                             ->nullable(),
                         Forms\Components\TextInput::make('year')
                             ->nullable(),
+                        Forms\Components\TextInput::make('color')
+                            ->nullable(),
                         Forms\Components\TextInput::make('serial_number')
-                            ->label('Serial Number')
+                            ->label('VIN / Serial #')
+                            ->nullable(),
+                        Forms\Components\Select::make('asset_category')
+                            ->label('Asset category')
+                            ->options(UnitMasterVehicle::CATEGORY_LABELS)
                             ->nullable(),
                     ])->columns(3),
+
+                Forms\Components\Section::make('Fleet Classification')
+                    ->schema([
+                        Forms\Components\TextInput::make('fleet_status_code')
+                            ->label('FY27 status')
+                            ->helperText('City FY27 status letter; meaning pending Fleet confirmation')
+                            ->maxLength(16)
+                            ->nullable(),
+                        Forms\Components\TextInput::make('fleet_class_code')
+                            ->label('Fleet class')
+                            ->maxLength(32)
+                            ->nullable(),
+                        Forms\Components\TextInput::make('fleet_class_description')
+                            ->label('Class description')
+                            ->nullable(),
+                        Forms\Components\Toggle::make('needs_fleet_review')
+                            ->label('Needs Fleet review')
+                            ->inline(false),
+                    ])->columns(2),
 
                 Forms\Components\Section::make('Department & Assignment')
                     ->schema([
@@ -64,6 +92,12 @@ class UnitMasterVehicleResource extends Resource
                             ->nullable(),
                         Forms\Components\TextInput::make('assignment')
                             ->label('Assignment (Driver)')
+                            ->nullable(),
+                        Forms\Components\Select::make('current_driver_employee_id')
+                            ->label('Current driver')
+                            ->searchable()
+                            ->getSearchResultsUsing(fn (string $search): array => self::employeeOptions($search))
+                            ->getOptionLabelUsing(fn ($value): ?string => self::employeeLabel(Employee::query()->find($value)))
                             ->nullable(),
                         Forms\Components\TextInput::make('location')
                             ->label('Current Location')
@@ -85,6 +119,10 @@ class UnitMasterVehicleResource extends Resource
     public static function table(Table $table): Table
     {
         return self::applyEnterpriseDefaults($table)
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query
+                ->with(['currentDriver', 'latestTakeHomeInspection'])
+                ->withCount(['changes as pending_changes_count' => fn ($changes) => $changes
+                    ->where('status', UnitMasterVehicleChange::STATUS_PROPOSED)]))
             ->columns([
                 Tables\Columns\TextColumn::make('veh_number')
                     ->label('Veh #')
@@ -94,6 +132,11 @@ class UnitMasterVehicleResource extends Resource
                     ->label('Tag #')
                     ->searchable()
                     ->sortable(),
+                Tables\Columns\TextColumn::make('asset_category')
+                    ->label('Category')
+                    ->badge()
+                    ->getStateUsing(fn (UnitMasterVehicle $record): string => $record->categoryLabel())
+                    ->color(fn (UnitMasterVehicle $record): string => $record->isNonroad() ? 'info' : 'gray'),
                 Tables\Columns\TextColumn::make('section')
                     ->searchable()
                     ->sortable(),
@@ -106,6 +149,14 @@ class UnitMasterVehicleResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('year')
                     ->sortable(),
+                Tables\Columns\TextColumn::make('color')
+                    ->toggleable(),
+                Tables\Columns\TextColumn::make('fleet_status_code')
+                    ->label('FY27 status')
+                    ->toggleable(),
+                Tables\Columns\TextColumn::make('fleet_class_description')
+                    ->label('Class description')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('employee_or_vehicle_name')
                     ->label('Employee/Vehicle')
                     ->searchable()
@@ -116,11 +167,26 @@ class UnitMasterVehicleResource extends Resource
                 Tables\Columns\TextColumn::make('location')
                     ->label('Location')
                     ->searchable(),
+                Tables\Columns\TextColumn::make('latestTakeHomeInspection.submitted_at')
+                    ->label('Last take-home inspection')
+                    ->dateTime('M j, Y g:i A', 'America/New_York')
+                    ->placeholder('None'),
+                Tables\Columns\TextColumn::make('pending_changes_count')
+                    ->label('Pending corrections')
+                    ->badge()
+                    ->color('warning')
+                    ->getStateUsing(fn (UnitMasterVehicle $record): ?int => $record->pending_changes_count ?: null),
+                Tables\Columns\IconColumn::make('needs_fleet_review')
+                    ->label('Review')
+                    ->getStateUsing(fn (UnitMasterVehicle $record): ?string => $record->needs_fleet_review ? 'review' : null)
+                    ->icon(fn (?string $state): ?string => $state ? 'heroicon-o-exclamation-triangle' : null)
+                    ->color('warning')
+                    ->tooltip(fn (UnitMasterVehicle $record): ?string => $record->needs_fleet_review ? 'Needs Fleet review' : null),
                 Tables\Columns\TextColumn::make('als_license')
                     ->label('ALS License')
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('serial_number')
-                    ->label('Serial #')
+                    ->label('VIN / Serial #')
                     ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('sunpass_number')
@@ -139,13 +205,56 @@ class UnitMasterVehicleResource extends Resource
                         ->distinct()
                         ->pluck('dept_code', 'dept_code')
                         ->toArray()),
+                Tables\Filters\SelectFilter::make('asset_category')
+                    ->label('Category')
+                    ->options(UnitMasterVehicle::CATEGORY_LABELS)
+                    ->query(function (Builder $query, array $data): Builder {
+                        $category = $data['value'] ?? null;
+
+                        return match (true) {
+                            blank($category) => $query,
+                            $category === UnitMasterVehicle::CATEGORY_VEHICLE => $query->where(fn (Builder $q) => $q
+                                ->whereNull('asset_category')->orWhere('asset_category', $category)),
+                            default => $query->where('asset_category', $category),
+                        };
+                    }),
+                Tables\Filters\SelectFilter::make('fleet_status_code')
+                    ->label('FY27 status')
+                    ->options(fn () => UnitMasterVehicle::whereNotNull('fleet_status_code')
+                        ->distinct()
+                        ->orderBy('fleet_status_code')
+                        ->pluck('fleet_status_code', 'fleet_status_code')
+                        ->toArray()),
+                Tables\Filters\Filter::make('needs_fleet_review')
+                    ->label('Needs Fleet review')
+                    ->toggle()
+                    ->query(fn (Builder $query): Builder => $query->where('needs_fleet_review', true)),
+                Tables\Filters\Filter::make('has_pending_corrections')
+                    ->label('Has pending corrections')
+                    ->toggle()
+                    ->query(fn (Builder $query): Builder => $query->whereHas(
+                        'changes',
+                        fn (Builder $changes) => $changes->where('status', UnitMasterVehicleChange::STATUS_PROPOSED),
+                    )),
             ])
+            ->recordUrl(fn (UnitMasterVehicle $record): string => static::getUrl('view', ['record' => $record]))
             ->actions([
                 Tables\Actions\EditAction::make(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->action(function (\Illuminate\Database\Eloquent\Collection $records): void {
+                            // Vehicles with take-home inspection history are kept (the history is immutable).
+                            $kept = $records->filter(fn (\Illuminate\Database\Eloquent\Model $vehicle): bool => $vehicle instanceof UnitMasterVehicle && $vehicle->takeHomeInspections()->exists());
+                            $records->diff($kept)->each->delete();
+                            if ($kept->isNotEmpty()) {
+                                \Filament\Notifications\Notification::make()
+                                    ->title($kept->count().' vehicle(s) kept because they have inspection history')
+                                    ->warning()
+                                    ->send();
+                            }
+                        }),
                 ]),
             ])
             ->defaultSort('veh_number');
@@ -161,7 +270,29 @@ class UnitMasterVehicleResource extends Resource
         return [
             'index' => Pages\ListUnitMasterVehicles::route('/'),
             'create' => Pages\CreateUnitMasterVehicle::route('/create'),
+            'view' => Pages\ViewUnitMasterVehicle::route('/{record}'),
             'edit' => Pages\EditUnitMasterVehicle::route('/{record}/edit'),
         ];
+    }
+
+    /** "Name (employee ID)" options for the current-driver picker, capped at 25. */
+    public static function employeeOptions(string $search): array
+    {
+        $term = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], mb_strtolower(trim($search))).'%';
+
+        return Employee::query()
+            ->where(fn (Builder $query) => $query
+                ->whereRaw('LOWER(name) LIKE ?', [$term])
+                ->orWhereRaw('LOWER(employee_id) LIKE ?', [$term]))
+            ->orderBy('name')
+            ->limit(25)
+            ->get()
+            ->mapWithKeys(fn (Employee $employee): array => [$employee->getKey() => self::employeeLabel($employee)])
+            ->all();
+    }
+
+    public static function employeeLabel(?Employee $employee): ?string
+    {
+        return $employee === null ? null : "{$employee->name} ({$employee->employee_id})";
     }
 }

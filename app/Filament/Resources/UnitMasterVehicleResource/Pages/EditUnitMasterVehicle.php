@@ -13,7 +13,9 @@ class EditUnitMasterVehicle extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\DeleteAction::make(),
+            Actions\DeleteAction::make()
+                // Vehicles with take-home inspection history cannot be deleted.
+                ->hidden(fn (): bool => ($record = $this->getRecord()) instanceof \App\Models\UnitMasterVehicle && $record->takeHomeInspections()->exists()),
         ];
     }
 }

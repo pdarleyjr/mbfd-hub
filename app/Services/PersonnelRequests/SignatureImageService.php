@@ -13,7 +13,7 @@ final class SignatureImageService
     /** @return array{disk: string, path: string, mime: string, sha256: string} */
     public function store(string $dataUrl, string $namespace = 'personnel-requests'): array
     {
-        if (! in_array($namespace, ['personnel-requests', 'training-rosters'], true)) {
+        if (! in_array($namespace, ['personnel-requests', 'training-rosters', 'take-home-inspections'], true)) {
             throw new \InvalidArgumentException('Unknown signature namespace.');
         }
         if (strlen($dataUrl) > 1_400_000) {
@@ -58,7 +58,7 @@ final class SignatureImageService
             throw ValidationException::withMessages(['signature' => 'The signature could not be stored. Please try again.']);
         }
 
-        if ($namespace === 'training-rosters') {
+        if ($namespace !== 'personnel-requests') {
             $stored = Storage::disk($disk)->get($path);
             if (! is_string($stored) || ! hash_equals(hash('sha256', $bytes), hash('sha256', $stored))) {
                 throw ValidationException::withMessages(['signature' => 'The stored signature could not be verified. Please try again.']);

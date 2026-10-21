@@ -30,6 +30,8 @@ export default defineConfig({
                 'resources/js/operational-forms/main.tsx',
                 'resources/js/video-conferencing/main.tsx',
                 'resources/js/training-roster/main.tsx',
+                'resources/css/take-home-inspection.css',
+                'resources/js/take-home-inspection.js',
             ],
             refresh: true,
         }),
