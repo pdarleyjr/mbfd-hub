@@ -20,15 +20,8 @@ async function login(page: Page, role = 'training_admin') {
     expect(response.headers().location).not.toContain('/login');
 }
 
-async function freshProposal(page: Page) {
-    await login(page);
-    const plannerResponse = await page.goto('/training/crew-planner');
-    expect(plannerResponse?.headers()['content-security-policy']).toContain("form-action 'self'");
-    await expect(page.getByRole('heading', { name: 'Crew Planner', exact: true })).toBeVisible();
-    await page.getByRole('combobox', { name: 'Course', exact: true }).selectOption({ label: 'Synthetic new course' });
-    await clickButton(page, 'Use this scope');
-    await expect(page.getByText('The proposal excludes members with verified attendance', { exact: false })).toBeVisible();
-    // Recheck after the Livewire render, when an absolute URL could switch to the apex host.
+async function uploadBeforeScope(page: Page) {
+    await expect(page.getByRole('combobox', { name: 'Course', exact: true })).toHaveValue('');
     await expect(page.locator('.crew-planner form[enctype="multipart/form-data"]')).toHaveAttribute('action', '/training/crew-planner/upload');
     const baseline = await (await page.request.get('/__crew_domain_fingerprint')).json();
     const pdf = await page.request.get('/__synthetic_daily.pdf');
@@ -40,6 +33,21 @@ async function freshProposal(page: Page) {
     await page.waitForFunction('window.Livewire && window.Livewire.all().length > 0');
     await expect(page.getByText('Roster date: 2026-10-21', { exact: false })).toBeVisible();
     await expect(page.getByText('This snapshot was generated before its roster date.', { exact: false })).toBeVisible();
+    expect(await (await page.request.get('/__crew_domain_fingerprint')).json()).toEqual(baseline);
+    return baseline;
+}
+
+async function freshProposal(page: Page) {
+    await login(page);
+    const plannerResponse = await page.goto('/training/crew-planner');
+    expect(plannerResponse?.headers()['content-security-policy']).toContain("form-action 'self'");
+    await expect(page.getByRole('heading', { name: 'Crew Planner', exact: true })).toBeVisible();
+    const baseline = await uploadBeforeScope(page);
+    await page.getByRole('combobox', { name: 'Course', exact: true }).selectOption({ label: 'Synthetic new course' });
+    await clickButton(page, 'Use this scope');
+    await expect(page.getByText('The proposal excludes members with verified attendance', { exact: false })).toBeVisible();
+    // Recheck after the Livewire render, when an absolute URL could switch to the apex host.
+    await expect(page.locator('.crew-planner form[enctype="multipart/form-data"]')).toHaveAttribute('action', '/training/crew-planner/upload');
     await clickButton(page, 'Save classroom times');
     await expect(page.getByRole('checkbox', { name: /^Propose Synthetic/ })).toHaveCount(3);
     return baseline;
@@ -155,12 +163,21 @@ test('authorized administrator finds the same independent planner through the Ad
     await login(page, 'super_admin');
     const response = await page.goto('/admin/crew-planner');
     expect(response?.status()).toBe(200);
+    expect(response?.headers()['content-security-policy']).toContain("form-action 'self'");
     await expect(page.getByRole('heading', { name: 'Crew Planner', exact: true })).toBeVisible();
     const openSidebar = page.getByRole('button', { name: 'Expand sidebar', exact: true }).locator('visible=true');
     if (await openSidebar.isVisible()) await openSidebar.click();
     await page.locator('.fi-sidebar-group-label').filter({ hasText: /^\s*Training\s*$/ }).click();
     await expect(page.locator('.fi-sidebar').getByRole('link', { name: 'Crew Planner', exact: true })).toHaveAttribute('href', /\/admin\/crew-planner$/);
+    const closeSidebar = page.locator('.fi-topbar-close-sidebar-btn:visible');
+    if (await closeSidebar.isVisible()) await closeSidebar.click();
     await expect(page.getByRole('button', { name: 'Read daily report', exact: true })).toBeVisible();
+    const baseline = await uploadBeforeScope(page);
+    await page.getByRole('combobox', { name: 'Course', exact: true }).selectOption({ label: 'Synthetic new course' });
+    await clickButton(page, 'Use this scope');
+    await clickButton(page, 'Save classroom times');
+    await expect(page.getByRole('checkbox', { name: /^Propose Synthetic/ })).toHaveCount(3);
+    expect(await (await page.request.get('/__crew_domain_fingerprint')).json()).toEqual(baseline);
 });
 
 test('flexible classroom and proposal fields retain readable widths on touch screens', async ({ page }, info) => {
