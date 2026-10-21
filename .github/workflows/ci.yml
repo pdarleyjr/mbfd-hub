@@ -3,6 +3,7 @@ name: CI
 # This is validation only. It is deliberately unable to reach a self-hosted
 # runner, deployment secret, production environment, or SSH target.
 on:
+  workflow_dispatch:
   push:
     branches: [main]
   pull_request:
@@ -28,4 +29,4 @@ jobs:
       checks: read
     uses: ./.github/workflows/hub-release-gates.yml
     with:
-      pint_base_sha: ${{ github.event.pull_request.base.sha || github.event.before }}
+      pint_base_sha: ${{ github.event.pull_request.base.sha || github.event.before || format('{0}^', github.sha) }}
