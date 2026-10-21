@@ -16,6 +16,7 @@ use App\Services\Security\ApplicationAccessService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Spatie\Permission\Models\Permission;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -90,5 +91,44 @@ final class PersonnelUniformPermissionTest extends TestCase
         self::assertNull($master->fresh()->description);
         self::assertNull($custom->fresh()->description);
         self::assertSame([], $custom->entries()->sole()->values);
+    }
+
+    public function test_uniform_directory_viewer_cannot_change_authoritative_rank_inline(): void
+    {
+        $member = Employee::query()->create(['employee_id' => '00427', 'name' => 'Read only Fixture',
+            'rank' => 'Firefighter', 'roster_status' => 'active']);
+        $this->actingAsUniformDirectoryViewer();
+
+        Livewire::test(MasterPersonnelDirectory::class)
+            ->call('updateTableColumnState', 'rank', (string) $member->id, 'Captain');
+
+        self::assertSame('Firefighter', $member->fresh()->rank);
+        $this->assertDatabaseMissing('employee_profile_events', ['employee_id' => $member->id, 'action' => 'profile_updated', 'result' => 'success']);
+    }
+
+    public function test_uniform_directory_viewer_has_no_profile_edit_action(): void
+    {
+        $member = Employee::query()->create(['employee_id' => '00428', 'name' => 'Profile action Fixture', 'roster_status' => 'active']);
+        $this->actingAsUniformDirectoryViewer();
+
+        Livewire::test(MasterPersonnelDirectory::class)->assertTableActionHidden('employee', $member);
+    }
+
+    public function test_uniform_directory_viewer_has_no_add_personnel_action(): void
+    {
+        $this->actingAsUniformDirectoryViewer();
+
+        Livewire::test(MasterPersonnelDirectory::class)->assertActionHidden('addPersonnel');
+    }
+
+    private function actingAsUniformDirectoryViewer(): User
+    {
+        $actor = User::factory()->create(['account_status' => 'active']);
+        foreach ([...ApplicationAccessService::UNIFORM_MANAGER_PERMISSIONS, 'personnel.directory.view'] as $permission) {
+            $actor->givePermissionTo(Permission::findOrCreate($permission, 'web'));
+        }
+        $this->actingAs($actor);
+
+        return $actor;
     }
 }
