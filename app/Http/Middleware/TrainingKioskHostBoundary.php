@@ -24,7 +24,7 @@ final class TrainingKioskHostBoundary
         abort_unless($request->is('/') || $request->is('catalog') || $request->is('csrf') || $request->is('courses/*/start') || $request->is('r/*'), 404);
         // Never flash submitted credentials/identifiers into the shared session,
         // including when a non-JavaScript client omits its JSON Accept header.
-        if ($request->is('r/*/submit')) {
+        if ($request->is('r/*/submit') || $request->is('courses/*/start')) {
             $request->headers->set('Accept', 'application/json');
         }
         config([

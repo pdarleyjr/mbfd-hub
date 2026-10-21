@@ -83,16 +83,74 @@ function Brand() {
     </header>;
 }
 
+type Course = Catalog['courses'][number];
+type CourseStart = { training_module_id?: number; new_module_name?: string; email?: string; password?: string };
+
+function CourseCard({ course, today, busy, enter }: { course: Course; today: string; busy: boolean; enter: (path: string, destination?: string, body?: CourseStart) => Promise<void> }) {
+    const choices = course.modules ?? [];
+    const [selection, setSelection] = useState<string | null>(null);
+    const [newName, setNewName] = useState('');
+    const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
+    const module = selection ?? (choices.length === 1 ? String(choices[0].id) : '');
+    const creating = module === 'new';
+    const unassigned = module === 'unassigned';
+    const needsModule = choices.length > 0 && (!module || unassigned);
+    const matching = course.sessions.filter(session => !module || (unassigned ? session.module_id == null : !creating && String(session.module_id) === module));
+    const todaySessions = matching.filter(session => session.held_on === today);
+    const otherSessions = matching.filter(session => session.held_on !== today);
+    const ambiguous = todaySessions.length > 1;
+    const start = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (busy || needsModule || ambiguous) return;
+        const body: CourseStart = creating ? { new_module_name: newName.trim(), email: email.trim(), password }
+            : module ? { training_module_id: Number(module) } : {};
+        setPassword('');
+        await enter(`/courses/${course.id}/start`, undefined, body);
+    };
+    const sessions = (items: Course['sessions']) => <ul className="session-list">{items.map((session, index) => <li key={session.public_id}>
+        <div><strong>{session.module_name || course.name}</strong><span>{dateLabel(session.held_on)} · {session.starts_at ? timeLabel(session.starts_at) : 'Time not specified'}</span><span>{session.location || 'Location not specified'} · Session {index + 1}</span></div>
+        <button className="secondary" disabled={busy} onClick={() => void enter(`/r/${session.public_id}/open`, `/r/${session.public_id}`)}>Open roster<span className="sr-only"> for {course.name}{session.module_name ? ` · ${session.module_name}` : ''} on {dateLabel(session.held_on)}{session.starts_at ? ` at ${timeLabel(session.starts_at)}` : ''}{session.location ? ` · ${session.location}` : ''} · Session {index + 1}</span></button>
+    </li>)}</ul>;
+    return <section className="course-card" aria-labelledby={`course-${course.id}`}>
+        <div className="course-card-heading"><div><h2 id={`course-${course.id}`}>{course.name}</h2>{course.classifications.length > 0 && <ul className="classification-badges" aria-label="Classifications">{course.classifications.map(classification => <li key={classification}>{classification}</li>)}</ul>}{course.default_location && <p>{course.default_location}</p>}</div></div>
+        <form className="course-start" onSubmit={event => void start(event)}>
+            <label className="search-label" htmlFor={`module-${course.id}`}>Module<span className="sr-only"> for {course.name}</span></label>
+            <select className="module-select" id={`module-${course.id}`} disabled={busy} value={module} onChange={event => { setSelection(event.target.value); setPassword(''); }}>
+                <option value="">{choices.length ? 'Choose a module' : 'Whole course (no module)'}</option>
+                {choices.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+                {choices.length > 0 && course.sessions.some(session => session.module_id == null) && <option value="unassigned">Whole course / unassigned rosters</option>}
+                <option value="new">+ Add a new module</option>
+            </select>
+            {creating && <div className="new-module-fields">
+                <label className="search-label" htmlFor={`module-name-${course.id}`}>New module name</label>
+                <input id={`module-name-${course.id}`} value={newName} onChange={event => setNewName(event.target.value)} required maxLength={200} disabled={busy} autoComplete="off" placeholder="For example, Module 2" />
+                <p>Use an authorized training admin’s Hub credentials to add this module and open its roster.</p>
+                <label className="search-label" htmlFor={`module-email-${course.id}`}>Email or employee ID</label>
+                <input id={`module-email-${course.id}`} value={email} onChange={event => setEmail(event.target.value)} required maxLength={254} disabled={busy} autoComplete="off" autoCapitalize="none" spellCheck={false} />
+                <label className="search-label" htmlFor={`module-password-${course.id}`}>Hub password</label>
+                <input id={`module-password-${course.id}`} type="password" value={password} onChange={event => setPassword(event.target.value)} required maxLength={1024} disabled={busy} autoComplete="off" />
+            </div>}
+            <button className="primary course-start-button" disabled={busy || needsModule || ambiguous || (creating && (!newName.trim() || !email.trim() || !password))} type="submit">{creating ? 'Create module & open today’s roster' : 'Open today’s roster'}<span className="sr-only"> for {course.name}</span></button>
+            <p className="hint">{unassigned ? 'Choose an existing unassigned roster below. Select a module above to start a new roster.' : needsModule ? 'Choose a module above, or add a new one.' : ambiguous ? 'More than one roster is open today. Choose the correct time and location below.' : 'Opens today’s roster, or creates it automatically if needed.'}</p>
+        </form>
+        {todaySessions.length > 0 && <div className="today-rosters"><h3>Today’s open rosters</h3>{sessions(todaySessions)}</div>}
+        {otherSessions.length > 0 && <details className="other-rosters"><summary>Open rosters on other dates ({otherSessions.length})</summary>{sessions(otherSessions)}</details>}
+    </section>;
+}
+
 function Classes() {
     const [catalog, setCatalog] = useState<Catalog | null>(null);
     const [query, setQuery] = useState('');
     const [error, setError] = useState('');
+    const [refreshError, setRefreshError] = useState('');
     const [busy, setBusy] = useState(false);
     const [loading, setLoading] = useState(true);
-    const [modules, setModules] = useState<Record<number, string>>({});
+    const alert = useRef<HTMLDivElement>(null);
+    useEffect(() => { if (error) alert.current?.focus(); }, [error]);
     const refresh = async () => {
-        try { setCatalog(await api<Catalog>('/catalog')); setError(''); }
-        catch { setError('Classes could not be refreshed. Check your connection and try again.'); }
+        try { setCatalog(await api<Catalog>('/catalog')); setRefreshError(''); }
+        catch { setRefreshError('Classes could not be refreshed. Check your connection and try again.'); }
         finally { setLoading(false); }
     };
     useEffect(() => {
@@ -102,32 +160,27 @@ function Classes() {
         document.addEventListener('visibilitychange', visible);
         return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', visible); };
     }, []);
-    const enter = async (path: string, destination?: string) => {
+    const enter = async (path: string, destination?: string, body: CourseStart = {}) => {
         if (busy) return;
         setBusy(true); setError('');
         try {
             await api('/csrf');
-            const result = await api<{ url?: string }>(path, {});
+            const result = await api<{ url?: string }>(path, body);
             const url = destination ?? result.url;
             if (!url || !/^\/r\/[A-Za-z0-9]+$/.test(url)) throw new Error('Invalid roster destination');
             window.location.assign(url);
         } catch (err) {
-            setError(err instanceof ApiError && [403, 404, 409, 422, 429].includes(err.status) ? err.message : 'This roster could not be opened. It may have closed. Refresh the classes and try again.');
+            setError(err instanceof ApiError && [403, 404, 409, 422, 429].includes(err.status) ? err.message : 'This roster could not be opened. Check your connection and try again.');
             setBusy(false);
         }
     };
     const courses = catalog?.courses.filter(course => [course.name, ...course.classifications].join(' ').toLocaleLowerCase().includes(query.toLocaleLowerCase())) ?? [];
     return <div className="kiosk-shell"><Brand /><main>
-        <section className="course-heading"><p className="eyebrow">Classroom attendance</p><h1>Choose your class</h1><p>Choose your module, date, time and location to open the correct roster.</p></section>
-        {error && <div className="message error" role="alert">{error} <button className="text-button" disabled={busy} onClick={() => void refresh()}>Refresh classes</button></div>}
+        <section className="course-heading"><p className="eyebrow">Classroom attendance</p><h1>Choose your class</h1><p>Find your course, choose or add a module, then open today’s roster.</p></section>
+        {(error || refreshError) && <div className="message error" role="alert" ref={alert} tabIndex={-1}>{error || refreshError} <button className="text-button" disabled={busy} onClick={() => { setError(''); void refresh(); }}>Refresh classes</button></div>}
         {loading && <p role="status">Loading classes…</p>}
         {catalog && <><p className="catalog-date">Today: {dateLabel(catalog.today)} · Eastern Time</p><label className="search-label" htmlFor="course-search">Find a course</label><input id="course-search" type="search" autoComplete="off" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search courses or classifications" />
-            <div className="course-list" aria-busy={busy}>{courses.map(course => <section className="course-card" key={course.id} aria-labelledby={`course-${course.id}`}>
-                <div className="course-card-heading"><div><h2 id={`course-${course.id}`}>{course.name}</h2>{course.classifications.length > 0 && <ul className="classification-badges" aria-label="Classifications">{course.classifications.map(classification => <li key={classification}>{classification}</li>)}</ul>}{course.default_location && <p>{course.default_location}</p>}</div>{!course.requires_session_selection && <button className="primary" disabled={busy} onClick={() => void enter(`/courses/${course.id}/start`)}>Start today’s roster<span className="sr-only"> for {course.name}</span></button>}</div>
-                {course.requires_session_selection && <><label className="search-label" htmlFor={`module-${course.id}`}>Module</label><select className="module-select" id={`module-${course.id}`} value={modules[course.id] ?? ''} onChange={event => setModules(current => ({ ...current, [course.id]: event.target.value }))}><option value="">All modules</option>{course.modules.map(module => <option key={module.id} value={module.id}>{module.name}</option>)}<option value="unassigned">Unassigned</option></select><p>Open a session below. Training staff manage separate deliveries and new sessions.</p></>}
-                {course.sessions.length > 0 && <ul className="session-list">{course.sessions.filter(session => !modules[course.id] || (modules[course.id] === 'unassigned' ? session.module_id === null : String(session.module_id) === modules[course.id])).map((session, index) => <li key={session.public_id}><div><strong>{session.module_name || (course.requires_session_selection ? 'Unassigned' : course.name)}</strong><span>{dateLabel(session.held_on)} · {session.starts_at ? timeLabel(session.starts_at) : 'Time not specified'}</span><span>{session.location || 'Location not specified'} · Session {index + 1}{session.staff_managed ? ' · Managed by training staff' : ''}</span></div><button className="secondary" disabled={busy} onClick={() => void enter(`/r/${session.public_id}/open`, `/r/${session.public_id}`)}>Open roster<span className="sr-only"> for {course.name}{session.module_name ? ` · ${session.module_name}` : ''} on {dateLabel(session.held_on)}{session.starts_at ? ` at ${timeLabel(session.starts_at)}` : ''}{session.location ? ` · ${session.location}` : ''} · Session {index + 1}</span></button></li>)}</ul>}
-                {!course.sessions.length && course.requires_session_selection && <p>No sessions are open. Ask training staff to open the dated roster for this class.</p>}
-            </section>)}</div>
+            <div className="course-list" aria-busy={busy}>{courses.map(course => <CourseCard key={course.id} course={course} today={catalog.today} busy={busy} enter={enter} />)}</div>
             {!courses.length && <section className="empty-state"><h2>{query ? 'No matching courses' : 'No courses are available'}</h2><p>{query ? 'Try a different course name or classification.' : 'Ask the training staff to add a course, then refresh this page.'}</p>{!query && <button className="secondary" onClick={() => void refresh()}>Refresh classes</button>}</section>}
         </>}
     </main></div>;

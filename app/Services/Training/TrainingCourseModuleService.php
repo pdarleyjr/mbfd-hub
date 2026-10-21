@@ -18,6 +18,23 @@ use Illuminate\Validation\ValidationException;
 
 final class TrainingCourseModuleService
 {
+    /** Course locking makes a retried kiosk request reuse the same module. */
+    public function findOrCreateModule(TrainingCourse $course, string $name, User $actor): TrainingModule
+    {
+        $this->authorize($actor);
+        $attributes = $this->moduleData(['name' => trim($name)]);
+
+        return DB::transaction(function () use ($course, $attributes, $actor): TrainingModule {
+            $course = TrainingCourse::query()->lockForUpdate()->findOrFail($course->id);
+            $matches = $course->modules()->get()->filter(fn (TrainingModule $module): bool => mb_strtolower(trim($module->name)) === mb_strtolower($attributes['name']));
+            if ($matches->count() > 1) {
+                throw ValidationException::withMessages(['new_module_name' => 'More than one module has this name. Select the existing module instead.']);
+            }
+
+            return $matches->first() ?? $this->createModule($course, $attributes, $actor);
+        });
+    }
+
     public function createModule(TrainingCourse $course, array $data, User $actor): TrainingModule
     {
         $this->authorize($actor);
