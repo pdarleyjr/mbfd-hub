@@ -251,7 +251,6 @@ final class AuthoritativeCityEmailRosterImporter
                 $status = match (true) {
                     $employeeEmail !== $cityEmail || $user->email !== $cityEmail => 'existing_email_preserved',
                     $binding !== null && ($binding->employee_id !== $employeeId || $binding->city_email !== $cityEmail) => 'existing_roster_binding_conflict',
-                    $binding !== null && $binding->approved_at === null => 'binding_review_required',
                     $binding === null && $needsBinding => 'ready_binding',
                     default => 'existing_email_preserved',
                 };
@@ -260,7 +259,6 @@ final class AuthoritativeCityEmailRosterImporter
                     ! $synthetic && $user->email !== $cityEmail => 'existing_user_email_conflict',
                     $synthetic && $user->email_verified_at !== null => 'verified_synthetic_email_conflict',
                     $binding !== null && ($binding->employee_id !== $employeeId || $binding->city_email !== $cityEmail) => 'existing_roster_binding_conflict',
-                    $binding !== null && $binding->approved_at === null => 'binding_review_required',
                     default => 'ready',
                 };
             }
