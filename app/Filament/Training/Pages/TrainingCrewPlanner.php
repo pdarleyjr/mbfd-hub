@@ -270,6 +270,7 @@ final class TrainingCrewPlanner extends Page
         session()->put($this->sessionKey(), $this->draftId);
         $this->candidateSelection = $this->planSelection = [];
         $this->confirmReview = false;
+        $this->resetErrorBag();
     }
 
     public function download(string $format): mixed
@@ -290,7 +291,7 @@ final class TrainingCrewPlanner extends Page
             $context = app(TrainingCrewPlannerDutyContext::class)->project($person['observed_unit_context'] ?? [], $slot);
             $rows[$id] = [
                 'employee_id' => $person['employee_id'] ?? '', 'name' => $person['name'] ?? 'Previously selected member — identity requires review',
-                'rank' => $person['rank'] ?? '', 'bid_position' => $person['assignment'] ?? '',
+                'rank' => $person['rank'] ?? '', 'bid_position' => ($person['assignment'] ?? '').(! empty($person['is_de_bid']) ? ' · Published Driver Engineer seat' : ''),
                 'station' => $context['station'], 'apparatus' => $context['apparatus'],
                 'slot_id' => $selection['slot_id'], 'verification_required' => $review,
                 'review_reasons' => $review ? ['Recheck identity, current attendance and full classroom-time availability before chief approval.'] : [],
@@ -303,6 +304,7 @@ final class TrainingCrewPlanner extends Page
             'slots' => $draft['slots'], 'rows' => $rows,
         ];
         $bytes = app(TrainingCrewPlanExporter::class)->{$format}($projection);
+        $this->resetErrorBag('confirmReview');
 
         return response()->streamDownload(static function () use ($bytes): void {
             echo $bytes;
@@ -321,7 +323,9 @@ final class TrainingCrewPlanner extends Page
         $courses = TrainingCourse::query()->when($this->courseSearch !== '', fn ($query) => $query->where('name', 'like', '%'.mb_substr($this->courseSearch, 0, 200).'%'))->orderBy('name')->limit(500)->get()->filter(fn (TrainingCourse $course): bool => app(TrainingRosterPolicy::class)->view($this->actor(), $course));
         $chosen = $this->courseId ? $this->course($this->courseId) : null;
 
-        return compact('draft', 'all', 'visible', 'courses', 'chosen');
+        $snapshotWarnings = $this->snapshotWarnings($draft['metadata']);
+
+        return compact('draft', 'all', 'visible', 'courses', 'chosen', 'snapshotWarnings');
     }
 
     private function actor(): User
@@ -437,5 +441,22 @@ final class TrainingCrewPlanner extends Page
             'start' => CarbonImmutable::parse($slot['start_at'])->setTimezone('America/New_York')->format('H:i'),
             'end' => empty($slot['end_at']) ? '' : CarbonImmutable::parse($slot['end_at'])->setTimezone('America/New_York')->format('H:i'),
         ];
+    }
+
+    private function snapshotWarnings(array $metadata): array
+    {
+        if (empty($metadata['printed_at'])) {
+            return [];
+        }
+        $printed = CarbonImmutable::parse($metadata['printed_at']);
+        $warnings = [];
+        if (! empty($metadata['schedule_date']) && $printed->lt(CarbonImmutable::parse($metadata['schedule_date'], 'America/New_York')->startOfDay())) {
+            $warnings[] = 'This snapshot was generated before its roster date. Verify any staffing changes made after it was printed.';
+        }
+        if ($printed->lt(CarbonImmutable::now()->subDay())) {
+            $warnings[] = 'This snapshot was generated more than 24 hours ago. Use it as dated planning evidence and verify later staffing changes.';
+        }
+
+        return $warnings;
     }
 }

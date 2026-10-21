@@ -49,6 +49,7 @@
                 <p class="mt-3 font-semibold">Roster date: {{ $draft['metadata']['schedule_date'] ?? 'Unconfirmed' }} · {{ $draft['metadata']['shift'] ?? 'Unconfirmed' }} Shift · {{ $draft['metadata']['page_count'] ?? '?' }} pages</p>
                 <p class="text-sm">Snapshot generated: {{ $draft['metadata']['printed_at'] ?? 'Not reported' }}. Scheduled work is based on this uploaded snapshot; verify later staffing changes.</p>
                 @foreach ($draft['metadata']['warnings'] ?? [] as $warning) <p role="status" class="mt-2 text-warning-700">{{ is_string($warning) ? $warning : 'The daily snapshot needs verification.' }}</p> @endforeach
+                @foreach ($snapshotWarnings as $warning)<p role="status" class="mt-2 text-warning-700">{{ $warning }}</p>@endforeach
             @endif
             <p class="mt-3 text-sm text-gray-600">The source PDF is deleted after reading. The encrypted proposal expires after four hours.</p>
         </x-filament::section>
