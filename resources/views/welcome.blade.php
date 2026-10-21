@@ -211,6 +211,7 @@
     <footer class="home-footer">
         <div class="home-footer__inner">
             <p>&copy; {{ date('Y') }} Miami Beach Fire Department · Support Services Division</p>
+            <a href="{{ route('take-home-inspections.index') }}" class="hub-link">Take Home Vehicle Inspection</a>
             <a href="{{ url('/security-standards') }}" class="hub-link">Security &amp; Standards</a>
         </div>
     </footer>

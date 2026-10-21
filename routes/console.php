@@ -98,6 +98,13 @@ Schedule::command('model:prune', [
     '--model' => [\App\Models\NotificationTracking::class],
 ])->daily();
 
+// Unsubmitted Take Home Vehicle Inspection uploads (drafts are kept on the device for 72h).
+Schedule::command('fleet:prune-take-home-uploads')
+    ->dailyAt('03:40')
+    ->timezone('America/New_York')
+    ->withoutOverlapping()
+    ->onOneServer();
+
 Schedule::command('personnel-equipment:notify-expirations')
     ->dailyAt('06:30')
     ->timezone('America/New_York')

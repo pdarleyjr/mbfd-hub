@@ -15,6 +15,7 @@ return [
         App\Models\HubSupportTicket::class => 'admin.support',
         App\Models\ShopWork::class => 'admin.fleet',
         App\Models\UnitMasterVehicle::class => 'admin.fleet',
+        App\Models\TakeHomeVehicleInspection::class => 'admin.fleet',
         App\Models\Station::class => 'admin.stations',
         App\Models\StationInspection::class => 'admin.stations',
         App\Models\StationRequest::class => 'admin.stations',
