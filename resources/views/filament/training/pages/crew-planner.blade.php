@@ -34,19 +34,35 @@
         </x-filament::section>
 
         <x-filament::section heading="2. Daily TeleStaff snapshot">
-            <form method="POST" action="{{ route('training.crew-planner.upload', [], false) }}" enctype="multipart/form-data" class="flex flex-wrap items-end gap-4">
+            <form method="POST" action="{{ route('training.crew-planner.upload', [], false) }}" enctype="multipart/form-data" class="flex flex-wrap items-end gap-4" x-data="{ reading: false }" x-on:submit="reading = true" x-on:pageshow.window="reading = false">
                 @csrf
                 <input type="hidden" name="draft_id" value="{{ $draftId }}" />
                 <input type="hidden" name="version" value="{{ $version }}" />
                 <label class="min-w-0 flex-1">Daily PDF (up to 5 MB)
                     <input aria-label="Daily TeleStaff PDF" type="file" name="roster_pdf" accept="application/pdf,.pdf" required class="block w-full" />
                 </label>
-                <x-filament::button type="submit">Read daily report</x-filament::button>
-                <x-filament::button type="reset" color="gray">Clear file selection</x-filament::button>
+                <x-filament::button type="submit" x-bind:disabled="reading"><span x-show="!reading">Read daily report</span><span x-cloak x-show="reading">Reading daily report…</span></x-filament::button>
+                <x-filament::button type="reset" color="gray" x-bind:disabled="reading">Clear file selection</x-filament::button>
+                <p x-cloak x-show="reading" role="status" aria-live="polite" class="w-full font-semibold">Reading daily report. Please wait while the schedule is checked.</p>
             </form>
             @if (session('crew_planner_notice'))<p role="status" class="mt-3">{{ session('crew_planner_notice') }}</p>@endif
             @error('roster_pdf') <p role="alert" class="mt-3 text-danger-600">{{ $message }}</p> @enderror
             @if (! empty($draft['metadata']))
+                <div role="status" class="hub-callout mt-3">
+                    @if ($errors->has('roster_pdf'))
+                        <strong>The previous report remains saved.</strong>
+                        <p>The latest upload was not read. The roster details below belong to your previously saved report.</p>
+                    @else
+                        <strong>Daily report read successfully.</strong>
+                        @if (empty($draft['course_id']))
+                            <p>Next, choose a course above and select Use this scope to check attendance.</p>
+                        @elseif (empty($draft['slots']))
+                            <p>Next, <a href="#crew-planner-classroom-times" class="font-semibold underline">save classroom times</a> to show eligible members. The displayed times are suggestions until saved.</p>
+                        @else
+                            <p>Confirm the roster date and shift, then review eligible members and your planning list below.</p>
+                        @endif
+                    @endif
+                </div>
                 <p class="mt-3 font-semibold">Roster date: {{ $draft['metadata']['schedule_date'] ?? 'Unconfirmed' }} · {{ $draft['metadata']['shift'] ?? 'Unconfirmed' }} Shift · {{ $draft['metadata']['page_count'] ?? '?' }} pages</p>
                 <p class="text-sm">Snapshot generated: {{ $draft['metadata']['printed_at'] ?? 'Not reported' }}. Scheduled work is based on this uploaded snapshot; verify later staffing changes.</p>
                 @foreach ($draft['metadata']['warnings'] ?? [] as $warning) <p role="status" class="mt-2 text-warning-700">{{ is_string($warning) ? $warning : 'The daily snapshot needs verification.' }}</p> @endforeach
@@ -55,7 +71,7 @@
             <p class="mt-3 text-sm text-gray-600">The source PDF is deleted after reading. The encrypted proposal expires after four hours.</p>
         </x-filament::section>
 
-        <x-filament::section heading="3. Classroom times">
+        <x-filament::section id="crew-planner-classroom-times" heading="3. Classroom times">
             <p class="mb-3 text-sm">These are proposal times for the roster date. Saving them never creates a training session.</p>
             @if (collect($draft['slots'])->contains(fn ($slot) => substr($slot['start_at'], 0, 10) !== ($draft['metadata']['schedule_date'] ?? null)))
                 <p role="alert" class="mb-3 font-medium text-warning-700">The new daily report has a different date. Your proposed members remain saved for review. Save classroom times for the new roster date before adding or assigning members.</p>
@@ -131,7 +147,13 @@
                         </label>
                     </li>
                 @empty
-                    <li class="py-4">{{ empty($draft['staff']) || empty($draft['slots']) ? 'Choose a course, read a daily report and save classroom times to find candidates.' : 'No eligible members match these preferences. Broaden the filters or inspect review results.' }}</li>
+                    <li class="py-4">
+                        @if (!empty($draft['metadata']) && !empty($draft['course_id']) && empty($draft['slots']))
+                            <a href="#crew-planner-classroom-times" class="font-semibold underline">Save classroom times above to show eligible members.</a> The displayed times have not been saved yet.
+                        @else
+                            {{ empty($draft['staff']) || empty($draft['slots']) ? 'Choose a course, read a daily report and save classroom times to find candidates.' : 'No eligible members match these preferences. Broaden the filters or inspect review results.' }}
+                        @endif
+                    </li>
                 @endforelse
             </ul>
             @if (count($visible) > 250)<p class="mt-3">Showing the first 250 members. Narrow your search to find a specific person. Add all eligible uses the full result set.</p>@endif
