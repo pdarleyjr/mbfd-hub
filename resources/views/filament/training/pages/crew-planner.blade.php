@@ -161,12 +161,10 @@
             <p class="mt-3 text-sm text-gray-600">For Battalion Chief 300 review — proposal only. No automatic notifications or roster submission.</p>
         </x-filament::section>
     </div>
-    @once
         <style>
-            .crew-planner input:not([type=checkbox]), .crew-planner select, .crew-planner button, .crew-planner summary { min-height: 44px; }
+            .crew-planner input:not([type=checkbox]), .crew-planner select, .crew-planner button, .crew-planner summary { min-height: 44px !important; }
             .crew-planner input[type=checkbox] { width: 24px; height: 24px; flex-shrink: 0; }
             .crew-planner label:has(input[type=checkbox]) { min-height: 44px; padding-block: 10px; }
             .crew-planner { overflow-wrap: anywhere; }
         </style>
-    @endonce
 </x-filament-panels::page>
