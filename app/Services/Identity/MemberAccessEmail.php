@@ -42,7 +42,7 @@ final class MemberAccessEmail
         'recently_sent' => 'A setup link was sent recently and is still valid. Ask the member to check Inbox and Junk.',
         'delivery_pending' => 'The last account email is still being confirmed by the mail service. Check Inbox and Junk before requesting another link.',
         'no_email_on_record' => 'Cannot send: there is no deliverable email on record. Add the member\'s City email first.',
-        'email_not_approved' => 'Cannot send: the City email on file has not been approved for first-time setup yet.',
+        'email_not_approved' => 'Cannot send: confirm the City email against the approved employee directory before sending an account link.',
         'email_conflict' => 'Cannot send: another account uses the same City email. Resolve the duplicate first.',
         'setup_not_available' => 'Cannot send: this account is waiting for an administrator to finish provisioning it.',
         'no_login_account' => 'Cannot send: no login account is linked to this personnel record.',
@@ -160,6 +160,9 @@ final class MemberAccessEmail
             return ['identity_conflict', $user, null];
         }
         $recipient = $this->emails->recoveryAddress($user);
+        if ($recipient === null && $this->emails->connectedEmail($user) !== null) {
+            return ['email_not_approved', $user, null];
+        }
 
         if ($recipient !== null) {
             $latest = OutboundEmail::query()->where('source_type', 'password_reset')

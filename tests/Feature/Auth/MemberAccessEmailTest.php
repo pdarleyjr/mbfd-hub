@@ -255,6 +255,7 @@ final class MemberAccessEmailTest extends TestCase
         MemberOnboardingRosterBinding::query()->where('employee_profile_id', $member->employee_profile_id)
             ->update(['city_email' => 'other@miamibeachfl.gov']);
         self::assertFalse(app(MemberAccessEmail::class)->diagnose($member->employeeProfile)['can_send']);
+        self::assertSame('email_not_approved', app(MemberAccessEmail::class)->diagnose($member->employeeProfile)['status']);
     }
 
     public function test_pasted_employee_id_uses_the_same_identity_and_recovery_path(): void

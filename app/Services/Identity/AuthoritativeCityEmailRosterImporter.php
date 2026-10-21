@@ -157,7 +157,7 @@ final class AuthoritativeCityEmailRosterImporter
         $allowed = ['ready', 'unchanged', 'established_skipped', 'inactive_skipped', 'missing_city_email'];
         if ($preview['fill_missing'] ?? false) {
             $allowed = [...$allowed, 'ready_binding', 'source_review_required', 'employee_not_found', 'no_login_account',
-                'existing_email_preserved', 'upstream_identity_skipped', 'not_pending_onboarding', 'binding_review_required'];
+                'existing_email_preserved', 'upstream_identity_skipped', 'not_pending_onboarding'];
         }
 
         return array_values(array_diff(array_keys($preview['statuses']), $allowed));
