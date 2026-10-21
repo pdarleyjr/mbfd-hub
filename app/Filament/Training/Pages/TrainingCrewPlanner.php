@@ -393,7 +393,7 @@ final class TrainingCrewPlanner extends Page
         $filters = [];
         foreach (['search', 'rank', 'day_station', 'day_apparatus', 'assignment_category', 'published_assignment'] as $key) {
             if (is_string($this->filters[$key] ?? null) && trim($this->filters[$key]) !== '') {
-                $filters[$key] = mb_substr(trim($this->filters[$key]), 0, 200);
+                $filters[$key] = mb_substr(trim($this->filters[$key]), 0, $key === 'published_assignment' ? 200 : 100);
             }
         }
         if (($this->filters['de_bid'] ?? false) === true) {
