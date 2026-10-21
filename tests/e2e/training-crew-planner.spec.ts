@@ -197,9 +197,10 @@ test('authorized administrator finds the same independent planner through the Ad
     const openSidebar = page.getByRole('button', { name: 'Expand sidebar', exact: true }).locator('visible=true');
     if (await openSidebar.isVisible()) await openSidebar.click();
     await page.locator('.fi-sidebar-group-label').filter({ hasText: /^\s*Training\s*$/ }).click();
-    await expect(page.locator('.fi-sidebar').getByRole('link', { name: 'Crew Planner', exact: true })).toHaveAttribute('href', /\/admin\/crew-planner$/);
-    const closeSidebar = page.locator('.fi-topbar-close-sidebar-btn:visible');
-    if (await closeSidebar.isVisible()) await closeSidebar.click();
+    const plannerLink = page.locator('.fi-sidebar').getByRole('link', { name: 'Crew Planner', exact: true });
+    await expect(plannerLink).toHaveAttribute('href', /\/admin\/crew-planner$/);
+    await plannerLink.click();
+    await expect(page.getByRole('heading', { name: 'Crew Planner', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Read daily report', exact: true })).toBeVisible();
     const baseline = await uploadBeforeScope(page);
     await page.getByRole('combobox', { name: 'Course', exact: true }).selectOption({ label: 'Synthetic new course' });
