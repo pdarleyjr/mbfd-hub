@@ -33,7 +33,9 @@ final class TeleStaffDailyPdfParser
         if (preg_match('/\/(?:JavaScript|JS|AA|OpenAction|Launch|EmbeddedFiles?|Filespec|RichMedia|AcroForm|XFA|SubmitForm|ImportData|GoToR|GoToE|Rendition|Sound|Movie|FileAttachment|URI|Encrypt|ObjStm)\b/', $names)) {
             throw new InvalidArgumentException('Use a plain, unprotected daily report PDF without interactive content.');
         }
-        if (preg_match_all('/\bstream\b/', $bytes) > 64 || preg_match_all('/\d+\s+\d+\s+obj\b/', $bytes) > 800) {
+        $rawObjects = preg_match_all('/\d+\s+\d+\s+obj\b/', $bytes);
+        $structureObjects = preg_match_all('/\/Type\s*\/StructElem\b/', $names);
+        if (preg_match_all('/\bstream\b/', $bytes) > 64 || $rawObjects > 12000 || $rawObjects - $structureObjects > 800) {
             throw new InvalidArgumentException('The daily report is too complex.');
         }
         $config = new Config;
@@ -47,21 +49,27 @@ final class TeleStaffDailyPdfParser
                 throw new InvalidArgumentException('The daily report has too many pages or objects.');
             }
             $decodedBytes = 0;
+            $nonStructureObjects = 0;
             foreach ($document->getObjects() as $object) {
+                if (! $object->getHeader()->get('Type')->equals('StructElem')) {
+                    $nonStructureObjects++;
+                }
                 $decodedBytes += strlen($object->getContent());
-                if ($decodedBytes > 33554432) {
+                if ($decodedBytes > 33554432 || $nonStructureObjects > 800) {
                     throw new InvalidArgumentException('The daily report is too complex.');
                 }
             }
             $positionedPages = [];
+            $pageSequence = [];
             foreach ($pages as $page) {
+                $pageSequence[] = filter_var($page->getHeader()->get('StructParents')->getContent(), FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
                 $positionedPages[] = $page->getDataTm();
                 if (count($positionedPages[array_key_last($positionedPages)]) > 18000 || microtime(true) - $started > 12) {
                     throw new InvalidArgumentException('The daily report is too complex.');
                 }
             }
 
-            return $this->parsePositionedPages($positionedPages, hash('sha256', $bytes));
+            return $this->parsePositionedPages($positionedPages, hash('sha256', $bytes), $pageSequence);
         } catch (\Throwable) {
             // Never propagate parser text, object contents or employee data into logs.
             throw new InvalidArgumentException('This PDF could not be read safely. Use a complete daily TeleStaff report.');
@@ -69,11 +77,14 @@ final class TeleStaffDailyPdfParser
     }
 
     /** Positioned synthetic fixtures exercise the same path used by the PDF decoder. */
-    public function parsePositionedPages(array $pages, string $sha256 = ''): array
+    public function parsePositionedPages(array $pages, string $sha256 = '', array $pageSequence = []): array
     {
         if (count($pages) < 1 || count($pages) > self::MAX_PAGES) {
             throw new InvalidArgumentException('The report page count is invalid.');
         }
+        $normalizer = new TeleStaffDailyPrintNormalizer;
+        $layout = $normalizer->normalize($pages, $pageSequence);
+        $pages = $layout['pages'] ?? $pages;
         $snapshot = [
             'schedule_date' => null, 'shift' => null, 'start_at' => null, 'end_at' => null,
             'printed_at' => null, 'page_count' => count($pages),
@@ -149,7 +160,15 @@ final class TeleStaffDailyPdfParser
                         $snapshot['warnings'][] = 'A staff row has no reliable employee identifier';
                         $snapshot['definitive_eligibility_blocked'] = true;
                     }
-                    if (preg_match('/^Station\s+\d+$/', $heading)) {
+                    if ($layout !== null && $heading === '{off roster}' && $name === '') {
+                        $apparatus = $rank = null;
+                    } elseif ($layout !== null && preg_match('/\bFloat Pool$/', $heading) && $name === '') {
+                        $station = $rank = null;
+                        $apparatus = $heading;
+                    } elseif ($layout !== null && preg_match('/^Captain\s+\d+$/', $heading) && $name === '') {
+                        $apparatus = $heading;
+                        $rank = null;
+                    } elseif (preg_match('/^Station\s+\d+$/', $heading)) {
                         $station = $heading;
                         $apparatus = $rank = null;
                     } elseif (preg_match('/^(?:Division Chief|Engine|Ladder|Rescue|Combat|Air Truck|Marine|Fire Boat)\b/', $heading) && $name === '') {
@@ -212,8 +231,12 @@ final class TeleStaffDailyPdfParser
         if ($snapshot['schedule_date'] === null || $snapshot['shift'] === null || $snapshot['parsed_assignments'] === []) {
             throw new InvalidArgumentException('The daily report date, shift or staff rows could not be confirmed.');
         }
+        $completePrint = $layout !== null && $normalizer->complete($layout, $snapshot);
+        if ($layout !== null) {
+            $snapshot['template_signature'] = 'mbfd-daily-tagged-print-v1';
+        }
         foreach (array_keys($pages) as $index) {
-            if (($pagination[$index + 1] ?? null) !== [$index + 1, count($pages)]) {
+            if (! $completePrint && ($pagination[$index + 1] ?? null) !== [$index + 1, count($pages)]) {
                 $snapshot['warnings'][] = 'Report pagination is incomplete or could not be verified';
                 $snapshot['definitive_eligibility_blocked'] = true;
             }

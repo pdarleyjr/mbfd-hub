@@ -835,13 +835,14 @@ test("CI cancels only superseded pull-request runs, never main validation", () =
   }
 });
 
-test("CI invokes the deploy-free shared release gate for main and pull requests", () => {
+test("CI invokes the deploy-free shared release gate for main, pull requests and exact branch qualification", () => {
   const ci = readFileSync(resolve(root, ".github/workflows/ci.yml"), "utf8");
 
   assert.match(ci, /^  push:\r?\n    branches: \[main\]/m);
   assert.match(ci, /^  pull_request:\r?\n    branches: \[main\]/m);
   assert.match(ci, /uses:\s*\.\/\.github\/workflows\/hub-release-gates\.yml/);
-  assert.match(ci, /pint_base_sha:\s*\$\{\{\s*github\.event\.pull_request\.base\.sha\s*\|\|\s*github\.event\.before\s*\}\}/);
+  assert.match(ci, /^  workflow_dispatch:\s*$/m);
+  assert.match(ci, /pint_base_sha:\s*\$\{\{\s*github\.event\.pull_request\.base\.sha\s*\|\|\s*github\.event\.before\s*\|\|\s*format\('\{0\}\^', github\.sha\)\s*\}\}/);
   assert.doesNotMatch(ci, /^\s*runs-on:\s*self-hosted\s*$/m);
   assert.doesNotMatch(ci, /^\s*environment:\s*$/m);
   assert.doesNotMatch(ci, /^\s*DEPLOY_SSH_KEY:/m);
