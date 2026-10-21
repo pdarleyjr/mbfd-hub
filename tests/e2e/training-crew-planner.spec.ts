@@ -1,6 +1,6 @@
 import { test, expect, Page, Route } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 
 async function clickButton(page: Page, name: string) {
     const button = page.getByRole('button', { name, exact: true });
@@ -31,29 +31,39 @@ async function uploadBeforeScope(page: Page) {
     const uploadPattern = '**/training/crew-planner/upload';
     const holdRequest = async (route: Route) => { await heldUpload; await route.continue(); };
     await page.route(uploadPattern, holdRequest);
-    const uploadStarted = page.waitForRequest(request => request.method() === 'POST' && new URL(request.url()).pathname === '/training/crew-planner/upload');
-    const upload = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/training/crew-planner/upload');
-    const submitted = clickButton(page, 'Read daily report');
-    try {
-        await uploadStarted;
-        // Locator actions wait for a native navigation to finish. Read the still-visible
-        // old document directly while this request is deliberately held before commit.
-        await expect.poll(() => page.evaluate(() => {
-            const form = document.querySelector<HTMLFormElement>('.crew-planner form[enctype="multipart/form-data"]')!;
+    let pendingReceipt: unknown = null;
+    await page.exposeFunction('__crewPlannerPending', (receipt: unknown) => { pendingReceipt = receipt; });
+    // Capture controls/text before navigation; compositor pixels prove the visible
+    // announcement separately, without timing Alpine's deferred x-show transition.
+    await page.evaluate(() => {
+        const form = document.querySelector<HTMLFormElement>('.crew-planner form[enctype="multipart/form-data"]')!;
+        form.addEventListener('submit', () => queueMicrotask(() => {
             const status = form.querySelector<HTMLElement>('[role="status"]')!;
-            return {
+            (window as unknown as { __crewPlannerPending: (receipt: unknown) => void }).__crewPlannerPending({
                 announcementBlockedByBusy: status.closest('[aria-busy="true"]') !== null,
-                statusVisible: status.getBoundingClientRect().height > 0 && getComputedStyle(status).display !== 'none',
                 statusText: status.textContent?.trim(),
                 submitDisabled: form.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled,
                 resetDisabled: form.querySelector<HTMLButtonElement>('button[type="reset"]')!.disabled,
-            };
-        })).toEqual({ announcementBlockedByBusy: false, statusVisible: true, statusText: 'Reading daily report. Please wait while the schedule is checked.', submitDisabled: true, resetDisabled: true });
-        if (test.info().title.startsWith('review results')) await page.screenshot({ path: test.info().outputPath('synthetic-reading-report.png') });
+            });
+        }), { once: true });
+    });
+    const uploadStarted = page.waitForRequest(request => request.method() === 'POST' && new URL(request.url()).pathname === '/training/crew-planner/upload');
+    const upload = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/training/crew-planner/upload');
+    const submitted = clickButton(page, 'Read daily report');
+    let compositor: import('@playwright/test').CDPSession | undefined;
+    try {
+        await uploadStarted;
+        if (test.info().title.startsWith('review results')) {
+            compositor = await page.context().newCDPSession(page);
+            const { data } = await compositor.send('Page.captureScreenshot', { format: 'png' });
+            writeFileSync(test.info().outputPath('synthetic-reading-report.png'), Buffer.from(data, 'base64'));
+        }
+        await expect.poll(() => pendingReceipt).toEqual({ announcementBlockedByBusy: false, statusText: 'Reading daily report. Please wait while the schedule is checked.', submitDisabled: true, resetDisabled: true });
     } finally {
         releaseUpload();
     }
     await submitted;
+    await compositor?.detach();
     expect((await upload).status(), 'Native daily-report upload must redirect successfully').toBe(302);
     await page.unroute(uploadPattern, holdRequest);
     await page.waitForLoadState('load');
