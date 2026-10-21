@@ -1,4 +1,4 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page, Route } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
@@ -26,13 +26,31 @@ async function uploadBeforeScope(page: Page) {
     const baseline = await (await page.request.get('/__crew_domain_fingerprint')).json();
     const pdf = await page.request.get('/__synthetic_daily.pdf');
     await page.getByLabel('Daily TeleStaff PDF', { exact: true }).setInputFiles({ name: 'synthetic-daily.pdf', mimeType: 'application/pdf', buffer: await pdf.body() });
+    let releaseUpload!: () => void;
+    const heldUpload = new Promise<void>(resolve => { releaseUpload = resolve; });
+    const uploadPattern = '**/training/crew-planner/upload';
+    const holdRequest = async (route: Route) => { await heldUpload; await route.continue(); };
+    await page.route(uploadPattern, holdRequest);
+    const uploadStarted = page.waitForRequest(request => request.method() === 'POST' && new URL(request.url()).pathname === '/training/crew-planner/upload');
     const upload = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/training/crew-planner/upload');
-    await clickButton(page, 'Read daily report');
+    const submitted = clickButton(page, 'Read daily report');
+    try {
+        await uploadStarted;
+        await expect(page.getByRole('status').filter({ hasText: 'Reading daily report. Please wait while the schedule is checked.' })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Reading daily report…', exact: true })).toBeDisabled();
+        await expect(page.getByRole('button', { name: 'Clear file selection', exact: true })).toBeDisabled();
+    } finally {
+        releaseUpload();
+    }
+    await submitted;
     expect((await upload).status(), 'Native daily-report upload must redirect successfully').toBe(302);
+    await page.unroute(uploadPattern, holdRequest);
     await page.waitForLoadState('load');
     await page.waitForFunction('window.Livewire && window.Livewire.all().length > 0');
     await expect(page.getByText('Roster date: 2026-10-21', { exact: false })).toBeVisible();
     await expect(page.getByText('This snapshot was generated before its roster date.', { exact: false })).toBeVisible();
+    await expect(page.getByText('Daily report read successfully.', { exact: true })).toBeVisible();
+    await expect(page.getByText('Next, choose a course above and select Use this scope to check attendance.', { exact: true })).toBeVisible();
     expect(await (await page.request.get('/__crew_domain_fingerprint')).json()).toEqual(baseline);
     return baseline;
 }
@@ -46,6 +64,7 @@ async function freshProposal(page: Page) {
     await page.getByRole('combobox', { name: 'Course', exact: true }).selectOption({ label: 'Synthetic new course' });
     await clickButton(page, 'Use this scope');
     await expect(page.getByText('The proposal excludes members with verified attendance', { exact: false })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Save classroom times above to show eligible members.', exact: true })).toBeVisible();
     // Recheck after the Livewire render, when an absolute URL could switch to the apex host.
     await expect(page.locator('.crew-planner form[enctype="multipart/form-data"]')).toHaveAttribute('action', '/training/crew-planner/upload');
     await clickButton(page, 'Save classroom times');
@@ -157,6 +176,16 @@ test('review results explain unavailable duty and keep unmatched identities non-
     await expect(page.getByRole('heading', { name: 'Unmatched schedule identities — verify before proposing', exact: true })).toBeVisible();
     await expect(page.getByText('SYNTHETIC, 90099', { exact: true })).toBeVisible();
     await expect(page.getByRole('checkbox', { name: /90099/ })).toHaveCount(0);
+    const beforeRejectedUpload = await (await page.request.get('/__crew_domain_fingerprint')).json();
+    await page.getByLabel('Daily TeleStaff PDF', { exact: true }).setInputFiles({ name: 'synthetic-invalid.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\ninvalid synthetic report') });
+    const rejectedUpload = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/training/crew-planner/upload');
+    await clickButton(page, 'Read daily report');
+    expect((await rejectedUpload).status()).toBe(302);
+    await expect(page.getByRole('alert')).toBeVisible();
+    await expect(page.getByText('The previous report remains saved.', { exact: true })).toBeVisible();
+    await expect(page.getByText('Daily report read successfully.', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Roster date: 2026-10-21', { exact: false })).toBeVisible();
+    expect(await (await page.request.get('/__crew_domain_fingerprint')).json()).toEqual(beforeRejectedUpload);
 });
 
 test('authorized administrator finds the same independent planner through the Admin Training menu', async ({ page }) => {
