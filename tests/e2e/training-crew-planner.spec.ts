@@ -39,6 +39,7 @@ async function uploadBeforeScope(page: Page) {
         await expect(page.getByRole('status').filter({ hasText: 'Reading daily report. Please wait while the schedule is checked.' })).toBeVisible();
         await expect(page.getByRole('button', { name: 'Reading daily report…', exact: true })).toBeDisabled();
         await expect(page.getByRole('button', { name: 'Clear file selection', exact: true })).toBeDisabled();
+        if (test.info().title.startsWith('review results')) await page.screenshot({ path: test.info().outputPath('synthetic-reading-report.png') });
     } finally {
         releaseUpload();
     }
