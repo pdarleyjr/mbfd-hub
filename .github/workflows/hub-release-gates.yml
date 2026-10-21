@@ -433,6 +433,16 @@ jobs:
           name: training-matrix-browser-evidence
           path: test-results/training-matrix
           retention-days: 7
+      - name: Verify isolated crew planner and standalone exports in browsers
+        id: training-crew-planner
+        run: npx playwright test --config=playwright.training-crew-planner.config.ts
+      - name: Retain crew planner browser evidence
+        if: ${{ always() && steps.training-crew-planner.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: training-crew-planner-browser-evidence
+          path: test-results/training-crew-planner
+          retention-days: 7
       - name: Verify Home and Daily member shell in Chromium and true iPhone WebKit
         id: mobile-shell
         env:
