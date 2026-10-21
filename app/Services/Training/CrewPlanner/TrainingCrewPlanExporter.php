@@ -157,6 +157,9 @@ final class TrainingCrewPlanExporter
 
     private function time(array $slot): string
     {
+        if (blank($slot['start_at'] ?? null) || blank($slot['end_at'] ?? null)) {
+            throw ValidationException::withMessages(['export' => 'Complete each class slot start and end time before export.']);
+        }
         try {
             $start = CarbonImmutable::parse((string) $slot['start_at'], 'America/New_York')->setTimezone('America/New_York');
             $end = CarbonImmutable::parse((string) $slot['end_at'], 'America/New_York')->setTimezone('America/New_York');
@@ -174,8 +177,10 @@ final class TrainingCrewPlanExporter
     {
         $name = trim((string) preg_replace('/[\\\\\/\?\*\[\]:\x00-\x1F]/u', ' ', $label), " '\t\n\r");
         $name = mb_substr($name !== '' ? $name : 'Class slot', 0, 25);
-        if (in_array(mb_strtolower($name), $names, true)) {
-            $name .= ' '.($index + 1);
+        $base = $name;
+        $suffix = $index + 1;
+        while (in_array(mb_strtolower($name), $names, true)) {
+            $name = $base.' '.$suffix++;
         }
         $names[] = mb_strtolower($name);
 

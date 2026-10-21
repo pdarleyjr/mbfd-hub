@@ -100,6 +100,30 @@ final class TrainingCrewPlanExporterTest extends TestCase
         $service->report($proposal);
     }
 
+    public function test_blank_times_are_rejected_instead_of_becoming_the_current_time(): void
+    {
+        $proposal = $this->proposal();
+        $proposal['slots'][0]['start_at'] = '';
+        $this->expectException(\Illuminate\Validation\ValidationException::class);
+        app(TrainingCrewPlanExporter::class)->report($proposal);
+    }
+
+    public function test_colliding_custom_sheet_labels_are_unique(): void
+    {
+        $proposal = $this->proposal();
+        $proposal['slots'][0]['label'] = 'Summary 2';
+        $proposal['slots'][1]['label'] = 'Summary';
+        $path = tempnam(sys_get_temp_dir(), 'crew-collision-test-');
+        try {
+            file_put_contents($path, app(TrainingCrewPlanExporter::class)->xlsx($proposal));
+            $book = IOFactory::load($path);
+            self::assertSame(['Summary', 'Summary 2', 'Summary 3', 'Unassigned', 'Needs verification'], $book->getSheetNames());
+            $book->disconnectWorksheets();
+        } finally {
+            unlink($path);
+        }
+    }
+
     private function proposal(): array
     {
         return [
