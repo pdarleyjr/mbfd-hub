@@ -42,13 +42,13 @@ async function uploadBeforeScope(page: Page) {
             const form = document.querySelector<HTMLFormElement>('.crew-planner form[enctype="multipart/form-data"]')!;
             const status = form.querySelector<HTMLElement>('[role="status"]')!;
             return {
-                busy: form.getAttribute('aria-busy'),
+                announcementBlockedByBusy: status.closest('[aria-busy="true"]') !== null,
                 statusVisible: status.getBoundingClientRect().height > 0 && getComputedStyle(status).display !== 'none',
                 statusText: status.textContent?.trim(),
                 submitDisabled: form.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled,
                 resetDisabled: form.querySelector<HTMLButtonElement>('button[type="reset"]')!.disabled,
             };
-        })).toEqual({ busy: 'true', statusVisible: true, statusText: 'Reading daily report. Please wait while the schedule is checked.', submitDisabled: true, resetDisabled: true });
+        })).toEqual({ announcementBlockedByBusy: false, statusVisible: true, statusText: 'Reading daily report. Please wait while the schedule is checked.', submitDisabled: true, resetDisabled: true });
         if (test.info().title.startsWith('review results')) await page.screenshot({ path: test.info().outputPath('synthetic-reading-report.png') });
     } finally {
         releaseUpload();

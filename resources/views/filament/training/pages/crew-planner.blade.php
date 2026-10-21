@@ -34,7 +34,7 @@
         </x-filament::section>
 
         <x-filament::section heading="2. Daily TeleStaff snapshot">
-            <form method="POST" action="{{ route('training.crew-planner.upload', [], false) }}" enctype="multipart/form-data" class="flex flex-wrap items-end gap-4" x-data="{ reading: false }" x-on:submit="reading = true" x-on:pageshow.window="reading = false" x-bind:aria-busy="reading">
+            <form method="POST" action="{{ route('training.crew-planner.upload', [], false) }}" enctype="multipart/form-data" class="flex flex-wrap items-end gap-4" x-data="{ reading: false }" x-on:submit="reading = true" x-on:pageshow.window="reading = false">
                 @csrf
                 <input type="hidden" name="draft_id" value="{{ $draftId }}" />
                 <input type="hidden" name="version" value="{{ $version }}" />
