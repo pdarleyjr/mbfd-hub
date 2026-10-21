@@ -65,10 +65,10 @@ async function uploadBeforeScope(page: Page) {
     await submitted;
     await compositor?.detach();
     expect((await upload).status(), 'Native daily-report upload must redirect successfully').toBe(302);
-    await page.unroute(uploadPattern, holdRequest);
     await page.waitForLoadState('load');
     await page.waitForFunction('window.Livewire && window.Livewire.all().length > 0');
     await expect(page.getByText('Roster date: 2026-10-21', { exact: false })).toBeVisible();
+    await page.unroute(uploadPattern, holdRequest);
     await expect(page.getByText('This snapshot was generated before its roster date.', { exact: false })).toBeVisible();
     await expect(page.getByText('Daily report read successfully.', { exact: true })).toBeVisible();
     await expect(page.getByText('Next, choose a course above and select Use this scope to check attendance.', { exact: true })).toBeVisible();
