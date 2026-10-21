@@ -23,7 +23,7 @@
         @error('employee_id')<div id="employee_id-error" class="error" role="alert">{{ $message }}</div>@enderror
         <button type="submit">Email my link</button>
     </form>
-    <p class="small">Check Inbox and Junk. No email after a few minutes? Contact MBFD Hub support to check your account and email on file. Do not create another account.</p>
+    <p class="small">Check Inbox and Junk in your City email. If the link expires, request another here. If no email arrives after retrying, contact MBFD Hub support to check the address on file. Do not create another account.</p>
     <a class="identity-secondary" href="{{ route('login') }}">Already have a password? Sign in</a>
 </main>
 </body>

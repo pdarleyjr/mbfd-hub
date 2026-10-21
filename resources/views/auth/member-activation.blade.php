@@ -58,7 +58,7 @@
                 <option value="{{ $unit }}" @selected(old('unit') === $unit)>{{ $unit }}</option>
             @endforeach
         </select>
-        <div id="bid-hint" class="hint">From the {{ $bidCycle }} bid, not the previous bid.</div>
+        <div id="bid-hint" class="hint">Use your officially recorded {{ $bidCycle }} bid, rather than a temporary assignment, overtime, or shift exchange. If your record is outdated, use an email link instead.</div>
         @error('unit')<div class="error" role="alert">{{ $message }}</div>@enderror
 
         @if ($bidChoices['positions'] !== [])

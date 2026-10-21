@@ -37,12 +37,14 @@ final class AccountAccessExperienceTest extends TestCase
             ->assertRedirect('/activate/email?login_attempt='.$attempt);
         $this->get('/activate/email?login_attempt='.$attempt)->assertOk()
             ->assertSee('first-time setup and forgotten passwords')
+            ->assertSee('Inbox and Junk in your City email')
             ->assertSee('method=details', false)
             ->assertSee('login_attempt='.$attempt, false)
             ->assertDontSee('name="email"', false)
             ->assertDontSee('name="password"', false);
         $this->get('/activate?method=details&login_attempt='.$attempt)->assertOk()
             ->assertSee('Shift you bid')
+            ->assertSee('temporary assignment, overtime, or shift exchange')
             ->assertSee('name="login_attempt"', false)
             ->assertSee('name="method" value="details"', false)
             ->assertSee('Already have a password? Sign in');
