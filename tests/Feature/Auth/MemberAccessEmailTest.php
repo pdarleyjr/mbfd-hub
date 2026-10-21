@@ -240,6 +240,49 @@ final class MemberAccessEmailTest extends TestCase
             ->assertActionHidden('sendAccessEmail');
     }
 
+    public function test_approved_roster_address_supports_recovery_without_fabricating_mailbox_verification(): void
+    {
+        config()->set('queue.default', 'database');
+        Queue::fake();
+        $member = $this->pending('APPROVED-RECOVERY');
+        $member->forceFill(['account_status' => AccountStatus::Active,
+            'bootstrap_onboarding_completed_at' => now(), 'email_verified_at' => null])->save();
+        $before = $member->fresh()->getRawOriginal();
+        self::assertSame('reset_queued', app(MemberAccessEmail::class)->request($member->employee_id));
+        self::assertSame($before, $member->fresh()->getRawOriginal());
+        Queue::assertPushed(SendMemberPasswordLink::class);
+
+        MemberOnboardingRosterBinding::query()->where('employee_profile_id', $member->employee_profile_id)
+            ->update(['city_email' => 'other@miamibeachfl.gov']);
+        self::assertFalse(app(MemberAccessEmail::class)->diagnose($member->employeeProfile)['can_send']);
+        self::assertSame('email_not_approved', app(MemberAccessEmail::class)->diagnose($member->employeeProfile)['status']);
+    }
+
+    public function test_pasted_employee_id_uses_the_same_identity_and_recovery_path(): void
+    {
+        config()->set('queue.default', 'database');
+        Queue::fake();
+        $member = $this->established('0019965');
+        self::assertSame('reset_queued', app(MemberAccessEmail::class)->request("\u{00a0}0019965\u{202f}"));
+        Queue::assertPushed(SendMemberPasswordLink::class, fn ($job): bool => $job->userId === $member->id);
+        self::assertSame('unknown_employee_id', app(MemberAccessEmail::class)->request('19965'));
+        self::assertSame('unknown_employee_id', app(MemberAccessEmail::class)->request('0019 965'));
+    }
+
+    public function test_uncertain_delivery_has_a_bounded_recovery_window(): void
+    {
+        $member = $this->established('DELIVERY-PENDING');
+        OutboundEmail::query()->create([
+            'provider' => 'cloudflare', 'source_type' => 'password_reset', 'source_id' => (string) $member->id,
+            'from_address' => 'hub@miamibeachfl.gov', 'to_recipients' => [$member->email],
+            'subject' => 'Password reset', 'recipient_count' => 1, 'chargeable_budget_units' => 1, 'status' => 'acceptance_unknown',
+        ]);
+        $service = app(MemberAccessEmail::class);
+        self::assertSame('delivery_pending', $service->diagnose($member->employeeProfile)['status']);
+        $this->travel(61)->minutes();
+        self::assertSame(MemberAccessEmail::RESET_READY, $service->diagnose($member->employeeProfile)['status']);
+    }
+
     private function established(string $employeeId, bool $admin = false, ?string $cityEmail = '', ?string $accountEmail = null): User
     {
         $address = strtolower($employeeId).'@miamibeachfl.gov';

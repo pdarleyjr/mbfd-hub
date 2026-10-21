@@ -7,7 +7,7 @@
     @include('auth.partials.city-email-style')
 </head>
 <body>
-<main style="max-width: 26rem">
+<main class="identity-narrow">
     <div class="identity-strip"><img src="/images/mbfd_logo-256.png" alt="" width="32" height="32">Miami Beach Fire Department</div>
     <h1>MBFD Sign In</h1>
     <p>Sign in with your Employee ID or email and password.</p>
@@ -26,10 +26,13 @@
             <input type="hidden" name="login_attempt" value="{{ $loginAttempt }}">
         @endif
         <label for="employee_id">Employee ID or email</label>
-        <input id="employee_id" name="employee_id" type="text" maxlength="254" autocomplete="username" value="{{ old('employee_id') }}" required autofocus @error('employee_id') aria-invalid="true" aria-describedby="employee_id-error" @enderror>
+        <input id="employee_id" name="employee_id" type="text" maxlength="254" autocomplete="username" autocapitalize="none" spellcheck="false" value="{{ old('employee_id') }}" required autofocus @error('employee_id') aria-invalid="true" aria-describedby="employee_id-error" @enderror>
         @error('employee_id')
             <div id="employee_id-error" class="error" role="alert">{{ $message }}</div>
         @enderror
+        @if ($errors->has('employee_id'))
+            <p class="small">If you already have a password, use it here. Need to choose or reset a password? Request a private email link below. If no email arrives, contact MBFD Hub support to check your account and email on file.</p>
+        @endif
 
         <label for="password">Password</label>
         <input id="password" name="password" type="password" maxlength="4096" autocomplete="current-password" required @error('password') aria-invalid="true" aria-describedby="password-error" @enderror>
@@ -41,7 +44,8 @@
     </form>
     <a class="help" href="{{ route('password.request') }}">Forgot your password?</a>
     @if ($activationUrl ?? null)
-        <a class="identity-secondary" href="{{ $activationUrl }}">First time using MBFD Hub? Activate Your Account</a>
+        <a class="identity-secondary" href="{{ $activationUrl }}">Set up or recover your account</a>
+        <p class="small">First time signing in or unsure whether you have an account? Start with your Employee ID. If you already have a password, sign in above.</p>
     @else
         <p class="help">First time signing in? Open the personal setup link sent to your City email. If you did not receive one, contact MBFD Hub support.</p>
     @endif
