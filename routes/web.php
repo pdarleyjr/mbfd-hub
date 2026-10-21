@@ -66,6 +66,7 @@ use Illuminate\Support\Facades\Route;
 require __DIR__.'/training-roster.php';
 require __DIR__.'/training-paper.php';
 require __DIR__.'/training-crew-planner.php';
+require __DIR__.'/take-home-inspections.php';
 
 Route::get('/', HomeController::class)->middleware('auth:web');
 
