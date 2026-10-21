@@ -18,7 +18,7 @@
     @else
         <p>One Employee ID works for first-time setup and forgotten passwords. Request a private link to choose your password using the email on file.</p>
     @endif
-    <p class="small">Check Inbox and Junk in your City email. If the link expires, request another below. If no email arrives after retrying, contact MBFD Hub support to check the address on file. Do not create another account.</p>
+    <p class="small">Check Inbox and Junk in your City email. If the link expires, request another below. If no email arrives after retrying, contact MBFD Hub support to check the email on file. Do not create another account.</p>
 
     <form method="POST" action="{{ route('member-activation.email.request', array_filter(['login_attempt' => $loginAttempt])) }}">
         @csrf
