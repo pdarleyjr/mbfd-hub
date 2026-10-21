@@ -46,7 +46,7 @@ final class TrainingPlannerCandidateService
                 continue;
             }
             $person = $matches[0];
-            $row = $person + array_intersect_key($duty, array_flip(['working_intervals', 'unavailable_slots', 'partial_slots', 'observed_unit_context', 'review_intervals', 'global_review_reasons']));
+            $row = $person + array_intersect_key($duty, array_flip(['working_intervals', 'unavailable_slots', 'partial_slots', 'observed_unit_context', 'review_intervals', 'global_review_reasons', 'slot_review_reasons']));
             $row['needs_review'] = array_values($duty['needs_review'] ?? []);
             if (in_array($person['attendance_status'], ['IDENTITY_OR_EVIDENCE_REVIEW', 'UNVERIFIED_OR_PROVISIONAL'], true)) {
                 $row['needs_review'][] = 'Prior attendance evidence requires verification.';

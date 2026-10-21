@@ -237,9 +237,11 @@ final class TrainingCrewPlannerProjectionTest extends TestCase
         $duty['needs_review'] = ['An overnight interval requires verification.'];
         $duty['review_intervals'] = [['start_at' => '2026-10-21T20:00:00-04:00', 'end_at' => '2026-10-22T08:00:00-04:00']];
         $duty['global_review_reasons'] = [];
+        $duty['slot_review_reasons'] = ['morning' => [], 'afternoon' => []];
         $row = $this->candidates(['DAY_WORK' => $duty])['rows'][$employee->id];
         self::assertSame(['morning', 'afternoon'], $row['eligible_slots']);
         self::assertSame($duty['review_intervals'], $row['review_intervals']);
+        self::assertSame($duty['slot_review_reasons'], $row['slot_review_reasons']);
         self::assertNotEmpty($row['needs_review']);
     }
 
