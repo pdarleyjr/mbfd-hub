@@ -152,7 +152,16 @@ test('authorized administrator finds the same independent planner through the Ad
     await expect(page.getByRole('heading', { name: 'Crew Planner', exact: true })).toBeVisible();
     const openSidebar = page.locator('.fi-topbar-open-sidebar-btn');
     if (await openSidebar.isVisible()) await openSidebar.click();
-    await page.locator('.fi-sidebar').getByText('Training', { exact: true }).click();
+    await page.locator('.fi-sidebar-group-label').filter({ hasText: /^\s*Training\s*$/ }).click();
     await expect(page.locator('.fi-sidebar').getByRole('link', { name: 'Crew Planner', exact: true })).toHaveAttribute('href', /\/admin\/crew-planner$/);
     await expect(page.getByRole('button', { name: 'Read daily report', exact: true })).toBeVisible();
+});
+
+test('flexible classroom and proposal fields retain readable widths on touch screens', async ({ page }, info) => {
+    await freshProposal(page);
+    const widths = await page.locator('.crew-planner label.flex-1').evaluateAll(labels => labels.map(label => label.getBoundingClientRect().width));
+    expect(widths.length).toBeGreaterThan(3);
+    expect(widths.every(width => width >= 190)).toBe(true);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    await page.screenshot({ path: info.outputPath('synthetic-readable-fields.png'), fullPage: true });
 });
