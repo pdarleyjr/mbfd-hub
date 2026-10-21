@@ -106,6 +106,12 @@ if (in_array('--seed', $argv ?? [], true)) {
     foreach (['training_admin' => 0, 'training_viewer' => 1, 'super_admin' => 2] as $role => $index) {
         App\Models\User::where('email', $role.'@example.test')->update(['employee_profile_id' => $employees[$index]->id, 'employee_id' => $employees[$index]->employee_id]);
     }
+    foreach (['desktop', 'tablet', 'phone'] as $index => $project) {
+        $number = (string) (90011 + $index);
+        $employee = App\Models\Employee::create(['employee_id' => $number, 'name' => 'Synthetic actor '.$project, 'rank' => 'Captain', 'roster_status' => 'active', 'city_email' => 'synthetic-actor-'.$project.'@miamibeachfl.gov']);
+        $actor = App\Models\User::factory()->create(['name' => 'Synthetic training admin '.$project, 'email' => 'training_admin-'.$project.'@example.test', 'password' => 'synthetic-crew-password', 'account_status' => 'active', 'must_change_password' => false, 'employee_profile_id' => $employee->id, 'employee_id' => $number]);
+        $actor->assignRole('training_admin');
+    }
     $fresh = App\Models\Training\TrainingCourse::create(['name' => 'Synthetic new course', 'classifications' => ['STC'], 'track_attendance_matrix' => false, 'created_by' => $admin->id]);
     $modular = App\Models\Training\TrainingCourse::create(['name' => 'Synthetic modular course', 'classifications' => ['STC'], 'track_attendance_matrix' => false, 'created_by' => $admin->id]);
     foreach (['Synthetic Module 1', 'Synthetic Module 2'] as $index => $label) {

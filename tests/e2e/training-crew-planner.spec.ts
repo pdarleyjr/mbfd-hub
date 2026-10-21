@@ -10,10 +10,11 @@ async function clickButton(page: Page, name: string) {
 }
 
 async function login(page: Page, role = 'training_admin') {
+    const identity = role === 'training_admin' ? `${role}-${test.info().project.name}` : role;
     await page.goto('/login');
     const response = await page.request.post('/login', { form: {
         _token: await page.locator('input[name="_token"]').inputValue(),
-        employee_id: `${role}@example.test`, password: 'synthetic-crew-password',
+        employee_id: `${identity}@example.test`, password: 'synthetic-crew-password',
     }, maxRedirects: 0 });
     expect(response.status()).toBe(302);
     expect(response.headers().location).not.toContain('/login');
@@ -29,7 +30,9 @@ async function freshProposal(page: Page) {
     const baseline = await (await page.request.get('/__crew_domain_fingerprint')).json();
     const pdf = await page.request.get('/__synthetic_daily.pdf');
     await page.getByLabel('Daily TeleStaff PDF', { exact: true }).setInputFiles({ name: 'synthetic-daily.pdf', mimeType: 'application/pdf', buffer: await pdf.body() });
+    const upload = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/training/crew-planner/upload');
     await clickButton(page, 'Read daily report');
+    expect((await upload).status(), 'Native daily-report upload must redirect successfully').toBe(302);
     await page.waitForLoadState('load');
     await page.waitForFunction('window.Livewire && window.Livewire.all().length > 0');
     await expect(page.getByText('Roster date: 2026-10-21', { exact: false })).toBeVisible();
