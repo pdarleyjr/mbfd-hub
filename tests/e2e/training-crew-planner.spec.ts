@@ -150,7 +150,7 @@ test('authorized administrator finds the same independent planner through the Ad
     const response = await page.goto('/admin/crew-planner');
     expect(response?.status()).toBe(200);
     await expect(page.getByRole('heading', { name: 'Crew Planner', exact: true })).toBeVisible();
-    const openSidebar = page.locator('.fi-topbar-open-sidebar-btn');
+    const openSidebar = page.getByRole('button', { name: 'Expand sidebar', exact: true }).locator('visible=true');
     if (await openSidebar.isVisible()) await openSidebar.click();
     await page.locator('.fi-sidebar-group-label').filter({ hasText: /^\s*Training\s*$/ }).click();
     await expect(page.locator('.fi-sidebar').getByRole('link', { name: 'Crew Planner', exact: true })).toHaveAttribute('href', /\/admin\/crew-planner$/);
