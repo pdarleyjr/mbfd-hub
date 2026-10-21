@@ -57,6 +57,8 @@ final class MasterPersonnelDirectory extends Page implements HasTable
 
     private ?array $emailStatuses = null;
 
+    private ?bool $employeeProfilesAccessible = null;
+
     public static function canAccess(): bool
     {
         $actor = auth()->user();
@@ -125,7 +127,7 @@ final class MasterPersonnelDirectory extends Page implements HasTable
                         'trackingValues' => $this->trackingEntry($record)->values ?? [],
                     ]))->modalSubmitAction(false)->modalCancelActionLabel('Close'),
                 Tables\Actions\Action::make('employee')->label('Edit profile / employment')->icon('heroicon-o-pencil-square')
-                    ->visible(fn (Employee $record): bool => EmployeeResource::canEdit($record))
+                    ->visible(fn (Employee $record): bool => $this->canAccessEmployeeProfiles() && EmployeeResource::canEdit($record))
                     ->url(fn (Employee $record): string => EmployeeResource::getUrl('edit', ['record' => $record])),
                 ...$this->trackingRowActions($definition),
             ])
@@ -152,7 +154,7 @@ final class MasterPersonnelDirectory extends Page implements HasTable
 
         $actions = [
             Action::make('addPersonnel')->label('Add personnel')->icon('heroicon-o-plus')
-                ->visible(fn (): bool => EmployeeResource::canCreate())->url(fn (): string => EmployeeResource::getUrl('create')),
+                ->visible(fn (): bool => $this->canAccessEmployeeProfiles() && EmployeeResource::canCreate())->url(fn (): string => EmployeeResource::getUrl('create')),
             Action::make('export')->label('Export')->icon('heroicon-o-arrow-down-tray')->color('gray')
                 ->visible(fn (): bool => $this->canExportDirectory())
                 ->form([
@@ -192,10 +194,12 @@ final class MasterPersonnelDirectory extends Page implements HasTable
         $source = app(PersonnelSource::class);
         if (in_array($key, Employee::PROFILE_FIELDS, true)) {
             $column = Tables\Columns\TextInputColumn::make($key)->label($label)
-                ->disabled(fn (Employee $record): bool => in_array($key, ['phone', 'display_name'], true) ? ! EmployeeResource::canUpdateProfile($record) : ! EmployeeResource::canManagePersonnel($record))
+                ->disabled(fn (Employee $record): bool => ! $this->canAccessEmployeeProfiles()
+                    || (in_array($key, ['phone', 'display_name'], true) ? ! EmployeeResource::canUpdateProfile($record) : ! EmployeeResource::canManagePersonnel($record)))
                 ->rules($key === 'name' ? ['required', 'string', 'max:255'] : ['nullable', 'string', 'max:255'])
                 ->updateStateUsing(function (Employee $record, mixed $state) use ($key): mixed {
                     $this->personnelTable();
+                    abort_unless($this->canAccessEmployeeProfiles(), 403);
                     $updated = app(EmployeeProfileService::class)->update($this->actor(), $record, [$key => $state]);
                     Notification::make()->title('Profile saved')->success()->send();
 
@@ -333,5 +337,10 @@ final class MasterPersonnelDirectory extends Page implements HasTable
         } catch (\Illuminate\Auth\Access\AuthorizationException) {
             return false;
         }
+    }
+
+    private function canAccessEmployeeProfiles(): bool
+    {
+        return $this->employeeProfilesAccessible ??= EmployeeResource::canViewAny();
     }
 }
