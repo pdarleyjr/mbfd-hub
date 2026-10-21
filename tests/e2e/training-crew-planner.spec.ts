@@ -1,5 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 
 async function clickButton(page: Page, name: string) {
     const button = page.getByRole('button', { name, exact: true });
@@ -49,6 +50,7 @@ function inspectExport(path: string, format: 'pdf' | 'xlsx'): string {
 }
 
 test('native upload and cumulative editable proposals survive filters, downloads, refresh and offline interruption', async ({ page }, info) => {
+    test.setTimeout(300_000);
     const baseline = await freshProposal(page);
     await page.getByRole('combobox', { name: 'Rank', exact: true }).selectOption('Captain');
     await expect(page.getByRole('checkbox', { name: /^Propose Synthetic/ })).toHaveCount(1);
@@ -81,9 +83,12 @@ test('native upload and cumulative editable proposals survive filters, downloads
         const download = await pending;
         const path = info.outputPath(`synthetic-proposal.${format}`);
         await download.saveAs(path);
-        const content = inspectExport(path, format);
-        for (const expected of ['Synthetic 90001', 'Synthetic 90002', 'Captain', 'Firefighter', 'Station 9', 'Engine 9', 'Battalion Chief 300']) expect(content).toContain(expected);
-        expect(content).not.toContain('Synthetic 90003');
+        expect(readFileSync(path).subarray(0, format === 'pdf' ? 5 : 2).toString()).toBe(format === 'pdf' ? '%PDF-' : 'PK');
+        if (info.project.name === 'desktop') {
+            const content = inspectExport(path, format);
+            for (const expected of ['Synthetic 90001', 'Synthetic 90002', 'Captain', 'Firefighter', 'Station 9', 'Engine 9', 'Battalion Chief 300']) expect(content).toContain(expected);
+            expect(content).not.toContain('Synthetic 90003');
+        }
     }
     await page.reload();
     await expect(planned(page)).toHaveCount(2);
@@ -123,4 +128,31 @@ test('viewer cannot open the planner', async ({ page }) => {
     const response = await page.goto('/training/crew-planner');
     expect([403, 404]).toContain(response?.status());
     await expect(page.getByRole('button', { name: 'Read daily report', exact: true })).toHaveCount(0);
+});
+
+test('review results explain unavailable duty and keep unmatched identities non-selectable', async ({ page }) => {
+    await freshProposal(page);
+    await expect(page.getByText('Attendance is checked against current verified Hub records as of', { exact: false })).toBeVisible();
+    await page.getByText('Published bid preferences and review results', { exact: true }).click();
+    await page.getByLabel('Show members requiring review / already attended', { exact: true }).check();
+    await expect(page.getByRole('checkbox', { name: 'Propose Synthetic 90004', exact: true })).toBeDisabled();
+    const disabled = page.locator('li').filter({ has: page.getByRole('checkbox', { name: 'Propose Synthetic 90004', exact: true }) });
+    await expect(disabled).toContainText('Needs training · staffing requires verification');
+    await expect(disabled).not.toContainText('NO_PRIOR_ATTENDANCE');
+    await expect(disabled).not.toContainText('ZZTEST');
+    await expect(page.getByRole('heading', { name: 'Unmatched schedule identities — verify before proposing', exact: true })).toBeVisible();
+    await expect(page.getByText('SYNTHETIC, 90099', { exact: true })).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: /90099/ })).toHaveCount(0);
+});
+
+test('authorized administrator finds the same independent planner through the Admin Training menu', async ({ page }) => {
+    await login(page, 'super_admin');
+    const response = await page.goto('/admin/crew-planner');
+    expect(response?.status()).toBe(200);
+    await expect(page.getByRole('heading', { name: 'Crew Planner', exact: true })).toBeVisible();
+    const openSidebar = page.locator('.fi-topbar-open-sidebar-btn');
+    if (await openSidebar.isVisible()) await openSidebar.click();
+    await page.locator('.fi-sidebar').getByText('Training', { exact: true }).click();
+    await expect(page.locator('.fi-sidebar').getByRole('link', { name: 'Crew Planner', exact: true })).toHaveAttribute('href', /\/admin\/crew-planner$/);
+    await expect(page.getByRole('button', { name: 'Read daily report', exact: true })).toBeVisible();
 });

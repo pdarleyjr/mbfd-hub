@@ -12,6 +12,31 @@ $allowed = realpath($fixtureRoot.'/test-results');
 if (! is_string($directory) || ! $allowed || ! str_starts_with((string) realpath($directory), $allowed.DIRECTORY_SEPARATOR.'training-crew-planner-server-')) {
     throw new RuntimeException('A newly created disposable browser directory is required.');
 }
+// Match the web server: static assets must not boot Laravel or write manifests.
+if (PHP_SAPI === 'cli-server') {
+    if (($_SERVER['SERVER_NAME'] ?? '') !== '127.0.0.1') {
+        throw new RuntimeException('Loopback test server only.');
+    }
+    $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
+    if ($path === '/__synthetic_daily.pdf') {
+        header('Content-Type: application/pdf');
+        readfile($directory.'/synthetic-daily.pdf');
+
+        return;
+    }
+    if ($path !== '/' && ! str_contains($path, '..')) {
+        foreach ([$directory.'/public', $assets] as $assetRoot) {
+            if (is_file($assetRoot.$path)) {
+                header('Content-Type: '.match (pathinfo($path, PATHINFO_EXTENSION)) {
+                    'js' => 'application/javascript', 'css' => 'text/css', 'svg' => 'image/svg+xml', 'woff2' => 'font/woff2', default => mime_content_type($assetRoot.$path)
+                });
+                readfile($assetRoot.$path);
+
+                return;
+            }
+        }
+    }
+}
 require $dependencies.'/tests/bootstrap.php';
 foreach (Composer\Autoload\ClassLoader::getRegisteredLoaders() as $loader) {
     foreach (['App\\' => 'app/', 'Tests\\' => 'tests/', 'Database\\Factories\\' => 'database/factories/', 'Database\\Seeders\\' => 'database/seeders/', 'Mbfd\\PolicyLibrary\\' => 'modules/policy-library/src/'] as $prefix => $path) {
@@ -40,8 +65,12 @@ foreach (['packages.php', 'services.php'] as $manifest) {
         copy($dependencies.'/bootstrap/cache/'.$manifest, $directory.'/bootstrap/cache/'.$manifest);
     }
 }
-copy($root.'/bootstrap/providers.php', $directory.'/bootstrap/providers.php');
-copy($assets.'/build/manifest.json', $directory.'/public/build/manifest.json');
+if (! is_file($directory.'/bootstrap/providers.php')) {
+    copy($root.'/bootstrap/providers.php', $directory.'/bootstrap/providers.php');
+}
+if (! is_file($directory.'/public/build/manifest.json')) {
+    copy($assets.'/build/manifest.json', $directory.'/public/build/manifest.json');
+}
 $app = require $root.'/bootstrap/app.php';
 $app->useStoragePath($directory.'/storage');
 $app->useBootstrapPath($directory.'/bootstrap');
@@ -65,16 +94,16 @@ if (in_array('--seed', $argv ?? [], true)) {
     Illuminate\Support\Facades\DB::statement('PRAGMA journal_mode = MEMORY');
     Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
     Illuminate\Support\Facades\Artisan::call('filament:assets');
-    foreach (['training_admin', 'training_viewer'] as $role) {
+    foreach (['training_admin', 'training_viewer', 'super_admin'] as $role) {
         $user = App\Models\User::factory()->create(['name' => 'Synthetic '.$role, 'email' => $role.'@example.test', 'password' => 'synthetic-crew-password', 'account_status' => 'active', 'must_change_password' => false]);
         $user->assignRole(Spatie\Permission\Models\Role::findOrCreate($role, 'web'));
     }
     $admin = App\Models\User::where('email', 'training_admin@example.test')->firstOrFail();
     $employees = [];
-    foreach (['90001' => 'Captain', '90002' => 'Firefighter', '90003' => 'Lieutenant'] as $number => $rank) {
+    foreach (['90001' => 'Captain', '90002' => 'Firefighter', '90003' => 'Lieutenant', '90004' => 'Firefighter'] as $number => $rank) {
         $employees[] = App\Models\Employee::create(['employee_id' => (string) $number, 'name' => 'Synthetic '.$number, 'rank' => $rank, 'roster_status' => 'active', 'city_email' => 'synthetic-'.$number.'@miamibeachfl.gov']);
     }
-    foreach (['training_admin' => 0, 'training_viewer' => 1] as $role => $index) {
+    foreach (['training_admin' => 0, 'training_viewer' => 1, 'super_admin' => 2] as $role => $index) {
         App\Models\User::where('email', $role.'@example.test')->update(['employee_profile_id' => $employees[$index]->id, 'employee_id' => $employees[$index]->employee_id]);
     }
     $fresh = App\Models\Training\TrainingCourse::create(['name' => 'Synthetic new course', 'classifications' => ['STC'], 'track_attendance_matrix' => false, 'created_by' => $admin->id]);
@@ -94,12 +123,6 @@ if (PHP_SAPI !== 'cli-server' || ($_SERVER['SERVER_NAME'] ?? '') !== '127.0.0.1'
     throw new RuntimeException('Loopback test server only.');
 }
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
-if ($path === '/__synthetic_daily.pdf') {
-    header('Content-Type: application/pdf');
-    readfile($directory.'/synthetic-daily.pdf');
-
-    return;
-}
 if ($path === '/__crew_domain_fingerprint') {
     $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
     $hashes = [];
@@ -113,18 +136,6 @@ if ($path === '/__crew_domain_fingerprint') {
 
     return;
 }
-if ($path !== '/' && ! str_contains($path, '..')) {
-    foreach ([$directory.'/public', $assets] as $assetRoot) {
-        if (is_file($assetRoot.$path)) {
-            header('Content-Type: '.match (pathinfo($path, PATHINFO_EXTENSION)) {
-                'js' => 'application/javascript', 'css' => 'text/css', 'svg' => 'image/svg+xml', 'woff2' => 'font/woff2', default => mime_content_type($assetRoot.$path)
-            });
-            readfile($assetRoot.$path);
-
-            return;
-        }
-    }
-}
 $_SERVER['SCRIPT_NAME'] = '/index.php';
 $_SERVER['SCRIPT_FILENAME'] = $root.'/public/index.php';
 $_SERVER['PHP_SELF'] = '/index.php';
@@ -133,9 +144,9 @@ $app->handleRequest(Illuminate\Http\Request::capture());
 function syntheticDailyPdf(): string
 {
     $items = [[48, 700, 'Wednesday, October 21, 2026'], [48, 680, 'B Shift'], [48, 660, 'Station 9'], [48, 640, 'Engine 9']];
-    foreach (['90001', '90002', '90003'] as $index => $id) {
+    foreach (['90001', '90002', '90003', '90004', '90099'] as $index => $id) {
         $y = 620 - 20 * $index;
-        array_push($items, [51, $y, 'Firefighter'], [173, $y, 'SYNTHETIC, '.$id], [311, $y, $id], [351, $y, 'SP'], [494.7, $y, '08:00'], [515.9, $y, '20:00'], [548, $y, '12']);
+        array_push($items, [51, $y, 'Firefighter'], [173, $y, 'SYNTHETIC, '.$id], [311, $y, $id], [351, $y, $id === '90004' ? 'ZZTEST' : 'SP'], [494.7, $y, '08:00'], [515.9, $y, '20:00'], [548, $y, '12']);
     }
     $content = '';
     foreach ($items as [$x, $y, $text]) {
