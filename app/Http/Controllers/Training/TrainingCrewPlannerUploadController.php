@@ -33,8 +33,10 @@ final class TrainingCrewPlannerUploadController extends Controller
             ]);
             $draft = $drafts->get($actor, $input['draft_id']);
             abort_if($draft['version'] !== (int) $input['version'], 409, 'The proposal changed in another tab. Reload it before uploading.');
-            $course = TrainingCourse::query()->findOrFail($draft['course_id']);
-            abort_unless(app(TrainingRosterPolicy::class)->view($actor, $course), 403);
+            if ($draft['course_id'] !== null) {
+                $course = TrainingCourse::query()->findOrFail($draft['course_id']);
+                abort_unless(app(TrainingRosterPolicy::class)->view($actor, $course), 403);
+            }
             abort_unless($file instanceof UploadedFile, 422);
             try {
                 $snapshot = $parser->parse($file->getPathname());
@@ -52,7 +54,9 @@ final class TrainingCrewPlannerUploadController extends Controller
             $request->session()->put('training_crew_planner_draft.'.$actor->id, $draft['id']);
 
             return redirect(TrainingCrewPlanner::getUrl(panel: 'training'))
-                ->with('crew_planner_notice', 'Daily snapshot processed. Confirm the date and shift, then review classroom times and your proposal.');
+                ->with('crew_planner_notice', $draft['course_id'] === null
+                    ? 'Daily snapshot processed. Choose a course and use its training scope to check attendance, then review classroom times and your proposal.'
+                    : 'Daily snapshot processed. Confirm the date and shift, then review classroom times and your proposal.');
         } finally {
             if ($file instanceof UploadedFile && is_file($file->getPathname())) {
                 unlink($file->getPathname());

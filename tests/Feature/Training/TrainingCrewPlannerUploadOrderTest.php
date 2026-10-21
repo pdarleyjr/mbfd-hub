@@ -72,7 +72,8 @@ final class TrainingCrewPlannerUploadOrderTest extends TestCase
             $path = $file->getPathname();
             $this->post(route('training.crew-planner.upload'), ['draft_id' => $id,
                 'version' => $component->get('version'), 'roster_pdf' => $file])
-                ->assertRedirect()->assertSessionHasNoErrors();
+                ->assertRedirect()->assertSessionHasNoErrors()
+                ->assertSessionHas('crew_planner_notice', fn (string $notice): bool => str_contains($notice, 'Choose a course'));
             self::assertFileDoesNotExist($path);
             $uploaded = $store->get($this->actor, $id);
             self::assertNull($uploaded['course_id']);
