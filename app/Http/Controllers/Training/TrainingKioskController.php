@@ -15,6 +15,7 @@ use App\Services\Training\TrainingRosterSubmissionAuthenticator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 final class TrainingKioskController extends Controller
 {
@@ -55,8 +56,8 @@ final class TrainingKioskController extends Controller
     public function startCourse(Request $request, TrainingCourse $course, TrainingRosterService $rosters, TrainingKioskService $kiosk, TrainingRosterSubmissionAuthenticator $authenticator): JsonResponse
     {
         $data = $request->validate([
-            'session_public_id' => ['sometimes', 'required', 'string', 'size:26', 'alpha_num:ascii', 'prohibited_with:new_module_name'],
-            'training_module_id' => ['sometimes', 'nullable', 'integer', 'min:1', 'prohibited_with:new_module_name'],
+            'session_public_id' => ['sometimes', 'required', 'string', 'size:26', 'alpha_num:ascii', Rule::prohibitedIf($request->filled('new_module_name'))],
+            'training_module_id' => ['sometimes', 'nullable', 'integer', 'min:1', Rule::prohibitedIf($request->filled('new_module_name'))],
             'new_module_name' => ['sometimes', 'required', 'string', 'max:200', 'regex:/\S/u'],
             'email' => ['required_with:new_module_name', 'string', 'max:254'],
             'password' => ['required_with:new_module_name', 'string', 'max:1024'],
