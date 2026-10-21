@@ -27,7 +27,7 @@ final class TrainingCrewPlannerDutyContext
             $station = (string) ($context['station'] ?? 'Not reported');
             $unit = (string) ($context['apparatus'] ?? 'Not reported');
             $period = ! empty($context['start_at']) && ! empty($context['end_at'])
-                ? CarbonImmutable::parse($context['start_at'])->format('m/d H:i').'–'.CarbonImmutable::parse($context['end_at'])->format('m/d H:i')
+                ? CarbonImmutable::parse($context['start_at'])->setTimezone('America/New_York')->format('m/d H:i').'–'.CarbonImmutable::parse($context['end_at'])->setTimezone('America/New_York')->format('m/d H:i')
                 : 'time not confirmed';
             // Keep the interval beside each unit, including when a class spans a unit change.
             $stations[] = $station.' ('.$period.')';

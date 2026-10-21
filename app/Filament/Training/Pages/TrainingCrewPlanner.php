@@ -146,11 +146,7 @@ final class TrainingCrewPlanner extends Page
     {
         $draft = $this->draft();
         $analysis = $this->analysis($draft);
-        $this->slotEdits = array_map(fn (array $slot): array => [
-            'id' => (string) Str::uuid(), 'label' => $slot['label'],
-            'start' => CarbonImmutable::parse($slot['start_at'])->format('H:i'),
-            'end' => empty($slot['end_at']) ? '' : CarbonImmutable::parse($slot['end_at'])->format('H:i'),
-        ], array_slice($analysis['session_suggestions'] ?? [], 0, 12));
+        $this->slotEdits = array_map(fn (array $slot): array => $this->slotEdit($slot, true), array_slice($analysis['session_suggestions'] ?? [], 0, 12));
     }
 
     public function saveSlots(): void
@@ -420,7 +416,7 @@ final class TrainingCrewPlanner extends Page
         $this->version = $draft['version'];
         $this->courseId = $draft['course_id'];
         $this->scope = $draft['module_id'] === null ? 'course' : (string) $draft['module_id'];
-        $this->slotEdits = array_map(fn (array $slot): array => ['id' => $slot['id'], 'label' => $slot['label'], 'start' => CarbonImmutable::parse($slot['start_at'])->format('H:i'), 'end' => CarbonImmutable::parse($slot['end_at'])->format('H:i')], $draft['slots']);
+        $this->slotEdits = array_map(fn (array $slot): array => $this->slotEdit($slot), $draft['slots']);
         if ($this->slotEdits === [] && ! empty($draft['metadata']['schedule_date'])) {
             $this->slotEdits = [
                 ['id' => (string) Str::uuid(), 'label' => 'Morning', 'start' => '08:30', 'end' => '11:30'],
@@ -432,5 +428,14 @@ final class TrainingCrewPlanner extends Page
     private function sessionKey(): string
     {
         return 'training_crew_planner_draft.'.auth()->id();
+    }
+
+    private function slotEdit(array $slot, bool $newId = false): array
+    {
+        return [
+            'id' => $newId ? (string) Str::uuid() : $slot['id'], 'label' => $slot['label'],
+            'start' => CarbonImmutable::parse($slot['start_at'])->setTimezone('America/New_York')->format('H:i'),
+            'end' => empty($slot['end_at']) ? '' : CarbonImmutable::parse($slot['end_at'])->setTimezone('America/New_York')->format('H:i'),
+        ];
     }
 }
