@@ -19,10 +19,12 @@
         thead { display: table-header-group; }
         tr { page-break-inside: avoid; }
         .footer { position: fixed; bottom: -27px; font-size: 7px; color: #52616c; }
+        .page-number:after { content: counter(page); }
         .note { font-size: 8px; color: #52616c; }
     </style>
 </head>
 <body>
+    <div class="footer">{{ $report['legend'] }} &nbsp; | &nbsp; Page <span class="page-number"></span></div>
     <h1>MBFD TRAINING - PROPOSED CLASS ATTENDANCE</h1>
     <p><strong>For Battalion Chief 300 review</strong></p>
     <table class="meta">
@@ -48,6 +50,5 @@
             </table>
         @endif
     @endforeach
-    <div class="footer">{{ $report['legend'] }}</div>
 </body>
 </html>

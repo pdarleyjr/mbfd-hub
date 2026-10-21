@@ -9,8 +9,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Training\TrainingCourse;
 use App\Models\User;
 use App\Policies\TrainingRosterPolicy;
-use App\Services\Training\CrewPlanner\TeleStaffDailyPdfParser;
 use App\Services\Training\CrewPlanner\TeleStaffDutyResolver;
+use App\Services\Training\CrewPlanner\TeleStaffPdfSandbox;
 use App\Services\Training\CrewPlanner\TrainingCrewPlannerDraftStore;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -19,7 +19,7 @@ use Illuminate\Validation\ValidationException;
 
 final class TrainingCrewPlannerUploadController extends Controller
 {
-    public function __invoke(Request $request, TrainingCrewPlannerDraftStore $drafts, TeleStaffDailyPdfParser $parser, TeleStaffDutyResolver $resolver): RedirectResponse
+    public function __invoke(Request $request, TrainingCrewPlannerDraftStore $drafts, TeleStaffPdfSandbox $parser, TeleStaffDutyResolver $resolver): RedirectResponse
     {
         // A normal multipart request uses PHP-owned temporary files, not a retained Livewire upload.
         $file = $request->file('roster_pdf');
