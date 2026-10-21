@@ -8,7 +8,9 @@ use App\Filament\Training\Pages\TrainingCrewPlanner;
 use App\Models\Employee;
 use App\Models\Training\TrainingCourse;
 use App\Models\User;
+use App\Services\Training\CrewPlanner\TeleStaffDutyResolver;
 use App\Services\Training\CrewPlanner\TrainingCrewPlannerDraftStore;
+use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -19,6 +21,7 @@ use Livewire\Livewire;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use Smalot\PdfParser\Parser;
+use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -181,6 +184,65 @@ final class TrainingCrewPlannerIsolationTest extends TestCase
         }
     }
 
+    public function test_changed_roster_date_blocks_old_slots_without_losing_the_proposal(): void
+    {
+        $component = Livewire::test(TrainingCrewPlanner::class)->set('courseId', $this->course->id)->call('applyScope');
+        $id = $component->get('draftId');
+        $this->post(route('training.crew-planner.upload'), ['draft_id' => $id, 'version' => $component->get('version'),
+            'roster_pdf' => UploadedFile::fake()->createWithContent('first.pdf', $this->pdf())])->assertRedirect()->assertSessionHasNoErrors();
+        $component->call('reloadProposal')->call('saveSlots')->call('addSelected', true)->assertHasNoErrors();
+        $morning = $this->draft($id)['slots'][0]['id'];
+        $ids = array_map('strval', array_keys($this->draft($id)['selections']));
+        $component->set('planSelection', $ids)->set('targetSlot', $morning)->call('moveSelected');
+        $component->set('slotEdits.0.start', '03:00')->set('slotEdits.0.end', '06:00')->call('saveSlots')->assertHasNoErrors();
+        $this->post(route('training.crew-planner.upload'), ['draft_id' => $id, 'version' => $component->get('version'),
+            'roster_pdf' => UploadedFile::fake()->createWithContent('previous-day.pdf', $this->pdf('2026-10-20', '08:00', '24'))])->assertRedirect()->assertSessionHasNoErrors();
+        $component->call('reloadProposal')->assertSee('The new daily report has a different date');
+        $before = $this->draft($id);
+        // Pure intervals would cover these old next-day times; the planner's day scope must reject them.
+        $resolved = app(TeleStaffDutyResolver::class)->resolveStaff($before['staff'], $before['slots']);
+        self::assertContains($morning, $resolved['90001']['eligible_slots']);
+        $component->assertSee('0 results')->call('addSelected', true)->assertHasErrors('slotEdits');
+        $component->set('planSelection', $ids)->call('moveSelected')->assertHasErrors('slotEdits');
+        foreach (['pdf', 'xlsx'] as $format) {
+            $component->set('confirmReview', true)->call('download', $format)->assertHasErrors('slotEdits')->assertNoFileDownloaded();
+        }
+        self::assertSame($before, $this->draft($id));
+        $component->set('slotEdits.0.start', '08:30')->set('slotEdits.0.end', '11:30')->call('saveSlots')->assertHasNoErrors();
+        self::assertSame($before['selections'], $this->draft($id)['selections']);
+        self::assertSame('2026-10-20', substr($this->draft($id)['slots'][0]['start_at'], 0, 10));
+        $component->call('download', 'pdf')->assertFileDownloaded('MBFD-Training-Proposal-2026-10-20.pdf');
+    }
+
+    public function test_slot_start_on_roster_date_can_end_the_following_day(): void
+    {
+        $store = app(TrainingCrewPlannerDraftStore::class);
+        $draft = $store->create($this->admin);
+        $draft = $store->update($this->admin, $draft['id'], 1, fn (array $row): array => [...$row, 'course_id' => $this->course->id]);
+        $this->post(route('training.crew-planner.upload'), ['draft_id' => $draft['id'], 'version' => $draft['version'],
+            'roster_pdf' => UploadedFile::fake()->createWithContent('overnight.pdf', $this->pdf('2026-10-21', '08:00', '24'))])->assertRedirect()->assertSessionHasNoErrors();
+        $draft = $this->draft($draft['id']);
+        $slot = ['id' => (string) Str::uuid(), 'label' => 'Overnight', 'start_at' => '2026-10-21T23:00:00-04:00', 'end_at' => '2026-10-22T01:00:00-04:00'];
+        $store->update($this->admin, $draft['id'], $draft['version'], fn (array $row): array => [...$row, 'slots' => [$slot]]);
+        $component = Livewire::test(TrainingCrewPlanner::class)->call('addSelected', true)->assertHasNoErrors();
+        self::assertCount(2, $this->draft($draft['id'])['selections']);
+        $component->set('planSelection', array_map('strval', array_keys($this->draft($draft['id'])['selections'])))
+            ->set('targetSlot', $slot['id'])->call('moveSelected')->assertHasNoErrors();
+        $component->call('download', 'xlsx')->assertFileDownloaded();
+    }
+
+    public function test_admin_alias_requires_training_management_even_with_admin_panel_access(): void
+    {
+        $this->admin->givePermissionTo(Permission::findOrCreate('admin.access', 'web'));
+        $this->admin->assignRole(Role::findOrCreate('admin', 'web'));
+        $response = $this->get('/admin/crew-planner')->assertOk();
+        self::assertStringContainsString('no-store', $response->headers->get('Cache-Control'));
+        self::assertStringContainsString('private', $response->headers->get('Cache-Control'));
+        $this->admin->removeRole('training_admin');
+        $this->admin->assignRole(Role::findOrCreate('training_viewer', 'web'));
+        $this->get('/admin/crew-planner')->assertForbidden();
+    }
+
     private function draft(string $id): array
     {
         return app(TrainingCrewPlannerDraftStore::class)->get($this->admin, $id);
@@ -205,13 +267,13 @@ final class TrainingCrewPlannerIsolationTest extends TestCase
     }
 
     /** Valid one-page template PDF with fabricated employees, decoded by the real parser. */
-    private function pdf(): string
+    private function pdf(string $date = '2026-10-21', string $to = '20:00', string $hours = '12'): string
     {
-        $items = [[48, 700, 'Wednesday, October 21, 2026'], [48, 680, 'B Shift'], [48, 660, 'Station 9'], [48, 640, 'Engine 9']];
+        $items = [[48, 700, CarbonImmutable::parse($date)->format('l, F j, Y')], [48, 680, 'B Shift'], [48, 660, 'Station 9'], [48, 640, 'Engine 9']];
         foreach (['90001', '90002'] as $index => $id) {
             $y = 620 - 20 * $index;
             array_push($items, [51, $y, 'Firefighter'], [173, $y, 'SYNTHETIC, '.$id], [311, $y, $id], [351, $y, 'SP'],
-                [494.7, $y, '08:00'], [515.9, $y, '20:00'], [548, $y, '12']);
+                [494.7, $y, '08:00'], [515.9, $y, $to], [548, $y, $hours]);
         }
         $content = '';
         foreach ($items as [$x, $y, $text]) {

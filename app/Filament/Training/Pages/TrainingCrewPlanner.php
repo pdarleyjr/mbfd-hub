@@ -185,6 +185,7 @@ final class TrainingCrewPlanner extends Page
     public function addSelected(bool $allEligible = false): void
     {
         $draft = $this->draft();
+        $this->requireCurrentSlotDates($draft);
         $this->validate(['candidateSelection' => ['array', 'max:2000'], 'candidateSelection.*' => ['integer', 'min:1']]);
         $analysis = $this->analysis($draft, $this->cleanFilters());
         $rows = $analysis['rows'] ?? [];
@@ -243,6 +244,7 @@ final class TrainingCrewPlanner extends Page
     public function moveSelected(): void
     {
         $draft = $this->draft();
+        $this->requireCurrentSlotDates($draft);
         $this->validate(['planSelection' => ['array', 'max:2000'], 'planSelection.*' => ['integer', 'min:1']]);
         $rows = $this->analysis($draft)['rows'] ?? [];
         $slot = $this->targetSlot === '' ? null : $this->targetSlot;
@@ -280,6 +282,7 @@ final class TrainingCrewPlanner extends Page
         abort_unless(in_array($format, ['pdf', 'xlsx'], true), 404);
         $draft = $this->draft();
         abort_if($draft['version'] !== $this->version, 409, 'Reload the proposal before exporting; another tab changed it.');
+        $this->requireCurrentSlotDates($draft);
         $analysis = $this->analysis($draft);
         $course = $this->course($draft['course_id']);
         $rows = [];
@@ -384,7 +387,7 @@ final class TrainingCrewPlanner extends Page
         if (! $draft['course_id']) {
             return ['rows' => [], 'session_suggestions' => []];
         }
-        $staff = app(TeleStaffDutyResolver::class)->resolveStaff($draft['staff'], $draft['slots']);
+        $staff = app(TeleStaffDutyResolver::class)->resolveStaff($draft['staff'], $this->hasStaleSlotDates($draft) ? [] : $draft['slots']);
 
         return app(TrainingPlannerCandidateService::class)->candidates($this->actor(), $this->course($draft['course_id']), $draft['module_id'], CarbonImmutable::now(), $staff, $filters, $draft['metadata']['schedule_date'] ?? null);
     }
@@ -392,6 +395,25 @@ final class TrainingCrewPlanner extends Page
     private function eligible(array $row, bool $applySlotFilter = false): bool
     {
         return ! empty($row['eligible_slots']) && (! $applySlotFilter || $this->candidateSlot === '' || in_array($this->candidateSlot, $row['eligible_slots'], true));
+    }
+
+    private function hasStaleSlotDates(array $draft): bool
+    {
+        $date = $draft['metadata']['schedule_date'] ?? null;
+        foreach ($draft['slots'] as $slot) {
+            if (CarbonImmutable::parse($slot['start_at'])->setTimezone('America/New_York')->toDateString() !== $date) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function requireCurrentSlotDates(array $draft): void
+    {
+        if ($this->hasStaleSlotDates($draft)) {
+            throw ValidationException::withMessages(['slotEdits' => 'Save classroom times for the new roster date before adding, assigning or exporting this proposal. Your planning list is safe.']);
+        }
     }
 
     private function cleanFilters(): array
