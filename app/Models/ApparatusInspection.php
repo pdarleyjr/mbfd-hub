@@ -73,6 +73,8 @@ class ApparatusInspection extends Model
             'accepted' => 'Accepted',
             'accepted_with_exception' => 'Follow-up needed',
             'pending_vehicle_swap' => 'Held: vehicle swap',
+            'held_for_review' => 'Needs approval',
+            'rejected' => 'Rejected',
             default => match ($this->review_status) {
                 'pending_review' => 'Pending review',
                 'approved' => 'Approved',

@@ -120,30 +120,31 @@ final class ApparatusInspectionAutomaticProcessingTest extends TestCase
         ];
     }
 
-    #[DataProvider('disputedMeters')]
-    public function test_rollback_or_stale_baseline_quarantines_only_the_disputed_meter(string $reason): void
+    public function test_a_rollback_holds_the_inspection_and_applies_only_the_undisputed_meter(): void
     {
         $payload = $this->payload();
-        if ($reason === 'rollback') {
-            $payload['engine_hours'] = 399;
-        } else {
-            $this->apparatus->update(['current_engine_hours' => 400.5]);
-        }
-        $this->postJson($this->url(), $payload)->assertCreated()->assertJsonPath('processing_status', 'accepted_with_exception');
+        $payload['engine_hours'] = 399;
+        $this->postJson($this->url(), $payload)->assertCreated()
+            ->assertJsonPath('processing_status', 'held_for_review')->assertJsonPath('review_status', 'pending_review');
         $exception = ApparatusInspectionException::sole();
         $this->assertSame('engine_hours', $exception->field);
-        $this->assertSame($reason, $exception->reason);
+        $this->assertSame('rollback', $exception->reason);
+        $this->assertTrue($exception->blocks_acceptance);
         $this->assertSame('400.0', $exception->baseline_value);
-        $this->assertSame($reason === 'rollback' ? '400.0' : '400.5', $this->apparatus->fresh()->current_engine_hours);
+        $this->assertSame('400.0', $this->apparatus->fresh()->current_engine_hours);
         $this->assertSame(1020, $this->apparatus->fresh()->current_miles);
-        $this->assertSame((float) $payload['engine_hours'], (float) ApparatusInspection::sole()->engine_hours);
-        $this->assertSame('approved', ApparatusInspection::sole()->review_status);
+        $this->assertSame(399.0, (float) ApparatusInspection::sole()->engine_hours);
         $this->assertSame('In Service', $this->apparatus->fresh()->status);
     }
 
-    public static function disputedMeters(): array
+    public function test_a_newer_fleet_reading_supersedes_the_submitted_one_without_an_exception(): void
     {
-        return [['rollback'], ['stale_baseline']];
+        $payload = $this->payload();
+        $this->apparatus->update(['current_engine_hours' => 400.5]);
+        $this->postJson($this->url(), $payload)->assertCreated()->assertJsonPath('processing_status', 'accepted');
+        $this->assertDatabaseCount('apparatus_inspection_exceptions', 0);
+        $this->assertSame('401.2', $this->apparatus->fresh()->current_engine_hours);
+        $this->assertSame(1020, $this->apparatus->fresh()->current_miles);
     }
 
     public function test_spoofed_member_and_vehicle_labels_are_overwritten_by_canonical_identity_and_foreign_retry_is_denied(): void

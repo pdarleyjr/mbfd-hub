@@ -58,7 +58,7 @@ class ApparatusInspectionPolicy
      */
     public function approve(User $user, ApparatusInspection $apparatusInspection): bool
     {
-        return $user->hasAnyRole(['super_admin', 'admin', 'logistics_admin']);
+        return $this->canReview($user);
     }
 
     /**
@@ -67,7 +67,17 @@ class ApparatusInspectionPolicy
      */
     public function reject(User $user, ApparatusInspection $apparatusInspection): bool
     {
-        return $user->hasAnyRole(['super_admin', 'admin', 'logistics_admin']);
+        return $this->canReview($user);
+    }
+
+    /**
+     * Reviewers are the legacy administrator roles or anyone with Fleet manage
+     * access (admin.access + admin.fleet.manage), the same capability the API
+     * and the Fleet pages already use, so Filament and the API agree.
+     */
+    private function canReview(User $user): bool
+    {
+        return $user->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) || $user->canManageFleetSwaps();
     }
 
     /**

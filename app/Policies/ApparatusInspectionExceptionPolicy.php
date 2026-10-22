@@ -12,7 +12,7 @@ final class ApparatusInspectionExceptionPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->hasAnyRole(['super_admin', 'admin', 'logistics_admin', FleetOperationsManagerAssignment::ROLE]);
+        return $user->hasAnyRole(['super_admin', 'admin', 'logistics_admin', FleetOperationsManagerAssignment::ROLE]) || $user->canManageFleetSwaps();
     }
 
     public function view(User $user, ApparatusInspectionException $exception): bool
