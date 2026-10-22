@@ -179,3 +179,103 @@ test('ordinary member is denied direct directory and custom table URLs', async (
         await expect(page.getByRole('heading', { name: 'Master Personnel Directory', exact: true })).toHaveCount(0);
     }
 });
+
+test('inline checkbox date and text persist after native save notifications close without server errors', async ({ page }, info) => {
+    const serverErrors: number[] = [];
+    const databaseCloseStatuses: number[] = [];
+    await page.addInitScript(() => {
+        const state = window as unknown as { personnelClosedNotificationIds: string[] };
+        state.personnelClosedNotificationIds = [];
+        window.addEventListener('notificationClosed', event => {
+            state.personnelClosedNotificationIds.push((event as CustomEvent<{ id: string }>).detail.id);
+        });
+    });
+    page.on('response', response => {
+        if (!response.url().endsWith('/livewire/update')) return;
+        if (response.status() >= 500) serverErrors.push(response.status());
+        const payload = response.request().postDataJSON() as { components?: { snapshot: string; calls?: { method: string; params: unknown[] }[] }[] };
+        if (payload.components?.some(component => JSON.parse(component.snapshot).memo.name === 'filament.livewire.database-notifications'
+            && component.calls?.some(call => call.method === '__dispatch' && call.params[0] === 'notificationClosed'))) {
+            databaseCloseStatuses.push(response.status());
+        }
+    });
+    const closedIds = () => page.evaluate(() => (window as unknown as { personnelClosedNotificationIds: string[] }).personnelClosedNotificationIds);
+    const saveAndClose = async (save: () => Promise<unknown>) => {
+        const priorEventCount = (await closedIds()).length;
+        const priorResponseCount = databaseCloseStatuses.length;
+        await save();
+        await expect(page.getByText('Saved', { exact: true }).last()).toBeVisible();
+        await expect.poll(async () => (await closedIds()).length).toBeGreaterThan(priorEventCount);
+        expect((await closedIds()).at(-1)).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+        await expect.poll(() => databaseCloseStatuses.length).toBeGreaterThan(priorResponseCount);
+        expect(databaseCloseStatuses.at(-1)).toBe(200);
+        expect(serverErrors).toEqual([]);
+        await expect(page.locator('iframe')).toHaveCount(0);
+    };
+    await login(page);
+    await openTable(page, `Synthetic inline date and text tracking ${info.project.name}`);
+    const row = page.getByRole('row').filter({ hasText: '99001' });
+    const reviewed = row.locator('input[type="checkbox"]').last();
+    await ready(reviewed);
+    await saveAndClose(() => reviewed.check());
+    await page.reload();
+    await expect(reviewed).toBeChecked();
+    const date = row.locator('input[type="date"]');
+    await ready(date);
+    await saveAndClose(async () => { await date.fill('2026-10-21'); await date.press('Tab'); });
+    const text = row.locator('input[type="text"]');
+    await ready(text);
+    await saveAndClose(async () => { await text.fill('Synthetic persisted inline note'); await text.press('Tab'); });
+    await page.reload();
+    await expect(reviewed).toBeChecked();
+    await expect(date).toHaveValue('2026-10-21');
+    await expect(text).toHaveValue('Synthetic persisted inline note');
+    expect(serverErrors).toEqual([]);
+    await expect(page.locator('iframe')).toHaveCount(0);
+    await page.screenshot({ path: info.outputPath('inline-tracking-persisted.png'), fullPage: true });
+});
+
+test('native Columns saves status choices and inline status persists after reload', async ({ page }, info) => {
+    await login(page);
+    await openTable(page, `Synthetic inline date and text tracking ${info.project.name}`);
+    const columns = await action(page, 'Columns');
+    const columnNames = columns.getByRole('textbox', { name: /^Column name/ });
+    const existingColumnCount = await columnNames.count();
+    await columns.getByRole('button', { name: 'Add tracking column', exact: true }).click();
+    await expect(columnNames).toHaveCount(existingColumnCount + 1);
+    const columnName = columnNames.last();
+    const columnType = columns.getByRole('combobox', { name: /^Type/ }).last();
+    await ready(columnName);
+    await ready(columnType);
+    await columnName.fill('Workflow status');
+    await columnType.selectOption('status');
+    const choices = columns.getByRole('combobox', { name: /^Choices/ });
+    await choices.scrollIntoViewIfNeeded();
+    await ready(choices);
+    for (const choice of ['Pending', 'Complete']) {
+        await choices.fill(choice);
+        await choices.press('Enter');
+        await expect(columns.locator('.fi-fo-tags-input-tags-ctn').getByText(choice, { exact: true })).toBeVisible();
+    }
+    await columns.getByRole('button', { name: 'Submit', exact: true }).click();
+    await expect(page.getByText('Columns saved', { exact: true })).toBeVisible();
+    const persisted = await action(page, 'Columns');
+    const persistedChoices = persisted.getByRole('combobox', { name: /^Choices/ });
+    await persistedChoices.scrollIntoViewIfNeeded();
+    await ready(persistedChoices);
+    for (const choice of ['Pending', 'Complete']) {
+        await expect(persisted.locator('.fi-fo-tags-input-tags-ctn').getByText(choice, { exact: true })).toBeVisible();
+    }
+    await persisted.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(page.locator('.fi-modal-window:visible')).toHaveCount(0);
+    const status = page.getByRole('row').filter({ hasText: '99001' }).getByRole('combobox');
+    await status.scrollIntoViewIfNeeded();
+    await ready(status);
+    await status.selectOption('Complete');
+    await expect(page.getByText('Saved', { exact: true }).last()).toBeVisible();
+    await page.reload();
+    await expect(status).toHaveValue('Complete');
+    await expect(status.getByRole('option', { name: 'Pending', exact: true })).toHaveCount(1);
+    await expect(status.getByRole('option', { name: 'Complete', exact: true })).toHaveCount(1);
+    await page.screenshot({ path: info.outputPath('status-tracking-persisted.png'), fullPage: true });
+});

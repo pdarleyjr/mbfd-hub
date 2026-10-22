@@ -40,7 +40,7 @@ final class PersonnelTableSchema
             Forms\Hidden::make('id')->default(fn (): string => (string) Str::uuid()),
             Forms\TextInput::make('label')->label('Column name')->required()->maxLength(80),
             Forms\Select::make('type')->options(self::columnTypes())->default('checkbox')->required()->live(),
-            Forms\TagsInput::make('options')->label('Choices')->separator(',')->rules(['array', 'max:30'])
+            Forms\TagsInput::make('options')->label('Choices')->rules(['array', 'max:30'])
                 ->visible(fn (Get $get): bool => in_array($get('type'), ['select', 'multiselect', 'status'], true))
                 ->required(fn (Get $get): bool => in_array($get('type'), ['select', 'multiselect', 'status'], true)),
             Forms\Select::make('color')->label('Column highlight')->options(self::colors())->default('')->live(),

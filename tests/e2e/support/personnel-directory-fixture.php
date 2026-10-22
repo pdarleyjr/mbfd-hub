@@ -58,6 +58,15 @@ if (in_array('--seed', $argv ?? [], true)) {
             ]]);
         $service->setCell($actor, $table, $alpha, $column, true, 0);
     }
+    foreach (['desktop', 'tablet', 'phone'] as $project) {
+        $service->create($actor, ['name' => 'Synthetic inline date and text tracking '.$project, 'visibility' => 'private',
+            'membership_mode' => 'fixed', 'employee_ids' => [$employee->id], 'source_columns' => ['name', 'employee_id'],
+            'columns' => [
+                ['label' => 'Reviewed', 'type' => 'checkbox'],
+                ['label' => 'Review date', 'type' => 'date'],
+                ['label' => 'Notes', 'type' => 'text'],
+            ]]);
+    }
     echo 'Synthetic personnel fixture ready.'.PHP_EOL;
     exit;
 }

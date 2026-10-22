@@ -15,7 +15,9 @@ use Filament\Forms\Components\Repeater;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\Group;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -75,6 +77,99 @@ final class CustomPersonnelTablesTest extends TestCase
         }
     }
 
+    public function test_native_create_keeps_choice_options_as_arrays_and_saves_selected_values(): void
+    {
+        $this->loginManager();
+        $member = $this->employee('UI-CREATE-CHOICES', 'Choice creation fixture');
+        $columns = [];
+        foreach (['select', 'multiselect', 'status'] as $type) {
+            $columns[] = ['id' => (string) Str::uuid(), 'label' => 'Choice '.$type, 'type' => $type,
+                'options' => ['Pending', 'Complete'], 'hidden' => false];
+        }
+        Livewire::test(CustomPersonnelTables::class)->mountAction('createTable')
+            ->set('mountedActionsData.0.source_columns', [])->setActionData([
+                'name' => 'Native choice creation', 'selection_mode' => 'manual', 'employee_ids' => [$member->id],
+                'source_columns' => [['field' => 'name']], 'columns' => $columns, 'visibility' => 'private',
+            ])->callMountedAction()->assertHasNoErrors()->assertRedirect();
+        $table = PersonnelTable::query()->where('name', 'Native choice creation')->sole();
+        self::assertSame(['Pending', 'Complete'], $table->columns[0]['options']);
+        self::assertSame(['Pending', 'Complete'], $table->columns[1]['options']);
+        self::assertSame(['Pending', 'Complete'], $table->columns[2]['options']);
+        $values = [$columns[0]['id'] => 'Complete', $columns[1]['id'] => ['Pending', 'Complete'], $columns[2]['id'] => 'Pending'];
+        Livewire::test(PersonnelTableEditor::class, ['table' => $table->id])
+            ->callTableAction('editTracking', $member, ['values' => $values, 'highlight' => '', 'entry_version' => 0])
+            ->assertHasNoTableActionErrors();
+        $stored = $table->entries()->sole()->values;
+        self::assertCount(count($values), $stored);
+        foreach ($values as $id => $value) {
+            self::assertSame($value, $stored[$id]);
+        }
+    }
+
+    public function test_native_columns_keeps_choice_options_as_arrays_and_preserves_existing_tracking(): void
+    {
+        $owner = $this->loginManager();
+        $member = $this->employee('UI-CONFIGURE-CHOICES', 'Choice configuration fixture');
+        $table = $this->makeTable($owner, [$member->id], [
+            ['label' => 'Acknowledged', 'type' => 'checkbox'], ['label' => 'Checked on', 'type' => 'date'],
+        ]);
+        $checkbox = $table->columns[0]['id'];
+        $date = $table->columns[1]['id'];
+        $service = app(PersonnelTableService::class);
+        $service->setCell($owner, $table, $member, $checkbox, true, 0);
+        $entry = $service->setCell($owner, $table, $member, $date, '2026-10-21', 1);
+        $before = $entry->values;
+        $columns = $table->columns;
+        foreach (['select', 'multiselect', 'status'] as $type) {
+            $columns[] = ['id' => (string) Str::uuid(), 'label' => 'Choice '.$type, 'type' => $type,
+                'options' => ['Pending', 'Complete'], 'hidden' => false];
+        }
+        $component = Livewire::test(PersonnelTableEditor::class, ['table' => $table->id])
+            ->mountAction('configureColumns')->set('mountedActionsData.0.source_columns', [])
+            ->setActionData(['source_columns' => [['field' => 'name'], ['field' => 'employee_id'], ['field' => 'rank']], 'columns' => $columns])
+            ->callMountedAction()->assertHasNoErrors();
+        self::assertSame(2, $table->fresh()->version);
+        self::assertSame($before, $entry->fresh()->values);
+        self::assertSame(2, $entry->fresh()->version);
+        $values = $before;
+        foreach (array_slice($table->fresh()->columns, 2) as $column) {
+            self::assertSame(['Pending', 'Complete'], $column['options']);
+            $component->assertTableColumnExists('tracking_'.$column['id']);
+            $values[$column['id']] = $column['type'] === 'multiselect' ? ['Pending', 'Complete'] : 'Complete';
+        }
+        $component->callTableAction('editTracking', $member, ['values' => $values, 'highlight' => '', 'entry_version' => 2])
+            ->assertHasNoTableActionErrors();
+        $stored = $entry->fresh()->values;
+        self::assertCount(count($values), $stored);
+        foreach ($values as $id => $value) {
+            self::assertSame($value, $stored[$id]);
+        }
+        self::assertTrue($entry->fresh()->values[$checkbox]);
+        self::assertSame('2026-10-21', $entry->fresh()->values[$date]);
+    }
+
+    public function test_duplicate_choices_inside_one_column_do_not_change_configuration_or_tracking(): void
+    {
+        $owner = $this->loginManager();
+        $member = $this->employee('UI-DUPLICATE-CHOICE', 'Duplicate choice fixture');
+        $table = $this->makeTable($owner, [$member->id]);
+        $before = $table->columns;
+        $service = app(PersonnelTableService::class);
+        $entry = $service->setCell($owner, $table, $member, $before[0]['id'], true, 0);
+        try {
+            $service->update($owner, $table, ['columns' => [...$before,
+                ['label' => 'Duplicate choices', 'type' => 'status', 'options' => ['Pending', 'Pending']],
+            ]], $table->version);
+            self::fail('Choices must remain unique within each column.');
+        } catch (ValidationException $exception) {
+            self::assertArrayHasKey('columns', $exception->errors());
+            self::assertSame(1, $table->fresh()->version);
+            self::assertSame($before, $table->fresh()->columns);
+            self::assertSame(1, $entry->fresh()->version);
+            self::assertTrue($entry->fresh()->values[$before[0]['id']]);
+        }
+    }
+
     public function test_checkbox_filter_distinguishes_checked_unchecked_and_empty_values(): void
     {
         $owner = $this->loginManager();
@@ -103,6 +198,48 @@ final class CustomPersonnelTablesTest extends TestCase
         app(PersonnelTableService::class)->setCell($owner, $table, $member, $id, true, 0);
         $component->call('updateTableColumnState', 'tracking_'.$id, (string) $member->id, false)->assertHasErrors(['conflict']);
         self::assertTrue($table->entries()->sole()->values[$id]);
+    }
+
+    public function test_saved_toast_can_close_without_querying_a_non_uuid_notification_id(): void
+    {
+        $this->assertTrackingToastDismissalIsSafe();
+    }
+
+    #[Group('postgres')]
+    public function test_postgresql_saved_toast_dismissal_preserves_tracking_and_existing_notifications(): void
+    {
+        if (! app()->environment('testing') || getenv('MBFD_ALLOW_DISPOSABLE_POSTGRES') !== '1'
+            || getenv('EXPECTED_TEST_DB_CONNECTION') !== 'pgsql' || DB::connection()->getDriverName() !== 'pgsql') {
+            if (getenv('REQUIRE_POSTGRES_INTEGRATION') === 'true') {
+                self::fail('Requires explicitly configured disposable PostgreSQL.');
+            }
+            $this->markTestSkipped('Requires explicitly configured disposable PostgreSQL.');
+        }
+        $this->assertTrackingToastDismissalIsSafe();
+    }
+
+    private function assertTrackingToastDismissalIsSafe(): void
+    {
+        $owner = $this->loginManager();
+        $member = $this->employee('UI-NOTIFICATION', 'Notification fixture');
+        $table = $this->makeTable($owner, [$member->id]);
+        $columnId = $table->columns[0]['id'];
+        $existing = $owner->notifications()->create([
+            'id' => (string) Str::uuid(), 'type' => \Filament\Notifications\DatabaseNotification::class,
+            'data' => ['format' => 'filament', 'title' => 'Retained notification'],
+        ]);
+
+        Livewire::test(PersonnelTableEditor::class, ['table' => $table->id])
+            ->call('updateTableColumnState', 'tracking_'.$columnId, (string) $member->id, true)
+            ->assertHasNoErrors();
+        $toast = collect(session()->get('filament.notifications', []))->firstWhere('title', 'Saved');
+        self::assertNotNull($toast);
+        self::assertTrue(Str::isUuid($toast['id']), 'Toast dismissal also reaches the PostgreSQL UUID notification query.');
+        Livewire::test(\Filament\Notifications\Livewire\DatabaseNotifications::class)
+            ->dispatch('notificationClosed', id: $toast['id'])->assertHasNoErrors();
+
+        self::assertTrue($table->entries()->sole()->values[$columnId]);
+        $this->assertDatabaseHas('notifications', ['id' => $existing->id]);
     }
 
     public function test_notes_highlight_and_membership_changes_preserve_personnel_and_tracking(): void

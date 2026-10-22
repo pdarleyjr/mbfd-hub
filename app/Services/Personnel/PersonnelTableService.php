@@ -393,7 +393,7 @@ final class PersonnelTableService
             'columns' => ['present', 'array', 'max:40'], 'columns.*' => ['array:id,label,type,options,hidden,color,highlight_when,highlight_value'],
             'columns.*.id' => ['sometimes', 'uuid', 'distinct'], 'columns.*.label' => ['required', 'string', 'max:80'],
             'columns.*.type' => ['required', Rule::in(self::TYPES)], 'columns.*.options' => ['sometimes', 'array', 'max:40'],
-            'columns.*.options.*' => ['required', 'string', 'distinct', 'max:100'],
+            'columns.*.options.*' => ['required', 'string', 'max:100'],
             'columns.*.hidden' => ['sometimes', 'boolean'], 'columns.*.color' => ['sometimes', 'nullable', Rule::in(['', ...self::COLORS])],
             'columns.*.highlight_when' => ['sometimes', Rule::in(['always', 'filled', 'checked', 'equals'])],
             'columns.*.highlight_value' => ['sometimes', 'nullable', 'string', 'max:100'],
@@ -402,6 +402,9 @@ final class PersonnelTableService
         $validated['criteria'] = $this->source->validateCriteria($validated['criteria']);
         $validated['columns'] = array_map(function (array $column): array {
             $column = array_replace(['id' => (string) Str::uuid(), 'options' => [], 'hidden' => false, 'color' => null, 'highlight_when' => 'always', 'highlight_value' => null], $column);
+            if (count($column['options']) !== count(array_unique($column['options']))) {
+                throw ValidationException::withMessages(['columns' => 'Choices within a column must be unique.']);
+            }
             $column['label'] = trim($column['label']);
             if ($column['label'] === '' || (in_array($column['type'], ['select', 'multiselect', 'status'], true) && $column['options'] === [])) {
                 throw ValidationException::withMessages(['columns' => 'Name every column and provide choices for select and status columns.']);

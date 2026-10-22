@@ -283,11 +283,20 @@
 /* Phones: dialogs are bottom sheets with a sticky action footer, and create/edit pages keep one
    sticky action bar above the bottom navigation (Admin has none, so it sits at the screen edge). */
 @media (max-width: 639.98px) {
-    :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-modal-window:not(.fi-modal-slide-over-window) {
-        grid-row: 3;
+    /* A sheet belongs in the auto-sized row, not a fractional row that can
+       grow an equally tall empty track above a long form. */
+    :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-modal:not(.fi-width-screen) [x-ref="modalContainer"]:has(> .fi-modal-window:not(.fi-modal-slide-over-window)) {
+        grid-template-rows: minmax(0, 1fr) auto;
+        padding-top: max(1rem, env(safe-area-inset-top, 0px));
+    }
+
+    :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-modal:not(.fi-width-screen) .fi-modal-window:not(.fi-modal-slide-over-window) {
+        grid-row: 2;
         align-self: end;
         width: calc(100% + 2rem);
         max-width: none;
+        max-height: calc(100dvh - max(1rem, env(safe-area-inset-top, 0px)));
+        overflow-y: auto;
         margin: 0 -1rem -1rem;
         border-radius: var(--hub-radius-sheet) var(--hub-radius-sheet) 0 0;
     }
