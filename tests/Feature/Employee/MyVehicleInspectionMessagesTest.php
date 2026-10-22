@@ -84,6 +84,25 @@ final class MyVehicleInspectionMessagesTest extends TestCase
         $this->assertStringNotContainsString('INTERNAL-METADATA-SECRET', $html);
     }
 
+    public function test_message_labels_come_from_the_author_context_recorded_when_written(): void
+    {
+        $messages = app(IssueMessageService::class);
+        $crew = $this->member('Crew Mate');
+        $this->participant($this->defect, $crew, 'confirmed', $this->inspection);
+        $messages->post($this->reviewer, ['defect_id' => $this->defect->id, 'visibility' => 'member', 'body' => 'LOGISTICS-WORDS']);
+        $messages->post($crew, ['defect_id' => $this->defect->id, 'body' => 'CREW-WORDS']);
+        $messages->post($this->owner, ['defect_id' => $this->defect->id, 'body' => 'OWN-WORDS']);
+        // Losing the role later must not turn an earlier Logistics message into a crew message.
+        $this->reviewer->syncRoles([]);
+
+        $html = $this->actingAs($this->owner)->get($this->url())->assertOk()->getContent();
+        $flat = preg_replace('/\s+/', ' ', strip_tags($html));
+
+        $this->assertMatchesRegularExpression('/Logistics [A-Z][a-z]{2} \d+, \d{4} [\d:]+ [AP]M LOGISTICS-WORDS/', $flat);
+        $this->assertMatchesRegularExpression('/Crew member [A-Z][a-z]{2} \d+, \d{4} [\d:]+ [AP]M CREW-WORDS/', $flat);
+        $this->assertMatchesRegularExpression('/You [A-Z][a-z]{2} \d+, \d{4} [\d:]+ [AP]M OWN-WORDS/', $flat);
+    }
+
     public function test_a_reviewer_who_also_owns_the_inspection_still_gets_no_internal_notes_in_the_member_portal(): void
     {
         $reviewerMember = $this->member('Rita Reviewer');
