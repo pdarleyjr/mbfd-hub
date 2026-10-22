@@ -445,6 +445,36 @@ final class DailyInspectionSecurityTest extends TestCase
         $this->assertSame(5000, $this->frontline->fresh()->current_miles);
     }
 
+    public function test_user_supplied_text_is_escaped_on_the_member_and_admin_pages(): void
+    {
+        Queue::fake();
+        Notification::fake();
+        $this->actAs($this->alpha);
+        $payload = $this->payload();
+        $payload['review_flag'] = ['explanation' => '<script>alert("flag")</script>', 'items' => [$this->itemRef($payload)]];
+        $this->markItem($payload, 0, 1, 'Missing', ['notes' => '<img src=x onerror=alert("note")>']);
+        $inspection = ApparatusInspection::query()->findOrFail($this->submit($payload)->assertCreated()->json('id'));
+        $messages = app(IssueMessageService::class);
+        $messages->post($this->reviewer, ['inspection_id' => $inspection->id, 'visibility' => 'member', 'body' => '<script>alert("reviewer")</script>']);
+        $messages->post($this->reviewer, ['inspection_id' => $inspection->id, 'visibility' => 'internal', 'body' => '<script>alert("internal")</script>']);
+        $messages->post($this->alpha, ['inspection_id' => $inspection->id, 'body' => '<script>alert("member")</script>']);
+
+        $this->actAs($this->alpha);
+        $member = $this->get('/employee/my-vehicle-inspections/'.$inspection->id)->assertOk()->getContent();
+        $this->actAs($this->reviewer);
+        $admin = $this->get('/admin/inspections/'.$inspection->id)->assertOk()->getContent();
+
+        foreach (['member page' => $member, 'admin page' => $admin] as $where => $html) {
+            foreach (['alert("flag")', 'alert("note")', 'alert("reviewer")', 'alert("member")', 'alert("internal")'] as $payloadText) {
+                $this->assertStringNotContainsString('<script>'.$payloadText, $html, "Unescaped script in the {$where}.");
+                $this->assertStringNotContainsString('<img src=x onerror='.$payloadText, $html, "Unescaped markup in the {$where}.");
+            }
+        }
+        $this->assertStringContainsString('&lt;script&gt;alert(&quot;reviewer&quot;)', $member);
+        $this->assertStringContainsString('&lt;script&gt;alert(&quot;internal&quot;)', $admin);
+        $this->assertStringNotContainsString('alert(&quot;internal&quot;)', $member, 'Internal text never reaches the member page, escaped or not.');
+    }
+
     // ------------------------------------------------------------- input bounds
 
     /** @param callable(array<string, mixed>): array<string, mixed> $mutate */

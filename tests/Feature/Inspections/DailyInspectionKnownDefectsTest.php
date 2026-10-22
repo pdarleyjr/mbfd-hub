@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Inspections;
 
+use App\Enums\AccountStatus;
 use App\Filament\Employee\Pages\MyVehicleInspections;
 use App\Filament\Resources\DefectResource\Pages\ListDefects;
 use App\Filament\Resources\InspectionResource\Pages\ViewInspection;
@@ -17,13 +18,19 @@ use App\Notifications\Inspections\InspectionEventNotification;
 use App\Services\ApparatusInspectionExceptionService;
 use App\Services\Inspections\InspectionReviewService;
 use App\Services\Inspections\IssueMessageService;
+use App\Support\Fleet\InspectionReviewers;
 use Filament\Facades\Filament;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\Feature\Inspections\Concerns\BuildsDailyScenarioWorld;
 use Tests\TestCase;
 
@@ -199,6 +206,53 @@ final class DailyInspectionKnownDefectsTest extends TestCase
 
         $html = $this->get(strtok($notification->url, '#'))->assertOk()->getContent();
         $this->assertStringContainsString('id="issue-'.$defect->id.'"', $html, 'The notification anchor must exist on the page it links to.');
+    }
+
+    /** DEFECT: "Use a corrected value" can lower the fleet meter without the explicit reset confirmation. */
+    public function test_correcting_a_meter_to_a_lower_value_also_needs_the_explicit_reset_confirmation(): void
+    {
+        $this->actAs($this->alpha);
+        $inspection = ApparatusInspection::query()->findOrFail(
+            $this->submit($this->payload(null, 900, 401.2))->assertCreated()->assertJsonPath('processing_status', 'held_for_review')->json('id'),
+        );
+        $hold = ApparatusInspectionException::query()->where('apparatus_inspection_id', $inspection->id)->where('field', 'miles')->sole();
+
+        try {
+            app(ApparatusInspectionExceptionService::class)->reconcile($hold->id, $this->reviewer, [
+                'action' => 'correct', 'value' => 800, 'reason' => 'Typo.', 'expected_current_value' => 1000,
+            ]);
+            $this->fail('Contract 2.3: lowering the fleet reading must be an explicit, confirmed meter reset; "correct" lowered it silently to '.$this->unit->fresh()->current_miles.'.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('confirm_meter_reset', $exception->errors());
+            $this->assertSame(1000, $this->unit->fresh()->current_miles);
+        }
+    }
+
+    /** DEFECT: "may review" is role-based in InspectionReviewers but every decision is gated by capability (AdminCapabilityGate). */
+    public function test_a_role_holder_without_the_fleet_manage_capability_is_not_treated_as_a_reviewer(): void
+    {
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+        $half = User::factory()->create(['account_status' => AccountStatus::Active, 'name' => 'Role Without Capability']);
+        $half->assignRole(Role::findOrCreate('logistics_admin', 'web'));
+        $half->givePermissionTo([Permission::findOrCreate('admin.access', 'web'), Permission::findOrCreate('admin.fleet.view', 'web')]);
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+        $half = $half->fresh();
+
+        $this->actAs($this->alpha);
+        $payload = $this->payload();
+        $payload['review_flag'] = ['explanation' => 'Look at the pump panel.', 'items' => [$this->itemRef($payload)]];
+        $inspection = ApparatusInspection::query()->findOrFail($this->submit($payload)->assertCreated()->json('id'));
+        app(IssueMessageService::class)->post($this->reviewer, ['inspection_id' => $inspection->id, 'visibility' => 'internal', 'body' => 'INTERNAL-ONLY-NOTE']);
+
+        $this->assertFalse(Gate::forUser($half)->allows('approve', $inspection), 'The gate that guards every decision refuses this user.');
+        $this->assertFalse(InspectionReviewers::canReview($half), 'The reviewer rule must agree with the gate.');
+        $this->assertNotContains($half->id, InspectionReviewers::all()->pluck('id')->all(), 'They must not be sent reviewer notifications.');
+        try {
+            $thread = app(IssueMessageService::class)->threadFor($half, $inspection);
+            $this->fail('A user who cannot decide must not read internal notes: '.$thread->pluck('body')->implode('|'));
+        } catch (AuthorizationException) {
+            $this->addToAssertionCount(1);
+        }
     }
 
     private function reportedDefect(): ApparatusDefect
