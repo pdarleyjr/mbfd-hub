@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Services\Inspections;
 
-use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusIssueMessage;
 use App\Models\User;
@@ -50,20 +49,12 @@ final class MemberInspectionConversation
         $state = (string) ($detail['acceptance']['state'] ?? 'accepted');
         $fromLogistics = array_values(array_filter($general, static fn (array $message): bool => ! $message['own']));
 
+        // One batched, once-authorized read for every issue on the page (no per-finding queries).
         $issues = [];
-        foreach ($this->defectIds($detail) as $defectId) {
-            $defect = ApparatusDefect::query()->find($defectId);
-            if ($defect === null) {
-                continue;
-            }
-            try {
-                $thread = $this->visible($this->messages->threadFor($viewer, $defect), $viewer, $authors);
-            } catch (AuthorizationException) {
-                continue;
-            }
+        foreach ($this->messages->memberThreadsForInspection($viewer, $inspection, $this->defectIds($detail)) as $defectId => $thread) {
             $issues[$defectId] = [
-                'messages' => $thread,
-                'can_post' => $this->messages->canPost($viewer, $defect),
+                'messages' => $this->visible($thread, $viewer, $authors),
+                'can_post' => true,
             ];
         }
 

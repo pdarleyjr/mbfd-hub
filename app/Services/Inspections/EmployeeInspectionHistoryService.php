@@ -38,6 +38,9 @@ final class EmployeeInspectionHistoryService
     /** Observation kinds that mean "the inspector reported this as a finding". */
     private const REPORTED_OBSERVATIONS = ['first_reported', 'confirmed_again'];
 
+    /** The member found a previously reported item present; they still follow that issue. */
+    private const VERIFIED_OBSERVATION = 'appears_corrected';
+
     /**
      * Inspections attributed to this user by foreign key only.
      *
@@ -171,8 +174,8 @@ final class EmployeeInspectionHistoryService
     public function reviewStatusLabel(?string $status): string
     {
         return match ($status) {
-            'pending_review' => 'Pending review',
-            'approved' => 'Approved',
+            'pending_review' => 'Needs approval',
+            'approved' => 'Accepted',
             'rejected' => 'Rejected',
             default => 'Submitted',
         };
@@ -280,10 +283,19 @@ final class EmployeeInspectionHistoryService
             $defects,
             fn (ApparatusDefect $defect): bool => ! isset($matched[$defect->getKey()]),
         ));
+        $verified = DB::table('apparatus_defect_observations')
+            ->where('apparatus_inspection_id', $inspection->getKey())
+            ->where('observation', self::VERIFIED_OBSERVATION)
+            ->pluck('apparatus_defect_id')
+            ->map(fn ($defectId): int => (int) $defectId)
+            ->all();
         $unmatched = array_map(fn (ApparatusDefect $defect): array => [
             'compartment' => (string) $defect->compartment,
             'name' => (string) $defect->item,
-            'status' => str((string) $defect->issue_type)->headline()->toString(),
+            // A member who found the item present sees their own observation, not the old report.
+            'status' => in_array((int) $defect->getKey(), $verified, true)
+                ? 'Found present'
+                : str((string) $defect->issue_type)->headline()->toString(),
             'notes' => null,
             'photo_key' => null,
             'follow_up' => $this->followUpFor($defect, $inspection),
@@ -435,7 +447,7 @@ final class EmployeeInspectionHistoryService
                 $scope->where('apparatus_inspection_id', $id)
                     ->orWhereIn('id', DB::table('apparatus_defect_observations')
                         ->where('apparatus_inspection_id', $id)
-                        ->whereIn('observation', self::REPORTED_OBSERVATIONS)
+                        ->whereIn('observation', [...self::REPORTED_OBSERVATIONS, self::VERIFIED_OBSERVATION])
                         ->select('apparatus_defect_id'));
             })
             ->orderBy('id')
