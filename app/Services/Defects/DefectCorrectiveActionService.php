@@ -232,8 +232,7 @@ final class DefectCorrectiveActionService
                 'previous_resolution_type' => $defect->resolution_type,
                 'previous_resolution_notes' => $defect->resolution_notes,
                 'previous_resolved_by_user_id' => $defect->resolved_by_user_id,
-                // resolved_at is not cast on the model, so it may be a plain string.
-                'previous_resolved_at' => $defect->resolved_at === null ? null : Carbon::parse((string) $defect->resolved_at)->toIso8601String(),
+                'previous_resolved_at' => $defect->resolved_at?->toIso8601String(),
             ];
             $defect->action_status = $to;
             $defect->resolved_by_user_id = null;
