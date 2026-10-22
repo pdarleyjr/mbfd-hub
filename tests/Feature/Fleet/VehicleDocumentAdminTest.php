@@ -210,6 +210,37 @@ final class VehicleDocumentAdminTest extends TestCase
         self::assertStringNotContainsString('"kind"', $data['evidence_summary']);
     }
 
+    public function test_review_action_requires_evidence_and_attaches_the_unchanged_original_to_the_chosen_vehicle(): void
+    {
+        $actor = $this->actingAsSuperAdmin();
+        $vehicle = $this->vehicle('002-12');
+        $other = $this->vehicle('002-99');
+        $document = $this->document($vehicle, 'Historical accident report', true);
+        $document->vehicles()->detach();
+        $document->update(['review_status' => 'needs_review']);
+        $originalHash = $document->sha256;
+
+        $component = Livewire::test(ReviewVehicleDocuments::class)
+            ->mountTableAction('assignVehicle', $document)
+            ->set('mountedTableActionsData.0.vehicle_ids', [$vehicle->id])
+            ->callMountedTableAction()->assertHasTableActionErrors(['decision_note' => 'required']);
+        self::assertSame(0, $document->vehicles()->count());
+        self::assertSame('needs_review', $document->fresh()->review_status);
+
+        $component->set('mountedTableActionsData.0.decision_note', 'The original vehicle identification field confirms vehicle 002-12.')
+            ->callMountedTableAction()->assertHasNoTableActionErrors()
+            ->assertCanNotSeeTableRecords([$document]);
+        $document->refresh();
+        self::assertSame('verified', $document->review_status);
+        self::assertSame([$vehicle->id], $document->vehicles()->pluck('unit_master_vehicles.id')->all());
+        self::assertSame($actor->id, $document->classification_evidence['reviewed_by']);
+        self::assertNotEmpty($document->classification_evidence['decision_note']);
+        $this->documents($vehicle)->assertCanSeeTableRecords([$document]);
+        $download = $this->get(route('vehicle-documents.download', [$vehicle, $document]))->assertOk();
+        self::assertSame($originalHash, hash('sha256', $download->streamedContent()));
+        $this->get(route('vehicle-documents.download', [$other, $document]))->assertNotFound();
+    }
+
     private function documents(UnitMasterVehicle $vehicle): \Livewire\Features\SupportTesting\Testable
     {
         return Livewire::test(DocumentsRelationManager::class, ['ownerRecord' => $vehicle, 'pageClass' => ViewUnitMasterVehicle::class])->loadTable();

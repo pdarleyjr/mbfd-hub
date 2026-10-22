@@ -141,7 +141,22 @@ if (in_array('--seed', $argv ?? [], true)) {
         ], [$vehicle->id], $actor);
         $vehicles[$device] = $vehicle->id;
     }
-    file_put_contents($directory.'/fixture.json', json_encode(['vehicles' => $vehicles, 'synthetic_pdfs' => $uploads], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
+    $reviewOriginal = $directory.'/synthetic-historical-review.pdf';
+    file_put_contents($reviewOriginal, Barryvdh\DomPDF\Facade\Pdf::loadHTML('<p>Synthetic historical accident record. Fleet number: QA-DESKTOP. Confirm this original before assigning a vehicle.</p>')->output());
+    $review = app(App\Services\Fleet\VehicleDocumentLibrary::class)->ingest($reviewOriginal, [
+        'original_filename' => 'Synthetic historical review.pdf', 'title' => 'Synthetic historical report awaiting assignment',
+        'category' => 'accidents', 'document_date' => '2025-06-14', 'is_sensitive' => true, 'review_status' => 'needs_review',
+        'source_type' => 'historical_import', 'source_relative_path' => 'synthetic/Review QA-DESKTOP.pdf', 'import_batch' => 'synthetic-browser-review',
+        'candidate_vehicle_ids' => [$vehicles['desktop']],
+        'classification_evidence' => [
+            'observations' => [['kind' => 'fleet_number', 'value' => 'QA-DESKTOP', 'page' => 1]],
+            'review_reasons' => ['confirm_identifying_evidence_from_original'],
+        ],
+    ], []);
+    file_put_contents($directory.'/fixture.json', json_encode([
+        'vehicles' => $vehicles, 'synthetic_pdfs' => $uploads,
+        'review' => ['id' => $review->id, 'title' => $review->title, 'source' => $reviewOriginal],
+    ], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
     echo 'SYNTHETIC_VEHICLE_DOCUMENTS_READY '.$directory.PHP_EOL;
     exit;
 }
