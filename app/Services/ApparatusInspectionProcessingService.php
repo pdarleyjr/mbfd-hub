@@ -8,14 +8,29 @@ use App\Jobs\AuditEquipmentAfterInspection;
 use App\Jobs\PmAlertNotificationJob;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
-use App\Models\ApparatusDefectObservation;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusInspectionException;
 use App\Models\ApparatusInspectionReviewEvent;
+use App\Services\Defects\DefectContinuityService;
+use App\Services\Defects\FindingsResult;
+use App\Services\Inspections\InspectionHold;
+use App\Services\Inspections\InspectionNotificationDispatcher;
 use Illuminate\Support\Facades\DB;
 
+/**
+ * Applies one submitted inspection to its physical apparatus
+ * (docs/daily-inspection-continuity.md section 2).
+ *
+ * Findings are facts and are always recorded. A routine inspection is accepted
+ * automatically; it is held for a reviewer only for a meter rollback, a member
+ * review flag, or new significant damage.
+ */
 final class ApparatusInspectionProcessingService
 {
+    public const STATUS_ACCEPTED = 'accepted';
+
+    public const STATUS_HELD = 'held_for_review';
+
     /**
      * Called inside the submission transaction with the apparatus locked.
      * Legacy queued payloads retain their existing review contract.
@@ -28,42 +43,9 @@ final class ApparatusInspectionProcessingService
         $evidence = $inspection->pending_effects ?? [];
         $baseline = app(InspectionMeterBaseline::class)->read($baselineToken, (int) $apparatus->id);
         $previousHealth = $apparatus->getPmHealthStatus()['status'];
-        $meterChanged = false;
         $definitions = app(InspectionPaperFields::class)->equipmentDefinitions($checklist);
 
-        foreach (['engine_hours' => 'current_engine_hours', 'miles' => 'current_miles'] as $field => $attribute) {
-            $submitted = $inspection->getAttribute($field);
-            if ($submitted === null) {
-                continue;
-            }
-            $authoritative = $apparatus->getAttribute($attribute);
-            $initial = $baseline[$field] ?? null;
-            $reason = match (true) {
-                $baseline === null => 'baseline_unverified',
-                $authoritative === null => 'baseline_missing',
-                $initial === null || (float) $initial !== (float) $authoritative => 'stale_baseline',
-                (float) $submitted < (float) $authoritative => 'rollback',
-                (float) $submitted - (float) $authoritative > (float) config("daily_checkout.maximum_{$field}_increase") => 'implausible_increase',
-                default => null,
-            };
-            if ($reason !== null) {
-                ApparatusInspectionException::query()->create([
-                    'apparatus_inspection_id' => $inspection->id,
-                    'apparatus_id' => $apparatus->id,
-                    'field' => $field,
-                    'reason' => $reason,
-                    'submitted_value' => $submitted,
-                    'baseline_value' => $initial,
-                    'authoritative_value' => $authoritative,
-                ]);
-
-                continue;
-            }
-            if ((float) $submitted !== (float) $authoritative) {
-                $apparatus->setAttribute($attribute, $submitted);
-                $meterChanged = true;
-            }
-        }
+        ['changed' => $meterChanged, 'outcomes' => $meterOutcomes] = $this->applyMeters($inspection, $apparatus, $baseline);
         if ($meterChanged) {
             $apparatus->reported_at = now();
             $apparatus->save();
@@ -73,72 +55,12 @@ final class ApparatusInspectionProcessingService
         if (! empty($evidence['checklist_v2']['scheduled_tasks'])) {
             $observations[] = ['id' => 'scheduled_duties', 'name' => 'Scheduled duties', 'items' => $evidence['checklist_v2']['scheduled_tasks']];
         }
-        $paperFields = app(InspectionPaperFields::class);
-        $openDefects = $this->lockOpenDefects((int) $apparatus->id, $observations, $definitions);
-        foreach ($observations as $compartment) {
-            foreach ($compartment['items'] ?? [] as $item) {
-                $identity = $definitions[$compartment['id']][$item['id'] ?? ''] ?? null;
-                $compartmentNames = $this->lookupNames($identity['compartment_names'] ?? [$compartment['name']]);
-                $itemNames = $this->lookupNames($identity['item_names'] ?? [$item['name']]);
-                $existing = null;
-                foreach ($openDefects as $candidate) {
-                    if (! $candidate->resolved
-                        && $candidate->compartment !== null && in_array((string) $candidate->compartment, $compartmentNames, true)
-                        && $candidate->item !== null && in_array((string) $candidate->item, $itemNames, true)
-                        && ($identity === null || count($paperFields->matchingEquipment($definitions, $candidate->compartment, $candidate->item)) === 1)) {
-                        $existing = $candidate;
-                        break;
-                    }
-                }
-                $isIssue = in_array($item['status'], ['Missing', 'Damaged'], true);
-                if (! $isIssue && $existing === null) {
-                    continue;
-                }
-                $photoPath = $item['photo_path'] ?? null;
-                foreach ($evidence['defects'] ?? [] as $finding) {
-                    if ($finding['compartment'] === $compartment['name'] && $finding['item'] === $item['name']) {
-                        $photoPath = $finding['photo_path'] ?? null;
-                        break;
-                    }
-                }
-                $defect = $existing ?? ApparatusDefect::recordDefect(
-                    $apparatus->id, $compartment['name'], $item['name'], $item['status'],
-                    $item['notes'] ?? null, $photoPath, $inspection->id,
-                );
-                if ($existing && $isIssue && $defect->issue_type !== strtolower($item['status'])) {
-                    $defect->update(['issue_type' => strtolower($item['status'])]);
-                }
-                // Later items must see this row exactly as a fresh per-item
-                // query would, including a defect created a moment ago.
-                $openDefects[$defect->id] = $defect;
-                ksort($openDefects);
-                ApparatusDefectObservation::query()->create([
-                    'apparatus_defect_id' => $defect->id,
-                    'apparatus_inspection_id' => $inspection->id,
-                    'actor_user_id' => $inspection->actor_user_id,
-                    'observation' => $isIssue ? ($existing ? 'confirmed_again' : 'first_reported') : 'appears_corrected',
-                    'reported_status' => $item['status'],
-                    'notes' => $item['notes'] ?? null,
-                    'photo_path' => $photoPath,
-                ]);
-                // A finding is never itself permission to take a unit OOS or
-                // return it to service. Its authorized disposition remains a
-                // later, explicit administrative decision; an unclassified
-                // finding alone is not a processing exception.
-            }
-        }
+        $findings = app(DefectContinuityService::class)->recordFindings($inspection, $apparatus, $observations, $definitions, $evidence);
 
-        $hasExceptions = ApparatusInspectionException::query()->where('apparatus_inspection_id', $inspection->id)->exists();
-        $processingStatus = $hasExceptions ? 'accepted_with_exception' : 'accepted';
-        ApparatusInspectionReviewEvent::query()->create([
-            'apparatus_inspection_id' => $inspection->id,
-            'previous_status' => $inspection->review_status,
-            'status' => $processingStatus,
-            // Automatic processing is not a human approval or impersonated actor.
-            'changed_by_user_id' => null,
-            'metadata' => ['processing_version' => 1, 'submitted_effects' => $evidence, 'reported_engine_hours' => $inspection->engine_hours, 'reported_miles' => $inspection->miles],
-        ]);
-        $inspection->update(['review_status' => 'approved', 'processing_status' => $processingStatus, 'pending_effects' => null]);
+        $this->recordNonMeterHolds($inspection, $apparatus, $findings);
+        $this->settle($inspection, $apparatus, $evidence, $meterOutcomes);
+        $this->notifyReviewers($inspection, $findings);
+
         DB::afterCommit(function () use ($inspection, $apparatus, $meterChanged, $previousHealth): void {
             if ($meterChanged) {
                 PmAlertNotificationJob::dispatch((int) $apparatus->id, $previousHealth);
@@ -149,54 +71,163 @@ final class ApparatusInspectionProcessingService
         });
     }
 
-    /**
-     * Load and lock, in one query, every unresolved defect any submitted item
-     * could match. The apparatus row is already locked, so this replaces one
-     * locking query per checklist item (often 100+) while preserving which
-     * rows are considered and their id order.
-     *
-     * @param  array<int, array<string, mixed>>  $observations
-     * @param  array<string, array<string, array<string, mixed>>>  $definitions
-     * @return array<int, ApparatusDefect>
-     */
-    private function lockOpenDefects(int $apparatusId, array $observations, array $definitions): array
+    /** Reviewers hear about a held inspection and about new significant damage; routine acceptance is silent. */
+    private function notifyReviewers(ApparatusInspection $inspection, FindingsResult $findings): void
     {
-        $compartmentNames = [];
-        $itemNames = [];
-        foreach ($observations as $compartment) {
-            foreach ($compartment['items'] ?? [] as $item) {
-                $identity = $definitions[$compartment['id']][$item['id'] ?? ''] ?? null;
-                array_push($compartmentNames, ...$this->lookupNames($identity['compartment_names'] ?? [$compartment['name']]));
-                array_push($itemNames, ...$this->lookupNames($identity['item_names'] ?? [$item['name']]));
+        $notifications = app(InspectionNotificationDispatcher::class);
+        if ($inspection->processing_status === self::STATUS_HELD) {
+            $notifications->reviewRequired($inspection);
+        }
+        foreach ($findings->significantNewOrEscalatedDefectIds as $defectId) {
+            $defect = ApparatusDefect::query()->find($defectId);
+            if ($defect !== null) {
+                $notifications->issueEscalated($defect, $inspection);
             }
         }
-        if ($compartmentNames === [] || $itemNames === []) {
-            return [];
-        }
-
-        return ApparatusDefect::query()
-            ->where('apparatus_id', $apparatusId)
-            ->whereIn('compartment', array_values(array_unique($compartmentNames)))
-            ->whereIn('item', array_values(array_unique($itemNames)))
-            ->where('resolved', false)
-            ->orderBy('id')
-            ->lockForUpdate()
-            ->get()
-            ->keyBy('id')
-            ->all();
     }
 
     /**
-     * SQL `IN` never matches NULL; scalar names compare as their string form.
-     *
-     * @param  array<int, mixed>  $names
-     * @return array<int, string>
+     * Record the member-flag and significant-damage holds. Public so a hold can
+     * be unit-tested with an explicit FindingsResult.
      */
-    private function lookupNames(array $names): array
+    public function recordNonMeterHolds(ApparatusInspection $inspection, Apparatus $apparatus, FindingsResult $findings): void
     {
-        return array_values(array_map(
-            static fn (mixed $name): string => (string) $name,
-            array_filter($names, static fn (mixed $name): bool => is_scalar($name)),
-        ));
+        if (filled($inspection->review_flag_explanation)) {
+            $this->createHold($inspection, $apparatus, InspectionHold::FIELD_REVIEW_FLAG, InspectionHold::REASON_MEMBER_FLAGGED, [
+                'explanation' => $inspection->review_flag_explanation,
+                'items' => $inspection->review_flag_items ?? [],
+            ]);
+        }
+        if ($findings->significantNewOrEscalatedDefectIds !== []) {
+            $this->createHold($inspection, $apparatus, InspectionHold::FIELD_SIGNIFICANT_DAMAGE, InspectionHold::REASON_SIGNIFICANT_DAMAGE, [
+                'defect_ids' => $findings->significantNewOrEscalatedDefectIds,
+            ]);
+        }
+    }
+
+    /**
+     * Meter rules (contract section 2.2). A reading never produces an exception
+     * unless it is below the fleet reading and was not simply overtaken while
+     * the member filled in the form.
+     *
+     * @param  array{engine_hours: mixed, miles: mixed}|null  $baseline  the readings the member's form loaded with
+     * @return array{changed: bool, outcomes: array<string, string>}
+     */
+    private function applyMeters(ApparatusInspection $inspection, Apparatus $apparatus, ?array $baseline): array
+    {
+        $changed = false;
+        $outcomes = [];
+        foreach (['engine_hours' => 'current_engine_hours', 'miles' => 'current_miles'] as $field => $attribute) {
+            $submitted = $inspection->getAttribute($field);
+            if ($submitted === null) {
+                continue;
+            }
+            $authoritative = $apparatus->getAttribute($attribute);
+            $initial = $baseline[$field] ?? null;
+
+            if ($authoritative === null || (float) $submitted >= (float) $authoritative) {
+                if ($authoritative === null || (float) $submitted > (float) $authoritative) {
+                    $apparatus->setAttribute($attribute, $submitted);
+                    $changed = true;
+                }
+
+                continue;
+            }
+            if ($initial !== null && (float) $submitted >= (float) $initial) {
+                // The fleet reading advanced after this form loaded. The member's
+                // reading was right when taken; the newer one stays authoritative.
+                $outcomes[$field] = 'superseded';
+
+                continue;
+            }
+            $this->createRollbackHold($inspection, $apparatus, $field, $submitted, $initial, $authoritative);
+        }
+
+        return ['changed' => $changed, 'outcomes' => $outcomes];
+    }
+
+    private function createRollbackHold(ApparatusInspection $inspection, Apparatus $apparatus, string $field, mixed $submitted, mixed $initial, mixed $authoritative): void
+    {
+        $previous = $this->latestAcceptedReading($inspection, $apparatus, $field);
+        ApparatusInspectionException::query()->create([
+            'apparatus_inspection_id' => $inspection->id,
+            'apparatus_id' => $apparatus->id,
+            'field' => $field,
+            'reason' => InspectionHold::REASON_ROLLBACK,
+            'blocks_acceptance' => true,
+            'submitted_value' => $submitted,
+            'baseline_value' => $initial,
+            'authoritative_value' => $authoritative,
+            'metadata' => [
+                'previous_inspection_id' => $previous?->id,
+                'previous_reading_at' => $previous === null ? null : ($previous->completed_at ?? $previous->created_at)?->toIso8601String(),
+                'previous_value' => $previous?->getAttribute($field),
+            ],
+        ]);
+    }
+
+    /** The latest accepted inspection of this physical vehicle that recorded the reading. */
+    private function latestAcceptedReading(ApparatusInspection $inspection, Apparatus $apparatus, string $field): ?ApparatusInspection
+    {
+        return ApparatusInspection::query()
+            ->where(static function ($query) use ($apparatus): void {
+                $query->where('processed_apparatus_id', $apparatus->id)
+                    ->orWhere(static fn ($legacy) => $legacy->whereNull('processed_apparatus_id')->where('apparatus_id', $apparatus->id));
+            })
+            ->where('id', '!=', $inspection->id)
+            ->where('review_status', 'approved')
+            ->whereNotNull($field)
+            ->orderByDesc('completed_at')
+            ->orderByDesc('id')
+            ->first();
+    }
+
+    /** @param array<string, mixed> $metadata */
+    private function createHold(ApparatusInspection $inspection, Apparatus $apparatus, string $field, string $reason, array $metadata): void
+    {
+        ApparatusInspectionException::query()->create([
+            'apparatus_inspection_id' => $inspection->id,
+            'apparatus_id' => $apparatus->id,
+            'field' => $field,
+            'reason' => $reason,
+            'blocks_acceptance' => true,
+            'metadata' => $metadata,
+        ]);
+    }
+
+    /**
+     * Final status: any open blocking hold keeps the inspection pending review,
+     * otherwise it is accepted automatically.
+     *
+     * @param  array<string, mixed>  $evidence
+     * @param  array<string, string>  $meterOutcomes
+     */
+    private function settle(ApparatusInspection $inspection, Apparatus $apparatus, array $evidence, array $meterOutcomes): void
+    {
+        $holds = InspectionHold::openQuery((int) $inspection->id)->orderBy('id')->get(['field', 'reason']);
+        $held = $holds->isNotEmpty();
+        $processingStatus = $held ? self::STATUS_HELD : self::STATUS_ACCEPTED;
+        $reviewStatus = $held ? 'pending_review' : 'approved';
+        ApparatusInspectionReviewEvent::query()->create([
+            'apparatus_inspection_id' => $inspection->id,
+            'previous_status' => $inspection->review_status,
+            'status' => $processingStatus,
+            // Automatic processing is not a human approval or impersonated actor.
+            'changed_by_user_id' => null,
+            'metadata' => [
+                'processing_version' => 1,
+                'submitted_effects' => $evidence,
+                'reported_engine_hours' => $inspection->engine_hours,
+                'reported_miles' => $inspection->miles,
+                'meter_outcomes' => $meterOutcomes,
+                'holds' => $holds->map(static fn (ApparatusInspectionException $hold): array => ['field' => $hold->field, 'reason' => $hold->reason])->all(),
+            ],
+        ]);
+        $inspection->update([
+            'review_status' => $reviewStatus,
+            'processing_status' => $processingStatus,
+            'pending_effects' => null,
+            'processed_apparatus_id' => $apparatus->id,
+        ]);
     }
 }

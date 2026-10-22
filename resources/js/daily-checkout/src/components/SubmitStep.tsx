@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
-import type { OfficerInfo, Compartment, ChecklistData, ChecklistFieldValue, MeterData, ScheduledChecklistTaskResult } from '../types';
+import type { OfficerInfo, Compartment, ChecklistData, ChecklistFieldValue, MeterData, ReviewFlagDraft, ScheduledChecklistTaskResult } from '../types';
 import { ArrowLeft, Send, TriangleAlert, Undo2 } from 'lucide-react';
 import { inspectionProgress } from '../utils/inspectionProgress';
 import { isVehicleMismatch, reportedVehicle } from '../utils/vehicleConfirmation';
+import { currentObservationText, previousIssueHeadline, previousIssueStatusLine, resolveFindingTargets, unlocatedFindings } from '../utils/previousFindings';
+import { reviewFlagExplanationMissing } from '../utils/reviewFlag';
+import ReviewFlagControl from './ReviewFlagControl';
 import './inspection-workspace.css';
 
 interface SubmitStepProps {
@@ -14,6 +17,8 @@ interface SubmitStepProps {
   meters: MeterData;
   signature: string | null;
   onSignatureChange: (value: string | null) => void;
+  reviewFlag: ReviewFlagDraft;
+  onReviewFlagChange: (value: ReviewFlagDraft) => void;
   scheduledTasks: ScheduledChecklistTaskResult[];
   onSubmit: (signature: string | null) => void;
   onBack: () => void;
@@ -30,6 +35,8 @@ export default function SubmitStep({
   meters,
   signature,
   onSignatureChange,
+  reviewFlag,
+  onReviewFlagChange,
   scheduledTasks,
   onSubmit,
   onBack,
@@ -38,6 +45,9 @@ export default function SubmitStep({
   const sigRef = useRef<SignatureCanvas | null>(null);
   const signatureSectionRef = useRef<HTMLDivElement>(null);
   const [sigError, setSigError] = useState(false);
+  const [flagError, setFlagError] = useState(false);
+  const flagSectionRef = useRef<HTMLDivElement>(null);
+  const flagTextareaRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
     const pad = sigRef.current;
     if (!pad) return;
@@ -62,15 +72,25 @@ export default function SubmitStep({
 
   const { total: totalItems, issues: issuesCount } = inspectionProgress(compartments);
   const vehicle = officerInfo.vehicleConfirmation;
+  const findingTargets = resolveFindingTargets(compartments, checklist.open_findings);
+  const otherFindings = unlocatedFindings(findingTargets, checklist.open_findings);
 
   const handleSubmit = () => {
     if (!officerInfo.shift) return;
-    if (!signature) {
-      setSigError(true);
-      // The action bar stays on screen, so bring the signature pad to the member when it is missing.
-      signatureSectionRef.current?.scrollIntoView({ block: 'center' });
+    const flagMissing = reviewFlagExplanationMissing(reviewFlag);
+    if (flagMissing || !signature) {
+      setFlagError(flagMissing);
+      setSigError(!signature);
+      // The action bar stays on screen, so bring the first missing piece to the member.
+      if (flagMissing) {
+        flagSectionRef.current?.scrollIntoView({ block: 'center' });
+        flagTextareaRef.current?.focus({ preventScroll: true });
+      } else {
+        signatureSectionRef.current?.scrollIntoView({ block: 'center' });
+      }
       return;
     }
+    setFlagError(false);
     setSigError(false);
     // react-signature-canvas delegates getTrimmedCanvas() to trim-canvas,
     // whose CommonJS default export is incompatible with the current Vite
@@ -135,6 +155,35 @@ export default function SubmitStep({
         </dl>
       </section>
 
+      {(findingTargets.length > 0 || otherFindings.length > 0) && (
+        <section aria-labelledby="inspection-previous-issues" className="inspection-review-details inspection-previous-issues">
+          <h3 id="inspection-previous-issues" className="mb-1 font-semibold">Previously reported issues</h3>
+          <p className="inspection-muted">Your current observation for each issue already on record for this vehicle.</p>
+          <ul>
+            {findingTargets.map(({ finding, compartment, item }) => {
+              const observation = currentObservationText(item);
+              return <li key={`${finding.id}-${compartment.id}-${item.id}`}>
+                <div>
+                  <strong>{item.name}</strong>
+                  <small>{compartment.name}</small>
+                  <small>{previousIssueHeadline(finding)}</small>
+                  <small>{previousIssueStatusLine(finding)}</small>
+                </div>
+                {observation && <span className={`hub-tag ${item.status === 'Present' ? 'hub-tag--success' : 'hub-tag--danger'}`}>{observation}</span>}
+              </li>;
+            })}
+            {otherFindings.map(finding => <li key={`other-${finding.id}`}>
+              <div>
+                <strong>{finding.item}</strong>
+                <small>{finding.compartment}</small>
+                <small>{previousIssueHeadline(finding)}</small>
+                <small>{previousIssueStatusLine(finding)}</small>
+              </div>
+            </li>)}
+          </ul>
+        </section>
+      )}
+
       {issuesCount > 0 && (
         <div className="mb-6 flex items-start gap-3 rounded-hub-control border border-hub-danger-border bg-hub-danger-bg p-4">
           <TriangleAlert className="mt-0.5 h-5 w-5 flex-none text-hub-danger" aria-hidden="true" />
@@ -181,6 +230,11 @@ export default function SubmitStep({
       </div>
 
       {scheduledTasks.length > 0 && <section className="inspection-review-details" aria-label="Recorded scheduled duties"><h3 className="mb-3 font-semibold">Scheduled duties</h3><dl>{scheduledTasks.map(task => <div key={task.id} className="inspection-review-area"><dt>{checklist.due_tasks.find(entry => entry.id === task.id)?.name}</dt><dd>{task.status}{task.notes ? ` · ${task.notes}` : ''}</dd></div>)}</dl></section>}
+
+      <div className="inspection-review-flag" ref={flagSectionRef}>
+        <ReviewFlagControl ref={flagTextareaRef} draft={reviewFlag} compartments={compartments} showError={flagError}
+          onChange={next => { onReviewFlagChange(next); if (next.explanation.trim() !== '') setFlagError(false); }} />
+      </div>
       </div>
 
       {/* Member signature */}

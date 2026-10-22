@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ApparatusInspectionExceptionResource\Pages\ListInspectionExceptions;
+use App\Filament\Support\InspectionWorkspace;
 use App\Models\ApparatusInspectionException;
 use App\Models\User;
 use App\Services\ApparatusInspectionExceptionService;
@@ -78,9 +79,17 @@ final class ApparatusInspectionExceptionResource extends Resource
         ])->actions([
             Tables\Actions\ActionGroup::make([
                 Tables\Actions\Action::make('inspection')->label('Original inspection')->icon('heroicon-o-document-text')
-                    ->url(fn (ApparatusInspectionException $record): string => ApparatusResource::getUrl('view-inspection', ['record' => $record->apparatus_id, 'inspection' => $record->apparatus_inspection_id])),
+                    ->url(fn (ApparatusInspectionException $record): string => InspectionWorkspace::url(
+                        (int) $record->apparatus_inspection_id,
+                        str_starts_with($record->field, 'defect:') && isset($record->metadata['defect_id'])
+                            ? 'issue-'.(int) $record->metadata['defect_id']
+                            : 'hold-'.$record->getKey(),
+                    )),
                 Tables\Actions\Action::make('reconcile')->label('Review')->icon('heroicon-o-pencil-square')
-                    ->visible(fn (ApparatusInspectionException $record): bool => ! in_array($record->status, ['resolved', 'dismissed'], true) && (auth()->user()?->can('update', $record) ?? false))
+                    // Member-flag and significant-damage holds are cleared by approving the inspection, not here.
+                    ->visible(fn (ApparatusInspectionException $record): bool => ! in_array($record->status, ['resolved', 'dismissed'], true)
+                        && ! in_array($record->field, ['member_review_flag', 'significant_damage'], true)
+                        && (auth()->user()?->can('update', $record) ?? false))
                     ->fillForm(fn (ApparatusInspectionException $record): array => ['expected_current_value' => $record->apparatus->getAttribute('current_'.$record->field)])
                     ->form([
                         Placeholder::make('original')->label('Original observation')->content(fn (ApparatusInspectionException $record): string => self::observation($record)),
@@ -93,6 +102,11 @@ final class ApparatusInspectionExceptionResource extends Resource
                             'dismiss' => 'Dismiss exception without changing fleet data',
                         ]),
                         TextInput::make('value')->label('Corrected value')->numeric()->minValue(0)->required()->visible(fn (Get $get): bool => $get('action') === 'correct'),
+                        Toggle::make('confirm_meter_reset')
+                            ->label('The vehicle meter was reset or replaced')
+                            ->helperText('Needed to accept a reading lower than the vehicle\'s current meter. It lowers the baseline for later inspections and is recorded in the review history.')
+                            ->visible(fn (Get $get, ApparatusInspectionException $record): bool => in_array($get('action'), ['accept_submitted', 'correct'], true)
+                                && in_array($record->field, ['miles', 'engine_hours'], true)),
                         Select::make('operational_impact')->label('Operational impact')->required()->live()
                             ->visible(fn (Get $get, ApparatusInspectionException $record): bool => $get('action') === 'accept_submitted' && str_starts_with($record->field, 'defect:'))
                             ->options(['non_blocking' => 'Informational — apparatus can remain in service', 'needs_repair' => 'Needs repair', 'needs_admin_review' => 'Further review needed', 'out_of_service' => 'Place apparatus Out of Service']),

@@ -33,34 +33,48 @@ final class ApparatusInspectionProcessingTest extends TestCase
         $this->assertNull($inspection->reviewEvents()->first()->changed_by_user_id);
     }
 
-    public function test_rollback_quarantines_only_the_disputed_meter_and_retains_original_evidence(): void
+    public function test_rollback_holds_the_inspection_for_review_and_applies_only_the_undisputed_meter(): void
     {
         [$apparatus, $inspection, $token] = $this->fixture(101, 900);
         $this->process($apparatus, $inspection, $token);
-        $this->assertSame('accepted_with_exception', $inspection->fresh()->processing_status);
+        $this->assertSame('held_for_review', $inspection->fresh()->processing_status);
+        $this->assertSame('pending_review', $inspection->fresh()->review_status);
         $this->assertSame(1000, $apparatus->fresh()->current_miles);
         $this->assertEquals(101, $apparatus->fresh()->current_engine_hours);
         $this->assertSame(900, $inspection->fresh()->miles);
-        $this->assertDatabaseHas('apparatus_inspection_exceptions', ['field' => 'miles', 'reason' => 'rollback', 'submitted_value' => 900]);
+        $this->assertSame($apparatus->id, $inspection->fresh()->processed_apparatus_id);
+        $this->assertDatabaseHas('apparatus_inspection_exceptions', ['field' => 'miles', 'reason' => 'rollback', 'submitted_value' => 900, 'blocks_acceptance' => true]);
+        $this->assertSame('held_for_review', $inspection->reviewEvents()->first()->status);
     }
 
-    public function test_stale_baseline_and_implausible_hours_are_not_applied(): void
+    public function test_a_newer_fleet_reading_supersedes_the_submission_and_a_large_increase_is_accepted(): void
     {
         [$apparatus, $inspection, $token] = $this->fixture(1000, 1001);
         $apparatus->update(['current_miles' => 1002]);
         $this->process($apparatus, $inspection, $token);
-        $this->assertDatabaseHas('apparatus_inspection_exceptions', ['field' => 'miles', 'reason' => 'stale_baseline']);
-        $this->assertDatabaseHas('apparatus_inspection_exceptions', ['field' => 'engine_hours', 'reason' => 'implausible_increase']);
-        $this->assertEquals(100, $apparatus->fresh()->current_engine_hours);
+        $this->assertDatabaseCount('apparatus_inspection_exceptions', 0);
+        $this->assertSame('accepted', $inspection->fresh()->processing_status);
+        $this->assertEquals(1000, $apparatus->fresh()->current_engine_hours, 'A +900 hour jump has no maximum-increase exception.');
         $this->assertSame(1002, $apparatus->fresh()->current_miles);
+        $this->assertSame(['miles' => 'superseded'], $inspection->reviewEvents()->first()->metadata['meter_outcomes']);
     }
 
-    public function test_tampered_or_other_apparatus_baseline_cannot_authorize_meters(): void
+    public function test_tampered_or_other_apparatus_baseline_cannot_turn_a_normal_increase_into_an_exception(): void
     {
         [$apparatus, $inspection] = $this->fixture(101, 1001);
         $this->process($apparatus, $inspection, 'tampered');
-        $this->assertSame(2, ApparatusInspectionException::query()->where('reason', 'baseline_unverified')->count());
+        $this->assertDatabaseCount('apparatus_inspection_exceptions', 0);
+        $this->assertSame(1001, $apparatus->fresh()->current_miles);
+    }
+
+    public function test_tampered_baseline_cannot_excuse_a_rollback(): void
+    {
+        [$apparatus, $inspection] = $this->fixture(99, 900);
+        $this->process($apparatus, $inspection, 'tampered');
+        $this->assertSame(2, ApparatusInspectionException::query()->where('reason', 'rollback')->where('blocks_acceptance', true)->count());
+        $this->assertNull(ApparatusInspectionException::query()->where('field', 'miles')->first()->baseline_value);
         $this->assertSame(1000, $apparatus->fresh()->current_miles);
+        $this->assertSame('held_for_review', $inspection->fresh()->processing_status);
     }
 
     public function test_repeated_finding_is_one_persistent_defect_and_present_does_not_resolve_it(): void

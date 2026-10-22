@@ -12,7 +12,7 @@ const theme = read("resources/css/filament/admin/theme.css");
 const views = {
   employeeDetail: read("resources/views/filament/employee/pages/my-vehicle-inspection-view.blade.php"),
   adminOverview: read("resources/views/filament/resources/apparatus-resource/partials/overview.blade.php"),
-  adminInspection: read("resources/views/filament/resources/apparatus-resource/pages/view-inspection.blade.php"),
+  adminInspection: read("resources/views/filament/resources/inspection-resource/pages/view-inspection.blade.php"),
   rowCard: read("resources/views/filament/employee/tables/inspection-summary.blade.php"),
 };
 
@@ -41,7 +41,7 @@ test("the admin report letterhead is print-only and Back lives only in the share
   assert.match(css, /\.hub-insp-print-only \{ display: none; \}/);
   assert.match(css, /@media print \{[^}]*\.hub-insp-print-only \{ display: block; \}/s);
 
-  assert.doesNotMatch(read("app/Filament/Resources/ApparatusResource/Pages/ViewInspection.php"), /Back to Apparatus/);
+  assert.doesNotMatch(read("app/Filament/Resources/InspectionResource/Pages/ViewInspection.php"), /Back to Apparatus/);
   assert.doesNotMatch(read("app/Filament/Employee/Pages/MyVehicleInspectionView.php"), /Back to my inspections'\)\s*->icon/);
 });
 

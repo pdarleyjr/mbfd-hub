@@ -252,9 +252,29 @@ PHP,
         DB::table('apparatus_inspection_review_events')
             ->whereIn('apparatus_inspection_id', $inspectionIds)
             ->delete();
-        DB::table('apparatus_defects')
-            ->whereIn('apparatus_inspection_id', $inspectionIds)
+        // Append-only models refuse Eloquent deletes, so the disposable fixture's
+        // dependent evidence is removed with the query builder, children first.
+        $defectIds = DB::table('apparatus_defects')->where('apparatus_id', $apparatus->id)->pluck('id')->all();
+        DB::table('apparatus_defect_events')->whereIn('apparatus_defect_id', $defectIds)->delete();
+        DB::table('apparatus_defect_participants')->whereIn('apparatus_defect_id', $defectIds)->delete();
+        DB::table('apparatus_issue_messages')
+            ->where(fn ($query) => $query->whereIn('apparatus_defect_id', $defectIds)->orWhereIn('apparatus_inspection_id', $inspectionIds))
             ->delete();
+        DB::table('apparatus_defect_observations')
+            ->where(fn ($query) => $query->whereIn('apparatus_defect_id', $defectIds)->orWhereIn('apparatus_inspection_id', $inspectionIds))
+            ->delete();
+        DB::table('apparatus_inspection_exceptions')->whereIn('apparatus_inspection_id', $inspectionIds)->delete();
+        DB::table('inspection_notification_deliveries')
+            ->where(function ($query) use ($inspectionIds, $defectIds): void {
+                foreach ($inspectionIds as $id) {
+                    $query->orWhere('event_key', 'like', "inspection:{$id}:%");
+                }
+                foreach ($defectIds as $id) {
+                    $query->orWhere('event_key', 'like', "defect:{$id}:%");
+                }
+            })
+            ->delete();
+        DB::table('apparatus_defects')->whereIn('id', $defectIds)->delete();
         DB::table('apparatus_inspections')->whereIn('id', $inspectionIds)->delete();
         // A critical approval can move this fixture apparatus to OOS, which
         // intentionally emits a restrictive status-ledger event. Remove only

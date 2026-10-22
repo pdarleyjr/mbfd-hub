@@ -4,10 +4,15 @@ namespace App\Filament\Resources;
 
 use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\DefectResource\Pages;
+use App\Filament\Support\DefectCorrectiveActions;
 use App\Filament\Support\DefectServiceTicketActions;
+use App\Filament\Support\InspectionWorkspace;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
+use App\Models\ApparatusInspection;
+use App\Support\Fleet\DefectActionStatus;
 use App\Support\Fleet\DefectFollowUpState;
+use Filament\Actions\MountableAction;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -75,21 +80,28 @@ class DefectResource extends Resource
                     ->imageEditor()
                     ->columnSpanFull(),
 
+                // The lifecycle is changed only by the corrective-action workflow (the inspection page
+                // or the Mark Resolved action), never by editing these fields, so they are display-only.
                 Forms\Components\Select::make('status')
-                    ->required()
-                    ->default('open')
+                    ->helperText('Change it with the issue actions on the inspection page, or Mark Resolved in the list.')
                     ->options([
                         'open' => 'Open',
                         'in_progress' => 'In Progress',
                         'resolved' => 'Resolved',
-                    ]),
+                    ])
+                    ->disabled()
+                    ->dehydrated(false),
 
                 Forms\Components\Textarea::make('resolution_notes')
                     ->columnSpanFull()
                     ->rows(3)
+                    ->disabled()
+                    ->dehydrated(false)
                     ->visible(fn (Forms\Get $get) => $get('status') === 'resolved'),
 
                 Forms\Components\DateTimePicker::make('resolved_at')
+                    ->disabled()
+                    ->dehydrated(false)
                     ->visible(fn (Forms\Get $get) => $get('status') === 'resolved'),
             ]);
     }
@@ -214,36 +226,42 @@ class DefectResource extends Resource
                         fn (Tables\Actions\Action $action): ?ApparatusDefect => DefectServiceTicketActions::defectFrom($action->getRecord()),
                     ),
 
-                    Tables\Actions\Action::make('mark_resolved')
+                    Tables\Actions\Action::make('source_inspection')
+                        ->label('Source inspection')
+                        ->icon('heroicon-o-clipboard-document-check')
+                        ->visible(fn (ApparatusDefect $record): bool => self::sourceInspectionId($record) !== null
+                            && (auth()->user()?->can('viewAny', ApparatusInspection::class) ?? false))
+                        ->url(fn (ApparatusDefect $record): string => InspectionWorkspace::url(
+                            (int) self::sourceInspectionId($record),
+                            'issue-'.$record->getKey(),
+                        )),
+
+                    // Resolution goes through the corrective-action service: it records the event,
+                    // tells the people who reported or confirmed the issue, and requires a type and notes.
+                    DefectCorrectiveActions::resolve(
+                        Tables\Actions\Action::make('mark_resolved'),
+                        fn (MountableAction $action): ?ApparatusDefect => $action instanceof Tables\Actions\Action
+                            ? DefectServiceTicketActions::defectFrom($action->getRecord())
+                            : null,
+                    )
                         ->label('Mark Resolved')
-                        ->icon('heroicon-o-check-circle')
-                        ->color('success')
                         ->tooltip('Resolve this equipment issue')
-                        ->visible(fn (ApparatusDefect $record) => $record->status !== 'resolved')
-                        ->form([
-                            Forms\Components\Textarea::make('resolution_notes')
-                                ->label('Resolution Notes')
-                                ->required()
-                                ->rows(3),
-                        ])
-                        ->action(function (ApparatusDefect $record, array $data) {
-                            $record->update([
-                                'status' => 'resolved',
-                                'resolution_notes' => $data['resolution_notes'],
-                                'resolved_at' => now(),
-                            ]);
-                        })
-                        ->successNotification(
-                            fn () => \Filament\Notifications\Notification::make()
-                                ->success()
-                                ->title('Defect Resolved')
-                                ->body('The defect has been marked as resolved.')
-                        ),
+                        ->visible(fn (Tables\Actions\Action $action): bool => DefectCorrectiveActions::canManage(auth()->user())
+                            && ($defect = DefectServiceTicketActions::defectFrom($action->getRecord())) instanceof ApparatusDefect
+                            && ! DefectActionStatus::isClosed($defect->action_status)),
 
                     Tables\Actions\EditAction::make(),
                 ])->label('Actions')->icon('heroicon-m-ellipsis-horizontal')->button()->color('gray'),
             ])
             ->defaultSort('reported_date', 'desc');
+    }
+
+    /** The inspection that first reported this issue, else the one that created the record, else the latest to observe it. */
+    private static function sourceInspectionId(ApparatusDefect $defect): ?int
+    {
+        $id = $defect->first_reported_inspection_id ?? $defect->apparatus_inspection_id ?? $defect->last_observed_inspection_id;
+
+        return $id === null ? null : (int) $id;
     }
 
     public static function getRelations(): array

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 
 import type { ChecklistData, ChecklistItem, Compartment } from '../types';
 import { resolveBlueprint } from '../data/apparatusBlueprints';
 import { findingsForArea, inspectionProgress, itemIsComplete } from '../utils/inspectionProgress';
+import { previousIssueHeadline, previousIssueStatusLine, resolveFindingTargets, targetsForItem, unlocatedFindings as findUnlocatedFindings, formatReportedDate } from '../utils/previousFindings';
 import { ArrowRight, Check, ChevronDown, ClipboardList, Package, TriangleAlert, X } from 'lucide-react';
 import ApparatusBlueprint from './ApparatusBlueprint';
 import './inspection-workspace.css';
@@ -28,6 +29,8 @@ const isNumeric = (item: ChecklistItem) => item.inputType === 'number' || item.i
 const percentageOutOfRange = (item: ChecklistItem) => item.inputType === 'percentage' && typeof item.value === 'number' && (item.value < 0 || item.value > 100);
 /** The batch only marks plain present/absent items that have not been reported or still need a typed value. */
 const batchEligible = (item: ChecklistItem) => !((item.observed && item.status !== 'Present') || (needsValue(item) && !itemIsComplete(item)));
+/** Leaving Damaged clears the significant-damage claim in the same update. */
+const statusPatch = (status: ChecklistItem['status']): Partial<ChecklistItem> => status === 'Damaged' ? { status, observed: true } : { status, observed: true, significant: undefined };
 
 export default function CompartmentStep({ checklistType, compartments, findings = [], onChange, onSubmit, onBack, actionLabel }: Props) {
   const profile = resolveBlueprint(checklistType);
@@ -55,7 +58,8 @@ export default function CompartmentStep({ checklistType, compartments, findings 
   const showBlueprint = profile !== null && mappedViews.length > 0;
   const progress = inspectionProgress(compartments);
   const compartmentProgress = current ? inspectionProgress([current]) : null;
-  const unlocatedFindings = findings.filter(finding => !compartments.some(compartment => compartment.name === finding.compartment && compartment.items.some(item => item.name === finding.item)));
+  const findingTargets = resolveFindingTargets(compartments, findings);
+  const unlocatedFindings = findUnlocatedFindings(findingTargets, findings);
   const mappedIds = new Set(mappedViews.flatMap(entry => entry.zones.map(zone => zone.compartmentId)));
   const otherAreas = compartments.filter(compartment => !mappedIds.has(compartment.id));
   const navigationIds = Array.from(new Set([...mappedViews.flatMap(entry => entry.zones.map(zone => zone.compartmentId)), ...otherAreas.map(area => area.id)]));
@@ -63,12 +67,12 @@ export default function CompartmentStep({ checklistType, compartments, findings 
     .filter(item => !itemIsComplete(item))
     .map(item => ({ compartment, item })));
   const attention = compartments.flatMap(compartment => compartment.items
-    .map(item => ({ compartment, item, known: findings.filter(finding => finding.compartment === compartment.name && finding.item === item.name) }))
+    .map(item => ({ compartment, item, known: targetsForItem(findingTargets, compartment.id, item.id).map(target => target.finding) }))
     .filter(({ item, known }) => (item.observed && item.status !== 'Present') || known.length > 0));
 
   const areaButton = (compartment: Compartment) => {
     const state = inspectionProgress([compartment]);
-    const existing = findingsForArea(compartment, findings).length;
+    const existing = findingsForArea(compartment, findings, compartments).length;
     return <button key={compartment.id} data-area-id={compartment.id} type="button" aria-pressed={compartment.id === current?.id} onClick={() => select(compartment.id)}>
       <span className={`area-state ${state.remaining === 0 ? 'is-complete' : ''}`} aria-hidden="true">{state.remaining === 0 ? <Check size={18} /> : <span className="area-open" />}</span>
       <span className="area-name">{compartment.name}{compartment.id === current?.id && <small className="area-selected">Selected</small>}{(existing > 0 || state.issues > 0) && <small className="area-warning"><TriangleAlert size={13} aria-hidden="true" />{existing > 0 ? `${existing} existing` : ''}{existing > 0 && state.issues > 0 ? ' · ' : ''}{state.issues > 0 ? `${state.issues} reported` : ''}</small>}</span>
@@ -200,12 +204,12 @@ export default function CompartmentStep({ checklistType, compartments, findings 
         <div className="blueprint-touch-zones" aria-label="Select a diagram area">{visibleZones.map(zone => {
           const area = compartments.find(compartment => compartment.id === zone.compartmentId)!;
           const state = inspectionProgress([area]);
-          const known = findingsForArea(area, findings).length;
+          const known = findingsForArea(area, findings, compartments).length;
           return <button key={zone.compartmentId} data-area-id={zone.compartmentId} type="button" aria-label={`${zone.label}: ${area.name}, ${state.completed} of ${state.total} inspected${known ? `, ${known} existing issues` : ''}${state.issues ? `, ${state.issues} reported issues` : ''}`} aria-pressed={current.id === zone.compartmentId} onClick={() => select(zone.compartmentId)}><span>{state.remaining === 0 && <Check size={13} className="area-state is-complete" aria-hidden="true" />}{zone.label}{(known > 0 || state.issues > 0) && <TriangleAlert size={13} className="area-warning" aria-hidden="true" />}</span><small>{current.id === zone.compartmentId ? 'Selected' : state.remaining === 0 ? 'Complete' : `${state.remaining} left`}</small></button>;
         })}</div>
         <div className="blueprint-findings">{visibleZones.map(zone => {
           const area = compartments.find(compartment => compartment.id === zone.compartmentId)!;
-          const existing = findingsForArea(area, findings).length;
+          const existing = findingsForArea(area, findings, compartments).length;
           const reported = inspectionProgress([area]).issues;
           return existing > 0 || reported > 0 ? <p key={area.id}><TriangleAlert size={14} aria-hidden="true" /><span>{zone.label} · {existing > 0 ? `${existing} existing issue${existing === 1 ? '' : 's'}` : ''}{existing > 0 && reported > 0 ? ' · ' : ''}{reported > 0 ? `${reported} reported` : ''}</span></p> : null;
         })}</div>
@@ -236,7 +240,8 @@ export default function CompartmentStep({ checklistType, compartments, findings 
         {current.items.map(item => {
           const expanded = expandedId === item.id;
           const issue = item.observed && item.status !== 'Present';
-          const known = findings.find(finding => finding.compartment === current.name && finding.item === item.name);
+          const known = targetsForItem(findingTargets, current.id, item.id).map(target => target.finding);
+          const markedPresent = item.observed === true && item.status === 'Present';
           const actionLabel = needsValue(item) ? 'Record' : 'Pass';
           const outOfRange = percentageOutOfRange(item);
           return <article key={item.id} className={`equipment-row ${issue ? 'has-issue' : ''} ${expanded ? 'is-expanded' : ''}`}>
@@ -246,14 +251,29 @@ export default function CompartmentStep({ checklistType, compartments, findings 
                 <span><strong>{item.name}</strong><small>{item.expectedQuantity !== undefined ? `Expected quantity: ${item.expectedQuantity} · ` : ''}{issue ? `${item.status} · Open to review` : item.observed ? 'Inspected' : 'Needs inspection'}</small></span>
                 <span className="equipment-chevron" aria-hidden="true">{expanded ? '−' : '+'}</span>
               </button>
-              <button type="button" className={`equipment-pass ${itemIsComplete(item) && !issue ? 'is-passed' : ''}`} aria-label={`${actionLabel} ${item.name}`} aria-pressed={itemIsComplete(item) && item.status === 'Present'} onClick={() => { if (needsValue(item) && !itemIsComplete({ ...item, status: 'Present', observed: true })) { setExpandedId(item.id); } else { update(current.id, item.id, { status: 'Present', observed: true }); } }}><Check size={16} aria-hidden="true" /><span>{actionLabel}</span></button>
+              <button type="button" className={`equipment-pass ${itemIsComplete(item) && !issue ? 'is-passed' : ''}`} aria-label={`${actionLabel} ${item.name}`} aria-pressed={itemIsComplete(item) && item.status === 'Present'} onClick={() => { if (needsValue(item) && !itemIsComplete({ ...item, status: 'Present', observed: true })) { setExpandedId(item.id); } else { update(current.id, item.id, statusPatch('Present')); } }}><Check size={16} aria-hidden="true" /><span>{actionLabel}</span></button>
             </div>
-            {known && <p className="equipment-known">Known {known.issue_type}{known.last_observation === 'appears_corrected' ? ' · Last reported present' : ''}</p>}
+            {known.length > 0 && <div className="equipment-known" data-previous-issues={item.id}>
+              {known.map(finding => {
+                const memberUpdate = finding.latest_member_update;
+                const updatedOn = formatReportedDate(memberUpdate?.at);
+                return <div key={finding.id} className="equipment-known-entry">
+                  <p><TriangleAlert size={14} aria-hidden="true" /><strong>{previousIssueHeadline(finding)}</strong></p>
+                  <p>{previousIssueStatusLine(finding)}{finding.last_observation === 'appears_corrected' ? ' · Last reported present' : ''}</p>
+                  {memberUpdate?.text && <p className="equipment-known-update">Latest update{updatedOn ? ` (${updatedOn})` : ''}: {memberUpdate.text}</p>}
+                </div>;
+              })}
+              {markedPresent && <p role="status" className="equipment-known-note">Marked present. Logistics will verify the correction.</p>}
+            </div>}
             {expanded && <div className="equipment-details" id={`details-${current.id}-${item.id}`}>
               {item.instructions && <p className="equipment-instructions">{item.instructions}</p>}
               <div className="equipment-status" role="group" aria-label={`Status for ${item.name}`}>
-                {(['Present', 'Missing', 'Damaged'] as const).map(status => <button key={status} type="button" aria-pressed={item.observed === true && item.status === status} onClick={() => update(current.id, item.id, { status, observed: true })}>{status}</button>)}
+                {(['Present', 'Missing', 'Damaged'] as const).map(status => <button key={status} type="button" aria-pressed={item.observed === true && item.status === status} onClick={() => update(current.id, item.id, statusPatch(status))}>{status}</button>)}
               </div>
+              {item.observed === true && item.status === 'Damaged' && <label className="equipment-significant" htmlFor={`significant-${item.id}`}>
+                <input id={`significant-${item.id}`} type="checkbox" checked={item.significant === true} onChange={event => update(current.id, item.id, { significant: event.target.checked ? true : undefined })} />
+                <span>Significant damage (new, affects safe operation)</span>
+              </label>}
               {issue && <p className="equipment-issue-copy">Add a note or photo if it helps describe what you found.</p>}
               {needsValue(item) && <label htmlFor={`value-${item.id}`}>
                 {item.name}

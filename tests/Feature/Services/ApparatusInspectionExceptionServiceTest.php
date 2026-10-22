@@ -45,7 +45,8 @@ final class ApparatusInspectionExceptionServiceTest extends TestCase
         Queue::fake();
         config()->set('google_sheets.apparatus_sync_enabled', false);
         $this->member = User::factory()->create();
-        $this->reviewer = User::factory()->create();
+        // Reviewers must be active accounts (App\Support\Fleet\InspectionReviewers).
+        $this->reviewer = User::factory()->create(['account_status' => \App\Enums\AccountStatus::Active]);
         $this->reviewer->assignRole(Role::findOrCreate('logistics_admin', 'web'));
         Permission::findOrCreate('update_apparatus', 'web');
         $this->apparatus = Apparatus::query()->create([
@@ -66,6 +67,8 @@ final class ApparatusInspectionExceptionServiceTest extends TestCase
     {
         $exception = $this->meterException('miles');
         $decision = ['action' => 'accept_submitted', 'reason' => 'Verified replacement odometer.', 'expected_current_value' => 1000];
+        $this->assertValidationFailure(fn () => $this->service->reconcile($exception->id, $this->reviewer, $decision));
+        $decision['confirm_meter_reset'] = true;
         $this->service->reconcile($exception->id, $this->reviewer, $decision);
         $this->service->reconcile($exception->id, $this->reviewer, $decision);
         $this->assertSame(900, $this->apparatus->fresh()->current_miles);
@@ -78,6 +81,7 @@ final class ApparatusInspectionExceptionServiceTest extends TestCase
         $this->assertSame('Verified replacement odometer.', $event->internal_note);
         $this->assertSame(1000, $event->metadata['prior_authoritative_meters']['miles']);
         $this->assertSame(900, $event->metadata['result_authoritative_meters']['miles']);
+        $this->assertTrue($event->metadata['meter_reset']);
         $this->assertNotNull($event->created_at);
     }
 

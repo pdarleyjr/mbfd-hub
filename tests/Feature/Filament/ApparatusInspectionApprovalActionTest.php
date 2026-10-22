@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Filament;
 
-use App\Filament\Resources\ApparatusResource\Pages\ViewInspection;
-use App\Filament\Resources\InspectionResource\Pages\ViewInspection as ViewStandaloneInspection;
+use App\Filament\Resources\InspectionResource\Pages\ViewInspection;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
@@ -35,7 +34,7 @@ final class ApparatusInspectionApprovalActionTest extends TestCase
         $this->withoutVite();
 
         $this->assertSame('Accepted', $inspection->displayStatus());
-        Livewire::test(ViewStandaloneInspection::class, ['record' => $inspection->getRouteKey()])
+        Livewire::test(ViewInspection::class, ['record' => $inspection->getRouteKey()])
             ->assertSuccessful()
             ->assertSee('Accepted')
             ->assertDontSee('Approved')
@@ -43,7 +42,7 @@ final class ApparatusInspectionApprovalActionTest extends TestCase
 
         $inspection->update(['processing_status' => 'accepted_with_exception']);
         $this->assertSame('Follow-up needed', $inspection->displayStatus());
-        Livewire::test(ViewStandaloneInspection::class, ['record' => $inspection->getRouteKey()])
+        Livewire::test(ViewInspection::class, ['record' => $inspection->getRouteKey()])
             ->assertSuccessful()
             ->assertSee('Follow-up needed')
             ->assertDontSee('Approved');
@@ -59,10 +58,7 @@ final class ApparatusInspectionApprovalActionTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $this->withoutVite();
 
-        Livewire::test(ViewInspection::class, [
-            'record' => $inspection->apparatus,
-            'inspection' => $inspection,
-        ])
+        Livewire::test(ViewInspection::class, ['record' => $inspection->getRouteKey()])
             ->assertSuccessful()
             ->assertActionVisible('downloadPdf')
             ->assertActionHasUrl('downloadPdf', route('employee.vehicle-inspections.pdf', $inspection))
@@ -79,10 +75,7 @@ final class ApparatusInspectionApprovalActionTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $this->withoutVite();
 
-        Livewire::test(ViewInspection::class, [
-            'record' => $inspection->apparatus,
-            'inspection' => $inspection,
-        ])
+        Livewire::test(ViewInspection::class, ['record' => $inspection->getRouteKey()])
             ->assertSuccessful()
             ->assertSee('Reported pending defects')
             ->assertSee('Portable radio')
@@ -116,10 +109,7 @@ final class ApparatusInspectionApprovalActionTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $this->withoutVite();
 
-        Livewire::test(ViewInspection::class, [
-            'record' => $inspection->apparatus,
-            'inspection' => $inspection,
-        ])
+        Livewire::test(ViewInspection::class, ['record' => $inspection->getRouteKey()])
             ->callAction('approveInspection', data: ['mark_out_of_service' => false])
             ->assertHasNoActionErrors();
 
@@ -130,7 +120,7 @@ final class ApparatusInspectionApprovalActionTest extends TestCase
         $this->assertSame('10010', (string) $inspection->apparatus->fresh()->current_miles);
     }
 
-    public function test_approve_form_defaults_the_out_of_service_choice_on_only_when_critical_defects_were_reported(): void
+    public function test_approve_form_never_pre_selects_out_of_service_even_when_critical_defects_were_reported(): void
     {
         $withDefects = $this->pendingInspection();
         $reviewer = $this->userWithRole('logistics_admin');
@@ -139,21 +129,7 @@ final class ApparatusInspectionApprovalActionTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $this->withoutVite();
 
-        Livewire::test(ViewInspection::class, [
-            'record' => $withDefects->apparatus,
-            'inspection' => $withDefects,
-        ])
-            ->mountAction('approveInspection')
-            ->assertActionDataSet(['mark_out_of_service' => true]);
-
-        $withDefects->update([
-            'pending_effects' => ['defects' => [], 'has_critical_defects' => false],
-        ]);
-
-        Livewire::test(ViewInspection::class, [
-            'record' => $withDefects->apparatus,
-            'inspection' => $withDefects->fresh(),
-        ])
+        Livewire::test(ViewInspection::class, ['record' => $withDefects->getRouteKey()])
             ->mountAction('approveInspection')
             ->assertActionDataSet(['mark_out_of_service' => false]);
     }
@@ -167,14 +143,11 @@ final class ApparatusInspectionApprovalActionTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $this->withoutVite();
 
-        Livewire::test(ViewInspection::class, [
-            'record' => $inspection->apparatus,
-            'inspection' => $inspection,
-        ])
+        Livewire::test(ViewInspection::class, ['record' => $inspection->getRouteKey()])
             ->assertSuccessful()
             ->assertActionVisible('rejectInspection')
             ->callAction('rejectInspection', data: [
-                'review_notes' => 'Duplicate submission; daily officer will resubmit the verified inspection.',
+                'reason' => 'Duplicate submission; daily officer will resubmit the verified inspection.',
             ])
             ->assertHasNoActionErrors();
 
@@ -201,18 +174,7 @@ final class ApparatusInspectionApprovalActionTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $this->withoutVite();
 
-        Livewire::test(ViewInspection::class, [
-            'record' => $inspection->apparatus,
-            'inspection' => $inspection,
-        ])
-            ->assertSuccessful()
-            ->assertSee('Checklist v2 evidence')
-            ->assertSee('High Low Tide')
-            ->assertSee('High 10:00 / Low 16:30')
-            ->assertSee('Fuel Tank Hold')
-            ->assertSee('Every Monday');
-
-        Livewire::test(ViewStandaloneInspection::class, ['record' => $inspection->getRouteKey()])
+        Livewire::test(ViewInspection::class, ['record' => $inspection->getRouteKey()])
             ->assertSuccessful()
             ->assertSee('Checklist v2 evidence')
             ->assertSee('High Low Tide')
@@ -222,21 +184,9 @@ final class ApparatusInspectionApprovalActionTest extends TestCase
 
         app(ApparatusInspectionApprovalService::class)->approve($inspection->id, $reviewer);
 
-        Livewire::test(ViewInspection::class, [
-            'record' => $inspection->apparatus,
-            'inspection' => $inspection,
-        ])
+        Livewire::test(ViewInspection::class, ['record' => $inspection->getRouteKey()])
             ->assertSuccessful()
-            ->assertSee('Review History')
-            ->assertSee('Checklist v2 evidence')
-            ->assertSee('High Low Tide')
-            ->assertSee('High 10:00 / Low 16:30')
-            ->assertSee('Fuel Tank Hold')
-            ->assertSee('Every Monday');
-
-        Livewire::test(ViewStandaloneInspection::class, ['record' => $inspection->getRouteKey()])
-            ->assertSuccessful()
-            ->assertSee('Review History')
+            ->assertSee('Review history')
             ->assertSee('Checklist v2 evidence')
             ->assertSee('High Low Tide')
             ->assertSee('High 10:00 / Low 16:30')
@@ -253,10 +203,7 @@ final class ApparatusInspectionApprovalActionTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $this->withoutVite();
 
-        Livewire::test(ViewInspection::class, [
-            'record' => $inspection->apparatus,
-            'inspection' => $inspection,
-        ])
+        Livewire::test(ViewInspection::class, ['record' => $inspection->getRouteKey()])
             ->assertSuccessful()
             ->assertActionHidden('approveInspection');
 
@@ -292,7 +239,7 @@ final class ApparatusInspectionApprovalActionTest extends TestCase
         }
     }
 
-    public function test_notification_target_routes_an_authorized_reviewer_to_the_full_evidence_view(): void
+    public function test_notification_target_is_the_canonical_page_with_the_full_evidence_and_review_actions(): void
     {
         $inspection = $this->pendingInspection();
         $reviewer = $this->userWithRole('admin');
@@ -301,12 +248,13 @@ final class ApparatusInspectionApprovalActionTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $this->withoutVite();
 
-        Livewire::test(ViewStandaloneInspection::class, ['record' => $inspection->getRouteKey()])
+        Livewire::test(ViewInspection::class, ['record' => $inspection->getRouteKey()])
             ->assertSuccessful()
-            ->assertSee('Pending Review Evidence')
-            ->assertSee('Use Review full inspection before deciding')
-            ->assertActionVisible('reviewFullInspection')
-            ->assertDontSee('Approve inspection');
+            ->assertSee('Pending officer review')
+            ->assertSee('Reported pending defects')
+            ->assertSee('Portable radio')
+            ->assertActionVisible('approveInspection')
+            ->assertActionVisible('rejectInspection');
 
         $this->assertSame('pending_review', $inspection->fresh()->review_status);
         $this->assertSame('In Service', $inspection->apparatus->fresh()->status);
@@ -420,6 +368,7 @@ final class ApparatusInspectionApprovalActionTest extends TestCase
             Permission::findOrCreate('view_apparatus', 'web'),
             Permission::findOrCreate('view_any_inspection', 'web'),
             Permission::findOrCreate('view_inspection', 'web'),
+            Permission::findOrCreate('update_apparatus', 'web'),
         ]);
         $user = User::factory()->create();
         $user->assignRole($role);

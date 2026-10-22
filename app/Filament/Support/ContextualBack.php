@@ -28,9 +28,10 @@ final class ContextualBack
             $parent = $page::getResource()::getUrl('index');
             $label = 'Back to '.$page::getResource()::getPluralModelLabel();
             $component = Livewire::current();
-            if ($component instanceof \App\Filament\Resources\ApparatusResource\Pages\ViewInspection) {
-                $parent = $page::getResource()::getUrl('view', ['record' => $component->record]);
-                $label = 'Back to apparatus';
+            // The canonical inspection page is reached from the apparatus profile, a station, the
+            // dashboard or the Daily Checkouts list; HubNavigation returns to whichever one the user came from.
+            if ($component instanceof \App\Filament\Resources\InspectionResource\Pages\ViewInspection) {
+                $label = 'Back to inspections';
             }
         } else {
             $parentPage = match ($page) {

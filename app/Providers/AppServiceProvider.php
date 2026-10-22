@@ -253,7 +253,7 @@ class AppServiceProvider extends ServiceProvider
                 'apparatus_inspection',
                 'New Vehicle Inspection',
                 "A vehicle inspection for {$unitName} has been submitted.",
-                '/admin/inspections/'.$inspection->id,
+                \App\Filament\Support\InspectionWorkspace::url($inspection),
             );
         });
 

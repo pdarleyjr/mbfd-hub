@@ -14,6 +14,8 @@ use App\Models\User;
 use App\Services\Display\DisplaySnapshotService;
 use App\Services\Fleet\VehicleSwapDecisionException;
 use App\Services\Fleet\VehicleSwapService;
+use App\Services\Inspections\InspectionNotificationDispatcher;
+use App\Services\Inspections\InspectionReviewService;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -29,10 +31,14 @@ final class ApparatusInspectionApprovalService
      * Taking the unit Out of Service is an explicit reviewer decision passed in
      * $markOutOfService; reported critical defects only inform that decision.
      */
-    public function approve(int $inspectionId, User $reviewer, bool $markOutOfService = false): ApparatusInspection
+    public function approve(int $inspectionId, User $reviewer, bool $markOutOfService = false, ?string $note = null): ApparatusInspection
     {
-        return $this->retryPostgresLockTimeout(function () use ($inspectionId, $reviewer, $markOutOfService): ApparatusInspection {
-            return DB::transaction(function () use ($inspectionId, $reviewer, $markOutOfService): ApparatusInspection {
+        if ($this->isProcessedInspection($inspectionId)) {
+            return app(InspectionReviewService::class)->approve($inspectionId, $reviewer, $note, $markOutOfService);
+        }
+
+        return $this->retryPostgresLockTimeout(function () use ($inspectionId, $reviewer, $markOutOfService, $note): ApparatusInspection {
+            return DB::transaction(function () use ($inspectionId, $reviewer, $markOutOfService, $note): ApparatusInspection {
                 $inspection = ApparatusInspection::query()
                     ->lockForUpdate()
                     ->findOrFail($inspectionId);
@@ -83,7 +89,7 @@ final class ApparatusInspectionApprovalService
                     $hasSnipeItAsset = filled($apparatus->snipeit_asset_id);
                 }
 
-                $this->recordReviewEvent($inspection, $reviewer, 'approved', null, [
+                $this->recordReviewEvent($inspection, $reviewer, 'approved', $note, [
                     'out_of_service_requested' => $markOutOfService,
                     'marked_out_of_service' => $markedOutOfService,
                     'critical_defects_reported' => $criticalDefectsReported,
@@ -92,6 +98,7 @@ final class ApparatusInspectionApprovalService
                     'review_status' => 'approved',
                     'pending_effects' => null,
                 ]);
+                app(InspectionNotificationDispatcher::class)->inspectionDecided($inspection, 'approved');
 
                 $apparatusId = (int) $inspection->apparatus_id;
                 DB::afterCommit(function () use ($inspectionId, $apparatusId, $previousHealth, $shouldDispatchPmAlert, $hasSnipeItAsset): void {
@@ -115,6 +122,10 @@ final class ApparatusInspectionApprovalService
 
     public function reject(int $inspectionId, User $reviewer, string $reviewNotes): ApparatusInspection
     {
+        if ($this->isProcessedInspection($inspectionId)) {
+            return app(InspectionReviewService::class)->reject($inspectionId, $reviewer, $reviewNotes);
+        }
+
         return $this->retryPostgresLockTimeout(function () use ($inspectionId, $reviewer, $reviewNotes): ApparatusInspection {
             return DB::transaction(function () use ($inspectionId, $reviewer, $reviewNotes): ApparatusInspection {
                 $inspection = ApparatusInspection::query()
@@ -131,6 +142,7 @@ final class ApparatusInspectionApprovalService
                 // terminal review status prevents these effects from being applied.
                 $this->recordReviewEvent($inspection, $reviewer, 'rejected', $reviewNotes);
                 $inspection->update(['review_status' => 'rejected']);
+                app(InspectionNotificationDispatcher::class)->inspectionDecided($inspection, 'rejected');
 
                 DB::afterCommit(static function (): void {
                     Cache::forget(DisplaySnapshotService::SNAPSHOT_CACHE_KEY);
@@ -140,6 +152,16 @@ final class ApparatusInspectionApprovalService
                 return $inspection;
             }, 3);
         });
+    }
+
+    /**
+     * Inspections that automatic processing held for review are decided by the
+     * review service, which understands holds. Everything else (legacy
+     * pending rows, swap-held rows) keeps this service's original behavior.
+     */
+    private function isProcessedInspection(int $inspectionId): bool
+    {
+        return ApparatusInspection::query()->whereKey($inspectionId)->value('processing_status') === ApparatusInspectionProcessingService::STATUS_HELD;
     }
 
     /**

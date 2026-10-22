@@ -13,7 +13,10 @@ use App\Models\ApparatusInspectionReviewEvent;
 use App\Models\ApparatusServiceTicket;
 use App\Models\User;
 use App\Services\Display\DisplaySnapshotService;
+use App\Services\Inspections\InspectionHold;
+use App\Services\Inspections\InspectionReviewService;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
@@ -29,15 +32,25 @@ final class ApparatusInspectionExceptionService
      * expected_current_value is mandatory (and may explicitly be null) for a
      * meter decision. A completed decision is a no-op on retry.
      *
+     * $inspectionId is the inspection page the decision was made from; an
+     * exception that belongs to a different inspection is treated as not found.
+     *
      * @param  array<string, mixed>  $data
      */
-    public function reconcile(int $exceptionId, User $reviewer, array $data): ApparatusInspectionException
+    public function reconcile(int $exceptionId, User $reviewer, array $data, ?int $inspectionId = null): ApparatusInspectionException
     {
-        return DB::transaction(function () use ($exceptionId, $reviewer, $data): ApparatusInspectionException {
+        return DB::transaction(function () use ($exceptionId, $reviewer, $data, $inspectionId): ApparatusInspectionException {
             [$inspection, $apparatus, $exception] = $this->lockEvidence($exceptionId);
+            if ($inspectionId !== null && (int) $inspection->id !== $inspectionId) {
+                throw (new ModelNotFoundException)->setModel(ApparatusInspectionException::class, [$exceptionId]);
+            }
             Gate::forUser($reviewer)->authorize('approve', $inspection);
             if (in_array($exception->status, ['resolved', 'dismissed'], true)) {
                 return $exception;
+            }
+            if (in_array($exception->field, [InspectionHold::FIELD_REVIEW_FLAG, InspectionHold::FIELD_SIGNIFICANT_DAMAGE], true)) {
+                // These holds are decided with the inspection itself, never by a meter or defect decision.
+                throw ValidationException::withMessages(['action' => 'Approve or reject the inspection to decide this hold.']);
             }
             $validated = Validator::make($data, [
                 'action' => ['required', Rule::in(['accept_submitted', 'correct', 'request_revision', 'dismiss'])],
@@ -65,6 +78,13 @@ final class ApparatusInspectionExceptionService
                         $value = (float) $value;
                     }
                     Validator::make(['value' => $value], ['value' => ['required', ...$this->meterRules($exception->field)]])->validate();
+                    if ($current !== null && (float) $value < (float) $current) {
+                        // Lowering the fleet reading is never silent: it must be an explicit, audited reset.
+                        if (filter_var($data['confirm_meter_reset'] ?? false, FILTER_VALIDATE_BOOLEAN) !== true) {
+                            throw ValidationException::withMessages(['confirm_meter_reset' => 'Confirm the vehicle meter was reset or replaced to accept a lower reading.']);
+                        }
+                        $metadata['meter_reset'] = true;
+                    }
                     $apparatus->setAttribute(self::METERS[$exception->field], $value);
                     if ($apparatus->isDirty(self::METERS[$exception->field])) {
                         $apparatus->reported_at = now();
@@ -126,9 +146,11 @@ final class ApparatusInspectionExceptionService
             $exception->update(['status' => $status]);
             $metadata['result_authoritative_meters'] = $this->meters($apparatus);
             $this->recordEvent($inspection, $exception, $reviewer, $previousStatus, $status, $validated['reason'], $metadata);
-            $hasPending = ApparatusInspectionException::query()->where('apparatus_inspection_id', $inspection->id)
-                ->whereNotIn('status', ['resolved', 'dismissed'])->exists();
-            $inspection->update(['processing_status' => $hasPending ? 'accepted_with_exception' : 'accepted']);
+            if ($action === 'request_revision') {
+                // The hold stays open; the member sees what the reviewer needs.
+                app(InspectionReviewService::class)->sendMemberMessage($inspection, $reviewer, trim($validated['reason']));
+            }
+            $this->settleInspection($inspection, $reviewer);
             $meterChanged = $before !== $this->meters($apparatus);
             DB::afterCommit(static function () use ($apparatus, $meterChanged, $previousHealth): void {
                 Cache::forget(DisplaySnapshotService::SNAPSHOT_CACHE_KEY);
@@ -140,6 +162,26 @@ final class ApparatusInspectionExceptionService
 
             return $exception;
         }, 3);
+    }
+
+    /**
+     * A decided hold may clear the inspection. Held inspections release only
+     * through the review service; historical accepted rows keep their
+     * follow-up marker in step with open exceptions.
+     */
+    private function settleInspection(ApparatusInspection $inspection, User $reviewer): void
+    {
+        if ($inspection->processing_status === ApparatusInspectionProcessingService::STATUS_HELD) {
+            app(InspectionReviewService::class)->releaseIfClear($inspection, $reviewer);
+
+            return;
+        }
+        if (! in_array($inspection->processing_status, ['accepted', 'accepted_with_exception'], true)) {
+            return;
+        }
+        $hasPending = ApparatusInspectionException::query()->where('apparatus_inspection_id', $inspection->id)
+            ->whereNotIn('status', ['resolved', 'dismissed'])->exists();
+        $inspection->update(['processing_status' => $hasPending ? 'accepted_with_exception' : 'accepted']);
     }
 
     /** Append a member's requested amendment; it never applies fleet effects. @param array<string, mixed> $data */
@@ -195,7 +237,9 @@ final class ApparatusInspectionExceptionService
     {
         $reference = ApparatusInspectionException::query()->findOrFail($exceptionId);
         $inspection = ApparatusInspection::query()->lockForUpdate()->findOrFail($reference->apparatus_inspection_id);
-        $apparatus = Apparatus::query()->lockForUpdate()->findOrFail($inspection->apparatus_id);
+        // The exception belongs to the physical truck the findings were applied to,
+        // which differs from the inspection's unit after a decided vehicle swap.
+        $apparatus = Apparatus::query()->lockForUpdate()->findOrFail($reference->apparatus_id);
         $exception = ApparatusInspectionException::query()->where('apparatus_inspection_id', $inspection->id)
             ->where('apparatus_id', $apparatus->id)->lockForUpdate()->findOrFail($exceptionId);
 

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\StationResource\RelationManagers;
 
-use App\Filament\Resources\ApparatusResource;
+use App\Filament\Support\InspectionWorkspace;
 use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
 use App\Models\Station;
@@ -53,7 +53,7 @@ class DailyCheckoutsRelationManager extends RelationManager
                     ->state(fn (ApparatusInspection $record): string => $record->displayStatus())
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
-                        'Pending review', 'Follow-up needed' => 'warning',
+                        'Pending review', 'Needs approval', 'Follow-up needed', 'Held: vehicle swap' => 'warning',
                         'Approved', 'Accepted' => 'success',
                         'Rejected' => 'danger',
                         default => 'gray',
@@ -99,10 +99,7 @@ class DailyCheckoutsRelationManager extends RelationManager
                 Tables\Actions\Action::make('view_results')
                     ->label('View results')
                     ->icon('heroicon-o-eye')
-                    ->url(fn (ApparatusInspection $record): string => ApparatusResource::getUrl('view-inspection', [
-                        'record' => $record->apparatus_id,
-                        'inspection' => $record->id,
-                    ])),
+                    ->url(fn (ApparatusInspection $record): string => InspectionWorkspace::url($record)),
             ]);
     }
 

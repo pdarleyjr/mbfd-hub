@@ -8,6 +8,8 @@ use App\Models\AdminAlertEvent;
 use App\Models\ApparatusDefectRecommendation;
 use App\Models\ApparatusInventoryAllocation;
 use App\Models\EquipmentItem;
+use App\Models\User;
+use App\Services\Defects\DefectCorrectiveActionService;
 use Closure;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -238,12 +240,19 @@ class RecommendationResource extends Resource
                             // 4. Mark recommendation as allocated
                             $record->update(['status' => 'allocated']);
 
-                            // 5. Mark defect as resolved
-                            $record->defect->update([
-                                'resolved' => true,
-                                'resolved_at' => now(),
-                                'resolution_notes' => "Allocated {$qty} × {$item->name} from inventory. {$data['notes']}",
-                            ]);
+                            // 5. Resolve the defect through the corrective-action workflow, so it is
+                            //    audited, reaches the people who reported it, and needs the right to do so.
+                            $actor = auth()->user();
+                            abort_unless($actor instanceof User, 403);
+                            app(DefectCorrectiveActionService::class)->resolve(
+                                (int) $record->apparatus_defect_id,
+                                $actor,
+                                [
+                                    'resolution_type' => 'replacement_installed',
+                                    'resolution_notes' => trim("Allocated {$qty} × {$item->name} from inventory. ".($data['notes'] ?? '')),
+                                ],
+                                'allocation-'.$allocation->id,
+                            );
 
                             // 6. Create alert
                             AdminAlertEvent::create([
