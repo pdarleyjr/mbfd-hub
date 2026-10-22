@@ -46,6 +46,9 @@ final class InspectionNotificationDispatcher
 
     private const EXCERPT_LENGTH = 240;
 
+    /** @var array{user: int, sent: bool}|null set only while redeliver() replays one ledger row */
+    private ?array $replay = null;
+
     /** A new blocking hold needs a reviewer's decision. */
     public function reviewRequired(ApparatusInspection $inspection): void
     {
@@ -260,6 +263,12 @@ final class InspectionNotificationDispatcher
      */
     private function queue(string $eventKey, string $kind, Collection $candidates, Closure $content, ?User $actor = null): void
     {
+        if ($this->replay !== null) {
+            $this->deliverReplay($kind, $candidates, $content, $actor);
+
+            return;
+        }
+
         $fresh = [];
         foreach ($this->distinctRecipients($candidates, $actor) as $recipient) {
             $inserted = DB::table('inspection_notification_deliveries')->insertOrIgnore([
@@ -301,6 +310,93 @@ final class InspectionNotificationDispatcher
                 }
             }
         });
+    }
+
+    /**
+     * Re-sends ONE existing ledger row (event key + recipient) that never left `queued`, for
+     * inspections:retry-notifications. The copy is rebuilt from current data by the same code
+     * path as the first send; no ledger row is created or duplicated. Returns true only when
+     * the notification was handed to the notification system for that recipient.
+     */
+    public function redeliver(string $eventKey, string $kind, int $recipientUserId): bool
+    {
+        $this->replay = ['user' => $recipientUserId, 'sent' => false];
+
+        try {
+            $parts = explode(':', $eventKey);
+            $subjectId = (int) ($parts[1] ?? 0);
+            $tail = $parts[3] ?? ($parts[2] ?? '');
+            match (true) {
+                $parts[0] === 'inspection' && ($parts[2] ?? '') === 'review_required' => $this->withInspection($subjectId, fn ($i) => $this->reviewRequired($i)),
+                $parts[0] === 'inspection' && ($parts[2] ?? '') === 'decided' => $this->withInspection($subjectId, fn ($i) => $this->inspectionDecided($i, $tail)),
+                $parts[0] === 'defect' && ($parts[2] ?? '') === 'escalated' => $this->withDefect($subjectId, fn ($d) => $this->withInspection((int) $tail, fn ($i) => $this->issueEscalated($d, $i))),
+                $parts[0] === 'defect' && ($parts[2] ?? '') === 'resolved' => $this->withDefect($subjectId, fn ($d) => $this->withEvent((int) $tail, fn ($e) => $this->issueResolved($d, $e))),
+                $parts[0] === 'defect' && ($parts[2] ?? '') === 'update' => $this->withDefect($subjectId, fn ($d) => $this->withEvent((int) $tail, fn ($e) => $this->issueMemberUpdate($d, $e))),
+                $parts[0] === 'message' => $this->withMessage($subjectId, fn ($m) => $this->messagePosted($m, $kind === Kind::CLARIFICATION_REQUESTED ? $kind : null)),
+                default => Log::warning('Inspection notification retry: unknown event key', ['event_key' => $eventKey]),
+            };
+
+            return $this->replay['sent'];
+        } finally {
+            $this->replay = null;
+        }
+    }
+
+    /** @param Closure(ApparatusInspection): void $then */
+    private function withInspection(int $id, Closure $then): void
+    {
+        if (($model = ApparatusInspection::query()->find($id)) !== null) {
+            $then($model);
+        }
+    }
+
+    /** @param Closure(ApparatusDefect): void $then */
+    private function withDefect(int $id, Closure $then): void
+    {
+        if (($model = ApparatusDefect::query()->find($id)) !== null) {
+            $then($model);
+        }
+    }
+
+    /** @param Closure(ApparatusDefectEvent): void $then */
+    private function withEvent(int $id, Closure $then): void
+    {
+        if (($model = ApparatusDefectEvent::query()->find($id)) !== null) {
+            $then($model);
+        }
+    }
+
+    /** @param Closure(ApparatusIssueMessage): void $then */
+    private function withMessage(int $id, Closure $then): void
+    {
+        if (($model = ApparatusIssueMessage::query()->find($id)) !== null) {
+            $then($model);
+        }
+    }
+
+    /**
+     * @param  Collection<int, User>  $candidates
+     * @param  Closure(User): array{title: string, body: string, url: string}  $content
+     */
+    private function deliverReplay(string $kind, Collection $candidates, Closure $content, ?User $actor): void
+    {
+        $recipient = $this->distinctRecipients($candidates, $actor)
+            ->first(fn (User $user): bool => (int) $user->getKey() === $this->replay['user']);
+        if ($recipient === null) {
+            return; // no longer an eligible recipient (inactive, now the actor, or no longer following)
+        }
+
+        try {
+            $payload = $content($recipient);
+            $recipient->notify(new InspectionEventNotification($kind, $payload['title'], $payload['body'], $payload['url']));
+            $this->replay['sent'] = true;
+        } catch (Throwable $exception) {
+            Log::error('Inspection notification retry could not be dispatched', [
+                'kind' => $kind,
+                'recipient_user_id' => $recipient->getKey(),
+                'exception' => $exception->getMessage(),
+            ]);
+        }
     }
 
     private function markDelivery(string $eventKey, User $recipient, string $status): void

@@ -94,6 +94,7 @@ class ApparatusDefect extends Model
         'resolved' => 'boolean',
         'reported_date' => 'date',
         'action_details' => 'array',
+        'resolved_at' => 'datetime',
         'first_reported_at' => 'datetime',
         'last_observed_at' => 'datetime',
         'acknowledged_at' => 'datetime',
