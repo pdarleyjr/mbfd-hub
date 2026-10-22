@@ -29,6 +29,8 @@ final class FleetOperationsManagerAssignment
     /** Granted directly because the admin capability gate ignores role inheritance. */
     public const DIRECT_PERMISSIONS = ['admin.access', 'admin.fleet.view', 'admin.fleet.manage', 'admin.stations.view'];
 
+    public const DOCUMENT_PERMISSIONS = ['admin.fleet.documents.sensitive', 'admin.fleet.documents.export'];
+
     /** Apparatus meter readings and preventative-maintenance tracking. */
     public const MAINTENANCE_PERMISSION = 'manage_pm_settings';
 
@@ -40,7 +42,7 @@ final class FleetOperationsManagerAssignment
     /** @return list<string> */
     public static function rolePermissions(): array
     {
-        return [...self::DIRECT_PERMISSIONS, self::MAINTENANCE_PERMISSION];
+        return [...self::DIRECT_PERMISSIONS, self::MAINTENANCE_PERMISSION, ...self::DOCUMENT_PERMISSIONS];
     }
 
     public static function isAssigned(User $user): bool
@@ -109,7 +111,7 @@ final class FleetOperationsManagerAssignment
             }
             $revoke = [];
         } else {
-            $revoke = array_values(array_intersect($before, ['admin.fleet.view', 'admin.fleet.manage']));
+            $revoke = array_values(array_intersect($before, ['admin.fleet.view', 'admin.fleet.manage', 'admin.fleet.documents.sensitive', 'admin.fleet.documents.export']));
             if (! $target->hasDirectWebPermission('admin.stations.manage')) {
                 $revoke = [...$revoke, ...array_intersect($before, ['admin.stations.view'])];
             }
