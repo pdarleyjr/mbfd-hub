@@ -13,6 +13,7 @@ use App\Models\ApparatusInspectionReviewEvent;
 use App\Models\ApparatusServiceTicket;
 use App\Models\User;
 use App\Services\Display\DisplaySnapshotService;
+use App\Services\Inspections\InspectionHold;
 use App\Services\Inspections\InspectionReviewService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -46,6 +47,10 @@ final class ApparatusInspectionExceptionService
             Gate::forUser($reviewer)->authorize('approve', $inspection);
             if (in_array($exception->status, ['resolved', 'dismissed'], true)) {
                 return $exception;
+            }
+            if (in_array($exception->field, [InspectionHold::FIELD_REVIEW_FLAG, InspectionHold::FIELD_SIGNIFICANT_DAMAGE], true)) {
+                // These holds are decided with the inspection itself, never by a meter or defect decision.
+                throw ValidationException::withMessages(['action' => 'Approve or reject the inspection to decide this hold.']);
             }
             $validated = Validator::make($data, [
                 'action' => ['required', Rule::in(['accept_submitted', 'correct', 'request_revision', 'dismiss'])],

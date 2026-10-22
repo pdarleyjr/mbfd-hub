@@ -826,6 +826,10 @@ test('Review & Sign lists previously reported issues; a flagged inspection needs
   const api = await fixture(page, { checklist: continuityChecklist, findings: [idMatchedFinding, sledgehammerFinding] });
   await reachContinuityReview(page, [['Officer R3', 'Sledgehammer', 'Missing'], ['Driver L4', 'HandTevy Box', 'Damaged']]);
 
+  for (const name of ['Back to Compartments', 'Submit Inspection', 'Clear Signature']) {
+    expect((await page.getByRole('button', { name, exact: true }).boundingBox())?.height, name).toBeGreaterThanOrEqual(43.9);
+  }
+
   const previous = page.getByRole('region', { name: 'Previously reported issues' });
   await expect(previous.locator('li', { hasText: "Driver's Gear" })).toContainText('You marked present');
   await expect(previous.locator('li', { hasText: 'Sledgehammer' })).toContainText('Still missing');
@@ -925,4 +929,14 @@ test('Review & Sign with the review flag, related-item picker and previous issue
   }
   expect((await explanation.boundingBox())?.width ?? 999).toBeLessThanOrEqual(320);
   await page.screenshot({ path: testInfo.outputPath('review-flag-320.png'), fullPage: true });
+});
+
+test('compartment step actions are 44px targets on fine pointers too', async ({ page }) => {
+  await fixture(page);
+  await showAreaPicker(page);
+  for (const name of ['Confirm all present', 'Next area']) {
+    expect((await page.getByRole('button', { name, exact: true }).boundingBox())?.height, name).toBeGreaterThanOrEqual(43.9);
+  }
+  const change = page.getByRole('button', { name: 'Change area', exact: true });
+  if (await change.isVisible()) expect((await change.boundingBox())?.height).toBeGreaterThanOrEqual(43.9);
 });

@@ -208,6 +208,8 @@
 .review-flag-option { display: flex; align-items: flex-start; gap: 12px; min-height: 44px; padding: 8px 0; font-size: 14px; cursor: pointer; border-bottom: 1px solid rgb(var(--hub-n-100)); }
 .review-flag-option > span { min-width: 0; overflow-wrap: anywhere; }
 .review-flag-option small { margin-left: 8px; }
+/* hub-btn is 40px on fine pointers; every control in the inspection workspace is a 44px target (borders included). */
+.apparatus-inspection :is(.inspection-layout, .inspection-review, .inspection-action-bar) .hub-btn { min-height: 44px; box-sizing: border-box; }
 @media (hover: hover) {
   .inspection-area-list button:hover, .equipment-expand:hover, .quick-checklist li button:hover, .blueprint-touch-zones button:not([aria-pressed=true]):hover { background: rgb(var(--hub-n-50)); }
   .blueprint-zone:hover > rect { stroke: var(--ink); stroke-width: 3; }

@@ -23,10 +23,25 @@ final class InspectionReviewers
     /** @var list<string> */
     public const ROLES = ['super_admin', 'admin', 'logistics_admin'];
 
+    /**
+     * Mirrors the effective decision for the approve policy once AdminCapabilityGate has run:
+     * super administrators always; anyone holding the direct admin.access permission only with
+     * the direct admin.fleet.manage capability (their roles alone do not count); everyone else
+     * by administrative role. The account must be active.
+     */
     public static function canReview(User $user): bool
     {
-        return $user->isAuthenticationAllowed()
-            && ($user->hasAnyRole(self::ROLES) || $user->canManageFleetSwaps());
+        if (! $user->isAuthenticationAllowed()) {
+            return false;
+        }
+        if ($user->hasRole('super_admin')) {
+            return true;
+        }
+        if ($user->hasDirectWebPermission('admin.access')) {
+            return $user->hasDirectWebPermission('admin.fleet.manage');
+        }
+
+        return $user->hasAnyRole(self::ROLES);
     }
 
     /**

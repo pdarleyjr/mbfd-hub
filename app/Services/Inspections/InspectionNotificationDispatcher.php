@@ -127,7 +127,7 @@ final class InspectionNotificationDispatcher
                 fn (User $recipient): array => [
                     'title' => "{$unit}: inspection {$decision}",
                     'body' => $body,
-                    'url' => $this->memberInspectionUrl((int) $inspection->getKey()),
+                    'url' => $this->inspectionUrlFor($recipient, (int) $inspection->getKey()),
                 ],
             );
         });
@@ -172,7 +172,7 @@ final class InspectionNotificationDispatcher
                     fn (User $recipient): array => [
                         'title' => "{$unit}: update on a reported issue",
                         'body' => 'Logistics wrote about the '.$this->issuePhrase($defect).": {$excerpt}",
-                        'url' => $this->memberDefectUrl($recipient, $defect),
+                        'url' => $this->urlFor($recipient, $defect),
                     ],
                     $author,
                 );
@@ -192,7 +192,7 @@ final class InspectionNotificationDispatcher
                 fn (User $recipient): array => [
                     'title' => $clarify ? "{$unit}: more information needed" : "{$unit}: message about your inspection",
                     'body' => ($clarify ? 'Logistics asked: ' : 'Logistics wrote: ').$excerpt,
-                    'url' => $this->memberInspectionUrl((int) $inspection->getKey(), 'messages'),
+                    'url' => $this->inspectionUrlFor($recipient, (int) $inspection->getKey(), 'messages'),
                 ],
                 $author,
             );
@@ -249,7 +249,7 @@ final class InspectionNotificationDispatcher
                 fn (User $recipient): array => [
                     'title' => "{$unit}: update on a reported issue",
                     'body' => 'The '.$this->issuePhrase($defect).": {$label}. ".$this->excerpt($message),
-                    'url' => $this->memberDefectUrl($recipient, $defect),
+                    'url' => $this->urlFor($recipient, $defect),
                 ],
                 $actor,
             );
@@ -564,6 +564,14 @@ final class InspectionNotificationDispatcher
     private function adminIndexUrl(): string
     {
         return InspectionResource::getUrl('index', [], false, 'admin');
+    }
+
+    /** Reviewers always land on the canonical admin page, members on the employee portal. */
+    private function inspectionUrlFor(User $recipient, int $inspectionId, ?string $anchor = null): string
+    {
+        return InspectionReviewers::canReview($recipient)
+            ? $this->adminUrl($inspectionId, $anchor)
+            : $this->memberInspectionUrl($inspectionId, $anchor);
     }
 
     public function memberInspectionUrl(int $inspectionId, ?string $anchor = null): string

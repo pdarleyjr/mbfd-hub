@@ -4,11 +4,9 @@ declare(strict_types=1);
 
 namespace App\Services\Inspections;
 
-use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusIssueMessage;
 use App\Models\User;
-use App\Support\Fleet\InspectionReviewers;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Collection;
@@ -45,25 +43,16 @@ final class MemberInspectionConversation
             throw new AuthorizationException('You can only view conversations on your own inspections.');
         }
 
-        $authors = [];
-        $general = $this->visible($this->messages->threadFor($viewer, $inspection), $viewer, $authors);
+        $general = $this->visible($this->messages->threadFor($viewer, $inspection), $viewer);
         $state = (string) ($detail['acceptance']['state'] ?? 'accepted');
-        $fromLogistics = array_values(array_filter($general, static fn (array $message): bool => ! $message['own']));
+        $fromLogistics = array_values(array_filter($general, static fn (array $message): bool => $message['from_logistics']));
 
+        // One batched, once-authorized read for every issue on the page (no per-finding queries).
         $issues = [];
-        foreach ($this->defectIds($detail) as $defectId) {
-            $defect = ApparatusDefect::query()->find($defectId);
-            if ($defect === null) {
-                continue;
-            }
-            try {
-                $thread = $this->visible($this->messages->threadFor($viewer, $defect), $viewer, $authors);
-            } catch (AuthorizationException) {
-                continue;
-            }
+        foreach ($this->messages->memberThreadsForInspection($viewer, $inspection, $this->defectIds($detail)) as $defectId => $thread) {
             $issues[$defectId] = [
-                'messages' => $thread,
-                'can_post' => $this->messages->canPost($viewer, $defect),
+                'messages' => $this->visible($thread, $viewer),
+                'can_post' => true,
             ];
         }
 
@@ -101,45 +90,27 @@ final class MemberInspectionConversation
 
     /**
      * @param  Collection<int, ApparatusIssueMessage>  $thread
-     * @param  array<int, string>  $authors  author id => label, filled lazily
      * @return list<array<string, mixed>>
      */
-    private function visible(Collection $thread, User $viewer, array &$authors): array
+    private function visible(Collection $thread, User $viewer): array
     {
         return $thread
             ->filter(static fn (ApparatusIssueMessage $message): bool => $message->visibility === ApparatusIssueMessage::VISIBILITY_MEMBER)
-            ->map(function (ApparatusIssueMessage $message) use ($viewer, &$authors): array {
+            ->map(function (ApparatusIssueMessage $message) use ($viewer): array {
                 $own = (int) $message->author_user_id === (int) $viewer->getKey();
+                // The audience label is the author's context when they wrote it, never their role today.
+                $fromLogistics = $message->isFromLogistics();
 
                 return [
                     'id' => (int) $message->getKey(),
                     'body' => (string) $message->body,
                     'own' => $own,
-                    'author' => $own ? 'You' : $this->authorLabel($message, $authors),
+                    'from_logistics' => $fromLogistics,
+                    'author' => $own ? 'You' : ($fromLogistics ? 'Logistics' : 'Crew member'),
                     'at' => CarbonImmutable::instance($message->created_at)->setTimezone(EmployeeInspectionHistoryService::TIMEZONE),
                 ];
             })
             ->values()
             ->all();
-    }
-
-    /** @param array<int, string> $authors */
-    private function authorLabel(ApparatusIssueMessage $message, array &$authors): string
-    {
-        $id = (int) $message->author_user_id;
-        if ($id === 0) {
-            return 'Logistics';
-        }
-
-        return $authors[$id] ??= $this->labelFor($message->author);
-    }
-
-    private function labelFor(?User $author): string
-    {
-        if ($author === null) {
-            return 'Logistics';
-        }
-
-        return InspectionReviewers::canReview($author) ? 'Logistics' : 'Crew member';
     }
 }

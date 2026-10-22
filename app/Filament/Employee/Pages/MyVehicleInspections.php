@@ -144,8 +144,8 @@ class MyVehicleInspections extends Page implements HasTable
                 Tables\Filters\SelectFilter::make('review_status')
                     ->label('Review status')
                     ->options([
-                        'pending_review' => 'Pending review',
-                        'approved' => 'Approved',
+                        'pending_review' => 'Needs approval',
+                        'approved' => 'Accepted',
                         'rejected' => 'Rejected',
                     ]),
                 Tables\Filters\TernaryFilter::make('has_findings')
@@ -282,9 +282,9 @@ class MyVehicleInspections extends Page implements HasTable
         $history = $this->history();
         $flagged = $record->processing_status === 'accepted_with_exception';
         [$label, $color] = match ($record->review_status) {
-            'approved' => ['Approved', 'success'],
+            'approved' => ['Accepted', 'success'],
             'rejected' => ['Rejected', 'danger'],
-            'pending_review' => ['Pending review', 'warning'],
+            'pending_review' => ['Needs approval', 'warning'],
             default => [$flagged ? 'Accepted' : $history->processingStatusLabel($record->processing_status), $flagged ? 'warning' : 'gray'],
         };
 

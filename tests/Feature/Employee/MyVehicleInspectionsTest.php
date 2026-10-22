@@ -144,7 +144,7 @@ final class MyVehicleInspectionsTest extends TestCase
         $this->assertNull($columns->get('processing_status'), 'processing is folded into one status column');
 
         // The long processing label becomes a short note plus a tooltip, never a wide badge.
-        $page->assertSee('Pending review')->assertSee('Meter flagged')->assertDontSee('Accepted, meter reading flagged</span>', false);
+        $page->assertSee('Needs approval')->assertSee('Meter flagged')->assertDontSee('Accepted, meter reading flagged</span>', false);
         $page->assertSee('View')->assertSee('PDF');
     }
 

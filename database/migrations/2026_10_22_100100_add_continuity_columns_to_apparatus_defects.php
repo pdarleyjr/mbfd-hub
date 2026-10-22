@@ -108,6 +108,9 @@ return new class extends Migration
         $duplicate = DB::table('apparatus_defects')
             ->select('apparatus_id', 'compartment', 'item')
             ->where('resolved', false)
+            // NULLs never collide in a unique index, so unnamed rows cannot violate it.
+            ->whereNotNull('compartment')
+            ->whereNotNull('item')
             ->groupBy('apparatus_id', 'compartment', 'item')
             ->havingRaw('COUNT(*) > 1')
             ->first();
