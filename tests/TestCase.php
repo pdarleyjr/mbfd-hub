@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
+use Livewire\Features\SupportRedirects\SupportRedirects;
 use Livewire\Livewire;
 
 abstract class TestCase extends BaseTestCase
@@ -174,5 +175,21 @@ abstract class TestCase extends BaseTestCase
             $request->setLaravelSession($session);
             $request->setUserResolver(static fn (): mixed => auth('web')->user());
         });
+    }
+
+    /**
+     * Livewire pushes the Redirector onto a static stack when a request starts and pops it when the
+     * request ends. A request that ends in an exception (every 403/404 assertion) never pops, and the
+     * stale Redirector keeps the whole previous Application, its container, routes and database
+     * connections alive for the rest of the run. Dropping the stack after each test releases them.
+     */
+    protected function tearDown(): void
+    {
+        parent::tearDown();
+
+        if (class_exists(SupportRedirects::class)) {
+            SupportRedirects::$redirectorCacheStack = [];
+            SupportRedirects::$atLeastOneMountedComponentHasRedirected = false;
+        }
     }
 }
