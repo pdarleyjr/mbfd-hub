@@ -35,12 +35,11 @@ use Tests\Feature\Inspections\Concerns\BuildsDailyScenarioWorld;
 use Tests\TestCase;
 
 /**
- * Defects found by Agent F's independent review. Each test asserts the behaviour the
- * contract (docs/daily-inspection-continuity.md) requires and therefore FAILS until the
- * owning agent fixes it. Kept apart from the passing regression suites on purpose;
- * once green, fold these into the owner's suite.
+ * Regression tests for defects found by the independent review of the daily inspection
+ * continuity work (docs/daily-inspection-continuity.md). Each asserts contract behaviour
+ * that an earlier revision got wrong.
  */
-final class DailyInspectionKnownDefectsTest extends TestCase
+final class DailyInspectionRegressionTest extends TestCase
 {
     use BuildsDailyScenarioWorld;
     use RefreshDatabase;
