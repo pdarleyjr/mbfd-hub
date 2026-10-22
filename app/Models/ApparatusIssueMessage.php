@@ -16,12 +16,27 @@ final class ApparatusIssueMessage extends Model
 
     public const VISIBILITY_INTERNAL = 'internal';
 
+    /** Who the author spoke as, snapshotted at write time (never recomputed from current roles). */
+    public const CONTEXT_LOGISTICS = 'logistics';
+
+    public const CONTEXT_MEMBER = 'member';
+
     protected $guarded = ['id'];
 
     protected static function booted(): void
     {
         self::updating(static fn (): never => throw new LogicException('Issue messages are append-only.'));
         self::deleting(static fn (): never => throw new LogicException('Issue messages are append-only.'));
+    }
+
+    public function scopeFromLogistics(Builder $query): Builder
+    {
+        return $query->where('author_context', self::CONTEXT_LOGISTICS);
+    }
+
+    public function isFromLogistics(): bool
+    {
+        return $this->author_context === self::CONTEXT_LOGISTICS;
     }
 
     public function scopeMemberVisible(Builder $query): Builder

@@ -237,10 +237,16 @@ final class IssueMessageService
         }
         $this->authorizeThread($author, $isReviewer, $inspection, $defect);
 
+        // Snapshot who the author spoke as. A correction keeps the corrected message's context.
+        $authorContext = $original !== null
+            ? ($original->author_context ?: ApparatusIssueMessage::CONTEXT_MEMBER)
+            : ($isReviewer ? ApparatusIssueMessage::CONTEXT_LOGISTICS : ApparatusIssueMessage::CONTEXT_MEMBER);
+
         $message = ApparatusIssueMessage::query()->create([
             'apparatus_inspection_id' => $inspection?->getKey(),
             'apparatus_defect_id' => $defect?->getKey(),
             'author_user_id' => $author->getKey(),
+            'author_context' => $authorContext,
             'visibility' => $visibility,
             'body' => trim((string) $data['body']),
             'client_message_id' => $clientId,

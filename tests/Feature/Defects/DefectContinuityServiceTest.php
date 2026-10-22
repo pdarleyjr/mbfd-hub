@@ -356,7 +356,7 @@ final class DefectContinuityServiceTest extends TestCase
         $logistics = User::factory()->create(['account_status' => 'active']);
         \Spatie\Permission\Models\Role::findOrCreate('logistics_admin', 'web');
         $logistics->assignRole('logistics_admin');
-        ApparatusIssueMessage::query()->create(['apparatus_defect_id' => $defect->id, 'author_user_id' => $logistics->id, 'visibility' => 'member', 'body' => 'Replacement is on the shelf', 'created_at' => now()->subMinutes(5)]);
+        ApparatusIssueMessage::query()->create(['apparatus_defect_id' => $defect->id, 'author_user_id' => $logistics->id, 'author_context' => 'logistics', 'visibility' => 'member', 'body' => 'Replacement is on the shelf', 'created_at' => now()->subMinutes(5)]);
         // A crew member's own reply is newer but must never be shown to the rest of the crew.
         ApparatusIssueMessage::query()->create(['apparatus_defect_id' => $defect->id, 'author_user_id' => $reporter->id, 'visibility' => 'member', 'body' => 'SECRET-MEMBER-REPLY', 'created_at' => now()->subMinutes(2)]);
 

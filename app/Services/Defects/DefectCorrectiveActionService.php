@@ -417,6 +417,7 @@ final class DefectCorrectiveActionService
                     'apparatus_inspection_id' => null,
                     'apparatus_defect_id' => $defect->getKey(),
                     'author_user_id' => $actor->getKey(),
+                    'author_context' => ApparatusIssueMessage::CONTEXT_LOGISTICS,
                     'visibility' => ApparatusIssueMessage::VISIBILITY_MEMBER,
                     'body' => $spec['member_message'],
                 ]);
