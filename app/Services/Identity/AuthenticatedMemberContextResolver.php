@@ -105,8 +105,6 @@ final readonly class AuthenticatedMemberContextResolver
                 'personnel_equipment_request' => ! $user->must_change_password
                     && $employee instanceof Employee
                     && app(OfficerAuthorizationService::class)->isAuthorized($employee),
-                // UI hint only; every 300 Command route re-checks the same policy server-side.
-                'command_300_access' => app(\App\Services\Security\Command300Access::class)->allows($user),
             ],
         );
 

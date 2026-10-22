@@ -84,8 +84,13 @@ final class CommandCommunications extends Page implements HasForms
     {
         $user = auth()->user();
 
+        // Inside the Admin Panel this page follows the Communications area's
+        // capability like its neighbours, so scoped administrators (for example
+        // Uniform & PPE managers) keep their narrow panel; they can still use
+        // the 300 profile tab when eligible.
         return $user instanceof User
             && $user->hasCurrentAdminPanelEntitlement()
+            && ($user->hasRole('super_admin') || $user->hasDirectWebPermission('admin.communications.view'))
             && app(Command300Access::class)->allows($user);
     }
 

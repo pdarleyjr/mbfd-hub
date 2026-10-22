@@ -66,6 +66,9 @@ final class Command300Access
         if (! $user instanceof User || ! $this->accountUsable($user)) {
             return null;
         }
+        if ($user->hasRole('super_admin')) {
+            return self::SOURCE_ADMINISTRATOR; // Roles are already loaded; skip the grant read.
+        }
         $direct = $this->directGrants($user);
 
         return $this->automaticSourceFrom($user, $direct)

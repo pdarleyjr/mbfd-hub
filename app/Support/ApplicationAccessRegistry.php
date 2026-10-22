@@ -127,17 +127,21 @@ final class ApplicationAccessRegistry
     }
 
     /** @return array<string, array{allowed: bool, operational: bool, grant_status: string, status: string, role: string|null, role_status: string, runtime_status: string}> */
-    public function states(User $user): array
+    /** @param  list<string>|null  $only  Limit evaluation to these application keys (navigation needs only launchable apps). */
+    public function states(User $user, ?array $only = null): array
     {
         $current = $user->fresh();
         $states = [];
-        foreach ($this->applications() as $key => $application) {
+        $applications = $only === null ? $this->applications() : array_intersect_key($this->applications(), array_flip($only));
+        // One 300 Command decision per evaluation, shared by allowed and grant status.
+        $commandSource = isset($applications['cmd']) && $current !== null ? app(\App\Services\Security\Command300Access::class)->source($current) : null;
+        foreach ($applications as $key => $application) {
             $operational = $this->clientConfigured($key);
             $entitled = $current !== null && match ($key) {
                 'admin' => $current->hasCurrentAdminPanelEntitlement(),
                 'bid' => $current->hasCurrentBidEntitlement(),
                 'media_control' => $current->hasCurrentMediaControlEntitlement(),
-                'cmd' => app(\App\Services\Security\Command300Access::class)->allows($current),
+                'cmd' => $commandSource !== null,
                 'cloud' => app(\App\Services\Oidc\CloudIdentityAccess::class)->forUser($current) !== null,
                 'meeting' => app(\App\Services\Security\ApplicationRoleResolver::class)->forUser($current, 'meeting') !== null,
                 default => false,
@@ -147,7 +151,7 @@ final class ApplicationAccessRegistry
             $states[$key] = [
                 'allowed' => $entitled && $active && $operational,
                 'operational' => $operational,
-                'grant_status' => $key === 'cmd' ? ($current === null ? 'No access' : app(\App\Services\Security\Command300Access::class)->sourceLabel(app(\App\Services\Security\Command300Access::class)->source($current))) : ($current?->hasRole('super_admin') ? 'Inherited from Super Administrator' : ($current !== null && $application['permission'] !== null && $current->hasDirectWebPermission($application['permission']) ? 'Access granted' : 'Not granted')),
+                'grant_status' => $key === 'cmd' ? app(\App\Services\Security\Command300Access::class)->sourceLabel($commandSource) : ($current?->hasRole('super_admin') ? 'Inherited from Super Administrator' : ($current !== null && $application['permission'] !== null && $current->hasDirectWebPermission($application['permission']) ? 'Access granted' : 'Not granted')),
                 'status' => ! $operational ? 'SSO client not configured or unavailable — access unavailable' : (! $active ? 'Account inactive or password setup required — access blocked' : ($key === 'cmd' ? ($entitled ? 'Open from the 300 Command profile; Hub sign-in carries over' : 'No 300 Command Access — use the 300 Command Access control to grant it') : ($key === 'cloud' && ! $entitled ? 'Cloud grant or approved account link missing' : ($current->hasRole('super_admin') ? 'Inherited from Super Administrator — managed through roles' : ($entitled ? 'Direct Hub access granted' : 'No direct access'))))),
                 'role' => $role,
                 'role_status' => match ($key) {
