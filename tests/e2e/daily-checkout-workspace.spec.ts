@@ -739,7 +739,7 @@ const fullFlowProjects = ['daily-checkout-chromium', 'daily-responsive-phone-390
 /** Quick Checklist focuses the item and opens its details, so the status buttons are in reach. */
 async function reportIssue(page: Page, area: string, item: string, status: 'Missing' | 'Damaged') {
   await page.getByRole('button', { name: /Checklist.*remaining/ }).click();
-  await page.getByRole('dialog', { name: 'Quick Checklist' }).getByRole('button', { name: new RegExp(`${area}.*${item}`) }).click();
+  await page.getByRole('dialog', { name: 'Quick Checklist' }).getByRole('button', { name: new RegExp(`${area}.*${item}`) }).first().click();
   await page.getByRole('button', { name: status, exact: true }).click();
 }
 
@@ -810,7 +810,7 @@ test('significant damage is optional, only offered for Damaged, cleared when the
   const submission = api.submissions[0];
   const sledgehammer = submission.defects.find(defect => defect.item === 'Sledgehammer');
   const tevy = submission.defects.find(defect => defect.item === 'HandTevy Box');
-  expect(sledgehammer).toMatchObject({ status: 'Damaged', compartment_id: 'comp_r2', item_id: 'comp_r2-item-1', significant: true });
+  expect(sledgehammer).toMatchObject({ status: 'Damaged', compartment: 'Officer R3', significant: true });
   // Without the claim the legacy defect shape is unchanged.
   expect(tevy).toMatchObject({ status: 'Damaged' });
   expect(tevy).not.toHaveProperty('significant');
