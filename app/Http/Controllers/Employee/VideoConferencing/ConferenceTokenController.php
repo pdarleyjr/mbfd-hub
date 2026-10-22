@@ -8,7 +8,7 @@ use App\Exceptions\VideoConferencing\ConferenceUnavailableException;
 use App\Exceptions\VideoConferencing\EndpointInUseException;
 use App\Http\Controllers\Controller;
 use App\Models\VideoConferenceSession;
-use App\Services\VideoConferencing\ConferenceCommandPinService;
+use App\Services\VideoConferencing\ConferenceCommandAuthorizationService;
 use App\Services\VideoConferencing\ConferenceTokenService;
 use App\Services\VideoConferencing\LiveKitProfileConfiguration;
 use Illuminate\Http\JsonResponse;
@@ -23,13 +23,12 @@ class ConferenceTokenController extends Controller
         Request $request,
         VideoConferenceSession $session,
         ConferenceTokenService $tokens,
-        ConferenceCommandPinService $commandPin,
+        ConferenceCommandAuthorizationService $authorization,
         LiveKitProfileConfiguration $livekit,
     ): JsonResponse {
         $validated = $request->validate([
             'join_as' => ['required', Rule::enum(ConferenceJoinRole::class)],
             'confirmed_takeover' => ['sometimes', 'boolean'],
-            'command_pin' => ['nullable', 'string', 'regex:/^\d{4,8}$/'],
         ]);
         $employee = $this->authenticatedEmployee();
 
@@ -40,7 +39,7 @@ class ConferenceTokenController extends Controller
                 abort_unless($role === ConferenceJoinRole::Command, 403);
             }
             if ($role === ConferenceJoinRole::Command) {
-                $commandPin->verify($employee, (string) $request->ip(), $validated['command_pin'] ?? null);
+                $authorization->assertAuthorized($request, $employee);
             }
             $result = $tokens->issue(
                 session: $session,

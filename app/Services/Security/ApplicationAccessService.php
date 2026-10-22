@@ -41,6 +41,17 @@ final class ApplicationAccessService
         $this->sync($actor, $target, $capabilities, array_combine($keys, $keys), $currentPassword, $reason, 'change_admin_capabilities');
     }
 
+    /**
+     * The optional direct 300 Command Access grant. It only adds access: rank,
+     * 300 assignment and administrator eligibility are derived elsewhere and
+     * are never removed by turning this off. It never grants admin.access.
+     */
+    public function setCommand300Access(User $actor, User $target, bool $enabled, string $currentPassword, string $reason): void
+    {
+        $this->sync($actor, $target, $enabled ? ['command_300'] : [], ['command_300' => Command300Access::PERMISSION],
+            $currentPassword, $reason, 'change_command_300_access');
+    }
+
     /** Permissions granted together by the "Uniform & PPE manager" toggle. */
     public const UNIFORM_MANAGER_PERMISSIONS = ['admin.access', 'admin.personnel.view', 'admin.personnel.manage'];
 
@@ -178,6 +189,12 @@ final class ApplicationAccessService
                     if (in_array('app.'.$application.'.access', $remove, true)) {
                         app(\App\Services\Oidc\OidcSessionRevoker::class)->revoke($currentTarget, $application);
                     }
+                }
+                // End Command Board sign-ins at once when the grant was the
+                // member's only route to 300 Command Access.
+                if (in_array(Command300Access::PERMISSION, $remove, true)
+                    && ! app(Command300Access::class)->allows($currentTarget->fresh())) {
+                    app(\App\Services\Oidc\OidcSessionRevoker::class)->revoke($currentTarget, 'cmd');
                 }
                 if ($action === 'change_meeting_role' && [...$add, ...$remove] !== []) {
                     app(\App\Services\Oidc\OidcSessionRevoker::class)->revoke($currentTarget, 'meeting');

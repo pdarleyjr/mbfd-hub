@@ -15,7 +15,7 @@ final class ApplicationAccessRegistry
             'admin' => ['label' => 'Hub administration', 'permission' => 'admin.access', 'description' => 'Admin panel access. Individual administration capabilities and application administrator roles are managed separately.'],
             'bid' => ['label' => 'Bid', 'permission' => 'app.bid.access', 'description' => 'Member access to Bid. Its administrator role requires a separate explicit grant.'],
             'media_control' => ['label' => 'Media Control', 'permission' => 'app.media_control.access', 'description' => 'Allows this member to use Media Control.'],
-            'cmd' => ['label' => 'Command Board', 'permission' => null, 'description' => 'Available through the 300 / Command profile to active Hub members. The Command Board PIN protects entry.'],
+            'cmd' => ['label' => 'Command Board', 'permission' => null, 'description' => 'Opens from the 300 Command profile with Hub sign-in and no PIN, for members with 300 Command Access: Captains, Division Chiefs, the 300 command officer, administrators, and explicit grants.'],
             'cloud' => ['label' => 'Cloud — cloud.mbfdhub.com', 'permission' => 'app.cloud.access', 'description' => 'Requires a separately approved link to the existing Cloud account. Account and device-token changes synchronize through the audited Cloud lifecycle.'],
             'meeting' => ['label' => 'Meeting Intelligence', 'permission' => 'app.meeting.access', 'description' => 'Viewer access to meetings. Participant, Operator, and Admin roles are assigned separately.'],
         ];
@@ -78,7 +78,7 @@ final class ApplicationAccessRegistry
         $options['files.manage'] = 'Policy library — manage';
         $options['training.rosters.submit'] = 'Training rosters — submit (requires Hub administration access)';
         $options['app.media_control.media'] = 'Media Control — upload and manage media';
-        $options['app.cmd.admin'] = 'Command Board — set and change the command PIN (requires Hub administration access)';
+        $options['app.cmd.admin'] = 'Command Board — legacy PIN rollback control (requires Hub administration access)';
         $options['personnel.directory.view'] = 'Personnel directory — view';
         $options['personnel.directory.edit'] = 'Personnel directory — edit tracking';
         $options['personnel.directory.export'] = 'Personnel directory — export';
@@ -129,17 +129,21 @@ final class ApplicationAccessRegistry
     }
 
     /** @return array<string, array{allowed: bool, operational: bool, grant_status: string, status: string, role: string|null, role_status: string, runtime_status: string}> */
-    public function states(User $user): array
+    /** @param  list<string>|null  $only  Limit evaluation to these application keys (navigation needs only launchable apps). */
+    public function states(User $user, ?array $only = null): array
     {
         $current = $user->fresh();
         $states = [];
-        foreach ($this->applications() as $key => $application) {
+        $applications = $only === null ? $this->applications() : array_intersect_key($this->applications(), array_flip($only));
+        // One 300 Command decision per evaluation, shared by allowed and grant status.
+        $commandSource = isset($applications['cmd']) && $current !== null ? app(\App\Services\Security\Command300Access::class)->source($current) : null;
+        foreach ($applications as $key => $application) {
             $operational = $this->clientConfigured($key);
             $entitled = $current !== null && match ($key) {
                 'admin' => $current->hasCurrentAdminPanelEntitlement(),
                 'bid' => $current->hasCurrentBidEntitlement(),
                 'media_control' => $current->hasCurrentMediaControlEntitlement(),
-                'cmd' => $current->employee_profile_id !== null,
+                'cmd' => $commandSource !== null,
                 'cloud' => app(\App\Services\Oidc\CloudIdentityAccess::class)->forUser($current) !== null,
                 'meeting' => app(\App\Services\Security\ApplicationRoleResolver::class)->forUser($current, 'meeting') !== null,
                 default => false,
@@ -149,14 +153,14 @@ final class ApplicationAccessRegistry
             $states[$key] = [
                 'allowed' => $entitled && $active && $operational,
                 'operational' => $operational,
-                'grant_status' => $key === 'cmd' ? 'Available to active Hub members — PIN required' : ($current?->hasRole('super_admin') ? 'Inherited from Super Administrator' : ($current !== null && $application['permission'] !== null && $current->hasDirectWebPermission($application['permission']) ? 'Access granted' : 'Not granted')),
-                'status' => ! $operational ? 'SSO client not configured or unavailable — access unavailable' : (! $active ? 'Account inactive or password setup required — access blocked' : ($key === 'cmd' ? ($entitled ? 'Open from 300 / Command and enter the Command Board PIN' : 'Personnel identity missing — access blocked') : ($key === 'cloud' && ! $entitled ? 'Cloud grant or approved account link missing' : ($current->hasRole('super_admin') ? 'Inherited from Super Administrator — managed through roles' : ($entitled ? 'Direct Hub access granted' : 'No direct access'))))),
+                'grant_status' => $key === 'cmd' ? app(\App\Services\Security\Command300Access::class)->sourceLabel($commandSource) : ($current?->hasRole('super_admin') ? 'Inherited from Super Administrator' : ($current !== null && $application['permission'] !== null && $current->hasDirectWebPermission($application['permission']) ? 'Access granted' : 'Not granted')),
+                'status' => ! $operational ? 'SSO client not configured or unavailable — access unavailable' : (! $active ? 'Account inactive or password setup required — access blocked' : ($key === 'cmd' ? ($entitled ? 'Open from the 300 Command profile; Hub sign-in carries over' : 'No 300 Command Access — use the 300 Command Access control to grant it') : ($key === 'cloud' && ! $entitled ? 'Cloud grant or approved account link missing' : ($current->hasRole('super_admin') ? 'Inherited from Super Administrator — managed through roles' : ($entitled ? 'Direct Hub access granted' : 'No direct access'))))),
                 'role' => $role,
                 'role_status' => match ($key) {
                     'bid', 'media_control' => $role === null ? 'No application access — administrator role inactive' : 'Hub application role: '.$role,
                     'meeting' => $role === null ? 'No application access — Meeting role inactive' : 'Hub application role: '.$role,
                     'admin' => 'Individual Hub administration capabilities are managed separately.',
-                    'cmd' => 'The PIN protects board access. Changing the PIN requires a separate administration capability.',
+                    'cmd' => 'Managed with the 300 Command Access control. Rank, 300 assignment and administrator access qualify automatically.',
                     default => 'No Hub-managed administrator role is supported. App-local roles are not changed.',
                 },
                 'runtime_status' => $key === 'admin' ? 'Enforced by the Hub.' : (config('application_access.runtime_verified.'.$key) === true

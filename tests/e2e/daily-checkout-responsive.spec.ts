@@ -67,8 +67,16 @@ async function mockDailySelectorApi(page: Page): Promise<void> {
           personnel: { employee_profile_id: 1_101, employee_number: 'E101', name: 'Responsive Tester', rank: 'Captain' },
           offline: { security_version: 1 },
           session: { authenticated: true },
+          authorization: { capabilities: { command_300_access: true } },
         },
       });
+    }
+
+    if (path === '/api/command-communications/posts') {
+      return route.fulfill({ json: { data: [], pinned: [], next_before: null, unread_count: 0 } });
+    }
+    if (path === '/api/command-communications/summary') {
+      return route.fulfill({ json: { unread_count: 0, latest_activity_at: null } });
     }
 
     if (path === '/api/public/stations') {
@@ -184,7 +192,7 @@ function commandOverview(): CommandOverview {
   };
 }
 
-test('Command 300 station tabs show one station and preserve selection through refresh and profile navigation', async ({ page }, testInfo) => {
+test('Command 300 tabs open on Communications, show one station at a time and preserve selection through refresh and profile navigation', async ({ page }, testInfo) => {
   await mockDailySelectorApi(page);
   const quality = captureBrowserQuality(page);
   const data = commandOverview();
@@ -202,11 +210,13 @@ test('Command 300 station tabs show one station and preserve selection through r
   await expect(commandBoard).toHaveAttribute('href', 'https://cmd.mbfdhub.com');
   await expect(commandBoard).toHaveAttribute('target', '_blank');
   await expect(commandBoard).toHaveAttribute('rel', 'noopener noreferrer');
-  const tabs = page.getByRole('tablist', { name: 'Station overview' });
-  await expect(tabs.getByRole('tab')).toHaveCount(5);
+  const tabs = page.getByRole('tablist', { name: 'Communications and stations' });
+  await expect(tabs.getByRole('tab')).toHaveCount(6);
+  await expect(tabs.getByRole('tab').first()).toHaveText('Communications');
+  await expect(tabs.getByRole('tab', { name: 'Communications', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByTestId('command-stations')).toHaveCount(1);
-  await expect(page.getByTestId('command-station')).toHaveCount(1);
-  await expect(page.getByRole('tabpanel', { name: 'Station 1', exact: true })).toBeVisible();
+  await expect(page.getByTestId('command-comms')).toBeVisible();
+  await expect(page.getByTestId('command-station')).toHaveCount(0);
   await expectTouchTargets(page, '[role="tab"]');
 
   for (const station of data.stations) {
@@ -231,16 +241,18 @@ test('Command 300 station tabs show one station and preserve selection through r
   await expect(page.getByRole('tabpanel', { name: 'Station 6', exact: true })).toBeVisible();
 
   const last = tabs.getByRole('tab', { name: 'Station 6', exact: true });
+  const comms = tabs.getByRole('tab', { name: 'Communications', exact: true });
   await last.focus();
   await page.keyboard.press('ArrowRight');
-  await expect(tabs.getByRole('tab', { name: 'Station 1', exact: true })).toBeFocused();
-  await expect(tabs.getByRole('tab', { name: 'Station 1', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(comms).toBeFocused();
+  await expect(comms).toHaveAttribute('aria-selected', 'true');
+  await expect(page).not.toHaveURL(/station=/);
   await page.keyboard.press('ArrowLeft');
   await expect(last).toBeFocused();
   await expect(last).toHaveAttribute('aria-selected', 'true');
   await page.keyboard.press('Home');
-  await expect(tabs.getByRole('tab', { name: 'Station 1', exact: true })).toBeFocused();
-  await expect(tabs.getByRole('tab', { name: 'Station 1', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect(comms).toBeFocused();
+  await expect(comms).toHaveAttribute('aria-selected', 'true');
   await page.keyboard.press('End');
   await expect(last).toBeFocused();
   await expect(last).toHaveAttribute('aria-selected', 'true');
@@ -268,13 +280,14 @@ test('Command 300 station tabs handle changed station lists, empty data, refresh
     ? route.fulfill({ status: 503, json: { message: 'Service unavailable' } })
     : route.fulfill({ json: data }));
   await page.goto('/daily/command-300?station=invalid');
-  await expect(page.getByRole('tabpanel', { name: 'Station 1', exact: true })).toBeVisible();
+  await expect(page.getByRole('tabpanel', { name: 'Communications', exact: true })).toBeVisible();
   await page.getByRole('tab', { name: 'Station 6', exact: true }).click();
   data.stations.pop();
   const refresh = page.getByTestId('command-overview-refresh');
   await refresh.click();
-  await expect(page.getByRole('tab')).toHaveCount(4);
-  await expect(page.getByRole('tabpanel', { name: 'Station 1', exact: true })).toBeVisible();
+  await expect(page.getByRole('tab')).toHaveCount(5);
+  await expect(page.getByRole('tabpanel', { name: 'Communications', exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: 'Station 1', exact: true }).click();
   fail = true;
   await refresh.click();
   await expect(page.getByRole('alert')).toContainText('The overview could not be refreshed');
@@ -287,12 +300,15 @@ test('Command 300 station tabs handle changed station lists, empty data, refresh
   fail = false;
   data.stations = [{ ...data.stations[0], apparatuses: [], apparatus_count: 0 }];
   await refresh.click();
-  await expect(page.getByRole('tab')).toHaveCount(1);
+  await expect(page.getByRole('tab')).toHaveCount(2);
+  await page.getByRole('tab', { name: 'Station 1', exact: true }).click();
   await expect(page.getByText('No apparatus is assigned to this station.')).toBeVisible();
   data.stations = [];
   await refresh.click();
   await expect(page.getByText('No active stations', { exact: true })).toBeVisible();
-  await expect(page.getByRole('tablist')).toHaveCount(0);
+  // Communications stays available with no stations at all.
+  await expect(page.getByRole('tab')).toHaveCount(1);
+  await expect(page.getByTestId('command-comms')).toBeVisible();
 });
 
 test('station selector stays visible, touchable, and horizontally contained at every required viewport', async ({ page }, testInfo) => {

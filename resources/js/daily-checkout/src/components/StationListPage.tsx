@@ -5,6 +5,7 @@ import { ApiClient, isApiAuthenticationError, redirectToLoginAfterSessionExpiry 
 import { useOffline } from '../hooks/useOffline';
 import StationCard from './StationCard';
 import Command300Card from './Command300Card';
+import { useCommandAccess } from './command-communications/useCommandAccess';
 import DailyPageNav from './DailyPageNav';
 import { HubPageHeader } from '../../../hub-ui/HubShell';
 import { EmptyState, LoadError } from './ui/StateViews';
@@ -21,6 +22,8 @@ export default function StationListPage() {
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [refreshNotice, setRefreshNotice] = useState('');
   const isOffline = useOffline();
+  // The server decides who may open 300 Command; the card appears only once it has said yes.
+  const commandAccess = useCommandAccess();
 
   /**
    * A refresh keeps the current cards on screen and reports failure inline, so
@@ -130,7 +133,7 @@ export default function StationListPage() {
       )}
 
       <div data-testid="daily-station-grid" className={GRID}>
-        <Command300Card />
+        {commandAccess === 'allowed' && <Command300Card />}
         {stations.map((station) => (
           <StationCard key={station.id} station={station} />
         ))}

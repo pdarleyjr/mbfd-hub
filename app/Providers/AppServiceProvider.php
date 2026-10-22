@@ -141,6 +141,10 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('viewPulse', function (\App\Models\User $user) {
             return $user->hasDirectWebPermission('admin.system.view');
         });
+        // The one 300 Command decision (profile, communications, video command
+        // controls, Command Board sign-in). Super Administrators also pass it.
+        Gate::define(\App\Services\Security\Command300Access::GATE,
+            fn (\App\Models\User $user): bool => app(\App\Services\Security\Command300Access::class)->allows($user));
 
         Todo::observe(TodoObserver::class);
         TrainingTodo::observe(TrainingTodoObserver::class);

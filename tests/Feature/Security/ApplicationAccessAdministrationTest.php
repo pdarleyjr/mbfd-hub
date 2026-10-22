@@ -119,10 +119,10 @@ final class ApplicationAccessAdministrationTest extends TestCase
         self::assertFalse($registry->states($target)['cloud']['operational']);
     }
 
-    public function test_command_board_is_automatic_for_active_members_and_not_a_delegated_application(): void
+    public function test_command_board_follows_300_command_access_and_is_not_a_delegated_application(): void
     {
         [, $target] = $this->members();
-        $employee = \App\Models\Employee::query()->create(['name' => 'Command member', 'employee_id' => $target->employee_id, 'password' => Hash::make('Command-test-only!')]);
+        $employee = \App\Models\Employee::query()->create(['name' => 'Command member', 'rank' => 'Firefighter', 'employee_id' => $target->employee_id, 'password' => Hash::make('Command-test-only!')]);
         $target->forceFill(['employee_profile_id' => $employee->id, 'must_change_password' => false])->save();
         $client = \Laravel\Passport\Client::query()->create(['name' => 'Command access test', 'secret' => 'test-client-secret', 'provider' => 'users',
             'redirect_uris' => ['https://cmd.mbfdhub.com/auth/callback'], 'grant_types' => ['authorization_code'], 'revoked' => false]);
@@ -131,15 +131,19 @@ final class ApplicationAccessAdministrationTest extends TestCase
 
         self::assertArrayNotHasKey('cmd', $registry->applicationOptions());
         self::assertNotContains('cmd', $registry->selectedApplications($target));
-        self::assertFalse($target->hasDirectWebPermission('app.cmd.access'));
-        self::assertTrue($registry->states($target)['cmd']['allowed']);
-        self::assertSame('Available to active Hub members — PIN required', $registry->states($target)['cmd']['grant_status']);
+        self::assertFalse($registry->states($target)['cmd']['allowed']);
+        self::assertSame('No access', $registry->states($target)['cmd']['grant_status']);
         self::assertArrayHasKey('app.cmd.admin', $registry->capabilityOptions());
 
+        // The legacy app.cmd.access permission still grants nothing.
         $target->givePermissionTo(Permission::findOrCreate('app.cmd.access', 'web'));
         self::assertNotContains('cmd', $registry->selectedApplications($target));
+        self::assertFalse($registry->states($target)['cmd']['allowed']);
         $target->revokePermissionTo('app.cmd.access');
+
+        $employee->forceFill(['rank' => 'Captain'])->save();
         self::assertTrue($registry->states($target)['cmd']['allowed']);
+        self::assertSame('Automatic — Captain', $registry->states($target)['cmd']['grant_status']);
 
         foreach ([
             ['account_status' => 'disabled'],

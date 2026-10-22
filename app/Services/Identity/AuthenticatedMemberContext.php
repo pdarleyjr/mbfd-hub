@@ -107,7 +107,11 @@ final readonly class AuthenticatedMemberContext
                 'abilities' => $this->abilities,
                 'workgroups' => $this->workgroups,
                 'active_workgroup' => $this->activeWorkgroup,
-                'capabilities' => $this->capabilities,
+                // The 300 Command hint is computed only when serialized for the SPA,
+                // so ordinary page requests never pay for it. UI hint only: every
+                // 300 Command route re-checks the same policy server-side.
+                'capabilities' => [...$this->capabilities,
+                    'command_300_access' => app(\App\Services\Security\Command300Access::class)->allows($this->user)],
             ],
             'operational_context' => [
                 'station' => null,
