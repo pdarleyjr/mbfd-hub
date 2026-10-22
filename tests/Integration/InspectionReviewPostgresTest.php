@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Tests\Integration;
 
+use App\Enums\AccountStatus;
 use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusInspectionException;
@@ -53,10 +54,11 @@ final class InspectionReviewPostgresTest extends TestCase
             'apparatus_inspection_id' => $inspection->id, 'apparatus_id' => $apparatus->id, 'field' => 'member_review_flag',
             'reason' => 'member_flagged', 'blocks_acceptance' => true, 'metadata' => ['explanation' => 'Look at the pump panel.', 'items' => []],
         ]);
-        $first = User::factory()->create();
-        $first->assignRole(Role::findOrCreate('logistics_admin', 'web'));
-        $second = User::factory()->create();
-        $second->assignRole(Role::findOrCreate('logistics_admin', 'web'));
+        // Real reviewers: active accounts (InspectionReviewers::canReview) holding the super_admin role.
+        $first = User::factory()->create(['account_status' => AccountStatus::Active]);
+        $first->assignRole(Role::findOrCreate('super_admin', 'web'));
+        $second = User::factory()->create(['account_status' => AccountStatus::Active]);
+        $second->assignRole(Role::findOrCreate('super_admin', 'web'));
         $connection = DB::connection();
         $holder = null;
 
