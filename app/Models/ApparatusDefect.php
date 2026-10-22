@@ -221,6 +221,10 @@ class ApparatusDefect extends Model
         return is_string($path) && trim($path) !== '' && $this->availablePhotoPath() === null;
     }
 
+    /**
+     * Legacy entry point (e.g. the legacy approval replay). Delegates to the continuity
+     * service so the origin report, notes, photo and workflow status are never overwritten.
+     */
     public static function recordDefect(
         $apparatusId,
         $compartment,
@@ -230,46 +234,14 @@ class ApparatusDefect extends Model
         $photoPath = null,
         $inspectionId = null,
     ) {
-        $issueType = strtolower((string) $status);
-
-        $existing = self::where('apparatus_id', $apparatusId)
-            ->where('compartment', $compartment)
-            ->where('item', $item)
-            ->unresolved()
-            ->first();
-
-        if ($existing) {
-            // Append current data to history
-            $history = $existing->defect_history ?? [];
-            $history[] = [
-                'status' => $existing->status,
-                'notes' => $existing->notes,
-                'photo' => $existing->photo,
-                'reported_at' => $existing->created_at->toISOString(),
-            ];
-            $existing->update([
-                'status' => in_array($existing->status, ['open', 'in_progress'], true) ? $existing->status : 'open',
-                'issue_type' => $issueType,
-                'notes' => $notes,
-                'photo_path' => $photoPath,
-                'apparatus_inspection_id' => $inspectionId,
-                'reported_date' => now()->toDateString(),
-                'defect_history' => $history,
-            ]);
-
-            return $existing;
-        } else {
-            return self::create([
-                'apparatus_id' => $apparatusId,
-                'compartment' => $compartment,
-                'item' => $item,
-                'status' => 'open',
-                'issue_type' => $issueType,
-                'notes' => $notes,
-                'photo_path' => $photoPath,
-                'apparatus_inspection_id' => $inspectionId,
-                'reported_date' => now()->toDateString(),
-            ]);
-        }
+        return app(\App\Services\Defects\DefectContinuityService::class)->recordLegacyFinding(
+            (int) $apparatusId,
+            (string) $compartment,
+            (string) $item,
+            (string) $status,
+            $notes,
+            $photoPath,
+            $inspectionId !== null ? (int) $inspectionId : null,
+        );
     }
 }

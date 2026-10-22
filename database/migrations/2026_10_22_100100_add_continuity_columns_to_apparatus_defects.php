@@ -31,21 +31,21 @@ return new class extends Migration
             $table->string('action_status', 32)->default('reported');
             $table->json('action_details')->nullable();
             $table->foreignId('first_reported_inspection_id')->nullable()
-                ->constrained('apparatus_inspections', 'id', 'apparatus_defects_first_reported_inspection_fk')->nullOnDelete();
+                ->constrained('apparatus_inspections')->nullOnDelete();
             $table->foreignId('first_reported_by_user_id')->nullable()
-                ->constrained('users', 'id', 'apparatus_defects_first_reported_user_fk')->nullOnDelete();
+                ->constrained('users')->nullOnDelete();
             $table->timestamp('first_reported_at')->nullable();
             $table->foreignId('last_observed_inspection_id')->nullable()
-                ->constrained('apparatus_inspections', 'id', 'apparatus_defects_last_observed_inspection_fk')->nullOnDelete();
+                ->constrained('apparatus_inspections')->nullOnDelete();
             $table->timestamp('last_observed_at')->nullable();
             $table->timestamp('acknowledged_at')->nullable();
             $table->foreignId('acknowledged_by_user_id')->nullable()
-                ->constrained('users', 'id', 'apparatus_defects_acknowledged_user_fk')->nullOnDelete();
+                ->constrained('users')->nullOnDelete();
             $table->foreignId('resolved_by_user_id')->nullable()
-                ->constrained('users', 'id', 'apparatus_defects_resolved_user_fk')->nullOnDelete();
+                ->constrained('users')->nullOnDelete();
             $table->string('resolution_type', 32)->nullable();
             $table->foreignId('recurrence_of_defect_id')->nullable()
-                ->constrained('apparatus_defects', 'id', 'apparatus_defects_recurrence_fk')->nullOnDelete();
+                ->constrained('apparatus_defects')->nullOnDelete();
 
             $table->index('action_status', 'apparatus_defects_action_status_index');
             $table->index('first_reported_inspection_id', 'apparatus_defects_first_reported_inspection_index');
@@ -84,24 +84,20 @@ return new class extends Migration
         }
 
         Schema::table('apparatus_defects', function (Blueprint $table): void {
-            $table->dropForeign('apparatus_defects_first_reported_inspection_fk');
-            $table->dropForeign('apparatus_defects_first_reported_user_fk');
-            $table->dropForeign('apparatus_defects_last_observed_inspection_fk');
-            $table->dropForeign('apparatus_defects_acknowledged_user_fk');
-            $table->dropForeign('apparatus_defects_resolved_user_fk');
-            $table->dropForeign('apparatus_defects_recurrence_fk');
             $table->dropIndex('apparatus_defects_action_status_index');
             $table->dropIndex('apparatus_defects_first_reported_inspection_index');
             $table->dropIndex('apparatus_defects_last_observed_inspection_index');
             $table->dropIndex('apparatus_defects_recurrence_index');
         });
         Schema::table('apparatus_defects', function (Blueprint $table): void {
+            foreach (['first_reported_inspection_id', 'first_reported_by_user_id', 'last_observed_inspection_id', 'acknowledged_by_user_id', 'resolved_by_user_id', 'recurrence_of_defect_id'] as $column) {
+                $table->dropConstrainedForeignId($column);
+            }
+        });
+        Schema::table('apparatus_defects', function (Blueprint $table): void {
             $table->dropColumn([
                 'compartment_key', 'item_key', 'severity', 'action_status', 'action_details',
-                'first_reported_inspection_id', 'first_reported_by_user_id', 'first_reported_at',
-                'last_observed_inspection_id', 'last_observed_at',
-                'acknowledged_at', 'acknowledged_by_user_id', 'resolved_by_user_id', 'resolution_type',
-                'recurrence_of_defect_id',
+                'first_reported_at', 'last_observed_at', 'acknowledged_at', 'resolution_type',
             ]);
         });
     }
