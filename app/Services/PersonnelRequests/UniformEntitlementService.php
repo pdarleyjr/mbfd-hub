@@ -20,7 +20,7 @@ final class UniformEntitlementService
 {
     public function __construct(private readonly UniformOrderCatalog $catalog) {}
 
-    /** Jacket styles share one allowance, measured from an actual recorded issue. */
+    /** The jacket allowance is measured from an actual recorded issue. */
     public function jacketEligibility(Employee $employee): array
     {
         // Check outstanding requests before issues so a concurrently completed issue
@@ -39,7 +39,7 @@ final class UniformEntitlementService
         $recentIssue = $eligibleFrom !== null && today()->lt($eligibleFrom);
         $reason = $pending ? 'You already have a jacket request awaiting issue. View it in My Requests.'
             : ($recentIssue ? 'Your last jacket was issued on '.$issuedAt->format('M j, Y').'. You may request one again from '.$eligibleFrom->format('M j, Y').'.'
-                : ($issuedAt ? 'You may request one jacket. All three styles share the same 3-year allowance.'
+                : ($issuedAt ? 'You may request one jacket. The 3-year cycle begins when it is issued.'
                     : 'You may request one jacket. Support Services will confirm any earlier off-system issue history.'));
 
         return [
@@ -60,7 +60,7 @@ final class UniformEntitlementService
     {
         $recipient = $this->lockIssueRecipient($recipient);
         if ($quantity !== 1) {
-            throw ValidationException::withMessages(['quantity' => 'Issue only one jacket. All three styles share one allowance every 3 years.']);
+            throw ValidationException::withMessages(['quantity' => 'Issue only one jacket per 3-year allowance.']);
         }
         Validator::make(['issued_at' => $issuedAt], ['issued_at' => ['required', 'date', 'before_or_equal:today']])->validate();
         $lastIssue = $this->lastJacketIssue($recipient);
@@ -127,7 +127,7 @@ final class UniformEntitlementService
             }
             $quantity = filter_var($item['quantity'] ?? null, FILTER_VALIDATE_INT);
             if (is_bool($item['quantity'] ?? null) || $quantity !== 1 || ++$total > 1) {
-                throw ValidationException::withMessages(["items.{$index}.quantity" => 'Choose only one jacket. All three styles share one allowance every 3 years.']);
+                throw ValidationException::withMessages(["items.{$index}.quantity" => 'Choose only one jacket per 3-year allowance.']);
             }
         }
     }

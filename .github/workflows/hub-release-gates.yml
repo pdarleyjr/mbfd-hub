@@ -332,7 +332,9 @@ jobs:
           DAILY_CHECKOUT_OUT_DIR: ../../../public/daily
         run: npm run build
       - name: Install Chromium and WebKit for Daily Checkout browser checks
-        run: npx playwright install --with-deps chromium webkit
+        run: |
+          bash scripts/ci/prepare-ubuntu-apt-mirror.sh
+          npx playwright install --with-deps chromium webkit
       - name: Verify first-login Bid handoff under enforced CSP
         run: node --test tests/Browser/bid-login-handoff.mjs
       - name: Install PHP dependencies
@@ -398,7 +400,9 @@ jobs:
           DAILY_CHECKOUT_OUT_DIR: ../../../public/daily
         run: npm run build
       - name: Install Chromium and WebKit for authenticated browsers
-        run: npx playwright install --with-deps chromium webkit
+        run: |
+          bash scripts/ci/prepare-ubuntu-apt-mirror.sh
+          npx playwright install --with-deps chromium webkit
       - name: Install PHP dependencies
         env:
           COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
@@ -513,7 +517,9 @@ jobs:
           DAILY_CHECKOUT_OUT_DIR: ../../../public/daily
         run: npm run build
       - name: Install Chromium for authenticated lifecycle browsers
-        run: npx playwright install --with-deps chromium
+        run: |
+          bash scripts/ci/prepare-ubuntu-apt-mirror.sh
+          npx playwright install --with-deps chromium
       - name: Install PHP dependencies
         env:
           COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
@@ -623,18 +629,10 @@ jobs:
       - name: Install Daily Checkout dependencies
         working-directory: resources/js/daily-checkout
         run: npm ci --ignore-scripts --legacy-peer-deps
-      - name: Use the official HTTPS Ubuntu mirror for WebKit dependencies
-        if: ${{ matrix.lane == 'workspace-webkit-iphone' || matrix.lane == 'webkit-ipad-and-issue-report' }}
-        run: |
-          set -euo pipefail
-          mirror_list=/etc/apt/apt-mirrors.txt
-          if test -f "$mirror_list" && grep -q '^http://azure\.archive\.ubuntu\.com/ubuntu\b' "$mirror_list"; then
-            curl --fail --silent --show-error --location --connect-timeout 10 --max-time 30 \
-              --output /dev/null https://archive.ubuntu.com/ubuntu/dists/noble/InRelease
-            sudo sed -i 's|^http://azure\.archive\.ubuntu\.com/ubuntu\b|https://archive.ubuntu.com/ubuntu|' "$mirror_list"
-          fi
       - name: Install Chromium and WebKit for Daily Checkout Playwright
-        run: npx playwright install --with-deps chromium webkit
+        run: |
+          bash scripts/ci/prepare-ubuntu-apt-mirror.sh
+          npx playwright install --with-deps chromium webkit
       - name: Run mocked Daily Checkout Playwright
         env:
           DAILY_CHECKOUT_E2E_BASE_URL: http://127.0.0.1:4176
