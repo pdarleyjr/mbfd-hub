@@ -50,7 +50,7 @@ final class CommandCommunicationAttachmentStore
     /**
      * Validate every file and describe it. Nothing is written here.
      *
-     * @param  list<mixed>  $files
+     * @param  array<array-key, mixed>  $files  Filament keys uploads by temporary id, so the list is re-indexed here.
      * @return list<array{file: UploadedFile, extension: string, mime: string, kind: string, original: string, size: int}>
      */
     public function inspect(array $files): array

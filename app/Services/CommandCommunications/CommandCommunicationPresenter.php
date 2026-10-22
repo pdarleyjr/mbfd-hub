@@ -23,8 +23,8 @@ final class CommandCommunicationPresenter
             'subject' => $post->subject,
             'body' => $post->body,
             'author' => [
-                'name' => (string) ($post->author?->name ?? 'Former member'),
-                'rank' => $post->author?->employeeProfile?->rank,
+                'name' => (string) $post->author->name,
+                'rank' => $post->author->employeeProfile?->rank,
                 'side' => $post->author_context,
             ],
             'is_mine' => (int) $post->author_user_id === (int) $viewer->getKey(),

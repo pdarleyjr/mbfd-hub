@@ -70,7 +70,7 @@ final class CommandCommunicationController extends Controller
             (string) ($data['body'] ?? ''),
             $data['parent_id'] ?? null,
             $data['client_submission_id'],
-            $request->file('attachments', []) ?? [],
+            \Illuminate\Support\Arr::wrap($request->file('attachments', [])),
         );
 
         return $this->json(['data' => $this->presenter->post($post, $user)], $post->wasRecentlyCreated ? 201 : 200);

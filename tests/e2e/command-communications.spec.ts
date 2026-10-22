@@ -74,7 +74,7 @@ function pageOf(server: ServerState, before: string | null, limit: number) {
 async function handleCreate(route: Route, server: ServerState): Promise<void> {
   if (server.onCreate && await server.onCreate(route)) return;
   const body = route.request().postData() ?? '';
-  const field = (name: string) => new RegExp(`name="${name.replace(/[[\]]/g, '\\$&')}"\\r\\n\\r\\n([^\\r\\n]*)`).exec(body)?.[1] ?? null;
+  const field = (name: string) => new RegExp(`name="${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"\\r\\n\\r\\n([^\\r\\n]*)`).exec(body)?.[1] ?? null;
   server.submissions.push(field('client_submission_id') ?? '');
   const parent = field('parent_id');
   server.parents.push(parent);

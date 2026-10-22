@@ -100,12 +100,12 @@ final class CommandCommunications extends Page implements HasForms
         return $unread > 0 ? (string) $unread : null;
     }
 
-    public static function getNavigationBadgeColor(): ?string
+    public static function getNavigationBadgeColor(): string
     {
         return 'info';
     }
 
-    public static function getNavigationBadgeTooltip(): ?string
+    public static function getNavigationBadgeTooltip(): string
     {
         return 'Unread 300 Command messages';
     }
