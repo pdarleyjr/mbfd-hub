@@ -57,22 +57,47 @@ final class InspectionReviewService
     }
 
     /** Reject a held inspection. Evidence, defects and observations are retained; every open hold is dismissed. */
-    public function reject(int $inspectionId, User $reviewer, string $reason): ApparatusInspection
+    public function reject(int $inspectionId, User $reviewer, string $reason, ?string $internalNote = null): ApparatusInspection
     {
         $reason = $this->cleanText($reason);
         if ($reason === null) {
             throw ValidationException::withMessages(['reason' => 'Enter the reason for rejecting this inspection.']);
         }
+        $internalNote = $this->cleanText($internalNote);
         $probe = ApparatusInspection::query()->findOrFail($inspectionId);
         Gate::forUser($reviewer)->authorize('reject', $probe);
         if ($probe->processing_status === null) {
-            return app(ApparatusInspectionApprovalService::class)->reject($inspectionId, $reviewer, $reason);
+            return $this->rejectLegacy($probe, $reviewer, $reason);
         }
 
         return $this->retryPostgresLockTimeout(fn (): ApparatusInspection => DB::transaction(
-            fn (): ApparatusInspection => $this->rejectLocked($inspectionId, $reviewer, $reason),
+            fn (): ApparatusInspection => $this->rejectLocked($inspectionId, $reviewer, $reason, $internalNote),
             3,
         ));
+    }
+
+    /** The legacy path records the note itself; the member still receives the reason. */
+    private function rejectLegacy(ApparatusInspection $probe, User $reviewer, string $reason): ApparatusInspection
+    {
+        $wasPending = $probe->review_status === 'pending_review';
+        $rejected = app(ApparatusInspectionApprovalService::class)->reject((int) $probe->getKey(), $reviewer, $reason);
+        if ($wasPending && $rejected->review_status === 'rejected') {
+            $this->postRejectionReason($rejected, $reviewer, $reason);
+        }
+
+        return $rejected;
+    }
+
+    /** The reason is the member's explanation; the decision notification is sent separately and once. */
+    private function postRejectionReason(ApparatusInspection $inspection, User $reviewer, string $reason): void
+    {
+        app(IssueMessageService::class)->post($reviewer, [
+            'inspection_id' => $inspection->getKey(),
+            'visibility' => ApparatusIssueMessage::VISIBILITY_MEMBER,
+            'body' => $reason,
+            'kind' => 'inspection_rejected',
+            'notify' => false,
+        ]);
     }
 
     /**
@@ -186,7 +211,7 @@ final class InspectionReviewService
         return $inspection;
     }
 
-    private function rejectLocked(int $inspectionId, User $reviewer, string $reason): ApparatusInspection
+    private function rejectLocked(int $inspectionId, User $reviewer, string $reason, ?string $internalNote): ApparatusInspection
     {
         $inspection = ApparatusInspection::query()->lockForUpdate()->findOrFail($inspectionId);
         if ($inspection->review_status !== 'pending_review') {
@@ -194,18 +219,20 @@ final class InspectionReviewService
         }
         $this->refuseWhileHeldForVehicleSwap($inspection);
         if ($inspection->processing_status === null) {
-            return app(ApparatusInspectionApprovalService::class)->reject($inspectionId, $reviewer, $reason);
+            return $this->rejectLegacy($inspection, $reviewer, $reason);
         }
 
         $holds = InspectionHold::openQuery($inspectionId)->orderBy('id')->lockForUpdate()->get();
         foreach ($holds as $hold) {
             $hold->update(['status' => 'dismissed']);
         }
-        $this->recordEvent($inspection, 'rejected', $reviewer, $reason, [
+        $this->recordEvent($inspection, 'rejected', $reviewer, $internalNote, [
             'action' => 'reject',
+            'member_reason' => $reason,
             'dismissed_exception_ids' => $holds->pluck('id')->all(),
         ]);
         $inspection->update(['review_status' => 'rejected', 'processing_status' => 'rejected']);
+        $this->postRejectionReason($inspection, $reviewer, $reason);
         $this->forgetDisplayReadModels();
         app(InspectionNotificationDispatcher::class)->inspectionDecided($inspection, 'rejected');
 

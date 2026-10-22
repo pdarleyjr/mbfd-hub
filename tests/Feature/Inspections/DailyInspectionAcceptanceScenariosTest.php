@@ -819,7 +819,8 @@ final class DailyInspectionAcceptanceScenariosTest extends TestCase
         $this->assertSame(1, ApparatusDefect::query()->where('apparatus_id', $this->unit->id)->unresolved()->count(), 'Recorded findings are facts and stay.');
         $event = ApparatusInspectionReviewEvent::query()->where('apparatus_inspection_id', $inspection->id)->where('status', 'rejected')->sole();
         $this->assertSame($this->reviewer->id, $event->changed_by_user_id);
-        $this->assertSame('Wrong vehicle was inspected.', $event->internal_note);
+        $this->assertSame('Wrong vehicle was inspected.', $event->metadata['member_reason']);
+        $this->assertNull($event->internal_note);
         $this->assertSame(1, $this->sentCount($this->alpha, 'inspection_decided'));
         $this->assertSame('Rejected', $rejected->displayStatus());
     }
