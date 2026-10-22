@@ -32,7 +32,10 @@ abbreviations (`Capt`, `DC`) are recognised.
 - Command Board (`cmd` OIDC client) — authorize, code exchange, token use and userinfo all run
   the policy; claims carry `command_access: "300"` and omit `employee_id` for an unlinked
   administrator. An ineligible member is redirected back to the board with `error=access_denied`.
-- 300 Command Communications — API, attachment downloads and the Filament page.
+- 300 Command Communications — API, attachment downloads and the Filament page. The Admin
+  Panel page additionally follows the Communications area capability (`super_admin` or a
+  direct `admin.communications.view`), like its panel neighbours, so scoped administrators
+  such as Uniform & PPE managers keep a narrow panel and use the 300 profile tab instead.
 
 ## Granting extra access
 
