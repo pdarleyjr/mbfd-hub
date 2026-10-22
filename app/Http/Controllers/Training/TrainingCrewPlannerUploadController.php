@@ -58,9 +58,9 @@ final class TrainingCrewPlannerUploadController extends Controller
             });
             $request->session()->put('training_crew_planner_draft.'.$actor->id, $draft['id']);
             $notice = match (true) {
-                $draft['course_id'] === null => 'Daily report read. Choose a course and use its training scope, then save classroom times to show eligible members.',
-                $draft['slots'] === [] => 'Daily report read. Save classroom times to show eligible members, then build your planning list.',
-                default => 'Daily report read. Review the results and your planning list.',
+                $draft['course_id'] === null => 'Daily roster read. Choose the training to see eligible members.',
+                $draft['slots'] === [] => 'Daily roster read. Enter the session start and end times to see eligible members.',
+                default => 'Daily roster read. Eligible members are updated below.',
             };
 
             return redirect(TrainingCrewPlanner::getUrl(panel: 'training'))

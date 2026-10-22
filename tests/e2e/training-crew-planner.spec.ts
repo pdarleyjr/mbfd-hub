@@ -71,9 +71,20 @@ async function uploadBeforeScope(page: Page) {
     await page.unroute(uploadPattern, holdRequest);
     await expect(page.getByText('This snapshot was generated before its roster date.', { exact: false })).toBeVisible();
     await expect(page.getByText('Daily report read successfully.', { exact: true })).toBeVisible();
-    await expect(page.getByText('Next, choose a course above and select Use this scope to check attendance.', { exact: true })).toBeVisible();
+    await expect(page.getByText('Next, choose the training in step 1.', { exact: true })).toBeVisible();
     expect(await (await page.request.get('/__crew_domain_fingerprint')).json()).toEqual(baseline);
     return baseline;
+}
+
+async function enterSession(page: Page, start: string, end: string, index = 0) {
+    await page.getByLabel(`Session ${index + 1} start time`, { exact: true }).fill(start);
+    await page.getByLabel(`Session ${index + 1} end time`, { exact: true }).fill(end);
+}
+
+async function chooseCourse(page: Page, label: string) {
+    await page.getByRole('combobox', { name: 'Course', exact: true }).selectOption({ label });
+    // Wait for the automatic apply before typing, so a late render cannot replace typed times.
+    await expect(page.getByText('Leaving out members who already attended', { exact: false })).toBeVisible();
 }
 
 async function freshProposal(page: Page) {
@@ -82,18 +93,22 @@ async function freshProposal(page: Page) {
     expect(plannerResponse?.headers()['content-security-policy']).toContain("form-action 'self'");
     await expect(page.getByRole('heading', { name: 'Crew Planner', exact: true })).toBeVisible();
     const baseline = await uploadBeforeScope(page);
-    await page.getByRole('combobox', { name: 'Course', exact: true }).selectOption({ label: 'Synthetic new course' });
-    await clickButton(page, 'Use this scope');
-    await expect(page.getByText('The proposal excludes members with verified attendance', { exact: false })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Save classroom times above to show eligible members.', exact: true })).toBeVisible();
+    // Choosing a course applies it at once: there is no separate apply button.
+    await chooseCourse(page, 'Synthetic new course');
+    await expect(page.getByText('Enter the class start and end time in step 3 to see eligible members.', { exact: true })).toBeVisible();
     // Recheck after the Livewire render, when an absolute URL could switch to the apex host.
     await expect(page.locator('.crew-planner form[enctype="multipart/form-data"]')).toHaveAttribute('action', '/training/crew-planner/upload');
-    await clickButton(page, 'Save classroom times');
-    await expect(page.getByRole('checkbox', { name: /^Propose Synthetic/ })).toHaveCount(3);
+    // No invented times: the row starts empty and the session saves itself once both times are typed.
+    await expect(page.getByLabel('Session 1 start time', { exact: true })).toHaveValue('');
+    await enterSession(page, '08:30', '11:30');
+    await expect(page.getByText('Saved: Session 1 08:30–11:30', { exact: true })).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: /^Select Synthetic/ })).toHaveCount(3);
+    await expect(page.getByText('3 eligible · 0 selected', { exact: true })).toBeVisible();
     return baseline;
 }
 
-const planned = (page: Page) => page.locator('.crew-planner li').filter({ has: page.locator('input[aria-label^="Select proposed member"]') });
+const planned = (page: Page) => page.locator('.crew-planner section[aria-labelledby^="review-"]:not(#review-verify) li');
+const candidate = (page: Page, member: string) => page.getByRole('checkbox', { name: `Select Synthetic ${member}`, exact: true });
 
 function inspectExport(path: string, format: 'pdf' | 'xlsx'): string {
     const dependencies = process.env.CREW_PLANNER_DEPENDENCY_ROOT || process.env.CREW_PLANNER_SOURCE_ROOT || process.cwd();
@@ -103,44 +118,50 @@ function inspectExport(path: string, format: 'pdf' | 'xlsx'): string {
     return execFileSync(process.env.PHP_BINARY || 'php', ['-r', code, dependencies, path], { encoding: 'utf8' });
 }
 
-test('native upload and cumulative editable proposals survive filters, downloads, refresh and offline interruption', async ({ page }, info) => {
+test('native upload, one-tap selection and per-session review survive filters, downloads, refresh and offline interruption', async ({ page }, info) => {
     test.setTimeout(300_000);
     const baseline = await freshProposal(page);
+    await page.getByText('More filters', { exact: true }).click();
     await page.getByRole('combobox', { name: 'Rank', exact: true }).selectOption('Captain');
-    await expect(page.getByRole('checkbox', { name: /^Propose Synthetic/ })).toHaveCount(1);
-    await clickButton(page, 'Add all eligible in these results');
+    await expect(page.getByRole('checkbox', { name: /^Select Synthetic/ })).toHaveCount(1);
+    await clickButton(page, 'Select all 1 shown');
     await expect(planned(page)).toHaveCount(1);
     await page.getByRole('combobox', { name: 'Rank', exact: true }).selectOption('Firefighter');
-    await expect(page.getByRole('checkbox', { name: /^Propose Synthetic/ })).toHaveCount(1);
-    await page.getByRole('checkbox', { name: 'Propose Synthetic 90002', exact: true }).check();
-    await clickButton(page, 'Add selected to planning list');
+    await expect(page.getByRole('checkbox', { name: /^Select Synthetic/ })).toHaveCount(1);
+    await candidate(page, '90002').check();
     await expect(planned(page)).toHaveCount(2);
-    await page.getByRole('combobox', { name: 'Rank', exact: true }).selectOption('Captain');
-    await expect(page.getByRole('checkbox', { name: /^Propose Synthetic/ })).toHaveCount(1);
-    await clickButton(page, 'Add all eligible in these results');
+    await page.getByRole('combobox', { name: 'Rank', exact: true }).selectOption('');
+    await expect(page.getByRole('checkbox', { name: /^Select Synthetic/ })).toHaveCount(3);
+    // Unselecting never hides the person from the candidate list.
+    await candidate(page, '90002').uncheck();
+    await expect(planned(page)).toHaveCount(1);
+    await expect(candidate(page, '90002')).toBeVisible();
+    await candidate(page, '90002').check();
     await expect(planned(page)).toHaveCount(2);
-    const remove = planned(page).filter({ hasText: 'Synthetic 90001' }).getByRole('button', { name: 'Remove from proposal' });
+    const remove = planned(page).filter({ hasText: 'Synthetic 90001' }).getByRole('button', { name: 'Remove Synthetic 90001' });
     await remove.evaluate(el => el.scrollIntoView({ block: 'center' }));
     await remove.click();
     await expect(planned(page)).toHaveCount(1);
     await clickButton(page, 'Undo remove');
     await expect(planned(page)).toHaveCount(2);
-    for (const [member, slot] of [['90001', 'Morning'], ['90002', 'Afternoon']]) {
-        await page.getByRole('checkbox', { name: `Select proposed member Synthetic ${member}`, exact: true }).check();
-        await page.getByRole('combobox', { name: 'Move selected to', exact: true }).selectOption({ label: slot });
-        await clickButton(page, 'Move selected');
-        await expect(planned(page).filter({ hasText: `Synthetic ${member}` })).toContainText(slot);
-    }
-    for (const [format, label] of [['pdf', 'Download proposal PDF'], ['xlsx', 'Download proposal Excel']] as const) {
+    // A second session adds a per-member choice; the one-session placement stays in Session 1.
+    await page.getByRole('button', { name: 'Add another session', exact: true }).click();
+    await enterSession(page, '13:00', '16:00', 1);
+    await expect(page.getByText('Saved: Session 1 08:30–11:30 · Session 2 13:00–16:00', { exact: true })).toBeVisible();
+    await page.getByLabel('Session for Synthetic 90002', { exact: true }).selectOption({ label: 'Session 2 13:00–16:00' });
+    await expect(page.getByRole('heading', { name: /^Session 2 — 13:00–16:00/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /^Session 1 — 08:30–11:30/ })).toBeVisible();
+    for (const [format, label] of [['pdf', 'Export Training Personnel PDF'], ['xlsx', 'Download Excel']] as const) {
         const pending = page.waitForEvent('download');
         await clickButton(page, label);
         const download = await pending;
+        expect(download.suggestedFilename()).toBe(`MBFD-Training-Personnel-Request-2026-10-21.${format}`);
         const path = info.outputPath(`synthetic-proposal.${format}`);
         await download.saveAs(path);
         expect(readFileSync(path).subarray(0, format === 'pdf' ? 5 : 2).toString()).toBe(format === 'pdf' ? '%PDF-' : 'PK');
         if (info.project.name === 'desktop') {
             const content = inspectExport(path, format);
-            for (const expected of ['Synthetic 90001', 'Synthetic 90002', 'Captain', 'Firefighter', 'Station 9', 'Engine 9', 'Battalion Chief 300']) expect(content).toContain(expected);
+            for (const expected of ['Synthetic 90001', 'Synthetic 90002', 'Captain', 'Firefighter', 'Station 9', 'Engine 9']) expect(content).toContain(expected);
             expect(content).not.toContain('Synthetic 90003');
         }
     }
@@ -158,23 +179,23 @@ test('native upload and cumulative editable proposals survive filters, downloads
     expect(measurements.document).toBeLessThanOrEqual(measurements.viewport + 1);
     expect(measurements.buttons.every(height => height >= 44)).toBe(true);
     await page.screenshot({ path: info.outputPath('synthetic-proposal-layout.png'), fullPage: true });
-    await page.locator('.fi-section').filter({ has: page.getByRole('heading', { name: 'Planning list · 2 proposed', exact: true }) }).screenshot({ path: info.outputPath('synthetic-planning-list.png') });
+    await page.locator('.fi-section').filter({ hasText: '5. Review and export' }).last().screenshot({ path: info.outputPath('synthetic-review-export.png') });
     page.once('dialog', dialog => dialog.accept());
-    await clickButton(page, 'Discard proposal');
+    await clickButton(page, 'Start over');
     await expect(planned(page)).toHaveCount(0);
     expect(await (await page.request.get('/__crew_domain_fingerprint')).json()).toEqual(baseline);
 });
 
-test('module scope excludes verified prior attendance and restores candidates for another module', async ({ page }) => {
+test('module choice applies at once, excludes verified prior attendance and explains why', async ({ page }) => {
     await freshProposal(page);
     await page.getByRole('combobox', { name: 'Course', exact: true }).selectOption({ label: 'Synthetic modular course' });
-    await page.getByRole('combobox', { name: 'Training scope', exact: true }).selectOption({ label: 'Synthetic Module 1 — no verified session attended' });
-    await clickButton(page, 'Use this scope');
-    await expect(page.getByRole('checkbox', { name: 'Propose Synthetic 90001', exact: true })).toHaveCount(0);
-    await expect(page.getByRole('checkbox', { name: /^Propose Synthetic/ })).toHaveCount(2);
-    await page.getByRole('combobox', { name: 'Training scope', exact: true }).selectOption({ label: 'Synthetic Module 2 — no verified session attended' });
-    await clickButton(page, 'Use this scope');
-    await expect(page.getByRole('checkbox', { name: 'Propose Synthetic 90001', exact: true })).toBeEnabled();
+    await page.getByRole('combobox', { name: 'Module', exact: true }).selectOption({ label: 'Synthetic Module 1' });
+    await expect(candidate(page, '90001')).toHaveCount(0);
+    await expect(page.getByRole('checkbox', { name: /^Select Synthetic/ })).toHaveCount(2);
+    await page.getByText("Why isn't someone listed?", { exact: true }).click();
+    await expect(page.locator('details').filter({ hasText: "Why isn't someone listed?" })).toContainText('Already attended this module (verified record)');
+    await page.getByRole('combobox', { name: 'Module', exact: true }).selectOption({ label: 'Synthetic Module 2' });
+    await expect(candidate(page, '90001')).toBeEnabled();
 });
 
 test('viewer cannot open the planner', async ({ page }) => {
@@ -184,19 +205,22 @@ test('viewer cannot open the planner', async ({ page }) => {
     await expect(page.getByRole('button', { name: 'Read daily report', exact: true })).toHaveCount(0);
 });
 
-test('review results explain unavailable duty and keep unmatched identities non-selectable', async ({ page }) => {
+test('review results explain who is not listed and keep unmatched identities non-selectable', async ({ page }) => {
     await freshProposal(page);
-    await expect(page.getByText('Attendance is checked against current verified Hub records as of', { exact: false })).toBeVisible();
-    await page.getByText('Published bid preferences and review results', { exact: true }).click();
-    await page.getByLabel('Show members requiring review / already attended', { exact: true }).check();
-    await expect(page.getByRole('checkbox', { name: 'Propose Synthetic 90004', exact: true })).toBeDisabled();
-    const disabled = page.locator('li').filter({ has: page.getByRole('checkbox', { name: 'Propose Synthetic 90004', exact: true }) });
-    await expect(disabled).toContainText('Needs training · staffing requires verification');
-    await expect(disabled).not.toContainText('NO_PRIOR_ATTENDANCE');
-    await expect(disabled).not.toContainText('ZZTEST');
-    await expect(page.getByRole('heading', { name: 'Unmatched schedule identities — verify before proposing', exact: true })).toBeVisible();
-    await expect(page.getByText('SYNTHETIC, 90099', { exact: true })).toBeVisible();
+    await expect(page.getByText(/Attendance is checked (as it stood when class begins|against current verified Hub records as of)/)).toBeVisible();
+    await expect(candidate(page, '90004')).toHaveCount(0);
     await expect(page.getByRole('checkbox', { name: /90099/ })).toHaveCount(0);
+    // Searching for someone who is absent opens the explanation at once.
+    await page.getByLabel('Find a member', { exact: true }).fill('90004');
+    const why = page.locator('details').filter({ hasText: "Why isn't someone listed?" });
+    await expect(why).toContainText('Synthetic 90004');
+    await expect(why).toContainText('Duty needs verification');
+    await expect(why).not.toContainText('NO_PRIOR_ATTENDANCE');
+    await expect(why).not.toContainText('ZZTEST');
+    await page.getByLabel('Find a member', { exact: true }).fill('90099');
+    await expect(why).toContainText('SYNTHETIC, 90099');
+    await expect(why).toContainText('Not matched to an active Hub employee (ID 90099)');
+    await page.getByLabel('Find a member', { exact: true }).fill('');
     const beforeRejectedUpload = await (await page.request.get('/__crew_domain_fingerprint')).json();
     await page.getByLabel('Daily TeleStaff PDF', { exact: true }).setInputFiles({ name: 'synthetic-invalid.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\ninvalid synthetic report') });
     const rejectedUpload = page.waitForResponse(response => response.request().method() === 'POST' && new URL(response.url()).pathname === '/training/crew-planner/upload');
@@ -224,18 +248,20 @@ test('authorized administrator finds the same independent planner through the Ad
     await expect(page.getByRole('heading', { name: 'Crew Planner', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Read daily report', exact: true })).toBeVisible();
     const baseline = await uploadBeforeScope(page);
-    await page.getByRole('combobox', { name: 'Course', exact: true }).selectOption({ label: 'Synthetic new course' });
-    await clickButton(page, 'Use this scope');
-    await clickButton(page, 'Save classroom times');
-    await expect(page.getByRole('checkbox', { name: /^Propose Synthetic/ })).toHaveCount(3);
+    await chooseCourse(page, 'Synthetic new course');
+    await enterSession(page, '08:30', '11:30');
+    await expect(page.getByRole('checkbox', { name: /^Select Synthetic/ })).toHaveCount(3);
     expect(await (await page.request.get('/__crew_domain_fingerprint')).json()).toEqual(baseline);
 });
 
 test('flexible classroom and proposal fields retain readable widths on touch screens', async ({ page }, info) => {
     await freshProposal(page);
     const widths = await page.locator('.crew-planner label.flex-1').evaluateAll(labels => labels.map(label => label.getBoundingClientRect().width));
-    expect(widths.length).toBeGreaterThan(3);
+    expect(widths.length).toBeGreaterThan(1);
     expect(widths.every(width => width >= 190)).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    const rowHeights = await page.locator('.crew-planner .cp-row').evaluateAll(rows => rows.map(row => row.getBoundingClientRect().height));
+    expect(rowHeights.length).toBe(3);
+    expect(rowHeights.every(height => height >= 44)).toBe(true);
     await page.screenshot({ path: info.outputPath('synthetic-readable-fields.png'), fullPage: true });
 });
