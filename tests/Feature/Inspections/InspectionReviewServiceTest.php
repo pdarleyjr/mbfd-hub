@@ -270,7 +270,7 @@ final class InspectionReviewServiceTest extends TestCase
         $inspection = ApparatusInspection::sole();
         $reviewer = $this->reviewer();
 
-        $rejected = $this->review->reject($inspection->id, $reviewer, 'The reading cannot be right.');
+        $rejected = $this->review->reject($inspection->id, $reviewer, 'The reading cannot be right.', 'Looks like a typo, call him.');
 
         $this->assertSame('rejected', $rejected->review_status);
         $this->assertSame('rejected', $rejected->processing_status);
@@ -281,8 +281,50 @@ final class InspectionReviewServiceTest extends TestCase
         $this->assertSame(1, ApparatusDefect::query()->count(), 'Recorded defects remain.');
         $this->assertNotNull($inspection->fresh()->officer_signature);
         $event = ApparatusInspectionReviewEvent::query()->where('status', 'rejected')->sole();
-        $this->assertSame('The reading cannot be right.', $event->internal_note);
+        $this->assertSame('Looks like a typo, call him.', $event->internal_note, 'The internal note is separate from the member reason.');
+        $this->assertSame('The reading cannot be right.', $event->metadata['member_reason']);
+        $message = ApparatusIssueMessage::sole();
+        $this->assertSame('member', $message->visibility);
+        $this->assertSame('The reading cannot be right.', $message->body);
+        $this->assertSame($inspection->id, $message->apparatus_inspection_id);
         $this->assertCount(2, $event->metadata['dismissed_exception_ids']);
+    }
+
+    public function test_a_rejection_notifies_the_member_once_and_without_internal_text(): void
+    {
+        $inspection = $this->heldFlag();
+        \Illuminate\Support\Facades\Notification::fake();
+
+        $this->review->reject($inspection->id, $this->reviewer(), 'Wrong truck.', 'INTERNAL-ONLY');
+
+        \Illuminate\Support\Facades\Notification::assertSentToTimes($this->member, \App\Notifications\Inspections\InspectionEventNotification::class, 1);
+        \Illuminate\Support\Facades\Notification::assertSentTo($this->member, \App\Notifications\Inspections\InspectionEventNotification::class, fn ($n): bool => ! str_contains($n->title.$n->body, 'INTERNAL-ONLY'));
+    }
+
+    public function test_a_legacy_rejection_also_gives_the_member_the_reason(): void
+    {
+        $legacy = $this->legacyPending();
+
+        $this->review->reject($legacy->id, $this->reviewer(), 'Duplicate of yesterday.');
+
+        $message = ApparatusIssueMessage::sole();
+        $this->assertSame('member', $message->visibility);
+        $this->assertSame('Duplicate of yesterday.', $message->body);
+    }
+
+    public function test_deciding_a_flag_or_damage_hold_through_reconcile_is_refused_cleanly(): void
+    {
+        $inspection = $this->heldFlag();
+        $hold = $this->holdFor($inspection, 'member_review_flag');
+
+        try {
+            app(ApparatusInspectionExceptionService::class)->reconcile($hold->id, $this->reviewer(), ['action' => 'dismiss', 'reason' => 'Fine.', 'expected_current_value' => null]);
+            $this->fail('A flag hold is decided with the inspection.');
+        } catch (ValidationException $exception) {
+            $this->assertSame('Approve or reject the inspection to decide this hold.', $exception->errors()['action'][0]);
+        }
+        $this->assertSame('open', $hold->fresh()->status);
+        $this->assertSame('held_for_review', $inspection->fresh()->processing_status);
     }
 
     public function test_a_rejection_reason_is_required(): void

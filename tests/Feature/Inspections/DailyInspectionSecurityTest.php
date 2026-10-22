@@ -664,7 +664,7 @@ final class DailyInspectionSecurityTest extends TestCase
         app(ApparatusInspectionExceptionService::class)->reconcile($rollbackHold->id, $this->reviewer, [
             'action' => 'request_revision', 'reason' => 'Which odometer did you read?', 'expected_current_value' => 1050,
         ]);
-        $reviews->reject($rolledBack->id, $this->reviewer, 'INT-REJECT-SECRET');
+        $reviews->reject($rolledBack->id, $this->reviewer, 'Please resubmit with the right odometer.', 'INT-REJECT-SECRET');
 
         $dismissHold = ApparatusInspectionException::query()->where('apparatus_inspection_id', $dismissed->id)->where('field', 'miles')->sole();
         app(ApparatusInspectionExceptionService::class)->reconcile($dismissHold->id, $this->reviewer, [

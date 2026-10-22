@@ -149,6 +149,49 @@ final class InspectionAcceptanceTest extends TestCase
         $this->assertSame(1005, ApparatusInspection::sole()->miles);
     }
 
+    public function test_a_token_within_the_age_limit_still_supersedes_after_days_offline(): void
+    {
+        $this->travelTo(now()->subDays(6));
+        $offline = $this->meterPayload(1005, 400.5);
+        $this->travelBack();
+        $this->unit->update(['current_miles' => 1010, 'current_engine_hours' => 401.0]);
+
+        $this->submit($offline)->assertCreated()->assertJsonPath('processing_status', 'accepted');
+
+        $this->assertDatabaseCount('apparatus_inspection_exceptions', 0);
+        $this->assertSame(1010, $this->unit->fresh()->current_miles);
+    }
+
+    public function test_an_expired_token_cannot_make_a_lower_reading_superseded(): void
+    {
+        $this->travelTo(now()->subDays(8));
+        $stale = $this->meterPayload(1005, 400.5);
+        $this->travelBack();
+        $this->unit->update(['current_miles' => 1010, 'current_engine_hours' => 401.0]);
+
+        $this->submit($stale)->assertCreated()->assertJsonPath('processing_status', 'held_for_review');
+
+        $hold = $this->holdFor(ApparatusInspection::sole(), 'miles');
+        $this->assertSame('rollback', $hold->reason);
+        $this->assertNull($hold->baseline_value, 'An expired token is unverified.');
+        $this->assertSame(1010, $this->unit->fresh()->current_miles);
+    }
+
+    public function test_the_age_limit_is_configurable_and_a_token_without_an_issue_time_is_unverified(): void
+    {
+        $baseline = app(\App\Services\InspectionMeterBaseline::class);
+        $token = $baseline->issue($this->unit->fresh());
+        $this->assertNotNull($baseline->read($token, $this->unit->id));
+
+        config()->set('daily_checkout.meter_baseline_max_age_hours', 1);
+        $this->travel(2)->hours();
+        $this->assertNull($baseline->read($token, $this->unit->id));
+
+        config()->set('daily_checkout.meter_baseline_max_age_hours', 168);
+        $legacy = \Illuminate\Support\Facades\Crypt::encryptString(json_encode(['apparatus_id' => $this->unit->id, 'engine_hours' => 400, 'miles' => 1000]));
+        $this->assertNull($baseline->read($legacy, $this->unit->id));
+    }
+
     public function test_an_offline_submission_after_a_later_accepted_inspection_is_superseded(): void
     {
         $offline = $this->meterPayload(1005, 400.5);
