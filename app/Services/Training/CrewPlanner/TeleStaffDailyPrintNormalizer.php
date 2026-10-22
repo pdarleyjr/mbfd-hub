@@ -112,17 +112,20 @@ final class TeleStaffDailyPrintNormalizer
     public function complete(array $layout, array $snapshot): bool
     {
         $observed = [];
-        $scheduled = 0;
+        $seatHours = 0.0;
         foreach ($snapshot['parsed_assignments'] as $row) {
             $key = $row['source_page'].'|'.$row['raw_employee_id'];
             $observed[$key] = ($observed[$key] ?? 0) + 1;
-            // This reconciles report totals only. It never grants exchange approval
-            // or changes UNKNOWN 2WXEON into an eligible working assignment.
-            if (in_array($row['normalized_code'], ['SP', '2WXON', '2WXEON'], true)
-                && $row['start_at'] === $snapshot['start_at'] && $row['end_at'] === $snapshot['end_at']) {
-                $scheduled++;
+            // This reconciles report totals only; duty classification belongs to the parser.
+            // The headcount counts staffed seats, so a seat covered by day and night
+            // overtime halves counts once: reconcile on staffed seat-hours.
+            if (in_array($row['normalized_code'], ['SP', '2WXON', '2WXEON', '+OT', 'OT'], true)
+                && $row['start_at'] !== null && $row['end_at'] !== null
+                && strtotime($row['start_at']) >= strtotime($snapshot['start_at']) && strtotime($row['end_at']) <= strtotime($snapshot['end_at'])) {
+                $seatHours += (strtotime($row['end_at']) - strtotime($row['start_at'])) / 3600;
             }
         }
+        $scheduled = round($seatHours / 24, 2);
         ksort($observed);
         $expected = $layout['expected_rows'];
         ksort($expected);
@@ -131,6 +134,6 @@ final class TeleStaffDailyPrintNormalizer
         }
 
         return $layout['page_sequence_verified'] && $layout['terminal_summary']
-            && $layout['reported_headcount'] !== null && $scheduled === $layout['reported_headcount'];
+            && $layout['reported_headcount'] !== null && $scheduled === (float) $layout['reported_headcount'];
     }
 }

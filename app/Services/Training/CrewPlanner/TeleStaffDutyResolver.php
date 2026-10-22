@@ -68,7 +68,7 @@ final class TeleStaffDutyResolver
                 $absences = [$this->interval($row)];
                 if (($row['normalized_code'] ?? '') === 'ADONIS DAY') {
                     foreach ($person['_events'] as $override) {
-                        if (in_array($override['normalized_code'] ?? '', ['+OT', 'OT', '2WXON'], true) && ($override['approval_state'] ?? '') === 'VERIFIED_EFFECTIVE' && ($override['code_class'] ?? '') === 'WORKING') {
+                        if (in_array($override['normalized_code'] ?? '', ['+OT', 'OT', '2WXON', '2WXEON'], true) && ($override['approval_state'] ?? '') === 'VERIFIED_EFFECTIVE' && ($override['code_class'] ?? '') === 'WORKING') {
                             $absences = $this->subtract($absences, $this->interval($override));
                         }
                     }

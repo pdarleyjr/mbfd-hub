@@ -63,9 +63,33 @@ final class TeleStaffDailyPdfParserTest extends TestCase
         self::assertSame('2026-10-22T08:00:00-04:00', $night['parsed_assignments'][0]['end_at']);
     }
 
-    public function test_pending_exchange_modifiers_unknowns_and_annotations_never_assert_approval(): void
+    public function test_published_exchange_onto_duty_is_effective_working_time(): void
     {
-        foreach (['2WXON', '2WXEON', '.SP', '.2WXOFF', '^OOC', "\u{e638}SP"] as $code) {
+        foreach (['2WXON', '2WXEON'] as $code) {
+            $row = (new TeleStaffDailyPdfParser)->parsePositionedPages([$this->page($code)])['parsed_assignments'][0];
+            self::assertSame(['WORKING', 'VERIFIED_EFFECTIVE'], [$row['code_class'], $row['approval_state']]);
+            self::assertSame([], $row['review_reasons']);
+        }
+    }
+
+    public function test_telestaff_category_icon_on_its_own_code_family_is_presentation_only(): void
+    {
+        // Oct 22 regression: Schwartz's exchange printed as "\u{E646}2WXON" was held for review.
+        foreach (["\u{E646}2WXON", "\u{E646}2WXEON", "\u{E521}+OT", "\u{E521}OT"] as $code) {
+            $row = (new TeleStaffDailyPdfParser)->parsePositionedPages([$this->page($code)])['parsed_assignments'][0];
+            self::assertSame($code, $row['raw_code']);
+            self::assertSame('VERIFIED_EFFECTIVE', $row['approval_state']);
+            self::assertSame([], $row['review_reasons'], $code);
+        }
+        foreach (["\u{E521}2WXON", "\u{E646}SP", "\u{E646}\u{E646}2WXON"] as $code) {
+            $row = (new TeleStaffDailyPdfParser)->parsePositionedPages([$this->page($code)])['parsed_assignments'][0];
+            self::assertNotEmpty($row['review_reasons'], $code);
+        }
+    }
+
+    public function test_modifiers_unknowns_and_annotations_never_assert_approval(): void
+    {
+        foreach (['.2WXON', '.SP', '.2WXOFF', '^OOC', "\u{e638}SP"] as $code) {
             $snapshot = (new TeleStaffDailyPdfParser)->parsePositionedPages([$this->page($code)]);
             $row = $snapshot['parsed_assignments'][0];
             self::assertSame($code, $row['raw_code']);
@@ -139,7 +163,8 @@ final class TeleStaffDailyPdfParserTest extends TestCase
         }
     }
 
-    public function test_real_pdf_decode_uses_the_positioned_template_without_retaining_or_deleting_the_callers_file(): void
+    /** Builds a real single-page PDF; each extra object is appended and optionally listed as a page annotation. */
+    private function pdf(array $extraObjects = [], bool $annotate = false): string
     {
         $content = '';
         foreach ($this->page() as [$matrix, $text]) {
@@ -147,12 +172,14 @@ final class TeleStaffDailyPdfParserTest extends TestCase
             $text = str_replace(['\\', '(', ')'], ['\\\\', '\\(', '\\)'], $text);
             $content .= sprintf("q %.8F 0 0 %.8F 0 0 cm BT /F1 18 Tf 1 0 0 1 %.8F %.8F Tm (%s) Tj ET Q\n", $scale, $scale, $matrix[4] / $scale, $matrix[5] / $scale, $text);
         }
+        $annots = $annotate ? ' /Annots ['.implode(' ', array_keys(array_filter($extraObjects, fn (string $object): bool => str_contains($object, '/Type /Annot')))).']' : '';
         $objects = [
             '<< /Type /Catalog /Pages 2 0 R >>',
             '<< /Type /Pages /Kids [4 0 R] /Count 1 >>',
             '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
-            '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 5 0 R >>',
+            '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 5 0 R'.$annots.' >>',
             '<< /Length '.strlen($content).">>\nstream\n".$content.'endstream',
+            ...array_values($extraObjects),
         ];
         $pdf = "%PDF-1.4\n";
         $offsets = [0];
@@ -161,11 +188,55 @@ final class TeleStaffDailyPdfParserTest extends TestCase
             $pdf .= ($index + 1)." 0 obj\n".$object."\nendobj\n";
         }
         $xref = strlen($pdf);
-        $pdf .= "xref\n0 6\n0000000000 65535 f \n";
+        $pdf .= "xref\n0 ".(count($objects) + 1)."\n0000000000 65535 f \n";
         foreach (array_slice($offsets, 1) as $offset) {
             $pdf .= sprintf("%010d 00000 n \n", $offset);
         }
-        $pdf .= "trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n".$xref."\n%%EOF";
+
+        return $pdf."trailer\n<< /Size ".(count($objects) + 1)." /Root 1 0 R >>\nstartxref\n".$xref."\n%%EOF";
+    }
+
+    /** Highlight annotation + appearance stream pairs, keyed by their final "N 0 R" reference. */
+    private function highlights(int $count, string $subtype = 'Highlight'): array
+    {
+        $objects = [];
+        for ($index = 0; $index < $count; $index++) {
+            $annotation = 6 + $index * 2;
+            $objects[$annotation.' 0 R'] = '<< /Type /Annot /Subtype /'.$subtype.' /Rect [18 673 352 682] /C [1 0.94 0.4] /AP << /N '.($annotation + 1).' 0 R >> >>';
+            $objects[($annotation + 1).' 0 R'] = "<< /Type /XObject /Subtype /Form /BBox [0 0 334 10] /Length 8 >>\nstream\n0 0 m S\nendstream";
+        }
+
+        return $objects;
+    }
+
+    public function test_roster_highlighted_by_an_officer_is_still_read(): void
+    {
+        // Oct 22 regression: 23 Edge highlight annotations pushed the report past the plain stream cap.
+        $path = tempnam(sys_get_temp_dir(), 'synthetic-crew-');
+        try {
+            file_put_contents($path, $this->pdf($this->highlights(70), true));
+            $snapshot = (new TeleStaffDailyPdfParser)->parse($path);
+            self::assertCount(1, $snapshot['parsed_assignments']);
+        } finally {
+            unlink($path);
+        }
+    }
+
+    public function test_extra_streams_without_markup_annotations_are_still_rejected(): void
+    {
+        $path = tempnam(sys_get_temp_dir(), 'synthetic-crew-');
+        try {
+            file_put_contents($path, $this->pdf(array_values(array_filter($this->highlights(70), fn (string $object): bool => str_contains($object, 'stream')))));
+            $this->expectException(InvalidArgumentException::class);
+            (new TeleStaffDailyPdfParser)->parse($path);
+        } finally {
+            unlink($path);
+        }
+    }
+
+    public function test_real_pdf_decode_uses_the_positioned_template_without_retaining_or_deleting_the_callers_file(): void
+    {
+        $pdf = $this->pdf();
         $path = tempnam(sys_get_temp_dir(), 'synthetic-crew-');
         try {
             file_put_contents($path, $pdf);

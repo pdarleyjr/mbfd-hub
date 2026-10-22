@@ -14,7 +14,7 @@ final class TeleStaffDutyResolverTest extends TestCase
     {
         return [
             'raw_employee_id' => $id, 'raw_name' => 'SYNTHETIC, PERSON',
-            'normalized_code' => $code, 'code_class' => in_array($code, ['ADONIS DAY', '2WXOFF', 'VACA', 'SIC'], true) ? 'NOT_WORKING' : (in_array($code, ['SP', '+OT', 'OT', '2WXON'], true) ? 'WORKING' : 'UNKNOWN'),
+            'normalized_code' => $code, 'code_class' => in_array($code, ['ADONIS DAY', '2WXOFF', 'VACA', 'SIC'], true) ? 'NOT_WORKING' : (in_array($code, ['SP', '+OT', 'OT', '2WXON', '2WXEON'], true) ? 'WORKING' : 'UNKNOWN'),
             'approval_state' => $approval,
             'start_at' => '2026-10-21T'.$from.':00-04:00',
             'end_at' => ($to <= $from ? '2026-10-22T' : '2026-10-21T').$to.':00-04:00',
@@ -52,10 +52,22 @@ final class TeleStaffDutyResolverTest extends TestCase
 
     public function test_approved_exchange_overrides_only_overlapping_aday_hours(): void
     {
-        $rows = [$this->event('ADONIS DAY', '08:00', '08:00'), $this->event('2WXON', '08:00', '12:00')];
-        $staff = (new TeleStaffDutyResolver)->resolve(['parsed_assignments' => $rows], $this->slots());
-        self::assertSame(['morning'], $staff['SYN90001']['eligible_slots']);
-        self::assertSame(['afternoon'], $staff['SYN90001']['unavailable_slots']);
+        foreach (['2WXON', '2WXEON'] as $code) {
+            $rows = [$this->event('ADONIS DAY', '08:00', '08:00'), $this->event($code, '08:00', '12:00')];
+            $staff = (new TeleStaffDutyResolver)->resolve(['parsed_assignments' => $rows], $this->slots());
+            self::assertSame(['morning'], $staff['SYN90001']['eligible_slots']);
+            self::assertSame(['afternoon'], $staff['SYN90001']['unavailable_slots']);
+        }
+    }
+
+    public function test_full_shift_exchange_onto_another_unit_is_eligible(): void
+    {
+        // Oct 22 regression: an A-shift captain exchanged onto C shift (Fire Boat 6) is working.
+        foreach (['2WXON', '2WXEON'] as $code) {
+            $staff = (new TeleStaffDutyResolver)->resolve(['parsed_assignments' => [$this->event($code, '08:00', '08:00')]], $this->slots());
+            self::assertSame(['morning', 'afternoon'], $staff['SYN90001']['eligible_slots']);
+            self::assertSame([], $staff['SYN90001']['needs_review']);
+        }
     }
 
     public function test_verified_overtime_overrides_aday_only_for_the_worked_interval(): void
@@ -95,7 +107,7 @@ final class TeleStaffDutyResolverTest extends TestCase
 
     public function test_pending_exchange_unknown_code_and_annotation_remain_review(): void
     {
-        foreach ([$this->event('2WXON', approval: 'UNVERIFIED'), $this->event('2WXEON'), $this->event('^OOC'), $this->event('.SP')] as $uncertain) {
+        foreach ([$this->event('2WXON', approval: 'UNVERIFIED'), $this->event('.2WXON'), $this->event('^OOC'), $this->event('.SP')] as $uncertain) {
             $staff = (new TeleStaffDutyResolver)->resolve(['parsed_assignments' => [$this->event('SP'), $uncertain]], $this->slots());
             self::assertSame([], $staff['SYN90001']['eligible_slots']);
             self::assertNotEmpty($staff['SYN90001']['needs_review']);
@@ -173,7 +185,7 @@ final class TeleStaffDutyResolverTest extends TestCase
     {
         $resolver = new TeleStaffDutyResolver;
         $slots = [...$this->slots(), ['id' => 'night', 'start_at' => '2026-10-21T20:00:00-04:00', 'end_at' => '2026-10-22T08:00:00-04:00']];
-        $staff = $resolver->resolve(['parsed_assignments' => [$this->event('SP'), $this->event('2WXEON', '20:00', '08:00')]], $slots);
+        $staff = $resolver->resolve(['parsed_assignments' => [$this->event('SP'), $this->event('.2WXON', '20:00', '08:00')]], $slots);
         self::assertSame(['morning', 'afternoon'], $staff['SYN90001']['eligible_slots']);
         self::assertSame(['night'], $staff['SYN90001']['partial_slots']);
         self::assertSame([], $staff['SYN90001']['slot_review_reasons']['morning']);
