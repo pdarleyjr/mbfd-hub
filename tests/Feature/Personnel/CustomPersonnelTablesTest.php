@@ -16,6 +16,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\Group;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
@@ -103,6 +104,48 @@ final class CustomPersonnelTablesTest extends TestCase
         app(PersonnelTableService::class)->setCell($owner, $table, $member, $id, true, 0);
         $component->call('updateTableColumnState', 'tracking_'.$id, (string) $member->id, false)->assertHasErrors(['conflict']);
         self::assertTrue($table->entries()->sole()->values[$id]);
+    }
+
+    public function test_saved_toast_can_close_without_querying_a_non_uuid_notification_id(): void
+    {
+        $this->assertTrackingToastDismissalIsSafe();
+    }
+
+    #[Group('postgres')]
+    public function test_postgresql_saved_toast_dismissal_preserves_tracking_and_existing_notifications(): void
+    {
+        if (! app()->environment('testing') || getenv('MBFD_ALLOW_DISPOSABLE_POSTGRES') !== '1'
+            || getenv('EXPECTED_TEST_DB_CONNECTION') !== 'pgsql' || DB::connection()->getDriverName() !== 'pgsql') {
+            if (getenv('REQUIRE_POSTGRES_INTEGRATION') === 'true') {
+                self::fail('Requires explicitly configured disposable PostgreSQL.');
+            }
+            $this->markTestSkipped('Requires explicitly configured disposable PostgreSQL.');
+        }
+        $this->assertTrackingToastDismissalIsSafe();
+    }
+
+    private function assertTrackingToastDismissalIsSafe(): void
+    {
+        $owner = $this->loginManager();
+        $member = $this->employee('UI-NOTIFICATION', 'Notification fixture');
+        $table = $this->makeTable($owner, [$member->id]);
+        $columnId = $table->columns[0]['id'];
+        $existing = $owner->notifications()->create([
+            'id' => (string) Str::uuid(), 'type' => \Filament\Notifications\DatabaseNotification::class,
+            'data' => ['format' => 'filament', 'title' => 'Retained notification'],
+        ]);
+
+        Livewire::test(PersonnelTableEditor::class, ['table' => $table->id])
+            ->call('updateTableColumnState', 'tracking_'.$columnId, (string) $member->id, true)
+            ->assertHasNoErrors();
+        $toast = collect(session()->get('filament.notifications', []))->firstWhere('title', 'Saved');
+        self::assertNotNull($toast);
+        self::assertTrue(Str::isUuid($toast['id']), 'Toast dismissal also reaches the PostgreSQL UUID notification query.');
+        Livewire::test(\Filament\Notifications\Livewire\DatabaseNotifications::class)
+            ->dispatch('notificationClosed', id: $toast['id'])->assertHasNoErrors();
+
+        self::assertTrue($table->entries()->sole()->values[$columnId]);
+        $this->assertDatabaseHas('notifications', ['id' => $existing->id]);
     }
 
     public function test_notes_highlight_and_membership_changes_preserve_personnel_and_tracking(): void

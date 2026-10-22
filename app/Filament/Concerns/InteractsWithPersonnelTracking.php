@@ -87,7 +87,7 @@ trait InteractsWithPersonnelTracking
             $columnId, $value, $this->personnelEntryVersions[$employee->id]);
         $this->personnelEntryVersions[$employee->id] = (int) $entry->version;
         $this->personnelEntries = null;
-        Notification::make('personnel-tracking-save')->title('Saved')->success()->duration(1500)->send();
+        Notification::make()->title('Saved')->success()->duration(1500)->send();
 
         return $entry->values[$columnId] ?? null;
     }
