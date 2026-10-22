@@ -75,7 +75,7 @@ final class ApparatusInspectionExceptionService
                     Validator::make(['value' => $value], ['value' => ['required', ...$this->meterRules($exception->field)]])->validate();
                     if ($current !== null && (float) $value < (float) $current) {
                         // Lowering the fleet reading is never silent: it must be an explicit, audited reset.
-                        if ($action === 'accept_submitted' && filter_var($data['confirm_meter_reset'] ?? false, FILTER_VALIDATE_BOOLEAN) !== true) {
+                        if (filter_var($data['confirm_meter_reset'] ?? false, FILTER_VALIDATE_BOOLEAN) !== true) {
                             throw ValidationException::withMessages(['confirm_meter_reset' => 'Confirm the vehicle meter was reset or replaced to accept a lower reading.']);
                         }
                         $metadata['meter_reset'] = true;

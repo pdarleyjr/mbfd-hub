@@ -116,6 +116,10 @@ final class InspectionReviewService
             'released_by' => $actor?->getKey(),
             'released_by_name' => $actor?->name,
         ]);
+        if ($actor !== null) {
+            // A human hold decision accepted the inspection; automatic acceptance stays silent.
+            app(InspectionNotificationDispatcher::class)->inspectionDecided($lockedInspection, 'approved');
+        }
 
         return true;
     }
