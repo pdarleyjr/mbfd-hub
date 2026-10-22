@@ -455,10 +455,7 @@ final class ApparatusDefectServiceTicketTest extends TestCase
             'lazy' => false,
         ])->call('loadTable');
         $this->assertSame(
-            route('filament.admin.resources.apparatuses.view-inspection', [
-                'record' => $this->apparatus->id,
-                'inspection' => $this->inspection->id,
-            ]),
+            route('filament.admin.resources.inspections.view', ['record' => $this->inspection->id]),
             $inspections->instance()->getTable()->getRecordUrl($this->inspection),
         );
 

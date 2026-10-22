@@ -13,6 +13,8 @@ use App\Filament\Resources\InspectionResource;
 use App\Filament\Resources\StationInspectionResource;
 use App\Filament\Resources\StationRequestResource;
 use App\Filament\Resources\StationResource;
+use App\Filament\Resources\VehicleSwapRequestResource;
+use App\Filament\Support\InspectionWorkspace;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
@@ -25,12 +27,14 @@ use App\Models\StationInventorySubmission;
 use App\Models\StationRequest;
 use App\Models\StationSupplyRequest;
 use App\Services\Display\DisplaySnapshotService;
+use App\Support\Fleet\DefectActionStatus;
 use App\Support\OperationalDisplayWindow;
 use BackedEnum;
 use Filament\Widgets\Widget;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 final class StationOperationsHubWidget extends Widget
 {
@@ -111,6 +115,7 @@ final class StationOperationsHubWidget extends Widget
                 'openServiceTickets' => $attention['serviceTickets']->count(),
                 'openDefects' => $attention['defects']->count(),
                 'openStationRequests' => $attention['stationRequests']->count(),
+                'inspectionQueues' => $this->inspectionQueues($apparatusIds, $apparatusById),
                 'links' => [
                     'apparatus' => ApparatusResource::getUrl('index'),
                     'inspections' => InspectionResource::getUrl('index'),
@@ -162,7 +167,7 @@ final class StationOperationsHubWidget extends Widget
                     label: (string) $label.' Checkout',
                     status: $record->displayStatus(),
                     timestamp: $record->completed_at ?: $record->created_at,
-                    url: InspectionResource::getUrl('view', ['record' => $record]),
+                    url: $this->inspectionUrl($record),
                     stationId: $stationId,
                     apparatusId: (int) $record->apparatus_id,
                     tone: $record->processing_status === 'accepted_with_exception' || $record->review_status === 'pending_review' ? 'warning' : 'neutral',
@@ -268,6 +273,110 @@ final class StationOperationsHubWidget extends Widget
             'stationRequests', 'serviceTickets', 'supplyRequests', 'stationInspections', 'defects',
             'inspectionExceptions', 'checkoutFollowUps', 'supportTickets', 'apparatusById',
         );
+    }
+
+    /**
+     * The four daily-inspection queues, built from three queries so the board stays inside its query budget.
+     * Counts are distinct inspections and distinct equipment issues: an issue seen in several
+     * inspections is one row, never one per sighting.
+     *
+     * @param  list<int>  $apparatusIds
+     * @param  Collection<int, Apparatus>  $apparatusById
+     * @return array<string, array<string, mixed>>
+     */
+    private function inspectionQueues(array $apparatusIds, Collection $apparatusById): array
+    {
+        $empty = ['count' => 0, 'rows' => []];
+        $swapUrl = VehicleSwapRequestResource::getUrl('index');
+        if ($apparatusIds === []) {
+            return ['approvals' => $empty + ['swapHeld' => 0], 'issues' => $empty, 'actions' => $empty, 'recent' => $empty, 'swapUrl' => $swapUrl];
+        }
+
+        $inspectionColumns = ['id', 'apparatus_id', 'processed_apparatus_id', 'designation_at_time', 'unit_number', 'operator_name', 'processing_status', 'review_status', 'completed_at', 'created_at'];
+        $physical = fn (Builder $query): Builder => $query->where(function (Builder $scope) use ($apparatusIds): void {
+            $scope->whereIn('processed_apparatus_id', $apparatusIds)
+                ->orWhere(fn (Builder $legacy) => $legacy->whereNull('processed_apparatus_id')->whereIn('apparatus_id', $apparatusIds));
+        });
+        $inspectionLabel = function (ApparatusInspection $record) use ($apparatusById): string {
+            $apparatus = $apparatusById->get((int) ($record->processed_apparatus_id ?? $record->apparatus_id));
+
+            return (string) ($record->designation_at_time ?: ($apparatus instanceof Apparatus ? $this->apparatusLabel($apparatus) : null) ?: $record->unit_number ?: 'Apparatus');
+        };
+        $moment = static fn (ApparatusInspection $record): mixed => $record->completed_at ?: $record->created_at;
+
+        // Query 1: everything that is waiting on a person, including checkouts held for a vehicle swap.
+        $waiting = $physical(ApparatusInspection::query()->select($inspectionColumns)->addSelect([
+            'open_holds' => DB::table('apparatus_inspection_exceptions as e')->selectRaw('count(*)')
+                ->whereColumn('e.apparatus_inspection_id', 'apparatus_inspections.id')
+                ->where('e.blocks_acceptance', true)
+                ->whereNotIn('e.status', ['resolved', 'dismissed']),
+        ]))
+            ->where(function (Builder $scope): void {
+                $scope->whereIn('processing_status', ['held_for_review', 'pending_vehicle_swap'])
+                    ->orWhere(fn (Builder $legacy) => $legacy->whereNull('processing_status')->where('review_status', 'pending_review'));
+            })
+            ->orderByRaw('COALESCE(completed_at, created_at) DESC')->orderByDesc('id')->get();
+        $swapHeld = $waiting->where('processing_status', 'pending_vehicle_swap')->count();
+        $approvals = $waiting->reject(fn (ApparatusInspection $record): bool => $record->processing_status === 'pending_vehicle_swap')
+            ->map(function (ApparatusInspection $record) use ($inspectionLabel, $moment): array {
+                $holds = (int) $record->getAttribute('open_holds');
+
+                return $this->attentionRow(
+                    (int) $record->id, 'inspection_approval', $inspectionLabel($record).' checkout',
+                    $holds > 0 ? 'Needs approval · '.$holds.($holds === 1 ? ' hold' : ' holds') : 'Needs approval',
+                    InspectionWorkspace::url($record, 'approval'), null, 'warning', $moment($record),
+                );
+            })->values();
+
+        // Query 2: every unresolved issue in a queue state; new/escalated wins over corrective action.
+        $defects = ApparatusDefect::query()
+            ->select(['id', 'apparatus_id', 'item', 'issue_type', 'severity', 'action_status', 'acknowledged_at', 'first_reported_inspection_id', 'apparatus_inspection_id', 'last_observed_inspection_id', 'first_reported_at', 'created_at'])
+            ->whereIn('apparatus_id', $apparatusIds)->unresolved()
+            ->whereIn('action_status', [
+                DefectActionStatus::REPORTED, DefectActionStatus::ACKNOWLEDGED, DefectActionStatus::ACTION_PENDING,
+                DefectActionStatus::REPLACEMENT_AVAILABLE, DefectActionStatus::REPAIR_SCHEDULED,
+            ])
+            ->orderByRaw('COALESCE(first_reported_at, created_at) DESC')->orderByDesc('id')->get();
+        $defectRow = function (ApparatusDefect $record, string $type) use ($apparatusById): array {
+            $apparatus = $apparatusById->get((int) $record->apparatus_id);
+            $sourceId = $record->first_reported_inspection_id ?? $record->apparatus_inspection_id ?? $record->last_observed_inspection_id;
+            $status = DefectActionStatus::label($record->action_status).($record->severity === 'significant' ? ' · Significant damage' : '');
+
+            return $this->attentionRow(
+                (int) $record->id, $type, ($apparatus instanceof Apparatus ? $this->apparatusLabel($apparatus) : 'Apparatus').' · '.($record->item ?: $this->headline((string) $record->issue_type)),
+                $status,
+                $sourceId !== null ? InspectionWorkspace::url((int) $sourceId, 'issue-'.$record->id) : DefectResource::getUrl('index'),
+                $apparatus instanceof Apparatus ? (int) $apparatus->station_id : null,
+                $record->severity === 'significant' ? 'critical' : 'warning',
+                $record->first_reported_at ?: $record->created_at,
+            );
+        };
+        [$newOrEscalated, $inProgress] = $defects->partition(fn (ApparatusDefect $record): bool => $record->action_status === DefectActionStatus::REPORTED
+            || ($record->severity === 'significant' && $record->acknowledged_at === null));
+        $issues = $newOrEscalated->map(fn (ApparatusDefect $record): array => $defectRow($record, 'new_issue'))->values();
+        $actions = $inProgress->map(fn (ApparatusDefect $record): array => $defectRow($record, 'corrective_action'))->values();
+
+        // Query 3: completed inspections of the last 7 days, informational only. The list is trimmed after counting.
+        $completed = $physical(ApparatusInspection::query()->select($inspectionColumns))
+            ->where(function (Builder $scope): void {
+                $scope->whereIn('processing_status', ['accepted', 'accepted_with_exception', 'rejected'])
+                    ->orWhere(fn (Builder $legacy) => $legacy->whereNull('processing_status')->whereIn('review_status', ['approved', 'rejected']));
+            })
+            ->whereRaw('COALESCE(completed_at, created_at) >= ?', [now()->subDays(7)->utc()->format('Y-m-d H:i:s')])
+            ->orderByRaw('COALESCE(completed_at, created_at) DESC')->orderByDesc('id')->get();
+        $recent = $completed->take(10)->map(fn (ApparatusInspection $record): array => $this->attentionRow(
+            (int) $record->id, 'recent_inspection', $inspectionLabel($record).' checkout',
+            InspectionWorkspace::statusPresentation($record)['label'],
+            InspectionWorkspace::url($record), null, 'neutral', $moment($record),
+        ))->values();
+
+        return [
+            'approvals' => ['count' => $approvals->count(), 'rows' => $approvals->all(), 'swapHeld' => $swapHeld],
+            'issues' => ['count' => $issues->count(), 'rows' => $issues->all()],
+            'actions' => ['count' => $actions->count(), 'rows' => $actions->all()],
+            'recent' => ['count' => $completed->count(), 'rows' => $recent->all()],
+            'swapUrl' => $swapUrl,
+        ];
     }
 
     /**
@@ -382,8 +491,6 @@ final class StationOperationsHubWidget extends Widget
      */
     private function departmentAttention(array $attention, Collection $fleetAttention, Collection $pmRecords, Collection $stationNumbersById): Collection
     {
-        /** @var Collection<int, Apparatus> $apparatusById */
-        $apparatusById = $attention['apparatusById'];
         $rows = collect();
 
         foreach ($attention['supportTickets'] as $record) {
@@ -413,14 +520,7 @@ final class StationOperationsHubWidget extends Widget
                 $record->created_at,
             ));
         }
-        foreach ($attention['checkoutFollowUps'] as $record) {
-            $apparatus = $apparatusById->get((int) $record->apparatus_id);
-            $rows->push($this->attentionRow(
-                (int) $record->id, 'checkout_follow_up', ($record->designation_at_time ?: $apparatus?->designation ?: $record->unit_number ?: 'Apparatus').' checkout',
-                $record->displayStatus(), InspectionResource::getUrl('view', ['record' => $record]),
-                $apparatus instanceof Apparatus ? (int) $apparatus->station_id : null, 'warning', $record->completed_at ?: $record->created_at,
-            ));
-        }
+        // Checkout follow-ups and equipment issues have their own grouped queues (see inspectionQueues()).
         foreach ($attention['serviceTickets'] as $record) {
             $priority = (string) $record->priority;
             $rows->push($this->attentionRow(
@@ -428,17 +528,6 @@ final class StationOperationsHubWidget extends Widget
                 $this->headline((string) $record->status), ApparatusServiceTicketResource::getUrl('view', ['record' => $record]),
                 (int) $record->station_id,
                 $priority === 'critical' ? 'critical' : (in_array($priority, ['attention', 'urgent', 'high'], true) ? 'warning' : 'neutral'),
-                $record->created_at,
-            ));
-        }
-        foreach ($attention['defects'] as $record) {
-            $apparatus = $apparatusById->get((int) $record->apparatus_id);
-            $impact = (string) ($record->operational_impact ?: 'unclassified');
-            $rows->push($this->attentionRow(
-                (int) $record->id, 'defect', ($apparatus instanceof Apparatus ? $this->apparatusLabel($apparatus) : 'Apparatus').' · '.($record->item ?: $this->headline((string) $record->issue_type)),
-                $this->headline($impact), DefectResource::getUrl('index'),
-                $apparatus instanceof Apparatus ? (int) $apparatus->station_id : null,
-                $impact === 'out_of_service' ? 'critical' : (in_array($impact, ['needs_repair', 'needs_admin_review'], true) ? 'warning' : 'neutral'),
                 $record->created_at,
             ));
         }
@@ -493,7 +582,7 @@ final class StationOperationsHubWidget extends Widget
                     return $this->attentionRow(
                         (int) $record->id, 'checkout_follow_up',
                         ($record->designation_at_time ?: $apparatus?->designation ?: $record->unit_number ?: 'Apparatus').' checkout',
-                        $record->displayStatus(), InspectionResource::getUrl('view', ['record' => $record]),
+                        $record->displayStatus(), $this->inspectionUrl($record),
                         $stationId, 'warning', $record->completed_at ?: $record->created_at,
                     );
                 }))
@@ -593,6 +682,15 @@ final class StationOperationsHubWidget extends Widget
         }
 
         return Carbon::parse($value)->timezone(OperationalDisplayWindow::TIMEZONE);
+    }
+
+    /** Canonical inspection URL; an inspection that waits on a decision opens at its approval section. */
+    private function inspectionUrl(ApparatusInspection $record): string
+    {
+        $waiting = $record->processing_status === 'held_for_review'
+            || ($record->processing_status === null && $record->review_status === 'pending_review');
+
+        return InspectionWorkspace::url($record, $waiting ? 'approval' : null);
     }
 
     private function stationFilterUrl(string $url, int $stationId): string

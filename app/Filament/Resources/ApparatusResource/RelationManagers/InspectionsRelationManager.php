@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\ApparatusResource\RelationManagers;
 
+use App\Filament\Support\InspectionWorkspace;
 use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -64,8 +65,9 @@ class InspectionsRelationManager extends RelationManager
                     ->getStateUsing(fn (ApparatusInspection $record): string => $record->displayStatus())
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
-                        'Pending review', 'Follow-up needed' => 'warning',
+                        'Pending review', 'Needs approval', 'Follow-up needed', 'Held: vehicle swap' => 'warning',
                         'Approved', 'Accepted' => 'success',
+                        'Rejected' => 'danger',
                         default => 'gray',
                     }),
 
@@ -93,12 +95,9 @@ class InspectionsRelationManager extends RelationManager
             ->defaultSort('completed_at', 'desc');
     }
 
-    /** Same-tab navigation: ContextualBack on the results page returns here. */
+    /** Same-tab navigation to the one canonical inspection page; its Back control returns here. */
     private static function resultsUrl(ApparatusInspection $record): string
     {
-        return route('filament.admin.resources.apparatuses.view-inspection', [
-            'record' => $record->apparatus_id,
-            'inspection' => $record->id,
-        ]);
+        return InspectionWorkspace::url($record);
     }
 }

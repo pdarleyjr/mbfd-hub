@@ -4,284 +4,176 @@ namespace App\Filament\Resources\InspectionResource\Pages;
 
 use App\Filament\Resources\ApparatusResource;
 use App\Filament\Resources\InspectionResource;
+use App\Filament\Support\InspectionWorkspace;
 use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
-use Filament\Actions;
-use Filament\Infolists;
-use Filament\Infolists\Infolist;
+use App\Models\User;
+use App\Services\ApparatusInspectionApprovalService;
+use Filament\Actions\Action;
+use Filament\Forms;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
+use Illuminate\Contracts\Support\Htmlable;
 
+/**
+ * The one authoritative admin page for a daily inspection. Everything a reviewer
+ * needs sits here: facts, holds and issues, the original checklist, the activity
+ * timeline and the vehicle's recent history. The apparatus-scoped URL redirects here.
+ */
 class ViewInspection extends ViewRecord
 {
     protected static string $resource = InspectionResource::class;
 
+    protected static string $view = 'filament.resources.inspection-resource.pages.view-inspection';
+
+    public function mount(int|string $record): void
+    {
+        parent::mount($record);
+
+        // Same gate as the former apparatus-scoped review page.
+        $apparatus = $this->inspection()->getRelationValue('apparatus');
+        abort_unless(! $apparatus instanceof Apparatus || ApparatusResource::canView($apparatus), 403);
+    }
+
+    public function getTitle(): string|Htmlable
+    {
+        $inspection = $this->inspection();
+
+        return 'Inspection '.($inspection->inspection_reference ?: '#'.$inspection->getKey());
+    }
+
+    public function getHeading(): string|Htmlable
+    {
+        $inspection = $this->inspection();
+        $designation = $inspection->designation_at_time ?: $inspection->getRelationValue('apparatus')?->designation;
+
+        return 'Inspection: '.($designation ?: 'Apparatus');
+    }
+
+    /** @return array<string, mixed> */
+    protected function getViewData(): array
+    {
+        $viewer = auth()->user();
+
+        return [
+            'workspace' => app(InspectionWorkspace::class)->build($this->inspection(), $viewer instanceof User ? $viewer : null),
+        ];
+    }
+
     protected function getHeaderActions(): array
+    {
+        return [
+            Action::make('approveInspection')
+                ->label('Approve inspection')
+                ->icon('heroicon-o-check-circle')
+                ->color('success')
+                ->requiresConfirmation()
+                ->modalDescription('This accepts the inspection and applies the reported meter readings and defects to the apparatus. It does not change the unit\'s operational status unless you choose to below.')
+                ->form([
+                    Forms\Components\Toggle::make('mark_out_of_service')
+                        ->label('Mark unit Out of Service')
+                        ->helperText(fn (): string => $this->reportsCriticalDefects()
+                            ? 'Missing or damaged equipment was reported. Review it, then confirm whether this unit should be taken Out of Service.'
+                            : 'No missing or damaged equipment was reported. Leave off unless you have another reason to take the unit out of service.')
+                        ->default(fn (): bool => $this->reportsCriticalDefects()),
+                ])
+                ->visible(fn (): bool => $this->isAwaitingDecision() && $this->canApproveInspection())
+                ->action(function (array $data, ApparatusInspectionApprovalService $approvalService): void {
+                    $reviewer = auth()->user();
+                    abort_unless($reviewer instanceof User && $this->canApproveInspection(), 403);
+
+                    $approvalService->approve(
+                        (int) $this->inspection()->getKey(),
+                        $reviewer,
+                        (bool) ($data['mark_out_of_service'] ?? false),
+                    );
+                    $this->refreshInspection();
+
+                    Notification::make()->success()->title('Inspection approved')->send();
+                }),
+            Action::make('rejectInspection')
+                ->label('Reject inspection')
+                ->icon('heroicon-o-x-circle')
+                ->color('danger')
+                ->requiresConfirmation()
+                ->modalDescription('This retains the submitted evidence and records your required review note. It does not apply any reported apparatus effects.')
+                ->form([
+                    Forms\Components\Textarea::make('review_notes')
+                        ->label('Review note')
+                        ->required()
+                        ->maxLength(2000)
+                        ->rows(4),
+                ])
+                ->visible(fn (): bool => $this->isAwaitingDecision() && $this->canRejectInspection())
+                ->action(function (array $data, ApparatusInspectionApprovalService $approvalService): void {
+                    $reviewer = auth()->user();
+                    abort_unless($reviewer instanceof User && $this->canRejectInspection(), 403);
+
+                    $approvalService->reject(
+                        (int) $this->inspection()->getKey(),
+                        $reviewer,
+                        trim($data['review_notes']),
+                    );
+                    $this->refreshInspection();
+
+                    Notification::make()->success()->title('Inspection rejected')->send();
+                }),
+            Action::make('print')
+                ->label('Print')
+                ->icon('heroicon-o-printer')
+                ->color('gray')
+                ->extraAttributes(['onclick' => 'window.print(); return false;']),
+            Action::make('downloadPdf')
+                ->label('Download PDF')
+                ->icon('heroicon-o-arrow-down-tray')
+                ->color('gray')
+                ->url(fn (): string => route('employee.vehicle-inspections.pdf', $this->inspection()))
+                ->openUrlInNewTab()
+                ->visible(fn (): bool => (bool) auth()->user()?->can('view', $this->inspection())),
+        ];
+    }
+
+    private function inspection(): ApparatusInspection
     {
         $inspection = $this->getRecord();
         abort_unless($inspection instanceof ApparatusInspection, 404);
 
-        return [
-            Actions\Action::make('reviewFullInspection')
-                ->label('Review full inspection')
-                ->icon('heroicon-o-arrow-top-right-on-square')
-                ->color('primary')
-                ->url(fn (): string => ApparatusResource::getUrl('view-inspection', [
-                    'record' => $inspection->apparatus_id,
-                    'inspection' => $inspection->getKey(),
-                ]))
-                ->visible(function () use ($inspection): bool {
-                    $apparatus = $inspection->getAttribute('apparatus');
-
-                    return $inspection->review_status === 'pending_review'
-                        && $apparatus instanceof Apparatus
-                        && ApparatusResource::canView($apparatus);
-                }),
-        ];
+        return $inspection;
     }
 
-    public function infolist(Infolist $infolist): Infolist
+    private function refreshInspection(): void
     {
-        return $infolist
-            ->schema([
-                Infolists\Components\Section::make('Inspection Details')
-                    ->schema([
-                        Infolists\Components\TextEntry::make('apparatus.name')
-                            ->label('Apparatus'),
-                        Infolists\Components\TextEntry::make('completed_at')
-                            ->label('Inspection Date')
-                            ->dateTime(),
-                        Infolists\Components\TextEntry::make('operator_name')
-                            ->label('Operator Name'),
-                        Infolists\Components\TextEntry::make('employee.employee_id')
-                            ->label('Employee ID')
-                            ->placeholder('Not linked'),
-                        Infolists\Components\TextEntry::make('shift')
-                            ->badge()
-                            ->color(fn ($state) => match ($state) {
-                                'A' => 'primary',
-                                'B' => 'warning',
-                                'C' => 'success',
-                                default => 'gray',
-                            }),
-                        Infolists\Components\TextEntry::make('inspection_reference')
-                            ->label('Inspection Reference')
-                            ->copyable(),
-                        Infolists\Components\TextEntry::make('inspection_status')
-                            ->label('Status')
-                            ->getStateUsing(fn (ApparatusInspection $record): string => $record->displayStatus())
-                            ->badge(),
-                        Infolists\Components\TextEntry::make('engine_hours')
-                            ->label('Engine Hours')
-                            ->numeric(decimalPlaces: 1)
-                            ->placeholder('Not reported'),
-                        Infolists\Components\TextEntry::make('miles')
-                            ->label('Miles')
-                            ->numeric()
-                            ->placeholder('Not reported'),
-                    ])
-                    ->columns(2),
-
-                Infolists\Components\Section::make('Pending Review Evidence')
-                    ->description('This submission has not changed readiness, defects, or meter records. Use Review full inspection before deciding; that view contains the complete checklist evidence and review actions.')
-                    ->visible(fn ($record): bool => $record->review_status === 'pending_review')
-                    ->schema([
-                        Infolists\Components\TextEntry::make('engine_hours')
-                            ->label('Reported Engine Hours')
-                            ->numeric(decimalPlaces: 1)
-                            ->placeholder('Not reported'),
-                        Infolists\Components\TextEntry::make('miles')
-                            ->label('Reported Miles')
-                            ->numeric()
-                            ->placeholder('Not reported'),
-                        Infolists\Components\RepeatableEntry::make('pending_effects.checklist_v2.field_values')
-                            ->label('Checklist v2 evidence — reported fields')
-                            ->schema([
-                                Infolists\Components\TextEntry::make('name')
-                                    ->label('Field'),
-                                Infolists\Components\TextEntry::make('value')
-                                    ->label('Reported value')
-                                    ->formatStateUsing(fn (mixed $state): string => $this->formatV2ChecklistValue($state)),
-                                Infolists\Components\TextEntry::make('input_type')
-                                    ->label('Type')
-                                    ->formatStateUsing(fn (mixed $state): string => ucfirst((string) $state)),
-                            ])
-                            ->columns(3)
-                            ->columnSpanFull()
-                            ->visible(fn (mixed $state): bool => is_array($state) && $state !== []),
-                        Infolists\Components\RepeatableEntry::make('pending_effects.checklist_v2.scheduled_tasks')
-                            ->label('Checklist v2 evidence — scheduled duties')
-                            ->schema([
-                                Infolists\Components\TextEntry::make('name')
-                                    ->label('Duty'),
-                                Infolists\Components\TextEntry::make('status')
-                                    ->label('Result')
-                                    ->badge()
-                                    ->color(fn ($state) => match ($state) {
-                                        'Present' => 'success',
-                                        'Missing' => 'danger',
-                                        'Damaged' => 'warning',
-                                        default => 'gray',
-                                    }),
-                                Infolists\Components\TextEntry::make('recurrence_label')
-                                    ->label('Recurrence'),
-                                Infolists\Components\TextEntry::make('instructions')
-                                    ->label('Instructions')
-                                    ->columnSpanFull()
-                                    ->placeholder('No instructions'),
-                                Infolists\Components\TextEntry::make('notes')
-                                    ->label('Notes')
-                                    ->columnSpanFull()
-                                    ->placeholder('No notes'),
-                            ])
-                            ->columns(3)
-                            ->columnSpanFull()
-                            ->visible(fn (mixed $state): bool => is_array($state) && $state !== []),
-                        Infolists\Components\RepeatableEntry::make('pending_effects.defects')
-                            ->label('Reported Pending Defects')
-                            ->schema([
-                                Infolists\Components\TextEntry::make('compartment')
-                                    ->label('Compartment'),
-                                Infolists\Components\TextEntry::make('item')
-                                    ->label('Item'),
-                                Infolists\Components\TextEntry::make('status')
-                                    ->label('Status')
-                                    ->badge()
-                                    ->color('warning'),
-                                Infolists\Components\TextEntry::make('notes')
-                                    ->label('Notes')
-                                    ->columnSpanFull()
-                                    ->placeholder('No notes'),
-                            ])
-                            ->columns(2)
-                            ->columnSpanFull()
-                            ->hidden(fn ($record): bool => empty($record->pending_effects['defects'] ?? [])),
-                        Infolists\Components\TextEntry::make('no_pending_defects')
-                            ->label('')
-                            ->default('No defects were reported with this pending submission.')
-                            ->color('success')
-                            ->hidden(fn ($record): bool => ! empty($record->pending_effects['defects'] ?? [])),
-                    ])
-                    ->columns(2),
-
-                Infolists\Components\Section::make('Review History')
-                    ->visible(fn ($record): bool => $record->reviewEvents()->exists())
-                    ->schema([
-                        Infolists\Components\RepeatableEntry::make('reviewEvents')
-                            ->label('')
-                            ->schema([
-                                Infolists\Components\TextEntry::make('created_at')
-                                    ->label('Reviewed at')
-                                    ->dateTime(),
-                                Infolists\Components\TextEntry::make('previous_status')
-                                    ->label('Previous status')
-                                    ->badge(),
-                                Infolists\Components\TextEntry::make('status')
-                                    ->label('Decision')
-                                    ->badge(),
-                                Infolists\Components\TextEntry::make('changedByUser.name')
-                                    ->label('Reviewer')
-                                    ->placeholder('User no longer active'),
-                                Infolists\Components\TextEntry::make('metadata.reviewer_name')
-                                    ->label('Reviewer name snapshot')
-                                    ->placeholder('Not recorded'),
-                                Infolists\Components\TextEntry::make('internal_note')
-                                    ->label('Review note')
-                                    ->placeholder('No note')
-                                    ->columnSpanFull(),
-                                Infolists\Components\RepeatableEntry::make('metadata.submitted_effects.checklist_v2.field_values')
-                                    ->label('Checklist v2 evidence — reported fields')
-                                    ->schema([
-                                        Infolists\Components\TextEntry::make('name')
-                                            ->label('Field'),
-                                        Infolists\Components\TextEntry::make('value')
-                                            ->label('Reported value')
-                                            ->formatStateUsing(fn (mixed $state): string => $this->formatV2ChecklistValue($state)),
-                                        Infolists\Components\TextEntry::make('input_type')
-                                            ->label('Type')
-                                            ->formatStateUsing(fn (mixed $state): string => ucfirst((string) $state)),
-                                    ])
-                                    ->columns(3)
-                                    ->columnSpanFull()
-                                    ->visible(fn (mixed $state): bool => is_array($state) && $state !== []),
-                                Infolists\Components\RepeatableEntry::make('metadata.submitted_effects.checklist_v2.scheduled_tasks')
-                                    ->label('Checklist v2 evidence — scheduled duties')
-                                    ->schema([
-                                        Infolists\Components\TextEntry::make('name')
-                                            ->label('Duty'),
-                                        Infolists\Components\TextEntry::make('status')
-                                            ->label('Result')
-                                            ->badge()
-                                            ->color(fn ($state) => match ($state) {
-                                                'Present' => 'success',
-                                                'Missing' => 'danger',
-                                                'Damaged' => 'warning',
-                                                default => 'gray',
-                                            }),
-                                        Infolists\Components\TextEntry::make('recurrence_label')
-                                            ->label('Recurrence'),
-                                        Infolists\Components\TextEntry::make('instructions')
-                                            ->label('Instructions')
-                                            ->columnSpanFull()
-                                            ->placeholder('No instructions'),
-                                        Infolists\Components\TextEntry::make('notes')
-                                            ->label('Notes')
-                                            ->columnSpanFull()
-                                            ->placeholder('No notes'),
-                                    ])
-                                    ->columns(3)
-                                    ->columnSpanFull()
-                                    ->visible(fn (mixed $state): bool => is_array($state) && $state !== []),
-                            ])
-                            ->columns(2),
-                    ]),
-
-                Infolists\Components\Section::make('Defects Found')
-                    ->schema([
-                        Infolists\Components\RepeatableEntry::make('defects')
-                            ->label('')
-                            ->schema([
-                                Infolists\Components\TextEntry::make('compartment')
-                                    ->label('Compartment'),
-                                Infolists\Components\TextEntry::make('item')
-                                    ->label('Item'),
-                                Infolists\Components\TextEntry::make('issue_type')
-                                    ->label('Issue Type')
-                                    ->badge()
-                                    ->formatStateUsing(fn ($state) => str_replace('_', ' ', ucfirst($state))),
-                                Infolists\Components\TextEntry::make('status')
-                                    ->badge()
-                                    ->color(fn ($state) => match ($state) {
-                                        'Missing' => 'danger',
-                                        'Damaged' => 'warning',
-                                        'Present' => 'success',
-                                        default => 'gray',
-                                    }),
-                                Infolists\Components\IconEntry::make('resolved')
-                                    ->label('Resolved')
-                                    ->boolean(),
-                                Infolists\Components\TextEntry::make('notes')
-                                    ->label('Notes')
-                                    ->columnSpanFull()
-                                    ->placeholder('No notes'),
-                            ])
-                            ->columns(2)
-                            ->hidden(fn ($record) => $record->defects->isEmpty()),
-                        Infolists\Components\TextEntry::make('no_defects')
-                            ->label('')
-                            ->default('No defects found during this inspection.')
-                            ->color('success')
-                            ->hidden(fn ($record) => $record->defects->isNotEmpty()),
-                    ]),
-            ]);
+        $this->record = $this->inspection()->refresh();
     }
 
-    private function formatV2ChecklistValue(mixed $value): string
+    /** Waiting on a person: not yet decided and not held for a vehicle swap decision. */
+    private function isAwaitingDecision(): bool
     {
-        return match ($value) {
-            null, '' => 'Not reported',
-            true => 'Yes',
-            false => 'No',
-            default => (string) $value,
-        };
+        $inspection = $this->inspection();
+
+        return $inspection->review_status === 'pending_review' && ! $inspection->isHeldForVehicleSwap();
+    }
+
+    /** Unprepared (legacy) evidence is treated as reporting critical defects; processed inspections default the choice off. */
+    private function reportsCriticalDefects(): bool
+    {
+        $inspection = $this->inspection();
+        if ($inspection->processing_status !== null) {
+            return false;
+        }
+
+        $pendingEffects = $inspection->pending_effects;
+
+        return $pendingEffects === null || (bool) ($pendingEffects['has_critical_defects'] ?? false);
+    }
+
+    private function canApproveInspection(): bool
+    {
+        return auth()->user()?->can('approve', $this->inspection()) ?? false;
+    }
+
+    private function canRejectInspection(): bool
+    {
+        return auth()->user()?->can('reject', $this->inspection()) ?? false;
     }
 }

@@ -5,8 +5,10 @@ namespace App\Filament\Resources;
 use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\DefectResource\Pages;
 use App\Filament\Support\DefectServiceTicketActions;
+use App\Filament\Support\InspectionWorkspace;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
+use App\Models\ApparatusInspection;
 use App\Support\Fleet\DefectFollowUpState;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -214,6 +216,16 @@ class DefectResource extends Resource
                         fn (Tables\Actions\Action $action): ?ApparatusDefect => DefectServiceTicketActions::defectFrom($action->getRecord()),
                     ),
 
+                    Tables\Actions\Action::make('source_inspection')
+                        ->label('Source inspection')
+                        ->icon('heroicon-o-clipboard-document-check')
+                        ->visible(fn (ApparatusDefect $record): bool => self::sourceInspectionId($record) !== null
+                            && (auth()->user()?->can('viewAny', ApparatusInspection::class) ?? false))
+                        ->url(fn (ApparatusDefect $record): string => InspectionWorkspace::url(
+                            (int) self::sourceInspectionId($record),
+                            'issue-'.$record->getKey(),
+                        )),
+
                     Tables\Actions\Action::make('mark_resolved')
                         ->label('Mark Resolved')
                         ->icon('heroicon-o-check-circle')
@@ -244,6 +256,14 @@ class DefectResource extends Resource
                 ])->label('Actions')->icon('heroicon-m-ellipsis-horizontal')->button()->color('gray'),
             ])
             ->defaultSort('reported_date', 'desc');
+    }
+
+    /** The inspection that first reported this issue, else the one that created the record, else the latest to observe it. */
+    private static function sourceInspectionId(ApparatusDefect $defect): ?int
+    {
+        $id = $defect->first_reported_inspection_id ?? $defect->apparatus_inspection_id ?? $defect->last_observed_inspection_id;
+
+        return $id === null ? null : (int) $id;
     }
 
     public static function getRelations(): array
