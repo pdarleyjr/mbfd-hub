@@ -114,7 +114,8 @@ final class AuthenticatedMemberContextTest extends TestCase
         self::assertStringNotContainsString('context-secret@example.test', $content);
         self::assertStringNotContainsString('logistics_admin', $content);
         self::assertStringNotContainsString('999999', $content);
-        self::assertLessThanOrEqual(12, $queries, 'The bootstrap context exceeded its query budget.');
+        // +2 for the 300 Command Access hint: one direct-grant read and one current-assignment read.
+        self::assertLessThanOrEqual(14, $queries, 'The bootstrap context exceeded its query budget.');
         self::assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
         self::assertStringContainsString('private', (string) $response->headers->get('Cache-Control'));
         self::assertStringContainsString('Cookie', (string) $response->headers->get('Vary'));

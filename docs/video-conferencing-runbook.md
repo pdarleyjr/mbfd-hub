@@ -20,9 +20,21 @@ The GMKtec production host is behind Starlink CGNAT and its routed IPv6 is filte
 
 Current Chromium browsers classify the Tailscale endpoint as local address space. Chrome and Edge users must grant the employee portal's Local Network Access prompt in addition to connecting Tailscale; the application performs a bounded browser reachability check before it creates a room so this permission is requested explicitly and failures are actionable. Firefox does not currently enforce that Chromium permission. A failed preflight must not create a LiveKit room or participation row.
 
+## 300 Command access
+
+The 300 command PIN was removed. Starting or ending Morning Lineup, direct station calls, the command status feed, 300 moderation controls and any 300/Command LiveKit token all ask `App\Services\Security\Command300Access` on every request (no session marker, no cache). Access is granted to: administrators (`super_admin` or the `admin.access` permission), members whose personnel rank is Captain or Division Chief, the member with a verified current 300 bid assignment, and any member granted the direct `command.300.access` permission. A demotion or revoked grant takes effect on the next request; a member who is already connected loses the moderation controls (mute, give floor) immediately, and the 20-minute lineup limit is unchanged.
+
+A client-supplied `join_as=300` never escalates: unqualified members receive 403. Ordinary member (`self`) participation and station endpoints are unchanged.
+
+Conference participation is keyed to a personnel profile, so an authorized administrator whose account is not linked to an employee record sees: "300 video conferencing needs a linked MBFD personnel profile. Ask a Hub administrator to link your account to your employee record." Link the account in the Admin Panel instead of creating placeholder employees.
+
+`POST /employee/video-conferencing/api/lineup/command/authorize` remains for one release so cached browsers keep working. It takes no body and only reports the live decision (`{"authorized": true}` or 403). Remove it in the following release.
+
+`VIDEO_CONFERENCING_COMMAND_PIN_HASH` is no longer read by conferencing. It is retained only for the legacy Command Board "use the camera PIN" copy action in the Admin Panel.
+
 ## Install
 
-1. Generate a unique API key, at least 32 random API-secret characters, and a separate 4-8 digit 300 command PIN. Store the PIN only in the approved operator secret store and put a one-way application hash in `VIDEO_CONFERENCING_COMMAND_PIN_HASH`; never store or commit the plaintext PIN in `.env`.
+1. Generate a unique API key, at least 32 random API-secret characters. There is no 300 command PIN: 300 Command video controls are authorized by the central `Command300Access` policy (see "300 Command access" below).
 2. Obtain one trusted certificate covering both signaling and TURN names. For the GMKtec Tailnet deployment, use Cloudflare DNS-01 validation. Copy the resulting certificate to `fullchain.pem` and key to `privkey.pem` under the root-owned directory identified by `LIVEKIT_CERT_DIR`; never place the DNS API token in the repository or container environment.
 3. Copy `infra/livekit/caddy.yaml.example` to the path identified by `LIVEKIT_CADDY_CONFIG`, replace both example SNI names, and validate it with the pinned Caddy image. Copy `infra/livekit/.env.example` to an operator-owned secret file outside the repository and set all values. In the Tailnet-only topology, set `LIVEKIT_NODE_IP` to the LiveKit host's Tailscale address; do not use a CGNAT address discovered through STUN.
 4. Validate without starting services:
@@ -39,7 +51,7 @@ Current Chromium browsers classify the Tailscale endpoint as local address space
    docker compose --env-file /secure/path/livekit.env -f infra/livekit/compose.yaml logs --tail=100 livekit
    ```
 
-6. Configure Laravel with browser-facing `LIVEKIT_URL=wss://...`, a server-side `LIVEKIT_API_URL`, the matching key/secret, `VIDEO_CONFERENCING_COMMAND_PIN_HASH`, and an optional `VIDEO_CONFERENCING_LINEUP_TIME=HH:MM`. A Laravel container co-located with host-networked LiveKit should use the host gateway (for example, `http://172.20.5.1:7880`) rather than hairpinning through its Tailscale/public DNS name. Permit TCP 7880 only from the exact application Docker subnet; keep it closed to public and Tailnet clients. A remote application host should use the trusted HTTPS API endpoint. Keep `VIDEO_CONFERENCING_ENABLED=false`, then run migrations and clear cached config.
+6. Configure Laravel with browser-facing `LIVEKIT_URL=wss://...`, a server-side `LIVEKIT_API_URL`, the matching key/secret, and an optional `VIDEO_CONFERENCING_LINEUP_TIME=HH:MM`. A Laravel container co-located with host-networked LiveKit should use the host gateway (for example, `http://172.20.5.1:7880`) rather than hairpinning through its Tailscale/public DNS name. Permit TCP 7880 only from the exact application Docker subnet; keep it closed to public and Tailnet clients. A remote application host should use the trusted HTTPS API endpoint. Keep `VIDEO_CONFERENCING_ENABLED=false`, then run migrations and clear cached config.
 7. Verify signed webhook delivery to `/webhooks/livekit`, then enable the feature and clear cached config again.
 
 The Caddy certificate reload hook should run `docker exec mbfd-livekit-caddy caddy reload --config /etc/caddy.yaml --adapter yaml` after renewal. Validate automatic renewal with the CA client's dry-run command before enabling the feature.
@@ -66,10 +78,9 @@ $env:LIVEKIT_URL='ws://127.0.0.1:7880'
 $env:LIVEKIT_API_URL='http://127.0.0.1:7880'
 $env:LIVEKIT_API_KEY='mbfd-integration-key'
 $env:LIVEKIT_API_SECRET='mbfd-integration-secret-not-for-production'
-$env:VIDEO_CONFERENCING_COMMAND_PIN_HASH = php -r "echo password_hash('246810', PASSWORD_BCRYPT);"
 $env:VIDEO_CONFERENCING_E2E_EMPLOYEE_ID='VC-E2E'
 $env:VIDEO_CONFERENCING_E2E_PASSWORD='<local-unique-password>'
-$env:VIDEO_CONFERENCING_E2E_COMMAND_PIN='246810'
+# The seeded VC-E2E member must hold 300 Command access (grant the command.300.access permission or set a Captain rank).
 $env:VIDEO_CONFERENCING_E2E_BASE_URL='http://127.0.0.1:8000'
 php artisan migrate
 php artisan db:seed --class=VideoConferenceIntegrationSeeder
@@ -84,7 +95,7 @@ npx playwright test --config=playwright.video-conferencing.config.ts
 
 This opens independent 300, Station 1, and Station 2 contexts with fake media, joins the same opaque lineup, checks all three tiles, verifies station starts muted, and exercises the verified 300 RPC path. Afterward, stop the app and run `docker compose -f infra/livekit/compose.integration.yaml down`. Do not use `-v` unless intentionally deleting the disposable integration volume.
 
-For a production TURN/TLS acceptance run, set the production fixture's `VIDEO_CONFERENCING_E2E_COMMAND_PIN` and `VIDEO_CONFERENCING_E2E_FORCE_RELAY=true` before starting Playwright. The test then adds the non-sensitive `force_relay=1` diagnostic query, connects all three LiveKit clients with WebRTC `iceTransportPolicy: relay`, verifies that every peer connection retained that policy, and fails unless the three endpoints connect and moderation still works. Successful connection in this mode proves that no host or server-reflexive candidate was used. Do not leave disposable production employee fixtures behind after the run.
+For a production TURN/TLS acceptance run, use a production fixture member who has 300 Command access (for example a Captain) and set `VIDEO_CONFERENCING_E2E_FORCE_RELAY=true` before starting Playwright. The test then adds the non-sensitive `force_relay=1` diagnostic query, connects all three LiveKit clients with WebRTC `iceTransportPolicy: relay`, verifies that every peer connection retained that policy, and fails unless the three endpoints connect and moderation still works. Successful connection in this mode proves that no host or server-reflexive candidate was used. Do not leave disposable production employee fixtures behind after the run.
 
 Physical acceptance remains separate: repeat on the 300 device, representative station devices, iPad/Safari, actual USB camera/microphone/speaker hardware, and a restricted-network/TURN-only path. Confirm speaker routing, hot-plug recovery, intelligibility, echo suppression, camera framing, touch targets, takeover messaging, and a sustained 30-minute lineup.
 

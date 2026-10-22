@@ -21,7 +21,7 @@ class MuteAllStationsController extends Controller
         $employee = $this->authenticatedEmployee();
 
         return response()->json([
-            'muted' => $moderation->muteAllStations($session, $employee),
+            'muted' => $moderation->muteAllStations($session, $employee, $request->user()),
         ]);
     }
 }

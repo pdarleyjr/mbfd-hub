@@ -22,7 +22,8 @@ class VideoConferenceIntegrationSeeder extends Seeder
             ['employee_id' => env('VIDEO_CONFERENCING_E2E_EMPLOYEE_ID', 'VC-E2E')],
             [
                 'name' => 'Conference Integration',
-                'rank' => 'Test',
+                // The integration actor runs the 300 lineup, which requires 300 Command Access.
+                'rank' => 'Captain',
                 'password' => $password,
                 'must_change_password' => false,
             ],

@@ -70,7 +70,7 @@ final class CommandBoardPinPageTest extends TestCase
     public function test_super_admin_can_grant_the_capability_from_the_employee_access_controls(): void
     {
         self::assertSame(
-            'Command Board — set and change the command PIN (requires Hub administration access)',
+            'Command Board — legacy PIN rollback control (requires Hub administration access)',
             app(ApplicationAccessRegistry::class)->capabilityOptions()['app.cmd.admin'],
         );
         $actor = $this->superAdmin();

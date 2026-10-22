@@ -8,14 +8,18 @@ export interface OfflineIdentity {
   securityVersion: number;
   personnel?: { employee_profile_id: number; employee_number: string; name: string; rank: string };
   /** Server-derived entry points; absent in identities cached before this field existed. */
-  capabilities?: { personnelEquipmentRequest: boolean };
+  capabilities?: {
+    personnelEquipmentRequest: boolean;
+    /** 300 Command access; undefined in identities cached before this field existed (unknown, not denied). */
+    commandAccess?: boolean;
+  };
 }
 
 interface MemberContextResponse {
   identity?: { user_id?: unknown };
   offline?: { security_version?: unknown };
   personnel?: OfflineIdentity['personnel'];
-  authorization?: { capabilities?: { personnel_equipment_request?: unknown } };
+  authorization?: { capabilities?: { personnel_equipment_request?: unknown; command_300_access?: unknown } };
 }
 
 const parseIdentity = (value: unknown): OfflineIdentity | null => {
@@ -29,7 +33,10 @@ const parseIdentity = (value: unknown): OfflineIdentity | null => {
         userId: userId as number,
         securityVersion: securityVersion as number,
         personnel: context.personnel,
-        capabilities: { personnelEquipmentRequest: context.authorization?.capabilities?.personnel_equipment_request === true },
+        capabilities: {
+          personnelEquipmentRequest: context.authorization?.capabilities?.personnel_equipment_request === true,
+          commandAccess: context.authorization?.capabilities?.command_300_access === true,
+        },
       }
     : null;
 };

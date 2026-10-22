@@ -268,7 +268,7 @@ body:has(> main > #video-conferencing-root) .vc-shell {
 .vc-standby[data-ready="true"] > svg,
 .vc-standby[data-ready="true"] strong { color: var(--vc-green); }
 
-.vc-command-login,
+.vc-command-denied,
 .vc-ready-dashboard,
 .vc-self-entry { display: grid; gap: .75rem; }
 .vc-ready-list { display: grid; gap: .5rem; margin-bottom: .25rem; }

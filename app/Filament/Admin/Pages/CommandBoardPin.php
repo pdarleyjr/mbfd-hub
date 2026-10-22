@@ -67,6 +67,17 @@ class CommandBoardPin extends Page
         return $user instanceof User && app(CommandBoardPinAdministration::class)->canAdminister($user);
     }
 
+    /**
+     * Retired from navigation: the Command Board no longer asks for a PIN; Hub
+     * sign-in with 300 Command Access admits members. The page stays reachable
+     * for authorized administrators only as the rollback control while the
+     * Board's CMD_PIN_REQUIRED switch exists.
+     */
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
     public function mount(): void
     {
         $this->authorizeAccess();

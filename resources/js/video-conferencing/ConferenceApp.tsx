@@ -138,8 +138,9 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
     const [forcedStationMic, setForcedStationMic] = useState(false);
     const [speakerTesting, setSpeakerTesting] = useState(false);
     const [actionBusy, setActionBusy] = useState<string | null>(null);
-    const [commandPin, setCommandPin] = useState('');
-    const [commandAuthorized, setCommandAuthorized] = useState(false);
+    // Server-side policy decision from the bootstrap; every command endpoint re-checks it live.
+    const [commandAuthorized, setCommandAuthorized] = useState(bootstrap.command_access === true);
+    const [commandDeniedMessage, setCommandDeniedMessage] = useState<string | null>(null);
     const [providerApiHealthy, setProviderApiHealthy] = useState<boolean | null>(null);
     const [lineup, setLineup] = useState<LineupState>(emptyLineup);
     const [stationReadiness, setStationReadiness] = useState<StationReadiness[]>([]);
@@ -385,7 +386,6 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
             if (nextRoom.canPlaybackAudio) await nextRoom.startAudio().catch(() => setAudioBlocked(true));
             setForcedStationMic(bootstrap.entry_mode === 'station');
             setMicrophoneEnabled(bootstrap.entry_mode !== 'station' && microphoneEnabled);
-            setCommandPin('');
             setNotice(null);
             connectedAtRef.current = Date.now();
             userLeftRef.current = false;
@@ -497,6 +497,18 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
         }
     }, [bootstrap, returnFromConference, requestStationToken, roomMode]);
 
+    // A 403 from any command endpoint means the live 300 policy no longer allows
+    // this account (for example after a demotion); show the access-denied panel.
+    const denyCommandAccess = useCallback((commandError: unknown): boolean => {
+        if (!(commandError instanceof ApiError) || commandError.status !== 403) return false;
+        setCommandAuthorized(false);
+        setCommandDeniedMessage(commandError.message || null);
+        setError(null);
+        setPhase('ready');
+
+        return true;
+    }, []);
+
     const refreshCommandStatus = useCallback(async () => {
         if (!commandAuthorized || commandStatusRequestRef.current || terminatingRef.current) return;
         commandStatusRequestRef.current = true;
@@ -510,12 +522,12 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
             const lineupEnded = !status.lineup.active && activeLineupSeenRef.current && roomRef.current !== null && roomMode === 'lineup';
             if (commandInactiveRef.current.observe(lineupEnded, Date.now())) await returnFromConference();
         } catch (statusError) {
-            if (statusError instanceof ApiError && statusError.status === 403) setCommandAuthorized(false);
+            if (denyCommandAccess(statusError)) return;
             else setError(statusError instanceof Error ? statusError.message : 'Unable to refresh station readiness.');
         } finally {
             commandStatusRequestRef.current = false;
         }
-    }, [bootstrap.endpoints.command_status, returnFromConference, commandAuthorized, roomMode]);
+    }, [bootstrap.endpoints.command_status, returnFromConference, commandAuthorized, denyCommandAccess, roomMode]);
 
     const acquireTracks = useCallback(async (): Promise<{ tracks: LocalTrack[]; primaryError: unknown }> => {
         let tracks: LocalTrack[] = [];
@@ -595,9 +607,11 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
 
     useEffect(() => {
         if (autoMediaStartedRef.current) return;
+        // An account without 300 access sees only the access-denied panel and is never prompted for devices.
+        if (bootstrap.entry_mode === 'command' && !bootstrap.command_access) return;
         autoMediaStartedRef.current = true;
         void prepareMedia();
-    }, [prepareMedia]);
+    }, [bootstrap.command_access, bootstrap.entry_mode, prepareMedia]);
 
     useEffect(() => {
         const onDeviceChange = () => void refreshDevices(false);
@@ -804,24 +818,6 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
         }
     };
 
-    const authorizeCommand = async () => {
-        setActionBusy('authorize');
-        setPhase('authorizing');
-        setError(null);
-        try {
-            await postJson(bootstrap.endpoints.command_authorize, bootstrap.csrf_token, { command_pin: commandPin });
-            setCommandAuthorized(true);
-            setCommandPin('');
-            setPhase('ready');
-            setNotice('300 command access confirmed.');
-        } catch (authorizationError) {
-            setError(authorizationError instanceof Error ? authorizationError.message : 'The 300 PIN could not be verified.');
-            setPhase('ready');
-        } finally {
-            setActionBusy(null);
-        }
-    };
-
     const startLineup = async (confirmedTakeover = false) => {
         setActionBusy('start');
         setError(null);
@@ -837,6 +833,7 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
             setRoomMode('lineup');
             await connectWithCredentials(credentials, confirmedTakeover);
         } catch (startError) {
+            if (denyCommandAccess(startError)) return;
             if (startError instanceof ApiError && startError.status === 409 && startError.payload.code === 'endpoint_in_use') {
                 setTakeover(true);
             }
@@ -862,6 +859,7 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
             setNotice(`Calling ${stationLabel(station)}…`);
             await connectWithCredentials(credentials, confirmedTakeover);
         } catch (directError) {
+            if (denyCommandAccess(directError)) return;
             if (directError instanceof ApiError && directError.status === 409 && directError.payload.code === 'endpoint_in_use') {
                 setTakeover(true);
             }
@@ -1100,7 +1098,6 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
     const remainingSeconds = lineup.ends_at
         ? Math.max(0, Math.floor((new Date(lineup.ends_at).getTime() - clock) / 1000))
         : null;
-    const commandPinReady = /^\d{4,8}$/.test(commandPin);
     const endLabel = roomMode === 'direct' ? 'End Direct Call' : 'End Conference';
 
     return (
@@ -1173,11 +1170,10 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
                             <small>Not connected to the conference yet. Standing by uses no call minutes.</small>
                         </div>}
 
-                        {bootstrap.entry_mode === 'command' && !commandAuthorized && <form className="vc-command-login" onSubmit={(event) => { event.preventDefault(); void authorizeCommand(); }}>
-                            <div className="vc-room-summary"><ShieldCheck size={22} /><div><strong>Employee session confirmed</strong><span>Enter the 300 PIN to unlock command controls. Your existing login is reused.</span></div></div>
-                            <label className="vc-field">300 command PIN<input type="password" inputMode="numeric" autoComplete="off" pattern="[0-9]{4,8}" minLength={4} maxLength={8} value={commandPin} onChange={(event) => setCommandPin(event.target.value.replace(/\D/g, '').slice(0, 8))} /></label>
-                            <button className="vc-button vc-button--primary" type="submit" disabled={!commandPinReady || actionBusy !== null}>{actionBusy === 'authorize' ? <LoaderCircle size={19} className="vc-spin" /> : <ShieldCheck size={19} />} Continue as 300</button>
-                        </form>}
+                        {bootstrap.entry_mode === 'command' && !commandAuthorized && <div className="vc-command-denied" role="alert">
+                            <div className="vc-room-summary"><ShieldCheck size={22} /><div><strong>300 Command access required</strong><span>{commandDeniedMessage ?? '300 Command video controls are available to Captains, Division Chiefs, the 300 command officer, administrators, and members granted 300 Command Access.'}</span></div></div>
+                            <a className="vc-button vc-button--secondary" href={bootstrap.navigation.back}>Return</a>
+                        </div>}
 
                         {bootstrap.entry_mode === 'command' && commandAuthorized && <div className="vc-ready-dashboard">
                             <div className={`vc-banner ${providerApiHealthy === false ? 'vc-banner--error' : 'vc-banner--info'}`} role="status">
