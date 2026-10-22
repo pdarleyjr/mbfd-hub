@@ -8,10 +8,11 @@
         default => 'neutral',
     };
     $statusText = fn (string $status): string => $status === 'Present' ? 'Pass' : $status;
-    $reviewTone = match ($detail['review_status']) {
-        'approved' => 'success',
+    $acceptance = $detail['acceptance'];
+    $reviewTone = match ($acceptance['state']) {
+        'accepted' => 'success',
         'rejected' => 'danger',
-        'pending_review' => 'warning',
+        'needs_approval' => 'warning',
         default => 'neutral',
     };
 @endphp
@@ -28,8 +29,37 @@
                         @if($detail['station_label']) · {{ $detail['station_label'] }}@endif
                     </p>
                 </div>
-                <span class="hub-insp-badge hub-insp-badge--lg hub-insp-badge--{{ $reviewTone }}">{{ $detail['review_label'] }}</span>
+                <span class="hub-insp-badge hub-insp-badge--lg hub-insp-badge--{{ $reviewTone }}">{{ $acceptance['headline'] }}</span>
             </div>
+
+            <div id="acceptance" class="hub-insp-accept" style="margin-top: 1rem;">
+                <p>
+                    @if($acceptance['state'] === 'needs_approval')
+                        Needs approval{{ count($acceptance['reasons']) > 0 ? ': '.implode('; ', $acceptance['reasons']) : '' }}
+                    @else
+                        {{ $acceptance['headline'] }}
+                    @endif
+                </p>
+            </div>
+
+            @if($acceptance['state'] === 'rejected')
+                <p class="hub-insp-note">
+                    @if(filled($conversation['rejection_reason']))
+                        Reason from Logistics: {{ $conversation['rejection_reason'] }}
+                    @else
+                        Logistics did not add a reason. Use the messages section below to ask.
+                    @endif
+                </p>
+            @endif
+
+            @if($conversation['clarification'])
+                <div class="hub-insp-callout" role="region" aria-labelledby="clarification-title">
+                    <h3 id="clarification-title">Latest message from Logistics</h3>
+                    <p>{{ $conversation['clarification']['body'] }}</p>
+                    <small>{{ $conversation['clarification']['at']->format('M j, Y g:i A') }}</small>
+                    <a class="hub-insp-finding__link" href="#messages">Reply in messages</a>
+                </div>
+            @endif
 
             <dl class="hub-insp-facts">
                 <div><dt>Submitted (Eastern)</dt><dd>{{ $detail['submitted_at']?->format('M j, Y g:i A') ?? '—' }}</dd></div>
@@ -71,7 +101,8 @@
                 </p>
                 <ul class="hub-insp-findings">
                     @foreach(array_merge($detail['findings'], array_map(fn ($row) => $row + ['is_finding' => true, 'notes' => null, 'photo_key' => null], $detail['unmatched_defects'])) as $finding)
-                        <li class="hub-insp-finding">
+                        @php($defectId = $finding['follow_up']['defect_id'] ?? null)
+                        <li class="hub-insp-finding" @if($defectId) id="issue-{{ $defectId }}" @endif>
                             <div class="hub-insp-finding__head">
                                 <div>
                                     <p class="hub-insp-finding__name">{{ $finding['name'] }}</p>
@@ -84,7 +115,14 @@
                             @endif
                             @php($followUp = $finding['follow_up'])
                             <p class="hub-insp-finding__follow">
-                                <strong>Defect status:</strong> {{ $followUp['stage'] }}
+                                @if($followUp['linked'])
+                                    <strong>Current status:</strong> {{ $followUp['action_label'] }}
+                                    @if($followUp['first_reported_at'])
+                                        · First reported {{ $followUp['first_reported_at']->format('M j, Y') }}
+                                    @endif
+                                @else
+                                    <strong>Defect status:</strong> {{ $followUp['stage'] }}
+                                @endif
                                 @if($followUp['ticket_number'])
                                     · <strong>Service ticket</strong> {{ $followUp['ticket_number'] }} ({{ $followUp['ticket_status'] }})
                                 @endif
@@ -92,6 +130,24 @@
                                     · <span class="hub-insp-finding__done">Repair completed</span>
                                 @endif
                             </p>
+                            @if($followUp['resolved_at'])
+                                <p class="hub-insp-finding__follow">
+                                    <span class="hub-insp-finding__done">Resolved on {{ $followUp['resolved_at']->format('M j, Y') }}.</span>
+                                    What you recorded on this inspection is unchanged.
+                                </p>
+                            @endif
+                            @if($defectId && isset($conversation['issues'][$defectId]))
+                                @include('filament.employee.pages.partials.inspection-thread', [
+                                    'messages' => $conversation['issues'][$defectId]['messages'],
+                                    'canPost' => $conversation['issues'][$defectId]['can_post'],
+                                    'heading' => 'Messages about '.$finding['name'],
+                                    'emptyText' => 'No messages about this issue yet.',
+                                    'fieldId' => 'issue-reply-'.$defectId,
+                                    'model' => 'issueReplies.'.$defectId,
+                                    'action' => 'sendIssueReply('.$defectId.')',
+                                    'label' => 'Reply about '.$finding['name'],
+                                ])
+                            @endif
                             @if(! empty($finding['photo_key']))
                                 <div class="hub-insp-photos">
                                     <a href="{{ $imageUrl($finding['photo_key']) }}" target="_blank" rel="noopener" class="hub-insp-photo" aria-label="Open photo of {{ $finding['name'] }} in a new tab">
@@ -103,6 +159,21 @@
                     @endforeach
                 </ul>
             @endif
+        </div>
+    </x-filament::section>
+
+    <x-filament::section heading="Messages about this inspection" id="messages">
+        <div class="hub-insp">
+            @include('filament.employee.pages.partials.inspection-thread', [
+                'messages' => $conversation['inspection']['messages'],
+                'canPost' => $conversation['inspection']['can_post'],
+                'heading' => 'Messages about this inspection',
+                'emptyText' => 'No messages yet. Logistics writes here if they need more information.',
+                'fieldId' => 'inspection-reply',
+                'model' => 'inspectionReply',
+                'action' => 'sendInspectionReply',
+                'label' => 'Reply to Logistics',
+            ])
         </div>
     </x-filament::section>
 

@@ -8,9 +8,11 @@ use App\Enums\ApparatusServiceTicketStatus;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
+use App\Models\ApparatusInspectionException;
 use App\Models\ApparatusServiceTicket;
 use App\Models\Station;
 use App\Models\User;
+use App\Support\Fleet\DefectActionStatus;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -282,6 +284,8 @@ final class EmployeeInspectionHistoryService
             'compartment' => (string) $defect->compartment,
             'name' => (string) $defect->item,
             'status' => str((string) $defect->issue_type)->headline()->toString(),
+            'notes' => null,
+            'photo_key' => null,
             'follow_up' => $this->followUpFor($defect, $inspection),
         ], $unmatchedDefects);
 
@@ -308,6 +312,7 @@ final class EmployeeInspectionHistoryService
             'review_status' => $inspection->review_status,
             'review_label' => $this->reviewStatusLabel($inspection->review_status),
             'processing_label' => $this->processingStatusLabel($inspection->processing_status),
+            'acceptance' => $this->acceptance($inspection),
             'reviewed_at' => $this->reviewedAt($inspection),
             'automatically_accepted' => $inspection->processing_status !== null,
             'paper_fields' => $this->paperFields($inspection),
@@ -434,7 +439,7 @@ final class EmployeeInspectionHistoryService
                         ->select('apparatus_defect_id'));
             })
             ->orderBy('id')
-            ->get(['id', 'apparatus_id', 'apparatus_inspection_id', 'compartment', 'item', 'status', 'issue_type', 'resolved', 'resolved_at', 'service_ticket_id']);
+            ->get(['id', 'apparatus_id', 'apparatus_inspection_id', 'compartment', 'item', 'status', 'issue_type', 'resolved', 'resolved_at', 'service_ticket_id', 'action_status', 'first_reported_at']);
 
         $keyed = [];
         foreach ($rows as $defect) {
@@ -455,6 +460,11 @@ final class EmployeeInspectionHistoryService
                 'ticket_status' => null,
                 'repair_completed' => false,
                 'linked' => false,
+                'defect_id' => null,
+                'action_status' => null,
+                'action_label' => null,
+                'first_reported_at' => null,
+                'resolved_at' => null,
             ];
         }
 
@@ -468,7 +478,54 @@ final class EmployeeInspectionHistoryService
             'ticket_status' => $ticket !== null ? $this->ticketStatusLabel($ticket->status) : null,
             'repair_completed' => $ticket !== null && $ticket->status === ApparatusServiceTicketStatus::Completed->value,
             'linked' => true,
+            'defect_id' => (int) $defect->getKey(),
+            'action_status' => (string) ($defect->action_status ?? DefectActionStatus::REPORTED),
+            'action_label' => DefectActionStatus::label($defect->action_status),
+            'first_reported_at' => $this->eastern($defect->first_reported_at),
+            // A later fact shown beside the unchanged historical observation.
+            'resolved_at' => $defect->resolved && $defect->resolved_at !== null ? $this->eastern($defect->resolved_at) : null,
         ];
+    }
+
+    /**
+     * Plain-language acceptance state for the member. Reasons come only from open blocking
+     * holds; reviewer notes and internal text are never used here.
+     *
+     * @return array{state: string, headline: string, reasons: list<string>}
+     */
+    public function acceptance(ApparatusInspection $inspection): array
+    {
+        if ($inspection->review_status === 'rejected') {
+            return ['state' => 'rejected', 'headline' => 'Rejected', 'reasons' => []];
+        }
+        if ($inspection->review_status !== 'pending_review') {
+            return ['state' => 'accepted', 'headline' => 'Accepted', 'reasons' => []];
+        }
+
+        $reasons = ApparatusInspectionException::query()
+            ->where('apparatus_inspection_id', $inspection->getKey())
+            ->where('blocks_acceptance', true)
+            ->whereNotIn('status', ['resolved', 'dismissed'])
+            ->orderBy('id')
+            ->get(['field', 'reason'])
+            ->map(fn (ApparatusInspectionException $hold): string => $this->holdLabel((string) $hold->field, (string) $hold->reason))
+            ->when($inspection->processing_status === 'pending_vehicle_swap', fn ($list) => $list->push('Fleet is confirming which vehicle you inspected'))
+            ->unique()
+            ->values()
+            ->all();
+
+        return ['state' => 'needs_approval', 'headline' => 'Needs approval', 'reasons' => $reasons];
+    }
+
+    public function holdLabel(string $field, string $reason): string
+    {
+        return match (true) {
+            $reason === 'member_flagged' => 'You flagged this for review',
+            $reason === 'new_significant_damage' => 'New significant damage',
+            $reason === 'rollback' && $field === 'engine_hours' => 'Engine hours lower than last reading',
+            $reason === 'rollback' => 'Mileage lower than last reading',
+            default => 'A reviewer needs to look at this',
+        };
     }
 
     private function identityKey(mixed $compartment, mixed $item): string
