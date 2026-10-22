@@ -87,7 +87,7 @@ Route::prefix('public')->middleware(['auth:sanctum', 'canonical.api', 'throttle:
     Route::get('stations/{station}/gas-meters', [\App\Http\Controllers\Api\StationController::class, 'gasMeters']);
 
     // 300 Command profile: read-only, allowlisted overview of every active station.
-    Route::get('command/overview', CommandOverviewController::class);
+    Route::get('command/overview', CommandOverviewController::class)->middleware('can:access-command-300');
 
 });
 
@@ -301,4 +301,22 @@ Route::prefix('workgroup/ai')->middleware(['web', AuthenticateSession::class, 'a
         Route::post('category-summary', [WorkgroupAIController::class, 'categorySummary']);
         Route::post('executive-report', [WorkgroupAIController::class, 'executiveReport']);
         Route::post('vectorize-upload/{uploadId}', [WorkgroupAIController::class, 'vectorizeUpload']);
+    });
+
+// =========================================================================
+// 300 Command Communications — one private, persistent conversation between
+// 300 Command users and Hub administrators. Authorization is the single
+// `access-command-300` gate (Command300Access); the service re-checks it.
+// =========================================================================
+Route::prefix('command-communications')
+    ->middleware(['auth:sanctum', 'canonical.api', 'can:access-command-300', 'throttle:120,1'])
+    ->name('api.command-communications.')
+    ->group(function () {
+        Route::get('/posts', [\App\Http\Controllers\Api\CommandCommunicationController::class, 'index'])->name('posts.index');
+        Route::get('/summary', [\App\Http\Controllers\Api\CommandCommunicationController::class, 'summary'])->name('summary');
+        Route::post('/posts', [\App\Http\Controllers\Api\CommandCommunicationController::class, 'store'])
+            ->middleware('throttle:30,1,command-communications-post')->name('posts.store');
+        Route::post('/posts/{publicId}/pin', [\App\Http\Controllers\Api\CommandCommunicationController::class, 'pin'])
+            ->where('publicId', '[0-9A-Za-z]{26}')->name('posts.pin');
+        Route::post('/read', [\App\Http\Controllers\Api\CommandCommunicationController::class, 'read'])->name('read');
     });

@@ -21,7 +21,7 @@ const DEFAULT_HEADERS = {
   'Content-Type': 'application/json',
 };
 
-const mutationHeaders = (): Record<string, string> => {
+export const mutationHeaders = (): Record<string, string> => {
   const encoded = document.cookie.split('; ').find((value) => value.startsWith('XSRF-TOKEN='))?.slice(11);
 
   return {

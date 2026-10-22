@@ -1,13 +1,32 @@
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { ChevronRight } from 'lucide-react';
 import { COMMAND_300_IMAGE, bundledImageSize } from '../types';
+import { fetchCommandSummary } from '../utils/commandCommunicationsApi';
 import StationCardMedia from './StationCardMedia';
+import Tag from './ui/Tag';
+
+/** Quiet by design: a failed summary simply shows no badge; the Command page has the full state. */
+function useUnreadCount(): number {
+  const [unread, setUnread] = useState(0);
+  useEffect(() => {
+    let active = true;
+    fetchCommandSummary()
+      .then((summary) => { if (active) setUnread(summary.unread_count); })
+      .catch(() => { if (active) setUnread(0); });
+    return () => { active = false; };
+  }, []);
+  return unread;
+}
 
 /**
  * Peer of StationCard on the stations list. 300 Command is a unit profile with
  * its own route (/command-300); it is never a station record or a station id.
+ * The stations list renders it only for accounts the server has cleared for 300 Command.
  */
 export default function Command300Card() {
+  const unread = useUnreadCount();
+
   return (
     <Link
       to="/command-300"
@@ -23,7 +42,12 @@ export default function Command300Card() {
 
       <div className="p-4 sm:p-5 2xl:p-6">
         <h3 className="mb-3 text-lg font-bold text-hub-ink font-heading 2xl:text-xl">300 Command</h3>
-        <p className="text-sm text-hub-n-600">Morning Lineup, Command Board and a read-only readiness overview of every station.</p>
+        <p className="text-sm text-hub-n-600">Morning Lineup, Command Board, messages for 300 Command and Administration, and a read-only readiness overview of every station.</p>
+        {unread > 0 && (
+          <p className="mt-3" data-testid="daily-command-unread">
+            <Tag tone="info">{unread} unread {unread === 1 ? 'message' : 'messages'}</Tag>
+          </p>
+        )}
         <div className="mt-4 flex min-h-11 items-center justify-end border-t border-hub-glass-border pt-3 text-sm font-semibold text-hub-blue group-hover:underline group-hover:underline-offset-4">
           View Command
           <ChevronRight className="ml-1 h-4 w-4" aria-hidden="true" />
