@@ -192,26 +192,49 @@ final class TrainingCrewPlannerFlowTest extends TestCase
         self::assertSame($before, $this->draft($id));
     }
 
-    public function test_attendance_is_judged_as_it_stood_when_the_earliest_session_begins(): void
+    /** One member signs in at 14:00 on $day to an earlier session of the course. */
+    private function signInDuring(string $day): void
     {
-        // A class that began two days ago; one member signed in during it.
-        $day = CarbonImmutable::now('America/New_York')->subDays(2)->toDateString();
-        $component = $this->readyComponent([], [], $day);
         $earlier = TrainingSession::query()->create(['training_course_id' => $this->course->id, 'public_id' => (string) Str::ulid(), 'course_name' => $this->course->name,
             'classifications' => ['STC'], 'held_on' => CarbonImmutable::parse($day)->subDay()->toDateString(), 'status' => 'submitted',
             'attendance_source' => 'digital', 'revision' => 1, 'created_by' => $this->admin->id]);
-        $signedDuringClass = CarbonImmutable::parse($day.' 14:00', 'America/New_York')->utc();
         TrainingAttendance::query()->create(['training_session_id' => $earlier->id, 'employee_profile_id' => $this->employees['90001']->id,
             'snapshot' => ['rank' => 'Captain'], 'signature' => ['disk' => 'local', 'path' => 'private/source.png', 'mime' => 'image/png', 'sha256' => str_repeat('d', 64)],
-            'signed_at' => $signedDuringClass, 'client_submission_id' => (string) Str::uuid(), 'request_hash' => str_repeat('e', 64)]);
-        // Judged at the present moment, that sign-in counts as prior attendance.
-        $now = app(TrainingPlannerAttendanceLookup::class)->lookup($this->admin, $this->course, null, CarbonImmutable::now(), $day);
-        self::assertSame('VERIFIED_ATTENDED', $now['rows'][$this->employees['90001']->id]['attendance_status']);
-        // Judged as of the 13:00 start, it does not, so the member is still listed.
+            'signed_at' => CarbonImmutable::parse($day.' 14:00', 'America/New_York')->utc(), 'client_submission_id' => (string) Str::uuid(), 'request_hash' => str_repeat('e', 64)]);
+    }
+
+    public function test_attendance_is_judged_as_it_stood_when_todays_class_begins(): void
+    {
+        $today = CarbonImmutable::now('America/New_York')->toDateString();
+        $page = $this->readyComponent([], [], $today)->instance();
+        $cutoff = fn (array $draft): array => (fn (array $draft): array => $this->attendanceCutoff($draft))->call($page, $draft);
+        $slot = fn (string $date, string $time): array => ['id' => (string) Str::uuid(), 'label' => 'Session 1',
+            'start_at' => CarbonImmutable::parse($date.' '.$time, 'America/New_York')->toIso8601String(),
+            'end_at' => CarbonImmutable::parse($date.' 23:59', 'America/New_York')->toIso8601String()];
+        // Today's class has begun: judged at its start, so attendance recorded during it does not remove anyone.
+        [$at, $classStart] = $cutoff(['slots' => [$slot($today, '00:00')], 'metadata' => ['schedule_date' => $today]]);
+        self::assertTrue($classStart);
+        self::assertSame(CarbonImmutable::parse($today.' 00:00', 'America/New_York')->getTimestamp(), $at->getTimestamp());
+        // A class later today is judged now; the cutoff never moves into the future.
+        [$at, $classStart] = $cutoff(['slots' => [$slot($today, '23:58')], 'metadata' => ['schedule_date' => $today]]);
+        self::assertFalse($classStart);
+        self::assertTrue($at->lessThanOrEqualTo(CarbonImmutable::now()));
+        // An older roster is always judged now.
+        $old = CarbonImmutable::now('America/New_York')->subDays(3)->toDateString();
+        [, $classStart] = $cutoff(['slots' => [$slot($old, '13:00')], 'metadata' => ['schedule_date' => $old]]);
+        self::assertFalse($classStart);
+    }
+
+    public function test_an_older_roster_never_moves_the_attendance_cutoff_into_the_past(): void
+    {
+        // Security review: an old report must not hide attendance recorded since its date.
+        $day = CarbonImmutable::now('America/New_York')->subDays(3)->toDateString();
+        $component = $this->readyComponent([], [], $day);
+        $this->signInDuring($day);
         $component->set('slotEdits.0.start', '13:00')->set('slotEdits.0.end', '15:00')->assertHasNoErrors();
-        $component->assertSee('as it stood when class begins')->assertSeeHtml('aria-label="Select Synthetic 90001"');
-        $component->call('toggleMember', $this->employees['90001']->id)->assertHasNoErrors();
-        self::assertArrayHasKey($this->employees['90001']->id, $this->draft($component->get('draftId'))['selections']);
+        $component->assertDontSee('as it stood when class begins')->assertDontSeeHtml('aria-label="Select Synthetic 90001"');
+        $component->call('toggleMember', $this->employees['90001']->id);
+        self::assertArrayNotHasKey($this->employees['90001']->id, $this->draft($component->get('draftId'))['selections']);
     }
 
     public function test_export_revalidates_and_reports_members_who_stop_qualifying_in_a_needs_verification_group(): void

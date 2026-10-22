@@ -288,6 +288,7 @@ final class TrainingCrewPlanner extends Page
 
             return $draft;
         });
+        $this->confirmReview = false;
     }
 
     public function moveSelected(): void
@@ -457,15 +458,17 @@ final class TrainingCrewPlanner extends Page
     }
 
     /**
-     * Attendance is judged as it stood when class begins: the earliest saved session start
-     * when that is already past, otherwise the present moment.
+     * Attendance is judged as it stood when today's class begins: the earliest saved session
+     * start when that is already past, otherwise the present moment. An older roster never
+     * moves the cutoff back, so recent verified attendance always excludes a member.
      *
      * @return array{0: CarbonImmutable, 1: bool}
      */
     private function attendanceCutoff(array $draft): array
     {
         $now = CarbonImmutable::now();
-        if ($draft['slots'] === [] || $this->hasStaleSlotDates($draft)) {
+        if ($draft['slots'] === [] || $this->hasStaleSlotDates($draft)
+            || ($draft['metadata']['schedule_date'] ?? null) !== $now->setTimezone(self::TZ)->toDateString()) {
             return [$now, false];
         }
         $earliest = collect($draft['slots'])->map(fn (array $slot): CarbonImmutable => CarbonImmutable::parse($slot['start_at']))->sortBy(fn (CarbonImmutable $start): int => $start->getTimestamp())->first();
@@ -610,7 +613,7 @@ final class TrainingCrewPlanner extends Page
             return;
         }
         $slots = $this->slotsFromEdits($date, array_column($draft['slots'], 'id'), false);
-        if ($slots === null || ($slots === [] && ! $allowClear) || $slots == $draft['slots']) {
+        if ($slots === null || ($slots === [] && ! $allowClear) || $slots === $draft['slots']) {
             return;
         }
         $this->commitSlots($slots);
@@ -623,9 +626,10 @@ final class TrainingCrewPlanner extends Page
     private function slotsFromEdits(string $date, array $savedIds, bool $strict): ?array
     {
         abort_if(count($this->slotEdits) > 12, 422);
+        abort_unless(array_is_list($this->slotEdits), 422);
         $slots = [];
         foreach ($this->slotEdits as $index => $edit) {
-            abort_unless(is_array($edit) && Str::isUuid((string) ($edit['id'] ?? '')), 422);
+            abort_unless(is_array($edit) && is_string($edit['id'] ?? null) && Str::isUuid($edit['id']), 422);
             abort_if(in_array($edit['id'], array_column($slots, 'id'), true), 422);
             $start = is_string($edit['start'] ?? null) ? $edit['start'] : '';
             $end = is_string($edit['end'] ?? null) ? $edit['end'] : '';

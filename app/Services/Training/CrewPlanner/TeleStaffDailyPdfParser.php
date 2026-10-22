@@ -39,7 +39,10 @@ final class TeleStaffDailyPdfParser
         $structureObjects = preg_match_all('/\/Type\s*\/StructElem\b/', $names);
         // Officers highlight or note rows before uploading; each passive markup annotation
         // carries its own appearance stream, so allow one extra stream per annotation.
-        $markup = preg_match_all('/\/Subtype\s*\/(?:Highlight|Underline|StrikeOut|Squiggly|Text|FreeText|Ink|Square|Circle|Popup)\b/', $names);
+        $markup = min(
+            preg_match_all('/\/Subtype\s*\/(?:Highlight|Underline|StrikeOut|Squiggly|Text|FreeText|Ink|Square|Circle|Popup)\b/', $names),
+            preg_match_all('/\/Type\s*\/Annot\b/', $names),
+        );
         if (preg_match_all('/\bstream\b/', $bytes) > 64 + min($markup, self::MAX_MARKUP_ANNOTATIONS) || $rawObjects > 12000 || $rawObjects - $structureObjects > 800) {
             throw new InvalidArgumentException('The daily report is too complex.');
         }
