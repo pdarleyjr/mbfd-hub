@@ -34,18 +34,36 @@ final class UniformPresentationConsistencyTest extends TestCase
         $this->assertDatabaseCount('personnel_requests', 0);
     }
 
-    public function test_the_builder_offers_no_vintage_jacket_and_labels_the_allocation_toggle_plainly(): void
+    public function test_the_builder_offers_only_the_parka_without_a_style_choice_and_labels_the_allocation_toggle_plainly(): void
     {
         $this->withoutVite();
         $builder = $this->builder($this->employee('UNIFORM-COPY'));
 
         $builder->assertSee('Click here to see your annual allocation')
             ->assertDontSee('<summary>Annual allocation</summary>', false)
-            ->assertSee('5.11 Quarter Zip')
-            ->assertSee('5.11 Softshell')
+            ->assertSee('5.11 3-in-1 Parka 2.0')
+            ->assertSet('data.items.jacket.metadata.jacket_style', 'parka_3_in_1')
+            ->assertDontSee('Choose one jacket style')
+            ->assertDontSee('5.11 Quarter Zip')
+            ->assertDontSee('5.11 Softshell')
             ->assertDontSee('MBFD Vintage jacket')
             ->assertDontSee('jacket-vintage', false);
         $this->assertArrayNotHasKey('vintage', config('uniform_orders.jacket_styles'));
+    }
+
+    public function test_the_parka_submits_with_its_automatic_style_and_selected_size(): void
+    {
+        $this->withoutVite();
+        $builder = $this->builder($this->employee('UNIFORM-PARKA'));
+
+        $builder->set('data.items.jacket.quantity', 1)
+            ->set('data.items.jacket.metadata.size', '5XL')
+            ->call('submit')->assertHasNoErrors();
+
+        $item = PersonnelRequestItem::query()->sole();
+        $this->assertSame('5.11 3-in-1 Parka 2.0', $item->item_name);
+        $this->assertSame(['jacket_style' => 'parka_3_in_1', 'size' => '5XL'], $item->metadata);
+        $builder->assertSet('data.items.jacket.metadata.jacket_style', 'parka_3_in_1');
     }
 
     public function test_offered_items_still_submit_normally(): void

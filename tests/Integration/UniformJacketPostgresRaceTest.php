@@ -25,8 +25,8 @@ final class UniformJacketPostgresRaceTest extends TestCase
         $applications = ['jacket-race-'.$suffix.'-1', 'jacket-race-'.$suffix.'-2'];
         $keys = ['jacket-race-'.$suffix.'-1', 'jacket-race-'.$suffix.($sameKey ? '-1' : '-2')];
         $children = [
-            $this->writer($employee, $keys[0], $applications[0], 'quarter_zip'),
-            $this->writer($employee, $keys[1], $applications[1], 'softshell'),
+            $this->writer($employee, $keys[0], $applications[0], 'parka_3_in_1'),
+            $this->writer($employee, $keys[1], $applications[1], 'parka_3_in_1'),
         ];
 
         try {

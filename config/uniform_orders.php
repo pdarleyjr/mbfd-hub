@@ -14,8 +14,7 @@ $shoeSize = ['key' => 'shoe_size', 'label' => 'Shoe size (US)', 'type' => 'numbe
     'help' => 'Enter your requested size; Support Services will confirm the vendor sizing.'];
 $measurementHelp = 'Enter your measurements; Support Services will confirm available vendor sizes.';
 $jacketStyles = [
-    'quarter_zip' => ['label' => '5.11 Quarter Zip', 'asset' => 'jacket-quarter-zip'],
-    'softshell' => ['label' => '5.11 Softshell', 'asset' => 'jacket-softshell'],
+    'parka_3_in_1' => ['label' => '5.11 3-in-1 Parka 2.0', 'asset' => 'jacket-parka-3-in-1-2'],
 ];
 
 return [
@@ -32,7 +31,7 @@ return [
     // Required, short reason when a request goes over the remaining annual allowance.
     'allowance_justification_max' => 1000,
     'jacket_styles' => $jacketStyles,
-    'legacy_jacket_stock_labels' => ['Winter Jacket', 'MBFD Vintage jacket'],
+    'legacy_jacket_stock_labels' => ['Jacket', 'Winter Jacket', 'MBFD Vintage jacket', '5.11 Quarter Zip', '5.11 Softshell'],
     'categories' => [
         'dress' => 'Dress Uniform',
         'work' => 'Work Uniforms',
@@ -105,10 +104,15 @@ return [
             'fields' => [$size], 'variant' => ['sleeve' => 'long'], 'asset' => 'tshirt-long'],
         'belt' => ['label' => 'JUKMO Work Belt', 'category' => 'accessories', 'group' => 'belts', 'asset' => 'belt',
             'fields' => [['key' => 'size', 'label' => 'Size', 'type' => 'select', 'options' => ['S' => 'S', 'M' => 'M', 'L' => 'L', 'XL' => 'XL', 'XXL' => 'XXL'], 'required' => true]]],
-        'jacket' => ['label' => 'Jacket', 'category' => 'accessories', 'group' => 'jackets', 'quantity_max' => 1,
-            'asset' => 'jacket-quarter-zip',
-            'fields' => [['key' => 'jacket_style', 'label' => 'Jacket style', 'type' => 'select', 'options' => array_map(fn (array $style): string => $style['label'], $jacketStyles), 'required' => true], $size],
-            'frequency' => 'every_3_years', 'help' => 'Choose one style. The 3-year cycle begins when your jacket is issued.'],
+        'jacket' => ['label' => '5.11 3-in-1 Parka 2.0', 'category' => 'accessories', 'group' => 'jackets', 'quantity_max' => 1,
+            'asset' => 'jacket-parka-3-in-1-2', 'variant' => ['jacket_style' => 'parka_3_in_1'],
+            'fields' => [['key' => 'jacket_style', 'label' => 'Jacket style', 'type' => 'select', 'options' => array_map(fn (array $style): string => $style['label'], $jacketStyles), 'required' => true],
+                ['key' => 'size', 'label' => 'Size', 'type' => 'select', 'options' => [
+                    'XS' => 'XS — Chest 32–34 in', 'S' => 'S — Chest 35–37 in', 'M' => 'M — Chest 38–40 in',
+                    'L' => 'L — Chest 41–43 in', 'XL' => 'XL — Chest 44–46 in', '2XL' => '2XL — Chest 47–49 in',
+                    '3XL' => '3XL — Chest 50–53 in', '4XL' => '4XL — Chest 54–57 in', '5XL' => '5XL — Chest 58–60 in',
+                ], 'required' => true]],
+            'frequency' => 'every_3_years', 'help' => 'The 3-year cycle begins when your jacket is issued.'],
         'raincoat' => ['label' => 'Raincoat', 'category' => 'accessories', 'group' => 'raincoats', 'fields' => [$size], 'frequency' => 'every_3_years', 'asset' => 'raincoat'],
         'class_a_coat' => ['label' => 'Class A Coat', 'category' => 'dress', 'group' => 'class_a_coats',
             'fields' => [['key' => 'size', 'label' => 'Requested size', 'type' => 'text', 'max_length' => 30, 'required' => true]],

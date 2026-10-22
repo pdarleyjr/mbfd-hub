@@ -332,7 +332,9 @@ jobs:
           DAILY_CHECKOUT_OUT_DIR: ../../../public/daily
         run: npm run build
       - name: Install Chromium and WebKit for Daily Checkout browser checks
-        run: npx playwright install --with-deps chromium webkit
+        run: |
+          bash scripts/ci/prepare-ubuntu-apt-mirror.sh
+          npx playwright install --with-deps chromium webkit
       - name: Verify first-login Bid handoff under enforced CSP
         run: node --test tests/Browser/bid-login-handoff.mjs
       - name: Install PHP dependencies
@@ -398,7 +400,9 @@ jobs:
           DAILY_CHECKOUT_OUT_DIR: ../../../public/daily
         run: npm run build
       - name: Install Chromium and WebKit for authenticated browsers
-        run: npx playwright install --with-deps chromium webkit
+        run: |
+          bash scripts/ci/prepare-ubuntu-apt-mirror.sh
+          npx playwright install --with-deps chromium webkit
       - name: Install PHP dependencies
         env:
           COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
@@ -513,7 +517,9 @@ jobs:
           DAILY_CHECKOUT_OUT_DIR: ../../../public/daily
         run: npm run build
       - name: Install Chromium for authenticated lifecycle browsers
-        run: npx playwright install --with-deps chromium
+        run: |
+          bash scripts/ci/prepare-ubuntu-apt-mirror.sh
+          npx playwright install --with-deps chromium
       - name: Install PHP dependencies
         env:
           COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
@@ -624,7 +630,9 @@ jobs:
         working-directory: resources/js/daily-checkout
         run: npm ci --ignore-scripts --legacy-peer-deps
       - name: Install Chromium and WebKit for Daily Checkout Playwright
-        run: npx playwright install --with-deps chromium webkit
+        run: |
+          bash scripts/ci/prepare-ubuntu-apt-mirror.sh
+          npx playwright install --with-deps chromium webkit
       - name: Run mocked Daily Checkout Playwright
         env:
           DAILY_CHECKOUT_E2E_BASE_URL: http://127.0.0.1:4176

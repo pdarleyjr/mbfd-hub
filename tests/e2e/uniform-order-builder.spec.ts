@@ -218,8 +218,8 @@ test('catalog is touch ready and only loads larger images on expansion', async (
   });
   await openBuilder(page);
   const thumbs = page.locator('[data-product] img');
-  await expect(thumbs).toHaveCount(15);
-  expect(new Set(await thumbs.evaluateAll(elements => elements.map(element => element.getAttribute('src')))).size).toBe(14);
+  await expect(thumbs).toHaveCount(13);
+  expect(new Set(await thumbs.evaluateAll(elements => elements.map(element => element.getAttribute('src')))).size).toBe(13);
   for (const thumb of await thumbs.all()) {
     await expect(thumb).toHaveAttribute('loading', 'lazy');
     await expect(thumb).toHaveAttribute('alt', /.+/);
@@ -393,59 +393,42 @@ test('crossing the tablet breakpoint releases cart focus and keeps the selection
   await expect(summary.getByRole('link', { name: 'Edit Short Sleeve T-Shirt, quantity 2', exact: true })).toBeVisible();
 });
 
-test('two jacket styles share one selection, retain size, and reject a second jacket before persistence', async ({ page }, testInfo) => {
+test('the Parka is the only jacket, offers the supplied sizes, and rejects a second jacket before persistence', async ({ page }, testInfo) => {
   await openBuilder(page);
   const priorRequests = await page.locator('.uo-recent-request').count();
   await scrollToCategory(page, 'accessories');
   const jacket = product(page, 'jacket');
   const quantity = jacket.getByRole('spinbutton', { name: 'Quantity', exact: true });
   await expect(quantity).toHaveAttribute('max', '1');
-  const styles = [
-    { label: '5.11 Quarter Zip', asset: 'jacket-quarter-zip' },
-    { label: '5.11 Softshell', asset: 'jacket-softshell' },
-  ];
-  await expect(jacket.getByRole('radio')).toHaveCount(2);
-  await expect(jacket.getByRole('radio', { name: 'MBFD Vintage jacket', exact: true })).toHaveCount(0);
-  await expect(jacket.locator('.uo-thumbnail img')).toHaveAttribute('src', /jacket-quarter-zip-thumb\.webp$/);
+  await expect(jacket.getByRole('heading', { name: '5.11 3-in-1 Parka 2.0', exact: true })).toBeVisible();
+  await expect(jacket.getByRole('radio')).toHaveCount(0);
+  await expect(jacket).not.toContainText('Choose one jacket style');
+  await expect(page.locator('img[src*="jacket-quarter-zip"], img[src*="jacket-softshell"], img[src*="jacket-vintage"]')).toHaveCount(0);
+  await expect(jacket.locator('.uo-thumbnail img')).toHaveAttribute('src', /jacket-parka-3-in-1-2-thumb\.webp$/);
   await expect(jacket).toContainText('Support Services will confirm any earlier off-system issue history.');
   await quantity.fill('1');
-  await jacket.getByLabel('Size', { exact: true }).selectOption('L');
-  for (let attempt = 0; attempt < 2; attempt++) {
-    await reviewOrder(page);
-    await page.getByRole('button', { name: 'Submit Uniform Request', exact: true }).click();
-    await expect(page.locator('.uo-input-errors')).toContainText('Check your order details');
-    await expect(page.getByRole('dialog', { name: 'Your cart', exact: true })).toHaveCount(0);
-    await expect(jacket.getByRole('radio').first()).toHaveAttribute('aria-invalid', 'true');
-    await expect(jacket.getByRole('radio').first()).toBeFocused();
-    await expect(jacket.getByRole('radio').first()).toBeInViewport();
-    await expect(jacket.getByLabel('Size', { exact: true })).toHaveValue('L');
-    await expect(page.locator('.uo-recent-request')).toHaveCount(priorRequests);
-  }
-  for (const [index, style] of styles.entries()) {
-    const radio = jacket.getByRole('radio', { name: style.label, exact: true });
-    await radio.check();
-    await expect(radio).toBeChecked();
-    await expect(quantity).toHaveValue('1');
-    await expect(jacket.getByRole('button', { name: 'Add one Jacket', exact: true })).toBeDisabled();
-    const size = jacket.getByLabel('Size', { exact: true });
-    if (index === 0) await size.selectOption('L');
-    await expect(size).toHaveValue('L');
-    await expect(jacket.locator('.uo-thumbnail img')).toHaveAttribute('src', new RegExp(style.asset + '-thumb\\.webp$'), { timeout: 20_000 });
-    await expect(page.locator('[data-product] img')).toHaveCount(15);
-    await jacket.getByRole('button', { name: 'Enlarge Jacket image', exact: true }).click();
-    const dialog = page.getByRole('dialog', { name: 'Jacket', exact: true });
-    await expect(dialog.getByRole('img')).toHaveAttribute('src', new RegExp(style.asset + '-large\\.webp$'));
-    await expect.poll(() => dialog.getByRole('img').evaluate(element => (element as HTMLImageElement).naturalWidth), { timeout: 20_000 }).toBeGreaterThan(0);
-    await dialog.getByRole('button', { name: 'Close product image', exact: true }).click();
-    await expect(dialog).toBeHidden();
-  }
+  const size = jacket.getByLabel('Size', { exact: true });
+  await expect(size.locator('option')).toHaveText([
+    'Select…', 'XS — Chest 32–34 in', 'S — Chest 35–37 in', 'M — Chest 38–40 in',
+    'L — Chest 41–43 in', 'XL — Chest 44–46 in', '2XL — Chest 47–49 in',
+    '3XL — Chest 50–53 in', '4XL — Chest 54–57 in', '5XL — Chest 58–60 in',
+  ]);
+  await size.selectOption('5XL');
+  await expect(jacket.getByRole('button', { name: 'Add one 5.11 3-in-1 Parka 2.0', exact: true })).toBeDisabled();
+  await jacket.getByRole('button', { name: 'Enlarge 5.11 3-in-1 Parka 2.0 image', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: '5.11 3-in-1 Parka 2.0', exact: true });
+  await expect(dialog.getByRole('img')).toHaveAttribute('src', /jacket-parka-3-in-1-2-large\.webp$/);
+  await expect.poll(() => dialog.getByRole('img').evaluate(element => (element as HTMLImageElement).naturalWidth), { timeout: 20_000 }).toBeGreaterThan(0);
+  await dialog.getByRole('button', { name: 'Close product image', exact: true }).click();
+  await expect(dialog).toBeHidden();
   await expectTouchTargets(page);
   await expectViewportFit(page);
-  await capture(page, testInfo, 'jacket-style-selection');
+  await capture(page, testInfo, 'parka-selection');
   const summary = await reviewOrder(page);
-  await expect(summary.getByRole('link', { name: 'Edit 5.11 Softshell, quantity 1', exact: true })).toBeVisible({ timeout: 20_000 });
-  await summary.getByRole('link', { name: 'Edit 5.11 Softshell, quantity 1', exact: true }).click();
-  await expect(jacket.getByLabel('Size', { exact: true })).toHaveValue('L');
+  await expect(summary.getByRole('link', { name: 'Edit 5.11 3-in-1 Parka 2.0, quantity 1', exact: true })).toBeVisible({ timeout: 20_000 });
+  await expect(summary).toContainText('5XL');
+  await summary.getByRole('link', { name: 'Edit 5.11 3-in-1 Parka 2.0, quantity 1', exact: true }).click();
+  await expect(size).toHaveValue('5XL');
   await quantity.fill('2');
   await quantity.blur();
   await reviewOrder(page);
@@ -459,8 +442,7 @@ test('two jacket styles share one selection, retain size, and reject a second ja
   await quantity.fill('1');
   await quantity.blur();
   await expect(quantity).toHaveAttribute('aria-invalid', 'false', { timeout: 20_000 });
-  await expect(jacket.getByRole('radio', { name: '5.11 Softshell', exact: true })).toBeChecked();
-  await expect(jacket.getByLabel('Size', { exact: true })).toHaveValue('L');
+  await expect(size).toHaveValue('5XL');
   await reviewOrder(page);
   await expect(page.getByRole('button', { name: 'Submit Uniform Request', exact: true })).toBeEnabled();
 });

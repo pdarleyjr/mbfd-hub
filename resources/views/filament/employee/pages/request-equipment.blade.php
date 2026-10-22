@@ -186,16 +186,7 @@
                                     </div>
                                     @if($code === 'jacket')
                                         <p class="uo-product-helper">{{ $jacketEligibility['reason'] }}</p>
-                                        <fieldset class="uo-jacket-options" @error('data.items.jacket.metadata.jacket_style') aria-describedby="uo-jacket-jacket_style-error" @enderror>
-                                            <legend>Choose one jacket style</legend>
-                                            @foreach(config('uniform_orders.jacket_styles') as $styleCode => $style)
-                                                <label class="uo-jacket-option">
-                                                    <img src="{{ asset('images/uniforms/'.$style['asset'].'-thumb.webp') }}" alt="{{ $style['label'] }} demonstration" width="160" height="160" loading="lazy" decoding="async">
-                                                    <span><input type="radio" name="jacket_style" aria-label="{{ $style['label'] }}" aria-invalid="{{ $errors->has('data.items.jacket.metadata.jacket_style') ? 'true' : 'false' }}" value="{{ $styleCode }}" wire:model.live="data.items.jacket.metadata.jacket_style" x-on:change="quantity = 1" @disabled($jacketBlocked)>{{ $style['label'] }}</span>
-                                                </label>
-                                            @endforeach
-                                            @error('data.items.jacket.metadata.jacket_style') <p class="uo-error" id="uo-jacket-jacket_style-error">{{ $message }}</p> @enderror
-                                        </fieldset>
+                                        @error('data.items.jacket.metadata.jacket_style') <p class="uo-error" id="uo-jacket-jacket_style-error">{{ $message }}</p> @enderror
                                     @endif
                                     @if($product['fields'])
                                         <div class="uo-product-fields" x-show="Number(quantity) > 0" x-cloak>

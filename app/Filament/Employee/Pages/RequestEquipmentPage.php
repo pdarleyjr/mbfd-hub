@@ -75,6 +75,7 @@ class RequestEquipmentPage extends Page
                 'quantity' => 0,
                 'metadata' => array_replace(
                     array_fill_keys(array_column($product['fields'], 'key'), ''),
+                    $product['variant'] ?? [],
                     $context['recommended_variants'][$code] ?? [],
                 ),
             ];
