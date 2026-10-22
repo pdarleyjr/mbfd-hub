@@ -15,7 +15,7 @@ final class ApparatusInspectionException extends Model
 
     protected function casts(): array
     {
-        return ['metadata' => 'array', 'submitted_value' => 'decimal:1', 'baseline_value' => 'decimal:1', 'authoritative_value' => 'decimal:1'];
+        return ['metadata' => 'array', 'blocks_acceptance' => 'boolean', 'submitted_value' => 'decimal:1', 'baseline_value' => 'decimal:1', 'authoritative_value' => 'decimal:1'];
     }
 
     protected static function booted(): void

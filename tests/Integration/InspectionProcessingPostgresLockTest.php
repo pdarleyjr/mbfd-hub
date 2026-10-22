@@ -76,8 +76,10 @@ PHP], base_path(), [
             $this->assertSame(1002, $apparatus->fresh()->current_miles);
             $this->assertEquals(102, $apparatus->fresh()->current_engine_hours);
             $this->assertSame(1001, $inspection->fresh()->miles);
-            $this->assertSame('accepted_with_exception', $inspection->fresh()->processing_status);
-            $this->assertSame(2, DB::table('apparatus_inspection_exceptions')->where('apparatus_inspection_id', $inspection->id)->where('reason', 'stale_baseline')->count());
+            // 101 h / 1001 mi are at or above the form's baseline (100 h / 1000 mi) but below the
+            // concurrently committed 102 h / 1002 mi: superseded, accepted, nothing quarantined.
+            $this->assertSame('accepted', $inspection->fresh()->processing_status);
+            $this->assertSame(0, DB::table('apparatus_inspection_exceptions')->where('apparatus_inspection_id', $inspection->id)->count());
             $this->assertSame(1, DB::table('apparatus_inspection_review_events')->where('apparatus_inspection_id', $inspection->id)->count());
             Queue::assertNothingPushed();
         } finally {

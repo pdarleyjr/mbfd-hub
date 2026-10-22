@@ -5,6 +5,7 @@ namespace App\Policies;
 use App\Models\ApparatusInspection;
 use App\Models\User;
 use App\Services\Inspections\EmployeeInspectionHistoryService;
+use App\Support\Fleet\InspectionReviewers;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
 class ApparatusInspectionPolicy
@@ -58,7 +59,7 @@ class ApparatusInspectionPolicy
      */
     public function approve(User $user, ApparatusInspection $apparatusInspection): bool
     {
-        return $user->hasAnyRole(['super_admin', 'admin', 'logistics_admin']);
+        return InspectionReviewers::canReview($user);
     }
 
     /**
@@ -67,7 +68,7 @@ class ApparatusInspectionPolicy
      */
     public function reject(User $user, ApparatusInspection $apparatusInspection): bool
     {
-        return $user->hasAnyRole(['super_admin', 'admin', 'logistics_admin']);
+        return InspectionReviewers::canReview($user);
     }
 
     /**

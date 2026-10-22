@@ -22,6 +22,7 @@ use App\Services\Display\DisplaySnapshotService;
 use App\Services\Fleet\VehicleSwapDecisionException;
 use App\Services\Fleet\VehicleSwapService;
 use App\Services\Identity\AuthenticatedMemberContextResolver;
+use App\Services\Inspections\InspectionSubmissionSignals;
 use App\Support\Fleet\FleetVehicleCatalog;
 use App\Support\Fleet\VehicleNumber;
 use App\Support\Security\Base64Image;
@@ -330,6 +331,7 @@ class ApparatusController extends Controller
             'compartments.*.items.*.observed' => ['sometimes', 'boolean'],
             'compartments.*.items.*.value' => ['sometimes', 'nullable'],
             'compartments.*.items.*.notes' => ['nullable', 'string', 'max:2000'],
+            'compartments.*.items.*.significant' => ['sometimes', 'boolean'],
             'compartments.*.items.*.photo' => ['nullable', 'string', 'max:7000000'],
             'defects' => ['nullable', 'array', 'max:100'],
             'defects.*.compartment' => ['required', 'string', 'max:255'],
@@ -339,6 +341,7 @@ class ApparatusController extends Controller
             'defects.*.photo' => ['nullable', 'string', 'max:7000000'],
             'defects.*.compartment_id' => ['nullable', 'string', 'max:255'],
             'defects.*.item_id' => ['nullable', 'string', 'max:255'],
+            'defects.*.significant' => ['sometimes', 'boolean'],
             'field_values' => ['nullable', 'array', 'max:100'],
             'field_values.*' => ['required', 'array'],
             'field_values.*.id' => ['required', 'string', 'max:255'],
@@ -361,7 +364,15 @@ class ApparatusController extends Controller
             'physical_vehicle.vehicle_number' => ['required_with:physical_vehicle', 'string', 'max:32'],
             'physical_vehicle.swap_answer' => ['nullable', 'string', 'in:'.implode(',', ApparatusVehicleSwapRequest::ANSWERS)],
             'physical_vehicle.note' => ['nullable', 'string', 'max:1000'],
+            // The member's request for further review. Items are validated against the resolved checklist.
+            'review_flag' => ['nullable', 'array:explanation,items', 'prohibited_unless:processing_version,1'],
+            'review_flag.explanation' => ['required_with:review_flag', 'string', 'max:1000', 'regex:/\S/'],
+            'review_flag.items' => ['nullable', 'array', 'max:50'],
+            'review_flag.items.*' => ['required', 'array:compartment_id,item_id'],
+            'review_flag.items.*.compartment_id' => ['required', 'string', 'max:255'],
+            'review_flag.items.*.item_id' => ['required', 'string', 'max:255'],
         ]);
+        $validated = app(InspectionSubmissionSignals::class)->normalize($validated);
 
         if (is_array($validated['physical_vehicle'] ?? null)) {
             $note = is_string($validated['physical_vehicle']['note'] ?? null) ? trim($validated['physical_vehicle']['note']) : '';
@@ -575,6 +586,7 @@ class ApparatusController extends Controller
                         : null,
                     'officer_signature' => $prepared['officer_signature_path'] ?? null,
                     'employee_id' => $prepared['employee_id'] ?? null,
+                    ...app(InspectionSubmissionSignals::class)->persistedFlag($prepared, $lockedChecklist),
                     // The authenticated actor is immutable provenance; signatures
                     // remain evidence. Operational effects still require review.
                     'pending_effects' => $pendingEffects,
@@ -1132,6 +1144,7 @@ class ApparatusController extends Controller
         if (($submission['processing_version'] ?? null) === 1 && $checklist !== null) {
             app(\App\Services\InspectionPaperFields::class)->validate($submission, $checklist);
         }
+        app(InspectionSubmissionSignals::class)->validate($submission, $checklist);
         if ($this->isV2Checklist($checklist)) {
             $this->validateCompleteV2Checklist($submission, $checklist, $checklistResolver, $inspectionSession);
 
