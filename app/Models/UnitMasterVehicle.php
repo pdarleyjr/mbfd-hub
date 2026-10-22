@@ -5,11 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * @property-read int|null $pending_changes_count
+ * @property-read int|null $visible_documents_count
  */
 class UnitMasterVehicle extends Model
 {
@@ -88,6 +90,13 @@ class UnitMasterVehicle extends Model
     public function changes(): HasMany
     {
         return $this->hasMany(UnitMasterVehicleChange::class)->latest('id');
+    }
+
+    /** @return BelongsToMany<VehicleDocument, $this> */
+    public function documents(): BelongsToMany
+    {
+        return $this->belongsToMany(VehicleDocument::class, 'vehicle_document_unit_master_vehicle', 'vehicle_id', 'document_id')
+            ->withTimestamps();
     }
 
     /** @return HasMany<TakeHomeVehicleInspection, $this> */

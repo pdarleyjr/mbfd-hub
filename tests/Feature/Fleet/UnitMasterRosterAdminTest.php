@@ -95,7 +95,7 @@ final class UnitMasterRosterAdminTest extends TestCase
         ));
         $about = $spreadsheet->getSheetByName('About this export');
 
-        self::assertSame('MBFD Master Unit Vehicle Inventory', $about->getCell('B1')->getValue());
+        self::assertSame('MBFD Master Vehicle Inventory', $about->getCell('B1')->getValue());
         self::assertSame('Current filters & search', $about->getCell('B3')->getValue());
         self::assertSame('Search: "x"', $about->getCell('B4')->getValue());
         self::assertSame('1', $about->getCell('B5')->getValue());
