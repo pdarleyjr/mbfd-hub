@@ -158,7 +158,7 @@ final class PersonnelTableEditor extends Page implements HasTable
                         $this->personnelEntries = null;
                         Notification::make()->title('Members removed from this table')->success()->send();
                     }),
-            ])->searchPlaceholder('Search name, Employee ID, email or rank')
+            ])->searchPlaceholder('Search name, employee ID, rank, station, unit or shift')
             ->emptyStateHeading('No members match this table')
             ->emptyStateDescription('Clear filters or use Members to update the selection.');
     }

@@ -140,7 +140,7 @@ final class MasterPersonnelDirectory extends Page implements HasTable
                     ->action(fn (array $data, \Illuminate\Database\Eloquent\Collection $records): StreamedResponse => app(PersonnelTableExporter::class)
                         ->export($this->actor(), $this->personnelTable(), $records, $this->exportColumns(), $data['format'], 'selected')),
             ])
-            ->searchPlaceholder('Search name, employee ID, email or profile');
+            ->searchPlaceholder('Search name, employee ID, rank, station, unit or shift');
     }
 
     protected function applySearchToTableQuery(Builder $query): Builder
