@@ -61,6 +61,48 @@ final class ContinuityMigrationBackfillTest extends TestCase
         $this->assertTrue(Schema::hasIndex('apparatus_defects', 'apparatus_defects_open_name_unique'));
     }
 
+    public function test_duplicate_guard_ignores_unnamed_rows_but_still_blocks_real_duplicates(): void
+    {
+        $apparatus = $this->apparatus();
+        $path = 'database/migrations/2026_10_22_100100_add_continuity_columns_to_apparatus_defects.php';
+        $this->artisan('migrate:rollback', ['--path' => $path, '--force' => true]);
+        Schema::table('apparatus_defects', function ($table): void {
+            $table->string('compartment')->nullable()->change();
+            $table->string('item')->nullable()->change();
+        });
+        $base = ['apparatus_id' => $apparatus->id, 'status' => 'open', 'issue_type' => 'missing', 'resolved' => false, 'created_at' => now(), 'updated_at' => now()];
+        DB::table('apparatus_defects')->insert([$base + ['compartment' => null, 'item' => null], $base + ['compartment' => null, 'item' => null]]);
+
+        $this->artisan('migrate', ['--path' => $path, '--force' => true])->assertSuccessful();
+        $this->assertTrue(Schema::hasIndex('apparatus_defects', 'apparatus_defects_open_name_unique'));
+        $this->assertSame(2, DB::table('apparatus_defects')->count());
+    }
+
+    public function test_duplicate_guard_still_blocks_real_unresolved_duplicates(): void
+    {
+        $apparatus = $this->apparatus();
+        $path = 'database/migrations/2026_10_22_100100_add_continuity_columns_to_apparatus_defects.php';
+        $this->artisan('migrate:rollback', ['--path' => $path, '--force' => true]);
+        // The legacy unique index would reject the fixture duplicates before the guard can see them.
+        DB::statement('DROP INDEX IF EXISTS defect_dedup');
+        $base = ['apparatus_id' => $apparatus->id, 'status' => 'open', 'issue_type' => 'missing', 'resolved' => false, 'compartment' => 'Cab', 'item' => 'Radio', 'created_at' => now(), 'updated_at' => now()];
+        DB::table('apparatus_defects')->insert([$base, $base]);
+
+        $this->withoutMockingConsoleOutput();
+        try {
+            \Illuminate\Support\Facades\Artisan::call('migrate', ['--path' => $path, '--force' => true]);
+            $this->fail('The duplicate guard must abort the migration.');
+        } catch (\RuntimeException $exception) {
+            $this->assertStringContainsString('more than one unresolved', $exception->getMessage());
+        }
+        $this->assertFalse(Schema::hasColumn('apparatus_defects', 'action_status'));
+
+        // Leave a migrated batch behind so the trait's teardown rollback only touches this migration.
+        DB::table('apparatus_defects')->delete();
+        \Illuminate\Support\Facades\Artisan::call('migrate', ['--path' => $path, '--force' => true]);
+        $this->assertTrue(Schema::hasColumn('apparatus_defects', 'action_status'));
+    }
+
     public function test_inspection_backfill_sets_the_processed_apparatus_for_processed_rows_only(): void
     {
         $apparatus = $this->apparatus();

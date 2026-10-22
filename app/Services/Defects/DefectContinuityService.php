@@ -12,7 +12,9 @@ use App\Models\ApparatusDefectParticipant;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusIssueMessage;
 use App\Services\InspectionPaperFields;
+use App\Models\User;
 use App\Support\Fleet\DefectActionStatus;
+use App\Support\Fleet\InspectionReviewers;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -566,8 +568,16 @@ final class DefectContinuityService
             return [];
         }
         $candidates = new Collection;
-        ApparatusIssueMessage::query()->whereIn('apparatus_defect_id', $defectIds)->memberVisible()
-            ->get(['id', 'apparatus_defect_id', 'body', 'created_at'])
+        // Only Logistics speaks to the whole crew: a reply written by another member is
+        // never shown here. Authors are loaded once, with the relations the reviewer rule reads.
+        $messages = ApparatusIssueMessage::query()->whereIn('apparatus_defect_id', $defectIds)->memberVisible()
+            ->whereNotNull('author_user_id')
+            ->get(['id', 'apparatus_defect_id', 'author_user_id', 'body', 'created_at']);
+        $reviewerIds = User::query()->with(['roles', 'permissions'])
+            ->whereIn('id', $messages->pluck('author_user_id')->unique()->all())->get()
+            ->filter(static fn (User $author): bool => InspectionReviewers::canReview($author))
+            ->pluck('id')->flip();
+        $messages->filter(fn ($message): bool => $reviewerIds->has($message->author_user_id))
             ->each(fn ($message) => $candidates->push(['defect' => (int) $message->apparatus_defect_id, 'text' => (string) $message->body, 'at' => $message->created_at, 'order' => 'm'.str_pad((string) $message->id, 12, '0', STR_PAD_LEFT)]));
         ApparatusDefectEvent::query()->whereIn('apparatus_defect_id', $defectIds)->whereNotNull('member_message')
             ->get(['id', 'apparatus_defect_id', 'member_message', 'created_at'])

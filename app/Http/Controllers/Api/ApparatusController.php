@@ -104,7 +104,7 @@ class ApparatusController extends Controller
             // This browser route only needs a warning count. Never
             // serialize defect notes, photos, resolution history, or paths.
             'open_defects_count' => $apparatus->openDefects()->count(),
-            'open_findings' => $this->knownFindings($apparatus),
+            'open_findings' => $this->knownFindings($apparatus, $checklist),
         ]);
     }
 
@@ -188,7 +188,7 @@ class ApparatusController extends Controller
             'inspection_date' => $session->duty_date?->toDateString(),
             'due_tasks' => $session->due_tasks,
             'open_defects_count' => $apparatus->openDefects()->count(),
-            'open_findings' => $this->knownFindings($apparatus),
+            'open_findings' => $this->knownFindings($apparatus, $resolution['checklist']),
             'inspection_session' => $inspectionSessionService->publicContract($session, $issued['token']),
         ], $issued['created'] ? 201 : 200);
 
@@ -294,7 +294,7 @@ class ApparatusController extends Controller
             'inspection_date' => $sessionDutyDate->toDateString(),
             'due_tasks' => $session->due_tasks,
             'open_defects_count' => $apparatus->openDefects()->count(),
-            'open_findings' => $this->knownFindings($apparatus),
+            'open_findings' => $this->knownFindings($apparatus, $resolution['checklist']),
             'inspection_session' => $inspectionSessionService->publicContract($session, $issued['token']),
         ], $issued['created'] ? 201 : 200);
     }
@@ -656,11 +656,9 @@ class ApparatusController extends Controller
     }
 
     /** Equipment context for authenticated members; no personnel, internal notes or private storage paths. */
-    private function knownFindings(Apparatus $apparatus): array
+    private function knownFindings(Apparatus $apparatus, array $checklist): array
     {
-        $resolved = app(DailyCheckoutChecklistResolver::class)->resolve($apparatus);
-
-        return app(\App\Services\Defects\DefectContinuityService::class)->openFindings($apparatus, $resolved['checklist'] ?? []);
+        return app(\App\Services\Defects\DefectContinuityService::class)->openFindings($apparatus, $checklist);
     }
 
     /**
