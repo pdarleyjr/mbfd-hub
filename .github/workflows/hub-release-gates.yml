@@ -623,6 +623,16 @@ jobs:
       - name: Install Daily Checkout dependencies
         working-directory: resources/js/daily-checkout
         run: npm ci --ignore-scripts --legacy-peer-deps
+      - name: Use the official HTTPS Ubuntu mirror for WebKit dependencies
+        if: ${{ matrix.lane == 'workspace-webkit-iphone' || matrix.lane == 'webkit-ipad-and-issue-report' }}
+        run: |
+          set -euo pipefail
+          mirror_list=/etc/apt/apt-mirrors.txt
+          if test -f "$mirror_list" && grep -q '^http://azure\.archive\.ubuntu\.com/ubuntu\b' "$mirror_list"; then
+            curl --fail --silent --show-error --location --connect-timeout 10 --max-time 30 \
+              --output /dev/null https://archive.ubuntu.com/ubuntu/dists/noble/InRelease
+            sudo sed -i 's|^http://azure\.archive\.ubuntu\.com/ubuntu\b|https://archive.ubuntu.com/ubuntu|' "$mirror_list"
+          fi
       - name: Install Chromium and WebKit for Daily Checkout Playwright
         run: npx playwright install --with-deps chromium webkit
       - name: Run mocked Daily Checkout Playwright
