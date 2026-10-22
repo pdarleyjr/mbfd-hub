@@ -317,8 +317,8 @@ final class DefectContinuityService
                 if (isset($claimed[$candidate->id])) {
                     continue;
                 }
-                if ($candidate->compartment !== null && in_array((string) $candidate->compartment, $entry['compartment_names'], true)
-                    && $candidate->item !== null && in_array((string) $candidate->item, $entry['item_names'], true)
+                if (in_array($candidate->compartment, $entry['compartment_names'], true)
+                    && in_array($candidate->item, $entry['item_names'], true)
                     && ($entry['identity'] === null || count($paperFields->matchingEquipment($definitions, $candidate->compartment, $candidate->item)) === 1)) {
                     $assigned[$index] = $candidate;
                     $claimed[$candidate->id] = true;

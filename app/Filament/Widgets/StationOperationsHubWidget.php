@@ -282,7 +282,7 @@ final class StationOperationsHubWidget extends Widget
      *
      * @param  list<int>  $apparatusIds
      * @param  Collection<int, Apparatus>  $apparatusById
-     * @return array<string, array<string, mixed>>
+     * @return array<string, mixed>
      */
     private function inspectionQueues(array $apparatusIds, Collection $apparatusById): array
     {
@@ -293,10 +293,7 @@ final class StationOperationsHubWidget extends Widget
         }
 
         $inspectionColumns = ['id', 'apparatus_id', 'processed_apparatus_id', 'designation_at_time', 'unit_number', 'operator_name', 'processing_status', 'review_status', 'completed_at', 'created_at'];
-        $physical = fn (Builder $query): Builder => $query->where(function (Builder $scope) use ($apparatusIds): void {
-            $scope->whereIn('processed_apparatus_id', $apparatusIds)
-                ->orWhere(fn (Builder $legacy) => $legacy->whereNull('processed_apparatus_id')->whereIn('apparatus_id', $apparatusIds));
-        });
+
         $inspectionLabel = function (ApparatusInspection $record) use ($apparatusById): string {
             $apparatus = $apparatusById->get((int) ($record->processed_apparatus_id ?? $record->apparatus_id));
 
@@ -305,12 +302,12 @@ final class StationOperationsHubWidget extends Widget
         $moment = static fn (ApparatusInspection $record): mixed => $record->completed_at ?: $record->created_at;
 
         // Query 1: everything that is waiting on a person, including checkouts held for a vehicle swap.
-        $waiting = $physical(ApparatusInspection::query()->select($inspectionColumns)->addSelect([
+        $waiting = $this->onPhysicalVehicles(ApparatusInspection::query()->select($inspectionColumns)->addSelect([
             'open_holds' => DB::table('apparatus_inspection_exceptions as e')->selectRaw('count(*)')
                 ->whereColumn('e.apparatus_inspection_id', 'apparatus_inspections.id')
                 ->where('e.blocks_acceptance', true)
                 ->whereNotIn('e.status', ['resolved', 'dismissed']),
-        ]))
+        ]), $apparatusIds)
             ->where(function (Builder $scope): void {
                 $scope->whereIn('processing_status', ['held_for_review', 'pending_vehicle_swap'])
                     ->orWhere(fn (Builder $legacy) => $legacy->whereNull('processing_status')->where('review_status', 'pending_review'));
@@ -357,7 +354,7 @@ final class StationOperationsHubWidget extends Widget
         $actions = $inProgress->map(fn (ApparatusDefect $record): array => $defectRow($record, 'corrective_action'))->values();
 
         // Query 3: completed inspections of the last 7 days, informational only. The list is trimmed after counting.
-        $completed = $physical(ApparatusInspection::query()->select($inspectionColumns))
+        $completed = $this->onPhysicalVehicles(ApparatusInspection::query()->select($inspectionColumns), $apparatusIds)
             ->where(function (Builder $scope): void {
                 $scope->whereIn('processing_status', ['accepted', 'accepted_with_exception', 'rejected'])
                     ->orWhere(fn (Builder $legacy) => $legacy->whereNull('processing_status')->whereIn('review_status', ['approved', 'rejected']));
@@ -377,6 +374,24 @@ final class StationOperationsHubWidget extends Widget
             'recent' => ['count' => $completed->count(), 'rows' => $recent->all()],
             'swapUrl' => $swapUrl,
         ];
+    }
+
+    /**
+     * Inspections whose findings were applied to one of these physical vehicles
+     * (COALESCE(processed_apparatus_id, apparatus_id)).
+     *
+     * @template TModel of \Illuminate\Database\Eloquent\Model
+     *
+     * @param  Builder<TModel>  $query
+     * @param  list<int>  $apparatusIds
+     * @return Builder<TModel>
+     */
+    private function onPhysicalVehicles(Builder $query, array $apparatusIds): Builder
+    {
+        return $query->where(function (Builder $scope) use ($apparatusIds): void {
+            $scope->whereIn('processed_apparatus_id', $apparatusIds)
+                ->orWhere(fn (Builder $legacy) => $legacy->whereNull('processed_apparatus_id')->whereIn('apparatus_id', $apparatusIds));
+        });
     }
 
     /**

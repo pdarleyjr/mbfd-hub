@@ -283,7 +283,7 @@ final class DefectCorrectiveActionService
                 $data['notes'] ?? 'Correction verified: the latest inspection reported the item as present.',
                 $data,
                 ['verified_observation_id' => $latest->getKey()],
-                $latest->apparatus_inspection_id !== null ? (int) $latest->apparatus_inspection_id : null,
+                $latest->apparatus_inspection_id,
             );
         });
     }

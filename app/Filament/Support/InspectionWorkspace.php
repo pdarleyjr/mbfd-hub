@@ -109,7 +109,7 @@ final class InspectionWorkspace
         ]);
 
         $physicalId = (int) ($inspection->processed_apparatus_id ?? $inspection->apparatus_id);
-        $physical = $inspection->processedApparatus ?? $inspection->apparatus;
+        $physical = $inspection->processedApparatus ?? $inspection->getRelationValue('apparatus');
         $canReview = $viewer instanceof User && $viewer->can('approve', $inspection);
 
         $detail = $this->history->detail($inspection);
@@ -133,7 +133,7 @@ final class InspectionWorkspace
             'can_review' => $canReview,
             'can_manage' => $canManage,
             'meter_hold_open' => $exceptions->contains(fn (ApparatusInspectionException $e): bool => $this->isOpenHold($e) && in_array($e->field, ['miles', 'engine_hours'], true)),
-            'general_thread' => $canReview && $viewer instanceof User ? $this->generalThread($inspection, $viewer) : null,
+            'general_thread' => $canReview ? $this->generalThread($inspection, $viewer) : null,
             'header' => $this->header($inspection, $physical, $detail, $viewer, $openHolds, $openIssues),
             'legacy_pending' => $inspection->processing_status === null && $inspection->review_status === 'pending_review',
             'pending_effects' => $this->pendingEffects($inspection),
@@ -244,7 +244,7 @@ final class InspectionWorkspace
             }
             $decisions[] = [
                 'at' => $this->eastern($event->created_at)?->format('M j, Y g:i A'),
-                'actor' => (string) ($eventMeta['actor_name'] ?? $event->changedByUser?->name ?? 'System'),
+                'actor' => (string) ($eventMeta['actor_name'] ?? data_get($event, 'changedByUser.name') ?? 'System'),
                 'note' => $event->internal_note,
                 'revision' => isset($eventMeta['revision']['value']) ? (string) $eventMeta['revision']['value'] : null,
             ];
@@ -360,7 +360,7 @@ final class InspectionWorkspace
                 $trail[] = [
                     'reference' => $trailInspection?->inspection_reference ?: 'Inspection #'.$row->apparatus_inspection_id,
                     'url' => (int) $row->apparatus_inspection_id === $id ? null : self::url((int) $row->apparatus_inspection_id, 'issue-'.$defect->getKey()),
-                    'at' => $this->eastern($trailInspection?->completed_at ?? $trailInspection?->created_at ?? $row->created_at)?->format('M j, Y g:i A'),
+                    'at' => $this->eastern($trailInspection->completed_at ?? $trailInspection->created_at ?? $row->created_at)?->format('M j, Y g:i A'),
                     'kind' => self::OBSERVATION_LABELS[$row->observation] ?? str((string) $row->observation)->replace('_', ' ')->headline()->toString(),
                     'current' => (int) $row->apparatus_inspection_id === $id,
                 ];
@@ -396,7 +396,7 @@ final class InspectionWorkspace
                     'kind' => $observation !== null
                         ? (self::OBSERVATION_LABELS[$observation->observation] ?? str((string) $observation->observation)->replace('_', ' ')->headline()->toString())
                         : self::OBSERVATION_LABELS['first_reported'],
-                    'status' => $observation?->reported_status ?? str((string) $defect->issue_type)->headline()->toString(),
+                    'status' => $observation->reported_status ?? str((string) $defect->issue_type)->headline()->toString(),
                     'notes' => filled($observation?->notes) ? (string) $observation->notes : (
                         (int) $defect->apparatus_inspection_id === $id && filled($defect->notes) ? (string) $defect->notes : null
                     ),
@@ -490,7 +490,7 @@ final class InspectionWorkspace
             'assigned_vehicle' => $swap->assigned_vehicle_number ?: 'none recorded',
             'pending' => $swap->isPending(),
             'status_label' => ApparatusVehicleSwapRequest::statusLabel($swap->status),
-            'decided_by' => $swap->decidedBy?->name ?? 'Fleet',
+            'decided_by' => data_get($swap, 'decidedBy.name') ?? 'Fleet',
             'decided_at' => $swap->decided_at ? $this->eastern($swap->decided_at)?->format('M j, Y g:i A') : null,
             'answer' => ApparatusVehicleSwapRequest::answerLabel($swap->answer),
             'note' => $swap->note,
@@ -521,7 +521,7 @@ final class InspectionWorkspace
             $push($swap->created_at, 'swap', 'Vehicle reported: '.$swap->reported_vehicle_number, ['actor' => $swap->reporter_name, 'body' => $swap->note]);
             if (! $swap->isPending()) {
                 $push($swap->decided_at ?? $swap->updated_at, 'swap', 'Vehicle swap decision: '.ApparatusVehicleSwapRequest::statusLabel($swap->status), [
-                    'actor' => $swap->decidedBy?->name ?? 'Fleet', 'body' => $swap->decision_note, 'internal' => filled($swap->decision_note),
+                    'actor' => data_get($swap, 'decidedBy.name') ?? 'Fleet', 'body' => $swap->decision_note, 'internal' => filled($swap->decision_note),
                 ]);
             }
         }
@@ -532,7 +532,7 @@ final class InspectionWorkspace
             $status = str((string) $event->status)->replace('_', ' ')->headline()->toString();
             $evidence = data_get($meta, 'submitted_effects.checklist_v2');
             $push($event->created_at, 'review', isset($meta['exception_id']) ? 'Meter reading decision: '.$status : 'Review: '.$previous.' to '.$status, [
-                'actor' => (string) ($event->changedByUser?->name ?? $meta['actor_name'] ?? $meta['reviewer_name'] ?? 'User no longer active'),
+                'actor' => (string) (data_get($event, 'changedByUser.name') ?? $meta['actor_name'] ?? $meta['reviewer_name'] ?? 'User no longer active'),
                 'body' => $event->internal_note,
                 'internal' => filled($event->internal_note),
                 'evidence' => is_array($evidence) ? $evidence : null,
@@ -577,7 +577,7 @@ final class InspectionWorkspace
 
         usort($items, static fn (array $a, array $b): int => $a['sort'] <=> $b['sort']);
 
-        return array_values($items);
+        return $items;
     }
 
     /** @return list<array<string, mixed>> */

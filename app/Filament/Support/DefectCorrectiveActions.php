@@ -97,7 +97,13 @@ final class DefectCorrectiveActions
 
     // --------------------------------------------------------------- builders
 
-    /** @param Closure(Action): ?ApparatusDefect $defectOf */
+    /**
+     * @template TAction of Action
+     *
+     * @param  TAction  $action
+     * @param  Closure(Action): ?ApparatusDefect  $defectOf
+     * @return TAction
+     */
     public static function acknowledge(Action $action, Closure $defectOf): Action
     {
         return self::base($action, $defectOf, 'Acknowledge', 'heroicon-o-hand-thumb-up', 'primary')
@@ -110,7 +116,13 @@ final class DefectCorrectiveActions
                 fn (int $id, User $user, array $payload, ?string $key) => app(DefectCorrectiveActionService::class)->acknowledge($id, $user, $payload, $key)));
     }
 
-    /** @param Closure(Action): ?ApparatusDefect $defectOf */
+    /**
+     * @template TAction of Action
+     *
+     * @param  TAction  $action
+     * @param  Closure(Action): ?ApparatusDefect  $defectOf
+     * @return TAction
+     */
     public static function update(Action $action, Closure $defectOf): Action
     {
         $replacement = static fn (string $item): string => sprintf(
@@ -189,7 +201,13 @@ final class DefectCorrectiveActions
             });
     }
 
-    /** @param Closure(Action): ?ApparatusDefect $defectOf */
+    /**
+     * @template TAction of Action
+     *
+     * @param  TAction  $action
+     * @param  Closure(Action): ?ApparatusDefect  $defectOf
+     * @return TAction
+     */
     public static function resolve(Action $action, Closure $defectOf): Action
     {
         return self::base($action, $defectOf, 'Resolve', 'heroicon-o-check-circle', 'success')
@@ -216,7 +234,13 @@ final class DefectCorrectiveActions
                 fn (int $id, User $user, array $payload, ?string $key) => app(DefectCorrectiveActionService::class)->resolve($id, $user, $payload, $key)));
     }
 
-    /** @param Closure(Action): ?ApparatusDefect $defectOf */
+    /**
+     * @template TAction of Action
+     *
+     * @param  TAction  $action
+     * @param  Closure(Action): ?ApparatusDefect  $defectOf
+     * @return TAction
+     */
     public static function dismiss(Action $action, Closure $defectOf): Action
     {
         return self::base($action, $defectOf, 'Dismiss', 'heroicon-o-x-circle', 'gray')
@@ -233,7 +257,13 @@ final class DefectCorrectiveActions
                 fn (int $id, User $user, array $payload, ?string $key) => app(DefectCorrectiveActionService::class)->dismiss($id, $user, $payload, $key)));
     }
 
-    /** @param Closure(Action): ?ApparatusDefect $defectOf */
+    /**
+     * @template TAction of Action
+     *
+     * @param  TAction  $action
+     * @param  Closure(Action): ?ApparatusDefect  $defectOf
+     * @return TAction
+     */
     public static function reopen(Action $action, Closure $defectOf): Action
     {
         return self::base($action, $defectOf, 'Reopen', 'heroicon-o-arrow-uturn-left', 'warning')
@@ -250,7 +280,13 @@ final class DefectCorrectiveActions
                 fn (int $id, User $user, array $payload, ?string $key) => app(DefectCorrectiveActionService::class)->reopen($id, $user, $payload, $key)));
     }
 
-    /** @param Closure(Action): ?ApparatusDefect $defectOf */
+    /**
+     * @template TAction of Action
+     *
+     * @param  TAction  $action
+     * @param  Closure(Action): ?ApparatusDefect  $defectOf
+     * @return TAction
+     */
     public static function verify(Action $action, Closure $defectOf): Action
     {
         return self::base($action, $defectOf, 'Verify correction', 'heroicon-o-shield-check', 'success')
@@ -268,7 +304,13 @@ final class DefectCorrectiveActions
                 fn (int $id, User $user, array $payload, ?string $key) => app(DefectCorrectiveActionService::class)->verifyCorrection($id, $user, $payload, $key)));
     }
 
-    /** @param Closure(Action): ?ApparatusDefect $defectOf */
+    /**
+     * @template TAction of Action
+     *
+     * @param  TAction  $action
+     * @param  Closure(Action): ?ApparatusDefect  $defectOf
+     * @return TAction
+     */
     public static function classify(Action $action, Closure $defectOf): Action
     {
         return self::base($action, $defectOf, 'Classify impact', 'heroicon-o-exclamation-triangle', 'gray')
@@ -296,7 +338,13 @@ final class DefectCorrectiveActions
                 fn (int $id, User $user, array $payload, ?string $key) => app(DefectCorrectiveActionService::class)->classifyImpact($id, $user, $payload, $key)));
     }
 
-    /** @param Closure(Action): ?ApparatusDefect $defectOf */
+    /**
+     * @template TAction of Action
+     *
+     * @param  TAction  $action
+     * @param  Closure(Action): ?ApparatusDefect  $defectOf
+     * @return TAction
+     */
     public static function ticket(Action $action, Closure $defectOf): Action
     {
         return self::base($action, $defectOf, 'Create service ticket', 'heroicon-o-wrench-screwdriver', 'gray')
@@ -325,7 +373,13 @@ final class DefectCorrectiveActions
 
     // ---------------------------------------------------------------- internals
 
-    /** @param Closure(Action): ?ApparatusDefect $defectOf */
+    /**
+     * @template TAction of Action
+     *
+     * @param  TAction  $action
+     * @param  Closure(Action): ?ApparatusDefect  $defectOf
+     * @return TAction
+     */
     private static function base(Action $action, Closure $defectOf, string $label, string $icon, string $color): Action
     {
         return $action

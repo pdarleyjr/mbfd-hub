@@ -18,6 +18,7 @@ use App\Notifications\Inspections\InspectionEventNotification;
 use App\Notifications\Inspections\InspectionNotificationKind as Kind;
 use App\Support\Fleet\DefectActionStatus;
 use App\Support\Fleet\InspectionReviewers;
+use Carbon\Carbon;
 use Carbon\CarbonInterface;
 use Closure;
 use Illuminate\Support\Collection;
@@ -163,7 +164,7 @@ final class InspectionNotificationDispatcher
             }
 
             if ($defect !== null) {
-                $unit = $this->unitLabel($defect->apparatus);
+                $unit = $this->unitLabel($defect->getRelationValue('apparatus'));
                 $this->queue(
                     $eventKey,
                     Kind::ISSUE_MEMBER_UPDATE,
@@ -202,7 +203,7 @@ final class InspectionNotificationDispatcher
     public function issueResolved(ApparatusDefect $defect, ApparatusDefectEvent $event): void
     {
         $this->guard('issueResolved', function () use ($defect, $event): void {
-            $unit = $this->unitLabel($defect->apparatus);
+            $unit = $this->unitLabel($defect->getRelationValue('apparatus'));
             $reportedOn = $this->date($defect->first_reported_at ?? $defect->reported_date ?? $defect->created_at);
             $resolvedOn = $this->date($event->created_at);
             $type = (string) (($event->details['resolution_type'] ?? null) ?: $defect->resolution_type);
@@ -237,7 +238,7 @@ final class InspectionNotificationDispatcher
             if ($message === '') {
                 return;
             }
-            $unit = $this->unitLabel($defect->apparatus);
+            $unit = $this->unitLabel($defect->getRelationValue('apparatus'));
             $label = DefectActionStatus::label($event->to_status ?: $defect->action_status);
             $actor = $event->actor_user_id !== null ? User::query()->find($event->actor_user_id) : null;
 
@@ -442,7 +443,6 @@ final class InspectionNotificationDispatcher
         $actorPerson = $actor !== null ? $this->person($actor) : null;
 
         return $candidates
-            ->filter(fn ($user): bool => $user instanceof User)
             ->unique(fn (User $user): int => (int) $user->getKey())
             ->reject(fn (User $user): bool => $actor !== null && (
                 (int) $user->getKey() === (int) $actor->getKey() || $this->person($user) === $actorPerson
@@ -452,7 +452,7 @@ final class InspectionNotificationDispatcher
             ->map(fn (Collection $accounts): User => $accounts
                 ->sortByDesc(fn (User $user): string => sprintf(
                     '%s-%010d',
-                    $user->last_login_at?->format('YmdHis') ?? '00000000000000',
+                    $user->last_login_at !== null ? Carbon::parse($user->last_login_at)->format('YmdHis') : '00000000000000',
                     (int) $user->getKey(),
                 ))
                 ->first())
@@ -528,11 +528,11 @@ final class InspectionNotificationDispatcher
         string $excerpt,
     ): void {
         $inspectionId = $inspection?->getKey()
-            ?? $defect?->last_observed_inspection_id
-            ?? $defect?->first_reported_inspection_id
+            ?? $defect->last_observed_inspection_id
+            ?? $defect->first_reported_inspection_id
             ?? $defect?->apparatus_inspection_id;
         $unit = $defect !== null
-            ? $this->unitLabel($defect->apparatus)
+            ? $this->unitLabel($defect->getRelationValue('apparatus'))
             : $this->unitLabel($inspection !== null ? $this->physicalApparatus($inspection) : null, $inspection?->designation_at_time);
         $name = trim((string) ($author->display_name ?: $author->name)) ?: 'A member';
         $about = $defect !== null ? ' about the '.$this->issuePhrase($defect) : '';
@@ -668,9 +668,7 @@ final class InspectionNotificationDispatcher
 
     private function physicalApparatus(ApparatusInspection $inspection): ?Apparatus
     {
-        $id = $inspection->processed_apparatus_id ?? $inspection->apparatus_id;
-
-        return $id !== null ? Apparatus::query()->find($id) : null;
+        return Apparatus::query()->find($inspection->processed_apparatus_id ?? $inspection->apparatus_id);
     }
 
     private function date(mixed $moment): string
