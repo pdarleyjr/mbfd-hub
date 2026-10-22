@@ -63,8 +63,17 @@ final class TrainingCrewPlannerUploadController extends Controller
                 default => 'Daily roster read. Eligible members are updated below.',
             };
 
+            $request->session()->forget(TrainingCrewPlanner::UPLOAD_ERROR_KEY);
+
             return redirect(TrainingCrewPlanner::getUrl(panel: 'training'))
                 ->with('crew_planner_notice', $notice);
+        } catch (ValidationException $exception) {
+            // Flashed errors are consumed by whichever request comes next, including a
+            // background Livewire update still in flight from the page; keep the
+            // message until the planner page itself loads and shows it.
+            $request->session()->put(TrainingCrewPlanner::UPLOAD_ERROR_KEY, (string) collect($exception->errors())->flatten()->first());
+
+            throw $exception;
         } finally {
             if ($file instanceof UploadedFile && is_file($file->getPathname())) {
                 unlink($file->getPathname());

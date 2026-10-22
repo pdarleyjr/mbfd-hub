@@ -24,6 +24,9 @@ final class TrainingCrewPlanner extends Page
 {
     private const TZ = 'America/New_York';
 
+    /** A rejected roster upload's message, held until the page itself loads and shows it. */
+    public const UPLOAD_ERROR_KEY = 'training_crew_planner_upload_error';
+
     protected static ?string $navigationGroup = 'Training';
 
     protected static ?string $navigationLabel = 'Crew Planner';
@@ -85,6 +88,10 @@ final class TrainingCrewPlanner extends Page
         }
         $this->loadDraft($draft);
         session()->put($this->sessionKey(), $draft['id']);
+        $uploadError = session()->pull(self::UPLOAD_ERROR_KEY);
+        if (is_string($uploadError) && $uploadError !== '' && ! $this->getErrorBag()->has('roster_pdf')) {
+            $this->addError('roster_pdf', $uploadError);
+        }
     }
 
     public function reloadProposal(): void
@@ -654,7 +661,7 @@ final class TrainingCrewPlanner extends Page
         return $slots;
     }
 
-    private function slotProblem(bool $strict, int|string $index, string $message): ?array
+    private function slotProblem(bool $strict, int|string $index, string $message): null
     {
         if ($strict) {
             throw ValidationException::withMessages(["slotEdits.$index.end" => $message]);

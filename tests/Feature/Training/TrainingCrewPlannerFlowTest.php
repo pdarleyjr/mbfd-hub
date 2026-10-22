@@ -12,7 +12,6 @@ use App\Models\Training\TrainingModule;
 use App\Models\Training\TrainingSession;
 use App\Models\User;
 use App\Services\Training\CrewPlanner\TrainingCrewPlannerDraftStore;
-use App\Services\Training\CrewPlanner\TrainingPlannerAttendanceLookup;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -223,6 +222,15 @@ final class TrainingCrewPlannerFlowTest extends TestCase
         $old = CarbonImmutable::now('America/New_York')->subDays(3)->toDateString();
         [, $classStart] = $cutoff(['slots' => [$slot($old, '13:00')], 'metadata' => ['schedule_date' => $old]]);
         self::assertFalse($classStart);
+    }
+
+    public function test_a_rejected_upload_message_survives_until_the_page_loads_and_shows_once(): void
+    {
+        // CI regression: a debounced search update consumed the flashed error before the redirect landed.
+        session()->put(TrainingCrewPlanner::UPLOAD_ERROR_KEY, 'Synthetic upload problem. Your saved proposal is safe.');
+        Livewire::test(TrainingCrewPlanner::class)->assertSee('Synthetic upload problem. Your saved proposal is safe.');
+        self::assertFalse(session()->has(TrainingCrewPlanner::UPLOAD_ERROR_KEY));
+        Livewire::test(TrainingCrewPlanner::class)->assertDontSee('Synthetic upload problem.');
     }
 
     public function test_an_older_roster_never_moves_the_attendance_cutoff_into_the_past(): void

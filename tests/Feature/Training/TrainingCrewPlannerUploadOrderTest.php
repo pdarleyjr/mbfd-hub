@@ -182,6 +182,8 @@ final class TrainingCrewPlannerUploadOrderTest extends TestCase
             self::assertStringContainsString('Your saved proposal is safe.', $message);
             self::assertStringContainsString('Reference: '.$reference, $message);
             self::assertStringContainsString($exit === 20 ? 'recognize' : 'server processing problem', $message);
+            // Held beyond the flash so a concurrent Livewire update cannot swallow it.
+            self::assertSame($message, session(\App\Filament\Training\Pages\TrainingCrewPlanner::UPLOAD_ERROR_KEY));
             if ($exit !== 20) {
                 self::assertStringNotContainsString('Choose a complete', $message);
             }
