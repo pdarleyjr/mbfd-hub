@@ -8,8 +8,11 @@ use App\Models\TakeHomeVehicleInspection;
 use App\Models\UnitMasterVehicle;
 use App\Models\UnitMasterVehicleChange;
 use App\Models\User;
+use App\Models\VehicleDocument;
 use App\Services\Fleet\UnitMasterVehicleChangeRecorder;
+use App\Support\Fleet\VehicleDocumentAccess;
 use Filament\Actions;
+use Filament\Forms;
 use Filament\Infolists\Components\Section;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Infolists\Components\ViewEntry;
@@ -17,6 +20,7 @@ use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Js;
 
 /**
  * The individual vehicle profile: master details, the latest take-home
@@ -31,11 +35,76 @@ class ViewUnitMasterVehicle extends ViewRecord
     /** @var array<int|string, string> */
     private array $employeeNames = [];
 
+    public function hasCombinedRelationManagerTabsWithContent(): bool
+    {
+        return true;
+    }
+
+    public function getContentTabLabel(): ?string
+    {
+        return 'Overview';
+    }
+
     protected function getHeaderActions(): array
     {
         return [
+            Actions\Action::make('exportVehicleProfile')
+                ->label('Export Vehicle Profile')
+                ->icon('heroicon-o-document-arrow-down')
+                ->color('gray')
+                ->visible(fn (): bool => VehicleDocumentAccess::canExport(auth()->user(), $this->exportVehicle()))
+                ->modalSubmitActionLabel('Download')
+                ->form([
+                    Forms\Components\Radio::make('format')->label('Format')
+                        ->options(['pdf' => 'PDF', 'xlsx' => 'Excel'])->default('pdf')->required()->inline(),
+                    Forms\Components\Radio::make('scope')->label('Include documents')
+                        ->options(['none' => 'Vehicle profile only', 'selected' => 'Choose documents', 'all' => 'All permitted documents'])
+                        ->default('none')->required()->live()
+                        ->helperText('When documents are included, download a ZIP containing the report, unchanged originals and a checksum manifest.'),
+                    Forms\Components\Select::make('documents')->label('Documents')->multiple()->searchable()
+                        ->options(fn (): array => $this->exportDocumentOptions())
+                        ->visible(fn (Forms\Get $get): bool => $get('scope') === 'selected')
+                        ->required(fn (Forms\Get $get): bool => $get('scope') === 'selected'),
+                ])
+                ->action(function (array $data): void {
+                    abort_unless(VehicleDocumentAccess::canExport(auth()->user(), $this->exportVehicle()), 403);
+                    $ids = match ($data['scope']) {
+                        'all' => array_keys($this->exportDocumentOptions()),
+                        'selected' => $data['documents'] ?? [],
+                        default => [],
+                    };
+
+                    $url = route('vehicle-documents.export', [
+                        'vehicle' => $this->exportVehicle(),
+                        'format' => $data['format'],
+                        'documents' => $ids,
+                    ]);
+                    $this->js('window.location.assign('.Js::from($url).')');
+                }),
             Actions\EditAction::make(),
         ];
+    }
+
+    /** @return array<int, string> */
+    private function exportDocumentOptions(): array
+    {
+        abort_unless(VehicleDocumentAccess::canExport(auth()->user(), $this->exportVehicle()), 403);
+        $query = $this->exportVehicle()->documents();
+        if (! VehicleDocumentAccess::canSensitive(auth()->user())) {
+            $query->where('is_sensitive', false);
+        }
+
+        return $query->orderBy('title')->get()->mapWithKeys(fn (VehicleDocument $document): array => [
+            $document->id => $document->title.' - '.$document->original_filename,
+        ])->all();
+    }
+
+    private function exportVehicle(): UnitMasterVehicle
+    {
+        $vehicle = $this->getRecord();
+        abort_unless($vehicle instanceof UnitMasterVehicle, 404);
+
+        return $vehicle;
     }
 
     public function getTitle(): string

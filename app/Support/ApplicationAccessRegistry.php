@@ -73,6 +73,8 @@ final class ApplicationAccessRegistry
             }
         }
         $options['admin.communications.send'] = 'Communications — send email';
+        $options['admin.fleet.documents.sensitive'] = 'Fleet — access restricted vehicle documents';
+        $options['admin.fleet.documents.export'] = 'Fleet — export vehicle profiles and permitted documents';
         $options['files.manage'] = 'Policy library — manage';
         $options['training.rosters.submit'] = 'Training rosters — submit (requires Hub administration access)';
         $options['app.media_control.media'] = 'Media Control — upload and manage media';
