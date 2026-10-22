@@ -258,6 +258,28 @@ final class DailyInspectionSecurityTest extends TestCase
         $this->assertSame(2, ApparatusIssueMessage::query()->count(), 'Nothing was written by the refused attempts.');
     }
 
+    public function test_tampering_with_the_livewire_inspection_id_cannot_reach_another_members_thread(): void
+    {
+        Queue::fake();
+        Notification::fake();
+        $own = $this->directInspection($this->alpha);
+        $theirs = $this->directInspection($this->beta);
+
+        $this->actAs($this->alpha);
+        $this->bindCanonicalSessionToLivewireTestRequests();
+        Filament::setCurrentPanel(Filament::getPanel('employee'));
+        $page = Livewire::test(MyVehicleInspectionView::class, ['inspection' => $own->id])->assertSuccessful();
+        // The very render that follows the tampered property is refused.
+        $page->set('inspectionId', $theirs->id)->assertForbidden();
+
+        // A write attempted with the tampered property is refused as well, and stores nothing.
+        $second = Livewire::test(MyVehicleInspectionView::class, ['inspection' => $own->id]);
+        $second->set('inspectionReply', 'intrusion');
+        $second->set('inspectionId', $theirs->id);
+        $second->call('sendInspectionReply');
+        $this->assertSame(0, ApparatusIssueMessage::query()->count());
+    }
+
     public function test_internal_notes_never_reach_member_html_open_findings_the_pdf_view_or_notifications(): void
     {
         Queue::fake();

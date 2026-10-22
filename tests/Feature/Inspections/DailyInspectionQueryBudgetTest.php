@@ -76,6 +76,7 @@ final class DailyInspectionQueryBudgetTest extends TestCase
         $largeMetrics = $this->measureSurfaces($largeInspection);
 
         $report = json_encode(['baseline' => $baseline, 'small' => $smallMetrics, 'large' => $largeMetrics, 'submit' => [$smallSubmitQueries, $largeSubmitQueries]], JSON_THROW_ON_ERROR);
+        fwrite(STDERR, "\n[query-budget] ".$report."\n");
         // The member page is covered by DailyInspectionKnownDefectsTest (it issues queries per finding).
         foreach (['canonical_admin_page', 'checklist_open_findings', 'dashboard_widget'] as $surface) {
             $this->assertLessThanOrEqual(

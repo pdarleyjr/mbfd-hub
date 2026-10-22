@@ -208,6 +208,22 @@ final class DailyInspectionKnownDefectsTest extends TestCase
         $this->assertStringContainsString('id="issue-'.$defect->id.'"', $html, 'The notification anchor must exist on the page it links to.');
     }
 
+    /** DEFECT: an assigned administrator gets the member-oriented link (employee portal) on updates, but the admin link on resolution. */
+    public function test_an_assigned_administrator_is_sent_the_admin_page_link_on_issue_updates(): void
+    {
+        $defect = $this->reportedDefect();
+        $assignee = $this->newReviewer('Assigned Admin');
+        app(\App\Services\Defects\DefectCorrectiveActionService::class)->updateAction($defect->id, $this->reviewer, [
+            'action_status' => 'repair_scheduled', 'details' => ['assigned_to' => $assignee->id],
+        ]);
+
+        app(IssueMessageService::class)->post($this->reviewer, ['defect_id' => $defect->id, 'visibility' => 'member', 'body' => 'Repair booked for Friday.']);
+
+        $notification = Notification::sent($assignee, InspectionEventNotification::class)->firstWhere('kind', 'issue_member_update');
+        $this->assertNotNull($notification, 'The assigned administrator follows the issue.');
+        $this->assertStringStartsWith('/admin/inspections/', $notification->url, 'A reviewer must be linked to the admin page, not the employee portal: '.$notification->url);
+    }
+
     /** DEFECT: "Use a corrected value" can lower the fleet meter without the explicit reset confirmation. */
     public function test_correcting_a_meter_to_a_lower_value_also_needs_the_explicit_reset_confirmation(): void
     {
