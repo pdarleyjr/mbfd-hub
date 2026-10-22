@@ -12,19 +12,55 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 
-/** Renders an independently revalidated proposal; never reads or writes a domain model. */
+/** Renders an independently revalidated personnel request; never reads or writes a domain model. */
 final class TrainingCrewPlanExporter
 {
-    public const LEGEND = 'Planning proposal only; not a TeleStaff deployment approval, sign-in roster, or attendance record.';
+    public const TITLE = 'TRAINING ATTENDANCE — PERSONNEL REQUEST';
+
+    public const INTRO = 'The following personnel have not yet attended the training course or module identified below, according to current attendance records. Please coordinate their attendance at the designated session times, subject to operational staffing and coverage requirements.';
+
+    public const LEGEND = 'Eligibility reflects the uploaded daily roster and Hub attendance records at the time generated.';
+
+    public const VERIFY_NOTE = 'These entries need confirmation before scheduling.';
+
+    private const LOGO_PATH = 'images/training/mbfd-logo.png';
+
+    private const TZ = 'America/New_York';
 
     public function pdf(array $projection): string
     {
         $report = $this->report($projection);
 
-        return Pdf::loadView('training.crew-planner-proposal', ['report' => $report])
-            ->setPaper('letter')
-            ->setOptions(['isRemoteEnabled' => false, 'isPhpEnabled' => false, 'isJavascriptEnabled' => false])
+        return Pdf::loadView('training.crew-planner-proposal', ['report' => $report, 'logo' => $this->logo()])
+            ->setPaper('letter', 'portrait')
+            ->setOptions(['isRemoteEnabled' => false, 'isPhpEnabled' => false, 'isJavascriptEnabled' => false, 'defaultFont' => 'DejaVu Sans'])
             ->output();
+    }
+
+    /**
+     * Official logo, proportionally resampled to 256 px wide (alpha preserved) and embedded as a data URI.
+     *
+     * @return array{uri:string,width:int,height:int}
+     */
+    public function logo(): array
+    {
+        $source = @imagecreatefrompng(public_path(self::LOGO_PATH));
+        if ($source === false) {
+            throw new \RuntimeException('The MBFD logo could not be loaded.');
+        }
+        $height = max(1, (int) round(256 * imagesy($source) / imagesx($source)));
+        $thumbnail = imagecreatetruecolor(256, $height);
+        if ($thumbnail === false) {
+            throw new \RuntimeException('The MBFD logo could not be prepared.');
+        }
+        imagealphablending($thumbnail, false);
+        imagesavealpha($thumbnail, true);
+        imagecopyresampled($thumbnail, $source, 0, 0, 0, 0, 256, $height, imagesx($source), imagesy($source));
+        ob_start();
+        imagepng($thumbnail);
+        $bytes = (string) ob_get_clean();
+
+        return ['uri' => 'data:image/png;base64,'.base64_encode($bytes), 'width' => 256, 'height' => $height];
     }
 
     public function xlsx(array $projection): string
@@ -34,36 +70,36 @@ final class TrainingCrewPlanExporter
         try {
             $summary = $book->getActiveSheet();
             $summary->setTitle('Summary');
+            $sessions = array_values(array_filter($report['groups'], static fn (array $g): bool => $g['kind'] === 'session'));
             $this->write($summary, [
-                ['MBFD TRAINING - PROPOSED CLASS ATTENDANCE'],
-                ['For Battalion Chief 300 review'],
+                ['MIAMI BEACH FIRE RESCUE'],
+                [self::TITLE],
                 ['Course', $report['course_name']],
-                ['Scope', $report['scope_label']],
-                ['Training date', $report['schedule_date']],
-                ['Roster shift', $report['shift']],
-                ['Schedule generated', $report['printed_at']],
-                ['Proposal prepared', $report['generated_at']],
+                ['Module', $report['module_name']],
+                ['Training date', $report['date_long']],
+                ['Shift', $report['shift_label']],
+                ['Generated', $report['generated_display']],
                 ['Prepared by', $report['author']],
-                ['Unique proposed members', $report['total']],
-                ['Assigned and eligible', $report['eligible_total']],
+                ['Personnel listed', $report['total']],
+                ['Assigned to a session', $report['eligible_total']],
                 ['Needs verification', $report['review_total']],
                 ['Unassigned', $report['unassigned_total']],
-                ['Meaning', self::LEGEND],
-                ['Availability', 'Scheduled duty based on an uploaded snapshot; confirm current operational availability.'],
+                ['Notes', self::INTRO],
+                ['Eligibility', self::LEGEND],
                 ['Time zone', 'America/New_York'],
                 [],
-                ['Class slot', 'Time (Eastern)', 'Proposed members'],
-                ...array_map(static fn (array $group): array => [$group['label'], $group['time'], count($group['rows'])], $report['groups']),
+                ['Session', 'Time (Eastern)', 'Personnel'],
+                ...array_map(static fn (array $group): array => [$group['label'], $group['time'], count($group['rows'])], $sessions),
             ], false);
             $names = ['summary'];
             foreach ($report['groups'] as $index => $group) {
                 $sheet = $book->createSheet();
                 $sheet->setTitle($this->sheetName($group['label'], $index, $names));
                 $this->write($sheet, [
-                    ['For Battalion Chief 300 review - proposal only'],
-                    [$report['course_name'], $report['scope_label']],
-                    [$group['label'], $group['time'], count($group['rows']).' proposed'],
-                    ['Name', 'Employee ID', 'Rank', 'Published bid seat', 'Duty station', 'Duty apparatus', 'Planning status'],
+                    [self::TITLE],
+                    [$report['course_name'], $report['module_name'] !== '' ? $report['module_name'] : $report['scope_label']],
+                    [$group['label'], $group['time'], count($group['rows']).' listed'],
+                    ['Name', 'Employee ID', 'Rank', 'Published bid seat', 'Station', 'Unit', 'Status'],
                     ...array_map(static fn (array $row): array => [
                         $row['name'], $row['employee_id'], $row['rank'], $row['bid_position'],
                         $row['station'], $row['apparatus'], $row['status'],
@@ -73,14 +109,14 @@ final class TrainingCrewPlanExporter
             $book->setActiveSheetIndex(0);
             $stream = fopen('php://temp/maxmemory:8388608', 'w+b');
             if ($stream === false) {
-                throw new \RuntimeException('Unable to prepare the planning workbook.');
+                throw new \RuntimeException('Unable to prepare the workbook.');
             }
             try {
                 (new Xlsx($book))->save($stream);
                 rewind($stream);
                 $bytes = stream_get_contents($stream);
                 if ($bytes === false) {
-                    throw new \RuntimeException('Unable to read the planning workbook.');
+                    throw new \RuntimeException('Unable to read the workbook.');
                 }
 
                 return $bytes;
@@ -98,7 +134,7 @@ final class TrainingCrewPlanExporter
         $slots = $projection['slots'] ?? [];
         $rows = $projection['rows'] ?? [];
         if (! is_array($slots) || ! is_array($rows) || count($slots) > 20 || count($rows) > 1000) {
-            throw ValidationException::withMessages(['export' => 'Use at most 20 class slots and 1,000 proposed members.']);
+            throw ValidationException::withMessages(['export' => 'Use at most 20 class slots and 1,000 listed members.']);
         }
         $groups = [];
         foreach ($slots as $slot) {
@@ -106,10 +142,10 @@ final class TrainingCrewPlanExporter
             if ($id === '' || isset($groups[$id])) {
                 throw ValidationException::withMessages(['export' => 'Each class slot must have a unique identifier.']);
             }
-            $groups[$id] = ['label' => (string) $slot['label'], 'time' => $this->time($slot), 'rows' => []];
+            $groups[$id] = ['kind' => 'session', 'label' => (string) ($slot['label'] ?? ''), 'time' => $this->time($slot), 'rows' => []];
         }
-        $unassigned = ['label' => 'Unassigned', 'time' => 'Class slot not assigned', 'rows' => []];
-        $review = ['label' => 'Needs verification', 'time' => 'Chief confirmation required before scheduling', 'rows' => []];
+        $unassigned = ['kind' => 'unassigned', 'label' => 'Unassigned', 'time' => 'Session not assigned', 'rows' => []];
+        $review = ['kind' => 'review', 'label' => 'Needs verification', 'time' => self::VERIFY_NOTE, 'rows' => []];
         $seen = [];
         foreach ($rows as $key => $row) {
             $identity = (string) ($row['employee_profile_id'] ?? $key);
@@ -123,13 +159,13 @@ final class TrainingCrewPlanExporter
             }
             $slotId = (string) ($row['slot_id'] ?? '');
             if (($row['verification_required'] ?? false) === true) {
-                $safe['status'] = 'Requires verification'.(isset($groups[$slotId]) ? ' - proposed '.$groups[$slotId]['label'] : '');
+                $safe['status'] = 'Needs verification'.(isset($groups[$slotId]) ? ' - '.$groups[$slotId]['label'] : '');
                 $review['rows'][] = $safe;
             } elseif ($slotId === '' || ! isset($groups[$slotId])) {
                 $safe['status'] = 'Unassigned';
                 $unassigned['rows'][] = $safe;
             } else {
-                $safe['status'] = 'Scheduled duty covers class slot';
+                $safe['status'] = 'On duty during session';
                 $groups[$slotId]['rows'][] = $safe;
             }
         }
@@ -140,19 +176,31 @@ final class TrainingCrewPlanExporter
         }
         unset($group);
         $report = [];
-        foreach (['course_name', 'scope_label', 'schedule_date', 'shift', 'printed_at', 'generated_at', 'author'] as $field) {
-            $report[$field] = (string) ($projection[$field] ?? '');
+        foreach (['course_name', 'module_name', 'scope_label', 'schedule_date', 'shift', 'printed_at', 'generated_at', 'author'] as $field) {
+            $report[$field] = trim((string) ($projection[$field] ?? ''));
         }
-        $report['printed_at'] = $report['printed_at'] !== '' ? $report['printed_at'] : 'Not recorded in source PDF';
-        if (! empty($projection['module_name'])) {
-            $report['scope_label'] = (string) $projection['module_name'].' - '.$report['scope_label'];
-        }
+        $shift = $report['shift'];
+        $report['shift_label'] = $shift === '' ? '' : (preg_match('/shift$/i', $shift) === 1 ? $shift : $shift.' Shift');
+        $report['date_long'] = $this->formatDate($report['schedule_date'], 'l, F j, Y');
+        $report['generated_display'] = $this->formatDate($report['generated_at'], 'F j, Y g:i A T');
 
         return $report + [
             'groups' => $groups, 'total' => count($seen), 'eligible_total' => $eligible,
             'review_total' => count($review['rows']), 'unassigned_total' => count($unassigned['rows']),
-            'legend' => self::LEGEND,
+            'legend' => self::LEGEND, 'title' => self::TITLE, 'intro' => self::INTRO, 'verify_note' => self::VERIFY_NOTE,
         ];
+    }
+
+    private function formatDate(string $value, string $format): string
+    {
+        if ($value === '') {
+            return '';
+        }
+        try {
+            return CarbonImmutable::parse($value, self::TZ)->setTimezone(self::TZ)->format($format);
+        } catch (\Throwable) {
+            return $value;
+        }
     }
 
     private function time(array $slot): string
@@ -161,8 +209,8 @@ final class TrainingCrewPlanExporter
             throw ValidationException::withMessages(['export' => 'Complete each class slot start and end time before export.']);
         }
         try {
-            $start = CarbonImmutable::parse((string) $slot['start_at'], 'America/New_York')->setTimezone('America/New_York');
-            $end = CarbonImmutable::parse((string) $slot['end_at'], 'America/New_York')->setTimezone('America/New_York');
+            $start = CarbonImmutable::parse((string) $slot['start_at'], self::TZ)->setTimezone(self::TZ);
+            $end = CarbonImmutable::parse((string) $slot['end_at'], self::TZ)->setTimezone(self::TZ);
         } catch (\Throwable) {
             throw ValidationException::withMessages(['export' => 'Complete each class slot start and end time before export.']);
         }
@@ -170,7 +218,7 @@ final class TrainingCrewPlanExporter
             throw ValidationException::withMessages(['export' => 'Each class slot must end after it starts.']);
         }
 
-        return $start->format('H:i').' - '.$end->format($end->isSameDay($start) ? 'H:i T' : 'M j H:i T');
+        return $start->format('H:i').'–'.$end->format($end->isSameDay($start) ? 'H:i' : 'M j H:i');
     }
 
     private function sheetName(string $label, int $index, array &$names): string
@@ -212,6 +260,6 @@ final class TrainingCrewPlanExporter
             $sheet->getColumnDimension('B')->setWidth(85);
         }
         $sheet->getPageSetup()->setOrientation('landscape')->setPaperSize(1)->setFitToWidth(1)->setFitToHeight(0)->setPrintArea('A1:G'.$last);
-        $sheet->getHeaderFooter()->setOddFooter('&LProposal only - Battalion Chief 300 review&RPage &P of &N');
+        $sheet->getHeaderFooter()->setOddFooter('&LGenerated by MBFD Hub&RPage &P of &N');
     }
 }
