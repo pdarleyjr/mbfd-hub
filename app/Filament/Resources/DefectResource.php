@@ -4,11 +4,13 @@ namespace App\Filament\Resources;
 
 use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\DefectResource\Pages;
+use App\Filament\Support\DefectCorrectiveActions;
 use App\Filament\Support\DefectServiceTicketActions;
 use App\Filament\Support\InspectionWorkspace;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
+use App\Support\Fleet\DefectActionStatus;
 use App\Support\Fleet\DefectFollowUpState;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -226,31 +228,17 @@ class DefectResource extends Resource
                             'issue-'.$record->getKey(),
                         )),
 
-                    Tables\Actions\Action::make('mark_resolved')
+                    // Resolution goes through the corrective-action service: it records the event,
+                    // tells the people who reported or confirmed the issue, and requires a type and notes.
+                    DefectCorrectiveActions::resolve(
+                        Tables\Actions\Action::make('mark_resolved'),
+                        fn (Tables\Actions\Action $action): ?ApparatusDefect => DefectServiceTicketActions::defectFrom($action->getRecord()),
+                    )
                         ->label('Mark Resolved')
-                        ->icon('heroicon-o-check-circle')
-                        ->color('success')
                         ->tooltip('Resolve this equipment issue')
-                        ->visible(fn (ApparatusDefect $record) => $record->status !== 'resolved')
-                        ->form([
-                            Forms\Components\Textarea::make('resolution_notes')
-                                ->label('Resolution Notes')
-                                ->required()
-                                ->rows(3),
-                        ])
-                        ->action(function (ApparatusDefect $record, array $data) {
-                            $record->update([
-                                'status' => 'resolved',
-                                'resolution_notes' => $data['resolution_notes'],
-                                'resolved_at' => now(),
-                            ]);
-                        })
-                        ->successNotification(
-                            fn () => \Filament\Notifications\Notification::make()
-                                ->success()
-                                ->title('Defect Resolved')
-                                ->body('The defect has been marked as resolved.')
-                        ),
+                        ->visible(fn (Tables\Actions\Action $action): bool => DefectCorrectiveActions::canManage(auth()->user())
+                            && ($defect = DefectServiceTicketActions::defectFrom($action->getRecord())) instanceof ApparatusDefect
+                            && ! DefectActionStatus::isClosed($defect->action_status)),
 
                     Tables\Actions\EditAction::make(),
                 ])->label('Actions')->icon('heroicon-m-ellipsis-horizontal')->button()->color('gray'),

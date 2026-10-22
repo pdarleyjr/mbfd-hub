@@ -22,8 +22,10 @@ use App\Models\ApparatusVehicleSwapRequest;
 use App\Models\Station;
 use App\Models\User;
 use App\Services\Inspections\EmployeeInspectionHistoryService;
+use App\Services\Inspections\IssueMessageService;
 use App\Support\Fleet\DefectActionStatus;
 use Carbon\CarbonImmutable;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Collection;
 
 /**
@@ -62,7 +64,10 @@ final class InspectionWorkspace
         'appears_corrected' => 'Member reports it appears corrected',
     ];
 
-    public function __construct(private readonly EmployeeInspectionHistoryService $history) {}
+    public function __construct(
+        private readonly EmployeeInspectionHistoryService $history,
+        private readonly IssueMessageService $messages,
+    ) {}
 
     /** URL of the one canonical inspection page, optionally anchored to a section or issue. */
     public static function url(int|ApparatusInspection $inspection, ?string $anchor = null): string
@@ -116,7 +121,8 @@ final class InspectionWorkspace
             ->get();
 
         $holdCards = $this->holdCards($inspection, $exceptions, $physical);
-        $defects = $this->defectCards($inspection, $physicalId, $this->damageDefectIds($exceptions), $itemPhotos);
+        $canManage = DefectCorrectiveActions::canManage($viewer);
+        $defects = $this->defectCards($inspection, $physicalId, $this->damageDefectIds($exceptions), $itemPhotos, $viewer, $canReview, $canManage);
 
         $openHolds = $exceptions->filter(fn (ApparatusInspectionException $e): bool => $this->isOpenHold($e))->count();
         $openIssues = collect($defects['cards'])->where('closed', false)->count();
@@ -125,6 +131,8 @@ final class InspectionWorkspace
             'inspection' => $inspection,
             'status' => self::statusPresentation($inspection),
             'can_review' => $canReview,
+            'can_manage' => $canManage,
+            'general_thread' => $canReview && $viewer instanceof User ? $this->generalThread($inspection, $viewer) : null,
             'header' => $this->header($inspection, $physical, $detail, $viewer, $openHolds, $openIssues),
             'legacy_pending' => $inspection->processing_status === null && $inspection->review_status === 'pending_review',
             'pending_effects' => $this->pendingEffects($inspection),
@@ -309,7 +317,7 @@ final class InspectionWorkspace
      * @param  array<string, string>  $itemPhotos
      * @return array{cards: list<array<string, mixed>>, ids: list<int>}
      */
-    private function defectCards(ApparatusInspection $inspection, int $physicalId, array $holdDefectIds, array $itemPhotos): array
+    private function defectCards(ApparatusInspection $inspection, int $physicalId, array $holdDefectIds, array $itemPhotos, ?User $viewer, bool $canReview, bool $canManage): array
     {
         $id = (int) $inspection->getKey();
         $observations = ApparatusDefectObservation::query()->where('apparatus_inspection_id', $id)->get()->keyBy('apparatus_defect_id');
@@ -401,10 +409,55 @@ final class InspectionWorkspace
                         : null,
                 ] : null,
                 'photo_key' => $photoKey,
+                'actions' => $canManage
+                    ? DefectCorrectiveActions::applicable($defect, $trailRows->get($defect->getKey(), collect())->last()?->observation === 'appears_corrected')
+                    : [],
+                'thread' => $canReview && $viewer instanceof User ? $this->issueThread($viewer, $defect) : null,
             ];
         }
 
         return ['cards' => $cards, 'ids' => $defects->modelKeys()];
+    }
+
+    /**
+     * The issue's conversation, oldest first. Internal notes are included only because the
+     * caller already proved the viewer is a reviewer, and they are always labelled.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function issueThread(User $viewer, ApparatusDefect $defect): array
+    {
+        try {
+            return $this->messageRows($this->messages->threadFor($viewer, $defect));
+        } catch (AuthorizationException) {
+            return [];
+        }
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function generalThread(ApparatusInspection $inspection, User $viewer): array
+    {
+        try {
+            return $this->messageRows($this->messages->threadFor($viewer, $inspection));
+        } catch (AuthorizationException) {
+            return [];
+        }
+    }
+
+    /**
+     * @param  Collection<int, ApparatusIssueMessage>  $messages
+     * @return list<array<string, mixed>>
+     */
+    private function messageRows(Collection $messages): array
+    {
+        return $messages->map(fn (ApparatusIssueMessage $message): array => [
+            'id' => (int) $message->getKey(),
+            'at' => $this->eastern($message->created_at)?->format('M j, Y g:i A'),
+            'author' => (string) ($message->author?->display_name ?: $message->author?->name ?: 'Staff member'),
+            'body' => (string) $message->body,
+            'internal' => $message->visibility === ApparatusIssueMessage::VISIBILITY_INTERNAL,
+            'correction' => $message->corrects_message_id !== null,
+        ])->values()->all();
     }
 
     /** @return array<string, mixed>|null */

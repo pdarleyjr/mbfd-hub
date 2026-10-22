@@ -145,6 +145,7 @@ final class ApparatusDefectStateIntegrityTest extends TestCase
             ->call('loadTable')
             ->assertTableActionExists('mark_resolved', record: $defect)
             ->callTableAction('mark_resolved', $defect, data: [
+                'resolution_type' => 'replacement_installed',
                 'resolution_notes' => 'Replacement radio installed and checked.',
             ])
             ->assertHasNoTableActionErrors();

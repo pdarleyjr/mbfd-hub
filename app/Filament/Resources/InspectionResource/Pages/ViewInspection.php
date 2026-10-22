@@ -4,16 +4,27 @@ namespace App\Filament\Resources\InspectionResource\Pages;
 
 use App\Filament\Resources\ApparatusResource;
 use App\Filament\Resources\InspectionResource;
+use App\Filament\Support\DefectCorrectiveActions;
 use App\Filament\Support\InspectionWorkspace;
 use App\Models\Apparatus;
+use App\Models\ApparatusDefect;
+use App\Models\ApparatusDefectObservation;
 use App\Models\ApparatusInspection;
+use App\Models\ApparatusIssueMessage;
 use App\Models\User;
 use App\Services\ApparatusInspectionApprovalService;
+use App\Services\Inspections\IssueMessageService;
+use App\Support\Fleet\InspectionReviewers;
+use Closure;
 use Filament\Actions\Action;
+use Filament\Actions\MountableAction;
 use Filament\Forms;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 /**
  * The one authoritative admin page for a daily inspection. Everything a reviewer
@@ -25,6 +36,13 @@ class ViewInspection extends ViewRecord
     protected static string $resource = InspectionResource::class;
 
     protected static string $view = 'filament.resources.inspection-resource.pages.view-inspection';
+
+    /**
+     * Unsent composer text per issue, keyed by defect id: ['body' => ..., 'visibility' => 'member'|'internal'].
+     *
+     * @var array<int|string, array<string, mixed>>
+     */
+    public array $issueDrafts = [];
 
     public function mount(int|string $record): void
     {
@@ -118,6 +136,30 @@ class ViewInspection extends ViewRecord
 
                     Notification::make()->success()->title('Inspection rejected')->send();
                 }),
+            Action::make('replyToMember')
+                ->label('Reply to member')
+                ->icon('heroicon-o-chat-bubble-left-ellipsis')
+                ->color('gray')
+                ->modalHeading('Reply to the member who submitted this inspection')
+                ->modalDescription('The member can read this reply on their inspection and gets a notification. Use an issue card for staff-only notes.')
+                ->modalSubmitActionLabel('Send reply')
+                ->visible(fn (): bool => $this->isReviewer())
+                ->mountUsing(fn (Forms\ComponentContainer $form) => $form->fill(['client_message_id' => (string) Str::uuid()]))
+                ->form([
+                    Forms\Components\Hidden::make('client_message_id'),
+                    Forms\Components\Textarea::make('body')
+                        ->label('Your reply')
+                        ->required()
+                        ->rows(4)
+                        ->maxLength(IssueMessageService::MAX_BODY),
+                ])
+                ->action(function (array $data): void {
+                    $this->sendMessage(
+                        ['inspection_id' => $this->inspection()->getKey(), 'visibility' => ApparatusIssueMessage::VISIBILITY_MEMBER, 'body' => $data['body']],
+                        $data['client_message_id'] ?? null,
+                        'Reply sent to the member',
+                    );
+                }),
             Action::make('print')
                 ->label('Print')
                 ->icon('heroicon-o-printer')
@@ -131,6 +173,139 @@ class ViewInspection extends ViewRecord
                 ->openUrlInNewTab()
                 ->visible(fn (): bool => (bool) auth()->user()?->can('view', $this->inspection())),
         ];
+    }
+
+    // ------------------------------------------------ per-issue corrective actions
+
+    public function acknowledgeIssueAction(): Action
+    {
+        return DefectCorrectiveActions::acknowledge(Action::make(DefectCorrectiveActions::ACKNOWLEDGE), $this->defectResolver());
+    }
+
+    public function updateIssueAction(): Action
+    {
+        return DefectCorrectiveActions::update(Action::make(DefectCorrectiveActions::UPDATE), $this->defectResolver());
+    }
+
+    public function resolveIssueAction(): Action
+    {
+        return DefectCorrectiveActions::resolve(Action::make(DefectCorrectiveActions::RESOLVE), $this->defectResolver());
+    }
+
+    public function dismissIssueAction(): Action
+    {
+        return DefectCorrectiveActions::dismiss(Action::make(DefectCorrectiveActions::DISMISS), $this->defectResolver());
+    }
+
+    public function reopenIssueAction(): Action
+    {
+        return DefectCorrectiveActions::reopen(Action::make(DefectCorrectiveActions::REOPEN), $this->defectResolver());
+    }
+
+    public function verifyCorrectionAction(): Action
+    {
+        return DefectCorrectiveActions::verify(Action::make(DefectCorrectiveActions::VERIFY), $this->defectResolver());
+    }
+
+    public function classifyImpactAction(): Action
+    {
+        return DefectCorrectiveActions::classify(Action::make(DefectCorrectiveActions::CLASSIFY), $this->defectResolver());
+    }
+
+    public function linkServiceTicketAction(): Action
+    {
+        return DefectCorrectiveActions::ticket(Action::make(DefectCorrectiveActions::TICKET), $this->defectResolver());
+    }
+
+    /**
+     * Posts the composer text under an issue card. The client message id is generated in the
+     * browser per composer, so a double click sends the same id and stores one message.
+     */
+    public function postIssueMessage(int $defectId, string $clientMessageId): void
+    {
+        $defect = $this->observedDefect(['defect' => $defectId]);
+        abort_unless($defect instanceof ApparatusDefect, 404);
+        $draft = $this->issueDrafts[$defectId] ?? [];
+        $visibility = ($draft['visibility'] ?? null) === ApparatusIssueMessage::VISIBILITY_INTERNAL
+            ? ApparatusIssueMessage::VISIBILITY_INTERNAL
+            : ApparatusIssueMessage::VISIBILITY_MEMBER;
+
+        $sent = $this->sendMessage(
+            [
+                'inspection_id' => $this->inspection()->getKey(),
+                'defect_id' => $defect->getKey(),
+                'visibility' => $visibility,
+                'body' => (string) ($draft['body'] ?? ''),
+            ],
+            $clientMessageId,
+            $visibility === ApparatusIssueMessage::VISIBILITY_INTERNAL ? 'Internal note saved' : 'Message sent to the member',
+        );
+        if ($sent) {
+            unset($this->issueDrafts[$defectId]);
+        }
+    }
+
+    /**
+     * Resolves the issue a mounted action is about, or null when no issue was named. An id
+     * that is not one of this inspection's observed issues on its physical vehicle is a 404:
+     * a forged id can never reach the service.
+     *
+     * @param  array<string, mixed>  $arguments
+     */
+    protected function observedDefect(array $arguments): ?ApparatusDefect
+    {
+        if (! isset($arguments['defect'])) {
+            return null;
+        }
+        $id = (int) $arguments['defect'];
+        $inspection = $this->inspection();
+        $physical = (int) ($inspection->processed_apparatus_id ?? $inspection->apparatus_id);
+
+        $observed = ApparatusDefectObservation::query()
+            ->where('apparatus_inspection_id', $inspection->getKey())
+            ->where('apparatus_defect_id', $id)
+            ->exists()
+            || ApparatusDefect::query()->whereKey($id)->where('apparatus_inspection_id', $inspection->getKey())->exists();
+        $defect = $observed ? ApparatusDefect::query()->where('apparatus_id', $physical)->find($id) : null;
+        abort_unless($defect instanceof ApparatusDefect, 404);
+
+        return $defect;
+    }
+
+    /** @return Closure(MountableAction): ?ApparatusDefect */
+    private function defectResolver(): Closure
+    {
+        return fn (MountableAction $action): ?ApparatusDefect => $this->observedDefect($action->getArguments());
+    }
+
+    /** @param array<string, mixed> $payload */
+    private function sendMessage(array $payload, ?string $clientMessageId, string $success): bool
+    {
+        $author = auth()->user();
+        abort_unless($author instanceof User && $this->isReviewer(), 403);
+
+        try {
+            app(IssueMessageService::class)->post($author, [...$payload, 'client_message_id' => $clientMessageId]);
+        } catch (ValidationException $exception) {
+            Notification::make()->danger()->title('That could not be sent')
+                ->body((string) (collect($exception->errors())->flatten()->first() ?? 'Write a message and try again.'))->send();
+
+            return false;
+        } catch (AuthorizationException) {
+            Notification::make()->danger()->title('You do not have permission to do this.')->send();
+
+            return false;
+        }
+        Notification::make()->success()->title($success)->send();
+
+        return true;
+    }
+
+    private function isReviewer(): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User && InspectionReviewers::canReview($user);
     }
 
     private function inspection(): ApparatusInspection

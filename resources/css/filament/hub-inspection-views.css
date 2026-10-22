@@ -211,6 +211,23 @@
 .hub-insp-trail__list { margin: .375rem 0 0; padding-left: 1.25rem; color: rgb(var(--hub-ink)); font-size: .875rem; }
 .hub-insp-trail__list li { margin-bottom: .125rem; }
 
+/* Issue actions, conversation and composer. Internal notes differ by label, dashed border and tint, never colour alone. */
+.hub-insp-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.hub-insp-btn { display: inline-flex; align-items: center; justify-content: center; min-height: 2.75rem; padding: .5rem 1rem; border: 1px solid rgb(var(--hub-border)); border-radius: var(--hub-radius-control); background: rgb(var(--hub-surface)); color: rgb(var(--hub-ink)); font-size: .875rem; font-weight: 600; cursor: pointer; }
+.hub-insp-btn:hover { background: rgb(var(--hub-surface-muted)); }
+.hub-insp-btn:focus-visible { outline: 2px solid rgb(var(--hub-focus)); outline-offset: 2px; }
+.hub-insp-btn--primary { border-color: rgb(var(--hub-action-primary)); background: rgb(var(--hub-action-primary)); color: rgb(var(--hub-n-0)); }
+.hub-insp-btn--primary:hover { background: rgb(var(--hub-action-primary)); filter: brightness(.92); }
+.hub-insp-thread { display: grid; gap: .625rem; }
+.hub-insp-message { min-width: 0; padding: .625rem .875rem; border: 1px solid rgb(var(--hub-border)); border-radius: var(--hub-radius-control); background: rgb(var(--hub-surface)); }
+.hub-insp-message--internal { border-style: dashed; border-color: rgb(var(--hub-warning-border)); background: rgb(var(--hub-warning-bg)); }
+.hub-insp-message__meta { display: flex; flex-wrap: wrap; align-items: center; gap: .375rem; margin: 0; color: rgb(var(--hub-ink-secondary)); font-size: .8125rem; }
+.hub-insp-message__body { margin: .375rem 0 0; color: rgb(var(--hub-ink)); font-size: .875rem; white-space: pre-wrap; }
+.hub-insp-composer { display: grid; gap: .5rem; }
+.hub-insp-label { color: rgb(var(--hub-ink-secondary)); font-size: .8125rem; font-weight: 650; }
+.hub-insp-input { width: 100%; min-height: 2.75rem; padding: .5rem .75rem; border: 1px solid rgb(var(--hub-border)); border-radius: var(--hub-radius-control); background: rgb(var(--hub-well)); color: rgb(var(--hub-ink)); font-size: .875rem; }
+.hub-insp-input:focus-visible { outline: 2px solid rgb(var(--hub-focus)); outline-offset: 2px; }
+
 /* Activity timeline and vehicle history. */
 .hub-insp-timeline { margin: 0; padding: 0; list-style: none; }
 .hub-insp-timeline__item { padding: .875rem 0; border-top: 1px solid rgb(var(--hub-border-soft)); }

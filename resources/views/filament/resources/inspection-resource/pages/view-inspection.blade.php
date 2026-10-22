@@ -13,6 +13,16 @@
         default => 'neutral',
     };
     $itemText = fn (string $value): string => $value === 'Present' ? 'Pass' : $value;
+    $actionLabels = [
+        'acknowledgeIssue' => 'Acknowledge',
+        'updateIssue' => 'Update action',
+        'verifyCorrection' => 'Verify correction',
+        'resolveIssue' => 'Resolve',
+        'classifyImpact' => 'Classify impact',
+        'linkServiceTicket' => 'Create service ticket',
+        'dismissIssue' => 'Dismiss',
+        'reopenIssue' => 'Reopen',
+    ];
     $hasIssues = $workspace['legacy_pending'] || $workspace['swap'] || count($workspace['holds']) > 0
         || $workspace['member_flag'] || count($workspace['damage_holds']) > 0 || count($workspace['defects']) > 0;
 @endphp
@@ -28,7 +38,18 @@
     </style>
 
     {{-- Layout and colour: semantic hub-insp-* classes in resources/css/filament/hub-inspection-views.css. --}}
-    <div class="hub-insp hub-insp-stack">
+    <div
+        class="hub-insp hub-insp-stack"
+        x-data="{
+            newId() {
+                if (window.crypto && window.crypto.randomUUID) { return window.crypto.randomUUID() }
+                return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+                    const r = Math.floor(Math.random() * 16)
+                    return (c === 'x' ? r : (r % 4) + 8).toString(16)
+                })
+            },
+        }"
+    >
         <div class="hub-insp-print-only hub-insp-letterhead">
             <img src="/images/mbfd_logo-256.png" alt="MBFD Logo" width="80" height="80">
             <h1>Miami Beach Fire Department</h1>
@@ -315,10 +336,84 @@
                                 </ol>
                             </div>
                         @endif
+
+                        @if(count($defect['actions']) > 0)
+                            <div class="hub-insp-actions" role="group" aria-label="Actions for {{ $defect['item'] }}" data-issue-actions>
+                                @foreach($defect['actions'] as $actionName)
+                                    <button
+                                        type="button"
+                                        class="hub-insp-btn @if(in_array($actionName, ['acknowledgeIssue', 'resolveIssue', 'verifyCorrection', 'reopenIssue'], true)) hub-insp-btn--primary @endif"
+                                        wire:click="mountAction('{{ $actionName }}', { defect: {{ $defect['id'] }} })"
+                                        data-issue-action="{{ $actionName }}"
+                                    >{{ $actionLabels[$actionName] ?? $actionName }}</button>
+                                @endforeach
+                            </div>
+                        @endif
+
+                        @if(is_array($defect['thread']))
+                            <div class="hub-insp-thread" data-issue-thread>
+                                <p class="hub-insp-observation__label">Conversation about this issue</p>
+                                @forelse($defect['thread'] as $message)
+                                    <div @class(['hub-insp-message', 'hub-insp-message--internal' => $message['internal']])>
+                                        <p class="hub-insp-message__meta">
+                                            @if($message['internal'])
+                                                <span class="hub-insp-badge hub-insp-badge--warning">Internal note</span>
+                                            @else
+                                                <span class="hub-insp-badge">Member-visible</span>
+                                            @endif
+                                            {{ $message['author'] }} · {{ $message['at'] }}@if($message['correction']) · Correction @endif
+                                        </p>
+                                        <p class="hub-insp-message__body">{{ $message['body'] }}</p>
+                                    </div>
+                                @empty
+                                    <p class="hub-insp-note">No messages about this issue yet.</p>
+                                @endforelse
+
+                                <div class="hub-insp-composer" x-data="{ cid: null }" x-init="cid = newId()">
+                                    <label class="hub-insp-label" for="issue-{{ $defect['id'] }}-body">Write a message</label>
+                                    <textarea id="issue-{{ $defect['id'] }}-body" class="hub-insp-input" rows="3" maxlength="4000" wire:model="issueDrafts.{{ $defect['id'] }}.body"></textarea>
+                                    <label class="hub-insp-label" for="issue-{{ $defect['id'] }}-visibility">Who can read it</label>
+                                    <select id="issue-{{ $defect['id'] }}-visibility" class="hub-insp-input" wire:model="issueDrafts.{{ $defect['id'] }}.visibility">
+                                        <option value="member">Member-visible</option>
+                                        <option value="internal">Internal note (staff only)</option>
+                                    </select>
+                                    <div>
+                                        <button type="button" class="hub-insp-btn hub-insp-btn--primary" x-on:click="$wire.postIssueMessage({{ $defect['id'] }}, cid).then(() => { cid = newId() })">Send message</button>
+                                    </div>
+                                </div>
+                            </div>
+                        @endif
                     </article>
                 @endforeach
             </div>
         </section>
+
+        {{-- General conversation with the member who submitted this inspection --}}
+        @if(is_array($workspace['general_thread']))
+            <section id="messages" class="hub-insp-section hub-insp-anchor" aria-labelledby="insp-messages-title" data-section="messages">
+                <div class="hub-insp-section__head">
+                    <h2 class="hub-insp-section__title" id="insp-messages-title">Messages with the member</h2>
+                    <button type="button" class="hub-insp-btn" wire:click="mountAction('replyToMember')">Reply to member</button>
+                </div>
+                <div class="hub-insp-card">
+                    @forelse($workspace['general_thread'] as $message)
+                        <div @class(['hub-insp-message', 'hub-insp-message--internal' => $message['internal']])>
+                            <p class="hub-insp-message__meta">
+                                @if($message['internal'])
+                                    <span class="hub-insp-badge hub-insp-badge--warning">Internal note</span>
+                                @else
+                                    <span class="hub-insp-badge">Member-visible</span>
+                                @endif
+                                {{ $message['author'] }} · {{ $message['at'] }}
+                            </p>
+                            <p class="hub-insp-message__body">{{ $message['body'] }}</p>
+                        </div>
+                    @empty
+                        <p class="hub-insp-note">No messages about this inspection yet. Replies you send here are visible to the member.</p>
+                    @endforelse
+                </div>
+            </section>
+        @endif
 
         {{-- D. Original checklist, exactly as submitted --}}
         <section class="hub-insp-section" aria-labelledby="insp-checklist-title" data-section="checklist">
