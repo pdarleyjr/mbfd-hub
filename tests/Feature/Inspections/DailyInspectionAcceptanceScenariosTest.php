@@ -631,6 +631,27 @@ final class DailyInspectionAcceptanceScenariosTest extends TestCase
         $this->assertSame(0, ApparatusInspectionException::query()->where('apparatus_inspection_id', $inspection->id)->whereNotIn('status', ['resolved', 'dismissed'])->count());
     }
 
+    public function test_a_checkout_held_for_a_vehicle_swap_renders_for_the_member_the_reviewer_and_the_pdf(): void
+    {
+        $this->actAs($this->alpha);
+        $payload = $this->payload();
+        $payload['physical_vehicle'] = ['vehicle_number' => 'V-303', 'swap_answer' => 'swap_completed', 'note' => 'E3 is in the shop.'];
+        $this->setField($payload, 'vehicle_num', 'V-303');
+        $inspection = ApparatusInspection::query()->findOrFail(
+            $this->submit($payload)->assertCreated()->assertJsonPath('processing_status', 'pending_vehicle_swap')->json('id'),
+        );
+
+        $html = $this->get('/employee/my-vehicle-inspections/'.$inspection->id)->assertOk()->getContent();
+        $this->assertStringContainsString('Needs approval', $html);
+        $this->assertStringContainsString('Fleet is confirming which vehicle you inspected', $html);
+        $this->get(route('employee.vehicle-inspections.pdf', $inspection))->assertOk();
+
+        $workspace = app(InspectionWorkspace::class)->build($inspection, $this->reviewer);
+        $this->assertSame('Held: vehicle swap', $workspace['status']['label']);
+        $this->actAs($this->reviewer);
+        $this->get('/admin/inspections/'.$inspection->id)->assertOk();
+    }
+
     // ------------------------------------------- issue lifecycle edge scenarios
 
     public function test_a_present_answer_from_a_stale_draft_after_the_issue_was_resolved_creates_no_observation_and_a_missing_answer_is_a_recurrence(): void
