@@ -12,6 +12,7 @@ use App\Rules\SafeNewPassword;
 use App\Services\Identity\MemberAccessEmail;
 use App\Services\Security\AccountSecurityService;
 use App\Services\Security\ApplicationAccessService;
+use App\Services\Security\Command300Access;
 use App\Services\Security\FleetOperationsManagerAssignment;
 use App\Support\ApplicationAccessRegistry;
 use Filament\Actions\Action;
@@ -83,6 +84,20 @@ trait ManagesEmployeeAccess
                 ...$this->securityFields(),
             ])
             ->action(fn (array $data) => $this->runProtected(fn () => app(FleetOperationsManagerAssignment::class)->set(
+                $this->actor(), $this->targetAccount(), (bool) ($data['enabled'] ?? false), $data['current_password'], $data['reason'])));
+        $actions[] = Action::make('manageCommand300Access')->label('300 Command Access')
+            ->visible(fn (): bool => $this->canManageAccountAccess())
+            ->fillForm(fn (): array => ['enabled' => $this->targetAccount()->hasDirectWebPermission(Command300Access::PERMISSION)])
+            ->form([
+                Forms\Placeholder::make('command300Source')->label('Current 300 Command Access')
+                    ->content(fn (): string => $this->command300Status()),
+                Forms\Toggle::make('enabled')->label('300 Command Access')
+                    ->helperText(fn (): string => app(Command300Access::class)->automaticSource($this->targetAccount()->fresh()) !== null
+                        ? 'This member already qualifies automatically. This optional grant changes nothing while that remains true, and turning it off never removes automatic access.'
+                        : 'Allows this member to use the 300 Command profile, 300 video-conferencing controls, Command Board, and command communications. It does not grant Admin Panel access.'),
+                ...$this->securityFields(),
+            ])
+            ->action(fn (array $data) => $this->runProtected(fn () => app(ApplicationAccessService::class)->setCommand300Access(
                 $this->actor(), $this->targetAccount(), (bool) ($data['enabled'] ?? false), $data['current_password'], $data['reason'])));
         $actions[] = Action::make('manageMeetingRole')->label('Meeting role')
             ->visible(fn (): bool => $this->canManageAccountAccess() && $this->targetAccount()->hasDirectWebPermission('app.meeting.access'))
@@ -206,6 +221,17 @@ trait ManagesEmployeeAccess
             \Filament\Actions\ActionGroup::make($actions)->label('Login & recovery')->color('gray')->button(),
             \Filament\Actions\ActionGroup::make($administrationActions)->label('Administration & access')->color('gray')->button(),
         ];
+    }
+
+    protected function command300Status(): string
+    {
+        $target = $this->targetAccount()->fresh();
+        $access = app(Command300Access::class);
+        if ($target === null || ! $target->isAuthenticationAllowed() || $target->must_change_password) {
+            return 'No access — account inactive or password setup required';
+        }
+
+        return $access->sourceLabel($access->source($target));
     }
 
     protected function securityFields(bool $temporaryPassword = false): array

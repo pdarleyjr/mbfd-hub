@@ -28,6 +28,7 @@ class StationMicrophoneController extends Controller
         return response()->json($moderation->setStationMicrophone(
             $session,
             $employee,
+            $request->user(),
             $role,
             $validated['enabled'],
         ));

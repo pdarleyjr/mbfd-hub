@@ -14,16 +14,12 @@ use App\Models\VideoConferenceParticipation;
 use App\Models\VideoConferenceSession;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\RateLimiter;
 use Tests\Fakes\FakeConferenceProvider;
 use Tests\TestCase;
 
 class ConferenceWorkflowTest extends TestCase
 {
     use RefreshDatabase;
-
-    private const COMMAND_PIN = '2468';
 
     private FakeConferenceProvider $provider;
 
@@ -35,7 +31,6 @@ class ConferenceWorkflowTest extends TestCase
         config([
             'broadcasting.default' => 'null',
             'video-conferencing.enabled' => true,
-            'video-conferencing.command_pin_hash' => Hash::make(self::COMMAND_PIN),
             'video-conferencing.livekit.url' => 'wss://video.test.example',
         ]);
         $this->provider = new FakeConferenceProvider;
@@ -65,7 +60,7 @@ class ConferenceWorkflowTest extends TestCase
     {
         CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-08-12T02:30:00Z'));
         try {
-            $started = $this->authorizeAndStart();
+            $started = $this->startLineupAsCaptain();
             $this->assertArrayNotHasKey('livekit_room_name', $started['session']);
             $this->assertCount(1, $this->provider->createdRooms);
             $this->assertMatchesRegularExpression(
@@ -87,7 +82,6 @@ class ConferenceWorkflowTest extends TestCase
             }
         };
         $this->app->instance(ConferenceProvider::class, $provider);
-        $this->authorizeCommand();
 
         $this->actingAs($this->employee, 'employee')
             ->postJson('/employee/video-conferencing/api/lineup/start')
@@ -98,7 +92,7 @@ class ConferenceWorkflowTest extends TestCase
 
     public function test_employee_lineup_token_is_stable_self_identity_and_ignores_submitted_station_role(): void
     {
-        $started = $this->authorizeAndStart();
+        $started = $this->startLineupAsCaptain();
         $response = $this->actingAs($this->employee, 'employee')->postJson(
             "/employee/video-conferencing/api/sessions/{$started['session']['id']}/token",
             ['join_as' => 'sta4', 'display_name' => 'Fake Name', 'identity' => 'mbfd:300'],
@@ -115,47 +109,26 @@ class ConferenceWorkflowTest extends TestCase
         );
     }
 
-    public function test_300_can_start_direct_station_call_only_with_valid_pin(): void
+    public function test_300_can_start_direct_station_call_without_a_pin(): void
     {
-        $payload = ['room' => 'direct', 'station' => 'sta3', 'join_as' => '300'];
-
         $this->actingAs($this->employee, 'employee')->postJson(
             '/employee/video-conferencing/api/sessions',
-            $payload,
-        )->assertUnprocessable()->assertJsonValidationErrors('command_pin');
-        $this->actingAs($this->employee, 'employee')->postJson(
-            '/employee/video-conferencing/api/sessions',
-            [...$payload, 'command_pin' => self::COMMAND_PIN],
+            ['room' => 'direct', 'station' => 'sta3', 'join_as' => '300'],
         )->assertOk()->assertJsonPath('session.target_station', 'sta3');
         $this->assertCount(1, $this->provider->createdRooms);
     }
 
-    public function test_incorrect_300_pin_attempts_are_rate_limited_by_employee_and_ip(): void
+    public function test_legacy_authorize_route_ignores_any_submitted_pin(): void
     {
-        $ipAddress = '203.0.113.10';
-        $employeeKey = 'conference-command-pin:employee:'.$this->employee->getKey();
-        $ipKey = 'conference-command-pin:ip:'.hash('sha256', $ipAddress);
-
-        try {
-            for ($attempt = 0; $attempt < 5; $attempt++) {
-                $this->actingAs($this->employee, 'employee')
-                    ->withServerVariables(['REMOTE_ADDR' => $ipAddress])
-                    ->postJson('/employee/video-conferencing/api/lineup/command/authorize', ['command_pin' => '1111'])
-                    ->assertUnprocessable();
-            }
-            $this->actingAs($this->employee, 'employee')
-                ->withServerVariables(['REMOTE_ADDR' => $ipAddress])
-                ->postJson('/employee/video-conferencing/api/lineup/command/authorize', ['command_pin' => self::COMMAND_PIN])
-                ->assertTooManyRequests();
-        } finally {
-            RateLimiter::clear($employeeKey);
-            RateLimiter::clear($ipKey);
-        }
+        $this->actingAs($this->employee, 'employee')->postJson(
+            '/employee/video-conferencing/api/lineup/command/authorize',
+            ['command_pin' => '0000'],
+        )->assertOk()->assertJsonPath('authorized', true);
     }
 
     public function test_connected_300_can_mute_and_give_floor_with_rpc_only_unmute(): void
     {
-        $started = $this->authorizeAndStart();
+        $started = $this->startLineupAsCaptain();
         $room = $this->provider->createdRooms[0]['room'];
         $this->provider->roomParticipants[$room] = [new ConferenceParticipant('mbfd:300', 'Captain Taylor Morgan — 300')];
 
@@ -183,7 +156,7 @@ class ConferenceWorkflowTest extends TestCase
             'camera_ready' => true,
             'microphone_ready' => true,
         ])->assertOk();
-        $this->authorizeAndStart();
+        $this->startLineupAsCaptain();
         $token = $this->postJson('/video-conferencing/api/lineup/token', [
             'launch_context' => $launchContext,
         ])->assertOk();
@@ -207,7 +180,7 @@ class ConferenceWorkflowTest extends TestCase
 
     public function test_exact_session_status_is_private_and_detects_server_end(): void
     {
-        $started = $this->authorizeAndStart();
+        $started = $this->startLineupAsCaptain();
         $session = VideoConferenceSession::query()->findOrFail($started['session']['id']);
         $url = '/employee/video-conferencing/api/sessions/'.$session->id.'/status';
         $this->getJson($url)->assertOk()->assertJsonPath('active', true);
@@ -220,7 +193,7 @@ class ConferenceWorkflowTest extends TestCase
 
     public function test_expiration_closes_room_and_participation_once(): void
     {
-        $started = $this->authorizeAndStart();
+        $started = $this->startLineupAsCaptain();
         $session = VideoConferenceSession::query()->findOrFail($started['session']['id']);
         $session->update(['started_at' => now()->subMinutes(16)]);
         $this->artisan('video-conferencing:expire-lineup')->assertSuccessful();
@@ -233,21 +206,11 @@ class ConferenceWorkflowTest extends TestCase
     }
 
     /** @return array<string, mixed> */
-    private function authorizeAndStart(): array
+    private function startLineupAsCaptain(): array
     {
-        $this->authorizeCommand();
-
         return $this->actingAs($this->employee, 'employee')
             ->postJson('/employee/video-conferencing/api/lineup/start')
             ->assertOk()
             ->json();
-    }
-
-    private function authorizeCommand(): void
-    {
-        $this->actingAs($this->employee, 'employee')
-            ->postJson('/employee/video-conferencing/api/lineup/command/authorize', [
-                'command_pin' => self::COMMAND_PIN,
-            ])->assertOk();
     }
 }

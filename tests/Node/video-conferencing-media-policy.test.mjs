@@ -21,25 +21,29 @@ test('conference mount prepares media once and exposes an explicit retry and dev
   assert.match(app, /createLocalTracks\(\{ audio: true, video: false \}\)/);
 });
 
-test('300 PIN authorization does not depend on local microphone readiness', () => {
-  const start = app.indexOf('className="vc-command-login"');
-  const end = app.indexOf('</form>}', start);
-  const commandLogin = app.slice(start, end);
-
-  assert.ok(start >= 0 && end > start, '300 command login form is present');
-  assert.match(commandLogin, /disabled=\{!commandPinReady \|\| actionBusy !== null\}/);
-  assert.doesNotMatch(commandLogin, /disabled=\{[^}]*!microphoneReady/);
+test('300 Command access comes from the server policy and no PIN UI or endpoint remains', () => {
+  assert.doesNotMatch(app, /commandPin|command_pin|authorizeCommand|command_authorize|Continue as 300/);
+  assert.match(app, /useState\(bootstrap\.command_access === true\)/);
 });
 
-test('browser-neutral 300 authorization remains interactive before media is ready', () => {
-  const start = app.indexOf('const authorizeCommand = async () =>');
-  const end = app.indexOf('const startLineup = async', start);
-  const authorizeCommand = app.slice(start, end);
+test('a 403 from any command endpoint shows the access-denied panel instead of a PIN form', () => {
+  const start = app.indexOf('const denyCommandAccess = useCallback');
+  const end = app.indexOf('const refreshCommandStatus = useCallback', start);
+  const handler = app.slice(start, end);
 
-  assert.ok(start >= 0 && end > start, '300 authorization handler is present');
-  assert.match(authorizeCommand, /postJson\(bootstrap\.endpoints\.command_authorize/);
-  assert.match(authorizeCommand, /setCommandAuthorized\(true\)/);
-  assert.doesNotMatch(authorizeCommand, /microphoneReady/);
+  assert.ok(start >= 0 && end > start, 'command access denial handler is present');
+  assert.match(handler, /status !== 403\) return false;/);
+  assert.match(handler, /setCommandAuthorized\(false\)/);
+  assert.match(app, /className="vc-command-denied" role="alert"/);
+  assert.match(app, /href=\{bootstrap\.navigation\.back\}/);
+  assert.doesNotMatch(app, /className="vc-command-login"/);
+  for (const handlerName of ['startError', 'directError', 'statusError']) {
+    assert.ok(app.includes("denyCommandAccess(" + handlerName + ")"), handlerName + " is routed through the access-denied handler");
+  }
+});
+
+test('an account without 300 access is never prompted for camera or microphone on page open', () => {
+  assert.match(app, /bootstrap\.entry_mode === 'command' && !bootstrap\.command_access\) return;[\s\S]*?void prepareMedia\(\)/);
 });
 
 test('presentation preference preserves adaptive delivery at actual gallery dimensions', () => {

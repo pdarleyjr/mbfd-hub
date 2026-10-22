@@ -25,7 +25,7 @@ final class HubShellNavigation
             return $navigation;
         }
 
-        $states = $applicationStates ?? app(ApplicationAccessRegistry::class)->states($user);
+        $states = $applicationStates ?? app(ApplicationAccessRegistry::class)->states($user, ['admin', 'bid', 'media_control', 'meeting']);
         foreach ([
             'admin' => ['label' => 'Admin', 'href' => '/admin'],
             'bid' => ['label' => 'Bid', 'href' => 'https://bid.mbfdhub.com/api/auth/start'],

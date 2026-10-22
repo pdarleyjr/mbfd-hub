@@ -2,10 +2,9 @@ import { expect, test, type Browser, type BrowserContext, type Page } from '@pla
 
 const employeeId = process.env.VIDEO_CONFERENCING_E2E_EMPLOYEE_ID;
 const password = process.env.VIDEO_CONFERENCING_E2E_PASSWORD;
-const commandPin = process.env.VIDEO_CONFERENCING_E2E_COMMAND_PIN;
 const forceRelay = process.env.VIDEO_CONFERENCING_E2E_FORCE_RELAY === 'true';
 
-test.skip(!employeeId || !password || !commandPin, 'Set explicit disposable conference E2E credentials and the 300 command PIN.');
+test.skip(!employeeId || !password, 'Set explicit disposable conference E2E credentials for a member with 300 Command access (for example a Captain).');
 
 type Endpoint = { context: BrowserContext; page: Page; sessionId?: string; errors: string[]; navigations: string[] };
 
@@ -154,8 +153,6 @@ async function prepareCommand(browser: Browser, baseURL: string): Promise<Endpoi
     }
     await expect(endpoint.page.locator('.vc-shell')).toHaveAttribute('data-entry-mode', 'command');
     await expect(endpoint.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'ready');
-    await endpoint.page.getByLabel('300 command PIN').fill(commandPin!);
-    await endpoint.page.getByRole('button', { name: 'Continue as 300' }).click();
     await expect(endpoint.page.getByText(/Conference service: Healthy/)).toBeVisible();
 
     return endpoint;

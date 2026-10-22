@@ -3,37 +3,34 @@
 namespace App\Services\VideoConferencing;
 
 use App\Models\Employee;
+use App\Models\User;
+use App\Services\Security\Command300Access;
 use Illuminate\Http\Request;
 
+/**
+ * 300 Command video controls follow the central Command300Access decision.
+ * It is re-evaluated live on every call: there is no PIN and no session
+ * marker, so a demotion or revoked grant takes effect on the next request.
+ */
 class ConferenceCommandAuthorizationService
 {
-    private const SESSION_KEY = 'video_conferencing.command_authorization';
+    public const DENIED_MESSAGE = '300 Command video controls are available to Captains, Division Chiefs, the 300 command officer, administrators, and members granted 300 Command Access.';
 
-    public function __construct(private readonly ConferenceCommandPinService $pin) {}
+    public function __construct(private readonly Command300Access $access) {}
 
-    public function authorize(Request $request, Employee $employee, ?string $pin): void
+    public function allows(?User $user): bool
     {
-        $this->pin->verify($employee, (string) $request->ip(), $pin);
-        $request->session()->put(self::SESSION_KEY, [
-            'employee_id' => $employee->getKey(),
-            'expires_at' => now()->addMinutes(20)->getTimestamp(),
-        ]);
+        return $this->access->allows($user);
     }
 
+    public function assertUserAllowed(?User $user): void
+    {
+        abort_unless($this->access->allows($user), 403, self::DENIED_MESSAGE);
+    }
+
+    /** The employee argument is kept for caller compatibility; the account is what is authorized. */
     public function assertAuthorized(Request $request, Employee $employee): void
     {
-        $authorization = $request->session()->get(self::SESSION_KEY);
-        abort_unless(
-            is_array($authorization)
-                && (string) ($authorization['employee_id'] ?? '') === (string) $employee->getKey()
-                && (int) ($authorization['expires_at'] ?? 0) >= now()->getTimestamp(),
-            403,
-            'Enter the 300 command PIN to continue.',
-        );
-    }
-
-    public function clear(Request $request): void
-    {
-        $request->session()->forget(self::SESSION_KEY);
+        $this->assertUserAllowed($request->user());
     }
 }

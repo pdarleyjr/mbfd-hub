@@ -70,9 +70,25 @@ final class OidcController
             if (! $user instanceof User) {
                 throw OAuthServerException::accessDenied();
             }
-            $policy->user((string) $user->id, $authorization->getClient()->getIdentifier());
+            try {
+                $policy->user((string) $user->id, $authorization->getClient()->getIdentifier());
+            } catch (OAuthServerException $denied) {
+                // Send an ineligible member back to the Command Board's own
+                // "no access" page (state preserved) instead of a raw Hub error.
+                $redirect = $authorization->getRedirectUri();
+                $clientId = $authorization->getClient()->getIdentifier();
+                $client = \Laravel\Passport\Client::query()->find($clientId);
+                // Redirect only for a missing 300 Command Access on a healthy
+                // client; every other denial keeps the generic error response.
+                if ($policy->application($clientId) !== 'cmd' || ! is_string($redirect) || $client === null || $client->revoked
+                    || app(\App\Services\Security\Command300Access::class)->allows($user)) {
+                    throw $denied;
+                }
+                throw OAuthServerException::accessDenied('300 Command Access is required.',
+                    $redirect.(str_contains($redirect, '?') ? '&' : '?').http_build_query(['state' => $authorization->getState()]));
+            }
             // These are explicitly configured, confidential first-party clients.
-            // The shared identity policy authorizes access; CMD also requires its board PIN.
+            // The shared identity policy (300 Command Access for CMD) authorizes access.
             $authorization->setUser(new \Laravel\Passport\Bridge\User((string) $user->id));
             $authorization->setAuthorizationApproved(true);
 

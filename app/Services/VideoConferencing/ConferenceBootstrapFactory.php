@@ -26,6 +26,7 @@ class ConferenceBootstrapFactory
         ?string $launchContext = null,
         ?Employee $employee = null,
         mixed $returnTo = null,
+        bool $commandAccess = false,
     ): array {
         if (in_array($role, [ConferenceJoinRole::Self, ConferenceJoinRole::Command], true) && $employee === null) {
             throw new \LogicException('An authenticated employee is required for this conference entry mode.');
@@ -43,6 +44,7 @@ class ConferenceBootstrapFactory
             'join_as' => $role->value,
             'display_name' => $displayName,
             'launch_context' => $launchContext,
+            'command_access' => $commandAccess,
             'navigation' => [
                 'back' => $role->isStation()
                     ? $this->stationPath(substr($role->value, 3))
@@ -67,7 +69,6 @@ class ConferenceBootstrapFactory
                 'station_status' => route('video-conferencing.api.lineup.status'),
                 'station_token' => route('video-conferencing.api.lineup.token'),
                 'station_participation_base' => url('/video-conferencing/api/participations'),
-                'command_authorize' => route('employee.video-conferencing.api.lineup.command.authorize'),
                 'command_status' => route('employee.video-conferencing.api.lineup.command.status'),
                 'command_start' => route('employee.video-conferencing.api.lineup.start'),
                 'command_end' => route('employee.video-conferencing.api.lineup.end'),

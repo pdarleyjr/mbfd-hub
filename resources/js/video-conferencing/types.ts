@@ -18,6 +18,7 @@ export interface ConferenceBootstrap {
     join_as: JoinRole;
     display_name: string;
     launch_context: string | null;
+    command_access: boolean;
     navigation: { back: string; home: string };
     lineup_time: string | null;
     lineup_max_minutes: number;
@@ -37,7 +38,6 @@ export interface ConferenceBootstrap {
         station_status: string;
         station_token: string;
         station_participation_base: string;
-        command_authorize: string;
         command_status: string;
         command_start: string;
         command_end: string;
