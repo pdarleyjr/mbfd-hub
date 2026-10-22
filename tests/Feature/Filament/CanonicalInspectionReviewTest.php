@@ -114,7 +114,7 @@ final class CanonicalInspectionReviewTest extends TestCase
     public function test_reject_dismisses_every_hold_and_keeps_the_evidence(): void
     {
         $this->page()
-            ->callAction('rejectInspection', ['review_notes' => 'Duplicate of the earlier checkout.'])
+            ->callAction('rejectInspection', ['reason' => 'Duplicate of the earlier checkout.'])
             ->assertHasNoActionErrors();
 
         $this->held->refresh();

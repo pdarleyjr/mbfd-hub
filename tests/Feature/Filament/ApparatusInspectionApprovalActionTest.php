@@ -147,7 +147,7 @@ final class ApparatusInspectionApprovalActionTest extends TestCase
             ->assertSuccessful()
             ->assertActionVisible('rejectInspection')
             ->callAction('rejectInspection', data: [
-                'review_notes' => 'Duplicate submission; daily officer will resubmit the verified inspection.',
+                'reason' => 'Duplicate submission; daily officer will resubmit the verified inspection.',
             ])
             ->assertHasNoActionErrors();
 

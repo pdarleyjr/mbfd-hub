@@ -49,7 +49,13 @@ final class InspectionHoldActions
         return array_keys(self::LABELS);
     }
 
-    /** @param Closure(Action): ?ApparatusInspectionException $holdOf */
+    /**
+     * @template TAction of Action
+     *
+     * @param  TAction  $action
+     * @param  Closure(Action): ?ApparatusInspectionException  $holdOf
+     * @return TAction
+     */
     public static function accept(Action $action, Closure $holdOf, int $inspectionId): Action
     {
         return self::base($action, $holdOf)
@@ -71,7 +77,13 @@ final class InspectionHoldActions
             ->action(fn (array $data, Action $action) => self::run($action, $holdOf, $inspectionId, [...$data, 'action' => 'accept_submitted'], 'Reading accepted'));
     }
 
-    /** @param Closure(Action): ?ApparatusInspectionException $holdOf */
+    /**
+     * @template TAction of Action
+     *
+     * @param  TAction  $action
+     * @param  Closure(Action): ?ApparatusInspectionException  $holdOf
+     * @return TAction
+     */
     public static function correct(Action $action, Closure $holdOf, int $inspectionId): Action
     {
         return self::base($action, $holdOf)
@@ -92,7 +104,13 @@ final class InspectionHoldActions
             ->action(fn (array $data, Action $action) => self::run($action, $holdOf, $inspectionId, [...$data, 'action' => 'correct'], 'Verified reading saved'));
     }
 
-    /** @param Closure(Action): ?ApparatusInspectionException $holdOf */
+    /**
+     * @template TAction of Action
+     *
+     * @param  TAction  $action
+     * @param  Closure(Action): ?ApparatusInspectionException  $holdOf
+     * @return TAction
+     */
     public static function clarify(Action $action, Closure $holdOf, int $inspectionId): Action
     {
         return self::base($action, $holdOf)
@@ -109,7 +127,13 @@ final class InspectionHoldActions
             ->action(fn (array $data, Action $action) => self::run($action, $holdOf, $inspectionId, [...$data, 'action' => 'request_revision'], 'Question sent to the member'));
     }
 
-    /** @param Closure(Action): ?ApparatusInspectionException $holdOf */
+    /**
+     * @template TAction of Action
+     *
+     * @param  TAction  $action
+     * @param  Closure(Action): ?ApparatusInspectionException  $holdOf
+     * @return TAction
+     */
     public static function keep(Action $action, Closure $holdOf, int $inspectionId): Action
     {
         return self::base($action, $holdOf)
@@ -128,7 +152,13 @@ final class InspectionHoldActions
 
     // ---------------------------------------------------------------- internals
 
-    /** @param Closure(Action): ?ApparatusInspectionException $holdOf */
+    /**
+     * @template TAction of Action
+     *
+     * @param  TAction  $action
+     * @param  Closure(Action): ?ApparatusInspectionException  $holdOf
+     * @return TAction
+     */
     private static function base(Action $action, Closure $holdOf): Action
     {
         return $action

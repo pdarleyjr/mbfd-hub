@@ -12,6 +12,7 @@ use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
 use App\Support\Fleet\DefectActionStatus;
 use App\Support\Fleet\DefectFollowUpState;
+use Filament\Actions\MountableAction;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -79,21 +80,28 @@ class DefectResource extends Resource
                     ->imageEditor()
                     ->columnSpanFull(),
 
+                // The lifecycle is changed only by the corrective-action workflow (the inspection page
+                // or the Mark Resolved action), never by editing these fields, so they are display-only.
                 Forms\Components\Select::make('status')
-                    ->required()
-                    ->default('open')
+                    ->helperText('Change it with the issue actions on the inspection page, or Mark Resolved in the list.')
                     ->options([
                         'open' => 'Open',
                         'in_progress' => 'In Progress',
                         'resolved' => 'Resolved',
-                    ]),
+                    ])
+                    ->disabled()
+                    ->dehydrated(false),
 
                 Forms\Components\Textarea::make('resolution_notes')
                     ->columnSpanFull()
                     ->rows(3)
+                    ->disabled()
+                    ->dehydrated(false)
                     ->visible(fn (Forms\Get $get) => $get('status') === 'resolved'),
 
                 Forms\Components\DateTimePicker::make('resolved_at')
+                    ->disabled()
+                    ->dehydrated(false)
                     ->visible(fn (Forms\Get $get) => $get('status') === 'resolved'),
             ]);
     }
@@ -232,7 +240,9 @@ class DefectResource extends Resource
                     // tells the people who reported or confirmed the issue, and requires a type and notes.
                     DefectCorrectiveActions::resolve(
                         Tables\Actions\Action::make('mark_resolved'),
-                        fn (Tables\Actions\Action $action): ?ApparatusDefect => DefectServiceTicketActions::defectFrom($action->getRecord()),
+                        fn (MountableAction $action): ?ApparatusDefect => $action instanceof Tables\Actions\Action
+                            ? DefectServiceTicketActions::defectFrom($action->getRecord())
+                            : null,
                     )
                         ->label('Mark Resolved')
                         ->tooltip('Resolve this equipment issue')

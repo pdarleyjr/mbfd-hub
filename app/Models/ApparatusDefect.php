@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
+use App\Support\Fleet\DefectActionStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use App\Support\Fleet\DefectActionStatus;
 use Illuminate\Support\Facades\Storage;
 
 class ApparatusDefect extends Model
@@ -125,6 +125,7 @@ class ApparatusDefect extends Model
         return $this->belongsTo(Apparatus::class);
     }
 
+    /** @return \Illuminate\Database\Eloquent\Relations\HasOne<ApparatusDefectObservation, $this> */
     public function latestObservation(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
         return $this->hasOne(ApparatusDefectObservation::class)->latestOfMany();
@@ -175,6 +176,7 @@ class ApparatusDefect extends Model
         return DefectActionStatus::label($this->action_status);
     }
 
+    /** @return \Illuminate\Database\Eloquent\Relations\BelongsTo<ApparatusServiceTicket, $this> */
     public function serviceTicket(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(ApparatusServiceTicket::class, 'service_ticket_id');

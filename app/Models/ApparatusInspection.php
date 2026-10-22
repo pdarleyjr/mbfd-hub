@@ -101,6 +101,7 @@ class ApparatusInspection extends Model
         return $this->hasMany(ApparatusIssueMessage::class)->orderBy('created_at')->orderBy('id');
     }
 
+    /** @return BelongsTo<Employee, $this> */
     public function employee(): BelongsTo
     {
         return $this->belongsTo(Employee::class);

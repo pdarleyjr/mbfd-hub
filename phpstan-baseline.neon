@@ -193,12 +193,6 @@ parameters:
 			path: app/Filament/Resources/ApparatusResource.php
 
 		-
-			message: '#^Cannot access property \$unit_id on App\\Models\\Apparatus\|int\|string\.$#'
-			identifier: property.nonObject
-			count: 1
-			path: app/Filament/Resources/ApparatusResource/Pages/ApparatusInspections.php
-
-		-
 			message: '#^Using nullsafe property access "\?\-\>designation" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
 			count: 1

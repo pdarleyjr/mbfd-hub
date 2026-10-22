@@ -212,7 +212,16 @@ final class DailyInspectionSecurityTest extends TestCase
         // Every public method of a Livewire page is callable from the browser. This guard forces
         // anyone adding one to ViewInspection to also add an authorization test for it here.
         $reflection = new ReflectionClass(ViewInspection::class);
-        $known = ['mount', 'getTitle', 'getHeading'];
+        // Page lifecycle hooks, plus every public method that Livewire can be asked to run. Each action
+        // builder and postIssueMessage is denied to a non-reviewer by
+        // CanonicalInspectionActionsTest::test_every_public_page_method_is_refused_to_a_viewer_who_cannot_review.
+        $known = [
+            'mount', 'getTitle', 'getHeading',
+            'acknowledgeIssueAction', 'updateIssueAction', 'resolveIssueAction', 'dismissIssueAction', 'reopenIssueAction',
+            'verifyCorrectionAction', 'classifyImpactAction', 'linkServiceTicketAction',
+            'acceptMeterReadingAction', 'enterVerifiedReadingAction', 'requestMeterClarificationAction', 'keepCurrentReadingAction',
+            'postIssueMessage',
+        ];
         $unknown = collect($reflection->getMethods(ReflectionMethod::IS_PUBLIC))
             ->filter(static fn (ReflectionMethod $method): bool => $method->getDeclaringClass()->getName() === ViewInspection::class)
             ->map(static fn (ReflectionMethod $method): string => $method->getName())

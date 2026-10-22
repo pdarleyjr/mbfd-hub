@@ -11,6 +11,7 @@ use App\Models\ApparatusDefect;
 use App\Models\ApparatusDefectRecommendation;
 use App\Support\Fleet\DefectActionStatus;
 use App\Support\Fleet\DefectFollowUpState;
+use Filament\Actions\MountableAction;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
@@ -190,7 +191,9 @@ class DefectsRelationManager extends RelationManager
                     // Resolution goes through the corrective-action service (event, notification, required type and notes).
                     DefectCorrectiveActions::resolve(
                         Tables\Actions\Action::make('mark_resolved'),
-                        fn (Tables\Actions\Action $action): ?ApparatusDefect => DefectServiceTicketActions::defectFrom($action->getRecord()),
+                        fn (MountableAction $action): ?ApparatusDefect => $action instanceof Tables\Actions\Action
+                            ? DefectServiceTicketActions::defectFrom($action->getRecord())
+                            : null,
                     )
                         ->label('Resolve')
                         ->visible(fn (Tables\Actions\Action $action): bool => DefectCorrectiveActions::canManage(auth()->user())

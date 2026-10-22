@@ -121,7 +121,7 @@ final class RosterHtmlParser
         return $value === '' ? null : $value;
     }
 
-    private function normalizeName(string $value): string
+    public function normalizeName(string $value): string
     {
         $value = trim((string) preg_replace('/\s+/', ' ', $value));
         if (! str_contains($value, ',')) {

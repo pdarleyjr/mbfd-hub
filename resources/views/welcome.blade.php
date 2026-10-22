@@ -44,6 +44,15 @@
                 'domain' => 'operations',
             ],
             [
+                'title' => 'Take Home Vehicle Inspection',
+                'description' => 'Complete a take-home vehicle inspection.',
+                'href' => route('take-home-inspections.index'),
+                'icon' => 'M8 17a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm12 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM3 5h11v10H3zM14 9h4l3 3v3h-7',
+                'external' => false,
+                'visible' => true,
+                'domain' => 'operations',
+            ],
+            [
                 'title' => 'Employee Portal',
                 'description' => 'View assigned gear, track requests, and request approved uniform items',
                 'href' => url('/employee'),
@@ -211,7 +220,6 @@
     <footer class="home-footer">
         <div class="home-footer__inner">
             <p>&copy; {{ date('Y') }} Miami Beach Fire Department · Support Services Division</p>
-            <a href="{{ route('take-home-inspections.index') }}" class="hub-link">Take Home Vehicle Inspection</a>
             <a href="{{ url('/security-standards') }}" class="hub-link">Security &amp; Standards</a>
         </div>
     </footer>
