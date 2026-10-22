@@ -79,6 +79,34 @@ final class InspectionHoldNotificationsTest extends TestCase
             && str_contains($n->title, 'rejected'));
     }
 
+    public function test_a_meter_decision_that_releases_the_inspection_tells_the_submitter_once(): void
+    {
+        $this->submit($this->meterPayload(900, 401.2))->assertCreated()->assertJsonPath('processing_status', 'held_for_review');
+        $inspection = ApparatusInspection::sole();
+        $reviewer = $this->reviewer();
+        Notification::fake();
+
+        $this->decideMeter($this->holdFor($inspection, 'miles'), $reviewer, ['action' => 'dismiss']);
+
+        $this->assertSame('accepted', $inspection->fresh()->processing_status);
+        Notification::assertSentToTimes($this->member, InspectionEventNotification::class, 1);
+        Notification::assertSentTo($this->member, InspectionEventNotification::class, fn (InspectionEventNotification $n): bool => $n->kind === InspectionNotificationKind::INSPECTION_DECIDED
+            && str_contains($n->title, 'approved'));
+    }
+
+    public function test_a_decision_that_leaves_another_hold_open_does_not_notify_yet(): void
+    {
+        $payload = $this->meterPayload(900, 401.2);
+        $payload['review_flag'] = ['explanation' => 'Also check the cab.'];
+        $this->submit($payload)->assertCreated();
+        $inspection = ApparatusInspection::sole();
+        Notification::fake();
+
+        $this->decideMeter($this->holdFor($inspection, 'miles'), $this->reviewer(), ['action' => 'dismiss']);
+
+        Notification::assertNotSentTo($this->member, InspectionEventNotification::class);
+    }
+
     public function test_a_clarification_goes_through_the_message_service_and_reaches_the_submitter(): void
     {
         $payload = $this->meterPayload(1020, 401.2);

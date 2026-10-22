@@ -83,6 +83,27 @@ final class InspectionReviewServiceTest extends TestCase
         $this->assertSame('accepted', $inspection->fresh()->processing_status);
     }
 
+    public function test_correcting_to_a_lower_value_also_requires_the_meter_reset_confirmation(): void
+    {
+        [$inspection, $hold] = $this->heldRollback();
+        $reviewer = $this->reviewer();
+
+        try {
+            $this->decideMeter($hold, $reviewer, ['action' => 'correct', 'value' => 950]);
+            $this->fail('A lower corrected value must not be applied silently.');
+        } catch (ValidationException $exception) {
+            $this->assertArrayHasKey('confirm_meter_reset', $exception->errors());
+        }
+        $this->assertSame(1000, $this->unit->fresh()->current_miles);
+        $this->assertSame('open', $hold->fresh()->status);
+
+        $this->decideMeter($hold, $reviewer, ['action' => 'correct', 'value' => 950, 'confirm_meter_reset' => true]);
+
+        $this->assertSame(950, $this->unit->fresh()->current_miles);
+        $this->assertTrue(ApparatusInspectionReviewEvent::query()->where('metadata->exception_id', $hold->id)->sole()->metadata['meter_reset']);
+        $this->assertSame('accepted', $inspection->fresh()->processing_status);
+    }
+
     public function test_requesting_clarification_keeps_the_hold_open_and_tells_the_member(): void
     {
         [$inspection, $hold] = $this->heldRollback();
