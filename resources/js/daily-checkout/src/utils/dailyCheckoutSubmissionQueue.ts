@@ -597,6 +597,8 @@ const equipmentEvidence = (areas: unknown): string | null => {
         value: item.value,
         notes: item.notes || null,
         photo: item.photo || undefined,
+        // The claim only exists while the item is Damaged; drafts and submissions normalise to the same value.
+        significant: item.status === 'Damaged' && item.significant === true ? true : undefined,
       };
     });
     return items.includes(null) ? null : { id: area.id, items };
