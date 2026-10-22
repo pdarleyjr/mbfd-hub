@@ -31,7 +31,7 @@ final class CommandOverviewApiTest extends TestCase
         ApparatusDefect::query()->create(['apparatus_id' => $engine->id, 'compartment' => 'A', 'item' => 'Light', 'status' => 'open', 'issue_type' => 'damaged', 'reported_date' => now()]);
         ApparatusServiceTicket::query()->create($this->ticket($engine, 'submitted', 'T-1'));
         ApparatusServiceTicket::query()->create($this->ticket($engine, 'completed', 'T-2'));
-        $this->actingAsCanonicalFixture();
+        $this->actingAsCanonicalFixture(rank: 'Captain');
 
         $response = $this->getJson('/api/public/command/overview')->assertOk();
 
@@ -53,11 +53,18 @@ final class CommandOverviewApiTest extends TestCase
         }
     }
 
+    public function test_members_without_300_command_access_are_forbidden(): void
+    {
+        $this->actingAsCanonicalFixture(rank: 'Lieutenant');
+        $this->getJson('/api/public/command/overview')->assertForbidden();
+    }
+
     public function test_query_count_does_not_grow_with_station_count(): void
     {
-        $this->actingAsCanonicalFixture();
+        $this->actingAsCanonicalFixture(rank: 'Captain');
         $first = $this->station(1, true);
         $this->apparatus($first, 'E1', 'In Service');
+        $this->countQueries(); // Warm the one-time permission cache read by the 300 access check.
         $small = $this->countQueries();
 
         foreach ([2, 3, 4, 6] as $number) {

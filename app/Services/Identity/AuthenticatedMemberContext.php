@@ -15,7 +15,7 @@ final readonly class AuthenticatedMemberContext
      * @param  list<string>  $abilities
      * @param  list<array{id: int, name: string, membership_role: string}>  $workgroups
      * @param  array{id: int, name: string, membership_role: string|null}|null  $activeWorkgroup
-     * @param  array{personnel_equipment_request: bool}  $capabilities  server-derived UI entry points
+     * @param  array{personnel_equipment_request: bool, command_300_access?: bool}  $capabilities  server-derived UI entry points
      */
     public function __construct(
         private User $user,
@@ -23,7 +23,7 @@ final readonly class AuthenticatedMemberContext
         private array $abilities,
         private array $workgroups,
         private ?array $activeWorkgroup,
-        private array $capabilities = ['personnel_equipment_request' => false],
+        private array $capabilities = ['personnel_equipment_request' => false, 'command_300_access' => false],
     ) {}
 
     public function user(): User

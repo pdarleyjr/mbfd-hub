@@ -39,6 +39,31 @@ final class HubOidcProviderTest extends TestCase
         $this->assertDatabaseCount('oidc_account_links', 0);
     }
 
+    public function test_ineligible_member_is_returned_to_the_command_board_with_access_denied(): void
+    {
+        [$user, $client] = $this->fixture();
+        $user->employeeProfile->forceFill(['rank' => 'Firefighter'])->save();
+        $response = $this->actingAs($user)->get('/oauth/authorize?'.http_build_query($this->authorizationQuery($client)))->assertRedirect();
+        $location = (string) $response->headers->get('Location');
+        self::assertStringStartsWith('https://cmd.mbfdhub.com/auth/callback?', $location);
+        parse_str((string) parse_url($location, PHP_URL_QUERY), $returned);
+        self::assertSame('access_denied', $returned['error']);
+        self::assertSame('test-state', $returned['state']);
+        self::assertArrayNotHasKey('code', $returned);
+        $this->assertDatabaseCount('oidc_sessions', 0);
+    }
+
+    public function test_cmd_rank_change_ends_userinfo_and_claims_carry_command_access(): void
+    {
+        [$user, $client] = $this->fixture();
+        $token = $this->exchange($client, $this->code($user, $client))->assertOk()->json();
+        $claims = json_decode(base64_decode(strtr(explode('.', $token['id_token'])[1], '-_', '+/')), true);
+        self::assertSame('300', $claims['command_access']);
+        $this->withToken($token['access_token'])->getJson('/oauth/userinfo')->assertOk()->assertJsonPath('command_access', '300');
+        $user->employeeProfile->forceFill(['rank' => 'Lieutenant'])->save();
+        $this->withToken($token['access_token'])->getJson('/oauth/userinfo')->assertUnauthorized();
+    }
+
     public function test_cmd_code_exchange_and_userinfo_need_no_role_or_grant_and_recheck_revocation(): void
     {
         [$user, $client] = $this->fixture();
@@ -339,6 +364,7 @@ final class HubOidcProviderTest extends TestCase
     {
         [$user, $client] = $this->fixture('meeting');
         $user->givePermissionTo(Permission::findOrCreate('app.meeting.operator', 'web'));
+        $user->employeeProfile->forceFill(['rank' => 'Captain'])->save();
         $cmd = Client::query()->create(['name' => 'CMD isolation test', 'secret' => 'test-client-secret', 'provider' => 'users',
             'redirect_uris' => ['https://cmd.mbfdhub.com/auth/callback'], 'grant_types' => ['authorization_code'], 'revoked' => false]);
         config(['oidc.clients.cmd' => $cmd->id]);
@@ -416,7 +442,8 @@ final class HubOidcProviderTest extends TestCase
         $key = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
         openssl_pkey_export($key, $private);
         config(['passport.private_key' => $private, 'passport.public_key' => openssl_pkey_get_details($key)['key']]);
-        $employee = Employee::query()->create(['name' => 'OIDC Test', 'employee_id' => 'OIDC-99001', 'city_email' => 'oidctest@miamibeachfl.gov', 'password' => bcrypt('Test-password-only!')]);
+        // The Command Board admits 300 Command Access; a Captain qualifies by rank.
+        $employee = Employee::query()->create(['name' => 'OIDC Test', 'employee_id' => 'OIDC-99001', 'rank' => $application === 'cmd' ? 'Captain' : 'Firefighter', 'city_email' => 'oidctest@miamibeachfl.gov', 'password' => bcrypt('Test-password-only!')]);
         $user = User::factory()->create(['employee_profile_id' => $employee->id, 'employee_id' => $employee->employee_id,
             'email' => $employee->city_email, 'account_status' => 'active', 'security_version' => 1, 'must_change_password' => false]);
         if ($application !== 'cmd') {
