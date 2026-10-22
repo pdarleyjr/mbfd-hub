@@ -5,14 +5,17 @@ namespace App\Filament\Resources\InspectionResource\Pages;
 use App\Filament\Resources\ApparatusResource;
 use App\Filament\Resources\InspectionResource;
 use App\Filament\Support\DefectCorrectiveActions;
+use App\Filament\Support\InspectionHoldActions;
 use App\Filament\Support\InspectionWorkspace;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusDefectObservation;
 use App\Models\ApparatusInspection;
+use App\Models\ApparatusInspectionException;
 use App\Models\ApparatusIssueMessage;
 use App\Models\User;
-use App\Services\ApparatusInspectionApprovalService;
+use App\Services\Inspections\InspectionHold;
+use App\Services\Inspections\InspectionReviewService;
 use App\Services\Inspections\IssueMessageService;
 use App\Support\Fleet\InspectionReviewers;
 use Closure;
@@ -86,28 +89,60 @@ class ViewInspection extends ViewRecord
                 ->icon('heroicon-o-check-circle')
                 ->color('success')
                 ->requiresConfirmation()
-                ->modalDescription('This accepts the inspection and applies the reported meter readings and defects to the apparatus. It does not change the unit\'s operational status unless you choose to below.')
+                ->modalDescription('Approving accepts this inspection record and clears its holds. It does not certify that the unit is safe or ready for service, and it does not change the unit\'s operational status unless you choose to below.')
                 ->form([
+                    Forms\Components\Textarea::make('note')
+                        ->label('Note (optional)')
+                        ->helperText('Kept in the review history.')
+                        ->rows(3)
+                        ->maxLength(2000),
                     Forms\Components\Toggle::make('mark_out_of_service')
-                        ->label('Mark unit Out of Service')
-                        ->helperText(fn (): string => $this->reportsCriticalDefects()
-                            ? 'Missing or damaged equipment was reported. Review it, then confirm whether this unit should be taken Out of Service.'
-                            : 'No missing or damaged equipment was reported. Leave off unless you have another reason to take the unit out of service.')
-                        ->default(fn (): bool => $this->reportsCriticalDefects()),
+                        ->label('Also mark unit Out of Service')
+                        ->helperText('Off by default. Turn it on only if what this inspection shows means the unit should come out of service now.')
+                        ->default(false)
+                        ->visible(fn (): bool => $this->canUpdateApparatus()),
                 ])
                 ->visible(fn (): bool => $this->isAwaitingDecision() && $this->canApproveInspection())
-                ->action(function (array $data, ApparatusInspectionApprovalService $approvalService): void {
-                    $reviewer = auth()->user();
-                    abort_unless($reviewer instanceof User && $this->canApproveInspection(), 403);
-
-                    $approvalService->approve(
-                        (int) $this->inspection()->getKey(),
-                        $reviewer,
-                        (bool) ($data['mark_out_of_service'] ?? false),
+                ->disabled(fn (): bool => $this->hasOpenMeterHold())
+                ->tooltip(fn (): ?string => $this->hasOpenMeterHold() ? 'Decide the meter reading first.' : null)
+                ->action(function (array $data): void {
+                    $this->decide(
+                        fn (User $reviewer) => app(InspectionReviewService::class)->approve(
+                            (int) $this->inspection()->getKey(),
+                            $reviewer,
+                            $data['note'] ?? null,
+                            $this->canUpdateApparatus() && (bool) ($data['mark_out_of_service'] ?? false),
+                        ),
+                        'Inspection approved',
                     );
-                    $this->refreshInspection();
-
-                    Notification::make()->success()->title('Inspection approved')->send();
+                }),
+            Action::make('requestClarification')
+                ->label('Request clarification')
+                ->icon('heroicon-o-question-mark-circle')
+                ->color('gray')
+                ->modalHeading('Ask the member for more information')
+                ->modalDescription('The inspection keeps its status. The member gets your question and can answer from their inspection.')
+                ->modalSubmitActionLabel('Send question')
+                ->visible(fn (): bool => $this->isAwaitingDecision() && $this->isReviewer())
+                ->mountUsing(fn (Forms\ComponentContainer $form) => $form->fill(['client_message_id' => (string) Str::uuid()]))
+                ->form([
+                    Forms\Components\Hidden::make('client_message_id'),
+                    Forms\Components\Textarea::make('message')
+                        ->label('Your question')
+                        ->required()
+                        ->rows(4)
+                        ->maxLength(2000),
+                ])
+                ->action(function (array $data): void {
+                    $this->decide(
+                        fn (User $reviewer) => app(InspectionReviewService::class)->requestClarification(
+                            (int) $this->inspection()->getKey(),
+                            $reviewer,
+                            (string) $data['message'],
+                            $data['client_message_id'] ?? null,
+                        ),
+                        'Question sent to the member',
+                    );
                 }),
             Action::make('rejectInspection')
                 ->label('Reject inspection')
@@ -123,18 +158,15 @@ class ViewInspection extends ViewRecord
                         ->rows(4),
                 ])
                 ->visible(fn (): bool => $this->isAwaitingDecision() && $this->canRejectInspection())
-                ->action(function (array $data, ApparatusInspectionApprovalService $approvalService): void {
-                    $reviewer = auth()->user();
-                    abort_unless($reviewer instanceof User && $this->canRejectInspection(), 403);
-
-                    $approvalService->reject(
-                        (int) $this->inspection()->getKey(),
-                        $reviewer,
-                        trim($data['review_notes']),
+                ->action(function (array $data): void {
+                    $this->decide(
+                        fn (User $reviewer) => app(InspectionReviewService::class)->reject(
+                            (int) $this->inspection()->getKey(),
+                            $reviewer,
+                            trim((string) $data['review_notes']),
+                        ),
+                        'Inspection rejected',
                     );
-                    $this->refreshInspection();
-
-                    Notification::make()->success()->title('Inspection rejected')->send();
                 }),
             Action::make('replyToMember')
                 ->label('Reply to member')
@@ -329,17 +361,95 @@ class ViewInspection extends ViewRecord
         return $inspection->review_status === 'pending_review' && ! $inspection->isHeldForVehicleSwap();
     }
 
-    /** Unprepared (legacy) evidence is treated as reporting critical defects; processed inspections default the choice off. */
-    private function reportsCriticalDefects(): bool
+    /** True while a meter rollback hold is undecided; approval must wait for that decision. */
+    private function hasOpenMeterHold(): bool
+    {
+        return InspectionHold::openQuery((int) $this->inspection()->getKey())
+            ->whereIn('field', InspectionHold::METER_FIELDS)
+            ->exists();
+    }
+
+    /** Out of Service is a separate decision: only people who may update the apparatus are offered it. */
+    private function canUpdateApparatus(): bool
     {
         $inspection = $this->inspection();
-        if ($inspection->processing_status !== null) {
-            return false;
+        $apparatus = Apparatus::query()->find($inspection->processed_apparatus_id ?? $inspection->apparatus_id);
+
+        return $apparatus instanceof Apparatus && (auth()->user()?->can('update', $apparatus) ?? false);
+    }
+
+    /**
+     * Runs one reviewer decision and turns a refusal into a plain-language message.
+     *
+     * @param  Closure(User): mixed  $decision
+     */
+    private function decide(Closure $decision, string $success): void
+    {
+        $reviewer = auth()->user();
+        abort_unless($reviewer instanceof User && $this->isReviewer(), 403);
+
+        try {
+            $decision($reviewer);
+        } catch (ValidationException $exception) {
+            Notification::make()->danger()->title('That was not saved')
+                ->body((string) (collect($exception->errors())->flatten()->first() ?? 'Check the form and try again.'))->send();
+
+            return;
+        } catch (AuthorizationException) {
+            Notification::make()->danger()->title('You do not have permission to do this.')->send();
+
+            return;
         }
+        $this->refreshInspection();
+        Notification::make()->success()->title($success)->send();
+    }
 
-        $pendingEffects = $inspection->pending_effects;
+    // ------------------------------------------------ meter rollback hold decisions
 
-        return $pendingEffects === null || (bool) ($pendingEffects['has_critical_defects'] ?? false);
+    public function acceptMeterReadingAction(): Action
+    {
+        return InspectionHoldActions::accept(Action::make(InspectionHoldActions::ACCEPT), $this->holdResolver(), (int) $this->inspection()->getKey());
+    }
+
+    public function enterVerifiedReadingAction(): Action
+    {
+        return InspectionHoldActions::correct(Action::make(InspectionHoldActions::CORRECT), $this->holdResolver(), (int) $this->inspection()->getKey());
+    }
+
+    public function requestMeterClarificationAction(): Action
+    {
+        return InspectionHoldActions::clarify(Action::make(InspectionHoldActions::CLARIFY), $this->holdResolver(), (int) $this->inspection()->getKey());
+    }
+
+    public function keepCurrentReadingAction(): Action
+    {
+        return InspectionHoldActions::keep(Action::make(InspectionHoldActions::KEEP), $this->holdResolver(), (int) $this->inspection()->getKey());
+    }
+
+    /**
+     * The meter exception a mounted action names, or null when none was named. An id that is
+     * not a meter exception of this inspection is a 404, so a forged id never reaches the service.
+     *
+     * @param  array<string, mixed>  $arguments
+     */
+    protected function observedHold(array $arguments): ?ApparatusInspectionException
+    {
+        if (! isset($arguments['exception'])) {
+            return null;
+        }
+        $hold = ApparatusInspectionException::query()
+            ->where('apparatus_inspection_id', $this->inspection()->getKey())
+            ->whereIn('field', InspectionHold::METER_FIELDS)
+            ->find((int) $arguments['exception']);
+        abort_unless($hold instanceof ApparatusInspectionException, 404);
+
+        return $hold;
+    }
+
+    /** @return Closure(MountableAction): ?ApparatusInspectionException */
+    private function holdResolver(): Closure
+    {
+        return fn (MountableAction $action): ?ApparatusInspectionException => $this->observedHold($action->getArguments());
     }
 
     private function canApproveInspection(): bool

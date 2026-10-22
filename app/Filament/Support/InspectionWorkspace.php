@@ -120,7 +120,7 @@ final class InspectionWorkspace
             ->orderBy('id')
             ->get();
 
-        $holdCards = $this->holdCards($inspection, $exceptions, $physical);
+        $holdCards = $this->holdCards($inspection, $exceptions, $physical, $canReview);
         $canManage = DefectCorrectiveActions::canManage($viewer);
         $defects = $this->defectCards($inspection, $physicalId, $this->damageDefectIds($exceptions), $itemPhotos, $viewer, $canReview, $canManage);
 
@@ -132,6 +132,7 @@ final class InspectionWorkspace
             'status' => self::statusPresentation($inspection),
             'can_review' => $canReview,
             'can_manage' => $canManage,
+            'meter_hold_open' => $exceptions->contains(fn (ApparatusInspectionException $e): bool => $this->isOpenHold($e) && in_array($e->field, ['miles', 'engine_hours'], true)),
             'general_thread' => $canReview && $viewer instanceof User ? $this->generalThread($inspection, $viewer) : null,
             'header' => $this->header($inspection, $physical, $detail, $viewer, $openHolds, $openIssues),
             'legacy_pending' => $inspection->processing_status === null && $inspection->review_status === 'pending_review',
@@ -190,7 +191,7 @@ final class InspectionWorkspace
      * @param  Collection<int, ApparatusInspectionException>  $exceptions
      * @return array{cards: list<array<string, mixed>>, damage: list<array<string, mixed>>}
      */
-    private function holdCards(ApparatusInspection $inspection, Collection $exceptions, mixed $physical): array
+    private function holdCards(ApparatusInspection $inspection, Collection $exceptions, mixed $physical, bool $canReview): array
     {
         $cards = [];
         $damage = [];
@@ -202,7 +203,7 @@ final class InspectionWorkspace
             $meta = is_array($exception->metadata) ? $exception->metadata : [];
 
             if (in_array($exception->field, ['miles', 'engine_hours'], true)) {
-                $cards[] = $this->meterCard($inspection, $exception, $meta, $vehicle);
+                $cards[] = $this->meterCard($inspection, $exception, $meta, $vehicle, $canReview, $physical instanceof Apparatus ? $physical : null);
             } elseif ($exception->field === 'significant_damage') {
                 $damage[] = [
                     'id' => (int) $exception->getKey(),
@@ -222,7 +223,7 @@ final class InspectionWorkspace
      * @param  array<string, mixed>  $meta
      * @return array<string, mixed>
      */
-    private function meterCard(ApparatusInspection $inspection, ApparatusInspectionException $exception, array $meta, ?string $vehicle): array
+    private function meterCard(ApparatusInspection $inspection, ApparatusInspectionException $exception, array $meta, ?string $vehicle, bool $canReview, ?Apparatus $physical): array
     {
         $isMiles = $exception->field === 'miles';
         $format = static fn (mixed $value): ?string => $value === null
@@ -257,6 +258,8 @@ final class InspectionWorkspace
             'blocking' => $this->isOpenHold($exception),
             'is_hold' => (bool) $exception->blocks_acceptance,
             'status_label' => $this->exceptionStatusLabel($exception),
+            'current_value' => $format($physical?->getAttribute($isMiles ? 'current_miles' : 'current_engine_hours')),
+            'actions' => $canReview && $this->isOpenHold($exception) ? InspectionHoldActions::names() : [],
             'previous_value' => $format($exception->authoritative_value),
             'submitted_value' => $format($exception->submitted_value),
             'loaded_value' => $format($exception->baseline_value),

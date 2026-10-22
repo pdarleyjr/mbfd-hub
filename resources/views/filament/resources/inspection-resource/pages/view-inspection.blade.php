@@ -13,6 +13,7 @@
         default => 'neutral',
     };
     $itemText = fn (string $value): string => $value === 'Present' ? 'Pass' : $value;
+    $holdLabels = \App\Filament\Support\InspectionHoldActions::LABELS;
     $actionLabels = [
         'acknowledgeIssue' => 'Acknowledge',
         'updateIssue' => 'Update action',
@@ -105,7 +106,13 @@
             <div class="hub-insp-section__head">
                 <h2 class="hub-insp-section__title" id="insp-issues-title">Issues requiring attention</h2>
                 @if($workspace['can_review'] && $inspection->review_status === 'pending_review' && ! $inspection->isHeldForVehicleSwap())
-                    <p class="hub-insp-note">Use Approve inspection or Reject inspection at the top of this page once you have reviewed the items below.</p>
+                    <p class="hub-insp-note">
+                        @if($workspace['meter_hold_open'])
+                            Decide the meter reading first. Approve inspection is unavailable until you do.
+                        @else
+                            Use Approve inspection or Reject inspection at the top of this page once you have reviewed the items below.
+                        @endif
+                    </p>
                 @endif
             </div>
 
@@ -208,9 +215,20 @@
                                 @if(filled($decision['note'])): {{ $decision['note'] }}@endif
                             </p>
                         @endforeach
-                        @if($hold['blocking'] && $workspace['can_review'])
-                            <p class="hub-insp-note">Record the decision for this reading on
-                                <a class="hub-insp-link" href="{{ $workspace['exceptions_url'] }}">Inspection Exceptions</a>.</p>
+                        @if($hold['blocking'] && $hold['current_value'])
+                            <p class="hub-insp-note">The vehicle's reading right now is <strong>{{ $hold['current_value'] }}</strong>. This inspection cannot be approved until the reading is decided.</p>
+                        @endif
+                        @if(count($hold['actions']) > 0)
+                            <div class="hub-insp-actions" role="group" aria-label="Decide the {{ strtolower($hold['field_label']) }} reading" data-hold-actions>
+                                @foreach($hold['actions'] as $holdAction)
+                                    <button
+                                        type="button"
+                                        class="hub-insp-btn"
+                                        wire:click="mountAction('{{ $holdAction }}', { exception: {{ $hold['id'] }} })"
+                                        data-hold-action="{{ $holdAction }}"
+                                    >{{ $holdLabels[$holdAction] ?? $holdAction }}</button>
+                                @endforeach
+                            </div>
                         @endif
                     </article>
                 @endforeach
@@ -237,6 +255,9 @@
                                 </dd>
                             </div>
                         </dl>
+                        @if($flag['blocking'])
+                            <p class="hub-insp-note">Approving this inspection clears the member's flag.</p>
+                        @endif
                     </article>
                 @endif
 
@@ -253,6 +274,9 @@
                                 @endif
                             @endforeach
                         </ul>
+                        @if($damage['blocking'])
+                            <p class="hub-insp-note">Approving this inspection clears this hold. Each item below keeps its own corrective action.</p>
+                        @endif
                     </article>
                 @endforeach
 

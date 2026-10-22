@@ -508,6 +508,7 @@ final class EmployeeInspectionHistoryService
             ->whereNotIn('status', ['resolved', 'dismissed'])
             ->orderBy('id')
             ->get(['field', 'reason'])
+            ->toBase()
             ->map(fn (ApparatusInspectionException $hold): string => $this->holdLabel((string) $hold->field, (string) $hold->reason))
             ->when($inspection->processing_status === 'pending_vehicle_swap', fn ($list) => $list->push('Fleet is confirming which vehicle you inspected'))
             ->unique()
