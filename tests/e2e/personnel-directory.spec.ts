@@ -234,3 +234,41 @@ test('inline checkbox date and text persist after native save notifications clos
     await expect(page.locator('iframe')).toHaveCount(0);
     await page.screenshot({ path: info.outputPath('inline-tracking-persisted.png'), fullPage: true });
 });
+
+test('native Columns saves status choices and inline status persists after reload', async ({ page }, info) => {
+    await login(page);
+    await openTable(page, `Synthetic inline date and text tracking ${info.project.name}`);
+    const columns = await action(page, 'Columns');
+    await columns.getByRole('button', { name: 'Add tracking column', exact: true }).click();
+    await columns.getByRole('textbox', { name: /^Column name/ }).last().fill('Workflow status');
+    await columns.getByRole('combobox', { name: /^Type/ }).last().selectOption('status');
+    const choices = columns.getByRole('textbox', { name: /^Choices/ });
+    await choices.scrollIntoViewIfNeeded();
+    await ready(choices);
+    for (const choice of ['Pending', 'Complete']) {
+        await choices.fill(choice);
+        await choices.press('Enter');
+        await expect(columns.locator('.fi-fo-tags-input-tags-ctn').getByText(choice, { exact: true })).toBeVisible();
+    }
+    await columns.getByRole('button', { name: 'Submit', exact: true }).click();
+    await expect(page.getByText('Columns saved', { exact: true })).toBeVisible();
+    const persisted = await action(page, 'Columns');
+    const persistedChoices = persisted.getByRole('textbox', { name: /^Choices/ });
+    await persistedChoices.scrollIntoViewIfNeeded();
+    await ready(persistedChoices);
+    for (const choice of ['Pending', 'Complete']) {
+        await expect(persisted.locator('.fi-fo-tags-input-tags-ctn').getByText(choice, { exact: true })).toBeVisible();
+    }
+    await persisted.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(page.locator('.fi-modal-window:visible')).toHaveCount(0);
+    const status = page.getByRole('row').filter({ hasText: '99001' }).getByRole('combobox');
+    await status.scrollIntoViewIfNeeded();
+    await ready(status);
+    await status.selectOption('Complete');
+    await expect(page.getByText('Saved', { exact: true }).last()).toBeVisible();
+    await page.reload();
+    await expect(status).toHaveValue('Complete');
+    await expect(status.getByRole('option', { name: 'Pending', exact: true })).toHaveCount(1);
+    await expect(status.getByRole('option', { name: 'Complete', exact: true })).toHaveCount(1);
+    await page.screenshot({ path: info.outputPath('status-tracking-persisted.png'), fullPage: true });
+});
