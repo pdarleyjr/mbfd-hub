@@ -69,6 +69,7 @@ class HomeNavigationTest extends TestCase
         $response->assertSee('Quick Access');
         $response->assertSeeInOrder([
             'Station / Vehicles / Equipment',
+            'Take Home Vehicle Inspection',
             'Employee Portal',
             'ICS Forms',
             'Workgroup Dashboard',
@@ -86,6 +87,7 @@ class HomeNavigationTest extends TestCase
 
         foreach ([
             url('/daily/stations'),
+            route('take-home-inspections.index'),
             url('/employee'),
             url('/employee/forms'),
             url('/workgroups'),

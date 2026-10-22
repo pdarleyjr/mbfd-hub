@@ -57,12 +57,21 @@ final class TakeHomeVehicleInspectionTest extends TestCase
             ->assertSee('instrument cluster');
     }
 
-    public function test_home_footer_links_to_the_inspection(): void
+    public function test_home_card_links_to_the_inspection_for_a_member_without_a_profile(): void
     {
-        $this->actingAs($this->member())->get('/')
+        $response = $this->actingAs($this->member())->get('/')
             ->assertOk()
             ->assertSee('Take Home Vehicle Inspection')
+            ->assertSee('Complete a take-home vehicle inspection.')
             ->assertSee(route('take-home-inspections.index'), false);
+
+        $document = new \DOMDocument;
+        @$document->loadHTML($response->getContent());
+        $xpath = new \DOMXPath($document);
+        $destination = route('take-home-inspections.index');
+        self::assertSame(1, $xpath->query('//a[@data-quick-access-card and @href="'.$destination.'"]')->length);
+        self::assertSame(0, $xpath->query('//footer//a[@href="'.$destination.'"]')->length);
+        self::assertSame(1, $xpath->query('//footer//a[@href="'.url('/security-standards').'"]')->length);
     }
 
     public function test_vehicle_search_resolves_an_exact_number_and_partial_matches(): void

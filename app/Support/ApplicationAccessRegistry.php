@@ -77,6 +77,15 @@ final class ApplicationAccessRegistry
         $options['training.rosters.submit'] = 'Training rosters — submit (requires Hub administration access)';
         $options['app.media_control.media'] = 'Media Control — upload and manage media';
         $options['app.cmd.admin'] = 'Command Board — set and change the command PIN (requires Hub administration access)';
+        $options['personnel.directory.view'] = 'Personnel directory — view';
+        $options['personnel.directory.edit'] = 'Personnel directory — edit tracking';
+        $options['personnel.directory.export'] = 'Personnel directory — export';
+        $options['personnel.tables.view'] = 'Custom personnel tables — view';
+        $options['personnel.tables.create'] = 'Custom personnel tables — create';
+        $options['personnel.tables.edit'] = 'Custom personnel tables — edit';
+        $options['personnel.tables.share'] = 'Custom personnel tables — share';
+        $options['personnel.tables.export'] = 'Custom personnel tables — export';
+        $options['personnel.tables.archive'] = 'Custom personnel tables — archive / restore';
 
         return $options;
     }
