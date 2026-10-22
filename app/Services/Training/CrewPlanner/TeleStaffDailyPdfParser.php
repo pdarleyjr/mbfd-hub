@@ -17,6 +17,8 @@ final class TeleStaffDailyPdfParser
 
     public const MAX_PAGES = 12;
 
+    public const MAX_MARKUP_ANNOTATIONS = 200;
+
     public function parse(string $path): array
     {
         $size = is_file($path) ? filesize($path) : false;
@@ -35,7 +37,13 @@ final class TeleStaffDailyPdfParser
         }
         $rawObjects = preg_match_all('/\d+\s+\d+\s+obj\b/', $bytes);
         $structureObjects = preg_match_all('/\/Type\s*\/StructElem\b/', $names);
-        if (preg_match_all('/\bstream\b/', $bytes) > 64 || $rawObjects > 12000 || $rawObjects - $structureObjects > 800) {
+        // Officers highlight or note rows before uploading; each passive markup annotation
+        // carries its own appearance stream, so allow one extra stream per annotation.
+        $markup = min(
+            preg_match_all('/\/Subtype\s*\/(?:Highlight|Underline|StrikeOut|Squiggly|Text|FreeText|Ink|Square|Circle|Popup)\b/', $names),
+            preg_match_all('/\/Type\s*\/Annot\b/', $names),
+        );
+        if (preg_match_all('/\bstream\b/', $bytes) > 64 + min($markup, self::MAX_MARKUP_ANNOTATIONS) || $rawObjects > 12000 || $rawObjects - $structureObjects > 800) {
             throw new InvalidArgumentException('The daily report is too complex.');
         }
         $config = new Config;
@@ -195,7 +203,7 @@ final class TeleStaffDailyPdfParser
                     $reasons[] = 'Duty shift section needs verification';
                 }
                 [$class, $approval] = $this->code($normalized);
-                if ($normalized !== $rawCode || $class === 'UNKNOWN' || $class === 'ANNOTATION' || $approval !== 'VERIFIED_EFFECTIVE') {
+                if ($this->withoutFamilyIcon($rawCode, $normalized) !== $normalized || $class === 'UNKNOWN' || $class === 'ANNOTATION' || $approval !== 'VERIFIED_EFFECTIVE') {
                     $reasons[] = 'Duty assignment needs verification';
                 }
                 $period = $this->period($snapshot['schedule_date'], $from, $to, $hours);
@@ -252,12 +260,31 @@ final class TeleStaffDailyPdfParser
     private function code(string $code): array
     {
         return match ($code) {
-            'SP', '+OT', 'OT' => ['WORKING', 'VERIFIED_EFFECTIVE'],
-            '2WXON' => ['WORKING', 'UNVERIFIED'],
+            // An exchange printed onto the published daily roster is the staffed seat for that
+            // interval, exactly as 2WXOFF is trusted as the matching absence.
+            'SP', '+OT', 'OT', '2WXON', '2WXEON' => ['WORKING', 'VERIFIED_EFFECTIVE'],
             '2WXOFF', 'ADONIS DAY', 'VAC', 'VACA', 'EVAC', 'SIC' => ['NOT_WORKING', 'VERIFIED_EFFECTIVE'],
             '^OOC', '^ROC', '^MOC', '^TOC' => ['ANNOTATION', 'UNVERIFIED'],
             default => ['UNKNOWN', 'UNVERIFIED'],
         };
+    }
+
+    /**
+     * TeleStaff prefixes some codes with a category icon: U+E646 on exchanges and U+E521 on
+     * overtime, observed only on those families across every validated daily report. An icon
+     * on its own family is presentation; any other glyph remains an unverified modifier.
+     */
+    private function withoutFamilyIcon(string $raw, string $code): string
+    {
+        $icon = match ($code) {
+            '2WXON', '2WXEON', '2WXOFF' => "\u{E646}",
+            '+OT', 'OT' => "\u{E521}",
+            default => null,
+        };
+
+        $raw = trim($raw);
+
+        return $icon !== null && str_starts_with($raw, $icon) ? trim(substr($raw, strlen($icon))) : $raw;
     }
 
     private function period(string $date, string $from, string $to, string $hours): ?array

@@ -22,10 +22,12 @@ final class TrainingCrewPlannerDutyContext
             return CarbonImmutable::parse($context['start_at'])->lt(CarbonImmutable::parse($slot['end_at']))
                 && CarbonImmutable::parse($context['end_at'])->gt(CarbonImmutable::parse($slot['start_at']));
         });
-        $stations = $apparatus = $labels = [];
+        $stations = $apparatus = $labels = $plainStations = $plainUnits = [];
         foreach ($relevant as $context) {
             $station = (string) ($context['station'] ?? 'Not reported');
             $unit = (string) ($context['apparatus'] ?? 'Not reported');
+            $plainStations[] = (string) ($context['station'] ?? '');
+            $plainUnits[] = (string) ($context['apparatus'] ?? '');
             $period = ! empty($context['start_at']) && ! empty($context['end_at'])
                 ? CarbonImmutable::parse($context['start_at'])->setTimezone('America/New_York')->format('m/d H:i').'–'.CarbonImmutable::parse($context['end_at'])->setTimezone('America/New_York')->format('m/d H:i')
                 : 'time not confirmed';
@@ -39,6 +41,9 @@ final class TrainingCrewPlannerDutyContext
             'station' => implode('; ', array_unique($stations)) ?: 'Not reported for this classroom time',
             'apparatus' => implode('; ', array_unique($apparatus)) ?: 'Not reported for this classroom time',
             'label' => implode('; ', array_unique($labels)) ?: 'Actual duty assignment requires verification',
+            // Printed request columns: just the station(s) and unit(s) worked during the session.
+            'station_plain' => implode(' / ', array_unique(array_filter($plainStations))),
+            'apparatus_plain' => implode(' / ', array_unique(array_filter($plainUnits))),
         ];
     }
 }

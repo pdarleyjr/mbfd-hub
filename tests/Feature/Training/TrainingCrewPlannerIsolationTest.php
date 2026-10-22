@@ -86,7 +86,8 @@ final class TrainingCrewPlannerIsolationTest extends TestCase
             $this->post(route('training.crew-planner.upload'), ['draft_id' => $draftId, 'version' => $version, 'roster_pdf' => $file])
                 ->assertRedirect()->assertSessionHasNoErrors();
             self::assertFileDoesNotExist($path);
-            $component->call('reloadProposal')->call('saveSlots')->assertHasNoErrors();
+            $component->call('reloadProposal');
+            $this->enterSessions($component, [['Morning', '08:30', '11:30'], ['Afternoon', '13:00', '16:00']]);
             $slots = $this->draft($draftId)['slots'];
             self::assertCount(2, $slots);
             $component->set('filters.rank', 'Captain')->call('addSelected', true)->assertHasNoErrors();
@@ -103,14 +104,14 @@ final class TrainingCrewPlannerIsolationTest extends TestCase
             self::assertCount(2, $this->draft($draftId)['selections']);
             $component->set('planSelection', [$firstId])->set('targetSlot', $slots[0]['id'])->call('moveSelected')->assertHasNoErrors();
             $component->set('planSelection', [$secondId])->set('targetSlot', $slots[1]['id'])->call('moveSelected')->assertHasNoErrors();
-            $component->call('download', 'pdf')->assertFileDownloaded('MBFD-Training-Proposal-2026-10-21.pdf');
+            $component->call('download', 'pdf')->assertFileDownloaded('MBFD-Training-Personnel-Request-2026-10-21.pdf');
             $pdf = $this->downloadBytes($component);
             self::assertStringStartsWith('%PDF-', $pdf);
             $text = (new Parser)->parseContent($pdf)->getText();
-            foreach (['Synthetic 90001', 'Synthetic 90002', 'Captain', 'Firefighter', 'Station 9', 'Engine 9', 'Battalion Chief 300'] as $expected) {
+            foreach (['Synthetic 90001', 'Synthetic 90002', 'Captain', 'Firefighter', 'Station 9', 'Engine 9'] as $expected) {
                 self::assertStringContainsString($expected, $text);
             }
-            $component->call('download', 'xlsx')->assertFileDownloaded('MBFD-Training-Proposal-2026-10-21.xlsx');
+            $component->call('download', 'xlsx')->assertFileDownloaded('MBFD-Training-Personnel-Request-2026-10-21.xlsx');
             $xlsx = $this->downloadBytes($component);
             self::assertStringStartsWith('PK', $xlsx);
             $bookPath = tempnam(sys_get_temp_dir(), 'crew-isolation-xlsx-');
@@ -137,7 +138,7 @@ final class TrainingCrewPlannerIsolationTest extends TestCase
             self::assertCount(2, $this->draft($draftId)['selections']);
             $component->call('download', 'pdf')->assertHasErrors('confirmReview');
             $component->set('confirmReview', true)->call('download', 'pdf')->assertFileDownloaded();
-            self::assertStringContainsString('Requires verification', (new Parser)->parseContent($this->downloadBytes($component))->getText());
+            self::assertStringContainsStringIgnoringCase('Needs verification', (new Parser)->parseContent($this->downloadBytes($component))->getText());
             $component->call('discardProposal')->assertHasNoErrors();
             self::assertNotSame($draftId, $component->get('draftId'));
             self::assertSame([], $this->draft($component->get('draftId'))['selections']);
@@ -207,7 +208,9 @@ final class TrainingCrewPlannerIsolationTest extends TestCase
         $id = $component->get('draftId');
         $this->post(route('training.crew-planner.upload'), ['draft_id' => $id, 'version' => $component->get('version'),
             'roster_pdf' => UploadedFile::fake()->createWithContent('first.pdf', $this->pdf())])->assertRedirect()->assertSessionHasNoErrors();
-        $component->call('reloadProposal')->call('saveSlots')->call('addSelected', true)->assertHasNoErrors();
+        $component->call('reloadProposal');
+        $this->enterSessions($component, [['Morning', '08:30', '11:30'], ['Afternoon', '13:00', '16:00']]);
+        $component->call('addSelected', true)->assertHasNoErrors();
         $morning = $this->draft($id)['slots'][0]['id'];
         $ids = array_map('strval', array_keys($this->draft($id)['selections']));
         $component->set('planSelection', $ids)->set('targetSlot', $morning)->call('moveSelected');
@@ -219,7 +222,7 @@ final class TrainingCrewPlannerIsolationTest extends TestCase
         // Pure intervals would cover these old next-day times; the planner's day scope must reject them.
         $resolved = app(TeleStaffDutyResolver::class)->resolveStaff($before['staff'], $before['slots']);
         self::assertContains($morning, $resolved['90001']['eligible_slots']);
-        $component->assertSee('0 results')->call('addSelected', true)->assertHasErrors('slotEdits');
+        $component->assertSee('Apply the session times to the new roster date')->call('addSelected', true)->assertHasErrors('slotEdits');
         $component->set('planSelection', $ids)->call('moveSelected')->assertHasErrors('slotEdits');
         foreach (['pdf', 'xlsx'] as $format) {
             $component->set('confirmReview', true)->call('download', $format)->assertHasErrors('slotEdits')->assertNoFileDownloaded();
@@ -228,7 +231,7 @@ final class TrainingCrewPlannerIsolationTest extends TestCase
         $component->set('slotEdits.0.start', '08:30')->set('slotEdits.0.end', '11:30')->call('saveSlots')->assertHasNoErrors();
         self::assertSame($before['selections'], $this->draft($id)['selections']);
         self::assertSame('2026-10-20', substr($this->draft($id)['slots'][0]['start_at'], 0, 10));
-        $component->call('download', 'pdf')->assertFileDownloaded('MBFD-Training-Proposal-2026-10-20.pdf');
+        $component->call('download', 'pdf')->assertFileDownloaded('MBFD-Training-Personnel-Request-2026-10-20.pdf');
     }
 
     public function test_slot_start_on_roster_date_can_end_the_following_day(): void
@@ -258,6 +261,17 @@ final class TrainingCrewPlannerIsolationTest extends TestCase
         $this->admin->removeRole('training_admin');
         $this->admin->assignRole(Role::findOrCreate('training_viewer', 'web'));
         $this->get('/admin/crew-planner')->assertForbidden();
+    }
+
+    /** Types real session rows; each row saves itself once both times are valid. */
+    private function enterSessions(mixed $component, array $sessions): void
+    {
+        foreach ($sessions as $index => [$label, $start, $end]) {
+            if ($index > 0) {
+                $component->call('addSlot');
+            }
+            $component->set("slotEdits.$index.label", $label)->set("slotEdits.$index.start", $start)->set("slotEdits.$index.end", $end)->assertHasNoErrors();
+        }
     }
 
     private function draft(string $id): array

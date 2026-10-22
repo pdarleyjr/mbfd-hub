@@ -60,9 +60,16 @@ final class PersonnelSource
         $search = trim((string) ($criteria['search'] ?? ''));
         if ($search !== '') {
             $query->where(function (Builder $match) use ($search): void {
-                foreach (['name', 'employee_id', 'city_email', 'rank'] as $field) {
+                foreach (['name', 'employee_id', 'city_email', 'rank', 'station'] as $field) {
                     $match->orWhereLike('employees.'.$field, '%'.$search.'%');
                 }
+                // Published-bid placement (shift, unit, bid station) uses the same single current term as the columns.
+                $match->orWhereIn('employees.id', $this->currentBid()->select('employee_profile_id')
+                    ->where(function (Builder $bid) use ($search): void {
+                        foreach (['shift_label', 'unit_label', 'station_label'] as $field) {
+                            $bid->orWhereLike($field, '%'.$search.'%');
+                        }
+                    }));
             });
         }
         foreach (array_diff(array_keys($criteria), ['active_only', 'search']) as $key) {

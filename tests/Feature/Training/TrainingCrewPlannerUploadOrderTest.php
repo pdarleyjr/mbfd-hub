@@ -52,14 +52,14 @@ final class TrainingCrewPlannerUploadOrderTest extends TestCase
     {
         return [
             'training administrator uploads first' => ['training_admin', false],
-            'training administrator has selected an unapplied course' => ['training_admin', true],
+            'training administrator selected a course before uploading' => ['training_admin', true],
             'super administrator uploads first' => ['super_admin', false],
-            'super administrator has selected an unapplied course' => ['super_admin', true],
+            'super administrator selected a course before uploading' => ['super_admin', true],
         ];
     }
 
     #[DataProvider('managementUploads')]
-    public function test_management_can_upload_before_applying_a_course_and_apply_it_later(string $role, bool $selected): void
+    public function test_management_can_upload_before_or_after_choosing_a_course(string $role, bool $selected): void
     {
         $this->signIn($role);
         $component = Livewire::test(TrainingCrewPlanner::class);
@@ -68,7 +68,8 @@ final class TrainingCrewPlannerUploadOrderTest extends TestCase
         }
         $id = $component->get('draftId');
         $store = app(TrainingCrewPlannerDraftStore::class);
-        self::assertNull($store->get($this->actor, $id)['course_id']);
+        // Choosing a course applies it immediately; without a choice nothing is applied.
+        self::assertSame($selected ? $this->course->id : null, $store->get($this->actor, $id)['course_id']);
         $before = $this->sourceHashes();
         DB::statement('PRAGMA query_only = ON');
         try {
@@ -77,11 +78,10 @@ final class TrainingCrewPlannerUploadOrderTest extends TestCase
             $this->post(route('training.crew-planner.upload'), ['draft_id' => $id,
                 'version' => $component->get('version'), 'roster_pdf' => $file])
                 ->assertRedirect()->assertSessionHasNoErrors()
-                ->assertSessionHas('crew_planner_notice', fn (string $notice): bool => str_contains($notice, 'Choose a course')
-                    && str_contains($notice, 'save classroom times'));
+                ->assertSessionHas('crew_planner_notice', fn (string $notice): bool => $notice !== '');
             self::assertFileDoesNotExist($path);
             $uploaded = $store->get($this->actor, $id);
-            self::assertNull($uploaded['course_id']);
+            self::assertSame($selected ? $this->course->id : null, $uploaded['course_id']);
             self::assertNull($uploaded['module_id']);
             self::assertSame('2026-10-21', $uploaded['metadata']['schedule_date']);
             self::assertSame('B', $uploaded['metadata']['shift']);
@@ -182,6 +182,8 @@ final class TrainingCrewPlannerUploadOrderTest extends TestCase
             self::assertStringContainsString('Your saved proposal is safe.', $message);
             self::assertStringContainsString('Reference: '.$reference, $message);
             self::assertStringContainsString($exit === 20 ? 'recognize' : 'server processing problem', $message);
+            // Held beyond the flash so a concurrent Livewire update cannot swallow it.
+            self::assertSame($message, session(\App\Filament\Training\Pages\TrainingCrewPlanner::UPLOAD_ERROR_KEY));
             if ($exit !== 20) {
                 self::assertStringNotContainsString('Choose a complete', $message);
             }

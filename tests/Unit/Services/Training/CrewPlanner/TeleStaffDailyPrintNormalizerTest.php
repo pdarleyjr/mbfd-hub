@@ -49,10 +49,34 @@ final class TeleStaffDailyPrintNormalizerTest extends TestCase
         self::assertCount(2, $snapshot['parsed_assignments']);
         self::assertSame('SP', $snapshot['parsed_assignments'][0]['raw_code']);
         self::assertSame('Engine 9', $snapshot['parsed_assignments'][1]['reported_apparatus']);
-        self::assertSame('UNKNOWN', $snapshot['parsed_assignments'][1]['code_class']);
+        // A published exchange onto duty (2WXEON) is the staffed seat for the shift.
+        self::assertSame('WORKING', $snapshot['parsed_assignments'][1]['code_class']);
         $staff = (new TeleStaffDutyResolver)->resolve($snapshot, [['id' => 'am', 'start_at' => '2026-10-22T09:00:00-04:00', 'end_at' => '2026-10-22T10:00:00-04:00']]);
         self::assertSame(['am'], $staff['90001']['eligible_slots']);
+        self::assertSame(['am'], $staff['90002']['eligible_slots']);
+        $unknown = (new TeleStaffDailyPdfParser)->parsePositionedPages($this->pages('.2WXON'), '', [0, 1, 2]);
+        self::assertSame('UNKNOWN', $unknown['parsed_assignments'][1]['code_class']);
+        $staff = (new TeleStaffDutyResolver)->resolve($unknown, [['id' => 'am', 'start_at' => '2026-10-22T09:00:00-04:00', 'end_at' => '2026-10-22T10:00:00-04:00']]);
         self::assertSame([], $staff['90002']['eligible_slots']);
+    }
+
+    private function overtime(float $y, string $id, string $from, string $to): array
+    {
+        return [$this->item(51, $y, 'Firefighter'), $this->item(173, $y, 'SYNTHETIC, OVERTIME'),
+            $this->item(311, $y, $id), $this->item(351, $y, '+OT'),
+            $this->item(494.7, $y, $from), $this->item(515.9, $y, $to), $this->item(548, $y, '12')];
+    }
+
+    public function test_seat_covered_by_day_and_night_overtime_reconciles_with_the_headcount(): void
+    {
+        // Oct 22 later print: two seats each covered by 08-20 and 20-08 overtime made the
+        // headcount (51) exceed full-shift rows (49), wrongly blocking every candidate.
+        $pages = $this->pages('2WXEON', 3);
+        $pages[1] = [...$pages[1], ...$this->overtime(-1420, '90003', '08:00', '20:00'), ...$this->overtime(-1440, '90004', '20:00', '08:00')];
+        $snapshot = (new TeleStaffDailyPdfParser)->parsePositionedPages($pages, '', [0, 1, 2]);
+        self::assertFalse($snapshot['definitive_eligibility_blocked']);
+        $pages[1] = [...$pages[1], ...$this->overtime(-1460, '90005', '08:00', '20:00')];
+        self::assertTrue((new TeleStaffDailyPdfParser)->parsePositionedPages($pages, '', [0, 1, 2])['definitive_eligibility_blocked']);
     }
 
     public function test_missing_middle_work_page_is_blocked_even_if_pdf_page_indices_are_rebuilt(): void

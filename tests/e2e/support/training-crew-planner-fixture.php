@@ -76,6 +76,14 @@ $app->useStoragePath($directory.'/storage');
 $app->useBootstrapPath($directory.'/bootstrap');
 // Publish vendor assets only into this disposable directory. Vite output remains read-only.
 $app->usePublicPath($directory.'/public');
+// The export embeds the official logo from the public path; copy only that file into the disposable directory.
+$logoSource = $root.'/public/images/training/mbfd-logo.png';
+if (is_file($logoSource) && ! is_file($directory.'/public/images/training/mbfd-logo.png')) {
+    if (! is_dir($directory.'/public/images/training')) {
+        mkdir($directory.'/public/images/training', 0777, true);
+    }
+    copy($logoSource, $directory.'/public/images/training/mbfd-logo.png');
+}
 if (in_array('--seed', $argv ?? [], true)) {
     if (file_exists($directory.'/planner.sqlite')) {
         throw new RuntimeException('Refusing to reuse a database.');

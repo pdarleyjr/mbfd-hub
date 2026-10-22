@@ -78,6 +78,31 @@ final class MasterPersonnelDirectoryTest extends TestCase
             ->searchTable('00125')->assertCanSeeTableRecords([$first])->assertCanNotSeeTableRecords([$second]);
     }
 
+    public function test_search_matches_station_unit_and_shift_from_the_current_published_bid(): void
+    {
+        $profileStation = $this->employee('Pat Station', '00131', 'Captain', 'Station 7');
+        $bidMember = $this->employee('Bo Bid', '00132', 'Captain', '1');
+        $older = $this->employee('Olly Older', '00133', 'Captain', '1');
+        $other = $this->employee('Cy Other', '00134', 'Captain', '1');
+        foreach ([[$bidMember, 2026, 'Shift Quartz', 'Rescue 99'], [$older, 2025, 'Shift Quartz', 'Rescue 99'], [$other, 2026, 'Shift Basalt', 'Engine 1']] as [$employee, $year, $shift, $unit]) {
+            \App\Models\EmployeeBidAssignment::query()->create([
+                'employee_profile_id' => $employee->id, 'payload_version' => 2, 'bid_year' => $year,
+                'term_label' => (string) $year, 'bid_session_id' => 'fx-'.$year, 'position_id' => 'p', 'rank_label' => 'Captain',
+                'shift_label' => $shift, 'station_label' => 'Station 3', 'division_label' => 'Operations', 'unit_label' => $unit,
+                'position_label' => 'Captain', 'bid_selection_label' => $unit, 'assignment_source' => 'bid_award', 'a_day_label' => 'A-Day 1',
+                'idempotency_key' => $employee->id.'-'.$year, 'payload_hash' => str_repeat('a', 64), 'is_forced' => false,
+            ]);
+        }
+        $this->travelTo(\Illuminate\Support\Carbon::create(2026, 6, 1, 12, 0, 0, 'America/New_York'));
+        $this->actingAsAdminWith(['admin.personnel.view']);
+
+        Livewire::test(MasterPersonnelDirectory::class)
+            ->searchTable('Station 7')->assertCanSeeTableRecords([$profileStation])->assertCanNotSeeTableRecords([$bidMember, $other])
+            ->searchTable('Quartz')->assertCanSeeTableRecords([$bidMember])->assertCanNotSeeTableRecords([$older, $other, $profileStation])
+            ->searchTable('Rescue 99')->assertCanSeeTableRecords([$bidMember])->assertCanNotSeeTableRecords([$older, $other])
+            ->searchTable('Station 3')->assertCanSeeTableRecords([$bidMember, $other])->assertCanNotSeeTableRecords([$older, $profileStation]);
+    }
+
     public function test_member_without_directory_access_cannot_open_it(): void
     {
         $this->actingAs(User::factory()->create(['account_status' => 'active']));
