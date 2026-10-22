@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Inspections;
 
+use App\Filament\Employee\Pages\MyVehicleInspectionView;
+use App\Filament\Resources\ApparatusInspectionExceptionResource\Pages\ListInspectionExceptions;
+use App\Filament\Resources\DefectResource\Pages\ListDefects;
+use App\Filament\Resources\InspectionResource\Pages\ListInspections;
 use App\Filament\Support\InspectionWorkspace;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
@@ -25,12 +29,16 @@ use App\Services\Defects\DefectCorrectiveActionService;
 use App\Services\Fleet\VehicleSwapService;
 use App\Services\Inspections\EmployeeInspectionHistoryService;
 use App\Services\Inspections\InspectionReviewService;
+use App\Services\Inspections\IssueMessageService;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Livewire\Livewire;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Spatie\Permission\Models\Role;
 use Tests\Feature\Inspections\Concerns\BuildsDailyScenarioWorld;
 use Tests\TestCase;
@@ -652,6 +660,251 @@ final class DailyInspectionAcceptanceScenariosTest extends TestCase
         $this->get('/admin/inspections/'.$inspection->id)->assertOk();
     }
 
+    /**
+     * @param  array<string, mixed>  $shape
+     */
+    #[DataProvider('inspectionStates')]
+    public function test_every_inspection_state_renders_for_the_member_the_reviewer_and_the_pdf(string $review, ?string $processing, array $shape): void
+    {
+        $inspection = ApparatusInspection::query()->create([
+            'apparatus_id' => $this->unit->id,
+            'processed_apparatus_id' => ($shape['other_truck'] ?? false) ? $this->frontline->id : (($shape['unprocessed'] ?? false) ? null : $this->unit->id),
+            'actor_user_id' => $this->alpha->id, 'employee_id' => $this->alpha->employee_profile_id,
+            'operator_name' => 'Alpha Member', 'rank' => 'Firefighter', 'shift' => 'A',
+            'unit_number' => 'V-202', 'vehicle_number' => 'V-202', 'designation_at_time' => 'E2',
+            'inspection_reference' => 'INS-STATE-1', 'review_status' => $review, 'processing_status' => $processing,
+            'results' => $shape['results'] ?? [['id' => 'cab', 'name' => 'Cab', 'items' => [
+                ['id' => 'cab-radio', 'name' => 'Radio battery', 'status' => 'Missing', 'notes' => 'gone', 'observed' => true],
+                ['id' => 'cab-mirror', 'name' => 'Mirror', 'status' => 'Damaged', 'notes' => 'cracked', 'observed' => true],
+                ['id' => 'cab-horn', 'name' => 'Horn', 'status' => 'Present', 'observed' => true],
+            ]]],
+            'pending_effects' => $shape['pending_effects'] ?? null,
+            'review_flag_explanation' => $shape['flag'] ?? null,
+            'review_flag_items' => isset($shape['flag']) ? [['compartment_id' => 'cab', 'item_id' => 'cab-horn', 'compartment' => 'Cab', 'item' => 'Horn']] : null,
+            'completed_at' => now(),
+        ]);
+        foreach ($shape['holds'] ?? [] as [$field, $reason, $status]) {
+            ApparatusInspectionException::query()->create([
+                'apparatus_inspection_id' => $inspection->id, 'apparatus_id' => $this->unit->id, 'field' => $field, 'reason' => $reason,
+                'status' => $status, 'blocks_acceptance' => $reason !== 'follow_up', 'submitted_value' => 900, 'authoritative_value' => 1000,
+            ]);
+        }
+        if ($shape['with_defect'] ?? true) {
+            $defect = ApparatusDefect::query()->create([
+                'apparatus_id' => $this->unit->id, 'apparatus_inspection_id' => $inspection->id, 'compartment' => 'Cab', 'item' => 'Radio battery',
+                'status' => 'open', 'issue_type' => 'missing', 'reported_date' => now()->toDateString(), 'compartment_key' => 'cab', 'item_key' => 'cab-radio',
+                'first_reported_inspection_id' => $inspection->id, 'first_reported_by_user_id' => $this->alpha->id, 'first_reported_at' => now(),
+            ]);
+            ApparatusDefectObservation::query()->create([
+                'apparatus_defect_id' => $defect->id, 'apparatus_inspection_id' => $inspection->id, 'actor_user_id' => $this->alpha->id,
+                'observation' => 'first_reported', 'reported_status' => 'Missing', 'notes' => 'gone',
+            ]);
+            ApparatusDefectParticipant::query()->create([
+                'apparatus_defect_id' => $defect->id, 'user_id' => $this->alpha->id, 'employee_id' => $this->alpha->employee_profile_id,
+                'enrollment_source' => 'reported', 'first_inspection_id' => $inspection->id, 'last_inspection_id' => $inspection->id,
+                'first_participated_at' => now(), 'last_participated_at' => now(),
+            ]);
+        }
+
+        $this->actAs($this->alpha);
+        $this->get('/employee/my-vehicle-inspections/'.$inspection->id)->assertOk();
+        $this->get(route('employee.vehicle-inspections.pdf', $inspection))->assertOk();
+        $this->actAs($this->reviewer);
+        $this->get('/admin/inspections/'.$inspection->id)->assertOk();
+    }
+
+    /** @return array<string, array{0: string, 1: ?string, 2: array<string, mixed>}> */
+    public static function inspectionStates(): array
+    {
+        return [
+            'accepted' => ['approved', 'accepted', []],
+            'accepted with a non blocking follow up' => ['approved', 'accepted_with_exception', ['holds' => [['miles', 'follow_up', 'open']]]],
+            'held for a meter rollback' => ['pending_review', 'held_for_review', ['holds' => [['miles', 'rollback', 'open']]]],
+            'held with clarification requested' => ['pending_review', 'held_for_review', ['holds' => [['miles', 'rollback', 'revision_requested']]]],
+            'held with the revision submitted' => ['pending_review', 'held_for_review', ['holds' => [['engine_hours', 'rollback', 'revision_submitted']]]],
+            'held for a member flag' => ['pending_review', 'held_for_review', ['flag' => 'Please look.', 'holds' => [['member_review_flag', 'member_flagged', 'open']]]],
+            'held for significant damage' => ['pending_review', 'held_for_review', ['holds' => [['significant_damage', 'new_significant_damage', 'open']]]],
+            'held with every hold at once' => ['pending_review', 'held_for_review', ['flag' => 'Look.', 'holds' => [
+                ['miles', 'rollback', 'open'], ['engine_hours', 'rollback', 'open'], ['member_review_flag', 'member_flagged', 'open'], ['significant_damage', 'new_significant_damage', 'open'],
+            ]]],
+            'held with a decided hold' => ['pending_review', 'held_for_review', ['holds' => [['miles', 'rollback', 'dismissed'], ['member_review_flag', 'member_flagged', 'open']]]],
+            'rejected' => ['rejected', 'rejected', ['holds' => [['miles', 'rollback', 'dismissed']]]],
+            'legacy pending with pending effects' => ['pending_review', null, ['unprocessed' => true, 'pending_effects' => [
+                'has_critical_defects' => true, 'defects' => [['compartment' => 'Cab', 'item' => 'Radio battery', 'status' => 'Missing', 'notes' => 'gone']],
+            ]]],
+            'legacy pending with no pending effects' => ['pending_review', null, ['unprocessed' => true, 'with_defect' => false]],
+            'legacy approved' => ['approved', null, ['unprocessed' => true, 'with_defect' => false]],
+            'held for a vehicle swap' => ['pending_review', 'pending_vehicle_swap', ['unprocessed' => true]],
+            'processed against a different truck' => ['approved', 'accepted', ['other_truck' => true]],
+            'no stored results' => ['approved', 'accepted', ['results' => [], 'with_defect' => false]],
+            'partly malformed stored results' => ['approved', 'accepted', ['results' => ['not an array', ['items' => [['name' => 'No status'], 'nor this']]], 'with_defect' => false]],
+        ];
+    }
+
+    public function test_admin_list_pages_render_with_held_inspections_and_the_legacy_page_redirects_to_the_canonical_one(): void
+    {
+        $this->actAs($this->alpha);
+        $payload = $this->payload(null, 900, 401.2);
+        $this->markItem($payload, 0, 0, 'Missing', ['notes' => 'Battery gone.']);
+        $payload['review_flag'] = ['explanation' => 'Check the charger.', 'items' => [$this->itemRef($payload)]];
+        $inspection = ApparatusInspection::query()->findOrFail(
+            $this->submit($payload)->assertCreated()->assertJsonPath('processing_status', 'held_for_review')->json('id'),
+        );
+        $defect = ApparatusDefect::query()->sole();
+        $hold = ApparatusInspectionException::query()->where('apparatus_inspection_id', $inspection->id)->where('field', 'miles')->sole();
+
+        $this->actAs($this->reviewer);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        foreach (['inspections', 'defects', 'apparatus-inspection-exceptions'] as $slug) {
+            $this->get(route("filament.admin.resources.{$slug}.index"))->assertOk();
+        }
+        Livewire::test(ListInspections::class)->loadTable()->assertSuccessful()->assertCanSeeTableRecords([$inspection]);
+        Livewire::test(ListDefects::class)->loadTable()->assertSuccessful()->assertCanSeeTableRecords([$defect])
+            ->assertTableActionVisible('source_inspection', $defect);
+        Livewire::test(ListInspectionExceptions::class)->loadTable()->assertSuccessful()->assertCanSeeTableRecords([$hold]);
+
+        $canonical = route('filament.admin.resources.inspections.view', ['record' => $inspection->id]);
+        $this->get(route('filament.admin.resources.apparatuses.view-inspection', ['record' => $this->unit->id, 'inspection' => $inspection->id]))
+            ->assertRedirect($canonical);
+        $this->get(route('filament.admin.resources.apparatuses.view', ['record' => $this->unit->id]))->assertOk();
+    }
+
+    public function test_notification_links_land_on_pages_that_contain_the_anchor_they_name(): void
+    {
+        $this->actAs($this->alpha);
+        $payload = $this->payload();
+        $this->markItem($payload, 0, 1, 'Damaged', ['significant' => true, 'notes' => 'Cracked.']);
+        $inspection = ApparatusInspection::query()->findOrFail($this->submit($payload)->assertCreated()->json('id'));
+        $defect = ApparatusDefect::query()->sole();
+
+        $review = Notification::sent($this->reviewer, InspectionEventNotification::class)->firstWhere('kind', 'inspection_review_required');
+        $escalated = Notification::sent($this->reviewer, InspectionEventNotification::class)->firstWhere('kind', 'issue_escalated');
+        $this->assertSame('/admin/inspections/'.$inspection->id.'#approval', $review->url);
+        $this->assertSame('/admin/inspections/'.$inspection->id.'#issue-'.$defect->id, $escalated->url);
+
+        $this->actAs($this->reviewer);
+        $admin = $this->get(strtok($review->url, '#'))->assertOk()->getContent();
+        $this->assertStringContainsString('id="approval"', $admin);
+        $this->assertStringContainsString('id="issue-'.$defect->id.'"', $admin);
+
+        app(InspectionReviewService::class)->approve($inspection->id, $this->reviewer);
+        app(DefectCorrectiveActionService::class)->acknowledge($defect->id, $this->reviewer, ['member_message' => 'We have it.']);
+        foreach (['inspection_decided', 'issue_member_update'] as $kind) {
+            $notification = Notification::sent($this->alpha, InspectionEventNotification::class)->firstWhere('kind', $kind);
+            $this->assertNotNull($notification, "{$kind} must reach the owner.");
+            $this->assertStringStartsWith('/employee/my-vehicle-inspections/'.$inspection->id, $notification->url);
+        }
+        $this->actAs($this->alpha);
+        $member = $this->get('/employee/my-vehicle-inspections/'.$inspection->id)->assertOk()->getContent();
+        $this->assertStringContainsString('id="issue-'.$defect->id.'"', $member);
+    }
+
+    public function test_rejecting_a_held_inspection_dismisses_every_hold_keeps_the_defects_and_never_applies_the_held_meter(): void
+    {
+        $this->actAs($this->alpha);
+        $payload = $this->payload(null, 900, 401.2);
+        $this->markItem($payload, 0, 0, 'Missing', ['notes' => 'Battery gone.']);
+        $payload['review_flag'] = ['explanation' => 'Check the charger.', 'items' => [$this->itemRef($payload)]];
+        $inspection = ApparatusInspection::query()->findOrFail(
+            $this->submit($payload)->assertCreated()->assertJsonPath('processing_status', 'held_for_review')->json('id'),
+        );
+        $this->assertSame(2, ApparatusInspectionException::query()->where('apparatus_inspection_id', $inspection->id)->count());
+
+        $rejected = app(InspectionReviewService::class)->reject($inspection->id, $this->reviewer, 'Wrong vehicle was inspected.');
+
+        $this->assertSame('rejected', $rejected->review_status);
+        $this->assertSame('rejected', $rejected->processing_status);
+        $this->assertSame(['dismissed'], ApparatusInspectionException::query()->where('apparatus_inspection_id', $inspection->id)->pluck('status')->unique()->values()->all());
+        $this->assertSame(1000, $this->unit->fresh()->current_miles, 'The held rollback reading is never applied.');
+        $this->assertSame(1, ApparatusDefect::query()->where('apparatus_id', $this->unit->id)->unresolved()->count(), 'Recorded findings are facts and stay.');
+        $event = ApparatusInspectionReviewEvent::query()->where('apparatus_inspection_id', $inspection->id)->where('status', 'rejected')->sole();
+        $this->assertSame($this->reviewer->id, $event->changed_by_user_id);
+        $this->assertSame('Wrong vehicle was inspected.', $event->internal_note);
+        $this->assertSame(1, $this->sentCount($this->alpha, 'inspection_decided'));
+        $this->assertSame('Rejected', $rejected->displayStatus());
+    }
+
+    public function test_resolution_skips_a_participant_whose_account_is_no_longer_active(): void
+    {
+        ['defect' => $defect] = $this->reportedByAlphaConfirmedByBeta();
+        $this->beta->forceFill(['account_status' => \App\Enums\AccountStatus::Disabled])->save();
+
+        app(DefectCorrectiveActionService::class)->resolve($defect->id, $this->reviewer, [
+            'resolution_type' => 'repair_completed', 'resolution_notes' => 'Done.',
+        ]);
+
+        $this->assertSame(1, $this->sentCount($this->alpha, 'issue_resolved'));
+        $this->assertSame(0, $this->sentCount($this->beta, 'issue_resolved'));
+        $this->assertSame([$this->alpha->id], DB::table('inspection_notification_deliveries')->where('event_key', 'like', 'defect:'.$defect->id.':resolved:%')->pluck('recipient_user_id')->map(fn ($id) => (int) $id)->all());
+    }
+
+    public function test_dashboard_queues_count_each_inspection_and_issue_once_and_move_an_acknowledged_issue_to_corrective_actions(): void
+    {
+        ['defect' => $defect] = $this->reportedByAlphaConfirmedByBeta();
+        $gamma = $this->newMember('Gamma Member');
+        $this->actAs($gamma);
+        $this->submit($this->payload(null, 900, 410.0))->assertCreated()->assertJsonPath('processing_status', 'held_for_review');
+
+        $queues = $this->dashboardQueues();
+        $this->assertSame(1, $queues['approvals']['count'], 'One held inspection.');
+        $this->assertStringEndsWith('#approval', $queues['approvals']['rows'][0]['url']);
+        $this->assertSame(1, $queues['issues']['count'], 'One defect seen by two inspections is one issue.');
+        $this->assertStringEndsWith('#issue-'.$defect->id, $queues['issues']['rows'][0]['url']);
+        $this->assertSame(0, $queues['actions']['count']);
+        $this->assertSame(2, $queues['recent']['count'], 'Only the two accepted checkouts are completed.');
+
+        app(DefectCorrectiveActionService::class)->acknowledge($defect->id, $this->reviewer);
+        $queues = $this->dashboardQueues();
+        $this->assertSame(0, $queues['issues']['count']);
+        $this->assertSame(1, $queues['actions']['count']);
+
+        app(DefectCorrectiveActionService::class)->resolve($defect->id, $this->reviewer, ['resolution_type' => 'other', 'resolution_notes' => 'Done.']);
+        $queues = $this->dashboardQueues();
+        $this->assertSame(0, $queues['issues']['count'] + $queues['actions']['count']);
+        $this->assertSame(1, $queues['approvals']['count'], 'The held inspection still waits for its meter decision.');
+    }
+
+    public function test_the_significant_marker_only_counts_on_a_damaged_item(): void
+    {
+        $this->actAs($this->alpha);
+        $payload = $this->payload();
+        $this->markItem($payload, 0, 0, 'Missing', ['significant' => true, 'notes' => 'Gone.']);
+
+        $this->submit($payload)->assertCreated()->assertJsonPath('processing_status', 'accepted');
+
+        $this->assertSame('routine', ApparatusDefect::query()->sole()->severity);
+        $this->assertSame(0, ApparatusInspectionException::query()->count());
+    }
+
+    public function test_a_member_reply_reaches_the_reviewers_and_a_reviewer_reply_reaches_the_member(): void
+    {
+        $this->actAs($this->alpha);
+        $payload = $this->payload();
+        $this->markItem($payload, 0, 0, 'Missing', ['notes' => 'Battery gone.']);
+        $inspection = ApparatusInspection::query()->findOrFail($this->submit($payload)->assertCreated()->json('id'));
+        $defect = ApparatusDefect::query()->sole();
+
+        $this->bindCanonicalSessionToLivewireTestRequests();
+        Filament::setCurrentPanel(Filament::getPanel('employee'));
+        Livewire::test(MyVehicleInspectionView::class, ['inspection' => $inspection->id])
+            ->set('issueReplies.'.$defect->id, 'Still missing as of this morning.')
+            ->call('sendIssueReply', $defect->id)
+            ->assertHasNoErrors();
+
+        $reply = ApparatusIssueMessage::query()->sole();
+        $this->assertSame('member', $reply->visibility);
+        $this->assertSame($this->alpha->id, $reply->author_user_id);
+        $this->assertSame($defect->id, $reply->apparatus_defect_id);
+        $notification = Notification::sent($this->reviewer, InspectionEventNotification::class)->firstWhere('kind', 'member_reply');
+        $this->assertNotNull($notification, 'Reviewers must hear about a member reply.');
+        $this->assertSame('/admin/inspections/'.$inspection->id.'#issue-'.$defect->id, $notification->url);
+        $this->assertSame(0, $this->sentCount($this->alpha, 'member_reply'));
+
+        app(IssueMessageService::class)->post($this->reviewer, ['defect_id' => $defect->id, 'visibility' => 'member', 'body' => 'Thanks, we are on it.']);
+        $this->assertSame(1, $this->sentCount($this->alpha, 'issue_member_update'));
+        $this->assertSame(0, $this->sentCount($this->reviewer, 'issue_member_update'));
+    }
+
     // ------------------------------------------- issue lifecycle edge scenarios
 
     public function test_a_present_answer_from_a_stale_draft_after_the_issue_was_resolved_creates_no_observation_and_a_missing_answer_is_a_recurrence(): void
@@ -853,6 +1106,15 @@ final class DailyInspectionAcceptanceScenariosTest extends TestCase
             'inspection' => $inspection,
             'hold' => ApparatusInspectionException::query()->where('apparatus_inspection_id', $inspection->id)->where('field', 'miles')->sole(),
         ];
+    }
+
+    /** @return array<string, array<string, mixed>> */
+    private function dashboardQueues(): array
+    {
+        $this->actAs($this->reviewer);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        return Livewire::test(\App\Filament\Widgets\StationOperationsHubWidget::class)->instance()->getViewData()['department']['inspectionQueues'];
     }
 
     private function workspaceStatus(ApparatusInspection $inspection): string
