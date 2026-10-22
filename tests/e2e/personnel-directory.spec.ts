@@ -239,10 +239,17 @@ test('native Columns saves status choices and inline status persists after reloa
     await login(page);
     await openTable(page, `Synthetic inline date and text tracking ${info.project.name}`);
     const columns = await action(page, 'Columns');
+    const columnNames = columns.getByRole('textbox', { name: /^Column name/ });
+    const existingColumnCount = await columnNames.count();
     await columns.getByRole('button', { name: 'Add tracking column', exact: true }).click();
-    await columns.getByRole('textbox', { name: /^Column name/ }).last().fill('Workflow status');
-    await columns.getByRole('combobox', { name: /^Type/ }).last().selectOption('status');
-    const choices = columns.getByRole('textbox', { name: /^Choices/ });
+    await expect(columnNames).toHaveCount(existingColumnCount + 1);
+    const columnName = columnNames.last();
+    const columnType = columns.getByRole('combobox', { name: /^Type/ }).last();
+    await ready(columnName);
+    await ready(columnType);
+    await columnName.fill('Workflow status');
+    await columnType.selectOption('status');
+    const choices = columns.getByRole('combobox', { name: /^Choices/ });
     await choices.scrollIntoViewIfNeeded();
     await ready(choices);
     for (const choice of ['Pending', 'Complete']) {
@@ -253,7 +260,7 @@ test('native Columns saves status choices and inline status persists after reloa
     await columns.getByRole('button', { name: 'Submit', exact: true }).click();
     await expect(page.getByText('Columns saved', { exact: true })).toBeVisible();
     const persisted = await action(page, 'Columns');
-    const persistedChoices = persisted.getByRole('textbox', { name: /^Choices/ });
+    const persistedChoices = persisted.getByRole('combobox', { name: /^Choices/ });
     await persistedChoices.scrollIntoViewIfNeeded();
     await ready(persistedChoices);
     for (const choice of ['Pending', 'Complete']) {
