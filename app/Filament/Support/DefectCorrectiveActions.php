@@ -168,7 +168,7 @@ final class DefectCorrectiveActions
                         array_map(fn (string $status): string => DefectActionStatus::label($status), DefectCorrectiveActionService::ACTION_STATUSES),
                     ))
                     ->required()
-                    ->native(false)
+                    ->native()
                     ->live()
                     ->afterStateUpdated(function (?string $state, Get $get, Set $set) use ($replacement): void {
                         if ($state === DefectActionStatus::REPLACEMENT_AVAILABLE && blank($get('member_message'))) {
@@ -214,14 +214,14 @@ final class DefectCorrectiveActions
             ->modalHeading('Resolve this issue')
             ->modalDescription('Resolving closes the issue and tells everyone who reported or confirmed it. It does not change the unit\'s operational status.')
             ->modalSubmitActionLabel('Resolve issue')
-            ->mountUsing(fn (Forms\ComponentContainer $form) => $form->fill(['idempotency_key' => self::newKey()]))
+            ->mountUsing(fn (Forms\ComponentContainer $form) => $form->fill(['idempotency_key' => self::newKey(), 'resolution_type' => 'other']))
             ->form([
                 Forms\Components\Hidden::make('idempotency_key'),
                 Forms\Components\Select::make('resolution_type')
                     ->label('How was it resolved?')
                     ->options(self::RESOLUTION_LABELS)
-                    ->required()
-                    ->native(false),
+                    ->selectablePlaceholder(false)
+                    ->native(),
                 Forms\Components\Textarea::make('resolution_notes')
                     ->label('Resolution notes')
                     ->helperText('Required. This stays in the issue history.')
@@ -230,7 +230,7 @@ final class DefectCorrectiveActions
                     ->maxLength(5000),
                 ...array_slice(self::messageFields(), 1),
             ])
-            ->action(fn (array $data, Action $action) => self::run($action, $defectOf, $data, 'Issue resolved',
+            ->action(fn (array $data, Action $action) => self::run($action, $defectOf, [...$data, 'resolution_type' => $data['resolution_type'] ?? 'other'], 'Issue resolved',
                 fn (int $id, User $user, array $payload, ?string $key) => app(DefectCorrectiveActionService::class)->resolve($id, $user, $payload, $key)));
     }
 
@@ -296,7 +296,7 @@ final class DefectCorrectiveActions
             ->mountUsing(fn (Forms\ComponentContainer $form) => $form->fill(['idempotency_key' => self::newKey(), 'resolution_type' => 'item_located']))
             ->form([
                 Forms\Components\Hidden::make('idempotency_key'),
-                Forms\Components\Select::make('resolution_type')->label('How was it corrected?')->options(self::RESOLUTION_LABELS)->native(false),
+                Forms\Components\Select::make('resolution_type')->label('How was it corrected?')->options(self::RESOLUTION_LABELS)->native(),
                 Forms\Components\Textarea::make('notes')->label('Notes')->rows(2)->maxLength(5000),
                 ...array_slice(self::messageFields(), 1),
             ])
@@ -327,7 +327,7 @@ final class DefectCorrectiveActions
             })
             ->form([
                 Forms\Components\Hidden::make('idempotency_key'),
-                Forms\Components\Select::make('operational_impact')->label('Operational impact')->options(self::IMPACT_LABELS)->required()->native(false)->live(),
+                Forms\Components\Select::make('operational_impact')->label('Operational impact')->options(self::IMPACT_LABELS)->required()->native()->live(),
                 Forms\Components\Placeholder::make('oos_warning')
                     ->label('Operational hold')
                     ->content('This places the physical apparatus Out of Service. Returning it to service follows the existing fleet workflow.')
@@ -361,8 +361,8 @@ final class DefectCorrectiveActions
                 Forms\Components\Hidden::make('idempotency_key'),
                 Forms\Components\TextInput::make('title')->label('Ticket title')->required()->maxLength(255),
                 Forms\Components\Grid::make(['default' => 1, 'sm' => 2])->schema([
-                    Forms\Components\Select::make('category')->options(ApparatusServiceTicketCategory::options())->required()->native(false),
-                    Forms\Components\Select::make('priority')->options(ApparatusServiceTicketPriority::options())->required()->native(false),
+                    Forms\Components\Select::make('category')->options(ApparatusServiceTicketCategory::options())->required()->native(),
+                    Forms\Components\Select::make('priority')->options(ApparatusServiceTicketPriority::options())->required()->native(),
                 ]),
                 Forms\Components\Textarea::make('description')->required()->rows(5)->maxLength(10000),
                 ...array_slice(self::messageFields(), 1),

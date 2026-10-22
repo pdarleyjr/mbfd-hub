@@ -46,7 +46,9 @@
 }
 .hub-insp-fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; font-size: .875rem; }
 .hub-insp-fields dt { color: rgb(var(--hub-ink-secondary)); font-size: .8125rem; }
-.hub-insp-fields dd { margin: .125rem 0 0; color: rgb(var(--hub-ink)); font-weight: 600; white-space: pre-wrap; }
+.hub-insp-fields dd { margin: .125rem 0 0; color: rgb(var(--hub-ink)); font-weight: 600; }
+/* Only text a person typed keeps its line breaks; structural values collapse template whitespace. */
+.hub-insp-fields dd.is-prose { white-space: pre-wrap; }
 @container (min-width: 36rem) {
     .hub-insp-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -208,8 +210,8 @@
 .hub-insp-issue__title { margin: 0; color: rgb(var(--hub-ink)); font-size: 1rem; font-weight: 650; line-height: 1.5; }
 .hub-insp-observation { padding: .75rem 1rem; border: 1px solid rgb(var(--hub-border-soft)); border-radius: var(--hub-radius-control); background: rgb(var(--hub-surface-muted)); }
 .hub-insp-observation__label { margin: 0; color: rgb(var(--hub-ink-secondary)); font-size: .8125rem; font-weight: 650; }
-.hub-insp-trail__list { margin: .375rem 0 0; padding-left: 1.25rem; color: rgb(var(--hub-ink)); font-size: .875rem; }
-.hub-insp-trail__list li { margin-bottom: .125rem; }
+.hub-insp-trail__list { display: grid; gap: .375rem; margin: .375rem 0 0; padding: 0; list-style: none; color: rgb(var(--hub-ink)); font-size: .875rem; }
+.hub-insp-trail__list li { display: flex; flex-wrap: wrap; align-items: center; gap: .125rem .5rem; }
 
 /* Issue actions, conversation and composer. Internal notes differ by label, dashed border and tint, never colour alone. */
 .hub-insp-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
@@ -278,6 +280,7 @@
 .hub-insp-message header { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .125rem .75rem; color: rgb(var(--hub-ink-secondary)); font-size: .8125rem; }
 .hub-insp-message header strong { color: rgb(var(--hub-ink)); font-weight: 650; }
 .hub-insp-message p { margin: .25rem 0 0; font-size: .875rem; white-space: pre-wrap; }
+.hub-insp-message p.hub-insp-message__meta { margin: 0; white-space: normal; }
 .hub-insp-reply { display: grid; gap: .5rem; margin-top: .75rem; }
 .hub-insp-reply label { color: rgb(var(--hub-ink)); font-size: .8125rem; font-weight: 650; }
 .hub-insp-reply textarea { display: block; width: 100%; min-height: 5.5rem; padding: .625rem .75rem; border: 1px solid rgb(var(--hub-control-border)); border-radius: var(--hub-radius-control); background: rgb(var(--hub-well)); color: rgb(var(--hub-ink)); font-size: 1rem; line-height: 1.5; }
@@ -289,4 +292,9 @@
 
 /* Header actions (Download PDF, Open printable PDF) are 44px targets. */
 [data-hub-portal="employee"] .fi-header .fi-btn { min-height: 2.75rem; }
+.hub-insp-table-wrap:focus-visible { outline: 2px solid rgb(var(--hub-focus)); outline-offset: 2px; }
+
+/* Page-scoped 44px targets for the admin inspection page header actions and the dashboard board controls. */
+[data-inspection-workspace] .fi-header .fi-btn,
+.mbfd-command-actions :is(button, a) { min-height: 2.75rem; }
 .hub-insp-table-wrap:focus-visible { outline: 2px solid rgb(var(--hub-focus)); outline-offset: 2px; }

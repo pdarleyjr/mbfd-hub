@@ -172,7 +172,7 @@
                         </p>
                         <dl class="hub-insp-fields">
                             <div><dt>Was a truck swap completed?</dt><dd>{{ $swap['answer'] }}</dd></div>
-                            <div><dt>Note from the member</dt><dd>{{ $swap['note'] ?: 'No note' }}</dd></div>
+                            <div><dt>Note from the member</dt><dd class="is-prose">{{ $swap['note'] ?: 'No note' }}</dd></div>
                         </dl>
                     </div>
                 @endif
@@ -206,7 +206,7 @@
                             </div>
                             <div><dt>Reporting member</dt><dd>{{ $hold['member'] ?: 'Not recorded' }}</dd></div>
                             <div><dt>Vehicle</dt><dd>{{ $hold['vehicle'] ?: 'Not recorded' }}</dd></div>
-                            <div><dt>Member explanation</dt><dd>{{ $hold['explanation'] ?? 'No explanation recorded.' }}</dd></div>
+                            <div><dt>Member explanation</dt><dd class="is-prose">{{ $hold['explanation'] ?? 'No explanation recorded.' }}</dd></div>
                         </dl>
                         @foreach($hold['decisions'] as $decision)
                             <p class="hub-insp-item__text">
@@ -243,7 +243,7 @@
                             <span class="hub-insp-badge hub-insp-badge--{{ $flag['blocking'] ? 'warning' : 'neutral' }}">{{ $flag['status_label'] }}</span>
                         </div>
                         <dl class="hub-insp-fields">
-                            <div><dt>Explanation</dt><dd>{{ $flag['explanation'] }}</dd></div>
+                            <div><dt>Explanation</dt><dd class="is-prose">{{ $flag['explanation'] }}</dd></div>
                             <div>
                                 <dt>Items the member pointed to</dt>
                                 <dd>
@@ -465,7 +465,7 @@
                 @forelse($checklist['compartments'] as $compartment)
                     <div class="hub-insp-card">
                         <h3 class="hub-insp-card__title">{{ $compartment['name'] }}</h3>
-                        <div class="hub-insp-table-wrap">
+                        <div class="hub-insp-table-wrap" tabindex="0" role="region" aria-label="{{ $compartment['name'] }} checklist">
                             <table class="hub-insp-table">
                                 <thead>
                                     <tr>

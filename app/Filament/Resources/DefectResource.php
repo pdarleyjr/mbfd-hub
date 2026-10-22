@@ -80,21 +80,28 @@ class DefectResource extends Resource
                     ->imageEditor()
                     ->columnSpanFull(),
 
+                // The lifecycle is changed only by the corrective-action workflow (the inspection page
+                // or the Mark Resolved action), never by editing these fields, so they are display-only.
                 Forms\Components\Select::make('status')
-                    ->required()
-                    ->default('open')
+                    ->helperText('Change it with the issue actions on the inspection page, or Mark Resolved in the list.')
                     ->options([
                         'open' => 'Open',
                         'in_progress' => 'In Progress',
                         'resolved' => 'Resolved',
-                    ]),
+                    ])
+                    ->disabled()
+                    ->dehydrated(false),
 
                 Forms\Components\Textarea::make('resolution_notes')
                     ->columnSpanFull()
                     ->rows(3)
+                    ->disabled()
+                    ->dehydrated(false)
                     ->visible(fn (Forms\Get $get) => $get('status') === 'resolved'),
 
                 Forms\Components\DateTimePicker::make('resolved_at')
+                    ->disabled()
+                    ->dehydrated(false)
                     ->visible(fn (Forms\Get $get) => $get('status') === 'resolved'),
             ]);
     }

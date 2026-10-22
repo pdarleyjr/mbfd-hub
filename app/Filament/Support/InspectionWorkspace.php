@@ -351,6 +351,7 @@ final class InspectionWorkspace
         $userIds = $defects->pluck('first_reported_by_user_id')->filter()->unique()->values()->all();
         $users = $userIds === [] ? collect() : User::query()->whereIn('id', $userIds)->pluck('name', 'id');
 
+        $threads = $canReview ? $this->issueThreads($defects->modelKeys()) : null;
         $cards = [];
         foreach ($defects as $defect) {
             $observation = $observations->get($defect->getKey());
@@ -415,7 +416,7 @@ final class InspectionWorkspace
                 'actions' => $canManage
                     ? DefectCorrectiveActions::applicable($defect, $trailRows->get($defect->getKey(), collect())->last()?->observation === 'appears_corrected')
                     : [],
-                'thread' => $canReview && $viewer instanceof User ? $this->issueThread($viewer, $defect) : null,
+                'thread' => $threads === null ? null : $this->messageRows($threads->get($defect->getKey(), collect())),
             ];
         }
 
@@ -423,18 +424,18 @@ final class InspectionWorkspace
     }
 
     /**
-     * The issue's conversation, oldest first. Internal notes are included only because the
-     * caller already proved the viewer is a reviewer, and they are always labelled.
+     * Every issue's conversation in one query, oldest first. Only called for reviewers, who may read
+     * internal notes too; the caller has already decided that once for the whole page.
      *
-     * @return list<array<string, mixed>>
+     * @param  list<int>  $defectIds
+     * @return Collection<(int|string), \Illuminate\Database\Eloquent\Collection<int, ApparatusIssueMessage>>
      */
-    private function issueThread(User $viewer, ApparatusDefect $defect): array
+    private function issueThreads(array $defectIds): Collection
     {
-        try {
-            return $this->messageRows($this->messages->threadFor($viewer, $defect));
-        } catch (AuthorizationException) {
-            return [];
-        }
+        return ApparatusIssueMessage::query()->with('author:id,name,display_name')
+            ->whereIn('apparatus_defect_id', $defectIds)
+            ->orderBy('created_at')->orderBy('id')->get()
+            ->groupBy('apparatus_defect_id');
     }
 
     /** @return list<array<string, mixed>> */
@@ -456,7 +457,7 @@ final class InspectionWorkspace
         return $messages->map(fn (ApparatusIssueMessage $message): array => [
             'id' => (int) $message->getKey(),
             'at' => $this->eastern($message->created_at)?->format('M j, Y g:i A'),
-            'author' => (string) ($message->author?->display_name ?: $message->author?->name ?: 'Staff member'),
+            'author' => $this->authorLabel($message),
             'body' => (string) $message->body,
             'internal' => $message->visibility === ApparatusIssueMessage::VISIBILITY_INTERNAL,
             'correction' => $message->corrects_message_id !== null,
@@ -558,7 +559,7 @@ final class InspectionWorkspace
             }
         }
 
-        $messages = ApparatusIssueMessage::query()->with('author:id,name')
+        $messages = ApparatusIssueMessage::query()->with('author:id,name,display_name')
             ->where(function ($query) use ($inspection, $defectIds): void {
                 $query->where('apparatus_inspection_id', $inspection->getKey());
                 if ($defectIds !== []) {
@@ -570,7 +571,7 @@ final class InspectionWorkspace
         foreach ($messages as $message) {
             $internal = $message->visibility === ApparatusIssueMessage::VISIBILITY_INTERNAL;
             $push($message->created_at, 'message', $internal ? 'Internal note' : 'Message visible to the member', [
-                'actor' => $message->author?->name, 'body' => $message->body, 'internal' => $internal,
+                'actor' => $this->authorLabel($message), 'body' => $message->body, 'internal' => $internal,
                 'anchor' => $message->apparatus_defect_id ? 'issue-'.$message->apparatus_defect_id : null,
             ]);
         }
@@ -578,6 +579,16 @@ final class InspectionWorkspace
         usort($items, static fn (array $a, array $b): int => $a['sort'] <=> $b['sort']);
 
         return $items;
+    }
+
+    /** Logistics replies are labelled as Logistics (with the staff name for accountability); members by their own name. */
+    private function authorLabel(ApparatusIssueMessage $message): string
+    {
+        $name = trim((string) (data_get($message, 'author.display_name') ?: data_get($message, 'author.name')));
+
+        return $message->isFromLogistics()
+            ? ($name !== '' ? 'Logistics · '.$name : 'Logistics')
+            : ($name !== '' ? $name : 'Member');
     }
 
     /** @return list<array<string, mixed>> */

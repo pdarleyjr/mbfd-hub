@@ -149,13 +149,19 @@ class ViewInspection extends ViewRecord
                 ->icon('heroicon-o-x-circle')
                 ->color('danger')
                 ->requiresConfirmation()
-                ->modalDescription('This retains the submitted evidence and records your required review note. It does not apply any reported apparatus effects.')
+                ->modalDescription('The submitted evidence is kept. The reported meter readings and findings are not applied to the apparatus. The member sees the reason you give below.')
                 ->form([
-                    Forms\Components\Textarea::make('review_notes')
-                        ->label('Review note')
+                    Forms\Components\Textarea::make('reason')
+                        ->label('Reason shared with the member')
+                        ->helperText('Required. Write it so the member knows what to do next.')
                         ->required()
                         ->maxLength(2000)
                         ->rows(4),
+                    Forms\Components\Textarea::make('internal_note')
+                        ->label('Internal note (Logistics only)')
+                        ->helperText('Optional. Never shown to the member.')
+                        ->maxLength(2000)
+                        ->rows(3),
                 ])
                 ->visible(fn (): bool => $this->isAwaitingDecision() && $this->canRejectInspection())
                 ->action(function (array $data): void {
@@ -163,7 +169,8 @@ class ViewInspection extends ViewRecord
                         fn (User $reviewer) => app(InspectionReviewService::class)->reject(
                             (int) $this->inspection()->getKey(),
                             $reviewer,
-                            trim((string) $data['review_notes']),
+                            trim((string) $data['reason']),
+                            filled($data['internal_note'] ?? null) ? trim((string) $data['internal_note']) : null,
                         ),
                         'Inspection rejected',
                     );

@@ -12,6 +12,7 @@ use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusDefectEvent;
 use App\Models\ApparatusInspection;
+use App\Models\ApparatusInspectionException;
 use App\Models\ApparatusIssueMessage;
 use App\Models\User;
 use App\Notifications\Inspections\InspectionEventNotification;
@@ -27,6 +28,7 @@ use Livewire\Livewire;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Tests\Feature\Defects\Concerns\BuildsContinuityFixtures;
 use Tests\TestCase;
@@ -113,11 +115,11 @@ final class CanonicalInspectionActionsTest extends TestCase
         ]);
     }
 
-    public function test_resolve_requires_type_and_notes_then_resolves_once(): void
+    public function test_resolve_requires_notes_defaults_the_type_to_other_then_resolves_once(): void
     {
         $this->page()
             ->callAction('resolveIssue', ['idempotency_key' => 'res-0', 'resolution_notes' => ''], ['defect' => $this->defect->id])
-            ->assertHasActionErrors(['resolution_type', 'resolution_notes']);
+            ->assertHasActionErrors(['resolution_notes']);
         $this->assertSame(0, ApparatusDefectEvent::query()->count());
 
         $this->page()
@@ -215,6 +217,34 @@ final class CanonicalInspectionActionsTest extends TestCase
         $this->assertSame('reported', $this->defect->fresh()->action_status);
     }
 
+    /** Companion to the public-method guard in DailyInspectionSecurityTest: every callable page method is denied. */
+    public function test_every_public_page_method_is_refused_to_a_viewer_who_cannot_review(): void
+    {
+        $hold = ApparatusInspectionException::query()->create([
+            'apparatus_inspection_id' => $this->inspection->id, 'apparatus_id' => $this->rig->id,
+            'field' => 'miles', 'reason' => 'rollback', 'status' => 'open', 'blocks_acceptance' => true,
+            'submitted_value' => 900, 'authoritative_value' => 1000,
+        ]);
+        $this->actAs($this->viewOnly());
+        $page = $this->page();
+
+        foreach (['acknowledgeIssue', 'updateIssue', 'resolveIssue', 'dismissIssue', 'reopenIssue', 'verifyCorrection', 'classifyImpact', 'linkServiceTicket'] as $name) {
+            $page->mountAction($name, ['defect' => $this->defect->id])->assertActionNotMounted($name);
+        }
+        foreach (['acceptMeterReading', 'enterVerifiedReading', 'requestMeterClarification', 'keepCurrentReading'] as $name) {
+            $page->mountAction($name, ['exception' => $hold->id])->assertActionNotMounted($name);
+        }
+        try {
+            $page->call('postIssueMessage', $this->defect->id, (string) Str::uuid())->assertForbidden();
+        } catch (HttpException $exception) {
+            $this->assertSame(403, $exception->getStatusCode());
+        }
+
+        $this->assertSame(0, ApparatusDefectEvent::query()->count());
+        $this->assertSame(0, ApparatusIssueMessage::query()->count());
+        $this->assertSame('open', $hold->fresh()->status);
+    }
+
     public function test_a_member_cannot_open_the_page_at_all(): void
     {
         $this->actAs($this->reporter);
@@ -283,6 +313,23 @@ final class CanonicalInspectionActionsTest extends TestCase
         $this->assertCount(1, app(IssueMessageService::class)->threadFor($this->reporter, $this->defect->fresh()));
     }
 
+    public function test_threads_label_logistics_and_member_authors_by_their_recorded_context(): void
+    {
+        $id = $this->defect->id;
+        $this->page()
+            ->set("issueDrafts.{$id}.body", 'We have a spare battery for you.')
+            ->call('postIssueMessage', $id, (string) Str::uuid());
+        app(IssueMessageService::class)->post($this->reporter, ['defect_id' => $id, 'inspection_id' => $this->inspection->id, 'body' => 'Thank you, I will pick it up.']);
+
+        $this->page()
+            ->assertSee('Logistics · '.$this->admin->name)
+            ->assertSee('Riley Reporter')
+            ->assertSee('We have a spare battery for you.')
+            ->assertSee('Thank you, I will pick it up.');
+        $contexts = ApparatusIssueMessage::query()->orderBy('id')->pluck('author_context')->all();
+        $this->assertSame(['logistics', 'member'], $contexts);
+    }
+
     public function test_an_empty_message_is_refused(): void
     {
         $this->page()->call('postIssueMessage', $this->defect->id, (string) Str::uuid());
@@ -334,8 +381,8 @@ final class CanonicalInspectionActionsTest extends TestCase
     {
         $list = Livewire::test(ListDefects::class)->call('loadTable');
 
-        $list->callTableAction('mark_resolved', $this->defect, data: ['resolution_notes' => 'Only notes.'])
-            ->assertHasTableActionErrors(['resolution_type']);
+        $list->callTableAction('mark_resolved', $this->defect, data: ['resolution_notes' => ''])
+            ->assertHasTableActionErrors(['resolution_notes']);
         $this->assertSame('reported', $this->defect->fresh()->action_status);
 
         $list->callTableAction('mark_resolved', $this->defect, data: [
