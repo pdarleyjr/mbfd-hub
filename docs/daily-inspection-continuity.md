@@ -335,6 +335,27 @@ PHPUnit (sqlite) for all suites; `--group=postgres` on disposable PostgreSQL in 
 Daily Checkout `npm run typecheck` + Playwright `playwright.daily-checkout.config.ts`; Node contract tests.
 Required scenarios: directive section 18 + section 20 scenarios A-J.
 
+## 7a. As built (deviations from the original contract)
+
+- Reviewer rule: `App\Support\Fleet\InspectionReviewers::canReview` (active account; super_admin always; a user
+  with direct `admin.access` also needs direct `admin.fleet.manage`, matching `AdminCapabilityGate`; otherwise
+  roles `admin|logistics_admin`). Policies, corrective actions, message visibility and reviewer notifications all use it.
+- Message attribution is a write-time snapshot: `apparatus_issue_messages.author_context` (`logistics|member`,
+  migration `2026_10_22_100400`), so later role changes never relabel history. Checkout "latest update" uses only
+  Logistics messages and event `member_message` text.
+- Rejection: `reject($id, $reviewer, $reason, ?$internalNote)`; `$reason` is posted member-visible,
+  `$internalNote` stays on the review event.
+- Meter baseline tokens carry `issued_at` and expire after `daily_checkout.meter_baseline_max_age_hours` (168);
+  an expired token is unverified, so a lower reading becomes a rollback hold instead of "superseded".
+  Lowering the fleet meter via `accept_submitted` or `correct` requires `confirm_meter_reset=true`.
+- Flag and significant-damage holds are decided only by Approve/Reject; `reconcile()` refuses them with a validation message.
+- Notifications use one class (`InspectionEventNotification`) with `InspectionNotificationKind`; ledger rows carry
+  `attempts` (migration `2026_10_22_100300`) and `inspections:retry-notifications` (every 10 minutes) re-sends rows
+  still `queued` after 10 minutes, at most 3 attempts.
+- Resolution type defaults to `other` in admin modals; resolution notes are always required.
+- Test suite: `tests/TestCase::tearDown` resets Livewire's static redirector stack, which leaked one Application per
+  403/404 Livewire assertion and pushed the full suite past the 512 MB limit.
+
 ## 8. Rollback
 All migrations additive. Rollback = redeploy previous immutable image (`deploy.yml` with prior SHA/digest).
 New columns/tables are ignored by the old code except: old code reads `defect_dedup`-free schema fine (it never
