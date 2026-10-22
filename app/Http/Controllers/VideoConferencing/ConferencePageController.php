@@ -8,6 +8,7 @@ use App\Concerns\ResolvesCanonicalEmployee;
 use App\Enums\VideoConferencing\ConferenceJoinRole;
 use App\Http\Controllers\Controller;
 use App\Services\VideoConferencing\ConferenceBootstrapFactory;
+use App\Services\VideoConferencing\ConferenceCommandAuthorizationService;
 use App\Services\VideoConferencing\ConferenceLaunchContextService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
@@ -32,13 +33,17 @@ class ConferencePageController extends Controller
         ]);
     }
 
-    public function command(Request $request, ConferenceBootstrapFactory $bootstrap): View
-    {
+    public function command(
+        Request $request,
+        ConferenceBootstrapFactory $bootstrap,
+        ConferenceCommandAuthorizationService $authorization,
+    ): View {
         $employee = $this->authenticatedEmployee();
+        $commandAccess = $authorization->allows($request->user());
 
         return view('video-conferencing', [
             'enabled' => (bool) config('video-conferencing.enabled'),
-            'conferenceBootstrap' => $bootstrap->make('command', ConferenceJoinRole::Command, employee: $employee, returnTo: $request->query('return_to')),
+            'conferenceBootstrap' => $bootstrap->make('command', ConferenceJoinRole::Command, employee: $employee, returnTo: $request->query('return_to'), commandAccess: $commandAccess),
         ]);
     }
 }

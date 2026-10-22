@@ -8,15 +8,12 @@ use App\Models\User;
 use App\Models\VideoConferenceParticipation;
 use App\Models\VideoConferenceSession;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Hash;
 use Tests\Fakes\FakeConferenceProvider;
 use Tests\TestCase;
 
 class MorningLineupWorkflowTest extends TestCase
 {
     use RefreshDatabase;
-
-    private const COMMAND_PIN = '2468';
 
     private FakeConferenceProvider $provider;
 
@@ -28,7 +25,6 @@ class MorningLineupWorkflowTest extends TestCase
         config([
             'broadcasting.default' => 'null',
             'video-conferencing.enabled' => true,
-            'video-conferencing.command_pin_hash' => Hash::make(self::COMMAND_PIN),
             'video-conferencing.livekit.profile' => 'cloud',
             'video-conferencing.livekit.profiles.cloud.url' => 'wss://cloud.video.test.example',
             'video-conferencing.livekit.profiles.cloud.api_url' => 'https://cloud.video.test.example',
@@ -101,7 +97,7 @@ class MorningLineupWorkflowTest extends TestCase
             ->assertJsonPath('station.ready', true);
     }
 
-    public function test_300_reuses_employee_session_and_requires_server_side_pin_before_start(): void
+    public function test_300_reuses_employee_session_and_starts_for_a_captain_without_a_pin(): void
     {
         $this->withoutVite();
         $this->get('/employee/video-conferencing/command')->assertRedirect('/login');
@@ -109,17 +105,12 @@ class MorningLineupWorkflowTest extends TestCase
             ->get('/employee/video-conferencing/command')
             ->assertOk()
             ->assertSee('"entry_mode":"command"', false)
-            ->assertSee('"join_as":"300"', false);
+            ->assertSee('"join_as":"300"', false)
+            ->assertSee('"command_access":true', false)
+            ->assertDontSee('command_authorize', false);
 
         $this->actingAs($this->employee, 'employee')
-            ->postJson('/employee/video-conferencing/api/lineup/start')
-            ->assertForbidden();
-        $this->actingAs($this->employee, 'employee')
-            ->postJson('/employee/video-conferencing/api/lineup/command/authorize', ['command_pin' => '1111'])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors('command_pin');
-        $this->actingAs($this->employee, 'employee')
-            ->postJson('/employee/video-conferencing/api/lineup/command/authorize', ['command_pin' => self::COMMAND_PIN])
+            ->postJson('/employee/video-conferencing/api/lineup/command/authorize')
             ->assertOk()
             ->assertJsonPath('authorized', true);
 
@@ -150,7 +141,6 @@ class MorningLineupWorkflowTest extends TestCase
             'join_as' => 'sta4',
         ])->assertConflict()->assertJsonPath('code', 'lineup_not_started');
 
-        $this->authorizeCommand();
         $this->actingAs($this->employee, 'employee')
             ->postJson('/employee/video-conferencing/api/lineup/start')
             ->assertOk();
@@ -180,7 +170,6 @@ class MorningLineupWorkflowTest extends TestCase
             'camera_ready' => true,
             'microphone_ready' => true,
         ])->assertOk();
-        $this->authorizeCommand();
         $this->actingAs($this->employee, 'employee')
             ->postJson('/employee/video-conferencing/api/lineup/start')
             ->assertOk();
@@ -207,7 +196,6 @@ class MorningLineupWorkflowTest extends TestCase
             'camera_ready' => true,
             'microphone_ready' => true,
         ])->assertOk();
-        $this->authorizeCommand();
         $started = $this->actingAs($this->employee, 'employee')
             ->postJson('/employee/video-conferencing/api/lineup/start')
             ->assertOk();
@@ -244,7 +232,6 @@ class MorningLineupWorkflowTest extends TestCase
             'microphone_ready' => true,
         ])->assertOk();
 
-        $this->authorizeCommand();
         $started = $this->actingAs($this->employee, 'employee')
             ->postJson('/employee/video-conferencing/api/direct/start', ['station' => 'sta4'])
             ->assertOk()
@@ -278,14 +265,6 @@ class MorningLineupWorkflowTest extends TestCase
             ->assertJsonPath('active', false);
 
         $this->assertCount(1, $this->provider->closedRooms);
-    }
-
-    private function authorizeCommand(): void
-    {
-        $this->actingAs($this->employee, 'employee')
-            ->postJson('/employee/video-conferencing/api/lineup/command/authorize', [
-                'command_pin' => self::COMMAND_PIN,
-            ])->assertOk();
     }
 
     private function latestLaunchContext(): string

@@ -8,17 +8,18 @@ use App\Services\VideoConferencing\ConferenceCommandAuthorizationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
+/**
+ * Retained for one release so cached clients that still call it keep working.
+ * It takes no body and reads no PIN: it only reports the live policy decision.
+ */
 class CommandAuthorizationController extends Controller
 {
     use ResolvesCanonicalEmployee;
 
     public function __invoke(Request $request, ConferenceCommandAuthorizationService $authorization): JsonResponse
     {
-        $validated = $request->validate([
-            'command_pin' => ['required', 'string', 'regex:/^\d{4,8}$/'],
-        ]);
         $employee = $this->authenticatedEmployee();
-        $authorization->authorize($request, $employee, $validated['command_pin']);
+        $authorization->assertAuthorized($request, $employee);
 
         return response()->json(['authorized' => true])->header('Cache-Control', 'no-store');
     }
