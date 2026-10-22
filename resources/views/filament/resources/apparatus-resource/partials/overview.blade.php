@@ -62,7 +62,7 @@
         <div class="hub-insp-metric">
             @if ($last)
                 <p class="hub-insp-metric__value hub-insp-metric__value--text" data-overview-last-inspection>
-                    <a href="{{ route('filament.admin.resources.apparatuses.view-inspection', ['record' => $apparatus->getKey(), 'inspection' => $last->getKey()]) }}">
+                    <a href="{{ \App\Filament\Support\InspectionWorkspace::url($last) }}">
                         {{ $last->completed_at?->format('M j, Y g:i A') ?? 'Date unavailable' }}
                     </a>
                 </p>

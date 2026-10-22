@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ApparatusInspectionExceptionResource\Pages\ListInspectionExceptions;
+use App\Filament\Support\InspectionWorkspace;
 use App\Models\ApparatusInspectionException;
 use App\Models\User;
 use App\Services\ApparatusInspectionExceptionService;
@@ -78,7 +79,12 @@ final class ApparatusInspectionExceptionResource extends Resource
         ])->actions([
             Tables\Actions\ActionGroup::make([
                 Tables\Actions\Action::make('inspection')->label('Original inspection')->icon('heroicon-o-document-text')
-                    ->url(fn (ApparatusInspectionException $record): string => ApparatusResource::getUrl('view-inspection', ['record' => $record->apparatus_id, 'inspection' => $record->apparatus_inspection_id])),
+                    ->url(fn (ApparatusInspectionException $record): string => InspectionWorkspace::url(
+                        (int) $record->apparatus_inspection_id,
+                        str_starts_with($record->field, 'defect:') && isset($record->metadata['defect_id'])
+                            ? 'issue-'.(int) $record->metadata['defect_id']
+                            : 'hold-'.$record->getKey(),
+                    )),
                 Tables\Actions\Action::make('reconcile')->label('Review')->icon('heroicon-o-pencil-square')
                     ->visible(fn (ApparatusInspectionException $record): bool => ! in_array($record->status, ['resolved', 'dismissed'], true) && (auth()->user()?->can('update', $record) ?? false))
                     ->fillForm(fn (ApparatusInspectionException $record): array => ['expected_current_value' => $record->apparatus->getAttribute('current_'.$record->field)])

@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\InspectionResource\Pages;
+use App\Filament\Support\InspectionWorkspace;
 use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
 use App\Models\Station;
@@ -86,10 +87,10 @@ class InspectionResource extends Resource
 
                 Tables\Columns\TextColumn::make('inspection_status')->visibleFrom('md')
                     ->label('Status')
-                    ->state(fn (ApparatusInspection $record): string => $record->displayStatus())
+                    ->state(fn (ApparatusInspection $record): string => InspectionWorkspace::statusPresentation($record)['label'])
                     ->badge()
                     ->color(fn (string $state): string => match ($state) {
-                        'Pending review', 'Follow-up needed' => 'warning',
+                        'Pending review', 'Needs approval', 'Follow-up needed', 'Held: vehicle swap' => 'warning',
                         'Approved', 'Accepted' => 'success',
                         'Rejected' => 'danger',
                         default => 'gray',

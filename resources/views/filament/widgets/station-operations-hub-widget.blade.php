@@ -44,6 +44,54 @@
             </div>
         </section>
 
+        @php
+            $queues = $department['inspectionQueues'];
+            $queueGroups = [
+                ['key' => 'approvals', 'eyebrow' => 'Needs a decision', 'title' => 'Inspections requiring approval', 'empty' => 'No inspections are waiting for approval.', 'tone' => 'warning'],
+                ['key' => 'issues', 'eyebrow' => 'Not yet acknowledged', 'title' => 'New or escalated issues', 'empty' => 'No new or escalated equipment issues.', 'tone' => 'warning'],
+                ['key' => 'actions', 'eyebrow' => 'In progress', 'title' => 'Open corrective actions', 'empty' => 'No corrective actions are open.', 'tone' => 'neutral'],
+                ['key' => 'recent', 'eyebrow' => 'Last 7 days, for reference', 'title' => 'Recently completed inspections', 'empty' => 'No inspections were completed in the last 7 days.', 'tone' => 'neutral'],
+            ];
+        @endphp
+        <section class="hub-insp-queues" aria-labelledby="mbfd-inspection-queues-heading" data-inspection-queues>
+            <div class="mbfd-command-section-heading">
+                <div><p class="mbfd-command-eyebrow">Daily Checkout</p><h2 id="mbfd-inspection-queues-heading">Inspections and Equipment Issues</h2></div>
+                <p>Each issue is counted once, however many inspections have seen it.</p>
+            </div>
+            <div class="hub-insp-queues__grid">
+                @foreach($queueGroups as $group)
+                    @php
+                        $queue = $queues[$group['key']];
+                    @endphp
+                    <article class="hub-insp-queue" data-queue="{{ $group['key'] }}" aria-labelledby="mbfd-queue-{{ $group['key'] }}-title">
+                        <header class="hub-insp-queue__head">
+                            <div>
+                                <p class="hub-insp-queue__eyebrow">{{ $group['eyebrow'] }}</p>
+                                <h3 class="hub-insp-queue__title" id="mbfd-queue-{{ $group['key'] }}-title">{{ $group['title'] }}</h3>
+                            </div>
+                            <span class="hub-insp-queue__count @if($group['tone'] === 'warning' && $queue['count'] > 0) hub-insp-queue__count--warning @endif" data-queue-count>{{ $queue['count'] }}</span>
+                        </header>
+                        <div class="hub-insp-queue__list" tabindex="0" aria-label="{{ $group['title'] }}">
+                            @forelse($queue['rows'] as $record)
+                                <a class="hub-insp-queue__row" href="{{ $record['url'] }}">
+                                    <strong>{{ $record['label'] }}</strong>
+                                    <small>{{ $record['status'] }}@if($record['timeLabel']) · <time datetime="{{ $record['timestamp'] }}">{{ $record['timeLabel'] }}</time>@endif</small>
+                                </a>
+                            @empty
+                                <p class="hub-insp-queue__empty">{{ $group['empty'] }}</p>
+                            @endforelse
+                        </div>
+                        @if($group['key'] === 'approvals' && ($queue['swapHeld'] ?? 0) > 0)
+                            <p class="hub-insp-queue__foot">
+                                {{ $queue['swapHeld'] }} more {{ $queue['swapHeld'] === 1 ? 'is' : 'are' }} held for a vehicle swap:
+                                <a href="{{ $queues['swapUrl'] }}">Pending vehicle swaps</a>
+                            </p>
+                        @endif
+                    </article>
+                @endforeach
+            </div>
+        </section>
+
         <section class="mbfd-command-master" aria-label="Department overview">
             <article class="mbfd-command-master-card">
                 <header>
