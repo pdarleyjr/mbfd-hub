@@ -7,12 +7,14 @@ namespace App\Services;
 use App\Jobs\AuditEquipmentAfterInspection;
 use App\Jobs\PmAlertNotificationJob;
 use App\Models\Apparatus;
+use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusInspectionException;
 use App\Models\ApparatusInspectionReviewEvent;
 use App\Services\Defects\DefectContinuityService;
 use App\Services\Defects\FindingsResult;
 use App\Services\Inspections\InspectionHold;
+use App\Services\Inspections\InspectionNotificationDispatcher;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -57,6 +59,7 @@ final class ApparatusInspectionProcessingService
 
         $this->recordNonMeterHolds($inspection, $apparatus, $findings);
         $this->settle($inspection, $apparatus, $evidence, $meterOutcomes);
+        $this->notifyReviewers($inspection, $findings);
 
         DB::afterCommit(function () use ($inspection, $apparatus, $meterChanged, $previousHealth): void {
             if ($meterChanged) {
@@ -66,6 +69,21 @@ final class ApparatusInspectionProcessingService
                 AuditEquipmentAfterInspection::dispatch((int) $inspection->id, (int) $apparatus->id)->delay(now()->addSeconds(5));
             }
         });
+    }
+
+    /** Reviewers hear about a held inspection and about new significant damage; routine acceptance is silent. */
+    private function notifyReviewers(ApparatusInspection $inspection, FindingsResult $findings): void
+    {
+        $notifications = app(InspectionNotificationDispatcher::class);
+        if ($inspection->processing_status === self::STATUS_HELD) {
+            $notifications->reviewRequired($inspection);
+        }
+        foreach ($findings->significantNewOrEscalatedDefectIds as $defectId) {
+            $defect = ApparatusDefect::query()->find($defectId);
+            if ($defect !== null) {
+                $notifications->issueEscalated($defect, $inspection);
+            }
+        }
     }
 
     /**

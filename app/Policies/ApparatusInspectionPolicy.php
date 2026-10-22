@@ -5,6 +5,7 @@ namespace App\Policies;
 use App\Models\ApparatusInspection;
 use App\Models\User;
 use App\Services\Inspections\EmployeeInspectionHistoryService;
+use App\Support\Fleet\InspectionReviewers;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
 class ApparatusInspectionPolicy
@@ -58,7 +59,7 @@ class ApparatusInspectionPolicy
      */
     public function approve(User $user, ApparatusInspection $apparatusInspection): bool
     {
-        return $this->canReview($user);
+        return InspectionReviewers::canReview($user);
     }
 
     /**
@@ -67,17 +68,7 @@ class ApparatusInspectionPolicy
      */
     public function reject(User $user, ApparatusInspection $apparatusInspection): bool
     {
-        return $this->canReview($user);
-    }
-
-    /**
-     * Reviewers are the legacy administrator roles or anyone with Fleet manage
-     * access (admin.access + admin.fleet.manage), the same capability the API
-     * and the Fleet pages already use, so Filament and the API agree.
-     */
-    private function canReview(User $user): bool
-    {
-        return $user->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) || $user->canManageFleetSwaps();
+        return InspectionReviewers::canReview($user);
     }
 
     /**

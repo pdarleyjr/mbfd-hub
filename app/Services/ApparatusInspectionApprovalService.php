@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Services\Display\DisplaySnapshotService;
 use App\Services\Fleet\VehicleSwapDecisionException;
 use App\Services\Fleet\VehicleSwapService;
+use App\Services\Inspections\InspectionNotificationDispatcher;
 use App\Services\Inspections\InspectionReviewService;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
@@ -97,6 +98,7 @@ final class ApparatusInspectionApprovalService
                     'review_status' => 'approved',
                     'pending_effects' => null,
                 ]);
+                app(InspectionNotificationDispatcher::class)->inspectionDecided($inspection, 'approved');
 
                 $apparatusId = (int) $inspection->apparatus_id;
                 DB::afterCommit(function () use ($inspectionId, $apparatusId, $previousHealth, $shouldDispatchPmAlert, $hasSnipeItAsset): void {
@@ -140,6 +142,7 @@ final class ApparatusInspectionApprovalService
                 // terminal review status prevents these effects from being applied.
                 $this->recordReviewEvent($inspection, $reviewer, 'rejected', $reviewNotes);
                 $inspection->update(['review_status' => 'rejected']);
+                app(InspectionNotificationDispatcher::class)->inspectionDecided($inspection, 'rejected');
 
                 DB::afterCommit(static function (): void {
                     Cache::forget(DisplaySnapshotService::SNAPSHOT_CACHE_KEY);

@@ -129,15 +129,15 @@ final class InspectionReviewService
         return $this->postMemberMessage($lockedInspection, $author, $body, $clientMessageId);
     }
 
-    /** Single seam for member-visible messages; the message service replaces this body. */
+    /** Member-visible clarification on the general thread; the message service notifies the inspection owner. */
     protected function postMemberMessage(ApparatusInspection $inspection, User $author, string $body, ?string $clientMessageId = null): ApparatusIssueMessage
     {
-        return ApparatusIssueMessage::query()->create([
-            'apparatus_inspection_id' => $inspection->getKey(),
-            'author_user_id' => $author->getKey(),
+        return app(IssueMessageService::class)->post($author, [
+            'inspection_id' => $inspection->getKey(),
             'visibility' => ApparatusIssueMessage::VISIBILITY_MEMBER,
             'body' => $body,
             'client_message_id' => $clientMessageId,
+            'kind' => 'clarification_requested',
         ]);
     }
 
@@ -177,6 +177,7 @@ final class InspectionReviewService
             'out_of_service_requested' => $markOutOfService,
             'marked_out_of_service' => $markedOutOfService,
         ]);
+        app(InspectionNotificationDispatcher::class)->inspectionDecided($inspection, 'approved');
 
         return $inspection;
     }
@@ -202,6 +203,7 @@ final class InspectionReviewService
         ]);
         $inspection->update(['review_status' => 'rejected', 'processing_status' => 'rejected']);
         $this->forgetDisplayReadModels();
+        app(InspectionNotificationDispatcher::class)->inspectionDecided($inspection, 'rejected');
 
         return $inspection;
     }

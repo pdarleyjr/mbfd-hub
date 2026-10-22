@@ -45,7 +45,8 @@ final class ApparatusInspectionExceptionServiceTest extends TestCase
         Queue::fake();
         config()->set('google_sheets.apparatus_sync_enabled', false);
         $this->member = User::factory()->create();
-        $this->reviewer = User::factory()->create();
+        // Reviewers must be active accounts (App\Support\Fleet\InspectionReviewers).
+        $this->reviewer = User::factory()->create(['account_status' => \App\Enums\AccountStatus::Active]);
         $this->reviewer->assignRole(Role::findOrCreate('logistics_admin', 'web'));
         Permission::findOrCreate('update_apparatus', 'web');
         $this->apparatus = Apparatus::query()->create([
