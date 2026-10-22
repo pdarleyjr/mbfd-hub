@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router';
-import { Apparatus, ApparatusServiceTicketSummary, FleetVehicle, OfficerInfo, ChecklistData, ChecklistFieldValue, Compartment, Defect, InspectionData, MeterData, InspectionSubmission, ScheduledChecklistTaskResult } from '../types';
+import { Apparatus, ApparatusServiceTicketSummary, FleetVehicle, OfficerInfo, ChecklistData, ChecklistFieldValue, Compartment, Defect, InspectionData, MeterData, InspectionSubmission, ReviewFlagDraft, ScheduledChecklistTaskResult } from '../types';
 import { ApiClient, READ_TIMEOUT_MS } from '../utils/api';
 import {
   DAILY_CHECKOUT_QUEUE_SYNC_EVENT,
@@ -31,6 +31,7 @@ import SubmitStep from './SubmitStep';
 import PreviousPageButton from './PreviousPageButton';
 import { inspectionProgress, inspectionReadiness } from '../utils/inspectionProgress';
 import { identityForQueueCapture, type OfflineIdentity } from '../lib/offlineIdentity';
+import { EMPTY_REVIEW_FLAG, buildReviewFlag, normalizeReviewFlagDraft, reviewFlagExplanationMissing } from '../utils/reviewFlag';
 import { defaultVehicleConfirmation, paperVehicleValue, reconcileVehicleConfirmation, toPhysicalVehicleReport } from '../utils/vehicleConfirmation';
 import { ClipboardList, Gauge, Truck, Users } from 'lucide-react';
 
@@ -139,6 +140,7 @@ export default function InspectionWizard() {
 
   const [apparatus, setApparatus] = useState<Apparatus | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
+  const [reviewFlag, setReviewFlag] = useState<ReviewFlagDraft>(EMPTY_REVIEW_FLAG);
   const [checklist, setChecklist] = useState<ChecklistData | null>(null);
   const [currentStep, setCurrentStep] = useState<Step>('compartments');
   const [memberIdentity, setMemberIdentity] = useState<OfflineIdentity | null>(null);
@@ -447,6 +449,7 @@ export default function InspectionWizard() {
         });
         setMeterData({ engine_hours: null, miles: null });
         setSignature(null);
+        setReviewFlag(EMPTY_REVIEW_FLAG);
         setCurrentStep('compartments');
         setCompartments(checklistData.compartments);
         setFieldValues(checklistData.fields.map((field) => ({
@@ -476,6 +479,7 @@ export default function InspectionWizard() {
             );
           if (canRestoreSavedProgress) {
             setSignature(saved.signature ?? null);
+            setReviewFlag(normalizeReviewFlagDraft(saved.reviewFlag));
             // Keep the issued baseline with the observation, even after a newer
             // checkout changed the live fleet meters while this draft was offline.
             setApparatus({ ...foundApparatus, meter_baseline_token: saved.apparatusSnapshot?.meter_baseline_token });
@@ -547,6 +551,7 @@ export default function InspectionWizard() {
         apparatusSnapshot: apparatus,
         officer: officerInfo,
         signature,
+        reviewFlag,
         meter: meterData,
         compartments,
         fieldValues,
@@ -556,7 +561,7 @@ export default function InspectionWizard() {
       },
       clearSessionStartKeyFor: checklist.schema_version === 2 && checklist.inspection_session ? checklist.checklist_version : undefined,
     }, stepChanged);
-  }, [officerInfo, meterData, compartments, fieldValues, scheduledTasks, currentStep, slug, apparatus, checklist, memberIdentity, loading, signature, submitting, queuedSubmissionBlocker, autosaver]);
+  }, [officerInfo, meterData, compartments, fieldValues, scheduledTasks, currentStep, slug, apparatus, checklist, memberIdentity, loading, signature, reviewFlag, submitting, queuedSubmissionBlocker, autosaver]);
 
   useEffect(() => {
     if (readiness.ready) setShowNotReady(false);
@@ -645,6 +650,7 @@ export default function InspectionWizard() {
       });
       setMeterData({ engine_hours: null, miles: null });
       setSignature(null);
+      setReviewFlag(EMPTY_REVIEW_FLAG);
       setCompartments(todayChecklist.compartments);
       setFieldValues(todayChecklist.fields.map((field) => ({
         id: field.id,
@@ -670,6 +676,11 @@ export default function InspectionWizard() {
 
   const handleSubmit = async (signature: string | null) => {
     if (!apparatus || !slug || !checklist) return;
+    // Defensive: the review step blocks this too, but a flagged inspection never leaves without its explanation.
+    if (reviewFlagExplanationMissing(reviewFlag)) {
+      setCurrentStep('submit');
+      return;
+    }
     if (!readiness.ready) {
       // Say why instead of silently moving to another step.
       setShowNotReady(true);
@@ -708,6 +719,7 @@ export default function InspectionWizard() {
               status: item.status,
               notes: item.notes,
               photo: item.photo,
+              ...(item.status === 'Damaged' && item.significant === true ? { significant: true } : {}),
               ...(checklist.schema_version === 2 ? {
                 compartment_id: compartment.id,
                 item_id: item.id,
@@ -717,6 +729,7 @@ export default function InspectionWizard() {
         });
       });
 
+      const flag = buildReviewFlag(reviewFlag, compartments);
       const submission: InspectionSubmission = {
         processing_version: 1,
         meter_baseline_token: apparatus.meter_baseline_token,
@@ -738,6 +751,7 @@ export default function InspectionWizard() {
             name: item.name,
             status: item.status,
             observed: item.observed === true,
+            ...(item.status === 'Damaged' && item.significant === true ? { significant: true as const } : {}),
             ...(item.photo ? { photo: item.photo } : {}),
             ...(item.value !== undefined ? { value: item.value } : {}),
             notes: item.notes || null,
@@ -752,6 +766,7 @@ export default function InspectionWizard() {
           inspection_session_replay_key: inspectionSession?.replay_key,
         } : {}),
         officer_signature: signature,
+        ...(flag ? { review_flag: flag } : {}),
       };
       clientSubmissionIdRef.current = submission.client_submission_id;
       const queueId = await queueSubmission(apparatus.id, submission, currentIdentity);
@@ -1138,6 +1153,8 @@ export default function InspectionWizard() {
           meters={meterData}
           signature={signature}
           onSignatureChange={setSignature}
+          reviewFlag={reviewFlag}
+          onReviewFlagChange={setReviewFlag}
           scheduledTasks={scheduledTasks}
           onSubmit={handleSubmit}
           onBack={goBack}

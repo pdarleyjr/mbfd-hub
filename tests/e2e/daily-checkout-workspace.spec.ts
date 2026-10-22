@@ -3,7 +3,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { readFileSync } from 'node:fs';
 import { readDrafts, replaceDrafts } from './support/daily-checkout-drafts';
 import { resolveBlueprint } from '../../resources/js/daily-checkout/src/data/apparatusBlueprints';
-import type { InspectionSubmission, InspectionRevision, ChecklistData } from '../../resources/js/daily-checkout/src/types';
+import type { InspectionSubmission, InspectionRevision, ChecklistData, OpenFinding } from '../../resources/js/daily-checkout/src/types';
 
 const sourceChecklist = JSON.parse(readFileSync('storage/checklists/engine2_checklist.json', 'utf8'));
 const version = 'e'.repeat(64);
@@ -660,12 +660,13 @@ test('known finding remains visible when reported corrected and keyboard actions
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await fixture(page, { findings: [{ id: 901, compartment: 'Driver L4', item: "Driver's Gear", issue_type: 'damaged', operational_impact: 'unclassified', last_observation: 'confirmed_again', last_observed_at: '2026-09-21T10:00:00Z', service_status: 'open' }] });
   await page.locator('.blueprint-touch-zones button').filter({ hasText: 'L4' }).click();
-  await expect(page.getByText('Known damaged', { exact: true })).toBeVisible();
+  await expect(page.getByText('Previously reported: Damaged', { exact: true })).toBeVisible();
   const pass = page.getByRole('button', { name: "Pass Driver's Gear", exact: true });
   await pass.focus();
   await page.keyboard.press('Enter');
   await expect(pass).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.getByText(/Known damaged/)).toBeVisible();
+  await expect(page.getByText('Previously reported: Damaged', { exact: true })).toBeVisible();
+  await expect(page.getByText('Awaiting verification', { exact: true })).toBeVisible();
   expect((await pass.boundingBox())?.height).toBeGreaterThanOrEqual(44);
   expect(await pass.evaluate(element => Number.parseFloat(getComputedStyle(element).transitionDuration))).toBeLessThanOrEqual(0.00001);
   const checklist = page.getByRole('button', { name: /Checklist.*remaining/ });
@@ -704,4 +705,224 @@ test('member clarification draft restores for its owner and is not shown to anot
   await page.getByRole('button', { name: 'Send clarification' }).click();
   await expect(page.getByText('Your clarification is recorded and awaiting review.', { exact: true })).toBeVisible();
   expect(api.revisions).toEqual([{ reason: 'Transposed the last digits; verified on the display.', value: 42521 }]);
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+// Issue continuity: previously reported issues, significant damage and the review flag.
+// ---------------------------------------------------------------------------------------------------------------
+
+/** Three real Engine 2 areas with four items each keep the full review flow short. */
+const continuityChecklist = {
+  ...sourceChecklist,
+  compartments: ['front_cab', 'comp_l1', 'comp_r2'].map(id => {
+    const area = sourceChecklist.compartments.find((entry: { id: string }) => entry.id === id);
+    return { ...area, items: area.items.slice(0, 4) };
+  }),
+};
+
+const FLAG_HELP = 'Select this only for significant or newly discovered problems that require special attention from Logistics or Fleet, such as major vehicle damage, critical missing equipment, or another unusual safety or operational concern. Do not select this for equipment already reported as missing or damaged, known vehicle damage, or routine issues already being addressed.';
+const SIGNIFICANT_LABEL = 'Significant damage (new, affects safe operation)';
+
+const finding = (overrides: Partial<OpenFinding> & Pick<OpenFinding, 'id' | 'compartment' | 'item' | 'issue_type'>): OpenFinding => ({
+  operational_impact: 'unclassified', last_observation: 'confirmed_again', last_observed_at: '2026-09-21T10:00:00Z', service_status: 'open', ...overrides,
+});
+
+const idMatchedFinding = finding({
+  id: 911, compartment: 'Old Driver Side Name', item: 'Old Gear Name', issue_type: 'missing',
+  compartment_id: 'comp_l1', item_id: 'comp_l1-item-1', action_status: 'replacement_available', action_label: 'Replacement available',
+  severity: 'routine', first_reported_at: '2026-09-18T15:00:00Z', latest_member_update: { text: 'Replacement ordered from vendor.', at: '2026-09-19T16:00:00Z' },
+});
+const nameOnlyFinding = finding({ id: 912, compartment: 'Driver L4', item: 'HandTevy Box', issue_type: 'damaged' });
+
+const fullFlowProjects = ['daily-checkout-chromium', 'daily-responsive-phone-390'];
+
+/** Quick Checklist focuses the item and opens its details, so the status buttons are in reach. */
+async function reportIssue(page: Page, area: string, item: string, status: 'Missing' | 'Damaged') {
+  await page.getByRole('button', { name: /Checklist.*remaining/ }).click();
+  await page.getByRole('dialog', { name: 'Quick Checklist' }).getByRole('button', { name: new RegExp(`${area}.*${item}`) }).click();
+  await page.getByRole('button', { name: status, exact: true }).click();
+}
+
+/** Required details, the reported items, every other item present, then Review & Sign. */
+async function reachContinuityReview(page: Page, issues: Array<[area: string, item: string, status: 'Missing' | 'Damaged']> = []) {
+  await fillRequiredPaperFields(page, continuityChecklist);
+  await page.getByRole('navigation', { name: 'Inspection workspace' }).getByRole('button', { name: 'Apparatus', exact: true }).click();
+  for (const [area, item, status] of issues) await reportIssue(page, area, item, status);
+  await inspectActualEquipment(page, continuityChecklist);
+}
+
+async function submitReview(page: Page) {
+  const closeNotification = page.getByRole('button', { name: 'Close notification' });
+  if (await closeNotification.isVisible()) await closeNotification.click();
+  await page.getByRole('button', { name: 'Submit Inspection', exact: true }).click();
+}
+
+test('previously reported issues show their current status, match by id before name, and never prefill the observation', async ({ page }) => {
+  await fixture(page, { findings: [idMatchedFinding, nameOnlyFinding] });
+  await selectArea(page, sourceChecklist, 'comp_l1');
+  const gear = page.locator('[data-previous-issues="comp_l1-item-1"]');
+  // The id match wins over the stale recorded names.
+  await expect(gear.getByText('Previously reported: Missing', { exact: true })).toBeVisible();
+  await expect(gear.getByText('Replacement available · First reported Sep 18, 2026', { exact: true })).toBeVisible();
+  await expect(gear.getByText('Latest update (Sep 19, 2026): Replacement ordered from vendor.', { exact: true })).toBeVisible();
+  // A finding without ids still matches by the recorded names and says it is waiting for verification.
+  const tevy = page.locator('[data-previous-issues]').filter({ hasText: 'Previously reported: Damaged' });
+  await expect(tevy).toHaveCount(1);
+  await expect(tevy.getByText('Awaiting verification', { exact: true })).toBeVisible();
+  await expect(page.getByText(/Known (missing|damaged)/)).toHaveCount(0);
+  // The member still records what they see.
+  const pass = page.getByRole('button', { name: "Pass Driver's Gear", exact: true });
+  await expect(pass).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.getByText('Marked present. Logistics will verify the correction.')).toHaveCount(0);
+  await pass.click();
+  await expect(pass).toHaveAttribute('aria-pressed', 'true');
+  await expect(gear.getByText('Marked present. Logistics will verify the correction.', { exact: true })).toBeVisible();
+  await expect(gear.getByText('Previously reported: Missing', { exact: true })).toBeVisible();
+  await expect(tevy.getByText('Marked present.')).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test('significant damage is optional, only offered for Damaged, cleared when the status changes, and sent on the item and its defect', async ({ page }, testInfo) => {
+  test.skip(!fullFlowProjects.includes(testInfo.project.name), 'Full submission flow runs on Chromium desktop and the 390px phone.');
+  test.setTimeout(90_000);
+  const api = await fixture(page, { checklist: continuityChecklist });
+  await fillRequiredPaperFields(page, continuityChecklist);
+  await page.getByRole('navigation', { name: 'Inspection workspace' }).getByRole('button', { name: 'Apparatus', exact: true }).click();
+  const significant = page.getByRole('checkbox', { name: SIGNIFICANT_LABEL, exact: true });
+  await reportIssue(page, 'Officer R3', 'Sledgehammer', 'Missing');
+  await expect(significant).toHaveCount(0);
+  await page.getByRole('button', { name: 'Damaged', exact: true }).click();
+  await expect(significant).not.toBeChecked();
+  expect((await significant.locator('xpath=ancestor::label').boundingBox())?.height).toBeGreaterThanOrEqual(44);
+  await significant.check();
+  // Leaving Damaged drops the claim; coming back does not resurrect it.
+  await page.getByRole('button', { name: 'Missing', exact: true }).click();
+  await expect(significant).toHaveCount(0);
+  await page.getByRole('button', { name: 'Damaged', exact: true }).click();
+  await expect(significant).not.toBeChecked();
+  await significant.check();
+  await expect(significant).toBeChecked();
+  await reportIssue(page, 'Driver L4', 'HandTevy Box', 'Damaged');
+  await inspectActualEquipment(page, continuityChecklist);
+  await sign(page);
+  await submitReview(page);
+  await expect.poll(() => api.submissions.length).toBe(1);
+  const submission = api.submissions[0];
+  const sledgehammer = submission.defects.find(defect => defect.item === 'Sledgehammer');
+  const tevy = submission.defects.find(defect => defect.item === 'HandTevy Box');
+  expect(sledgehammer).toMatchObject({ status: 'Damaged', compartment_id: 'comp_r2', item_id: 'comp_r2-item-1', significant: true });
+  // Without the claim the legacy defect shape is unchanged.
+  expect(tevy).toMatchObject({ status: 'Damaged' });
+  expect(tevy).not.toHaveProperty('significant');
+  const items = submission.compartments.flatMap(area => area.items);
+  expect(items.filter(item => 'significant' in item).map(item => item.id)).toEqual(['comp_r2-item-1']);
+  expect(submission).not.toHaveProperty('review_flag');
+});
+
+test('Review & Sign lists previously reported issues; a flagged inspection needs an explanation and sends the flag with related items', async ({ page }, testInfo) => {
+  test.skip(!fullFlowProjects.includes(testInfo.project.name), 'Full submission flow runs on Chromium desktop and the 390px phone.');
+  test.setTimeout(90_000);
+  const sledgehammerFinding = finding({ id: 913, compartment: 'Gone', item: 'Gone', issue_type: 'missing', compartment_id: 'comp_r2', item_id: 'comp_r2-item-1', first_reported_at: '2026-09-17T15:00:00Z' });
+  const api = await fixture(page, { checklist: continuityChecklist, findings: [idMatchedFinding, sledgehammerFinding] });
+  await reachContinuityReview(page, [['Officer R3', 'Sledgehammer', 'Missing'], ['Driver L4', 'HandTevy Box', 'Damaged']]);
+
+  const previous = page.getByRole('region', { name: 'Previously reported issues' });
+  await expect(previous.locator('li', { hasText: "Driver's Gear" })).toContainText('You marked present');
+  await expect(previous.locator('li', { hasText: 'Sledgehammer' })).toContainText('Still missing');
+  await expect(previous.locator('li', { hasText: 'Sledgehammer' })).toContainText('Previously reported: Missing');
+
+  const toggle = page.getByRole('checkbox', { name: 'Flag this inspection for further review', exact: true });
+  await expect(toggle).not.toBeChecked();
+  await expect(page.getByText(FLAG_HELP, { exact: true })).toBeVisible();
+  await expect(page.getByLabel('What needs special attention?')).toHaveCount(0);
+  await toggle.check();
+  const explanation = page.getByRole('textbox', { name: 'What needs special attention?', exact: true });
+  await expect(explanation).toHaveAttribute('aria-required', 'true');
+  await expect(explanation).toHaveAttribute('maxlength', '1000');
+  expect((await toggle.locator('xpath=ancestor::label').boundingBox())?.height).toBeGreaterThanOrEqual(44);
+
+  await sign(page);
+  await submitReview(page);
+  await expect(page.getByRole('alert').filter({ hasText: 'Describe what needs special attention before submitting.' })).toBeVisible();
+  await expect(explanation).toHaveAttribute('aria-invalid', 'true');
+  await expect(explanation).toBeFocused();
+  expect(api.submissions).toHaveLength(0);
+  // Whitespace is still blank.
+  await explanation.fill('   ');
+  await page.getByRole('button', { name: 'Submit Inspection', exact: true }).click();
+  await expect(explanation).toHaveAttribute('aria-invalid', 'true');
+  expect(api.submissions).toHaveLength(0);
+
+  await explanation.fill('  Hydraulic fluid is leaking under the pump panel.  ');
+  await expect(explanation).not.toHaveAttribute('aria-invalid', 'true');
+  const related = page.locator('details.review-flag-items');
+  await related.locator('summary').click();
+  await expect(related.locator('summary')).toContainText('selected (0)');
+  // Items the member reported come first.
+  await expect(related.getByRole('checkbox').first()).toHaveAccessibleName(/Sledgehammer|HandTevy Box/);
+  await related.getByRole('checkbox', { name: /Sledgehammer/ }).check();
+  await expect(related.locator('summary')).toContainText('selected (1)');
+  await page.getByRole('button', { name: 'Submit Inspection', exact: true }).click();
+  await expect.poll(() => api.submissions.length).toBe(1);
+  expect(api.submissions[0].review_flag).toEqual({ explanation: 'Hydraulic fluid is leaking under the pump panel.', items: [{ compartment_id: 'comp_r2', item_id: 'comp_r2-item-1' }] });
+});
+
+test('review flag rides inside the offline queued payload and replays the same bytes', async ({ page, context }, testInfo) => {
+  test.skip(!fullFlowProjects.includes(testInfo.project.name), 'Full submission flow runs on Chromium desktop and the 390px phone.');
+  test.setTimeout(90_000);
+  const api = await fixture(page, { checklist: continuityChecklist });
+  await reachContinuityReview(page, [['Officer R3', 'Sledgehammer', 'Damaged']]);
+  await page.getByRole('checkbox', { name: 'Flag this inspection for further review', exact: true }).check();
+  await page.getByRole('textbox', { name: 'What needs special attention?', exact: true }).fill('Frame crack behind the rear axle.');
+  await sign(page);
+  // The draft keeps the flag until the inspection is accepted.
+  await expect.poll(async () => (await readDrafts(page))[0]?.data.reviewFlag?.explanation).toBe('Frame crack behind the rear axle.');
+  await context.setOffline(true);
+  await submitReview(page);
+  await expect(page.getByRole('heading', { name: 'Inspection saved on this device' })).toBeVisible();
+  const rows = await queued(page);
+  expect(rows).toHaveLength(1);
+  expect(rows[0].data.review_flag).toEqual({ explanation: 'Frame crack behind the rear axle.', items: [] });
+  expect(api.submissions).toHaveLength(0);
+  await context.setOffline(false);
+  await expect.poll(() => api.submissions.length).toBe(1);
+  expect(api.submissions[0]).toEqual(rows[0].data);
+  await expect.poll(async () => (await queued(page)).length).toBe(0);
+});
+
+test('an unchecked or cleared review flag sends no review_flag key', async ({ page }, testInfo) => {
+  test.skip(!fullFlowProjects.includes(testInfo.project.name), 'Full submission flow runs on Chromium desktop and the 390px phone.');
+  test.setTimeout(90_000);
+  const api = await fixture(page, { checklist: continuityChecklist });
+  await reachContinuityReview(page);
+  const toggle = page.getByRole('checkbox', { name: 'Flag this inspection for further review', exact: true });
+  await toggle.check();
+  await page.getByRole('textbox', { name: 'What needs special attention?', exact: true }).fill('Changed my mind.');
+  await toggle.uncheck();
+  await expect(page.getByLabel('What needs special attention?')).toHaveCount(0);
+  await toggle.check();
+  await expect(page.getByRole('textbox', { name: 'What needs special attention?', exact: true })).toHaveValue('');
+  await toggle.uncheck();
+  await sign(page);
+  await submitReview(page);
+  await expect.poll(() => api.submissions.length).toBe(1);
+  expect(Object.keys(api.submissions[0])).not.toContain('review_flag');
+});
+
+test('Review & Sign with the review flag, related-item picker and previous issues has no horizontal overflow at 320px', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'daily-responsive-phone-320', 'Dedicated 320px check.');
+  test.setTimeout(90_000);
+  await fixture(page, { checklist: continuityChecklist, findings: [idMatchedFinding, nameOnlyFinding] });
+  await reachContinuityReview(page, [['Officer R3', 'Sledgehammer', 'Missing']]);
+  await page.getByRole('checkbox', { name: 'Flag this inspection for further review', exact: true }).check();
+  const explanation = page.getByRole('textbox', { name: 'What needs special attention?', exact: true });
+  await explanation.fill('A very long explanation '.repeat(40).slice(0, 1000));
+  await page.locator('details.review-flag-items summary').click();
+  await expect(page.getByRole('region', { name: 'Previously reported issues' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  for (const label of await page.locator('.review-flag-toggle, .review-flag-option').all()) {
+    expect((await label.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(43.5);
+  }
+  expect((await explanation.boundingBox())?.width ?? 999).toBeLessThanOrEqual(320);
+  await page.screenshot({ path: testInfo.outputPath('review-flag-320.png'), fullPage: true });
 });

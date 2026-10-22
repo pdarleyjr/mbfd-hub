@@ -170,6 +170,8 @@ export interface ChecklistItem {
   photo?: string; // base64 encoded image
   inputType?: ChecklistInputType;
   expectedQuantity?: number;
+  /** Optional member claim: new damage that affects safe operation. Only meaningful while status is Damaged. */
+  significant?: boolean;
 }
 
 export interface Compartment {
@@ -178,8 +180,29 @@ export interface Compartment {
   items: ChecklistItem[];
 }
 
+/** A previously reported, still-open issue on this apparatus. The newer keys are optional until the server sends them. */
+export interface OpenFinding {
+  id: number;
+  compartment: string;
+  item: string;
+  issue_type: string;
+  operational_impact: string;
+  last_observation: string | null;
+  last_observed_at: string | null;
+  service_status: string | null;
+  /** Stable checklist ids; matched before display names when both are present. */
+  compartment_id?: string;
+  item_id?: string;
+  action_status?: string;
+  /** Member-facing corrective action wording, for example "Replacement available". */
+  action_label?: string;
+  severity?: 'routine' | 'significant';
+  first_reported_at?: string | null;
+  latest_member_update?: { text: string; at: string } | null;
+}
+
 export interface ChecklistData {
-  open_findings?: Array<{ id: number; compartment: string; item: string; issue_type: string; operational_impact: string; last_observation: string | null; last_observed_at: string | null; service_status: string | null }>;
+  open_findings?: OpenFinding[];
   checklist_version: string;
   checklist_type?: string;
   schema_version: 1 | 2;
@@ -201,6 +224,37 @@ export interface Defect {
   item_id?: string;
   notes?: string;
   photo?: string;
+  /** Present only when the member marked new damage that affects safe operation. */
+  significant?: boolean;
+}
+
+/** One checklist item the member relates to a review flag. */
+export interface ReviewFlagItemRef {
+  compartment_id: string;
+  item_id: string;
+}
+
+/** The member's request for further review by Logistics or Fleet. Sent only when the flag is checked. */
+export interface ReviewFlag {
+  explanation: string;
+  items: ReviewFlagItemRef[];
+}
+
+export interface SubmittedChecklistItem {
+  id: string;
+  name: string;
+  status: ItemStatus;
+  observed: boolean;
+  photo?: string;
+  value?: ChecklistFieldValue;
+  notes: string | null;
+  significant?: true;
+}
+
+export interface SubmittedCompartment {
+  id: string;
+  name: string;
+  items: SubmittedChecklistItem[];
 }
 
 export interface InspectionSubmission {
@@ -218,13 +272,15 @@ export interface InspectionSubmission {
   engine_hours?: number | null;
   miles?: number | null;
   defects: Defect[];
-  compartments?: unknown[];
+  compartments?: SubmittedCompartment[];
   field_values?: Array<{ id: string; value: ChecklistFieldValue }>;
   scheduled_tasks?: ScheduledChecklistTaskResult[];
   inspection_session_id?: string;
   inspection_session_token?: string;
   inspection_session_replay_key?: string;
   officer_signature?: string | null;
+  /** Present only when the member checked "Flag this inspection for further review". */
+  review_flag?: ReviewFlag;
 }
 
 export interface MeterData {
@@ -232,8 +288,16 @@ export interface MeterData {
   miles: number | null;
 }
 
+export interface ReviewFlagDraft {
+  checked: boolean;
+  explanation: string;
+  items: ReviewFlagItemRef[];
+}
+
 export interface InspectionData {
   signature?: string | null;
+  /** Draft state of the review flag; absent when never checked. */
+  reviewFlag?: ReviewFlagDraft;
   actorUserId?: number;
   actorSecurityVersion?: number;
   checklist_version: string;
