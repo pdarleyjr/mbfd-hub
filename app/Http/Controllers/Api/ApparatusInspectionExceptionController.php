@@ -74,7 +74,7 @@ final class ApparatusInspectionExceptionController extends Controller
     {
         $reviewer = $this->members->resolve($request)->user();
         $result = $this->exceptions->reconcile($exception->id, $reviewer, $request->only([
-            'action', 'reason', 'value', 'expected_current_value', 'operational_impact', 'service_ticket',
+            'action', 'reason', 'value', 'expected_current_value', 'confirm_meter_reset', 'operational_impact', 'service_ticket',
         ]));
 
         return $this->receipt($result);

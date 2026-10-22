@@ -6,13 +6,13 @@ namespace App\Policies;
 
 use App\Models\ApparatusInspectionException;
 use App\Models\User;
-use App\Services\Security\FleetOperationsManagerAssignment;
+use App\Support\Fleet\InspectionReviewers;
 
 final class ApparatusInspectionExceptionPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->hasAnyRole(['super_admin', 'admin', 'logistics_admin', FleetOperationsManagerAssignment::ROLE]);
+        return InspectionReviewers::canReview($user);
     }
 
     public function view(User $user, ApparatusInspectionException $exception): bool
