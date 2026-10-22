@@ -10,20 +10,15 @@
 <body>
 <main class="identity-narrow">
     <div class="identity-strip"><img src="/images/mbfd_logo-256.png" alt="" width="32" height="32">Miami Beach Fire Department</div>
-    <h1>Set up with employee details</h1>
-    <p>This option completes first-time setup for eligible accounts. If you already have a password, sign in. To choose or reset a password by email, request a private link.</p>
-    <a class="help" href="{{ $loginAttempt ? '/login?login_attempt='.$loginAttempt : route('login') }}">Already have a password? Sign in</a>
-    @if ($emailEnabled)
-        <a class="identity-secondary" href="{{ route('member-activation.email', array_filter(['login_attempt' => $loginAttempt])) }}">Get a private email link</a>
-    @endif
+    <h1>Activate your account</h1>
+    <p>First time using MBFD Hub? Confirm who you are and choose a password. It takes about a minute.</p>
 
     @error('activation')
         <div class="notice error" role="alert">{{ $message }}</div>
     @enderror
 
-    <form method="POST" action="{{ route('member-activation.store', array_filter(['method' => 'details', 'login_attempt' => $loginAttempt])) }}">
+    <form method="POST" action="{{ route('member-activation.store', array_filter(['login_attempt' => $loginAttempt])) }}">
         @csrf
-        <input type="hidden" name="method" value="details">
         @if ($loginAttempt)
             <input type="hidden" name="login_attempt" value="{{ $loginAttempt }}">
         @endif
@@ -58,7 +53,7 @@
                 <option value="{{ $unit }}" @selected(old('unit') === $unit)>{{ $unit }}</option>
             @endforeach
         </select>
-        <div id="bid-hint" class="hint">Use your officially recorded {{ $bidCycle }} bid, rather than a temporary assignment, overtime, or shift exchange. If your record is outdated, use an email link instead.</div>
+        <div id="bid-hint" class="hint">From the {{ $bidCycle }} bid, not the previous bid.</div>
         @error('unit')<div class="error" role="alert">{{ $message }}</div>@enderror
 
         @if ($bidChoices['positions'] !== [])
@@ -86,7 +81,12 @@
         <button type="submit">Activate account</button>
     </form>
 
-    <p class="help small">Having trouble or missing your position? Contact MBFD Hub support to check your account and email on file. Do not create another account.</p>
+    @if ($emailEnabled)
+        <a class="help" href="{{ route('member-activation.email', array_filter(['login_attempt' => $loginAttempt])) }}">Use email activation instead</a>
+    @else
+        <p class="help small">Having trouble? Contact MBFD Hub support for an email setup link.</p>
+    @endif
+    <a class="help" href="{{ $loginAttempt ? '/login?login_attempt='.$loginAttempt : route('login') }}">Already activated? Sign in</a>
 </main>
 </body>
 </html>

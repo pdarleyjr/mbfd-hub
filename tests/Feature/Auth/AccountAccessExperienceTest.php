@@ -29,25 +29,29 @@ final class AccountAccessExperienceTest extends TestCase
         Queue::fake();
     }
 
-    public function test_email_is_the_primary_setup_and_recovery_path_and_details_are_explicit(): void
+    public function test_bid_form_is_the_primary_setup_path_and_email_is_the_backup(): void
     {
         $attempt = str_repeat('a', 64);
 
-        $this->get('/activate?login_attempt='.$attempt)
-            ->assertRedirect('/activate/email?login_attempt='.$attempt);
+        $this->get('/activate?login_attempt='.$attempt)->assertOk()
+            ->assertSee('Activate your account')
+            ->assertSee('First time using MBFD Hub? Confirm who you are and choose a password. It takes about a minute.')
+            ->assertSee('Shift you bid')
+            ->assertSee('From the 2026–27 bid, not the previous bid.')
+            ->assertSee('name="login_attempt"', false)
+            ->assertSee('Use email activation instead')
+            ->assertSee('Already activated? Sign in');
+        $this->get('/activate?method=details&login_attempt='.$attempt)->assertOk()
+            ->assertSee('Shift you bid');
         $this->get('/activate/email?login_attempt='.$attempt)->assertOk()
             ->assertSee('first-time setup and forgotten passwords')
             ->assertSee('Inbox and Junk in your City email')
-            ->assertSee('method=details', false)
+            ->assertSee('Activate with your bid shift and unit instead')
+            ->assertDontSee('Another way', false)
+            ->assertDontSee('<details', false)
             ->assertSee('login_attempt='.$attempt, false)
             ->assertDontSee('name="email"', false)
             ->assertDontSee('name="password"', false);
-        $this->get('/activate?method=details&login_attempt='.$attempt)->assertOk()
-            ->assertSee('Shift you bid')
-            ->assertSee('temporary assignment, overtime, or shift exchange')
-            ->assertSee('name="login_attempt"', false)
-            ->assertSee('name="method" value="details"', false)
-            ->assertSee('Already have a password? Sign in');
     }
 
     public function test_feature_switches_keep_the_available_path_reachable(): void
@@ -60,7 +64,8 @@ final class AccountAccessExperienceTest extends TestCase
         config()->set('identity.self_service_activation.email_request_enabled', true);
         config()->set('identity.self_service_activation.enabled', false);
         $this->get('/activate?method=details')->assertRedirect('/activate/email');
-        $this->get('/activate/email')->assertOk()->assertDontSee('method=details', false);
+        $this->get('/activate')->assertRedirect('/activate/email');
+        $this->get('/activate/email')->assertOk()->assertDontSee('bid shift and unit');
     }
 
     public function test_email_request_is_honest_generic_and_retains_only_the_employee_id(): void
@@ -116,15 +121,16 @@ final class AccountAccessExperienceTest extends TestCase
         $messages = [];
 
         foreach (['EXISTING-NOEMAIL', 'UNKNOWN-ACCOUNT'] as $identifier) {
-            $this->post('/activate?method=details', [
+            $this->post('/activate', [
                 'employee_id' => $identifier, 'email' => 'typed-address@miamibeachfl.gov',
                 'position' => 'Firefighter', 'password' => 'New-Private-Password!5729',
                 'password_confirmation' => 'New-Private-Password!5729',
-            ])->assertRedirect('/activate?method=details')->assertSessionHasErrors('activation');
+            ])->assertRedirect('/activate')->assertSessionHasErrors('activation');
             $messages[] = session('errors')->first('activation');
-            $this->get('/activate?method=details')->assertOk()
+            $this->get('/activate')->assertOk()
+                ->assertSee('Shift you bid')
                 ->assertSee('If you already have a password, sign in.')
-                ->assertSee('Get a private email link')
+                ->assertSee('Use email activation instead')
                 ->assertDontSee('Private Existing Member')
                 ->assertDontSee('private-existing@canonical.mbfdhub.invalid')
                 ->assertDontSee('New-Private-Password!5729');
@@ -143,7 +149,7 @@ final class AccountAccessExperienceTest extends TestCase
 
     public function test_all_auth_pages_protect_private_urls_from_caching_referrers_and_csp_reports(): void
     {
-        foreach (['/login', '/activate/email', '/activate?method=details', '/forgot-password',
+        foreach (['/login', '/activate/email', '/activate', '/forgot-password',
             '/reset-password/private-reset-token?employee_id=ACCESS-ID', '/member-onboarding/invite'] as $path) {
             $response = $this->get($path)->assertOk()
                 ->assertHeader('Cache-Control', 'no-store, private')
@@ -162,7 +168,8 @@ final class AccountAccessExperienceTest extends TestCase
                 ->assertSee('email on file')
                 ->assertDontSee('Create account');
         }
-        $this->get('/login')->assertOk()->assertSee('Set up or recover your account')
-            ->assertSee('already have a password');
+        $this->get('/login')->assertOk()->assertSee('First time using MBFD Hub? Activate Your Account')
+            ->assertDontSee('Set up or recover your account')
+            ->assertDontSee('First time signing in or unsure');
     }
 }

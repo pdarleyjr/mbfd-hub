@@ -33,11 +33,7 @@
 
     <a class="identity-secondary" href="{{ $loginAttempt ? '/login?login_attempt='.$loginAttempt : route('login') }}">Already have a password? Sign in</a>
     @if ($claimEnabled)
-        <details>
-            <summary>Another way to complete first-time setup</summary>
-            <p class="small">If your account is waiting for first-time setup, you can verify your City email and bid assignment or non-bid position. Existing passwords cannot be changed this way.</p>
-            <a class="help" href="{{ route('member-activation.show', array_filter(['method' => 'details', 'login_attempt' => $loginAttempt])) }}">Use employee details instead</a>
-        </details>
+        <a class="help" href="{{ route('member-activation.show', array_filter(['login_attempt' => $loginAttempt])) }}">Activate with your bid shift and unit instead</a>
     @endif
 </main>
 </body>

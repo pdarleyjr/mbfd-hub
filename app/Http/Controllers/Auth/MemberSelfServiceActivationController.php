@@ -40,11 +40,10 @@ final class MemberSelfServiceActivationController extends Controller
         if ($request->user('web') instanceof User) {
             return redirect('/');
         }
-        if ($activation->emailRequestEnabled() && (! $activation->enabled() || $request->query('method') !== 'details')) {
-            return redirect()->route('member-activation.email', $request->only('login_attempt'));
-        }
         if (! $activation->enabled()) {
-            return redirect('/login');
+            return $activation->emailRequestEnabled()
+                ? redirect()->route('member-activation.email', $request->only('login_attempt'))
+                : redirect('/login');
         }
 
         return $this->page('auth.member-activation', $request, $activation);
@@ -80,7 +79,7 @@ final class MemberSelfServiceActivationController extends Controller
             'position' => 'position',
         ]);
         if ($validator->fails()) {
-            return redirect()->route('member-activation.show', ['method' => 'details'] + $request->only('login_attempt'))
+            return redirect()->route('member-activation.show', $request->only('login_attempt'))
                 ->withErrors($validator)->withInput($request->only(self::REMEMBERED));
         }
         $data = $validator->validated();
@@ -205,7 +204,7 @@ final class MemberSelfServiceActivationController extends Controller
             'source_fingerprint' => hash_hmac('sha256', (string) $request->ip(), (string) config('app.key')),
         ]);
 
-        return redirect()->route('member-activation.show', ['method' => 'details'] + $request->only('login_attempt'))
+        return redirect()->route('member-activation.show', $request->only('login_attempt'))
             ->withErrors(['activation' => $message])->withInput($request->only(self::REMEMBERED));
     }
 

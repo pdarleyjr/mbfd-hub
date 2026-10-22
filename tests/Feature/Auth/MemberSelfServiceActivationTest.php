@@ -81,9 +81,8 @@ final class MemberSelfServiceActivationTest extends TestCase
         $other = $this->pending('SELF-OTHER', shift: 'B Shift', unit: 'Rescue 2');
         $userCount = User::query()->count();
 
-        $this->get('/login')->assertOk()->assertSee('Set up or recover your account');
-        $this->get('/activate')->assertRedirect('/activate/email');
-        $this->get('/activate?method=details')->assertOk()
+        $this->get('/login')->assertOk()->assertSee('First time using MBFD Hub? Activate Your Account');
+        $this->get('/activate')->assertOk()
             ->assertSee('Shift you bid')->assertSee('A Shift')->assertSee('B Shift')
             ->assertSee('Engine 1')->assertSee('Rescue 2')
             ->assertHeader('Cache-Control', 'no-store, private');
@@ -151,7 +150,7 @@ final class MemberSelfServiceActivationTest extends TestCase
             $this->form('SELF-DOES-NOT-EXIST'),
         ] as $attempt) {
             $response = $this->from('/activate')->post('/activate', $attempt);
-            $response->assertRedirect('/activate?method=details')->assertSessionHasErrors('activation');
+            $response->assertRedirect('/activate')->assertSessionHasErrors('activation');
             $messages[] = session('errors')->first('activation');
             $this->assertGuest('web');
             $this->flushSession();
@@ -168,7 +167,7 @@ final class MemberSelfServiceActivationTest extends TestCase
         $member = $this->pending('SELF-LATEST', shift: 'C Shift', unit: 'Engine 4', bidYear: 2025);
         $this->bid($member->employeeProfile, 'A Shift', 'Engine 1', 2026);
 
-        $this->get('/activate?method=details')->assertOk()->assertSee('Engine 1')->assertDontSee('Engine 4');
+        $this->get('/activate')->assertOk()->assertSee('Engine 1')->assertDontSee('Engine 4');
         $this->post('/activate', $this->form('SELF-LATEST', ['shift' => 'C Shift', 'unit' => 'Engine 4']))
             ->assertSessionHasErrors('activation');
         self::assertSame(AccountStatus::PendingActivation, $member->fresh()->account_status);
@@ -182,7 +181,7 @@ final class MemberSelfServiceActivationTest extends TestCase
         $member = $this->pending('SELF-NOTE', shift: 'C Shift', unit: 'Engine 4', bidYear: 2025);
         $this->bid($member->employeeProfile, 'A Shift', 'Engine 1', 2026);
 
-        $this->get('/activate?method=details')->assertOk()
+        $this->get('/activate')->assertOk()
             ->assertSee('Use your new 2026–27 bid.')
             ->assertSee('not the assignment you held under the previous bid', false)
             ->assertSee('Shift you bid (2026–27 bid)');
@@ -194,7 +193,7 @@ final class MemberSelfServiceActivationTest extends TestCase
         $analyst = $this->pending('SELF-ANALYST', bid: false, rank: 'Plans Analyst #2');
         $this->pending('SELF-MECHANIC', bid: false, rank: 'Mechanic #1');
 
-        $this->get('/activate?method=details')->assertOk()
+        $this->get('/activate')->assertOk()
             ->assertSee('My position does not bid')
             ->assertSee('Plans Analyst #2')->assertSee('Mechanic #1')
             ->assertDontSee('Firefighter');
@@ -253,7 +252,7 @@ final class MemberSelfServiceActivationTest extends TestCase
 
         $this->from('/activate')->post('/activate', $this->form('SELF-ONCE', [
             'password' => 'Attacker-Password!9911', 'password_confirmation' => 'Attacker-Password!9911',
-        ]))->assertRedirect('/activate?method=details')->assertSessionHasErrors('activation');
+        ]))->assertRedirect('/activate')->assertSessionHasErrors('activation');
 
         self::assertSame($hash, $member->fresh()->getRawOriginal('password'));
         self::assertSame(2, $member->fresh()->security_version);
@@ -424,7 +423,7 @@ final class MemberSelfServiceActivationTest extends TestCase
         config()->set('identity.self_service_activation.email_request_enabled', false);
         $member = $this->pending('SELF-OFF');
 
-        $this->get('/login')->assertOk()->assertDontSee('Set up or recover your account')->assertSee('personal setup link');
+        $this->get('/login')->assertOk()->assertDontSee('Activate Your Account')->assertSee('personal setup link');
         $this->get('/activate')->assertRedirect('/login');
         $this->get('/activate/email')->assertRedirect('/login');
         $this->post('/activate', $this->form('SELF-OFF'))->assertNotFound();
@@ -445,7 +444,7 @@ final class MemberSelfServiceActivationTest extends TestCase
     {
         config()->set('identity.self_service_activation.enabled', false);
 
-        $this->get('/login')->assertOk()->assertSee('Set up or recover your account');
+        $this->get('/login')->assertOk()->assertSee('First time using MBFD Hub? Activate Your Account');
         $this->get('/activate')->assertRedirect('/activate/email');
         $this->get('/activate/email')->assertOk()->assertSee('Email my link')->assertDontSee('bid shift and unit');
         $this->post('/activate', $this->form('ANY'))->assertNotFound();

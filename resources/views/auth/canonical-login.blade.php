@@ -44,8 +44,7 @@
     </form>
     <a class="help" href="{{ route('password.request') }}">Forgot your password?</a>
     @if ($activationUrl ?? null)
-        <a class="identity-secondary" href="{{ $activationUrl }}">Set up or recover your account</a>
-        <p class="small">First time signing in or unsure whether you have an account? Start with your Employee ID. If you already have a password, sign in above.</p>
+        <a class="identity-secondary" href="{{ $activationUrl }}">First time using MBFD Hub? Activate Your Account</a>
     @else
         <p class="help">First time signing in? Open the personal setup link sent to your City email. If you did not receive one, contact MBFD Hub support.</p>
     @endif
