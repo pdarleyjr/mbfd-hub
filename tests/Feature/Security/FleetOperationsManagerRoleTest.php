@@ -35,7 +35,7 @@ final class FleetOperationsManagerRoleTest extends TestCase
         $role = Role::findByName(FleetOperationsManagerAssignment::ROLE, 'web');
         self::assertSame(1, Role::query()->where('name', FleetOperationsManagerAssignment::ROLE)->count());
         self::assertEqualsCanonicalizing(
-            ['admin.access', 'admin.fleet.view', 'admin.fleet.manage', 'admin.stations.view', 'manage_pm_settings'],
+            ['admin.access', 'admin.fleet.view', 'admin.fleet.manage', 'admin.stations.view', 'manage_pm_settings', 'admin.fleet.documents.sensitive', 'admin.fleet.documents.export'],
             $role->permissions->pluck('name')->all(),
         );
         self::assertSame(2, $role->users()->count());
@@ -80,6 +80,28 @@ final class FleetOperationsManagerRoleTest extends TestCase
         self::assertSame([], $second['granted']);
         self::assertSame(1, $member->fresh()->roles()->where('name', FleetOperationsManagerAssignment::ROLE)->count());
         self::assertTrue($member->fresh()->hasDirectWebPermission('admin.stations.manage'));
+    }
+
+    public function test_document_capabilities_extend_the_existing_role_without_changing_member_assignments(): void
+    {
+        $role = Role::findOrCreate(FleetOperationsManagerAssignment::ROLE, 'web');
+        $member = $this->member();
+        $member->assignRole($role);
+        $member->givePermissionTo(collect(FleetOperationsManagerAssignment::DIRECT_PERMISSIONS)
+            ->map(fn (string $name): Permission => Permission::findOrCreate($name, 'web')));
+        $before = $this->granted($member);
+        $roles = $member->roles()->pluck('name')->all();
+
+        $migration = require database_path('migrations/2026_10_22_150100_provision_fleet_document_permissions.php');
+        $migration->up();
+        $member = $member->fresh();
+        $vehicle = \App\Models\UnitMasterVehicle::query()->create(['veh_number' => 'ROLE-TEST']);
+
+        self::assertSame($before, $this->granted($member));
+        self::assertSame($roles, $member->roles()->pluck('name')->all());
+        self::assertTrue(FleetOperationsManagerAssignment::isAssigned($member));
+        self::assertTrue(\App\Support\Fleet\VehicleDocumentAccess::canSensitive($member));
+        self::assertTrue(\App\Support\Fleet\VehicleDocumentAccess::canExport($member, $vehicle));
     }
 
     public function test_removing_takes_back_fleet_access_but_keeps_unrelated_capabilities(): void

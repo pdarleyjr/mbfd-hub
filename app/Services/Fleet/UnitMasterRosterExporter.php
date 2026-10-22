@@ -25,7 +25,7 @@ final class UnitMasterRosterExporter
 {
     public const TIMEZONE = 'America/New_York';
 
-    public const TITLE = 'MBFD Master Unit Vehicle Inventory';
+    public const TITLE = 'MBFD Master Vehicle Inventory';
 
     private const LOGO_PATH = 'images/mbfd_logo-256.png';
 

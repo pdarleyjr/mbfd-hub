@@ -22,6 +22,10 @@ class ListUnitMasterVehicles extends ListRecords
             $this->exportAction('exportExcel', 'Export Excel', 'heroicon-o-table-cells', 'xlsx'),
             $this->exportAction('exportPdf', 'Export PDF', 'heroicon-o-document-arrow-down', 'pdf'),
             Actions\CreateAction::make(),
+            Actions\Action::make('importReview')->label('Historical document review')
+                ->icon('heroicon-o-inbox')->color('gray')
+                ->visible(fn (): bool => \App\Support\Fleet\VehicleDocumentAccess::canManage(auth()->user()))
+                ->url(UnitMasterVehicleResource::getUrl('import-review')),
         ];
     }
 
