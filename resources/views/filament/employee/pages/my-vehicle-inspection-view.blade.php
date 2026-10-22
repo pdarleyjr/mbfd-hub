@@ -191,7 +191,7 @@
 
     @forelse($detail['compartments'] as $compartment)
         <x-filament::section :heading="$compartment['name']" collapsible>
-            <div class="hub-insp-table-wrap">
+            <div class="hub-insp-table-wrap" tabindex="0" role="region" aria-label="{{ $compartment['name'] }} checklist results">
                 <table class="hub-insp-table">
                     <thead>
                         <tr>

@@ -286,3 +286,7 @@
 .hub-insp-reply button { justify-self: start; min-height: 2.75rem; min-width: 2.75rem; padding: .5rem 1.25rem; border: 1px solid rgb(var(--hub-action-primary)); border-radius: var(--hub-radius-control); background: rgb(var(--hub-action-primary)); color: rgb(var(--hub-n-0)); font-size: .9375rem; font-weight: 650; cursor: pointer; }
 .hub-insp-reply button[disabled] { opacity: .7; cursor: progress; }
 .hub-insp-finding__link { display: inline-flex; align-items: center; min-height: 2.75rem; color: rgb(var(--hub-action-primary)); font-weight: 650; text-decoration: underline; text-underline-offset: 3px; }
+
+/* Header actions (Download PDF, Open printable PDF) are 44px targets. */
+[data-hub-portal="employee"] .fi-header .fi-btn { min-height: 2.75rem; }
+.hub-insp-table-wrap:focus-visible { outline: 2px solid rgb(var(--hub-focus)); outline-offset: 2px; }

@@ -103,6 +103,8 @@ final class MyVehicleInspectionMessagesTest extends TestCase
         $html = $this->actingAs($this->owner)->get($this->url())->assertOk()->getContent();
 
         $this->assertStringContainsString('id="messages"', $html);
+        // Scrollable checklist tables are keyboard reachable and named (axe scrollable-region-focusable).
+        $this->assertMatchesRegularExpression('/class="hub-insp-table-wrap" tabindex="0" role="region" aria-label="Cab checklist results"/', $html);
         $this->assertStringContainsString('id="issue-'.$this->defect->id.'"', $html);
 
         $link = MyVehicleInspectionView::getUrl(['inspection' => $this->inspection->id], false, 'employee');
