@@ -138,6 +138,11 @@ Schedule::command('department-updates:send-due-notifications')
     ->withoutOverlapping()
     ->onOneServer();
 
+Schedule::command('inspections:retry-notifications')
+    ->everyTenMinutes()
+    ->withoutOverlapping()
+    ->onOneServer();
+
 Artisan::command('video-conferencing:expire-lineup', function (
     ConferenceSessionService $sessions,
     ConferenceLineupReadinessService $readiness,

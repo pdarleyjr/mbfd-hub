@@ -20,7 +20,7 @@ return new class extends Migration
             $table->json('review_flag_items')->nullable();
             // The physical truck whose meters/defects this inspection's findings were applied to.
             $table->foreignId('processed_apparatus_id')->nullable()
-                ->constrained('apparatuses', 'id', 'apparatus_inspections_processed_apparatus_fk')->nullOnDelete();
+                ->constrained('apparatuses')->nullOnDelete();
             $table->index('processed_apparatus_id', 'apparatus_inspections_processed_apparatus_index');
         });
 
@@ -55,11 +55,11 @@ return new class extends Migration
             $table->dropColumn('blocks_acceptance');
         });
         Schema::table('apparatus_inspections', function (Blueprint $table): void {
-            $table->dropForeign('apparatus_inspections_processed_apparatus_fk');
             $table->dropIndex('apparatus_inspections_processed_apparatus_index');
         });
         Schema::table('apparatus_inspections', function (Blueprint $table): void {
-            $table->dropColumn(['review_flag_explanation', 'review_flag_items', 'processed_apparatus_id']);
+            $table->dropConstrainedForeignId('processed_apparatus_id');
+            $table->dropColumn(['review_flag_explanation', 'review_flag_items']);
         });
     }
 };

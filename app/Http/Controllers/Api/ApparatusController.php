@@ -655,27 +655,12 @@ class ApparatusController extends Controller
         }
     }
 
-    /** Equipment context for authenticated members; no personnel, notes or private storage paths. */
+    /** Equipment context for authenticated members; no personnel, internal notes or private storage paths. */
     private function knownFindings(Apparatus $apparatus): array
     {
         $resolved = app(DailyCheckoutChecklistResolver::class)->resolve($apparatus);
-        $definitions = collect(app(\App\Services\InspectionPaperFields::class)->equipmentDefinitions($resolved['checklist'] ?? []))->flatten(1);
 
-        return $apparatus->openDefects()->with(['latestObservation', 'serviceTicket'])->get()->map(static function ($defect) use ($definitions): array {
-            $matches = $definitions->filter(fn (array $identity): bool => in_array($defect->compartment, $identity['compartment_names'], true) && in_array($defect->item, $identity['item_names'], true));
-            $identity = $matches->count() === 1 ? $matches->first() : null;
-
-            return [
-                'id' => $defect->id,
-                'compartment' => $identity['compartment'] ?? $defect->compartment,
-                'item' => $identity['item'] ?? $defect->item,
-                'issue_type' => $defect->issue_type,
-                'operational_impact' => $defect->operational_impact,
-                'last_observation' => $defect->latestObservation?->observation,
-                'last_observed_at' => $defect->latestObservation?->created_at?->toIso8601String(),
-                'service_status' => $defect->serviceTicket?->status,
-            ];
-        })->all();
+        return app(\App\Services\Defects\DefectContinuityService::class)->openFindings($apparatus, $resolved['checklist'] ?? []);
     }
 
     /**

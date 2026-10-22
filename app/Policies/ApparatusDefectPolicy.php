@@ -4,6 +4,7 @@ namespace App\Policies;
 
 use App\Models\ApparatusDefect;
 use App\Models\User;
+use App\Support\Fleet\InspectionReviewers;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
 class ApparatusDefectPolicy
@@ -24,6 +25,16 @@ class ApparatusDefectPolicy
     public function view(User $user, ApparatusDefect $apparatusDefect): bool
     {
         return $user->can('view_defect');
+    }
+
+    /**
+     * Acknowledge, update, resolve, dismiss, reopen, verify, classify or link a ticket
+     * on an equipment issue, and write internal notes. Same rule as approving an
+     * inspection: an administrative role OR the Fleet manage capability.
+     */
+    public function manageCorrectiveAction(User $user, ?ApparatusDefect $apparatusDefect = null): bool
+    {
+        return InspectionReviewers::canReview($user);
     }
 
     /**

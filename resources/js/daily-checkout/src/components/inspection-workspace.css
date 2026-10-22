@@ -171,6 +171,43 @@
 .inspection-signature-pad { border: 2px solid rgb(var(--hub-control-border)); border-radius: var(--hub-radius-control); background: rgb(var(--hub-well)); }
 .inspection-signature-pad.is-invalid { border-color: var(--red); }
 .inspection-review-actions { display: flex; flex-wrap: nowrap; align-items: center; justify-content: space-between; gap: 12px; }
+/* Previously reported issues: status is always spelled out in text, never colour alone. */
+.equipment-known { display: grid; gap: 8px; }
+.equipment-known-entry p { display: flex; align-items: flex-start; gap: 6px; }
+.equipment-known-entry p + p { padding-left: 20px; color: var(--muted); font-size: 13px; }
+.equipment-known-entry strong { font-weight: 650; overflow-wrap: anywhere; }
+.equipment-known-entry svg { flex-shrink: 0; margin-top: 3px; }
+.equipment-known-entry .equipment-known-update { color: rgb(var(--hub-n-800)); overflow-wrap: anywhere; }
+.equipment-known-note { padding: 8px 12px; border: 1px solid rgb(var(--hub-info-border)); border-radius: var(--hub-radius-control); background: rgb(var(--hub-info-bg)); color: rgb(var(--hub-info)); font-size: 14px; font-weight: 600; }
+.equipment-details label.equipment-significant { display: flex; align-items: flex-start; gap: 12px; min-height: 44px; margin: 4px 0 12px; padding: 8px 0; font-size: 14px; font-weight: 600; cursor: pointer; }
+.equipment-details label.equipment-significant input[type="checkbox"] { flex-shrink: 0; width: 24px; min-height: 24px; height: 24px; margin: 0; padding: 0; accent-color: var(--action); }
+
+/* Review & Sign: previously reported issues and the review flag. */
+.inspection-previous-issues ul { display: grid; gap: 0; margin-top: 8px; }
+.inspection-previous-issues li { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 6px 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+.inspection-previous-issues li > div { min-width: 0; flex: 1 1 200px; }
+.inspection-previous-issues strong { display: block; font-weight: 650; overflow-wrap: anywhere; }
+.inspection-previous-issues small { display: block; margin-top: 2px; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.inspection-review-flag { padding-block: 16px; border-top: 1px solid var(--line); }
+.review-flag-toggle { display: flex; align-items: flex-start; gap: 12px; min-height: 44px; padding: 8px 0; font-weight: 650; cursor: pointer; }
+.review-flag-toggle input, .review-flag-option input { flex-shrink: 0; width: 24px; height: 24px; margin: 0; accent-color: var(--action); }
+.review-flag-help { margin: 0 0 12px; padding-left: 36px; font-size: 14px; color: var(--muted); }
+.review-flag-body { padding: 12px; border: 1px solid rgb(var(--hub-glass-border)); border-radius: var(--hub-radius-control); background: rgb(var(--hub-well)); }
+.review-flag-field-label { display: block; margin: 0 0 4px; font-size: 13px; font-weight: 650; }
+.review-flag-body :is(textarea, input[type="search"]) { display: block; width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid rgb(var(--hub-control-border)); border-radius: var(--hub-radius-control); background: rgb(var(--hub-well)); font-size: 16px; }
+.review-flag-body textarea.is-invalid { border-color: var(--red); }
+.review-flag-meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; margin-top: 4px; }
+.review-flag-error { color: var(--red); font-size: 14px; font-weight: 650; }
+.review-flag-count { margin-left: auto; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.review-flag-items { margin-top: 12px; border-top: 1px solid var(--line); }
+.review-flag-items > summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px; min-height: 44px; cursor: pointer; font-weight: 650; font-size: 14px; }
+.review-flag-selected { font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; }
+.review-flag-items :is(summary, input, label):focus-visible { outline: 2px solid rgb(var(--hub-focus)); outline-offset: 2px; }
+.review-flag-group { margin: 12px 0 0; padding: 0; border: 0; min-width: 0; }
+.review-flag-group legend { padding: 0; font-size: 13px; font-weight: 700; color: var(--muted); overflow-wrap: anywhere; }
+.review-flag-option { display: flex; align-items: flex-start; gap: 12px; min-height: 44px; padding: 8px 0; font-size: 14px; cursor: pointer; border-bottom: 1px solid rgb(var(--hub-n-100)); }
+.review-flag-option > span { min-width: 0; overflow-wrap: anywhere; }
+.review-flag-option small { margin-left: 8px; }
 @media (hover: hover) {
   .inspection-area-list button:hover, .equipment-expand:hover, .quick-checklist li button:hover, .blueprint-touch-zones button:not([aria-pressed=true]):hover { background: rgb(var(--hub-n-50)); }
   .blueprint-zone:hover > rect { stroke: var(--ink); stroke-width: 3; }

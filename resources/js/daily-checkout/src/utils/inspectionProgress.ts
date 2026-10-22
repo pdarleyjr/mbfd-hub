@@ -1,4 +1,5 @@
 import type { ChecklistData, ChecklistFieldValue, ChecklistItem, Compartment, MeterData, OfficerInfo, ScheduledChecklistTaskResult } from '../types';
+import { resolveFindingTargets } from './previousFindings';
 import { vehicleConfirmationComplete } from './vehicleConfirmation';
 
 export function itemIsComplete(item: ChecklistItem) {
@@ -14,8 +15,10 @@ export function inspectionProgress(compartments: Compartment[]) {
   return { total: items.length, completed, remaining: items.length - completed, issues };
 }
 
-export function findingsForArea(compartment: Compartment, findings: ChecklistData['open_findings'] = []) {
-  return findings.filter(finding => finding.compartment === compartment.name && compartment.items.some(item => item.name === finding.item));
+/** Findings that resolve to an item of this area. Pass every area so id matches fall back to names correctly. */
+export function findingsForArea(compartment: Compartment, findings: ChecklistData['open_findings'] = [], compartments: Compartment[] = [compartment]) {
+  const located = new Set(resolveFindingTargets(compartments, findings).filter(target => target.compartment.id === compartment.id).map(target => target.finding));
+  return findings.filter(finding => located.has(finding));
 }
 
 export function inspectionReadiness(checklist: ChecklistData | null, compartments: Compartment[], fieldValues: Array<{ id: string; value: ChecklistFieldValue }>, scheduledTasks: ScheduledChecklistTaskResult[], officer: OfficerInfo, meters: MeterData) {

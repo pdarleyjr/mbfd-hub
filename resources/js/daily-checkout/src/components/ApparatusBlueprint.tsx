@@ -25,7 +25,7 @@ export default function ApparatusBlueprint({ view, compartments, activeId, onSel
         const compartment = compartments.find(entry => entry.id === zone.compartmentId);
         if (!compartment) return null;
         const progress = inspectionProgress([compartment]);
-        const existing = findingsForArea(compartment, findings).length;
+        const existing = findingsForArea(compartment, findings, compartments).length;
         const complete = progress.total > 0 && progress.remaining === 0;
         // Pointer target only (tabIndex -1): the matching touch-zone button below the diagram is the single keyboard stop.
         return <g key={zone.compartmentId} data-area-id={zone.compartmentId} role="button" tabIndex={-1} aria-pressed={activeId === zone.compartmentId}
