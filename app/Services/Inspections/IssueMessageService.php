@@ -116,6 +116,65 @@ final class IssueMessageService
         return $query->orderBy('created_at')->orderBy('id')->get();
     }
 
+    /**
+     * Member-visible threads for the issues one owned inspection reported or observed, loaded in a
+     * constant number of queries. Authorization happens once for the page: the viewer must own the
+     * inspection, and an issue qualifies only when this inspection created, first reported or
+     * observed it on the same physical vehicle. Internal messages are never returned, even to a
+     * viewer who also holds a reviewer role.
+     *
+     * @param  list<int>  $defectIds
+     * @return array<int, Collection<int, ApparatusIssueMessage>> defect id => messages (oldest first); ids that do not qualify are omitted
+     *
+     * @throws AuthorizationException
+     */
+    public function memberThreadsForInspection(User $viewer, ApparatusInspection $inspection, array $defectIds): array
+    {
+        if (! $this->history->owns($viewer, $inspection)) {
+            throw new AuthorizationException('You can only use the threads of an inspection you submitted.');
+        }
+        if ($defectIds === []) {
+            return [];
+        }
+
+        $observed = DB::table('apparatus_defect_observations')
+            ->where('apparatus_inspection_id', $inspection->getKey())
+            ->whereIn('apparatus_defect_id', $defectIds)
+            ->pluck('apparatus_defect_id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+        $physicalId = (int) ($inspection->processed_apparatus_id ?? $inspection->apparatus_id);
+        $allowed = ApparatusDefect::query()
+            ->whereIn('id', $defectIds)
+            ->where('apparatus_id', $physicalId)
+            ->get(['id', 'apparatus_inspection_id', 'first_reported_inspection_id'])
+            ->filter(fn (ApparatusDefect $defect): bool => (int) $defect->apparatus_inspection_id === (int) $inspection->getKey()
+                || (int) $defect->first_reported_inspection_id === (int) $inspection->getKey()
+                || in_array((int) $defect->getKey(), $observed, true))
+            ->pluck('id')
+            ->map(fn ($id): int => (int) $id)
+            ->all();
+        if ($allowed === []) {
+            return [];
+        }
+
+        $byDefect = ApparatusIssueMessage::query()
+            ->with('author:id,name,display_name')
+            ->whereIn('apparatus_defect_id', $allowed)
+            ->memberVisible()
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->get()
+            ->groupBy('apparatus_defect_id');
+
+        $threads = [];
+        foreach ($allowed as $id) {
+            $threads[$id] = $byDefect->get($id, new Collection);
+        }
+
+        return $threads;
+    }
+
     public function canPost(User $user, ApparatusInspection|ApparatusDefect $target, string $visibility = ApparatusIssueMessage::VISIBILITY_MEMBER): bool
     {
         try {
