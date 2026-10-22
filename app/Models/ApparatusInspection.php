@@ -18,7 +18,7 @@ class ApparatusInspection extends Model
     protected static function booted(): void
     {
         static::updating(function (self $inspection): void {
-            if ($inspection->isDirty(['actor_user_id', 'apparatus_id', 'vehicle_number', 'designation_at_time', 'operator_name', 'rank', 'shift', 'unit_number', 'employee_id', 'engine_hours', 'miles', 'results', 'checklist_evidence', 'checklist_version', 'client_submission_id', 'submission_payload_hash', 'officer_signature', 'completed_at'])) {
+            if ($inspection->isDirty(['actor_user_id', 'apparatus_id', 'vehicle_number', 'designation_at_time', 'operator_name', 'rank', 'shift', 'unit_number', 'employee_id', 'engine_hours', 'miles', 'results', 'checklist_evidence', 'checklist_version', 'client_submission_id', 'submission_payload_hash', 'officer_signature', 'review_flag_explanation', 'review_flag_items', 'completed_at'])) {
                 throw new LogicException('Submitted inspection observations are immutable. Record a separate review decision.');
             }
         });
@@ -51,6 +51,9 @@ class ApparatusInspection extends Model
         'inspection_reference',
         'review_status',
         'processing_status',
+        'review_flag_explanation',
+        'review_flag_items',
+        'processed_apparatus_id',
         'completed_at',
     ];
 
@@ -58,6 +61,7 @@ class ApparatusInspection extends Model
         'results' => 'array',
         'checklist_evidence' => 'array',
         'pending_effects' => 'array',
+        'review_flag_items' => 'array',
         'engine_hours' => 'decimal:1',
         'miles' => 'integer',
         'completed_at' => 'datetime',
@@ -81,6 +85,18 @@ class ApparatusInspection extends Model
     public function apparatus()
     {
         return $this->belongsTo(Apparatus::class);
+    }
+
+    /** The physical truck this inspection's findings were applied to (differs from apparatus_id after a decided swap). */
+    public function processedApparatus(): BelongsTo
+    {
+        return $this->belongsTo(Apparatus::class, 'processed_apparatus_id');
+    }
+
+    /** @return HasMany<ApparatusIssueMessage, $this> */
+    public function messages(): HasMany
+    {
+        return $this->hasMany(ApparatusIssueMessage::class)->orderBy('created_at')->orderBy('id');
     }
 
     public function employee(): BelongsTo
