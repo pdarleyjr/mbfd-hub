@@ -20,6 +20,7 @@ use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Js;
 
 /**
  * The individual vehicle profile: master details, the latest take-home
@@ -65,7 +66,7 @@ class ViewUnitMasterVehicle extends ViewRecord
                         ->visible(fn (Forms\Get $get): bool => $get('scope') === 'selected')
                         ->required(fn (Forms\Get $get): bool => $get('scope') === 'selected'),
                 ])
-                ->action(function (array $data) {
+                ->action(function (array $data): void {
                     abort_unless(VehicleDocumentAccess::canExport(auth()->user(), $this->exportVehicle()), 403);
                     $ids = match ($data['scope']) {
                         'all' => array_keys($this->exportDocumentOptions()),
@@ -73,11 +74,12 @@ class ViewUnitMasterVehicle extends ViewRecord
                         default => [],
                     };
 
-                    return redirect()->to(route('vehicle-documents.export', [
+                    $url = route('vehicle-documents.export', [
                         'vehicle' => $this->exportVehicle(),
                         'format' => $data['format'],
                         'documents' => $ids,
-                    ]));
+                    ]);
+                    $this->js('window.location.assign('.Js::from($url).')');
                 }),
             Actions\EditAction::make(),
         ];
@@ -86,6 +88,7 @@ class ViewUnitMasterVehicle extends ViewRecord
     /** @return array<int, string> */
     private function exportDocumentOptions(): array
     {
+        abort_unless(VehicleDocumentAccess::canExport(auth()->user(), $this->exportVehicle()), 403);
         $query = $this->exportVehicle()->documents();
         if (! VehicleDocumentAccess::canSensitive(auth()->user())) {
             $query->where('is_sensitive', false);

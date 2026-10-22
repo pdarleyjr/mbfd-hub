@@ -23,6 +23,7 @@
         .records tr:nth-child(even) td { background: #f3f5f8; }
         .label { width: 35%; color: #475569; }
         .muted { color: #64748b; }
+        .section-intro { page-break-inside: avoid; page-break-after: avoid; }
     </style>
 </head>
 <body>
@@ -68,8 +69,10 @@
         <p class="muted">Vehicle profile only. No original documents were requested.</p>
     @endif
 
-    <h2>Take-home inspection summary</h2>
-    <p class="meta">Most recent 100 inspections. This summary preserves the original inspection workflow and does not replace an inspection report.</p>
+    <div class="section-intro">
+        <h2>Take-home inspection summary</h2>
+        <p class="meta">Most recent 100 inspections. This summary preserves the original inspection workflow and does not replace an inspection report.</p>
+    </div>
     <table class="records">
         <thead><tr><th style="width: 35%;">Reference</th><th style="width: 35%;">Submitted (Eastern)</th><th style="width: 30%;">Acceptable for use</th></tr></thead>
         <tbody>
@@ -81,8 +84,10 @@
         </tbody>
     </table>
 
-    <h2>Vehicle history</h2>
-    <p class="meta">Most recent 100 recorded changes. Proposed corrections remain proposals until accepted by Fleet.</p>
+    <div class="section-intro">
+        <h2>Vehicle history</h2>
+        <p class="meta">Most recent 100 recorded changes. Proposed corrections remain proposals until accepted by Fleet.</p>
+    </div>
     <table class="records">
         <thead><tr><th style="width: 25%;">Field</th><th style="width: 27%;">Previous value</th><th style="width: 28%;">Proposed / new value</th><th style="width: 20%;">Status</th></tr></thead>
         <tbody>

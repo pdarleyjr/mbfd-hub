@@ -100,10 +100,11 @@ final class ImportVehicleDocuments extends Command
                                 'is_sensitive' => true,
                                 'classification_evidence' => [
                                     'rule' => $row['match_rule'] ?? null,
-                                    'confidence' => $row['confidence'] ?? null,
+                                    'confidence' => $row['classification_confidence'] ?? $row['confidence'] ?? null,
                                     'observations' => $row['observations'] ?? [],
                                     'match_evidence' => $row['match_evidence'] ?? [],
                                     'document_type' => $row['document_type'] ?? null,
+                                    'review_reasons' => $row['review_reasons'] ?? [],
                                 ],
                                 'candidate_vehicle_ids' => $row['candidate_vehicle_ids'] ?? [],
                             ], array_map('intval', $ids));

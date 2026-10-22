@@ -33,6 +33,39 @@ if (PHP_SAPI === 'cli-server') {
 }
 putenv('MBFD_ALLOW_DISPOSABLE_POSTGRES=0');
 require $root.'/tests/bootstrap.php';
+$optimizedMapRoot = getenv('VEHICLE_DOCUMENTS_OPTIMIZED_MAP_ROOT');
+if (is_string($optimizedMapRoot) && $optimizedMapRoot !== '') {
+    if (! hash_equals(hash_file('sha256', $root.'/composer.lock'), hash_file('sha256', $optimizedMapRoot.'/composer.lock'))) {
+        throw new RuntimeException('An optimized dependency map must have the exact candidate composer.lock.');
+    }
+    $loader = require $root.'/vendor/autoload.php';
+    $vendorPrefix = str_replace('\\', '/', $optimizedMapRoot).'/vendor/';
+    $dependencyMap = [];
+    foreach (require $optimizedMapRoot.'/vendor/composer/autoload_classmap.php' as $class => $file) {
+        // Reuse only dependency lookup metadata; every class still loads candidate files.
+        if (str_starts_with($class, 'App\\') || str_starts_with($class, 'Database\\') || str_starts_with($class, 'Tests\\') || str_starts_with($class, 'Mbfd\\PolicyLibrary\\')) {
+            continue;
+        }
+        $file = str_replace('\\', '/', $file);
+        if (str_starts_with($file, $vendorPrefix)) {
+            $dependencyMap[$class] = $root.'/vendor/'.substr($file, strlen($vendorPrefix));
+        }
+    }
+    $loader->addClassMap($dependencyMap);
+}
+foreach ([
+    App\Models\UnitMasterVehicle::class => 'app/Models/UnitMasterVehicle.php',
+    App\Models\VehicleDocument::class => 'app/Models/VehicleDocument.php',
+    App\Services\Fleet\VehicleDocumentLibrary::class => 'app/Services/Fleet/VehicleDocumentLibrary.php',
+    App\Services\Fleet\UnitMasterVehicleProfileExporter::class => 'app/Services/Fleet/UnitMasterVehicleProfileExporter.php',
+    App\Support\Fleet\VehicleDocumentAccess::class => 'app/Support/Fleet/VehicleDocumentAccess.php',
+    App\Filament\Resources\UnitMasterVehicleResource\Pages\ViewUnitMasterVehicle::class => 'app/Filament/Resources/UnitMasterVehicleResource/Pages/ViewUnitMasterVehicle.php',
+    App\Filament\Resources\UnitMasterVehicleResource\RelationManagers\DocumentsRelationManager::class => 'app/Filament/Resources/UnitMasterVehicleResource/RelationManagers/DocumentsRelationManager.php',
+] as $class => $file) {
+    if (realpath((new ReflectionClass($class))->getFileName()) !== realpath($root.'/'.$file)) {
+        throw new RuntimeException('The browser fixture must load exact candidate project classes.');
+    }
+}
 foreach ([
     'DB_DATABASE' => $directory.'/vehicles.sqlite', 'SESSION_DRIVER' => 'file', 'CACHE_STORE' => 'file',
     'APP_CONFIG_CACHE' => $directory.'/bootstrap/cache/config.php', 'APP_ROUTES_CACHE' => $directory.'/bootstrap/cache/routes.php',
@@ -79,9 +112,8 @@ if (in_array('--seed', $argv ?? [], true)) {
     Illuminate\Support\Facades\DB::statement('PRAGMA journal_mode = MEMORY');
     Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
     Illuminate\Support\Facades\Artisan::call('filament:assets');
-    $pdf = Barryvdh\DomPDF\Facade\Pdf::loadHTML('<html><body><p>Synthetic vehicle document — browser upload validation.</p></body></html>')->output();
-    file_put_contents($directory.'/synthetic-upload.pdf', $pdf);
     $vehicles = [];
+    $uploads = [];
     foreach (['desktop', 'tablet', 'phone'] as $index => $device) {
         $employee = App\Models\Employee::create([
             'employee_id' => '9980'.$index, 'name' => 'Synthetic Fleet '.$device, 'rank' => 'Captain',
@@ -98,6 +130,8 @@ if (in_array('--seed', $argv ?? [], true)) {
             'serial_number' => '000123'.($index + 1), 'tag_number' => '0012'.$index, 'dept_code' => 'FIRE',
             'color' => 'White', 'location' => 'Synthetic station',
         ]);
+        $uploads[$device] = $directory.'/synthetic-upload-'.$device.'.pdf';
+        file_put_contents($uploads[$device], Barryvdh\DomPDF\Facade\Pdf::loadHTML('<p>Synthetic browser upload for '.e($device).'</p>')->output());
         $original = $directory.'/seed-'.$device.'.pdf';
         file_put_contents($original, Barryvdh\DomPDF\Facade\Pdf::loadHTML('<p>Synthetic original record for '.e($device).'</p>')->output());
         app(App\Services\Fleet\VehicleDocumentLibrary::class)->ingest($original, [
@@ -107,7 +141,7 @@ if (in_array('--seed', $argv ?? [], true)) {
         ], [$vehicle->id], $actor);
         $vehicles[$device] = $vehicle->id;
     }
-    file_put_contents($directory.'/fixture.json', json_encode(['vehicles' => $vehicles, 'synthetic_pdf' => $directory.'/synthetic-upload.pdf'], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
+    file_put_contents($directory.'/fixture.json', json_encode(['vehicles' => $vehicles, 'synthetic_pdfs' => $uploads], JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR));
     echo 'SYNTHETIC_VEHICLE_DOCUMENTS_READY '.$directory.PHP_EOL;
     exit;
 }

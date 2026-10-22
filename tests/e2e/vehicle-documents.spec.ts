@@ -23,7 +23,8 @@ test('vehicle documents remain usable across upload, refresh, search, preview, d
     const project = info.project.name;
     const id = fixture.vehicles[project];
     const title = `Synthetic uploaded report ${project}`;
-    const original = readFileSync(fixture.synthetic_pdf);
+    const originalPathForUpload = fixture.synthetic_pdfs[project];
+    const original = readFileSync(originalPathForUpload);
 
     await page.goto('/login');
     const signedIn = await page.request.post('/login', { form: {
@@ -36,13 +37,13 @@ test('vehicle documents remain usable across upload, refresh, search, preview, d
     await expect(page.getByRole('heading', { name: new RegExp(`QA-${project.toUpperCase()}`) })).toBeVisible();
     const documentsTab = page.getByRole('tab', { name: /^Documents/ });
     await ready(documentsTab);
-    await documentsTab.click();
+    if (await documentsTab.getAttribute('aria-selected') !== 'true') await documentsTab.click();
     await expect(page.getByText('Synthetic original record', { exact: true })).toBeVisible({ timeout: 90_000 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);
     await page.screenshot({ path: info.outputPath('vehicle-profile-before-upload.png'), fullPage: true });
 
     const upload = await openAction(page, 'Add Documents');
-    await upload.locator('input[type="file"]').setInputFiles(fixture.synthetic_pdf);
+    await upload.locator('input[type="file"]').setInputFiles(originalPathForUpload);
     const titleField = upload.getByRole('textbox', { name: /^Title/ });
     await expect(titleField).toBeVisible();
     await titleField.fill(title);
@@ -51,12 +52,16 @@ test('vehicle documents remain usable across upload, refresh, search, preview, d
     await expect(page.getByText(title, { exact: true })).toBeVisible();
     await page.reload();
     await ready(page.getByRole('tab', { name: /^Documents/ }));
-    await page.getByRole('tab', { name: /^Documents/ }).click();
+    if (await page.getByRole('tab', { name: /^Documents/ }).getAttribute('aria-selected') !== 'true') {
+        await page.getByRole('tab', { name: /^Documents/ }).click();
+    }
     await expect(page.getByText(title, { exact: true })).toBeVisible();
 
     const documents = page.locator('.fi-ta').filter({ has: page.getByRole('heading', { name: 'Documents', exact: true }) });
     const search = documents.getByRole('searchbox');
+    await ready(search);
     await search.fill(title);
+    await expect(search).toHaveValue(title);
     await expect(documents.getByText('Synthetic original record', { exact: true })).toHaveCount(0);
     await expect(documents.getByText(title, { exact: true })).toBeVisible();
 
@@ -76,9 +81,12 @@ test('vehicle documents remain usable across upload, refresh, search, preview, d
     await page.screenshot({ path: info.outputPath('documents-mobile-ready.png'), fullPage: true });
 
     const pdfDialog = await openAction(page, 'Export Vehicle Profile');
-    const pdfDownloaded = page.waitForEvent('download');
-    await pdfDialog.getByRole('button', { name: 'Download', exact: true }).click();
-    const pdfDownload = await pdfDownloaded;
+    const [pdfDownload] = await Promise.all([
+        page.waitForEvent('download', { timeout: 60_000 }),
+        page.waitForResponse(response => new URL(response.url()).pathname === `/fleet/vehicles/${id}/export`)
+            .then(response => expect(response.status()).toBe(200)),
+        pdfDialog.getByRole('button', { name: 'Download', exact: true }).click(),
+    ]);
     expect(pdfDownload.suggestedFilename()).toMatch(/\.pdf$/);
     const pdfPath = info.outputPath('vehicle-profile.pdf');
     await pdfDownload.saveAs(pdfPath);
@@ -88,9 +96,12 @@ test('vehicle documents remain usable across upload, refresh, search, preview, d
     const exportDialog = await openAction(page, 'Export Vehicle Profile');
     await exportDialog.getByLabel('Excel', { exact: true }).check();
     await exportDialog.getByLabel('All permitted documents', { exact: true }).check();
-    const downloaded = page.waitForEvent('download');
-    await exportDialog.getByRole('button', { name: 'Download', exact: true }).click();
-    const download = await downloaded;
+    const [download] = await Promise.all([
+        page.waitForEvent('download', { timeout: 60_000 }),
+        page.waitForResponse(response => new URL(response.url()).pathname === `/fleet/vehicles/${id}/export`)
+            .then(response => expect(response.status()).toBe(200)),
+        exportDialog.getByRole('button', { name: 'Download', exact: true }).click(),
+    ]);
     expect(download.suggestedFilename()).toMatch(/\.zip$/);
     const packagePath = info.outputPath('vehicle-export.zip');
     await download.saveAs(packagePath);

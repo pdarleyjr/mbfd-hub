@@ -269,6 +269,7 @@ final class DocumentsRelationManager extends RelationManager
     {
         $vehicle = $this->getOwnerRecord();
         abort_unless($vehicle instanceof UnitMasterVehicle, 404);
+        abort_unless(VehicleDocumentAccess::canViewVehicle(auth()->user(), $vehicle), 403);
 
         return $vehicle;
     }

@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { createWriteStream, existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -42,7 +42,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     if (seeded.status !== 0) process.exit(seeded.status ?? 1);
     if (!existsSync(resolve(directory, 'fixture.json'))) throw new Error('The disposable fixture did not finish seeding.');
     writeFileSync(resolve(sourceRoot, 'test-results/vehicle-documents-fixture.json'), JSON.stringify({ directory }, null, 2));
-    const server = spawn(php, [...options, '-S', '127.0.0.1:8053', fixture], { cwd: sourceRoot, env, stdio: ['ignore', 'inherit', 'inherit'] });
+    const server = spawn(php, [...options, '-S', '127.0.0.1:8053', fixture], { cwd: sourceRoot, env, stdio: ['ignore', 'inherit', 'pipe'] });
+    server.stderr.pipe(createWriteStream(resolve(directory, 'server.log')));
     for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => { server.kill(); process.exit(); });
     server.on('exit', code => process.exit(code ?? 0));
 }

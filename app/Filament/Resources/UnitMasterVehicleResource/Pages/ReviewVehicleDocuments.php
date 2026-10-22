@@ -130,8 +130,35 @@ final class ReviewVehicleDocuments extends Page implements HasTable
     private function evidenceSummary(VehicleDocument $record): string
     {
         $evidence = $record->classification_evidence ?? [];
+        $lines = ['Original source references:', ...$record->sources->pluck('source_relative_path')->all()];
+        $observations = collect($evidence['observations'] ?? [])->filter(fn ($item): bool => is_array($item));
+        $lines[] = '';
+        $lines[] = 'Identifiers observed in the original:';
+        foreach ($observations as $observation) {
+            $kind = match ($observation['kind'] ?? '') {
+                'vin' => 'VIN',
+                'fleet', 'fleet_number' => 'Fleet number',
+                'plate' => 'License plate',
+                default => str((string) ($observation['kind'] ?? 'Identifier'))->headline()->toString(),
+            };
+            $page = isset($observation['page']) ? ' (page '.$observation['page'].')' : '';
+            $lines[] = $kind.': '.($observation['value'] ?? $observation['normalized'] ?? '').$page;
+        }
+        if ($observations->isEmpty()) {
+            $lines[] = 'No supported vehicle identifier was extracted. Review the original.';
+        }
+        foreach ($evidence['review_reasons'] ?? [] as $reason) {
+            $lines[] = 'Check: '.str((string) $reason)->headline()->toString();
+        }
+        $candidateIds = $record->sources->flatMap(fn ($source): array => $source->metadata['candidate_vehicle_ids'] ?? [])->unique()->all();
+        if ($candidateIds !== []) {
+            $lines[] = '';
+            $lines[] = 'Possible vehicles to check against the original (not confirmed):';
+            foreach (UnitMasterVehicle::query()->whereKey($candidateIds)->orderBy('veh_number')->get() as $vehicle) {
+                $lines[] = $vehicle->displayName();
+            }
+        }
 
-        return $record->sources->pluck('source_relative_path')->implode("\n")
-            ."\n\n".json_encode($evidence['observations'] ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        return implode("\n", $lines);
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Fleet;
 
 use App\Filament\Resources\UnitMasterVehicleResource;
+use App\Filament\Resources\UnitMasterVehicleResource\Pages\ReviewVehicleDocuments;
 use App\Filament\Resources\UnitMasterVehicleResource\Pages\ViewUnitMasterVehicle;
 use App\Filament\Resources\UnitMasterVehicleResource\RelationManagers\DocumentsRelationManager;
 use App\Models\UnitMasterVehicle;
@@ -98,6 +99,20 @@ final class VehicleDocumentAdminTest extends TestCase
             ->assertTableActionHidden('editMetadata', $document);
     }
 
+    public function test_revoked_fleet_access_cannot_rehydrate_an_existing_document_component(): void
+    {
+        $this->actingAsSuperAdmin();
+        $vehicle = $this->vehicle('REVOKED-ACCESS');
+        $document = $this->document($vehicle, 'Internal service record', false);
+        $viewer = $this->actingAsAdminWith(['admin.fleet.view']);
+        $component = $this->documents($vehicle)->assertCanSeeTableRecords([$document]);
+        $viewer->revokePermissionTo('admin.fleet.view');
+        $viewer->unsetRelation('permissions');
+        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
+
+        $component->call('$refresh')->assertForbidden();
+    }
+
     public function test_metadata_action_corrects_links_without_changing_any_original_bytes(): void
     {
         $this->actingAsSuperAdmin();
@@ -149,6 +164,50 @@ final class VehicleDocumentAdminTest extends TestCase
         $vehicle->documents()->attach($document);
 
         $this->get(route('vehicle-documents.download', [$vehicle, $document]))->assertRedirect();
+    }
+
+    public function test_downloading_documents_does_not_consume_the_separate_profile_export_limit(): void
+    {
+        $this->actingAsSuperAdmin();
+        $vehicle = $this->vehicle('002-12');
+        $document = $this->document($vehicle, 'Synthetic export throttle record', false);
+        foreach (range(1, 12) as $attempt) {
+            $response = $this->get(route('vehicle-documents.download', [$vehicle, $document]))->assertOk();
+            self::assertSame($document->sha256, hash('sha256', $response->streamedContent()));
+        }
+
+        $response = $this->get(route('vehicle-documents.export', ['vehicle' => $vehicle, 'format' => 'pdf']))->assertOk();
+        $response->assertHeader('Content-Type', 'application/pdf');
+        self::assertGreaterThan(0, (int) $response->headers->get('Content-Length'));
+    }
+
+    public function test_historical_review_explains_evidence_and_candidates_without_preselecting_a_vehicle(): void
+    {
+        $this->actingAsSuperAdmin();
+        $vehicle = $this->vehicle('002-12');
+        $document = $this->document($vehicle, 'Uncertain historical report', true);
+        $document->vehicles()->detach();
+        $document->update([
+            'review_status' => 'needs_review',
+            'classification_evidence' => [
+                'observations' => [['kind' => 'fleet_number', 'value' => '002-12', 'page' => '2']],
+                'review_reasons' => ['conflicting_identifiers'],
+            ],
+        ]);
+        $document->sources()->create([
+            'source_relative_path' => 'Historical/report.pdf',
+            'source_hash' => hash('sha256', 'Historical/report.pdf'),
+            'import_batch' => 'synthetic-review', 'status' => 'needs_review',
+            'metadata' => ['candidate_vehicle_ids' => [$vehicle->id]],
+        ]);
+
+        $component = Livewire::test(ReviewVehicleDocuments::class)->mountTableAction('assignVehicle', $document);
+        $data = $component->get('mountedTableActionsData.0');
+        self::assertSame([], $data['vehicle_ids']);
+        self::assertStringContainsString('Fleet number: 002-12 (page 2)', $data['evidence_summary']);
+        self::assertStringContainsString('Check: Conflicting Identifiers', $data['evidence_summary']);
+        self::assertStringContainsString($vehicle->displayName(), $data['evidence_summary']);
+        self::assertStringNotContainsString('"kind"', $data['evidence_summary']);
     }
 
     private function documents(UnitMasterVehicle $vehicle): \Livewire\Features\SupportTesting\Testable
