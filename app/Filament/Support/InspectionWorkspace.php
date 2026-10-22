@@ -22,8 +22,10 @@ use App\Models\ApparatusVehicleSwapRequest;
 use App\Models\Station;
 use App\Models\User;
 use App\Services\Inspections\EmployeeInspectionHistoryService;
+use App\Services\Inspections\IssueMessageService;
 use App\Support\Fleet\DefectActionStatus;
 use Carbon\CarbonImmutable;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Collection;
 
 /**
@@ -62,7 +64,10 @@ final class InspectionWorkspace
         'appears_corrected' => 'Member reports it appears corrected',
     ];
 
-    public function __construct(private readonly EmployeeInspectionHistoryService $history) {}
+    public function __construct(
+        private readonly EmployeeInspectionHistoryService $history,
+        private readonly IssueMessageService $messages,
+    ) {}
 
     /** URL of the one canonical inspection page, optionally anchored to a section or issue. */
     public static function url(int|ApparatusInspection $inspection, ?string $anchor = null): string
@@ -115,8 +120,9 @@ final class InspectionWorkspace
             ->orderBy('id')
             ->get();
 
-        $holdCards = $this->holdCards($inspection, $exceptions, $physical);
-        $defects = $this->defectCards($inspection, $physicalId, $this->damageDefectIds($exceptions), $itemPhotos);
+        $holdCards = $this->holdCards($inspection, $exceptions, $physical, $canReview);
+        $canManage = DefectCorrectiveActions::canManage($viewer);
+        $defects = $this->defectCards($inspection, $physicalId, $this->damageDefectIds($exceptions), $itemPhotos, $viewer, $canReview, $canManage);
 
         $openHolds = $exceptions->filter(fn (ApparatusInspectionException $e): bool => $this->isOpenHold($e))->count();
         $openIssues = collect($defects['cards'])->where('closed', false)->count();
@@ -125,6 +131,9 @@ final class InspectionWorkspace
             'inspection' => $inspection,
             'status' => self::statusPresentation($inspection),
             'can_review' => $canReview,
+            'can_manage' => $canManage,
+            'meter_hold_open' => $exceptions->contains(fn (ApparatusInspectionException $e): bool => $this->isOpenHold($e) && in_array($e->field, ['miles', 'engine_hours'], true)),
+            'general_thread' => $canReview && $viewer instanceof User ? $this->generalThread($inspection, $viewer) : null,
             'header' => $this->header($inspection, $physical, $detail, $viewer, $openHolds, $openIssues),
             'legacy_pending' => $inspection->processing_status === null && $inspection->review_status === 'pending_review',
             'pending_effects' => $this->pendingEffects($inspection),
@@ -182,7 +191,7 @@ final class InspectionWorkspace
      * @param  Collection<int, ApparatusInspectionException>  $exceptions
      * @return array{cards: list<array<string, mixed>>, damage: list<array<string, mixed>>}
      */
-    private function holdCards(ApparatusInspection $inspection, Collection $exceptions, mixed $physical): array
+    private function holdCards(ApparatusInspection $inspection, Collection $exceptions, mixed $physical, bool $canReview): array
     {
         $cards = [];
         $damage = [];
@@ -194,7 +203,7 @@ final class InspectionWorkspace
             $meta = is_array($exception->metadata) ? $exception->metadata : [];
 
             if (in_array($exception->field, ['miles', 'engine_hours'], true)) {
-                $cards[] = $this->meterCard($inspection, $exception, $meta, $vehicle);
+                $cards[] = $this->meterCard($inspection, $exception, $meta, $vehicle, $canReview, $physical instanceof Apparatus ? $physical : null);
             } elseif ($exception->field === 'significant_damage') {
                 $damage[] = [
                     'id' => (int) $exception->getKey(),
@@ -214,7 +223,7 @@ final class InspectionWorkspace
      * @param  array<string, mixed>  $meta
      * @return array<string, mixed>
      */
-    private function meterCard(ApparatusInspection $inspection, ApparatusInspectionException $exception, array $meta, ?string $vehicle): array
+    private function meterCard(ApparatusInspection $inspection, ApparatusInspectionException $exception, array $meta, ?string $vehicle, bool $canReview, ?Apparatus $physical): array
     {
         $isMiles = $exception->field === 'miles';
         $format = static fn (mixed $value): ?string => $value === null
@@ -249,6 +258,8 @@ final class InspectionWorkspace
             'blocking' => $this->isOpenHold($exception),
             'is_hold' => (bool) $exception->blocks_acceptance,
             'status_label' => $this->exceptionStatusLabel($exception),
+            'current_value' => $format($physical?->getAttribute($isMiles ? 'current_miles' : 'current_engine_hours')),
+            'actions' => $canReview && $this->isOpenHold($exception) ? InspectionHoldActions::names() : [],
             'previous_value' => $format($exception->authoritative_value),
             'submitted_value' => $format($exception->submitted_value),
             'loaded_value' => $format($exception->baseline_value),
@@ -309,7 +320,7 @@ final class InspectionWorkspace
      * @param  array<string, string>  $itemPhotos
      * @return array{cards: list<array<string, mixed>>, ids: list<int>}
      */
-    private function defectCards(ApparatusInspection $inspection, int $physicalId, array $holdDefectIds, array $itemPhotos): array
+    private function defectCards(ApparatusInspection $inspection, int $physicalId, array $holdDefectIds, array $itemPhotos, ?User $viewer, bool $canReview, bool $canManage): array
     {
         $id = (int) $inspection->getKey();
         $observations = ApparatusDefectObservation::query()->where('apparatus_inspection_id', $id)->get()->keyBy('apparatus_defect_id');
@@ -401,10 +412,55 @@ final class InspectionWorkspace
                         : null,
                 ] : null,
                 'photo_key' => $photoKey,
+                'actions' => $canManage
+                    ? DefectCorrectiveActions::applicable($defect, $trailRows->get($defect->getKey(), collect())->last()?->observation === 'appears_corrected')
+                    : [],
+                'thread' => $canReview && $viewer instanceof User ? $this->issueThread($viewer, $defect) : null,
             ];
         }
 
         return ['cards' => $cards, 'ids' => $defects->modelKeys()];
+    }
+
+    /**
+     * The issue's conversation, oldest first. Internal notes are included only because the
+     * caller already proved the viewer is a reviewer, and they are always labelled.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function issueThread(User $viewer, ApparatusDefect $defect): array
+    {
+        try {
+            return $this->messageRows($this->messages->threadFor($viewer, $defect));
+        } catch (AuthorizationException) {
+            return [];
+        }
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function generalThread(ApparatusInspection $inspection, User $viewer): array
+    {
+        try {
+            return $this->messageRows($this->messages->threadFor($viewer, $inspection));
+        } catch (AuthorizationException) {
+            return [];
+        }
+    }
+
+    /**
+     * @param  Collection<int, ApparatusIssueMessage>  $messages
+     * @return list<array<string, mixed>>
+     */
+    private function messageRows(Collection $messages): array
+    {
+        return $messages->map(fn (ApparatusIssueMessage $message): array => [
+            'id' => (int) $message->getKey(),
+            'at' => $this->eastern($message->created_at)?->format('M j, Y g:i A'),
+            'author' => (string) ($message->author?->display_name ?: $message->author?->name ?: 'Staff member'),
+            'body' => (string) $message->body,
+            'internal' => $message->visibility === ApparatusIssueMessage::VISIBILITY_INTERNAL,
+            'correction' => $message->corrects_message_id !== null,
+        ])->values()->all();
     }
 
     /** @return array<string, mixed>|null */

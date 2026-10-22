@@ -3,11 +3,13 @@
 namespace App\Filament\Resources\ApparatusResource\RelationManagers;
 
 use App\Filament\Resources\RecommendationResource;
+use App\Filament\Support\DefectCorrectiveActions;
 use App\Filament\Support\DefectServiceTicketActions;
 use App\Models\AdminAlertEvent;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusDefectRecommendation;
+use App\Support\Fleet\DefectActionStatus;
 use App\Support\Fleet\DefectFollowUpState;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -185,24 +187,15 @@ class DefectsRelationManager extends RelationManager
                 ),
 
                 Tables\Actions\ActionGroup::make([
-                    Tables\Actions\Action::make('mark_resolved')
+                    // Resolution goes through the corrective-action service (event, notification, required type and notes).
+                    DefectCorrectiveActions::resolve(
+                        Tables\Actions\Action::make('mark_resolved'),
+                        fn (Tables\Actions\Action $action): ?ApparatusDefect => DefectServiceTicketActions::defectFrom($action->getRecord()),
+                    )
                         ->label('Resolve')
-                        ->icon('heroicon-o-check-circle')
-                        ->color('success')
-                        ->visible(fn (ApparatusDefect $record) => $record->status !== 'resolved')
-                        ->form([
-                            Forms\Components\Textarea::make('resolution_notes')
-                                ->label('Resolution Notes')
-                                ->required()
-                                ->rows(3),
-                        ])
-                        ->action(function (ApparatusDefect $record, array $data) {
-                            $record->update([
-                                'status' => 'resolved',
-                                'resolution_notes' => $data['resolution_notes'],
-                                'resolved_at' => now(),
-                            ]);
-                        }),
+                        ->visible(fn (Tables\Actions\Action $action): bool => DefectCorrectiveActions::canManage(auth()->user())
+                            && ($defect = DefectServiceTicketActions::defectFrom($action->getRecord())) instanceof ApparatusDefect
+                            && ! DefectActionStatus::isClosed($defect->action_status)),
 
                     Tables\Actions\Action::make('request_replacement')
                         ->label('Request Replacement')

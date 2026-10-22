@@ -120,7 +120,7 @@ final class ApparatusInspectionApprovalActionTest extends TestCase
         $this->assertSame('10010', (string) $inspection->apparatus->fresh()->current_miles);
     }
 
-    public function test_approve_form_defaults_the_out_of_service_choice_on_only_when_critical_defects_were_reported(): void
+    public function test_approve_form_never_pre_selects_out_of_service_even_when_critical_defects_were_reported(): void
     {
         $withDefects = $this->pendingInspection();
         $reviewer = $this->userWithRole('logistics_admin');
@@ -130,14 +130,6 @@ final class ApparatusInspectionApprovalActionTest extends TestCase
         $this->withoutVite();
 
         Livewire::test(ViewInspection::class, ['record' => $withDefects->getRouteKey()])
-            ->mountAction('approveInspection')
-            ->assertActionDataSet(['mark_out_of_service' => true]);
-
-        $withDefects->update([
-            'pending_effects' => ['defects' => [], 'has_critical_defects' => false],
-        ]);
-
-        Livewire::test(ViewInspection::class, ['record' => $withDefects->fresh()->getRouteKey()])
             ->mountAction('approveInspection')
             ->assertActionDataSet(['mark_out_of_service' => false]);
     }
@@ -376,6 +368,7 @@ final class ApparatusInspectionApprovalActionTest extends TestCase
             Permission::findOrCreate('view_apparatus', 'web'),
             Permission::findOrCreate('view_any_inspection', 'web'),
             Permission::findOrCreate('view_inspection', 'web'),
+            Permission::findOrCreate('update_apparatus', 'web'),
         ]);
         $user = User::factory()->create();
         $user->assignRole($role);
