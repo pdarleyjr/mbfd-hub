@@ -33,7 +33,8 @@ final class InventoryOverlay
             return ['checklist' => $baseline, 'change_ids' => [], 'conflicts' => []];
         }
 
-        $changes = ApparatusInventoryChange::query()
+        // Same connection as the apparatus: the pre-activation audit resolves a candidate database.
+        $changes = ApparatusInventoryChange::on($apparatus->getConnectionName())
             ->where('apparatus_id', $apparatus->getKey())
             ->active()
             ->orderBy('id')
