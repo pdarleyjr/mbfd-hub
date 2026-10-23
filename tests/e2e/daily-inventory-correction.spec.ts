@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type BrowserContext, type Locator, type Page } from '@playwright/test';
 import { readDrafts } from './support/daily-checkout-drafts';
 
 const apparatus = {
@@ -20,13 +20,13 @@ const BASE_VERSION = 'f'.repeat(64);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 interface PendingCorrection {
-  id: number;
+  id: number | null;
   compartment_id: string | null;
   item_id: string | null;
-  reason: string;
-  reason_label: string;
+  reason: string | null;
+  reason_label?: string;
   status: string;
-  reported_at: string;
+  reported_at?: string;
   mine: boolean;
 }
 
@@ -56,13 +56,16 @@ const checklistA = (): ChecklistFixture => ({
 
 interface CorrectionApi {
   readonly corrections: Array<Record<string, unknown>>;
+  readonly inspections: Array<Record<string, unknown>>;
+  /** Status the mocked server answers an inspection with; 503 keeps a queued checkout waiting. */
+  inspectionStatus: number;
   fixture: ChecklistFixture;
   /** Status the mocked server answers a correction with; 201 accepts it. */
   respondWith: { status: number; message?: string };
 }
 
 async function mockApi(page: Page, fixture: ChecklistFixture = checklistA()): Promise<CorrectionApi> {
-  const api: CorrectionApi = { corrections: [], fixture, respondWith: { status: 201 } };
+  const api: CorrectionApi = { corrections: [], inspections: [], inspectionStatus: 503, fixture, respondWith: { status: 201 } };
 
   await page.route('**/images/mbfd_logo-256.png', (route) => route.fulfill({ path: 'public/images/mbfd_logo-256.png' }));
   await page.route('**/api/**', async (route) => {
@@ -99,6 +102,11 @@ async function mockApi(page: Page, fixture: ChecklistFixture = checklistA()): Pr
       return route.fulfill(status < 300
         ? { status, json: { id: 1, reference: 'IC-000001', status: 'submitted', duplicate: false } }
         : { status, json: { message: message ?? 'Unavailable.' } });
+    }
+
+    if (path === `/api/public/apparatuses/${apparatus.id}/inspections` && request.method() === 'POST') {
+      api.inspections.push(request.postDataJSON() as Record<string, unknown>);
+      return route.fulfill(api.inspectionStatus < 300 ? { status: api.inspectionStatus, json: { success: true, review_status: 'approved' } } : { status: api.inspectionStatus, json: { message: 'Down for maintenance.' } });
     }
 
     return route.fulfill({ status: 404, json: { message: `Unmocked API route: ${path}` } });
@@ -359,7 +367,7 @@ test('server pending corrections mark their items and compartment', async ({ pag
   await expect(row(page, 'Flashlight').getByText('Correction pending review')).toBeVisible();
   const radio = row(page, 'Portable Radio');
   await expect(radio.getByText('Logistics asked a question')).toBeVisible();
-  await expect(radio.getByRole('link', { name: 'Open the question' })).toHaveAttribute('href', '/employee/my-vehicle-inspections#inventory-corrections');
+  await expect(radio.getByRole('link', { name: 'Open the question' })).toHaveAttribute('href', '/employee/my-inventory-corrections/8');
   await expect(page.getByText('1 unlisted item reported here, pending review.')).toBeVisible();
 
   // A question asked of someone else's report is only a pending marker for this member.
@@ -492,4 +500,109 @@ test('the correction controls are labelled and at least 44px tall', async ({ pag
   const note = await item.getByLabel('Note (required)').boundingBox();
   expect(note?.height).toBeGreaterThanOrEqual(44);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth)).toBe(true);
+});
+
+async function drawSignature(page: Page): Promise<void> {
+  const canvas = page.locator('canvas');
+  await expect(canvas).toHaveCount(1);
+  await canvas.scrollIntoViewIfNeeded();
+  const box = await canvas.boundingBox();
+  if (!box) throw new Error('The inspection signature canvas is not visible.');
+  const startX = box.x + 24;
+  const startY = box.y + box.height / 2;
+  await page.mouse.move(startX, startY);
+  await page.mouse.down();
+  for (let step = 1; step <= 8; step += 1) await page.mouse.move(startX + ((box.width - 48) * step) / 8, startY + step);
+  await page.mouse.up();
+}
+
+/** Completes the checkout and submits it while offline, so it is saved in the Daily Checkout queue. */
+async function queueCheckoutOffline(page: Page, context: BrowserContext): Promise<void> {
+  await page.getByRole('button', { name: 'Member / Vehicle Info', exact: true }).first().click();
+  await page.getByRole('combobox', { name: 'Shift', exact: true }).selectOption('A');
+  await page.getByRole('button', { name: 'Continue: Apparatus' }).click();
+  await page.getByRole('button', { name: 'Confirm all present' }).click();
+  await page.getByRole('button', { name: /Compartment B1/ }).click();
+  await page.getByRole('button', { name: 'Confirm all present' }).click();
+  await page.getByRole('button', { name: 'Review & Sign', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Review & Sign Inspection' })).toBeVisible();
+  await drawSignature(page);
+  await context.setOffline(true);
+  await page.getByRole('button', { name: 'Submit Inspection' }).click();
+  await expect(page.getByRole('heading', { name: 'Inspection saved on this device' })).toBeVisible();
+  await context.setOffline(false);
+}
+
+async function queuedCheckouts(page: Page): Promise<Array<{ apparatusId: number; checklistVersion: string; checklistBaseVersion?: string; data: { client_submission_id: string } }>> {
+  return page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('mbfd-daily-checkout');
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      return await new Promise<Array<{ apparatusId: number; checklistVersion: string; checklistBaseVersion?: string; data: { client_submission_id: string } }>>((resolve, reject) => {
+        const request = database.transaction('dailyCheckoutSubmissions', 'readonly').objectStore('dailyCheckoutSubmissions').getAll();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    } finally {
+      database.close();
+    }
+  });
+}
+
+test('a checkout queued before an inventory change still blocks a second checkout on the new version', async ({ page, context }) => {
+  const api = await mockApi(page);
+  await openInspection(page);
+  await queueCheckoutOffline(page, context);
+
+  const [queued] = await queuedCheckouts(page);
+  expect(queued).toMatchObject({ apparatusId: apparatus.id, checklistVersion: 'a'.repeat(64), checklistBaseVersion: BASE_VERSION });
+
+  // Logistics approved a correction: a new checklist version over the same baseline template.
+  api.fixture = checklistA();
+  api.fixture.version = 'c'.repeat(64);
+  api.fixture.compartments[0].items[0] = { ...api.fixture.compartments[0].items[0], name: 'Portable Radio (XTS)' };
+  await page.goto('/daily/apparatus/engine-1');
+
+  await expect(page.getByRole('heading', { name: 'Saved inspection not sent yet' })).toBeVisible();
+  await expect(page.getByText('A saved Daily Checkout using this checklist version is still awaiting synchronization.')).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Compartment Inspection' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Submit Inspection' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Confirm all present' })).toHaveCount(0);
+
+  // Only the queued record's own id was ever sent; no second checkout exists, in the queue or on the wire.
+  await page.waitForTimeout(750);
+  expect((await queuedCheckouts(page)).map((record) => record.data.client_submission_id)).toEqual([queued.data.client_submission_id]);
+  expect(new Set(api.inspections.map((submission) => submission.client_submission_id))).toEqual(new Set([queued.data.client_submission_id]));
+});
+
+test('a queued checkout does not block a checkout on a different baseline template', async ({ page, context }) => {
+  const api = await mockApi(page);
+  await openInspection(page);
+  await queueCheckoutOffline(page, context);
+  expect(await queuedCheckouts(page)).toHaveLength(1);
+
+  api.fixture = { ...checklistA(), version: 'd'.repeat(64), base: '9'.repeat(64) };
+  await page.goto('/daily/apparatus/engine-1');
+
+  await expect(page.getByRole('region', { name: 'Compartment Inspection' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Saved inspection not sent yet' })).toHaveCount(0);
+  await expect(row(page, 'Portable Radio')).toContainText('Needs inspection');
+});
+
+test('another member\'s minimal pending marker still reads "Correction pending review"', async ({ page }) => {
+  const fixture = checklistA();
+  fixture.pending = [
+    { id: null, reason: null, status: 'pending', mine: false, compartment_id: 'cab', item_id: 'cab-flashlight' },
+    { id: null, reason: null, status: 'pending', mine: false, compartment_id: 'b1', item_id: null },
+  ];
+  await mockApi(page, fixture);
+  await openInspection(page);
+
+  await expect(row(page, 'Flashlight').getByText('Correction pending review')).toBeVisible();
+  await expect(row(page, 'Portable Radio').getByText('Correction pending review')).toHaveCount(0);
+  await page.getByRole('button', { name: /Compartment B1/ }).click();
+  await expect(page.getByText('1 unlisted item reported here, pending review.')).toBeVisible();
 });

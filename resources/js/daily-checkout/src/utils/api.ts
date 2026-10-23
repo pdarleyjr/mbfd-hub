@@ -59,12 +59,13 @@ const optionalItemText = (item: Record<string, unknown>): Pick<ChecklistItem, 'm
 const parsePendingCorrections = (value: unknown): PendingInventoryCorrection[] => (Array.isArray(value) ? value : []).flatMap((entry): PendingInventoryCorrection[] => {
   if (!entry || typeof entry !== 'object') return [];
   const row = entry as Record<string, unknown>;
-  if (typeof row.id !== 'number' || typeof row.status !== 'string' || typeof row.reason !== 'string') return [];
+  // Another member's report arrives as a bare marker: no id and no reason, only its status and location.
+  if (typeof row.status !== 'string') return [];
   return [{
-    id: row.id,
+    id: typeof row.id === 'number' ? row.id : null,
     compartment_id: nonEmptyString(row.compartment_id) ? row.compartment_id : null,
     item_id: nonEmptyString(row.item_id) ? row.item_id : null,
-    reason: row.reason,
+    reason: typeof row.reason === 'string' ? row.reason : null,
     reason_label: typeof row.reason_label === 'string' ? row.reason_label : undefined,
     status: row.status,
     reported_at: typeof row.reported_at === 'string' ? row.reported_at : undefined,
