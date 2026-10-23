@@ -240,7 +240,7 @@ final class PersonnelRequestTrashTest extends TestCase
         Livewire::test(ViewPersonnelRequest::class, ['record' => $active->public_id])
             ->assertActionExists('archive')->assertActionExists('delete_order');
         Livewire::test(ViewPersonnelRequest::class, ['record' => $trashed->public_id])
-            ->assertActionExists('restore_from_trash')->assertActionDoesNotExist('archive')->assertActionDoesNotExist('delete_order');
+            ->assertActionVisible('restore_from_trash')->assertActionHidden('archive')->assertActionHidden('delete_order');
         $this->actingAs($trashed->beneficiary, 'employee')->get('/employee/my-requests/'.$trashed->public_id)->assertNotFound();
     }
 
@@ -255,6 +255,68 @@ final class PersonnelRequestTrashTest extends TestCase
     public static function directMutations(): array
     {
         return [['delete'], ['forceDelete'], ['restore']];
+    }
+
+    public function test_delete_and_restore_update_the_same_page_header_without_a_reload(): void
+    {
+        $this->withoutVite();
+        $request = $this->request(PersonnelRequestStatus::Cancelled);
+        $original = $request->refresh()->getRawOriginal();
+        $item = $request->items()->sole()->getRawOriginal();
+        $this->actingAs($this->admin());
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        $page = Livewire::test(ViewPersonnelRequest::class, ['record' => $request->public_id]);
+        $page->assertActionVisible('delete_order')
+            ->callAction('delete_order', ['deletion_reason' => 'Verify immediate lifecycle controls.'])
+            ->assertHasNoActionErrors()
+            ->assertActionVisible('restore_from_trash')
+            ->assertActionHidden('delete_order')
+            ->assertActionHidden('archive')
+            ->assertActionHidden('add_note');
+        $this->assertSoftDeleted($request);
+
+        $page->callAction('restore_from_trash')->assertHasNoActionErrors()
+            ->assertActionHidden('restore_from_trash')
+            ->assertActionVisible('delete_order')
+            ->assertActionVisible('archive')
+            ->assertActionVisible('add_note');
+        $this->assertNotSoftDeleted($request);
+        foreach (['status', 'assigned_admin_id', 'acknowledged_at', 'completed_at', 'cancelled_at'] as $field) {
+            $this->assertSame($original[$field], $request->refresh()->getRawOriginal($field), $field);
+        }
+        $this->assertSame($item, $request->items()->sole()->getRawOriginal());
+        $this->assertSame(1, $request->updates()->where('event', 'deleted')->count());
+        $this->assertSame(1, $request->updates()->where('event', 'restored_from_trash')->count());
+    }
+
+    public function test_an_initially_trashed_page_restores_all_controls_and_can_delete_again_without_a_reload(): void
+    {
+        $this->withoutVite();
+        $request = $this->request(PersonnelRequestStatus::Cancelled);
+        $admin = $this->admin();
+        app(PersonnelRequestLifecycleService::class)->delete($request, $admin, 'Retained QA order.');
+        $this->actingAs($admin);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+
+        Livewire::test(ViewPersonnelRequest::class, ['record' => $request->public_id])
+            ->assertActionVisible('restore_from_trash')
+            ->callAction('restore_from_trash')->assertHasNoActionErrors()
+            ->assertActionHidden('restore_from_trash')
+            ->assertActionVisible('archive')->assertActionVisible('delete_order')->assertActionVisible('add_note')
+            ->callAction('add_note', ['idempotency_key' => (string) Str::uuid(), 'internal_note' => 'Private note after restoring the mounted order.'])
+            ->assertHasNoActionErrors()
+            ->callAction('delete_order', ['deletion_reason' => 'Return QA order to Trash.'])->assertHasNoActionErrors()
+            ->assertActionVisible('restore_from_trash')->assertActionHidden('delete_order')->assertActionHidden('archive');
+
+        $this->assertSoftDeleted($request);
+        $this->assertSame(PersonnelRequestStatus::Cancelled, $request->refresh()->status);
+        $this->assertSame(2, $request->updates()->where('event', 'deleted')->count());
+        $this->assertSame(1, $request->updates()->where('event', 'restored_from_trash')->count());
+        $this->assertDatabaseHas('personnel_request_updates', [
+            'personnel_request_id' => $request->id, 'event' => 'note_added',
+            'internal_note' => 'Private note after restoring the mounted order.', 'employee_visible_note' => null,
+        ]);
     }
 
     private function request(PersonnelRequestStatus $status): PersonnelRequest
