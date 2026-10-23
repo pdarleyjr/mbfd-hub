@@ -17,12 +17,9 @@ use Illuminate\Support\Str;
 use PhpOffice\PhpSpreadsheet\Cell\DataType;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\Attributes\Group;
 use Smalot\PdfParser\Parser;
 use Tests\TestCase;
 
-// Composer runs this group in a fresh process so retained suite heap does not share its large PDF/XLSX buffers.
-#[Group('training-roster-export')]
 final class TrainingRosterExportTest extends TestCase
 {
     use RefreshDatabase;

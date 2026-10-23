@@ -727,7 +727,7 @@ test("the shared release gate has hard-failing quality, Daily, PostgreSQL, asset
   assert.match(postgresDailyAssets, /working-directory:\s*resources\/js\/daily-checkout/);
   assert.match(postgresDailyAssets, /DAILY_CHECKOUT_OUT_DIR:\s*\.\.\/\.\.\/\.\.\/public\/daily/);
   assert.match(postgresDailyAssets, /npm run build/);
-  assert.match(workflowStep(postgres, "Run PHPUnit suite"), /^\s*run: composer test\r?$/m);
+  assert.match(workflowStep(postgres, "Run PHPUnit suite"), /php artisan test --exclude-group=postgres/);
   assert.match(
     workflowStep(postgres, "Run PostgreSQL concurrency and integrity tests"),
     /php artisan test --group=postgres/,
@@ -801,7 +801,7 @@ test("the shared release gate has hard-failing quality, Daily, PostgreSQL, asset
   assert.match(php85DailyAssets, /working-directory:\s*resources\/js\/daily-checkout/);
   assert.match(php85DailyAssets, /DAILY_CHECKOUT_OUT_DIR:\s*\.\.\/\.\.\/\.\.\/public\/daily/);
   assert.match(php85DailyAssets, /npm run build/);
-  assert.match(workflowStep(php85, "Run PHP 8.5 PHPUnit compatibility suite"), /^\s*run: composer test\r?$/m);
+  assert.match(workflowStep(php85, "Run PHP 8.5 PHPUnit compatibility suite"), /php artisan test --exclude-group=postgres/);
   assert.match(workflowStep(php85, "Run PHP 8.5 PostgreSQL compatibility tests"), /php artisan test --group=postgres/);
 
   const aiGateway = workflowJob(gates, "ai-gateway-source");
@@ -849,18 +849,6 @@ test("CI invokes the deploy-free shared release gate for main, pull requests and
   assert.doesNotMatch(ci, /^\s*run:.*\bssh\s+deploy-target\b/im);
 });
 
-test("the standard test command runs both complete non-PostgreSQL partitions", () => {
-  const composer = JSON.parse(readFileSync(resolve(root, "composer.json"), "utf8"));
-  const exportTests = readFileSync(resolve(root, "tests/Feature/TrainingRosterExportTest.php"), "utf8");
-
-  assert.deepEqual(composer.scripts.test, [
-    "Composer\\Config::disableProcessTimeout",
-    "@php artisan test --exclude-group=postgres --exclude-group=training-roster-export",
-    "@php artisan test --group=training-roster-export --exclude-group=postgres",
-  ]);
-  assert.match(exportTests, /#\[Group\('training-roster-export'\)\]/);
-});
-
 test("CI runs a required PostgreSQL group against its dedicated disposable service", () => {
   const workflow = readFileSync(resolve(root, ".github/workflows/hub-release-gates.yml"), "utf8");
   const phpunit = readFileSync(resolve(root, "phpunit.xml"), "utf8");
@@ -871,7 +859,7 @@ test("CI runs a required PostgreSQL group against its dedicated disposable servi
   assert.match(workflow, /POSTGRES_DB:\s*mbfd_hub_test_ci/);
   assert.match(workflow, /POSTGRES_USER:\s*mbfd_test_ci/);
   assert.match(workflow, /POSTGRES_HOST_AUTH_METHOD:\s*trust/);
-  assert.match(defaultTestStep, /^\s*run: composer test\r?$/m);
+  assert.match(defaultTestStep, /php artisan test --exclude-group=postgres/);
   assert.match(postgresTestStep, /MBFD_ALLOW_DISPOSABLE_POSTGRES:\s*["']1["']/);
   assert.match(postgresTestStep, /REQUIRE_POSTGRES_INTEGRATION:\s*["']true["']/);
   assert.match(postgresTestStep, /DISPOSABLE_POSTGRES_HOST:\s*127\.0\.0\.1/);
