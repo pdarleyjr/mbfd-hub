@@ -16,6 +16,7 @@ use Filament\Tables;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Logistics' queue of member-reported Daily Checkout inventory corrections
@@ -38,6 +39,8 @@ class InventoryCorrectionResource extends Resource
     protected static ?string $modelLabel = 'Inventory correction';
 
     protected static ?string $slug = 'inventory-corrections';
+
+    public const OPEN_COUNT_CACHE_KEY = 'inventory-corrections:open-count';
 
     public static function canViewAny(): bool
     {
@@ -76,7 +79,8 @@ class InventoryCorrectionResource extends Resource
         if (! static::canViewAny()) {
             return null;
         }
-        $open = ApparatusInventoryCorrection::query()->open()->count();
+        // Every admin page renders the navigation: keep the count off the database hot path.
+        $open = (int) Cache::remember(self::OPEN_COUNT_CACHE_KEY, 60, static fn (): int => ApparatusInventoryCorrection::query()->open()->count());
 
         return $open > 0 ? (string) $open : null;
     }

@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Filament\Resources\InventoryCorrectionResource;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 /**
  * One member report that the Daily Checkout checklist is wrong for an apparatus
@@ -38,6 +41,13 @@ final class ApparatusInventoryCorrection extends Model
         'decided_at' => 'datetime',
         'lock_version' => 'integer',
     ];
+
+    protected static function booted(): void
+    {
+        // The admin navigation badge caches the open count; any write refreshes it after commit.
+        // A cache outage never fails the request: the count simply expires within a minute.
+        self::saved(static fn () => DB::afterCommit(static fn () => rescue(static fn () => Cache::forget(InventoryCorrectionResource::OPEN_COUNT_CACHE_KEY), report: false)));
+    }
 
     public function isOpen(): bool
     {
