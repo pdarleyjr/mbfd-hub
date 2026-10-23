@@ -39,28 +39,32 @@ class ViewPersonnelRequest extends ViewRecord
 
     private ?array $inventoryChoices = null;
 
+    public function getRecord(): PersonnelRequest
+    {
+        $record = parent::getRecord();
+        assert($record instanceof PersonnelRequest);
+
+        return $record;
+    }
+
     protected function getHeaderActions(): array
     {
-        /** @var PersonnelRequest $request */
-        $request = $this->record;
-
-        if ($request->trashed()) {
-            return [
-                Action::make('restore_from_trash')->label('Restore from Trash')->icon('heroicon-o-arrow-uturn-left')
-                    ->authorize('restore', $request)->requiresConfirmation()
-                    ->action(fn () => $this->performItemAction(fn () => app(PersonnelRequestLifecycleService::class)->restore($request, auth()->user()), 'Order restored from Trash')),
-            ];
-        }
+        $request = $this->getRecord();
 
         return [
+            Action::make('restore_from_trash')->label('Restore from Trash')->icon('heroicon-o-arrow-uturn-left')
+                ->authorize(fn (): bool => auth()->user()?->can('restore', $this->getRecord()) ?? false)
+                ->visible(fn (): bool => $this->getRecord()->trashed())
+                ->requiresConfirmation()
+                ->action(fn () => $this->performItemAction(fn () => app(PersonnelRequestLifecycleService::class)->restore($this->getRecord(), auth()->user()), 'Order restored from Trash')),
             ...$this->getArchiveActions(),
             Action::make('delete_order')->label('Delete order')->icon('heroicon-o-trash')->color('danger')
-                ->authorize('delete', $request)
-                ->visible(fn (): bool => $request->type === PersonnelRequestType::Uniform)
+                ->authorize(fn (): bool => auth()->user()?->can('delete', $this->getRecord()) ?? false)
+                ->visible(fn (): bool => ! $this->getRecord()->trashed() && $this->getRecord()->type === PersonnelRequestType::Uniform)
                 ->modalDescription('Move this cancelled or denied, unissued order to Trash. The original order, items, history, and private evidence are retained for recovery.')
                 ->form([Textarea::make('deletion_reason')->label('Reason for deletion')->required()->maxLength(2000)])
                 ->requiresConfirmation()
-                ->action(fn (array $data) => $this->performItemAction(fn () => app(PersonnelRequestLifecycleService::class)->delete($request, auth()->user(), $data['deletion_reason']), 'Order moved to Trash')),
+                ->action(fn (array $data) => $this->performItemAction(fn () => app(PersonnelRequestLifecycleService::class)->delete($this->getRecord(), auth()->user(), $data['deletion_reason']), 'Order moved to Trash')),
             $this->transitionAction('acknowledge', 'Acknowledge', PersonnelRequestStatus::Acknowledged, 'primary', 'heroicon-o-hand-raised'),
             Action::make('request_information')
                 ->authorize('update', $request)
