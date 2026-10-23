@@ -99,8 +99,16 @@ final class ApparatusInspectionTestClassificationService
             'apparatus_issue_messages' => 'apparatus_inspection_id',
             'apparatus_vehicle_swap_requests' => 'apparatus_inspection_id',
             'daily_checkout_inspection_sessions' => 'submitted_inspection_id',
+            'apparatus_inventory_corrections' => 'apparatus_inspection_id',
         ] as $table => $column) {
             $hasEffects = $hasEffects || DB::table($table)->where($column, $id)->exists();
+        }
+        if (is_string($inspection->inventory_draft_id) && $inspection->inventory_draft_id !== '' && $inspection->actor_user_id !== null) {
+            $hasEffects = $hasEffects || DB::table('apparatus_inventory_corrections')
+                ->where('inspection_draft_id', strtolower($inspection->inventory_draft_id))
+                ->where('apparatus_id', $inspection->apparatus_id)
+                ->where('reporter_user_id', $inspection->actor_user_id)
+                ->exists();
         }
         if ($hasEffects || $hasDefect) {
             throw ValidationException::withMessages([

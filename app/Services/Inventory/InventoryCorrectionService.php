@@ -27,7 +27,8 @@ use Throwable;
  * (docs/apparatus-inventory-corrections.md). Every method authorizes, validates and
  * writes inside one transaction; notifications are ledgered there and sent after commit.
  *
- * Lock order: correction row -> apparatus rows (ascending id) -> inventory changes.
+ * Lock order: existing correction rows (ascending id) -> inspection -> apparatus rows (ascending id) -> inventory changes.
+ * New reports lock the inspection before INSERT takes any foreign-key locks.
  */
 final class InventoryCorrectionService
 {
@@ -82,7 +83,7 @@ final class InventoryCorrectionService
 
         try {
             $correction = DB::transaction(function () use ($reporter, $employeeId, $apparatus, $data, $hash, $checklistType, $target, $photoPath): ApparatusInventoryCorrection {
-                $correction = ApparatusInventoryCorrection::query()->create([
+                $correction = new ApparatusInventoryCorrection([
                     'client_request_id' => strtolower((string) $data['client_submission_id']),
                     'payload_hash' => $hash,
                     'apparatus_id' => $apparatus->getKey(),
@@ -101,8 +102,12 @@ final class InventoryCorrectionService
                     'photo_path' => $photoPath,
                     'status' => ApparatusInventoryCorrection::STATUS_SUBMITTED,
                 ]);
+                // Capture the parent before INSERT acquires an apparatus foreign-key lock.
+                // Do not discover a newly committed inspection after that lock is held.
+                $inspection = $this->lockOperationalInspection($correction);
+                $correction->apparatus_inspection_id = $inspection?->getKey();
+                $correction->save();
                 $this->event($correction, $reporter, Event::SUBMITTED, Event::VISIBILITY_MEMBER, $correction->member_note);
-                $this->linkToSubmittedInspection($correction);
                 $this->notifications->inventoryCorrectionSubmitted($correction);
 
                 return $correction;
@@ -130,17 +135,21 @@ final class InventoryCorrectionService
         if (! is_string($draftId) || $draftId === '' || $inspection->actor_user_id === null) {
             return;
         }
-        ApparatusInventoryCorrection::query()
-            ->where('inspection_draft_id', strtolower($draftId))
-            ->where('apparatus_id', $inspection->apparatus_id)
-            ->where('reporter_user_id', $inspection->actor_user_id)
-            ->whereNull('apparatus_inspection_id')
-            ->orderBy('id')
-            ->get()
-            ->each(function (ApparatusInventoryCorrection $correction) use ($inspection): void {
+        DB::transaction(function () use ($inspection, $draftId): void {
+            $corrections = ApparatusInventoryCorrection::query()
+                ->where('inspection_draft_id', strtolower($draftId))
+                ->where('apparatus_id', $inspection->apparatus_id)
+                ->where('reporter_user_id', $inspection->actor_user_id)
+                ->whereNull('apparatus_inspection_id')
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get();
+            $inspection->assertOperational();
+            foreach ($corrections as $correction) {
                 $correction->forceFill(['apparatus_inspection_id' => $inspection->getKey()])->save();
                 $this->event($correction, null, Event::LINKED_TO_INSPECTION, Event::VISIBILITY_INTERNAL, null, ['inspection_id' => $inspection->getKey()]);
-            });
+            }
+        }, 3);
     }
 
     // ---------------------------------------------------------------- messages
@@ -653,25 +662,33 @@ final class InventoryCorrectionService
         return $existing;
     }
 
-    private function linkToSubmittedInspection(ApparatusInventoryCorrection $correction): void
-    {
-        if ($correction->inspection_draft_id === null) {
-            return;
-        }
-        $inspectionId = ApparatusInspection::query()
-            ->where('inventory_draft_id', $correction->inspection_draft_id)
-            ->where('apparatus_id', $correction->apparatus_id)
-            ->where('actor_user_id', $correction->reporter_user_id)
-            ->orderByDesc('id')
-            ->value('id');
-        if ($inspectionId !== null) {
-            $correction->forceFill(['apparatus_inspection_id' => $inspectionId])->save();
-        }
-    }
-
     private function lock(int $correctionId): ApparatusInventoryCorrection
     {
-        return ApparatusInventoryCorrection::query()->whereKey($correctionId)->lockForUpdate()->firstOrFail();
+        $correction = ApparatusInventoryCorrection::query()->whereKey($correctionId)->lockForUpdate()->firstOrFail();
+        $this->lockOperationalInspection($correction);
+
+        return $correction;
+    }
+
+    /** Retain the parent lock until the operational write commits, including drafts awaiting linkage. */
+    private function lockOperationalInspection(ApparatusInventoryCorrection $correction): ?ApparatusInspection
+    {
+        if ($correction->apparatus_inspection_id !== null) {
+            $inspection = ApparatusInspection::query()->whereKey($correction->apparatus_inspection_id)->lockForUpdate()->firstOrFail();
+        } elseif ($correction->inspection_draft_id !== null) {
+            $inspection = ApparatusInspection::query()
+                ->where('inventory_draft_id', $correction->inspection_draft_id)
+                ->where('apparatus_id', $correction->apparatus_id)
+                ->where('actor_user_id', $correction->reporter_user_id)
+                ->orderByDesc('id')
+                ->lockForUpdate()
+                ->first();
+        } else {
+            return null;
+        }
+        $inspection?->assertOperational();
+
+        return $inspection;
     }
 
     private function assertDecidable(ApparatusInventoryCorrection $correction, ?int $expectedLock): void
