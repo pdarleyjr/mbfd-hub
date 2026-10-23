@@ -248,6 +248,12 @@ Route::prefix('employee')
             ->name('attachments.download');
     });
 
+// Photo attached to a Daily Checkout inventory correction (Logistics and the reporting member).
+Route::get('employee/inventory-corrections/{correction}/photo', \App\Http\Controllers\InventoryCorrectionPhotoController::class)
+    ->middleware(['auth:web', 'throttle:120,1'])
+    ->whereNumber('correction')
+    ->name('inventory-corrections.photo');
+
 // Daily Checkout history exports. Authenticated users only (not employee-only,
 // so Fleet administrators without an employee profile can print any record);
 // the controllers authorize the submitting user or the inspection `view` policy.

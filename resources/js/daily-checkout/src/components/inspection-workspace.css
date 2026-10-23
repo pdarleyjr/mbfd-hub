@@ -313,3 +313,35 @@ html:has(.apparatus-inspection) { scroll-padding-bottom: calc(96px + env(safe-ar
   .inspection-action-bar { padding-top: 6px; padding-bottom: max(6px, env(safe-area-inset-bottom)); }
   .quick-checklist { bottom: calc(68px + env(safe-area-inset-bottom)); }
 }
+
+/* Inventory corrections: a quiet disclosure under the item (or compartment) that opens an inline report. */
+.equipment-spec { margin-bottom: 8px; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.equipment-markers { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 0 16px 8px; }
+.ic-link { display: inline-flex; align-items: center; min-height: 44px; font-size: 14px; font-weight: 650; color: rgb(var(--hub-blue)); text-decoration: underline; text-underline-offset: 2px; }
+.ic-link:focus-visible { outline: 2px solid rgb(var(--hub-focus)); outline-offset: 2px; }
+.equipment-unlisted { margin-top: 12px; padding-top: 4px; border-top: 1px solid var(--line); }
+.equipment-unlisted > .inspection-muted { margin: 0 0 8px; }
+.inventory-correction { margin-top: 12px; }
+.inventory-correction > .hub-btn { padding-inline: 0; font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+.ic-status { margin: 0; font-size: 14px; font-weight: 600; color: rgb(var(--hub-info)); }
+.ic-status:empty { display: none; }
+.ic-panel { margin-top: 8px; padding: 12px; border: 1px solid rgb(var(--hub-glass-border)); border-radius: var(--hub-radius-control); background: rgb(var(--hub-n-25)); }
+.ic-hint { margin: 0 0 8px; font-size: 14px; color: var(--muted); }
+.ic-reasons { margin: 0; padding: 0; border: 0; min-width: 0; }
+.ic-reasons legend { padding: 0; font-size: 13px; font-weight: 700; }
+.inventory-correction .ic-option { display: flex; align-items: flex-start; gap: 12px; min-height: 44px; margin: 0; padding: 10px 0; font-size: 14px; font-weight: 500; cursor: pointer; border-bottom: 1px solid rgb(var(--hub-n-100)); }
+.inventory-correction .ic-option input[type="radio"] { flex-shrink: 0; width: 24px; height: 24px; min-height: 24px; margin: 0; padding: 0; accent-color: var(--action); }
+.inventory-correction .ic-option > span { min-width: 0; overflow-wrap: anywhere; }
+.inventory-correction label { display: block; margin: 12px 0 4px; font-size: 13px; font-weight: 650; }
+.inventory-correction label.ic-option { display: flex; margin: 0; }
+.inventory-correction :is(textarea, select, input:not([type="file"], [type="radio"])) { display: block; width: 100%; min-height: 44px; border: 1px solid rgb(var(--hub-control-border)); border-radius: var(--hub-radius-control); background: rgb(var(--hub-well)); padding: 10px 12px; font-size: 15px; font-weight: 400; }
+.inventory-correction :is(textarea, select, input)[aria-invalid="true"] { border-color: var(--red); }
+.inventory-correction input[type="file"] { display: block; max-width: 100%; font-size: 14px; color: var(--muted); }
+.inventory-correction input[type="file"]::file-selector-button { min-height: 44px; margin-right: 12px; padding: 0 16px; border: 1px solid rgb(var(--hub-n-400)); border-radius: var(--hub-radius-control); background: rgb(var(--hub-well)); color: rgb(var(--hub-n-900)); font: inherit; font-weight: 600; cursor: pointer; }
+.inventory-correction :is(summary, input, select, textarea, button):focus-visible { outline: 2px solid rgb(var(--hub-focus)); outline-offset: 2px; }
+.ic-error { margin: 4px 0 0; color: var(--red); font-size: 14px; font-weight: 650; }
+.ic-failure { margin: 12px 0 0; }
+.ic-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+@media (pointer: coarse) {
+  .inventory-correction :is(textarea, select, input:not([type="file"], [type="radio"])) { font-size: 16px; }
+}

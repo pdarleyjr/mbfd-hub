@@ -18,7 +18,7 @@ class ApparatusInspection extends Model
     protected static function booted(): void
     {
         static::updating(function (self $inspection): void {
-            if ($inspection->isDirty(['actor_user_id', 'apparatus_id', 'vehicle_number', 'designation_at_time', 'operator_name', 'rank', 'shift', 'unit_number', 'employee_id', 'engine_hours', 'miles', 'results', 'checklist_evidence', 'checklist_version', 'client_submission_id', 'submission_payload_hash', 'officer_signature', 'review_flag_explanation', 'review_flag_items', 'completed_at'])) {
+            if ($inspection->isDirty(['actor_user_id', 'apparatus_id', 'vehicle_number', 'designation_at_time', 'operator_name', 'rank', 'shift', 'unit_number', 'employee_id', 'engine_hours', 'miles', 'results', 'checklist_evidence', 'checklist_version', 'client_submission_id', 'submission_payload_hash', 'officer_signature', 'review_flag_explanation', 'review_flag_items', 'inventory_draft_id', 'completed_at'])) {
                 throw new LogicException('Submitted inspection observations are immutable. Record a separate review decision.');
             }
         });
@@ -54,6 +54,7 @@ class ApparatusInspection extends Model
         'review_flag_explanation',
         'review_flag_items',
         'processed_apparatus_id',
+        'inventory_draft_id',
         'completed_at',
     ];
 

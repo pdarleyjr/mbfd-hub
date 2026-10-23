@@ -67,6 +67,7 @@ Route::prefix('public')->middleware(['auth:sanctum', 'canonical.api', 'throttle:
     Route::post('apparatuses/{apparatus}/inspection-sessions/{session}/abandon', [ApparatusController::class, 'abandonInspectionSession'])->middleware(['throttle:30,1']);
     Route::get('apparatuses/{apparatus}/service-notices', [PublicApparatusServiceTicketController::class, 'apparatusNotices']);
     Route::post('apparatuses/{apparatus}/inspections', [ApparatusController::class, 'storeInspection']);
+    Route::post('apparatuses/{apparatus}/inventory-corrections', [\App\Http\Controllers\Api\InventoryCorrectionController::class, 'store'])->middleware(['throttle:30,1']);
     Route::get('employees/list', [ApparatusController::class, 'employees']);
 
     // Public Station Routes for Daily Checkout SPA

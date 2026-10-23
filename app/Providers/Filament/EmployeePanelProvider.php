@@ -63,6 +63,7 @@ class EmployeePanelProvider extends PanelProvider
                 EmployeeDashboard::class,
                 \App\Filament\Employee\Pages\TrainingHistoryPage::class,
                 \App\Filament\Employee\Pages\MyVehicleInspections::class, \App\Filament\Employee\Pages\MyVehicleInspectionView::class,
+                \App\Filament\Employee\Pages\MyInventoryCorrectionView::class,
                 OperationalForms::class,
                 VideoConferencing::class,
                 MyEquipmentPage::class,

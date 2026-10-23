@@ -716,6 +716,7 @@ class ApparatusResource extends Resource
             RelationManagers\ServiceTicketsRelationManager::class,
             RelationManagers\VehicleSwapReportsRelationManager::class,
             RelationManagers\DefectsRelationManager::class,
+            RelationManagers\InventoryCorrectionsRelationManager::class,
         ];
     }
 

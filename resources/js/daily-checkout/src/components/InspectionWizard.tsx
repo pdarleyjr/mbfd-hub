@@ -22,6 +22,8 @@ import {
 import type { DailyCheckoutQueuedSubmission } from '../lib/db';
 import { clearInspectionProgress, clearInspectionSessionAbandonKey, clearInspectionSessionStartKey, createClientSubmissionId, createDraftAutosaver, getOrCreateInspectionSessionAbandonKey, getOrCreateInspectionSessionStartKey, loadInspectionProgress, type DraftAutosaver } from '../utils/storage';
 import { safeContextualPath } from '../utils/contextualBack';
+import { canMigrateInventoryDraft, inventoryMigrationMessage, mergeDraftAnswers } from '../utils/inventoryDraftMigration';
+import { useInventoryMarkers } from '../hooks/useInventoryMarkers';
 import { useOffline } from '../hooks/useOffline';
 import OfficerStep from './OfficerStep';
 import ChecklistFieldsStep from './ChecklistFieldsStep';
@@ -141,6 +143,8 @@ export default function InspectionWizard() {
   const [apparatus, setApparatus] = useState<Apparatus | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
   const [reviewFlag, setReviewFlag] = useState<ReviewFlagDraft>(EMPTY_REVIEW_FLAG);
+  // Created once per draft; links inventory corrections reported meanwhile to the inspection.
+  const [draftId, setDraftId] = useState<string | null>(null);
   const [checklist, setChecklist] = useState<ChecklistData | null>(null);
   const [currentStep, setCurrentStep] = useState<Step>('compartments');
   const [memberIdentity, setMemberIdentity] = useState<OfflineIdentity | null>(null);
@@ -185,7 +189,10 @@ export default function InspectionWizard() {
   const meterFormRef = useRef<HTMLFormElement>(null);
   const hasQueuedInspectionRef = useRef(false);
   const initializedChecklistKeyRef = useRef<string | null>(null);
+  // A draft whose answers were carried into a newer checklist version; removed once the new draft is durable.
+  const supersededDraftRef = useRef<{ slug: string; version: string; owner: OfflineIdentity } | null>(null);
   const loadedContractRef = useRef<{ slug: string; apparatus: Apparatus; checklist: ChecklistData } | null>(null);
+  const inventoryMarkers = useInventoryMarkers(apparatus?.id, memberIdentity?.userId, checklist?.pending_corrections);
   const readiness = inspectionReadiness(checklist, compartments, fieldValues, scheduledTasks, officerInfo, meterData);
   const continueLabel = readiness.nextStep === 'compartments' ? 'Continue: Apparatus' : readiness.label;
   // On the Member step the Continue button is the vehicle confirmation, so its label
@@ -203,6 +210,11 @@ export default function InspectionWizard() {
 
   if (autosaverRef.current === null) {
     autosaverRef.current = createDraftAutosaver((succeeded) => {
+      const superseded = supersededDraftRef.current;
+      if (succeeded && superseded) {
+        supersededDraftRef.current = null;
+        void clearInspectionProgress(superseded.slug, superseded.version, superseded.owner);
+      }
       if (!mountedRef.current) return;
       setAutosaveState(succeeded ? 'saved' : 'failed');
       setSaveStatusText(succeeded ? SAVE_STATUS_TEXT.saved : SAVE_STATUS_TEXT.failed);
@@ -450,6 +462,7 @@ export default function InspectionWizard() {
         setMeterData({ engine_hours: null, miles: null });
         setSignature(null);
         setReviewFlag(EMPTY_REVIEW_FLAG);
+        setDraftId(createClientSubmissionId());
         setCurrentStep('compartments');
         setCompartments(checklistData.compartments);
         setFieldValues(checklistData.fields.map((field) => ({
@@ -477,19 +490,22 @@ export default function InspectionWizard() {
               checklistData.schema_version !== 2
               || saved.inspectionSession?.id === checklistData.inspection_session?.id
             );
-          if (canRestoreSavedProgress) {
+          // The normal restore and the inventory-overlay migration differ only in which answers are loaded.
+          const personnel = identity.personnel;
+          const applySavedProgress = (restoredCompartments: Compartment[]) => {
             setSignature(saved.signature ?? null);
             setReviewFlag(normalizeReviewFlagDraft(saved.reviewFlag));
+            setDraftId(saved.draftId ?? createClientSubmissionId());
             // Keep the issued baseline with the observation, even after a newer
             // checkout changed the live fleet meters while this draft was offline.
             setApparatus({ ...foundApparatus, meter_baseline_token: saved.apparatusSnapshot?.meter_baseline_token });
             // A saved confirmation only counts against the vehicle assigned today.
             const restoredVehicle = reconcileVehicleConfirmation(saved.officer.vehicleConfirmation, foundApparatus.vehicle_number ?? '');
-            setOfficerInfo({ ...saved.officer, name: identity.personnel.name, rank: identity.personnel.rank as OfficerInfo['rank'], employeeId: identity.personnel.employee_profile_id, unitNumber: foundApparatus.vehicle_number ?? '', vehicleConfirmation: restoredVehicle });
+            setOfficerInfo({ ...saved.officer, name: personnel.name, rank: personnel.rank as OfficerInfo['rank'], employeeId: personnel.employee_profile_id, unitNumber: foundApparatus.vehicle_number ?? '', vehicleConfirmation: restoredVehicle });
             if (saved.meter) {
               setMeterData(saved.meter);
             }
-            setCompartments(saved.compartments);
+            setCompartments(restoredCompartments);
             {
               if (saved.fieldValues) {
                 setFieldValues(saved.fieldValues.map(field => field.id === 'vehicle_num' ? { ...field, value: paperVehicleValue(restoredVehicle) } : field));
@@ -500,10 +516,20 @@ export default function InspectionWizard() {
             }
             setCurrentStep('compartments');
             setHasLoadedAutosave(true);
+          };
+          if (canRestoreSavedProgress) {
+            applySavedProgress(saved.compartments);
           } else if (saved.actorUserId !== identity.userId || saved.actorSecurityVersion !== identity.securityVersion) {
             setAutosaveReviewMessage('A saved inspection belongs to a different or unverified sign-in. Its answers were not loaded.');
           } else if (saved.checklist_version === checklistData.checklist_version && checklistData.schema_version === 2) {
             setAutosaveReviewMessage('The prior Fire Boat session expired or changed. Its saved answers were not copied into this new server-issued session.');
+          } else if (canMigrateInventoryDraft(saved, checklistData, identity)) {
+            // Only the inventory overlay changed: keep the answers by item id; changed and new items need a fresh look.
+            const merged = mergeDraftAnswers(checklistData.compartments, saved.compartments);
+            applySavedProgress(merged.compartments);
+            setAutosaveReviewMessage(inventoryMigrationMessage(merged.needsLook));
+            // The old-version draft is removed once the migrated draft is saved, so its answers cannot be carried into a later inspection.
+            supersededDraftRef.current = { slug, version: saved.checklist_version, owner: identity };
           } else {
             setAutosaveReviewMessage('A previously saved inspection uses a different checklist version. It remains saved on this device and requires officer review; this form is using the current checklist.');
           }
@@ -552,6 +578,7 @@ export default function InspectionWizard() {
         officer: officerInfo,
         signature,
         reviewFlag,
+        ...(draftId ? { draftId } : {}),
         meter: meterData,
         compartments,
         fieldValues,
@@ -561,7 +588,7 @@ export default function InspectionWizard() {
       },
       clearSessionStartKeyFor: checklist.schema_version === 2 && checklist.inspection_session ? checklist.checklist_version : undefined,
     }, stepChanged);
-  }, [officerInfo, meterData, compartments, fieldValues, scheduledTasks, currentStep, slug, apparatus, checklist, memberIdentity, loading, signature, reviewFlag, submitting, queuedSubmissionBlocker, autosaver]);
+  }, [officerInfo, meterData, compartments, fieldValues, scheduledTasks, currentStep, slug, apparatus, checklist, memberIdentity, loading, signature, reviewFlag, draftId, submitting, queuedSubmissionBlocker, autosaver]);
 
   useEffect(() => {
     if (readiness.ready) setShowNotReady(false);
@@ -651,6 +678,7 @@ export default function InspectionWizard() {
       setMeterData({ engine_hours: null, miles: null });
       setSignature(null);
       setReviewFlag(EMPTY_REVIEW_FLAG);
+      setDraftId(createClientSubmissionId());
       setCompartments(todayChecklist.compartments);
       setFieldValues(todayChecklist.fields.map((field) => ({
         id: field.id,
@@ -767,6 +795,7 @@ export default function InspectionWizard() {
         } : {}),
         officer_signature: signature,
         ...(flag ? { review_flag: flag } : {}),
+        ...(draftId ? { inventory_draft_id: draftId } : {}),
       };
       clientSubmissionIdRef.current = submission.client_submission_id;
       const queueId = await queueSubmission(apparatus.id, submission, currentIdentity);
@@ -1128,6 +1157,7 @@ export default function InspectionWizard() {
           onSubmit={handleCompartmentsSubmit}
           onBack={() => setCurrentStep('officer')}
           backLabel="Member / Vehicle Info"
+          inventory={checklist.schema_version === 2 ? undefined : { apparatusId: apparatus.id, checklistVersion: checklist.checklist_version, draftId, markers: inventoryMarkers.markers, onRecorded: inventoryMarkers.record }}
         />
       )}
 
