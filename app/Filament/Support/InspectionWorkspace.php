@@ -9,6 +9,7 @@ use App\Filament\Resources\ApparatusResource;
 use App\Filament\Resources\ApparatusServiceTicketResource;
 use App\Filament\Resources\EmployeeResource;
 use App\Filament\Resources\InspectionResource;
+use App\Filament\Resources\InventoryCorrectionResource;
 use App\Filament\Resources\VehicleSwapRequestResource;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
@@ -16,6 +17,7 @@ use App\Models\ApparatusDefectEvent;
 use App\Models\ApparatusDefectObservation;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusInspectionException;
+use App\Models\ApparatusInventoryCorrection;
 use App\Models\ApparatusIssueMessage;
 use App\Models\ApparatusServiceTicket;
 use App\Models\ApparatusVehicleSwapRequest;
@@ -23,6 +25,7 @@ use App\Models\Station;
 use App\Models\User;
 use App\Services\Inspections\EmployeeInspectionHistoryService;
 use App\Services\Inspections\IssueMessageService;
+use App\Services\Inventory\InventoryCorrectionReason;
 use App\Support\Fleet\DefectActionStatus;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -100,6 +103,25 @@ final class InspectionWorkspace
         };
     }
 
+    /** @return list<array<string, mixed>> */
+    private function inventoryCorrections(ApparatusInspection $inspection): array
+    {
+        return ApparatusInventoryCorrection::query()
+            ->where('apparatus_inspection_id', $inspection->getKey())
+            ->orderBy('id')
+            ->get(['id', 'reason', 'status', 'target_snapshot', 'proposal'])
+            ->map(static fn (ApparatusInventoryCorrection $correction): array => [
+                'id' => (int) $correction->getKey(),
+                'reference' => $correction->reference(),
+                'item' => InventoryCorrectionResource::itemLabel($correction),
+                'reason' => InventoryCorrectionReason::label($correction->reason),
+                'status' => ApparatusInventoryCorrection::statusLabel($correction->status),
+                'open' => $correction->isOpen(),
+                'url' => InventoryCorrectionResource::getUrl('view', ['record' => $correction->getKey()], panel: 'admin'),
+            ])
+            ->all();
+    }
+
     /** @return array<string, mixed> */
     public function build(ApparatusInspection $inspection, ?User $viewer): array
     {
@@ -134,6 +156,8 @@ final class InspectionWorkspace
             'can_manage' => $canManage,
             'meter_hold_open' => $exceptions->contains(fn (ApparatusInspectionException $e): bool => $this->isOpenHold($e) && in_array($e->field, ['miles', 'engine_hours'], true)),
             'general_thread' => $canReview ? $this->generalThread($inspection, $viewer) : null,
+            // Checklist corrections the member reported while doing this inspection (separate from its findings).
+            'inventory_corrections' => $canReview ? $this->inventoryCorrections($inspection) : [],
             'header' => $this->header($inspection, $physical, $detail, $viewer, $openHolds, $openIssues),
             'legacy_pending' => $inspection->processing_status === null && $inspection->review_status === 'pending_review',
             'pending_effects' => $this->pendingEffects($inspection),

@@ -198,8 +198,10 @@ final class DefectContinuityService
                 'last_observation' => $defect->latestObservation?->observation,
                 'last_observed_at' => $defect->latestObservation?->created_at?->toIso8601String(),
                 'service_status' => $defect->serviceTicket?->status,
-                'compartment_id' => $defect->compartment_key ?? $match['compartment_id'] ?? null,
-                'item_id' => $defect->item_key ?? $match['item_id'] ?? null,
+                // Where the item is listed now (an approved inventory move keeps its id and adds the old
+                // compartment as an alias); the stored keys only when the current checklist is ambiguous.
+                'compartment_id' => $match['compartment_id'] ?? $defect->compartment_key,
+                'item_id' => $match['item_id'] ?? $defect->item_key,
                 'action_status' => $defect->action_status,
                 'action_label' => DefectActionStatus::label($defect->action_status),
                 'severity' => $defect->severity,

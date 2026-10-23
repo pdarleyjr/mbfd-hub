@@ -9,6 +9,7 @@ use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
 use App\Models\User;
 use App\Services\Inspections\EmployeeInspectionHistoryService;
+use App\Services\Inventory\InventoryCorrectionProjection;
 use Carbon\CarbonImmutable;
 use Filament\Forms\Components\DatePicker;
 use Filament\Pages\Page;
@@ -65,6 +66,17 @@ class MyVehicleInspections extends Page implements HasTable
     {
         // Fail closed with the canonical 403 when the account has no employee context.
         $this->authenticatedEmployee();
+    }
+
+    /** @return array<string, mixed> */
+    protected function getViewData(): array
+    {
+        return [
+            // Only corrections this member reported; the projection never widens the set.
+            'inventoryCorrections' => collect(app(InventoryCorrectionProjection::class)->memberList($this->member(), 20))
+                ->map(fn (array $row): array => [...$row, 'url' => MyInventoryCorrectionView::getUrl(['correction' => $row['id']], panel: 'employee')])
+                ->all(),
+        ];
     }
 
     private function history(): EmployeeInspectionHistoryService

@@ -8,6 +8,7 @@ use App\Filament\Resources\ApparatusResource;
 use App\Filament\Resources\ApparatusResource\Pages\ViewApparatus;
 use App\Filament\Resources\ApparatusResource\RelationManagers\DefectsRelationManager;
 use App\Filament\Resources\ApparatusResource\RelationManagers\InspectionsRelationManager;
+use App\Filament\Resources\ApparatusResource\RelationManagers\InventoryCorrectionsRelationManager;
 use App\Filament\Resources\ApparatusResource\RelationManagers\ServiceTicketsRelationManager;
 use App\Filament\Resources\ApparatusResource\RelationManagers\VehicleSwapReportsRelationManager;
 use App\Filament\Resources\ApparatusServiceTicketResource;
@@ -440,7 +441,8 @@ final class ApparatusDefectServiceTicketTest extends TestCase
             ServiceTicketsRelationManager::class,
             VehicleSwapReportsRelationManager::class,
             DefectsRelationManager::class,
-        ], array_values(ApparatusResource::getRelations()), 'Vehicle swaps is the fourth tab, shown only to Fleet staff who can view swap reports.');
+            InventoryCorrectionsRelationManager::class,
+        ], array_values(ApparatusResource::getRelations()), 'Vehicle swaps is the fourth tab, shown only to Fleet staff who can view swap reports; inventory corrections come last, for reviewers.');
         $this->assertSame('Overview', $component->instance()->getContentTabLabel());
     }
 

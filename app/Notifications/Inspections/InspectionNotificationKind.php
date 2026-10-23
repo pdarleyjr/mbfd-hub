@@ -28,6 +28,15 @@ final class InspectionNotificationKind
 
     public const INSPECTION_DECIDED = 'inspection_decided';
 
+    /** A member reported that a Daily Checkout checklist entry is wrong (to reviewers). */
+    public const INVENTORY_CORRECTION_SUBMITTED = 'inventory_correction_submitted';
+
+    /** Logistics asked, replied, decided or reversed an inventory correction (to the reporter). */
+    public const INVENTORY_CORRECTION_UPDATE = 'inventory_correction_update';
+
+    /** The reporting member replied on an inventory correction (to reviewers). */
+    public const INVENTORY_CORRECTION_REPLY = 'inventory_correction_reply';
+
     /** @return list<string> */
     public static function all(): array
     {
@@ -40,13 +49,16 @@ final class InspectionNotificationKind
             self::MEMBER_REPLY,
             self::ISSUE_RESOLVED,
             self::INSPECTION_DECIDED,
+            self::INVENTORY_CORRECTION_SUBMITTED,
+            self::INVENTORY_CORRECTION_UPDATE,
+            self::INVENTORY_CORRECTION_REPLY,
         ];
     }
 
     /** Kinds addressed to reviewers; every other kind is addressed to a member. */
     public static function isForReviewers(string $kind): bool
     {
-        return in_array($kind, [self::REVIEW_REQUIRED, self::ISSUE_ESCALATED, self::MEMBER_REPLY], true);
+        return in_array($kind, [self::REVIEW_REQUIRED, self::ISSUE_ESCALATED, self::MEMBER_REPLY, self::INVENTORY_CORRECTION_SUBMITTED, self::INVENTORY_CORRECTION_REPLY], true);
     }
 
     public static function icon(string $kind): string
@@ -55,7 +67,8 @@ final class InspectionNotificationKind
             self::REVIEW_REQUIRED => 'heroicon-o-clipboard-document-check',
             self::ISSUE_ESCALATED => 'heroicon-o-exclamation-triangle',
             self::CLARIFICATION_REQUESTED => 'heroicon-o-question-mark-circle',
-            self::MEMBER_REPLY, self::INSPECTION_MESSAGE, self::ISSUE_MEMBER_UPDATE => 'heroicon-o-chat-bubble-left-right',
+            self::MEMBER_REPLY, self::INSPECTION_MESSAGE, self::ISSUE_MEMBER_UPDATE, self::INVENTORY_CORRECTION_REPLY, self::INVENTORY_CORRECTION_UPDATE => 'heroicon-o-chat-bubble-left-right',
+            self::INVENTORY_CORRECTION_SUBMITTED => 'heroicon-o-pencil-square',
             self::ISSUE_RESOLVED => 'heroicon-o-check-circle',
             default => 'heroicon-o-clipboard-document-list',
         };

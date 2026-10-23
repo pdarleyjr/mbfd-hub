@@ -33,6 +33,8 @@ export interface DailyCheckoutQueuedSubmission {
   id: string;
   apparatusId: number;
   checklistVersion: string;
+  /** Not indexed: the template hash beneath approved inventory corrections (absent on older records). */
+  checklistBaseVersion?: string;
   data: InspectionSubmission;
   createdAt: Date;
   updatedAt: Date;

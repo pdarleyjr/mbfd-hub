@@ -377,6 +377,8 @@ export const queueSubmission = async (
   data: InspectionSubmission,
   /** The member identity the caller already verified for this submission. */
   verifiedOwner?: OfflineIdentity,
+  /** The template hash under the inventory overlay; one unresolved inspection per apparatus and base. */
+  checklistBaseVersion?: string,
 ): Promise<string> => {
   await ensureDailyCheckoutQueueReady();
 
@@ -390,6 +392,7 @@ export const queueSubmission = async (
     id: `daily_${data.client_submission_id}`,
     apparatusId,
     checklistVersion: data.checklist_version,
+    ...(isChecklistVersion(checklistBaseVersion) ? { checklistBaseVersion } : {}),
     data,
     createdAt: now,
     updatedAt: now,
@@ -412,7 +415,7 @@ export const queueSubmission = async (
   const existingByChecklistVersion = await db.dailyCheckoutSubmissions
     .where('[apparatusId+checklistVersion]')
     .equals([apparatusId, queuedSubmission.checklistVersion])
-    .first();
+    .first() ?? await queuedForInventoryRevision(apparatusId, checklistBaseVersion);
   if (existingByChecklistVersion) {
     if (hasSamePersistedPayload(existingByChecklistVersion, queuedSubmission)) {
       return existingByChecklistVersion.id;
@@ -461,16 +464,35 @@ export const getQueuedSubmission = async (id: string): Promise<DailyCheckoutQueu
   return (await db.dailyCheckoutSubmissions.get(id)) ?? null;
 };
 
+/**
+ * An approved inventory correction changes the checklist version but not its template (base)
+ * version, and the server still accepts work done on the previous list. A checkout queued on
+ * the previous list therefore still blocks a second checkout of the same apparatus.
+ */
+const queuedForInventoryRevision = async (
+  apparatusId: number,
+  checklistBaseVersion: string | undefined,
+): Promise<DailyCheckoutQueuedSubmission | undefined> => {
+  if (!isChecklistVersion(checklistBaseVersion)) return undefined;
+
+  return db.dailyCheckoutSubmissions
+    .where('apparatusId')
+    .equals(apparatusId)
+    .filter((submission) => submission.checklistBaseVersion === checklistBaseVersion)
+    .first();
+};
+
 export const getQueuedSubmissionForApparatusAndChecklistVersion = async (
   apparatusId: number,
   checklistVersion: string,
+  checklistBaseVersion?: string,
 ): Promise<DailyCheckoutQueuedSubmission | null> => {
   await ensureDailyCheckoutQueueReady();
 
   return (await db.dailyCheckoutSubmissions
     .where('[apparatusId+checklistVersion]')
     .equals([apparatusId, checklistVersion])
-    .first()) ?? null;
+    .first()) ?? (await queuedForInventoryRevision(apparatusId, checklistBaseVersion)) ?? null;
 };
 
 export const getSubmissionQueue = async (): Promise<DailyCheckoutQueuedSubmission[]> => {

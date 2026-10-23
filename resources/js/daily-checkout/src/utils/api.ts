@@ -1,5 +1,5 @@
 import {
-  Apparatus, CommandOverview, ChecklistData, ChecklistField, ChecklistInputType, InspectionSubmission, InspectionRevision, EmployeeOption, ScheduledChecklistTask, Station, StationDetail,
+  Apparatus, CommandOverview, ChecklistData, ChecklistField, ChecklistInputType, ChecklistItem, PendingInventoryCorrection, InspectionSubmission, InspectionRevision, EmployeeOption, ScheduledChecklistTask, Station, StationDetail,
   Room, RoomAsset, RoomAudit, BigTicketRequest, BigTicketRequestFormData,
   StationInventorySubmission, InventorySubmissionItem, Shift,
   InventoryV2Response, SupplyRequest, UpdateItemRequest, CreateSupplyRequestRequest,
@@ -45,6 +45,33 @@ const isChecklistInputType = (value: unknown): value is ChecklistInputType => (
   || value === 'checkbox'
   || value === 'percentage'
 );
+
+const nonEmptyString = (value: unknown): value is string => typeof value === 'string' && value.trim() !== '';
+
+/** Display-only item details; anything that is not text is dropped. */
+const optionalItemText = (item: Record<string, unknown>): Pick<ChecklistItem, 'manufacturer' | 'model' | 'description'> => ({
+  ...(nonEmptyString(item.manufacturer) ? { manufacturer: item.manufacturer } : {}),
+  ...(nonEmptyString(item.model) ? { model: item.model } : {}),
+  ...(nonEmptyString(item.description) ? { description: item.description } : {}),
+});
+
+/** The server list is advisory display data: unusable entries are skipped instead of failing the checklist. */
+const parsePendingCorrections = (value: unknown): PendingInventoryCorrection[] => (Array.isArray(value) ? value : []).flatMap((entry): PendingInventoryCorrection[] => {
+  if (!entry || typeof entry !== 'object') return [];
+  const row = entry as Record<string, unknown>;
+  // Another member's report arrives as a bare marker: no id and no reason, only its status and location.
+  if (typeof row.status !== 'string') return [];
+  return [{
+    id: typeof row.id === 'number' ? row.id : null,
+    compartment_id: nonEmptyString(row.compartment_id) ? row.compartment_id : null,
+    item_id: nonEmptyString(row.item_id) ? row.item_id : null,
+    reason: typeof row.reason === 'string' ? row.reason : null,
+    reason_label: typeof row.reason_label === 'string' ? row.reason_label : undefined,
+    status: row.status,
+    reported_at: typeof row.reported_at === 'string' ? row.reported_at : undefined,
+    mine: row.mine === true,
+  }];
+});
 
 export class ApiRequestError extends Error {
   constructor(
@@ -401,8 +428,11 @@ export class ApiClient {
         })()
       : undefined;
 
+    const checklistBaseVersion = [payload?.checklist_base_version, rawChecklist?.checklist_base_version].find(nonEmptyString);
     const checklist: ChecklistData = {
       open_findings: Array.isArray(payload?.open_findings) ? payload.open_findings : [],
+      ...(checklistBaseVersion ? { checklist_base_version: checklistBaseVersion } : {}),
+      pending_corrections: parsePendingCorrections(payload?.pending_corrections),
       checklist_version: checklistVersion.toLowerCase(),
       checklist_type: typeof payload?.checklist_type === 'string' ? payload.checklist_type : undefined,
       schema_version: schemaVersion,
@@ -442,6 +472,7 @@ export class ApiClient {
                   inputType: isChecklistInputType(item.inputType) ? item.inputType : undefined,
                   valueRequired: item.valueRequired !== false,
                   expectedQuantity: typeof item.expectedQuantity === 'number' ? item.expectedQuantity : undefined,
+                  ...optionalItemText(item),
                 };
               })
             : [],
