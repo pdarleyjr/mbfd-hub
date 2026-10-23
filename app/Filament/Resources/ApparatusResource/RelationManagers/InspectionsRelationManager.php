@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\ApparatusResource\RelationManagers;
 
+use App\Filament\Support\InspectionTestFilter;
 use App\Filament\Support\InspectionWorkspace;
 use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
@@ -18,7 +19,7 @@ class InspectionsRelationManager extends RelationManager
 
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {
-        $count = $ownerRecord instanceof Apparatus ? $ownerRecord->inspections()->count() : 0;
+        $count = $ownerRecord instanceof Apparatus ? $ownerRecord->inspections()->operational()->count() : 0;
 
         return $count > 0 ? (string) $count : null;
     }
@@ -78,6 +79,7 @@ class InspectionsRelationManager extends RelationManager
                     ->color(fn ($state) => $state > 0 ? 'danger' : 'success'),
             ])
             ->filters([
+                InspectionTestFilter::make(),
                 Tables\Filters\SelectFilter::make('shift')
                     ->options([
                         'A' => 'A Shift',

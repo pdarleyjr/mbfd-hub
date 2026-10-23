@@ -30,6 +30,7 @@ class ServiceTicketsRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
+            ->modifyQueryUsing(fn ($query) => $query->active())
             ->recordTitleAttribute('ticket_number')
             ->recordUrl(fn (ApparatusServiceTicket $record): ?string => self::ticketUrl($record))
             ->columns([

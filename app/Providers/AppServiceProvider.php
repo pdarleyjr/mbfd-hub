@@ -79,6 +79,12 @@ class AppServiceProvider extends ServiceProvider
         Gate::before(function (User $user, string $ability, array $arguments): ?bool {
             $subject = $arguments[0] ?? null;
             $model = is_object($subject) ? $subject::class : $subject;
+            if (in_array($model, [\App\Models\PersonnelRequest::class, \App\Models\HubSupportTicket::class], true)
+                && in_array($ability, ['update', 'delete', 'deleteAny', 'restore', 'restoreAny', 'forceDelete', 'forceDeleteAny'], true)) {
+                // Lifecycle rules must apply to delegated managers and super administrators alike.
+                return null;
+            }
+
             if (in_array($model, [\App\Models\Training\TrainingCourse::class, \App\Models\Training\TrainingSession::class], true)) {
                 // Retention and lifecycle rules apply even to super administrators.
                 return null;

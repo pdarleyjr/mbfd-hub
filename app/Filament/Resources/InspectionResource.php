@@ -4,6 +4,7 @@ namespace App\Filament\Resources;
 
 use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\InspectionResource\Pages;
+use App\Filament\Support\InspectionTestFilter;
 use App\Filament\Support\InspectionWorkspace;
 use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
@@ -52,6 +53,13 @@ class InspectionResource extends Resource
     {
         return self::applyEnterpriseDefaults($table)
             ->columns([
+                Tables\Columns\TextColumn::make('test_excluded_at')
+                    ->label('Classification')
+                    ->formatStateUsing(fn (): string => 'Excluded test')
+                    ->placeholder('Operational')
+                    ->badge()
+                    ->color('gray')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('completed_at')
                     ->wrap()
                     ->extraAttributes(['class' => 'hub-phone-summary'])
@@ -103,6 +111,7 @@ class InspectionResource extends Resource
                     ->color(fn ($state) => $state > 0 ? 'danger' : 'success'),
             ])
             ->filters([
+                InspectionTestFilter::make(),
                 Filter::make('completed_at')
                     ->form([
                         Forms\Components\DatePicker::make('from')

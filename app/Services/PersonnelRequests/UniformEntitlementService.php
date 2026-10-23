@@ -25,7 +25,7 @@ final class UniformEntitlementService
     {
         // Check outstanding requests before issues so a concurrently completed issue
         // cannot disappear between checking its request and checking its issue date.
-        $pending = $employee->personnelRequests()->where('type', PersonnelRequestType::Uniform)
+        $pending = $employee->personnelRequests()->withTrashed()->where('type', PersonnelRequestType::Uniform)
             ->whereNotIn('status', [PersonnelRequestStatus::Denied, PersonnelRequestStatus::Cancelled])
             ->whereHas('items', fn (Builder $query) => $query->where('item_code', 'jacket'))
             ->where(fn (Builder $query) => $query->where('status', '!=', PersonnelRequestStatus::Completed)

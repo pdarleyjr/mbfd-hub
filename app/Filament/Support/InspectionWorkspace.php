@@ -619,6 +619,7 @@ final class InspectionWorkspace
     private function vehicleHistory(ApparatusInspection $inspection, int $physicalId): array
     {
         return ApparatusInspection::query()
+            ->operational()
             ->whereRaw('COALESCE(processed_apparatus_id, apparatus_id) = ?', [$physicalId])
             ->withCount('defects')
             ->orderByDesc('completed_at')->orderByDesc('id')

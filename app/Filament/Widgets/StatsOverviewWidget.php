@@ -10,7 +10,7 @@ use Filament\Widgets\StatsOverviewWidget\Stat;
 
 class StatsOverviewWidget extends BaseWidget
 {
-    protected int | string | array $columnSpan = [
+    protected int|string|array $columnSpan = [
         'sm' => 1,
         'md' => 2,
         'xl' => 2,
@@ -32,7 +32,7 @@ class StatsOverviewWidget extends BaseWidget
                 ->descriptionIcon('heroicon-o-exclamation-triangle')
                 ->color('danger'),
 
-            Stat::make('Inspections Today', ApparatusInspection::whereBetween('completed_at', [$today, $todayEnd])->count())
+            Stat::make('Inspections Today', ApparatusInspection::operational()->whereBetween('completed_at', [$today, $todayEnd])->count())
                 ->description('Completed today')
                 ->descriptionIcon('heroicon-o-clipboard-document-check')
                 ->color('success'),
@@ -51,10 +51,11 @@ class StatsOverviewWidget extends BaseWidget
 
         foreach ($apparatuses as $apparatus) {
             $latestInspection = ApparatusInspection::where('apparatus_id', $apparatus->id)
+                ->operational()
                 ->orderBy('completed_at', 'desc')
                 ->first();
 
-            if (!$latestInspection || $latestInspection->completed_at < now()->subDay()) {
+            if (! $latestInspection || $latestInspection->completed_at < now()->subDay()) {
                 $overdueCount++;
             }
         }

@@ -270,6 +270,7 @@ final class DisplaySnapshotService
         $apparatusInspections = empty($apparatusIds)
             ? collect()
             : ApparatusInspection::query()
+                ->operational()
                 ->with('apparatus:id,unit_id,designation,name')
                 ->whereIn('apparatus_id', $apparatusIds)
                 ->orderByDesc('created_at')
@@ -594,6 +595,7 @@ final class DisplaySnapshotService
 
         // Apparatus inspections flagged for review (H-01 review queue).
         $apparatusPendingReview = ApparatusInspection::query()
+            ->operational()
             ->where('review_status', 'pending_review')
             ->count();
 
@@ -605,8 +607,8 @@ final class DisplaySnapshotService
             'daily_checkout' => $dailyCheckout,
             'inspections' => [
                 'today' => $dailyCheckout['completed'],
-                'this_week' => ApparatusInspection::query()->where('completed_at', '>=', Carbon::now()->startOfWeek())->count(),
-                'this_month' => ApparatusInspection::query()->where('completed_at', '>=', Carbon::now()->startOfMonth())->count(),
+                'this_week' => ApparatusInspection::query()->operational()->where('completed_at', '>=', Carbon::now()->startOfWeek())->count(),
+                'this_month' => ApparatusInspection::query()->operational()->where('completed_at', '>=', Carbon::now()->startOfMonth())->count(),
                 'pending_review' => $dailyCheckout['review_pending'],
                 'history_records_pending_review' => $apparatusPendingReview,
             ],

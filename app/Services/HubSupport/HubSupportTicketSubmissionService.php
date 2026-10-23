@@ -12,7 +12,6 @@ use App\Models\User;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\File;
@@ -30,6 +29,7 @@ final class HubSupportTicketSubmissionService
     /** @param array<string, mixed> $input @param list<UploadedFile> $attachments */
     public function submit(User $reporter, array $input, array $attachments = []): HubSupportTicketSubmissionResult
     {
+        abort_unless($reporter->isAuthenticationAllowed() && ! $reporter->must_change_password, 403);
         $validated = validator($input, [
             'client_submission_id' => ['required', 'uuid'],
             'description' => ['required', 'string', 'min:3', 'max:10000'],
@@ -106,16 +106,7 @@ final class HubSupportTicketSubmissionService
                     $this->storeAttachment($ticket, $reporter, $file, $stored);
                 }
 
-                DB::afterCommit(function () use ($ticket): void {
-                    try {
-                        $this->sideEffects->ticketCreated($ticket);
-                    } catch (Throwable $exception) {
-                        Log::error('Hub support report notification could not be queued', [
-                            'ticket_id' => $ticket->id,
-                            'exception' => $exception::class,
-                        ]);
-                    }
-                });
+                $this->sideEffects->ticketCreated($ticket);
 
                 return new HubSupportTicketSubmissionResult($this->load($ticket), true);
             });
@@ -133,10 +124,13 @@ final class HubSupportTicketSubmissionService
 
     private function existing(string $clientId, User $reporter, bool $lock = false): ?HubSupportTicket
     {
-        $query = HubSupportTicket::query()->where('client_submission_id', $clientId);
+        $query = HubSupportTicket::withTrashed()->where('client_submission_id', $clientId);
         $ticket = ($lock ? $query->lockForUpdate() : $query)->first();
         if ($ticket && $ticket->reported_by_user_id !== $reporter->id) {
             throw ValidationException::withMessages(['client_submission_id' => 'This submission cannot be reused.']);
+        }
+        if ($ticket?->trashed()) {
+            throw ValidationException::withMessages(['description' => 'This report was moved to Trash. Contact support with its reference before submitting it again.']);
         }
 
         return $ticket ? $this->load($ticket) : null;

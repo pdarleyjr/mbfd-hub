@@ -31,6 +31,7 @@ final readonly class ApparatusOverview
             ->first();
 
         $lastInspection = $apparatus->inspections()
+            ->operational()
             ->orderByDesc('completed_at')
             ->orderByDesc('id')
             ->first();

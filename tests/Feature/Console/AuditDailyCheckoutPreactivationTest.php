@@ -551,6 +551,24 @@ final class AuditDailyCheckoutPreactivationTest extends TestCase
         $this->assertContains('post_return_checkout_missing_or_not_strictly_after_return', $row['issues']);
     }
 
+    public function test_excluded_tests_cannot_satisfy_the_raw_preactivation_evidence_query(): void
+    {
+        $apparatus = $this->makeApparatus();
+        $resolution = app(DailyCheckoutChecklistResolver::class)->resolve($apparatus);
+        $inspection = $this->makeInspection($apparatus, CarbonImmutable::parse('2026-08-26T14:00:00Z'), (string) $resolution['checklist_version']);
+        DB::connection(self::CONNECTION)->table('apparatus_inspections')->where('id', $inspection->id)
+            ->update(['test_excluded_at' => '2026-08-26 14:30:00']);
+
+        [, $report] = $this->preactivate($this->writeManifest($this->manifestFor(
+            $apparatus,
+            expectedChecklistType: 'engine',
+            expectedChecklistVersion: (string) $resolution['checklist_version'],
+        )));
+
+        $this->assertSame('not_checked', $report['apparatus'][0]['canonical_daily']['state']);
+        $this->assertSame(1, DB::connection(self::CONNECTION)->table('apparatus_inspections')->count());
+    }
+
     public function test_it_requires_a_checked_required_apparatus_to_have_the_manifest_checklist_version(): void
     {
         $apparatus = $this->makeApparatus();

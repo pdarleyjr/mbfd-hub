@@ -34,6 +34,9 @@ class AuditEquipmentAfterInspection implements ShouldQueue
     public function handle(SnipeItService $snipeIt): void
     {
         $inspection = ApparatusInspection::find($this->inspectionId);
+        if ($inspection?->test_excluded_at !== null) {
+            return;
+        }
         $apparatus = Apparatus::find($this->apparatusId);
 
         if (! $inspection || ! $apparatus || ! $apparatus->snipeit_asset_id) {

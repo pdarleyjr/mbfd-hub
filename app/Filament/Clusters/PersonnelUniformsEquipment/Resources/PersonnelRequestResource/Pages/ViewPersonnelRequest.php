@@ -12,6 +12,7 @@ use App\Models\PersonnelRequest;
 use App\Models\PersonnelRequestItem;
 use App\Models\Uniform;
 use App\Services\PersonnelRequests\PersonnelRequestFulfillmentService;
+use App\Services\PersonnelRequests\PersonnelRequestLifecycleService;
 use App\Services\PersonnelRequests\PersonnelRequestWorkflowService;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -43,8 +44,23 @@ class ViewPersonnelRequest extends ViewRecord
         /** @var PersonnelRequest $request */
         $request = $this->record;
 
+        if ($request->trashed()) {
+            return [
+                Action::make('restore_from_trash')->label('Restore from Trash')->icon('heroicon-o-arrow-uturn-left')
+                    ->authorize('restore', $request)->requiresConfirmation()
+                    ->action(fn () => $this->performItemAction(fn () => app(PersonnelRequestLifecycleService::class)->restore($request, auth()->user()), 'Order restored from Trash')),
+            ];
+        }
+
         return [
             ...$this->getArchiveActions(),
+            Action::make('delete_order')->label('Delete order')->icon('heroicon-o-trash')->color('danger')
+                ->authorize('delete', $request)
+                ->visible(fn (): bool => $request->type === PersonnelRequestType::Uniform)
+                ->modalDescription('Move this cancelled or denied, unissued order to Trash. The original order, items, history, and private evidence are retained for recovery.')
+                ->form([Textarea::make('deletion_reason')->label('Reason for deletion')->required()->maxLength(2000)])
+                ->requiresConfirmation()
+                ->action(fn (array $data) => $this->performItemAction(fn () => app(PersonnelRequestLifecycleService::class)->delete($request, auth()->user(), $data['deletion_reason']), 'Order moved to Trash')),
             $this->transitionAction('acknowledge', 'Acknowledge', PersonnelRequestStatus::Acknowledged, 'primary', 'heroicon-o-hand-raised'),
             Action::make('request_information')
                 ->authorize('update', $request)

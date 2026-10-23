@@ -739,6 +739,7 @@ class StationController extends Controller
         $startOfNextDay = $startOfDay->addDay();
 
         $inspections = ApparatusInspection::whereIn('apparatus_id', $apparatusIds)
+            ->operational()
             ->whereNotNull('completed_at')
             // Pending public submissions are evidence for officer review, not
             // an operationally completed checkout for the public station view.

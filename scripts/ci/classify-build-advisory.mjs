@@ -67,7 +67,10 @@ export function classifyVacationBuildAdvisory(report, auditExit, now = Date.now(
     validateCounts(findings, report.metadata?.vulnerabilities, false);
     for (const [id, finding] of Object.entries(report.advisories)) assert.ok(Number.isInteger(finding.id) && String(finding.id) === id, 'Invalid pnpm advisory ID');
     const blocking = findings.filter((finding) => ['high', 'critical'].includes(finding.severity));
-    assert.equal(auditExit, blocking.length ? 1 : 0, 'Audit exit contradicts its threshold findings');
+    // Pinned pnpm 9.12.0 JSON mode exits 1 for any severity, before audit-level
+    // filtering. Validate that status separately from the HIGH/CRITICAL gate.
+    // https://github.com/pnpm/pnpm/blob/v9.12.0/lockfile/plugin-commands-audit/src/audit.ts#L204-L226
+    assert.equal(auditExit, findings.length ? 1 : 0, 'Audit exit contradicts its findings');
     if (blocking.length === 0) return 'No HIGH or CRITICAL findings';
     assert.ok(Number.isFinite(now) && now < expires, 'Build advisory classification expired');
     verifyInputs(vacationInputs);

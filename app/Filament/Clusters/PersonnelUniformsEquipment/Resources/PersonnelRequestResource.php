@@ -8,7 +8,6 @@ use App\Enums\PersonnelRequestStatus;
 use App\Enums\PersonnelRequestType;
 use App\Filament\Clusters\PersonnelUniformsEquipment;
 use App\Filament\Clusters\PersonnelUniformsEquipment\Resources\PersonnelRequestResource\Pages;
-use App\Filament\Support\ArchiveFilter;
 use App\Models\PersonnelRequest;
 use App\Models\PersonnelRequestItem;
 use App\Services\PersonnelRequests\UniformOrderCatalog;
@@ -24,6 +23,7 @@ use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class PersonnelRequestResource extends Resource
 {
@@ -53,7 +53,15 @@ class PersonnelRequestResource extends Resource
             TextColumn::make('items_count')->counts('items')->label('Items')->alignCenter(),
             TextColumn::make('created_at')->label('Submitted')->dateTime('M j, Y g:i A')->sortable(),
         ])->filters([
-            ArchiveFilter::make(),
+            SelectFilter::make('archive_state')->label('Visibility')
+                ->options(['active' => 'Active', 'archived' => 'Archived', 'trash' => 'Trash', 'all' => 'All'])
+                ->default('active')
+                ->query(fn (Builder $query, array $data): Builder => match ($data['value'] ?? 'active') {
+                    'archived' => $query->whereNull('personnel_requests.deleted_at')->whereNotNull('personnel_requests.archived_at'),
+                    'trash' => $query->whereNotNull('personnel_requests.deleted_at'),
+                    'all' => $query,
+                    default => $query->whereNull('personnel_requests.deleted_at')->whereNull('personnel_requests.archived_at'),
+                }),
             SelectFilter::make('type')->options(['uniform' => 'Uniform', 'equipment' => 'Personnel Equipment']),
             SelectFilter::make('status')->options(collect(PersonnelRequestStatus::cases())->mapWithKeys(fn ($status) => [$status->value => $status->label()])->all())->multiple(),
             Filter::make('over_allowance')->label('Over annual allowance')->toggle()
@@ -64,6 +72,11 @@ class PersonnelRequestResource extends Resource
     public static function infolist(Infolist $infolist): Infolist
     {
         return $infolist->schema([
+            Section::make('Trash')->description('The original order and its evidence are retained. Restore returns its previous workflow and archive state.')->schema([
+                TextEntry::make('deleted_at')->label('Deleted at')->dateTime(),
+                TextEntry::make('deletedBy.name')->label('Deleted by'),
+                TextEntry::make('deletion_reason')->label('Reason'),
+            ])->columns(3)->visible(fn (PersonnelRequest $record): bool => $record->trashed()),
             Section::make('Archive')->schema([
                 TextEntry::make('archived_at')->dateTime(),
                 TextEntry::make('archivedBy.name')->label('Archived by'),
@@ -167,5 +180,10 @@ class PersonnelRequestResource extends Resource
     public static function canViewAny(): bool
     {
         return auth()->user()?->can('admin.personnel.view') ?? false;
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->withoutGlobalScopes([SoftDeletingScope::class]);
     }
 }

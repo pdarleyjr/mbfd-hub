@@ -154,12 +154,12 @@ async function submitAdminModal(page: Page): Promise<void> {
   await expect(modal).toBeHidden({ timeout: 30_000 });
 }
 
-async function setArchiveVisibility(page: Page, value: 'active' | 'archived' | 'all'): Promise<void> {
+async function setArchiveVisibility(page: Page, value: 'active' | 'archived' | 'trash' | 'all', label: 'Visibility' | 'Show' = 'Visibility'): Promise<void> {
   const table = page.locator('.fi-ta');
   await expect(table).toBeVisible();
   await expect(table).not.toHaveClass(/\banimate-pulse\b/);
   await page.getByRole('button', { name: /^Filters?(?: \d+)?$/i }).click();
-  const visibility = page.getByLabel('Visibility', { exact: true });
+  const visibility = page.getByLabel(label, { exact: true });
   await expect(visibility).toBeVisible();
   if (await visibility.inputValue() !== value) {
     const [filtered] = await Promise.all([
@@ -176,24 +176,24 @@ async function setArchiveVisibility(page: Page, value: 'active' | 'archived' | '
   await page.keyboard.press('Escape');
 }
 
-async function archiveFindRestore(page: Page, adminUrl: string, indexUrl: string, reference: string): Promise<void> {
+async function archiveFindRestore(page: Page, adminUrl: string, indexUrl: string, reference: string, visibilityLabel: 'Visibility' | 'Show' = 'Visibility'): Promise<void> {
   await page.goto(adminUrl);
   await page.getByRole('button', { name: 'Archive', exact: true }).click();
   await page.getByLabel('Archive reason (optional)').fill('[QA TEST] Historical browser workflow evidence.');
   await submitAdminModal(page);
   await page.goto(indexUrl);
-  await setArchiveVisibility(page, 'active');
+  await setArchiveVisibility(page, 'active', visibilityLabel);
   await expect(page.getByText(reference, { exact: true })).toHaveCount(0);
-  await setArchiveVisibility(page, 'archived');
+  await setArchiveVisibility(page, 'archived', visibilityLabel);
   await expect(page.getByText(reference, { exact: true }).first()).toBeVisible({ timeout: 30_000 });
-  await setArchiveVisibility(page, 'all');
+  await setArchiveVisibility(page, 'all', visibilityLabel);
   await expect(page.getByText(reference, { exact: true }).first()).toBeVisible({ timeout: 30_000 });
   await page.goto(adminUrl);
   await page.getByRole('button', { name: 'Restore', exact: true }).click();
   await submitAdminModal(page);
   await expect(page.getByRole('button', { name: 'Archive', exact: true })).toBeVisible({ timeout: 30_000 });
   await page.goto(indexUrl);
-  await setArchiveVisibility(page, 'active');
+  await setArchiveVisibility(page, 'active', visibilityLabel);
   await expect(page.getByText(reference, { exact: true }).first()).toBeVisible({ timeout: 30_000 });
   await page.goto(adminUrl);
   await page.getByRole('button', { name: 'Archive', exact: true }).click();
@@ -569,7 +569,7 @@ test('real apparatus service request progresses through scheduling, parts, notes
   await screenshot(page, testInfo, 'apparatus-service-archived', false);
 });
 
-test('real Hub Support submission, member reply, resolution, reopen, close and archive preserve evidence', async ({ page }, testInfo) => {
+test('real Hub Support submission, member reply, confirm, reopen, archive and recoverable Trash preserve evidence', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'desktop', 'One isolated real workflow run; responsive surfaces have separate coverage.');
   test.setTimeout(240_000);
   await loginAdmin(page);
@@ -605,23 +605,70 @@ test('real Hub Support submission, member reply, resolution, reopen, close and a
   await submitAdminModal(page);
   await page.goto(memberUrl);
   await expect(page.getByText('[QA TEST] Verified corrected behavior.', { exact: true }).first()).toBeVisible();
-  await page.getByLabel('Reply', { exact: true }).fill('[QA TEST] Reopen verification.');
+  await expect(page.getByLabel('Still having trouble?', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: "It's fixed — close my report", exact: true }).click();
+  await expect(page.getByRole('main').getByRole('status')).toHaveText('Thanks for confirming. Your report is closed.');
+  await expect(page.locator('main > p').filter({ hasText: /^Closed$/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: "It's fixed — close my report", exact: true })).toHaveCount(0);
+  await expect(page.getByText('[QA TEST] Verified corrected behavior.', { exact: true }).first()).toBeVisible();
+  await page.getByLabel('Still having trouble?', { exact: true }).fill('[QA TEST] Reopen verification.');
   await page.getByRole('button', { name: 'Send Reply', exact: true }).click();
-  await expect(page.getByText("We're working on it", { exact: true })).toBeVisible();
+  await expect(page.locator('main > p').filter({ hasText: /^We're working on it$/ })).toBeVisible();
+  await expect(page.getByText('What we found', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('[QA TEST] Verified corrected behavior.', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Reply', { exact: true })).toBeVisible();
   await page.goto(adminUrl);
+  await expect(page.getByText('[QA TEST] Reopen verification.', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Resolve', exact: true }).click();
   await page.getByLabel('Resolution summary').fill('[QA TEST] Reopen verification resolved.');
   await submitAdminModal(page);
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   await submitAdminModal(page);
-  await archiveFindRestore(page, adminUrl, '/admin/hub-support-tickets', reference);
+  await archiveFindRestore(page, adminUrl, '/admin/hub-support-tickets', reference, 'Show');
   await screenshot(page, testInfo, 'support-archived', false);
   await page.goto(memberUrl);
-  await expect(page.getByText('Closed', { exact: true })).toBeVisible();
+  await expect(page.locator('main > p').filter({ hasText: /^Closed$/ })).toBeVisible();
+  await expect(page.getByText('This report is archived.', { exact: false })).toBeVisible();
+  await expect(page.getByLabel('Still having trouble?', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Send Reply', exact: true })).toHaveCount(0);
+  await expect(page.getByText('[QA TEST] Private diagnostic note.', { exact: true })).toHaveCount(0);
   await expect(page.getByText('[QA TEST] Reopen verification resolved.', { exact: true }).first()).toBeVisible();
   const retained = await page.request.get(attachmentUrl);
   expect(retained.status()).toBe(200);
   expect(await retained.body()).toEqual(qaPng);
+
+  await page.goto(adminUrl);
+  await page.getByRole('button', { name: 'Delete', exact: true }).click();
+  await page.getByRole('textbox', { name: /^Reason\s*\*?$/ }).fill('[QA TEST] Recoverable Trash verification; retain evidence.');
+  await submitAdminModal(page);
+  await expect(page.getByRole('button', { name: 'Restore from Trash', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Archive', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Assign / Update', exact: true })).toHaveCount(0);
+  await page.goto('/admin/hub-support-tickets');
+  await setArchiveVisibility(page, 'archived', 'Show');
+  await expect(page.getByText(reference, { exact: true })).toHaveCount(0);
+  await setArchiveVisibility(page, 'trash', 'Show');
+  await expect(page.getByText(reference, { exact: true }).first()).toBeVisible();
+  expect((await page.request.get(memberUrl)).status()).toBe(404);
+  expect((await page.request.get(attachmentUrl)).status()).toBe(403);
+  const attachmentId = new URL(attachmentUrl, memberUrl).pathname.split('/').at(-1)!;
+  const adminRetained = await page.request.get(`/admin/hub-support-attachments/${attachmentId}`);
+  expect(adminRetained.status()).toBe(200);
+  expect(await adminRetained.body()).toEqual(qaPng);
+  await page.goto(adminUrl);
+  await page.getByRole('button', { name: 'Restore from Trash', exact: true }).click();
+  await submitAdminModal(page);
+  await expect(page.getByRole('button', { name: 'Restore', exact: true })).toBeVisible();
+  await page.goto(memberUrl);
+  await expect(page.locator('main > p').filter({ hasText: /^Closed$/ })).toBeVisible();
+  await expect(page.getByText('This report is archived.', { exact: false })).toBeVisible();
+  await expect(page.getByText('[QA TEST] Reopen verification resolved.', { exact: true }).first()).toBeVisible();
+  expect(await (await page.request.get(attachmentUrl)).body()).toEqual(qaPng);
+  await page.goto(adminUrl);
+  await page.getByRole('button', { name: 'Delete', exact: true }).click();
+  await page.getByRole('textbox', { name: /^Reason\s*\*?$/ }).fill('[QA TEST] Finished; retain original files and history in Trash.');
+  await submitAdminModal(page);
+  await screenshot(page, testInfo, 'support-trash', false);
 });
 
 test('real station inventory snapshot and supply request appear in their station Admin context', async ({ page }, testInfo) => {

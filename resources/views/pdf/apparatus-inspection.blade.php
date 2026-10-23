@@ -75,6 +75,9 @@
         </table>
     </div>
 
+    @if($detail['inspection']->test_excluded_at)
+        <p><strong>Excluded test — retained for audit.</strong> This submission does not count toward operational inspections.</p>
+    @endif
     <h2>Inspection summary</h2>
     <table class="meta">
         <tr>

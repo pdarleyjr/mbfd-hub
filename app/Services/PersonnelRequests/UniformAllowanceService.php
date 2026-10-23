@@ -7,6 +7,7 @@ namespace App\Services\PersonnelRequests;
 use App\Enums\PersonnelRequestStatus;
 use App\Enums\PersonnelRequestType;
 use App\Models\Employee;
+use App\Models\PersonnelRequest;
 use App\Models\PersonnelRequestItem;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -58,12 +59,15 @@ final class UniformAllowanceService
         $products = $this->catalog->products();
         $used = [];
         $items = PersonnelRequestItem::query()
-            ->whereHas('request', fn (Builder $requests) => $requests
-                ->where('beneficiary_employee_id', $employee->id)
-                ->where('type', PersonnelRequestType::Uniform)
-                ->whereNotIn('status', self::EXCLUDED_STATUSES)
-                ->where('created_at', '>=', $period['start'])
-                ->where('created_at', '<', $period['end']))
+            ->whereHas('request', function (Builder $requests) use ($employee, $period): Builder {
+                /** @var Builder<PersonnelRequest> $requests */
+                return $requests->withTrashed()
+                    ->where('beneficiary_employee_id', $employee->id)
+                    ->where('type', PersonnelRequestType::Uniform)
+                    ->whereNotIn('status', self::EXCLUDED_STATUSES)
+                    ->where('created_at', '>=', $period['start'])
+                    ->where('created_at', '<', $period['end']);
+            })
             ->get(['item_code', 'quantity']);
         foreach ($items as $item) {
             $group = $products[(string) $item->item_code]['group'] ?? null;

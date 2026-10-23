@@ -59,6 +59,7 @@ final class CommandOverviewController extends Controller
             ->pluck('aggregate', 'station_id');
 
         $lastCheckouts = $apparatusIds === [] ? collect() : ApparatusInspection::query()
+            ->operational()
             ->whereIn('apparatus_id', $apparatusIds)
             ->whereNotNull('client_submission_id')
             ->whereNotNull('completed_at')

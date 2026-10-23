@@ -16,7 +16,7 @@ final class HubSupportTicketAttachmentController extends Controller
     {
         $user = $request->user('web');
         abort_unless($user instanceof User && $user->isAuthenticationAllowed()
-            && $attachment->ticket()->where('reported_by_user_id', $user->id)->exists(), 403);
+            && $attachment->ticket()->whereNull('deleted_at')->where('reported_by_user_id', $user->id)->exists(), 403);
 
         return $this->download($attachment);
     }

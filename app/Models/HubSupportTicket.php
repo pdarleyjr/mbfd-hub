@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Carbon;
 
 /**
@@ -61,6 +62,8 @@ final class HubSupportTicket extends Model
     /** @use HasFactory<\Database\Factories\HubSupportTicketFactory> */
     use HasFactory;
 
+    use SoftDeletes;
+
     protected $fillable = [
         'client_submission_id', 'ticket_number', 'reported_by_user_id', 'reported_by_employee_id',
         'reporter_name_snapshot', 'reporter_employee_identifier_snapshot', 'description', 'generated_title',
@@ -89,6 +92,11 @@ final class HubSupportTicket extends Model
 
     protected static function booted(): void
     {
+        self::deleting(function (self $ticket): void {
+            if ($ticket->isForceDeleting()) {
+                throw new \LogicException('Support reports and their evidence cannot be permanently deleted.');
+            }
+        });
         self::created(function (self $ticket): void {
             if ($ticket->ticket_number !== null) {
                 return;

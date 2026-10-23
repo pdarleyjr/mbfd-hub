@@ -146,6 +146,7 @@ final class StationOperationsHubWidget extends Widget
         $end = $window->databaseEnd();
 
         $checkouts = $apparatusIds === [] ? collect() : ApparatusInspection::query()
+            ->operational()
             ->select(['id', 'apparatus_id', 'client_submission_id', 'designation_at_time', 'unit_number', 'processing_status', 'review_status', 'completed_at', 'created_at'])
             ->whereIn('apparatus_id', $apparatusIds)
             ->whereNotNull('client_submission_id')
@@ -177,6 +178,7 @@ final class StationOperationsHubWidget extends Widget
         return [
             'checkouts' => $checkouts,
             'stationInspections' => StationInspection::query()
+                ->active()
                 ->select(['id', 'station_id', 'inspection_type', 'overall_status', 'inspection_date', 'reviewed_at', 'created_at'])
                 ->whereIn('station_id', $stationIds)->where('created_at', '>=', $start)->where('created_at', '<', $end)
                 ->orderByDesc('created_at')->orderByDesc('id')->get()
@@ -187,6 +189,7 @@ final class StationOperationsHubWidget extends Widget
                     tone: $record->reviewed_at === null ? 'warning' : 'neutral',
                 )),
             'stationRequests' => StationRequest::query()
+                ->active()
                 ->select(['id', 'station_id', 'request_number', 'title', 'status', 'priority', 'acknowledged_at', 'created_at'])
                 ->whereIn('station_id', $stationIds)->where('created_at', '>=', $start)->where('created_at', '<', $end)
                 ->orderByDesc('created_at')->orderByDesc('id')->get()
@@ -197,6 +200,7 @@ final class StationOperationsHubWidget extends Widget
                     tone: $record->acknowledged_at === null ? 'info' : 'neutral',
                 )),
             'serviceTickets' => ApparatusServiceTicket::query()
+                ->active()
                 ->select(['id', 'station_id', 'apparatus_id', 'ticket_number', 'title', 'status', 'priority', 'acknowledged_at', 'created_at'])
                 ->whereIn('station_id', $stationIds)->where('created_at', '>=', $start)->where('created_at', '<', $end)
                 ->orderByDesc('created_at')->orderByDesc('id')->get()
@@ -208,6 +212,7 @@ final class StationOperationsHubWidget extends Widget
                     $record->acknowledged_at === null ? 'info' : 'neutral',
                 )),
             'inventory' => StationInventorySubmission::query()
+                ->active()
                 ->select(['id', 'station_id', 'submitted_at', 'created_at'])
                 ->whereIn('station_id', $stationIds)->where('created_at', '>=', $start)->where('created_at', '<', $end)
                 ->orderByDesc('created_at')->orderByDesc('id')->get()
@@ -216,6 +221,7 @@ final class StationOperationsHubWidget extends Widget
                     $this->stationRelationUrl((int) $record->station_id, 'inventorySubmissions'), (int) $record->station_id,
                 )),
             'supply' => StationSupplyRequest::query()
+                ->active()
                 ->select(['id', 'station_id', 'status', 'created_at'])
                 ->whereIn('station_id', $stationIds)->where('created_at', '>=', $start)->where('created_at', '<', $end)
                 ->orderByDesc('created_at')->orderByDesc('id')->get()
@@ -244,6 +250,7 @@ final class StationOperationsHubWidget extends Widget
         $supplyRequests = $stationIds === [] ? collect() : StationSupplyRequest::query()
             ->select(['id', 'station_id', 'status', 'created_at'])->whereIn('station_id', $stationIds)->open()->orderByDesc('created_at')->get();
         $stationInspections = $stationIds === [] ? collect() : StationInspection::query()
+            ->active()
             ->select(['id', 'station_id', 'inspection_type', 'overall_status', 'inspection_date', 'reviewed_at', 'created_at'])
             ->whereIn('station_id', $stationIds)->whereNull('reviewed_at')->orderByDesc('created_at')->get();
         $defects = $apparatusIds === [] ? collect() : ApparatusDefect::query()
@@ -254,6 +261,7 @@ final class StationOperationsHubWidget extends Widget
             ->whereIn('apparatus_id', $apparatusIds)->whereNotIn('status', ['resolved', 'dismissed'])->orderByDesc('created_at')->get();
         $followUpInspectionIds = $inspectionExceptions->pluck('apparatus_inspection_id')->map(static fn (mixed $id): int => (int) $id)->all();
         $checkoutFollowUps = $apparatusIds === [] ? collect() : ApparatusInspection::query()
+            ->operational()
             ->select(['id', 'apparatus_id', 'client_submission_id', 'designation_at_time', 'unit_number', 'processing_status', 'review_status', 'completed_at', 'created_at'])
             ->whereIn('apparatus_id', $apparatusIds)
             ->where(function (Builder $query) use ($followUpInspectionIds): void {
@@ -302,7 +310,7 @@ final class StationOperationsHubWidget extends Widget
         $moment = static fn (ApparatusInspection $record): mixed => $record->completed_at ?: $record->created_at;
 
         // Query 1: everything that is waiting on a person, including checkouts held for a vehicle swap.
-        $waiting = $this->onPhysicalVehicles(ApparatusInspection::query()->select($inspectionColumns)->addSelect([
+        $waiting = $this->onPhysicalVehicles(ApparatusInspection::query()->operational()->select($inspectionColumns)->addSelect([
             'open_holds' => DB::table('apparatus_inspection_exceptions as e')->selectRaw('count(*)')
                 ->whereColumn('e.apparatus_inspection_id', 'apparatus_inspections.id')
                 ->where('e.blocks_acceptance', true)
@@ -354,7 +362,7 @@ final class StationOperationsHubWidget extends Widget
         $actions = $inProgress->map(fn (ApparatusDefect $record): array => $defectRow($record, 'corrective_action'))->values();
 
         // Query 3: completed inspections of the last 7 days, informational only. The list is trimmed after counting.
-        $completed = $this->onPhysicalVehicles(ApparatusInspection::query()->select($inspectionColumns), $apparatusIds)
+        $completed = $this->onPhysicalVehicles(ApparatusInspection::query()->operational()->select($inspectionColumns), $apparatusIds)
             ->where(function (Builder $scope): void {
                 $scope->whereIn('processing_status', ['accepted', 'accepted_with_exception', 'rejected'])
                     ->orWhere(fn (Builder $legacy) => $legacy->whereNull('processing_status')->whereIn('review_status', ['approved', 'rejected']));

@@ -42,6 +42,7 @@ final class DefectContinuityService
         array $definitions,
         array $evidence,
     ): FindingsResult {
+        $inspection->assertOperational();
         $entries = $this->entries($observations, $definitions, $evidence);
         if ($entries === []) {
             return new FindingsResult;
@@ -125,6 +126,7 @@ final class DefectContinuityService
     ): ApparatusDefect {
         $issueType = strtolower($status);
         $inspection = $inspectionId !== null ? ApparatusInspection::query()->find($inspectionId) : null;
+        $inspection?->assertOperational();
         $existing = ApparatusDefect::query()
             ->where('apparatus_id', $apparatusId)->where('compartment', $compartment)->where('item', $item)
             ->unresolved()->lockForUpdate()->first();

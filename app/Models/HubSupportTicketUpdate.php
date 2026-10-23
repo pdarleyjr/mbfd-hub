@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\HubSupportTicketStatus;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use LogicException;
 
 /**
@@ -18,12 +19,13 @@ use LogicException;
  * @property string|null $internal_note
  * @property int|null $changed_by_user_id
  * @property array<string, mixed>|null $metadata
+ * @property-read HubSupportTicket $ticket
  */
 final class HubSupportTicketUpdate extends Model
 {
     protected $fillable = [
         'hub_support_ticket_id', 'previous_status', 'status', 'public_response', 'internal_note',
-        'changed_by_user_id', 'metadata',
+        'changed_by_user_id', 'metadata', 'client_action_id', 'action_hash',
     ];
 
     protected function casts(): array
@@ -42,9 +44,15 @@ final class HubSupportTicketUpdate extends Model
     }
 
     /** @return BelongsTo<HubSupportTicket, $this> */
+    /** @return BelongsTo<HubSupportTicket, $this> */
     public function ticket(): BelongsTo
     {
-        return $this->belongsTo(HubSupportTicket::class, 'hub_support_ticket_id');
+        return $this->belongsTo(HubSupportTicket::class, 'hub_support_ticket_id')->withTrashed();
+    }
+
+    public function notificationDeliveries(): HasMany
+    {
+        return $this->hasMany(HubSupportNotificationDelivery::class, 'hub_support_ticket_update_id');
     }
 
     /** @return BelongsTo<User, $this> */

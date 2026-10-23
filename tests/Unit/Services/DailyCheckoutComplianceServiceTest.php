@@ -20,6 +20,22 @@ class DailyCheckoutComplianceServiceTest extends TestCase
 {
     use RefreshDatabase;
 
+    public function test_excluded_tests_are_retained_but_do_not_complete_operational_daily_checkout(): void
+    {
+        $this->activateBaseCutover();
+        $station = Station::create(['station_number' => 99, 'name' => 'Test station', 'address' => 'Test address', 'is_active' => true]);
+        $apparatus = $this->makeApparatus($station, 'E99', 'required', 'In Service');
+        $now = CarbonImmutable::now('America/New_York');
+        $inspection = $this->recordInspection($apparatus, $now->utc());
+        $inspection->forceFill(['test_excluded_at' => now(), 'test_exclusion_reason' => 'Operational signal fixture.'])->save();
+
+        $summary = app(DailyCheckoutComplianceService::class)->summaryForApparatuses($station->apparatuses()->get(), $now);
+
+        $this->assertSame(0, $summary['completed']);
+        $this->assertFalse($summary['matrix'][0]['included_in_completed']);
+        $this->assertSame(1, ApparatusInspection::query()->count());
+    }
+
     public function test_accepted_checkout_counts_as_complete_while_its_follow_up_stays_visible(): void
     {
         $this->activateBaseCutover();

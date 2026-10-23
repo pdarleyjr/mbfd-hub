@@ -493,6 +493,7 @@ final class AuditDailyCheckoutPreactivation extends Command
         $schema = Schema::connection($connection);
         $inspectionColumns = [
             'apparatus_id',
+            'test_excluded_at',
             'client_submission_id',
             'submission_payload_hash',
             'checklist_version',
@@ -587,6 +588,7 @@ final class AuditDailyCheckoutPreactivation extends Command
         }
 
         $inspections = $connection->table('apparatus_inspections')
+            ->whereNull('test_excluded_at')
             ->whereIn('apparatus_id', $apparatusIds)
             ->whereNotNull('client_submission_id')
             ->whereNotNull('submission_payload_hash')

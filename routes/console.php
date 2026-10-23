@@ -143,6 +143,11 @@ Schedule::command('inspections:retry-notifications')
     ->withoutOverlapping()
     ->onOneServer();
 
+Schedule::command('support:retry-notifications --limit=100')
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->onOneServer();
+
 Artisan::command('video-conferencing:expire-lineup', function (
     ConferenceSessionService $sessions,
     ConferenceLineupReadinessService $readiness,

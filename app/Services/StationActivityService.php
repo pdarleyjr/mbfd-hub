@@ -27,6 +27,7 @@ class StationActivityService
             ->keyBy('id');
 
         $apparatusInspections = ApparatusInspection::query()
+            ->operational()
             ->whereIn('apparatus_id', $apparatusIds)
             ->latest('completed_at')
             ->limit($limit)
@@ -43,6 +44,7 @@ class StationActivityService
             });
 
         $stationInspections = StationInspection::query()
+            ->active()
             ->where('station_id', $station->id)
             ->latest('created_at')
             ->limit($limit)
@@ -55,6 +57,7 @@ class StationActivityService
             ]);
 
         $inventory = StationInventorySubmission::query()
+            ->active()
             ->where('station_id', $station->id)
             ->latest('submitted_at')
             ->limit($limit)
@@ -67,6 +70,7 @@ class StationActivityService
             ]);
 
         $supplyRequests = StationSupplyRequest::query()
+            ->active()
             ->where('station_id', $station->id)
             ->latest('created_at')
             ->limit($limit)
@@ -79,6 +83,7 @@ class StationActivityService
             ]);
 
         $stationRequests = StationRequest::query()
+            ->active()
             ->where('station_id', $station->id)
             ->latest('created_at')
             ->limit($limit)
@@ -93,7 +98,7 @@ class StationActivityService
             ]);
 
         $apparatusServiceTicketUpdates = ApparatusServiceTicketUpdate::query()
-            ->whereHas('ticket', fn ($query) => $query->where('station_id', $station->id))
+            ->whereHas('ticket', fn ($query) => $query->whereNull('apparatus_service_tickets.archived_at')->where('station_id', $station->id))
             ->with('ticket:id,station_id,ticket_number,unit_designation_snapshot,title')
             ->latest('created_at')
             ->latest('id')

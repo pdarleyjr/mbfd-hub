@@ -431,6 +431,7 @@ final class DailyCheckoutComplianceService
 
         $signals = [];
         $inspectionQuery = ($connection === null ? ApparatusInspection::query() : ApparatusInspection::on($connection))
+            ->operational()
             ->whereIn('apparatus_id', $apparatusIds)
             // This is an intentional data-integrity cutover. Historical rows
             // predate server-side checklist reconciliation and therefore cannot

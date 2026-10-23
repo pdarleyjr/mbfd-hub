@@ -17,7 +17,6 @@ use App\Services\HubSupport\HubSupportTicketSubmissionService;
 use App\Services\HubSupport\HubSupportTicketWorkflowService;
 use App\Services\RequestArchivalService;
 use Filament\Facades\Filament;
-use Illuminate\Contracts\Notifications\Dispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Notification;
@@ -25,7 +24,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use LogicException;
-use Mockery;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Spatie\Permission\Models\Permission;
 use Tests\TestCase;
@@ -251,9 +249,7 @@ final class HubSupportAuthorizationAndWorkflowTest extends TestCase
         $ticket = HubSupportTicket::factory()->for($reporter, 'reporter')->create([
             'status' => HubSupportTicketStatus::InProgress,
         ]);
-        $dispatcher = Mockery::mock(Dispatcher::class);
-        $dispatcher->shouldReceive('send')->once()->andThrow(new \RuntimeException('notification transport unavailable'));
-        app()->instance(Dispatcher::class, $dispatcher);
+        Notification::shouldReceive('sendNow')->once()->andThrow(new \RuntimeException('notification transport unavailable'));
 
         $updated = app(HubSupportTicketWorkflowService::class)->transition($ticket, $this->supportManager(), HubSupportTicketStatus::Resolved, [
             'resolution_summary' => 'The form service was restored.',
@@ -264,6 +260,9 @@ final class HubSupportAuthorizationAndWorkflowTest extends TestCase
             'hub_support_ticket_id' => $ticket->id,
             'previous_status' => HubSupportTicketStatus::InProgress->value,
             'status' => HubSupportTicketStatus::Resolved->value,
+        ]);
+        self::assertDatabaseHas('hub_support_notification_deliveries', [
+            'recipient_user_id' => $reporter->id, 'delivered_at' => null, 'attempts' => 1,
         ]);
     }
 

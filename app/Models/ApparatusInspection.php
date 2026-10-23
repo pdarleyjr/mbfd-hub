@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Validation\ValidationException;
 use LogicException;
 
 class ApparatusInspection extends Model
@@ -66,7 +68,27 @@ class ApparatusInspection extends Model
         'engine_hours' => 'decimal:1',
         'miles' => 'integer',
         'completed_at' => 'datetime',
+        'test_excluded_at' => 'datetime',
     ];
+
+    public function scopeOperational(Builder $query): Builder
+    {
+        return $query->whereNull($query->getModel()->qualifyColumn('test_excluded_at'));
+    }
+
+    public function testClassificationEvents(): HasMany
+    {
+        return $this->hasMany(ApparatusInspectionTestEvent::class)->with('actor')->orderBy('id');
+    }
+
+    /** Call inside the operational write transaction, retaining the parent lock until commit. */
+    public function assertOperational(): void
+    {
+        $current = $this->newQuery()->lockForUpdate()->findOrFail($this->getKey(), ['id', 'test_excluded_at']);
+        if ($current->test_excluded_at !== null) {
+            throw ValidationException::withMessages(['inspection' => 'This inspection is an excluded test. Restore it before adding operational work.']);
+        }
+    }
 
     public function displayStatus(): string
     {

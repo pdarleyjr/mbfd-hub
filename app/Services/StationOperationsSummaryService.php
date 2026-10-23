@@ -83,6 +83,7 @@ final class StationOperationsSummaryService
         $onStationApparatus = fn (Builder $query): Builder => $query->whereIn('apparatus_id', $apparatusIds);
 
         $checkouts = $apparatusIds === [] ? null : ApparatusInspection::query()
+            ->operational()
             ->tap($onStationApparatus)
             ->toBase()
             ->selectRaw(
@@ -95,10 +96,12 @@ final class StationOperationsSummaryService
 
         return [
             'open_station_requests' => StationRequest::query()
+                ->active()
                 ->where('station_id', $stationId)
                 ->whereIn('status', StationRequestStatus::openValues())
                 ->count(),
             'open_service_tickets' => ApparatusServiceTicket::query()
+                ->active()
                 ->where('station_id', $stationId)
                 ->whereIn('status', ApparatusServiceTicketStatus::openValues())
                 ->count(),
