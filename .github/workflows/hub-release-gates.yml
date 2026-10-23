@@ -590,6 +590,8 @@ jobs:
           - lane: workspace-webkit-iphone
             projects: >-
               --project=daily-workspace-webkit-iphone
+              --project=captain5-chromium
+              --project=captain5-chromium-phone
           - lane: webkit-ipad-and-issue-report
             projects: >-
               --project=daily-workspace-webkit-ipad

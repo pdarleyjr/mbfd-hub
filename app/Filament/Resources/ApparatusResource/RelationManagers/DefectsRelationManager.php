@@ -4,6 +4,7 @@ namespace App\Filament\Resources\ApparatusResource\RelationManagers;
 
 use App\Filament\Resources\RecommendationResource;
 use App\Filament\Support\DefectCorrectiveActions;
+use App\Filament\Support\DefectHistory;
 use App\Filament\Support\DefectServiceTicketActions;
 use App\Models\AdminAlertEvent;
 use App\Models\Apparatus;
@@ -188,6 +189,18 @@ class DefectsRelationManager extends RelationManager
                 ),
 
                 Tables\Actions\ActionGroup::make([
+                    // Read-only audit trail: who did what and when, with Captain 5 actions labelled as recorded.
+                    Tables\Actions\Action::make('issue_history')
+                        ->label('Issue history')
+                        ->icon('heroicon-o-clock')
+                        ->color('gray')
+                        ->modalHeading(fn (ApparatusDefect $record): string => 'Issue history: '.$record->item)
+                        ->modalContent(fn (ApparatusDefect $record) => view('filament.resources.apparatus-resource.partials.defect-history', [
+                            'events' => DefectHistory::rows($record, DefectCorrectiveActions::canManage(auth()->user())),
+                        ]))
+                        ->modalSubmitAction(false)
+                        ->modalCancelActionLabel('Close'),
+
                     // Resolution goes through the corrective-action service (event, notification, required type and notes).
                     DefectCorrectiveActions::resolve(
                         Tables\Actions\Action::make('mark_resolved'),

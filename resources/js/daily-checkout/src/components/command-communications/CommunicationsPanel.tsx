@@ -5,7 +5,7 @@ import { EmptyState, LoadError } from '../ui/StateViews';
 import Composer from './Composer';
 import PinnedStrip from './PinnedStrip';
 import PostItem from './PostItem';
-import type { CommandPost } from './types';
+import { CHANNEL_COPY, DEFAULT_CHANNEL, type CommandChannel, type CommandPost } from './types';
 import type { CommandCommunications } from './useCommandCommunications';
 import { useClock } from './usePageClock';
 
@@ -18,12 +18,16 @@ const BOTTOM_SLACK_PX = 48;
 const FEED_BOX = 'max-h-[min(50dvh,480px)] min-h-40 overflow-y-auto overscroll-contain sm:max-h-[min(60dvh,560px)]';
 
 interface CommunicationsPanelProps {
+  /** From `useCommandCommunications({ ..., channel })`; it already knows which feed it reads and writes. */
   comms: CommandCommunications;
+  /** Only changes the wording (empty state, placeholder, labels). Defaults to the hook's channel, else the 300 channel. */
+  channel?: CommandChannel;
 }
 
-export default function CommunicationsPanel({ comms }: CommunicationsPanelProps) {
+export default function CommunicationsPanel({ comms, channel = comms.channel ?? DEFAULT_CHANNEL }: CommunicationsPanelProps) {
+  const copy = CHANNEL_COPY[channel];
   const { feed, controls, sentCount, isVisible } = comms;
-  const { setPinned, markRead, loadEarlier, refresh } = feed;
+  const { setPinned, markRead, loadEarlier, refresh, removePost } = feed;
   const now = useClock();
   const offline = useOffline();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -114,7 +118,7 @@ export default function CommunicationsPanel({ comms }: CommunicationsPanelProps)
           ref={feedRef}
           onScroll={onScroll}
           role="log"
-          aria-label="Command messages"
+          aria-label={copy.feedLabel}
           aria-relevant="additions"
           tabIndex={0}
           data-testid="command-feed"
@@ -132,7 +136,7 @@ export default function CommunicationsPanel({ comms }: CommunicationsPanelProps)
             <EmptyState
               icon={<MessageSquare className="hub-empty__icon" aria-hidden="true" />}
               title="No messages yet"
-              body="Post an update for 300 Command and Administration. New messages appear here."
+              body={copy.emptyBody}
             />
           )}
           {feed.nextBefore && (
@@ -143,7 +147,7 @@ export default function CommunicationsPanel({ comms }: CommunicationsPanelProps)
             </div>
           )}
           {ordered.map((post) => (
-            <PostItem key={post.id} post={post} now={now} onReply={onReply} onTogglePin={onTogglePin} pinBusy={feed.pinBusyId === post.id} />
+            <PostItem key={post.id} post={post} now={now} onReply={onReply} onTogglePin={onTogglePin} pinBusy={feed.pinBusyId === post.id} onRemove={removePost} />
           ))}
         </div>
         {!atBottom && newCount > 0 && (
@@ -160,7 +164,7 @@ export default function CommunicationsPanel({ comms }: CommunicationsPanelProps)
         )}
       </div>
 
-      <Composer comms={comms} offline={offline} textareaRef={textareaRef} />
+      <Composer comms={comms} offline={offline} textareaRef={textareaRef} placeholder={copy.placeholder} />
     </div>
   );
 }

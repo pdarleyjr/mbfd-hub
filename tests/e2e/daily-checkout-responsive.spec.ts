@@ -49,7 +49,7 @@ async function mockDailySelectorApi(page: Page): Promise<void> {
     if (path === '/images/icons/checkout-apparatus.svg') {
       return route.fulfill({ path: resolve('public/images/icons/checkout-apparatus.svg'), contentType: 'image/svg+xml' });
     }
-    if (/^\/images\/stations\/(station-(1|2|3|4|6)|command-300-wide)\.webp$/.test(path)) {
+    if (/^\/images\/stations\/(station-(1|2|3|4|6)|command-300-wide|captain-5-wide)\.webp$/.test(path)) {
       return route.fulfill({ path: resolve('public', path.slice(1)), contentType: 'image/webp' });
     }
 
@@ -58,6 +58,17 @@ async function mockDailySelectorApi(page: Page): Promise<void> {
   await page.route('**/favicon*', (route) => route.fulfill({ status: 204 }));
   await page.route('**/api/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
+
+    // Captain 5 card: the station list probes the summary; a 200 shows the card in the grid at every viewport.
+    if (path === '/api/captain5/summary') {
+      return route.fulfill({
+        json: {
+          access: { view: true, act: true, on_duty: true, dismiss: true, manage_assignments: false, configure: false, acts_as: 'captain5', authority: 'on_duty_captain5', authority_label: 'Captain 5 (on duty)' },
+          on_duty: { duty_date: '2026-10-23', shift: 'B', source: 'bid_holder', resolved: true, name: 'Responsive Tester', rank: 'Captain', assignment_id: null },
+          open_issues: 3,
+        },
+      });
+    }
 
     if (path === '/api/me/context') {
       return route.fulfill({

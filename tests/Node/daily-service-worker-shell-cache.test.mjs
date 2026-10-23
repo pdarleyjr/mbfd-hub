@@ -31,7 +31,7 @@ function loadWorker(networkFor, { failCachePut = false } = {}) {
     const store = stores.get(name);
     return {
       put: async (request, response) => {
-        if (failCachePut && name === mbfd-checkout-v10 && !keyOf(request).startsWith('/daily/')) throw new Error('quota exceeded');
+        if (failCachePut && name === mbfd-checkout-v11 && !keyOf(request).startsWith('/daily/')) throw new Error('quota exceeded');
         store.set(keyOf(request), response);
       },
       match: async (request) => store.get(keyOf(request)),
@@ -100,7 +100,7 @@ const cachedShell = async (worker) => {
 };
 
 test('the shell cache version is bumped past the releases that stored a sign-in page and truncated images', () => {
-  assert.match(source, /const CACHE_NAME = 'mbfd-checkout-v10'/);
+  assert.match(source, /const CACHE_NAME = 'mbfd-checkout-v11'/);
 });
 
 test('install does not store a redirected sign-in page as the Daily shell', async () => {

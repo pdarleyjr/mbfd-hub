@@ -20,6 +20,7 @@ use App\Models\ApparatusIssueMessage;
 use App\Models\User;
 use App\Notifications\Inspections\InspectionEventNotification;
 use App\Notifications\Inspections\InspectionNotificationKind as Kind;
+use App\Services\Captain5\Captain5Notifier;
 use App\Services\Inventory\InventoryCorrectionReason;
 use App\Support\Fleet\DefectActionStatus;
 use App\Support\Fleet\InspectionReviewers;
@@ -162,8 +163,15 @@ final class InspectionNotificationDispatcher
             $excerpt = $this->excerpt($message->body);
             $eventKey = 'message:'.$message->getKey().':notify';
 
+            // Captain 5 speaks for the department on its own, narrower routing (Captain5Notifier).
+            if ($message->isFromCaptain5()) {
+                app(Captain5Notifier::class)->messagePosted($message, $kind, $inspection);
+
+                return;
+            }
             if ($author !== null && ! InspectionReviewers::canReview($author)) {
                 $this->memberReply($eventKey, $author, $defect, $inspection, $excerpt);
+                app(Captain5Notifier::class)->memberReplied($message);
 
                 return;
             }

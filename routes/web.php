@@ -391,10 +391,11 @@ Route::get('/admin-pwa/service-worker.js', function () {
 })->middleware(PreventPreviousUrlStorage::class);
 // --- End Admin Desktop-PWA -------------------------------------------------
 
-// 300 Command Communications attachment download (private disk, 300 Command access only).
+// Shared 300 Command / Captain 5 communications attachment download (private disk). Signed-in
+// users only at the route; the controller authorizes per attachment from the post's audience.
 Route::get('/command-communications/attachments/{public_id}', [\App\Http\Controllers\CommandCommunicationAttachmentController::class, 'show'])
     ->where('public_id', '[0-9A-Za-z]{26}')
-    ->middleware(['auth:web', 'can:access-command-300', 'throttle:60,1'])
+    ->middleware(['auth:web', 'throttle:60,1'])
     ->name('command-communications.attachment');
 
 // Daily Checkout SPA - catch-all for React Router
@@ -404,6 +405,11 @@ Route::get('/daily/{path?}', function (?string $path = null) {
     if (preg_match('#^command-300(?:/.*)?$#iD', trim((string) $path, '/'))
         && ! app(\App\Services\Security\Command300Access::class)->allows(auth('web')->user())) {
         abort(403, 'The 300 Command profile is available to Captains, Division Chiefs, the 300 command officer, administrators, and members granted 300 Command Access.');
+    }
+    // Captain 5 EMS Operations Center: same server-side rule as its API (Captain5Access).
+    if (preg_match('#^captain-5(?:/.*)?$#iD', trim((string) $path, '/'))
+        && ! app(\App\Services\Security\Captain5Access::class)->canView(auth('web')->user())) {
+        abort(403, 'The Captain 5 EMS Operations Center is available to Lieutenants, Captains, Chiefs, the Captain 5 and EMS Captain positions, the acting Captain 5 and administrators.');
     }
     $index = file_get_contents(public_path('daily/index.html'));
     abort_unless(is_string($index), 404);

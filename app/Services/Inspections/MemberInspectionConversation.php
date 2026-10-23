@@ -45,7 +45,8 @@ final class MemberInspectionConversation
 
         $general = $this->visible($this->messages->threadFor($viewer, $inspection), $viewer);
         $state = (string) ($detail['acceptance']['state'] ?? 'accepted');
-        $fromLogistics = array_values(array_filter($general, static fn (array $message): bool => $message['from_logistics']));
+        // Holds and rejections are Logistics decisions: a Captain 5 message never becomes their reason.
+        $fromLogistics = array_values(array_filter($general, static fn (array $message): bool => $message['from_logistics'] && ! $message['from_captain5']));
 
         // One batched, once-authorized read for every issue on the page (no per-finding queries).
         $issues = [];
@@ -99,14 +100,15 @@ final class MemberInspectionConversation
             ->map(function (ApparatusIssueMessage $message) use ($viewer): array {
                 $own = (int) $message->author_user_id === (int) $viewer->getKey();
                 // The audience label is the author's context when they wrote it, never their role today.
-                $fromLogistics = $message->isFromLogistics();
+                $fromLogistics = $message->isFromStaff();
 
                 return [
                     'id' => (int) $message->getKey(),
                     'body' => (string) $message->body,
                     'own' => $own,
                     'from_logistics' => $fromLogistics,
-                    'author' => $own ? 'You' : ($fromLogistics ? 'Logistics' : 'Crew member'),
+                    'from_captain5' => $message->isFromCaptain5(),
+                    'author' => $own ? 'You' : ($message->isFromCaptain5() ? 'Captain 5' : ($fromLogistics ? 'Logistics' : 'Crew member')),
                     'at' => CarbonImmutable::instance($message->created_at)->setTimezone(EmployeeInspectionHistoryService::TIMEZONE),
                 ];
             })

@@ -1,7 +1,7 @@
 <x-filament-panels::page>
     <div class="mx-auto w-full max-w-4xl space-y-6" wire:poll.30s.visible="poll">
         <p class="text-sm text-gray-600">
-            A private conversation between 300 Command and Hub administrators. Messages are a permanent record and cannot be edited or deleted.
+            A private conversation between 300 Command, Captain 5 and Hub administrators. Messages cannot be edited. Removing one keeps a record of who removed it and why.
         </p>
 
         <x-filament::section>
@@ -15,6 +15,19 @@
                 </div>
             </form>
         </x-filament::section>
+
+        <nav aria-label="Show messages for" class="flex flex-wrap gap-2">
+            @foreach (['all' => 'All', 'command_300' => '300 Command', 'captain_5' => 'Captain 5'] as $value => $label)
+                <x-filament::button
+                    size="sm"
+                    :color="$filter === $value ? 'primary' : 'gray'"
+                    :outlined="$filter !== $value"
+                    wire:click="setFilter('{{ $value }}')"
+                    class="min-h-[44px] min-w-[44px]"
+                    :aria-pressed="$filter === $value ? 'true' : 'false'"
+                >{{ $label }}</x-filament::button>
+            @endforeach
+        </nav>
 
         <div>
             <label for="command-comm-search" class="sr-only">Search the conversation</label>

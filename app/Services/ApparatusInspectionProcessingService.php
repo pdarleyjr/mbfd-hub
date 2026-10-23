@@ -11,6 +11,7 @@ use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusInspectionException;
 use App\Models\ApparatusInspectionReviewEvent;
+use App\Services\Captain5\Captain5Notifier;
 use App\Services\Defects\DefectContinuityService;
 use App\Services\Defects\FindingsResult;
 use App\Services\Inspections\InspectionHold;
@@ -85,6 +86,8 @@ final class ApparatusInspectionProcessingService
                 $notifications->issueEscalated($defect, $inspection);
             }
         }
+        // The on-duty Captain 5 hears about new Rescue and medical findings (never a repeat alert).
+        app(Captain5Notifier::class)->newFindings($inspection, $findings);
     }
 
     /**

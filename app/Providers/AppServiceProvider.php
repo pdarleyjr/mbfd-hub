@@ -44,6 +44,13 @@ class AppServiceProvider extends ServiceProvider
         );
         $this->app->bind(ConferenceProvider::class, \App\Services\VideoConferencing\LiveKitConferenceProvider::class);
 
+        // Captain 5 decisions are memoized per request (scoped), never across requests or jobs.
+        $this->app->scoped(\App\Services\Captain5\VerifiedBidSeats::class);
+        $this->app->scoped(\App\Services\Captain5\Captain5DutyRoster::class);
+        $this->app->scoped(\App\Services\Captain5\MedicalScope::class);
+        $this->app->scoped(\App\Services\Captain5\Captain5IssueScope::class);
+        $this->app->scoped(\App\Services\Security\Captain5Access::class);
+
         $this->app->bind(
             \Filament\Http\Responses\Auth\Contracts\LoginResponse::class,
             \App\Http\Responses\LoginResponse::class,
@@ -151,6 +158,15 @@ class AppServiceProvider extends ServiceProvider
         // controls, Command Board sign-in). Super Administrators also pass it.
         Gate::define(\App\Services\Security\Command300Access::GATE,
             fn (\App\Models\User $user): bool => app(\App\Services\Security\Command300Access::class)->allows($user));
+        // Captain 5 EMS Operations Center (docs/captain5-ems-operations-center.md section 2).
+        Gate::define(\App\Services\Security\Captain5Access::GATE_VIEW,
+            fn (\App\Models\User $user): bool => app(\App\Services\Security\Captain5Access::class)->decide($user)->canViewData);
+        Gate::define(\App\Services\Security\Captain5Access::GATE_ACT,
+            fn (\App\Models\User $user): bool => app(\App\Services\Security\Captain5Access::class)->decide($user)->canAct);
+        Gate::define(\App\Services\Security\Captain5Access::GATE_MANAGE_ASSIGNMENTS,
+            fn (\App\Models\User $user): bool => app(\App\Services\Security\Captain5Access::class)->decide($user)->canManageAssignments);
+        Gate::define(\App\Services\Security\Captain5Access::GATE_ADMIN,
+            fn (\App\Models\User $user): bool => app(\App\Services\Security\Captain5Access::class)->decide($user)->canConfigure);
 
         Todo::observe(TodoObserver::class);
         TrainingTodo::observe(TrainingTodoObserver::class);

@@ -9,15 +9,19 @@ use App\Exceptions\CurrentPasswordMismatch;
 use App\Filament\Support\EmployeeAccessSchema;
 use App\Models\User;
 use App\Rules\SafeNewPassword;
+use App\Services\Captain5\Captain5AccessExplainer;
+use App\Services\Captain5\Captain5AdministrationService;
 use App\Services\Identity\MemberAccessEmail;
 use App\Services\Security\AccountSecurityService;
 use App\Services\Security\ApplicationAccessService;
+use App\Services\Security\Captain5Access;
 use App\Services\Security\Command300Access;
 use App\Services\Security\FleetOperationsManagerAssignment;
 use App\Support\ApplicationAccessRegistry;
 use Filament\Actions\Action;
 use Filament\Forms\Components as Forms;
 use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
 trait ManagesEmployeeAccess
@@ -99,6 +103,32 @@ trait ManagesEmployeeAccess
             ])
             ->action(fn (array $data) => $this->runProtected(fn () => app(ApplicationAccessService::class)->setCommand300Access(
                 $this->actor(), $this->targetAccount(), (bool) ($data['enabled'] ?? false), $data['current_password'], $data['reason'])));
+        $actions[] = Action::make('manageCaptain5Access')->label('Captain 5 Access')
+            ->visible(fn (): bool => $this->canManageCaptain5Access())
+            ->fillForm(fn (): array => ['choice' => app(Captain5AccessExplainer::class)->currentChoice((int) $this->targetAccount()->employee_profile_id)])
+            ->form([
+                Forms\Placeholder::make('captain5Source')->label('Current Captain 5 access')
+                    ->content(fn (): string => $this->captain5Status()),
+                Forms\Radio::make('choice')->label('Captain 5 access')->required()
+                    ->options(Captain5AccessExplainer::CHOICE_LABELS)
+                    ->descriptions([
+                        'automatic' => 'Rank, seat and acting assignment decide. Removes any earlier Allow or Deny.',
+                        'allow_view' => 'Can open Captain 5 and see its issues. Cannot act on them.',
+                        'allow_act' => 'Can open Captain 5 and act on its issues.',
+                        'deny' => 'Cannot open Captain 5, even with a qualifying rank or seat.',
+                    ]),
+                ...$this->securityFields(),
+            ])
+            ->action(fn (array $data) => $this->runProtected(function () use ($data): void {
+                // Hidden for super administrators (protected recovery accounts) and for the actor's own profile.
+                abort_unless($this->canManageCaptain5Access(), 403);
+                $actor = $this->actor();
+                $target = $this->targetAccount();
+                if (! Hash::check((string) ($data['current_password'] ?? ''), $actor->getAuthPassword())) {
+                    throw new CurrentPasswordMismatch;
+                }
+                app(Captain5AdministrationService::class)->setOverride($actor, (int) $target->employee_profile_id, (string) ($data['choice'] ?? ''), (string) ($data['reason'] ?? ''));
+            }));
         $actions[] = Action::make('manageMeetingRole')->label('Meeting role')
             ->visible(fn (): bool => $this->canManageAccountAccess() && $this->targetAccount()->hasDirectWebPermission('app.meeting.access'))
             ->fillForm(fn (): array => ['meeting_role' => app(\App\Services\Security\ApplicationRoleResolver::class)->forUser($this->targetAccount()->fresh(), 'meeting') ?? 'viewer'])
@@ -232,6 +262,34 @@ trait ManagesEmployeeAccess
         }
 
         return $access->sourceLabel($access->source($target));
+    }
+
+    protected function captain5Status(): string
+    {
+        $explained = app(Captain5AccessExplainer::class)->explain($this->targetAccount()->fresh());
+        $line = $explained['headline'];
+        if ($explained['sources'] !== []) {
+            $line .= ' '.implode('; ', $explained['sources']).'.';
+        }
+        if ($explained['override'] !== null) {
+            $line .= ' Administrator choice: '.$explained['override']['label'].'.';
+        }
+
+        return $line;
+    }
+
+    /**
+     * Captain 5 administrators (not only super administrators) change another member's Captain 5
+     * access. Super administrators are protected recovery accounts whose access cannot be denied,
+     * and nobody changes their own access here, so those profiles never show the control.
+     */
+    protected function canManageCaptain5Access(): bool
+    {
+        $target = $this->accountOrNull();
+
+        return $target !== null && $target->employee_profile_id !== null
+            && ! $this->actor()->is($target) && ! $target->hasRole('super_admin')
+            && app(Captain5Access::class)->decide($this->actor())->canConfigure;
     }
 
     protected function securityFields(bool $temporaryPassword = false): array

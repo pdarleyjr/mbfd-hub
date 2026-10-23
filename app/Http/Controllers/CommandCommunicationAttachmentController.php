@@ -6,25 +6,29 @@ namespace App\Http\Controllers;
 
 use App\Models\CommandCommunicationAttachment;
 use App\Models\User;
-use App\Services\Security\Command300Access;
+use App\Services\CommandCommunications\CommandCommunicationAccess;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
- * Streams a 300 Command Communications attachment from the private disk.
- * Route middleware gates access; the controller re-checks the same decision.
+ * Streams a shared-conversation attachment from the private disk. The route only requires a
+ * signed-in user; access is decided per attachment from the post's audience (a channel the
+ * user can read), and the attachments of a removed post are never served.
  */
 final class CommandCommunicationAttachmentController extends Controller
 {
-    public function show(Request $request, string $publicId, Command300Access $access): StreamedResponse
+    public function show(Request $request, string $publicId, CommandCommunicationAccess $access): StreamedResponse
     {
         $user = $request->user('web');
-        abort_unless($user instanceof User && $access->allows($user), 403);
+        abort_unless($user instanceof User, 401);
+        abort_if($access->readableChannels($user) === [], 403);
 
-        $attachment = CommandCommunicationAttachment::query()->where('public_id', $publicId)->first();
-        abort_unless($attachment instanceof CommandCommunicationAttachment, 404);
+        $attachment = CommandCommunicationAttachment::query()->with('post')->where('public_id', $publicId)->first();
+        abort_unless($attachment instanceof CommandCommunicationAttachment && $attachment->post !== null, 404);
+        // Same 404 for missing, removed and other-audience attachments: no existence oracle.
+        abort_unless($access->canSee($user, $attachment->post) && ! $attachment->post->isDeleted(), 404);
         $disk = Storage::disk($attachment->disk);
         abort_unless($disk->exists($attachment->storage_path), 404);
 

@@ -155,6 +155,12 @@ class ApparatusDefect extends Model
         return $this->hasMany(ApparatusDefectParticipant::class);
     }
 
+    /** @return \Illuminate\Database\Eloquent\Relations\BelongsTo<User, $this> */
+    public function firstReporter(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(User::class, 'first_reported_by_user_id');
+    }
+
     public function firstReportedInspection(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(ApparatusInspection::class, 'first_reported_inspection_id');

@@ -42,7 +42,7 @@ const responsiveViewports = [
  */
 export default defineConfig({
   testDir: './tests/e2e',
-  testMatch: /(canonical-login-responsive|command-communications|daily-checkout-(inspection|responsive|service-worker|workspace|mobile|vehicle-confirmation)|daily-issue-report|daily-inventory-correction)\.spec\.ts/,
+  testMatch: /(canonical-login-responsive|command-communications|daily-checkout-(inspection|responsive|service-worker|workspace|mobile|vehicle-confirmation)|daily-issue-report|daily-inventory-correction|captain5-workspace)\.spec\.ts/,
   timeout: 45_000,
   retries: process.env.CI ? 1 : 0,
   workers: 1,
@@ -95,6 +95,16 @@ export default defineConfig({
       name: 'daily-workspace-webkit-ipad',
       testMatch: /daily-checkout-workspace\.spec\.ts/,
       use: { ...devices['iPad (gen 7)'], browserName: 'webkit' },
+    },
+    {
+      name: 'captain5-chromium',
+      testMatch: /captain5-workspace\.spec\.ts/,
+      use: { browserName: 'chromium', viewport: { width: 1280, height: 800 } },
+    },
+    {
+      name: 'captain5-chromium-phone',
+      testMatch: /captain5-workspace\.spec\.ts/,
+      use: { browserName: 'chromium', viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true },
     },
     {
       name: 'daily-pwa-chromium',

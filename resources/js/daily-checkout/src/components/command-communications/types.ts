@@ -1,6 +1,15 @@
-/** Shapes of the /api/command-communications contract. */
+/**
+ * Shapes of the shared conversation contract. One post model serves two channels:
+ * /api/command-communications (the 300 channel) and /api/captain5/communications (Captain 5).
+ */
 
-export type CommandPostSide = 'command' | 'administration';
+/** Which feed a panel shows. `command_300` is the default and the original 300 page behaviour. */
+export type CommandChannel = 'command_300' | 'captain_5';
+
+/** Who a post is shown to. `both` appears in the 300 and the Captain 5 feed as one record. */
+export type CommandAudience = 'command_300' | 'captain_5' | 'both';
+
+export type CommandPostSide = 'command' | 'administration' | 'captain5';
 
 export interface CommandAttachment {
   id: string;
@@ -17,15 +26,26 @@ export interface CommandPostAuthor {
   side: CommandPostSide;
 }
 
+export interface CommandPostRemoval {
+  by: string;
+  at: string | null;
+}
+
 export interface CommandPost {
   id: string;
   parent_id: string | null;
+  audience: CommandAudience;
   subject: string | null;
   body: string;
   author: CommandPostAuthor;
   is_mine: boolean;
   created_at: string;
   pinned: boolean;
+  /** A removed post is a tombstone: no subject, body or attachments, only who removed it. */
+  deleted: boolean;
+  removed: CommandPostRemoval | null;
+  /** The viewer is the author or a communications administrator. The server enforces it. */
+  can_delete: boolean;
   attachments: CommandAttachment[];
   replies: CommandPost[];
 }
@@ -78,4 +98,23 @@ export const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 
 export const SOURCE_LABEL: Record<CommandPostSide, string> = {
   command: '300 Command',
   administration: 'Administration',
+  captain5: 'Captain 5',
 };
+
+export const DEFAULT_CHANNEL: CommandChannel = 'command_300';
+
+/** Wording that differs between the two channels. */
+export const CHANNEL_COPY: Record<CommandChannel, { feedLabel: string; emptyBody: string; placeholder: string }> = {
+  command_300: {
+    feedLabel: 'Command messages',
+    emptyBody: 'Post an update for 300 Command and Administration. New messages appear here.',
+    placeholder: 'Write a message to 300 Command and Administration',
+  },
+  captain_5: {
+    feedLabel: 'Captain 5 messages',
+    emptyBody: 'Post an update for Captain 5 and Administration. New messages appear here.',
+    placeholder: 'Write a message to Captain 5 and Administration',
+  },
+};
+
+export const BOTH_AUDIENCE_LABEL = '300 Command + Captain 5';

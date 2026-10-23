@@ -5,7 +5,9 @@
 // ("Image corrupt or truncated"). Activating v10 deletes that cache; only
 // immutable build assets and the precache list are cache-first now, and other
 // static GETs are network-first and only stored after their body is verified.
-const CACHE_NAME = 'mbfd-checkout-v10';
+// v11: drops any 300 / Captain 5 message attachment a v10 worker may have stored (they are private
+// and per-audience); attachments now always bypass the cache.
+const CACHE_NAME = 'mbfd-checkout-v11';
 const API_CACHE_NAME = 'mbfd-api-cache-v7';
 const BUILD_ASSETS = /* DAILY_BUILD_ASSETS */ [];
 const DAILY_SHELL_KEYS = ['/daily/', '/daily/index.html'];
@@ -243,10 +245,18 @@ self.addEventListener('fetch', (event) => {
     url.pathname.endsWith('/service-notices') ||
     url.pathname.endsWith('/service-tickets')
   );
+  // Private, per-audience message attachments (300 / Captain 5) are authorized on every request and
+  // sent no-store: never keep a copy a different person could open later on a shared device.
+  const isPrivateAttachmentRequest = isSameOrigin && url.pathname.startsWith('/command-communications/attachments/');
 
   // Identity and member-specific follow-ups must always be authorized live.
   // Only the existing, redacted station/apparatus read models may use API cache.
   if (isSameOrigin && url.pathname.startsWith('/api/') && !isApparatusApiRequest && !isStationApiRequest) {
+    event.respondWith(fetch(request, { cache: 'no-store' }));
+    return;
+  }
+
+  if (isPrivateAttachmentRequest) {
     event.respondWith(fetch(request, { cache: 'no-store' }));
     return;
   }

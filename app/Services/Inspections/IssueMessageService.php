@@ -8,7 +8,9 @@ use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusIssueMessage;
 use App\Models\User;
+use App\Services\Captain5\Captain5IssueScope;
 use App\Services\Defects\DefectParticipants;
+use App\Services\Security\Captain5Access;
 use App\Support\Fleet\InspectionReviewers;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -30,6 +32,12 @@ use Illuminate\Validation\ValidationException;
  * write everything, including internal notes. A member may only read member-visible messages
  * and only post member-visible messages, on an inspection they own or an issue they follow.
  * Internal notes are never returned to a member by any method here.
+ *
+ * Captain 5 (docs/captain5-ems-operations-center.md section 5): a member who may act as Captain 5
+ * reads and writes like a reviewer, but only on in-scope issues and on Rescue inspections (or an
+ * inspection that observed an in-scope issue), and writes with author context `captain5`. A
+ * view-only Captain 5 officer reads member-visible messages of those threads only. Writing as Captain 5
+ * is opt-in (`as_captain5`), and an inspection's general thread is Captain 5's only for Rescue units.
  */
 final class IssueMessageService
 {
@@ -39,6 +47,8 @@ final class IssueMessageService
         private readonly EmployeeInspectionHistoryService $history,
         private readonly DefectParticipants $participants,
         private readonly InspectionNotificationDispatcher $notifications,
+        private readonly Captain5Access $captain5Access,
+        private readonly Captain5IssueScope $captain5Scope,
     ) {}
 
     /**
@@ -61,6 +71,7 @@ final class IssueMessageService
             'client_message_id' => ['nullable', 'uuid'],
             'corrects_message_id' => ['nullable', 'integer', 'min:1'],
             'kind' => ['nullable', 'string', 'max:40'],
+            'as_captain5' => ['nullable', 'boolean'],
         ])->validate();
 
         try {
@@ -100,8 +111,12 @@ final class IssueMessageService
      */
     public function threadFor(User $viewer, ApparatusInspection|ApparatusDefect $target): Collection
     {
+        $inspection = $target instanceof ApparatusInspection ? $target : null;
+        $defect = $target instanceof ApparatusDefect ? $target : null;
         $isReviewer = InspectionReviewers::canReview($viewer);
-        $this->authorizeThread($viewer, $isReviewer, $target instanceof ApparatusInspection ? $target : null, $target instanceof ApparatusDefect ? $target : null);
+        $captain5 = ! $isReviewer && $this->captain5Reads($viewer, $inspection, $defect);
+        $seesInternal = $isReviewer || ($captain5 && $this->captain5Writes($viewer, $inspection, $defect));
+        $this->authorizeThread($viewer, $isReviewer || $captain5, $inspection, $defect);
 
         $query = ApparatusIssueMessage::query()->with('author:id,name,display_name');
         if ($target instanceof ApparatusDefect) {
@@ -109,7 +124,7 @@ final class IssueMessageService
         } else {
             $query->where('apparatus_inspection_id', $target->getKey())->whereNull('apparatus_defect_id');
         }
-        if (! $isReviewer) {
+        if (! $seesInternal) {
             $query->memberVisible();
         }
 
@@ -181,11 +196,13 @@ final class IssueMessageService
             if ($target instanceof ApparatusInspection && $target->test_excluded_at !== null) {
                 return false;
             }
-            $isReviewer = InspectionReviewers::canReview($user);
-            if (! $isReviewer && $visibility !== ApparatusIssueMessage::VISIBILITY_MEMBER) {
+            $inspection = $target instanceof ApparatusInspection ? $target : null;
+            $defect = $target instanceof ApparatusDefect ? $target : null;
+            $isStaff = InspectionReviewers::canReview($user) || $this->captain5Writes($user, $inspection, $defect);
+            if (! $isStaff && $visibility !== ApparatusIssueMessage::VISIBILITY_MEMBER) {
                 return false;
             }
-            $this->authorizeThread($user, $isReviewer, $target instanceof ApparatusInspection ? $target : null, $target instanceof ApparatusDefect ? $target : null);
+            $this->authorizeThread($user, $isStaff, $inspection, $defect);
 
             return true;
         } catch (AuthorizationException) {
@@ -204,6 +221,7 @@ final class IssueMessageService
 
         $isReviewer = InspectionReviewers::canReview($author);
         $original = null;
+        $captain5 = false;
         if (! empty($data['corrects_message_id'])) {
             $original = ApparatusIssueMessage::query()->find($data['corrects_message_id']);
             if ($original === null) {
@@ -229,22 +247,30 @@ final class IssueMessageService
             throw ValidationException::withMessages(['visibility' => 'Choose who can see this message: the member or internal only.']);
         }
         $visibility = $data['visibility'] ?? ApparatusIssueMessage::VISIBILITY_MEMBER;
-        if (! $isReviewer && $visibility !== ApparatusIssueMessage::VISIBILITY_MEMBER) {
-            throw new AuthorizationException('Members cannot write internal notes.');
-        }
 
         $inspection = $inspectionId !== null ? ApparatusInspection::query()->find($inspectionId) : null;
         $defect = $defectId !== null ? ApparatusDefect::query()->find($defectId) : null;
         if (($inspectionId !== null && $inspection === null) || ($defectId !== null && $defect === null)) {
             throw $this->missing($isReviewer, 'The inspection or issue does not exist.');
         }
-        $this->authorizeThread($author, $isReviewer, $inspection, $defect);
+        // Captain 5 authorship is opt-in (only the Captain 5 workspace asks for it), so an officer who
+        // also holds a Captain 5 role still replies as a crew member on their own inspection.
+        if (! $isReviewer && (bool) ($data['as_captain5'] ?? false) && $this->captain5Writes($author, $inspection, $defect)) {
+            // Captain 5 speaks for the department on in-scope threads and, like a reviewer, must choose the audience.
+            $captain5 = true;
+            if ($original === null && empty($data['visibility'])) {
+                throw ValidationException::withMessages(['visibility' => 'Choose who can see this message: the member or internal only.']);
+            }
+        } elseif (! $isReviewer && $visibility !== ApparatusIssueMessage::VISIBILITY_MEMBER) {
+            throw new AuthorizationException('Members cannot write internal notes.');
+        }
+        $this->authorizeThread($author, $isReviewer || $captain5, $inspection, $defect);
         $inspection?->assertOperational();
 
         // Snapshot who the author spoke as. A correction keeps the corrected message's context.
         $authorContext = $original !== null
             ? ($original->author_context ?: ApparatusIssueMessage::CONTEXT_MEMBER)
-            : ($isReviewer ? ApparatusIssueMessage::CONTEXT_LOGISTICS : ApparatusIssueMessage::CONTEXT_MEMBER);
+            : ($isReviewer ? ApparatusIssueMessage::CONTEXT_LOGISTICS : ($captain5 ? ApparatusIssueMessage::CONTEXT_CAPTAIN5 : ApparatusIssueMessage::CONTEXT_MEMBER));
 
         $message = ApparatusIssueMessage::query()->create([
             'apparatus_inspection_id' => $inspection?->getKey(),
@@ -258,7 +284,7 @@ final class IssueMessageService
         ]);
 
         if ($defect !== null && ! $isReviewer) {
-            $this->participants->enroll($defect, $author, 'replied', $inspection);
+            $this->participants->enroll($defect, $author, $captain5 ? 'captain5' : 'replied', $inspection);
         }
         if ($notify) {
             $this->notifications->messagePosted($message, $data['kind'] ?? null, $inspection);
@@ -332,6 +358,37 @@ final class IssueMessageService
 
         return $inspectionIds !== []
             && $this->history->ownedQuery($user)->whereIn('apparatus_inspections.id', $inspectionIds)->exists();
+    }
+
+    /** A Captain 5 officer may read this thread (in-scope issue, or a Rescue / in-scope inspection). */
+    private function captain5Reads(User $user, ?ApparatusInspection $inspection, ?ApparatusDefect $defect): bool
+    {
+        return $this->captain5Access->decide($user)->canViewData && $this->captain5Covers($inspection, $defect);
+    }
+
+    /** A Captain 5 actor (not a reviewer, who already writes everywhere) may write to this thread. */
+    private function captain5Writes(User $user, ?ApparatusInspection $inspection, ?ApparatusDefect $defect): bool
+    {
+        if ($inspection === null && $defect === null) {
+            return false;
+        }
+        $decision = $this->captain5Access->decide($user);
+
+        return $decision->canAct && ! $decision->isReviewer && $this->captain5Covers($inspection, $defect);
+    }
+
+    private function captain5Covers(?ApparatusInspection $inspection, ?ApparatusDefect $defect): bool
+    {
+        if ($defect !== null) {
+            return $this->captain5Scope->inScope($defect);
+        }
+        if ($inspection === null) {
+            return false;
+        }
+
+        // The general thread of an Engine/Ladder inspection is Fleet's too; Captain 5 talks about a
+        // medical item on that item's own issue thread instead.
+        return $this->captain5Scope->inspectionKind($inspection) === Captain5IssueScope::KIND_RESCUE;
     }
 
     private function missing(bool $isReviewer, string $message): \Throwable

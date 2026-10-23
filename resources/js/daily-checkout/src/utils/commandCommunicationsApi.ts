@@ -1,9 +1,15 @@
-import type {
-  CommandAttachment, CommandPost, CommandPostInput, CommandPostsPage, CommandReadReceipt, CommandSummary,
+import {
+  DEFAULT_CHANNEL,
+  type CommandAttachment, type CommandAudience, type CommandChannel, type CommandPost, type CommandPostInput, type CommandPostSide,
+  type CommandPostsPage, type CommandReadReceipt, type CommandSummary,
 } from '../components/command-communications/types';
 import { ApiRequestError, fetchWithTimeout, mutationHeaders, parseRetryAfter } from './api';
 
-const BASE = '/api/command-communications';
+/** The 300 page keeps its original endpoint; the Captain 5 page reads the same posts through its own gate. */
+const BASES: Record<CommandChannel, string> = {
+  command_300: '/api/command-communications',
+  captain_5: '/api/captain5/communications',
+};
 const UPLOAD_TIMEOUT_MS = 180_000;
 
 export const isForbiddenError = (error: unknown): error is ApiRequestError => (
@@ -13,6 +19,9 @@ export const isForbiddenError = (error: unknown): error is ApiRequestError => (
 const asString = (value: unknown, fallback = ''): string => (typeof value === 'string' ? value : fallback);
 const asNumber = (value: unknown): number => (typeof value === 'number' && Number.isFinite(value) ? value : 0);
 const asRecord = (value: unknown): Record<string, unknown> => (value && typeof value === 'object' ? value as Record<string, unknown> : {});
+
+const SIDES: readonly CommandPostSide[] = ['command', 'administration', 'captain5'];
+const AUDIENCES: readonly CommandAudience[] = ['command_300', 'captain_5', 'both'];
 
 function normalizeAttachment(raw: unknown): CommandAttachment {
   const item = asRecord(raw);
@@ -26,6 +35,11 @@ function normalizeAttachment(raw: unknown): CommandAttachment {
   };
 }
 
+function normalizeRemoval(raw: unknown): CommandPost['removed'] {
+  const removed = asRecord(raw);
+  return { by: asString(removed.by, 'an administrator'), at: typeof removed.at === 'string' ? removed.at : null };
+}
+
 /** Never trust the shape: a missing list becomes an empty one so rendering cannot throw. */
 export function normalizePost(raw: unknown): CommandPost {
   const item = asRecord(raw);
@@ -33,16 +47,20 @@ export function normalizePost(raw: unknown): CommandPost {
   return {
     id: String(item.id ?? ''),
     parent_id: item.parent_id == null ? null : String(item.parent_id),
+    audience: AUDIENCES.find((audience) => audience === item.audience) ?? 'command_300',
     subject: typeof item.subject === 'string' && item.subject.trim() !== '' ? item.subject : null,
     body: asString(item.body),
     author: {
       name: asString(author.name, 'Unknown'),
       rank: typeof author.rank === 'string' && author.rank !== '' ? author.rank : null,
-      side: author.side === 'administration' ? 'administration' : 'command',
+      side: SIDES.find((side) => side === author.side) ?? 'command',
     },
     is_mine: item.is_mine === true,
     created_at: asString(item.created_at),
     pinned: item.pinned === true,
+    deleted: item.deleted === true,
+    removed: item.deleted === true ? normalizeRemoval(item.removed) : null,
+    can_delete: item.can_delete === true && item.deleted !== true,
     attachments: Array.isArray(item.attachments) ? item.attachments.map(normalizeAttachment) : [],
     replies: Array.isArray(item.replies) ? item.replies.map(normalizePost) : [],
   };
@@ -72,17 +90,19 @@ async function readJson(response: Response): Promise<unknown> {
   return response.json().catch(() => null);
 }
 
-async function request(path: string, init: RequestInit, fallback: string): Promise<unknown> {
-  const response = await fetchWithTimeout(`${BASE}${path}`, { credentials: 'same-origin', cache: 'no-store', ...init });
+async function request(channel: CommandChannel, path: string, init: RequestInit, fallback: string): Promise<unknown> {
+  const response = await fetchWithTimeout(`${BASES[channel]}${path}`, { credentials: 'same-origin', cache: 'no-store', ...init });
   const payload = await readJson(response);
   if (!response.ok) throw errorFromResponse(response.status, payload, response.headers.get('Retry-After'), fallback);
   return payload;
 }
 
-export async function fetchCommandPosts({ before, limit = 20 }: { before?: string | null; limit?: number } = {}): Promise<CommandPostsPage> {
+export async function fetchCommandPosts(
+  { before, limit = 20, channel = DEFAULT_CHANNEL }: { before?: string | null; limit?: number; channel?: CommandChannel } = {},
+): Promise<CommandPostsPage> {
   const query = new URLSearchParams({ limit: String(limit) });
   if (before) query.set('before', before);
-  const payload = asRecord(await request(`/posts?${query}`, { headers: { Accept: 'application/json' } }, 'Messages could not be loaded.'));
+  const payload = asRecord(await request(channel, `/posts?${query}`, { headers: { Accept: 'application/json' } }, 'Messages could not be loaded.'));
   return {
     data: normalizeList(payload.data),
     pinned: normalizeList(payload.pinned),
@@ -91,13 +111,13 @@ export async function fetchCommandPosts({ before, limit = 20 }: { before?: strin
   };
 }
 
-export async function fetchCommandSummary(): Promise<CommandSummary> {
-  const payload = asRecord(await request('/summary', { headers: { Accept: 'application/json' } }, 'The message summary could not be loaded.'));
+export async function fetchCommandSummary(channel: CommandChannel = DEFAULT_CHANNEL): Promise<CommandSummary> {
+  const payload = asRecord(await request(channel, '/summary', { headers: { Accept: 'application/json' } }, 'The message summary could not be loaded.'));
   return { unread_count: asNumber(payload.unread_count), latest_activity_at: typeof payload.latest_activity_at === 'string' ? payload.latest_activity_at : null };
 }
 
-export async function setCommandPostPinned(id: string, pinned: boolean): Promise<CommandPost> {
-  const payload = asRecord(await request(`/posts/${encodeURIComponent(id)}/pin`, {
+export async function setCommandPostPinned(id: string, pinned: boolean, channel: CommandChannel = DEFAULT_CHANNEL): Promise<CommandPost> {
+  const payload = asRecord(await request(channel, `/posts/${encodeURIComponent(id)}/pin`, {
     method: 'POST',
     headers: mutationHeaders(),
     body: JSON.stringify({ pinned }),
@@ -105,8 +125,21 @@ export async function setCommandPostPinned(id: string, pinned: boolean): Promise
   return normalizePost(payload.data);
 }
 
-export async function markCommandPostsRead(): Promise<CommandReadReceipt> {
-  const payload = asRecord(await request('/read', { method: 'POST', headers: mutationHeaders(), body: '{}' }, 'Messages could not be marked as read.'));
+/**
+ * Controlled removal (the author, or a communications administrator). The reason is required and
+ * kept in the audit trail. Resolves with the tombstone the server now serves for that message.
+ */
+export async function deleteCommandPost(id: string, reason: string, channel: CommandChannel = DEFAULT_CHANNEL): Promise<CommandPost> {
+  const payload = asRecord(await request(channel, `/posts/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: mutationHeaders(),
+    body: JSON.stringify({ reason }),
+  }, 'The message could not be removed.'));
+  return normalizePost(payload.data);
+}
+
+export async function markCommandPostsRead(channel: CommandChannel = DEFAULT_CHANNEL): Promise<CommandReadReceipt> {
+  const payload = asRecord(await request(channel, '/read', { method: 'POST', headers: mutationHeaders(), body: '{}' }, 'Messages could not be marked as read.'));
   return { unread_count: asNumber(payload.unread_count), last_read_at: typeof payload.last_read_at === 'string' ? payload.last_read_at : null };
 }
 
@@ -126,10 +159,10 @@ function buildForm(input: CommandPostInput): FormData {
  * means the outcome is unknown (network drop or timeout), so the caller keeps the draft and
  * retries with the same client_submission_id.
  */
-export function sendCommandPost(input: CommandPostInput, onProgress: (fraction: number) => void): Promise<CommandPost> {
+export function sendCommandPost(input: CommandPostInput, onProgress: (fraction: number) => void, channel: CommandChannel = DEFAULT_CHANNEL): Promise<CommandPost> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    xhr.open('POST', `${BASE}/posts`);
+    xhr.open('POST', `${BASES[channel]}/posts`);
     xhr.timeout = UPLOAD_TIMEOUT_MS;
     xhr.withCredentials = false;
     const { 'Content-Type': _contentType, ...headers } = mutationHeaders();
