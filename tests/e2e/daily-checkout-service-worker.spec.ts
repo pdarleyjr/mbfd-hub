@@ -74,7 +74,7 @@ async function waitForCachedDailyShell(page: Page): Promise<string[]> {
   expect(emittedAssets.filter(asset => asset.endsWith('.png')).length).toBeGreaterThanOrEqual(15);
 
   await expect.poll(async () => page.evaluate(async expectedAssets => {
-    const cache = await caches.open('mbfd-checkout-v10');
+    const cache = await caches.open('mbfd-checkout-v11');
     const cachedPaths = (await cache.keys()).map(request => new URL(request.url).pathname);
 
     return Boolean(await cache.match('/daily/index.html'))
@@ -152,10 +152,10 @@ test('installed Daily worker caches the shell and an offline queue survives relo
 
   const cacheEvidence = await page.evaluate(async () => ({
     names: await caches.keys(),
-    shell: Boolean(await (await caches.open('mbfd-checkout-v10')).match('/daily/index.html')),
-    assets: (await (await caches.open('mbfd-checkout-v10')).keys()).map(request => new URL(request.url).pathname),
+    shell: Boolean(await (await caches.open('mbfd-checkout-v11')).match('/daily/index.html')),
+    assets: (await (await caches.open('mbfd-checkout-v11')).keys()).map(request => new URL(request.url).pathname),
   }));
-  expect(cacheEvidence.names).toContain('mbfd-checkout-v10');
+  expect(cacheEvidence.names).toContain('mbfd-checkout-v11');
   expect(cacheEvidence.names).not.toContain('mbfd-checkout-v6');
   expect(cacheEvidence.names).not.toContain('mbfd-api-cache-v6');
   expect(cacheEvidence.shell).toBe(true);
@@ -346,7 +346,7 @@ test('a truncated station photo left in the old cache is purged, and a corrupt c
 
   // Even a corrupt entry in the current cache must not be served while the network is up.
   await page.evaluate(async ({ path, bytes }) => {
-    await (await caches.open('mbfd-checkout-v10')).put(path, new Response(new Uint8Array(bytes), { headers: { 'Content-Type': 'image/webp' } }));
+    await (await caches.open('mbfd-checkout-v11')).put(path, new Response(new Uint8Array(bytes), { headers: { 'Content-Type': 'image/webp' } }));
   }, { path: stationImagePath, bytes: [...stationImageBytes.subarray(0, 1024)] });
   const before = imageRequests;
 
@@ -354,7 +354,7 @@ test('a truncated station photo left in the old cache is purged, and a corrupt c
 
   expect(size).toEqual({ width: 1200, height: 1200 });
   expect(imageRequests).toBeGreaterThan(before);
-  await expect.poll(() => page.evaluate(async path => (await (await (await caches.open('mbfd-checkout-v10')).match(path))?.arrayBuffer())?.byteLength, stationImagePath), { timeout: 10_000 }).toBe(stationImageBytes.length);
+  await expect.poll(() => page.evaluate(async path => (await (await (await caches.open('mbfd-checkout-v11')).match(path))?.arrayBuffer())?.byteLength, stationImagePath), { timeout: 10_000 }).toBe(stationImageBytes.length);
 
   // The verified copy is the offline fallback (drop the network mock so offline is real).
   await context.unroute(`**${stationImagePath}`);

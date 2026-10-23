@@ -43,6 +43,19 @@ export function insertPost(existing: CommandPost[], post: CommandPost): CommandP
     : [post, ...existing];
 }
 
+/**
+ * Applies the tombstone the server returned after a removal. A removed top-level post keeps the
+ * replies the server sent with it; a removed reply is swapped in place inside its parent.
+ */
+export function applyRemoval(existing: CommandPost[], removed: CommandPost): CommandPost[] {
+  if (removed.parent_id) {
+    return existing.map((candidate) => (candidate.id === removed.parent_id
+      ? { ...candidate, replies: candidate.replies.map((reply) => (reply.id === removed.id ? removed : reply)) }
+      : candidate));
+  }
+  return existing.map((candidate) => (candidate.id === removed.id ? removed : candidate));
+}
+
 export function replaceTopLevel(existing: CommandPost[], post: CommandPost): CommandPost[] {
   return existing.map((candidate) => (candidate.id === post.id ? { ...candidate, pinned: post.pinned } : candidate));
 }

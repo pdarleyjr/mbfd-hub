@@ -1,0 +1,157 @@
+# Captain 5 EMS Operations Center
+
+Status: implementation contract (2026-10-23). Branch `feat/captain5-ems-operations-center`.
+Builds on `docs/daily-inspection-continuity.md` (issues, corrective actions, messages,
+notifications) and `docs/command-300-access.md` (300 profile + communications). It adds
+no second issue engine: Captain 5 acts on the same `apparatus_defects` rows, through the
+same `DefectCorrectiveActionService` / `IssueMessageService`, and Admin and Captain 5 see
+the same live state.
+
+## 1. Data sources (verified read-only against production 2026-10-23)
+
+| Fact | Authoritative source |
+|---|---|
+| Captain 5 seat | `employee_bid_assignments` current verified v2 row, `unit_label` exactly `Captain 5` (one per A/B/C shift, `position_label` `Captain 5`). |
+| EMS Captain | Same table, `unit_label` exactly `EMS` (D Shift, rank Captain). |
+| Ranks | `employees.rank`, canonical strings: `Lieutenant`, `Captain`, `Division Chief`, `Deputy Fire Chief`, `Fire Chief`. No abbreviations. Civilian titles (e.g. `EMS Coordinator`, `Chief Plans Analyst #3`) never match. |
+| Shift on duty | No staffing store exists. Duty day = 08:00–08:00 America/New_York (TeleStaff print boundary). A/B/C 24-hour rotation anchored at `captain5.shift_rotation.anchor_date` (2026-03-09 = A), checked against production inspection `shift` values (8 of 9 recorded dates match; the one mismatch is a single member-entered value). Config can disable it; when disabled the on-duty bid holder is "unknown". |
+| Acting Captain 5 (out of class) | No reliable source: the Crew Planner TeleStaff parse is ephemeral and treats OOC/ROC/MOC/TOC codes as unverified. **Controlled assignment** table `captain5_duty_assignments` (section 3). Never inferred from rank. |
+| Medical equipment | No structured flag exists in the checklists. Verified mapping `config/captain5_medical_scope.php` keyed by `(checklist_type, item_key)` plus admin decisions in `captain5_item_classifications`. Anything not mapped is `unclassified` → not visible to Captain 5, queued for admin classification. |
+| Current crew | Inspection submissions for the physical apparatus during the current duty day. If none, the unit-level channel is the issue's "latest update" shown at the next Daily Checkout of that unit. |
+
+## 2. Access (`App\Services\Security\Captain5Access`)
+
+One class decides everything, like `Command300Access`. Gate abilities (never the permission names):
+`captain5-view` (page + scoped data), `captain5-act`, `captain5-manage-assignments`, `captain5-admin`.
+
+Account must be usable (`isAuthenticationAllowed()` and no pending password change).
+
+| Source | View page/data | Act on issues | On-duty authority | Dismiss |
+|---|---|---|---|---|
+| `super_admin` | yes (cannot be denied: protected recovery) | via reviewer rule | – | via reviewer rule |
+| Admin panel (`admin.access` direct) | yes | only if `InspectionReviewers::canReview` (existing rule) | – | same |
+| Officer rank (Lt, Capt, DC, Deputy FC, FC) | yes | no | – | – |
+| Captain 5 bid holder | yes | yes | when their bid shift is on duty and no acting assignment covers now | when on duty |
+| EMS Captain bid holder | yes | yes | – | yes |
+| Active acting assignment (covers now) | yes | yes | yes (exclusive for that duty day) | yes |
+| Override `allow` level `view` / `act` | view / view+act | act level only | – | – |
+| Override `deny` | removes every source above except `super_admin` | | | |
+
+- `captain5-admin` = active account with Admin Panel entitlement AND (`super_admin` OR direct `captain5.admin`). Configures overrides, assignments and medical classification. Grants nothing in the Admin Panel by itself.
+- `captain5-manage-assignments` = `captain5-admin` OR EMS Captain bid holder OR Division Chief rank OR verified 300 bid seat; deny override removes it.
+- Five separated permissions in code: `canViewPage`, `canViewData`, `canAct`, `hasOnDutyAuthority`, `canConfigure`.
+- Enforced server-side on: `/daily/captain-5` shell (403 before the SPA), every `/api/captain5/*` route, Captain 5 communications API + attachment download, every issue mutation (service layer), message threads. UI hiding is cosmetic only.
+- Never grants Admin Panel access, Fleet authority (`classifyImpact` out_of_service, service tickets), inspection approval/rejection, hold decisions or meter decisions.
+
+## 3. Tables (all additive, PostgreSQL + SQLite)
+
+- `captain5_duty_assignments`: id, `employee_profile_id` FK employees restrict, `duty_date` date, `starts_at`/`ends_at` timestampTz (default the 08:00–08:00 duty window), `shift_letter` char(1) null, `reason` text, `assigned_by_user_id` FK users, `revoked_at` null, `revoked_by_user_id` null, `revocation_reason` null, `client_request_id` string(64) unique null, timestamps. Partial unique `(duty_date) WHERE revoked_at IS NULL` (one acting Captain 5 per duty day). Rows are never deleted; revocation is an update of the revoke columns only.
+- `captain5_access_overrides`: id, `employee_profile_id`, `effect` (`allow|deny`), `level` (`view|act`, null for deny), `reason`, `set_by_user_id`, `superseded_at` null, `superseded_by_user_id` null, timestamps. Partial unique `(employee_profile_id) WHERE superseded_at IS NULL`. History rows are immutable.
+- `captain5_item_classifications`: id, `checklist_type`, `item_key`, `item_name`, `classification` (`medical|not_medical`), `reason`, `decided_by_user_id`, timestamps, unique (`checklist_type`,`item_key`).
+- `captain5_handoff_notes`: id, `duty_date`, `author_user_id`, `author_authority` (snapshot), `body` text, `client_request_id` unique null, `acknowledged_by_user_id` null, `acknowledged_at` null, timestamps. Append-only except the acknowledge columns (set once).
+- Communications (section 6): `command_communication_posts.audience` string(20) not null default `command_300` (`command_300|captain_5|both`), `deleted_at`/`deleted_by_user_id`/`deletion_reason`; `command_communication_channel_reads` (`user_id`, `channel`, `last_read_at`, unique pair).
+
+## 4. Issue scope (`App\Services\Captain5\Captain5IssueScope`)
+
+- Physical apparatus checklist type via `DailyCheckoutChecklistResolver::checklistTypeFor()`.
+- `rescue` → every issue, except `compartment_key = scheduled_duties`.
+- `engine`, `engine2`, `ladder1`, `ladder3` → only items classified `medical` (DB decision wins over config). Item key resolution: `item_key`; when null, a unique name match through `InspectionPaperFields::equipmentDefinitions()` (incl. legacy names); otherwise `unclassified`.
+- Everything else (Air Truck, Fire Boat, command vehicles, unmapped) → out of scope.
+- `unclassified` and config `ambiguous` items are never visible to Captain 5; they appear in the admin Medical Scope review list.
+- Fleet keeps all mechanical/PM/non-medical authority; Captain 5 sees nothing outside the scope.
+
+## 5. Actions (same services as the Admin Panel)
+
+`DefectCorrectiveActionService::forCaptain5(Captain5ActorContext)` returns a copy whose
+`run()` authorizes with `Captain5IssueAuthority` (scope + operation) instead of the reviewer
+rule, records `details.actor_context` (`role=captain5`, authority source, assignment id,
+duty date, shift letter) on the event, writes member messages with `author_context=captain5`,
+enrolls the actor as participant (`enrollment_source=captain5`) and routes notifications through
+`Captain5Notifier`. Reviewers keep the unchanged path.
+
+| Captain 5 action | Service call |
+|---|---|
+| Acknowledge | `acknowledge` |
+| Ordered (+ vendor ref, expected delivery) | `updateAction(action_pending, details)` |
+| Update expected delivery / notes | `updateAction(current pending status, details)` |
+| Available for pickup | `updateAction(replacement_available, pickup_instructions)` |
+| Replaced / returned to service | `resolve(replacement_installed|spare_issued|repair_completed, notes)` — requires an explicit "verified in place" confirmation |
+| Verify member's correction | `verifyCorrection` |
+| Dismiss | `dismiss` — on-duty authority, EMS Captain or reviewer only |
+| Reopen | `reopen` |
+| Message submitter / followers | `IssueMessageService::post` (issue thread) |
+| Request clarification | `IssueMessageService::post(kind=clarification_requested)` on the originating inspection |
+
+Acknowledged, Ordered and Available for pickup never close an issue. Optimistic concurrency:
+every mutation carries `expected_state` = `{action_status}:{last_event_id}`; a mismatch returns 409
+with the current issue. Every mutation carries an idempotency key (retry = no-op).
+
+## 6. Shared 300 + Captain 5 communications
+
+One `command_communication_posts` row per post with `audience`; it appears in each feed whose
+channel the audience includes. 300 feed = `command_300|both` (Command300Access). Captain 5 feed =
+`captain_5|both` (Captain5Access view). Admins (Filament page) choose the audience; 300 members
+post `command_300`; Captain 5 members post `captain_5`; replies inherit the parent's audience.
+Controlled delete = soft delete with actor, reason and audit, by the author or a communications
+administrator; attachments of deleted posts are no longer served. Read state per channel.
+Immediate notification: `captain_5|both` posts by administrators notify the on-duty Captain 5 only
+(acting → on-duty bid holder → all Captain 5 bid holders when the on-duty person cannot be
+resolved). Everyone else eligible sees the post and the unread count.
+
+## 7. Notifications (`Captain5Notifier`, same ledger + `InspectionEventNotification`)
+
+Event keys start with `captain5:`; `inspections:retry-notifications` routes them back here.
+- New in-scope findings of one inspection → on-duty Captain 5 (one notification per inspection).
+- New significant damage in scope → on-duty Captain 5 and EMS Captain.
+- Captain 5 issue update / resolution → original reporter, current-duty-day crew of that unit,
+  participants who replied or were assigned, other Captain 5 actors on the issue; never the actor,
+  never every former observer. One per person per event.
+- Member reply on an in-scope issue → Captain 5 actors on that issue (in addition to the existing reviewer routing; reviewers excluded from the Captain 5 copy).
+- Notification failure is logged and never rolls back the issue change.
+
+## 8. Audit visibility
+
+The same `apparatus_defect_events` rows (actor, time, from→to, details incl. actor_context) are
+shown in: Admin inspection page timeline and issue cards, Apparatus defect history, the member's
+`MyVehicleInspectionView`, and the Captain 5 page. Labels say "Captain 5 (acting)" etc. from the
+snapshot, never from current roles.
+
+## 9. Rollback
+
+All migrations additive. Redeploy the previous image; old code ignores the new tables/columns
+(`audience` defaults to `command_300`, so the old 300 feed keeps showing only 300 posts — Captain 5
+only posts would become visible to 300 under old code, so roll back communications by hiding them
+with `captain5.communications_enabled=false` first if needed).
+
+## 10. As built (2026-10-23)
+
+- **Access**: `Captain5Access::decide()` as in section 2. Reviewers (`InspectionReviewers::canReview`) using the
+  workspace act through the unchanged Logistics path; everyone else with `canAct` acts as Captain 5.
+  The station-list probe `GET /api/captain5/summary` is outside the view gate on purpose and returns only
+  `{"access":{"view":false}}` to ineligible members.
+- **Acting assignments** refuse self-assignment, denied members, departed members and members without an
+  active Hub account. Reasons are shown only to people who manage assignments.
+- **Notifications** to "the on-duty Captain 5" are filtered through `Captain5Access` at send time (a denied or
+  disabled person is skipped; fallback = eligible seat holders). Captain 5 participants are found from the audit
+  snapshots (`details.actor_context.role = captain5`, `author_context = captain5`). Retrying one ledger row
+  rebuilds and sends only that row.
+- **Messages**: Captain 5 authorship is opt-in (`as_captain5`, set only by the Captain 5 API), so an officer who
+  holds a Captain 5 role still replies as a crew member on their own inspection. Captain 5 writes to an
+  inspection's general thread only for Rescue units; Engine/Ladder conversations happen on the medical issue.
+  Hold/rejection reasons shown to members stay Logistics messages.
+- **Scope**: candidates include issues whose physical truck OR inspected unit is a Rescue/Engine/Ladder (vehicle
+  swaps, reserves). The open queue scans in id-descending chunks (in-scope items can never be pushed out by Fleet
+  items); above 500 in-scope open issues the page shows a notice and the server logs
+  `captain5.open_issue_queue_truncated`. The medical mapping is honoured only while the template matches its
+  `reviewed_version`; an unreviewed template change makes every item of it unclassified (admin review).
+- **Medical classification decisions** are append-only history (`superseded_at`), like overrides.
+- **Communications**: `CommandCommunicationAccess` is the single channel decision (300 = `Command300Access`,
+  Captain 5 = `Captain5Access` view + kill switch). Admin posts default to "300 only". Removal: author or
+  super_admin / direct `admin.communications.manage` (Admin Panel entitlement required); reason required; audit
+  row in `command_communication_audit_events`; tombstone in feeds; attachments of removed or other-audience posts
+  answer 404. Admin replies in a thread that includes Captain 5 also notify the on-duty Captain 5.
+- **PWA**: service worker cache `mbfd-checkout-v11` (activation drops v10). Message attachments are never stored by
+  the service worker.
+- **Duty day** uses wall-clock 08:00 America/New_York (DST-safe).
+- **Known policy choice**: Captain 5 messages do not push a notification to Logistics; Logistics sees them on the
+  canonical inspection page and issue history (labelled "Captain 5 · Name").

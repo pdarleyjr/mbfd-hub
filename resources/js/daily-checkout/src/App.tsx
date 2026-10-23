@@ -13,6 +13,7 @@ const InspectionWizard = lazy(() => import('./components/InspectionWizard'));
 const StationListPage = lazy(() => import('./components/StationListPage'));
 const StationDetailPage = lazy(() => import('./components/StationDetailPage'));
 const Command300Page = lazy(() => import('./components/Command300Page'));
+const Captain5Page = lazy(() => import('./components/Captain5Page'));
 const RoomAssetTracker = lazy(() => import('./components/RoomAssetTracker'));
 const FormsHub = lazy(() => import('./components/FormsHub'));
 const StationInventoryForm = lazy(() => import('./components/StationInventoryForm'));
@@ -69,6 +70,8 @@ function DailyShell() {
             <Route path="/stations/:id" element={<StationDetailPage />} />
             {/* 300 Command is a unit profile with its own route, never a station id. */}
             <Route path="/command-300" element={<Command300Page />} />
+            {/* Captain 5 EMS Operations is a workspace route, never a station id. */}
+            <Route path="/captain-5" element={<Captain5Page />} />
             <Route path="/stations/:stationId/rooms/:roomId" element={<RoomAssetTracker />} />
             {/* Forms Hub Routes */}
             <Route path="/forms-hub" element={<FormsHub />} />

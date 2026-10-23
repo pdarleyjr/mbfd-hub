@@ -13,8 +13,10 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * JSON API of the 300 page's Communications tab. Routes are guarded by the
- * single `command.300.access` ability; the service re-checks it on every call.
+ * JSON API of the shared conversation. Two route groups reuse this controller: the 300 page's
+ * Communications tab (`/api/command-communications`, gate `access-command-300`) and the
+ * Captain 5 page's Messages tab (`/api/captain5/communications`, gate `captain5-view`, route
+ * default `channel = captain_5`). The service re-checks the channel on every call.
  */
 final class CommandCommunicationController extends Controller
 {
@@ -30,7 +32,7 @@ final class CommandCommunicationController extends Controller
             'limit' => ['nullable', 'integer', 'min:1', 'max:'.(int) config('command_communications.max_page_size', 50)],
         ]);
         $user = $this->user($request);
-        $feed = $this->service->feed($user, $params['before'] ?? null, isset($params['limit']) ? (int) $params['limit'] : null);
+        $feed = $this->service->feed($user, $params['before'] ?? null, isset($params['limit']) ? (int) $params['limit'] : null, $this->channel($request));
 
         return $this->json([
             'data' => $this->presenter->posts($feed['posts'], $user),
@@ -43,10 +45,12 @@ final class CommandCommunicationController extends Controller
     public function summary(Request $request): JsonResponse
     {
         $user = $this->user($request);
+        $channel = $this->channel($request);
+        $this->service->assertCanRead($user, $channel); // includes the Captain 5 kill switch
 
         return $this->json([
-            'unread_count' => $this->service->unreadCount($user),
-            'latest_activity_at' => $this->service->latestActivityAt()?->toIso8601String(),
+            'unread_count' => $this->service->unreadCount($user, $channel),
+            'latest_activity_at' => $this->service->latestActivityAt($user, $channel)?->toIso8601String(),
         ]);
     }
 
@@ -65,7 +69,9 @@ final class CommandCommunicationController extends Controller
 
         $post = $this->service->post(
             $user,
-            CommandCommunicationPost::CONTEXT_COMMAND,
+            $this->channel($request) === CommandCommunicationPost::CHANNEL_CAPTAIN_5
+                ? CommandCommunicationPost::CONTEXT_CAPTAIN5
+                : CommandCommunicationPost::CONTEXT_COMMAND,
             $data['subject'] ?? null,
             (string) ($data['body'] ?? ''),
             $data['parent_id'] ?? null,
@@ -80,23 +86,49 @@ final class CommandCommunicationController extends Controller
     {
         $data = $request->validate(['pinned' => ['required', 'boolean']]);
         $user = $this->user($request);
-        $post = $this->service->findTopLevel($user, $publicId);
+        $channel = $this->channel($request);
+        $post = $this->service->findTopLevel($user, $publicId, $channel);
         abort_if($post === null, 404);
 
-        $post = $this->service->setPinned($user, $post, (bool) $data['pinned']);
+        $post = $this->service->setPinned($user, $post, (bool) $data['pinned'], $channel);
 
         return $this->json(['data' => $this->presenter->post($post, $user)]);
+    }
+
+    /** Controlled removal: the author or a communications administrator, with a required reason. */
+    public function destroy(Request $request, string $publicId): JsonResponse
+    {
+        $data = $request->validate(['reason' => ['required', 'string', 'min:3', 'max:500']]);
+        $user = $this->user($request);
+        $channel = $this->channel($request);
+        $post = $this->service->find($user, $publicId, $channel);
+        abort_if($post === null, 404);
+
+        $post = $this->service->delete($user, $post, $data['reason'], $channel);
+
+        return $this->json(['data' => $this->presenter->post($post, $user, $post->parent_id === null)]);
     }
 
     public function read(Request $request): JsonResponse
     {
         $user = $this->user($request);
-        $readAt = $this->service->markRead($user);
+        $channel = $this->channel($request);
+        $readAt = $this->service->markRead($user, $channel);
 
         return $this->json([
-            'unread_count' => $this->service->unreadCount($user),
+            'unread_count' => $this->service->unreadCount($user, $channel),
             'last_read_at' => $readAt->toIso8601String(),
         ]);
+    }
+
+    /** The channel this route group serves: the route default, else the 300 channel. */
+    private function channel(Request $request): string
+    {
+        $channel = $request->route('channel');
+
+        return $channel === CommandCommunicationPost::CHANNEL_CAPTAIN_5
+            ? CommandCommunicationPost::CHANNEL_CAPTAIN_5
+            : CommandCommunicationPost::CHANNEL_COMMAND_300;
     }
 
     private function user(Request $request): User

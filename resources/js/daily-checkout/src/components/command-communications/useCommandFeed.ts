@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isApiAuthenticationError, redirectToLoginAfterSessionExpiry, ApiRequestError } from '../../utils/api';
 import {
-  fetchCommandPosts, fetchCommandSummary, isForbiddenError, markCommandPostsRead, setCommandPostPinned,
+  deleteCommandPost, fetchCommandPosts, fetchCommandSummary, isForbiddenError, markCommandPostsRead, setCommandPostPinned,
 } from '../../utils/commandCommunicationsApi';
-import { appendOlder, insertPost, isDisconnected, mergeFirstPage, replaceTopLevel, withPinned } from './feedMerge';
-import type { CommandPost } from './types';
+import { appendOlder, applyRemoval, insertPost, isDisconnected, mergeFirstPage, replaceTopLevel, withPinned } from './feedMerge';
+import { DEFAULT_CHANNEL, type CommandChannel, type CommandPost } from './types';
 
 const POLL_MS = 20_000;
 const MAX_BACKOFF_MS = 300_000;
@@ -31,6 +31,8 @@ interface FeedOptions {
   enabled: boolean;
   onDenied: () => void;
   isVisible: boolean;
+  /** Which feed this is; the 300 channel unless a page says otherwise. */
+  channel?: CommandChannel;
 }
 
 /**
@@ -38,7 +40,7 @@ interface FeedOptions {
  * active, backs off exponentially (up to 5 minutes) on failure, and refreshes the moment the
  * page becomes visible again. The state lives with the caller, so switching tabs keeps it.
  */
-export function useCommandFeed({ active, enabled, onDenied, isVisible }: FeedOptions) {
+export function useCommandFeed({ active, enabled, onDenied, isVisible, channel = DEFAULT_CHANNEL }: FeedOptions) {
   const [state, setState] = useState<FeedState>(INITIAL);
   const [loadingEarlier, setLoadingEarlier] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -68,7 +70,7 @@ export function useCommandFeed({ active, enabled, onDenied, isVisible }: FeedOpt
     if (inFlight.current) return inFlight.current;
     const run = (async () => {
       try {
-        const page = await fetchCommandPosts({ limit: PAGE_SIZE });
+        const page = await fetchCommandPosts({ limit: PAGE_SIZE, channel });
         setState((current) => {
           const keepOlder = current.olderLoaded && page.next_before !== null && !isDisconnected(current.posts, page);
           return {
@@ -92,17 +94,17 @@ export function useCommandFeed({ active, enabled, onDenied, isVisible }: FeedOpt
     })();
     inFlight.current = run;
     return run;
-  }, [settleTerminal]);
+  }, [channel, settleTerminal]);
 
   // Seed the Communications badge when the page opens on a station tab (one cheap request).
   const seeded = useRef(false);
   useEffect(() => {
     if (seeded.current || active || !enabled) return;
     seeded.current = true;
-    fetchCommandSummary()
+    fetchCommandSummary(channel)
       .then((summary) => setState((current) => (current.status === 'loading' ? { ...current, unreadCount: summary.unread_count } : current)))
       .catch((error) => { settleTerminal(error); });
-  }, [active, enabled, settleTerminal]);
+  }, [active, channel, enabled, settleTerminal]);
 
   useEffect(() => {
     if (!enabled || !active || !isVisible || stopped.current) return undefined;
@@ -137,7 +139,7 @@ export function useCommandFeed({ active, enabled, onDenied, isVisible }: FeedOpt
     setLoadingEarlier(true);
     setActionError(null);
     try {
-      const page = await fetchCommandPosts({ before, limit: PAGE_SIZE });
+      const page = await fetchCommandPosts({ before, limit: PAGE_SIZE, channel });
       setState((current) => ({ ...current, posts: appendOlder(current.posts, page.data), nextBefore: page.next_before, olderLoaded: true }));
       return true;
     } catch (error) {
@@ -146,26 +148,26 @@ export function useCommandFeed({ active, enabled, onDenied, isVisible }: FeedOpt
     } finally {
       setLoadingEarlier(false);
     }
-  }, [settleTerminal]);
+  }, [channel, settleTerminal]);
 
   const markRead = useCallback(async () => {
     if (readInFlight.current) return;
     readInFlight.current = true;
     try {
-      const receipt = await markCommandPostsRead();
+      const receipt = await markCommandPostsRead(channel);
       setState((current) => ({ ...current, unreadCount: receipt.unread_count }));
     } catch (error) {
       settleTerminal(error);
     } finally {
       readInFlight.current = false;
     }
-  }, [settleTerminal]);
+  }, [channel, settleTerminal]);
 
   const setPinned = useCallback(async (post: CommandPost, pinned: boolean) => {
     setPinBusyId(post.id);
     setActionError(null);
     try {
-      const updated = await setCommandPostPinned(post.id, pinned);
+      const updated = await setCommandPostPinned(post.id, pinned, channel);
       setState((current) => ({ ...current, posts: replaceTopLevel(current.posts, updated), pinned: withPinned(current.pinned, updated) }));
     } catch (error) {
       if (isApiAuthenticationError(error)) settleTerminal(error);
@@ -173,13 +175,28 @@ export function useCommandFeed({ active, enabled, onDenied, isVisible }: FeedOpt
     } finally {
       setPinBusyId(null);
     }
-  }, [settleTerminal]);
+  }, [channel, settleTerminal]);
+
+  /** Removes a message with a required reason. Resolves null on success, else the message to show beside the prompt. */
+  const removePost = useCallback(async (post: CommandPost, reason: string): Promise<string | null> => {
+    try {
+      const tombstone = await deleteCommandPost(post.id, reason, channel);
+      setState((current) => ({ ...current, posts: applyRemoval(current.posts, tombstone), pinned: withPinned(current.pinned, tombstone) }));
+      return null;
+    } catch (error) {
+      if (isApiAuthenticationError(error)) {
+        settleTerminal(error);
+        return 'Your sign-in expired.';
+      }
+      return messageOf(error, 'The message could not be removed. Try again.');
+    }
+  }, [channel, settleTerminal]);
 
   const addPost = useCallback((post: CommandPost) => {
     setState((current) => ({ ...current, posts: insertPost(current.posts, post), status: 'ready', error: null }));
   }, []);
 
-  return { ...state, loadingEarlier, actionError, pinBusyId, refresh, loadEarlier, markRead, setPinned, addPost };
+  return { ...state, loadingEarlier, actionError, pinBusyId, refresh, loadEarlier, markRead, setPinned, removePost, addPost };
 }
 
 export type CommandFeed = ReturnType<typeof useCommandFeed>;

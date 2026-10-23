@@ -371,7 +371,7 @@ final class CommandCommunicationApiTest extends TestCase
         $this->postJson('/api/command-communications/posts', ['body' => 'Shape', 'client_submission_id' => 'shape-00001'])->assertCreated();
 
         $post = $this->getJson('/api/command-communications/posts')->json('data.0');
-        $this->assertEqualsCanonicalizing(['id', 'parent_id', 'subject', 'body', 'author', 'is_mine', 'created_at', 'pinned', 'attachments', 'replies'], array_keys($post));
+        $this->assertEqualsCanonicalizing(['id', 'parent_id', 'audience', 'subject', 'body', 'author', 'is_mine', 'created_at', 'pinned', 'deleted', 'removed', 'can_delete', 'attachments', 'replies'], array_keys($post));
         $this->assertEqualsCanonicalizing(['name', 'rank', 'side'], array_keys($post['author']));
         $this->assertStringNotContainsString($user->email, json_encode($post, JSON_THROW_ON_ERROR));
     }

@@ -76,3 +76,48 @@ test("access gating reads the server capability and 403 is distinct from network
   assert.match(page, /isForbiddenError\(err\)/);
   assert.match(page, /<AccessDenied \/>/);
 });
+
+test("the panel is channel-aware and the 300 channel stays the default", () => {
+  const api = read("utils/commandCommunicationsApi.ts");
+  assert.match(api, /command_300: '\/api\/command-communications'/);
+  assert.match(api, /captain_5: '\/api\/captain5\/communications'/);
+  for (const fn of ["fetchCommandPosts", "fetchCommandSummary", "setCommandPostPinned", "markCommandPostsRead", "deleteCommandPost", "sendCommandPost"]) {
+    assert.match(api, new RegExp(`${fn}[\\s\\S]{0,260}channel(?:: CommandChannel)? = DEFAULT_CHANNEL`), `${fn} must default to the 300 channel`);
+  }
+  const hook = read("components/command-communications/useCommandCommunications.ts");
+  assert.match(hook, /channel = DEFAULT_CHANNEL/);
+  assert.match(hook, /\}, setProgress, channel\)/, "the send goes to the hook's channel");
+  const feed = read("components/command-communications/useCommandFeed.ts");
+  assert.match(feed, /fetchCommandPosts\(\{ limit: PAGE_SIZE, channel \}\)/);
+  assert.match(feed, /markCommandPostsRead\(channel\)/);
+  assert.match(feed, /setCommandPostPinned\(post\.id, pinned, channel\)/);
+  const panel = read("components/command-communications/CommunicationsPanel.tsx");
+  assert.match(panel, /channel = comms\.channel \?\? DEFAULT_CHANNEL/);
+  assert.match(panel, /CHANNEL_COPY\[channel\]/);
+});
+
+test("the Command 300 page keeps using the unchanged 300 channel", () => {
+  const page = read("components/Command300Page.tsx");
+  assert.doesNotMatch(page, /captain_5|captain5/, "the 300 page must not point at the Captain 5 channel");
+  const card = read("components/Command300Card.tsx");
+  assert.doesNotMatch(card, /captain_5|captain5/);
+});
+
+test("removal needs a reason, uses DELETE, and removed messages render as tombstones", () => {
+  const api = read("utils/commandCommunicationsApi.ts");
+  assert.match(api, /method: 'DELETE'/);
+  assert.match(api, /JSON\.stringify\(\{ reason \}\)/);
+  const control = read("components/command-communications/RemoveControl.tsx");
+  assert.match(control, /reason\.trim\(\)\.length < MIN_REASON/);
+  const post = read("components/command-communications/PostItem.tsx");
+  assert.match(post, /post\.deleted \? <Tombstone/);
+  assert.match(post, /reply\.deleted \? <Tombstone/);
+  assert.match(post, /post\.can_delete && onRemove/);
+  assert.match(post, /!post\.parent_id && post\.audience === 'both'/, "the audience badge shows on shared (Both) posts only");
+  // A tombstone shows who removed it, never the original text.
+  const tombstone = /function Tombstone[\s\S]*?\n}\n/.exec(post)?.[0] ?? "";
+  assert.match(tombstone, /post\.removed\?\.by/);
+  assert.doesNotMatch(tombstone, /post\.body|post\.subject/);
+  const normalizer = read("utils/commandCommunicationsApi.ts");
+  assert.match(normalizer, /can_delete: item\.can_delete === true && item\.deleted !== true/);
+});

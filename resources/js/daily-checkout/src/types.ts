@@ -418,6 +418,7 @@ export const BUNDLED_IMAGE_SIZES: Record<string, ImageSize> = {
   '/images/stations/station-4.webp': { width: 1200, height: 680 },
   '/images/stations/station-6.webp': { width: 1200, height: 506 },
   '/images/stations/command-300-wide.webp': { width: 1200, height: 800 },
+  '/images/stations/captain-5-wide.webp': { width: 1200, height: 800 },
 };
 
 /** Size of a bundled image; null for an uploaded photo whose dimensions are unknown. */
@@ -438,6 +439,9 @@ export function stationImageUrl(station: Pick<Station, 'station_number' | 'image
 /** 300 Command is a unit profile, not a station row: it never has a station id or number.
  *  3:2 framing of the command SUV with margin on every side, so the cover crop used from xl up never clips the vehicle. */
 export const COMMAND_300_IMAGE = '/images/stations/command-300-wide.webp';
+
+/** Captain 5 (EMS Operations) is an operations workspace, not a station: same 3:2 framing as the command image. */
+export const CAPTAIN_5_IMAGE = '/images/stations/captain-5-wide.webp';
 export interface CommandOverviewApparatus {
   id: number;
   name: string | null;

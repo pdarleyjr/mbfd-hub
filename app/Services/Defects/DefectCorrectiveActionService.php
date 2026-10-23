@@ -11,11 +11,15 @@ use App\Models\ApparatusDefectObservation;
 use App\Models\ApparatusIssueMessage;
 use App\Models\User;
 use App\Services\ApparatusDefectServiceTicketService;
+use App\Services\Captain5\Captain5ActorContext;
+use App\Services\Captain5\Captain5IssueScope;
+use App\Services\Captain5\Captain5Notifier;
 use App\Services\Inspections\InspectionNotificationDispatcher;
 use App\Support\Fleet\DefectActionStatus;
 use App\Support\Fleet\PostgresLockRetry;
 use Carbon\Carbon;
 use Closure;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
@@ -41,6 +45,10 @@ use Illuminate\Validation\ValidationException;
  *    administrators resolving together produce one resolved event).
  *
  * Internal notes live only on the event row and are never copied to a message or notification.
+ *
+ * forCaptain5() returns a copy for the Captain 5 EMS Operations Center: the same engine, but
+ * authorized by Captain 5 scope and operation (docs/captain5-ems-operations-center.md section 5)
+ * instead of the reviewer rule, with the acting authority snapshotted on every event.
  */
 final class DefectCorrectiveActionService
 {
@@ -67,11 +75,73 @@ final class DefectCorrectiveActionService
 
     private const RESOLVING_EVENTS = ['resolved', 'correction_verified'];
 
+    private ?Captain5ActorContext $captain5 = null;
+
+    private ?string $expectedState = null;
+
     public function __construct(
         private readonly DefectParticipants $participants,
         private readonly InspectionNotificationDispatcher $notifications,
         private readonly ApparatusDefectServiceTicketService $tickets,
+        private readonly Captain5IssueScope $captain5Scope,
+        private readonly Captain5Notifier $captain5Notifier,
     ) {}
+
+    /** A copy that acts as Captain 5 under the given authority snapshot. */
+    public function forCaptain5(Captain5ActorContext $context): self
+    {
+        $copy = clone $this;
+        $copy->captain5 = $context;
+
+        return $copy;
+    }
+
+    /**
+     * A copy that refuses to act unless the issue is still in the state the caller saw
+     * (optimistic concurrency: `{action_status}:{last event id}`). A mismatch throws
+     * StaleDefectStateException before anything is written.
+     */
+    public function expectingState(?string $stateToken): self
+    {
+        $copy = clone $this;
+        $copy->expectedState = $stateToken === null || trim($stateToken) === '' ? null : trim($stateToken);
+
+        return $copy;
+    }
+
+    /** Current concurrency token of an issue. */
+    public static function stateToken(ApparatusDefect $defect): string
+    {
+        $lastEvent = (int) ApparatusDefectEvent::query()->where('apparatus_defect_id', $defect->getKey())->max('id');
+
+        return ($defect->action_status ?: DefectActionStatus::REPORTED).':'.$lastEvent;
+    }
+
+    /**
+     * Reviewers: the unchanged class-level rule, checked before the id is looked up.
+     * Captain 5: the operation must be one Captain 5 may perform and the issue must be in
+     * Captain 5 scope; anything else (including an unknown id) is the same "not available".
+     */
+    private function authorizedProbe(string $operation, int $defectId, User $actor): ApparatusDefect
+    {
+        if ($this->captain5 === null) {
+            Gate::forUser($actor)->authorize('manageCorrectiveAction', ApparatusDefect::class);
+
+            return ApparatusDefect::query()->findOrFail($defectId);
+        }
+
+        if (! $this->captain5->mayPerform($operation)) {
+            throw new AuthorizationException($operation === 'dismiss'
+                ? 'Only the on-duty Captain 5, the EMS Captain or Logistics can dismiss an issue.'
+                : 'Captain 5 cannot perform this action.');
+        }
+        $probe = ApparatusDefect::query()->find($defectId);
+        if ($probe === null || ! $this->captain5Scope->inScope($probe)) {
+            throw new AuthorizationException('Not available.');
+        }
+
+        return $probe;
+    }
 
     /** @param array{member_message?: ?string, internal_note?: ?string} $data */
     public function acknowledge(int $defectId, User $actor, array $data = [], ?string $idempotencyKey = null): ApparatusDefect
@@ -117,6 +187,11 @@ final class DefectCorrectiveActionService
             ...$this->messageRules(),
         ]);
         $details = $this->normalizeDetails($data['details'] ?? []);
+        if ($this->captain5 !== null && array_diff(array_keys($details), Captain5ActorContext::DETAIL_KEYS) !== []) {
+            throw ValidationException::withMessages([
+                'details' => 'Captain 5 can record ordering, vendor reference, expected delivery and pickup details only.',
+            ]);
+        }
 
         return $this->run('update_action', $defectId, $actor, $idempotencyKey, false, function (ApparatusDefect $defect) use ($actor, $data, $details): ?array {
             $this->assertOpen($defect);
@@ -378,13 +453,14 @@ final class DefectCorrectiveActionService
         if ($idempotencyKey !== null && (trim($idempotencyKey) === '' || mb_strlen($idempotencyKey) > 48)) {
             throw ValidationException::withMessages(['idempotency_key' => 'The idempotency key must be 1 to 48 characters.']);
         }
-        Gate::forUser($actor)->authorize('manageCorrectiveAction', ApparatusDefect::class);
-        $probe = ApparatusDefect::query()->findOrFail($defectId);
+        $probe = $this->authorizedProbe($operation, $defectId, $actor);
         // Scoped to the defect AND the operation, so one form-load key cannot turn a later,
         // different action into a silent no-op. Longest case stays under the 100-char column.
         $storedKey = $idempotencyKey === null ? null : 'defect:'.$defectId.':'.$operation.':'.$idempotencyKey;
+        $captain5 = $this->captain5;
+        $expectedState = $this->expectedState;
 
-        return PostgresLockRetry::run(fn (): ApparatusDefect => DB::transaction(function () use ($probe, $actor, $storedKey, $lockApparatusFirst, $mutate): ApparatusDefect {
+        return PostgresLockRetry::run(fn (): ApparatusDefect => DB::transaction(function () use ($probe, $actor, $storedKey, $lockApparatusFirst, $mutate, $captain5, $expectedState): ApparatusDefect {
             if ($lockApparatusFirst) {
                 Apparatus::query()->lockForUpdate()->find($probe->apparatus_id);
             }
@@ -393,10 +469,16 @@ final class DefectCorrectiveActionService
             if ($storedKey !== null && ApparatusDefectEvent::query()->where('idempotency_key', $storedKey)->exists()) {
                 return $defect; // a retry of an action that already took effect
             }
+            if ($expectedState !== null && ! hash_equals(self::stateToken($defect), $expectedState)) {
+                throw new StaleDefectStateException($defect);
+            }
 
             $spec = $mutate($defect);
             if ($spec === null) {
                 return $defect->refresh();
+            }
+            if ($captain5 !== null) {
+                $spec['details']['actor_context'] = $captain5->toAudit();
             }
 
             $event = ApparatusDefectEvent::query()->create([
@@ -417,14 +499,17 @@ final class DefectCorrectiveActionService
                     'apparatus_inspection_id' => null,
                     'apparatus_defect_id' => $defect->getKey(),
                     'author_user_id' => $actor->getKey(),
-                    'author_context' => ApparatusIssueMessage::CONTEXT_LOGISTICS,
+                    'author_context' => $captain5 !== null ? ApparatusIssueMessage::CONTEXT_CAPTAIN5 : ApparatusIssueMessage::CONTEXT_LOGISTICS,
                     'visibility' => ApparatusIssueMessage::VISIBILITY_MEMBER,
                     'body' => $spec['member_message'],
                 ]);
             }
 
             $defect->refresh();
-            if (in_array($spec['type'], self::RESOLVING_EVENTS, true)) {
+            if ($captain5 !== null) {
+                $this->participants->enroll($defect, $actor, 'captain5');
+                $this->captain5Notifier->issueUpdated($defect, $event);
+            } elseif (in_array($spec['type'], self::RESOLVING_EVENTS, true)) {
                 $this->notifications->issueResolved($defect, $event);
             } elseif ($spec['member_message'] !== null) {
                 $this->notifications->issueMemberUpdate($defect, $event);

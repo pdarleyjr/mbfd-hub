@@ -320,4 +320,57 @@ Route::prefix('command-communications')
         Route::post('/posts/{publicId}/pin', [\App\Http\Controllers\Api\CommandCommunicationController::class, 'pin'])
             ->where('publicId', '[0-9A-Za-z]{26}')->name('posts.pin');
         Route::post('/read', [\App\Http\Controllers\Api\CommandCommunicationController::class, 'read'])->name('read');
+        Route::delete('/posts/{publicId}', [\App\Http\Controllers\Api\CommandCommunicationController::class, 'destroy'])
+            ->where('publicId', '[0-9A-Za-z]{26}')->middleware('throttle:30,1,command-communications-delete')->name('posts.destroy');
+    });
+
+// The same conversation as seen from the Captain 5 page: the `captain_5` channel of the shared
+// posts (audience captain_5 or both). Same controller and service; only the gate and channel differ.
+Route::prefix('captain5/communications')
+    ->middleware(['auth:sanctum', 'canonical.api', 'can:'.\App\Services\Security\Captain5Access::GATE_VIEW, 'throttle:120,1'])
+    ->name('api.captain5.communications.')
+    ->controller(\App\Http\Controllers\Api\CommandCommunicationController::class)
+    ->group(function () {
+        Route::get('/posts', 'index')->defaults('channel', 'captain_5')->name('posts.index');
+        Route::get('/summary', 'summary')->defaults('channel', 'captain_5')->name('summary');
+        Route::post('/posts', 'store')->defaults('channel', 'captain_5')
+            ->middleware('throttle:30,1,captain5-communications-post')->name('posts.store');
+        Route::post('/posts/{publicId}/pin', 'pin')->defaults('channel', 'captain_5')
+            ->where('publicId', '[0-9A-Za-z]{26}')->name('posts.pin');
+        Route::delete('/posts/{publicId}', 'destroy')->defaults('channel', 'captain_5')
+            ->where('publicId', '[0-9A-Za-z]{26}')->middleware('throttle:30,1,captain5-communications-delete')->name('posts.destroy');
+        Route::post('/read', 'read')->defaults('channel', 'captain_5')->name('read');
+    });
+
+// =========================================================================
+// Captain 5 EMS Operations Center (docs/captain5-ems-operations-center.md).
+// The group needs `captain5-view`; every mutation re-checks its own
+// capability (act / dismiss / manage assignments) in the service layer.
+// =========================================================================
+// Card probe for the station list: every signed-in member gets 200 (view:false when not eligible),
+// so ineligible members never see a 403 in their console. It returns no Captain 5 data to them.
+Route::get('captain5/summary', [\App\Http\Controllers\Api\Captain5Controller::class, 'summary'])
+    ->middleware(['auth:sanctum', 'canonical.api', 'throttle:120,1'])
+    ->name('api.captain5.summary');
+
+Route::prefix('captain5')
+    ->middleware(['auth:sanctum', 'canonical.api', 'can:'.\App\Services\Security\Captain5Access::GATE_VIEW, 'throttle:120,1'])
+    ->name('api.captain5.')
+    ->controller(\App\Http\Controllers\Api\Captain5Controller::class)
+    ->group(function () {
+        Route::get('/workspace', 'overview')->name('workspace');
+        Route::get('/issues', 'issues')->name('issues.index');
+        Route::get('/issues/{defect}', 'issue')->whereNumber('defect')->name('issues.show');
+        Route::post('/issues/{defect}/actions', 'act')->whereNumber('defect')
+            ->middleware('throttle:60,1,captain5-actions')->name('issues.act');
+        Route::post('/issues/{defect}/messages', 'message')->whereNumber('defect')
+            ->middleware('throttle:30,1,captain5-messages')->name('issues.message');
+        Route::get('/inspections/{inspection}', 'inspection')->whereNumber('inspection')->name('inspections.show');
+        Route::post('/inspections/{inspection}/clarification', 'clarification')->whereNumber('inspection')
+            ->middleware('throttle:30,1,captain5-messages')->name('inspections.clarification');
+        Route::post('/handoff', 'writeHandoff')->name('handoff.store');
+        Route::post('/handoff/{note}/acknowledge', 'acknowledgeHandoff')->whereNumber('note')->name('handoff.acknowledge');
+        Route::post('/assignments', 'assign')->name('assignments.store');
+        Route::post('/assignments/{assignment}/revoke', 'revokeAssignment')->whereNumber('assignment')->name('assignments.revoke');
+        Route::get('/people', 'people')->middleware('throttle:30,1,captain5-people')->name('people');
     });

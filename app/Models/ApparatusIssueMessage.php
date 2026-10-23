@@ -21,6 +21,12 @@ final class ApparatusIssueMessage extends Model
 
     public const CONTEXT_MEMBER = 'member';
 
+    /** Captain 5 EMS Operations Center (docs/captain5-ems-operations-center.md). */
+    public const CONTEXT_CAPTAIN5 = 'captain5';
+
+    /** Contexts that speak for the department (Logistics or Captain 5), not for a crew member. */
+    public const STAFF_CONTEXTS = [self::CONTEXT_LOGISTICS, self::CONTEXT_CAPTAIN5];
+
     protected $guarded = ['id'];
 
     protected static function booted(): void
@@ -37,6 +43,22 @@ final class ApparatusIssueMessage extends Model
     public function isFromLogistics(): bool
     {
         return $this->author_context === self::CONTEXT_LOGISTICS;
+    }
+
+    /** Logistics or Captain 5 (the department speaking to members). */
+    public function scopeFromStaff(Builder $query): Builder
+    {
+        return $query->whereIn('author_context', self::STAFF_CONTEXTS);
+    }
+
+    public function isFromCaptain5(): bool
+    {
+        return $this->author_context === self::CONTEXT_CAPTAIN5;
+    }
+
+    public function isFromStaff(): bool
+    {
+        return in_array($this->author_context, self::STAFF_CONTEXTS, true);
     }
 
     public function scopeMemberVisible(Builder $query): Builder

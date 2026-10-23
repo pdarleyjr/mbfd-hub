@@ -11,6 +11,8 @@ interface ComposerProps {
   comms: CommandCommunications;
   offline: boolean;
   textareaRef: RefObject<HTMLTextAreaElement | null>;
+  /** Wording for a new top-level message (differs per channel). */
+  placeholder?: string;
 }
 
 function SendProgress({ progress }: { progress: number | null }) {
@@ -26,7 +28,7 @@ function SendProgress({ progress }: { progress: number | null }) {
   );
 }
 
-export default function Composer({ comms, offline, textareaRef }: ComposerProps) {
+export default function Composer({ comms, offline, textareaRef, placeholder = 'Write a message to 300 Command and Administration' }: ComposerProps) {
   const { controls, sending, progress, sendError, canSend, send } = comms;
   const { draft } = controls;
   const fileInput = useRef<HTMLInputElement>(null);
@@ -86,7 +88,7 @@ export default function Composer({ comms, offline, textareaRef }: ComposerProps)
         ref={textareaRef}
         rows={2}
         aria-label={draft.replyTo ? `Reply to ${draft.replyTo.label}` : 'Message'}
-        placeholder={draft.replyTo ? 'Write a reply' : 'Write a message to 300 Command and Administration'}
+        placeholder={draft.replyTo ? 'Write a reply' : placeholder}
         className={`${FIELD} block min-h-[3.25rem] max-h-40 resize-none overflow-y-auto`}
         value={draft.body}
         onChange={(event) => controls.setBody(event.target.value)}

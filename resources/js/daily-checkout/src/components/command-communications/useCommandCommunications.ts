@@ -2,6 +2,7 @@ import { useCallback, useState } from 'react';
 import { ApiRequestError, isApiAuthenticationError, redirectToLoginAfterSessionExpiry } from '../../utils/api';
 import { sendCommandPost } from '../../utils/commandCommunicationsApi';
 import { useCommandDraft } from './useCommandDraft';
+import { DEFAULT_CHANNEL, type CommandChannel } from './types';
 import { useCommandFeed } from './useCommandFeed';
 import { usePageVisible } from './usePageClock';
 
@@ -9,6 +10,8 @@ interface Options {
   active: boolean;
   enabled: boolean;
   onDenied: () => void;
+  /** `command_300` (default, the 300 page) or `captain_5` (the Captain 5 page's Messages tab). */
+  channel?: CommandChannel;
 }
 
 /**
@@ -16,9 +19,9 @@ interface Options {
  * after the server answers 200/201; on failure the text, files and submission id are kept so
  * Retry sends the identical request.
  */
-export function useCommandCommunications({ active, enabled, onDenied }: Options) {
+export function useCommandCommunications({ active, enabled, onDenied, channel = DEFAULT_CHANNEL }: Options) {
   const isVisible = usePageVisible();
-  const feed = useCommandFeed({ active, enabled, onDenied, isVisible });
+  const feed = useCommandFeed({ active, enabled, onDenied, isVisible, channel });
   const controls = useCommandDraft();
   const { draft, markAttempt, reset } = controls;
   const [sending, setSending] = useState(false);
@@ -41,7 +44,7 @@ export function useCommandCommunications({ active, enabled, onDenied }: Options)
         parentId: draft.replyTo?.id ?? null,
         clientSubmissionId: draft.submissionId,
         files: draft.files,
-      }, setProgress);
+      }, setProgress, channel);
       addPost(post);
       reset();
       setSentCount((count) => count + 1);
@@ -58,9 +61,9 @@ export function useCommandCommunications({ active, enabled, onDenied }: Options)
       setSending(false);
       setProgress(null);
     }
-  }, [addPost, canSend, draft, markAttempt, refresh, reset]);
+  }, [addPost, canSend, channel, draft, markAttempt, refresh, reset]);
 
-  return { feed, controls, sending, progress, sendError, sentCount, canSend, send, isVisible };
+  return { channel, feed, controls, sending, progress, sendError, sentCount, canSend, send, isVisible };
 }
 
 export type CommandCommunications = ReturnType<typeof useCommandCommunications>;

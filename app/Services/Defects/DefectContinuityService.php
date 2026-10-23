@@ -570,10 +570,10 @@ final class DefectContinuityService
             return [];
         }
         $candidates = new Collection;
-        // Only Logistics speaks to the whole crew: a reply written by another member is never
-        // shown here. "Logistics" is the author context snapshotted when the message was written,
-        // so later role changes cannot relabel history.
-        ApparatusIssueMessage::query()->whereIn('apparatus_defect_id', $defectIds)->memberVisible()->fromLogistics()
+        // Only the department (Logistics or Captain 5) speaks to the whole crew: a reply written by
+        // another member is never shown here. The author context is snapshotted when the message was
+        // written, so later role changes cannot relabel history.
+        ApparatusIssueMessage::query()->whereIn('apparatus_defect_id', $defectIds)->memberVisible()->fromStaff()
             ->get(['id', 'apparatus_defect_id', 'body', 'created_at'])
             ->each(fn ($message) => $candidates->push(['defect' => (int) $message->apparatus_defect_id, 'text' => (string) $message->body, 'at' => $message->created_at, 'order' => 'm'.str_pad((string) $message->id, 12, '0', STR_PAD_LEFT)]));
         ApparatusDefectEvent::query()->whereIn('apparatus_defect_id', $defectIds)->whereNotNull('member_message')

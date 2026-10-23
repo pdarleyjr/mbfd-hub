@@ -3,6 +3,7 @@
 namespace App\Providers\Filament;
 
 use App\Filament\Admin\Pages\BidAccessPin;
+use App\Filament\Admin\Pages\Captain5Operations;
 use App\Filament\Admin\Pages\CommandCommunications;
 use App\Filament\Admin\Pages\EquipmentIntake;
 use App\Filament\Admin\Pages\KnowledgeBase;
@@ -93,6 +94,7 @@ class AdminPanelProvider extends PanelProvider
                 // Dashboard discovered from app/Filament/Pages and made /admin
                 // ambiguous at runtime.
                 Dashboard::class,
+                Captain5Operations::class,
                 CommandCommunications::class,
                 CommunicationsUsage::class,
                 ComposeEmail::class,

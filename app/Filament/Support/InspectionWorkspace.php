@@ -26,6 +26,7 @@ use App\Models\User;
 use App\Services\Inspections\EmployeeInspectionHistoryService;
 use App\Services\Inspections\IssueMessageService;
 use App\Services\Inventory\InventoryCorrectionReason;
+use App\Support\Captain5\EventActorLabel;
 use App\Support\Fleet\DefectActionStatus;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -570,7 +571,7 @@ final class InspectionWorkspace
                 $label = self::EVENT_LABELS[$event->event_type] ?? str((string) $event->event_type)->replace('_', ' ')->headline()->toString();
                 $item = (string) ($names->get($event->apparatus_defect_id) ?? 'equipment issue');
                 $push($event->created_at, 'defect', $label.': '.$item, [
-                    'actor' => $event->actor?->name,
+                    'actor' => EventActorLabel::for($event),
                     'body' => filled($event->member_message) ? 'Message to member: '.$event->member_message : null,
                     'anchor' => 'issue-'.$event->apparatus_defect_id,
                 ]);
@@ -605,10 +606,14 @@ final class InspectionWorkspace
         return $items;
     }
 
-    /** Logistics replies are labelled as Logistics (with the staff name for accountability); members by their own name. */
+    /** Logistics and Captain 5 replies carry their context (with the staff name for accountability); members their own name. */
     private function authorLabel(ApparatusIssueMessage $message): string
     {
         $name = trim((string) (data_get($message, 'author.display_name') ?: data_get($message, 'author.name')));
+
+        if ($message->isFromCaptain5()) {
+            return $name !== '' ? 'Captain 5 · '.$name : 'Captain 5';
+        }
 
         return $message->isFromLogistics()
             ? ($name !== '' ? 'Logistics · '.$name : 'Logistics')

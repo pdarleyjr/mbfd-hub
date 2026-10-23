@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Services\Captain5\Captain5Notifier;
 use App\Services\Inspections\InspectionNotificationDispatcher;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -55,7 +56,9 @@ final class RetryInspectionNotifications extends Command
             }
 
             try {
-                $delivered = $dispatcher->redeliver((string) $row->event_key, (string) $row->notification_type, (int) $row->recipient_user_id);
+                $delivered = str_starts_with((string) $row->event_key, 'captain5:')
+                    ? app(Captain5Notifier::class)->redeliver((string) $row->event_key, (string) $row->notification_type, (int) $row->recipient_user_id)
+                    : $dispatcher->redeliver((string) $row->event_key, (string) $row->notification_type, (int) $row->recipient_user_id);
             } catch (Throwable $exception) {
                 $delivered = false;
                 Log::error('Inspection notification retry crashed', ['ledger_id' => $row->id, 'exception' => $exception->getMessage()]);
