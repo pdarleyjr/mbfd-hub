@@ -9,6 +9,7 @@ use App\Filament\Employee\Pages\MyInventoryCorrectionView;
 use App\Filament\Resources\InventoryCorrectionResource;
 use App\Models\ApparatusInventoryChange;
 use App\Models\ApparatusInventoryCorrection;
+use App\Services\Inventory\InventoryCorrectionService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -69,8 +70,14 @@ final class InventoryCorrectionSecurityTest extends TestCase
         $this->assertRefused(fn () => $this->service()->preview($correction->id, $this->member, ['op' => 'remove'], 'unit'), AuthorizationException::class);
         $this->assertRefused(fn () => $this->service()->approve($correction->id, $this->member, ['op' => 'remove'], 'unit', [$this->units['E1']->id], 'x', null, (string) Str::uuid()), AuthorizationException::class);
 
-        $this->get(MyInventoryCorrectionView::getUrl(['correction' => $correction->id], panel: 'employee'))->assertForbidden();
-        $this->get(route('inventory-corrections.photo', $correction))->assertForbidden();
+        $this->get(MyInventoryCorrectionView::getUrl(['correction' => $correction->id], panel: 'employee'))->assertNotFound();
+        $this->get(route('inventory-corrections.photo', $correction))->assertNotFound();
+        $this->getJson("/api/public/apparatuses/{$this->units['E1']->id}/checklist")->assertOk()
+            ->assertJsonPath('pending_corrections.0.id', null)
+            ->assertJsonPath('pending_corrections.0.reason', null)
+            ->assertJsonPath('pending_corrections.0.status', 'pending')
+            ->assertJsonPath('pending_corrections.0.mine', false)
+            ->assertJsonMissingPath('pending_corrections.0.reported_at');
         $this->get(InventoryCorrectionResource::getUrl('view', ['record' => $correction->id], panel: 'admin'))->assertForbidden();
         $this->assertSame('submitted', $correction->fresh()->status);
         $this->assertSame(0, ApparatusInventoryChange::query()->count());
@@ -147,6 +154,38 @@ final class InventoryCorrectionSecurityTest extends TestCase
 
         $this->assertRefused(fn () => $this->service()->reject($correction->id, $suspended->fresh(), 'no'), AuthorizationException::class);
         $this->assertSame('submitted', $correction->fresh()->status);
+    }
+
+    public function test_repeat_reports_are_merged_and_volume_is_capped(): void
+    {
+        $passports = $this->item('E1', 'Passports');
+        $report = ['reason' => 'no_longer_carried', 'compartment_id' => $passports['compartment_id'], 'item_id' => $passports['item_id']];
+        $first = $this->report('E1', $report)->assertCreated();
+        $this->report('E1', $report)->assertOk()->assertJsonPath('duplicate', true)->assertJsonPath('id', $first->json('id'));
+        $this->report('E1', ['reason' => 'new_item', 'compartment_id' => 'rear_cab', 'proposal' => ['name' => '<a href="https://x.example">Click</a>']])->assertUnprocessable();
+
+        $items = collect($this->resolved('E1')['checklist']['compartments'])->flatMap(fn (array $compartment) => collect($compartment['items'])
+            ->map(fn (array $item): array => ['compartment_id' => $compartment['id'], 'item_id' => $item['id']]))
+            ->reject(fn (array $target): bool => $target['item_id'] === $passports['item_id'])->values();
+        foreach ($items->slice(1, InventoryCorrectionService::MAX_OPEN_PER_MEMBER_AND_APPARATUS - 1) as $target) {
+            $this->report('E1', ['reason' => 'no_longer_carried', ...$target])->assertCreated();
+        }
+        $this->report('E1', ['reason' => 'no_longer_carried', ...$items[InventoryCorrectionService::MAX_OPEN_PER_MEMBER_AND_APPARATUS + 2]])->assertUnprocessable();
+        $this->assertSame(InventoryCorrectionService::MAX_OPEN_PER_MEMBER_AND_APPARATUS, ApparatusInventoryCorrection::query()->count());
+    }
+
+    public function test_an_idempotency_key_cannot_be_borrowed_across_corrections(): void
+    {
+        $passports = $this->item('E1', 'Passports');
+        $one = $this->reported('E1', ['reason' => 'no_longer_carried', 'compartment_id' => $passports['compartment_id'], 'item_id' => $passports['item_id']]);
+        $toughbook = $this->item('E1', 'Toughbook');
+        $two = $this->reported('E1', ['reason' => 'no_longer_carried', 'compartment_id' => $toughbook['compartment_id'], 'item_id' => $toughbook['item_id']]);
+        $key = (string) Str::uuid();
+        $this->service()->postMessage($one->id, $this->member, 'First.', 'member', $key);
+
+        $this->assertRefused(fn () => $this->service()->postMessage($two->id, $this->member, 'Second.', 'member', $key), ValidationException::class);
+        $this->assertRefused(fn () => $this->service()->postMessage($two->id, $this->member, 'Second.', 'member', str_repeat('a', 300)), ValidationException::class);
+        $this->assertSame(0, $two->events()->where('event_type', 'member_replied')->count());
     }
 
     /** @param class-string<\Throwable> $exception */

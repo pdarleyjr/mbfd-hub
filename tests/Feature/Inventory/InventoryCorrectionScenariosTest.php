@@ -77,6 +77,9 @@ final class InventoryCorrectionScenariosTest extends TestCase
         $this->assertSame($e3Before, $this->resolved('E3')['checklist_version'], 'E3 is untouched');
         $this->assertSame('front_cab', $this->item('E3', 'Binoculars')['compartment_id']);
         $this->assertSame('applied', $correction->fresh()->status);
+        $this->getJson("/api/public/apparatuses/{$this->units['E1']->id}/checklist")->assertOk()
+            ->assertJsonPath('open_findings.0.compartment_id', 'rear_cab')
+            ->assertJsonPath('open_findings.0.item_id', $binoculars['item_id']);
 
         // The same physical item reported missing again is the same issue, not a new one.
         $this->postJson("/api/public/apparatuses/{$this->units['E1']->id}/inspections", $this->inspectionPayload('E1', 'Binoculars'))->assertCreated();
@@ -358,25 +361,103 @@ final class InventoryCorrectionScenariosTest extends TestCase
 
     public function test_reversal_restores_the_previous_checklist_and_refuses_while_a_later_change_depends_on_it(): void
     {
+        $logistics = $this->logistics();
         $passports = $this->item('E1', 'Passports');
         $original = $this->resolved('E1')['checklist_version'];
-        $quantity = $this->reported('E1', ['reason' => 'wrong_quantity', 'compartment_id' => $passports['compartment_id'], 'item_id' => $passports['item_id'], 'proposal' => ['quantity' => 3]]);
-        $logistics = $this->logistics();
+        $target = ['compartment_id' => $passports['compartment_id'], 'item_id' => $passports['item_id']];
+
+        // Independent fields: either can be reversed first.
+        $quantity = $this->reported('E1', ['reason' => 'wrong_quantity', ...$target, 'proposal' => ['quantity' => 3]]);
         $this->approve($quantity, $logistics, ['op' => 'modify', 'fields' => ['expectedQuantity' => 3]]);
-        $rename = $this->reported('E1', ['reason' => 'wrong_description', 'compartment_id' => $passports['compartment_id'], 'item_id' => $passports['item_id'], 'proposal' => ['name' => 'Passports (crew)']]);
+        $rename = $this->reported('E1', ['reason' => 'wrong_description', ...$target, 'proposal' => ['name' => 'Passports (crew)']]);
         $this->approve($rename, $logistics, ['op' => 'modify', 'fields' => ['name' => 'Passports (crew)']]);
-
-        try {
-            $this->service()->reverse($quantity->id, $logistics, 'Wrong count.', $quantity->fresh()->lock_version);
-            $this->fail('A reversal under a later change must be refused.');
-        } catch (InventoryCorrectionConflict $conflict) {
-            $this->assertSame(InventoryCorrectionConflict::DEPENDENT_CHANGE, $conflict->reason);
-        }
-
-        $this->service()->reverse($rename->id, $logistics, 'Name stays.', $rename->fresh()->lock_version);
         $this->service()->reverse($quantity->id, $logistics, 'Wrong count.', $quantity->fresh()->lock_version);
+        $renamed = $this->item('E1', 'Passports (crew)')['item'];
+        $this->assertSame(2, $renamed['expectedQuantity']);
+        $this->service()->reverse($rename->id, $logistics, 'Name stays.', $rename->fresh()->lock_version);
         $this->assertSame($original, $this->resolved('E1')['checklist_version'], 'exactly the original checklist again');
         $this->assertSame('reversed', $quantity->fresh()->status);
         Notification::assertSentTo($this->member, InspectionEventNotification::class, fn (InspectionEventNotification $n): bool => str_contains($n->title, 'reversed'));
+
+        // A change that builds on another blocks reversing the other until it is reversed itself.
+        $added = $this->reported('E1', ['reason' => 'new_item', 'compartment_id' => 'rear_cab', 'proposal' => ['name' => 'Rope Bag']]);
+        $this->approve($added, $logistics, ['op' => 'add', 'fields' => ['compartment_id' => 'rear_cab', 'name' => 'Rope Bag']]);
+        $ropeBag = $this->item('E1', 'Rope Bag');
+        $count = $this->reported('E1', ['reason' => 'wrong_quantity', 'compartment_id' => 'rear_cab', 'item_id' => $ropeBag['item_id'], 'proposal' => ['quantity' => 2]]);
+        $this->approve($count, $logistics, ['op' => 'modify', 'fields' => ['expectedQuantity' => 2]]);
+        try {
+            $this->service()->reverse($added->id, $logistics, 'Not carried.', $added->fresh()->lock_version);
+            $this->fail('Reversing an added item under a later change to it must be refused.');
+        } catch (InventoryCorrectionConflict $conflict) {
+            $this->assertSame(InventoryCorrectionConflict::DEPENDENT_CHANGE, $conflict->reason);
+        }
+        $this->service()->reverse($count->id, $logistics, 'Undo.', $count->fresh()->lock_version);
+        $this->service()->reverse($added->id, $logistics, 'Not carried.', $added->fresh()->lock_version);
+        $this->assertSame($original, $this->resolved('E1')['checklist_version']);
+    }
+
+    public function test_a_superseded_change_reverses_without_effect_and_never_comes_back(): void
+    {
+        $logistics = $this->logistics();
+        $passports = $this->item('E1', 'Passports');
+        $target = ['compartment_id' => $passports['compartment_id'], 'item_id' => $passports['item_id']];
+        $first = $this->reported('E1', ['reason' => 'wrong_quantity', ...$target, 'proposal' => ['quantity' => 3]]);
+        $this->approve($first, $logistics, ['op' => 'modify', 'fields' => ['expectedQuantity' => 3]]);
+        $second = $this->reported('E1', ['reason' => 'wrong_quantity', ...$target, 'proposal' => ['quantity' => 4]]);
+        $this->approve($second, $logistics, ['op' => 'modify', 'fields' => ['expectedQuantity' => 4]]);
+        $this->assertSame('superseded', ApparatusInventoryChange::query()->where('apparatus_inventory_correction_id', $first->id)->value('status'));
+
+        $this->service()->reverse($first->id, $logistics, 'Old count.', $first->fresh()->lock_version);
+        $this->assertSame(4, $this->item('E1', 'Passports')['item']['expectedQuantity']);
+        $this->service()->reverse($second->id, $logistics, 'Back to template.', $second->fresh()->lock_version);
+        $this->assertSame(2, $this->item('E1', 'Passports')['item']['expectedQuantity']);
+        $this->assertSame('reversed', ApparatusInventoryChange::query()->where('apparatus_inventory_correction_id', $first->id)->value('status'));
+    }
+
+    public function test_chained_moves_keep_every_old_compartment_as_an_alias(): void
+    {
+        $logistics = $this->logistics();
+        $binoculars = $this->item('E1', 'Binoculars');
+        $first = $this->reported('E1', ['reason' => 'moved', 'compartment_id' => 'front_cab', 'item_id' => $binoculars['item_id'], 'proposal' => ['to_compartment_id' => 'rear_cab']]);
+        $this->approve($first, $logistics, ['op' => 'modify', 'fields' => ['compartment_id' => 'rear_cab']]);
+        $second = $this->reported('E1', ['reason' => 'moved', 'compartment_id' => 'rear_cab', 'item_id' => $binoculars['item_id'], 'proposal' => ['to_compartment_id' => 'comp_a1']]);
+        $this->approve($second, $logistics, ['op' => 'modify', 'fields' => ['compartment_id' => 'comp_a1']]);
+
+        $moved = $this->item('E1', 'Binoculars');
+        $this->assertSame('comp_a1', $moved['compartment_id']);
+        $this->assertSame(['Front Cab', 'Rear Cab'], $moved['item']['legacyCompartmentNames']);
+        $this->assertSame('active', ApparatusInventoryChange::query()->where('apparatus_inventory_correction_id', $first->id)->value('status'));
+    }
+
+    public function test_ladder_variants_never_reuse_a_compartment_id_with_a_different_meaning(): void
+    {
+        $l1 = collect($this->resolved('L1')['checklist']['compartments'])->keyBy('id');
+        $l3 = collect($this->resolved('L3')['checklist']['compartments'])->keyBy('id');
+        $trap = $l1->keys()->first(fn (string $id): bool => $l3->has($id)
+            && \App\Services\Inventory\InventoryOverlay::compartmentName($l1[$id]) !== \App\Services\Inventory\InventoryOverlay::compartmentName($l3[$id]));
+        $this->assertNotNull($trap, 'the templates share an id with different meanings');
+        $passports = $this->item('L1', 'Passports');
+        $correction = $this->reported('L1', ['reason' => 'moved', 'compartment_id' => $passports['compartment_id'], 'item_id' => $passports['item_id'], 'proposal' => ['to_compartment_id' => $trap]]);
+
+        $plan = $this->service()->preview($correction->id, $this->logistics(), ['op' => 'modify', 'fields' => ['compartment_id' => $trap]], 'family');
+        $l3Unit = collect($plan['units'])->firstWhere('apparatus_id', $this->units['L3']->id);
+        $l3Name = $l3Unit['destination_compartment_id'] !== null ? \App\Services\Inventory\InventoryOverlay::compartmentName($l3[$l3Unit['destination_compartment_id']]) : null;
+        $this->assertTrue($l3Unit['verdict'] === 'destination_missing' || $l3Name === \App\Services\Inventory\InventoryOverlay::compartmentName($l1[$trap]),
+            'Ladder 3 is either matched by the same compartment name or excluded');
+    }
+
+    public function test_an_approved_change_is_skipped_when_its_item_id_now_means_different_equipment(): void
+    {
+        $passports = $this->item('E1', 'Passports');
+        $correction = $this->reported('E1', ['reason' => 'no_longer_carried', 'compartment_id' => $passports['compartment_id'], 'item_id' => $passports['item_id']]);
+        $this->approve($correction, $this->logistics(), ['op' => 'remove']);
+        // Simulate a template edit that reuses the id for other equipment.
+        $change = ApparatusInventoryChange::query()->where('apparatus_inventory_correction_id', $correction->id)->sole();
+        DB::table('apparatus_inventory_changes')->where('id', $change->id)->update(['equipment_key' => 'name:something else']);
+
+        $resolution = $this->resolved('E1');
+        $this->assertSame([['change_id' => $change->id, 'reason' => 'identity_mismatch']], $resolution['overlay_conflicts']);
+        $this->assertSame($resolution['checklist_base_version'], $resolution['checklist_version'], 'nothing applied: the template is served unchanged');
+        $this->assertTrue($this->hasItem('E1', $passports['item_id']));
     }
 }

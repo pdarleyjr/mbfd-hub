@@ -33,6 +33,12 @@ final class InventoryCorrectionService
 {
     public const MAX_MESSAGE = 2000;
 
+    public const MAX_MEMBER_REPLIES = 50;
+
+    public const MAX_OPEN_PER_MEMBER_AND_APPARATUS = 10;
+
+    public const MAX_PER_MEMBER_PER_DAY = 40;
+
     public const PHOTO_DISK = 'local';
 
     public function __construct(
@@ -53,7 +59,7 @@ final class InventoryCorrectionService
      */
     public function submit(User $reporter, ?int $employeeId, Apparatus $apparatus, array $data): array
     {
-        $hash = $this->payloadHash($data);
+        $hash = $this->payloadHash([...$data, 'apparatus_id' => (int) $apparatus->getKey()]);
         $existing = $this->existingSubmission($reporter, (string) $data['client_submission_id'], $hash);
         if ($existing !== null) {
             return ['correction' => $existing, 'duplicate' => true];
@@ -61,6 +67,13 @@ final class InventoryCorrectionService
 
         [$checklist, $checklistType] = $this->checklistSeenBy($apparatus, (string) $data['checklist_version']);
         $target = $this->target($checklist, $data);
+        // The same member reporting the same open problem again (another device, a second tap
+        // with a new id) gets their earlier report back instead of a second review item.
+        $same = $this->openReportOfSameProblem($reporter, $apparatus, $data, $target);
+        if ($same !== null) {
+            return ['correction' => $same, 'duplicate' => true];
+        }
+        $this->assertWithinReportLimits($reporter, $apparatus);
         $photoPath = null;
         if (filled($data['photo'] ?? null)) {
             $photoPath = Base64Image::store((string) $data['photo'], 'inventory-corrections', 'correction', self::PHOTO_DISK)
@@ -142,15 +155,19 @@ final class InventoryCorrectionService
         $body = $this->messageBody($body);
 
         return DB::transaction(function () use ($correctionId, $author, $body, $visibility, $idempotencyKey): Event {
-            if (($replayed = $this->replayedEvent($idempotencyKey)) !== null) {
-                return $replayed;
-            }
             $correction = $this->lock($correctionId);
             $isReviewer = InventoryCorrectionAccess::canReview($author);
             if (! $isReviewer && ! InventoryCorrectionAccess::owns($author, $correction)) {
                 throw new AuthorizationException;
             }
+            if (($replayed = $this->replayedEvent($idempotencyKey, $correction, $author)) !== null) {
+                return $replayed;
+            }
             if (! $isReviewer) {
+                $replies = Event::query()->where('apparatus_inventory_correction_id', $correction->getKey())->where('event_type', Event::MEMBER_REPLIED)->count();
+                if ($replies >= self::MAX_MEMBER_REPLIES) {
+                    throw ValidationException::withMessages(['body' => 'This conversation has reached its message limit. Contact Logistics directly.']);
+                }
                 $event = $this->event($correction, $author, Event::MEMBER_REPLIED, Event::VISIBILITY_MEMBER, $body, null, $idempotencyKey, 'member');
                 if ($correction->status === ApparatusInventoryCorrection::STATUS_CLARIFICATION) {
                     $this->transition($correction, ApparatusInventoryCorrection::STATUS_SUBMITTED);
@@ -183,10 +200,12 @@ final class InventoryCorrectionService
         $question = $this->messageBody($question);
 
         return DB::transaction(function () use ($correctionId, $reviewer, $question, $expectedLock, $idempotencyKey): ApparatusInventoryCorrection {
-            if (($replayed = $this->replayedEvent($idempotencyKey)) !== null) {
-                return $replayed->correction()->firstOrFail();
+            $correction = $this->lock($correctionId);
+            $this->authorizeReview($reviewer);
+            if ($this->replayedEvent($idempotencyKey, $correction, $reviewer) !== null) {
+                return $correction;
             }
-            $correction = $this->lockForDecision($correctionId, $reviewer, $expectedLock);
+            $this->assertDecidable($correction, $expectedLock);
             $this->transition($correction, ApparatusInventoryCorrection::STATUS_CLARIFICATION);
             $event = $this->event($correction, $reviewer, Event::CLARIFICATION_REQUESTED, Event::VISIBILITY_MEMBER, $question, null, $idempotencyKey);
             $this->notifications->inventoryCorrectionUpdate($correction, $event);
@@ -202,10 +221,12 @@ final class InventoryCorrectionService
         $reason = $this->messageBody($reason);
 
         return DB::transaction(function () use ($correctionId, $reviewer, $reason, $internalNote, $expectedLock, $idempotencyKey): ApparatusInventoryCorrection {
-            if (($replayed = $this->replayedEvent($idempotencyKey)) !== null) {
-                return $replayed->correction()->firstOrFail();
+            $correction = $this->lock($correctionId);
+            $this->authorizeReview($reviewer);
+            if ($this->replayedEvent($idempotencyKey, $correction, $reviewer) !== null) {
+                return $correction;
             }
-            $correction = $this->lockForDecision($correctionId, $reviewer, $expectedLock);
+            $this->assertDecidable($correction, $expectedLock);
             $correction->forceFill([
                 'decision_reason' => $reason,
                 'decided_by_user_id' => $reviewer->getKey(),
@@ -260,6 +281,9 @@ final class InventoryCorrectionService
         $internalNote = filled($internalNote) ? $this->messageBody((string) $internalNote) : null;
 
         return DB::transaction(function () use ($correctionId, $reviewer, $operation, $scope, $selectedApparatusIds, $previewFingerprint, $expectedLock, $idempotencyKey, $memberMessage, $internalNote): ApparatusInventoryChangeSet {
+            $this->assertIdempotencyKey($idempotencyKey);
+            // Under the correction lock, so a concurrent double submit waits and then gets the first result.
+            $correction = $this->lock($correctionId);
             $replay = ApparatusInventoryChangeSet::query()->where('idempotency_key', $idempotencyKey)->first();
             if ($replay !== null) {
                 if ((int) $replay->apparatus_inventory_correction_id !== $correctionId) {
@@ -268,7 +292,7 @@ final class InventoryCorrectionService
 
                 return $replay;
             }
-            $correction = $this->lockForDecision($correctionId, $reviewer, $expectedLock);
+            $this->assertDecidable($correction, $expectedLock);
             $plan = $this->planner->plan($correction, $operation, $scope, lock: true);
             if (! hash_equals($plan['fingerprint'], $previewFingerprint)) {
                 throw new InventoryCorrectionConflict(
@@ -346,11 +370,11 @@ final class InventoryCorrectionService
         $reason = $this->messageBody($reason);
 
         return DB::transaction(function () use ($correctionId, $reviewer, $reason, $expectedLock, $idempotencyKey): ApparatusInventoryChangeSet {
-            if (($replayed = $this->replayedEvent($idempotencyKey)) !== null) {
-                return ApparatusInventoryChangeSet::query()->findOrFail((int) ($replayed->details['change_set_id'] ?? 0));
-            }
             $correction = $this->lock($correctionId);
             $this->authorizeReview($reviewer);
+            if (($replayed = $this->replayedEvent($idempotencyKey, $correction, $reviewer)) !== null) {
+                return ApparatusInventoryChangeSet::query()->findOrFail((int) ($replayed->details['change_set_id'] ?? 0));
+            }
             $this->assertLockVersion($correction, $expectedLock);
             if ($correction->status !== ApparatusInventoryCorrection::STATUS_APPLIED) {
                 throw ValidationException::withMessages(['decision' => 'Only an applied correction can be reversed.']);
@@ -369,35 +393,25 @@ final class InventoryCorrectionService
             $units = Apparatus::query()->whereIn('id', $apparatusIds)->orderBy('id')->lockForUpdate()->get()->keyBy('id');
 
             foreach ($changes as $change) {
-                $later = ApparatusInventoryChange::query()
-                    ->where('apparatus_id', $change->apparatus_id)
-                    ->where('item_key', $change->item_key)
-                    ->where('id', '>', $change->getKey())
-                    ->active()
-                    ->orderBy('id')
-                    ->value('id');
-                if ($later !== null || $change->status !== ApparatusInventoryChange::STATUS_ACTIVE) {
-                    throw new InventoryCorrectionConflict(
-                        InventoryCorrectionConflict::DEPENDENT_CHANGE,
-                        'A later approved change affects this item'.($later !== null ? " (change #{$later})" : '').'. Reverse that change first.',
-                    );
-                }
+                $this->assertReversible($change, $units[(int) $change->apparatus_id] ?? null);
             }
 
             foreach ($apparatusIds as $apparatusId) {
                 $apparatus = $units[$apparatusId];
-                $this->revisions->remember($apparatus, $this->resolver->resolve($apparatus), $changeSet->getKey(), retire: true);
+                $before = $this->resolver->resolve($apparatus);
+                $this->revisions->remember($apparatus, $before, $changeSet->getKey(), retire: true);
                 foreach ($changes->where('apparatus_id', $apparatusId) as $change) {
+                    $wasActive = $change->status === ApparatusInventoryChange::STATUS_ACTIVE;
+                    // What this change had replaced comes back, or stays replaced by whatever replaced this change.
+                    ApparatusInventoryChange::query()->where('superseded_by_change_id', $change->getKey())->where('status', ApparatusInventoryChange::STATUS_SUPERSEDED)->get()
+                        ->each(static fn (ApparatusInventoryChange $restored) => $restored->forceFill($wasActive
+                            ? ['status' => ApparatusInventoryChange::STATUS_ACTIVE, 'superseded_by_change_id' => null, 'status_changed_at' => now()]
+                            : ['superseded_by_change_id' => $change->superseded_by_change_id, 'status_changed_at' => now()])->save());
                     $change->forceFill(['status' => ApparatusInventoryChange::STATUS_REVERSED, 'status_changed_at' => now()])->save();
-                    ApparatusInventoryChange::query()->where('superseded_by_change_id', $change->getKey())->get()
-                        ->each(static fn (ApparatusInventoryChange $restored) => $restored->forceFill([
-                            'status' => ApparatusInventoryChange::STATUS_ACTIVE,
-                            'superseded_by_change_id' => null,
-                            'status_changed_at' => now(),
-                        ])->save());
                 }
                 $after = $this->resolver->resolve($apparatus);
-                if ($after['usable'] !== true || $after['overlay_conflicts'] !== []) {
+                $newConflicts = array_diff(array_column($after['overlay_conflicts'], 'change_id'), array_column($before['overlay_conflicts'], 'change_id'));
+                if ($after['usable'] !== true || $newConflicts !== []) {
                     throw ValidationException::withMessages(['decision' => "Reversing would leave {$apparatus->designation} with an invalid checklist. Nothing was changed."]);
                 }
                 $this->revisions->remember($apparatus, $after, $changeSet->getKey(), retire: false);
@@ -460,7 +474,41 @@ final class InventoryCorrectionService
         ];
     }
 
-    /** An earlier modify whose fields the new change fully replaces (or any earlier modify, for a removal). */
+    /**
+     * A later change on the same item that builds on this one (edits the item it added, removes
+     * it, or sets the same fields) must be reversed first, so history never forks.
+     */
+    private function assertReversible(ApparatusInventoryChange $change, ?Apparatus $apparatus): void
+    {
+        if ($change->status === ApparatusInventoryChange::STATUS_SUPERSEDED) {
+            return; // already without effect: a later change replaced every field it set
+        }
+        $fields = array_keys((array) $change->payload);
+        $dependent = ApparatusInventoryChange::query()
+            ->where('apparatus_id', $change->apparatus_id)
+            ->where('item_key', $change->item_key)
+            ->where('id', '>', $change->getKey())
+            ->active()
+            ->orderBy('id')
+            ->get()
+            ->first(static fn (ApparatusInventoryChange $later): bool => $change->operation === ApparatusInventoryChange::OP_ADD
+                || $later->operation === ApparatusInventoryChange::OP_REMOVE
+                || $change->operation === ApparatusInventoryChange::OP_REMOVE
+                || array_intersect($fields, array_keys((array) $later->payload)) !== []);
+        if ($dependent !== null) {
+            $unit = trim((string) ($apparatus?->designation ?: $apparatus?->name));
+            throw new InventoryCorrectionConflict(
+                InventoryCorrectionConflict::DEPENDENT_CHANGE,
+                "A later approved change (#{$dependent->getKey()}".($unit !== '' ? " on {$unit}" : '').') builds on this one. Reverse that change first.',
+            );
+        }
+    }
+
+    /**
+     * An earlier modify whose fields the new change fully replaces (or any earlier modify, for a
+     * removal). Moves and renames are never superseded: their old compartment and name stay as
+     * aliases on the item, which keeps defect continuity across chained moves and renames.
+     */
     private function supersedeEarlierChanges(ApparatusInventoryChange $change): void
     {
         $newFields = array_keys($change->payload ?? []);
@@ -474,6 +522,7 @@ final class InventoryCorrectionService
             ->get()
             ->filter(static fn (ApparatusInventoryChange $earlier): bool => $change->operation === ApparatusInventoryChange::OP_REMOVE
                 || ($change->operation === ApparatusInventoryChange::OP_MODIFY && array_diff(array_keys($earlier->payload ?? []), $newFields) === []))
+            ->reject(static fn (ApparatusInventoryChange $earlier): bool => array_intersect(array_keys($earlier->payload ?? []), ['name', 'compartment_id']) !== [])
             ->each(static fn (ApparatusInventoryChange $earlier) => $earlier->forceFill([
                 'status' => ApparatusInventoryChange::STATUS_SUPERSEDED,
                 'superseded_by_change_id' => $change->getKey(),
@@ -625,16 +674,50 @@ final class InventoryCorrectionService
         return ApparatusInventoryCorrection::query()->whereKey($correctionId)->lockForUpdate()->firstOrFail();
     }
 
-    private function lockForDecision(int $correctionId, User $reviewer, ?int $expectedLock): ApparatusInventoryCorrection
+    private function assertDecidable(ApparatusInventoryCorrection $correction, ?int $expectedLock): void
     {
-        $correction = $this->lock($correctionId);
-        $this->authorizeReview($reviewer);
         if (! $correction->isOpen()) {
             throw ValidationException::withMessages(['decision' => 'This correction was already decided ('.mb_strtolower(ApparatusInventoryCorrection::statusLabel($correction->status)).').']);
         }
         $this->assertLockVersion($correction, $expectedLock);
+    }
 
-        return $correction;
+    /**
+     * An open report by this member about the same item (or unlisted item name) for the same reason.
+     *
+     * @param  array<string, mixed>  $data
+     * @param  array{compartment_id: string, item_id: string|null, equipment_key: string|null, snapshot: array<string, mixed>}  $target
+     */
+    private function openReportOfSameProblem(User $reporter, Apparatus $apparatus, array $data, array $target): ?ApparatusInventoryCorrection
+    {
+        $candidates = ApparatusInventoryCorrection::query()
+            ->where('apparatus_id', $apparatus->getKey())
+            ->where('reporter_user_id', $reporter->getKey())
+            ->where('reason', $data['reason'])
+            ->where('compartment_key', $target['compartment_id'])
+            ->open()
+            ->when($target['item_id'] !== null, fn ($query) => $query->where('item_key', $target['item_id']), fn ($query) => $query->whereNull('item_key'))
+            ->orderBy('id')
+            ->get();
+        if ($target['item_id'] !== null) {
+            return $candidates->first();
+        }
+        $name = EquipmentIdentity::normalize((string) ($data['proposal']['name'] ?? ''));
+
+        return $candidates->first(static fn (ApparatusInventoryCorrection $open): bool => EquipmentIdentity::normalize((string) ($open->proposal['name'] ?? '')) === $name);
+    }
+
+    /** Keeps one member from flooding Logistics' queue or the checklist payload. */
+    private function assertWithinReportLimits(User $reporter, Apparatus $apparatus): void
+    {
+        $open = ApparatusInventoryCorrection::query()->where('apparatus_id', $apparatus->getKey())->where('reporter_user_id', $reporter->getKey())->open()->count();
+        if ($open >= self::MAX_OPEN_PER_MEMBER_AND_APPARATUS) {
+            throw ValidationException::withMessages(['reason' => 'You already have '.self::MAX_OPEN_PER_MEMBER_AND_APPARATUS.' corrections waiting for Logistics on this apparatus. Wait for those to be reviewed, or add details to one of them.']);
+        }
+        $today = ApparatusInventoryCorrection::query()->where('reporter_user_id', $reporter->getKey())->where('created_at', '>=', now()->subDay())->count();
+        if ($today >= self::MAX_PER_MEMBER_PER_DAY) {
+            throw ValidationException::withMessages(['reason' => 'You have reached today\'s limit for inventory corrections. Contact Logistics directly.']);
+        }
     }
 
     private function assertLockVersion(ApparatusInventoryCorrection $correction, ?int $expectedLock): void
@@ -667,11 +750,32 @@ final class InventoryCorrectionService
         }
     }
 
-    private function replayedEvent(?string $idempotencyKey): ?Event
+    /**
+     * The event an earlier attempt of this same request already wrote. Only the same person's
+     * request on the same correction counts; any other reuse of a key is refused.
+     */
+    private function replayedEvent(?string $idempotencyKey, ApparatusInventoryCorrection $correction, User $actor): ?Event
     {
-        return $idempotencyKey !== null && $idempotencyKey !== ''
-            ? Event::query()->where('idempotency_key', $idempotencyKey)->first()
-            : null;
+        if ($idempotencyKey === null || $idempotencyKey === '') {
+            return null;
+        }
+        $this->assertIdempotencyKey($idempotencyKey);
+        $event = Event::query()->where('idempotency_key', $idempotencyKey)->first();
+        if ($event === null) {
+            return null;
+        }
+        if ((int) $event->apparatus_inventory_correction_id !== (int) $correction->getKey() || (int) $event->actor_user_id !== (int) $actor->getKey()) {
+            throw ValidationException::withMessages(['body' => 'This request could not be matched. Reload the page and try again.']);
+        }
+
+        return $event;
+    }
+
+    private function assertIdempotencyKey(string $key): void
+    {
+        if (strlen($key) > 100 || preg_match('/\A[A-Za-z0-9-]+\z/', $key) !== 1) {
+            throw ValidationException::withMessages(['body' => 'This request could not be matched. Reload the page and try again.']);
+        }
     }
 
     /** @param array<string, mixed>|null $details */

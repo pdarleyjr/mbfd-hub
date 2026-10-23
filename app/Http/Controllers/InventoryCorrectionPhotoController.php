@@ -19,7 +19,7 @@ final class InventoryCorrectionPhotoController
     {
         $user = $request->user();
         abort_unless($user instanceof User
-            && (InventoryCorrectionAccess::canReview($user) || InventoryCorrectionAccess::owns($user, $correction)), 403);
+            && (InventoryCorrectionAccess::canReview($user) || InventoryCorrectionAccess::owns($user, $correction)), 404);
         $path = $correction->photo_path;
         $disk = Storage::disk(InventoryCorrectionService::PHOTO_DISK);
         abort_unless(is_string($path) && str_starts_with($path, 'inventory-corrections/') && $disk->exists($path), 404);

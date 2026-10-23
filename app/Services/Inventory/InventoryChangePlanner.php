@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Inventory;
 
 use App\Models\Apparatus;
+use App\Models\ApparatusDefect;
 use App\Models\ApparatusInventoryChange;
 use App\Models\ApparatusInventoryCorrection;
 use App\Services\DailyCheckoutChecklistResolver;
@@ -175,21 +176,21 @@ final class InventoryChangePlanner
         if ($scope === self::SCOPE_UNIT) {
             $query->whereKey($sourceId);
         }
-        if ($lock) {
-            $query->lockForUpdate();
-        }
         $all = $query->get();
-        if ($scope !== self::SCOPE_FAMILY) {
+        if ($scope === self::SCOPE_FAMILY) {
+            $source = $all->firstWhere('id', $sourceId);
+            $family = $source instanceof Apparatus
+                ? DailyCheckoutChecklistResolver::familyForChecklistType($this->resolver->checklistTypeFor($source))
+                : null;
+            $all = $all->filter(fn (Apparatus $apparatus): bool => $apparatus->getKey() === $sourceId
+                || ($family !== null && DailyCheckoutChecklistResolver::familyForChecklistType($this->resolver->checklistTypeFor($apparatus)) === $family))->values();
+        }
+        if (! $lock) {
             return $all;
         }
 
-        $source = $all->firstWhere('id', $sourceId);
-        $family = $source instanceof Apparatus
-            ? DailyCheckoutChecklistResolver::familyForChecklistType($this->resolver->checklistTypeFor($source))
-            : null;
-
-        return $all->filter(fn (Apparatus $apparatus): bool => $apparatus->getKey() === $sourceId
-            || ($family !== null && DailyCheckoutChecklistResolver::familyForChecklistType($this->resolver->checklistTypeFor($apparatus)) === $family))->values();
+        // Lock only the candidates, in ascending id order (the order inspection submissions use).
+        return Apparatus::query()->whereKey($all->modelKeys())->orderBy('id')->lockForUpdate()->get();
     }
 
     /**
@@ -260,6 +261,7 @@ final class InventoryChangePlanner
             'before' => null,
             'after' => null,
             'overriding_change_ids' => [],
+            'open_issues' => 0,
         ];
         $sameTemplate = $sourceChecklistType !== null && ($resolution['checklist_type'] ?? null) === $sourceChecklistType;
         $verdict = $this->evaluate($unit, $apparatus, $resolution, $operation, $itemKey, $equipmentKey, $sourceDestination, $isSource, $sameTemplate);
@@ -309,11 +311,19 @@ final class InventoryChangePlanner
                 return $target === null ? 'item_not_found' : 'ambiguous_item';
             }
             $unit['before'] = $this->describe($checklist, $target);
+            if ($operation['op'] === ApparatusInventoryChange::OP_REMOVE) {
+                // Open issues stay open (and visible to Logistics) when the item leaves the checklist.
+                $unit['open_issues'] = ApparatusDefect::query()
+                    ->where('apparatus_id', $apparatus->getKey())
+                    ->where('resolved', false)
+                    ->where(fn ($query) => $query->where('item_key', $target)->orWhere('item', $unit['before']['name'] ?? ''))
+                    ->count();
+            }
         }
         $unit['target_item_key'] = $target;
 
         if (array_key_exists('compartment_id', $fields)) {
-            $destination = $isSource ? $fields['compartment_id'] : $this->matchCompartment($checklist, $sourceDestination);
+            $destination = $isSource ? $fields['compartment_id'] : $this->matchCompartment($checklist, $sourceDestination, $sameTemplate);
             if ($destination === null || ! $this->hasCompartment($checklist, (string) $destination)) {
                 return 'destination_missing';
             }
@@ -390,12 +400,14 @@ final class InventoryChangePlanner
      * @param  array<string, mixed>  $checklist
      * @param  array{id: string, name: string}|null  $sourceDestination
      */
-    private function matchCompartment(array $checklist, ?array $sourceDestination): ?string
+    private function matchCompartment(array $checklist, ?array $sourceDestination, bool $sameTemplate): ?string
     {
         if ($sourceDestination === null) {
             return null;
         }
-        if ($this->hasCompartment($checklist, $sourceDestination['id'])) {
+        // Compartment ids are only comparable on the same template: Ladder 1 and Ladder 3 reuse
+        // b_comp_N for different positions. On a variant only a unique name match counts.
+        if ($sameTemplate && $this->hasCompartment($checklist, $sourceDestination['id'])) {
             return $sourceDestination['id'];
         }
         $name = EquipmentIdentity::normalize($sourceDestination['name']);
@@ -457,7 +469,7 @@ final class InventoryChangePlanner
     private function name(mixed $value): string
     {
         $name = is_string($value) ? trim($value) : '';
-        if ($name === '' || mb_strlen($name) > 160) {
+        if ($name === '' || mb_strlen($name) > 160 || preg_match('/[<>]/', $name) === 1) {
             throw ValidationException::withMessages(['operation' => 'An item name is required (at most 160 characters).']);
         }
 
@@ -482,7 +494,7 @@ final class InventoryChangePlanner
     private function optionalText(string $key, mixed $value): ?string
     {
         $text = is_string($value) ? trim($value) : '';
-        if (mb_strlen($text) > self::TEXT_LIMITS[$key]) {
+        if (mb_strlen($text) > self::TEXT_LIMITS[$key] || preg_match('/[<>]/', $text) === 1) {
             throw ValidationException::withMessages(['operation' => ucfirst($key).' is too long.']);
         }
 

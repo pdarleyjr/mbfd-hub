@@ -38,11 +38,11 @@ final class InventoryCorrectionController extends Controller
             'item_id' => ['required_unless:reason,'.InventoryCorrectionReason::NEW_ITEM, 'prohibited_if:reason,'.InventoryCorrectionReason::NEW_ITEM, 'nullable', 'string', 'max:128'],
             'proposal' => ['nullable', 'array:to_compartment_id,to_location_text,name,manufacturer,model,description,quantity'],
             'proposal.to_compartment_id' => ['nullable', 'string', 'max:128'],
-            'proposal.to_location_text' => ['nullable', 'string', 'max:200'],
-            'proposal.name' => ['required_if:reason,'.InventoryCorrectionReason::NEW_ITEM, 'nullable', 'string', 'max:160', 'regex:/\S/'],
-            'proposal.manufacturer' => ['nullable', 'string', 'max:120'],
-            'proposal.model' => ['nullable', 'string', 'max:120'],
-            'proposal.description' => ['nullable', 'string', 'max:500'],
+            'proposal.to_location_text' => ['nullable', 'string', 'max:200', 'not_regex:/[<>]/'],
+            'proposal.name' => ['required_if:reason,'.InventoryCorrectionReason::NEW_ITEM, 'nullable', 'string', 'max:160', 'not_regex:/[<>]/', 'regex:/\S/'],
+            'proposal.manufacturer' => ['nullable', 'string', 'max:120', 'not_regex:/[<>]/'],
+            'proposal.model' => ['nullable', 'string', 'max:120', 'not_regex:/[<>]/'],
+            'proposal.description' => ['nullable', 'string', 'max:500', 'not_regex:/[<>]/'],
             'proposal.quantity' => ['required_if:reason,'.InventoryCorrectionReason::WRONG_QUANTITY, 'nullable', 'integer', 'min:1', 'max:999'],
             'note' => ['required_if:reason,'.InventoryCorrectionReason::OTHER, 'nullable', 'string', 'max:1000'],
             'photo' => ['nullable', 'string', 'max:7000000'],
@@ -51,6 +51,7 @@ final class InventoryCorrectionController extends Controller
             'proposal.name.required_if' => 'Give the unlisted item a name.',
             'proposal.quantity.required_if' => 'Enter the quantity actually carried.',
             'note.required_if' => 'Describe what is wrong with this checklist entry.',
+            'proposal.*.not_regex' => 'Use plain text without < or > characters.',
         ]);
         if ($validated['reason'] === InventoryCorrectionReason::MOVED
             && blank($validated['proposal']['to_compartment_id'] ?? null)

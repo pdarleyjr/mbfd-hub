@@ -293,6 +293,7 @@ export default function InspectionWizard() {
           const blocker = await getQueuedSubmissionForApparatusAndChecklistVersion(
             loadedContract.apparatus.id,
             loadedContract.checklist.checklist_version,
+            loadedContract.checklist.checklist_base_version,
           );
           const previousBlockerId = blockerIdRef.current;
           blockerIdRef.current = blocker?.id ?? null;
@@ -434,6 +435,7 @@ export default function InspectionWizard() {
         const queuedSubmission = await getQueuedSubmissionForApparatusAndChecklistVersion(
           foundApparatus.id,
           checklistData.checklist_version,
+          checklistData.checklist_base_version,
         );
         if (queuedSubmission) {
           blockerIdRef.current = queuedSubmission.id;
@@ -798,7 +800,7 @@ export default function InspectionWizard() {
         ...(draftId ? { inventory_draft_id: draftId } : {}),
       };
       clientSubmissionIdRef.current = submission.client_submission_id;
-      const queueId = await queueSubmission(apparatus.id, submission, currentIdentity);
+      const queueId = await queueSubmission(apparatus.id, submission, currentIdentity, checklist.checklist_base_version);
       const queuedSubmission = await getQueuedSubmission(queueId);
       if (!queuedSubmission) {
         throw new Error('Unable to retain this inspection for submission. Please try again.');

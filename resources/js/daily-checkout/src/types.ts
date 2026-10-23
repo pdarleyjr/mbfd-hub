@@ -207,11 +207,12 @@ export interface OpenFinding {
 
 /** A member's inventory correction report that Logistics has not decided yet (outside the hashed checklist). */
 export interface PendingInventoryCorrection {
-  id: number;
+  /** Only for the signed-in member's own reports; another member's report is just a marker. */
+  id: number | null;
   /** Null or absent for a report about an unlisted item that has no checklist item yet. */
   compartment_id?: string | null;
   item_id?: string | null;
-  reason: string;
+  reason: string | null;
   reason_label?: string;
   status: string;
   reported_at?: string;

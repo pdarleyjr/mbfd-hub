@@ -18,6 +18,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Livewire\Attributes\Locked;
 
 /**
  * One inventory correction the signed-in member reported: what they proposed, Logistics'
@@ -37,6 +38,8 @@ class MyInventoryCorrectionView extends Page implements HasNavigationParent
 
     public string $reply = '';
 
+    /** Server-issued idempotency key for the reply being sent; the browser cannot change it. */
+    #[Locked]
     public ?string $replyKey = null;
 
     public function mount(int|string $correction): void
@@ -104,8 +107,9 @@ class MyInventoryCorrectionView extends Page implements HasNavigationParent
     {
         $user = auth('web')->user();
         abort_unless($user instanceof User, 403);
-        $correction = ApparatusInventoryCorrection::query()->findOrFail($id);
-        abort_unless(InventoryCorrectionAccess::owns($user, $correction), 403);
+        // Someone else's correction is indistinguishable from one that does not exist.
+        $correction = ApparatusInventoryCorrection::query()->find($id);
+        abort_unless($correction instanceof ApparatusInventoryCorrection && InventoryCorrectionAccess::owns($user, $correction), 404);
 
         return $correction;
     }

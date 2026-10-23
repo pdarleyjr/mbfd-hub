@@ -269,7 +269,7 @@ final class InspectionNotificationDispatcher
         $this->guard('inventoryCorrectionSubmitted', function () use ($correction): void {
             $unit = $this->unitLabel(Apparatus::query()->find($correction->apparatus_id));
             $reporter = $correction->reporter_user_id !== null ? User::query()->find($correction->reporter_user_id) : null;
-            $name = trim((string) ($reporter?->display_name ?: $reporter?->name)) ?: 'A member';
+            $name = $this->excerpt((string) ($reporter?->display_name ?: $reporter?->name)) ?: 'A member';
 
             $this->queue(
                 'correction:'.$correction->getKey().':submitted',
@@ -326,7 +326,7 @@ final class InspectionNotificationDispatcher
         $this->guard('inventoryCorrectionReply', function () use ($correction, $event): void {
             $unit = $this->unitLabel(Apparatus::query()->find($correction->apparatus_id));
             $author = $event->actor_user_id !== null ? User::query()->find($event->actor_user_id) : null;
-            $name = trim((string) ($author?->display_name ?: $author?->name)) ?: 'A member';
+            $name = $this->excerpt((string) ($author?->display_name ?: $author?->name)) ?: 'A member';
             $reviewers = InspectionReviewers::all();
             $involved = ApparatusInventoryCorrectionEvent::query()
                 ->where('apparatus_inventory_correction_id', $correction->getKey())
@@ -384,10 +384,11 @@ final class InspectionNotificationDispatcher
     private function correctionSubject(ApparatusInventoryCorrection $correction): string
     {
         $snapshot = (array) $correction->target_snapshot;
-        $where = trim((string) ($snapshot['compartment'] ?? ''));
-        $name = trim((string) ($snapshot['name'] ?? ''));
+        // Member-supplied text: plain, single-line, never markup.
+        $where = $this->excerpt((string) ($snapshot['compartment'] ?? ''));
+        $name = $this->excerpt((string) ($snapshot['name'] ?? ''));
         if ($name === '') {
-            $proposed = trim((string) ($correction->proposal['name'] ?? ''));
+            $proposed = $this->excerpt((string) ($correction->proposal['name'] ?? ''));
             $item = $proposed !== '' ? "unlisted item \"{$proposed}\"" : 'an unlisted item';
 
             return $item.($where !== '' ? " in {$where}" : '');

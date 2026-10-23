@@ -17,6 +17,9 @@ use Illuminate\Database\Eloquent\Builder;
  */
 final class InventoryCorrectionProjection
 {
+    /** Newest open reports shown as checklist markers; keeps the checklist payload bounded. */
+    private const MAX_MARKERS = 100;
+
     /**
      * Open corrections on one apparatus, for the "correction pending review" marker.
      *
@@ -27,20 +30,34 @@ final class InventoryCorrectionProjection
         return ApparatusInventoryCorrection::query()
             ->where('apparatus_id', $apparatus->getKey())
             ->open()
-            ->orderBy('id')
-            ->get(['id', 'compartment_key', 'item_key', 'reason', 'status', 'created_at', 'reporter_user_id', 'reporter_employee_id', 'proposal'])
-            ->map(fn (ApparatusInventoryCorrection $correction): array => [
-                'id' => (int) $correction->getKey(),
-                'compartment_id' => $correction->compartment_key,
-                'item_id' => $correction->item_key,
-                'reason' => $correction->reason,
-                'reason_label' => InventoryCorrectionReason::label($correction->reason),
-                'status' => $correction->status,
-                'reported_at' => $correction->created_at?->toIso8601String(),
-                'mine' => InventoryCorrectionAccess::owns($viewer, $correction),
-                // Only the item's proposed name, so a crew sees which unlisted item is already reported.
-                'proposed_name' => $correction->item_key === null ? ($correction->proposal['name'] ?? null) : null,
-            ])
+            ->orderByDesc('id')
+            ->limit(self::MAX_MARKERS)
+            ->get(['id', 'compartment_key', 'item_key', 'reason', 'status', 'created_at', 'reporter_user_id', 'reporter_employee_id'])
+            ->sortBy('id')
+            ->map(function (ApparatusInventoryCorrection $correction) use ($viewer): array {
+                // Another member's report is only "something here is under review".
+                if (! InventoryCorrectionAccess::owns($viewer, $correction)) {
+                    return [
+                        'id' => null,
+                        'compartment_id' => $correction->compartment_key,
+                        'item_id' => $correction->item_key,
+                        'reason' => null,
+                        'status' => 'pending',
+                        'mine' => false,
+                    ];
+                }
+
+                return [
+                    'id' => (int) $correction->getKey(),
+                    'compartment_id' => $correction->compartment_key,
+                    'item_id' => $correction->item_key,
+                    'reason' => $correction->reason,
+                    'reason_label' => InventoryCorrectionReason::label($correction->reason),
+                    'status' => $correction->status,
+                    'reported_at' => $correction->created_at?->toIso8601String(),
+                    'mine' => true,
+                ];
+            })
             ->values()
             ->all();
     }

@@ -58,6 +58,14 @@ final class InventoryOverlay
         $applied = $conflicts = [];
         foreach ($changes as $change) {
             try {
+                // The item must still be the one the change was approved for: a template edit can
+                // reuse a positional id for different equipment.
+                if ($change->operation !== ApparatusInventoryChange::OP_ADD) {
+                    $found = $this->findItem($checklist, (string) $change->item_key);
+                    if ($found !== null && EquipmentIdentity::forItem($found['item']) !== (string) $change->equipment_key) {
+                        throw new InventoryOperationException('identity_mismatch');
+                    }
+                }
                 $candidate = $this->apply(
                     $checklist,
                     (string) $change->operation,
@@ -82,7 +90,10 @@ final class InventoryOverlay
             }
         }
 
-        return ['checklist' => $checklist, 'change_ids' => $applied, 'conflicts' => $conflicts];
+        // Nothing applied: serve the template exactly as resolved, so content and hash agree.
+        return $applied === []
+            ? ['checklist' => $baseline, 'change_ids' => [], 'conflicts' => $conflicts]
+            : ['checklist' => $checklist, 'change_ids' => $applied, 'conflicts' => $conflicts];
     }
 
     /**

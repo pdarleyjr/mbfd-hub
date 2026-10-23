@@ -72,10 +72,14 @@ Correction status: `submitted` -> (`clarification_requested` <-> `submitted`) ->
 
 Every change is validated by applying it and running the resolver's own schema validation
 (`hasUnambiguousSubmissionSchema`). At resolve time a change that no longer applies (template
-changed under it) is skipped and logged; the checklist stays usable (`overlay_conflicts`).
+changed under it: item gone, destination gone, or the item id now carries a different
+`equipment_key` = `identity_mismatch`) is skipped and logged; the checklist stays usable
+(`overlay_conflicts`). If nothing applies, the template is served unchanged with its own hash.
 
-An earlier active change on the same apparatus+item whose touched fields are a subset of a new
-change's fields (or any earlier change when the new op is `remove`) is marked `superseded`.
+An earlier active `modify` on the same apparatus+item whose touched fields are a subset of a new
+`modify`'s fields (or any earlier `modify` when the new op is `remove`) is marked `superseded`,
+except moves and renames: they stay active so every old compartment/name remains an alias and
+defect continuity survives chained moves and renames (later change still wins per field).
 
 ### 2.4 Propagation scopes
 
@@ -85,9 +89,11 @@ change's fields (or any earlier change when the new op is `remove`) is marked `s
 | `family` | every usable apparatus of the same family (`engine*`, `ladder*`, `rescue`, `fireboat*`) | Daily Checkout units that are eligible | propagation authority |
 | `equipment` | every usable apparatus whose effective checklist carries the same `equipment_key` | eligible Daily Checkout units | propagation authority |
 
-Per-unit matching: same `item_key` with same `equipment_key`, else the single item with the
-same `equipment_key`. Destination compartment: same compartment id, else the single
-compartment with the same normalized name. Per-unit verdicts (`eligible` or an exclusion):
+Per-unit matching: on the same template, same `item_key` with same `equipment_key`; otherwise only
+the single item with the same `equipment_key` (variant template ids are positional). Destination
+compartment: on the same template the same id; on a variant only the single compartment with the
+same normalized name (Ladder 1 and Ladder 3 reuse `b_comp_N` for different positions), else
+`destination_missing`. A removal's preview shows how many open issues on that item stay open. Per-unit verdicts (`eligible` or an exclusion):
 `item_not_found`, `ambiguous_item`, `destination_missing`, `invalid_result` (name clash),
 `no_change` (already as requested), `unit_override` (another unit-scoped active change on this
 item; excluded by default, may be included), `not_daily_checkout` (reserve; may be included),
@@ -113,8 +119,10 @@ one unit). Server re-checks everything; the form's unit list is advisory.
 7. Notifications are ledger rows in the transaction and sent after commit; a delivery failure
    never touches the committed inventory.
 
-Reverse: refused while a later active change on an affected item exists ("reverse #N first");
-otherwise its changes become `reversed`, revisions are snapshotted, correction -> `reversed`.
+Reverse: refused while a later active change builds on an affected change (edits an item it added,
+removes the item, or sets an overlapping field): "reverse #N on <unit> first". A change already
+superseded is reversed without effect. Changes it had superseded come back (or stay superseded
+by its successor). The reversal is refused if it would introduce a new overlay conflict.
 
 ### 2.6 In-flight work
 
@@ -184,6 +192,16 @@ item_id, reason, reason_label, status, reported_at, mine }]`. Items may carry `m
 (clarification, Logistics reply, approved/applied, rejected, reversed); `inventory_correction_reply`
 -> reviewers in the thread (else all). Ledger keys `correction:{id}:...`; retried by
 `inspections:retry-notifications`.
+
+## 5a. Limits (abuse resistance)
+
+- Per member: at most 10 open corrections per apparatus and 40 reports per 24 h; a repeat of an
+  open report (same item or unlisted name, same reason) returns the existing report.
+- Member text in names/descriptions is plain text (`<` and `>` refused); notifications strip markup.
+- Checklist markers: at most the 100 newest open reports; another member's report is shown only as
+  "pending" (no id, reason, time or name). Member replies: 50 per correction; idempotency keys are
+  matched only for the same actor and correction, after authorization.
+- Someone else's correction page or photo is a 404.
 
 ## 6. Rollback
 
