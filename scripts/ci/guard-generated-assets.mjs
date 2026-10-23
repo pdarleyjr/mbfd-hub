@@ -54,7 +54,7 @@ if (missingReleaseCommands.length > 0) {
 const composer = JSON.parse(readFileSync(resolve(root, "composer.json"), "utf8"));
 const expectedTestScript = [
   "Composer\\Config::disableProcessTimeout",
-  "@php artisan test --exclude-group=postgres,training-roster-export",
+  "@php artisan test --exclude-group=postgres --exclude-group=training-roster-export",
   "@php artisan test --group=training-roster-export --exclude-group=postgres",
 ];
 if (!isDeepStrictEqual(composer.scripts?.test, expectedTestScript)) {

@@ -855,7 +855,7 @@ test("the standard test command runs both complete non-PostgreSQL partitions", (
 
   assert.deepEqual(composer.scripts.test, [
     "Composer\\Config::disableProcessTimeout",
-    "@php artisan test --exclude-group=postgres,training-roster-export",
+    "@php artisan test --exclude-group=postgres --exclude-group=training-roster-export",
     "@php artisan test --group=training-roster-export --exclude-group=postgres",
   ]);
   assert.match(exportTests, /#\[Group\('training-roster-export'\)\]/);

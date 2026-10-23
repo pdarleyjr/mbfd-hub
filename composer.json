@@ -72,7 +72,7 @@
         ],
         "test": [
             "Composer\\Config::disableProcessTimeout",
-            "@php artisan test --exclude-group=postgres,training-roster-export",
+            "@php artisan test --exclude-group=postgres --exclude-group=training-roster-export",
             "@php artisan test --group=training-roster-export --exclude-group=postgres"
         ],
         "dev": [
