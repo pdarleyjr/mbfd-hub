@@ -240,15 +240,15 @@ final class CommunicationRemovalAndPinTest extends TestCase
         $this->assertNull(CommandCommunicationAuditEvent::query()->where('post_id', $post->id)->value('reason'));
     }
 
-    public function test_pinning_in_the_captain5_channel_needs_the_right_to_act_or_an_administrator(): void
+    public function test_every_captain5_page_user_and_administrator_can_pin_in_the_captain5_channel(): void
     {
-        $lieutenant = $this->captain5Viewer('View Only');
+        $lieutenant = $this->captain5Viewer('Lieutenant Poster');
         $seatHolder = $this->officer('Captain', 'Captain 5 Seat');
-        $this->seat($seatHolder, 'Captain 5', 'B Shift'); // a seat holder acts even off shift
+        $this->seat($seatHolder, 'Captain 5', 'B Shift'); // off shift: no duty gating
         $id = $this->postVia($lieutenant, self::C5, 'Pin candidate');
         $post = CommandCommunicationPost::query()->where('public_id', $id)->firstOrFail();
 
-        $this->actAs($lieutenant);
+        $this->actAs($this->newMember('Plain Firefighter'));
         $this->postJson($this->commsBase(self::C5).'/posts/'.$id.'/pin', ['pinned' => true])->assertForbidden();
         $this->assertNull($post->fresh()->pinned_at);
 

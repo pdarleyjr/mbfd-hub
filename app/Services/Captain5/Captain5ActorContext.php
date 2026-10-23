@@ -7,13 +7,13 @@ namespace App\Services\Captain5;
 use App\Services\Security\Captain5AccessDecision;
 
 /**
- * Snapshot of the authority a Captain 5 action is taken under. It is written onto every
- * audit event (`apparatus_defect_events.details.actor_context`) so history never depends on
- * who holds which role later.
+ * Snapshot of the capacity a Captain 5 page action is taken in. It is written onto every audit
+ * event (`apparatus_defect_events.details.actor_context`) so history never depends on who holds
+ * which role later. The acting member is always the signed-in user; this only adds context.
  */
 final readonly class Captain5ActorContext
 {
-    /** Operations Captain 5 may perform on an in-scope issue. Fleet-only operations are absent. */
+    /** Operations available on the Captain 5 page. Fleet-only operations (impact, tickets) are absent. */
     public const OPERATIONS = ['acknowledge', 'update_action', 'resolve', 'verify_correction', 'reopen', 'dismiss'];
 
     /** action_details keys Captain 5 may set (assignment of Logistics staff stays with Logistics). */
@@ -30,11 +30,7 @@ final readonly class Captain5ActorContext
 
     public function mayPerform(string $operation): bool
     {
-        if (! $this->decision->canAct || ! in_array($operation, self::OPERATIONS, true)) {
-            return false;
-        }
-
-        return $operation !== 'dismiss' || $this->decision->canDismiss;
+        return $this->decision->canAct && in_array($operation, self::OPERATIONS, true);
     }
 
     /** @return array<string, mixed> */
@@ -46,10 +42,10 @@ final readonly class Captain5ActorContext
             'role' => 'captain5',
             'authority' => $this->decision->authority(),
             'label' => $this->decision->authorityLabel(),
-            'on_duty' => $this->decision->hasOnDutyAuthority,
-            'assignment_id' => $this->decision->actingAssignment?->getKey(),
+            'shown_captain5' => $this->decision->isShownCaptain5,
+            'acting_request_id' => $this->decision->isShownCaptain5 ? $onDuty->actingRequest?->getKey() : null,
             'duty_date' => $onDuty->dutyDate->format('Y-m-d'),
-            'shift' => $this->decision->actingAssignment->shift_letter ?? $onDuty->shiftLetter,
+            'shift' => $onDuty->shiftLetter,
             'bid_shift' => $this->decision->bidShiftLetter,
         ];
     }

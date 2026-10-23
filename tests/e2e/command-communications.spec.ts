@@ -158,7 +158,7 @@ test('Communications is the first and default tab; unknown stations fall back to
   const server = newServer({ posts: [makePost('a')] });
   await open(page, server);
   const tabs = page.getByRole('tablist', { name: 'Communications and stations' });
-  await expect(tabs.getByRole('tab')).toHaveCount(3);
+  await expect(tabs.getByRole('tab')).toHaveCount(4);
   await expect(tabs.getByRole('tab').first()).toHaveText('Communications');
   await expect(tabs.getByRole('tab').first()).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByTestId('command-post')).toHaveCount(1);
@@ -180,7 +180,7 @@ test('Communications stays usable with no stations and when the overview fails',
   const server = newServer({ overviewStatus: 503 });
   await open(page, server);
   await expect(page.getByTestId('command-comms')).toBeVisible();
-  await expect(page.getByRole('tab')).toHaveCount(1);
+  await expect(page.getByRole('tab')).toHaveCount(2);
   await expect(page.getByRole('alert').filter({ hasText: 'Station overview unavailable' })).toBeVisible();
   await expect(page.getByText('No messages yet')).toBeVisible();
 });
@@ -408,7 +408,7 @@ test('accounts without 300 Command access see no card and an explanatory page, a
   await expect(page.getByTestId('daily-command-card')).toHaveCount(0);
 
   await page.goto('/daily/command-300');
-  await expect(page.getByRole('heading', { name: '300 Command is not available to your account' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '300 is not available to your account' })).toBeVisible();
   await expect(page.getByText('Your station tools are not affected')).toBeVisible();
   await expect(page.getByTestId('command-comms')).toHaveCount(0);
   await expect(page.getByTestId('command-stations')).toHaveCount(0);
@@ -426,12 +426,12 @@ test('eligible accounts see the card with an unread count', async ({ page }) => 
 
 test('a 403 from the station overview closes the page even when the capability said yes', async ({ page }) => {
   await open(page, newServer({ capability: true, overviewStatus: 403 }));
-  await expect(page.getByRole('heading', { name: '300 Command is not available to your account' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '300 is not available to your account' })).toBeVisible();
 });
 
 test('a 403 from the message feed closes the page', async ({ page }) => {
   await open(page, newServer({ postsStatus: 403 }));
-  await expect(page.getByRole('heading', { name: '300 Command is not available to your account' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '300 is not available to your account' })).toBeVisible();
   await expect(page.getByTestId('command-send')).toHaveCount(0);
 });
 
@@ -448,4 +448,187 @@ test('the Communications tab fits every viewport without horizontal overflow', a
     expect(box!.height).toBeGreaterThanOrEqual(43.5);
     expect(box!.x).toBeGreaterThanOrEqual(0);
   }
+});
+
+// ---------------------------------------------------------------------------
+// The card and page are named "300"; Messages explains itself; Department Updates is its own tab.
+// ---------------------------------------------------------------------------
+
+const UPDATES = '/api/command-communications/department-updates';
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+interface PostedUpdate {
+  id: number; title: string; excerpt: string; status: 'published' | 'taken_down'; posted_at: string; expires_at: string | null; author: string;
+  author_rank: string | null; author_name: string | null; own: boolean; has_image: boolean; has_attachment: boolean; url: string;
+}
+interface UpdatesState {
+  updates: PostedUpdate[];
+  forms: Array<{ fields: Record<string, string>; files: Record<string, string> }>;
+  takeDowns: number[];
+  failNextWith?: { status: number; json: unknown };
+}
+
+function formOf(raw: string): { fields: Record<string, string>; files: Record<string, string> } {
+  const fields: Record<string, string> = {};
+  const files: Record<string, string> = {};
+  const part = /Content-Disposition: form-data; name="([^"]+)"(?:; filename="([^"]*)")?\r\n(?:Content-Type: [^\r\n]+\r\n)?\r\n([\s\S]*?)\r\n--/g;
+  for (const match of raw.matchAll(part)) {
+    if (match[2] !== undefined) files[match[1]] = match[2]; else fields[match[1]] = match[3];
+  }
+  return { fields, files };
+}
+
+const aUpdate = (id: number, overrides: Partial<PostedUpdate> = {}): PostedUpdate => ({
+  id, title: `Update ${id}`, excerpt: 'Body text', status: 'published', posted_at: minutesAgo(30), expires_at: null, author: 'Division Chief Jane Smith',
+  author_rank: 'Division Chief', author_name: 'Jane Smith', own: true, has_image: false, has_attachment: false, url: `/updates/${id}`, ...overrides,
+});
+
+/** Mocks the page's own API, then the Department Updates endpoints on top (the last route registered answers first). */
+async function openWithUpdates(page: Page, server: ServerState, state: UpdatesState, path = '/daily/command-300?tab=updates'): Promise<void> {
+  await mockApi(page, server);
+  await mockUpdates(page, state);
+  await page.goto(path);
+}
+
+async function mockUpdates(page: Page, state: UpdatesState): Promise<void> {
+  await page.route(`**${UPDATES}**`, async (route) => {
+    const { pathname } = new URL(route.request().url());
+    const method = route.request().method();
+    if (pathname === UPDATES && method === 'GET') return route.fulfill({ json: { updates: state.updates } });
+    if (pathname === UPDATES && method === 'POST') {
+      if (state.failNextWith) {
+        const failure = state.failNextWith;
+        state.failNextWith = undefined;
+        return route.fulfill({ status: failure.status, json: failure.json });
+      }
+      const form = formOf(route.request().postData() ?? '');
+      state.forms.push(form);
+      const update = aUpdate(700 + state.forms.length, { title: form.fields.title, excerpt: form.fields.body, has_image: 'image' in form.files, has_attachment: 'attachment' in form.files });
+      state.updates = [update, ...state.updates];
+      return route.fulfill({ status: 201, json: { update } });
+    }
+    const takeDown = /\/department-updates\/(\d+)\/take-down$/.exec(pathname);
+    if (takeDown) {
+      const id = Number(takeDown[1]);
+      state.takeDowns.push(id);
+      state.updates = state.updates.map((update) => (update.id === id ? { ...update, status: 'taken_down' as const } : update));
+      return route.fulfill({ json: { update: state.updates.find((update) => update.id === id) } });
+    }
+    return route.fulfill({ status: 404, json: { message: `Unmocked route ${pathname}` } });
+  });
+}
+
+const newUpdates = (overrides: Partial<UpdatesState> = {}): UpdatesState => ({ updates: [], forms: [], takeDowns: [], ...overrides });
+const updateForm = (page: Page) => page.getByTestId('department-update-form');
+
+test('the stations list card is named 300 with a Shift Division Chief badge, and the page heading is 300', async ({ page }) => {
+  await open(page, newServer({ unread: 1 }), '/daily/stations');
+  const card = page.getByTestId('daily-command-card');
+  await expect(card).toHaveAttribute('aria-label', 'Open 300');
+  await expect(card.getByRole('heading', { name: '300', exact: true, level: 3 })).toBeVisible();
+  await expect(card).toContainText('Shift Division Chief');
+  await expect(card).not.toContainText('300 Command');
+  await expect(card.getByText('Command', { exact: true })).toHaveCount(0);
+  await card.click();
+  await expect(page).toHaveURL(/\/daily\/command-300$/);
+  await expect(page.getByRole('heading', { name: '300', exact: true, level: 1 })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: '300 actions' })).toBeVisible();
+});
+
+test('Messages says who can read it and points to Department Updates', async ({ page }) => {
+  await open(page, newServer());
+  const about = page.getByTestId('command-comms-about');
+  await expect(about).toContainText('Post and receive messages, files, etc. Messages can only be received and sent by admin personnel, Capt. 5 and 300.');
+  await expect(about).toContainText('For a notice everyone sees on the home page, use Post to Department Updates instead.');
+  await expectNoHorizontalOverflow(page);
+});
+
+test('Department Updates is its own tab: the link in Messages opens it, stations still work, and the URL is shareable', async ({ page }) => {
+  const server = newServer();
+  await openWithUpdates(page, server, newUpdates(), '/daily/command-300');
+  const tabs = page.getByRole('tablist', { name: 'Communications and stations' });
+  await expect(tabs.getByRole('tab')).toHaveText([/Communications/, 'Department Updates', 'Station 1', 'Station 2']);
+  await page.getByTestId('command-comms-about').getByRole('button', { name: 'Post to Department Updates' }).click();
+  await expect(page).toHaveURL(/tab=updates$/);
+  await expect(tabs.getByRole('tab', { name: 'Department Updates' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByTestId('department-updates-about')).toHaveText('Department Updates appear on the MBFD Hub home page for everyone in the department. For private messages to administrators, Captain 5 and 300, use Messages.');
+  await expect(page.getByTestId('department-updates-byline')).toContainText('Posted by');
+  await expect(page.getByTestId('command-comms')).toHaveCount(0);
+  await expectNoHorizontalOverflow(page);
+
+  await tabs.getByRole('tab', { name: 'Station 2', exact: true }).click();
+  await expect(page).toHaveURL(/station=42$/);
+  await expect(page).not.toHaveURL(/tab=updates/);
+  await page.goto('/daily/command-300?tab=updates');
+  await expect(page.getByTestId('department-updates')).toBeVisible();
+  await page.getByTestId('department-updates').getByRole('button', { name: 'Go to Messages' }).click();
+  await expect(page.getByTestId('command-comms')).toBeVisible();
+  await expect(page).not.toHaveURL(/tab=updates/);
+});
+
+test('posts a Department Update with a picture and a file, shows the byline, and links to it', async ({ page }) => {
+  const state = newUpdates();
+  await openWithUpdates(page, newServer(), state);
+  await updateForm(page).getByLabel('Title').fill('Station 2 water outage');
+  await updateForm(page).getByLabel('Details').fill('Water is off on Station 2 until 1400.');
+  await updateForm(page).getByLabel('Picture (optional)').setInputFiles({ name: 'notice.png', mimeType: 'image/png', buffer: PNG_1X1 });
+  await updateForm(page).getByLabel('File (optional)').setInputFiles({ name: 'schedule.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 test') });
+  await updateForm(page).getByRole('button', { name: 'Post to Department Updates' }).click();
+
+  const success = page.getByTestId('department-update-success');
+  await expect(success).toContainText('Posted. Everyone in the department can now see it on the home page.');
+  await expect(success.getByRole('link', { name: /View the update/ })).toHaveAttribute('href', '/updates/701');
+  expect(state.forms[0].fields).toMatchObject({ title: 'Station 2 water outage', body: 'Water is off on Station 2 until 1400.', category: 'operations' });
+  expect(state.forms[0].fields.client_request_id).toMatch(UUID);
+  expect(state.forms[0].fields).not.toHaveProperty('expires_at');
+  expect(state.forms[0].files).toEqual({ image: 'notice.png', attachment: 'schedule.pdf' });
+  const row = page.getByTestId('department-update-row');
+  await expect(row).toHaveCount(1);
+  await expect(row).toContainText('Posted by Division Chief Jane Smith');
+  await expect(row).toContainText('Published');
+  await expectNoHorizontalOverflow(page);
+});
+
+test('takes down your own post only after confirming; other posts have no Take down', async ({ page }) => {
+  const state = newUpdates({ updates: [aUpdate(5, { title: 'Mine' }), aUpdate(4, { title: 'Theirs', own: false, author: 'Captain Pat Doe' })] });
+  await openWithUpdates(page, newServer(), state);
+  const rows = page.getByTestId('department-update-row');
+  await expect(rows).toHaveCount(2);
+  await expect(rows.filter({ hasText: 'Theirs' }).getByRole('button', { name: /Take down/ })).toHaveCount(0);
+  const mine = rows.filter({ hasText: 'Mine' });
+  await mine.getByRole('button', { name: /Take down/ }).click();
+  await expect(mine).toContainText('Take this off the home page?');
+  expect(state.takeDowns).toEqual([]);
+  await mine.getByRole('button', { name: 'Yes, take it down' }).click();
+  await expect(mine).toContainText('Taken down');
+  expect(state.takeDowns).toEqual([5]);
+});
+
+test('a server 422 shows its field error and keeps the text; offline says nothing was posted and keeps the text', async ({ page, context }) => {
+  const state = newUpdates({ failNextWith: { status: 422, json: { message: 'Invalid.', errors: { image: ['The picture must be a JPEG, PNG or WebP image up to 5 MB.'] } } } });
+  await openWithUpdates(page, newServer(), state);
+  await updateForm(page).getByLabel('Title').fill('Keep this');
+  await updateForm(page).getByLabel('Details').fill('And this.');
+  await updateForm(page).getByRole('button', { name: 'Post to Department Updates' }).click();
+  await expect(updateForm(page).getByText('The picture must be a JPEG, PNG or WebP image up to 5 MB.')).toBeVisible();
+  await expect(updateForm(page).getByLabel('Title')).toHaveValue('Keep this');
+
+  await context.setOffline(true);
+  await updateForm(page).getByRole('button', { name: 'Try posting again' }).click();
+  await expect(page.getByTestId('department-update-error')).toHaveText("You're offline. Nothing was posted; what you wrote is kept.");
+  await expect(updateForm(page).getByLabel('Details')).toHaveValue('And this.');
+  expect(state.forms).toHaveLength(0);
+  await context.setOffline(false);
+  await updateForm(page).getByRole('button', { name: 'Try posting again' }).click();
+  await expect(page.getByTestId('department-update-success')).toBeVisible();
+  expect(state.forms).toHaveLength(1);
+});
+
+test('the Department Updates tab fits every viewport with 44px controls', async ({ page }) => {
+  const state = newUpdates({ updates: [aUpdate(9, { title: 'A long update title that has to wrap instead of overflowing the row on a phone '.repeat(2), excerpt: 'word '.repeat(80) })] });
+  await openWithUpdates(page, newServer(), state);
+  await expect(page.getByTestId('department-update-row')).toHaveCount(1);
+  await expectNoHorizontalOverflow(page);
+  const heights = await page.getByTestId('department-updates').evaluate((el) => [...el.querySelectorAll<HTMLElement>('button, input:not([type="file"]), select, textarea, a')].map((c) => Math.round(c.getBoundingClientRect().height)));
+  expect(Math.min(...heights)).toBeGreaterThanOrEqual(44);
 });

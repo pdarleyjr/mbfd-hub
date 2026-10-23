@@ -9,11 +9,10 @@ import { BTN_PRIMARY, FIELD, HINT, LABEL } from './ui';
 interface Props {
   issue: IssueDetail;
   /** Posting is a write control: view-only viewers read the thread but get no composer. */
-  canWrite: boolean;
   onPosted: (issue: IssueDetail) => void;
 }
 
-export default function IssueThread({ issue, canWrite, onPosted }: Props) {
+export default function IssueThread({ issue, onPosted }: Props) {
   const id = useId();
   const [body, setBody] = useState('');
   const [visibility, setVisibility] = useState<'member' | 'internal'>('member');
@@ -73,7 +72,7 @@ export default function IssueThread({ issue, canWrite, onPosted }: Props) {
           </ul>
         )}
 
-      {canWrite && issue.can_post && (
+      {issue.can_post && (
         <form onSubmit={send} noValidate className="space-y-2" aria-label="Write a message">
           <div>
             <label className={LABEL} htmlFor={`${id}-body`}>Message</label>

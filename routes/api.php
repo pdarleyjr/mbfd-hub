@@ -324,6 +324,18 @@ Route::prefix('command-communications')
             ->where('publicId', '[0-9A-Za-z]{26}')->middleware('throttle:30,1,command-communications-delete')->name('posts.destroy');
     });
 
+// Post to the department-wide Department Updates from the 300 page (not a private message). Who may
+// post is CommandDepartmentUpdatePublisher::canPost (checked on every call), not the 300 page gate.
+Route::prefix('command-communications/department-updates')
+    ->middleware(['auth:sanctum', 'canonical.api', 'throttle:120,1'])
+    ->name('api.command-communications.department-updates.')
+    ->controller(\App\Http\Controllers\Api\CommandDepartmentUpdateController::class)
+    ->group(function () {
+        Route::get('/', 'index')->defaults('origin', 'command_300')->name('index');
+        Route::post('/', 'store')->defaults('origin', 'command_300')->middleware('throttle:10,1,command-department-updates')->name('store');
+        Route::post('/{update}/take-down', 'takeDown')->defaults('origin', 'command_300')->whereNumber('update')->name('take-down');
+    });
+
 // The same conversation as seen from the Captain 5 page: the `captain_5` channel of the shared
 // posts (audience captain_5 or both). Same controller and service; only the gate and channel differ.
 Route::prefix('captain5/communications')
@@ -344,8 +356,8 @@ Route::prefix('captain5/communications')
 
 // =========================================================================
 // Captain 5 EMS Operations Center (docs/captain5-ems-operations-center.md).
-// The group needs `captain5-view`; every mutation re-checks its own
-// capability (act / dismiss / manage assignments) in the service layer.
+// The group needs `captain5-view` (everyone eligible may use the whole page);
+// services re-check on every call. Acting Captain 5 is display only.
 // =========================================================================
 // Card probe for the station list: every signed-in member gets 200 (view:false when not eligible),
 // so ineligible members never see a 403 in their console. It returns no Captain 5 data to them.
@@ -370,7 +382,20 @@ Route::prefix('captain5')
             ->middleware('throttle:30,1,captain5-messages')->name('inspections.clarification');
         Route::post('/handoff', 'writeHandoff')->name('handoff.store');
         Route::post('/handoff/{note}/acknowledge', 'acknowledgeHandoff')->whereNumber('note')->name('handoff.acknowledge');
-        Route::post('/assignments', 'assign')->name('assignments.store');
-        Route::post('/assignments/{assignment}/revoke', 'revokeAssignment')->whereNumber('assignment')->name('assignments.revoke');
-        Route::get('/people', 'people')->middleware('throttle:30,1,captain5-people')->name('people');
+        Route::post('/acting-requests', 'requestActing')->middleware('throttle:20,1,captain5-acting')->name('acting.store');
+        Route::post('/acting-requests/{actingRequest}/approve', 'approveActing')->whereNumber('actingRequest')->name('acting.approve');
+        Route::post('/acting-requests/{actingRequest}/reject', 'rejectActing')->whereNumber('actingRequest')->name('acting.reject');
+        Route::post('/acting-requests/{actingRequest}/withdraw', 'withdrawActing')->whereNumber('actingRequest')->name('acting.withdraw');
+    });
+
+// Post to the department-wide Department Updates from the Captain 5 page (not a private message).
+// Same posting rule as above (CommandDepartmentUpdatePublisher::canPost).
+Route::prefix('captain5/department-updates')
+    ->middleware(['auth:sanctum', 'canonical.api', 'throttle:120,1'])
+    ->name('api.captain5.department-updates.')
+    ->controller(\App\Http\Controllers\Api\CommandDepartmentUpdateController::class)
+    ->group(function () {
+        Route::get('/', 'index')->defaults('origin', 'captain_5')->name('index');
+        Route::post('/', 'store')->defaults('origin', 'captain_5')->middleware('throttle:10,1,captain5-department-updates')->name('store');
+        Route::post('/{update}/take-down', 'takeDown')->defaults('origin', 'captain_5')->whereNumber('update')->name('take-down');
     });

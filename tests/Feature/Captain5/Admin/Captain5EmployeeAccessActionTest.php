@@ -43,7 +43,7 @@ final class Captain5EmployeeAccessActionTest extends TestCase
             ->assertSee('Current Captain 5 access')->assertSee('No Captain 5 access')
             ->assertSee('Your current administrator password')->assertSee('Reason for this change');
 
-        $page->setActionData(['choice' => 'allow_act', 'current_password' => 'password', 'reason' => 'Covers EMS duties'])
+        $page->setActionData(['choice' => 'allow', 'current_password' => 'password', 'reason' => 'Covers EMS duties'])
             ->callMountedAction()->assertHasNoActionErrors();
 
         $override = Captain5AccessOverride::query()->current()->where('employee_profile_id', $target->employee_profile_id)->sole();
@@ -58,7 +58,7 @@ final class Captain5EmployeeAccessActionTest extends TestCase
         self::assertTrue(app(Captain5Access::class)->decide($target->fresh())->canAct);
 
         // Reopening shows the choice now in force.
-        $page->mountAction('manageCaptain5Access')->assertSee('Administrator choice: Allow, view and act.');
+        $page->mountAction('manageCaptain5Access')->assertSee('Administrator choice: Allow.');
     }
 
     public function test_wrong_password_or_missing_reason_changes_nothing(): void
@@ -73,6 +73,10 @@ final class Captain5EmployeeAccessActionTest extends TestCase
             ->callMountedAction()->assertHasActionErrors(['reason']);
         $page->setActionData(['choice' => 'banned', 'current_password' => 'password', 'reason' => 'Bad choice'])
             ->callMountedAction()->assertHasActionErrors();
+        foreach (['allow_view', 'allow_act'] as $removed) {
+            $page->setActionData(['choice' => $removed, 'current_password' => 'password', 'reason' => 'Removed level'])
+                ->callMountedAction()->assertHasActionErrors(['choice']);
+        }
 
         self::assertSame(0, Captain5AccessOverride::query()->count());
         self::assertDatabaseMissing('security_action_events', ['action' => 'change_captain5_access']);
@@ -109,10 +113,10 @@ final class Captain5EmployeeAccessActionTest extends TestCase
 
         Livewire::test(EditEmployee::class, ['record' => $target->employee_profile_id])
             ->mountAction('manageCaptain5Access')
-            ->setActionData(['choice' => 'allow_view', 'current_password' => 'password', 'reason' => 'Observer for the pilot'])
+            ->setActionData(['choice' => 'allow', 'current_password' => 'password', 'reason' => 'Observer for the pilot'])
             ->callMountedAction()->assertHasNoActionErrors();
 
-        self::assertSame('view', Captain5AccessOverride::query()->current()->sole()->level);
+        self::assertSame('allow', Captain5AccessOverride::query()->current()->sole()->effect);
     }
 
     public function test_the_control_is_hidden_for_unauthorized_actors_self_super_admins_and_nonemployee_accounts(): void

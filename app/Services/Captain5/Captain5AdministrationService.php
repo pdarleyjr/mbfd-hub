@@ -23,7 +23,7 @@ use Illuminate\Validation\ValidationException;
 final class Captain5AdministrationService
 {
     /** Effective choices offered to an administrator. `automatic` removes the current override. */
-    public const OVERRIDE_CHOICES = ['automatic', 'allow_view', 'allow_act', 'deny'];
+    public const OVERRIDE_CHOICES = ['automatic', 'allow', 'deny'];
 
     public function __construct(
         private readonly Captain5Access $access,
@@ -37,7 +37,7 @@ final class Captain5AdministrationService
         $this->authorize($actor);
         $reason = trim($reason);
         if (! in_array($choice, self::OVERRIDE_CHOICES, true)) {
-            throw ValidationException::withMessages(['choice' => 'Choose automatic, allow (view), allow (act) or deny.']);
+            throw ValidationException::withMessages(['choice' => 'Choose automatic, allow or deny.']);
         }
         if ($reason === '' || mb_strlen($reason) > 500) {
             throw ValidationException::withMessages(['reason' => 'Give a reason (up to 500 characters).']);
@@ -54,8 +54,7 @@ final class Captain5AdministrationService
         $override = DB::transaction(function () use ($actor, $employee, $choice, $reason): ?Captain5AccessOverride {
             $current = Captain5AccessOverride::query()->current()->where('employee_profile_id', $employee->getKey())->lockForUpdate()->first();
             $wanted = match ($choice) {
-                'allow_view' => [Captain5AccessOverride::EFFECT_ALLOW, Captain5AccessOverride::LEVEL_VIEW],
-                'allow_act' => [Captain5AccessOverride::EFFECT_ALLOW, Captain5AccessOverride::LEVEL_ACT],
+                'allow' => [Captain5AccessOverride::EFFECT_ALLOW, Captain5AccessOverride::LEVEL_ACT],
                 'deny' => [Captain5AccessOverride::EFFECT_DENY, null],
                 default => null,
             };

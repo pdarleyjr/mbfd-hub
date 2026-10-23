@@ -9,6 +9,7 @@ import { useOffline } from '../hooks/useOffline';
 import DailyPageNav from './DailyPageNav';
 import AccessDenied from './command-communications/AccessDenied';
 import CommunicationsPanel from './command-communications/CommunicationsPanel';
+import DepartmentUpdatesPanel from './department-updates/DepartmentUpdatesPanel';
 import { useCommandAccess } from './command-communications/useCommandAccess';
 import { useCommandCommunications, type CommandCommunications } from './command-communications/useCommandCommunications';
 import Tabs, { type TabItem } from './ui/Tabs';
@@ -23,8 +24,11 @@ export const COMMAND_BOARD_HREF = 'https://cmd.mbfdhub.com';
 /** A checkout older than this is stale, not healthy. */
 const STALE_AFTER_HOURS = 36;
 
-/** First and default tab of the card. Every other tab id is a station id. */
+/** First and default tab of the card. Every other tab id is a station id, except Department Updates. */
 const COMMS_TAB = 'communications';
+const UPDATES_TAB = 'department-updates';
+/** `?tab=updates` selects the Department Updates tab; `?station=` still selects a station. */
+const UPDATES_PARAM = 'updates';
 
 const ACTION = 'flex min-h-12 items-center gap-2.5 rounded-hub-control px-4 py-2.5 text-sm font-semibold transition-colors';
 const ACTION_PRIMARY = `${ACTION} border border-hub-blue bg-hub-blue text-white hover:bg-hub-blue-hover`;
@@ -116,21 +120,25 @@ interface CommandCenterProps {
   comms: CommandCommunications;
   /** The raw `?station=` value; anything that is not a known station falls back to Communications. */
   requested: string | null;
+  /** The page is on the Department Updates tab (and no station is requested). */
+  updatesOpen: boolean;
   onSelect: (id: string) => void;
 }
 
 const isStationId = (value: string | null): value is string => value !== null && /^\d+$/.test(value);
 
 /** Communications first, then one tab per station. The card mounts whether or not the overview loads. */
-function CommandCenter({ overview, loading, comms, requested, onSelect }: CommandCenterProps) {
+function CommandCenter({ overview, loading, comms, requested, updatesOpen, onSelect }: CommandCenterProps) {
   const stations = overview?.stations ?? [];
   const known = stations.some((station) => String(station.id) === requested);
   // A deep link to a station waits for the overview instead of flashing Communications first.
   const pending = !known && loading && !overview && isStationId(requested);
-  const activeId = (known || pending) && requested ? requested : COMMS_TAB;
+  const stationId = (known || pending) && requested ? requested : COMMS_TAB;
+  const activeId = stationId === COMMS_TAB && updatesOpen ? UPDATES_TAB : stationId;
 
   const tabs: TabItem<string>[] = [
     { id: COMMS_TAB, label: 'Communications', badge: comms.feed.unreadCount, badgeLabel: 'unread messages' },
+    { id: UPDATES_TAB, label: 'Department Updates' },
     ...stations.map((station) => ({ id: String(station.id), label: station.name })),
     ...(pending && requested ? [{ id: requested, label: 'Station' }] : []),
   ];
@@ -145,7 +153,8 @@ function CommandCenter({ overview, loading, comms, requested, onSelect }: Comman
         idPrefix="command-stations"
         panelClassName="p-4 sm:p-5"
         renderPanel={(id) => {
-          if (id === COMMS_TAB) return <CommunicationsPanel comms={comms} />;
+          if (id === COMMS_TAB) return <CommunicationsPanel comms={comms} onOpenUpdates={() => onSelect(UPDATES_TAB)} />;
+          if (id === UPDATES_TAB) return <DepartmentUpdatesPanel origin="command_300" onOpenMessages={() => onSelect(COMMS_TAB)} />;
           const station = stations.find((candidate) => String(candidate.id) === id);
           return station ? <StationSection station={station} /> : <StationPanelSkeleton />;
         }}
@@ -168,9 +177,10 @@ export default function Command300Page() {
   const onStationTab = overview
     ? overview.stations.some((station) => String(station.id) === requested)
     : loading && isStationId(requested);
+  const updatesOpen = !onStationTab && searchParams.get('tab') === UPDATES_PARAM;
   const onDenied = useCallback(() => setForbidden(true), []);
   const comms = useCommandCommunications({
-    active: !onStationTab,
+    active: !onStationTab && !updatesOpen,
     enabled: (access === 'allowed' || access === 'unknown') && !forbidden,
     onDenied,
   });
@@ -202,21 +212,23 @@ export default function Command300Page() {
 
   const onSelect = useCallback((id: string) => {
     const next = new URLSearchParams(searchParams);
+    next.delete('tab');
     if (id === COMMS_TAB) next.delete('station');
+    else if (id === UPDATES_TAB) { next.delete('station'); next.set('tab', UPDATES_PARAM); }
     else next.set('station', id);
     setSearchParams(next, { replace: true, preventScrollReset: true });
   }, [searchParams, setSearchParams]);
 
   const onRefresh = () => {
     void load(true);
-    if (!onStationTab) refreshFeed().catch(() => undefined);
+    if (!onStationTab && !updatesOpen) refreshFeed().catch(() => undefined);
   };
 
   // The server decides. This only keeps protected content off screen for someone it already refused.
   if (forbidden || access === 'denied') return <AccessDenied />;
   if (access === 'checking') {
     return (
-      <div data-hub-ui="2" className="space-y-6 font-hub" role="status" aria-label="Checking access to 300 Command">
+      <div data-hub-ui="2" className="space-y-6 font-hub" role="status" aria-label="Checking access to 300">
         <DailyPageNav fallback="/stations" />
         <span className="hub-skeleton block !h-40 w-full" />
         <span className="hub-skeleton block !h-64 w-full" />
@@ -227,7 +239,7 @@ export default function Command300Page() {
   const refreshLabel = isOffline ? 'Refresh unavailable while offline' : refreshing ? 'Refreshing overview' : 'Refresh overview';
   const description = overview
     ? `Stations are read-only. Loaded ${formatDateTime(overview.generated_at)}.`
-    : loading ? 'Loading stations…' : 'Messages for 300 Command and Administration, with a read-only summary of each active station.';
+    : loading ? 'Loading stations…' : 'Messages and Department Updates for 300, with a read-only summary of each active station.';
 
   return (
     <div data-hub-ui="2" className="space-y-6 font-hub">
@@ -245,9 +257,9 @@ export default function Command300Page() {
           />
           <div className="min-w-0 flex-1">
             <p className="text-[13px] font-semibold text-hub-n-600">Command unit</p>
-            <h1 id="command-heading" className="font-heading text-2xl font-bold text-hub-ink sm:text-3xl">300 Command</h1>
-            <p className={`mt-1 max-w-prose ${SECONDARY}`}>Department command vehicle. Join the command Morning Lineup, open the Command Board, message 300 Command and Administration, or review station readiness below.</p>
-            <nav aria-label="300 Command actions" className="mt-4 grid gap-2.5 sm:grid-cols-2">
+            <h1 id="command-heading" className="font-heading text-2xl font-bold text-hub-ink sm:text-3xl">300</h1>
+            <p className={`mt-1 max-w-prose ${SECONDARY}`}>Shift Division Chief. Join the command Morning Lineup, open the Command Board, message Administration and Captain 5, post to Department Updates, or review station readiness below.</p>
+            <nav aria-label="300 actions" className="mt-4 grid gap-2.5 sm:grid-cols-2">
               <a href={COMMAND_LINEUP_HREF} className={ACTION_PRIMARY}>
                 <ClipboardCheck size={20} aria-hidden="true" />
                 <span className="min-w-0">Morning Lineup — Command</span>
@@ -295,7 +307,7 @@ export default function Command300Page() {
           </div>
         )}
 
-        <CommandCenter overview={overview} loading={loading} comms={comms} requested={requested} onSelect={onSelect} />
+        <CommandCenter overview={overview} loading={loading} comms={comms} requested={requested} updatesOpen={updatesOpen} onSelect={onSelect} />
       </section>
     </div>
   );

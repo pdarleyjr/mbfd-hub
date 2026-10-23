@@ -7,9 +7,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
-use App\Models\Employee;
 use App\Models\User;
-use App\Services\Captain5\Captain5AssignmentService;
+use App\Services\Captain5\Captain5ActingService;
 use App\Services\Captain5\Captain5HandoffService;
 use App\Services\Captain5\Captain5InspectionView;
 use App\Services\Captain5\Captain5IssueActions;
@@ -189,43 +188,44 @@ final class Captain5Controller extends Controller
         return $this->json(['handoff' => $this->workspace()->handoff($this->access()->decide($user)->onDuty->dutyDate->format('Y-m-d'), $user)]);
     }
 
-    public function assign(Request $request, Captain5AssignmentService $assignments): JsonResponse
+    /** "Acting as Captain 5 today?" (display only; an administrator approves). */
+    public function requestActing(Request $request, Captain5ActingService $acting): JsonResponse
     {
-        $assignments->assign($this->user($request), $request->only(['employee_profile_id', 'duty_date', 'reason', 'client_request_id']));
-        $this->access()->flush();
+        $acting->request($this->user($request), $request->only(['kind', 'duration', 'ends_at', 'client_request_id']));
 
-        return $this->json(['assignments' => $this->workspace()->assignments(true)], 201);
+        return $this->json($this->actingState($this->user($request)), 201);
     }
 
-    public function revokeAssignment(Request $request, Captain5AssignmentService $assignments, int $assignment): JsonResponse
+    public function approveActing(Request $request, Captain5ActingService $acting, int $actingRequest): JsonResponse
     {
-        $valid = $request->validate(['reason' => ['required', 'string', 'max:500']]);
-        $assignments->revoke($this->user($request), $assignment, $valid['reason']);
-        $this->access()->flush();
+        $valid = $request->validate(['note' => ['nullable', 'string', 'max:500']]);
+        $acting->approve($this->user($request), $actingRequest, $valid['note'] ?? null);
 
-        return $this->json(['assignments' => $this->workspace()->assignments(true)]);
+        return $this->json($this->actingState($this->user($request)));
     }
 
-    /** Member picker for acting assignments (managers only): current members, name and rank. */
-    public function people(Request $request): JsonResponse
+    public function rejectActing(Request $request, Captain5ActingService $acting, int $actingRequest): JsonResponse
     {
-        if (! $this->access()->decide($this->user($request))->canManageAssignments) {
-            throw new AuthorizationException('Only people who assign an acting Captain 5 can search members.');
-        }
-        $valid = $request->validate(['q' => ['required', 'string', 'min:2', 'max:60']]);
-        $term = '%'.str_replace(['%', '_'], ['\%', '\_'], trim($valid['q'])).'%';
-        $people = Employee::query()
-            ->where(fn ($q) => $q->whereNull('roster_status')->orWhere('roster_status', '!=', 'departed'))
-            ->where(fn ($q) => $q->where('name', 'like', $term)->orWhere('display_name', 'like', $term))
-            ->orderBy('name')->limit(20)->get(['id', 'name', 'display_name', 'rank', 'station'])
-            ->map(fn (Employee $employee): array => [
-                'id' => (int) $employee->getKey(),
-                'name' => trim((string) ($employee->display_name ?: $employee->name)),
-                'rank' => $employee->rank,
-                'station' => $employee->station,
-            ])->values()->all();
+        $valid = $request->validate(['note' => ['required', 'string', 'max:500']]);
+        $acting->reject($this->user($request), $actingRequest, $valid['note']);
 
-        return $this->json(['people' => $people]);
+        return $this->json($this->actingState($this->user($request)));
+    }
+
+    public function withdrawActing(Request $request, Captain5ActingService $acting, int $actingRequest): JsonResponse
+    {
+        $acting->withdraw($this->user($request), $actingRequest);
+
+        return $this->json($this->actingState($this->user($request)));
+    }
+
+    /** @return array<string, mixed> */
+    private function actingState(User $user): array
+    {
+        $this->access()->flush();
+        $decision = $this->access()->decide($user);
+
+        return ['on_duty' => $decision->onDuty->toArray(), 'acting' => $this->workspace()->acting($user, $decision)];
     }
 
     private function inScope(int $defectId): ApparatusDefect

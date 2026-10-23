@@ -28,7 +28,7 @@ function SendProgress({ progress }: { progress: number | null }) {
   );
 }
 
-export default function Composer({ comms, offline, textareaRef, placeholder = 'Write a message to 300 Command and Administration' }: ComposerProps) {
+export default function Composer({ comms, offline, textareaRef, placeholder = 'Write a message to 300 and Administration' }: ComposerProps) {
   const { controls, sending, progress, sendError, canSend, send } = comms;
   const { draft } = controls;
   const fileInput = useRef<HTMLInputElement>(null);

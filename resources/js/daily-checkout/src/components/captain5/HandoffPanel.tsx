@@ -8,13 +8,12 @@ import { BTN_PRIMARY, BTN_SECONDARY, FIELD, HINT, LABEL } from './ui';
 
 interface Props {
   handoff: Handoff;
-  canAct: boolean;
   onChange: (handoff: Handoff) => void;
 }
 
 const messageOf = (error: unknown, fallback: string) => (error instanceof Error && error.message ? error.message : fallback);
 
-export default function HandoffPanel({ handoff, canAct, onChange }: Props) {
+export default function HandoffPanel({ handoff, onChange }: Props) {
   const [body, setBody] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -86,7 +85,7 @@ export default function HandoffPanel({ handoff, canAct, onChange }: Props) {
                     : <Tag tone="warning">Not yet acknowledged</Tag>}
                 </p>
                 <p className="mt-1 whitespace-pre-wrap break-words text-sm text-hub-ink">{note.body}</p>
-                {canAct && !note.acknowledged_at && !note.own && !ownIds.current.has(note.id) && (
+                {!note.acknowledged_at && !note.own && !ownIds.current.has(note.id) && (
                   <button type="button" className={`${BTN_SECONDARY} mt-2`} disabled={ackBusy === note.id} aria-busy={ackBusy === note.id} onClick={() => void acknowledge(note.id)}>
                     {ackBusy === note.id ? 'Acknowledging…' : 'Acknowledge handoff'}
                   </button>
@@ -97,18 +96,16 @@ export default function HandoffPanel({ handoff, canAct, onChange }: Props) {
           </ul>
         )}
 
-      {canAct && (
-        <form onSubmit={save} noValidate className="space-y-2" aria-label="Write a handoff note">
-          <div>
-            <label className={LABEL} htmlFor="c5-handoff-body">Handoff note for the next Captain 5</label>
-            <textarea id="c5-handoff-body" rows={3} className={FIELD} value={body} disabled={busy} maxLength={4000}
-              onChange={(event) => { setBody(event.target.value); setSaved(false); }} />
-          </div>
-          {error && <p role="alert" className="hub-callout hub-callout--warning p-3 text-sm">{error}</p>}
-          {saved && !error && <p role="status" className="text-sm font-semibold text-hub-success">Handoff saved.</p>}
-          <button type="submit" className={BTN_PRIMARY} disabled={busy} aria-busy={busy}>{busy ? 'Saving…' : retry ? 'Retry save' : 'Save handoff'}</button>
-        </form>
-      )}
+      <form onSubmit={save} noValidate className="space-y-2" aria-label="Write a handoff note">
+        <div>
+          <label className={LABEL} htmlFor="c5-handoff-body">Handoff note for the next Captain 5</label>
+          <textarea id="c5-handoff-body" rows={3} className={FIELD} value={body} disabled={busy} maxLength={4000}
+            onChange={(event) => { setBody(event.target.value); setSaved(false); }} />
+        </div>
+        {error && <p role="alert" className="hub-callout hub-callout--warning p-3 text-sm">{error}</p>}
+        {saved && !error && <p role="status" className="text-sm font-semibold text-hub-success">Handoff saved.</p>}
+        <button type="submit" className={BTN_PRIMARY} disabled={busy} aria-busy={busy}>{busy ? 'Saving…' : retry ? 'Retry save' : 'Save handoff'}</button>
+      </form>
     </section>
   );
 }

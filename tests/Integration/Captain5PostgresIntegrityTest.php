@@ -9,7 +9,7 @@ use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
 use App\Models\Captain5\Captain5AccessOverride;
-use App\Models\Captain5\Captain5DutyAssignment;
+use App\Models\Captain5\Captain5ActingRequest;
 use App\Models\Employee;
 use App\Models\EmployeeBidAssignment;
 use App\Models\Station;
@@ -27,8 +27,8 @@ use Symfony\Component\Process\Process as SymfonyProcess;
 use Tests\TestCase;
 
 /**
- * Captain 5 integrity on real PostgreSQL: the partial unique indexes that keep one acting
- * Captain 5 per duty day and one current override per member, and the shared corrective-action
+ * Captain 5 integrity on real PostgreSQL: the idempotency key and self reference of acting
+ * Captain 5 requests, the partial unique index that keeps one current override per member, and the shared corrective-action
  * engine's lock retry when a Captain 5 acts while another session holds the issue row.
  * Guarded to an explicitly configured disposable test database (never production).
  */
@@ -49,23 +49,23 @@ final class Captain5PostgresIntegrityTest extends TestCase
         $actor = User::factory()->create(['account_status' => AccountStatus::Active]);
         $first = Employee::query()->create(['employee_id' => "C5PG-A-{$suffix}", 'name' => 'PG One', 'rank' => 'Lieutenant', 'password' => 'x']);
         $second = Employee::query()->create(['employee_id' => "C5PG-B-{$suffix}", 'name' => 'PG Two', 'rank' => 'Lieutenant', 'password' => 'x']);
-        $dutyDate = '2099-01-0'.random_int(1, 9);
-        $row = fn (Employee $employee): array => [
-            'employee_profile_id' => $employee->id, 'duty_date' => $dutyDate,
-            'starts_at' => CarbonImmutable::parse($dutyDate.' 12:00:00', 'UTC'), 'ends_at' => CarbonImmutable::parse($dutyDate.' 12:00:00', 'UTC')->addDay(),
-            'reason' => 'PG test', 'assigned_by_user_id' => $actor->id,
+        $key = 'c5pg-'.strtolower($suffix);
+        $row = fn (Employee $employee, string $clientId): array => [
+            'kind' => Captain5ActingRequest::KIND_ACT, 'employee_profile_id' => $employee->id, 'requested_by_user_id' => $actor->id,
+            'duration' => '24h', 'shift_letter' => 'A', 'ends_at' => CarbonImmutable::parse('2099-01-02 13:00:00', 'UTC'),
+            'status' => Captain5ActingRequest::PENDING, 'client_request_id' => $clientId,
         ];
 
         try {
-            $active = Captain5DutyAssignment::query()->create($row($first));
+            $active = Captain5ActingRequest::query()->create($row($first, $key));
             try {
-                DB::transaction(fn () => Captain5DutyAssignment::query()->create($row($second)));
-                $this->fail('Two active acting assignments for one duty day must violate the partial unique index.');
+                DB::transaction(fn () => Captain5ActingRequest::query()->create($row($second, $key)));
+                $this->fail('A retried acting request must violate the client_request_id unique index.');
             } catch (UniqueConstraintViolationException) {
             }
-            $active->forceFill(['revoked_at' => now(), 'revoked_by_user_id' => $actor->id, 'revocation_reason' => 'PG test'])->save();
-            $replacement = Captain5DutyAssignment::query()->create($row($second));
-            $this->assertNotNull($replacement->id, 'After revocation the day can be reassigned');
+            $replacement = Captain5ActingRequest::query()->create($row($second, $key.'-2'));
+            $active->forceFill(['ended_at' => now(), 'ended_by_request_id' => $replacement->id])->save();
+            $this->assertSame($replacement->id, (int) $active->fresh()->ended_by_request_id, 'A takeover records which request ended the earlier one');
 
             Captain5AccessOverride::query()->create(['employee_profile_id' => $first->id, 'effect' => 'deny', 'reason' => 'PG', 'set_by_user_id' => $actor->id]);
             try {
@@ -75,7 +75,8 @@ final class Captain5PostgresIntegrityTest extends TestCase
             }
         } finally {
             DB::table('captain5_access_overrides')->whereIn('employee_profile_id', [$first->id, $second->id])->delete();
-            DB::table('captain5_duty_assignments')->whereIn('employee_profile_id', [$first->id, $second->id])->delete();
+            DB::table('captain5_acting_requests')->whereIn('employee_profile_id', [$first->id, $second->id])->update(['ended_by_request_id' => null]);
+            DB::table('captain5_acting_requests')->whereIn('employee_profile_id', [$first->id, $second->id])->delete();
             DB::table('employees')->whereIn('id', [$first->id, $second->id])->delete();
             DB::table('users')->where('id', $actor->id)->delete();
         }

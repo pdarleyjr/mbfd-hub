@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace App\Services\Security;
 
-use App\Models\Captain5\Captain5DutyAssignment;
 use App\Services\Captain5\OnDutyCaptain5;
 
 /**
- * Immutable result of Captain5Access::decide(). The five capabilities are kept separate on
- * purpose: viewing the page, viewing scoped data, acting on issues, on-duty Captain 5 authority
- * and administrative configuration (docs/captain5-ems-operations-center.md section 2).
+ * Immutable result of Captain5Access::decide(). Everyone eligible may use the whole Captain 5 page
+ * (view, act, close); configuration (overrides, medical classification, approving acting Captain 5
+ * requests) is separate. Being the shift's Captain 5 is display information only.
  */
 final readonly class Captain5AccessDecision
 {
@@ -24,11 +23,7 @@ final readonly class Captain5AccessDecision
 
     public const SOURCE_EMS_CAPTAIN_SEAT = 'ems_captain_seat';
 
-    public const SOURCE_ACTING = 'acting_assignment';
-
-    public const SOURCE_ALLOW_VIEW = 'explicit_allow_view';
-
-    public const SOURCE_ALLOW_ACT = 'explicit_allow_act';
+    public const SOURCE_EXPLICIT_ALLOW = 'explicit_allow';
 
     public const SOURCE_REVIEWER = 'fleet_reviewer';
 
@@ -40,20 +35,18 @@ final readonly class Captain5AccessDecision
         public bool $canViewPage,
         public bool $canViewData,
         public bool $canAct,
-        public bool $hasOnDutyAuthority,
         public bool $canDismiss,
-        public bool $canManageAssignments,
         public bool $canConfigure,
         public bool $isReviewer,
         public bool $denied,
+        public bool $isShownCaptain5,
         public ?string $bidShiftLetter,
-        public ?Captain5DutyAssignment $actingAssignment,
         public OnDutyCaptain5 $onDuty,
     ) {}
 
     public static function none(OnDutyCaptain5 $onDuty, bool $denied = false): self
     {
-        return new self([], false, false, false, false, false, false, false, false, $denied, null, null, $onDuty);
+        return new self([], false, false, false, false, false, false, $denied, false, null, $onDuty);
     }
 
     public function has(string $source): bool
@@ -61,16 +54,26 @@ final readonly class Captain5AccessDecision
         return in_array($source, $this->sources, true);
     }
 
-    /** The authority an action is taken under, snapshotted onto every audit row. */
+    /**
+     * Whether page actions use the Logistics path: a Fleet/Logistics reviewer keeps speaking as
+     * Logistics unless they hold a Captain 5 or EMS Captain seat or are the shift's Captain 5.
+     */
+    public function actsAsLogistics(): bool
+    {
+        return $this->isReviewer && ! $this->isShownCaptain5
+            && ! $this->has(self::SOURCE_CAPTAIN5_SEAT) && ! $this->has(self::SOURCE_EMS_CAPTAIN_SEAT);
+    }
+
+    /** The capacity an action is taken in, snapshotted onto every audit row. */
     public function authority(): string
     {
         return match (true) {
-            $this->hasOnDutyAuthority && $this->actingAssignment !== null => 'on_duty_acting',
-            $this->hasOnDutyAuthority => 'on_duty_bid_holder',
+            $this->isShownCaptain5 && $this->onDuty->source === OnDutyCaptain5::SOURCE_ACTING => 'shift_captain5_acting',
+            $this->isShownCaptain5 => 'shift_captain5',
             $this->has(self::SOURCE_EMS_CAPTAIN_SEAT) => 'ems_captain',
             $this->has(self::SOURCE_CAPTAIN5_SEAT) => 'captain5_seat',
-            $this->has(self::SOURCE_ALLOW_ACT) => 'explicit_act',
-            $this->isReviewer => 'fleet_reviewer',
+            $this->actsAsLogistics() => 'fleet_reviewer',
+            $this->canAct => 'officer',
             default => 'view_only',
         };
     }
@@ -78,12 +81,12 @@ final readonly class Captain5AccessDecision
     public function authorityLabel(): string
     {
         return match ($this->authority()) {
-            'on_duty_acting' => 'Captain 5 (acting)',
-            'on_duty_bid_holder' => 'Captain 5 (on duty)',
+            'shift_captain5_acting' => 'Captain 5 (acting)',
+            'shift_captain5' => 'Captain 5 (on shift)',
             'ems_captain' => 'EMS Captain',
             'captain5_seat' => 'Captain 5',
-            'explicit_act' => 'Captain 5 delegate',
             'fleet_reviewer' => 'Logistics',
+            'officer' => 'Captain 5 page',
             default => 'Viewer',
         };
     }
@@ -94,13 +97,8 @@ final readonly class Captain5AccessDecision
         return [
             'view' => $this->canViewData,
             'act' => $this->canAct,
-            'on_duty' => $this->hasOnDutyAuthority,
-            'dismiss' => $this->canDismiss,
-            'manage_assignments' => $this->canManageAssignments,
             'configure' => $this->canConfigure,
-            'acts_as' => $this->isReviewer && ! $this->hasOnDutyAuthority && ! $this->has(self::SOURCE_CAPTAIN5_SEAT)
-                && ! $this->has(self::SOURCE_EMS_CAPTAIN_SEAT) && ! $this->has(self::SOURCE_ALLOW_ACT) && $this->actingAssignment === null
-                ? 'logistics' : 'captain5',
+            'acts_as' => $this->actsAsLogistics() ? 'logistics' : 'captain5',
             'authority' => $this->authority(),
             'authority_label' => $this->authorityLabel(),
         ];

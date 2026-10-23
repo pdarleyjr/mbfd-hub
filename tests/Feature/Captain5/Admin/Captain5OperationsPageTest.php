@@ -7,11 +7,13 @@ namespace Tests\Feature\Captain5\Admin;
 use App\Filament\Admin\Pages\Captain5Operations;
 use App\Models\ApparatusDefect;
 use App\Models\Captain5\Captain5AccessOverride;
-use App\Models\Captain5\Captain5DutyAssignment;
+use App\Models\Captain5\Captain5ActingRequest;
 use App\Models\Captain5\Captain5ItemClassification;
 use App\Models\User;
+use App\Services\Captain5\Captain5AccessExplainer;
 use App\Services\Captain5\Captain5IssueScope;
 use App\Services\Security\Captain5Access;
+use App\Services\Security\Captain5AccessDecision;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -120,17 +122,17 @@ final class Captain5OperationsPageTest extends TestCase
         $page->set('memberSearch', 'Alpha Seat')->assertSee('Alpha Seatholder')
             ->call('chooseMember', (int) $seatHolder->employee_profile_id)
             ->assertSee('Holds the Captain 5 seat on A shift')
-            ->assertSee('On-duty Captain 5 authority right now.')
+            ->assertSee('Can use the whole Captain 5 page')
+            ->assertSee('is shown as the shift')
             ->assertSee('Act on issues')
             ->assertSee('No administrator choice is set');
 
         $page->call('chooseMember', (int) $firefighter->employee_profile_id)
-            ->assertSee('No Captain 5 access. This member does not qualify by rank, seat or assignment.');
+            ->assertSee('No Captain 5 access. This member does not qualify by rank, seat or administrator access.');
 
         $page->call('chooseMember', (int) $denied->employee_profile_id)
             ->assertSee('Denied by an administrator')
             ->assertSee('Reassigned to training');
-
     }
 
     public function test_lookup_for_a_super_administrator_says_the_account_is_protected(): void
@@ -157,19 +159,53 @@ final class Captain5OperationsPageTest extends TestCase
         $this->actAs($admin);
 
         Livewire::test(Captain5Operations::class)
-            ->callAction('setAccess', ['employee_profile_id' => (int) $member->employee_profile_id, 'choice' => 'allow_act', 'reason' => 'Covers EMS duties this month'])
+            ->callAction('setAccess', ['employee_profile_id' => (int) $member->employee_profile_id, 'choice' => 'allow', 'reason' => 'Covers EMS duties this month'])
             ->assertHasNoActionErrors()
-            ->assertSee('Delegate Dana')->assertSee('Allow, view and act')->assertSee('Covers EMS duties this month')->assertSee('Captain 5 Admin');
+            ->assertSee('Delegate Dana')->assertSee('Allow')->assertSee('Covers EMS duties this month')->assertSee('Captain 5 Admin');
 
         $override = Captain5AccessOverride::query()->current()->where('employee_profile_id', $member->employee_profile_id)->sole();
         self::assertSame('allow', $override->effect);
         self::assertSame('act', $override->level);
         self::assertSame((int) $admin->id, (int) $override->set_by_user_id);
         $this->forgetCaptain5Memo();
-        self::assertTrue(app(Captain5Access::class)->decide($member->fresh())->canAct);
+        $decision = app(Captain5Access::class)->decide($member->fresh());
+        self::assertTrue($decision->canViewPage && $decision->canViewData && $decision->canAct, 'Allow means the whole page');
+        self::assertContains(Captain5AccessDecision::SOURCE_EXPLICIT_ALLOW, $decision->sources);
         self::assertDatabaseHas('security_action_events', [
             'actor_user_id' => $admin->id, 'target_user_id' => $member->id, 'action' => 'change_captain5_access', 'reason' => 'Covers EMS duties this month',
         ]);
+    }
+
+    public function test_only_automatic_allow_and_deny_are_offered_and_the_old_levels_are_refused(): void
+    {
+        $this->actAs($this->captain5Administrator());
+        $member = $this->officer('Firefighter', 'Old Levels');
+        $page = Livewire::test(Captain5Operations::class);
+
+        self::assertSame(['automatic', 'allow', 'deny'], array_keys(Captain5AccessExplainer::CHOICE_LABELS));
+        self::assertSame('Allow: can use the Captain 5 page', Captain5AccessExplainer::CHOICE_LABELS['allow']);
+        foreach (['allow_view', 'allow_act'] as $old) {
+            $page->callAction('setAccess', ['employee_profile_id' => (int) $member->employee_profile_id, 'choice' => $old, 'reason' => 'Old level'])
+                ->assertHasActionErrors(['choice'])->call('unmountAction');
+        }
+        self::assertSame(0, Captain5AccessOverride::query()->count());
+    }
+
+    public function test_a_stored_view_only_allow_row_reads_as_a_full_allow(): void
+    {
+        $admin = $this->captain5Administrator();
+        $member = $this->officer('Firefighter', 'Stored View');
+        Captain5AccessOverride::query()->create([
+            'employee_profile_id' => $member->employee_profile_id, 'effect' => Captain5AccessOverride::EFFECT_ALLOW,
+            'level' => Captain5AccessOverride::LEVEL_VIEW, 'reason' => 'Granted before duty gating was removed', 'set_by_user_id' => $admin->id,
+        ]);
+        $this->forgetCaptain5Memo();
+        $this->actAs($admin);
+
+        self::assertSame('allow', app(Captain5AccessExplainer::class)->currentChoice((int) $member->employee_profile_id));
+        self::assertTrue(app(Captain5Access::class)->decide($member->fresh())->canAct);
+        Livewire::test(Captain5Operations::class)->assertSee('Stored View')->assertSee('Granted before duty gating was removed')
+            ->call('chooseMember', (int) $member->employee_profile_id)->assertSee('Allowed by an administrator')->assertSee('Administrator choice: Allow.');
     }
 
     public function test_changing_access_keeps_history_and_automatic_removes_the_override(): void
@@ -179,9 +215,9 @@ final class Captain5OperationsPageTest extends TestCase
         $this->actAs($admin);
 
         $page = Livewire::test(Captain5Operations::class);
-        $page->callAction('setAccess', ['employee_profile_id' => (int) $member->employee_profile_id, 'choice' => 'allow_view', 'reason' => 'First look'])->assertHasNoActionErrors();
+        $page->callAction('setAccess', ['employee_profile_id' => (int) $member->employee_profile_id, 'choice' => 'allow', 'reason' => 'First look'])->assertHasNoActionErrors();
         $this->forgetCaptain5Memo();
-        $page->callAction('changeAccess', ['employee_profile_id' => (int) $member->employee_profile_id, 'choice' => 'allow_act', 'reason' => 'Now acts'], ['employee' => (int) $member->employee_profile_id])->assertHasNoActionErrors();
+        $page->callAction('changeAccess', ['employee_profile_id' => (int) $member->employee_profile_id, 'choice' => 'deny', 'confirm_deny' => true, 'reason' => 'Second thoughts'], ['employee' => (int) $member->employee_profile_id])->assertHasNoActionErrors();
         $this->forgetCaptain5Memo();
         $page->callAction('setAccess', ['employee_profile_id' => (int) $member->employee_profile_id, 'choice' => 'automatic', 'reason' => 'Back to automatic'])->assertHasNoActionErrors();
 
@@ -191,7 +227,7 @@ final class Captain5OperationsPageTest extends TestCase
 
         $page->assertSee('No access choices are set')
             ->call('toggleOverrideHistory')
-            ->assertSee('History Harper: Allow, view only.')->assertSee('First look')->assertSee('History Harper: Allow, view and act.')->assertSee('Ended');
+            ->assertSee('History Harper: Allow.')->assertSee('First look')->assertSee('History Harper: Deny.')->assertSee('Second thoughts')->assertSee('Ended');
     }
 
     public function test_deny_needs_confirmation_and_is_never_applied_to_protected_or_own_accounts(): void
@@ -226,7 +262,7 @@ final class Captain5OperationsPageTest extends TestCase
         // Own access is changed by someone else.
         $page->callAction('setAccess', ['employee_profile_id' => (int) $admin->employee_profile_id, 'choice' => 'deny', 'confirm_deny' => true, 'reason' => 'Self'])
             ->assertHasActionErrors(['employee_profile_id']);
-        $page->callAction('setAccess', ['employee_profile_id' => (int) $admin->employee_profile_id, 'choice' => 'allow_act', 'reason' => 'Self grant'])
+        $page->callAction('setAccess', ['employee_profile_id' => (int) $admin->employee_profile_id, 'choice' => 'allow', 'reason' => 'Self grant'])
             ->assertHasActionErrors(['employee_profile_id']);
         self::assertSame(0, Captain5AccessOverride::query()->where('employee_profile_id', $admin->employee_profile_id)->count());
     }
@@ -237,87 +273,10 @@ final class Captain5OperationsPageTest extends TestCase
         $member = $this->officer('Firefighter', 'Needs Reason');
         $page = Livewire::test(Captain5Operations::class);
 
-        $page->callAction('setAccess', ['employee_profile_id' => (int) $member->employee_profile_id, 'choice' => 'allow_view', 'reason' => ''])->assertHasActionErrors(['reason']);
+        $page->callAction('setAccess', ['employee_profile_id' => (int) $member->employee_profile_id, 'choice' => 'allow', 'reason' => ''])->assertHasActionErrors(['reason']);
         $page->callAction('setAccess', ['employee_profile_id' => (int) $member->employee_profile_id, 'choice' => null, 'reason' => 'x'])->assertHasActionErrors(['choice']);
-        $page->callAction('setAccess', ['employee_profile_id' => 987654, 'choice' => 'allow_view', 'reason' => 'Ghost'])->assertHasActionErrors(['employee_profile_id']);
+        $page->callAction('setAccess', ['employee_profile_id' => 987654, 'choice' => 'allow', 'reason' => 'Ghost'])->assertHasActionErrors(['employee_profile_id']);
         self::assertSame(0, Captain5AccessOverride::query()->count());
-    }
-
-    // ------------------------------------------------------ acting Captain 5
-
-    public function test_assign_and_end_an_acting_captain5_with_history_and_audit(): void
-    {
-        $admin = $this->captain5Administrator();
-        $acting = $this->officer('Firefighter', 'Acting Avery');
-        $this->actAs($admin);
-        $today = now('America/New_York')->format('Y-m-d');
-
-        $page = Livewire::test(Captain5Operations::class)->assertSee('No acting assignments');
-        $page->callAction('assignActing', [
-            'employee_profile_id' => (int) $acting->employee_profile_id, 'duty_date' => $today,
-            'reason' => 'Out of class coverage for Captain 5', 'client_request_id' => 'assign-0001-0001',
-        ])->assertHasNoActionErrors();
-
-        $assignment = Captain5DutyAssignment::query()->sole();
-        self::assertSame((int) $acting->employee_profile_id, (int) $assignment->employee_profile_id);
-        self::assertSame('Out of class coverage for Captain 5', $assignment->reason);
-        self::assertSame((int) $admin->id, (int) $assignment->assigned_by_user_id);
-        self::assertSame('A', $assignment->shift_letter);
-        self::assertNull($assignment->revoked_at);
-        self::assertDatabaseHas('security_action_events', ['action' => 'captain5_acting_assigned', 'target_user_id' => $acting->id]);
-
-        $page->assertSee('Acting Avery')->assertSee('Out of class coverage for Captain 5')
-            ->assertSee('Acting assignment'); // on-duty source
-        $this->forgetCaptain5Memo();
-        self::assertTrue(app(Captain5Access::class)->decide($acting->fresh())->hasOnDutyAuthority);
-
-        // The same duty day cannot be assigned twice.
-        $page->callAction('assignActing', [
-            'employee_profile_id' => (int) $this->officer('Firefighter', 'Second Sam')->employee_profile_id, 'duty_date' => $today,
-            'reason' => 'Duplicate', 'client_request_id' => 'assign-0002-0002',
-        ])->assertHasActionErrors(['duty_date'])->call('unmountAction');
-        self::assertSame(1, Captain5DutyAssignment::query()->count());
-
-        // Ending requires a reason, then ends it for good and keeps the row.
-        $page->callAction('endAssignment', ['reason' => ''], ['assignment' => $assignment->id])->assertHasActionErrors(['reason']);
-        self::assertNull($assignment->fresh()->revoked_at);
-        $page->callAction('endAssignment', ['reason' => 'Captain returned early'], ['assignment' => $assignment->id])->assertHasNoActionErrors();
-        $assignment->refresh();
-        self::assertNotNull($assignment->revoked_at);
-        self::assertSame('Captain returned early', $assignment->revocation_reason);
-        self::assertSame((int) $admin->id, (int) $assignment->revoked_by_user_id);
-        self::assertDatabaseHas('security_action_events', ['action' => 'captain5_acting_revoked', 'target_user_id' => $acting->id]);
-        $this->forgetCaptain5Memo();
-        self::assertFalse(app(Captain5Access::class)->decide($acting->fresh())->hasOnDutyAuthority);
-
-        $page->assertSee('No acting assignments')
-            ->call('toggleEndedAssignments')->assertSee('Captain returned early');
-    }
-
-    public function test_assignment_refuses_past_far_future_and_unknown_members(): void
-    {
-        $this->actAs($this->captain5Administrator());
-        $member = $this->officer('Firefighter', 'Bad Dates');
-        $page = Livewire::test(Captain5Operations::class);
-
-        foreach (['2026-10-01', '2026-12-31'] as $date) {
-            $page->callAction('assignActing', [
-                'employee_profile_id' => (int) $member->employee_profile_id, 'duty_date' => $date, 'reason' => 'Out of range', 'client_request_id' => 'range-'.$date.'-xx',
-            ])->assertHasActionErrors(['duty_date'])->call('unmountAction');
-        }
-        $page->callAction('assignActing', [
-            'employee_profile_id' => 987654, 'duty_date' => now('America/New_York')->format('Y-m-d'), 'reason' => 'Ghost', 'client_request_id' => 'ghost-0000-0001',
-        ])->assertHasActionErrors(['employee_profile_id']);
-        self::assertSame(0, Captain5DutyAssignment::query()->count());
-    }
-
-    public function test_the_on_duty_bid_holder_is_shown_without_an_assignment(): void
-    {
-        $holder = $this->officer('Captain', 'Bid Holder Bo');
-        $this->seat($holder, 'Captain 5', 'A Shift');
-        $this->actAs($this->superAdmin());
-
-        Livewire::test(Captain5Operations::class)->assertSee('Bid Holder Bo')->assertSee('Captain 5 bid seat')->assertSee('(A shift)');
     }
 
     // ----------------------------------------------------- medical scope review
@@ -408,7 +367,7 @@ final class Captain5OperationsPageTest extends TestCase
 
         Livewire::test(Captain5Operations::class)->assertForbidden();
         self::assertSame(0, Captain5AccessOverride::query()->count());
-        self::assertSame(0, Captain5DutyAssignment::query()->count());
+        self::assertSame(0, Captain5ActingRequest::query()->count());
         self::assertNotNull($member);
         self::assertInstanceOf(User::class, $plain);
     }

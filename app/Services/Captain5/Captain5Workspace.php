@@ -7,9 +7,10 @@ namespace App\Services\Captain5;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
-use App\Models\Captain5\Captain5DutyAssignment;
+use App\Models\Captain5\Captain5ActingRequest;
 use App\Models\Captain5\Captain5HandoffNote;
 use App\Models\User;
+use App\Services\Security\Captain5Access;
 use App\Services\Security\Captain5AccessDecision;
 use App\Support\Captain5\DutyCalendar;
 use App\Support\Fleet\DefectActionStatus;
@@ -18,7 +19,7 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Read model for the Captain 5 workspace page: today's duty, Rescue dailies, the open
- * in-scope issue queue with replacement tracking, handoff and upcoming acting assignments.
+ * in-scope issue queue with replacement tracking, handoff and acting Captain 5 requests.
  * Everything comes from the shared inspection/issue tables; nothing is copied.
  */
 final class Captain5Workspace
@@ -34,6 +35,7 @@ final class Captain5Workspace
         private readonly Captain5IssueScope $scope,
         private readonly Captain5IssuePresenter $presenter,
         private readonly DutyCalendar $calendar,
+        private readonly Captain5Access $access,
     ) {}
 
     /** @return array<string, mixed> */
@@ -52,7 +54,7 @@ final class Captain5Workspace
             'issues' => $summaries,
             'issues_truncated' => $this->truncated,
             'handoff' => $this->handoff($dutyDate, $viewer),
-            'assignments' => $this->assignments($decision->canManageAssignments),
+            'acting' => $this->acting($viewer, $decision),
             'generated_at' => now()->utc()->toIso8601String(),
         ];
     }
@@ -170,25 +172,46 @@ final class Captain5Workspace
         ];
     }
 
-    /** @return list<array<string, mixed>> current and upcoming acting Captain 5 assignments */
-    public function assignments(bool $withReasons = false): array
+    /**
+     * The "Acting as Captain 5 today?" panel: who is shown now, the viewer's own pending request,
+     * and (for Captain 5 administrators) every pending request to approve.
+     *
+     * @return array<string, mixed>
+     */
+    public function acting(User $viewer, Captain5AccessDecision $decision): array
     {
-        $from = $this->calendar->dutyDate()->format('Y-m-d');
+        $pending = Captain5ActingRequest::query()->pending()->with(['requester:id,name,display_name', 'employee:id,name,display_name,rank'])
+            ->orderBy('id')->limit(50)->get();
+        $canApprove = $this->access->canConfigure($viewer);
+        $mine = $pending->first(fn (Captain5ActingRequest $r): bool => (int) $r->requested_by_user_id === (int) $viewer->getKey());
 
-        return Captain5DutyAssignment::query()->active()->whereDate('duty_date', '>=', $from)
-            ->with(['employee:id,name,display_name,rank', 'assignedBy:id,name,display_name'])
-            ->orderBy('duty_date')->limit(30)->get()
-            ->map(fn (Captain5DutyAssignment $assignment): array => [
-                'id' => (int) $assignment->getKey(),
-                'duty_date' => $assignment->duty_date->format('Y-m-d'),
-                'shift' => $assignment->shift_letter,
-                'name' => trim((string) ($assignment->employee?->display_name ?: $assignment->employee?->name)),
-                'rank' => $assignment->employee?->rank,
-                // The reason is often personal (leave); only people who manage assignments see it.
-                'reason' => $withReasons ? (string) $assignment->reason : null,
-                'assigned_by' => $assignment->assignedBy instanceof User ? $this->presenter->name($assignment->assignedBy) : null,
-                'starts_at' => $this->presenter->iso($assignment->starts_at),
-                'ends_at' => $this->presenter->iso($assignment->ends_at),
-            ])->values()->all();
+        return [
+            'can_approve' => $canApprove,
+            'mine' => $mine instanceof Captain5ActingRequest ? $this->presentActing($mine, $viewer) : null,
+            'pending' => $canApprove ? $pending->map(fn (Captain5ActingRequest $r): array => $this->presentActing($r, $viewer))->values()->all() : [],
+            'choices' => [
+                '12h' => $this->presenter->iso($this->calendar->actingEnd('12h')),
+                '24h' => $this->presenter->iso($this->calendar->actingEnd('24h')),
+            ],
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function presentActing(Captain5ActingRequest $request, User $viewer): array
+    {
+        $requester = $request->requester;
+
+        return [
+            'id' => (int) $request->getKey(),
+            'kind' => $request->kind,
+            'requested_by' => $requester instanceof User ? $this->presenter->name($requester) : 'A member',
+            'name' => $request->employee !== null ? trim((string) ($request->employee->display_name ?: $request->employee->name)) : null,
+            'rank' => $request->employee?->rank,
+            'duration' => $request->duration,
+            'shift' => $request->shift_letter,
+            'ends_at' => $this->presenter->iso($request->ends_at),
+            'requested_at' => $this->presenter->iso($request->created_at),
+            'own' => (int) $request->requested_by_user_id === (int) $viewer->getKey(),
+        ];
     }
 }

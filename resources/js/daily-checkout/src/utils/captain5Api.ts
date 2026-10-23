@@ -1,6 +1,6 @@
 import type {
-  Captain5Summary, DutyAssignment, Handoff, InspectionView, IssueActionRequest, IssueDetail, IssueSummary,
-  PersonOption, Workspace,
+  ActingDuration, ActingRequest, ActingResult, ActingState, Captain5Summary, Handoff, InspectionView, IssueActionRequest,
+  IssueDetail, IssueSummary, OnDuty, Workspace,
 } from '../components/captain5/types';
 import { ApiRequestError, fetchWithTimeout, mutationHeaders } from './api';
 
@@ -102,14 +102,50 @@ export function normalizeDetail(raw: unknown): IssueDetail {
   };
 }
 
+const asIso = (value: unknown): string | null => (typeof value === 'string' && value !== '' ? value : null);
+
+function normalizeActingRequest(raw: unknown): ActingRequest {
+  const item = asRecord(raw);
+  return {
+    id: typeof item.id === 'number' ? item.id : 0,
+    kind: item.kind === 'end' ? 'end' : 'act',
+    requested_by: typeof item.requested_by === 'string' ? item.requested_by : 'A member',
+    name: typeof item.name === 'string' && item.name !== '' ? item.name : null,
+    rank: typeof item.rank === 'string' && item.rank !== '' ? item.rank : null,
+    duration: item.duration === '12h' || item.duration === '24h' || item.duration === 'custom' ? item.duration : null,
+    shift: item.shift === 'A' || item.shift === 'B' || item.shift === 'C' ? item.shift : null,
+    ends_at: asIso(item.ends_at),
+    requested_at: asIso(item.requested_at),
+    own: item.own === true,
+  };
+}
+
+/** Never trust the shape: a missing block becomes "nothing pending" so the page cannot throw. */
+export function normalizeActing(raw: unknown): ActingState {
+  const acting = asRecord(raw);
+  const choices = asRecord(acting.choices);
+  return {
+    can_approve: acting.can_approve === true,
+    mine: acting.mine ? normalizeActingRequest(acting.mine) : null,
+    pending: asArray(acting.pending).map(normalizeActingRequest),
+    choices: { '12h': asIso(choices['12h']), '24h': asIso(choices['24h']) },
+  };
+}
+
+const normalizeOnDuty = (raw: unknown): OnDuty => {
+  const duty = asRecord(raw) as unknown as OnDuty;
+  return { ...duty, acting_until: asIso(duty.acting_until), acting_request_id: typeof duty.acting_request_id === 'number' ? duty.acting_request_id : null };
+};
+
 function normalizeWorkspace(raw: Record<string, unknown>): Workspace {
   const data = raw as unknown as Workspace;
   return {
     ...data,
+    on_duty: normalizeOnDuty(data.on_duty),
     rescue_dailies: asArray(data.rescue_dailies),
     issues: asArray(data.issues).map(normalizeSummary),
     handoff: { duty_date: data.handoff?.duty_date ?? data.duty_date, notes: asArray(data.handoff?.notes) },
-    assignments: asArray(data.assignments),
+    acting: normalizeActing(raw.acting),
   };
 }
 
@@ -117,7 +153,7 @@ function normalizeWorkspace(raw: Record<string, unknown>): Workspace {
 export async function fetchCaptain5Summary(): Promise<Captain5Summary> {
   const summary = await request<Captain5Summary>('/summary');
   if (summary.access?.view !== true) throw new Captain5ApiError(FALLBACKS[403], 403);
-  return summary;
+  return { ...summary, on_duty: normalizeOnDuty(summary.on_duty) };
 }
 
 export const fetchWorkspace = async (): Promise<Workspace> => normalizeWorkspace(await request('/workspace'));
@@ -165,19 +201,53 @@ export async function acknowledgeHandoff(noteId: number): Promise<Handoff> {
   return handoffOf(await request(`/handoff/${noteId}/acknowledge`, { method: 'POST', body: '{}' }));
 }
 
-export async function assignActing(input: { employee_profile_id: number; duty_date: string; reason: string; client_request_id: string }): Promise<DutyAssignment[]> {
-  const payload = await request<{ assignments?: unknown }>('/assignments', json(input));
-  return asArray(payload.assignments);
+const actingResult = (payload: { on_duty?: unknown; acting?: unknown }): ActingResult => ({
+  on_duty: normalizeOnDuty(payload.on_duty),
+  acting: normalizeActing(payload.acting),
+});
+
+export interface ActingRequestInput {
+  kind: 'act' | 'end';
+  duration?: ActingDuration;
+  /** Custom end, exactly as the datetime-local field gives it; the server reads it as Miami Beach time. */
+  ends_at?: string;
+  client_request_id: string;
 }
 
-export async function revokeAssignment(id: number, reason: string): Promise<DutyAssignment[]> {
-  const payload = await request<{ assignments?: unknown }>(`/assignments/${id}/revoke`, json({ reason }));
-  return asArray(payload.assignments);
+/** "Acting as Captain 5 today?" (kind 'act', also a takeover) or "End the current acting Captain 5" (kind 'end'). */
+export async function requestActing(input: ActingRequestInput): Promise<ActingResult> {
+  return actingResult(await request('/acting-requests', json(input)));
 }
 
-export async function searchPeople(query: string): Promise<PersonOption[]> {
-  const payload = await request<{ people?: unknown }>(`/people?${new URLSearchParams({ q: query.trim() }).toString()}`);
-  return asArray(payload.people);
+export async function approveActing(id: number, note = ''): Promise<ActingResult> {
+  return actingResult(await request(`/acting-requests/${id}/approve`, json(note.trim() === '' ? {} : { note: note.trim() })));
+}
+
+export async function rejectActing(id: number, note: string): Promise<ActingResult> {
+  return actingResult(await request(`/acting-requests/${id}/reject`, json({ note: note.trim() })));
+}
+
+export async function withdrawActing(id: number): Promise<ActingResult> {
+  return actingResult(await request(`/acting-requests/${id}/withdraw`, { method: 'POST', body: '{}' }));
+}
+
+/** The first message a 422 carries for a field, else the response message. */
+export function firstFieldError(error: Captain5ApiError): string {
+  return Object.values(error.fieldErrors)[0] ?? error.message;
+}
+
+/**
+ * What to tell the member when a request that is not a text draft (acting requests, decisions) fails.
+ * Offline and unreachable are different: offline is certain, unreachable is not.
+ */
+export function requestFailureMessage(error: unknown, fallback: string): string {
+  if (!(error instanceof Captain5ApiError)) return error instanceof Error && error.message ? error.message : fallback;
+  if (error.status === 0) {
+    return typeof navigator !== 'undefined' && navigator.onLine === false
+      ? "You're offline. Nothing was sent. Reconnect, then try again."
+      : 'The server could not be reached, so nothing is confirmed. Try again.';
+  }
+  return error.status === 422 ? firstFieldError(error) : error.message;
 }
 
 export const isCaptain5Forbidden = (error: unknown): boolean => error instanceof Captain5ApiError && error.status === 403;

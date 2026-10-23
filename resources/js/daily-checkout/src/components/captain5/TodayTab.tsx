@@ -37,7 +37,7 @@ export default function TodayTab({ workspace, onFilter, onOpenInspection, onHand
         </ul>
       </section>
       <RescueDailies dailies={workspace.rescue_dailies} onOpenInspection={onOpenInspection} />
-      <HandoffPanel handoff={workspace.handoff} canAct={workspace.access.act} onChange={onHandoff} />
+      <HandoffPanel handoff={workspace.handoff} onChange={onHandoff} />
     </div>
   );
 }

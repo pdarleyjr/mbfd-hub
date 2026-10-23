@@ -40,6 +40,10 @@ use Illuminate\Support\Str;
  * @property string|null $attachment_path
  * @property string|null $attachment_name
  * @property int|null $author_id
+ * @property string|null $author_name who posted it, stored at creation and never edited
+ * @property string|null $author_rank their rank at the time, stored at creation and never edited
+ * @property string|null $origin posted from the 300 or Captain 5 page (null = Admin Panel)
+ * @property string|null $client_request_id
  * @property int $notification_cancelled_count
  * @property int $notification_delivered_count
  * @property int $notification_pending_count
@@ -65,6 +69,10 @@ class DepartmentUpdate extends Model
         'attachment_path',
         'attachment_name',
         'author_id',
+        'author_name',
+        'author_rank',
+        'origin',
+        'client_request_id',
         'send_in_app',
         'send_web_push',
         'audience',
@@ -91,6 +99,49 @@ class DepartmentUpdate extends Model
             'notification_prepared_at' => 'immutable_datetime',
             'first_published_at' => 'immutable_datetime',
         ];
+    }
+
+    /** Fields that describe who posted an update: filled once, from the signed-in author, and never edited. */
+    private const ATTRIBUTION = ['author_id', 'author_name', 'author_rank', 'origin'];
+
+    protected static function booted(): void
+    {
+        self::creating(static function (self $update): void {
+            if ($update->author_id === null || $update->author_name !== null) {
+                return;
+            }
+            $author = User::query()->with('employeeProfile:id,name,display_name,rank')->find($update->author_id);
+            if (! $author instanceof User) {
+                return;
+            }
+            $profile = $author->employeeProfile;
+            $name = trim((string) ($profile->display_name ?? '')) ?: trim((string) ($profile->name ?? '')) ?: trim((string) $author->name);
+            $rank = trim((string) ($profile->rank ?? ''));
+            $update->author_name = $name !== '' ? Str::limit($name, 160, '') : null;
+            $update->author_rank = $rank !== '' ? Str::limit($rank, 80, '') : null;
+        });
+        self::updating(static function (self $update): void {
+            if ($update->getOriginal('author_name') === null) {
+                return;
+            }
+            foreach (self::ATTRIBUTION as $field) {
+                if ($update->isDirty($field)) {
+                    throw new \LogicException('Who posted a Department Update cannot be changed.');
+                }
+            }
+        });
+    }
+
+    /** "Division Chief Jane Smith": the stored rank and name, or the account name for older updates. */
+    public function attribution(): ?string
+    {
+        if ($this->author_name !== null && $this->author_name !== '') {
+            return trim(($this->author_rank ?? '').' '.$this->author_name);
+        }
+
+        $name = $this->author?->name;
+
+        return $name !== null && $name !== '' ? $name : null;
     }
 
     /** @return BelongsTo<User, $this> */

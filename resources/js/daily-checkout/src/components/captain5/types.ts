@@ -6,27 +6,32 @@ export type IssueActionName =
   | 'acknowledge' | 'ordered' | 'update_delivery' | 'available_for_pickup'
   | 'replaced' | 'verify' | 'dismiss' | 'reopen';
 
+/**
+ * Everyone who can open the page can do everything on it, so there is no view-only mode. `act` stays in
+ * the payload as a server hint and is never used to hide a control.
+ */
 export interface Captain5Access {
   view: boolean;
   act: boolean;
-  on_duty: boolean;
-  dismiss: boolean;
-  manage_assignments: boolean;
   configure: boolean;
   acts_as: string;
   authority: string;
   authority_label: string;
 }
 
+export type ShiftLetter = 'A' | 'B' | 'C';
+
 export interface OnDuty {
   duty_date: string;
-  shift: string | null;
-  /** 'acting_assignment' | 'bid_holder' | 'unknown' */
-  source: string;
+  shift: ShiftLetter | null;
+  /** 'acting' is an approved acting member; 'bid_holder' is the shift's bid holder. */
+  source: 'acting' | 'bid_holder' | 'unknown';
   resolved: boolean;
   name: string | null;
   rank: string | null;
-  assignment_id: number | null;
+  /** ISO time an approved acting member stops being shown. */
+  acting_until: string | null;
+  acting_request_id: number | null;
 }
 
 export interface IssueDetails {
@@ -147,17 +152,36 @@ export interface Handoff {
   notes: HandoffNote[];
 }
 
-export interface DutyAssignment {
+export type ActingDuration = '12h' | '24h' | 'custom';
+
+/** A request to be shown as (or to stop showing) the acting Captain 5. Display only; an administrator approves. */
+export interface ActingRequest {
   id: number;
-  duty_date: string;
-  shift: string | null;
-  name: string;
+  kind: 'act' | 'end';
+  requested_by: string;
+  name: string | null;
   rank: string | null;
-  /** Only returned to people who manage assignments (it is often personal). */
-  reason: string | null;
-  assigned_by: string | null;
-  starts_at: string | null;
+  duration: ActingDuration | null;
+  shift: ShiftLetter | null;
   ends_at: string | null;
+  requested_at: string | null;
+  own: boolean;
+}
+
+export interface ActingState {
+  can_approve: boolean;
+  /** The viewer's own request that is waiting for approval. */
+  mine: ActingRequest | null;
+  /** Everything waiting for approval; filled only for people who can approve. */
+  pending: ActingRequest[];
+  /** When a 12 or 24 hour stint would end, as the server computes it. */
+  choices: { '12h': string | null; '24h': string | null };
+}
+
+/** Answer of every acting-request call: what is shown now, and the acting state. */
+export interface ActingResult {
+  on_duty: OnDuty;
+  acting: ActingState;
 }
 
 export interface Workspace {
@@ -170,7 +194,7 @@ export interface Workspace {
   /** More in-scope issues exist than the page lists (logged on the server). */
   issues_truncated?: boolean;
   handoff: Handoff;
-  assignments: DutyAssignment[];
+  acting: ActingState;
   generated_at: string;
 }
 
@@ -203,13 +227,6 @@ export interface InspectionView {
   acceptance: string;
   scope_note: string | null;
   compartments: InspectionCompartment[];
-}
-
-export interface PersonOption {
-  id: number;
-  name: string;
-  rank: string | null;
-  station: string | null;
 }
 
 /** Body of POST /issues/{id}/actions apart from the concurrency and idempotency fields. */
