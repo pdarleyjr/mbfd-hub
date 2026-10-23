@@ -64,13 +64,15 @@ final class StationOperationsIntegrationTest extends TestCase
         $engine = $this->apparatus($station, 'E1');
         $open = $this->ticket($station, $engine, 'submitted');
         $closed = $this->ticket($station, $engine, 'completed');
+        $archived = $this->ticket($station, $engine, 'submitted');
+        $archived->forceFill(['archived_at' => now()])->save();
         $foreign = $this->ticket($other, $this->apparatus($other, 'E2'), 'submitted');
         $this->actingAsAdminWith(['admin.stations.view', 'admin.fleet.view']);
 
         Livewire::test(ApparatusServiceTicketsRelationManager::class, $this->relationParams($station))
             ->assertSuccessful()
             ->assertCanSeeTableRecords([$open])
-            ->assertCanNotSeeTableRecords([$closed, $foreign])
+            ->assertCanNotSeeTableRecords([$closed, $foreign, $archived])
             ->filterTable('open', false)
             ->assertCanSeeTableRecords([$closed])
             ->assertCanNotSeeTableRecords([$open]);
@@ -148,6 +150,28 @@ final class StationOperationsIntegrationTest extends TestCase
         self::assertSame(1, $summary['open_inspection_exceptions']);
         self::assertSame(2, $summary['checkouts_last_24h']);
         self::assertNotNull($summary['last_checkout_at']);
+    }
+
+    public function test_archiving_open_requests_removes_active_counts_without_changing_workflow_or_history(): void
+    {
+        $station = $this->station(1);
+        $engine = $this->apparatus($station, 'E1');
+        $request = $this->stationRequest($station, 'pending');
+        $ticket = $this->ticket($station, $engine, 'submitted');
+        $request->forceFill(['archived_at' => now()])->save();
+        $ticket->forceFill(['archived_at' => now()])->save();
+
+        $summary = app(StationOperationsSummaryService::class)->summaryFor($station->fresh());
+        self::assertSame(0, $summary['open_station_requests']);
+        self::assertSame(0, $summary['open_service_tickets']);
+        self::assertSame('pending', $request->fresh()->status);
+        self::assertSame('submitted', $ticket->fresh()->status);
+
+        $request->forceFill(['archived_at' => null])->save();
+        $ticket->forceFill(['archived_at' => null])->save();
+        $restored = app(StationOperationsSummaryService::class)->summaryFor($station->fresh());
+        self::assertSame(1, $restored['open_station_requests']);
+        self::assertSame(1, $restored['open_service_tickets']);
     }
 
     public function test_view_page_shows_operations_counts_with_station_filtered_links(): void

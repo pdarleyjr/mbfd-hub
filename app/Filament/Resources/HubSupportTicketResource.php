@@ -9,7 +9,6 @@ use App\Enums\HubSupportTicketImpact;
 use App\Enums\HubSupportTicketStatus;
 use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\HubSupportTicketResource\Pages;
-use App\Filament\Support\ArchiveFilter;
 use App\Models\HubSupportTicket;
 use App\Models\HubSupportTicketUpdate;
 use Filament\Infolists;
@@ -19,6 +18,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\HtmlString;
 
 final class HubSupportTicketResource extends Resource
@@ -59,7 +59,14 @@ final class HubSupportTicketResource extends Resource
                 Tables\Columns\TextColumn::make('created_at')->visibleFrom('md')->toggleable(isToggledHiddenByDefault: true)->label('Submitted')->dateTime()->sortable(),
             ])
             ->filters([
-                ArchiveFilter::make(),
+                Tables\Filters\SelectFilter::make('archive_state')->label('Show')
+                    ->options(['active' => 'Active', 'archived' => 'Archived', 'trash' => 'Trash', 'all' => 'All'])
+                    ->default('active')->query(fn (Builder $query, array $data): Builder => match ($data['value'] ?? 'active') {
+                        'trash' => $query->whereNotNull('deleted_at'),
+                        'archived' => $query->whereNull('deleted_at')->whereNotNull('archived_at'),
+                        'all' => $query,
+                        default => $query->whereNull('deleted_at')->whereNull('archived_at'),
+                    }),
                 Tables\Filters\SelectFilter::make('status')->options(collect(HubSupportTicketStatus::cases())->mapWithKeys(fn ($status) => [$status->value => $status->memberLabel()])->all()),
                 Tables\Filters\SelectFilter::make('category')->options(collect(HubSupportTicketCategory::cases())->mapWithKeys(fn ($category) => [$category->value => $category->label()])->all()),
                 Tables\Filters\SelectFilter::make('impact')->options(collect(HubSupportTicketImpact::cases())->mapWithKeys(fn ($impact) => [$impact->value => $impact->label()])->all()),
@@ -76,6 +83,10 @@ final class HubSupportTicketResource extends Resource
     public static function infolist(Infolist $infolist): Infolist
     {
         return $infolist->schema([
+            Infolists\Components\Section::make('Trash')->schema([
+                Infolists\Components\TextEntry::make('deleted_at')->label('Moved to Trash')->dateTime(),
+                Infolists\Components\TextEntry::make('delete_reason')->label('Reason'),
+            ])->visible(fn (HubSupportTicket $record): bool => $record->trashed()),
             Infolists\Components\Section::make('Archive')->schema([
                 Infolists\Components\TextEntry::make('archived_at')->dateTime(),
                 Infolists\Components\TextEntry::make('archivedBy.name')->label('Archived by'),
@@ -150,6 +161,19 @@ final class HubSupportTicketResource extends Resource
                     Infolists\Components\TextEntry::make('changedBy.name')->label('By')->placeholder('System'),
                     Infolists\Components\TextEntry::make('public_response')->label('Member-visible reply')->placeholder('—')->columnSpanFull(),
                     Infolists\Components\TextEntry::make('internal_note')->label('Internal note')->placeholder('—')->columnSpanFull(),
+                    Infolists\Components\TextEntry::make('notification_delivery')
+                        ->label('Notifications')->state(function (HubSupportTicketUpdate $record): string {
+                            $deliveries = $record->notificationDeliveries;
+                            if ($deliveries->isEmpty()) {
+                                return 'No notification needed';
+                            }
+                            $pending = $deliveries->whereNull('delivered_at')->whereNull('cancelled_at');
+
+                            return $deliveries->whereNotNull('delivered_at')->count().' sent; '
+                                .$pending->where('attempts', '<', 5)->count().' awaiting delivery; '
+                                .$pending->where('attempts', '>=', 5)->count().' need attention; '
+                                .$deliveries->whereNotNull('cancelled_at')->count().' stopped';
+                        })->columnSpanFull(),
                     Infolists\Components\TextEntry::make('metadata.resolution_summary')
                         ->label('Resolution recorded')
                         ->visible(fn (HubSupportTicketUpdate $record): bool => filled($record->metadata['resolution_summary'] ?? null))
@@ -249,7 +273,8 @@ final class HubSupportTicketResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        return parent::getEloquentQuery()->with(['reporter', 'assignedTo', 'updates.changedBy', 'attachments']);
+        return parent::getEloquentQuery()->withoutGlobalScopes([SoftDeletingScope::class])
+            ->with(['reporter', 'assignedTo', 'updates.changedBy', 'updates.notificationDeliveries', 'attachments']);
     }
 
     public static function canViewAny(): bool
@@ -273,6 +298,11 @@ final class HubSupportTicketResource extends Resource
     }
 
     public static function canDelete(Model $record): bool
+    {
+        return auth()->user()?->can('delete', $record) ?? false;
+    }
+
+    public static function canForceDelete(Model $record): bool
     {
         return false;
     }

@@ -52,7 +52,7 @@ class ApparatusServiceTicketsRelationManager extends RelationManager
                     ->label('Open tickets')
                     ->default(true)
                     ->queries(
-                        true: fn (Builder $query): Builder => $query->whereIn('status', ApparatusServiceTicketStatus::openValues()),
+                        true: fn (Builder $query): Builder => $query->whereNull('archived_at')->whereIn('status', ApparatusServiceTicketStatus::openValues()),
                         false: fn (Builder $query): Builder => $query->whereIn('status', ApparatusServiceTicketStatus::terminalValues()),
                     ),
                 Tables\Filters\SelectFilter::make('status')

@@ -116,6 +116,7 @@ final class InspectionReviewService
 
         return $this->retryPostgresLockTimeout(fn (): ApparatusInspection => DB::transaction(function () use ($inspectionId, $reviewer, $message, $clientMessageId): ApparatusInspection {
             $inspection = ApparatusInspection::query()->lockForUpdate()->findOrFail($inspectionId);
+            $inspection->assertOperational();
             if ($clientMessageId !== null && ApparatusIssueMessage::query()->where('client_message_id', $clientMessageId)->exists()) {
                 return $inspection;
             }
@@ -132,6 +133,7 @@ final class InspectionReviewService
      */
     public function releaseIfClear(ApparatusInspection $lockedInspection, ?User $actor = null): bool
     {
+        $lockedInspection->assertOperational();
         if ($lockedInspection->review_status !== 'pending_review'
             || $lockedInspection->processing_status !== ApparatusInspectionProcessingService::STATUS_HELD
             || InspectionHold::openQuery((int) $lockedInspection->id)->exists()) {
@@ -173,6 +175,7 @@ final class InspectionReviewService
     private function approveLocked(int $inspectionId, User $reviewer, ?string $note, bool $markOutOfService): ApparatusInspection
     {
         $inspection = ApparatusInspection::query()->lockForUpdate()->findOrFail($inspectionId);
+        $inspection->assertOperational();
         if ($inspection->review_status !== 'pending_review') {
             return $inspection;
         }
@@ -214,6 +217,7 @@ final class InspectionReviewService
     private function rejectLocked(int $inspectionId, User $reviewer, string $reason, ?string $internalNote): ApparatusInspection
     {
         $inspection = ApparatusInspection::query()->lockForUpdate()->findOrFail($inspectionId);
+        $inspection->assertOperational();
         if ($inspection->review_status !== 'pending_review') {
             return $inspection;
         }

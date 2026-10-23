@@ -66,14 +66,27 @@ final class HubSupportTicketController extends Controller
 
         return view('hub-support.show', [
             'report' => $ticket->load(['updates' => fn ($query) => $query
-                ->whereNotNull('public_response')->orderBy('created_at')->orderBy('id'), 'attachments']),
+                ->where(fn ($visible) => $visible->whereNotNull('public_response')
+                    ->orWhereColumn('status', '!=', 'previous_status')->orWhereNull('previous_status')
+                    ->orWhereNotNull('metadata->resolution_summary'))->orderBy('created_at')->orderBy('id'), 'attachments']),
+            'latestUpdateId' => (int) $ticket->updates()->max('id'),
         ]);
     }
 
     public function reply(Request $request, HubSupportTicket $ticket, HubSupportTicketWorkflowService $workflow): RedirectResponse
     {
         $this->authorizeOwner($request, $ticket);
-        $workflow->reply($ticket, $this->reporter($request), (string) $request->input('response', ''));
+        $validated = $request->validate([
+            'action' => ['nullable', 'in:reply,confirm_fixed'], 'client_action_id' => ['nullable', 'uuid'],
+            'expected_update_id' => ['nullable', 'integer', 'min:0'],
+            'response' => ['nullable', 'string', 'max:5000'],
+        ]);
+        if (($validated['action'] ?? 'reply') === 'confirm_fixed') {
+            $workflow->confirmFixed($ticket, $this->reporter($request), $validated);
+
+            return back()->with('status', 'Thanks for confirming. Your report is closed.');
+        }
+        $workflow->reply($ticket, $this->reporter($request), (string) ($validated['response'] ?? ''), $validated);
 
         return back()->with('status', 'Your reply was sent.');
     }

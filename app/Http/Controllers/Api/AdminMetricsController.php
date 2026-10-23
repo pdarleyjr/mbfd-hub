@@ -30,9 +30,9 @@ class AdminMetricsController extends Controller
             ],
 
             'inspections' => [
-                'today' => ApparatusInspection::whereDate('completed_at', today())->count(),
-                'this_week' => ApparatusInspection::where('completed_at', '>=', now()->startOfWeek())->count(),
-                'this_month' => ApparatusInspection::where('completed_at', '>=', now()->startOfMonth())->count(),
+                'today' => ApparatusInspection::operational()->whereDate('completed_at', today())->count(),
+                'this_week' => ApparatusInspection::operational()->where('completed_at', '>=', now()->startOfWeek())->count(),
+                'this_month' => ApparatusInspection::operational()->where('completed_at', '>=', now()->startOfMonth())->count(),
             ],
 
             // NEW: Fire Equipment Inventory metrics

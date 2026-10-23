@@ -19,6 +19,9 @@
 <x-filament-panels::page data-hub-ui="2" data-hub-portal="employee">
     <x-filament::section>
         <div class="hub-insp">
+            @if($detail['inspection']->test_excluded_at)
+                <p class="hub-insp-note" data-inspection-test-exclusion>Excluded test — retained for audit. This submission does not count toward operational inspections.</p>
+            @endif
             <div class="hub-insp-head">
                 <div class="hub-insp-head__main">
                     <h2 class="hub-insp-title">{{ $detail['apparatus_label'] }}

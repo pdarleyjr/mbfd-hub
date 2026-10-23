@@ -58,6 +58,22 @@
         </div>
 
         {{-- A. Header --}}
+        @if($inspection->test_excluded_at)
+            <section class="hub-insp-card" data-inspection-test-exclusion>
+                <h2 class="hub-insp-subtitle">Excluded test — retained for audit</h2>
+                <p>This submission does not count toward operational inspection history or readiness.</p>
+                <p>{{ $inspection->test_exclusion_reason }}</p>
+            </section>
+        @endif
+        @if($inspection->testClassificationEvents->isNotEmpty())
+            <details class="hub-insp-card" data-inspection-test-history>
+                <summary>Test classification history</summary>
+                @foreach($inspection->testClassificationEvents as $event)
+                    <p>{{ ucfirst($event->action) }} {{ $event->created_at->clone()->timezone('America/New_York')->format('M j, Y g:i A T') }}
+                        by {{ $event->actor?->display_name ?: $event->actor?->name }} — {{ $event->reason }}</p>
+                @endforeach
+            </details>
+        @endif
         <section class="hub-insp-card" aria-labelledby="insp-header-title" data-section="header">
             <div class="hub-insp-head">
                 <div class="hub-insp-head__main">

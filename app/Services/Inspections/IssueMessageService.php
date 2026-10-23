@@ -178,6 +178,9 @@ final class IssueMessageService
     public function canPost(User $user, ApparatusInspection|ApparatusDefect $target, string $visibility = ApparatusIssueMessage::VISIBILITY_MEMBER): bool
     {
         try {
+            if ($target instanceof ApparatusInspection && $target->test_excluded_at !== null) {
+                return false;
+            }
             $isReviewer = InspectionReviewers::canReview($user);
             if (! $isReviewer && $visibility !== ApparatusIssueMessage::VISIBILITY_MEMBER) {
                 return false;
@@ -236,6 +239,7 @@ final class IssueMessageService
             throw $this->missing($isReviewer, 'The inspection or issue does not exist.');
         }
         $this->authorizeThread($author, $isReviewer, $inspection, $defect);
+        $inspection?->assertOperational();
 
         // Snapshot who the author spoke as. A correction keeps the corrected message's context.
         $authorContext = $original !== null

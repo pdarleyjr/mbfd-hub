@@ -237,6 +237,7 @@ final class ApparatusInspectionExceptionService
     {
         $reference = ApparatusInspectionException::query()->findOrFail($exceptionId);
         $inspection = ApparatusInspection::query()->lockForUpdate()->findOrFail($reference->apparatus_inspection_id);
+        $inspection->assertOperational();
         // The exception belongs to the physical truck the findings were applied to,
         // which differs from the inspection's unit after a decided vehicle swap.
         $apparatus = Apparatus::query()->lockForUpdate()->findOrFail($reference->apparatus_id);

@@ -23,6 +23,7 @@ final class DefectParticipants
         string $source,
         ?ApparatusInspection $inspection = null,
     ): ApparatusDefectParticipant {
+        $inspection?->assertOperational();
         $now = now();
 
         // insertOrIgnore keeps two concurrent enrollments from aborting a PostgreSQL transaction

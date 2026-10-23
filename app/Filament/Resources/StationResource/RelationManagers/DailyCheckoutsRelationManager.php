@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\StationResource\RelationManagers;
 
+use App\Filament\Support\InspectionTestFilter;
 use App\Filament\Support\InspectionWorkspace;
 use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
@@ -64,6 +65,7 @@ class DailyCheckoutsRelationManager extends RelationManager
                     ->color(fn (int $state): string => $state > 0 ? 'danger' : 'success'),
             ])
             ->filters([
+                InspectionTestFilter::make(),
                 Tables\Filters\SelectFilter::make('apparatus_id')
                     ->label('Apparatus')
                     ->options(fn (): array => $this->stationApparatusOptions())

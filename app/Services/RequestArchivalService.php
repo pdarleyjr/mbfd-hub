@@ -15,6 +15,10 @@ final class RequestArchivalService
 {
     public function canManage(User $actor, PersonnelRequest|StationRequest|ApparatusServiceTicket|HubSupportTicket $record): bool
     {
+        if (($record instanceof PersonnelRequest || $record instanceof HubSupportTicket) && $record->trashed()) {
+            return false;
+        }
+
         return $record instanceof StationRequest
             ? $actor->can('admin.stations.manage', 'web')
             : $actor->can('update', $record);

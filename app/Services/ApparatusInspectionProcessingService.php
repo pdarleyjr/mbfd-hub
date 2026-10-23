@@ -37,6 +37,7 @@ final class ApparatusInspectionProcessingService
      */
     public function process(ApparatusInspection $inspection, Apparatus $apparatus, ?string $baselineToken, array $checklist = []): void
     {
+        $inspection->assertOperational();
         if ($inspection->processing_status !== null) {
             return;
         }
@@ -170,6 +171,7 @@ final class ApparatusInspectionProcessingService
     private function latestAcceptedReading(ApparatusInspection $inspection, Apparatus $apparatus, string $field): ?ApparatusInspection
     {
         return ApparatusInspection::query()
+            ->operational()
             ->where(static function ($query) use ($apparatus): void {
                 $query->where('processed_apparatus_id', $apparatus->id)
                     ->orWhere(static fn ($legacy) => $legacy->whereNull('processed_apparatus_id')->where('apparatus_id', $apparatus->id));

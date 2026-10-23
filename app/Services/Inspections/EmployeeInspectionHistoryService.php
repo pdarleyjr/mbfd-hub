@@ -51,7 +51,7 @@ final class EmployeeInspectionHistoryService
         $userId = $user->getKey();
         $employeeId = $user->employee_profile_id;
 
-        return ApparatusInspection::query()->where(function (Builder $owned) use ($userId, $employeeId): void {
+        return ApparatusInspection::query()->operational()->where(function (Builder $owned) use ($userId, $employeeId): void {
             $owned->where('apparatus_inspections.actor_user_id', $userId);
 
             if ($employeeId !== null) {

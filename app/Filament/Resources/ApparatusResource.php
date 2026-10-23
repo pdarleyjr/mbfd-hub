@@ -355,7 +355,7 @@ class ApparatusResource extends Resource
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('inspections_count')->visibleFrom('md')
                     ->label('Inspections')
-                    ->counts('inspections')
+                    ->counts(['inspections' => fn (Builder $query): Builder => $query->whereNull('apparatus_inspections.test_excluded_at')])
                     ->badge()
                     ->alignment(Alignment::Center)
                     ->color('info')

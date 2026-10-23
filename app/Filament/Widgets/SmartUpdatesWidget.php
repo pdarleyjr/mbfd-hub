@@ -203,7 +203,7 @@ class SmartUpdatesWidget extends Widget
 
         // Overdue inspections - optimized query
         $overdueInspections = Apparatus::whereDoesntHave('inspections', function ($q) {
-            $q->where('created_at', '>=', today()->subDay());
+            $q->whereNull('apparatus_inspections.test_excluded_at')->where('created_at', '>=', today()->subDay());
         })->count();
 
         // Open defects/apparatus issues

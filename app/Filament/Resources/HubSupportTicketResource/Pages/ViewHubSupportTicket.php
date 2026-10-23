@@ -11,6 +11,8 @@ use App\Filament\Concerns\ArchivesRequests;
 use App\Filament\Resources\HubSupportTicketResource;
 use App\Models\HubSupportTicket;
 use App\Models\User;
+use App\Services\HubSupport\HubSupportTicketRecoveryService;
+use App\Services\HubSupport\HubSupportTicketSideEffectService;
 use App\Services\HubSupport\HubSupportTicketWorkflowService;
 use Filament\Actions;
 use Filament\Forms;
@@ -27,9 +29,36 @@ final class ViewHubSupportTicket extends ViewRecord
     {
         return [
             ...$this->getArchiveActions(),
+            Actions\Action::make('delete')
+                ->label('Delete')->icon('heroicon-o-trash')->color('danger')
+                ->modalHeading('Move issue report to Trash?')
+                ->modalDescription('The report leaves normal views. Its files and history remain recoverable by an administrator.')
+                ->visible(fn (): bool => ! $this->ticket()->trashed() && (auth()->user()?->can('delete', $this->ticket()) ?? false))
+                ->form([Forms\Components\Textarea::make('reason')->label('Reason')->required()->maxLength(2000)])
+                ->requiresConfirmation()->action(function (array $data): void {
+                    $this->record = app(HubSupportTicketRecoveryService::class)->trash($this->ticket(), auth()->user(), $data['reason']);
+                    Notification::make()->title('Issue report moved to Trash')->success()->send();
+                }),
+            Actions\Action::make('restore_trash')
+                ->label('Restore from Trash')->icon('heroicon-o-arrow-uturn-left')->color('gray')
+                ->visible(fn (): bool => $this->ticket()->trashed() && (auth()->user()?->can('restore', $this->ticket()) ?? false))
+                ->requiresConfirmation()->action(function (): void {
+                    $this->record = app(HubSupportTicketRecoveryService::class)->restore($this->ticket(), auth()->user());
+                    Notification::make()->title('Issue report restored')->success()->send();
+                }),
             ...collect(HubSupportTicketStatus::cases())->filter(fn ($status): bool => $status !== HubSupportTicketStatus::New)
                 ->map(fn ($status): Actions\Action => $this->transitionAction($status))->all(),
             $this->updateAction(),
+            Actions\Action::make('retry_notifications')
+                ->label('Retry failed notifications')->color('gray')
+                ->visible(fn (): bool => $this->canManage() && \App\Models\HubSupportNotificationDelivery::query()
+                    ->whereIn('hub_support_ticket_update_id', $this->ticket()->updates()->select('id'))
+                    ->whereNull('delivered_at')->whereNull('cancelled_at')->where('attempts', '>=', 5)->exists())
+                ->requiresConfirmation()->action(function (): void {
+                    app(HubSupportTicketSideEffectService::class)->retryFailed($this->ticket(), auth()->user());
+                    $this->record = $this->ticket()->refresh();
+                    Notification::make()->title('Notification retry requested')->success()->send();
+                }),
         ];
     }
 
@@ -46,6 +75,7 @@ final class ViewHubSupportTicket extends ViewRecord
             })
             ->visible(fn (): bool => $this->canManage() && $this->ticket()->status->canTransitionTo($status))
             ->form([
+                ...$this->actionContext(),
                 Forms\Components\Textarea::make('public_response')->label('Member-visible response')
                     ->required($status === HubSupportTicketStatus::WaitingForReporter)->maxLength(5000),
                 Forms\Components\Textarea::make('internal_note')->label('Internal note')->maxLength(10000),
@@ -62,6 +92,7 @@ final class ViewHubSupportTicket extends ViewRecord
             ->label('Assign / Update')
             ->visible(fn (): bool => $this->canManage())
             ->form([
+                ...$this->actionContext(),
                 Forms\Components\Select::make('assigned_to_user_id')->label('Assigned To')
                     ->options(fn (): array => User::query()->where(function ($query): void {
                         $query->whereHas('permissions', fn ($permissions) => $permissions->where('name', 'admin.support.manage'))
@@ -91,7 +122,16 @@ final class ViewHubSupportTicket extends ViewRecord
 
     private function canManage(): bool
     {
-        return auth()->user()?->can('update', $this->ticket()) ?? false;
+        return ! $this->ticket()->trashed() && ! $this->ticket()->isArchived()
+            && (auth()->user()?->can('update', $this->ticket()) ?? false);
+    }
+
+    private function actionContext(): array
+    {
+        return [
+            Forms\Components\Hidden::make('client_action_id')->default(fn (): string => (string) \Illuminate\Support\Str::uuid()),
+            Forms\Components\Hidden::make('expected_update_id')->default(fn (): int => (int) $this->ticket()->updates()->max('id')),
+        ];
     }
 
     private function ticket(): HubSupportTicket

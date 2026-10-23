@@ -21,7 +21,7 @@ final class HubSupportTicketPolicy
 
     public function update(User $user, HubSupportTicket $ticket): bool
     {
-        return $this->can($user, 'admin.support.manage');
+        return ! $ticket->trashed() && $this->can($user, 'admin.support.manage');
     }
 
     public function create(User $user): bool
@@ -31,6 +31,16 @@ final class HubSupportTicketPolicy
 
     public function delete(User $user, HubSupportTicket $ticket): bool
     {
+        return $this->can($user, 'admin.support.manage');
+    }
+
+    public function restore(User $user, HubSupportTicket $ticket): bool
+    {
+        return $this->can($user, 'admin.support.manage');
+    }
+
+    public function forceDelete(User $user, HubSupportTicket $ticket): bool
+    {
         return false;
     }
 
@@ -38,6 +48,6 @@ final class HubSupportTicketPolicy
     {
         return $user->isAuthenticationAllowed()
             && $user->hasCurrentAdminPanelEntitlement()
-            && $user->hasDirectWebPermission($permission);
+            && ($user->hasRole('super_admin') || $user->hasDirectWebPermission($permission));
     }
 }

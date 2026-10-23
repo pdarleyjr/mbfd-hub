@@ -41,7 +41,7 @@ final class HubSupportTicketAttachment extends Model
     /** @return BelongsTo<HubSupportTicket, $this> */
     public function ticket(): BelongsTo
     {
-        return $this->belongsTo(HubSupportTicket::class, 'hub_support_ticket_id');
+        return $this->belongsTo(HubSupportTicket::class, 'hub_support_ticket_id')->withTrashed();
     }
 
     /** @return BelongsTo<HubSupportTicketUpdate, $this> */

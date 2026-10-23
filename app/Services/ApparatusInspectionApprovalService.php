@@ -43,6 +43,8 @@ final class ApparatusInspectionApprovalService
                     ->lockForUpdate()
                     ->findOrFail($inspectionId);
 
+                $inspection->assertOperational();
+
                 if ($inspection->review_status !== 'pending_review') {
                     return $inspection;
                 }
@@ -131,6 +133,8 @@ final class ApparatusInspectionApprovalService
                 $inspection = ApparatusInspection::query()
                     ->lockForUpdate()
                     ->findOrFail($inspectionId);
+
+                $inspection->assertOperational();
 
                 if ($inspection->review_status !== 'pending_review') {
                     return $inspection;

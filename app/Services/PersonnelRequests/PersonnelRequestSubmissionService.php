@@ -288,12 +288,15 @@ final class PersonnelRequestSubmissionService
 
     private function existingSubmission(string $idempotencyKey, Employee $requester, PersonnelRequestType $type): ?PersonnelRequest
     {
-        $existing = PersonnelRequest::query()->where('idempotency_key', $idempotencyKey)->first();
+        $existing = PersonnelRequest::withTrashed()->where('idempotency_key', $idempotencyKey)->first();
         if (! $existing) {
             return null;
         }
         if ($existing->requester_employee_id !== $requester->id || $existing->type !== $type) {
             throw ValidationException::withMessages(['idempotency_key' => 'This submission key cannot be reused.']);
+        }
+        if ($existing->trashed()) {
+            throw ValidationException::withMessages(['idempotency_key' => 'This order is in Trash. Ask Support Services to restore it, or start a new order.']);
         }
 
         return $existing->load('items');

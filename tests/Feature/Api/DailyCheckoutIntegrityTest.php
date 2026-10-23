@@ -160,6 +160,22 @@ class DailyCheckoutIntegrityTest extends TestCase
         $this->assertSame('pending_review', ApparatusInspection::sole()->review_status);
     }
 
+    public function test_excluding_a_retained_test_does_not_break_an_offline_submission_receipt_retry(): void
+    {
+        $apparatus = $this->makeApparatus('required');
+        $payload = $this->submissionWithChecklist($apparatus, '27272727-2727-4272-8272-272727272727');
+        $first = $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", $payload)->assertCreated();
+        // Shape retained classification metadata without rewriting the signed request evidence.
+        ApparatusInspection::findOrFail($first->json('id'))->forceFill([
+            'test_excluded_at' => now(), 'test_exclusion_reason' => 'Receipt compatibility fixture.',
+        ])->save();
+
+        $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", $payload)
+            ->assertOk()->assertJsonPath('id', $first->json('id'));
+        $this->assertDatabaseCount('apparatus_inspections', 1);
+        $this->assertSame(0, ApparatusInspection::operational()->count());
+    }
+
     public function test_client_submission_id_cannot_be_reused_for_another_apparatus(): void
     {
         $firstApparatus = $this->makeApparatus('required', 'Engine 1');
