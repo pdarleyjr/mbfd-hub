@@ -35,7 +35,7 @@ final class InventoryCorrectionPostgresLockOrderTest extends TestCase
                 'inventory_draft_id' => $draftId, 'operator_name' => 'Inventory Reporter', 'rank' => 'Firefighter',
                 'review_status' => 'approved', 'completed_at' => now(), 'results' => [],
             ]);
-            $original = $inspection->getRawOriginal();
+            $original = $inspection->refresh()->getRawOriginal();
             $item = $this->item('E1', 'Passports');
             $data = [
                 'client_submission_id' => $clientId, 'inspection_draft_id' => $draftId,
