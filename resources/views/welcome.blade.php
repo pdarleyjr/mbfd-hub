@@ -36,7 +36,7 @@
             ],
             [
                 'title' => 'Station / Vehicles / Equipment',
-                'description' => 'Apparatus checkout, vehicle inspections, station inventory, and station requests',
+                'description' => 'Station forms, Vehicle Checkouts, Video Conferencing',
                 'href' => url('/daily/stations'),
                 'icon' => 'M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2m-6 9 2 2 4-4',
                 'external' => false,
@@ -166,7 +166,7 @@
                                 <div class="home-update__footer">
                                     <p class="hub-caption home-update__stamp">
                                         <time datetime="{{ $update->publish_at?->toIso8601String() }}">{{ $update->publish_at?->timezone('America/New_York')->format('M j · g:i A') }}</time>
-                                        @if($update->author?->name)<span aria-hidden="true"> · </span>{{ $update->author->name }}@endif
+                                        @if($update->attribution())<span aria-hidden="true"> · </span>Posted by {{ $update->attribution() }}@endif
                                     </p>
                                     <a href="{{ route('updates.show', $update) }}" data-important-target class="hub-link hub-link--standalone">Read update<span class="hub-visually-hidden">: {{ $update->title }}</span></a>
                                 </div>

@@ -22,9 +22,13 @@ interface CommunicationsPanelProps {
   comms: CommandCommunications;
   /** Only changes the wording (empty state, placeholder, labels). Defaults to the hook's channel, else the 300 channel. */
   channel?: CommandChannel;
+  /** Opens the page's Department Updates section, for the public alternative to a private message. */
+  onOpenUpdates?: () => void;
 }
 
-export default function CommunicationsPanel({ comms, channel = comms.channel ?? DEFAULT_CHANNEL }: CommunicationsPanelProps) {
+export const MESSAGES_ABOUT = 'Post and receive messages, files, etc. Messages can only be received and sent by admin personnel, Capt. 5 and 300.';
+
+export default function CommunicationsPanel({ comms, channel = comms.channel ?? DEFAULT_CHANNEL, onOpenUpdates }: CommunicationsPanelProps) {
   const copy = CHANNEL_COPY[channel];
   const { feed, controls, sentCount, isVisible } = comms;
   const { setPinned, markRead, loadEarlier, refresh, removePost } = feed;
@@ -98,6 +102,16 @@ export default function CommunicationsPanel({ comms, channel = comms.channel ?? 
 
   return (
     <div data-testid="command-comms">
+      <div className="mb-3 space-y-1" data-testid="command-comms-about">
+        <p className="max-w-prose text-sm text-hub-ink">{MESSAGES_ABOUT}</p>
+        <p className="max-w-prose text-[13px] leading-5 text-hub-n-600">
+          For a notice everyone sees on the home page, use{' '}
+          {onOpenUpdates
+            ? <button type="button" onClick={onOpenUpdates} className="inline-flex min-h-11 items-center align-middle font-semibold text-hub-blue underline underline-offset-4">Post to Department Updates</button>
+            : 'Post to Department Updates'}
+          {' '}instead.
+        </p>
+      </div>
       {offline && (
         <div className="hub-callout hub-callout--warning mb-3 flex items-center gap-2 p-3 text-sm" role="status">
           <WifiOff className="h-4 w-4 flex-none" aria-hidden="true" />

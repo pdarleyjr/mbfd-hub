@@ -186,7 +186,7 @@ final class DepartmentUpdateResource extends Resource
                     ->formatStateUsing(fn (bool $state): string => $state ? 'Pinned' : 'Not pinned')
                     ->icon(fn (bool $state): string => $state ? 'heroicon-o-check-circle' : 'heroicon-o-x-circle')
                     ->iconColor(fn (bool $state): string => $state ? 'success' : 'danger'),
-                Tables\Columns\TextColumn::make('author.name')->label('Author')->placeholder('Former user'),
+                Tables\Columns\TextColumn::make('author_name')->label('Posted by')->getStateUsing(fn (DepartmentUpdate $record): ?string => $record->attribution())->placeholder('Former user'),
                 Tables\Columns\TextColumn::make('publish_at')->dateTime(timezone: 'America/New_York')->sortable(),
                 Tables\Columns\TextColumn::make('expires_at')->dateTime(timezone: 'America/New_York')->placeholder('No expiration')->sortable(),
                 Tables\Columns\TextColumn::make('notification_delivery_status')
@@ -262,7 +262,7 @@ final class DepartmentUpdateResource extends Resource
                 Infolists\Components\TextEntry::make('category')->badge(),
                 Infolists\Components\TextEntry::make('priority')->badge(),
                 Infolists\Components\TextEntry::make('status')->badge(),
-                Infolists\Components\TextEntry::make('author.name')->label('Author')->placeholder('Former user'),
+                Infolists\Components\TextEntry::make('author_name')->label('Posted by')->getStateUsing(fn (DepartmentUpdate $record): ?string => $record->attribution())->placeholder('Former user'),
                 Infolists\Components\TextEntry::make('publish_at')->dateTime(timezone: 'America/New_York'),
                 Infolists\Components\TextEntry::make('expires_at')->dateTime(timezone: 'America/New_York')->placeholder('No expiration'),
             ])->columns(3),

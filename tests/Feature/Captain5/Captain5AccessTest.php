@@ -7,13 +7,11 @@ namespace Tests\Feature\Captain5;
 use App\Models\Captain5\Captain5AccessOverride;
 use App\Models\User;
 use App\Services\Captain5\Captain5AdministrationService;
-use App\Services\Captain5\Captain5AssignmentService;
 use App\Services\Captain5\OnDutyCaptain5;
 use App\Services\Security\Captain5Access;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\Feature\Captain5\Concerns\BuildsCaptain5World;
@@ -30,11 +28,14 @@ final class Captain5AccessTest extends TestCase
         $this->buildCaptain5World();
     }
 
-    public function test_every_automatically_eligible_group_can_open_the_workspace_and_others_cannot(): void
+    public function test_every_officer_chief_and_administrator_can_use_the_whole_page_and_others_cannot(): void
     {
         $access = app(Captain5Access::class);
         foreach (['Lieutenant', 'Captain', 'Division Chief', 'Deputy Fire Chief', 'Fire Chief', '  captain '] as $rank) {
-            self::assertTrue($access->decide($this->officer($rank))->canViewPage, "{$rank} must open the workspace");
+            $decision = $access->decide($this->officer($rank));
+            self::assertTrue($decision->canViewPage, "{$rank} must open the workspace");
+            self::assertTrue($decision->canAct, "{$rank} must be able to act (no duty gating)");
+            self::assertTrue($decision->canDismiss, "{$rank} may close issues");
         }
         foreach (['Firefighter', 'Driver Engineer', 'EMS Coordinator', 'Chief Plans Analyst #3', 'Capt', 'Lt', 'Captain 5', ''] as $rank) {
             $decision = $access->decide($this->officer($rank));
@@ -45,135 +46,67 @@ final class Captain5AccessTest extends TestCase
         $panel = $this->officer('Firefighter');
         $panel->givePermissionTo(Permission::findOrCreate('admin.access', 'web'));
         $this->forgetCaptain5Memo();
-        self::assertTrue($access->decide($panel->fresh())->canViewPage, 'Admin panel users see the workspace');
-        self::assertFalse($access->decide($panel->fresh())->canAct, 'Admin panel alone never acts on issues');
-        self::assertTrue($access->decide($this->superAdmin())->canViewPage);
+        $adminDecision = app(Captain5Access::class)->decide($panel->fresh());
+        self::assertTrue($adminDecision->canViewPage, 'Members with admin rights use the page');
+        self::assertTrue($adminDecision->canAct, 'and can carry out every task');
+        self::assertTrue($access->decide($this->superAdmin())->canAct);
     }
 
-    public function test_officer_ranks_view_but_only_position_holders_act(): void
-    {
-        $access = app(Captain5Access::class);
-        $lieutenant = $access->decide($this->officer('Lieutenant'));
-        self::assertTrue($lieutenant->canViewData);
-        self::assertFalse($lieutenant->canAct);
-        self::assertFalse($lieutenant->hasOnDutyAuthority);
-        self::assertFalse($lieutenant->canDismiss);
-
-        $bidHolder = $this->officer('Captain');
-        $this->seat($bidHolder, 'Captain 5', 'A Shift');
-        $decision = app(Captain5Access::class)->decide($bidHolder);
-        self::assertTrue($decision->canAct);
-        self::assertTrue($decision->hasOnDutyAuthority, 'The A-shift Captain 5 holder is on duty on an A day');
-        self::assertTrue($decision->canDismiss);
-        self::assertSame('on_duty_bid_holder', $decision->authority());
-
-        $offShift = $this->officer('Captain');
-        $this->seat($offShift, 'Captain 5', 'B Shift');
-        $offDecision = app(Captain5Access::class)->decide($offShift);
-        self::assertTrue($offDecision->canAct, 'Seat holders act even off shift');
-        self::assertFalse($offDecision->hasOnDutyAuthority, 'Only the on-duty seat holder has on-duty authority');
-        self::assertFalse($offDecision->canDismiss);
-
-        $ems = $this->officer('Captain');
-        $this->seat($ems, 'EMS', 'D Shift');
-        $emsDecision = app(Captain5Access::class)->decide($ems);
-        self::assertTrue($emsDecision->canAct);
-        self::assertTrue($emsDecision->canDismiss);
-        self::assertTrue($emsDecision->canManageAssignments);
-        self::assertFalse($emsDecision->hasOnDutyAuthority);
-    }
-
-    public function test_the_on_duty_bid_holder_follows_the_rotation(): void
+    public function test_the_shift_captain5_follows_the_rotation_and_is_display_only(): void
     {
         $a = $this->officer('Captain', 'Captain A');
         $b = $this->officer('Captain', 'Captain B');
         $this->seat($a, 'Captain 5', 'A Shift');
         $this->seat($b, 'Captain 5', 'B Shift');
 
-        self::assertSame('A', app(Captain5Access::class)->decide($a)->onDuty->shiftLetter);
-        self::assertTrue(app(Captain5Access::class)->decide($a)->hasOnDutyAuthority);
+        $decisionA = app(Captain5Access::class)->decide($a);
+        self::assertSame('A', $decisionA->onDuty->shiftLetter);
+        self::assertTrue($decisionA->isShownCaptain5);
+        self::assertSame('shift_captain5', $decisionA->authority());
+        $decisionB = app(Captain5Access::class)->decide($b);
+        self::assertFalse($decisionB->isShownCaptain5);
+        self::assertTrue($decisionB->canAct, 'Off-shift seat holders still use the whole page');
+        self::assertTrue($decisionB->canDismiss);
 
         // 07:59 the next morning is still the A duty day; 08:00 is B.
         $this->travelTo(CarbonImmutable::parse('2026-10-21 07:59:00', 'America/New_York'));
         $this->forgetCaptain5Memo();
-        self::assertTrue(app(Captain5Access::class)->decide($a)->hasOnDutyAuthority);
+        self::assertTrue(app(Captain5Access::class)->decide($a)->isShownCaptain5);
         $this->travelTo(CarbonImmutable::parse('2026-10-21 08:00:00', 'America/New_York'));
         $this->forgetCaptain5Memo();
-        self::assertFalse(app(Captain5Access::class)->decide($a)->hasOnDutyAuthority);
-        self::assertTrue(app(Captain5Access::class)->decide($b)->hasOnDutyAuthority);
+        self::assertFalse(app(Captain5Access::class)->decide($a)->isShownCaptain5);
+        self::assertTrue(app(Captain5Access::class)->decide($b)->isShownCaptain5);
     }
 
-    public function test_acting_assignment_grants_on_duty_authority_for_its_duty_day_only(): void
+    public function test_an_approved_acting_member_is_shown_until_the_end_time_without_changing_anyones_permissions(): void
     {
         $holder = $this->officer('Captain');
         $this->seat($holder, 'Captain 5', 'A Shift');
         $acting = $this->officer('Lieutenant', 'Acting Officer');
-        $manager = $this->captain5Administrator();
-
-        app(Captain5AssignmentService::class)->assign($manager, [
-            'employee_profile_id' => $acting->employee_profile_id,
-            'duty_date' => '2026-10-20',
-            'reason' => 'Out of class: Captain 5 on leave',
-        ]);
-        $this->forgetCaptain5Memo();
+        $this->actingAssignment($acting, $this->captain5Administrator(), CarbonImmutable::parse('2026-10-20 20:00:00', 'America/New_York'));
 
         $decision = app(Captain5Access::class)->decide($acting);
-        self::assertTrue($decision->hasOnDutyAuthority);
-        self::assertTrue($decision->canAct);
-        self::assertTrue($decision->canDismiss);
-        self::assertSame('on_duty_acting', $decision->authority());
+        self::assertTrue($decision->isShownCaptain5);
         self::assertSame(OnDutyCaptain5::SOURCE_ACTING, $decision->onDuty->source);
-        self::assertFalse(app(Captain5Access::class)->decide($holder)->hasOnDutyAuthority, 'Acting coverage supersedes the bid holder for that day');
+        self::assertSame('Acting Officer', $decision->onDuty->toArray()['name']);
+        self::assertSame('Captain 5 (acting)', $decision->authorityLabel());
+        $holderDecision = app(Captain5Access::class)->decide($holder);
+        self::assertFalse($holderDecision->isShownCaptain5, 'The acting display replaces the bid holder on top');
+        self::assertTrue($holderDecision->canAct, 'but the bid holder keeps every capability');
 
-        // Expired: the next duty day the acting officer is just a Lieutenant again.
-        $this->travelTo(CarbonImmutable::parse('2026-10-21 08:00:01', 'America/New_York'));
+        $this->travelTo(CarbonImmutable::parse('2026-10-20 20:00:01', 'America/New_York'));
         $this->forgetCaptain5Memo();
-        $after = app(Captain5Access::class)->decide($acting->fresh());
-        self::assertFalse($after->hasOnDutyAuthority);
-        self::assertFalse($after->canAct);
-        self::assertTrue($after->canViewData, 'Rank still opens the workspace read-only');
+        self::assertSame(OnDutyCaptain5::SOURCE_BID, app(Captain5Access::class)->decide($acting)->onDuty->source, 'The display ends on its own');
+        self::assertTrue(app(Captain5Access::class)->decide($acting)->canAct, 'Rank still gives full use');
     }
 
-    public function test_a_firefighter_acting_out_of_class_gets_access_only_while_assigned(): void
+    public function test_acting_never_grants_access_to_someone_who_is_not_otherwise_eligible(): void
     {
         $firefighter = $this->officer('Firefighter');
-        self::assertFalse(app(Captain5Access::class)->decide($firefighter)->canViewPage);
         $this->actingAssignment($firefighter, $this->captain5Administrator());
-        self::assertTrue(app(Captain5Access::class)->decide($firefighter)->canViewPage);
-
-        $this->travelTo(CarbonImmutable::parse('2026-10-22 09:00:00', 'America/New_York'));
-        $this->forgetCaptain5Memo();
-        self::assertFalse(app(Captain5Access::class)->decide($firefighter)->canViewPage, 'Stale assignment grants nothing');
-    }
-
-    public function test_revoked_assignment_removes_authority_immediately_and_double_booking_is_refused(): void
-    {
-        $manager = $this->captain5Administrator();
-        $first = $this->officer('Lieutenant');
-        $second = $this->officer('Lieutenant');
-        $service = app(Captain5AssignmentService::class);
-        $assignment = $service->assign($manager, ['employee_profile_id' => $first->employee_profile_id, 'duty_date' => '2026-10-20', 'reason' => 'Coverage']);
-
-        try {
-            $service->assign($manager, ['employee_profile_id' => $second->employee_profile_id, 'duty_date' => '2026-10-20', 'reason' => 'Coverage']);
-            self::fail('A second acting Captain 5 for the same duty day must be refused');
-        } catch (ValidationException) {
-        }
-
-        $service->revoke($manager, $assignment->id, 'Captain 5 returned');
-        $this->forgetCaptain5Memo();
-        self::assertFalse(app(Captain5Access::class)->decide($first)->hasOnDutyAuthority);
-        self::assertNotNull($assignment->fresh()->revoked_at);
-        self::assertDatabaseHas('security_action_events', ['action' => 'captain5_acting_revoked', 'actor_user_id' => $manager->id]);
-    }
-
-    public function test_only_managers_can_assign_and_rank_never_infers_assignment_rights(): void
-    {
-        $captain = $this->officer('Captain');
-        $this->expectException(AuthorizationException::class);
-        app(Captain5AssignmentService::class)->assign($captain, [
-            'employee_profile_id' => $captain->employee_profile_id, 'duty_date' => '2026-10-20', 'reason' => 'Self-assign attempt',
-        ]);
+        $decision = app(Captain5Access::class)->decide($firefighter);
+        self::assertFalse($decision->canViewPage, 'The acting display is display only');
+        self::assertSame(OnDutyCaptain5::SOURCE_ACTING, $decision->onDuty->source);
     }
 
     public function test_deny_override_beats_every_automatic_source_except_super_admin(): void
@@ -188,12 +121,10 @@ final class Captain5AccessTest extends TestCase
         self::assertTrue($decision->denied);
         self::assertFalse($decision->canViewPage);
         self::assertFalse($decision->canAct);
-        self::assertFalse($decision->hasOnDutyAuthority);
 
-        $protected = $this->superAdmin();
         $employeeLinkedSuper = $this->officer('Captain');
         $employeeLinkedSuper->assignRole(Role::findOrCreate('super_admin', 'web'));
-        app(Captain5AdministrationService::class)->setOverride($protected, (int) $employeeLinkedSuper->employee_profile_id, 'deny', 'Test');
+        app(Captain5AdministrationService::class)->setOverride($this->superAdmin(), (int) $employeeLinkedSuper->employee_profile_id, 'deny', 'Test');
         $this->forgetCaptain5Memo();
         self::assertTrue(app(Captain5Access::class)->decide($employeeLinkedSuper->fresh())->canViewPage, 'super_admin is protected recovery access');
 
@@ -202,40 +133,35 @@ final class Captain5AccessTest extends TestCase
         self::assertTrue(app(Captain5Access::class)->decide($holder)->canAct);
         $history = Captain5AccessOverride::query()->where('employee_profile_id', $holder->employee_profile_id)->get();
         self::assertCount(1, $history, 'The deny decision stays in history');
-        self::assertNotNull($history->first()->superseded_at, 'Returning to automatic supersedes it');
-        self::assertSame($admin->id, (int) $history->first()->superseded_by_user_id);
+        self::assertNotNull($history->first()->superseded_at);
         self::assertDatabaseHas('security_action_events', ['action' => 'change_captain5_access', 'target_user_id' => $holder->id]);
     }
 
-    public function test_allow_overrides_grant_view_or_act_and_never_admin_panel_access(): void
+    public function test_allow_override_grants_the_whole_page_and_never_admin_panel_access(): void
     {
         $admin = $this->captain5Administrator();
-        $viewer = $this->officer('Firefighter');
-        $actor = $this->officer('Firefighter');
-        app(Captain5AdministrationService::class)->setOverride($admin, (int) $viewer->employee_profile_id, 'allow_view', 'Training');
-        app(Captain5AdministrationService::class)->setOverride($admin, (int) $actor->employee_profile_id, 'allow_act', 'EMS logistics delegate');
+        $firefighter = $this->officer('Firefighter');
+        app(Captain5AdministrationService::class)->setOverride($admin, (int) $firefighter->employee_profile_id, 'allow', 'EMS logistics delegate');
         $this->forgetCaptain5Memo();
 
-        $view = app(Captain5Access::class)->decide($viewer);
-        self::assertTrue($view->canViewData);
-        self::assertFalse($view->canAct);
-        $act = app(Captain5Access::class)->decide($actor);
-        self::assertTrue($act->canAct);
-        self::assertFalse($act->canDismiss);
-        self::assertFalse($act->canConfigure);
-        self::assertFalse($actor->fresh()->hasCurrentAdminPanelEntitlement(), 'No Admin Panel access is ever granted');
+        $decision = app(Captain5Access::class)->decide($firefighter);
+        self::assertTrue($decision->canAct);
+        self::assertFalse($decision->canConfigure);
+        self::assertFalse($firefighter->fresh()->hasCurrentAdminPanelEntitlement(), 'No Admin Panel access is ever granted');
     }
 
     public function test_configuration_requires_admin_panel_plus_captain5_admin(): void
     {
         $access = app(Captain5Access::class);
         self::assertTrue($access->decide($this->captain5Administrator())->canConfigure);
+        self::assertTrue($access->canConfigure($this->captain5Administrator()));
         self::assertTrue($access->decide($this->superAdmin())->canConfigure);
 
         $permissionOnly = $this->officer('Captain');
         $permissionOnly->givePermissionTo(Captain5Access::PERMISSION_ADMIN);
         $this->forgetCaptain5Memo();
         self::assertFalse(app(Captain5Access::class)->decide($permissionOnly->fresh())->canConfigure, 'captain5.admin without the Admin Panel is not enough');
+        self::assertFalse(app(Captain5Access::class)->canConfigure($permissionOnly->fresh()));
 
         $this->expectException(AuthorizationException::class);
         app(Captain5AdministrationService::class)->setOverride($this->officer('Division Chief'), 1, 'deny', 'Not allowed');
@@ -267,6 +193,8 @@ final class Captain5AccessTest extends TestCase
         $this->actAs($this->officer('Lieutenant'));
         $this->getJson('/api/captain5/workspace')->assertOk()
             ->assertJsonPath('access.view', true)
-            ->assertJsonPath('access.act', false);
+            ->assertJsonPath('access.act', true)
+            ->assertJsonMissingPath('access.on_duty')
+            ->assertJsonMissingPath('assignments');
     }
 }

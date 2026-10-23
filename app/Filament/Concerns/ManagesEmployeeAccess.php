@@ -111,12 +111,7 @@ trait ManagesEmployeeAccess
                     ->content(fn (): string => $this->captain5Status()),
                 Forms\Radio::make('choice')->label('Captain 5 access')->required()
                     ->options(Captain5AccessExplainer::CHOICE_LABELS)
-                    ->descriptions([
-                        'automatic' => 'Rank, seat and acting assignment decide. Removes any earlier Allow or Deny.',
-                        'allow_view' => 'Can open Captain 5 and see its issues. Cannot act on them.',
-                        'allow_act' => 'Can open Captain 5 and act on its issues.',
-                        'deny' => 'Cannot open Captain 5, even with a qualifying rank or seat.',
-                    ]),
+                    ->descriptions(Captain5AccessExplainer::CHOICE_DESCRIPTIONS),
                 ...$this->securityFields(),
             ])
             ->action(fn (array $data) => $this->runProtected(function () use ($data): void {

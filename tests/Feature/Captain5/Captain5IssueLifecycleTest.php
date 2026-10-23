@@ -71,7 +71,7 @@ final class Captain5IssueLifecycleTest extends TestCase
 
         $ordered = ApparatusDefectEvent::query()->where('apparatus_defect_id', $defect->id)->where('to_status', 'action_pending')->sole();
         self::assertSame((int) $this->captainA->id, (int) $ordered->actor_user_id);
-        self::assertSame('on_duty_bid_holder', $ordered->details['actor_context']['authority']);
+        self::assertSame('shift_captain5', $ordered->details['actor_context']['authority']);
         self::assertSame('2026-10-20', $ordered->details['actor_context']['duty_date']);
         self::assertSame('A', $ordered->details['actor_context']['shift']);
         self::assertDatabaseHas('apparatus_issue_messages', ['apparatus_defect_id' => $defect->id, 'author_context' => ApparatusIssueMessage::CONTEXT_CAPTAIN5]);
@@ -89,7 +89,7 @@ final class Captain5IssueLifecycleTest extends TestCase
         $this->act($this->captainB, $defect, 'available_for_pickup', ['pickup_instructions' => 'Logistics shelf 3'])
             ->assertOk()->assertJsonPath('issue.action_status', 'replacement_available');
         $pickup = ApparatusDefectEvent::query()->where('apparatus_defect_id', $defect->id)->where('to_status', 'replacement_available')->sole();
-        self::assertSame('on_duty_bid_holder', $pickup->details['actor_context']['authority']);
+        self::assertSame('shift_captain5', $pickup->details['actor_context']['authority']);
         self::assertSame('B', $pickup->details['actor_context']['shift']);
         $this->assertLedger('captain5:defect:'.$defect->id.':update:'.$pickup->id, [$alpha, $bravo, $this->captainA]);
 
@@ -110,7 +110,7 @@ final class Captain5IssueLifecycleTest extends TestCase
         $reviewer = $this->newReviewer('Logistics Reviewer');
         $this->actAs($reviewer);
         $this->get('/admin/inspections/'.$defect->first_reported_inspection_id)->assertOk()
-            ->assertSee('Captain 5 (on duty)')->assertSee('Captain Bravo');
+            ->assertSee('Captain 5 (on shift)')->assertSee('Captain Bravo');
 
         // Day 3: the closed issue no longer appears as unresolved in Daily Checkout.
         $this->travelTo(CarbonImmutable::parse('2026-10-22 09:00:00', 'America/New_York'));
@@ -150,19 +150,17 @@ final class Captain5IssueLifecycleTest extends TestCase
         $this->getJson('/api/captain5/issues/'.$cooler->id)->assertOk();
     }
 
-    public function test_view_only_officers_cannot_act_and_dismiss_needs_authority(): void
+    public function test_every_officer_can_act_and_close_issues_whatever_the_shift(): void
     {
         [$defect] = $this->reportMissing($this->rescue, $this->newMember('Reporter'), [self::RESCUE_ITEM]);
 
         $lieutenant = $this->officer('Lieutenant');
         $this->actAs($lieutenant);
-        $this->getJson('/api/captain5/issues/'.$defect->id)->assertOk()->assertJsonPath('issue.actions', []);
-        $this->act($lieutenant, $defect, 'acknowledge')->assertForbidden();
+        self::assertNotEmpty($this->getJson('/api/captain5/issues/'.$defect->id)->assertOk()->json('issue.actions'), 'No duty gating: any officer sees the actions');
+        $this->act($lieutenant, $defect, 'acknowledge')->assertOk();
 
-        $this->act($this->captainB, $defect, 'dismiss', ['reason' => 'Duplicate'])->assertForbidden(); // off-duty seat holder
-        $ems = $this->officer('Captain', 'EMS Captain');
-        $this->seat($ems, 'EMS', 'D Shift');
-        $this->act($ems, $defect, 'dismiss', ['reason' => 'Item is not carried on this Rescue'])->assertOk()->assertJsonPath('issue.action_status', 'dismissed');
+        // An off-shift Captain 5 seat holder closes it just as well.
+        $this->act($this->captainB, $defect, 'dismiss', ['reason' => 'Item is not carried on this Rescue'])->assertOk()->assertJsonPath('issue.action_status', 'dismissed');
 
         $this->actAs($this->newMember('Plain Firefighter'));
         $this->getJson('/api/captain5/issues/'.$defect->id)->assertForbidden();

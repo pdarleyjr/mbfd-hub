@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Captain5;
 
-use App\Models\Captain5\Captain5DutyAssignment;
+use App\Models\Captain5\Captain5ActingRequest;
 use App\Models\Employee;
 use App\Models\EmployeeBidAssignment;
 use App\Models\User;
@@ -14,10 +14,11 @@ use DateTimeInterface;
 use Illuminate\Support\Collection;
 
 /**
- * Resolves the on-duty Captain 5 from authoritative data only:
- *  1. an active controlled acting assignment covering the moment;
+ * Resolves who is shown as the shift's Captain 5 (display and notification routing only, never a
+ * permission):
+ *  1. an administrator-approved acting request showing at the moment;
  *  2. otherwise the verified Captain 5 bid holder whose bid shift is the on-duty rotation shift;
- *  3. otherwise unknown (callers fall back to unit-level routing). Never inferred from rank.
+ *  3. otherwise unknown (callers fall back to the seat holders). Never inferred from rank.
  */
 final class Captain5DutyRoster
 {
@@ -41,9 +42,9 @@ final class Captain5DutyRoster
         return $this->memo[$moment->format('Y-m-d H:i')] ??= $this->resolve($moment);
     }
 
-    public function actingAt(DateTimeInterface $moment): ?Captain5DutyAssignment
+    public function actingAt(DateTimeInterface $moment): ?Captain5ActingRequest
     {
-        return Captain5DutyAssignment::query()->covering($moment)->with('employee')->orderByDesc('id')->first();
+        return Captain5ActingRequest::query()->showingAt($moment)->with('employee')->orderByDesc('starts_at')->orderByDesc('id')->first();
     }
 
     /** @return Collection<int, EmployeeBidAssignment> keyed by employee_profile_id */
@@ -114,7 +115,7 @@ final class Captain5DutyRoster
 
         $acting = $this->actingAt($moment);
         if ($acting !== null && $acting->employee instanceof Employee) {
-            return new OnDutyCaptain5($dutyDate, $acting->shift_letter ?? $shift, OnDutyCaptain5::SOURCE_ACTING, $acting->employee, $acting);
+            return new OnDutyCaptain5($dutyDate, $shift ?? $acting->shift_letter, OnDutyCaptain5::SOURCE_ACTING, $acting->employee, $acting);
         }
 
         if ($shift !== null) {

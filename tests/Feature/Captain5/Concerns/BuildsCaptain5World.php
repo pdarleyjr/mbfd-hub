@@ -7,7 +7,7 @@ namespace Tests\Feature\Captain5\Concerns;
 use App\Enums\AccountStatus;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
-use App\Models\Captain5\Captain5DutyAssignment;
+use App\Models\Captain5\Captain5ActingRequest;
 use App\Models\Employee;
 use App\Models\EmployeeBidAssignment;
 use App\Models\Station;
@@ -120,20 +120,22 @@ trait BuildsCaptain5World
         return $user->fresh();
     }
 
-    /** An acting Captain 5 for the current duty day, written directly (assignment API has its own tests). */
-    protected function actingAssignment(User $member, User $assignedBy, ?string $dutyDate = null): Captain5DutyAssignment
+    /**
+     * An approved acting Captain 5 display for $member until $endsAt (default: 08:00 tomorrow), written
+     * directly; the request/approval flow has its own tests.
+     */
+    protected function actingAssignment(User $member, User $approvedBy, ?CarbonImmutable $endsAt = null): Captain5ActingRequest
     {
         $calendar = app(DutyCalendar::class);
-        $dutyDate ??= $calendar->dutyDate()->format('Y-m-d');
-        [$start, $end] = $calendar->window($dutyDate);
-        $assignment = Captain5DutyAssignment::query()->create([
-            'employee_profile_id' => $member->employee_profile_id, 'duty_date' => $dutyDate,
-            'starts_at' => $start, 'ends_at' => $end, 'shift_letter' => $calendar->shiftFor($dutyDate),
-            'reason' => 'Out of class coverage', 'assigned_by_user_id' => $assignedBy->getKey(),
+        $request = Captain5ActingRequest::query()->create([
+            'kind' => Captain5ActingRequest::KIND_ACT, 'employee_profile_id' => $member->employee_profile_id,
+            'requested_by_user_id' => $member->getKey(), 'duration' => '24h',
+            'shift_letter' => $calendar->shiftFor($calendar->dutyDate()), 'ends_at' => $endsAt ?? $calendar->actingEnd('24h'),
+            'status' => Captain5ActingRequest::APPROVED, 'decided_by_user_id' => $approvedBy->getKey(), 'decided_at' => now(), 'starts_at' => now(),
         ]);
         $this->forgetCaptain5Memo();
 
-        return $assignment;
+        return $request;
     }
 
     /**

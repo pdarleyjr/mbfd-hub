@@ -12,8 +12,6 @@ import { BTN_SECONDARY, Fact, IssueTags, Sheet } from './ui';
 
 interface Props {
   issueId: number | null;
-  /** access.act: false means "View only". */
-  canAct: boolean;
   onClose: () => void;
   /** The issue changed on the server: refresh the lists behind the sheet. */
   onChanged: () => void;
@@ -42,7 +40,7 @@ function Summary({ issue }: { issue: IssueDetail }) {
   );
 }
 
-export default function IssueSheet({ issueId, canAct, onClose, onChanged, onOpenInspection }: Props) {
+export default function IssueSheet({ issueId, onClose, onChanged, onOpenInspection }: Props) {
   const [issue, setIssue] = useState<IssueDetail | null>(null);
   const [error, setError] = useState<Captain5ApiError | null>(null);
   const [loading, setLoading] = useState(false);
@@ -105,19 +103,17 @@ export default function IssueSheet({ issueId, canAct, onClose, onChanged, onOpen
           {issue.origin_inspection_id !== null && (
             <button type="button" className={BTN_SECONDARY} onClick={() => onOpenInspection(issue.origin_inspection_id as number)}>View originating inspection</button>
           )}
-          {canAct && (
-              <IssueActionPanel
-                key={issue.id}
-                issue={issue}
-                onResult={(updated, confirmation) => { setIssue(updated); setNotice({ tone: 'success', text: confirmation }); onChanged(); }}
-                onConflict={(fresh) => {
-                  setNotice({ tone: 'warning', text: 'Updated by someone else. This is the latest version of the issue.' });
-                  if (fresh) setIssue(fresh); else void load(issue.id, true);
-                  onChanged();
-                }}
-              />
-          )}
-          <IssueThread issue={issue} canWrite={canAct} onPosted={(updated) => { setIssue(updated); onChanged(); }} />
+          <IssueActionPanel
+            key={issue.id}
+            issue={issue}
+            onResult={(updated, confirmation) => { setIssue(updated); setNotice({ tone: 'success', text: confirmation }); onChanged(); }}
+            onConflict={(fresh) => {
+              setNotice({ tone: 'warning', text: 'Updated by someone else. This is the latest version of the issue.' });
+              if (fresh) setIssue(fresh); else void load(issue.id, true);
+              onChanged();
+            }}
+          />
+          <IssueThread issue={issue} onPosted={(updated) => { setIssue(updated); onChanged(); }} />
           <IssueTimeline issue={issue} onOpenInspection={onOpenInspection} />
         </div>
       )}

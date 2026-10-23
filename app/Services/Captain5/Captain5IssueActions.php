@@ -95,7 +95,7 @@ final class Captain5IssueActions
     /** Officers holding a Captain 5 role act as Captain 5; Logistics reviewers keep their own path. */
     private function engineFor(Captain5AccessDecision $decision): DefectCorrectiveActionService
     {
-        return ($decision->toClientArray()['acts_as'] ?? 'captain5') === 'logistics'
+        return $decision->actsAsLogistics()
             ? $this->engine
             : $this->engine->forCaptain5(Captain5ActorContext::from($decision));
     }

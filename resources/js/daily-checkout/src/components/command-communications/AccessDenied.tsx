@@ -9,9 +9,9 @@ export default function AccessDenied() {
       <DailyPageNav fallback="/stations" />
       <section className="hub-panel flex flex-col items-center gap-2 px-4 py-8 text-center sm:px-6" aria-labelledby="command-denied-heading">
         <Lock className="h-6 w-6 text-hub-n-600" aria-hidden="true" />
-        <h1 id="command-denied-heading" className="font-heading text-xl font-bold text-hub-ink">300 Command is not available to your account</h1>
+        <h1 id="command-denied-heading" className="font-heading text-xl font-bold text-hub-ink">300 is not available to your account</h1>
         <p className="max-w-prose text-sm text-hub-n-600">
-          Your account does not have access to 300 Command, so its messages and readiness overview are closed to you.
+          Your account does not have access to 300, so its messages and readiness overview are closed to you.
           Your station tools are not affected and still work as usual.
         </p>
         <Link to="/stations" className="hub-btn hub-btn--primary mt-2 !min-h-11">Back to stations</Link>

@@ -10,6 +10,7 @@ use App\Models\ApparatusDefect;
 use App\Models\ApparatusDefectEvent;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusIssueMessage;
+use App\Models\Captain5\Captain5ActingRequest;
 use App\Models\CommandCommunicationPost;
 use App\Models\User;
 use App\Notifications\Inspections\InspectionEventNotification;
@@ -53,6 +54,10 @@ final class Captain5Notifier
     public const KIND_MEMBER_REPLY = 'captain5_member_reply';
 
     public const KIND_COMMUNICATION = 'captain5_communication';
+
+    public const KIND_ACTING_REQUEST = 'captain5_acting_request';
+
+    public const KIND_ACTING_DECISION = 'captain5_acting_decision';
 
     public const WORKSPACE_PATH = '/daily/captain-5';
 
@@ -271,6 +276,52 @@ final class Captain5Notifier
         });
     }
 
+    /** A member asked to be shown as (or to end) the acting Captain 5: Captain 5 administrators approve. */
+    public function actingRequested(Captain5ActingRequest $request): void
+    {
+        $this->guard('actingRequested', function () use ($request): void {
+            $requester = User::query()->find($request->requested_by_user_id);
+            $name = trim((string) ($requester?->display_name ?: $requester?->name)) ?: 'A member';
+            $approvers = User::query()
+                ->where(fn ($query) => $query->whereHas('roles', fn ($roles) => $roles->where('name', 'super_admin'))
+                    ->orWhereHas('permissions', fn ($permissions) => $permissions->where('name', Captain5Access::PERMISSION_ADMIN)))
+                ->get()->filter(fn (User $user): bool => $this->access->canConfigure($user))->values();
+            $what = $request->kind === Captain5ActingRequest::KIND_END
+                ? "{$name} asked to end the current acting Captain 5 display."
+                : "{$name} asked to be shown as acting Captain 5 until ".$this->localTime($request->ends_at).'.';
+
+            $this->queue('captain5:acting:'.$request->getKey().':requested', self::KIND_ACTING_REQUEST, $approvers, fn (): array => [
+                'title' => 'Acting Captain 5: approval needed',
+                'body' => $what,
+                'url' => self::WORKSPACE_PATH.'?tab=today',
+            ], $requester);
+        });
+    }
+
+    /** Tells the requester how their acting Captain 5 request was decided. */
+    public function actingDecided(Captain5ActingRequest $request): void
+    {
+        $this->guard('actingDecided', function () use ($request): void {
+            $approved = $request->status === Captain5ActingRequest::APPROVED;
+            $decider = $request->decided_by_user_id !== null ? User::query()->find($request->decided_by_user_id) : null;
+            $body = match (true) {
+                $approved && $request->kind === Captain5ActingRequest::KIND_END => 'The acting Captain 5 display was ended.',
+                $approved => 'You are shown as acting Captain 5 until '.$this->localTime($request->ends_at).'.',
+                default => 'Your acting Captain 5 request was not approved.'.($request->decision_note ? ' '.$this->excerpt($request->decision_note) : ''),
+            };
+            $this->queue('captain5:acting:'.$request->getKey().':decided', self::KIND_ACTING_DECISION, User::query()->whereKey($request->requested_by_user_id)->get(), fn (): array => [
+                'title' => $approved ? 'Acting Captain 5 approved' : 'Acting Captain 5 not approved',
+                'body' => $body,
+                'url' => self::WORKSPACE_PATH,
+            ], $decider);
+        });
+    }
+
+    private function localTime(?\DateTimeInterface $moment): string
+    {
+        return $moment !== null ? \Carbon\CarbonImmutable::instance($moment)->setTimezone('America/New_York')->format('D g:i A') : 'the end of the shift';
+    }
+
     /** Replays one queued ledger row (inspections:retry-notifications). */
     public function redeliver(string $eventKey, string $kind, int $recipientUserId): bool
     {
@@ -283,6 +334,8 @@ final class Captain5Notifier
             $tail = $parts[3] ?? '';
             match (true) {
                 $subject === 'communication' => $this->replayCommunication($parts[2] ?? ''),
+                $subject === 'acting' && $tail === 'requested' => ($a = Captain5ActingRequest::query()->find($id)) !== null ? $this->actingRequested($a) : null,
+                $subject === 'acting' && $tail === 'decided' => ($a = Captain5ActingRequest::query()->find($id)) !== null ? $this->actingDecided($a) : null,
                 $subject === 'inspection' => $this->replayFindings($id),
                 $subject === 'defect' => $this->withModels($id, (int) ($parts[4] ?? 0), fn (ApparatusDefect $d, ApparatusDefectEvent $e) => $this->issueUpdated($d, $e)),
                 $subject === 'message' && $tail === 'notify' => ($m = ApparatusIssueMessage::query()->find($id)) !== null

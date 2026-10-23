@@ -18,11 +18,25 @@ use Carbon\CarbonImmutable;
  */
 final class Captain5AccessExplainer
 {
+    /** What an administrator picks in the access forms. */
     public const CHOICE_LABELS = [
         'automatic' => 'Automatic (follow rank and seat)',
-        'allow_view' => 'Allow, view only',
-        'allow_act' => 'Allow, view and act',
+        'allow' => 'Allow: can use the Captain 5 page',
+        'deny' => 'Deny: cannot use the Captain 5 page',
+    ];
+
+    /** Short names for badges, lists and history lines. */
+    public const CHOICE_NAMES = [
+        'automatic' => 'Automatic',
+        'allow' => 'Allow',
         'deny' => 'Deny',
+    ];
+
+    /** The help line under each choice in the access forms. */
+    public const CHOICE_DESCRIPTIONS = [
+        'automatic' => 'Rank, seat and administrator access decide. Removes any earlier Allow or Deny.',
+        'allow' => 'Can use the whole Captain 5 page, even without a qualifying rank or seat.',
+        'deny' => 'Cannot open Captain 5, even with a qualifying rank or seat.',
     ];
 
     public function __construct(private readonly Captain5Access $access) {}
@@ -30,7 +44,7 @@ final class Captain5AccessExplainer
     /**
      * @return array{
      *     headline: string,
-     *     tone: 'success'|'info'|'danger'|'gray',
+     *     tone: 'success'|'danger'|'gray',
      *     sources: list<string>,
      *     capabilities: list<array{label: string, allowed: bool}>,
      *     override: array{choice: string, label: string, reason: string, set_by: string, at: string}|null,
@@ -43,7 +57,7 @@ final class Captain5AccessExplainer
         $override = $employee instanceof Employee ? $this->currentOverride((int) $employee->getKey()) : null;
         $overrideSummary = $override instanceof Captain5AccessOverride ? [
             'choice' => self::choiceFor($override),
-            'label' => self::CHOICE_LABELS[self::choiceFor($override)],
+            'label' => self::CHOICE_NAMES[self::choiceFor($override)],
             'reason' => (string) $override->reason,
             'set_by' => (string) ($override->setBy->name ?? 'A former administrator'),
             'at' => $this->when($override->created_at),
@@ -74,16 +88,14 @@ final class Captain5AccessExplainer
             return $this->result('Denied by an administrator. This member cannot open Captain 5.', 'danger', [], $overrideSummary, $this->capabilities($decision), $notes);
         }
         if ($decision->sources === []) {
-            return $this->result('No Captain 5 access. This member does not qualify by rank, seat or assignment.', 'gray', [], $overrideSummary, $this->capabilities($decision), $notes);
+            return $this->result('No Captain 5 access. This member does not qualify by rank, seat or administrator access.', 'gray', [], $overrideSummary, $this->capabilities($decision), $notes);
         }
 
-        $headline = match (true) {
-            $decision->hasOnDutyAuthority => 'On-duty Captain 5 authority right now.',
-            $decision->canAct => 'Can view and act on Captain 5 issues.',
-            default => 'Can view Captain 5, but cannot act on issues.',
-        };
+        $headline = $decision->isShownCaptain5
+            ? 'Can use the whole Captain 5 page, and is shown as the shift\'s Captain 5 right now.'
+            : 'Can use the whole Captain 5 page.';
 
-        return $this->result($headline, $decision->canAct ? 'success' : 'info', $this->sources($decision, $employee), $overrideSummary, $this->capabilities($decision), $notes);
+        return $this->result($headline, 'success', $this->sources($decision, $employee), $overrideSummary, $this->capabilities($decision), $notes);
     }
 
     /** One line for the employee action modal. */
@@ -103,8 +115,7 @@ final class Captain5AccessExplainer
         return match (true) {
             $override === null => 'automatic',
             $override->effect === Captain5AccessOverride::EFFECT_DENY => 'deny',
-            $override->level === Captain5AccessOverride::LEVEL_ACT => 'allow_act',
-            default => 'allow_view',
+            default => 'allow',
         };
     }
 
@@ -126,13 +137,11 @@ final class Captain5AccessExplainer
         foreach ($decision->sources as $source) {
             $lines[] = match ($source) {
                 Captain5AccessDecision::SOURCE_SUPER_ADMIN => 'Super administrator',
-                Captain5AccessDecision::SOURCE_ADMINISTRATOR => 'Admin Panel account (view only)',
+                Captain5AccessDecision::SOURCE_ADMINISTRATOR => 'Admin Panel account',
                 Captain5AccessDecision::SOURCE_OFFICER_RANK => 'Officer rank'.($employee?->rank ? ': '.$employee->rank : ''),
                 Captain5AccessDecision::SOURCE_CAPTAIN5_SEAT => 'Holds the Captain 5 seat'.($decision->bidShiftLetter ? ' on '.$decision->bidShiftLetter.' shift' : ''),
                 Captain5AccessDecision::SOURCE_EMS_CAPTAIN_SEAT => 'Holds the EMS Captain seat',
-                Captain5AccessDecision::SOURCE_ACTING => 'Acting Captain 5 for duty day '.($decision->actingAssignment?->duty_date->format('M j') ?? 'today'),
-                Captain5AccessDecision::SOURCE_ALLOW_VIEW => 'Allowed by an administrator (view only)',
-                Captain5AccessDecision::SOURCE_ALLOW_ACT => 'Allowed by an administrator (view and act)',
+                Captain5AccessDecision::SOURCE_EXPLICIT_ALLOW => 'Allowed by an administrator',
                 Captain5AccessDecision::SOURCE_REVIEWER => 'Fleet inspection reviewer',
                 default => $source,
             };
@@ -147,8 +156,7 @@ final class Captain5AccessExplainer
         return [
             ['label' => 'Open the Captain 5 workspace', 'allowed' => $decision->canViewPage],
             ['label' => 'Act on issues', 'allowed' => $decision->canAct],
-            ['label' => 'On-duty Captain 5 authority', 'allowed' => $decision->hasOnDutyAuthority],
-            ['label' => 'Dismiss issues', 'allowed' => $decision->canDismiss],
+            ['label' => 'Shown as the shift\'s Captain 5 now (display only)', 'allowed' => $decision->isShownCaptain5],
             ['label' => 'Configure Captain 5 in the Admin Panel', 'allowed' => $decision->canConfigure],
         ];
     }
@@ -158,8 +166,8 @@ final class Captain5AccessExplainer
      * @param  array{choice: string, label: string, reason: string, set_by: string, at: string}|null  $override
      * @param  list<array{label: string, allowed: bool}>  $capabilities
      * @param  list<string>  $notes
-     * @param  'success'|'info'|'danger'|'gray'  $tone
-     * @return array{headline: string, tone: 'success'|'info'|'danger'|'gray', sources: list<string>, capabilities: list<array{label: string, allowed: bool}>, override: array{choice: string, label: string, reason: string, set_by: string, at: string}|null, notes: list<string>}
+     * @param  'success'|'danger'|'gray'  $tone
+     * @return array{headline: string, tone: 'success'|'danger'|'gray', sources: list<string>, capabilities: list<array{label: string, allowed: bool}>, override: array{choice: string, label: string, reason: string, set_by: string, at: string}|null, notes: list<string>}
      */
     private function result(string $headline, string $tone, array $sources, ?array $override, array $capabilities, array $notes = []): array
     {

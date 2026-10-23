@@ -63,8 +63,8 @@ async function mockDailySelectorApi(page: Page): Promise<void> {
     if (path === '/api/captain5/summary') {
       return route.fulfill({
         json: {
-          access: { view: true, act: true, on_duty: true, dismiss: true, manage_assignments: false, configure: false, acts_as: 'captain5', authority: 'on_duty_captain5', authority_label: 'Captain 5 (on duty)' },
-          on_duty: { duty_date: '2026-10-23', shift: 'B', source: 'bid_holder', resolved: true, name: 'Responsive Tester', rank: 'Captain', assignment_id: null },
+          access: { view: true, act: true, configure: false, acts_as: 'captain5', authority: 'on_duty_captain5', authority_label: 'Captain 5 (on duty)' },
+          on_duty: { duty_date: '2026-10-23', shift: 'B', source: 'bid_holder', resolved: true, name: 'Responsive Tester', rank: 'Captain', acting_until: null, acting_request_id: null },
           open_issues: 3,
         },
       });
@@ -215,14 +215,14 @@ test('Command 300 tabs open on Communications, show one station at a time and pr
   await page.route('**/api/public/stations/29', route => route.fulfill({ json: { ...stations[0], id: 29, apparatuses: [], rooms: [] } }));
 
   await page.goto('/daily/command-300');
-  await expect(page.getByRole('heading', { name: '300 Command', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '300', exact: true })).toBeVisible();
   const commandBoard = page.getByRole('link', { name: /^Open Command Board/ });
   await expect(commandBoard).toHaveCount(1);
   await expect(commandBoard).toHaveAttribute('href', 'https://cmd.mbfdhub.com');
   await expect(commandBoard).toHaveAttribute('target', '_blank');
   await expect(commandBoard).toHaveAttribute('rel', 'noopener noreferrer');
   const tabs = page.getByRole('tablist', { name: 'Communications and stations' });
-  await expect(tabs.getByRole('tab')).toHaveCount(6);
+  await expect(tabs.getByRole('tab')).toHaveCount(7);
   await expect(tabs.getByRole('tab').first()).toHaveText('Communications');
   await expect(tabs.getByRole('tab', { name: 'Communications', exact: true })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByTestId('command-stations')).toHaveCount(1);
@@ -273,7 +273,7 @@ test('Command 300 tabs open on Communications, show one station at a time and pr
   await page.getByRole('link', { name: 'Open Station 1', exact: true }).click();
   await expect(page).toHaveURL(/\/daily\/stations\/29\?return_to=%2Fdaily%2Fcommand-300%3Fstation%3D29$/);
   await expect(page.getByRole('heading', { name: 'Station 1', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Back to 300 Command', exact: true }).click();
+  await page.getByRole('button', { name: 'Back to 300', exact: true }).click();
   await expect(page).toHaveURL(/\/daily\/command-300\?station=29$/);
   await expect(page.getByRole('tabpanel', { name: 'Station 1', exact: true })).toBeVisible();
   await expectNoHorizontalOverflow(page);
@@ -296,7 +296,7 @@ test('Command 300 station tabs handle changed station lists, empty data, refresh
   data.stations.pop();
   const refresh = page.getByTestId('command-overview-refresh');
   await refresh.click();
-  await expect(page.getByRole('tab')).toHaveCount(5);
+  await expect(page.getByRole('tab')).toHaveCount(6);
   await expect(page.getByRole('tabpanel', { name: 'Communications', exact: true })).toBeVisible();
   await page.getByRole('tab', { name: 'Station 1', exact: true }).click();
   fail = true;
@@ -311,14 +311,14 @@ test('Command 300 station tabs handle changed station lists, empty data, refresh
   fail = false;
   data.stations = [{ ...data.stations[0], apparatuses: [], apparatus_count: 0 }];
   await refresh.click();
-  await expect(page.getByRole('tab')).toHaveCount(2);
+  await expect(page.getByRole('tab')).toHaveCount(3);
   await page.getByRole('tab', { name: 'Station 1', exact: true }).click();
   await expect(page.getByText('No apparatus is assigned to this station.')).toBeVisible();
   data.stations = [];
   await refresh.click();
   await expect(page.getByText('No active stations', { exact: true })).toBeVisible();
   // Communications stays available with no stations at all.
-  await expect(page.getByRole('tab')).toHaveCount(1);
+  await expect(page.getByRole('tab')).toHaveCount(2);
   await expect(page.getByTestId('command-comms')).toBeVisible();
 });
 

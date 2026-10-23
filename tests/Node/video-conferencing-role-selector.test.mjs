@@ -58,7 +58,7 @@ test("300 Command profile owns the Command lineup entry through the employee rou
   assert.match(command300, /target="_blank" rel="noopener noreferrer"/);
   assert.doesNotMatch(command300, /<iframe/);
   assert.match(readFileSync(resolve(root, "resources/js/daily-checkout/src/App.tsx"), "utf8"), /path="\/command-300"/);
-  assert.match(readFileSync(resolve(root, "resources/js/daily-checkout/src/utils/contextualBack.ts"), "utf8"), /Back to 300 Command/);
+  assert.match(readFileSync(resolve(root, "resources/js/daily-checkout/src/utils/contextualBack.ts"), "utf8"), /'Back to 300'/);
 });
 
 test("the conference app drops its own Back / Hub Home when a Filament page already renders them", () => {

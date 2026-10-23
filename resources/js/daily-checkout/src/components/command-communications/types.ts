@@ -96,7 +96,7 @@ export const ATTACHMENT_ACCEPT = 'image/*,.pdf,.docx,.xlsx,.pptx,.txt,.csv';
 export const ALLOWED_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif', 'pdf', 'docx', 'xlsx', 'pptx', 'txt', 'csv'];
 
 export const SOURCE_LABEL: Record<CommandPostSide, string> = {
-  command: '300 Command',
+  command: '300',
   administration: 'Administration',
   captain5: 'Captain 5',
 };
@@ -107,8 +107,8 @@ export const DEFAULT_CHANNEL: CommandChannel = 'command_300';
 export const CHANNEL_COPY: Record<CommandChannel, { feedLabel: string; emptyBody: string; placeholder: string }> = {
   command_300: {
     feedLabel: 'Command messages',
-    emptyBody: 'Post an update for 300 Command and Administration. New messages appear here.',
-    placeholder: 'Write a message to 300 Command and Administration',
+    emptyBody: 'Post a message for 300 and Administration. New messages appear here.',
+    placeholder: 'Write a message to 300 and Administration',
   },
   captain_5: {
     feedLabel: 'Captain 5 messages',
@@ -117,4 +117,4 @@ export const CHANNEL_COPY: Record<CommandChannel, { feedLabel: string; emptyBody
   },
 };
 
-export const BOTH_AUDIENCE_LABEL = '300 Command + Captain 5';
+export const BOTH_AUDIENCE_LABEL = '300 + Captain 5';

@@ -60,7 +60,7 @@ final class Captain5AuditVisibilityTest extends TestCase
 
         $this->get('/admin/inspections/'.$this->defect->first_reported_inspection_id)->assertOk()
             ->assertSee('Acknowledged: Bolt Cutters')
-            ->assertSee('Captain 5 (on duty) · Captain Alpha');
+            ->assertSee('Captain 5 (on shift) · Captain Alpha');
     }
 
     public function test_the_apparatus_issue_history_labels_captain5_actions_and_keeps_other_actors_plain(): void
@@ -76,12 +76,12 @@ final class Captain5AuditVisibilityTest extends TestCase
             ->assertSee('Issue history')
             ->assertSee('Acknowledged')
             ->assertSee('Corrective action updated')
-            ->assertSee('Captain 5 (on duty) · Captain Alpha')
+            ->assertSee('Captain 5 (on shift) · Captain Alpha')
             ->assertSee('Message to member: Bolt cutters ordered, due Friday.')
             ->assertSee('Internal note: Vendor confirmed price.')
             ->assertSee('Issue reported')
             ->assertSee('Firefighter Reporter')
-            ->assertDontSee('Captain 5 (on duty) · Firefighter Reporter');
+            ->assertDontSee('Captain 5 (on shift) · Firefighter Reporter');
 
         // The history is a read of the append-only event log: every event, newest first, internal notes only on request.
         $eventCount = ApparatusDefectEvent::query()->where('apparatus_defect_id', $this->defect->id)->count();

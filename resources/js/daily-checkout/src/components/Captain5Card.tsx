@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { ChevronRight } from 'lucide-react';
 import { CAPTAIN_5_IMAGE, bundledImageSize } from '../types';
+import { dutyLine, dutyTone } from './captain5/format';
 import { fetchCaptain5Summary } from '../utils/captain5Api';
 import type { Captain5Summary } from './captain5/types';
 import StationCardMedia from './StationCardMedia';
@@ -41,6 +42,9 @@ export default function Captain5Card({ summary }: { summary: Captain5Summary }) 
 
       <div className="p-4 sm:p-5 2xl:p-6">
         <h3 className="mb-3 text-lg font-bold text-hub-ink font-heading 2xl:text-xl">Captain 5</h3>
+        <p className="mb-2" data-testid="daily-captain5-duty">
+          <Tag tone={dutyTone(summary.on_duty)} className="!whitespace-normal !py-1 max-w-full break-words">{dutyLine(summary.on_duty)}</Tag>
+        </p>
         <p className="text-sm text-hub-n-600">EMS Operations: Rescue and medical equipment issues, replacements, shift handoff and messages.</p>
         <p className="mt-3" data-testid="daily-captain5-open">
           <Tag tone={open > 0 ? 'warning' : 'success'}>{open > 0 ? `${open} open ${open === 1 ? 'issue' : 'issues'}` : 'No open issues'}</Tag>

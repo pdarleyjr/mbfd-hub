@@ -10,8 +10,6 @@ import { BTN_PRIMARY, BTN_SECONDARY, FIELD, HINT, LABEL, Sheet } from './ui';
 
 interface Props {
   inspectionId: number | null;
-  /** access.act: the clarification composer is a write control. */
-  canAct: boolean;
   onClose: () => void;
 }
 
@@ -67,7 +65,7 @@ function Clarification({ inspection }: { inspection: InspectionView }) {
   );
 }
 
-export default function InspectionSheet({ inspectionId, canAct, onClose }: Props) {
+export default function InspectionSheet({ inspectionId, onClose }: Props) {
   const [inspection, setInspection] = useState<InspectionView | null>(null);
   const [error, setError] = useState<Captain5ApiError | null>(null);
   const [loading, setLoading] = useState(false);
@@ -135,7 +133,7 @@ export default function InspectionSheet({ inspectionId, canAct, onClose }: Props
               </ul>
             </section>
           ))}
-          {canAct && inspection.kind === 'rescue' && <Clarification key={inspection.id} inspection={inspection} />}
+          {inspection.kind === 'rescue' && <Clarification key={inspection.id} inspection={inspection} />}
         </div>
       )}
     </Sheet>

@@ -163,8 +163,6 @@ class AppServiceProvider extends ServiceProvider
             fn (\App\Models\User $user): bool => app(\App\Services\Security\Captain5Access::class)->decide($user)->canViewData);
         Gate::define(\App\Services\Security\Captain5Access::GATE_ACT,
             fn (\App\Models\User $user): bool => app(\App\Services\Security\Captain5Access::class)->decide($user)->canAct);
-        Gate::define(\App\Services\Security\Captain5Access::GATE_MANAGE_ASSIGNMENTS,
-            fn (\App\Models\User $user): bool => app(\App\Services\Security\Captain5Access::class)->decide($user)->canManageAssignments);
         Gate::define(\App\Services\Security\Captain5Access::GATE_ADMIN,
             fn (\App\Models\User $user): bool => app(\App\Services\Security\Captain5Access::class)->decide($user)->canConfigure);
 

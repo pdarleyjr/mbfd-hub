@@ -5,13 +5,13 @@ declare(strict_types=1);
 namespace App\Filament\Admin\Pages;
 
 use App\Models\Captain5\Captain5AccessOverride;
-use App\Models\Captain5\Captain5DutyAssignment;
+use App\Models\Captain5\Captain5ActingRequest;
 use App\Models\Captain5\Captain5ItemClassification;
 use App\Models\Employee;
 use App\Models\User;
 use App\Services\Captain5\Captain5AccessExplainer;
+use App\Services\Captain5\Captain5ActingService;
 use App\Services\Captain5\Captain5AdministrationService;
-use App\Services\Captain5\Captain5AssignmentService;
 use App\Services\Captain5\Captain5DutyRoster;
 use App\Services\Captain5\MedicalScopeReview;
 use App\Services\Captain5\OnDutyCaptain5;
@@ -20,7 +20,6 @@ use Carbon\CarbonImmutable;
 use Closure;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Checkbox;
-use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -29,16 +28,15 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 
 /**
  * Administrator surface for the Captain 5 EMS Operations Center: who can use it, access
- * overrides, the acting Captain 5 for a duty day, and the medical scope review.
+ * overrides (automatic, allow, deny), acting Captain 5 requests, and the medical scope review.
  *
  * Every decision is made by Captain5Access / Captain5AdministrationService /
- * Captain5AssignmentService, which authorize again and write the history and audit rows. This
+ * Captain5ActingService, which authorize again and write the history and audit rows. This
  * page only gathers input; hiding a control here is cosmetic.
  */
 final class Captain5Operations extends Page
@@ -61,6 +59,8 @@ final class Captain5Operations extends Page
 
     private const HISTORY_LIMIT = 60;
 
+    private const DECIDED_REQUESTS_LIMIT = 20;
+
     /** Member lookup text for "Who has access". */
     public string $memberSearch = '';
 
@@ -69,9 +69,6 @@ final class Captain5Operations extends Page
 
     #[Locked]
     public bool $showOverrideHistory = false;
-
-    #[Locked]
-    public bool $showEndedAssignments = false;
 
     /** @var array<string, mixed>|null per-request memo of the medical scope review */
     private ?array $reviewMemo = null;
@@ -115,12 +112,6 @@ final class Captain5Operations extends Page
         $this->showOverrideHistory = ! $this->showOverrideHistory;
     }
 
-    public function toggleEndedAssignments(): void
-    {
-        $this->authorizeAccess();
-        $this->showEndedAssignments = ! $this->showEndedAssignments;
-    }
-
     public function setAccessAction(): Action
     {
         return $this->accessAction('setAccess', 'Set Captain 5 access');
@@ -131,55 +122,44 @@ final class Captain5Operations extends Page
         return $this->accessAction('changeAccess', 'Change')->color('gray')->outlined()->size('sm');
     }
 
-    public function assignActingAction(): Action
+    public function approveActingAction(): Action
     {
-        return Action::make('assignActing')
-            ->label('Assign acting Captain 5')
-            ->icon('heroicon-o-user-plus')
+        return Action::make('approveActing')
+            ->label('Approve')
+            ->color('success')
+            ->size('sm')
             ->authorize(fn (): bool => self::canAccess())
-            ->modalHeading('Assign an acting Captain 5')
-            ->modalDescription('The member gets on-duty Captain 5 authority for the whole duty day (8:00 AM to 8:00 AM). Use this when someone out of class covers the position. It is never inferred from rank.')
-            ->modalSubmitActionLabel('Assign')
-            ->fillForm(fn (): array => ['duty_date' => $this->dutyDateOptions()['default'], 'client_request_id' => (string) Str::uuid()])
+            ->modalHeading(fn (array $arguments): string => 'Approve '.($this->actingRequestSummary($arguments) ?? 'this request').'?')
+            ->modalDescription('Only the Captain 5 name shown for the shift changes. Nobody gains or loses access to the Captain 5 page. If someone else is shown now, this replaces them.')
+            ->modalSubmitActionLabel('Approve')
             ->form([
-                $this->memberSelect('employee_profile_id', 'Acting member'),
-                Select::make('duty_date')->label('Duty day')->required()
-                    ->options(fn (): array => $this->dutyDateOptions()['options'])
-                    ->disableOptionWhen(fn (string $value): bool => in_array($value, $this->dutyDateOptions()['taken'], true))
-                    ->helperText('Today or any of the next 14 duty days. One acting Captain 5 per duty day.'),
-                Textarea::make('reason')->label('Reason')->required()->maxLength(500)->rows(2),
-                Hidden::make('client_request_id'),
+                Textarea::make('note')->label('Note (optional)')->maxLength(500)->rows(2),
             ])
-            ->action(function (array $data, Action $action): void {
-                $this->perform($action, ['employee_profile_id', 'duty_date', 'reason', 'client_request_id'], function (User $actor) use ($data): void {
-                    app(Captain5AssignmentService::class)->assign($actor, [
-                        'employee_profile_id' => (int) ($data['employee_profile_id'] ?? 0),
-                        'duty_date' => (string) ($data['duty_date'] ?? ''),
-                        'reason' => (string) ($data['reason'] ?? ''),
-                        'client_request_id' => (string) ($data['client_request_id'] ?? ''),
-                    ]);
-                }, 'Acting Captain 5 assigned', 'They hold on-duty Captain 5 authority for that duty day.');
+            ->action(function (array $data, array $arguments, Action $action): void {
+                $this->decideActing($action, $arguments, ['note'], function (User $actor, int $requestId) use ($data): void {
+                    app(Captain5ActingService::class)->approve($actor, $requestId, (string) ($data['note'] ?? ''));
+                }, 'Request approved', 'The Captain 5 name shown for the shift is updated.');
             });
     }
 
-    public function endAssignmentAction(): Action
+    public function rejectActingAction(): Action
     {
-        return Action::make('endAssignment')
-            ->label('End assignment')
+        return Action::make('rejectActing')
+            ->label('Not approved')
             ->color('danger')
             ->outlined()
             ->size('sm')
             ->authorize(fn (): bool => self::canAccess())
-            ->modalHeading('End this acting assignment?')
-            ->modalDescription('The member loses acting Captain 5 authority immediately. The on-duty Captain 5 for that duty day goes back to the bid holder. The assignment stays in the record.')
-            ->modalSubmitActionLabel('End assignment')
+            ->modalHeading(fn (array $arguments): string => 'Not approve '.($this->actingRequestSummary($arguments) ?? 'this request').'?')
+            ->modalDescription('The member is told it was not approved and sees your note. The request stays in the record.')
+            ->modalSubmitActionLabel('Not approved')
             ->form([
-                Textarea::make('reason')->label('Reason')->required()->maxLength(500)->rows(2),
+                Textarea::make('note')->label('Why is it not approved?')->required()->maxLength(500)->rows(2),
             ])
             ->action(function (array $data, array $arguments, Action $action): void {
-                $this->perform($action, ['reason'], function (User $actor) use ($data, $arguments): void {
-                    app(Captain5AssignmentService::class)->revoke($actor, (int) ($arguments['assignment'] ?? 0), (string) ($data['reason'] ?? ''));
-                }, 'Acting assignment ended');
+                $this->decideActing($action, $arguments, ['note'], function (User $actor, int $requestId) use ($data): void {
+                    app(Captain5ActingService::class)->reject($actor, $requestId, (string) ($data['note'] ?? ''));
+                }, 'Request not approved', 'The member is told, with your note.');
             });
     }
 
@@ -204,7 +184,7 @@ final class Captain5Operations extends Page
             'lookup' => $this->lookupData(),
             'overrides' => $this->overrideRows($timezone),
             'overrideHistory' => $this->showOverrideHistory ? $this->overrideHistoryRows($timezone) : [],
-            'duty' => $this->dutyData($timezone),
+            'acting' => $this->actingData($timezone),
             'pendingItems' => $review['pending'],
             'decidedItems' => $review['decided'],
             'unmatchedOpenIssues' => $review['unmatched_open_issues'],
@@ -219,7 +199,7 @@ final class Captain5Operations extends Page
             ->icon($name === 'setAccess' ? 'heroicon-o-shield-check' : null)
             ->authorize(fn (): bool => self::canAccess())
             ->modalHeading('Set Captain 5 access')
-            ->modalDescription('Automatic follows rank, seat and assignment. Allow and Deny override that for one member. The change is recorded with your reason.')
+            ->modalDescription('Automatic follows rank, seat and administrator access. Allow and Deny override that for one member. The change is recorded with your reason.')
             ->modalSubmitActionLabel('Save access')
             ->fillForm(function (array $arguments): array {
                 $employeeId = isset($arguments['employee']) ? (int) $arguments['employee'] : null;
@@ -233,12 +213,7 @@ final class Captain5Operations extends Page
                 $this->memberSelect('employee_profile_id', 'Member')->live(),
                 Radio::make('choice')->label('Captain 5 access')->required()->live()
                     ->options(fn (Get $get): array => $this->choiceOptions($this->intOrNull($get('employee_profile_id'))))
-                    ->descriptions([
-                        'automatic' => 'Rank, seat and acting assignment decide. Removes any earlier Allow or Deny.',
-                        'allow_view' => 'Can open Captain 5 and see its issues. Cannot act on them.',
-                        'allow_act' => 'Can open Captain 5 and act on its issues.',
-                        'deny' => 'Cannot open Captain 5, even with a qualifying rank or seat.',
-                    ]),
+                    ->descriptions(Captain5AccessExplainer::CHOICE_DESCRIPTIONS),
                 Checkbox::make('confirm_deny')
                     ->label('I understand this member loses all Captain 5 access, including access from their rank or seat.')
                     ->visible(fn (Get $get): bool => $get('choice') === 'deny')
@@ -431,7 +406,7 @@ final class Captain5Operations extends Page
                 'member' => $this->memberName($row->employee),
                 'rank' => (string) ($row->employee->rank ?? ''),
                 'choice' => Captain5AccessExplainer::choiceFor($row),
-                'label' => Captain5AccessExplainer::CHOICE_LABELS[Captain5AccessExplainer::choiceFor($row)],
+                'label' => Captain5AccessExplainer::CHOICE_NAMES[Captain5AccessExplainer::choiceFor($row)],
                 'reason' => (string) $row->reason,
                 'set_by' => (string) ($row->setBy->name ?? 'A former administrator'),
                 'at' => $this->format($row->created_at, $timezone),
@@ -447,7 +422,7 @@ final class Captain5Operations extends Page
 
         return $rows->map(fn (Captain5AccessOverride $row): array => [
             'member' => $this->memberName($row->employee),
-            'label' => Captain5AccessExplainer::CHOICE_LABELS[Captain5AccessExplainer::choiceFor($row)],
+            'label' => Captain5AccessExplainer::CHOICE_NAMES[Captain5AccessExplainer::choiceFor($row)],
             'reason' => (string) $row->reason,
             'set_by' => (string) ($row->setBy->name ?? 'A former administrator'),
             'at' => $this->format($row->created_at, $timezone),
@@ -457,83 +432,139 @@ final class Captain5Operations extends Page
         ])->values()->all();
     }
 
-    /** @return array<string, mixed> */
-    private function dutyData(string $timezone): array
+    /**
+     * Who is shown as the shift's Captain 5 now, the requests waiting for a decision, and the
+     * last decided ones. Display information only: none of it changes who can use the page.
+     *
+     * @return array{shown: array<string, mixed>, pending: list<array<string, mixed>>, decided: list<array<string, mixed>>}
+     */
+    private function actingData(string $timezone): array
     {
-        $roster = app(Captain5DutyRoster::class);
-        $onDuty = $roster->onDuty();
-        $today = $onDuty->dutyDate->format('Y-m-d');
+        $onDuty = app(Captain5DutyRoster::class)->onDuty();
+        $actor = auth()->user();
+        $isSuperAdmin = $actor instanceof User && $actor->hasRole('super_admin');
 
-        $upcoming = Captain5DutyAssignment::query()->active()->whereDate('duty_date', '>=', $today)
-            ->with(['employee:id,name,display_name,rank', 'assignedBy:id,name'])
-            ->orderBy('duty_date')->get()
-            ->map(fn (Captain5DutyAssignment $row): array => $this->assignmentRow($row, $timezone, $today))->values()->all();
+        $pending = Captain5ActingRequest::query()->pending()
+            ->with(['employee:id,name,display_name,rank', 'requester:id,name'])
+            ->orderBy('created_at')->orderBy('id')->get()
+            ->map(fn (Captain5ActingRequest $row): array => $this->requestRow($row, $timezone) + [
+                'own' => $actor instanceof User && ! $isSuperAdmin && (int) $row->requested_by_user_id === (int) $actor->getKey(),
+                'passed' => $row->kind === Captain5ActingRequest::KIND_ACT && $row->ends_at !== null && $row->ends_at->lessThanOrEqualTo(now()),
+            ])->values()->all();
 
-        $ended = $this->showEndedAssignments
-            ? Captain5DutyAssignment::query()->whereNotNull('revoked_at')->with(['employee:id,name,display_name,rank', 'assignedBy:id,name', 'revokedBy:id,name'])
-                ->orderByDesc('revoked_at')->limit(20)->get()
-                ->map(fn (Captain5DutyAssignment $row): array => $this->assignmentRow($row, $timezone, $today) + [
-                    'ended' => 'Ended '.$this->format($row->revoked_at, $timezone).' by '.($row->revokedBy->name ?? 'a former administrator').': '.$row->revocation_reason,
-                ])->values()->all()
-            : [];
+        $decided = Captain5ActingRequest::query()->whereIn('status', [Captain5ActingRequest::APPROVED, Captain5ActingRequest::REJECTED])
+            ->with(['employee:id,name,display_name,rank', 'requester:id,name', 'decidedBy:id,name'])
+            ->orderByDesc('decided_at')->orderByDesc('id')->limit(self::DECIDED_REQUESTS_LIMIT)->get()
+            ->map(fn (Captain5ActingRequest $row): array => $this->requestRow($row, $timezone) + [
+                'approved' => $row->status === Captain5ActingRequest::APPROVED,
+                'status' => $row->status === Captain5ActingRequest::APPROVED ? 'Approved' : 'Not approved',
+                'state' => $this->decidedState($row, $timezone),
+                'decided_by' => (string) ($row->decidedBy->name ?? 'A former administrator'),
+                'decided_at' => $this->format($row->decided_at, $timezone),
+                'note' => (string) $row->decision_note,
+            ])->values()->all();
 
         return [
-            'today' => [
+            'shown' => [
                 'date' => $onDuty->dutyDate->format('l, M j'),
                 'shift' => $onDuty->shiftLetter,
                 'name' => $onDuty->employee !== null ? $this->memberName($onDuty->employee) : null,
                 'rank' => (string) ($onDuty->employee->rank ?? ''),
                 'source' => match ($onDuty->source) {
-                    OnDutyCaptain5::SOURCE_ACTING => 'Acting assignment',
+                    OnDutyCaptain5::SOURCE_ACTING => 'Acting Captain 5 (approved request)',
                     OnDutyCaptain5::SOURCE_BID => 'Captain 5 bid seat',
                     default => null,
                 },
+                'until' => $onDuty->source === OnDutyCaptain5::SOURCE_ACTING ? $this->format($onDuty->actingRequest?->ends_at, $timezone) : null,
             ],
-            'upcoming' => $upcoming,
-            'ended' => $ended,
+            'pending' => $pending,
+            'decided' => $decided,
         ];
     }
 
     /** @return array<string, mixed> */
-    private function assignmentRow(Captain5DutyAssignment $row, string $timezone, string $today): array
+    private function requestRow(Captain5ActingRequest $row, string $timezone): array
     {
-        $date = $row->duty_date->format('Y-m-d');
+        $isEnd = $row->kind === Captain5ActingRequest::KIND_END;
 
         return [
             'id' => (int) $row->getKey(),
-            'date' => $row->duty_date->format('D, M j'),
-            'is_today' => $date === $today,
+            'kind' => $row->kind,
+            'kind_label' => $isEnd ? 'End the acting display' : 'Be shown as acting Captain 5',
+            'requester' => (string) ($row->requester->name ?? 'A former member'),
+            'member' => $isEnd ? null : $this->memberName($row->employee),
+            'rank' => $isEnd ? '' : (string) ($row->employee->rank ?? ''),
             'shift' => $row->shift_letter,
-            'member' => $this->memberName($row->employee),
-            'rank' => (string) ($row->employee->rank ?? ''),
-            'reason' => (string) $row->reason,
-            'assigned_by' => (string) ($row->assignedBy->name ?? 'A former administrator'),
-            'at' => $this->format($row->created_at, $timezone),
+            'duration' => match ($row->duration) {
+                '12h' => '12 hours',
+                '24h' => '24 hours',
+                'custom' => 'Custom time',
+                default => null,
+            },
+            'ends_at' => $this->format($row->ends_at, $timezone),
+            'requested_at' => $this->format($row->created_at, $timezone),
         ];
     }
 
-    /** @return array{options: array<string, string>, taken: list<string>, default: string} */
-    private function dutyDateOptions(): array
+    /** Where a decided request stands now: showing, ended early, or expired. */
+    private function decidedState(Captain5ActingRequest $row, string $timezone): string
     {
-        $roster = app(Captain5DutyRoster::class);
-        $calendar = $roster->calendar();
-        $today = $calendar->dutyDate();
-        $taken = Captain5DutyAssignment::query()->active()->whereDate('duty_date', '>=', $today->format('Y-m-d'))->get()
-            ->map(fn (Captain5DutyAssignment $row): string => $row->duty_date->format('Y-m-d'))->all();
-
-        $options = [];
-        for ($offset = 0; $offset <= 14; $offset++) {
-            $day = $today->addDays($offset);
-            $key = $day->format('Y-m-d');
-            $shift = $calendar->shiftFor($key);
-            $options[$key] = $day->format('D, M j')
-                .($offset === 0 ? ' (today)' : '')
-                .($shift !== null ? ' · '.$shift.' shift' : '')
-                .(in_array($key, $taken, true) ? ' · already assigned' : '');
+        if ($row->status !== Captain5ActingRequest::APPROVED || $row->kind === Captain5ActingRequest::KIND_END) {
+            return '';
         }
-        $default = collect(array_keys($options))->first(fn (string $key): bool => ! in_array($key, $taken, true)) ?? $today->format('Y-m-d');
+        if ($row->ended_at !== null) {
+            return 'Ended early '.$this->format($row->ended_at, $timezone);
+        }
 
-        return ['options' => $options, 'taken' => $taken, 'default' => $default];
+        return $row->ends_at !== null && $row->ends_at->lessThanOrEqualTo(now())
+            ? 'Expired '.$this->format($row->ends_at, $timezone)
+            : 'Showing now';
+    }
+
+    /**
+     * Run a decision on one acting request as the signed-in administrator. A request the
+     * administrator made themselves is refused with a plain message before the service is called.
+     *
+     * @param  array<string, mixed>  $arguments
+     * @param  list<string>  $fields
+     * @param  Closure(User, int): void  $work
+     */
+    private function decideActing(Action $action, array $arguments, array $fields, Closure $work, string $successTitle, string $successBody): void
+    {
+        $actor = $this->authorizeAccess();
+        $requestId = (int) ($arguments['request'] ?? 0);
+        $request = Captain5ActingRequest::query()->find($requestId);
+        if (! $request instanceof Captain5ActingRequest) {
+            Notification::make()->danger()->title('That request is no longer here')->body('Refresh the page to see the current requests.')->send();
+            $action->halt();
+
+            return;
+        }
+        if ((int) $request->requested_by_user_id === (int) $actor->getKey() && ! $actor->hasRole('super_admin')) {
+            Notification::make()->danger()->title('Nothing was changed')->body('Another administrator approves your own request.')->send();
+            $action->halt();
+
+            return;
+        }
+
+        $this->perform($action, $fields, fn (User $user) => $work($user, $requestId), $successTitle, $successBody);
+    }
+
+    /**
+     * "Name's request to ..." for the decision modals; null when the request is not found.
+     *
+     * @param  array<string, mixed>  $arguments
+     */
+    private function actingRequestSummary(array $arguments): ?string
+    {
+        $request = Captain5ActingRequest::query()->with(['employee:id,name,display_name', 'requester:id,name'])->find((int) ($arguments['request'] ?? 0));
+        if (! $request instanceof Captain5ActingRequest) {
+            return null;
+        }
+
+        return $request->kind === Captain5ActingRequest::KIND_END
+            ? ($request->requester->name ?? 'a member')."'s request to end the acting display"
+            : $this->memberName($request->employee)."'s request to act as Captain 5";
     }
 
     /**

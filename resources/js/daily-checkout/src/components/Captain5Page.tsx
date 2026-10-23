@@ -4,9 +4,10 @@ import { RefreshCw } from 'lucide-react';
 import { CAPTAIN_5_IMAGE } from '../types';
 import { useOffline } from '../hooks/useOffline';
 import DailyPageNav from './DailyPageNav';
+import ActingApprovals from './captain5/ActingApprovals';
+import ActingControl from './captain5/ActingControl';
 import Captain5Denied from './captain5/Captain5Denied';
 import Captain5Messages from './captain5/Captain5Messages';
-import DutyTab from './captain5/DutyTab';
 import HistoryTab from './captain5/HistoryTab';
 import InspectionSheet from './captain5/InspectionSheet';
 import IssueSheet from './captain5/IssueSheet';
@@ -14,16 +15,17 @@ import IssuesTab from './captain5/IssuesTab';
 import ReplacementsTab from './captain5/ReplacementsTab';
 import TodayTab from './captain5/TodayTab';
 import { isKindFilter, isQueueFilter, type KindFilter, type QueueFilter } from './captain5/filters';
-import { dutyLine, isReplacementTracked } from './captain5/format';
-import type { Workspace } from './captain5/types';
+import { dutyLine, dutyTone, isReplacementTracked } from './captain5/format';
+import type { ActingResult, Workspace } from './captain5/types';
 import { useWorkspace } from './captain5/useWorkspace';
+import DepartmentUpdatesPanel from './department-updates/DepartmentUpdatesPanel';
 import Tabs, { type TabItem } from './ui/Tabs';
 import Tag from './ui/Tag';
 import { LoadError } from './ui/StateViews';
 
-type TabId = 'today' | 'issues' | 'replacements' | 'messages' | 'history' | 'duty';
+type TabId = 'today' | 'issues' | 'replacements' | 'messages' | 'updates' | 'history';
 
-const TAB_IDS: TabId[] = ['today', 'issues', 'replacements', 'messages', 'history', 'duty'];
+const TAB_IDS: TabId[] = ['today', 'issues', 'replacements', 'messages', 'updates', 'history'];
 const isTab = (value: string | null): value is TabId => TAB_IDS.includes(value as TabId);
 const positiveInt = (value: string | null): number | null => (value !== null && /^\d{1,12}$/.test(value) && Number(value) > 0 ? Number(value) : null);
 
@@ -34,8 +36,8 @@ function tabsFor(workspace: Workspace, unread: number): Array<TabItem<TabId>> {
     { id: 'issues', label: 'Issues', badge: workspace.counts.open, badgeLabel: 'open issues' },
     { id: 'replacements', label: 'Replacements', badge: tracked, badgeLabel: 'in progress' },
     { id: 'messages', label: 'Messages', badge: unread, badgeLabel: 'unread messages' },
+    { id: 'updates', label: 'Department Updates' },
     { id: 'history', label: 'History' },
-    ...(workspace.access.manage_assignments ? [{ id: 'duty' as const, label: 'Duty' }] : []),
   ];
 }
 
@@ -79,6 +81,7 @@ export default function Captain5Page() {
     if (pushedIssue.current) { pushedIssue.current = false; navigate(-1); } else update({ issue: null });
   }, [navigate, update]);
   const changed = useCallback(() => { setVersion((n) => n + 1); void load('silent'); }, [load]);
+  const actingChanged = useCallback((result: ActingResult) => { ws.patch({ on_duty: result.on_duty, acting: result.acting }); void load('silent'); }, [ws.patch, load]);
 
   if (ws.forbidden) return <Captain5Denied />;
   if (ws.loading && !data) return <Loading />;
@@ -105,11 +108,11 @@ export default function Captain5Page() {
       case 'replacements':
         return <ReplacementsTab issues={data.issues} onOpen={openIssue} />;
       case 'messages':
-        return <Captain5Messages onDenied={ws.markForbidden} />;
-      case 'history':
-        return <HistoryTab onOpen={openIssue} version={version} onForbidden={ws.markForbidden} />;
+        return <Captain5Messages onDenied={ws.markForbidden} onOpenUpdates={() => update({ tab: 'updates', filter: null, kind: null })} />;
+      case 'updates':
+        return <DepartmentUpdatesPanel origin="captain_5" onOpenMessages={() => update({ tab: 'messages', filter: null, kind: null })} />;
       default:
-        return <DutyTab assignments={data.assignments} onChange={(assignments) => { ws.patch({ assignments }); void load('silent'); }} />;
+        return <HistoryTab onOpen={openIssue} version={version} onForbidden={ws.markForbidden} />;
     }
   };
 
@@ -130,12 +133,10 @@ export default function Captain5Page() {
           <div className="min-w-0 flex-1 space-y-2">
             <h1 id="captain5-heading" className="font-heading text-2xl font-bold text-hub-ink sm:text-3xl">Captain 5 · EMS Operations</h1>
             <p className="flex flex-wrap items-center gap-2 text-sm" data-testid="captain5-duty-line">
-              <Tag tone={data.on_duty.resolved ? 'success' : 'warning'} className="!text-sm">{dutyLine(data.on_duty)}</Tag>
+              <Tag tone={dutyTone(data.on_duty)} className="!text-sm !whitespace-normal !py-1 max-w-full break-words">{dutyLine(data.on_duty)}</Tag>
             </p>
-            <p className="flex flex-wrap items-center gap-2 text-[13px] leading-5 text-hub-n-600" data-testid="captain5-authority">
-              <span>Your access: {access.authority_label || 'Captain 5'}</span>
-              {!access.act && <Tag>View only</Tag>}
-            </p>
+            <ActingControl onDuty={data.on_duty} acting={data.acting} onChange={actingChanged} />
+            <p className="text-[13px] leading-5 text-hub-n-600" data-testid="captain5-authority">Your access: {access.authority_label || 'Captain 5'}</p>
           </div>
           <button
             type="button"
@@ -152,6 +153,8 @@ export default function Captain5Page() {
           </button>
         </div>
       </section>
+
+      <ActingApprovals acting={data.acting} onChange={actingChanged} />
 
       {ws.error && (
         <div className="hub-callout hub-callout--warning p-3 text-sm" role="alert">
@@ -171,8 +174,8 @@ export default function Captain5Page() {
         />
       </div>
 
-      <IssueSheet issueId={issueId} canAct={access.act} onClose={closeIssue} onChanged={changed} onOpenInspection={setInspectionId} />
-      <InspectionSheet inspectionId={inspectionId} canAct={access.act} onClose={() => setInspectionId(null)} />
+      <IssueSheet issueId={issueId} onClose={closeIssue} onChanged={changed} onOpenInspection={setInspectionId} />
+      <InspectionSheet inspectionId={inspectionId} onClose={() => setInspectionId(null)} />
     </div>
   );
 }

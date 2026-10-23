@@ -120,7 +120,7 @@ final class Captain5MessagingAndInvariantsTest extends TestCase
         $this->actAs($this->officer('Lieutenant'));
         $this->forgetCaptain5Memo();
         $bodies = collect($this->getJson('/api/captain5/issues/'.$defect->id)->assertOk()->json('issue.messages'))->pluck('body');
-        self::assertNotContains('Internal: check the supply room count first.', $bodies->all(), 'View-only officers never see internal notes');
+        self::assertContains('Internal: check the supply room count first.', $bodies->all(), 'Every officer on the Captain 5 page sees the team notes');
 
         $this->actAs($reporter);
         $this->get('/employee/my-vehicle-inspections/'.$defect->first_reported_inspection_id)->assertOk()

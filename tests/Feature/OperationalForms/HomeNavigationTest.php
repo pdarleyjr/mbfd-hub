@@ -77,7 +77,7 @@ class HomeNavigationTest extends TestCase
             'Videos',
             'Media Control',
         ]);
-        $response->assertSee('Apparatus checkout, vehicle inspections, station inventory, and station requests');
+        $response->assertSee('Station forms, Vehicle Checkouts, Video Conferencing');
         $response->assertSee('View assigned gear, track requests, and request approved uniform items');
         $response->assertSee('ICS 214 &amp; F-ROC reports', false);
         $response->assertSee('Evaluations &amp; reviews', false);

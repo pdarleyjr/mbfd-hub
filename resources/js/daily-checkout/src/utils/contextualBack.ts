@@ -29,7 +29,7 @@ export function contextualBackPath(search: string, fallback: string, origin: str
 export function contextualBackLabel(path: string): string {
   const pathname = path.split(/[?#]/)[0];
   if (pathname === '/') return 'Back';
-  if (pathname === '/daily/command-300') return 'Back to 300 Command';
+  if (pathname === '/daily/command-300') return 'Back to 300';
   if (/^\/daily\/stations\/\d+\/rooms\/\d+$/.test(pathname)) return 'Back to room';
   if (/^\/daily\/stations\/\d+$/.test(pathname)) return 'Back to station';
   if (pathname === '/daily/stations') return 'Back to stations';

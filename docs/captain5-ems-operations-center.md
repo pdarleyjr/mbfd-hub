@@ -15,37 +15,39 @@ the same live state.
 | EMS Captain | Same table, `unit_label` exactly `EMS` (D Shift, rank Captain). |
 | Ranks | `employees.rank`, canonical strings: `Lieutenant`, `Captain`, `Division Chief`, `Deputy Fire Chief`, `Fire Chief`. No abbreviations. Civilian titles (e.g. `EMS Coordinator`, `Chief Plans Analyst #3`) never match. |
 | Shift on duty | No staffing store exists. Duty day = 08:00–08:00 America/New_York (TeleStaff print boundary). A/B/C 24-hour rotation anchored at `captain5.shift_rotation.anchor_date` (2026-03-09 = A), checked against production inspection `shift` values (8 of 9 recorded dates match; the one mismatch is a single member-entered value). Config can disable it; when disabled the on-duty bid holder is "unknown". |
-| Acting Captain 5 (out of class) | No reliable source: the Crew Planner TeleStaff parse is ephemeral and treats OOC/ROC/MOC/TOC codes as unverified. **Controlled assignment** table `captain5_duty_assignments` (section 3). Never inferred from rank. |
+| Acting Captain 5 (out of class) | No reliable source: the Crew Planner TeleStaff parse is ephemeral and treats OOC/ROC/MOC/TOC codes as unverified. A member asks to be shown as acting Captain 5 and an administrator approves it (`captain5_acting_requests`, section 11). Display only. Never inferred from rank. |
 | Medical equipment | No structured flag exists in the checklists. Verified mapping `config/captain5_medical_scope.php` keyed by `(checklist_type, item_key)` plus admin decisions in `captain5_item_classifications`. Anything not mapped is `unclassified` → not visible to Captain 5, queued for admin classification. |
 | Current crew | Inspection submissions for the physical apparatus during the current duty day. If none, the unit-level channel is the issue's "latest update" shown at the next Daily Checkout of that unit. |
 
 ## 2. Access (`App\Services\Security\Captain5Access`)
 
 One class decides everything, like `Command300Access`. Gate abilities (never the permission names):
-`captain5-view` (page + scoped data), `captain5-act`, `captain5-manage-assignments`, `captain5-admin`.
+`captain5-view` (page + scoped data), `captain5-act`, `captain5-admin`.
 
 Account must be usable (`isAuthenticationAllowed()` and no pending password change).
 
-| Source | View page/data | Act on issues | On-duty authority | Dismiss |
-|---|---|---|---|---|
-| `super_admin` | yes (cannot be denied: protected recovery) | via reviewer rule | – | via reviewer rule |
-| Admin panel (`admin.access` direct) | yes | only if `InspectionReviewers::canReview` (existing rule) | – | same |
-| Officer rank (Lt, Capt, DC, Deputy FC, FC) | yes | no | – | – |
-| Captain 5 bid holder | yes | yes | when their bid shift is on duty and no acting assignment covers now | when on duty |
-| EMS Captain bid holder | yes | yes | – | yes |
-| Active acting assignment (covers now) | yes | yes | yes (exclusive for that duty day) | yes |
-| Override `allow` level `view` / `act` | view / view+act | act level only | – | – |
-| Override `deny` | removes every source above except `super_admin` | | | |
+No duty gating (follow-up 2026-10-23): everyone who may open the page may do every task on it.
 
-- `captain5-admin` = active account with Admin Panel entitlement AND (`super_admin` OR direct `captain5.admin`). Configures overrides, assignments and medical classification. Grants nothing in the Admin Panel by itself.
-- `captain5-manage-assignments` = `captain5-admin` OR EMS Captain bid holder OR Division Chief rank OR verified 300 bid seat; deny override removes it.
-- Five separated permissions in code: `canViewPage`, `canViewData`, `canAct`, `hasOnDutyAuthority`, `canConfigure`.
+| Source | Page, data and every task | Shown as the shift's Captain 5 |
+|---|---|---|
+| `super_admin` | yes (cannot be denied: protected recovery) | – |
+| Admin panel (`admin.access` direct) | yes | – |
+| Officer rank (Lt, Capt, DC, Deputy FC, FC) | yes | – |
+| Captain 5 bid holder | yes | when their bid shift is on duty and no approved acting request is showing |
+| EMS Captain bid holder | yes | – |
+| Approved acting request (showing now) | only if another source above applies | yes, until its end time (display only) |
+| Override `allow` | yes | – |
+| Override `deny` | removes every source above except `super_admin` | |
+
+- `captain5-admin` = active account with Admin Panel entitlement AND (`super_admin` OR direct `captain5.admin`). Configures overrides, approves acting requests and decides medical classification. Grants nothing in the Admin Panel by itself.
+- Separated decisions in code: `canViewPage`, `canViewData`, `canAct`, `canDismiss` (all equal for eligible members), `canConfigure`, and the display-only `isShownCaptain5`.
 - Enforced server-side on: `/daily/captain-5` shell (403 before the SPA), every `/api/captain5/*` route, Captain 5 communications API + attachment download, every issue mutation (service layer), message threads. UI hiding is cosmetic only.
 - Never grants Admin Panel access, Fleet authority (`classifyImpact` out_of_service, service tickets), inspection approval/rejection, hold decisions or meter decisions.
 
 ## 3. Tables (all additive, PostgreSQL + SQLite)
 
-- `captain5_duty_assignments`: id, `employee_profile_id` FK employees restrict, `duty_date` date, `starts_at`/`ends_at` timestampTz (default the 08:00–08:00 duty window), `shift_letter` char(1) null, `reason` text, `assigned_by_user_id` FK users, `revoked_at` null, `revoked_by_user_id` null, `revocation_reason` null, `client_request_id` string(64) unique null, timestamps. Partial unique `(duty_date) WHERE revoked_at IS NULL` (one acting Captain 5 per duty day). Rows are never deleted; revocation is an update of the revoke columns only.
+- `captain5_duty_assignments`: id, `employee_profile_id` FK employees restrict, `duty_date` date, `starts_at`/`ends_at` timestampTz (default the 08:00–08:00 duty window), `shift_letter` char(1) null, `reason` text, `assigned_by_user_id` FK users, `revoked_at` null, `revoked_by_user_id` null, `revocation_reason` null, `client_request_id` string(64) unique null, timestamps. Partial unique `(duty_date) WHERE revoked_at IS NULL` (one acting Captain 5 per duty day). Rows are never deleted; revocation is an update of the revoke columns only. **Retired by the follow-up**: no code reads or writes it; the table and its rows stay as history and for rollback.
+- `captain5_acting_requests`: see section 11.
 - `captain5_access_overrides`: id, `employee_profile_id`, `effect` (`allow|deny`), `level` (`view|act`, null for deny), `reason`, `set_by_user_id`, `superseded_at` null, `superseded_by_user_id` null, timestamps. Partial unique `(employee_profile_id) WHERE superseded_at IS NULL`. History rows are immutable.
 - `captain5_item_classifications`: id, `checklist_type`, `item_key`, `item_name`, `classification` (`medical|not_medical`), `reason`, `decided_by_user_id`, timestamps, unique (`checklist_type`,`item_key`).
 - `captain5_handoff_notes`: id, `duty_date`, `author_user_id`, `author_authority` (snapshot), `body` text, `client_request_id` unique null, `acknowledged_by_user_id` null, `acknowledged_at` null, timestamps. Append-only except the acknowledge columns (set once).
@@ -77,7 +79,7 @@ enrolls the actor as participant (`enrollment_source=captain5`) and routes notif
 | Available for pickup | `updateAction(replacement_available, pickup_instructions)` |
 | Replaced / returned to service | `resolve(replacement_installed|spare_issued|repair_completed, notes)` — requires an explicit "verified in place" confirmation |
 | Verify member's correction | `verifyCorrection` |
-| Dismiss | `dismiss` — on-duty authority, EMS Captain or reviewer only |
+| Dismiss | `dismiss` (any Captain 5 page user since the follow-up) |
 | Reopen | `reopen` |
 | Message submitter / followers | `IssueMessageService::post` (issue thread) |
 | Request clarification | `IssueMessageService::post(kind=clarification_requested)` on the originating inspection |
@@ -129,8 +131,8 @@ with `captain5.communications_enabled=false` first if needed).
   workspace act through the unchanged Logistics path; everyone else with `canAct` acts as Captain 5.
   The station-list probe `GET /api/captain5/summary` is outside the view gate on purpose and returns only
   `{"access":{"view":false}}` to ineligible members.
-- **Acting assignments** refuse self-assignment, denied members, departed members and members without an
-  active Hub account. Reasons are shown only to people who manage assignments.
+- **Acting assignments** (retired by section 11) refused self-assignment, denied members, departed members and
+  members without an active Hub account.
 - **Notifications** to "the on-duty Captain 5" are filtered through `Captain5Access` at send time (a denied or
   disabled person is skipped; fallback = eligible seat holders). Captain 5 participants are found from the audit
   snapshots (`details.actor_context.role = captain5`, `author_context = captain5`). Retrying one ledger row
@@ -155,3 +157,56 @@ with `captain5.communications_enabled=false` first if needed).
 - **Duty day** uses wall-clock 08:00 America/New_York (DST-safe).
 - **Known policy choice**: Captain 5 messages do not push a notification to Logistics; Logistics sees them on the
   canonical inspection page and issue history (labelled "Captain 5 · Name").
+
+## 11. Follow-up (2026-10-23): no duty gating, acting requests, Department Updates
+
+- **No duty gating.** Every officer (Lt and up), Division Chief, Chief, member with Admin Panel rights, Captain 5
+  or EMS Captain seat holder, and anyone with an `allow` override can do every task on the Captain 5 page, on
+  any shift. A `deny` override still removes access (except `super_admin`). The "on-duty authority" branch,
+  the `captain5-manage-assignments` gate, the `/api/captain5/assignments*` and `/api/captain5/people` routes,
+  `Captain5AssignmentService` and `Captain5DutyAssignment` are removed. Overrides are now `automatic | allow |
+  deny`; stored `allow` rows of either old level read as `allow`.
+- **Who is shown as Captain 5.** The page header shows "<Shift> Shift Captain 5: <name>" (A green, B blue,
+  C red) from data: an approved acting request that is showing, otherwise the bid seat holder for the shift on
+  duty (rotation, 08:00 boundary). It is display only and never changes permissions or who an action is
+  attributed to (attribution is always the signed-in member; the audit snapshot also records
+  `shown_captain5` and `acting_request_id`). New-findings notifications go to the person shown.
+- **Acting requests** (`captain5_acting_requests`): `kind` `act|end`, `employee_profile_id`,
+  `requested_by_user_id`, `duration` `12h|24h|custom`, `shift_letter`, `ends_at`, `status`
+  `pending|approved|rejected|withdrawn`, `decided_by_user_id`, `decided_at`, `decision_note`, `starts_at`,
+  `ended_at`, `ended_by_request_id` (self FK), `client_request_id` unique. Decided rows are immutable except
+  `ended_at` / `ended_by_request_id`.
+  - "Acting as Captain 5 today? Click here." on the page: 12 hours (ends at the next 08:00 or 20:00), 24 hours
+    (ends at the next day's 08:00) or a custom end (15 minutes to 72 hours ahead).
+  - Captain 5 administrators (`canConfigure`) are notified and approve or decline (a note is required to
+    decline) on the page or in Admin > Captain 5 Operations. Nobody approves their own request except a
+    super admin. An expired request cannot be approved.
+  - Approval shows the member until `ends_at`, then the display ends on its own. Another member can ask to take
+    over (approval ends the earlier one) and anyone on the page can ask to remove it (`kind=end`), both with
+    approval. A requester can withdraw a pending request; a new request replaces their earlier pending one.
+  - Acting never grants access to someone who cannot otherwise use the page.
+- **Messages vs Department Updates.** The Messages tab (on both pages) says: "Post and receive messages, files,
+  etc. Messages can only be received and sent by admin personnel, Capt. 5 and 300." The separate "Department
+  Updates" panel posts a home page notice everyone sees.
+  - Rule (set by the user): anyone who can use the Captain 5 page or the 300 page, any Chief or Division Chief
+    (Division Chief, Deputy Fire Chief, Fire Chief), a Fleet Operations Manager / `admin.fleet.manage`, and any
+    member with Admin Panel rights, on an active account with no pending password change. One server rule,
+    `CommandDepartmentUpdatePublisher::canPost`, checked on every call from either page (not the page gate).
+    Posts publish immediately to Everyone with no push or in-app broadcast; administrators edit, pin, notify
+    or archive them in the Admin Panel as usual; the author can take their own post down (archived, kept as
+    history).
+  - Attribution: `author_name` and `author_rank` are filled from the signed-in account when any Department
+    Update is created (page or Admin Panel), never from the request, and cannot be changed afterwards (the
+    model refuses). The home page, archive, detail page, Admin Panel and the page feeds show "Posted by
+    <rank> <name>". Older updates show the account name.
+  - It reuses `department_updates` (new nullable `origin` `command_300|captain_5` and unique
+    `client_request_id`), the private local disk and the existing home page, archive and detail views. Text is
+    escaped into paragraphs. One picture (JPEG/PNG/WebP up to 5 MB) and one document (PDF, DOCX, XLSX, PPTX,
+    TXT, CSV) per post; a schedule is posted as an attached document or picture.
+  - Routes: `GET|POST /api/command-communications/department-updates`, `POST .../{id}/take-down`, and the same
+    under `/api/captain5/department-updates`.
+- **Naming.** The station-list card and page for the Shift Division Chief seat are titled "300" with the badge
+  "Shift Division Chief". The home page Station / Vehicles / Equipment card reads "Station forms, Vehicle
+  Checkouts, Video Conferencing".
+- **Rollback.** The migration is additive. Old code ignores `captain5_acting_requests` and the two new
+  `department_updates` columns; posts made from the pages stay ordinary published Department Updates.

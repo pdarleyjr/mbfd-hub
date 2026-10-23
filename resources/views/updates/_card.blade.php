@@ -48,8 +48,8 @@
         <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-hub-border-soft pt-3">
             <p class="text-xs text-hub-muted">
                 <time datetime="{{ $update->publish_at?->toIso8601String() }}">{{ $update->publish_at?->timezone('America/New_York')->format('M j, Y · g:i A') }}</time>
-                @if($update->author?->name)
-                    <span aria-hidden="true"> · </span>{{ $update->author->name }}
+                @if($update->attribution())
+                    <span aria-hidden="true"> · </span>Posted by {{ $update->attribution() }}
                 @endif
             </p>
             <div class="flex flex-wrap items-center gap-2">

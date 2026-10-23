@@ -63,11 +63,29 @@ export function daysBetween(a: string, b: string): number {
   return Math.round((toUtc(b) - toUtc(a)) / DAY);
 }
 
+export const DUTY_UNSET = 'Shift Captain 5 not set';
+
+/**
+ * The line at the top of the page and on the station-list card: "A Shift Captain 5: Oscar Lima", or
+ * "A Shift Acting Captain 5: Oscar Lima until Oct 24, 8:00 AM" for an approved acting member. The name
+ * is whatever the server resolved; nothing here knows a person.
+ */
 export function dutyLine(onDuty: OnDuty): string {
-  if (!onDuty.resolved || !onDuty.name) return 'On-duty Captain 5 not resolved';
-  const who = [onDuty.rank, onDuty.name].filter(Boolean).join(' ');
-  const shift = onDuty.shift ? ` (${onDuty.shift} Shift)` : '';
-  return onDuty.source === 'acting_assignment' ? `Acting: ${who}${shift}` : `On duty: ${who}${shift}`;
+  if (!onDuty.resolved || !onDuty.name) return DUTY_UNSET;
+  const shift = onDuty.shift ? `${onDuty.shift} Shift ` : '';
+  if (onDuty.source === 'acting') {
+    const until = onDuty.acting_until ? ` until ${dateTimeText(onDuty.acting_until)}` : '';
+    return `${shift}Acting Captain 5: ${onDuty.name}${until}`;
+  }
+  return `${shift}Captain 5: ${onDuty.name}`;
+}
+
+const SHIFT_TONE: Record<string, Tone> = { A: 'success', B: 'info', C: 'danger' };
+
+/** A is green, B is blue, C is red. The text always names the shift, so colour never carries it alone. */
+export function dutyTone(onDuty: OnDuty): Tone {
+  if (!onDuty.resolved || !onDuty.name || !onDuty.shift) return 'neutral';
+  return SHIFT_TONE[onDuty.shift] ?? 'neutral';
 }
 
 /** Rescue-first, then newest: the order the queue is read in. */

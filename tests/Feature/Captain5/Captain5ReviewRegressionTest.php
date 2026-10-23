@@ -10,18 +10,18 @@ use App\Models\ApparatusInspection;
 use App\Models\ApparatusIssueMessage;
 use App\Models\User;
 use App\Notifications\Inspections\InspectionEventNotification;
+use App\Services\Captain5\Captain5ActingService;
 use App\Services\Captain5\Captain5AdministrationService;
-use App\Services\Captain5\Captain5AssignmentService;
 use App\Services\Captain5\Captain5Notifier;
 use App\Services\Captain5\Captain5Workspace;
 use App\Services\Inspections\IssueMessageService;
 use App\Support\Captain5\DutyCalendar;
 use Carbon\CarbonImmutable;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
 use Tests\Feature\Captain5\Concerns\BuildsCaptain5World;
 use Tests\TestCase;
 
@@ -54,7 +54,7 @@ final class Captain5ReviewRegressionTest extends TestCase
         self::assertSame(ApparatusIssueMessage::VISIBILITY_MEMBER, $reply->visibility);
     }
 
-    public function test_denied_seat_holders_are_never_notified_and_cannot_be_assigned(): void
+    public function test_denied_seat_holders_are_never_notified_and_cannot_ask_to_act(): void
     {
         $admin = $this->captain5Administrator();
         $denied = $this->officer('Captain', 'Denied Captain');
@@ -70,30 +70,17 @@ final class Captain5ReviewRegressionTest extends TestCase
         self::assertNotContains((int) $denied->id, $recipients, 'A denied on-duty seat holder is skipped');
         self::assertSame([(int) $other->id], $recipients, 'Falls back to the eligible seat holders');
 
-        $this->expectException(ValidationException::class);
-        app(Captain5AssignmentService::class)->assign($admin, [
-            'employee_profile_id' => $denied->employee_profile_id, 'duty_date' => '2026-10-20', 'reason' => 'Coverage',
-        ]);
+        $this->expectException(AuthorizationException::class);
+        app(Captain5ActingService::class)->request($denied->fresh(), ['kind' => 'act', 'duration' => '12h']);
     }
 
-    public function test_nobody_assigns_themselves_and_account_less_members_cannot_be_assigned(): void
+    public function test_account_less_members_cannot_ask_to_act(): void
     {
-        $chief = $this->officer('Division Chief');
-        try {
-            app(Captain5AssignmentService::class)->assign($chief, [
-                'employee_profile_id' => $chief->employee_profile_id, 'duty_date' => '2026-10-20', 'reason' => 'Self',
-            ]);
-            self::fail('Self-assignment must be refused');
-        } catch (ValidationException $e) {
-            self::assertArrayHasKey('employee_profile_id', $e->errors());
-        }
-
         $noAccount = $this->officer('Lieutenant');
         User::query()->whereKey($noAccount->id)->update(['account_status' => 'disabled']);
-        $this->expectException(ValidationException::class);
-        app(Captain5AssignmentService::class)->assign($chief, [
-            'employee_profile_id' => $noAccount->employee_profile_id, 'duty_date' => '2026-10-20', 'reason' => 'Coverage',
-        ]);
+        $this->forgetCaptain5Memo();
+        $this->expectException(AuthorizationException::class);
+        app(Captain5ActingService::class)->request($noAccount->fresh(), ['kind' => 'act', 'duration' => '12h']);
     }
 
     public function test_findings_recorded_on_a_reserve_truck_from_a_rescue_checklist_stay_in_scope(): void
