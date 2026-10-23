@@ -275,7 +275,7 @@ jobs:
           DAILY_CHECKOUT_OUT_DIR: ../../../public/daily
         run: npm run build
       - name: Run PHPUnit suite
-        run: php artisan test --exclude-group=postgres
+        run: composer test
       - name: Test Policy Library navigation and source proof processing
         run: |
           npm --prefix modules/policy-library test
@@ -910,7 +910,7 @@ jobs:
           DAILY_CHECKOUT_OUT_DIR: ../../../public/daily
         run: npm run build
       - name: Run PHP 8.5 PHPUnit compatibility suite
-        run: php artisan test --exclude-group=postgres
+        run: composer test
       - name: Run PHP 8.5 PostgreSQL compatibility tests
         env:
           MBFD_ALLOW_DISPOSABLE_POSTGRES: "1"

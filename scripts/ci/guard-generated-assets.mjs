@@ -10,6 +10,7 @@
 import { execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { isDeepStrictEqual } from "node:util";
 
 const root = execSync("git rev-parse --show-toplevel").toString().trim();
 
@@ -42,12 +43,22 @@ const releaseGateWorkflow = readFileSync(releaseGateWorkflowPath, "utf8");
 const missingReleaseCommands = [
   "run: composer install",
   "run: npm run build",
-  "run: php artisan test --exclude-group=postgres",
+  "run: composer test",
 ].filter((command) => !releaseGateWorkflow.includes(command));
 
 if (missingReleaseCommands.length > 0) {
   console.error("ERROR: the shared Hub release gate is missing required validation command(s):");
   missingReleaseCommands.forEach((command) => console.error("  " + command));
+  process.exit(1);
+}
+const composer = JSON.parse(readFileSync(resolve(root, "composer.json"), "utf8"));
+const expectedTestScript = [
+  "Composer\\Config::disableProcessTimeout",
+  "@php artisan test --exclude-group=postgres,training-roster-export",
+  "@php artisan test --group=training-roster-export --exclude-group=postgres",
+];
+if (!isDeepStrictEqual(composer.scripts?.test, expectedTestScript)) {
+  console.error("ERROR: composer test must run both complete non-PostgreSQL partitions in separate processes.");
   process.exit(1);
 }
 console.log("OK: shared Hub release gates define PHP install, production asset build, and PHPUnit validation.");
