@@ -165,6 +165,12 @@ class Apparatus extends Model
             ->orderBy('id');
     }
 
+    /** @return HasMany<ApparatusInventoryCorrection, $this> member-reported Daily Checkout checklist corrections */
+    public function inventoryCorrections(): HasMany
+    {
+        return $this->hasMany(ApparatusInventoryCorrection::class);
+    }
+
     /**
      * Get all inventory allocations for this apparatus
      */

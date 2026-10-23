@@ -6,6 +6,7 @@ namespace App\Services;
 
 use App\Enums\DailyCheckoutChecklistTemplate;
 use App\Models\Apparatus;
+use App\Services\Inventory\InventoryOverlay;
 use Carbon\CarbonImmutable;
 use JsonException;
 
@@ -51,6 +52,9 @@ final class DailyCheckoutChecklistResolver
      *     fallback_used: false,
      *     item_count: int,
      *     checklist_version: string|null,
+     *     checklist_base_version: string|null,
+     *     inventory_change_ids: list<int>,
+     *     overlay_conflicts: list<array{change_id: int, reason: string}>,
      *     checklist: array<string, mixed>|null,
      *     usable: bool,
      *     error: string|null
@@ -91,7 +95,16 @@ final class DailyCheckoutChecklistResolver
         }
 
         try {
-            $checklistVersion = $this->checklistVersion($checklist);
+            $baseVersion = $this->checklistVersion($checklist);
+            // Approved inventory corrections for this apparatus, layered on the template
+            // (docs/apparatus-inventory-corrections.md). No active change = untouched baseline.
+            $overlay = app(InventoryOverlay::class)->effectiveFor(
+                $apparatus,
+                $checklist,
+                fn (array $candidate): bool => $this->hasUnambiguousSubmissionSchema($candidate),
+            );
+            $checklist = $overlay['checklist'];
+            $checklistVersion = $overlay['change_ids'] === [] ? $baseVersion : $this->checklistVersion($checklist);
         } catch (JsonException) {
             return $this->unusable($mapping, $path, 'invalid_json');
         }
@@ -102,10 +115,49 @@ final class DailyCheckoutChecklistResolver
             'fallback_used' => false,
             'item_count' => $this->itemCount($checklist),
             'checklist_version' => $checklistVersion,
+            'checklist_base_version' => $baseVersion,
+            'inventory_change_ids' => $overlay['change_ids'],
+            'overlay_conflicts' => $overlay['conflicts'],
             'checklist' => $checklist,
             'usable' => true,
             'error' => null,
         ];
+    }
+
+    /**
+     * The checklist_version of any checklist array (same canonical hash as resolve()).
+     *
+     * @param  array<string, mixed>  $checklist
+     */
+    public function versionOf(array $checklist): string
+    {
+        return $this->checklistVersion($checklist);
+    }
+
+    /**
+     * Whether a checklist array meets the unambiguous submission contract.
+     *
+     * @param  array<string, mixed>  $checklist
+     */
+    public function isSubmittable(array $checklist): bool
+    {
+        return $this->hasUnambiguousSubmissionSchema($checklist);
+    }
+
+    /**
+     * The family an inventory change may propagate across: Engine 1 and Engine 2 templates
+     * are both engines, Ladder 1 and Ladder 3 both ladders.
+     */
+    public static function familyForChecklistType(string $checklistType): ?string
+    {
+        return match (true) {
+            str_starts_with($checklistType, 'engine') => 'engine',
+            str_starts_with($checklistType, 'ladder') => 'ladder',
+            str_starts_with($checklistType, 'rescue') => 'rescue',
+            str_starts_with($checklistType, 'fireboat') => 'fireboat',
+            $checklistType === '' || $checklistType === 'unmapped' => null,
+            default => $checklistType,
+        };
     }
 
     public function checklistTypeFor(Apparatus $apparatus): string
@@ -777,6 +829,9 @@ final class DailyCheckoutChecklistResolver
      *     fallback_used: false,
      *     item_count: 0,
      *     checklist_version: null,
+     *     checklist_base_version: null,
+     *     inventory_change_ids: list<int>,
+     *     overlay_conflicts: list<array{change_id: int, reason: string}>,
      *     checklist: null,
      *     usable: false,
      *     error: string
@@ -790,6 +845,9 @@ final class DailyCheckoutChecklistResolver
             'fallback_used' => false,
             'item_count' => 0,
             'checklist_version' => null,
+            'checklist_base_version' => null,
+            'inventory_change_ids' => [],
+            'overlay_conflicts' => [],
             'checklist' => null,
             'usable' => false,
             'error' => $error,

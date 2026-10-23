@@ -5,6 +5,8 @@ import { findingsForArea, inspectionProgress, itemIsComplete } from '../utils/in
 import { previousIssueHeadline, previousIssueStatusLine, resolveFindingTargets, targetsForItem, unlocatedFindings as findUnlocatedFindings, formatReportedDate } from '../utils/previousFindings';
 import { ArrowRight, Check, ChevronDown, ClipboardList, Package, TriangleAlert, X } from 'lucide-react';
 import ApparatusBlueprint from './ApparatusBlueprint';
+import InventoryCorrectionForm from './InventoryCorrectionForm';
+import { correctionLink, emptyCorrectionForm, markerForItem, questionFor, unlistedMarkers, type CorrectionForm, type InventoryCorrectionContext } from '../utils/inventoryCorrections';
 import './inspection-workspace.css';
 
 interface Props {
@@ -16,6 +18,8 @@ interface Props {
   onBack: () => void;
   backLabel?: string;
   actionLabel: string;
+  /** Present when this apparatus accepts inventory correction reports (checklist version, draft id, markers). */
+  inventory?: InventoryCorrectionContext;
 }
 
 /** Answers replaced by "Confirm all present", kept so the member can undo the batch for this area. */
@@ -32,7 +36,7 @@ const batchEligible = (item: ChecklistItem) => !((item.observed && item.status !
 /** Leaving Damaged clears the significant-damage claim in the same update. */
 const statusPatch = (status: ChecklistItem['status']): Partial<ChecklistItem> => status === 'Damaged' ? { status, observed: true } : { status, observed: true, significant: undefined };
 
-export default function CompartmentStep({ checklistType, compartments, findings = [], onChange, onSubmit, onBack, actionLabel }: Props) {
+export default function CompartmentStep({ checklistType, compartments, findings = [], onChange, onSubmit, onBack, actionLabel, inventory }: Props) {
   const profile = resolveBlueprint(checklistType);
   const mappedViews = profile?.views.filter(view => view.zones.some(zone => compartments.some(compartment => compartment.id === zone.compartmentId))) ?? [];
   const [activeId, setActiveId] = useState(mappedViews[0]?.zones.find(zone => compartments.some(compartment => compartment.id === zone.compartmentId))?.compartmentId ?? compartments[0]?.id ?? '');
@@ -45,6 +49,8 @@ export default function CompartmentStep({ checklistType, compartments, findings 
   const [focusWorkspace, setFocusWorkspace] = useState(false);
   const [batchUndo, setBatchUndo] = useState<BatchUndo | null>(null);
   const [announcement, setAnnouncement] = useState('');
+  // Inventory correction reports in progress, keyed by item or compartment so closing a panel or changing area keeps what was typed.
+  const [correctionForms, setCorrectionForms] = useState<Record<string, CorrectionForm>>({});
   // Bumped to clear a photo picker after a removal or a rejected file, so the same file can be chosen again.
   const [photoResets, setPhotoResets] = useState<Record<string, number>>({});
   const workspaceRef = useRef<HTMLDivElement>(null);
@@ -155,6 +161,11 @@ export default function CompartmentStep({ checklistType, compartments, findings 
     setAnnouncement('Confirm all present was undone.');
   };
 
+  const correctionFormFor = (key: string, expectedQuantity?: number): CorrectionForm => correctionForms[key] ?? emptyCorrectionForm(expectedQuantity);
+  const patchCorrectionForm = (key: string, expectedQuantity?: number) => (patch: Partial<CorrectionForm>) => {
+    setCorrectionForms(previous => ({ ...previous, [key]: { ...(previous[key] ?? emptyCorrectionForm(expectedQuantity)), ...patch } }));
+  };
+
   const resetPhotoInput = (itemId: string) => setPhotoResets(previous => ({ ...previous, [itemId]: (previous[itemId] ?? 0) + 1 }));
 
   const removePhoto = (compartmentId: string, itemId: string) => {
@@ -178,6 +189,8 @@ export default function CompartmentStep({ checklistType, compartments, findings 
     reader.onerror = () => setPhotoError('The image could not be read. Choose it again.');
     reader.readAsDataURL(file);
   };
+
+  const unlistedPending = inventory && current ? unlistedMarkers(inventory.markers, current.id) : { pending: 0, question: false };
 
   if (!current || !compartmentProgress) return <div data-hub-ui="2" role="alert" className="inspection-alert">No checklist items available. <button type="button" className="hub-btn hub-btn--secondary ml-2" onClick={onBack}>Member / Vehicle Info</button></div>;
 
@@ -244,6 +257,9 @@ export default function CompartmentStep({ checklistType, compartments, findings 
           const markedPresent = item.observed === true && item.status === 'Present';
           const actionLabel = needsValue(item) ? 'Record' : 'Pass';
           const outOfRange = percentageOutOfRange(item);
+          const correctionMarker = inventory ? markerForItem(inventory.markers, current.id, item.id) : null;
+          const itemSpec = [item.manufacturer, item.model, item.description].filter(Boolean).join(' · ');
+          const correctionKey = `item:${current.id}:${item.id}`;
           return <article key={item.id} className={`equipment-row ${issue ? 'has-issue' : ''} ${expanded ? 'is-expanded' : ''}`}>
             <div className="equipment-summary">
               <button type="button" className="equipment-expand" data-item-id={item.id} aria-expanded={expanded} aria-controls={`details-${current.id}-${item.id}`} onClick={() => setExpandedId(expanded ? null : item.id)}>
@@ -253,6 +269,11 @@ export default function CompartmentStep({ checklistType, compartments, findings 
               </button>
               <button type="button" className={`equipment-pass ${itemIsComplete(item) && !issue ? 'is-passed' : ''}`} aria-label={`${actionLabel} ${item.name}`} aria-pressed={itemIsComplete(item) && item.status === 'Present'} onClick={() => { if (needsValue(item) && !itemIsComplete({ ...item, status: 'Present', observed: true })) { setExpandedId(item.id); } else { update(current.id, item.id, statusPatch('Present')); } }}><Check size={16} aria-hidden="true" /><span>{actionLabel}</span></button>
             </div>
+            {correctionMarker && <div className="equipment-markers" data-correction-marker={correctionMarker}>
+              {correctionMarker === 'question'
+                ? <><span className="hub-tag hub-tag--warning">Logistics asked a question</span><a className="ic-link" href={correctionLink(questionFor(inventory!.markers, current.id, item.id))}>Open the question</a></>
+                : <span className="hub-tag hub-tag--info">Correction pending review</span>}
+            </div>}
             {known.length > 0 && <div className="equipment-known" data-previous-issues={item.id}>
               {known.map(finding => {
                 const memberUpdate = finding.latest_member_update;
@@ -267,6 +288,7 @@ export default function CompartmentStep({ checklistType, compartments, findings 
             </div>}
             {expanded && <div className="equipment-details" id={`details-${current.id}-${item.id}`}>
               {item.instructions && <p className="equipment-instructions">{item.instructions}</p>}
+              {itemSpec && <p className="equipment-spec">{itemSpec}</p>}
               <div className="equipment-status" role="group" aria-label={`Status for ${item.name}`}>
                 {(['Present', 'Missing', 'Damaged'] as const).map(status => <button key={status} type="button" aria-pressed={item.observed === true && item.status === status} onClick={() => update(current.id, item.id, statusPatch(status))}>{status}</button>)}
               </div>
@@ -298,10 +320,20 @@ export default function CompartmentStep({ checklistType, compartments, findings 
                 <img src={item.photo} alt={`Photo of ${item.name}`} className="inspection-photo" />
                 <button type="button" className="hub-btn hub-btn--destructive" aria-label={`Remove photo of ${item.name}`} onClick={() => removePhoto(current.id, item.id)}>Remove photo</button>
               </div>}
+              {inventory && <InventoryCorrectionForm mode="item" fieldId={`ic-${current.id}-${item.id}`} compartment={current} compartments={compartments} item={item}
+                form={correctionFormFor(correctionKey, item.expectedQuantity)} onForm={patchCorrectionForm(correctionKey, item.expectedQuantity)} context={inventory} />}
             </div>}
           </article>;
         })}
       </div>
+      {inventory && <div className="equipment-unlisted">
+        <InventoryCorrectionForm mode="new_item" fieldId={`ic-new-${current.id}`} compartment={current} compartments={compartments}
+          form={correctionFormFor(`new:${current.id}`)} onForm={patchCorrectionForm(`new:${current.id}`)} context={inventory} />
+        {unlistedPending.pending > 0 && <p className="inspection-muted" data-unlisted-pending>
+          {unlistedPending.question ? 'Logistics asked a question about an unlisted item reported here. ' : `${unlistedPending.pending} unlisted ${unlistedPending.pending === 1 ? 'item' : 'items'} reported here, pending review. `}
+          {unlistedPending.question && <a className="ic-link" href={correctionLink(questionFor(inventory.markers, current.id, null))}>Open the question</a>}
+        </p>}
+      </div>}
       <footer className="inspection-compartment-footer"><span>Area {navigationIds.indexOf(current.id) + 1} of {navigationIds.length}</span></footer>
     </section>
 

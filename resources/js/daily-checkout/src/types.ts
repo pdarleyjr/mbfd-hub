@@ -170,6 +170,10 @@ export interface ChecklistItem {
   photo?: string; // base64 encoded image
   inputType?: ChecklistInputType;
   expectedQuantity?: number;
+  /** Display only: shown as one muted line in the expanded item details. */
+  manufacturer?: string;
+  model?: string;
+  description?: string;
   /** Optional member claim: new damage that affects safe operation. Only meaningful while status is Damaged. */
   significant?: boolean;
 }
@@ -201,8 +205,26 @@ export interface OpenFinding {
   latest_member_update?: { text: string; at: string } | null;
 }
 
+/** A member's inventory correction report that Logistics has not decided yet (outside the hashed checklist). */
+export interface PendingInventoryCorrection {
+  /** Only for the signed-in member's own reports; another member's report is just a marker. */
+  id: number | null;
+  /** Null or absent for a report about an unlisted item that has no checklist item yet. */
+  compartment_id?: string | null;
+  item_id?: string | null;
+  reason: string | null;
+  reason_label?: string;
+  status: string;
+  reported_at?: string;
+  /** True when the signed-in member filed it. */
+  mine: boolean;
+}
+
 export interface ChecklistData {
   open_findings?: OpenFinding[];
+  /** Hash of the baseline template without inventory overlays; equal across overlay-only changes. */
+  checklist_base_version?: string;
+  pending_corrections?: PendingInventoryCorrection[];
   checklist_version: string;
   checklist_type?: string;
   schema_version: 1 | 2;
@@ -281,6 +303,8 @@ export interface InspectionSubmission {
   officer_signature?: string | null;
   /** Present only when the member checked "Flag this inspection for further review". */
   review_flag?: ReviewFlag;
+  /** Links inventory corrections reported while this draft was open; the server treats it as optional. */
+  inventory_draft_id?: string;
 }
 
 export interface MeterData {
@@ -298,6 +322,8 @@ export interface InspectionData {
   signature?: string | null;
   /** Draft state of the review flag; absent when never checked. */
   reviewFlag?: ReviewFlagDraft;
+  /** Created once per draft; sent as `inspection_draft_id` with inventory corrections and `inventory_draft_id` with the inspection. */
+  draftId?: string;
   actorUserId?: number;
   actorSecurityVersion?: number;
   checklist_version: string;

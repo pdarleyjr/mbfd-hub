@@ -23,6 +23,9 @@ use App\Services\Fleet\VehicleSwapDecisionException;
 use App\Services\Fleet\VehicleSwapService;
 use App\Services\Identity\AuthenticatedMemberContextResolver;
 use App\Services\Inspections\InspectionSubmissionSignals;
+use App\Services\Inventory\ChecklistRevisionStore;
+use App\Services\Inventory\InventoryCorrectionProjection;
+use App\Services\Inventory\InventoryCorrectionService;
 use App\Support\Fleet\FleetVehicleCatalog;
 use App\Support\Fleet\VehicleNumber;
 use App\Support\Security\Base64Image;
@@ -97,6 +100,9 @@ class ApparatusController extends Controller
             'apparatus' => (new PublicApparatusResource($apparatus))->resolve(request()),
             'checklist' => $checklist,
             'checklist_version' => $resolution['checklist_version'],
+            // The template hash without approved inventory changes: lets an open draft tell
+            // an inventory update (answers carry over by item id) from a template change.
+            'checklist_base_version' => $resolution['checklist_base_version'],
             'checklist_type' => $resolution['checklist_type'],
             'checklist_item_count' => $resolution['item_count'],
             'inspection_date' => $inspectionDate->toDateString(),
@@ -105,7 +111,29 @@ class ApparatusController extends Controller
             // serialize defect notes, photos, resolution history, or paths.
             'open_defects_count' => $apparatus->openDefects()->count(),
             'open_findings' => $this->knownFindings($apparatus, $checklist),
+            'pending_corrections' => $this->pendingCorrections($apparatus, $request),
         ]);
+    }
+
+    /** Open inventory corrections on this apparatus (member-safe markers, no reporter identity). */
+    private function pendingCorrections(Apparatus $apparatus, Request $request): array
+    {
+        $viewer = $request->user();
+
+        return app(InventoryCorrectionProjection::class)->pendingMarkers($apparatus, $viewer instanceof User ? $viewer : null);
+    }
+
+    /**
+     * The checklist an inspection was performed on when an approved inventory change has
+     * replaced it since: work begun on the old list is validated against exactly that list.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function recentlyReplacedChecklist(Apparatus $apparatus, string $submittedVersion): ?array
+    {
+        $checklist = app(ChecklistRevisionStore::class)->recentlyRetired((int) $apparatus->getKey(), $submittedVersion);
+
+        return is_array($checklist) && ! $this->isV2Checklist($checklist) ? $checklist : null;
     }
 
     /**
@@ -371,6 +399,8 @@ class ApparatusController extends Controller
             'review_flag.items.*' => ['required', 'array:compartment_id,item_id'],
             'review_flag.items.*.compartment_id' => ['required', 'string', 'max:255'],
             'review_flag.items.*.item_id' => ['required', 'string', 'max:255'],
+            // Correlates inventory corrections reported while this checkout was in progress.
+            'inventory_draft_id' => ['nullable', 'uuid'],
         ]);
         $validated = app(InspectionSubmissionSignals::class)->normalize($validated);
 
@@ -446,6 +476,11 @@ class ApparatusController extends Controller
             if ($this->isV2Checklist($checklist)) {
                 return $this->inspectionSessionRequiredResponse();
             }
+            if (! hash_equals($expectedChecklistVersion, $validated['checklist_version'])
+                && ($replaced = $this->recentlyReplacedChecklist($apparatus, $validated['checklist_version'])) !== null) {
+                $checklist = $replaced;
+                $expectedChecklistVersion = $validated['checklist_version'];
+            }
         }
 
         if (! is_array($checklist)
@@ -505,6 +540,12 @@ class ApparatusController extends Controller
 
                     $lockedChecklist = $lockedResolution['checklist'];
                     $lockedChecklistVersion = $lockedResolution['checklist_version'];
+                    if (is_string($lockedChecklistVersion)
+                        && ! hash_equals($lockedChecklistVersion, (string) $prepared['checklist_version'])
+                        && ($replaced = $this->recentlyReplacedChecklist($lockedApparatus, (string) $prepared['checklist_version'])) !== null) {
+                        $lockedChecklist = $replaced;
+                        $lockedChecklistVersion = (string) $prepared['checklist_version'];
+                    }
                 }
 
                 if (! is_array($lockedChecklist) || ! is_string($lockedChecklistVersion)
@@ -586,6 +627,7 @@ class ApparatusController extends Controller
                         : null,
                     'officer_signature' => $prepared['officer_signature_path'] ?? null,
                     'employee_id' => $prepared['employee_id'] ?? null,
+                    'inventory_draft_id' => isset($prepared['inventory_draft_id']) ? strtolower((string) $prepared['inventory_draft_id']) : null,
                     ...app(InspectionSubmissionSignals::class)->persistedFlag($prepared, $lockedChecklist),
                     // The authenticated actor is immutable provenance; signatures
                     // remain evidence. Operational effects still require review.
@@ -614,8 +656,17 @@ class ApparatusController extends Controller
                     app(ApparatusInspectionProcessingService::class)->process($inspection, $lockedApparatus, $prepared['meter_baseline_token'] ?? null, $lockedChecklist);
                 }
 
-                DB::afterCommit(function (): void {
+                DB::afterCommit(function () use ($inspection): void {
                     $this->forgetDisplayReadModels();
+                    // Best effort, outside the submission's locks: a failed link never affects the inspection.
+                    try {
+                        app(InventoryCorrectionService::class)->linkInspection($inspection);
+                    } catch (Throwable $exception) {
+                        Log::warning('Inventory corrections could not be linked to an inspection.', [
+                            'inspection_id' => $inspection->getKey(),
+                            'exception' => $exception->getMessage(),
+                        ]);
+                    }
                 });
 
                 return ['inspection' => $inspection, 'created' => true];

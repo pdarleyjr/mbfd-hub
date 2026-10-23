@@ -4,18 +4,23 @@ declare(strict_types=1);
 
 namespace App\Services\Inspections;
 
+use App\Filament\Employee\Pages\MyInventoryCorrectionView;
 use App\Filament\Employee\Pages\MyVehicleInspections;
 use App\Filament\Employee\Pages\MyVehicleInspectionView;
 use App\Filament\Resources\InspectionResource;
+use App\Filament\Resources\InventoryCorrectionResource;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusDefectEvent;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusInspectionException;
+use App\Models\ApparatusInventoryCorrection;
+use App\Models\ApparatusInventoryCorrectionEvent;
 use App\Models\ApparatusIssueMessage;
 use App\Models\User;
 use App\Notifications\Inspections\InspectionEventNotification;
 use App\Notifications\Inspections\InspectionNotificationKind as Kind;
+use App\Services\Inventory\InventoryCorrectionReason;
 use App\Support\Fleet\DefectActionStatus;
 use App\Support\Fleet\InspectionReviewers;
 use Carbon\Carbon;
@@ -256,6 +261,142 @@ final class InspectionNotificationDispatcher
         });
     }
 
+    // ------------------------------------------------------- inventory corrections
+
+    /** A member reported a checklist entry that does not match the apparatus. */
+    public function inventoryCorrectionSubmitted(ApparatusInventoryCorrection $correction): void
+    {
+        $this->guard('inventoryCorrectionSubmitted', function () use ($correction): void {
+            $unit = $this->unitLabel(Apparatus::query()->find($correction->apparatus_id));
+            $reporter = $correction->reporter_user_id !== null ? User::query()->find($correction->reporter_user_id) : null;
+            $name = $this->excerpt((string) ($reporter?->display_name ?: $reporter?->name)) ?: 'A member';
+
+            $this->queue(
+                'correction:'.$correction->getKey().':submitted',
+                Kind::INVENTORY_CORRECTION_SUBMITTED,
+                InspectionReviewers::all(),
+                fn (User $recipient): array => [
+                    'title' => "{$unit}: inventory correction reported",
+                    'body' => "{$name} reported that the checklist is wrong for ".$this->correctionSubject($correction).': '.InventoryCorrectionReason::label($correction->reason).'.',
+                    'url' => $this->correctionAdminUrl((int) $correction->getKey()),
+                ],
+                $reporter,
+            );
+        });
+    }
+
+    /** Logistics asked, replied, decided or reversed: tells the reporting member. */
+    public function inventoryCorrectionUpdate(ApparatusInventoryCorrection $correction, ApparatusInventoryCorrectionEvent $event): void
+    {
+        $this->guard('inventoryCorrectionUpdate', function () use ($correction, $event): void {
+            if ($event->visibility !== ApparatusInventoryCorrectionEvent::VISIBILITY_MEMBER) {
+                return;
+            }
+            $unit = $this->unitLabel(Apparatus::query()->find($correction->apparatus_id));
+            $subject = $this->correctionSubject($correction);
+            $excerpt = $this->excerpt((string) $event->body);
+            [$title, $body] = match ($event->event_type) {
+                ApparatusInventoryCorrectionEvent::CLARIFICATION_REQUESTED => ["{$unit}: question about your inventory correction", "Logistics asked about {$subject}: {$excerpt}"],
+                ApparatusInventoryCorrectionEvent::APPLIED => ["{$unit}: inventory correction approved", "Logistics approved your correction for {$subject}. The Daily Checkout checklist now reflects it."],
+                ApparatusInventoryCorrectionEvent::REJECTED => ["{$unit}: inventory correction not approved", "Logistics did not approve your correction for {$subject}: {$excerpt}"],
+                ApparatusInventoryCorrectionEvent::REVERSED => ["{$unit}: inventory correction reversed", "Logistics reversed the change made for {$subject}: {$excerpt}"],
+                default => ["{$unit}: message about your inventory correction", "Logistics wrote about {$subject}: {$excerpt}"],
+            };
+            $actor = $event->actor_user_id !== null ? User::query()->find($event->actor_user_id) : null;
+
+            $this->queue(
+                'correction:'.$correction->getKey().':update:'.$event->getKey(),
+                Kind::INVENTORY_CORRECTION_UPDATE,
+                $this->correctionOwners($correction),
+                fn (User $recipient): array => [
+                    'title' => $title,
+                    'body' => $body,
+                    'url' => InspectionReviewers::canReview($recipient)
+                        ? $this->correctionAdminUrl((int) $correction->getKey())
+                        : $this->correctionMemberUrl((int) $correction->getKey()),
+                ],
+                $actor,
+            );
+        });
+    }
+
+    /** The reporting member answered: tells the reviewers in this thread (else every reviewer). */
+    public function inventoryCorrectionReply(ApparatusInventoryCorrection $correction, ApparatusInventoryCorrectionEvent $event): void
+    {
+        $this->guard('inventoryCorrectionReply', function () use ($correction, $event): void {
+            $unit = $this->unitLabel(Apparatus::query()->find($correction->apparatus_id));
+            $author = $event->actor_user_id !== null ? User::query()->find($event->actor_user_id) : null;
+            $name = $this->excerpt((string) ($author?->display_name ?: $author?->name)) ?: 'A member';
+            $reviewers = InspectionReviewers::all();
+            $involved = ApparatusInventoryCorrectionEvent::query()
+                ->where('apparatus_inventory_correction_id', $correction->getKey())
+                ->where('author_context', 'logistics')
+                ->whereNotNull('actor_user_id')
+                ->pluck('actor_user_id')
+                ->map(static fn ($id): int => (int) $id)
+                ->all();
+            $participating = $reviewers->filter(static fn (User $user): bool => in_array((int) $user->getKey(), $involved, true))->values();
+
+            $this->queue(
+                'correction:'.$correction->getKey().':reply:'.$event->getKey(),
+                Kind::INVENTORY_CORRECTION_REPLY,
+                $participating->isNotEmpty() ? $participating : $reviewers,
+                fn (User $recipient): array => [
+                    'title' => "{$unit}: member reply on an inventory correction",
+                    'body' => "{$name} replied about ".$this->correctionSubject($correction).': '.$this->excerpt((string) $event->body),
+                    'url' => $this->correctionAdminUrl((int) $correction->getKey()),
+                ],
+                $author,
+            );
+        });
+    }
+
+    public function correctionAdminUrl(int $correctionId): string
+    {
+        return InventoryCorrectionResource::getUrl('view', ['record' => $correctionId], false, 'admin');
+    }
+
+    public function correctionMemberUrl(int $correctionId): string
+    {
+        return MyInventoryCorrectionView::getUrl(['correction' => $correctionId], false, 'employee');
+    }
+
+    /** @return Collection<int, User> */
+    private function correctionOwners(ApparatusInventoryCorrection $correction): Collection
+    {
+        if ($correction->reporter_user_id === null && $correction->reporter_employee_id === null) {
+            return collect();
+        }
+
+        return User::query()
+            ->where(function ($query) use ($correction): void {
+                if ($correction->reporter_user_id !== null) {
+                    $query->orWhere('id', $correction->reporter_user_id);
+                }
+                if ($correction->reporter_employee_id !== null) {
+                    $query->orWhere('employee_profile_id', $correction->reporter_employee_id);
+                }
+            })
+            ->get();
+    }
+
+    /** "Garage Door Clicker (Front Cab)" or "an unlisted item in Rear Cab". */
+    private function correctionSubject(ApparatusInventoryCorrection $correction): string
+    {
+        $snapshot = (array) $correction->target_snapshot;
+        // Member-supplied text: plain, single-line, never markup.
+        $where = $this->excerpt((string) ($snapshot['compartment'] ?? ''));
+        $name = $this->excerpt((string) ($snapshot['name'] ?? ''));
+        if ($name === '') {
+            $proposed = $this->excerpt((string) ($correction->proposal['name'] ?? ''));
+            $item = $proposed !== '' ? "unlisted item \"{$proposed}\"" : 'an unlisted item';
+
+            return $item.($where !== '' ? " in {$where}" : '');
+        }
+
+        return $name.($where !== '' ? " ({$where})" : '');
+    }
+
     // ------------------------------------------------------------------ delivery
 
     /**
@@ -334,6 +475,9 @@ final class InspectionNotificationDispatcher
                 $parts[0] === 'defect' && ($parts[2] ?? '') === 'resolved' => $this->withDefect($subjectId, fn ($d) => $this->withEvent((int) $tail, fn ($e) => $this->issueResolved($d, $e))),
                 $parts[0] === 'defect' && ($parts[2] ?? '') === 'update' => $this->withDefect($subjectId, fn ($d) => $this->withEvent((int) $tail, fn ($e) => $this->issueMemberUpdate($d, $e))),
                 $parts[0] === 'message' => $this->withMessage($subjectId, fn ($m) => $this->messagePosted($m, $kind === Kind::CLARIFICATION_REQUESTED ? $kind : null)),
+                $parts[0] === 'correction' && ($parts[2] ?? '') === 'submitted' => $this->withCorrection($subjectId, fn ($c) => $this->inventoryCorrectionSubmitted($c)),
+                $parts[0] === 'correction' && ($parts[2] ?? '') === 'update' => $this->withCorrection($subjectId, fn ($c) => $this->withCorrectionEvent((int) $tail, fn ($e) => $this->inventoryCorrectionUpdate($c, $e))),
+                $parts[0] === 'correction' && ($parts[2] ?? '') === 'reply' => $this->withCorrection($subjectId, fn ($c) => $this->withCorrectionEvent((int) $tail, fn ($e) => $this->inventoryCorrectionReply($c, $e))),
                 default => Log::warning('Inspection notification retry: unknown event key', ['event_key' => $eventKey]),
             };
 
@@ -371,6 +515,22 @@ final class InspectionNotificationDispatcher
     private function withMessage(int $id, Closure $then): void
     {
         if (($model = ApparatusIssueMessage::query()->find($id)) !== null) {
+            $then($model);
+        }
+    }
+
+    /** @param Closure(ApparatusInventoryCorrection): void $then */
+    private function withCorrection(int $id, Closure $then): void
+    {
+        if (($model = ApparatusInventoryCorrection::query()->find($id)) !== null) {
+            $then($model);
+        }
+    }
+
+    /** @param Closure(ApparatusInventoryCorrectionEvent): void $then */
+    private function withCorrectionEvent(int $id, Closure $then): void
+    {
+        if (($model = ApparatusInventoryCorrectionEvent::query()->find($id)) !== null) {
             $then($model);
         }
     }

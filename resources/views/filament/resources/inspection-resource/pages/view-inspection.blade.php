@@ -455,6 +455,29 @@
             </section>
         @endif
 
+        {{-- Inventory corrections the member reported during this checkout: a separate review, never a finding --}}
+        @if(count($workspace['inventory_corrections']) > 0)
+            <section id="inventory-corrections" class="hub-insp-section hub-insp-anchor" aria-labelledby="insp-inventory-title" data-section="inventory-corrections">
+                <div class="hub-insp-section__head">
+                    <h2 class="hub-insp-section__title" id="insp-inventory-title">Inventory corrections reported</h2>
+                    <p class="hub-insp-note">The member said the checklist itself is wrong. Approving one changes future checklists, not this inspection.</p>
+                </div>
+                <div class="hub-insp-card">
+                    <ul class="hub-insp-linklist">
+                        @foreach($workspace['inventory_corrections'] as $correction)
+                            <li class="hub-insp-history__row" data-inventory-correction="{{ $correction['id'] }}">
+                                <div class="hub-insp-history__main">
+                                    <a class="hub-insp-link hub-insp-history__title" href="{{ $correction['url'] }}">{{ $correction['item'] }}</a>
+                                    <p class="hub-insp-item__sub">{{ $correction['reference'] }} · {{ $correction['reason'] }}</p>
+                                </div>
+                                <span class="hub-insp-badge hub-insp-badge--{{ $correction['open'] ? 'warning' : 'neutral' }}">{{ $correction['status'] }}</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            </section>
+        @endif
+
         {{-- D. Original checklist, exactly as submitted --}}
         <section class="hub-insp-section" aria-labelledby="insp-checklist-title" data-section="checklist">
             <div class="hub-insp-section__head">
