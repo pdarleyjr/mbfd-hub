@@ -31,6 +31,19 @@ const pnpmReport = {
     advisories: { '1240992': { id: 1240992, module_name: 'braces', severity: 'high', github_advisory_id: 'GHSA-vfj7-8cjw-p6xm', vulnerable_versions: '<=3.0.3', findings: [{ version: '3.0.3', paths: [] }] } },
     metadata: { vulnerabilities: { info: 0, low: 0, moderate: 0, high: 1, critical: 0 } },
 };
+// Representative fields from the pinned pnpm 9.12.0 report: JSON mode reports
+// every severity and returns 1 even when --audit-level=high was requested.
+const pnpmLowerSeverityReport = {
+    actions: [
+        { action: 'review', module: 'postcss', resolves: [{ id: 1130709, path: 'apps__web>postcss' }] },
+        { action: 'review', module: 'postcss-selector-parser', resolves: [{ id: 1153170, path: 'apps__web>tailwindcss>postcss-selector-parser' }] },
+    ],
+    advisories: {
+        '1130709': { id: 1130709, module_name: 'postcss', severity: 'moderate', github_advisory_id: 'GHSA-fxqj-rqcc-2cmp' },
+        '1153170': { id: 1153170, module_name: 'postcss-selector-parser', severity: 'low', github_advisory_id: 'GHSA-w9m9-85wc-3x92' },
+    },
+    metadata: { vulnerabilities: { info: 0, low: 1, moderate: 1, high: 0, critical: 0 } },
+};
 
 test('the exact reviewed root and Daily reports classify only the known advisory', () => {
     for (const scope of ['.', 'resources/js/daily-checkout']) assert.match(classifyBuildAdvisory(report, scope, 1, now), /VISIBLE BUILD ADVISORY/);
@@ -108,6 +121,62 @@ test('pnpm classifies only the exact reviewed braces build graph and expiry', ()
     const clean = { actions: [], advisories: {}, metadata: { vulnerabilities: { info: 0, low: 0, moderate: 0, high: 0, critical: 0 } } };
     assert.throws(() => classifyVacationBuildAdvisory(clean, 1, now), /Audit exit contradicts/);
     assert.throws(() => classifyVacationBuildAdvisory(pnpmReport, 2, now), /did not complete normally/);
+});
+test('pnpm 9 JSON exit status counts lower severities while the gate remains HIGH or CRITICAL', () => {
+    assert.match(classifyVacationBuildAdvisory(pnpmLowerSeverityReport, 1, now), /No HIGH or CRITICAL findings/);
+    assert.throws(() => classifyVacationBuildAdvisory(pnpmLowerSeverityReport, 0, now), /Audit exit contradicts/);
+    const clean = { actions: [], advisories: {}, metadata: { vulnerabilities: { info: 0, low: 0, moderate: 0, high: 0, critical: 0 } } };
+    assert.match(classifyVacationBuildAdvisory(clean, 0, now), /No HIGH or CRITICAL findings/);
+    assert.throws(() => classifyVacationBuildAdvisory(clean, 1, now), /Audit exit contradicts/);
+});
+test('lower pnpm findings cannot hide an unclassified HIGH or CRITICAL finding', () => {
+    for (const severity of ['high', 'critical']) {
+        for (const includeReviewed of [false, true]) {
+            const value = structuredClone(pnpmLowerSeverityReport);
+            if (includeReviewed) {
+                value.advisories = { ...value.advisories, ...structuredClone(pnpmReport.advisories) };
+                value.actions.push(...structuredClone(pnpmReport.actions));
+                value.metadata.vulnerabilities.high++;
+            }
+            value.advisories['1234'] = { id: 1234, module_name: 'other', severity };
+            value.metadata.vulnerabilities[severity]++;
+            assert.throws(() => classifyVacationBuildAdvisory(value, 1, now), /Unclassified pnpm HIGH or CRITICAL finding/);
+        }
+    }
+});
+test('lower-only pnpm reports still require valid counts, schema and completed tooling', () => {
+    for (const mutate of [
+        (copy) => { copy.error = { message: 'ENOTFOUND' }; },
+        (copy) => { copy.metadata.vulnerabilities.moderate = 0; },
+        (copy) => { copy.metadata.vulnerabilities.low = 0.5; },
+        (copy) => { copy.advisories['1130709'].id = 1234; },
+        (copy) => { copy.advisories['1130709'].severity = 'unknown'; },
+        (copy) => { copy.actions = null; },
+        (copy) => { copy.actions[0].resolves[0].path = null; },
+    ]) {
+        const value = structuredClone(pnpmLowerSeverityReport);
+        mutate(value);
+        assert.throws(() => classifyVacationBuildAdvisory(value, 1, now));
+    }
+    for (const exit of [-1, 2, 127]) assert.throws(() => classifyVacationBuildAdvisory(pnpmLowerSeverityReport, exit, now), /did not complete normally/);
+});
+test('the pnpm CLI preserves raw lower-severity reports and refuses malformed or failed audits', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'mbfd-pnpm-report-'));
+    try {
+        const file = join(directory, 'audit.json');
+        const raw = JSON.stringify(pnpmLowerSeverityReport, null, 2);
+        writeFileSync(file, raw);
+        const passed = spawnSync(process.execPath, [resolve(root, 'scripts/ci/classify-build-advisory.mjs'), 'vacation-app', file, '1'], { encoding: 'utf8', timeout: 10000 });
+        assert.equal(passed.status, 0, passed.stderr);
+        assert.equal(passed.stderr, '');
+        assert.equal(passed.stdout, `${raw}\nNo HIGH or CRITICAL findings\n`);
+        for (const [failedRaw, exit] of [[raw, '0'], [raw, '2'], ['{malformed', '1']]) {
+            writeFileSync(file, failedRaw);
+            const failed = spawnSync(process.execPath, [resolve(root, 'scripts/ci/classify-build-advisory.mjs'), 'vacation-app', file, exit], { encoding: 'utf8', timeout: 10000 });
+            assert.equal(failed.status, 1);
+            assert.ok(failed.stdout.startsWith(failedRaw));
+        }
+    } finally { assert.equal(dirname(directory), tmpdir()); rmSync(directory, { recursive: true, force: true }); }
 });
 test('a changed pnpm lock SHA cannot reuse the exception', async () => {
     const directory = mkdtempSync(join(tmpdir(), 'mbfd-pnpm-input-'));
