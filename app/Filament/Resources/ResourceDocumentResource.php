@@ -38,6 +38,8 @@ final class ResourceDocumentResource extends Resource
 
     protected static ?string $modelLabel = 'resource document';
 
+    protected static ?string $pluralModelLabel = 'Resource Library';
+
     protected static ?int $navigationSort = 20;
 
     public static function form(Form $form): Form
@@ -135,8 +137,10 @@ final class ResourceDocumentResource extends Resource
                     ->options(fn (): array => ResourceDocument::query()->distinct()->orderBy('category')->pluck('category', 'category')->all()),
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
-                self::visibilityAction(),
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\EditAction::make(),
+                    self::visibilityAction(),
+                ])->label('Actions')->icon('heroicon-m-ellipsis-horizontal')->button()->color('gray'),
             ])
             ->bulkActions([])
             ->emptyStateHeading('No documents yet')

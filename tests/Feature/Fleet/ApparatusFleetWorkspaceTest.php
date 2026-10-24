@@ -144,6 +144,37 @@ final class ApparatusFleetWorkspaceTest extends TestCase
         self::assertTrue($history->every(fn (UnitMasterVehicleChange $change): bool => $change->user_id === $manager->id));
     }
 
+    public function test_link_picker_searches_the_whole_inventory_case_insensitively(): void
+    {
+        $tahoe = $this->master('23500', ['make' => 'Chevy', 'model' => 'Tahoe', 'year' => '2023']);
+        $this->master('22530', ['make' => 'Ford', 'model' => 'F-250']);
+        $captain = $this->legacyApparatus('Captain 5', '22530', ['vin' => 'TESTVIN000000631']);
+        app(ApparatusMasterVehicleLink::class)->reconcile($captain);
+        $this->actingAs($this->fleetManager());
+
+        $results = Livewire::test(ViewApparatus::class, ['record' => $captain->getRouteKey()])
+            ->mountAction('linkVehicleRecord')
+            ->instance()
+            ->getFormSelectSearchResults('mountedActionsData.0.unit_master_vehicle_id', 'tahoe');
+
+        self::assertContains((string) $tahoe->id, array_map('strval', array_column($results, 'value')), json_encode($results));
+    }
+
+    public function test_desktop_list_shows_the_vehicle_and_flags_review(): void
+    {
+        $this->master('20503', ['make' => 'PIERCE', 'model' => 'VELOCITY', 'year' => '2021']);
+        $engine = $this->legacyApparatus('E 1', '20503');
+        app(ApparatusMasterVehicleLink::class)->reconcile($engine);
+        $boat = $this->legacyApparatus('FB6', null);
+        app(ApparatusMasterVehicleLink::class)->reconcile($boat);
+        $this->actingAs($this->fleetManager());
+
+        Livewire::test(ListApparatuses::class)
+            ->call('loadTable')
+            ->assertSee('2021 PIERCE VELOCITY')
+            ->assertSee('Vehicle record needs review');
+    }
+
     public function test_a_vehicle_linked_to_another_unit_cannot_be_taken(): void
     {
         $this->master('20503');

@@ -215,6 +215,14 @@ class ApparatusResource extends Resource
                     ->sortable()
                     ->weight('bold')
                     ->placeholder('—'),
+                Tables\Columns\TextColumn::make('vehicle_number')->visibleFrom('md')
+                    ->label('Vehicle')
+                    ->description(fn (Apparatus $record): string => self::vehicleSummary($record))
+                    ->color(fn (Apparatus $record): ?string => $record->master_link_status === Apparatus::MASTER_LINK_NEEDS_REVIEW ? 'warning' : null)
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable()
+                    ->placeholder('Not recorded'),
                 Tables\Columns\TextColumn::make('status')->visibleFrom('md')
                     ->badge()
                     ->alignment(Alignment::Center)
@@ -264,11 +272,6 @@ class ApparatusResource extends Resource
                         ->orWhereRaw('LOWER(current_location) LIKE ?', ['%'.mb_strtolower($search).'%']))),
 
                 // Optional columns.
-                Tables\Columns\TextColumn::make('vehicle_number')->visibleFrom('md')
-                    ->label('Veh #')
-                    ->searchable()
-                    ->toggleable(isToggledHiddenByDefault: true)
-                    ->placeholder('—'),
                 Tables\Columns\TextColumn::make('daily_checkout_requirement')->visibleFrom('md')
                     ->label('Daily Checkout')
                     ->badge()
@@ -473,6 +476,16 @@ class ApparatusResource extends Resource
         }
 
         return implode(' · ', $parts);
+    }
+
+    /** Desktop vehicle column detail: year/make/model, or why the vehicle record needs Fleet. */
+    private static function vehicleSummary(Apparatus $record): string
+    {
+        if ($record->master_link_status === Apparatus::MASTER_LINK_NEEDS_REVIEW) {
+            return 'Vehicle record needs review';
+        }
+
+        return trim(implode(' ', array_filter([$record->getAttribute('year'), $record->getAttribute('make'), $record->getAttribute('model')]))) ?: 'Year, make and model not recorded';
     }
 
     private static function openWorkLabel(Apparatus $record): string
