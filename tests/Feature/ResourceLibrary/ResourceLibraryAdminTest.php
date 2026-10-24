@@ -170,7 +170,8 @@ final class ResourceLibraryAdminTest extends TestCase
         self::assertSame(hash_file('sha256', $replacement), $fresh->original_sha256);
         self::assertSame('manual-2026.pdf', $fresh->original_filename);
         self::assertSame($document->uuid, $fresh->uuid);
-        self::assertSame([$fresh->original_path], Storage::disk('local')->allFiles());
+        // Replacing keeps the superseded bytes as a version (see ResourceLibraryVersionsTest).
+        self::assertEqualsCanonicalizing([$document->original_path, $fresh->original_path], Storage::disk('local')->allFiles());
         self::assertStringContainsString('sprinkler', (string) ResourceDocument::query()->whereKey($fresh->id)->value('search_text'));
 
         $event = $fresh->events()->where('event', 'replaced')->sole();
