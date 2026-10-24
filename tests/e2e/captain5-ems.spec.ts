@@ -459,7 +459,7 @@ test.describe('rescue inventory list', () => {
     await expect(rows.first()).toContainText('Rescue 2');
     await expect(rows.first()).toContainText('Paramedic Pat Medic');
     await expect(rows.first()).toContainText('Oct 23, 2:05 PM EDT');
-    await expect(rows.first()).toContainText('5 items requested, 0 with issues');
+    await expect(rows.first()).toContainText('5 items requested, 0 issued');
     await expect(page.getByRole('button', { name: 'Open', exact: true })).toHaveAttribute('aria-pressed', 'true');
     const list = server.reads.filter((read) => read.path === '/requests' && read.search.includes('per_page=25'));
     expect(decodeURIComponent(list[0].search)).toContain('status=submitted,reviewed,prepared,partially_issued');

@@ -100,7 +100,7 @@ export const memberText = (request: Pick<RequestSummary, 'submitter_name' | 'sub
 
 /** "4 items requested, 1 with something issued". */
 export function itemsText(request: Pick<RequestSummary, 'line_count' | 'issued_line_count'>): string {
-  return `${plural(request.line_count, 'item')} requested, ${request.issued_line_count} with issues`;
+  return `${plural(request.line_count, 'item')} requested, ${request.issued_line_count} issued`;
 }
 
 export const REQUEST_TONE: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'neutral'> = {
