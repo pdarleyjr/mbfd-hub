@@ -19,6 +19,9 @@ use App\Services\ApparatusInspectionProcessingService;
 use App\Services\DailyCheckoutChecklistResolver;
 use App\Services\DailyCheckoutInspectionSessionService;
 use App\Services\Display\DisplaySnapshotService;
+use App\Services\Fleet\VehicleIdentificationPlanner;
+use App\Services\Fleet\VehicleIdentificationService;
+use App\Services\Fleet\VehicleIdentificationSubmission;
 use App\Services\Fleet\VehicleSwapDecisionException;
 use App\Services\Fleet\VehicleSwapService;
 use App\Services\Identity\AuthenticatedMemberContextResolver;
@@ -27,6 +30,7 @@ use App\Services\Inventory\ChecklistRevisionStore;
 use App\Services\Inventory\InventoryCorrectionProjection;
 use App\Services\Inventory\InventoryCorrectionService;
 use App\Support\Fleet\FleetVehicleCatalog;
+use App\Support\Fleet\VehicleIdentificationFields;
 use App\Support\Fleet\VehicleNumber;
 use App\Support\Security\Base64Image;
 use Carbon\CarbonImmutable;
@@ -112,6 +116,8 @@ class ApparatusController extends Controller
             'open_defects_count' => $apparatus->openDefects()->count(),
             'open_findings' => $this->knownFindings($apparatus, $checklist),
             'pending_corrections' => $this->pendingCorrections($apparatus, $request),
+            // Outside the hashed checklist on purpose: answering a question never changes checklist_version.
+            'vehicle_identification' => app(VehicleIdentificationPlanner::class)->block($apparatus),
         ]);
     }
 
@@ -218,6 +224,8 @@ class ApparatusController extends Controller
             'open_defects_count' => $apparatus->openDefects()->count(),
             'open_findings' => $this->knownFindings($apparatus, $resolution['checklist']),
             'inspection_session' => $inspectionSessionService->publicContract($session, $issued['token']),
+            // Not part of the frozen session snapshot or its hash.
+            'vehicle_identification' => app(VehicleIdentificationPlanner::class)->block($apparatus),
         ], $issued['created'] ? 201 : 200);
 
         if ($browserBinding['new']) {
@@ -324,6 +332,7 @@ class ApparatusController extends Controller
             'open_defects_count' => $apparatus->openDefects()->count(),
             'open_findings' => $this->knownFindings($apparatus, $resolution['checklist']),
             'inspection_session' => $inspectionSessionService->publicContract($session, $issued['token']),
+            'vehicle_identification' => app(VehicleIdentificationPlanner::class)->block($apparatus),
         ], $issued['created'] ? 201 : 200);
     }
 
@@ -401,8 +410,18 @@ class ApparatusController extends Controller
             'review_flag.items.*.item_id' => ['required', 'string', 'max:255'],
             // Correlates inventory corrections reported while this checkout was in progress.
             'inventory_draft_id' => ['nullable', 'uuid'],
+            // One-time vehicle questions. Deliberately no type rule: a malformed section is cleaned item by
+            // item below and can never reject the checkout.
+            'vehicle_identification' => ['nullable'],
         ]);
         $validated = app(InspectionSubmissionSignals::class)->normalize($validated);
+        $identification = app(VehicleIdentificationSubmission::class)
+            ->clean($validated['vehicle_identification'] ?? null, $this->identificationKind($id))['section'];
+        if ($identification === null) {
+            unset($validated['vehicle_identification']);
+        } else {
+            $validated['vehicle_identification'] = $identification;
+        }
 
         if (is_array($validated['physical_vehicle'] ?? null)) {
             $note = is_string($validated['physical_vehicle']['note'] ?? null) ? trim($validated['physical_vehicle']['note']) : '';
@@ -642,6 +661,12 @@ class ApparatusController extends Controller
                     $lockedInspectionSession->update(['submitted_inspection_id' => $inspection->id]);
                 }
 
+                if (is_array($prepared['vehicle_identification'] ?? null)) {
+                    // A different physical vehicle than the unit's own was reported: the answers describe that
+                    // vehicle, so they are kept but never applied to this unit.
+                    $this->recordVehicleIdentification($lockedApparatus, $prepared['vehicle_identification'], $request, $clientSubmissionId, $inspection, $swapAssessment !== null);
+                }
+
                 if ($swapAssessment !== null) {
                     // Saved under the unit, findings and readings held until Fleet decides.
                     app(VehicleSwapService::class)->hold(
@@ -704,6 +729,47 @@ class ApparatusController extends Controller
 
             throw $exception;
         }
+    }
+
+    /**
+     * Identification answers ride along with the checkout but never decide its outcome: they are
+     * recorded inside a savepoint, and a failure is logged while the checkout is still saved.
+     *
+     * @param  array{questions_version: string, answers: list<array<string, mixed>>}  $section
+     */
+    private function recordVehicleIdentification(
+        Apparatus $apparatus,
+        array $section,
+        Request $request,
+        string $clientSubmissionId,
+        ApparatusInspection $inspection,
+        bool $differentVehicleReported,
+    ): void {
+        $user = $request->user();
+        try {
+            DB::transaction(fn () => app(VehicleIdentificationService::class)->record(
+                $apparatus,
+                $section,
+                $user instanceof User ? $user : null,
+                $clientSubmissionId,
+                (int) $inspection->getKey(),
+                $differentVehicleReported,
+            ));
+        } catch (Throwable $exception) {
+            Log::error('Vehicle identification answers could not be recorded; the checkout was saved without them.', [
+                'apparatus_id' => $apparatus->getKey(),
+                'inspection_id' => $inspection->getKey(),
+                'exception' => $exception->getMessage(),
+            ]);
+        }
+    }
+
+    /** The kind (vehicle or boat) the unit's answers are validated against. */
+    private function identificationKind(int $apparatusId): string
+    {
+        $apparatus = Apparatus::query()->find($apparatusId);
+
+        return $apparatus instanceof Apparatus ? VehicleIdentificationFields::kindFor($apparatus) : VehicleIdentificationFields::KIND_VEHICLE;
     }
 
     /** Equipment context for authenticated members; no personnel, internal notes or private storage paths. */
