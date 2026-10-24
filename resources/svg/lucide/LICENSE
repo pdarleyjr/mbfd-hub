@@ -1,4 +1,4 @@
-Lucide icons in this folder (briefcase-medical.svg, from lucide 0.500.0).
+Lucide icons in this folder (briefcase-medical.svg, from lucide 0.500.0; stroke width set to 1.5 to match the Heroicons outline set).
 Registered as the blade-icons set 'lucide' in App\Providers\AppServiceProvider::register().
 
 ISC License
