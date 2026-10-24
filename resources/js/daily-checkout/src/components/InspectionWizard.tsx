@@ -35,7 +35,7 @@ import { inspectionProgress, inspectionReadiness } from '../utils/inspectionProg
 import { identityForQueueCapture, type OfflineIdentity } from '../lib/offlineIdentity';
 import { EMPTY_REVIEW_FLAG, buildReviewFlag, normalizeReviewFlagDraft, reviewFlagExplanationMissing } from '../utils/reviewFlag';
 import { defaultVehicleConfirmation, paperVehicleValue, reconcileVehicleConfirmation, toPhysicalVehicleReport } from '../utils/vehicleConfirmation';
-import { toVehicleIdentificationSubmission } from '../utils/vehicleIdentification';
+import { activeVehicleIdentification, toVehicleIdentificationSubmission } from '../utils/vehicleIdentification';
 import { ClipboardList, Gauge, Truck, Users } from 'lucide-react';
 
 type Step = 'officer' | 'meter' | 'details' | 'compartments' | 'submit';
@@ -772,7 +772,7 @@ export default function InspectionWizard() {
 
       const flag = buildReviewFlag(reviewFlag, compartments);
       // Omitted when no question is open, so a checkout without questions is byte for byte what it was.
-      const identificationReport = toVehicleIdentificationSubmission(checklist.vehicle_identification, vehicleIdentification);
+      const identificationReport = toVehicleIdentificationSubmission(activeVehicleIdentification(checklist.vehicle_identification, officerInfo), vehicleIdentification);
       const submission: InspectionSubmission = {
         processing_version: 1,
         meter_baseline_token: apparatus.meter_baseline_token,

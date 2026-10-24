@@ -128,6 +128,8 @@ export interface VehicleIdentificationReason {
 /** The server's block of open questions; kept outside the hashed checklist. */
 export interface VehicleIdentification {
   note: string;
+  /** False when this person may only read the questions (Fleet or a Captain 5 officer answers). Missing means true. */
+  can_answer: boolean;
   kind: 'vehicle' | 'boat';
   questions: VehicleIdentificationQuestion[];
   reasons: VehicleIdentificationReason[];
