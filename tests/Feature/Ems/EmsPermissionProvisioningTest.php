@@ -44,30 +44,27 @@ final class EmsPermissionProvisioningTest extends TestCase
         $this->assertSame('EMS — manage', $options['admin.ems.manage']);
     }
 
-    public function test_the_migration_grants_view_to_admin_access_holders_and_manage_to_captain5_admins_only(): void
+    public function test_the_migration_creates_the_permissions_but_grants_them_to_nobody(): void
     {
+        // The production deploy gate refuses role or permission changes on established accounts, so access
+        // to Admin -> EMS is granted deliberately in the capability editor, never by a migration.
         $admin = $this->user(['admin.access']);
         $captain5Admin = $this->user(['admin.access', 'captain5.admin']);
-        $captain5Only = $this->user(['captain5.admin']);
-        $plain = $this->user();
         $roleOnly = $this->user();
         $roleOnly->assignRole(Role::findOrCreate('admin', 'web'));
         Role::findOrCreate('admin', 'web')->givePermissionTo(Permission::findOrCreate('admin.access', 'web'));
-        DB::table('model_has_permissions')->whereIn('permission_id', Permission::query()->whereIn('name', ['admin.ems.view', 'admin.ems.manage'])->pluck('id'))->delete();
         app(PermissionRegistrar::class)->forgetCachedPermissions();
+        $before = DB::table('model_has_permissions')->count();
 
         $this->runMigration();
         $this->runMigration(); // idempotent
 
-        $has = fn (User $u, string $p): bool => $u->fresh()->hasDirectWebPermission($p);
-        $this->assertTrue($has($admin, 'admin.ems.view'));
-        $this->assertFalse($has($admin, 'admin.ems.manage'));
-        $this->assertTrue($has($captain5Admin, 'admin.ems.view'));
-        $this->assertTrue($has($captain5Admin, 'admin.ems.manage'));
-        $this->assertFalse($has($captain5Only, 'admin.ems.view'), 'Without admin.access there is no Admin -> EMS.');
-        $this->assertTrue($has($captain5Only, 'admin.ems.manage'));
-        $this->assertFalse($has($plain, 'admin.ems.view'));
-        $this->assertFalse($has($roleOnly, 'admin.ems.view'), 'Only direct permissions count.');
-        $this->assertSame(4, DB::table('model_has_permissions')->whereIn('permission_id', Permission::query()->whereIn('name', ['admin.ems.view', 'admin.ems.manage'])->pluck('id'))->count());
+        foreach (['admin.ems.view', 'admin.ems.manage'] as $name) {
+            $this->assertSame(1, Permission::query()->where('name', $name)->where('guard_name', 'web')->count());
+            foreach ([$admin, $captain5Admin, $roleOnly] as $user) {
+                $this->assertFalse($user->fresh()->hasDirectWebPermission($name));
+            }
+        }
+        $this->assertSame($before, DB::table('model_has_permissions')->count(), 'No account gains a permission from the migration.');
     }
 }

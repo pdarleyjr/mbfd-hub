@@ -72,7 +72,7 @@ Accepted originals: PDF, DOCX, XLSX, PPTX, DOC, XLS, PPT. A file whose first byt
 
 ## Admin
 
-- Permissions: `admin.resources.view` (see the list) and `admin.resources.manage` (edit, replace). Both are direct permissions on top of `admin.access` and appear as "Resource library" in member access administration. The migration grants both to everyone who held `admin.access` when it ran; super administrators always have them.
+- Permissions: `admin.resources.view` (see the list) and `admin.resources.manage` (edit, replace). Both are direct permissions on top of `admin.access` and appear as "Resource library" in member access administration. The migration only creates them; an administrator grants them in member access administration (migrations never grant access, because the production deploy gate refuses permission changes on existing accounts). Super administrators always have them.
 - Editing title, category, description, sort order and "Visible to members" never touches the stored file. Hiding a document is the supported way to retire it; documents are not deleted from Admin.
 - The edit page shows the current file name, type, size, SHA-256 and the last ten history entries.
 

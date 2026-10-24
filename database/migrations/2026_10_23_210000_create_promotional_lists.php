@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Models\User;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -14,15 +13,12 @@ use Spatie\Permission\PermissionRegistrar;
  * Additive only. Promotional lists, their ranked entries and an append-only history,
  * plus the direct capability personnel.promotions.manage.
  *
- * The capability is granted once to users who already hold direct personnel.directory.edit
- * or admin.personnel.manage. Accounts whose only administration is the uniform and PPE
- * manager set keep out: PersonnelTableService does not treat them as personnel managers.
+ * The capability is created and granted to nobody: the production deploy gate refuses permission
+ * changes on established accounts, so it is given deliberately in the Admin capability editor.
  */
 return new class extends Migration
 {
     private const PERMISSION = 'personnel.promotions.manage';
-
-    private const UNIFORM_SET = ['admin.access', 'admin.personnel.view', 'admin.personnel.manage'];
 
     public function up(): void
     {
@@ -76,15 +72,7 @@ return new class extends Migration
             $table->index(['list_id', 'created_at']);
         });
 
-        $permission = Permission::findOrCreate(self::PERMISSION, 'web');
-        $holders = User::query()->whereHas('permissions', fn ($query) => $query->where('guard_name', 'web')
-            ->whereIn('name', ['personnel.directory.edit', 'admin.personnel.manage']))->get();
-        foreach ($holders as $holder) {
-            if (! $holder->hasDirectWebPermission('personnel.directory.edit') && $this->isUniformManagerOnly($holder)) {
-                continue;
-            }
-            $holder->givePermissionTo($permission);
-        }
+        Permission::findOrCreate(self::PERMISSION, 'web');
         app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 
@@ -97,20 +85,5 @@ return new class extends Migration
         Schema::dropIfExists('promotional_list_events');
         Schema::dropIfExists('promotional_list_entries');
         Schema::dropIfExists('promotional_lists');
-    }
-
-    private function isUniformManagerOnly(User $user): bool
-    {
-        if ($user->hasAnyRole(['super_admin', 'admin', 'logistics_admin'])) {
-            return false;
-        }
-        foreach (self::UNIFORM_SET as $permission) {
-            if (! $user->hasDirectWebPermission($permission)) {
-                return false;
-            }
-        }
-
-        return ! $user->permissions()->where('guard_name', 'web')->where('name', 'like', 'admin.%')
-            ->whereNotIn('name', self::UNIFORM_SET)->exists();
     }
 };
