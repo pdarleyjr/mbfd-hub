@@ -151,7 +151,8 @@ final class ApparatusProfileAccessibilityTest extends TestCase
     {
         $apparatus = $this->createApparatus('Table navigation');
         $this->submitDailyCheckout($apparatus);
-        $profileUrl = ApparatusResource::getUrl('edit', ['record' => $apparatus]);
+        // Rows open the read-only profile; editing is a deliberate second step.
+        $profileUrl = ApparatusResource::getUrl('view', ['record' => $apparatus]);
 
         $list = Livewire::test(ListApparatuses::class)
             ->call('loadTable');
