@@ -592,6 +592,7 @@ jobs:
               --project=daily-workspace-webkit-iphone
               --project=captain5-chromium
               --project=captain5-chromium-phone
+              --project=captain5-ems-chromium
           - lane: webkit-ipad-and-issue-report
             projects: >-
               --project=daily-workspace-webkit-ipad
