@@ -17,16 +17,18 @@ use Illuminate\Support\Collection;
 /**
  * Turns the crew's answers into the right vehicle record, without guessing.
  *
- * A unit already linked to a master vehicle record only has its blanks filled (a differing value
- * is proposed to Fleet, never written over). A unit that is not linked is matched only by exact
- * identifiers, never by names or partial similarity:
+ * A unit already linked to a master vehicle record: year, make and model blanks are filled; a
+ * VIN or plate is only ever proposed to Fleet (Fleet accepts), as is any differing value; the
+ * vehicle number is never touched because the link defines it. A unit that is not linked is
+ * matched only by exact identifiers, never by names or partial similarity, and never when the
+ * match would replace the unit's own vehicle number or VIN:
  *  a. the VIN/HIN equals exactly one master record that no other unit holds: link it.
- *  b. the vehicle number equals exactly one such master record AND the plate (or VIN) equals the
- *     same record's: link it.
+ *  b. the vehicle number equals exactly one such master record AND the plate equals the same
+ *     record's: link it.
  *  c. anything partial, contradicting or ambiguous: flag the unit for Fleet with what the crew
  *     reported. No link.
- *  d. no candidate at all and the crew gave a VIN/HIN or a vehicle number: create a master record
- *     flagged for Fleet verification, then link it.
+ *  d. no candidate at all and the crew gave a VIN/HIN: create a master record flagged for Fleet
+ *     verification, then link it. A vehicle number alone never creates a record.
  *  e. otherwise wait: the open questions stay open.
  *
  * Runs inside the caller's transaction, with the apparatus row already locked.
@@ -37,6 +39,8 @@ final class VehicleIdentificationResolver
 
     public const ALERT_CONFLICT = 'conflict';
 
+    public const ALERT_PROPOSAL = 'proposal';
+
     public function __construct(
         private readonly ApparatusMasterVehicleLink $link,
         private readonly UnitMasterVehicleChangeRecorder $recorder,
@@ -44,9 +48,10 @@ final class VehicleIdentificationResolver
 
     /**
      * @param  array<string, string>  $answeredNow  field => cleaned value, answered in this submission
+     * @param  array<string, string>  $shown  field => the recorded value the crew was shown to confirm
      * @return list<array{type: string, message: string}> what Fleet should be told once the transaction commits
      */
-    public function resolve(VehicleIdentificationLedger $ledger, array $answeredNow): array
+    public function resolve(VehicleIdentificationLedger $ledger, array $answeredNow, array $shown = []): array
     {
         if ($answeredNow === []) {
             return [];
@@ -57,15 +62,16 @@ final class VehicleIdentificationResolver
             : UnitMasterVehicle::query()->lockForUpdate()->find($apparatus->unit_master_vehicle_id);
 
         return $master !== null
-            ? $this->fillLinked($ledger, $master, $answeredNow)
+            ? $this->fillLinked($ledger, $master, $answeredNow, $shown)
             : $this->resolveUnlinked($ledger);
     }
 
     /**
      * @param  array<string, string>  $answers
+     * @param  array<string, string>  $shown
      * @return list<array{type: string, message: string}>
      */
-    private function fillLinked(VehicleIdentificationLedger $ledger, UnitMasterVehicle $master, array $answers): array
+    private function fillLinked(VehicleIdentificationLedger $ledger, UnitMasterVehicle $master, array $answers, array $shown = []): array
     {
         $alerts = [];
         $unit = $this->unitName($ledger->apparatus);
@@ -73,33 +79,71 @@ final class VehicleIdentificationResolver
             $column = Fields::masterColumn($field);
             $current = $master->getAttribute($column);
             $context = ['user' => $ledger->actor, 'note' => $ledger->historyNote()];
+            $details = ['master_id' => $master->getKey(), 'column' => $column];
+
+            if ($field === Fields::VEHICLE_NUMBER) {
+                // The link already defines the vehicle number; a crew answer never fills or changes it.
+                $same = ! Fields::isBlankValue($current) && Fields::key($field, $current) === Fields::key($field, $value);
+                $ledger->record($field, $same ? ApparatusIdentificationEvent::EVENT_CONFIRMED : ApparatusIdentificationEvent::EVENT_CONFLICT, [
+                    'value' => $value,
+                    'note' => $same ? null : 'The vehicle number is defined by the link and was not changed.',
+                    'metadata' => $details,
+                ]);
+                if (! $same && ! Fields::isBlankValue($current)) {
+                    $alerts[] = $this->conflictAlert(sprintf('%s: the crew reported vehicle number "%s", the linked vehicle record has "%s". Nothing was changed.', $unit, $value, trim((string) $current)));
+                }
+
+                continue;
+            }
 
             if (Fields::isBlankValue($current)) {
+                $isIdentifier = in_array($field, [Fields::VIN, Fields::PLATE], true);
+                if (! $isIdentifier) {
+                    $this->recorder->apply($master, $column, $value, UnitMasterVehicleChange::SOURCE_DAILY_CHECKOUT, $context);
+                    $ledger->record($field, ApparatusIdentificationEvent::EVENT_MASTER_FILLED, ['value' => $value, 'metadata' => $details]);
+
+                    continue;
+                }
                 $owner = $field === Fields::VIN ? $this->otherMasterWithVin($master, $value) : null;
                 if ($owner !== null) {
                     $ledger->record($field, ApparatusIdentificationEvent::EVENT_CONFLICT, [
                         'value' => $value,
-                        'note' => "Not written: master vehicle {$owner->veh_number} already has this VIN/HIN.",
-                        'metadata' => ['master_id' => $master->getKey(), 'other_master_id' => $owner->getKey()],
+                        'note' => "Not proposed: master vehicle {$owner->veh_number} already has this VIN/HIN.",
+                        'metadata' => $details + ['other_master_id' => $owner->getKey()],
                     ]);
                     $alerts[] = $this->conflictAlert("{$unit}: the crew reported VIN/HIN {$value}, but master vehicle {$owner->veh_number} already has it. Nothing was changed.");
 
                     continue;
                 }
-                $this->recorder->apply($master, $column, $value, UnitMasterVehicleChange::SOURCE_DAILY_CHECKOUT, $context);
-                $ledger->record($field, ApparatusIdentificationEvent::EVENT_MASTER_FILLED, [
+                // A VIN or plate is read off a vehicle by a person: Fleet accepts it before it reaches the record.
+                $proposal = $this->recorder->propose($master, $column, $value, UnitMasterVehicleChange::SOURCE_DAILY_CHECKOUT, $context);
+                $ledger->record($field, ApparatusIdentificationEvent::EVENT_PROPOSED, [
                     'value' => $value,
-                    'metadata' => ['master_id' => $master->getKey(), 'column' => $column],
+                    'note' => 'Waiting for Fleet to accept it.',
+                    'metadata' => $details + ['proposal_id' => $proposal?->getKey(), 'already_proposed' => $proposal === null],
                 ]);
+                if ($proposal !== null) {
+                    $alerts[] = $this->proposalAlert(sprintf('%s: the crew reported %s "%s". It is waiting for Fleet to accept it on the vehicle record.', $unit, Fields::shortLabel($field), $value));
+                }
 
                 continue;
             }
 
             if (Fields::key($field, $current) === Fields::key($field, $value)) {
-                $ledger->record($field, ApparatusIdentificationEvent::EVENT_CONFIRMED, [
+                $ledger->record($field, ApparatusIdentificationEvent::EVENT_CONFIRMED, ['value' => $value, 'metadata' => $details]);
+
+                continue;
+            }
+
+            $seen = $shown[$field] ?? null;
+            if ($seen !== null && Fields::key($field, $seen) !== Fields::key($field, $current)) {
+                // The crew confirmed a value that is no longer what the record holds: do not propose their stale value.
+                $ledger->record($field, ApparatusIdentificationEvent::EVENT_CONFLICT, [
                     'value' => $value,
-                    'metadata' => ['master_id' => $master->getKey(), 'column' => $column],
+                    'note' => 'The vehicle record changed after the crew was shown it. Nothing was proposed.',
+                    'metadata' => $details + ['record_value' => trim((string) $current), 'shown_value' => $seen],
                 ]);
+                $alerts[] = $this->conflictAlert(sprintf('%s: the crew confirmed %s "%s" for a record that has since changed to "%s". Nothing was changed.', $unit, Fields::shortLabel($field), $value, trim((string) $current)));
 
                 continue;
             }
@@ -108,18 +152,18 @@ final class VehicleIdentificationResolver
             $ledger->record($field, ApparatusIdentificationEvent::EVENT_CONFLICT, [
                 'value' => $value,
                 'note' => 'The crew reported a different value than the vehicle record. The record was not changed.',
-                'metadata' => [
-                    'master_id' => $master->getKey(),
-                    'column' => $column,
+                'metadata' => $details + [
                     'record_value' => trim((string) $current),
                     'proposal_id' => $proposal?->getKey(),
                     'already_proposed' => $proposal === null,
                 ],
             ]);
-            $alerts[] = $this->conflictAlert(sprintf(
-                '%s: the crew reported %s "%s", the vehicle record has "%s". The record was not changed; the crew value is waiting as a proposed change.',
-                $unit, Fields::shortLabel($field), $value, trim((string) $current),
-            ));
+            if ($proposal !== null) {
+                $alerts[] = $this->conflictAlert(sprintf(
+                    '%s: the crew reported %s "%s", the vehicle record has "%s". The record was not changed; the crew value is waiting as a proposed change.',
+                    $unit, Fields::shortLabel($field), $value, trim((string) $current),
+                ));
+            }
         }
 
         return $alerts;
@@ -146,7 +190,9 @@ final class VehicleIdentificationResolver
         if ($vin !== null && $byVin->count() === 1) {
             /** @var UnitMasterVehicle $candidate */
             $candidate = $byVin->first();
-            $problem = $this->contradiction($candidate, $number, $plate, $byNumber, $byPlate) ?? $this->takenBy($apparatus, $candidate);
+            $problem = $this->contradiction($candidate, $number, $plate, $byNumber, $byPlate)
+                ?? $this->takenBy($apparatus, $candidate)
+                ?? $this->ownIdentityProblem($apparatus, $candidate->veh_number, $candidate->serial_number);
 
             return $problem !== null
                 ? $this->needsReview($ledger, $answers, $problem)
@@ -161,7 +207,8 @@ final class VehicleIdentificationResolver
             /** @var UnitMasterVehicle $candidate */
             $candidate = $byNumber->first();
             $problem = $this->contradiction($candidate, $number, $plate, $byNumber, $byPlate, $vin)
-                ?? $this->takenBy($apparatus, $candidate);
+                ?? $this->takenBy($apparatus, $candidate)
+                ?? $this->ownIdentityProblem($apparatus, $candidate->veh_number, $candidate->serial_number);
             $backed = $plate !== null && $byPlate->contains(fn (UnitMasterVehicle $m): bool => $m->getKey() === $candidate->getKey());
             if ($problem === null && $backed) {
                 return $this->linkAndFill($ledger, $candidate, $answers, 'b');
@@ -178,9 +225,16 @@ final class VehicleIdentificationResolver
             return $this->needsReview($ledger, $answers, 'Only the plate matches a vehicle record.');
         }
 
-        // d. No candidate at all, and a strong identifier to build a record from.
-        if ($vin !== null || $number !== null) {
-            return $this->createAndLink($ledger, $answers);
+        // d. No candidate at all and a VIN/HIN to build a record from. A vehicle number alone is not enough.
+        if ($vin !== null) {
+            $problem = $this->ownIdentityProblem($apparatus, $number, $vin);
+
+            return $problem !== null
+                ? $this->needsReview($ledger, $answers, $problem)
+                : $this->createAndLink($ledger, $answers);
+        }
+        if ($number !== null) {
+            return $this->needsReview($ledger, $answers, "No vehicle record has number {$number}, and no VIN/HIN was given to create one from.");
         }
 
         return []; // e. wait
@@ -299,6 +353,26 @@ final class VehicleIdentificationResolver
         return null;
     }
 
+    /**
+     * Linking or creating copies the record's number and VIN onto the unit. When the unit already
+     * has its own, different one, that would silently replace it: Fleet decides instead.
+     */
+    private function ownIdentityProblem(Apparatus $apparatus, mixed $number, mixed $vin): ?string
+    {
+        $ownNumber = $apparatus->vehicle_number;
+        if (! Fields::isBlankValue($ownNumber) && ! Fields::isBlankValue($number)
+            && VehicleIdentity::numberKey($ownNumber) !== VehicleIdentity::numberKey($number)) {
+            return 'This unit\'s own vehicle number is '.trim((string) $ownNumber).', not '.trim((string) $number).'.';
+        }
+        $ownVin = $apparatus->getAttribute('vin');
+        if (! Fields::isBlankValue($ownVin) && ! Fields::isBlankValue($vin)
+            && VehicleIdentity::vinKey($ownVin) !== VehicleIdentity::vinKey($vin)) {
+            return 'This unit\'s own VIN/HIN is '.trim((string) $ownVin).', not '.trim((string) $vin).'.';
+        }
+
+        return null;
+    }
+
     private function takenBy(Apparatus $apparatus, UnitMasterVehicle $candidate): ?string
     {
         $holder = Apparatus::query()
@@ -331,7 +405,9 @@ final class VehicleIdentificationResolver
         $key = Fields::key($field, $value);
 
         return $masters
-            ->filter(fn (UnitMasterVehicle $master): bool => $key !== null && Fields::key($field, $master->getAttribute($column)) === $key)
+            ->filter(fn (UnitMasterVehicle $master): bool => $key !== null
+                && ! Fields::isPlaceholderValue($master->getAttribute($column))
+                && Fields::key($field, $master->getAttribute($column)) === $key)
             ->values();
     }
 
@@ -369,5 +445,11 @@ final class VehicleIdentificationResolver
     private function conflictAlert(string $message): array
     {
         return ['type' => self::ALERT_CONFLICT, 'message' => $message];
+    }
+
+    /** @return array{type: string, message: string} */
+    private function proposalAlert(string $message): array
+    {
+        return ['type' => self::ALERT_PROPOSAL, 'message' => $message];
     }
 }

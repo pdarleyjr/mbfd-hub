@@ -26,7 +26,7 @@ use Throwable;
  * The server decides what is open at the moment of recording, with the apparatus row locked. An
  * answer for a field that is no longer open is kept as a "superseded" event and never overwrites.
  */
-final class VehicleIdentificationService
+class VehicleIdentificationService
 {
     public function __construct(
         private readonly VehicleIdentificationPlanner $planner,
@@ -37,7 +37,7 @@ final class VehicleIdentificationService
     /**
      * Record one cleaned section. The caller owns the transaction and has locked the apparatus.
      *
-     * @param  array{questions_version: string, answers: list<array<string, mixed>>}  $section
+     * @param  array{kind?: string, questions_version: string, answers: list<array<string, mixed>>}  $section
      * @param  bool  $held  the crew reported a different physical vehicle than the unit's own, so nothing may be applied to this unit
      */
     public function record(Apparatus $apparatus, array $section, ?User $actor, ?string $clientSubmissionId, ?int $inspectionId = null, bool $held = false): void
@@ -46,6 +46,7 @@ final class VehicleIdentificationService
         $open = $held ? [] : $this->planner->openByField($apparatus);
 
         $answeredNow = [];
+        $shown = [];
         $alerts = [];
         foreach ($section['answers'] as $answer) {
             $field = (string) $answer['field'];
@@ -58,12 +59,15 @@ final class VehicleIdentificationService
             if (isset($answer['value'])) {
                 $this->markAnswered($ledger, $question, (string) $answer['value']);
                 $answeredNow[$field] = (string) $answer['value'];
+                if (isset($answer['current_value'])) {
+                    $shown[$field] = (string) $answer['current_value'];
+                }
             } else {
                 $this->markUnavailable($ledger, $question, (string) $answer['unavailable_reason'], $answer['note'] ?? null);
             }
         }
 
-        array_push($alerts, ...$this->resolver->resolve($ledger, $answeredNow));
+        array_push($alerts, ...$this->resolver->resolve($ledger, $answeredNow, $shown));
         $this->notifyAfterCommit((int) $apparatus->getKey(), $alerts);
     }
 
@@ -71,7 +75,7 @@ final class VehicleIdentificationService
      * The dedicated endpoint: lock the unit, record once. Returns true when this submission id was
      * already recorded (a retry), in which case nothing is written again.
      *
-     * @param  array{questions_version: string, answers: list<array<string, mixed>>}  $section
+     * @param  array{kind?: string, questions_version: string, answers: list<array<string, mixed>>}  $section
      */
     public function submitStandalone(Apparatus $apparatus, array $section, User $actor, string $clientSubmissionId): bool
     {
@@ -221,7 +225,8 @@ final class VehicleIdentificationService
                 'metadata' => ['master_id' => $master->getKey(), 'record_value' => trim((string) $masterValue), 'proposal_id' => $proposal?->getKey()],
             ]);
 
-            return [['type' => VehicleIdentificationResolver::ALERT_CONFLICT, 'message' => sprintf(
+            // A proposal Fleet already has is not announced again.
+            return $proposal === null ? [] : [['type' => VehicleIdentificationResolver::ALERT_CONFLICT, 'message' => sprintf(
                 '%s: a crew reported %s "%s", the vehicle record has "%s". The record was not changed.',
                 $unit, Fields::shortLabel($field), $value, trim((string) $masterValue),
             )]];

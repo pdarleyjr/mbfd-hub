@@ -29,6 +29,7 @@ use App\Services\Inspections\InspectionSubmissionSignals;
 use App\Services\Inventory\ChecklistRevisionStore;
 use App\Services\Inventory\InventoryCorrectionProjection;
 use App\Services\Inventory\InventoryCorrectionService;
+use App\Support\Database\TransientDatabaseFailure;
 use App\Support\Fleet\FleetVehicleCatalog;
 use App\Support\Fleet\VehicleIdentificationFields;
 use App\Support\Fleet\VehicleNumber;
@@ -416,7 +417,7 @@ class ApparatusController extends Controller
         ]);
         $validated = app(InspectionSubmissionSignals::class)->normalize($validated);
         $identification = app(VehicleIdentificationSubmission::class)
-            ->clean($validated['vehicle_identification'] ?? null, $this->identificationKind($id))['section'];
+            ->clean($validated['vehicle_identification'] ?? null, $this->identificationKind($id, (string) $validated['client_submission_id']))['section'];
         if ($identification === null) {
             unset($validated['vehicle_identification']);
         } else {
@@ -647,6 +648,8 @@ class ApparatusController extends Controller
                     'officer_signature' => $prepared['officer_signature_path'] ?? null,
                     'employee_id' => $prepared['employee_id'] ?? null,
                     'inventory_draft_id' => isset($prepared['inventory_draft_id']) ? strtolower((string) $prepared['inventory_draft_id']) : null,
+                    // Kept with the checkout so answers lost to a failed savepoint can be replayed.
+                    'vehicle_identification' => is_array($prepared['vehicle_identification'] ?? null) ? $prepared['vehicle_identification'] : null,
                     ...app(InspectionSubmissionSignals::class)->persistedFlag($prepared, $lockedChecklist),
                     // The authenticated actor is immutable provenance; signatures
                     // remain evidence. Operational effects still require review.
@@ -663,8 +666,12 @@ class ApparatusController extends Controller
 
                 if (is_array($prepared['vehicle_identification'] ?? null)) {
                     // A different physical vehicle than the unit's own was reported: the answers describe that
-                    // vehicle, so they are kept but never applied to this unit.
-                    $this->recordVehicleIdentification($lockedApparatus, $prepared['vehicle_identification'], $request, $clientSubmissionId, $inspection, $swapAssessment !== null);
+                    // vehicle, so they are kept but never applied to this unit. A unit with no vehicle number
+                    // of its own (Fire Boat 6) has nothing to differ from: its crew is naming the vehicle,
+                    // which is exactly what the questions are for. The swap hold itself is unchanged.
+                    $differentVehicleReported = $swapAssessment !== null
+                        && VehicleNumber::normalize($lockedApparatus->vehicle_number) !== null;
+                    $this->recordVehicleIdentification($lockedApparatus, $prepared['vehicle_identification'], $request, $clientSubmissionId, $inspection, $differentVehicleReported);
                 }
 
                 if ($swapAssessment !== null) {
@@ -733,9 +740,16 @@ class ApparatusController extends Controller
 
     /**
      * Identification answers ride along with the checkout but never decide its outcome: they are
-     * recorded inside a savepoint, and a failure is logged while the checkout is still saved.
+     * recorded inside a savepoint, and an ordinary failure is logged while the checkout is still
+     * saved (the savepoint was rolled back by Laravel, and the section stays on the inspection so
+     * `fleet:replay-vehicle-identification` can record it later).
      *
-     * @param  array{questions_version: string, answers: list<array<string, mixed>>}  $section
+     * A deadlock, serialization failure, lock timeout or lost connection is different: inside a
+     * nested transaction Laravel does not roll back to the savepoint, the outer transaction is left
+     * aborted, and swallowing it would only make the checkout fail later. Those are rethrown so the
+     * outer transaction's own retry handles them.
+     *
+     * @param  array{kind: string, questions_version: string, answers: list<array<string, mixed>>}  $section
      */
     private function recordVehicleIdentification(
         Apparatus $apparatus,
@@ -756,6 +770,9 @@ class ApparatusController extends Controller
                 $differentVehicleReported,
             ));
         } catch (Throwable $exception) {
+            if (TransientDatabaseFailure::isTransient($exception)) {
+                throw $exception;
+            }
             Log::error('Vehicle identification answers could not be recorded; the checkout was saved without them.', [
                 'apparatus_id' => $apparatus->getKey(),
                 'inspection_id' => $inspection->getKey(),
@@ -764,9 +781,22 @@ class ApparatusController extends Controller
         }
     }
 
-    /** The kind (vehicle or boat) the unit's answers are validated against. */
-    private function identificationKind(int $apparatusId): string
+    /**
+     * The kind (vehicle or boat) the unit's answers are validated against. A replay of a stored
+     * submission uses the kind that submission was cleaned with, so editing the unit's type in
+     * between can never change its replay hash.
+     */
+    private function identificationKind(int $apparatusId, string $clientSubmissionId): string
     {
+        $stored = ApparatusInspection::query()
+            ->where('client_submission_id', $clientSubmissionId)
+            ->where('apparatus_id', $apparatusId)
+            ->value('vehicle_identification');
+        $stored = is_string($stored) ? json_decode($stored, true) : $stored;
+        if (is_array($stored) && in_array($stored['kind'] ?? null, [VehicleIdentificationFields::KIND_VEHICLE, VehicleIdentificationFields::KIND_BOAT], true)) {
+            return (string) $stored['kind'];
+        }
+
         $apparatus = Apparatus::query()->find($apparatusId);
 
         return $apparatus instanceof Apparatus ? VehicleIdentificationFields::kindFor($apparatus) : VehicleIdentificationFields::KIND_VEHICLE;

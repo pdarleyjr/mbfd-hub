@@ -127,9 +127,14 @@ class IdentificationQuestionsRelationManager extends RelationManager
                         $apparatus = $record->apparatus;
                         try {
                             abort_unless($user instanceof User && $apparatus instanceof Apparatus, 403);
-                            app(VehicleIdentificationService::class)->reopen($apparatus, $record->field, $user);
+                            $reopened = app(VehicleIdentificationService::class)->reopen($apparatus, $record->field, $user);
                         } catch (AuthorizationException) {
                             Notification::make()->title('You cannot ask this question again.')->danger()->send();
+
+                            return;
+                        }
+                        if (! $reopened) {
+                            Notification::make()->title('This question is already open.')->warning()->send();
 
                             return;
                         }

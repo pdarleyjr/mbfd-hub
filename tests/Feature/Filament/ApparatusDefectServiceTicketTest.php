@@ -7,6 +7,7 @@ namespace Tests\Feature\Filament;
 use App\Filament\Resources\ApparatusResource;
 use App\Filament\Resources\ApparatusResource\Pages\ViewApparatus;
 use App\Filament\Resources\ApparatusResource\RelationManagers\DefectsRelationManager;
+use App\Filament\Resources\ApparatusResource\RelationManagers\IdentificationQuestionsRelationManager;
 use App\Filament\Resources\ApparatusResource\RelationManagers\InspectionsRelationManager;
 use App\Filament\Resources\ApparatusResource\RelationManagers\InventoryCorrectionsRelationManager;
 use App\Filament\Resources\ApparatusResource\RelationManagers\ServiceTicketsRelationManager;
@@ -488,7 +489,12 @@ final class ApparatusDefectServiceTicketTest extends TestCase
             VehicleSwapReportsRelationManager::class,
             DefectsRelationManager::class,
             InventoryCorrectionsRelationManager::class,
-        ], array_values(ApparatusResource::getRelations()), 'Vehicle swaps is the fourth tab, shown only to Fleet staff who can view swap reports; inventory corrections come last, for reviewers.');
+            IdentificationQuestionsRelationManager::class,
+        ], array_values(ApparatusResource::getRelations()), 'Vehicle swaps is the fourth tab, shown only to Fleet staff who can view swap reports; inventory corrections follow for reviewers; Identification is a rare Fleet task, last, and only shown once a question exists.');
+        $this->assertFalse(
+            IdentificationQuestionsRelationManager::canViewForRecord($this->apparatus, ViewApparatus::class),
+            'No question has been asked for this unit, so there is no Identification tab.',
+        );
         $this->assertSame('Overview', $component->instance()->getContentTabLabel());
     }
 

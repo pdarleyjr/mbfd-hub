@@ -544,9 +544,10 @@ class ApparatusResource extends Resource
             RelationManagers\InspectionsRelationManager::class,
             RelationManagers\ServiceTicketsRelationManager::class,
             RelationManagers\VehicleSwapReportsRelationManager::class,
-            RelationManagers\IdentificationQuestionsRelationManager::class,
             RelationManagers\DefectsRelationManager::class,
             RelationManagers\InventoryCorrectionsRelationManager::class,
+            // A rare Fleet task, so it follows the everyday tabs.
+            RelationManagers\IdentificationQuestionsRelationManager::class,
         ];
     }
 

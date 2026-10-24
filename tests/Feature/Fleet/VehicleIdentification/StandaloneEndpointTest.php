@@ -114,11 +114,61 @@ final class StandaloneEndpointTest extends IdentificationTestCase
         $unit = $this->captainFive('XK4560');
         $this->captainUser();
 
-        $this->postJson($this->url($unit), $this->body($unit, [$this->answer('plate', 'XK4560')]))->assertOk();
+        $this->postJson($this->url($unit), $this->body($unit, [$this->answer('plate', 'ZZ0001')]))->assertOk();
 
         $this->assertSame('XD1904', $unit->fresh()->masterVehicle->tag_number, 'the record is never overwritten');
         $this->assertSame(1, ApparatusIdentificationEvent::query()->where('event', 'conflict')->count());
         Notification::assertSentTo($manager, NewSubmissionNotification::class);
+    }
+
+    public function test_a_proposal_fleet_already_holds_is_not_announced_again(): void
+    {
+        $manager = $this->fleetOperationsManager('fleet.manager@example.test');
+        $unit = $this->captainFive('XK4560');
+        $this->captainUser();
+
+        // The crew reads the very plate the FY27 list already proposed.
+        $this->postJson($this->url($unit), $this->body($unit, [$this->answer('plate', 'XK4560')]))->assertOk();
+
+        $this->assertSame(1, ApparatusIdentificationEvent::query()->where('event', 'conflict')->count());
+        $this->assertTrue(ApparatusIdentificationEvent::query()->where('event', 'conflict')->sole()->metadata['already_proposed']);
+        Notification::assertNotSentTo($manager, NewSubmissionNotification::class);
+    }
+
+    public function test_a_confirmation_of_a_record_that_changed_since_it_was_shown_is_not_proposed(): void
+    {
+        $manager = $this->fleetOperationsManager('fleet.manager@example.test');
+        $unit = $this->captainFive('XK4560');
+        $this->captainUser();
+        $body = $this->body($unit, [['field' => 'plate', 'value' => 'OLD111', 'current_value' => 'OLD111']]);
+
+        $this->postJson($this->url($unit), $body)->assertOk();
+
+        $this->assertSame(0, UnitMasterVehicleChange::query()->where('new_value', 'OLD111')->count(), 'the stale value is not proposed');
+        $conflict = ApparatusIdentificationEvent::query()->where('event', 'conflict')->sole();
+        $this->assertSame('OLD111', $conflict->metadata['shown_value']);
+        Notification::assertSentTo($manager, NewSubmissionNotification::class);
+    }
+
+    public function test_view_only_access_to_captain_5_can_see_the_questions_but_not_answer(): void
+    {
+        $unit = $this->captainFive('XK4560');
+        $this->captainUser();
+        \Illuminate\Support\Facades\Gate::define(\App\Services\Security\Captain5Access::GATE_ACT, fn (): bool => false);
+
+        $this->getJson('/api/captain5/workspace')->assertOk()->assertJsonPath('vehicle_identification.can_answer', false);
+        $this->getJson($this->url($unit))->assertOk()->assertJsonPath('vehicle_identification.can_answer', false);
+        $this->postJson($this->url($unit), $this->body($unit, [$this->answer('plate', 'XD1904')]))->assertForbidden();
+        $this->assertSame(0, ApparatusIdentificationEvent::query()->count());
+    }
+
+    public function test_an_actor_with_act_access_is_told_they_can_answer(): void
+    {
+        $unit = $this->captainFive('XK4560');
+        $this->captainUser();
+
+        $this->getJson('/api/captain5/workspace')->assertOk()->assertJsonPath('vehicle_identification.can_answer', true);
+        $this->assertTrue($this->block($unit)['can_answer']);
     }
 
     public function test_bad_items_come_back_as_field_errors_and_record_nothing(): void

@@ -37,6 +37,12 @@ final class ResolutionTest extends IdentificationTestCase
         return $master->fresh();
     }
 
+    /** A unit with no vehicle number of its own, like FB6 in production, so a new record can name it. */
+    private function withoutOwnNumber(): void
+    {
+        Apparatus::query()->whereKey($this->unit->id)->toBase()->update(['vehicle_number' => null]);
+    }
+
     /**
      * Answer the way a crew would: through the same cleaning as the checkout.
      *
@@ -73,7 +79,10 @@ final class ResolutionTest extends IdentificationTestCase
         $matched = ApparatusIdentificationEvent::query()->where('event', 'matched')->sole();
         $this->assertSame('a', $matched->metadata['rule']);
         $this->assertSame($this->member->id, $matched->actor_user_id);
-        $this->assertSame(['XE1234', '2022'], [$master->fresh()->tag_number, $master->fresh()->year], 'blank fields on the record are filled from the answers');
+        $this->assertSame('2022', $master->fresh()->year, 'a blank year is filled from the answers');
+        $this->assertNull($master->fresh()->tag_number, 'a plate is only proposed; Fleet accepts it');
+        $proposal = UnitMasterVehicleChange::query()->where('unit_master_vehicle_id', $master->id)->where('field', 'tag_number')->sole();
+        $this->assertSame(['proposed', 'XE1234', UnitMasterVehicleChange::SOURCE_DAILY_CHECKOUT], [$proposal->status, $proposal->new_value, $proposal->source]);
         $this->assertSame(0, $this->eventsOf('master_created'));
         $this->assertSame(self::VIN_A, $unit->vin, 'the unit takes the record identity');
     }
@@ -155,6 +164,7 @@ final class ResolutionTest extends IdentificationTestCase
     {
         $manager = $this->fleetOperationsManager('fleet.manager@example.test');
         $this->unlinkedUnitWithMaster([]);
+        $this->withoutOwnNumber();
         $before = $this->masterCount();
 
         $this->crewAnswers([
@@ -206,16 +216,83 @@ final class ResolutionTest extends IdentificationTestCase
     public function test_near_misses_never_link_to_a_lookalike_record(): void
     {
         $original = $this->unlinkedUnitWithMaster(['serial_number' => self::VIN_A]);
+        $this->withoutOwnNumber();
+        $before = $this->masterCount();
 
         // "V202" is not "V-202": dashes are never stripped, so this is a different vehicle number.
+        // A number alone never links and never creates a record: it goes to Fleet.
         $this->crewAnswers([$this->answer('vehicle_number', 'V202'), $this->answer('year', '2022')]);
 
         $unit = $this->unit->fresh();
-        $this->assertNotSame($original->id, $unit->unit_master_vehicle_id);
-        $created = UnitMasterVehicle::query()->where('veh_number', 'V202')->sole();
-        $this->assertSame($created->id, $unit->unit_master_vehicle_id);
-        $this->assertTrue($created->needs_fleet_review);
+        $this->assertNull($unit->unit_master_vehicle_id);
+        $this->assertStringContainsString('no VIN/HIN was given', (string) $unit->master_link_note);
+        $this->assertStringContainsString('vehicle number V202', (string) $unit->master_link_note);
+        $this->assertSame($before, $this->masterCount());
         $this->assertSame(self::VIN_A, $original->fresh()->serial_number, 'the lookalike record is untouched');
+        $this->assertSame(1, $this->eventsOf('conflict'));
+    }
+
+    public function test_a_vehicle_number_alone_with_no_candidate_never_creates_a_record(): void
+    {
+        $manager = $this->fleetOperationsManager('fleet.manager@example.test');
+        $this->unlinkedUnitWithMaster([]);
+        $this->withoutOwnNumber();
+        $before = $this->masterCount();
+
+        $this->crewAnswers([$this->answer('vehicle_number', 'V-777'), $this->answer('plate', 'NEW7777')]);
+
+        $this->assertSame($before, $this->masterCount());
+        $this->assertNull($this->unit->fresh()->unit_master_vehicle_id);
+        $this->assertSame(0, $this->eventsOf('master_created'));
+        $this->assertStringContainsString('V-777', (string) $this->unit->fresh()->master_link_note);
+        Notification::assertSentTo($manager, NewSubmissionNotification::class);
+    }
+
+    public function test_a_match_that_would_replace_the_units_own_vehicle_number_goes_to_fleet(): void
+    {
+        $manager = $this->fleetOperationsManager('fleet.manager@example.test');
+        // E3's record holds the VIN, but E2 already has its own number V-202. E3 is not linked here.
+        $other = $this->frontline->fresh()->masterVehicle;
+        $other->forceFill(['serial_number' => self::VIN_B])->save();
+        Apparatus::query()->whereKey($this->frontline->id)->toBase()->update(['unit_master_vehicle_id' => null, 'master_link_status' => 'needs_review']);
+        $this->unlinkedUnitWithMaster([]);
+
+        $this->crewAnswers([$this->answer('vin', self::VIN_B)]);
+
+        $unit = $this->unit->fresh();
+        $this->assertNull($unit->unit_master_vehicle_id);
+        $this->assertSame('V-202', $unit->vehicle_number, 'the unit keeps its own number');
+        $this->assertStringContainsString('own vehicle number is V-202, not V-303', (string) $unit->master_link_note);
+        $this->assertSame(0, $this->eventsOf('matched'));
+        Notification::assertSentTo($manager, NewSubmissionNotification::class);
+    }
+
+    public function test_a_creation_that_would_replace_the_units_own_vin_goes_to_fleet(): void
+    {
+        $this->unlinkedUnitWithMaster([]);
+        $this->withoutOwnNumber();
+        Apparatus::query()->whereKey($this->unit->id)->toBase()->update(['vin' => self::VIN_A]);
+        $before = $this->masterCount();
+
+        $this->crewAnswers([$this->answer('vin', self::VIN_B)]);
+
+        $this->assertSame($before, $this->masterCount());
+        $this->assertStringContainsString('own VIN/HIN', (string) $this->unit->fresh()->master_link_note);
+    }
+
+    public function test_placeholder_values_on_a_record_are_never_matched(): void
+    {
+        $this->unlinkedUnitWithMaster(['serial_number' => 'UNKNOWN', 'tag_number' => 'N/A']);
+        $this->withoutOwnNumber();
+        $this->frontline->fresh()->masterVehicle->forceFill(['serial_number' => '-'])->save();
+        $before = $this->masterCount();
+
+        // Even if a placeholder somehow reached a record, a real answer cannot equal it; and a record
+        // holding a placeholder is not a candidate, so a real VIN with no match creates a record.
+        $this->crewAnswers([$this->answer('vin', self::VIN_B)]);
+
+        $this->assertSame($before + 1, $this->masterCount());
+        $this->assertSame(self::VIN_B, UnitMasterVehicle::query()->latest('id')->first()->serial_number);
     }
 
     public function test_make_model_and_year_never_match_a_record_by_similarity(): void
@@ -321,10 +398,12 @@ final class ResolutionTest extends IdentificationTestCase
     public function test_the_same_submission_never_creates_two_records(): void
     {
         $this->unlinkedUnitWithMaster([]);
+        $this->withoutOwnNumber();
         $csid = (string) Str::uuid();
+        $answers = [$this->answer('vehicle_number', 'V-777'), $this->answer('vin', self::VIN_B)];
 
-        $this->assertFalse($this->crewAnswers([$this->answer('vehicle_number', 'V-777')], clientSubmissionId: $csid));
-        $this->assertTrue($this->crewAnswers([$this->answer('vehicle_number', 'V-777')], clientSubmissionId: $csid));
+        $this->assertFalse($this->crewAnswers($answers, clientSubmissionId: $csid));
+        $this->assertTrue($this->crewAnswers($answers, clientSubmissionId: $csid));
 
         $this->assertSame(1, UnitMasterVehicle::query()->where('veh_number', 'V-777')->count());
         $this->assertSame(1, $this->eventsOf('master_created'));
