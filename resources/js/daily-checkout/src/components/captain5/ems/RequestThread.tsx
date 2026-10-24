@@ -55,7 +55,7 @@ export function RequestMessages({ requestId, messages, canPost, onPosted }: Thre
         )}
 
       {canPost && (
-        <form onSubmit={send} noValidate className="space-y-2" aria-label="Write a message to the member">
+        <form onSubmit={send} noValidate className="space-y-2" aria-label="New message">
           <div>
             <label className={LABEL} htmlFor={`${id}-body`}>Message to the member</label>
             <textarea id={`${id}-body`} rows={3} className={FIELD} value={body} maxLength={MESSAGE_MAX} disabled={write.busy}

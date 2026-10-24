@@ -83,7 +83,7 @@ function PrepareForm({ request, onSaved, onConflict, onCancel }: FormProps) {
               <p className={HINT}>{lineCounts(line)}</p>
               <ErrorText>{errors[String(line.id)]}</ErrorText>
             </div>
-            <NumberInput label={`Prepared quantity for ${line.label}`} value={values[line.id] ?? ''} disabled={write.busy}
+            <NumberInput caption="Prepared" label={`Prepared quantity for ${line.label}`} value={values[line.id] ?? ''} disabled={write.busy}
               onChange={(next) => setValues((current) => ({ ...current, [line.id]: next }))} />
           </li>
         ))}
@@ -137,7 +137,7 @@ function IssueForm({ request, onSaved, onConflict, onCancel }: FormProps) {
                   <p className="text-sm font-semibold text-hub-ink">{line.label}{line.variant_label ? ` (${line.variant_label})` : ''}</p>
                   <p className={HINT}>{lineCounts(line)}. Still needed: {outstandingQty(line)}.</p>
                 </div>
-                <NumberInput label={`Quantity to issue for ${line.label}`} value={current.quantity} disabled={write.busy} onChange={(next) => patch(line, { quantity: next })} />
+                <NumberInput caption="Issue now" label={`Quantity to issue for ${line.label}`} value={current.quantity} disabled={write.busy} onChange={(next) => patch(line, { quantity: next })} />
               </div>
               {line.controlled_substance || line.response_type === 'yes_no'
                 ? <p className={HINT}>Controlled item. This is recorded on the request only. Narcotics are restocked through the department controlled-substance procedure.</p>
@@ -289,7 +289,7 @@ function ReopenForm({ request, onSaved, onConflict, onCancel }: FormProps) {
 function CorrectForm({ request, onSaved, onConflict, onCancel }: FormProps) {
   const issuances = useMemo(() => currentIssuances(request.history), [request.history]);
   const [eventId, setEventId] = useState<number | null>(issuances.length === 1 ? issuances[0].eventId : null);
-  const [quantity, setQuantity] = useState('');
+  const [quantity, setQuantity] = useState(issuances.length === 1 ? String(issuances[0].quantity) : '');
   const [itemId, setItemId] = useState('');
   const [reason, setReason] = useState('');
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -402,7 +402,7 @@ export default function RequestActions({ request, meta, panel, onPanel, onSaved,
         {open && <button type="button" className={request.status === 'submitted' ? BTN_SECONDARY : BTN_PRIMARY} aria-pressed={panel?.kind === 'prepare'} onClick={() => toggle({ kind: 'prepare' })}>Prepare</button>}
         {open && <button type="button" className={BTN_SECONDARY} aria-pressed={panel?.kind === 'issue'} onClick={() => toggle({ kind: 'issue' })}>Issue</button>}
         {hasIssuances && <button type="button" className={BTN_SECONDARY} aria-pressed={panel?.kind === 'correct'} onClick={() => toggle({ kind: 'correct' })}>Correct an issuance</button>}
-        {open && <button type="button" className={BTN_SECONDARY} aria-pressed={panel?.kind === 'close'} onClick={() => toggle({ kind: 'close' })}>Close</button>}
+        {open && <button type="button" className={BTN_SECONDARY} aria-pressed={panel?.kind === 'close'} onClick={() => toggle({ kind: 'close' })}>Close request</button>}
         {request.status === 'closed' && <button type="button" className={BTN_PRIMARY} aria-pressed={panel?.kind === 'reopen'} onClick={() => toggle({ kind: 'reopen' })}>Reopen</button>}
         {request.status === 'cancelled' && <p className={HINT}>The member cancelled this request, so it cannot be changed.</p>}
       </div>

@@ -488,7 +488,7 @@ export function reconcileDelta(row: ReconcileRow): string {
 export function suggestedOrderText(advisory: Advisory): string {
   const unit = advisory.package_unit && advisory.package_unit !== 'each' ? advisory.package_unit : 'package';
   if (advisory.suggested_basis === 'unknown_package_size' || advisory.suggested_packages === null) return 'Package size not stated: decide the amount by hand';
-  const count = `${advisory.suggested_packages} ${advisory.suggested_packages === 1 ? unit : `${unit}s`}`;
+  const count = `${advisory.suggested_packages} ${advisory.suggested_packages === 1 ? unit : (unit === 'box' ? 'boxes' : `${unit}s`)}`;
   return advisory.suggested_basis === 'source_order_amount'
     ? `${count} (the order sheet's amount${advisory.order_amount_text ? `: ${advisory.order_amount_text}` : ''})`
     : `${count} (worked out from how far below the threshold it is)`;

@@ -138,11 +138,13 @@ export function Field({ label, hint, error, required, children }: FieldProps) {
 }
 
 /** Whole-number input: a text box with a numeric keypad, so the mouse wheel and arrows never change a count. */
-export function NumberInput({ value, onChange, disabled, label, id, maxLength = 4, ...aria }: {
+export function NumberInput({ value, onChange, disabled, label, id, maxLength = 4, caption, ...aria }: {
   value: string; onChange: (value: string) => void; disabled?: boolean; label?: string; id?: string; maxLength?: number;
+  /** Visible words above the box; `label` is what assistive technology reads. */
+  caption?: string;
   'aria-describedby'?: string; 'aria-invalid'?: boolean;
 }) {
-  return (
+  const input = (
     <input
       id={id}
       type="text"
@@ -150,12 +152,19 @@ export function NumberInput({ value, onChange, disabled, label, id, maxLength = 
       pattern="[0-9]*"
       autoComplete="off"
       aria-label={label}
-      className={`${FIELD} w-24 text-center tabular-nums`}
+      className={`${FIELD} !w-28 text-center tabular-nums`}
       value={value}
       disabled={disabled}
       onChange={(event) => onChange(event.target.value.replace(/[^\d]/g, '').slice(0, maxLength))}
       {...aria}
     />
+  );
+  if (!caption) return input;
+  return (
+    <span className="block">
+      <span className="mb-1 block text-[13px] font-semibold text-hub-n-600" aria-hidden="true">{caption}</span>
+      {input}
+    </span>
   );
 }
 
