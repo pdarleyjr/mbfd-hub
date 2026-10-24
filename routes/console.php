@@ -153,19 +153,20 @@ Artisan::command('video-conferencing:expire-lineup', function (
     ConferenceLineupReadinessService $readiness,
     ConferenceLineupNotifier $notifier,
 ): int {
-    $session = $sessions->activeLineup();
-    if ($session === null || $session->started_at === null) {
+    // Date-independent: every unfinished lineup past started_at + the limit is closed, including
+    // one begun at 23:50 Eastern whose calendar key is no longer today's.
+    $expired = $sessions->expireOverdueLineups();
+    if ($expired === []) {
         return Command::SUCCESS;
     }
-    $maximumMinutes = max(5, min(30, (int) config('video-conferencing.lineup_max_minutes', 15)));
-    if ($session->started_at->addMinutes($maximumMinutes)->isFuture()) {
-        return Command::SUCCESS;
+    $todayKey = 'lineup:'.\Carbon\CarbonImmutable::now((string) config('video-conferencing.timezone'))->toDateString();
+    foreach ($expired as $session) {
+        if ($session->logical_key === $todayKey) {
+            $readiness->clear();
+        }
+        $notifier->notify('expired');
+        $this->info('Expired Morning Lineup '.$session->id.'.');
     }
-
-    $sessions->end($session);
-    $readiness->clear();
-    $notifier->notify('expired');
-    $this->info('Expired Morning Lineup '.$session->id.'.');
 
     return Command::SUCCESS;
 })->purpose('End a Morning Lineup that exceeded its configured maximum duration');

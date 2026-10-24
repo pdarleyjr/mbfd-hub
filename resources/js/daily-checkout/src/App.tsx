@@ -7,6 +7,7 @@ import OfflineIndicator from './components/OfflineIndicator';
 import { IOSInstallPrompt } from './components/IOSInstallPrompt';
 import SuccessPage from './components/SuccessPage';
 import HubIssueWidget from './components/HubIssueWidget';
+import DailyPwaBridge from './pwa/DailyPwaBridge';
 
 const ApparatusList = lazy(() => import('./components/ApparatusList'));
 const InspectionWizard = lazy(() => import('./components/InspectionWizard'));
@@ -52,6 +53,7 @@ function DailyShell() {
       <HubShell module="Daily Checkout" navigation={readHubNavigation()} currentSection={currentSection} renderLink={renderHubLink}
         connection={<OfflineIndicator />} className={standard ? 'daily-shell daily-standard' : 'daily-shell'}>
         <DailyCheckoutQueueProcessor />
+        <DailyPwaBridge />
         <IOSInstallPrompt />
         <main id="main-content" data-testid="daily-workspace" className="daily-workspace mx-auto px-4 py-6 sm:px-6 md:py-8 lg:px-8 xl:px-10 2xl:px-12">
           <Suspense fallback={<PageLoading />}>

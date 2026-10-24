@@ -10,8 +10,8 @@ use App\Models\User;
 use App\Notifications\ApparatusServiceTicketEmployeeNotification;
 use App\Notifications\NewSubmissionNotification;
 use App\Services\Display\DisplaySnapshotService;
+use App\Services\Notifications\NotificationDispatchService;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Notification;
 
 class ApparatusServiceTicketSideEffectService
 {
@@ -19,24 +19,22 @@ class ApparatusServiceTicketSideEffectService
     {
         $this->forgetReadModels($ticket);
 
-        $recipients = User::query()
-            ->whereHas('notificationSubscriptions', fn ($query) => $query
-                ->where('event_key', User::NOTIFICATION_PREFERENCE_APPARATUS_SERVICE_TICKETS)
-                ->where(fn ($channels) => $channels
-                    ->where('database_enabled', true)
-                    ->orWhere('webpush_enabled', true)
-                    ->orWhere('email_enabled', true)))
-            ->get();
+        $eventKey = NotificationDispatchService::eventKey(User::NOTIFICATION_PREFERENCE_APPARATUS_SERVICE_TICKETS, 'apparatus_service_ticket', $ticket->id, 'created');
 
-        if ($recipients->isNotEmpty()) {
-            Notification::send($recipients, new NewSubmissionNotification(
+        // Everyone eligible for service tickets right now; saved choices only narrow channels. Queued after the
+        // ticket's write commits, and a failure here can never undo that write.
+        app(NotificationDispatchService::class)->dispatch(
+            User::NOTIFICATION_PREFERENCE_APPARATUS_SERVICE_TICKETS,
+            new NewSubmissionNotification(
                 submissionType: 'apparatus_service_ticket',
                 title: 'New Apparatus Service Ticket',
                 body: "{$ticket->ticket_number}: {$ticket->unit_designation_snapshot} — {$ticket->title}",
                 actionUrl: '/admin/apparatus-service-tickets/'.$ticket->id,
                 icon: 'heroicon-o-wrench-screwdriver',
-            ));
-        }
+                eventKey: $eventKey,
+            ),
+            eventKey: $eventKey,
+        );
     }
 
     public function ticketChanged(ApparatusServiceTicket $ticket, bool $notifyRequester): void
@@ -45,12 +43,39 @@ class ApparatusServiceTicketSideEffectService
 
         $requester = $ticket->requestedByEmployee;
         if ($notifyRequester && $requester instanceof Employee) {
-            $requester->notify(new ApparatusServiceTicketEmployeeNotification(
+            $this->notifyRequester($ticket, $requester);
+        }
+    }
+
+    /**
+     * A member's own ticket update is an "update on something I submitted": decided by the evaluator for the
+     * member's account. Personnel with no bound account keep the personnel inbox (it is carried over to the
+     * account when they first sign in), as before.
+     */
+    private function notifyRequester(ApparatusServiceTicket $ticket, Employee $requester): void
+    {
+        try {
+            $status = (string) $ticket->status;
+            $notification = new ApparatusServiceTicketEmployeeNotification(
                 ticketNumber: (string) $ticket->ticket_number,
-                unit: $ticket->unit_designation_snapshot,
-                status: $ticket->status,
+                unit: (string) $ticket->unit_designation_snapshot,
+                status: $status,
                 publicNote: $ticket->current_public_response,
-            ));
+                eventKey: NotificationDispatchService::eventKey(User::NOTIFICATION_PREFERENCE_MEMBER_REQUEST_UPDATES, 'apparatus_service_ticket', $ticket->id, 'status:'.$status.':'.\Illuminate\Support\Str::uuid()),
+            );
+            $account = $requester->user;
+            if ($account instanceof User && $account->employee_id === $requester->employee_id) {
+                app(NotificationDispatchService::class)->dispatch(User::NOTIFICATION_PREFERENCE_MEMBER_REQUEST_UPDATES, $notification, [$account]);
+
+                return;
+            }
+
+            \Filament\Notifications\Notification::make()
+                ->title("{$ticket->ticket_number} updated")
+                ->body(trim("{$ticket->unit_designation_snapshot}: ".str($status)->replace('_', ' ')->title()->toString().'. '.($ticket->current_public_response ?? '')))
+                ->sendToDatabase($requester);
+        } catch (\Throwable $exception) {
+            report($exception);
         }
     }
 

@@ -7,6 +7,7 @@ namespace App\Filament\Resources\StationResource\RelationManagers;
 use App\Filament\Resources\DefectResource;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
+use App\Support\Fleet\DefectActionStatus;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -45,14 +46,15 @@ class EquipmentIssuesRelationManager extends RelationManager
                     ->label('Issue')
                     ->badge()
                     ->formatStateUsing(fn (?string $state): string => str((string) $state)->replace('_', ' ')->ucfirst()->toString()),
+                // From action_status: "Resolved" (fixed) is not "Closed — no action required".
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
-                    ->formatStateUsing(fn (?string $state): string => str((string) $state)->replace('_', ' ')->title()->toString())
-                    ->color(fn (?string $state): string => match ($state) {
-                        'open' => 'danger',
-                        'in_progress' => 'warning',
-                        'resolved' => 'success',
-                        default => 'gray',
+                    ->state(fn (ApparatusDefect $record): string => DefectActionStatus::label($record->action_status))
+                    ->color(fn (ApparatusDefect $record): string => match ($record->action_status) {
+                        DefectActionStatus::RESOLVED => 'success',
+                        DefectActionStatus::DISMISSED => 'gray',
+                        DefectActionStatus::REPORTED => 'danger',
+                        default => 'warning',
                     }),
                 Tables\Columns\TextColumn::make('reported_date')
                     ->label('Reported')

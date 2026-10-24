@@ -10,6 +10,7 @@ use App\Models\PersonnelRequest;
 use App\Models\PersonnelRequestItem;
 use App\Models\PersonnelRequestUpdate;
 use App\Models\User;
+use App\Support\DecisionReason;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -17,10 +18,13 @@ use Illuminate\Validation\ValidationException;
 final class PersonnelRequestWorkflowService
 {
     private const TRANSITIONS = [
-        'pending' => ['acknowledged', 'needs_information', 'ready_for_pickup', 'denied', 'cancelled'],
-        'acknowledged' => ['needs_information', 'ordered', 'arrived', 'ready_for_pickup', 'denied', 'cancelled'],
+        // `completed` is reachable from every active state a clerk can be in once all items
+        // are issued (the "fulfill every requested item" guard in transition() enforces it),
+        // so issuing the last item needs no Arrived / Ready-for-pickup detour.
+        'pending' => ['acknowledged', 'needs_information', 'ready_for_pickup', 'completed', 'denied', 'cancelled'],
+        'acknowledged' => ['needs_information', 'ordered', 'arrived', 'ready_for_pickup', 'completed', 'denied', 'cancelled'],
         'needs_information' => ['acknowledged', 'denied', 'cancelled'],
-        'ordered' => ['arrived', 'ready_for_pickup', 'denied', 'cancelled'],
+        'ordered' => ['arrived', 'ready_for_pickup', 'completed', 'denied', 'cancelled'],
         'arrived' => ['ready_for_pickup', 'completed'],
         'ready_for_pickup' => ['completed'],
         'completed' => [],
@@ -33,6 +37,13 @@ final class PersonnelRequestWorkflowService
     public function canTransition(PersonnelRequest $request, PersonnelRequestStatus $to): bool
     {
         return in_array($to->value, self::TRANSITIONS[$request->status->value], true);
+    }
+
+    /** True when the request can be closed now: Complete is allowed from this state and every item is issued. */
+    public function canComplete(PersonnelRequest $request): bool
+    {
+        return $this->canTransition($request, PersonnelRequestStatus::Completed)
+            && ! $request->items()->where('fulfillment_status', '!=', 'fulfilled')->exists();
     }
 
     public function transition(
@@ -51,6 +62,15 @@ final class PersonnelRequestWorkflowService
             }
             if (! in_array($to->value, self::TRANSITIONS[$locked->status->value], true)) {
                 throw ValidationException::withMessages(['status' => "Cannot move {$locked->status->label()} to {$to->label()}."]);
+            }
+            $isDecision = in_array($to, [PersonnelRequestStatus::Denied, PersonnelRequestStatus::Cancelled], true);
+            if ($isDecision) {
+                // The member reads this note, so a deny or cancel always carries a real reason.
+                $employeeVisibleNote = DecisionReason::require(
+                    $employeeVisibleNote,
+                    'employee_note',
+                    $to === PersonnelRequestStatus::Denied ? 'denied' : 'cancelled',
+                );
             }
             if ($to === PersonnelRequestStatus::Completed && $locked->items()->where('fulfillment_status', '!=', 'fulfilled')->exists()) {
                 throw ValidationException::withMessages(['status' => 'Fulfill every requested item before completing the request.']);
@@ -74,7 +94,7 @@ final class PersonnelRequestWorkflowService
             if ($to === PersonnelRequestStatus::NeedsInformation && isset($metadata['information_requested'])) {
                 $locked->information_requested = $metadata['information_requested'];
             }
-            if ($to === PersonnelRequestStatus::Acknowledged && $locked->acknowledged_at === null) {
+            if (in_array($to, [PersonnelRequestStatus::Acknowledged, PersonnelRequestStatus::Completed], true) && $locked->acknowledged_at === null) {
                 $locked->acknowledged_by_id = $actor->id;
                 $locked->acknowledged_at = now();
             }
@@ -93,7 +113,8 @@ final class PersonnelRequestWorkflowService
                 'metadata' => $metadata ?: null,
             ]);
 
-            DB::afterCommit(fn () => $this->notifier->statusChanged($locked));
+            $reason = $isDecision ? $employeeVisibleNote : null;
+            DB::afterCommit(fn () => $this->notifier->statusChanged($locked, $reason));
 
             return $locked->fresh(['items', 'updates']);
         });

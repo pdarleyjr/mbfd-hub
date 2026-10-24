@@ -59,6 +59,7 @@ use App\Http\Controllers\Workgroup\FileDownloadController;
 use App\Http\Controllers\Workgroup\WorkgroupReportController;
 use App\Http\Middleware\EnsureEmployeeAuthenticated;
 use App\Http\Middleware\PreventPreviousUrlStorage;
+use App\Support\Http\StatelessRoute;
 use App\Support\Workgroups\WorkgroupReportSessionResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -207,6 +208,11 @@ Route::prefix('employee/video-conferencing/api')
             ->name('lineup.command.authorize');
         Route::get('/lineup/command/status', CommandLineupStatusController::class)
             ->name('lineup.command.status');
+        // Waiting members poll this; it has its own limiter so it can never starve stations or 300.
+        Route::get('/lineup/status', \App\Http\Controllers\Employee\VideoConferencing\MemberLineupStatusController::class)
+            ->withoutMiddleware('throttle:conference-controls')
+            ->middleware('throttle:conference-lineup-status')
+            ->name('lineup.status');
         Route::post('/lineup/start', StartMorningLineupController::class)->name('lineup.start');
         Route::post('/lineup/end', EndMorningLineupController::class)->name('lineup.end');
         Route::post('/direct/start', StartDirectCallController::class)->name('direct.start');
@@ -349,11 +355,14 @@ Route::get('/manifest.json', function () {
     $response->headers->set('Expires', '0');
 
     return $response;
-});
+})->withoutMiddleware(StatelessRoute::WITHOUT_MIDDLEWARE);
 
 // --- Admin Desktop-PWA -----------------------------------------------------
+// The manifests and service-worker scripts below are fetched by the browser on its own, cookies attached,
+// while a member is mid-form. They must not open (and so age) the session: see StatelessRoute.
 Route::redirect('/site.webmanifest', '/manifest.json', 301)
-    ->middleware(PreventPreviousUrlStorage::class);
+    ->middleware(PreventPreviousUrlStorage::class)
+    ->withoutMiddleware(StatelessRoute::WITHOUT_MIDDLEWARE);
 
 // These two routes serve the scoped admin manifest + service worker with
 // the correct Content-Type and Service-Worker-Allowed scope header. The
@@ -365,7 +374,7 @@ Route::get('/admin-pwa/manifest.webmanifest', function () {
         'Content-Type' => 'application/manifest+json',
         'Cache-Control' => 'public, max-age=300, must-revalidate',
     ]);
-})->middleware(PreventPreviousUrlStorage::class);
+})->middleware(PreventPreviousUrlStorage::class)->withoutMiddleware(StatelessRoute::WITHOUT_MIDDLEWARE);
 
 // Keep the worker URL inside its intended scope. Production web servers may
 // serve /admin-pwa/* directly and bypass Laravel's Service-Worker-Allowed
@@ -376,7 +385,7 @@ Route::get('/admin/service-worker.js', function () {
         'Service-Worker-Allowed' => '/admin/',
         'Cache-Control' => 'no-cache, must-revalidate',
     ]);
-})->middleware(PreventPreviousUrlStorage::class);
+})->middleware(PreventPreviousUrlStorage::class)->withoutMiddleware(StatelessRoute::WITHOUT_MIDDLEWARE);
 
 Route::get('/admin/pulse/queues.json', QueueStatusController::class)
     ->middleware(['auth', PreventPreviousUrlStorage::class, 'throttle:60,1'])
@@ -388,7 +397,7 @@ Route::get('/admin-pwa/service-worker.js', function () {
         'Service-Worker-Allowed' => '/admin/',
         'Cache-Control' => 'no-cache, must-revalidate',
     ]);
-})->middleware(PreventPreviousUrlStorage::class);
+})->middleware(PreventPreviousUrlStorage::class)->withoutMiddleware(StatelessRoute::WITHOUT_MIDDLEWARE);
 // --- End Admin Desktop-PWA -------------------------------------------------
 
 // Shared 300 Command / Captain 5 communications attachment download (private disk). Signed-in
@@ -415,7 +424,11 @@ Route::get('/daily/{path?}', function (?string $path = null) {
     abort_unless(is_string($index), 404);
 
     $canonicalOrigin = rtrim((string) config('app.url'), '/');
-    $runtimeConfig = '<script>window.__MBFD_CANONICAL_ORIGIN__ = '.json_encode(
+    // The release this shell was rendered by. The page-side update registrar (resources/js/pwa)
+    // compares it with /app-release, so a shell restored from the offline cache after days is
+    // recognised as old instead of being mistaken for the current release.
+    $releaseMeta = '<meta name="mbfd-release" content="'.e(app(\App\Support\Release\DeployedRelease::class)->short()).'">';
+    $runtimeConfig = $releaseMeta.'<script>window.__MBFD_CANONICAL_ORIGIN__ = '.json_encode(
         $canonicalOrigin,
         JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT,
     ).';window.__MBFD_HUB_NAVIGATION__ = '.json_encode(
@@ -445,6 +458,15 @@ Route::get('/__version', function () {
         'build_time' => $buildTime,
     ]);
 })->middleware(['auth', PreventPreviousUrlStorage::class]);
+
+// Release identity for PWA update checks (resources/js/pwa/update-registrar.ts). Public, stateless
+// (no session start or write, no member-state redirects) and never cached; it exposes only the
+// first 12 characters of the commit of the build that is serving it, the same value as
+// <meta name="mbfd-release">. The limit is per address and stations share one egress address with every
+// device probing on return to the app and when the network comes back, so it is generous but bounded.
+Route::get('/app-release', function (\App\Support\Release\DeployedRelease $release) {
+    return response()->json(['release' => $release->short()])->header('Cache-Control', 'no-store');
+})->middleware('throttle:600,1')->withoutMiddleware(StatelessRoute::WITHOUT_MIDDLEWARE)->name('app-release');
 
 // Station Inventory PDF Download
 Route::get('/inventory-pdf/{submission}', [StationInventoryController::class, 'downloadPdf'])

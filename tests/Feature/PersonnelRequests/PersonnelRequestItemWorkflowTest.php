@@ -291,7 +291,7 @@ final class PersonnelRequestItemWorkflowTest extends TestCase
         $employee = Employee::query()->create(['employee_id' => 'ITEM-'.str()->uuid(), 'name' => 'Item Workflow Member',
             'rank' => 'Firefighter', 'password' => 'unused-fixture-credential', 'must_change_password' => false]);
         Role::findOrCreate('logistics_admin', 'web');
-        $admin = User::factory()->create();
+        $admin = User::factory()->create(['account_status' => 'active']);
         $admin->assignRole('logistics_admin');
         $publicId = (string) str()->ulid();
         $request = PersonnelRequest::query()->create([

@@ -1,12 +1,5 @@
 <x-filament-panels::page data-hub-ui="2" data-hub-portal="employee">
-    <section class="ast-employee-heading" aria-labelledby="ast-request-heading">
-        <div class="ast-employee-mark" aria-hidden="true">AST</div>
-        <div>
-            <span>AUTHENTICATED FLEET REQUEST</span>
-            <h2 id="ast-request-heading">Report apparatus repair or service needs</h2>
-            <p>Fleet receives the request immediately. Station personnel can follow the public operational status without exposing employee or mechanic notes.</p>
-        </div>
-    </section>
+    <p class="hub-portal-intro">Report apparatus repair or service needs. Fleet receives the request immediately. Station personnel can follow the public operational status without exposing employee or mechanic notes.</p>
 
     <form wire:submit="submit" class="ast-employee-form">
         {{ $this->form }}

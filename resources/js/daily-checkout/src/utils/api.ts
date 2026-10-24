@@ -6,6 +6,7 @@ import {
   StationInspectionSummary, FireEquipmentRequestSummary,
   SingleGasMeterSummary, StationRequestSummary, ApparatusServiceTicketSummary, StationActivityEntry, RoomProfile, FleetVehicle,
 } from '../types';
+import { purgeOnSessionEnd } from '../pwa/userCaches.ts';
 
 const API_BASE = '/api';
 
@@ -157,6 +158,9 @@ export function redirectToLoginAfterSessionExpiry(): void {
   }
 
   sessionExpiryRedirectStarted = true;
+  // Signed out: drop the cached station/apparatus responses first. The worker message is
+  // posted synchronously, so it still goes out as the page navigates to sign-in.
+  void purgeOnSessionEnd();
   const configuredOrigin = window.__MBFD_CANONICAL_ORIGIN__;
   let loginUrl = new URL('/login', window.location.origin);
 

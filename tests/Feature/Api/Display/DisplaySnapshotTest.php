@@ -133,6 +133,28 @@ class DisplaySnapshotTest extends TestCase
         $this->assertSame('Miami Beach Fire Department', $data['organization']['name']);
     }
 
+    public function test_station_inspection_pending_review_count_ignores_archived_inspections(): void
+    {
+        $station = $this->seedStationWithData();
+        foreach (['active', 'archived'] as $state) {
+            $inspection = \App\Models\StationInspection::query()->create([
+                'client_submission_id' => (string) Str::uuid(),
+                'station_id' => $station->id,
+                'inspection_date' => now(),
+                'inspection_type' => 'weekly',
+                'overall_status' => 'pass',
+                'form_data' => [],
+            ]);
+            if ($state === 'archived') {
+                $inspection->forceFill(['archived_at' => now(), 'archive_reason' => 'QA cleanup'])->save();
+            }
+        }
+
+        $data = $this->getJson('/api/display/snapshot')->json();
+
+        $this->assertSame(1, $data['submissions']['station_inspections']['pending_review']);
+    }
+
     public function test_station_rows_include_readiness_with_reasons(): void
     {
         $this->seedStationWithData();

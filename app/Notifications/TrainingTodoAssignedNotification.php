@@ -2,6 +2,7 @@
 
 namespace App\Notifications;
 
+use App\Notifications\Concerns\EvaluatesDelivery;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -10,6 +11,7 @@ use NotificationChannels\WebPush\WebPushMessage;
 
 class TrainingTodoAssignedNotification extends Notification implements ShouldQueue
 {
+    use EvaluatesDelivery;
     use Queueable;
 
     public function __construct(
@@ -19,15 +21,20 @@ class TrainingTodoAssignedNotification extends Notification implements ShouldQue
         private readonly string $actionUrl,
     ) {}
 
+    protected function deliveryCategory(): string
+    {
+        return 'training_assignments';
+    }
+
+    protected function deliveryEventKey(): string
+    {
+        return 'training_assignments:todo:'.$this->todoId.':assigned';
+    }
+
+    /** @return list<string> */
     public function via(object $notifiable): array
     {
-        $channels = ['database'];
-
-        if ($notifiable->pushSubscriptions()->exists()) {
-            $channels[] = WebPushChannel::class;
-        }
-
-        return $channels;
+        return $this->evaluatedChannels($notifiable);
     }
 
     public function toDatabase(object $notifiable): array
@@ -43,11 +50,12 @@ class TrainingTodoAssignedNotification extends Notification implements ShouldQue
                 [
                     'name' => 'view',
                     'label' => 'View',
-                    'url' => $this->actionUrl,
+                    'url' => $this->deliveryUrl($notifiable, $this->actionUrl),
                     'color' => 'primary',
                     'isOutlined' => false,
                 ],
             ],
+            'provenance' => $this->deliveryProvenance($notifiable),
         ];
     }
 
@@ -59,7 +67,7 @@ class TrainingTodoAssignedNotification extends Notification implements ShouldQue
             ->icon('/images/mbfd-logo.png')
             ->badge('/images/mbfd-logo.png')
             ->tag('training-todo-'.$this->todoId)
-            ->data(['url' => $this->actionUrl]);
+            ->data(['url' => $this->deliveryUrl($notifiable, $this->actionUrl)]);
     }
 
     public function viaQueues(): array

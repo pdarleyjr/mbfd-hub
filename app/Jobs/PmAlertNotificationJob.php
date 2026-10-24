@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\Apparatus;
 use App\Models\User;
+use App\Services\Notifications\NotificationRecipientEvaluator;
 use Filament\Notifications\Notification;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -15,7 +16,7 @@ use Illuminate\Support\Facades\Log;
 /**
  * Checks PM health status after an inspection updates meter readings.
  * Sends Filament database notifications to admin users when thresholds are crossed.
- * 
+ *
  * Deduplication: Only sends one notification per apparatus per threshold per 24 hours.
  */
 class PmAlertNotificationJob implements ShouldQueue
@@ -30,7 +31,7 @@ class PmAlertNotificationJob implements ShouldQueue
     public function handle(): void
     {
         $apparatus = Apparatus::find($this->apparatusId);
-        if (!$apparatus) {
+        if (! $apparatus) {
             return;
         }
 
@@ -46,17 +47,11 @@ class PmAlertNotificationJob implements ShouldQueue
             return; // No escalation, skip notification
         }
 
-        // Get admin users
-        $admins = User::whereHas('roles', function ($q) {
-            $q->whereIn('name', ['super_admin', 'admin', 'fleet_manager']);
-        })->get();
-
-        if ($admins->isEmpty()) {
-            // Fallback: get all users with admin panel access
-            $admins = User::where('email', 'like', '%admin%')
-                ->orWhere('email', 'pdarleyjr@gmail.com')
-                ->get();
-        }
+        // Fleet reviewers as they are right now (the single InspectionReviewers definition),
+        // narrowed by each member's in-app choice. There is deliberately no guess-by-email fallback.
+        $evaluator = app(NotificationRecipientEvaluator::class);
+        $admins = $evaluator->recipients('vehicle_maintenance_alerts')
+            ->filter(fn (User $user): bool => $evaluator->decide($user, 'vehicle_maintenance_alerts')->allows('database'));
 
         $unit = $apparatus->designation ?? $apparatus->vehicle_number ?? "ID#{$apparatus->id}";
         $hours = $health['hours_since_pm'];

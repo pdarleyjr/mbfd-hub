@@ -41,7 +41,7 @@ class ApparatusServiceTicketWorkflowTest extends TestCase
         Notification::fake();
         app(PermissionRegistrar::class)->forgetCachedPermissions();
         $role = Role::findOrCreate('logistics_admin', 'web');
-        $this->fleetAdmin = User::factory()->create();
+        $this->fleetAdmin = User::factory()->create(['account_status' => 'active']);
         $this->fleetAdmin->assignRole($role);
         UserNotificationSubscription::query()->create([
             'user_id' => $this->fleetAdmin->id,
@@ -125,6 +125,12 @@ class ApparatusServiceTicketWorkflowTest extends TestCase
 
     public function test_workflow_enforces_legal_transitions_and_append_only_updates(): void
     {
+        // The requester has a Hub account: their ticket updates are decided by the evaluator for that account.
+        $account = User::factory()->create([
+            'account_status' => 'active',
+            'employee_profile_id' => $this->employee->id,
+            'employee_id' => $this->employee->employee_id,
+        ]);
         $service = app(ApparatusServiceTicketWorkflowService::class);
         $ticket = $service->submitFromEmployee($this->employee, $this->apparatus, [
             'client_submission_id' => 'b7e97ef8-15f6-4796-b321-af5bba786976',
@@ -147,7 +153,7 @@ class ApparatusServiceTicketWorkflowTest extends TestCase
             'public_note' => 'Fleet has reviewed the report.',
             'internal_note' => 'Inspect wiring at connector J4.',
         ]);
-        Notification::assertSentTo($this->employee, ApparatusServiceTicketEmployeeNotification::class);
+        Notification::assertSentTo($account, ApparatusServiceTicketEmployeeNotification::class);
         $service->transition($ticket, $this->fleetAdmin, ApparatusServiceTicketStatus::Scheduled, [
             'scheduled_for' => now()->addDay()->toDateTimeString(),
             'service_type' => 'Electrical diagnosis',

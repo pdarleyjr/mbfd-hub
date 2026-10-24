@@ -152,6 +152,74 @@ class StationRequestAdminWorkflowTest extends TestCase
         }
     }
 
+    public function test_deny_and_cancel_need_a_reason_the_station_can_read(): void
+    {
+        foreach (['denied' => 'Denied', 'cancelled' => 'Cancelled'] as $status => $label) {
+            $request = $this->request('pending', '[QA TEST] '.$status.' reason', 'normal');
+
+            Livewire::test(ViewStationRequest::class, ['record' => $request->getRouteKey()])
+                ->callAction('update_workflow', data: ['status' => $status])
+                ->assertHasActionErrors(['public_note' => 'required'])
+                ->callAction('update_workflow', data: ['status' => $status, 'public_note' => 'too short'])
+                ->assertHasActionErrors(['public_note'])
+                ->callAction('update_workflow', data: ['status' => $status, 'public_note' => 'Covered by the existing stock.'])
+                ->assertHasNoActionErrors();
+
+            $request->refresh();
+            $this->assertSame($status, $request->status);
+            $this->assertSame($label.': Covered by the existing stock.', $request->current_public_response);
+            $this->assertSame('Covered by the existing stock.', $request->updates()->where('status', $status)->value('public_note'));
+        }
+    }
+
+    public function test_service_refuses_a_blank_denial_but_does_not_ask_twice_for_an_already_denied_request(): void
+    {
+        $request = $this->request('pending', '[QA TEST] service denial', 'normal');
+        $workflow = app(StationRequestWorkflowService::class);
+
+        try {
+            $workflow->transition($request, ['status' => 'denied', 'public_note' => '   '], $this->admin);
+            $this->fail('A blank denial reason was accepted.');
+        } catch (\Illuminate\Validation\ValidationException $exception) {
+            $this->assertArrayHasKey('public_note', $exception->errors());
+        }
+        $this->assertSame('pending', $request->refresh()->status);
+
+        $workflow->transition($request, ['status' => 'denied', 'public_note' => 'Not in this year budget.'], $this->admin);
+        $workflow->transition($request, ['status' => 'denied', 'internal_note' => 'Re-save keeps the first reason.'], $this->admin);
+        $this->assertSame('Denied: Not in this year budget.', $request->refresh()->current_public_response);
+    }
+
+    public function test_supply_request_denial_needs_a_reason_but_other_statuses_do_not(): void
+    {
+        $supply = \App\Models\StationSupplyRequest::query()->create([
+            'station_id' => $this->station->id, 'request_text' => '[QA TEST] Paper towels', 'status' => 'open',
+            'created_by_name' => 'Member', 'created_by_shift' => 'A',
+        ]);
+        $workflow = app(\App\Services\StationSupplyRequestWorkflowService::class);
+
+        $workflow->update($supply, $this->admin, ['status' => 'ordered']);
+        $this->assertSame('ordered', $supply->refresh()->status);
+
+        foreach ([[], ['public_response' => ''], ['public_response' => 'no']] as $extra) {
+            try {
+                $workflow->update($supply, $this->admin, ['status' => 'denied'] + $extra);
+                $this->fail('A supply denial without a reason was accepted.');
+            } catch (\Illuminate\Validation\ValidationException $exception) {
+                $this->assertArrayHasKey('public_response', $exception->errors());
+            }
+            $this->assertSame('ordered', $supply->refresh()->status);
+        }
+
+        $workflow->update($supply, $this->admin, ['status' => 'denied', 'public_response' => '  Stocked by the city contract.  ']);
+        $supply->refresh();
+        $this->assertSame('denied', $supply->status);
+        $this->assertSame('Stocked by the city contract.', $supply->public_response);
+
+        $workflow->update($supply, $this->admin, ['status' => 'denied', 'admin_notes' => 'Internal follow-up only.']);
+        $this->assertSame('Stocked by the city contract.', $supply->refresh()->public_response);
+    }
+
     public function test_station_viewer_cannot_process_or_archive_requests_without_manage_permission(): void
     {
         $request = $this->request('pending', '[QA TEST] viewer authorization repair', 'normal');

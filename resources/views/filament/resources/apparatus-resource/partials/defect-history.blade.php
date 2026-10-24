@@ -13,6 +13,9 @@
                     <p class="text-xs text-gray-600 dark:text-gray-400">
                         {{ $event['at'] }}@if ($event['actor']) · {{ $event['actor'] }}@endif
                     </p>
+                    @foreach ($event['details'] ?? [] as $line)
+                        <p class="text-sm text-gray-700 dark:text-gray-300">{{ $line }}</p>
+                    @endforeach
                     @if ($event['member_message'])
                         <p class="text-sm text-gray-700 dark:text-gray-300">Message to member: {{ $event['member_message'] }}</p>
                     @endif

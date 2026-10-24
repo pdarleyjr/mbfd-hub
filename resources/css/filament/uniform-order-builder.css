@@ -1,12 +1,7 @@
 /* Compact employee ordering; existing Hub palette, type and touch targets. */
-.fi-page:has(.uo-builder) { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: .75rem; padding-top: .75rem; }
-.fi-page:has(.uo-builder) > .employee-global-back { margin: 0; }
-.fi-page:has(.uo-builder) > section { display: contents; }
-.fi-page:has(.uo-builder) > section > .fi-header { grid-column: 2; align-self: center; }
-.fi-page:has(.uo-builder) > section > .fi-header .fi-header-heading { font-size: 1.25rem; line-height: 1.5; }
-.fi-page:has(.uo-builder) > section > div { grid-column: 1 / -1; row-gap: .75rem; }
+/* The page frame (nav and title on one row, tight rhythm) is the Employee panel rule in hub-admin-v2.css. */
 /* The sticky toolbar sits directly under the shared shell bar, including a notched installed app. */
-[data-hub-portal="employee"] .uo-builder { --uo-toolbar-top: calc(var(--hub-shell-bar-height) + env(safe-area-inset-top, 0px)); min-width: 0; padding-bottom: 1rem; color: rgb(var(--hub2-n-900)); }
+[data-hub-portal="employee"] .uo-builder { --uo-toolbar-top: var(--hub-bar-total); min-width: 0; padding-bottom: 1rem; color: rgb(var(--hub2-n-900)); }
 .uo-builder [x-cloak] { display: none !important; }
 .uo-builder :is(button, input, select, textarea, a, summary):focus-visible { outline: 2px solid rgb(var(--hub2-focus)); outline-offset: 3px; }
 .uo-builder :is(button, input, select, textarea) { font: inherit; }

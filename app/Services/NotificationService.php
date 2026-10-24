@@ -5,7 +5,9 @@ namespace App\Services;
 use App\Models\CapitalProject;
 use App\Models\NotificationTracking;
 use App\Models\User;
-use Filament\Notifications\Notification;
+use App\Notifications\OperationalAlertNotification;
+use App\Services\Notifications\NotificationCategoryRegistry;
+use App\Services\Notifications\NotificationDispatchService;
 use Illuminate\Support\Collection;
 
 class NotificationService
@@ -20,38 +22,39 @@ class NotificationService
         array $recipients
     ): int {
         $sent = 0;
-        
+
         foreach ($recipients as $user) {
             // Check cooldown before sending
-            if (!$this->checkNotificationCooldown($user, $project, $type)) {
+            if (! $this->checkNotificationCooldown($user, $project, $type)) {
                 continue;
             }
-            
+
             // Determine notification styling based on type
             [$icon, $iconColor] = $this->getNotificationStyle($type);
-            
-            // Create and send notification
-            Notification::make()
-                ->title($this->getNotificationTitle($type))
-                ->body($message)
-                ->icon($icon)
-                ->iconColor($iconColor)
-                ->actions([
-                    \Filament\Notifications\Actions\Action::make('view')
-                        ->label('View Project')
-                        ->url(route('filament.admin.resources.capital-projects.edit', $project)),
-                ])
-                ->sendToDatabase($user);
-            
+
+            // Only people who may act on projects right now are told (the project alert category).
+            $delivered = app(NotificationDispatchService::class)->notifyUser(NotificationCategoryRegistry::PROJECT_ALERTS, $user, new OperationalAlertNotification(
+                category: NotificationCategoryRegistry::PROJECT_ALERTS,
+                title: $this->getNotificationTitle($type),
+                body: $message,
+                url: route('filament.admin.resources.capital-projects.edit', $project),
+                icon: $icon,
+                iconColor: $iconColor,
+                actionLabel: 'View Project',
+            ));
+            if (! $delivered) {
+                continue;
+            }
+
             // Track the notification
             $this->trackNotification($user, $project, $type);
-            
+
             $sent++;
         }
-        
+
         return $sent;
     }
-    
+
     /**
      * Check if a notification has been sent recently (within cooldown period)
      */
@@ -67,10 +70,10 @@ class NotificationService
             ->where('notification_type', $type)
             ->where('created_at', '>=', now()->subHours($hours))
             ->exists();
-        
-        return !$exists; // Return true if we CAN send (no recent notification)
+
+        return ! $exists; // Return true if we CAN send (no recent notification)
     }
-    
+
     /**
      * Track a sent notification to prevent duplicates
      */
@@ -88,7 +91,7 @@ class NotificationService
             'metadata' => $metadata,
         ]);
     }
-    
+
     /**
      * Get users by role(s) for batch notifications
      */
@@ -98,7 +101,7 @@ class NotificationService
             $query->whereIn('name', $roles);
         })->get();
     }
-    
+
     /**
      * Get notification styling based on type
      */
@@ -114,10 +117,10 @@ class NotificationService
             'budget_alert' => ['heroicon-o-currency-dollar', 'warning'],
             'status_update' => ['heroicon-o-information-circle', 'info'],
         ];
-        
+
         return $styles[$type] ?? ['heroicon-o-bell', 'info'];
     }
-    
+
     /**
      * Get notification title based on type
      */
@@ -133,7 +136,7 @@ class NotificationService
             'budget_alert' => 'Budget Alert',
             'status_update' => 'Project Status Update',
         ];
-        
+
         return $titles[$type] ?? 'Project Notification';
     }
 }

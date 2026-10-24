@@ -37,12 +37,20 @@ if ($uri !== '/' && is_file($publicPath.$uri)) {
         return true;
     }
 
-    // The Daily service workers are unhashed, so without a Cache-Control the edge
+    // Service worker scripts are unhashed, so without a Cache-Control the edge
     // applied its four-hour default and kept serving a retired worker after a
-    // release. Always revalidate; browsers already do for the worker script.
-    if ($uri === '/daily/sw.js' || $uri === '/daily/service-worker.js') {
+    // release. Always revalidate every registered worker URL, including the
+    // legacy ones older installs may still check for updates.
+    $serviceWorkers = ['/sw.js', '/admin-pwa/service-worker.js', '/daily/sw.js', '/daily/service-worker.js'];
+    if (in_array($uri, $serviceWorkers, true)) {
         header('Content-Type: text/javascript; charset=UTF-8');
         header('Cache-Control: no-cache, must-revalidate');
+        // This is a real file under public/, so it never reaches the Laravel route that adds the
+        // scope header. A registration made from this URL has scope /admin/, which browsers only
+        // accept (for the script AND for every later update check) when the script allows it.
+        if ($uri === '/admin-pwa/service-worker.js') {
+            header('Service-Worker-Allowed: /admin/');
+        }
         header('Content-Length: '.(string) filesize($publicPath.$uri));
         header('X-Content-Type-Options: nosniff');
         readfile($publicPath.$uri);

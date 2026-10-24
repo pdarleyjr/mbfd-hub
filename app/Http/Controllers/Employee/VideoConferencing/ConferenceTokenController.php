@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Employee\VideoConferencing;
 
 use App\Concerns\ResolvesCanonicalEmployee;
 use App\Enums\VideoConferencing\ConferenceJoinRole;
+use App\Exceptions\VideoConferencing\ConferenceRoomFullException;
 use App\Exceptions\VideoConferencing\ConferenceUnavailableException;
 use App\Exceptions\VideoConferencing\EndpointInUseException;
 use App\Http\Controllers\Controller;
@@ -52,6 +53,12 @@ class ConferenceTokenController extends Controller
                 'message' => $exception->getMessage(),
                 'code' => 'endpoint_in_use',
                 'takeover_available' => true,
+            ], 409)->header('Cache-Control', 'no-store');
+        } catch (ConferenceRoomFullException $exception) {
+            // Refused before any participation or token exists, so there is nothing to clean up.
+            return response()->json([
+                'message' => $exception->getMessage(),
+                'code' => 'room_full',
             ], 409)->header('Cache-Control', 'no-store');
         } catch (ConferenceUnavailableException $exception) {
             return response()->json([

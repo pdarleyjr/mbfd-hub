@@ -64,6 +64,7 @@ export default function Composer({ comms, offline, textareaRef, placeholder = 'W
       className="mt-3 space-y-2 border-t border-hub-glass-border pt-3"
       aria-label="Write a message"
       data-testid="command-composer"
+      data-mbfd-ignore-edits
       onSubmit={(event) => { event.preventDefault(); if (!offline) void send(); }}
     >
       {draft.replyTo && (

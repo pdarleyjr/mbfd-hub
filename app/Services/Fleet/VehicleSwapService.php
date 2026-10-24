@@ -201,7 +201,7 @@ final class VehicleSwapService
             $inspection = ApparatusInspection::query()->lockForUpdate()->findOrFail($request->apparatus_inspection_id);
             $truckId = $decision === self::DECISION_REJECT ? null : ($request->reported_apparatus_id ?? $mappedApparatusId);
             if ($decision !== self::DECISION_REJECT && $truckId === null) {
-                throw new VehicleSwapDecisionException('Vehicle '.$request->reported_vehicle_number.' is not on the fleet list. Choose the existing truck record it is, or reject the report.');
+                throw new VehicleSwapDecisionException('Vehicle '.$request->reported_vehicle_number.' is not on the fleet list. Choose the existing truck record it is, or choose "No swap".');
             }
             if ($truckId !== null && $truckId === (int) $request->apparatus_id) {
                 throw new VehicleSwapDecisionException('The reported truck is the one already assigned to this unit.');
@@ -276,10 +276,10 @@ final class VehicleSwapService
     private function assertStillCurrent(ApparatusVehicleSwapRequest $request, Apparatus $assigned, Apparatus $truck): void
     {
         if (($assigned->designation ?: $assigned->name) !== $request->unit_designation) {
-            throw new VehicleSwapDecisionException('Unit '.$request->unit_designation.' moved to a different truck record after this report. Reject it, or review the fleet records first.');
+            throw new VehicleSwapDecisionException('Unit '.$request->unit_designation.' moved to a different truck record after this report. Choose "No swap", or review the fleet records first.');
         }
         if ($request->reported_apparatus_id !== null && ! VehicleNumber::same($truck->vehicle_number, $request->reported_vehicle_number)) {
-            throw new VehicleSwapDecisionException('The reported truck record no longer carries vehicle '.$request->reported_vehicle_number.'. Reject it, or review the fleet records first.');
+            throw new VehicleSwapDecisionException('The reported truck record no longer carries vehicle '.$request->reported_vehicle_number.'. Choose "No swap", or review the fleet records first.');
         }
     }
 

@@ -1,16 +1,6 @@
 <x-filament-panels::page data-hub-ui="2" data-hub-portal="employee">
-    {{-- Identity bar --}}
-    <div class="ep-id-bar">
-        <div class="ep-id-left">
-            <span class="ep-id-name">{{ $user->name }}</span>
-            <span class="ep-id-sep">·</span>
-            <span class="ep-id-rank">{{ $user->rank ?? '' }}</span>
-        </div>
-        <div class="ep-id-right">
-            <span class="ep-id-label">Employee ID</span>
-            <span class="ep-id-number">{{ $user->employee_id ?? 'Not assigned' }}</span>
-        </div>
-    </div>
+    {{-- Whose gear this is: one line under the page title (the title is the page, this is the person). --}}
+    <p class="ep-eq-identity">{{ collect([$user->name, $user->rank ?: null, 'Employee ID '.($user->employee_id ?? 'Not assigned')])->filter()->implode(' · ') }}</p>
 
     @if($activeEquipment->isEmpty() && $history->isEmpty())
         <div class="ep-empty-full">

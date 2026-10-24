@@ -6,8 +6,8 @@ namespace App\Services\Fleet;
 
 use App\Models\ApparatusVehicleSwapRequest;
 use App\Models\User;
-use App\Models\UserNotificationSubscription;
 use App\Notifications\NewSubmissionNotification;
+use App\Services\Notifications\NotificationRecipientEvaluator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -47,7 +47,6 @@ class VehicleSwapNotifier
             // One unreachable inbox, mailbox or push endpoint must never keep
             // the others from being told, or fail the checkout that raised it.
             try {
-                UserNotificationSubscription::ensureVehicleSwapForUser((int) $recipient->getKey());
                 $recipient->notify(new NewSubmissionNotification(
                     submissionType: self::SUBMISSION_TYPE,
                     title: "Vehicle swap reported on {$unit}",
@@ -72,14 +71,6 @@ class VehicleSwapNotifier
      */
     public function recipients(): Collection
     {
-        return User::query()
-            ->where(function ($query): void {
-                $query->whereHas('roles', fn ($roles) => $roles->where('name', 'super_admin'))
-                    ->orWhereHas('permissions', fn ($permissions) => $permissions->where('name', 'admin.fleet.manage'));
-            })
-            ->orderBy('id')
-            ->get()
-            ->filter(fn (User $user): bool => $user->canManageFleetSwaps())
-            ->values();
+        return app(NotificationRecipientEvaluator::class)->recipients(User::NOTIFICATION_PREFERENCE_VEHICLE_SWAP_REPORTED);
     }
 }

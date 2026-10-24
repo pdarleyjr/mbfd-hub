@@ -7,6 +7,7 @@ namespace Tests\Feature\Filament;
 use App\Filament\Widgets\StationOperationsHubWidget;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
+use App\Models\ApparatusDefectObservation;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusServiceTicket;
 use App\Models\Station;
@@ -120,6 +121,31 @@ final class StationOperationsHubWidgetDailyCheckoutTest extends TestCase
         $this->assertStringContainsString('/admin/station-inspections/'.$inspection->id, $activity->firstWhere('type', 'station_inspection')['url']);
         $this->assertSame(1, $data['stationNumber']);
         $this->assertStringContainsString('tableFilters%5Bstation_id%5D%5Bvalue%5D='.$station->id, $data['links']['requests']);
+    }
+
+    public function test_it_flags_an_open_issue_the_member_reports_corrected_so_logistics_can_verify_it(): void
+    {
+        $station = $this->station(1);
+        $apparatus = $this->apparatus($station, 'E1');
+        $first = $this->inspection($apparatus, 'approved', '2026-09-23 08:00:00');
+        $second = $this->inspection($apparatus, 'approved', '2026-09-23 09:00:00');
+        $flagged = ApparatusDefect::recordDefect($apparatus->id, 'Cab', 'Portable radio', 'Missing', 'Radio absent.');
+        $plain = ApparatusDefect::recordDefect($apparatus->id, 'Cab', 'Scene light', 'Damaged', 'Lens cracked.');
+        foreach ([$flagged, $plain] as $defect) {
+            ApparatusDefectObservation::query()->create(['apparatus_defect_id' => $defect->id, 'apparatus_inspection_id' => $first->id, 'observation' => 'first_reported', 'reported_status' => 'Missing']);
+        }
+        ApparatusDefectObservation::query()->create(['apparatus_defect_id' => $flagged->id, 'apparatus_inspection_id' => $second->id, 'observation' => 'appears_corrected', 'reported_status' => 'Present']);
+        ApparatusDefectObservation::query()->create(['apparatus_defect_id' => $plain->id, 'apparatus_inspection_id' => $second->id, 'observation' => 'confirmed_again', 'reported_status' => 'Damaged']);
+
+        $queues = app(StationOperationsHubWidget::class)->getViewData()['department']['inspectionQueues'];
+        $rows = collect($queues['issues']['rows']);
+
+        $this->assertSame(2, $queues['issues']['count']);
+        $this->assertStringStartsWith(StationOperationsHubWidget::MEMBER_REPORTS_CORRECTED, $rows->first(fn (array $row): bool => str_contains($row['label'], 'Portable radio'))['status']);
+        $this->assertStringNotContainsString('verify', $rows->first(fn (array $row): bool => str_contains($row['label'], 'Scene light'))['status']);
+        // Presentation only: the issue itself is untouched.
+        $this->assertSame('reported', $flagged->refresh()->action_status);
+        $this->assertFalse($flagged->resolved);
     }
 
     public function test_it_keeps_all_current_window_activity_and_excludes_older_history(): void

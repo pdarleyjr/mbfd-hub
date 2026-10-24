@@ -4,6 +4,8 @@ namespace App\Notifications;
 
 use App\Models\User;
 use App\Notifications\Channels\BudgetedMailChannel;
+use App\Notifications\Concerns\EvaluatesDelivery;
+use App\Services\Notifications\PushPrivacy;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -12,59 +14,49 @@ use NotificationChannels\WebPush\WebPushChannel;
 use NotificationChannels\WebPush\WebPushMessage;
 use Throwable;
 
+/**
+ * An operational submission or request alert. Who gets it, and over which
+ * channels, is decided only by the notification evaluator (current eligibility,
+ * then the member's saved choices); a saved choice never makes someone eligible.
+ */
 class NewSubmissionNotification extends Notification implements ShouldQueue
 {
+    use EvaluatesDelivery;
     use Queueable;
 
+    /**
+     * @param  string|null  $eventKey  Idempotency key (category + subject + event) recorded as provenance.
+     * @param  bool  $messageBearing  The text carries a person's words, name or a reason: the lock-screen push is generic
+     *                                (the in-app copy and the email keep the full text).
+     * @param  string|null  $pushSubject  The unit or request number the generic push names.
+     */
     public function __construct(
         private string $submissionType,
         private string $title,
         private string $body,
         private string $actionUrl = '/admin',
         private string $icon = 'heroicon-o-document-check',
-        private bool $essentialInApp = false,
+        private ?string $eventKey = null,
+        private bool $messageBearing = false,
+        private ?string $pushSubject = null,
     ) {}
 
+    protected function deliveryCategory(): ?string
+    {
+        return User::preferenceKeyForSubmissionType($this->submissionType);
+    }
+
+    protected function deliveryEventKey(): ?string
+    {
+        return $this->eventKey;
+    }
+
     /**
-     * Route to both database (Filament in-app) and web push channels.
+     * @return list<string>
      */
     public function via(object $notifiable): array
     {
-        if (! $notifiable instanceof User) {
-            return [];
-        }
-
-        $eventKey = User::preferenceKeyForSubmissionType($this->submissionType);
-        $subscription = $eventKey === null
-            ? null
-            : $notifiable->notificationSubscriptions()->where('event_key', $eventKey)->first();
-        if ($subscription === null && ! $this->essentialInApp) {
-            return [];
-        }
-
-        $channels = [];
-        if ($this->essentialInApp || $subscription->database_enabled) {
-            $channels[] = 'database';
-        }
-        $pushSubscriptionCount = $notifiable->pushSubscriptions()->count();
-
-        Log::info('Preparing submission notification delivery', [
-            'notification' => static::class,
-            'submission_type' => $this->submissionType,
-            'notifiable_id' => $notifiable->id ?? null,
-            'notifiable_email' => $notifiable->email ?? null,
-            'push_subscription_count' => $pushSubscriptionCount,
-        ]);
-
-        // Only add WebPush if user has active push subscriptions
-        if ($subscription?->webpush_enabled && $pushSubscriptionCount > 0) {
-            $channels[] = WebPushChannel::class;
-        }
-        if ($subscription?->email_enabled && filled($notifiable->employeeProfile?->city_email)) {
-            $channels[] = BudgetedMailChannel::class;
-        }
-
-        return $channels;
+        return $this->evaluatedChannels($notifiable);
     }
 
     /** @return array{subject: string, text: string, html: string} */
@@ -72,7 +64,7 @@ class NewSubmissionNotification extends Notification implements ShouldQueue
     {
         $safeTitle = e($this->title);
         $safeBody = e($this->body);
-        $url = url($this->actionUrl);
+        $url = url($this->deliveryUrl($notifiable, $this->actionUrl));
 
         return [
             'subject' => $this->title,
@@ -97,11 +89,13 @@ class NewSubmissionNotification extends Notification implements ShouldQueue
                 [
                     'name' => 'view',
                     'label' => 'View',
-                    'url' => $this->actionUrl,
+                    'url' => $this->deliveryUrl($notifiable, $this->actionUrl),
                     'color' => 'primary',
                     'isOutlined' => false,
                 ],
             ],
+            // Not rendered by Filament; answers "why did I get this".
+            'provenance' => $this->deliveryProvenance($notifiable),
         ];
     }
 
@@ -110,24 +104,20 @@ class NewSubmissionNotification extends Notification implements ShouldQueue
      */
     public function toWebPush(object $notifiable, $notification): WebPushMessage
     {
-        Log::info('Building WebPush payload for submission notification', [
-            'notification' => static::class,
-            'submission_type' => $this->submissionType,
-            'notifiable_id' => $notifiable->id ?? null,
-            'notifiable_email' => $notifiable->email ?? null,
-            'action_url' => $this->actionUrl,
-            'vapid_subject' => config('webpush.vapid.subject'),
-            'vapid_public_key_present' => filled(config('webpush.vapid.public_key')),
-            'vapid_private_key_present' => filled(config('webpush.vapid.private_key')),
-        ]);
+        // One lock-screen entry per event; two different events never replace each other.
+        $tag = 'mbfd-submission-'.$this->submissionType
+            .($this->eventKey !== null ? '-'.substr(sha1($this->eventKey), 0, 12) : '');
+
+        $title = $this->messageBearing ? 'New message' : $this->title;
+        $body = $this->messageBearing ? PushPrivacy::messageBody($this->pushSubject) : $this->body;
 
         return (new WebPushMessage)
-            ->title($this->title)
-            ->body($this->body)
+            ->title($title)
+            ->body($body)
             ->icon('/images/mbfd-logo.png')
             ->badge('/images/mbfd-logo.png')
-            ->tag('mbfd-submission-'.$this->submissionType)
-            ->data(['url' => $this->actionUrl]);
+            ->tag($tag)
+            ->data(['url' => $this->deliveryUrl($notifiable, $this->actionUrl)]);
     }
 
     public function viaQueues(): array

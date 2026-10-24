@@ -25,6 +25,7 @@ use App\Models\Station;
 use App\Models\User;
 use App\Models\UserNotificationSubscription;
 use App\Notifications\NewSubmissionNotification;
+use App\Services\Inspections\InspectionNotificationDispatcher;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -100,21 +101,35 @@ final class CanonicalInspectionWorkspaceTest extends TestCase
         $this->assertSame($canonical, $checkouts[0]['url']);
     }
 
-    public function test_new_inspection_notifications_link_to_the_canonical_page(): void
+    public function test_a_new_checkout_sends_no_default_alert_and_reviewer_alerts_link_to_the_canonical_page(): void
     {
         Notification::fake();
-        $recipient = User::factory()->create();
+        // A current reviewer with an old `vehicle_inspections` row: neither the row nor the role triggers a per-checkout
+        // alert. The only per-checkout alert is the opt-in "daily_checkout_every_submission" category
+        // (tests/Feature/Notifications/EveryDailyCheckoutAlertTest.php), and it has its own row.
+        $recipient = $this->userWithRole('super_admin');
         UserNotificationSubscription::query()->create([
             'user_id' => $recipient->id,
             'event_key' => User::NOTIFICATION_PREFERENCE_VEHICLE_INSPECTIONS,
             'database_enabled' => true, 'webpush_enabled' => false, 'email_enabled' => false,
         ]);
 
+        $optedIn = $this->userWithRole('super_admin');
+        UserNotificationSubscription::query()->create([
+            'user_id' => $optedIn->id,
+            'event_key' => User::NOTIFICATION_PREFERENCE_DAILY_CHECKOUT_EVERY_SUBMISSION,
+            'database_enabled' => true, 'webpush_enabled' => false, 'email_enabled' => false,
+        ]);
+
         $inspection = $this->inspection();
 
-        Notification::assertSentTo($recipient, NewSubmissionNotification::class, function (NewSubmissionNotification $notification) use ($recipient, $inspection): bool {
-            return str_contains(json_encode($notification->toDatabase($recipient), JSON_UNESCAPED_SLASHES), route('filament.admin.resources.inspections.view', ['record' => $inspection->id]));
-        });
+        Notification::assertNotSentTo($recipient, NewSubmissionNotification::class);
+        Notification::assertSentTo($optedIn, NewSubmissionNotification::class);
+        // The alerts reviewers do get are built by the dispatcher and open the canonical page.
+        $this->assertSame(
+            route('filament.admin.resources.inspections.view', ['record' => $inspection->id], false),
+            app(InspectionNotificationDispatcher::class)->adminUrl($inspection->id),
+        );
     }
 
     public function test_the_apparatus_scoped_url_redirects_to_the_canonical_page(): void

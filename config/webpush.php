@@ -1,5 +1,24 @@
 <?php
 
+/*
+ * Official push services: Chrome (FCM), Firefox (Mozilla autopush), Safari and
+ * iOS Home Screen apps (Apple), and Edge on Windows (WNS, which uses regional
+ * hosts such as wns2-ch1p.notify.windows.com).
+ */
+$defaultPushHosts = [
+    'fcm.googleapis.com',
+    'updates.push.services.mozilla.com',
+    'web.push.apple.com',
+    '*.notify.windows.com',
+];
+
+$configuredPushHosts = array_values(array_filter(array_map(
+    static fn (string $host): string => strtolower(trim($host)),
+    explode(',', (string) env('WEBPUSH_ALLOWED_ENDPOINT_HOSTS', '')),
+), static fn (string $host): bool => $host !== ''));
+
+$allowedEndpointHosts = $configuredPushHosts !== [] ? $configuredPushHosts : $defaultPushHosts;
+
 return [
 
     /**
@@ -14,23 +33,23 @@ return [
     ],
 
     /**
-     * Exact HTTPS delivery hosts accepted from browser PushSubscription data.
+     * HTTPS delivery hosts accepted from browser PushSubscription data.
      *
-     * Keep this empty until the service owner has approved the supported
-     * browser providers. The registration endpoint fails closed when there
-     * are no configured hosts; wildcard entries and URLs are never accepted.
+     * WEBPUSH_ALLOWED_ENDPOINT_HOSTS (comma separated) replaces the defaults.
+     * When it is empty the official browser push services above are used, so
+     * a blank environment value never silently blocks every enrollment. An
+     * entry is an exact host, or `*.example.com`, which matches one or more
+     * whole labels in front of example.com (never a lookalike suffix). URLs,
+     * IP addresses and bare or top-level wildcards are never accepted.
      *
      * @var list<string>
      */
-    'allowed_endpoint_hosts' => array_values(array_filter(array_map(
-        static fn (string $host): string => strtolower(trim($host)),
-        explode(',', (string) env('WEBPUSH_ALLOWED_ENDPOINT_HOSTS', '')),
-    ))),
+    'allowed_endpoint_hosts' => $allowedEndpointHosts,
 
     /**
-     * This is model that will be used to for push subscriptions.
+     * The push subscription model: the package model plus device health.
      */
-    'model' => \NotificationChannels\WebPush\PushSubscription::class,
+    'model' => \App\Models\HubPushSubscription::class,
 
     /**
      * This is the name of the table that will be created by the migration and

@@ -133,7 +133,7 @@ final class DailyInspectionRegressionTest extends TestCase
     }
 
     /** DEFECT: the member list says "Approved" for an automatic acceptance and "Pending review" for a hold. */
-    public function test_the_member_inspection_list_uses_accepted_and_needs_approval_wording(): void
+    public function test_the_member_inspection_list_uses_accepted_and_waiting_for_review_wording(): void
     {
         $this->actAs($this->alpha);
         $this->submit($this->payload())->assertCreated()->assertJsonPath('processing_status', 'accepted');
@@ -143,7 +143,8 @@ final class DailyInspectionRegressionTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('employee'));
         $html = Livewire::test(MyVehicleInspections::class)->loadTable()->html();
 
-        $this->assertStringContainsString('Needs approval', $html, 'A held inspection must read "Needs approval" in the member list.');
+        $this->assertStringContainsString('Waiting for Logistics review', $html, 'A held inspection must read "Waiting for Logistics review" in the member list.');
+        $this->assertStringNotContainsString('Needs approval', $html, 'The member cannot approve anything, so the list must not ask them to.');
         $this->assertStringContainsString('Accepted', $html, 'An automatic acceptance must read "Accepted".');
         // "Approved"/"Pending review" legitimately remain in the filter menu (one occurrence each); a row badge would add more.
         $this->assertLessThanOrEqual(1, substr_count($html, 'Approved'), 'A row still reads "Approved".');

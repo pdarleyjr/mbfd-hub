@@ -425,7 +425,7 @@ class ViewInventoryCorrection extends ViewRecord
             $open = (int) ($unit['open_issues'] ?? 0);
 
             return $status.'Removes "'.($before['name'] ?? 'item').'" from '.($before['compartment'] ?? 'the checklist').'.'
-                .($open > 0 ? ' '.$open.' open '.($open === 1 ? 'issue' : 'issues').' on it stay open; resolve or dismiss them separately.' : '');
+                .($open > 0 ? ' '.$open.' open '.($open === 1 ? 'issue' : 'issues').' on it stay open; resolve them, or close them with no action required, separately.' : '');
         }
         $parts = [];
         foreach (['compartment' => 'compartment', 'name' => 'name', 'expectedQuantity' => 'quantity', 'manufacturer' => 'manufacturer', 'model' => 'model', 'description' => 'description'] as $key => $label) {

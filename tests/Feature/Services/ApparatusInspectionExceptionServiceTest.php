@@ -9,8 +9,10 @@ use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusInspectionException;
 use App\Models\ApparatusInspectionReviewEvent;
+use App\Models\ApparatusIssueMessage;
 use App\Models\ApparatusServiceTicket;
 use App\Models\User;
+use App\Notifications\Inspections\InspectionEventNotification;
 use App\Services\ApparatusInspectionExceptionService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -117,7 +119,9 @@ final class ApparatusInspectionExceptionServiceTest extends TestCase
         $this->assertSame('open', $exception->fresh()->status);
         $this->assertSame('accepted_with_exception', $this->inspection->fresh()->processing_status);
         $this->assertDatabaseCount('apparatus_inspection_review_events', 0);
-        Queue::assertNothingPushed();
+        // The fixture's own Daily Checkout queued its alert fan-out in setUp; the rolled-back reconcile queued nothing more.
+        Queue::assertNotPushed(\App\Jobs\PmAlertNotificationJob::class);
+        Queue::assertPushed(\App\Jobs\FanOutNotification::class, 1);
     }
 
     public function test_correction_checks_meter_precision_and_database_range_and_preserves_original(): void
@@ -195,6 +199,48 @@ final class ApparatusInspectionExceptionServiceTest extends TestCase
             'action' => 'correct', 'reason' => 'Verified revised reading.', 'expected_current_value' => 400, 'value' => 401.2,
         ]);
         $this->assertSame('401.2', $this->apparatus->fresh()->current_engine_hours);
+    }
+
+    public function test_member_revision_is_posted_to_the_thread_and_notifies_reviewers(): void
+    {
+        $exception = $this->meterException();
+        $this->service->reconcile($exception->id, $this->reviewer, [
+            'action' => 'request_revision', 'reason' => 'Please check the hours.', 'expected_current_value' => 400,
+        ]);
+
+        $this->service->submitRevision($exception->id, $this->member, ['reason' => 'Read the meter again.', 'value' => 401.2]);
+        $this->service->submitRevision($exception->id, $this->member, ['reason' => 'Read the meter again.', 'value' => 401.2]);
+
+        $messages = ApparatusIssueMessage::query()->where('apparatus_inspection_id', $this->inspection->id)->where('author_user_id', $this->member->id)->get();
+        $this->assertCount(1, $messages, 'A retried revision must not post twice.');
+        $this->assertSame('member', $messages->first()->visibility);
+        $this->assertStringContainsString('engine hours (revised to 401.2): Read the meter again.', $messages->first()->body);
+        Notification::assertSentTo($this->reviewer, InspectionEventNotification::class);
+    }
+
+    public function test_a_portal_reply_hands_waiting_meter_clarifications_back_to_the_reviewers(): void
+    {
+        $waiting = $this->meterException();
+        $other = $this->meterException('miles');
+        $this->service->reconcile($waiting->id, $this->reviewer, [
+            'action' => 'request_revision', 'reason' => 'Please check the hours.', 'expected_current_value' => 400,
+        ]);
+        $events = ApparatusInspectionReviewEvent::query()->count();
+
+        $this->assertSame(0, $this->service->markMemberReplied($this->inspection->id, $this->reviewer), 'Only the original member can answer.');
+        $this->assertSame('revision_requested', $waiting->fresh()->status);
+
+        $this->assertSame(1, $this->service->markMemberReplied($this->inspection->id, $this->member));
+        $this->assertSame('revision_submitted', $waiting->fresh()->status);
+        $this->assertSame('open', $other->fresh()->status, 'Holds that were not waiting on the member are untouched.');
+        $this->assertSame($events + 1, ApparatusInspectionReviewEvent::query()->count());
+        $event = ApparatusInspectionReviewEvent::query()->latest('id')->firstOrFail();
+        $this->assertSame('member_reply', $event->metadata['action']);
+        $this->assertSame($this->member->id, $event->changed_by_user_id);
+        $this->assertSame('400.0', $this->apparatus->fresh()->current_engine_hours, 'A reply never changes the meters.');
+
+        $this->assertSame(0, $this->service->markMemberReplied($this->inspection->id, $this->member), 'A second reply is a no-op.');
+        $this->assertSame($events + 1, ApparatusInspectionReviewEvent::query()->count());
     }
 
     public function test_dismissal_does_not_resolve_a_real_defect_or_clear_other_exceptions(): void

@@ -17,8 +17,11 @@ const mount = manifest['resources/js/video-conferencing/mount.tsx'];
 const livekit = Object.values(manifest).find((item) => item.name === 'livekit');
 const echo = Object.values(manifest).find((item) => item.name === 'echo');
 const pusher = Object.values(manifest).find((item) => item.name === 'pusher');
+// The member waiting room loads on demand, so it is outside the mount budget; it has its own.
+const memberWaitingRoom = manifest['resources/js/video-conferencing/MemberWaitingRoom.tsx'];
+const waitingRoomLogic = manifest['resources/js/video-conferencing/waiting-room.ts'];
 
-for (const [name, item] of Object.entries({ entry, mount, livekit, echo, pusher })) {
+for (const [name, item] of Object.entries({ entry, mount, livekit, echo, pusher, memberWaitingRoom, waitingRoomLogic })) {
     if (!item?.file) throw new Error(`Conference ${name} chunk is missing from the Vite manifest.`);
 }
 
@@ -29,6 +32,8 @@ const limits = [
     ['livekit', livekit.file, 500_000, 140_000],
     ['echo', echo.file, 15_000, 5_000],
     ['pusher', pusher.file, 70_000, 22_000],
+    ['member-waiting-room', memberWaitingRoom.file, 8_000, 3_000],
+    ['waiting-room-logic', waitingRoomLogic.file, 10_000, 3_500],
 ];
 
 for (const [name, file, rawLimit, gzipLimit] of limits) {
@@ -44,6 +49,13 @@ for (const cssFile of mount.css ?? []) {
     const size = fs.statSync(path.join(buildDir, cssFile)).size;
     if (size > 19_500) throw new Error(`Conference CSS exceeds budget: ${size} bytes.`);
     process.stdout.write(`css: ${size} raw bytes\n`);
+}
+
+for (const cssFile of memberWaitingRoom.css ?? []) {
+    const size = fs.statSync(path.join(buildDir, cssFile)).size;
+    if (size > 1_500) throw new Error(`Waiting room CSS exceeds budget: ${size} bytes.`);
+    process.stdout.write(`waiting-room css: ${size} raw bytes
+`);
 }
 
 function findMaps(directory) {

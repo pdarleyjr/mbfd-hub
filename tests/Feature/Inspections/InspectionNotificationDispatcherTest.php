@@ -265,7 +265,34 @@ final class InspectionNotificationDispatcherTest extends TestCase
         Notification::assertSentTo($this->reporter, InspectionEventNotification::class, fn (InspectionEventNotification $n): bool => $n->kind === 'inspection_decided'
             && $n->title === 'Engine 2: inspection approved'
             && str_contains($n->body, 'was approved'));
-        Notification::assertSentTo($this->reporter, InspectionEventNotification::class, fn (InspectionEventNotification $n): bool => $n->title === 'Engine 2: inspection rejected');
+        // A rejected checkout does not count as done, so the message says what to do next.
+        Notification::assertSentTo($this->reporter, InspectionEventNotification::class, fn (InspectionEventNotification $n): bool => $n->title === 'Engine 2: inspection rejected'
+            && str_contains($n->body, 'does not count as done')
+            && str_contains($n->body, 'submit a new Daily Checkout')
+            && ! str_contains($n->body, 'contact Logistics'));
+        Notification::assertNotSentTo($this->admin, InspectionEventNotification::class);
+    }
+
+    public function test_a_closed_no_action_issue_is_announced_without_calling_it_resolved(): void
+    {
+        $event = \App\Models\ApparatusDefectEvent::query()->create([
+            'apparatus_defect_id' => $this->defect->id,
+            'actor_user_id' => $this->admin->id,
+            'event_type' => 'dismissed',
+            'from_status' => 'reported',
+            'to_status' => 'dismissed',
+            'details' => ['reason' => 'Duplicate of the report from Oct 20.', 'previous_action_status' => 'reported'],
+        ]);
+
+        $this->dispatcher->issueClosedNoAction($this->defect, $event);
+
+        Notification::assertSentToTimes($this->reporter, InspectionEventNotification::class, 1);
+        Notification::assertSentTo($this->reporter, InspectionEventNotification::class, fn (InspectionEventNotification $n): bool => $n->kind === 'issue_member_update'
+            && $n->title === 'Engine 2: issue closed, no action required'
+            && str_contains($n->body, 'was closed with no action required')
+            && str_contains($n->body, 'Reason: Duplicate of the report from Oct 20')
+            && str_contains($n->body, 'It was not repaired or replaced.')
+            && ! str_contains(strtolower($n->body), 'resolved'));
         Notification::assertNotSentTo($this->admin, InspectionEventNotification::class);
     }
 

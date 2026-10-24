@@ -156,7 +156,7 @@ class MyVehicleInspections extends Page implements HasTable
                 Tables\Filters\SelectFilter::make('review_status')
                     ->label('Review status')
                     ->options([
-                        'pending_review' => 'Needs approval',
+                        'pending_review' => 'Waiting for Logistics review',
                         'approved' => 'Accepted',
                         'rejected' => 'Rejected',
                     ]),
@@ -296,7 +296,7 @@ class MyVehicleInspections extends Page implements HasTable
         [$label, $color] = match ($record->review_status) {
             'approved' => ['Accepted', 'success'],
             'rejected' => ['Rejected', 'danger'],
-            'pending_review' => ['Needs approval', 'warning'],
+            'pending_review' => ['Waiting for Logistics review', 'warning'],
             default => [$flagged ? 'Accepted' : $history->processingStatusLabel($record->processing_status), $flagged ? 'warning' : 'gray'],
         };
 
@@ -304,7 +304,8 @@ class MyVehicleInspections extends Page implements HasTable
             'label' => $label,
             'color' => $color,
             'note' => $flagged ? 'Meter flagged' : null,
-            'tooltip' => $history->processingStatusLabel($record->processing_status).' · '.$history->reviewStatusLabel($record->review_status),
+            // The service still calls this review state "Needs approval"; members cannot approve anything.
+            'tooltip' => $history->processingStatusLabel($record->processing_status).' · '.($record->review_status === 'pending_review' ? $label : $history->reviewStatusLabel($record->review_status)),
         ];
     }
 

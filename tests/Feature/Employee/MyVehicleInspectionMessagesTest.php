@@ -155,7 +155,7 @@ final class MyVehicleInspectionMessagesTest extends TestCase
 
         $html = $this->actingAs($this->owner)->get($this->url())->assertOk()->getContent();
 
-        $this->assertStringContainsString('Needs approval: Mileage lower than last reading; You flagged this for review; New significant damage', preg_replace('/\s+/', ' ', $html));
+        $this->assertStringContainsString('Waiting for Logistics review: Mileage lower than last reading; You flagged this for review; New significant damage', preg_replace('/\s+/', ' ', $html));
         $this->assertStringNotContainsString('Engine hours lower than last reading', $html);
     }
 
@@ -202,6 +202,82 @@ final class MyVehicleInspectionMessagesTest extends TestCase
         $this->assertSame('Missing', $this->inspection->fresh()->results[0]['items'][0]['status']);
     }
 
+    public function test_an_issue_closed_with_no_action_is_never_called_resolved_and_shows_who_why_and_that_nothing_was_fixed(): void
+    {
+        app(\App\Services\Defects\DefectCorrectiveActionService::class)->dismiss($this->defect->id, $this->reviewer, ['reason' => 'Duplicate of the report from Oct 20.']);
+
+        $html = $this->actingAs($this->owner)->get($this->url())->assertOk()->getContent();
+        $flat = preg_replace('/\s+/', ' ', strip_tags($html));
+
+        $this->assertStringContainsString('Closed — no action required', $html);
+        $this->assertStringContainsString('Reason: Duplicate of the report from Oct 20.', $flat);
+        $this->assertStringContainsString('Nothing was repaired or replaced.', $flat);
+        $this->assertStringContainsString('What you recorded on this inspection is unchanged.', $flat);
+        $this->assertStringNotContainsString('Resolved on', $html, 'A no-action closure is not a repair.');
+        $this->assertStringNotContainsString('Current status: Resolved', $flat);
+        $this->assertStringNotContainsString('Defect status: Resolved', $flat);
+
+        // The PDF prints the same facts, in the stage column.
+        $history = app(\App\Services\Inspections\EmployeeInspectionHistoryService::class);
+        $pdf = view('pdf.apparatus-inspection', [
+            'detail' => $history->detail($this->inspection->fresh()),
+            'images' => [], 'omittedImages' => 0, 'logo' => null, 'generatedAt' => now(),
+        ])->render();
+        $pdfFlat = preg_replace('/\s+/', ' ', strip_tags($pdf));
+        $this->assertStringContainsString('Closed — no action required', $pdfFlat);
+        $this->assertStringContainsString('Reason: Duplicate of the report from Oct 20.', $pdfFlat);
+        $this->assertStringContainsString('Nothing was repaired or replaced.', $pdfFlat);
+        $this->assertStringNotContainsString('Resolved', $pdfFlat);
+    }
+
+    public function test_members_are_told_waiting_for_logistics_review_never_needs_approval(): void
+    {
+        $this->inspection->forceFill(['review_status' => 'pending_review', 'processing_status' => 'held_for_review'])->save();
+        $history = app(\App\Services\Inspections\EmployeeInspectionHistoryService::class);
+
+        $this->assertSame('Waiting for Logistics review', $history->reviewStatusLabel('pending_review'));
+        $this->assertSame('Waiting for Logistics review', $history->acceptance($this->inspection->fresh())['headline']);
+        $detail = $history->detail($this->inspection->fresh());
+        $this->assertSame('Waiting for Logistics review', $detail['review_label']);
+
+        $pdf = view('pdf.apparatus-inspection', [
+            'detail' => $detail, 'images' => [], 'omittedImages' => 0, 'logo' => null, 'generatedAt' => now(),
+        ])->render();
+        $this->assertStringContainsString('Waiting for Logistics review', $pdf);
+        $this->assertStringNotContainsString('Needs approval', $pdf);
+
+        $html = $this->actingAs($this->owner)->get($this->url())->assertOk()->getContent();
+        $this->assertStringContainsString('Waiting for Logistics review', $html);
+        $this->assertStringNotContainsString('Needs approval', $html);
+        // Reviewers keep their own wording on the admin pages.
+        $this->assertSame('Needs approval', $this->inspection->fresh()->displayStatus());
+    }
+
+    public function test_the_inspection_list_summary_separates_repairs_from_no_action_closures(): void
+    {
+        $summary = function (): string {
+            $history = app(\App\Services\Inspections\EmployeeInspectionHistoryService::class);
+            $row = $history->withFollowUpCounts(ApparatusInspection::query()->whereKey($this->inspection->id))->firstOrFail();
+
+            return $history->followUpSummary($row);
+        };
+        $service = app(\App\Services\Defects\DefectCorrectiveActionService::class);
+        $this->assertSame('1 of 1 open', $summary());
+
+        $service->dismiss($this->defect->id, $this->reviewer, ['reason' => 'Duplicate of the report from Oct 20.']);
+        $this->assertSame('Closed — no action required', $summary());
+
+        $second = $this->openDefect($this->rig, $this->inspection, $this->owner, 'Hose nozzle');
+        $this->assertSame('1 of 2 open', $summary());
+        $service->resolve($second->id, $this->reviewer, ['resolution_type' => 'replacement_installed', 'resolution_notes' => 'New nozzle issued.']);
+        $this->assertSame('1 resolved, 1 closed — no action required', $summary());
+
+        $this->defect->refresh();
+        $service->reopen($this->defect->id, $this->reviewer, ['reason' => 'It is a different battery.']);
+        $service->resolve($this->defect->id, $this->reviewer, ['resolution_type' => 'repair_completed', 'resolution_notes' => 'Battery replaced.']);
+        $this->assertSame('All 2 resolved', $summary());
+    }
+
     public function test_owner_replies_to_the_inspection_and_to_an_issue_with_member_visibility_only(): void
     {
         $page = $this->page($this->owner);
@@ -220,6 +296,25 @@ final class MyVehicleInspectionMessagesTest extends TestCase
         $this->assertSame($this->inspection->id, $issue->apparatus_inspection_id);
 
         $page->assertSee('It was the dash odometer.')->assertSee('Battery is still missing today.');
+    }
+
+    public function test_replying_on_the_inspection_thread_answers_a_waiting_meter_clarification(): void
+    {
+        $waiting = ApparatusInspectionException::query()->create([
+            'apparatus_inspection_id' => $this->inspection->id, 'apparatus_id' => $this->rig->id,
+            'field' => 'engine_hours', 'reason' => 'rollback', 'status' => 'revision_requested',
+            'submitted_value' => 300, 'baseline_value' => 400, 'authoritative_value' => 400,
+        ]);
+        $page = $this->page($this->owner);
+
+        // An issue-thread reply is about an item, not the meter question.
+        $page->set('issueReplies.'.$this->defect->id, 'Battery is still missing today.')->call('sendIssueReply', $this->defect->id);
+        $this->assertSame('revision_requested', $waiting->fresh()->status);
+
+        $page->set('inspectionReply', 'The dash odometer was right.')->call('sendInspectionReply')->assertHasNoErrors();
+
+        $this->assertSame('revision_submitted', $waiting->fresh()->status);
+        $this->assertSame('member_reply', ApparatusInspectionReviewEvent::query()->latest('id')->firstOrFail()->metadata['action']);
     }
 
     public function test_blank_and_oversized_replies_are_rejected_with_an_inline_error(): void

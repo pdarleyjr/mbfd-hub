@@ -11,6 +11,7 @@ use App\Models\HubSupportTicketUpdate;
 use App\Models\User;
 use App\Notifications\HubSupportMemberNotification;
 use App\Notifications\NewSubmissionNotification;
+use App\Services\Notifications\NotificationRecipientEvaluator;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
@@ -37,17 +38,11 @@ final class HubSupportTicketSideEffectService
 
     private function notifySupportRecipients(HubSupportTicket $ticket, HubSupportTicketUpdate $update, string $title): void
     {
-        $recipients = User::query()
-            ->whereHas('notificationSubscriptions', fn ($query) => $query
-                ->where('event_key', User::NOTIFICATION_PREFERENCE_HUB_SUPPORT_TICKETS)
-                ->where(fn ($channels) => $channels
-                    ->where('database_enabled', true)
-                    ->orWhere('webpush_enabled', true)
-                    ->orWhere('email_enabled', true)))
-            ->get()
-            ->filter(fn (User $user): bool => $user->isAuthenticationAllowed()
-                && $user->hasCurrentAdminPanelEntitlement()
-                && $user->can('view', $ticket));
+        // Eligibility (admin entitlement + the support policy) is evaluated now; the per-ticket
+        // view check and the member's opt-in choices (off by default) narrow it further.
+        $recipients = app(NotificationRecipientEvaluator::class)
+            ->recipients(User::NOTIFICATION_PREFERENCE_HUB_SUPPORT_TICKETS)
+            ->filter(fn (User $user): bool => $user->can('view', $ticket));
 
         foreach ($recipients as $recipient) {
             $this->record($update, $recipient, 'admin', ['title' => $title, 'message' => "{$ticket->ticket_number}: {$ticket->generated_title}"]);

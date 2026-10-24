@@ -410,7 +410,7 @@ test('self join keeps the exact session for status fallback and returns safely',
         await signIn(self.page);
         await self.page.goto('/employee/video-conferencing?return_to=%2Femployee');
         await expect(self.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'ready');
-        await self.page.getByRole('button', {name:'Join active Morning Lineup'}).click();
+        await self.page.getByRole('button', {name:'Join Morning Lineup'}).click();
         await expect(self.page.locator('.vc-shell')).toHaveAttribute('data-phase', 'connected');
         await expect(command.page.locator('.vc-tile')).toHaveCount(2);
         // Simulate a missed LiveKit closure reason: server status remains the

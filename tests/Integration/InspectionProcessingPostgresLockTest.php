@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Integration;
 
+use App\Jobs\FanOutNotification;
 use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
+use App\Models\User;
 use App\Services\ApparatusInspectionProcessingService;
 use App\Services\InspectionMeterBaseline;
 use Illuminate\Support\Facades\DB;
@@ -31,6 +33,11 @@ final class InspectionProcessingPostgresLockTest extends TestCase
         $apparatus = Apparatus::create(['name' => 'Concurrent inspection fixture', 'unit_id' => 'PG-CHECK-'.uniqid(), 'type' => 'Engine', 'status' => 'In Service', 'current_engine_hours' => 100, 'current_miles' => 1000]);
         $inspection = ApparatusInspection::create(['apparatus_id' => $apparatus->id, 'operator_name' => 'Concurrency fixture', 'rank' => 'Firefighter', 'review_status' => 'pending_review', 'engine_hours' => 101, 'miles' => 1001, 'results' => []]);
         $token = app(InspectionMeterBaseline::class)->issue($apparatus);
+        // Creating the fixture is itself a submission: the opt-in "every Daily Checkout" category queues its one
+        // fan-out for the committed row (and only that). Prove it, then watch processing from a clean queue.
+        Queue::assertPushed(FanOutNotification::class, 1);
+        Queue::assertPushed(FanOutNotification::class, fn (FanOutNotification $job): bool => $job->categoryKey === User::NOTIFICATION_PREFERENCE_DAILY_CHECKOUT_EVERY_SUBMISSION);
+        Queue::fake();
         $connection = config('database.connections.pgsql');
         $lockKey = random_int(1_000_000, 2_000_000_000);
         $writer = new Process([PHP_BINARY, '-d', 'extension=pdo_pgsql', '-r', <<<'PHP'

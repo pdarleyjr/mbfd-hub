@@ -158,9 +158,16 @@ async function setArchiveVisibility(page: Page, value: 'active' | 'archived' | '
   const table = page.locator('.fi-ta');
   await expect(table).toBeVisible();
   await expect(table).not.toHaveClass(/\banimate-pulse\b/);
-  await page.getByRole('button', { name: /^Filters?(?: \d+)?$/i }).click();
   const visibility = page.getByLabel(label, { exact: true });
-  await expect(visibility).toBeVisible();
+  // The Filters toggle is wired by the table's lazily loaded Alpine component (table.js). A click made before that
+  // script has run does nothing, and the single-threaded test server can take a second to deliver it, so click
+  // again until the panel is actually open instead of assuming the first click landed.
+  await expect(async () => {
+    if (!await visibility.isVisible()) {
+      await page.getByRole('button', { name: /^Filters?(?: \d+)?$/i }).click({ timeout: 2_000 });
+    }
+    await expect(visibility).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 30_000 });
   if (await visibility.inputValue() !== value) {
     const [filtered] = await Promise.all([
       page.waitForResponse(response => {
@@ -174,6 +181,8 @@ async function setArchiveVisibility(page: Page, value: 'active' | 'archived' | '
     expect(await filtered.finished()).toBeNull();
   }
   await page.keyboard.press('Escape');
+  // The panel leaves with a transition; the next call must start from a closed panel, not one that is still closing.
+  await expect(visibility).toBeHidden();
 }
 
 async function archiveFindRestore(page: Page, adminUrl: string, indexUrl: string, reference: string, visibilityLabel: 'Visibility' | 'Show' = 'Visibility'): Promise<void> {
@@ -638,7 +647,7 @@ test('real Hub Support submission, member reply, confirm, reopen, archive and re
   expect(await retained.body()).toEqual(qaPng);
 
   await page.goto(adminUrl);
-  await page.getByRole('button', { name: 'Delete', exact: true }).click();
+  await page.getByRole('button', { name: 'Move to Trash', exact: true }).click();
   await page.getByRole('textbox', { name: /^Reason\s*\*?$/ }).fill('[QA TEST] Recoverable Trash verification; retain evidence.');
   await submitAdminModal(page);
   await expect(page.getByRole('button', { name: 'Restore from Trash', exact: true })).toBeVisible();
@@ -665,7 +674,7 @@ test('real Hub Support submission, member reply, confirm, reopen, archive and re
   await expect(page.getByText('[QA TEST] Reopen verification resolved.', { exact: true }).first()).toBeVisible();
   expect(await (await page.request.get(attachmentUrl)).body()).toEqual(qaPng);
   await page.goto(adminUrl);
-  await page.getByRole('button', { name: 'Delete', exact: true }).click();
+  await page.getByRole('button', { name: 'Move to Trash', exact: true }).click();
   await page.getByRole('textbox', { name: /^Reason\s*\*?$/ }).fill('[QA TEST] Finished; retain original files and history in Trash.');
   await submitAdminModal(page);
   await screenshot(page, testInfo, 'support-trash', false);

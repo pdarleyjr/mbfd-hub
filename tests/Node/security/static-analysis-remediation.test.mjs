@@ -22,14 +22,13 @@ test('Ollama proxy validates one fixed loopback upstream and relative request ta
 });
 
 test('push navigation and messages remain same-origin in source and generated workers', () => {
-  for (const file of [
-    'resources/js/daily-checkout/inject-push-sw.js',
-    'resources/js/daily-checkout/public/service-worker.js',
-  ]) {
-    const source = read(file);
-    assert.match(source, /sameOriginNavigation/);
-    assert.match(source, /candidate\.origin !== self\.location\.origin/);
-  }
+  const injector = read('resources/js/daily-checkout/inject-push-sw.js');
+  assert.match(injector, /sameOriginNavigation/);
+  assert.match(injector, /candidate\.origin !== self\.location\.origin/);
+  // The Daily worker gets its push routing from the shared core, which keeps the same rule.
+  const dailyWorker = read('resources/js/daily-checkout/public/service-worker.js');
+  assert.match(dailyWorker, /function sameOriginNavigation\(/);
+  assert.match(dailyWorker, /candidate\.origin === origin\(\)/);
   const worker = read('resources/js/daily-checkout/public/service-worker.js');
   assert.match(worker, /event\.source\?\.url/);
   assert.match(worker, /sourceUrl\.origin !== self\.location\.origin/);

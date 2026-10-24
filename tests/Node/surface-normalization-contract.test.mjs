@@ -132,8 +132,11 @@ for (const sheet of normalisedStylesheets) {
 
 test('the uniform toolbar sits under the shared shell bar, not a fixed offset', () => {
   const css = readFileSync('resources/css/filament/uniform-order-builder.css', 'utf8');
-  assert.match(css, /--uo-toolbar-top: calc\(var\(--hub-shell-bar-height\)/);
+  // --hub-bar-total is the shell bar plus the top safe-area inset (installed apps on notched phones).
+  assert.match(css, /--uo-toolbar-top: var\(--hub-bar-total\)/);
   assert.doesNotMatch(css, /--uo-toolbar-top: \d+px/);
+  const theme = readFileSync('resources/css/mbfd-theme.css', 'utf8');
+  assert.match(theme, /--hub-bar-total: calc\(var\(--hub-shell-bar-height\) \+ var\(--hub-safe-top\)\)/);
 });
 
 /*

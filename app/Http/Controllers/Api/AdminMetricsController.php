@@ -26,6 +26,9 @@ class AdminMetricsController extends Controller
             'defects' => [
                 'open' => ApparatusDefect::query()->unresolved()->count(),
                 'critical' => ApparatusDefect::query()->unresolved()->missing()->count(),
+                // Closed two different ways: fixed, or closed with no action required (nothing repaired).
+                'resolved' => ApparatusDefect::query()->fixed()->count(),
+                'closed_no_action' => ApparatusDefect::query()->closedNoAction()->count(),
                 'total' => ApparatusDefect::count(),
             ],
 

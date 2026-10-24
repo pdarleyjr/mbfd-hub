@@ -30,7 +30,7 @@ final class ViewHubSupportTicket extends ViewRecord
         return [
             ...$this->getArchiveActions(),
             Actions\Action::make('delete')
-                ->label('Delete')->icon('heroicon-o-trash')->color('danger')
+                ->label('Move to Trash')->icon('heroicon-o-trash')->color('danger')
                 ->modalHeading('Move issue report to Trash?')
                 ->modalDescription('The report leaves normal views. Its files and history remain recoverable by an administrator.')
                 ->visible(fn (): bool => ! $this->ticket()->trashed() && (auth()->user()?->can('delete', $this->ticket()) ?? false))

@@ -1,6 +1,7 @@
-<x-filament-panels::page data-hub-ui="2" data-hub-portal="employee">
+<x-filament-panels::page data-hub-ui="2" data-hub-portal="employee" data-hub-page-frame="bleed">
     <div
         id="operational-forms-root"
+        data-mbfd-unsaved-work-guard
         data-bootstrap='@json($operationalFormsBootstrap)'
         aria-label="MBFD Operational Forms workspace"
         x-data

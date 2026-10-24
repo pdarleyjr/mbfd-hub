@@ -140,20 +140,24 @@ final class VehicleSwapNotificationTest extends TestCase
 
         Livewire::test(NotificationSettings::class)
             ->assertSuccessful()
-            ->assertFormFieldExists(User::NOTIFICATION_PREFERENCE_DEPARTMENT_UPDATES.'.email')
+            ->assertFormFieldExists(User::NOTIFICATION_PREFERENCE_DEPARTMENT_UPDATES.'.webpush')
+            ->assertFormFieldDoesNotExist(User::NOTIFICATION_PREFERENCE_DEPARTMENT_UPDATES.'.email')
             ->assertFormFieldDoesNotExist(self::EVENT.'.email')
             ->call('save');
 
         $this->assertDatabaseMissing('user_notification_subscriptions', ['user_id' => $support->id, 'event_key' => self::EVENT]);
     }
 
-    public function test_a_fleet_operations_manager_can_open_notification_settings(): void
+    public function test_every_active_member_can_open_notification_settings_but_only_a_manager_sees_the_swap_alert(): void
     {
         $this->actingAs($this->fleetOperationsManager());
         $this->assertTrue(NotificationSettings::canAccess());
 
         $this->actingAs($this->member);
-        $this->assertFalse(NotificationSettings::canAccess());
+        $this->assertTrue(NotificationSettings::canAccess());
+        Livewire::test(NotificationSettings::class)
+            ->assertSuccessful()
+            ->assertFormFieldDoesNotExist(self::EVENT.'.email');
     }
 
     private function sentNotification(User $user): NewSubmissionNotification

@@ -591,7 +591,7 @@ final class DisplaySnapshotService
         $passRate = $totalRecent > 0 ? (int) round(($passCount / $totalRecent) * 100) : null;
 
         // "Pending review" station inspections: submitted but not yet reviewed.
-        $stationPendingReview = StationInspection::query()->whereNull('reviewed_by')->count();
+        $stationPendingReview = StationInspection::query()->active()->whereNull('reviewed_by')->count();
 
         // Apparatus inspections flagged for review (H-01 review queue).
         $apparatusPendingReview = ApparatusInspection::query()

@@ -5,6 +5,7 @@ import App from './App.tsx'
 import { QueryProvider } from './providers/QueryProvider'
 import './index.css'
 import { startHubIssueDiagnosticsCollector } from '../../hub-support/diagnostics.js'
+import { startUpdateRegistrar } from '../../pwa/update-registrar'
 
 startHubIssueDiagnosticsCollector()
 
@@ -15,11 +16,18 @@ Sentry.init({
 })
 
 if ('serviceWorker' in navigator) {
+  // The one and only registration of this worker: plain URL (never a ?v= variant,
+  // see 2.AI_AGENT_ERRORS.md ERROR-037), scope /daily/. Do not add a second register().
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/daily/sw.js', { scope: '/daily/' })
       .catch((error) => console.error('Service worker registration failed:', error))
   })
 }
+
+// Release detection, the "update ready" banner, chunk-load recovery and notification
+// deep links (MBFD_NAVIGATE). No scriptUrl: the registration above stays the only one.
+// It never reloads while a draft or a queued submission is busy (see src/pwa).
+startUpdateRegistrar({ scope: '/daily/' })
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

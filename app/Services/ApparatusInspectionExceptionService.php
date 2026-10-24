@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Services\Display\DisplaySnapshotService;
 use App\Services\Inspections\InspectionHold;
 use App\Services\Inspections\InspectionReviewService;
+use App\Services\Inspections\IssueMessageService;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Cache;
@@ -227,9 +228,57 @@ final class ApparatusInspectionExceptionService
                 'prior_authoritative_meters' => $this->meters($apparatus),
                 'result_authoritative_meters' => $this->meters($apparatus),
             ]);
+            // The inspection thread is where reviewers already hear from members (and are notified),
+            // so the revision is posted there too instead of arriving silently.
+            app(IssueMessageService::class)->post($member, [
+                'inspection_id' => $inspection->id,
+                'body' => $this->revisionMessage($exception, $validated),
+            ]);
 
             return $exception;
         }, 3);
+    }
+
+    /**
+     * A member answered in the inspection messages: every meter clarification waiting on them
+     * returns to the reviewers' queue (revision_requested -> revision_submitted). The reply text
+     * itself lives in the message thread, which already notifies reviewers; nothing is applied
+     * to the fleet. Returns how many holds were handed back.
+     */
+    public function markMemberReplied(int $inspectionId, User $member): int
+    {
+        return DB::transaction(function () use ($inspectionId, $member): int {
+            $inspection = ApparatusInspection::query()->lockForUpdate()->find($inspectionId);
+            if ($inspection === null || $inspection->actor_user_id === null
+                || (int) $inspection->actor_user_id !== (int) $member->id) {
+                return 0;
+            }
+            $waiting = ApparatusInspectionException::query()
+                ->where('apparatus_inspection_id', $inspection->id)
+                ->where('status', 'revision_requested')
+                ->orderBy('id')->lockForUpdate()->get();
+            foreach ($waiting as $exception) {
+                $exception->update(['status' => 'revision_submitted']);
+                $this->recordEvent($inspection, $exception, $member, 'revision_requested', 'revision_submitted', 'Member replied in the inspection messages.', [
+                    'action' => 'member_reply',
+                ]);
+            }
+
+            return $waiting->count();
+        }, 3);
+    }
+
+    /** @param array<string, mixed> $revision validated reason (and meter value) */
+    private function revisionMessage(ApparatusInspectionException $exception, array $revision): string
+    {
+        $label = match ($exception->field) {
+            'engine_hours' => 'engine hours',
+            'miles' => 'miles',
+            default => str_replace('_', ' ', (string) $exception->field),
+        };
+        $value = array_key_exists('value', $revision) ? ' (revised to '.$revision['value'].')' : '';
+
+        return "Clarification on {$label}{$value}: ".$revision['reason'];
     }
 
     /** @return array{ApparatusInspection, Apparatus, ApparatusInspectionException} */

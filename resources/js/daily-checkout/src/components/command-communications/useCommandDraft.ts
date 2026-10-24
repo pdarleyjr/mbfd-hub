@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { describeFileProblem } from './format';
 import { ALLOWED_EXTENSIONS, MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, type CommandDraft } from './types';
+import { useUnsavedWorkBusy } from '../../pwa/useUnsavedWorkBusy.ts';
 
 /** crypto.randomUUID needs a secure context; fall back so an http kiosk still gets a unique id. */
 export function newSubmissionId(): string {
@@ -38,6 +39,9 @@ export function acceptFiles(current: File[], picked: File[]): { files: File[]; n
  */
 export function useCommandDraft() {
   const [draft, setDraft] = useState<CommandDraft>(emptyDraft);
+  // The draft lives in memory only (shared workstations), so a reload would lose it:
+  // tell the update registrar while a message is being written.
+  useUnsavedWorkBusy(draft.body.trim() !== '' || draft.subject.trim() !== '' || draft.files.length > 0);
 
   /** Content changed. If the last attempt may have been stored, this is a new message: new id. */
   const edit = useCallback((patch: Partial<CommandDraft>) => {

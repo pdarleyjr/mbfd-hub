@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
-use App\Models\User;
 use App\Notifications\CriticalAlertNotification;
+use App\Services\Notifications\NotificationRecipientEvaluator;
 use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
@@ -35,9 +35,8 @@ final class SendBackupAlert extends Command
         }
 
         $isTest = (bool) $this->option('test');
-        $recipients = User::role(['super_admin', 'admin'])
-            ->get()
-            ->filter(fn (User $user): bool => $user->isAuthenticationAllowed());
+        // Everyone who may receive system alerts right now; push follows each member's own device and choice.
+        $recipients = app(NotificationRecipientEvaluator::class)->recipients('system_alerts');
         if ($recipients->isEmpty()) {
             $this->error('No active administrator can receive the backup alert.');
 

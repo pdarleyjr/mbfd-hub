@@ -157,6 +157,7 @@ final class Captain5AccessExplainer
             ['label' => 'Open the Captain 5 workspace', 'allowed' => $decision->canViewPage],
             ['label' => 'Act on issues', 'allowed' => $decision->canAct],
             ['label' => 'Shown as the shift\'s Captain 5 now (display only)', 'allowed' => $decision->isShownCaptain5],
+            ['label' => 'Close issues with no action required', 'allowed' => $decision->canDismiss],
             ['label' => 'Configure Captain 5 in the Admin Panel', 'allowed' => $decision->canConfigure],
         ];
     }
