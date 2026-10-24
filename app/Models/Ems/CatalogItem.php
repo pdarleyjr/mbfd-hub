@@ -7,7 +7,21 @@ namespace App\Models\Ems;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-/** A stable identity (slug) shared by bag-form items and supply-room rows only when the extraction said so. */
+/**
+ * A stable identity (slug) shared by bag-form items and supply-room rows only when the extraction said so.
+ *
+ * @property int $id
+ * @property string $key
+ * @property string $name
+ * @property string|null $category
+ * @property array<int, string>|null $aliases
+ * @property bool $refrigerated
+ * @property bool $controlled_substance
+ * @property bool|null $has_expiration
+ * @property bool $active
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ */
 class CatalogItem extends Model
 {
     protected $table = 'ems_catalog_items';

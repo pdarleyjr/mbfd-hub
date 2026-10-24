@@ -14,6 +14,41 @@ use LogicException;
 /**
  * A Medical Inventory Request (MIR). The submission facts and the snapshot are written once and
  * never change; only the workflow columns (status, review, close, cancel, Files copy id) move.
+ *
+ * @property int $id
+ * @property string $uuid
+ * @property string $number
+ * @property string $status
+ * @property int|null $submitted_by_user_id
+ * @property int|null $submitted_by_employee_id
+ * @property string $submitter_name
+ * @property string|null $submitter_rank
+ * @property \Illuminate\Support\Carbon $submitted_at
+ * @property string $target_kind
+ * @property int|null $apparatus_id
+ * @property string $target_label
+ * @property string|null $event_assignment
+ * @property string|null $member_note
+ * @property string $client_submission_id
+ * @property array<string, mixed> $source_form_versions
+ * @property array<string, mixed> $snapshot
+ * @property string $snapshot_sha256
+ * @property string|null $operational_form_record_id
+ * @property \Illuminate\Support\Carbon|null $reviewed_at
+ * @property int|null $reviewed_by_user_id
+ * @property \Illuminate\Support\Carbon|null $closed_at
+ * @property int|null $closed_by_user_id
+ * @property string|null $close_reason
+ * @property \Illuminate\Support\Carbon|null $cancelled_at
+ * @property int|null $cancelled_by_user_id
+ * @property string|null $cancel_reason
+ * @property \Illuminate\Support\Carbon|null $last_activity_at
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ * @property-read int|null $lines_count
+ * @property-read int|string|null $qty_requested
+ * @property-read int|string|null $qty_issued
+ * @property-read string|null $last_message_context
  */
 class InventoryRequest extends Model
 {

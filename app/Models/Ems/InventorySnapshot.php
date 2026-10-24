@@ -9,7 +9,28 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use LogicException;
 
-/** A physical count, a calculated reconciliation or a baseline. A `final` snapshot never changes. */
+/**
+ * A physical count, a calculated reconciliation or a baseline. A `final` snapshot never changes.
+ *
+ * @property int $id
+ * @property string $uuid
+ * @property int|null $version
+ * @property string $kind
+ * @property string $status
+ * @property string|null $scope_location_code
+ * @property int|null $started_by_user_id
+ * @property \Illuminate\Support\Carbon $started_at
+ * @property int|null $finalized_by_user_id
+ * @property \Illuminate\Support\Carbon|null $finalized_at
+ * @property string|null $finalized_name
+ * @property \Illuminate\Support\Carbon|null $cutoff_at
+ * @property int|null $through_movement_id
+ * @property int|null $previous_snapshot_id
+ * @property string|null $idempotency_key
+ * @property string|null $notes
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ */
 class InventorySnapshot extends Model
 {
     public const KIND_COUNT = 'physical_count';

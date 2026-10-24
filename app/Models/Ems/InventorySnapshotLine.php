@@ -9,6 +9,20 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\DB;
 use LogicException;
 
+/**
+ * @property int $id
+ * @property int $snapshot_id
+ * @property int $supply_item_id
+ * @property string|null $location_code
+ * @property string $item_name
+ * @property int|null $quantity_base
+ * @property array<string, mixed>|null $entry
+ * @property string $value_source
+ * @property array<int|string, mixed>|null $warnings
+ * @property int|null $through_movement_id
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ */
 class InventorySnapshotLine extends Model
 {
     public const COUNTED = 'counted';

@@ -8,7 +8,23 @@ use App\Models\Ems\Concerns\AppendOnly;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-/** Append-only request history. Corrections are new events, never edits. */
+/**
+ * Append-only request history. Corrections are new events, never edits.
+ *
+ * @property int $id
+ * @property int $request_id
+ * @property int|null $request_line_id
+ * @property int|null $actor_user_id
+ * @property string|null $actor_name
+ * @property string|null $actor_rank
+ * @property string $actor_context
+ * @property string $action
+ * @property string|null $from_status
+ * @property string|null $to_status
+ * @property string|null $idempotency_key
+ * @property array<string, mixed>|null $payload
+ * @property \Illuminate\Support\Carbon|null $created_at
+ */
 class InventoryRequestEvent extends Model
 {
     use AppendOnly;

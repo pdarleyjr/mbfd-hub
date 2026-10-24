@@ -11,6 +11,34 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 /**
  * One row of the Captain 5 supply room catalogue. A conversion factor (units_per_package) is
  * only ever set from explicit source text or by an authorized person; null means unknown.
+ *
+ * @property int $id
+ * @property int|null $catalog_item_id
+ * @property int|null $location_id
+ * @property string|null $source_row_key
+ * @property string|null $section_key
+ * @property string $name
+ * @property string|null $bag_alias_text
+ * @property string $base_unit
+ * @property string|null $package_unit
+ * @property int|null $units_per_package
+ * @property int|null $packages_per_case
+ * @property int|null $threshold_qty_base
+ * @property string|null $threshold_source_text
+ * @property string|null $qty_per_package_text
+ * @property string|null $order_amount_text
+ * @property int|null $order_qty_packages
+ * @property array<int|string, mixed>|null $suppliers
+ * @property array<int|string, mixed>|null $item_numbers
+ * @property bool $refrigerated
+ * @property bool $controlled_substance
+ * @property bool|null $has_expiration
+ * @property bool $needs_review
+ * @property array<int|string, mixed>|null $review_reasons
+ * @property array<string, mixed>|null $source
+ * @property bool $active
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class SupplyItem extends Model
 {

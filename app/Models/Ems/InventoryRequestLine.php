@@ -8,6 +8,30 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
 
+/**
+ * @property int $id
+ * @property int $request_id
+ * @property int|null $source_form_item_id
+ * @property int|null $catalog_item_id
+ * @property string $bag_key
+ * @property string $item_key
+ * @property string $label
+ * @property string|null $section_label
+ * @property string|null $variant_label
+ * @property string|null $min_text
+ * @property string|null $unit
+ * @property string $response_type
+ * @property int|null $requested_qty
+ * @property bool|null $requested_flag
+ * @property int|null $prepared_qty
+ * @property int $issued_qty
+ * @property string $line_status
+ * @property string|null $not_issued_reason
+ * @property array<string, mixed>|null $flags
+ * @property int $sort
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
+ */
 class InventoryRequestLine extends Model
 {
     public const OPEN = 'open';

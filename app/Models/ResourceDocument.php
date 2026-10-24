@@ -64,14 +64,15 @@ class ResourceDocument extends Model
     protected static function booted(): void
     {
         static::creating(function (self $document): void {
-            if (! is_string($document->uuid) || $document->uuid === '') {
+            $uuid = $document->getAttribute('uuid');
+            if (! is_string($uuid) || $uuid === '') {
                 $document->uuid = (string) Str::uuid();
             }
         });
 
         static::saving(function (self $document): void {
             if ($document->published && $document->published_at === null) {
-                $document->published_at = now();
+                $document->published_at = now()->toImmutable();
             }
         });
 
