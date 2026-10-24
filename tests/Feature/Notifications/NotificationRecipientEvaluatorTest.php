@@ -51,7 +51,7 @@ final class NotificationRecipientEvaluatorTest extends TestCase
         foreach ([
             'vehicle_inspections', 'station_inspections', 'station_requests', 'apparatus_service_tickets', 'workgroup_evaluations',
             'station_inventory_alerts', 'department_updates', 'hub_support_tickets', 'uniform_requests', 'personnel_equipment_requests',
-            'member_request_updates', 'vehicle_swap_reports',
+            'member_request_updates', 'vehicle_swap_reports', 'vehicle_identification_reports',
         ] as $existing) {
             $this->assertContains($existing, $keys, "{$existing} keeps its meaning for existing rows");
         }
@@ -79,6 +79,7 @@ final class NotificationRecipientEvaluatorTest extends TestCase
         }
         $this->assertTrue($registry->get('department_updates')->defaults['webpush'], 'department notices keep their existing push default');
         $this->assertSame(['database' => true, 'webpush' => false, 'email' => true], $registry->get('vehicle_swap_reports')->defaults);
+        $this->assertSame(['database' => true, 'webpush' => false, 'email' => true], $registry->get('vehicle_identification_reports')->defaults);
         $this->assertSame(['database' => false, 'webpush' => false, 'email' => false], $registry->get('hub_support_tickets')->defaults, 'opt-in only');
     }
 

@@ -3,6 +3,7 @@ import type {
   Captain5Summary, Handoff, InspectionView, IssueActionRequest, IssueDetail, IssueSummary, Workspace,
 } from '../components/captain5/types';
 import { ApiRequestError, fetchWithTimeout, mutationHeaders } from './api';
+import { parseVehicleIdentification } from './vehicleIdentification';
 
 const BASE = '/api/captain5';
 
@@ -155,8 +156,12 @@ export const normalizeOnDuty = (raw: unknown): OnDuty => {
 
 function normalizeWorkspace(raw: Record<string, unknown>): Workspace {
   const data = raw as unknown as Workspace;
+  const vehicleIdentification = parseVehicleIdentification(raw.vehicle_identification);
   return {
     ...data,
+    // The one-time vehicle questions are rebuilt field by field; an absent or empty block means none are open.
+    apparatus_id: typeof raw.apparatus_id === 'number' && Number.isInteger(raw.apparatus_id) && raw.apparatus_id > 0 ? raw.apparatus_id : undefined,
+    vehicle_identification: vehicleIdentification,
     on_duty: normalizeOnDuty(data.on_duty),
     rescue_dailies: asArray(data.rescue_dailies),
     issues: asArray(data.issues).map(normalizeSummary),

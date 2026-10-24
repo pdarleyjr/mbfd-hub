@@ -1,6 +1,7 @@
-import type { ChecklistData, ChecklistFieldValue, ChecklistItem, Compartment, MeterData, OfficerInfo, ScheduledChecklistTaskResult } from '../types';
+import type { ChecklistData, ChecklistFieldValue, ChecklistItem, Compartment, MeterData, OfficerInfo, ScheduledChecklistTaskResult, VehicleIdentificationAnswers } from '../types';
 import { resolveFindingTargets } from './previousFindings';
 import { vehicleConfirmationComplete } from './vehicleConfirmation';
+import { activeVehicleIdentification, vehicleIdentificationComplete } from './vehicleIdentification';
 
 export function itemIsComplete(item: ChecklistItem) {
   if (item.observed !== true) return false;
@@ -21,7 +22,7 @@ export function findingsForArea(compartment: Compartment, findings: ChecklistDat
   return findings.filter(finding => located.has(finding));
 }
 
-export function inspectionReadiness(checklist: ChecklistData | null, compartments: Compartment[], fieldValues: Array<{ id: string; value: ChecklistFieldValue }>, scheduledTasks: ScheduledChecklistTaskResult[], officer: OfficerInfo, meters: MeterData) {
+export function inspectionReadiness(checklist: ChecklistData | null, compartments: Compartment[], fieldValues: Array<{ id: string; value: ChecklistFieldValue }>, scheduledTasks: ScheduledChecklistTaskResult[], officer: OfficerInfo, meters: MeterData, identification: VehicleIdentificationAnswers = {}) {
   const equipment = inspectionProgress(compartments);
   const missingFields = checklist?.fields.filter(field => {
     if (!field.required) return false;
@@ -33,15 +34,18 @@ export function inspectionReadiness(checklist: ChecklistData | null, compartment
   const missingShift = !['A', 'B', 'C'].includes(officer.shift);
   // The physical vehicle must be confirmed (and any different vehicle explained) before submitting.
   const missingVehicle = !vehicleConfirmationComplete(officer.vehicleConfirmation);
+  // Each open one-time vehicle question needs an answer, or "not available" with its reason. No questions, no gate.
+  // Not asked while the crew reports a different vehicle: the server ignores those answers.
+  const missingIdentification = !vehicleIdentificationComplete(activeVehicleIdentification(checklist?.vehicle_identification, officer), identification);
   const maxMiles = checklist?.fields.some(field => field.id === 'mileage') ? 999999999 : 2147483647;
   const invalidMeters = (meters.engine_hours !== null && (!Number.isFinite(meters.engine_hours) || meters.engine_hours < 0 || meters.engine_hours > 9999999.9 || !/^\d+(\.\d)?$/.test(String(meters.engine_hours))))
     || (meters.miles !== null && (!Number.isInteger(meters.miles) || meters.miles < 0 || meters.miles > maxMiles));
   const nextStep = equipment.remaining > 0 || equipment.total === 0 ? 'compartments'
     : missingFields.length > 0 || missingDuties.length > 0 ? 'details'
-    : missingShift || missingVehicle ? 'officer' : invalidMeters ? 'meter' : 'submit';
+    : missingShift || missingVehicle || missingIdentification ? 'officer' : invalidMeters ? 'meter' : 'submit';
   const label = nextStep === 'compartments' ? `${equipment.remaining} ${equipment.remaining === 1 ? 'item' : 'items'} remaining`
     : nextStep === 'details' ? 'Continue: Required details'
-    : nextStep === 'officer' ? (missingVehicle ? (missingShift ? 'Continue: Vehicle & Shift' : 'Continue: Vehicle') : 'Continue: Shift')
+    : nextStep === 'officer' ? (missingVehicle || missingIdentification ? (missingShift ? 'Continue: Vehicle & Shift' : 'Continue: Vehicle') : 'Continue: Shift')
     : nextStep === 'meter' ? 'Continue: Readings' : 'Review & Sign';
-  return { equipment, missingFields, missingDuties, missingShift, missingVehicle, invalidMeters, nextStep, label, ready: nextStep === 'submit' } as const;
+  return { equipment, missingFields, missingDuties, missingShift, missingVehicle, missingIdentification, invalidMeters, nextStep, label, ready: nextStep === 'submit' } as const;
 }

@@ -14,7 +14,11 @@ export const mobileApparatus = [
 export async function mobileInspectionFixture(
   page: Page,
   model: typeof mobileApparatus[number],
-  options: { fleetVehicles?: Array<{ vehicle_number: string; designation: string | null; role: string }> } = {},
+  options: {
+    fleetVehicles?: Array<{ vehicle_number: string; designation: string | null; role: string }>;
+    /** The server's `vehicle_identification` block, sent next to the checklist; absent when not given. */
+    vehicleIdentification?: unknown;
+  } = {},
 ) {
   const checklist = JSON.parse(readFileSync(`storage/checklists/${model.checklistType}_checklist.json`, 'utf8'));
   const inspectionDate = '2026-09-21';
@@ -33,7 +37,10 @@ export async function mobileInspectionFixture(
     } });
     if (path === '/api/public/fleet-vehicles') return route.fulfill({ json: { vehicles: options.fleetVehicles ?? [] } });
     if (path === '/api/public/apparatuses') return route.fulfill({ json: [vehicle] });
-    const contract = { inspection_date: inspectionDate, checklist_version: version, checklist_type: model.checklistType, checklist, due_tasks: [], open_findings: [] };
+    const contract = {
+      inspection_date: inspectionDate, checklist_version: version, checklist_type: model.checklistType, checklist, due_tasks: [], open_findings: [],
+      ...(options.vehicleIdentification !== undefined ? { vehicle_identification: options.vehicleIdentification } : {}),
+    };
     if (path.endsWith('/checklist')) return route.fulfill({ json: contract });
     if (path.endsWith('/inspection-sessions')) return route.fulfill({ status: 201, json: { ...contract, inspection_session: {
       id: '11111111-2222-4333-8444-555555555555', token: 'd'.repeat(64),

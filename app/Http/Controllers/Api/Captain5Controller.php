@@ -17,6 +17,7 @@ use App\Services\Captain5\Captain5IssuePresenter;
 use App\Services\Captain5\Captain5IssueScope;
 use App\Services\Captain5\Captain5Workspace;
 use App\Services\Defects\StaleDefectStateException;
+use App\Services\Fleet\VehicleIdentificationPlanner;
 use App\Services\Inspections\IssueMessageService;
 use App\Services\Security\Captain5Access;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -72,7 +73,26 @@ final class Captain5Controller extends Controller
     {
         $user = $this->user($request);
 
-        return $this->json($this->workspace()->overview($user, $this->access()->decide($user)));
+        return $this->json($this->workspace()->overview($user, $this->access()->decide($user)) + $this->vehicleIdentification($user));
+    }
+
+    /**
+     * The Captain 5 unit's one-time vehicle questions, for the same viewers who may open this
+     * workspace (the route is behind captain5-view). Answers post to
+     * POST /api/public/apparatuses/{apparatus_id}/vehicle-identification.
+     *
+     * @return array<string, mixed>
+     */
+    private function vehicleIdentification(User $viewer): array
+    {
+        $planner = app(VehicleIdentificationPlanner::class);
+        $unit = $planner->captain5Unit();
+
+        // can_answer is false for a viewer who may see the page but not write: the card shows no submit path.
+        return $unit === null ? [] : [
+            'apparatus_id' => $unit->getKey(),
+            'vehicle_identification' => $planner->block($unit, $planner->canAnswer($viewer, $unit)),
+        ];
     }
 
     public function issues(Request $request): JsonResponse

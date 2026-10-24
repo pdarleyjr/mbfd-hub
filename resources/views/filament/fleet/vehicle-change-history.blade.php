@@ -8,6 +8,7 @@
         \App\Models\UnitMasterVehicleChange::SOURCE_APPARATUS_LINK => 'Linked to apparatus',
         \App\Models\UnitMasterVehicleChange::SOURCE_APPARATUS_PAGE => 'Apparatus page',
         \App\Models\UnitMasterVehicleChange::SOURCE_MASTER_INVENTORY => 'Master Vehicle Inventory',
+        \App\Models\UnitMasterVehicleChange::SOURCE_DAILY_CHECKOUT => 'Daily Checkout',
     ];
     $statusColors = ['applied' => 'info', 'accepted' => 'success', 'rejected' => 'gray'];
 @endphp

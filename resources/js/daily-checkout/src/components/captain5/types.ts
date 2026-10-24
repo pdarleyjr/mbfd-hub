@@ -2,6 +2,8 @@ import type { ActingState, OnDuty } from '../acting/types';
 
 /** Shapes of /api/captain5/* (docs/captain5-ems-operations-center.md). Only what the page reads. */
 
+import type { VehicleIdentification } from '../../types';
+
 export type IssueKind = 'rescue' | 'medical';
 
 export type IssueActionName =
@@ -147,6 +149,10 @@ export interface Handoff {
 }
 
 export interface Workspace {
+  /** The Captain 5 unit's apparatus id; the one-time vehicle information is saved against it. */
+  apparatus_id?: number;
+  /** Open one-time vehicle information questions for this unit. Absent when nothing is open. */
+  vehicle_identification?: VehicleIdentification;
   access: Captain5Access;
   on_duty: OnDuty;
   duty_date: string;
