@@ -73,6 +73,24 @@
     border-radius: 9999px;
 }
 
+/*
+ * The bell is a 44px touch target (the global .fi-icon-btn minimum) but Filament lays it out as a
+ * 36px button pulled into a 32px slot with a -0.375rem margin. Its count badge is pinned to the
+ * button's top edge and lifted by half its height, so it rose above the bar (cut off by the window
+ * edge in the installed app) and hung over the account menu. The trigger now takes its real size
+ * in the bar and the count sits inside the button's own box.
+ */
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-topbar .fi-topbar-database-notifications-btn {
+    margin: 0;
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-topbar .fi-topbar-database-notifications-btn .fi-icon-btn-badge-ctn {
+    top: 0.125rem;
+    inset-inline-start: auto;
+    inset-inline-end: 0.125rem;
+    transform: none;
+}
+
 /* ---------- Sidebar: a glass rail ---------- */
 
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-sidebar {
