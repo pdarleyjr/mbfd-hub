@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace Tests\Integration;
 
+use App\Jobs\FanOutNotification;
 use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
+use App\Models\User;
 use App\Services\ApparatusInspectionProcessingService;
 use App\Services\InspectionMeterBaseline;
 use Illuminate\Support\Facades\DB;

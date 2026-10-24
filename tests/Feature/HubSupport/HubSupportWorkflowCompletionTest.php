@@ -65,6 +65,24 @@ final class HubSupportWorkflowCompletionTest extends TestCase
         self::assertStringNotContainsString('Private investigation', $payloads);
     }
 
+    public function test_confirming_a_fix_shows_the_member_a_confirmation_after_the_redirect(): void
+    {
+        $reporter = $this->member();
+        $ticket = HubSupportTicket::factory()->for($reporter, 'reporter')->create(['status' => HubSupportTicketStatus::InProgress]);
+        app(HubSupportTicketWorkflowService::class)->transition($ticket, $this->manager(), HubSupportTicketStatus::Resolved, [
+            'resolution_summary' => 'We restored the upload service.',
+        ]);
+
+        $this->actingAsCanonicalUser($reporter)
+            ->from(route('hub-support.show', $ticket))
+            ->followingRedirects()
+            ->post(route('hub-support.reply', $ticket), [
+                'action' => 'confirm_fixed', 'client_action_id' => (string) Str::uuid(), 'expected_update_id' => $ticket->updates()->max('id'),
+            ])
+            ->assertOk()
+            ->assertSee('Thanks for confirming. Your report is closed.');
+    }
+
     public function test_member_can_confirm_a_fix_then_reopen_without_losing_the_resolution(): void
     {
         $reporter = $this->member();
