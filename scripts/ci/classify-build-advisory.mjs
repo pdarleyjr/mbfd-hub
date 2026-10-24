@@ -21,6 +21,8 @@ const expires = Date.parse('2026-11-12T00:00:00Z');
 // 2026-10-23: re-pinned for the zod 3 -> 4.6.7 upgrade (HIGH GHSA-mrhx-c7xc-m3w5),
 // postcss 8.5.29, hono 4.13.13 and wrangler 4.149.0 (drops miniflare's zod 3).
 // Tailwind 3 and its braces graph are unchanged.
+// 2026-10-24: re-pinned for undici GHSA-xjj6-f33q-929c (testcontainers>undici 6.29.1,
+// miniflare>undici 7.30.1; dev tooling only). Tailwind 3 / braces graph unchanged.
 const inputs = {
     '.': {
         'package.json': '66b565f0dbc7f41b5257264f01c85d624e9c874644764b618ea55dc6f719c570',
@@ -36,8 +38,8 @@ const runtimeInputs = {
     '.dockerignore': 'c360145b9617b149ed9b27b613b63cc577e2abd22005efa5367f608e71c67dbc',
 };
 const vacationInputs = {
-    'vacation-app/package.json': '6a38c3117dc491cbbc2c914cd56e40fd508170983616b709bef454643eed963f',
-    'vacation-app/pnpm-lock.yaml': '4a3b968a43f355af138a7ba45baf1174d922ad267641c5274eb418b95d618c95',
+    'vacation-app/package.json': '16c91186f725d792d917d3e63c02954fc4e3a7c6aaeb996e3aff211056c80ce7',
+    'vacation-app/pnpm-lock.yaml': '66d4ef0315b778d925967563d0ea5a75da8b297b7f7bd5cbc9fab7249b5cb7ad',
     'vacation-app/apps/web/package.json': '3209e36ed461f072d9bc4fbf269afbf9314b88b7c60e4dded7b5f0ed5ceb13f7',
     'vacation-app/apps/web/tailwind.config.ts': '96732f9aaa71986b4c6a9af762ac99323eb6024849cbb1ab4daf1e6122ddd5c6',
 };
