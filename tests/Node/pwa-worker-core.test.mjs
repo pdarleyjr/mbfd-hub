@@ -499,22 +499,39 @@ test('pushsubscriptionchange never throws, whatever fails', async () => {
 
 test('SKIP_WAITING activates the waiting worker and GET_VERSION answers on the port', async () => {
   const world = createWorld();
-  await world.dispatch('message', { data: { type: 'SKIP_WAITING' } });
+  await world.dispatch('message', { source: { url: `${ORIGIN}/admin` }, data: { type: 'SKIP_WAITING' } });
   assert.equal(world.world.skipWaitingCalls, 1);
 
   const replies = [];
-  await world.dispatch('message', { data: { type: 'GET_VERSION' }, ports: [{ postMessage: (reply) => replies.push(plain(reply)) }] });
+  await world.dispatch('message', { source: { url: `${ORIGIN}/admin` }, data: { type: 'GET_VERSION' }, ports: [{ postMessage: (reply) => replies.push(plain(reply)) }] });
   assert.deepEqual(replies, [{ type: 'MBFD_VERSION', build: 'test-build', core: '2026-10-23.2' }]);
 
-  await assert.doesNotReject(world.dispatch('message', { data: 'not an object' }));
-  await assert.doesNotReject(world.dispatch('message', { data: { type: 'SOMETHING_ELSE' } }));
+  await assert.doesNotReject(world.dispatch('message', { source: { url: `${ORIGIN}/admin` }, data: 'not an object' }));
+  await assert.doesNotReject(world.dispatch('message', { source: { url: `${ORIGIN}/admin` }, data: { type: 'SOMETHING_ELSE' } }));
   assert.equal(world.world.skipWaitingCalls, 1);
+});
+
+test('messages from another origin, or with no client source, are ignored', async () => {
+  const world = createWorld();
+  const replies = [];
+  const port = { postMessage: (reply) => replies.push(plain(reply)) };
+
+  for (const source of [undefined, null, {}, { url: 'https://evil.example/admin' }, { url: 'not a url' }]) {
+    await world.dispatch('message', { source, data: { type: 'SKIP_WAITING' } });
+    await world.dispatch('message', { source, data: { type: 'GET_VERSION' }, ports: [port] });
+  }
+
+  assert.equal(world.world.skipWaitingCalls, 0);
+  assert.deepEqual(replies, []);
+
+  await world.dispatch('message', { source: { url: `${ORIGIN}/daily/` }, data: { type: 'SKIP_WAITING' } });
+  assert.equal(world.world.skipWaitingCalls, 1, 'a same-origin client still drives the update');
 });
 
 test('GET_VERSION reports unknown when the worker declares no build id', async () => {
   const world = createWorld({ buildId: null });
   const replies = [];
-  await world.dispatch('message', { data: { type: 'GET_VERSION' }, ports: [{ postMessage: (reply) => replies.push(plain(reply)) }] });
+  await world.dispatch('message', { source: { url: `${ORIGIN}/admin` }, data: { type: 'GET_VERSION' }, ports: [{ postMessage: (reply) => replies.push(plain(reply)) }] });
 
   assert.equal(replies[0].build, 'unknown');
 });
@@ -602,7 +619,7 @@ test('shipped workers answer GET_VERSION with their own build id', async () => {
   for (const [target, build] of Object.entries(expected)) {
     const world = createWorld({ source: read(target) });
     const replies = [];
-    await world.dispatch('message', { data: { type: 'GET_VERSION' }, ports: [{ postMessage: (reply) => replies.push(plain(reply)) }] });
+    await world.dispatch('message', { source: { url: `${ORIGIN}/admin` }, data: { type: 'GET_VERSION' }, ports: [{ postMessage: (reply) => replies.push(plain(reply)) }] });
 
     assert.deepEqual(replies, [{ type: 'MBFD_VERSION', build, core: '2026-10-23.2' }], target);
   }

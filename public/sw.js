@@ -514,8 +514,24 @@ const MBFD_WORKER_CORE_VERSION = '2026-10-23.2';
     return typeof MBFD_WORKER_BUILD_ID === 'string' ? MBFD_WORKER_BUILD_ID : 'unknown';
   }
 
+  /** Only a window or worker of this Hub origin may drive the update protocol. */
+  function isSameOriginSource(event) {
+    var source = event && event.source;
+    if (!source || typeof source.url !== 'string') {
+      return false;
+    }
+    try {
+      return new URL(source.url).origin === origin();
+    } catch (_) {
+      return false;
+    }
+  }
+
   function onMessage(event) {
-    var message = event && event.data;
+    if (!isSameOriginSource(event)) {
+      return;
+    }
+    var message = event.data;
     if (!isPlainObject(message)) {
       return;
     }
