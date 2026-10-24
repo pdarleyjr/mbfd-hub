@@ -284,7 +284,7 @@ final class ApparatusWorkflowActions
                     ->searchable()
                     ->required()
                     ->getSearchResultsUsing(fn (string $search, Apparatus $record): array => self::linkableVehicles($record, $search))
-                    ->options(fn (Apparatus $record): array => self::linkableVehicles($record, (string) $record->vehicle_number))
+                    ->searchPrompt('Type a vehicle #, make, model or VIN')
                     ->getOptionLabelUsing(fn ($value): ?string => UnitMasterVehicle::query()->find($value)?->displayName()),
             ])
             ->action(function (Apparatus $record, array $data): void {

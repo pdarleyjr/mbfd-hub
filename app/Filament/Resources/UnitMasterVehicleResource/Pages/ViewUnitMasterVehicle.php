@@ -182,7 +182,7 @@ class ViewUnitMasterVehicle extends ViewRecord
 
                                 return $overview->openDefects + $overview->openTickets === 0
                                     ? 'Clear'
-                                    : $overview->openDefects.' open issues, '.$overview->openTickets.' open service tickets';
+                                    : trans_choice(':count open issue|:count open issues', $overview->openDefects).', '.trans_choice(':count open service ticket|:count open service tickets', $overview->openTickets);
                             }),
                     ]))
                     ->columns(['default' => 1, 'md' => 2, 'xl' => 4])

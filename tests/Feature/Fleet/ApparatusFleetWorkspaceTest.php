@@ -117,9 +117,11 @@ final class ApparatusFleetWorkspaceTest extends TestCase
 
     public function test_unlinked_unit_explains_why_and_fleet_links_it_with_history(): void
     {
-        $tahoe = $this->master('23500', ['make' => 'Chevy', 'model' => 'Tahoe', 'year' => '2023', 'serial_number' => 'TESTVIN000000235']);
-        $this->master('22530', ['make' => 'Ford', 'model' => 'F-250', 'year' => '2022', 'serial_number' => 'TESTVIN000000530']);
-        $captain = $this->legacyApparatus('Captain 5', '22530', ['vin' => 'TESTVIN000000631', 'make' => 'Chevrolet', 'model' => 'Tahoe']);
+        // Production shape: the Captain 5 apparatus row still carried a former vehicle's
+        // identity, so its VIN contradicts master 22530 (the Ford F-250 assigned to
+        // CAPTAIN 5) and the automatic match refused it.
+        $f250 = $this->master('22530', ['make' => 'Ford', 'model' => 'F-250', 'year' => '2022', 'serial_number' => 'TESTVIN000000530', 'employee_or_vehicle_name' => 'CAPTAIN 5']);
+        $captain = $this->legacyApparatus('Captain 5', '22530', ['vin' => 'TESTVIN000000631', 'make' => 'Former make', 'model' => 'Former model', 'year' => 2024]);
         app(ApparatusMasterVehicleLink::class)->reconcile($captain);
         $captain->refresh();
         self::assertSame(Apparatus::MASTER_LINK_NEEDS_REVIEW, $captain->master_link_status);
@@ -131,17 +133,48 @@ final class ApparatusFleetWorkspaceTest extends TestCase
             ->assertSee('Vehicle record needs review.')
             ->assertSee('does not match master vehicle 22530')
             ->assertActionVisible('linkVehicleRecord')
-            ->callAction('linkVehicleRecord', data: ['unit_master_vehicle_id' => $tahoe->id])
+            ->callAction('linkVehicleRecord', data: ['unit_master_vehicle_id' => $f250->id])
             ->assertHasNoActionErrors();
 
         $captain->refresh();
-        self::assertSame($tahoe->id, $captain->unit_master_vehicle_id);
+        self::assertSame($f250->id, $captain->unit_master_vehicle_id);
         self::assertSame(Apparatus::MASTER_LINK_LINKED, $captain->master_link_status);
-        self::assertSame('23500', $captain->vehicle_number);
-        self::assertSame('TESTVIN000000235', $captain->vin);
-        $history = UnitMasterVehicleChange::query()->where('unit_master_vehicle_id', $tahoe->id)->get();
-        self::assertNotEmpty($history);
+        self::assertSame(['22530', 'Ford', 'F-250', 2022, 'TESTVIN000000530'], [$captain->vehicle_number, $captain->make, $captain->model, (int) $captain->year, $captain->vin]);
+        $history = UnitMasterVehicleChange::query()->where('unit_master_vehicle_id', $f250->id)->get();
         self::assertTrue($history->every(fn (UnitMasterVehicleChange $change): bool => $change->user_id === $manager->id));
+        self::assertSame('TESTVIN000000631', $history->firstWhere('field', 'serial_number')?->old_value, 'The former identity stays in the vehicle history.');
+        self::assertSame('Former model', $history->firstWhere('field', 'model')?->old_value);
+    }
+
+    public function test_link_picker_searches_the_whole_inventory_case_insensitively(): void
+    {
+        $f250 = $this->master('22530', ['make' => 'Ford', 'model' => 'F-250', 'year' => '2022']);
+        $this->master('16507', ['make' => 'FREIGHTLINER', 'model' => 'M2106']);
+        $unit = $this->legacyApparatus('C 9', '9999');
+        app(ApparatusMasterVehicleLink::class)->reconcile($unit);
+        $this->actingAs($this->fleetManager());
+
+        $results = Livewire::test(ViewApparatus::class, ['record' => $unit->getRouteKey()])
+            ->mountAction('linkVehicleRecord')
+            ->instance()
+            ->getFormSelectSearchResults('mountedActionsData.0.unit_master_vehicle_id', 'f-250');
+
+        self::assertSame([(string) $f250->id], array_map('strval', array_column($results, 'value')), json_encode($results));
+    }
+
+    public function test_desktop_list_shows_the_vehicle_and_flags_review(): void
+    {
+        $this->master('20503', ['make' => 'PIERCE', 'model' => 'VELOCITY', 'year' => '2021']);
+        $engine = $this->legacyApparatus('E 1', '20503');
+        app(ApparatusMasterVehicleLink::class)->reconcile($engine);
+        $boat = $this->legacyApparatus('FB6', null);
+        app(ApparatusMasterVehicleLink::class)->reconcile($boat);
+        $this->actingAs($this->fleetManager());
+
+        Livewire::test(ListApparatuses::class)
+            ->call('loadTable')
+            ->assertSee('2021 PIERCE VELOCITY')
+            ->assertSee('Vehicle record needs review');
     }
 
     public function test_a_vehicle_linked_to_another_unit_cannot_be_taken(): void

@@ -56,7 +56,7 @@ final class ApparatusMasterVehicleReconciliationCommandTest extends TestCase
             'E1' => $this->legacyApparatus('E1', '20503'),
             'E21' => $this->legacyApparatus('E21', '002-16', ['make' => 'Pierce']),
             'R2' => $this->legacyApparatus('R2', '16507', ['year' => 2015, 'make' => 'FREIGHTLINER', 'model' => 'M2', 'vin' => 'testvin-000000002']),
-            'Captain 5' => $this->legacyApparatus('Captain 5', '22530', ['year' => 2024, 'make' => 'Chevrolet', 'model' => 'Tahoe', 'vin' => 'TESTVIN000000631']),
+            'Captain 5' => $this->legacyApparatus('Captain 5', '22530', ['year' => 2024, 'make' => 'Former make', 'model' => 'Former model', 'vin' => 'TESTVIN000000631']),
             'FB6' => $this->legacyApparatus('FB6', null),
             'X9' => $this->legacyApparatus('X9', '3000'),
             'ZZV1' => $this->legacyApparatus('ZZV1', 'ZZ-V1'),
