@@ -6,6 +6,7 @@ namespace App\Services\Personnel\Promotions;
 
 use App\Models\PromotionalList;
 use App\Models\PromotionalListEntry;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -89,7 +90,7 @@ final class PromotionalListImporter
     {
         $list = $this->service->validatedList($listAttributes);
         $existing = $this->findList($list);
-        $entries = $existing?->entries()->get() ?? collect();
+        $entries = $existing === null ? new EloquentCollection : $existing->entries()->get();
         $bySoi = $entries->filter(fn (PromotionalListEntry $entry): bool => $entry->soi_id !== null)->keyBy('soi_id');
         $byRank = $entries->keyBy('original_rank');
         $claimed = $entries->whereNotNull('employee_id')->pluck('employee_id')->flip()->all();
@@ -115,7 +116,7 @@ final class PromotionalListImporter
                 if ($employee['employee_id'] !== null) {
                     $claimed[$employee['employee_id']] = true;
                 }
-            } elseif ($entry?->employee_id !== null) {
+            } elseif ($entry->employee_id !== null) {
                 $employee = ['status' => 'linked', 'employee_id' => (int) $entry->employee_id, 'candidates' => 1];
             }
             $counts[$action]++;

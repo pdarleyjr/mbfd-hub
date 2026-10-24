@@ -88,7 +88,7 @@ final class RequestFormDefinition
      */
     private function aliases(SourceFormItem $item): array
     {
-        $names = [...(array) ($item->catalogItem?->aliases ?? []), $item->catalogItem?->name];
+        $names = [...(array) ($item->catalogItem->aliases ?? []), $item->catalogItem?->name];
 
         return array_values(array_unique(array_filter(
             array_map(static fn (mixed $name): string => is_string($name) ? trim($name) : '', $names),

@@ -193,7 +193,7 @@ final class ResourceLibraryService
                 }
             }
 
-            if ($previewChanged && $preview !== null) {
+            if ($previewChanged) {
                 $finalPreview = $this->storage->previewPath($existing->uuid);
                 $staged[] = $this->stage($finalPreview, $preview->localPath, $input['previewSha']);
                 $changes += ['preview_path' => $finalPreview, 'preview_sha256' => $input['previewSha']];

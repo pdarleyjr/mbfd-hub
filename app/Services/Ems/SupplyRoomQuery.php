@@ -9,7 +9,6 @@ use App\Models\Ems\StockMovement;
 use App\Models\Ems\StorageLocation;
 use App\Models\Ems\SupplyItem;
 use App\Models\Ems\SupplyOrder;
-use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 
 /** Read side of the Medical Supply Room: items with current quantity and basis, locations, movements, orders. */
 final class SupplyRoomQuery
@@ -56,7 +55,6 @@ final class SupplyRoomQuery
             return ['items' => $rows->forPage($page, $perPage)->values()->all(), 'meta' => ['page' => $page, 'per_page' => $perPage, 'total' => $rows->count(), 'last_page' => max(1, (int) ceil($rows->count() / $perPage))]];
         }
 
-        /** @var LengthAwarePaginator<int, SupplyItem> $page */
         $page = $query->paginate($perPage, ['*'], 'page', max(1, (int) ($filters['page'] ?? 1)));
         $current = $this->ledger->current($page->getCollection()->filter->tracksStock());
 
@@ -152,7 +150,7 @@ final class SupplyRoomQuery
         return [
             'movements' => $page->getCollection()->map(fn (StockMovement $m): array => [
                 'id' => $m->getKey(), 'uuid' => $m->uuid, 'supply_item_id' => $m->supply_item_id, 'item_name' => $m->supplyItem?->name,
-                'movement_type' => $m->movement_type, 'quantity_base' => $m->quantity_base, 'occurred_at' => $m->occurred_at?->toIso8601String(),
+                'movement_type' => $m->movement_type, 'quantity_base' => $m->quantity_base, 'occurred_at' => $m->occurred_at->toIso8601String(),
                 'actor_name' => $m->actor_name, 'reason' => $m->reason, 'request_id' => $m->request_id, 'supply_order_id' => $m->supply_order_id,
                 'corrects_movement_id' => $m->corrects_movement_id,
             ])->values()->all(),
@@ -180,7 +178,7 @@ final class SupplyRoomQuery
             'id' => $order->getKey(), 'supply_item_id' => $order->supply_item_id, 'item_name' => $order->supplyItem?->name,
             'status' => $order->status, 'packages' => $order->packages, 'quantity_base' => $order->quantity_base,
             'supplier_code' => $order->supplier_code, 'item_number' => $order->item_number, 'notes' => $order->notes,
-            'placed_by_name' => $order->placed_by_name, 'placed_at' => $order->placed_at?->toIso8601String(),
+            'placed_by_name' => $order->placed_by_name, 'placed_at' => $order->placed_at->toIso8601String(),
             'received_at' => $order->received_at?->toIso8601String(), 'cancelled_at' => $order->cancelled_at?->toIso8601String(),
         ];
     }

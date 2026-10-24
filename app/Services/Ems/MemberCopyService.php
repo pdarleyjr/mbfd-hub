@@ -61,7 +61,7 @@ final class MemberCopyService
         }
 
         $record = $request->operational_form_record_id !== null ? OperationalFormRecord::query()->find($request->operational_form_record_id) : null;
-        $document = $record?->documents()->orderByDesc('version_number')->first();
+        $document = $record === null ? null : OperationalFormDocument::query()->where('form_record_id', $record->getKey())->orderByDesc('version_number')->first();
         if ($record !== null && $document !== null && Storage::disk($document->storage_disk)->exists($document->storage_path)) {
             return $record;
         }
@@ -71,8 +71,8 @@ final class MemberCopyService
         $bytes = $pdf->output();
         $pages = (int) $pdf->getDomPDF()->getCanvas()->get_page_count();
         // Lower-case ULIDs, the same form Eloquent's HasUlids generates, so foreign keys always match.
-        $recordId = $record?->id ?? strtolower((string) Str::ulid());
-        $documentId = $document?->id ?? strtolower((string) Str::ulid());
+        $recordId = $record->id ?? strtolower((string) Str::ulid());
+        $documentId = $document->id ?? strtolower((string) Str::ulid());
         $path = sprintf('operational-form-uploads/ems-requests/%s/%s/%s/%s.pdf', now()->format('Y/m'), $employee->getKey(), $recordId, $documentId);
         $displayName = Str::limit(preg_replace('~[\x00-\x1f\x7f"\\\\/]+~', '_', "{$request->number} {$request->target_label}") ?: $request->number, 200, '').'.pdf';
 
@@ -83,7 +83,7 @@ final class MemberCopyService
                 $summary = [
                     'medical_inventory_request' => [
                         'request_id' => $request->uuid, 'number' => $request->number, 'target_label' => $request->target_label,
-                        'submitted_at' => $request->submitted_at?->toIso8601String(), 'line_count' => count((array) ($request->snapshot['lines'] ?? [])),
+                        'submitted_at' => $request->submitted_at->toIso8601String(), 'line_count' => count((array) ($request->snapshot['lines'] ?? [])),
                         'snapshot_sha256' => $request->snapshot_sha256,
                     ],
                 ];

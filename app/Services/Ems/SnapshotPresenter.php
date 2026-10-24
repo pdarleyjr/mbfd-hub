@@ -30,7 +30,7 @@ final class SnapshotPresenter
             'status' => $snapshot->status,
             'version' => $snapshot->version,
             'scope_location_code' => $snapshot->scope_location_code,
-            'started_at' => $snapshot->started_at?->toIso8601String(),
+            'started_at' => $snapshot->started_at->toIso8601String(),
             'started_by' => $names[$snapshot->started_by_user_id] ?? null,
             'finalized_at' => $snapshot->finalized_at?->toIso8601String(),
             'finalized_name' => $snapshot->finalized_name,
@@ -70,9 +70,9 @@ final class SnapshotPresenter
                 ->map(fn (SupplyItem $item): array => [
                     'id' => $item->getKey(), 'name' => $item->name, 'location_code' => $item->location?->code,
                     'package_unit' => $item->package_unit, 'units_per_package' => $item->units_per_package, 'packages_per_case' => $item->packages_per_case,
-                    'entry' => $entries->get($item->getKey())?->entry ?? null,
+                    'entry' => $entries->get($item->getKey())->entry ?? null,
                     'quantity_base' => $entries->get($item->getKey())?->quantity_base,
-                    'warnings' => $entries->get($item->getKey())?->warnings ?? [],
+                    'warnings' => $entries->get($item->getKey())->warnings ?? [],
                 ])->values()->all();
         }
 

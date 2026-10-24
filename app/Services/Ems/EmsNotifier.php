@@ -143,7 +143,7 @@ final class EmsNotifier
 
         try {
             $parts = explode(':', $eventKey);
-            if (($parts[0] ?? '') !== 'ems') {
+            if ($parts[0] !== 'ems') {
                 return false;
             }
             if (($parts[1] ?? '') === 'message') {

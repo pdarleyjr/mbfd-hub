@@ -8,11 +8,10 @@ use App\Models\User;
 use App\Services\Security\SecurityAuditRecorder;
 use Carbon\CarbonImmutable;
 use Filament\Tables\Contracts\HasTable;
-use Filament\Tables\Filters\Indicator;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\Relation;
-use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
@@ -258,9 +257,10 @@ final class TableExportService
                 throw new ExportFailedException('Select at least one record to export.');
             }
             $query->whereKey($selectedKeys);
-        } elseif (in_array(SoftDeletes::class, class_uses_recursive($query->getModel()), true)) {
+        } elseif (method_exists($query->getModel(), 'getQualifiedDeletedAtColumn')) {
             // "All" never includes records that were moved to the trash; pick them in the table to export them.
-            $query->withoutTrashed();
+            // Same as the soft-delete scope's withoutTrashed(), for models that use SoftDeletes.
+            $query->withoutGlobalScope(SoftDeletingScope::class)->whereNull($query->getModel()->getQualifiedDeletedAtColumn());
         }
 
         invade($livewire)->applySortingToTableQuery($query);
@@ -282,9 +282,6 @@ final class TableExportService
     {
         $labels = [];
         foreach ($livewire->getTable()->getFilterIndicators() as $indicator) {
-            if (! $indicator instanceof Indicator) {
-                continue;
-            }
             $label = $indicator->getLabel();
             $label = trim(strip_tags($label instanceof Htmlable ? $label->toHtml() : (string) $label));
             if ($label !== '') {

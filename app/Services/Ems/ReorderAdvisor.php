@@ -68,7 +68,7 @@ final class ReorderAdvisor
                 'supplier_code' => $first['code'] ?? null,
                 'item_number' => ($item->item_numbers ?? [])[0] ?? null,
                 'details_unverified' => true,
-                'open_orders' => ($openOrders->get($item->getKey()) ?? collect())->map(fn (SupplyOrder $o): array => ['id' => $o->getKey(), 'packages' => $o->packages, 'placed_at' => $o->placed_at?->toIso8601String()])->values()->all(),
+                'open_orders' => ($openOrders->get($item->getKey()) ?? collect())->map(fn (SupplyOrder $o): array => ['id' => $o->getKey(), 'packages' => $o->packages, 'placed_at' => $o->placed_at->toIso8601String()])->values()->all(),
             ];
         }
 

@@ -35,16 +35,17 @@ final class EmsUnitDirectory
         $other = [];
         foreach (Apparatus::query()->orderBy('designation')->orderBy('name')->get() as $apparatus) {
             $isRescue = in_array($this->resolver->checklistTypeFor($apparatus), Captain5IssueScope::RESCUE_TYPES, true);
-            if (! $isRescue && $apparatus->status === 'Out of Service') {
+            $status = $apparatus->getAttribute('status');
+            if (! $isRescue && $status === 'Out of Service') {
                 continue;
             }
-            $label = trim((string) ($apparatus->name ?: $apparatus->designation ?: $apparatus->unit_id));
+            $label = trim((string) ($apparatus->name ?: $apparatus->designation ?: $apparatus->getAttribute('unit_id')));
             $row = [
                 'id' => (int) $apparatus->getKey(),
                 'kind' => $isRescue ? InventoryRequest::TARGET_RESCUE : InventoryRequest::TARGET_OTHER,
                 'label' => $label !== '' ? $label : 'Unit '.$apparatus->getKey(),
                 'designation' => $apparatus->designation !== null ? (string) $apparatus->designation : null,
-                'status' => $apparatus->status !== null ? (string) $apparatus->status : null,
+                'status' => $status !== null ? (string) $status : null,
                 'group' => $isRescue ? 'Rescue units' : 'Other units',
             ];
             if ($isRescue) {

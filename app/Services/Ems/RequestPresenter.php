@@ -9,6 +9,7 @@ use App\Models\Ems\InventoryRequestEvent;
 use App\Models\Ems\InventoryRequestLine;
 use App\Models\Ems\InventoryRequestMessage;
 use App\Models\Ems\SupplyItem;
+use App\Models\OperationalFormDocument;
 use App\Models\OperationalFormRecord;
 use Illuminate\Support\Collection;
 
@@ -52,7 +53,7 @@ final class RequestPresenter
             'number' => $request->number,
             'status' => $request->status,
             'status_label' => self::STATUS_LABELS[$request->status] ?? $request->status,
-            'submitted_at' => $request->submitted_at?->toIso8601String(),
+            'submitted_at' => $request->submitted_at->toIso8601String(),
             'submitter_name' => $request->submitter_name,
             'submitter_rank' => $request->submitter_rank,
             'target_kind' => $request->target_kind,
@@ -224,7 +225,7 @@ final class RequestPresenter
             ? OperationalFormRecord::query()->with('latestDocument')->find($request->operational_form_record_id)
             : null;
         $document = $record?->latestDocument;
-        if ($document === null) {
+        if (! $document instanceof OperationalFormDocument) {
             return ['status' => 'pending', 'record_id' => $record?->id, 'document_id' => null];
         }
 

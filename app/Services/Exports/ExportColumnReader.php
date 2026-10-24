@@ -12,6 +12,7 @@ use Filament\Tables\Columns\Column;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\SelectColumn;
+use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Columns\ViewColumn;
 use Filament\Tables\Table;
@@ -53,7 +54,7 @@ final class ExportColumnReader
                 if ($entry instanceof Column) {
                     $entry->table($table);
                     $candidates[] = $entry;
-                } elseif (is_string($entry) && isset($available[$entry])) {
+                } elseif (isset($available[$entry])) {
                     $candidates[] = $available[$entry];
                 }
             }
@@ -235,7 +236,7 @@ final class ExportColumnReader
             return ExportCell::date($appTime);
         }
 
-        $dateOnly = method_exists($column, 'isDate') && $column->isDate() && ! $column->isDateTime();
+        $dateOnly = $column instanceof TextColumn && $column->isDate() && ! $column->isDateTime();
         if ($dateOnly) {
             return ExportCell::date(CarbonImmutable::instance($value)->setTimezone(TableExportService::TIMEZONE));
         }
@@ -245,7 +246,7 @@ final class ExportColumnReader
 
     private function isTemporalColumn(Column $column): bool
     {
-        return method_exists($column, 'isDate') && ($column->isDate() || $column->isDateTime());
+        return $column instanceof TextColumn && ($column->isDate() || $column->isDateTime());
     }
 
     private function looksLikeDate(string $value): bool

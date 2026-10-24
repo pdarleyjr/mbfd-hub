@@ -67,7 +67,7 @@ final class PromotionalListExporter
     {
         $scores = (array) $entry->scores;
         $row = [$entry->current_rank, $entry->original_rank, (string) $entry->soi_id, $entry->last_name, $entry->first_name,
-            $entry->statusLabel(), (string) $entry->status_reason, (string) ($entry->employee?->employee_id ?? '')];
+            $entry->statusLabel(), (string) $entry->status_reason, (string) ($entry->employee->employee_id ?? '')];
         foreach (array_keys((array) config('promotional_lists.score_columns')) as $key) {
             $row[] = (string) ($scores[$key] ?? '');
         }

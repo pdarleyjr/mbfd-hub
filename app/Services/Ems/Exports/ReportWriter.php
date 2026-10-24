@@ -38,7 +38,7 @@ final class ReportWriter
                 $sheet->setCellValueExplicit([$index + 1, 1], $header, DataType::TYPE_STRING);
             }
             foreach ($section->rows as $rowIndex => $row) {
-                foreach (array_values($row) as $index => $value) {
+                foreach ($row as $index => $value) {
                     $this->writeCell($sheet, [$index + 1, $rowIndex + 2], $value, in_array($index, $section->numericColumns, true));
                 }
             }
