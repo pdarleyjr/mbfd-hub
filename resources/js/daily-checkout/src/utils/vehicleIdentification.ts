@@ -1,4 +1,6 @@
+import { isVehicleMismatch } from './vehicleConfirmation';
 import type {
+  OfficerInfo,
   VehicleIdentification,
   VehicleIdentificationAnswer,
   VehicleIdentificationAnswers,
@@ -68,6 +70,8 @@ export function parseVehicleIdentification(raw: unknown): VehicleIdentification 
 
   return {
     note: typeof block.note === 'string' ? block.note.trim() : '',
+    // A server that does not send can_answer predates the flag: the crew can answer.
+    can_answer: block.can_answer !== false,
     kind: block.kind === 'boat' ? 'boat' : 'vehicle',
     questions,
     reasons: Array.isArray(block.reasons) ? block.reasons.flatMap((entry) => parseReason(entry) ?? []) : [],
@@ -80,7 +84,22 @@ export const parseVehicleIdentificationResponse = (payload: unknown): VehicleIde
   parseVehicleIdentification(record(payload)?.vehicle_identification ?? payload)
 );
 
-export const openQuestions = (block: VehicleIdentification | null | undefined): VehicleIdentificationQuestion[] => block?.questions ?? [];
+/**
+ * The block that applies to this checkout, or undefined. It does not apply when the server says the crew
+ * cannot answer, or while the crew reports a different physical vehicle than the one assigned (the server
+ * ignores identification answers for another vehicle, so nothing is asked, required or sent).
+ */
+export function activeVehicleIdentification(
+  block: VehicleIdentification | null | undefined,
+  officer: Pick<OfficerInfo, 'vehicleConfirmation'>,
+): VehicleIdentification | undefined {
+  if (!block || !block.can_answer) return undefined;
+  const confirmation = officer.vehicleConfirmation;
+  // With no vehicle number on record there is nothing for another vehicle to differ from.
+  const differentVehicle = confirmation !== undefined && confirmation.assignedVehicle !== '' && isVehicleMismatch(confirmation);
+
+  return differentVehicle ? undefined : block;
+}
 
 const EMPTY_ANSWER: VehicleIdentificationAnswer = { mode: '', value: '', reason: '', note: '' };
 
@@ -113,7 +132,42 @@ export const withAnswer = (
   [field]: { ...(answers[field] ?? EMPTY_ANSWER), ...patch },
 });
 
-const plainVin = (value: string): string => value.toUpperCase().replace(/[\s-]/g, '');
+/** Upper case with spaces and dashes removed: how the server compares plates, VINs and hull IDs. */
+const compact = (value: string): string => value.toUpperCase().replace(/[\s-]/g, '');
+
+const BLANK_MARKERS = new Set(['N/A', 'NA', 'NONE', '-', '0', 'UNKNOWN', 'X']);
+const VEHICLE_NUMBER_PATTERN = /^[A-Za-z0-9][A-Za-z0-9 ./#-]{3,31}$/;
+const HELP = "If it isn't on the vehicle or you can't read it, choose Information not available.";
+
+/** A placeholder such as N/A, or one character repeated, is not a real value. The server drops these too. */
+const looksLikeBlank = (value: string): boolean => {
+  const marker = value.trim().toUpperCase().replace(/\s+/g, '');
+  const letters = compact(value);
+
+  return BLANK_MARKERS.has(marker) || letters === '' || (letters.length > 1 && /^(.)\1+$/.test(letters));
+};
+
+/** The format message for a typed value, or null when it is acceptable. Mirrors the server rules. */
+function formatProblem(block: VehicleIdentification, question: VehicleIdentificationQuestion, value: string): string | null {
+  if (question.input === 'year') return /^(19|20)\d{2}$/.test(value) ? null : 'Enter a year from 1900 to 2099.';
+  if (looksLikeBlank(value)) return `That is not a real value. ${HELP}`;
+  const letters = compact(value);
+  if (question.field === 'plate') {
+    return /^[A-Z0-9]{2,16}$/.test(letters) ? null : `A plate has 2 to 16 letters and numbers. ${HELP}`;
+  }
+  if (question.field === 'vehicle_number') {
+    return VEHICLE_NUMBER_PATTERN.test(value.trim())
+      ? null
+      : `A vehicle number has 4 to 32 characters: letters, numbers, spaces and . / # -. ${HELP}`;
+  }
+  if (question.field === 'vin') {
+    return block.kind === 'boat'
+      ? (/^[A-Z0-9]{6,32}$/.test(letters) ? null : `A hull ID has 6 to 32 letters and numbers. ${HELP}`)
+      : (/^[A-Z0-9]{17}$/.test(letters) ? null : `A VIN has 17 letters and numbers. ${HELP}`);
+  }
+
+  return null;
+}
 
 /** Why this question is not answered yet, in the crew's words; null when it is answered. */
 export function questionProblem(
@@ -132,12 +186,8 @@ export function questionProblem(
   if (mode === '') return 'Confirm it, or enter what is on the vehicle.';
   const value = answer.value.trim();
   if (value === '') return 'Enter it, or choose Information not available.';
-  if (question.input === 'year') return /^(19|20)\d{2}$/.test(value) ? null : 'Enter the 4 digit year.';
-  if (question.field === 'vin' && block.kind === 'vehicle' && !/^[A-Z0-9]{17}$/.test(plainVin(value))) {
-    return 'A VIN has 17 letters and numbers.';
-  }
 
-  return null;
+  return formatProblem(block, question, value);
 }
 
 /** True when nothing is open or every open question is answered or marked not available with its reason. */

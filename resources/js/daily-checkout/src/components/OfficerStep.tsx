@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import type { FleetVehicle, OfficerInfo, Shift, SwapAnswer, VehicleConfirmation, VehicleIdentification, VehicleIdentificationAnswers } from '../types';
-import { firstIncompleteField } from '../utils/vehicleIdentification';
+import { activeVehicleIdentification, firstIncompleteField } from '../utils/vehicleIdentification';
 import VehicleIdentificationCard, { focusIdentificationField } from './VehicleIdentificationCard';
 import {
   MAX_VEHICLE_ID_LENGTH,
@@ -43,6 +43,8 @@ export default function OfficerStep({
   identification, identificationAnswers = NO_ANSWERS, onIdentificationChange, showIdentificationErrors = false,
 }: Props) {
   const sectionRef = useRef<HTMLElement>(null);
+  // Hidden, not asked and not required while a different physical vehicle is reported.
+  const activeIdentification = activeVehicleIdentification(identification, initialData);
   const [identificationAttempted, setIdentificationAttempted] = useState(false);
   const confirmation: VehicleConfirmation = initialData.vehicleConfirmation ?? defaultVehicleConfirmation('');
   const assigned = confirmation.assignedVehicle;
@@ -60,7 +62,7 @@ export default function OfficerStep({
     <form onSubmit={event => {
       event.preventDefault();
       // Every open one-time question needs an answer, or "not available" with its reason.
-      const unanswered = firstIncompleteField(identification, identificationAnswers);
+      const unanswered = firstIncompleteField(activeIdentification, identificationAnswers);
       if (unanswered) {
         setIdentificationAttempted(true);
         focusIdentificationField(sectionRef.current, unanswered);
@@ -143,8 +145,8 @@ export default function OfficerStep({
           </button>
         </fieldset>}
         <label className="text-sm font-semibold">Shift<select name="shift" required value={initialData.shift} onChange={event => onChange({ ...initialData, shift: event.target.value as Shift })} className={CONTROL}><option value="">Choose shift</option>{(['A', 'B', 'C'] as const).map(shift => <option key={shift} value={shift}>Shift {shift}</option>)}</select></label>
-        {identification && <VehicleIdentificationCard
-          block={identification}
+        {activeIdentification && <VehicleIdentificationCard
+          block={activeIdentification}
           answers={identificationAnswers}
           onChange={answers => onIdentificationChange?.(answers)}
           showErrors={identificationAttempted || showIdentificationErrors}

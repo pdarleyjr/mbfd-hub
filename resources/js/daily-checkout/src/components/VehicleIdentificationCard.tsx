@@ -16,6 +16,8 @@ interface Props {
   /** Show what is still missing on each open question. */
   showErrors?: boolean;
   disabled?: boolean;
+  /** Show the open questions without controls (the person may read them but not answer). */
+  readOnly?: boolean;
 }
 
 const CONTROL = 'mt-1 block min-h-11 w-full rounded-hub-control border border-hub-control-border bg-hub-well px-3 py-2.5 font-normal text-hub-ink';
@@ -145,9 +147,23 @@ function Question({ block, question, answers, onChange, showErrors, disabled, pr
  * The one-time vehicle information card. The same component is used in the Daily Checkout (Member / Vehicle
  * Info step) and on the Captain 5 page. It renders nothing when the server has no open question.
  */
-export default function VehicleIdentificationCard({ block, answers, onChange, showErrors = false, disabled = false }: Props) {
+export default function VehicleIdentificationCard({ block, answers, onChange, showErrors = false, disabled = false, readOnly = false }: Props) {
   const prefix = useId();
   if (block.questions.length === 0) return null;
+
+  if (readOnly) {
+    return <section data-vehicle-identification data-read-only aria-labelledby={`${prefix}-title`} className="rounded-xl border border-hub-glass-border bg-hub-n-50 p-4">
+      <h3 id={`${prefix}-title`} className="text-base font-semibold text-hub-ink">One-time vehicle information</h3>
+      {block.note && <p className="mt-1 text-sm text-hub-n-600">{block.note}</p>}
+      <ul className="mt-3 grid gap-2 text-sm text-hub-ink">
+        {block.questions.map((question) => <li key={question.field}>
+          <span className="font-semibold">{question.label}</span>
+          {question.current_value && <span> · The Hub has <span className="tabular-nums">{question.current_value}</span> on record.</span>}
+        </li>)}
+      </ul>
+      <p className="mt-3 text-sm font-semibold text-hub-ink">Fleet or a Captain 5 officer can answer this.</p>
+    </section>;
+  }
 
   return <section data-vehicle-identification aria-labelledby={`${prefix}-title`} className="rounded-xl border border-hub-glass-border bg-hub-n-50 p-4">
     <h3 id={`${prefix}-title`} className="text-base font-semibold text-hub-ink">One-time vehicle information</h3>

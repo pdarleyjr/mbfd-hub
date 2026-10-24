@@ -16,6 +16,7 @@ const VERSION = 'a'.repeat(64);
 const VIN = '1FTFW1ET5DFC10312';
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const NOTE = "One-time question: this information is needed only once to create this unit's vehicle record or match it to the Master Vehicle Inventory.";
+const HELP = "If it isn't on the vehicle or you can't read it, choose Information not available.";
 const NOT_NOW = "Can't get to it right now (unit in service, away, or blocked)";
 
 const reasons = [
@@ -147,14 +148,14 @@ test.describe('one-time vehicle information in the Daily Checkout', () => {
     await group(page, 'VIN').getByRole('textbox').fill('abc');
     await continueButton(page).click();
     await expect(group(page, 'License plate').getByRole('alert')).toHaveCount(0);
-    await expect(group(page, 'VIN').getByRole('alert')).toHaveText('A VIN has 17 letters and numbers.');
+    await expect(group(page, 'VIN').getByRole('alert')).toHaveText('A VIN has 17 letters and numbers. ' + HELP);
 
     await group(page, 'VIN').getByRole('textbox').fill(VIN.toLowerCase());
     await expect(group(page, 'VIN').getByRole('textbox')).toHaveValue(VIN);
     await group(page, 'Model year').getByRole('textbox').fill('19');
     await continueButton(page).click();
     await expect(group(page, 'VIN').getByRole('alert')).toHaveCount(0);
-    await expect(group(page, 'Model year').getByRole('alert')).toHaveText('Enter the 4 digit year.');
+    await expect(group(page, 'Model year').getByRole('alert')).toHaveText('Enter a year from 1900 to 2099.');
 
     // Not available needs a reason, and the "Other" reason also needs a short note.
     await notAvailable(page, 'Model year').check();
@@ -177,6 +178,101 @@ test.describe('one-time vehicle information in the Daily Checkout', () => {
 
     await expect(vehicleSelect(page)).toHaveCount(0);
     expect(api.submissions).toEqual([]);
+  });
+
+  test('values the server would drop are refused with a pointer to Information not available', async ({ page }) => {
+    const NOT_REAL = `That is not a real value. ${HELP}`;
+    await mobileInspectionFixture(page, engine2, { vehicleIdentification: {
+      ...identification,
+      questions: [
+        identification.questions[0],
+        { field: 'vehicle_number', label: 'Fleet vehicle number', hint: null, input: 'text', max: 32, current_value: null, confirm: false },
+        { field: 'make', label: 'Make', hint: null, input: 'text', max: 64, current_value: null, confirm: false },
+      ],
+    } });
+    await openMemberStep(page);
+    await chooseShiftA(page);
+
+    const cases: Array<[string, string, string]> = [
+      ['License plate', 'A', `A plate has 2 to 16 letters and numbers. ${HELP}`],
+      ['License plate', 'n/a', NOT_REAL],
+      ['License plate', '-', NOT_REAL],
+      ['License plate', 'aaaa', NOT_REAL],
+      ['Fleet vehicle number', 'abc', `A vehicle number has 4 to 32 characters: letters, numbers, spaces and . / # -. ${HELP}`],
+      ['Fleet vehicle number', 'unknown', NOT_REAL],
+      ['Fleet vehicle number', '0', NOT_REAL],
+      ['Make', 'x', NOT_REAL],
+      ['Make', 'none', NOT_REAL],
+    ];
+    for (const [label, value, message] of cases) {
+      await group(page, label).getByRole('textbox').fill(value);
+      await continueButton(page).click();
+      await expect(group(page, label).getByRole('alert'), `${label}: ${value}`).toHaveText(message);
+    }
+
+    await group(page, 'License plate').getByRole('textbox').fill('ab 1-2');
+    await group(page, 'Fleet vehicle number').getByRole('textbox').fill('E-2/12');
+    await group(page, 'Make').getByRole('textbox').fill('Pierce');
+    await continueButton(page).click();
+    await expect(vehicleSelect(page)).toHaveCount(0);
+  });
+
+  test('a boat asks for a hull ID of 6 to 32 letters and numbers', async ({ page }) => {
+    await mobileInspectionFixture(page, engine2, { vehicleIdentification: {
+      ...identification,
+      kind: 'boat',
+      questions: [{ field: 'vin', label: 'Hull ID', hint: null, input: 'text', max: 32, current_value: null, confirm: false }],
+    } });
+    await openMemberStep(page);
+    await chooseShiftA(page);
+    await group(page, 'Hull ID').getByRole('textbox').fill('ab12');
+    await continueButton(page).click();
+    await expect(group(page, 'Hull ID').getByRole('alert')).toHaveText(`A hull ID has 6 to 32 letters and numbers. ${HELP}`);
+    await group(page, 'Hull ID').getByRole('textbox').fill('abc-123');
+    await continueButton(page).click();
+    await expect(vehicleSelect(page)).toHaveCount(0);
+  });
+
+  test('a different physical vehicle hides the card, skips the gate, and the answers return with the assigned vehicle', async ({ page }) => {
+    await mobileInspectionFixture(page, engine2, {
+      fleetVehicles: [{ vehicle_number: 'TEST-205', designation: 'E5', role: 'frontline' }],
+      vehicleIdentification: identification,
+    });
+    await openMemberStep(page);
+    await group(page, 'License plate').getByRole('textbox').fill('ab12');
+
+    await vehicleSelect(page).selectOption('TEST-205');
+    await expect(card(page)).toHaveCount(0);
+    await page.getByRole('group', { name: 'Was a truck swap completed?' }).getByRole('radio', { name: 'Yes, swap completed' }).check();
+    await chooseShiftA(page);
+    await continueButton(page).click();
+    await expect(vehicleSelect(page)).toHaveCount(0);
+
+    await openMemberStep(page);
+    await page.getByRole('button', { name: 'I picked wrong', exact: true }).click();
+    await expect(card(page)).toHaveCount(1);
+    await expect(group(page, 'License plate').getByRole('textbox')).toHaveValue('AB12');
+  });
+
+  test('a checkout for a different physical vehicle is not blocked and sends no vehicle_identification key', async ({ page }) => {
+    test.setTimeout(120_000);
+    const api = await mobileInspectionFixture(page, engine2, {
+      fleetVehicles: [{ vehicle_number: 'TEST-205', designation: 'E5', role: 'frontline' }],
+      vehicleIdentification: identification,
+    });
+    await completeChecklist(page, api.checklist);
+    await openMemberStep(page);
+    await vehicleSelect(page).selectOption('TEST-205');
+    await page.getByRole('group', { name: 'Was a truck swap completed?' }).getByRole('radio', { name: 'Yes, swap completed' }).check();
+    await chooseShiftA(page);
+    await page.getByRole('button', { name: 'Review & Sign', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Review & Sign Inspection' })).toBeVisible();
+    await sign(page);
+    await page.getByRole('button', { name: 'Submit Inspection', exact: true }).click();
+
+    await expect.poll(() => api.submissions.length).toBe(1);
+    expect(api.submissions[0].physical_vehicle).toEqual({ vehicle_number: 'TEST-205', swap_answer: 'swap_completed' });
+    expect(Object.keys(api.submissions[0])).not.toContain('vehicle_identification');
   });
 
   test('answers are kept in the draft and come back after a reload', async ({ page }) => {
@@ -266,12 +362,13 @@ test.describe('one-time vehicle information in the Daily Checkout', () => {
 });
 
 test.describe('one-time vehicle information on the Captain 5 page', () => {
-  const workspace = (withBlock: boolean) => ({
+  const workspace = (withBlock: boolean, canAnswer: boolean) => ({
     ...(withBlock ? {
       apparatus_id: 63,
       vehicle_identification: {
         required: true,
         note: NOTE,
+        can_answer: canAnswer,
         kind: 'vehicle',
         questions: [{ field: 'plate', label: 'License plate', hint: null, input: 'text', max: 32, current_value: 'XD1904', confirm: true }],
         reasons,
@@ -289,7 +386,7 @@ test.describe('one-time vehicle information on the Captain 5 page', () => {
     generated_at: '2026-10-24T12:00:00Z',
   });
 
-  async function mockCaptain5(page: Page, options: { withBlock: boolean; failFirstSave?: boolean }) {
+  async function mockCaptain5(page: Page, options: { withBlock: boolean; failFirstSave?: boolean; canAnswer?: boolean }) {
     const saves: Array<Record<string, unknown>> = [];
     let saved = false;
     let failNext = options.failFirstSave === true;
@@ -306,7 +403,7 @@ test.describe('one-time vehicle information on the Captain 5 page', () => {
           authorization: { capabilities: { command_300_access: false } },
         } });
       }
-      if (path === '/api/captain5/workspace') return route.fulfill({ json: workspace(options.withBlock && !saved) });
+      if (path === '/api/captain5/workspace') return route.fulfill({ json: workspace(options.withBlock && !saved, options.canAnswer !== false) });
       if (path === '/api/captain5/communications/summary') return route.fulfill({ json: { unread_count: 0, latest_activity_at: null } });
       if (path === '/api/public/apparatuses/63/vehicle-identification' && route.request().method() === 'POST') {
         saves.push(route.request().postDataJSON());
@@ -329,6 +426,19 @@ test.describe('one-time vehicle information on the Captain 5 page', () => {
     await mockCaptain5(page, { withBlock: false });
     await expect(page.getByTestId('captain5-vehicle-identification')).toHaveCount(0);
     await expect(page.getByText('One-time vehicle information')).toHaveCount(0);
+  });
+
+  test('a person who cannot answer sees the questions read-only with no save button', async ({ page }) => {
+    const saves = await mockCaptain5(page, { withBlock: true, canAnswer: false });
+    const readOnly = page.locator('[data-vehicle-identification][data-read-only]');
+    await expect(readOnly).toBeVisible();
+    await expect(readOnly).toContainText('License plate');
+    await expect(readOnly).toContainText('The Hub has XD1904 on record.');
+    await expect(readOnly).toContainText('Fleet or a Captain 5 officer can answer this.');
+    await expect(readOnly.getByRole('textbox')).toHaveCount(0);
+    await expect(readOnly.getByRole('radio')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Save vehicle information' })).toHaveCount(0);
+    expect(saves).toHaveLength(0);
   });
 
   test('the card confirms the plate, keeps its answers after a failed save, and retries with the same submission id', async ({ page }) => {

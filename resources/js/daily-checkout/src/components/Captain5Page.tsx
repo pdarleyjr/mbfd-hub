@@ -15,6 +15,7 @@ import IssuesTab from './captain5/IssuesTab';
 import ReplacementsTab from './captain5/ReplacementsTab';
 import TodayTab from './captain5/TodayTab';
 import VehicleIdentificationPanel from './captain5/VehicleIdentificationPanel';
+import VehicleIdentificationCard from './VehicleIdentificationCard';
 import RescueInventoryTab, { type RescueView } from './captain5/ems/RescueInventoryTab';
 import SupplyRoomTab, { isSupplyView, type SupplyView } from './captain5/ems/SupplyRoomTab';
 import { useEmsAccess, useOpenRequestCount } from './captain5/ems/useEmsAccess';
@@ -214,7 +215,10 @@ export default function Captain5Page() {
 
       <ActingApprovals acting={data.acting} onChange={actingChanged} />
 
-      {data.vehicle_identification && data.apparatus_id !== undefined && (
+      {data.vehicle_identification && !data.vehicle_identification.can_answer && (
+        <VehicleIdentificationCard block={data.vehicle_identification} answers={{}} onChange={() => undefined} readOnly />
+      )}
+      {data.vehicle_identification?.can_answer && data.apparatus_id !== undefined && (
         <VehicleIdentificationPanel apparatusId={data.apparatus_id} block={data.vehicle_identification} onSaved={identificationChanged} />
       )}
       {identificationSaved && !data.vehicle_identification && (

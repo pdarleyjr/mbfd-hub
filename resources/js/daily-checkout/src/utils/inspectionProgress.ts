@@ -1,7 +1,7 @@
 import type { ChecklistData, ChecklistFieldValue, ChecklistItem, Compartment, MeterData, OfficerInfo, ScheduledChecklistTaskResult, VehicleIdentificationAnswers } from '../types';
 import { resolveFindingTargets } from './previousFindings';
 import { vehicleConfirmationComplete } from './vehicleConfirmation';
-import { vehicleIdentificationComplete } from './vehicleIdentification';
+import { activeVehicleIdentification, vehicleIdentificationComplete } from './vehicleIdentification';
 
 export function itemIsComplete(item: ChecklistItem) {
   if (item.observed !== true) return false;
@@ -35,7 +35,8 @@ export function inspectionReadiness(checklist: ChecklistData | null, compartment
   // The physical vehicle must be confirmed (and any different vehicle explained) before submitting.
   const missingVehicle = !vehicleConfirmationComplete(officer.vehicleConfirmation);
   // Each open one-time vehicle question needs an answer, or "not available" with its reason. No questions, no gate.
-  const missingIdentification = !vehicleIdentificationComplete(checklist?.vehicle_identification, identification);
+  // Not asked while the crew reports a different vehicle: the server ignores those answers.
+  const missingIdentification = !vehicleIdentificationComplete(activeVehicleIdentification(checklist?.vehicle_identification, officer), identification);
   const maxMiles = checklist?.fields.some(field => field.id === 'mileage') ? 999999999 : 2147483647;
   const invalidMeters = (meters.engine_hours !== null && (!Number.isFinite(meters.engine_hours) || meters.engine_hours < 0 || meters.engine_hours > 9999999.9 || !/^\d+(\.\d)?$/.test(String(meters.engine_hours))))
     || (meters.miles !== null && (!Number.isInteger(meters.miles) || meters.miles < 0 || meters.miles > maxMiles));
