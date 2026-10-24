@@ -38,6 +38,17 @@ final class ResourceLibraryStorage
         return $this->directory($uuid).'/preview.pdf';
     }
 
+    /** Where the original of a replacement lives. Never an earlier version's path, so nothing is overwritten. */
+    public function versionedOriginalPath(string $uuid, int $version, string $extension): string
+    {
+        return $this->directory($uuid).'/v'.$version.'/original.'.strtolower($extension);
+    }
+
+    public function versionedPreviewPath(string $uuid, int $version): string
+    {
+        return $this->directory($uuid).'/v'.$version.'/preview.pdf';
+    }
+
     /** Copy a local file onto the private disk as a stream (documents can be tens of megabytes). */
     public function putFromLocal(string $diskPath, string $localPath): void
     {

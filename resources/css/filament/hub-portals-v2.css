@@ -318,6 +318,7 @@
 [data-hub-portal="employee"] .rl-card { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem 1.5rem; padding: 1rem 1.25rem; border: 1px solid rgb(var(--hub-glass-border)); border-radius: var(--hub-radius-card); background: rgb(var(--hub-glass) / var(--hub-glass-alpha)); box-shadow: var(--hub-glass-highlight), var(--hub-shadow-card); }
 [data-hub-portal="employee"] .rl-card__body { flex: 1 1 18rem; min-width: 0; }
 [data-hub-portal="employee"] .rl-card__title { color: rgb(var(--hub-ink)); font-size: 1rem; font-weight: 650; line-height: 1.4; }
+[data-hub-portal="employee"] .rl-badge-new { display: inline-block; margin-left: .375rem; padding: .0625rem .5rem; border: 1px solid rgb(var(--hub-action-primary)); border-radius: var(--hub-radius-tag); color: rgb(var(--hub-action-primary)); font-size: .75rem; font-weight: 650; line-height: 1.4; vertical-align: .0625rem; }
 [data-hub-portal="employee"] .rl-card__meta { margin: .25rem 0 0; color: rgb(var(--hub-ink-secondary)); font-size: .8125rem; }
 [data-hub-portal="employee"] .rl-card__description { max-width: 46rem; margin: .5rem 0 0; color: rgb(var(--hub-ink-secondary)); font-size: .875rem; line-height: 1.55; }
 [data-hub-portal="employee"] .rl-card__actions { display: flex; flex-wrap: wrap; gap: .5rem; }

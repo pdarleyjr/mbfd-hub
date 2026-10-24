@@ -40,6 +40,12 @@ class ResourceDocument extends Model
 
     public const PDF_MIME = 'application/pdf';
 
+    /** Documents first shown to members within this many days carry the "New" badge. */
+    public const NEW_BADGE_DAYS = 14;
+
+    /** Wording fields whose changes are written to the history with their previous values. */
+    private const AUDITED_DETAILS = ['title', 'category', 'description'];
+
     protected $fillable = [
         'slug', 'title', 'category', 'description',
         'original_filename', 'original_mime', 'original_size', 'original_sha256', 'original_path',
@@ -76,16 +82,10 @@ class ResourceDocument extends Model
             }
         });
 
-        // Administrators flip visibility from the Admin panel; record who did it. Imports log their own events.
+        // Administrators change visibility, wording and order from the Admin panel; record who did it and what
+        // it was before. Imports and replacements log their own events.
         static::updated(function (self $document): void {
-            if (! $document->wasChanged('published')) {
-                return;
-            }
-            $document->events()->create([
-                'event' => $document->published ? 'published' : 'unpublished',
-                'actor_id' => Auth::id(),
-                'metadata' => ['source' => 'admin'],
-            ]);
+            $document->recordAuditedChanges();
         });
     }
 
@@ -93,6 +93,68 @@ class ResourceDocument extends Model
     public function events(): HasMany
     {
         return $this->hasMany(ResourceDocumentEvent::class);
+    }
+
+    /** @return HasMany<ResourceDocumentVersion, $this> */
+    public function versions(): HasMany
+    {
+        return $this->hasMany(ResourceDocumentVersion::class);
+    }
+
+    /** The number of the file members get today: 1 until the first replacement. */
+    public function currentVersionNumber(): int
+    {
+        return ((int) $this->versions()->max('version')) + 1;
+    }
+
+    /** Published recently enough to carry the "New" badge on the member page. */
+    public function isNew(): bool
+    {
+        return $this->published_at !== null && $this->published_at->greaterThan(now()->subDays(self::NEW_BADGE_DAYS));
+    }
+
+    private function recordAuditedChanges(): void
+    {
+        $actor = Auth::id();
+        $source = $actor === null ? 'system' : 'admin';
+
+        if ($this->wasChanged('published')) {
+            $this->events()->create([
+                'event' => $this->published ? 'published' : 'unpublished',
+                'actor_id' => $actor,
+                'metadata' => ['source' => 'admin'],
+            ]);
+        }
+
+        $before = [];
+        $after = [];
+        foreach (self::AUDITED_DETAILS as $field) {
+            $old = (string) $this->getOriginal($field);
+            $new = (string) $this->getAttribute($field);
+            if ($old !== $new) {
+                $before[$field] = $old;
+                $after[$field] = $new;
+            }
+        }
+        if ($before !== []) {
+            $this->events()->create([
+                'event' => 'details_changed',
+                'actor_id' => $actor,
+                'metadata' => ['source' => $source, 'before' => $before, 'after' => $after],
+            ]);
+        }
+
+        if ($this->wasChanged('sort')) {
+            $this->events()->create([
+                'event' => 'reordered',
+                'actor_id' => $actor,
+                'metadata' => [
+                    'source' => $source,
+                    'before' => ['sort' => (int) $this->getOriginal('sort')],
+                    'after' => ['sort' => (int) $this->sort],
+                ],
+            ]);
+        }
     }
 
     /** @param  Builder<self>  $query */

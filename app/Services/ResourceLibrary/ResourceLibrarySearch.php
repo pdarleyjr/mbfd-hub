@@ -23,7 +23,7 @@ final class ResourceLibrarySearch
     {
         $query = ResourceDocument::query()
             // The extracted text is large; it is filtered on in SQL and never loaded into the page.
-            ->select(['id', 'uuid', 'slug', 'title', 'category', 'description', 'original_filename', 'original_mime', 'original_size', 'original_path', 'preview_path', 'page_count', 'sort'])
+            ->select(['id', 'uuid', 'slug', 'title', 'category', 'description', 'original_filename', 'original_mime', 'original_size', 'original_path', 'preview_path', 'page_count', 'sort', 'published_at'])
             ->published()
             ->orderBy('category')
             ->orderBy('sort')

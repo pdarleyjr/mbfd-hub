@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\ResourceLibrary;
 
 use App\Models\ResourceDocument;
+use App\Models\ResourceDocumentVersion;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Symfony\Component\HttpFoundation\HeaderUtils;
@@ -37,6 +38,18 @@ final class ResourceDocumentStreamer
             $document->original_path,
             $document->original_mime,
             $document->original_filename,
+            HeaderUtils::DISPOSITION_ATTACHMENT,
+            "sandbox; default-src 'none'",
+        );
+    }
+
+    /** A superseded file, in its original format. Only reached through the manager-only admin route. */
+    public function downloadVersion(ResourceDocumentVersion $version): StreamedResponse
+    {
+        return $this->stream(
+            $version->original_path,
+            $version->original_mime,
+            $version->original_filename,
             HeaderUtils::DISPOSITION_ATTACHMENT,
             "sandbox; default-src 'none'",
         );
