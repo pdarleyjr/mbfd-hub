@@ -5,8 +5,10 @@ import {
   InventoryV2Response, SupplyRequest, UpdateItemRequest, CreateSupplyRequestRequest,
   StationInspectionSummary, FireEquipmentRequestSummary,
   SingleGasMeterSummary, StationRequestSummary, ApparatusServiceTicketSummary, StationActivityEntry, RoomProfile, FleetVehicle,
+  VehicleIdentification, VehicleIdentificationSubmission,
 } from '../types';
 import { purgeOnSessionEnd } from '../pwa/userCaches.ts';
+import { parseVehicleIdentification, parseVehicleIdentificationResponse } from './vehicleIdentification';
 
 const API_BASE = '/api';
 
@@ -433,10 +435,13 @@ export class ApiClient {
       : undefined;
 
     const checklistBaseVersion = [payload?.checklist_base_version, rawChecklist?.checklist_base_version].find(nonEmptyString);
+    // Sent next to the checklist (and on the Fire Boat session start), never inside the hashed contract.
+    const vehicleIdentification = parseVehicleIdentification(payload?.vehicle_identification);
     const checklist: ChecklistData = {
       open_findings: Array.isArray(payload?.open_findings) ? payload.open_findings : [],
       ...(checklistBaseVersion ? { checklist_base_version: checklistBaseVersion } : {}),
       pending_corrections: parsePendingCorrections(payload?.pending_corrections),
+      ...(vehicleIdentification ? { vehicle_identification: vehicleIdentification } : {}),
       checklist_version: checklistVersion.toLowerCase(),
       checklist_type: typeof payload?.checklist_type === 'string' ? payload.checklist_type : undefined,
       schema_version: schemaVersion,
@@ -538,6 +543,28 @@ export class ApiClient {
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  /**
+   * Save one-time vehicle information outside a checkout (the Captain 5 page). The same
+   * client_submission_id may be sent again after a lost response; the server ignores the duplicate.
+   * Returns the refreshed block, or undefined when nothing is open any more.
+   */
+  static async submitVehicleIdentification(
+    apparatusId: number,
+    body: { client_submission_id: string } & VehicleIdentificationSubmission,
+  ): Promise<VehicleIdentification | undefined> {
+    const response = await fetchWithTimeout(`${API_BASE}/public/apparatuses/${apparatusId}/vehicle-identification`, {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: mutationHeaders(),
+      body: JSON.stringify(body),
+    });
+    if (!response.ok) {
+      throw new ApiRequestError(await responseMessage(response, 'The vehicle information could not be saved.'), response.status);
+    }
+
+    return parseVehicleIdentificationResponse(await response.json().catch(() => null));
   }
 
   // Station API methods
