@@ -89,7 +89,7 @@ final class ApparatusMasterVehicleLinkTest extends TestCase
     {
         // Captain 5 shape: same vehicle number, a different truck (different VIN).
         $master = $this->master('22530', ['year' => '2022', 'make' => 'Ford', 'model' => 'F-250', 'serial_number' => 'TESTVIN000000530']);
-        $apparatus = $this->legacyApparatus('Captain 5', '22530', ['year' => 2024, 'make' => 'Chevrolet', 'model' => 'Tahoe', 'vin' => 'TESTVIN000000631']);
+        $apparatus = $this->legacyApparatus('Captain 5', '22530', ['year' => 2024, 'make' => 'Former make', 'model' => 'Former model', 'vin' => 'TESTVIN000000631']);
 
         $result = $this->service()->reconcile($apparatus);
 
