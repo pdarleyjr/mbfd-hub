@@ -95,6 +95,8 @@ class AdminPanelProvider extends PanelProvider
                 // ambiguous at runtime.
                 Dashboard::class,
                 Captain5Operations::class,
+                \App\Filament\Admin\Pages\MedicalSupplyRoom::class,
+                \App\Filament\Admin\Pages\MedicalDataStatistics::class,
                 CommandCommunications::class,
                 CommunicationsUsage::class,
                 ComposeEmail::class,
@@ -125,6 +127,7 @@ class AdminPanelProvider extends PanelProvider
             ->navigationGroups([
                 NavigationGroup::make()->label('Operations')->icon('heroicon-o-clipboard-document-list')->collapsed(),
                 NavigationGroup::make()->label('Fleet')->icon('heroicon-o-truck')->collapsed(),
+                NavigationGroup::make()->label('EMS')->icon('heroicon-o-heart')->collapsed(),
                 NavigationGroup::make()->label('Logistics')->icon('heroicon-o-cube')->collapsed(),
                 NavigationGroup::make()->label('Personnel')->icon('heroicon-o-user-group')->collapsed(),
                 NavigationGroup::make()->label('Programs')->icon('heroicon-o-folder-open')->collapsed(),

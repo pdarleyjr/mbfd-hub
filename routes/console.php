@@ -105,8 +105,22 @@ Schedule::command('fleet:prune-take-home-uploads')
     ->withoutOverlapping()
     ->onOneServer();
 
+// EMS idempotency keys older than 30 days (a retry window, not history).
+Schedule::command('ems:prune-idempotency')
+    ->dailyAt('03:50')
+    ->timezone('America/New_York')
+    ->withoutOverlapping()
+    ->onOneServer();
+
 Schedule::command('personnel-equipment:notify-expirations')
     ->dailyAt('06:30')
+    ->timezone('America/New_York')
+    ->withoutOverlapping()
+    ->onOneServer();
+
+// A promotional list past its expiry date stops ranking members and shows as expired.
+Schedule::command('personnel:expire-promotional-lists')
+    ->dailyAt('00:10')
     ->timezone('America/New_York')
     ->withoutOverlapping()
     ->onOneServer();

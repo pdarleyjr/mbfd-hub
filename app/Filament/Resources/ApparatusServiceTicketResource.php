@@ -8,6 +8,7 @@ use App\Enums\ApparatusServiceTicketCategory;
 use App\Enums\ApparatusServiceTicketPriority;
 use App\Enums\ApparatusServiceTicketStatus;
 use App\Filament\Concerns\EnterpriseTable;
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\ApparatusServiceTicketResource\Pages;
 use App\Filament\Support\ArchiveFilter;
 use App\Models\ApparatusServiceTicket;
@@ -22,6 +23,7 @@ use Illuminate\Database\Eloquent\Model;
 class ApparatusServiceTicketResource extends Resource
 {
     use EnterpriseTable;
+    use HasExportActions;
 
     protected static ?string $model = ApparatusServiceTicket::class;
 
@@ -37,7 +39,7 @@ class ApparatusServiceTicketResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return self::applyEnterpriseDefaults($table)
+        return static::withExportActions(self::applyEnterpriseDefaults($table)
             ->columns([
                 Tables\Columns\TextColumn::make('ticket_number')
                     ->wrap()
@@ -97,7 +99,7 @@ class ApparatusServiceTicketResource extends Resource
                     ),
             ])
             ->defaultSort('created_at', 'desc')
-            ->actions([Tables\Actions\ViewAction::make()]);
+            ->actions([Tables\Actions\ViewAction::make()]));
     }
 
     public static function infolist(Infolist $infolist): Infolist

@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Enums\ProjectPriority;
 use App\Enums\ProjectStatus;
 use App\Filament\Concerns\EnterpriseTable;
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\Under25kProjectResource\Pages;
 use App\Filament\Resources\Under25kProjectResource\RelationManagers;
 use App\Models\Under25kProject;
@@ -19,6 +20,7 @@ use Filament\Tables\Table;
 class Under25kProjectResource extends Resource
 {
     use EnterpriseTable;
+    use HasExportActions;
 
     protected static ?string $model = Under25kProject::class;
 
@@ -160,7 +162,7 @@ class Under25kProjectResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return self::applyEnterpriseDefaults($table)
+        return static::withExportActions(self::applyEnterpriseDefaults($table)
             ->columns([
                 Tables\Columns\TextColumn::make('project_number')
                     ->searchable()
@@ -240,7 +242,7 @@ class Under25kProjectResource extends Resource
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ])
-            ->defaultSort('created_at', 'desc');
+            ->defaultSort('created_at', 'desc'));
     }
 
     public static function infolist(Infolist $infolist): Infolist

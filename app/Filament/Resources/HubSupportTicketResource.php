@@ -8,6 +8,7 @@ use App\Enums\HubSupportTicketCategory;
 use App\Enums\HubSupportTicketImpact;
 use App\Enums\HubSupportTicketStatus;
 use App\Filament\Concerns\EnterpriseTable;
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\HubSupportTicketResource\Pages;
 use App\Models\HubSupportTicket;
 use App\Models\HubSupportTicketUpdate;
@@ -27,6 +28,8 @@ final class HubSupportTicketResource extends Resource
 
     use EnterpriseTable;
 
+    use HasExportActions;
+
     protected static ?string $model = HubSupportTicket::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-lifebuoy';
@@ -39,7 +42,7 @@ final class HubSupportTicketResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return self::applyEnterpriseDefaults($table)
+        return static::withExportActions(self::applyEnterpriseDefaults($table)
             ->columns([
                 Tables\Columns\TextColumn::make('ticket_number')
                     ->wrap()
@@ -77,7 +80,7 @@ final class HubSupportTicketResource extends Resource
                 ),
             ])
             ->defaultSort('created_at', 'desc')
-            ->actions([Tables\Actions\ViewAction::make()]);
+            ->actions([Tables\Actions\ViewAction::make()]));
     }
 
     public static function infolist(Infolist $infolist): Infolist

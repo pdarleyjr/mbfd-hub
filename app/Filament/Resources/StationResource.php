@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Concerns\EnterpriseTable;
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\StationResource\Pages;
 use App\Filament\Resources\StationResource\RelationManagers;
 use App\Filament\Resources\StationResource\StationOperationsSection;
@@ -21,6 +22,7 @@ use Illuminate\Database\Eloquent\Model;
 class StationResource extends Resource
 {
     use EnterpriseTable;
+    use HasExportActions;
 
     protected static ?string $model = Station::class;
 
@@ -196,7 +198,7 @@ class StationResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return self::applyEnterpriseDefaults($table)
+        return static::withExportActions(self::applyEnterpriseDefaults($table)
             // The three staffing columns share one memoized summary per station,
             // built from apparatus loaded once for the whole page.
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with([
@@ -250,6 +252,7 @@ class StationResource extends Resource
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
+            ->defaultSort('station_number')
             ->filters([
                 Tables\Filters\TernaryFilter::make('is_active')
                     ->label('Active'),
@@ -262,7 +265,7 @@ class StationResource extends Resource
             ])
             // No bulk delete: stations with inspection evidence must be deactivated,
             // and the single-record delete action already enforces canDelete().
-            ->bulkActions([]);
+            ->bulkActions([]));
     }
 
     /**

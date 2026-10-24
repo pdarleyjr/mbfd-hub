@@ -47,11 +47,11 @@ for (const menuName of ['Apps', 'More']) {
 test('a member sees no Admin destination and keeps all operational form access', async ({ page }) => {
   await loginHome(page, true);
   await expect(page.locator('[data-hub-menu] a[href="/admin"]')).toHaveCount(0);
-  await expect(page.getByRole('link', { name: /ICS Forms/ })).toBeVisible();
-  await expect(page.getByRole('link', { name: /ICS Forms/ })).toHaveAttribute('href', /\/employee\/forms$/);
+  await expect(page.getByRole('link', { name: /ICS Forms/ })).toHaveCount(0);
+  await expect(page.locator('[data-additional-links] summary')).toBeVisible();
 });
 
-test('phone Home has the official brand, Stations action and five comfortable navigation items', async ({ page, isMobile }, testInfo) => {
+test('phone Home has the official brand, Vehicle Checkout action and five comfortable navigation items', async ({ page, isMobile }, testInfo) => {
   test.skip(!isMobile, 'Phone layout is verified in the Chromium and true WebKit phone projects.');
   await loginHome(page);
   for (const width of [320, 375, 390, 430]) {
@@ -62,9 +62,9 @@ test('phone Home has the official brand, Stations action and five comfortable na
     await expect(logo).toBeVisible();
     await expect(logo).toHaveAttribute('src', '/images/mbfd-official-seal-256.png');
     await expect.poll(() => logo.evaluate(image => (image as HTMLImageElement).naturalWidth)).toBe(256);
-    const stations = page.getByRole('link', { name: 'Stations', exact: true });
-    await expect(stations).toBeVisible();
-    await expect(stations).toHaveAttribute('href', /\/daily\/stations$/);
+    const vehicleCheckout = page.getByRole('link', { name: 'Vehicle Checkout', exact: true });
+    await expect(vehicleCheckout).toBeVisible();
+    await expect(vehicleCheckout).toHaveAttribute('href', /\/daily\/vehicle-inspections$/);
     const navigation = page.getByRole('navigation', { name: 'Member navigation', exact: true });
     await expect(navigation).toBeVisible();
     await expect(navigation.locator('.hub-member-nav__item > span:last-child')).toHaveText(['Home', 'Checkout', 'Employee', 'Requests', 'More']);
@@ -100,12 +100,12 @@ test('phone Home has the official brand, Stations action and five comfortable na
   });
 });
 
-test('desktop Home retains the Hub brand and Stations primary action', async ({ page, isMobile }, testInfo) => {
+test('desktop Home retains the Hub brand and Vehicle Checkout primary action', async ({ page, isMobile }, testInfo) => {
   test.skip(isMobile, 'Desktop layout is verified in the desktop project.');
   await loginHome(page);
   await expect(page.getByRole('link', { name: 'MBFD Hub home', exact: true })).toHaveText('Hub');
   await expect(page.locator('.hub-shell-brand img')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Stations', exact: true })).toHaveAttribute('href', /\/daily\/stations$/);
+  await expect(page.getByRole('link', { name: 'Vehicle Checkout', exact: true })).toHaveAttribute('href', /\/daily\/vehicle-inspections$/);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth + 1)).toBe(true);
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
   await page.screenshot({ path: testInfo.outputPath('home-desktop.png'), fullPage: true });

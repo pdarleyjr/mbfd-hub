@@ -24,16 +24,10 @@
         // Fleet tools only for super administrators and members with the Fleet manage switch on.
         $showFleetOperations = $currentUser instanceof \App\Models\User && $currentUser->canManageFleetSwaps();
         $hubNavigation = \App\Support\HubShellNavigation::forUser($currentUser, $applicationStates);
+        // Profile-less accounts cannot open the Employee Portal (where Forms links the inspection),
+        // so the shell navigation hands them the inspection as their own entry.
+        $takeHomeFallback = collect($hubNavigation['moreNavigation'])->firstWhere('key', 'take-home-inspection');
         $quickAccessItems = [
-            [
-                'title' => 'Fleet operations',
-                'description' => 'Apparatus, defects, service tickets, shop work, and preventative maintenance',
-                'href' => url('/admin/apparatuses'),
-                'icon' => 'M8 17a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm12 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM3 5h11v10H3zM14 9h4l3 3v3h-7',
-                'external' => false,
-                'visible' => $showFleetOperations,
-                'domain' => 'operations',
-            ],
             [
                 'title' => 'Station / Vehicles / Equipment',
                 'description' => 'Station forms, Vehicle Checkouts, Video Conferencing',
@@ -44,12 +38,12 @@
                 'domain' => 'operations',
             ],
             [
-                'title' => 'Take Home Vehicle Inspection',
+                'title' => 'Take Home Inspection',
                 'description' => 'Complete a take-home vehicle inspection.',
-                'href' => route('take-home-inspections.index'),
+                'href' => url($takeHomeFallback['href'] ?? '/'),
                 'icon' => 'M8 17a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm12 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM3 5h11v10H3zM14 9h4l3 3v3h-7',
                 'external' => false,
-                'visible' => true,
+                'visible' => $takeHomeFallback !== null,
                 'domain' => 'operations',
             ],
             [
@@ -61,14 +55,17 @@
                 'visible' => $showEmployeePortal,
                 'domain' => 'personnel',
             ],
+        ];
+        // One expandable card holds the less-used destinations. Each keeps its own visibility rule.
+        $additionalLinks = collect([
             [
-                'title' => 'ICS Forms',
-                'description' => 'ICS 214 & F-ROC reports',
-                'href' => url('/employee/forms'),
-                'icon' => 'M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2m-6 0a3 3 0 0 1 6 0m-6 0a3 3 0 0 0 6 0M9 12h6m-6 4h4',
+                'title' => 'Fleet operations',
+                'description' => 'Apparatus, defects, service tickets, shop work, and preventative maintenance',
+                'href' => url('/admin/apparatuses'),
+                'icon' => 'M8 17a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm12 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM3 5h11v10H3zM14 9h4l3 3v3h-7',
                 'external' => false,
-                'visible' => $showEmployeePortal,
-                'domain' => 'personnel',
+                'visible' => $showFleetOperations,
+                'domain' => 'operations',
             ],
             [
                 'title' => 'Workgroup Dashboard',
@@ -106,8 +103,7 @@
                 'visible' => $showMediaControl,
                 'domain' => 'training',
             ],
-        ];
-    @endphp
+        ])->filter(fn (array $item): bool => $item['visible'])->values();    @endphp
 
     <a href="#main-content" class="hub-skip-link">Skip to main content</a>
 
@@ -121,9 +117,9 @@
             </div>
             @if($showEmployeePortal)
                 <div class="hub-page-header__actions">
-                    <a href="{{ url('/daily/stations') }}" data-important-target class="hub-btn hub-btn--primary hub-btn--field">
-                        <x-heroicon-o-building-office-2 class="hub-btn__icon" aria-hidden="true" />
-                        Stations
+                    <a href="{{ url('/daily/vehicle-inspections') }}" data-important-target class="hub-btn hub-btn--primary hub-btn--field">
+                        <x-heroicon-o-truck class="hub-btn__icon" aria-hidden="true" />
+                        Vehicle Checkout
                     </a>
                 </div>
             @endif
@@ -211,6 +207,44 @@
                                 @endif
                             </a>
                         @endforeach
+
+                        @if($additionalLinks->isNotEmpty())
+                            <details data-quick-access-card data-additional-links class="hub-tile hub-tile--programs hub-additional bg-hub-surface">
+                                <summary class="hub-additional__summary">
+                                    <svg class="hub-tile__glyph" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"></path></svg>
+                                    <span class="hub-tile__body">
+                                        <span class="hub-tile__title">Additional Links</span>
+                                        <span class="hub-tile__description">Fleet, workgroups, training, and media tools</span>
+                                    </span>
+                                    <svg class="hub-tile__affordance hub-additional__chevron" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
+                                </summary>
+                                <ul class="hub-additional__list" aria-label="Additional links">
+                                    @foreach($additionalLinks as $item)
+                                        <li>
+                                            <a
+                                                href="{{ $item['href'] }}"
+                                                @if($item['external']) target="_blank" rel="noopener noreferrer" @endif
+                                                data-additional-link
+                                                data-important-target
+                                                class="hub-additional__link hub-tile--{{ $item['domain'] }}"
+                                            >
+                                                <svg class="hub-tile__glyph" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $item['icon'] }}"></path></svg>
+                                                <span class="hub-tile__body">
+                                                    <span class="hub-tile__title">{{ $item['title'] }}</span>
+                                                    <span class="hub-tile__description">{{ $item['description'] }}</span>
+                                                </span>
+                                                @if($item['external'])
+                                                    <svg class="hub-tile__affordance text-hub-blue" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>
+                                                    <span class="hub-visually-hidden">(opens in a new tab)</span>
+                                                @else
+                                                    <svg class="hub-tile__affordance" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
+                                                @endif
+                                            </a>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            </details>
+                        @endif
                     </div>
                 </section>
             </aside>

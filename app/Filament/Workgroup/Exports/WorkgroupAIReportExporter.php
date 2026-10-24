@@ -5,8 +5,8 @@ namespace App\Filament\Workgroup\Exports;
 use App\Models\CandidateProduct;
 use App\Models\WorkgroupSession;
 use App\Services\Workgroup\WorkgroupAIService;
+use App\Filament\Exports\SafeExporter;
 use Filament\Actions\Exports\ExportColumn;
-use Filament\Actions\Exports\Exporter;
 use Filament\Actions\Exports\Models\Export;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Log;
  *
  * This exporter is designed for the Health & Safety Committee presentation.
  */
-class WorkgroupAIReportExporter extends Exporter
+class WorkgroupAIReportExporter extends SafeExporter
 {
     protected static ?string $model = CandidateProduct::class;
 

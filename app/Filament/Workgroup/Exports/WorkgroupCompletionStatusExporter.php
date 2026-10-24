@@ -6,14 +6,14 @@ use App\Models\CandidateProduct;
 use App\Models\EvaluationSubmission;
 use App\Models\WorkgroupMember;
 use App\Models\WorkgroupSession;
+use App\Filament\Exports\SafeExporter;
 use Filament\Actions\Exports\ExportColumn;
-use Filament\Actions\Exports\Exporter;
 use Filament\Actions\Exports\Models\Export;
 
 /**
  * Exporter for per-user completion status - who has completed what evaluations.
  */
-class WorkgroupCompletionStatusExporter extends Exporter
+class WorkgroupCompletionStatusExporter extends SafeExporter
 {
     protected static ?string $model = WorkgroupMember::class;
 

@@ -5,14 +5,14 @@ namespace App\Filament\Workgroup\Exports;
 use App\Models\EvaluationComment;
 use App\Models\EvaluationSubmission;
 use App\Models\WorkgroupSession;
+use App\Filament\Exports\SafeExporter;
 use Filament\Actions\Exports\ExportColumn;
-use Filament\Actions\Exports\Exporter;
 use Filament\Actions\Exports\Models\Export;
 
 /**
  * Exporter for non-rankable feedback summaries - Training, Instructor categories.
  */
-class WorkgroupFeedbackExporter extends Exporter
+class WorkgroupFeedbackExporter extends SafeExporter
 {
     protected static ?string $model = EvaluationComment::class;
 

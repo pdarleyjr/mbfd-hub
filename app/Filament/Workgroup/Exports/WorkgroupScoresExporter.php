@@ -6,8 +6,8 @@ use App\Models\CandidateProduct;
 use App\Models\EvaluationScore;
 use App\Models\EvaluationSubmission;
 use App\Models\WorkgroupSession;
+use App\Filament\Exports\SafeExporter;
 use Filament\Actions\Exports\ExportColumn;
-use Filament\Actions\Exports\Exporter;
 use Filament\Actions\Exports\Models\Export;
 use Illuminate\Support\Facades\DB;
 
@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\DB;
  * Exporter for full scoring details - all scores per product per evaluator.
  * Updated to include SAVER rubric category scores and decision metadata.
  */
-class WorkgroupScoresExporter extends Exporter
+class WorkgroupScoresExporter extends SafeExporter
 {
     protected static ?string $model = EvaluationSubmission::class;
 

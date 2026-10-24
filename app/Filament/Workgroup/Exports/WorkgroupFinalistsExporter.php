@@ -7,14 +7,14 @@ use App\Models\EvaluationCategory;
 use App\Models\EvaluationScore;
 use App\Models\EvaluationSubmission;
 use App\Models\WorkgroupSession;
+use App\Filament\Exports\SafeExporter;
 use Filament\Actions\Exports\ExportColumn;
-use Filament\Actions\Exports\Exporter;
 use Filament\Actions\Exports\Models\Export;
 
 /**
  * Exporter for finalists - top 2 products per rankable category.
  */
-class WorkgroupFinalistsExporter extends Exporter
+class WorkgroupFinalistsExporter extends SafeExporter
 {
     protected static ?string $model = CandidateProduct::class;
 

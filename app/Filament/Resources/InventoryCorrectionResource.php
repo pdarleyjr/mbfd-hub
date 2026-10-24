@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources;
 
 use App\Filament\Concerns\EnterpriseTable;
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\InventoryCorrectionResource\Pages;
 use App\Models\Apparatus;
 use App\Models\ApparatusInventoryCorrection;
@@ -25,6 +26,7 @@ use Illuminate\Support\Facades\Cache;
 class InventoryCorrectionResource extends Resource
 {
     use EnterpriseTable;
+    use HasExportActions;
 
     protected static ?string $model = ApparatusInventoryCorrection::class;
 
@@ -97,7 +99,7 @@ class InventoryCorrectionResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return self::applyEnterpriseDefaults($table)
+        return static::withExportActions(self::applyEnterpriseDefaults($table)
             ->modifyQueryUsing(fn ($query) => $query->with(['apparatus:id,designation,name,unit_id', 'reporter:id,name,display_name']))
             ->defaultSort('created_at', 'desc')
             ->columns([
@@ -151,7 +153,7 @@ class InventoryCorrectionResource extends Resource
             ->actions([
                 Tables\Actions\ViewAction::make()->label('Review'),
             ])
-            ->bulkActions([]);
+            ->bulkActions([]));
     }
 
     public static function getPages(): array

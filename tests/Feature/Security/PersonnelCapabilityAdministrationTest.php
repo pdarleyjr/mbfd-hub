@@ -25,9 +25,10 @@ final class PersonnelCapabilityAdministrationTest extends TestCase
         'personnel.directory.view', 'personnel.directory.edit', 'personnel.directory.export',
         'personnel.tables.view', 'personnel.tables.create', 'personnel.tables.edit',
         'personnel.tables.share', 'personnel.tables.export', 'personnel.tables.archive',
+        'personnel.promotions.manage',
     ];
 
-    public function test_all_nine_capabilities_can_be_granted_and_revoked_with_audit_and_separate_panel_access(): void
+    public function test_all_personnel_capabilities_can_be_granted_and_revoked_with_audit_and_separate_panel_access(): void
     {
         [$actor, $target] = $this->members();
         $target->givePermissionTo(Permission::findOrCreate('app.bid.access', 'web'));

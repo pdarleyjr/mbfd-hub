@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources;
 
 use App\Filament\Concerns\EnterpriseTable;
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\VehicleSwapRequestResource\Pages;
 use App\Filament\Support\VehicleSwapDecisionAction;
 use App\Models\ApparatusVehicleSwapRequest;
@@ -24,6 +25,7 @@ use Illuminate\Database\Eloquent\Model;
 class VehicleSwapRequestResource extends Resource
 {
     use EnterpriseTable;
+    use HasExportActions;
 
     protected static ?string $model = ApparatusVehicleSwapRequest::class;
 
@@ -58,13 +60,13 @@ class VehicleSwapRequestResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return self::applyEnterpriseDefaults($table)
+        return static::withExportActions(self::applyEnterpriseDefaults($table)
             ->columns(self::columns(showUnit: true))
             ->filters([
                 Tables\Filters\SelectFilter::make('apparatus_id')->relationship('apparatus', 'designation')->label('Unit')->searchable()->preload(),
             ])
             ->defaultSort('created_at', 'desc')
-            ->actions(self::rowActions());
+            ->actions(self::rowActions()));
     }
 
     /** @return list<Tables\Actions\Action> */

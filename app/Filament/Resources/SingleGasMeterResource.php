@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Concerns\EnterpriseTable;
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\SingleGasMeterResource\Pages;
 use App\Models\Apparatus;
 use App\Models\SingleGasMeter;
@@ -18,6 +19,8 @@ class SingleGasMeterResource extends Resource
     protected static ?int $navigationSort = 60;
 
     use EnterpriseTable;
+
+    use HasExportActions;
 
     protected static ?string $model = SingleGasMeter::class;
 
@@ -81,7 +84,7 @@ class SingleGasMeterResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return self::applyEnterpriseDefaults($table)
+        return static::withExportActions(self::applyEnterpriseDefaults($table)
             ->columns([
                 Tables\Columns\TextColumn::make('apparatus.designation')
                     ->label('Apparatus')
@@ -156,14 +159,8 @@ class SingleGasMeterResource extends Resource
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
-                    Tables\Actions\ExportBulkAction::make()
-                        ->exporter(\App\Filament\Exports\SingleGasMetersExporter::class),
                 ]),
-            ])
-            ->headerActions([
-                Tables\Actions\ExportAction::make()
-                    ->exporter(\App\Filament\Exports\SingleGasMetersExporter::class),
-            ]);
+            ]));
     }
 
     public static function getRelations(): array

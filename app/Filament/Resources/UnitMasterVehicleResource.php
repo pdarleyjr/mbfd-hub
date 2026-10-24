@@ -131,67 +131,92 @@ class UnitMasterVehicleResource extends Resource
                 ->withCount(['changes as pending_changes_count' => fn ($changes) => $changes
                     ->where('status', UnitMasterVehicleChange::STATUS_PROPOSED)]))
             ->columns([
+                // Secondary values sit under a main column ("stacked"), so the table needs fewer columns.
+                // Each stacked value stays its own sortable, searchable and toggleable column, hidden by default.
                 Tables\Columns\TextColumn::make('veh_number')
                     ->label('Veh #')
+                    ->description(fn (UnitMasterVehicle $record): ?string => filled($record->tag_number) ? 'Tag '.$record->tag_number : null)
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('tag_number')
                     ->label('Tag #')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('asset_category')
                     ->label('Category')
                     ->badge()
                     ->getStateUsing(fn (UnitMasterVehicle $record): string => $record->categoryLabel())
-                    ->color(fn (UnitMasterVehicle $record): string => $record->isNonroad() ? 'info' : 'gray'),
+                    ->color(fn (UnitMasterVehicle $record): string => $record->isNonroad() ? 'info' : 'gray')
+                    ->visibleFrom('md'),
                 Tables\Columns\TextColumn::make('section')
+                    ->description(fn (UnitMasterVehicle $record): ?string => filled($record->dept_code) ? 'Dept. '.$record->dept_code : null)
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->wrap()
+                    ->visibleFrom('md'),
                 Tables\Columns\TextColumn::make('dept_code')
                     ->label('Dept.')
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('make')
-                    ->sortable(),
+                    ->label('Make / model / year')
+                    ->description(fn (UnitMasterVehicle $record): ?string => collect([$record->model, $record->year])->filter()->implode(' · ') ?: null)
+                    ->sortable()
+                    ->wrap(),
                 Tables\Columns\TextColumn::make('model')
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('year')
-                    ->sortable(),
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('color')
-                    ->toggleable(),
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('fleet_status_code')
                     ->label('FY27 status')
-                    ->toggleable(),
+                    ->toggleable()
+                    ->visibleFrom('md'),
                 Tables\Columns\TextColumn::make('fleet_class_description')
                     ->label('Class description')
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('employee_or_vehicle_name')
                     ->label('Employee/Vehicle')
+                    // The driver sits under the name; when there is no name the driver takes its place.
+                    ->getStateUsing(fn (UnitMasterVehicle $record): ?string => filled($record->employee_or_vehicle_name) ? $record->employee_or_vehicle_name : ($record->assignment ?: null))
+                    ->description(fn (UnitMasterVehicle $record): ?string => filled($record->employee_or_vehicle_name) && filled($record->assignment) ? $record->assignment : null)
                     ->searchable()
                     ->wrap(),
                 Tables\Columns\TextColumn::make('assignment')
                     ->label('Assignment')
-                    ->searchable(),
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('location')
                     ->label('Location')
-                    ->searchable(),
+                    ->searchable()
+                    ->wrap()
+                    ->visibleFrom('md'),
                 Tables\Columns\TextColumn::make('latestTakeHomeInspection.submitted_at')
                     ->label('Last take-home inspection')
                     ->dateTime('M j, Y g:i A', 'America/New_York')
-                    ->placeholder('None'),
+                    ->placeholder('None')
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('pending_changes_count')
                     ->label('Pending corrections')
                     ->badge()
                     ->color('warning')
-                    ->getStateUsing(fn (UnitMasterVehicle $record): ?int => $record->pending_changes_count ?: null),
+                    ->getStateUsing(fn (UnitMasterVehicle $record): ?int => $record->pending_changes_count ?: null)
+                    ->visibleFrom('md'),
                 Tables\Columns\TextColumn::make('visible_documents_count')
                     ->label('Documents')->badge()->color('gray')
-                    ->sortable(),
+                    ->sortable()
+                    ->visibleFrom('md'),
                 Tables\Columns\IconColumn::make('needs_fleet_review')
                     ->label('Review')
                     ->getStateUsing(fn (UnitMasterVehicle $record): ?string => $record->needs_fleet_review ? 'review' : null)
                     ->icon(fn (?string $state): ?string => $state ? 'heroicon-o-exclamation-triangle' : null)
                     ->color('warning')
-                    ->tooltip(fn (UnitMasterVehicle $record): ?string => $record->needs_fleet_review ? 'Needs Fleet review' : null),
+                    ->tooltip(fn (UnitMasterVehicle $record): ?string => $record->needs_fleet_review ? 'Needs Fleet review' : null)
+                    ->visibleFrom('md'),
                 Tables\Columns\TextColumn::make('als_license')
                     ->label('ALS License')
                     ->toggleable(isToggledHiddenByDefault: true),

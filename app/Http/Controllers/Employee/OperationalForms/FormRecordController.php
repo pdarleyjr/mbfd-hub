@@ -9,6 +9,7 @@ use App\Http\Requests\OperationalForms\UpdateFormRecordRequest;
 use App\Models\Employee;
 use App\Models\OperationalFormEvent;
 use App\Models\OperationalFormRecord;
+use App\Services\Ems\MemberCopyService;
 use App\Services\OperationalForms\FormDataValidator;
 use App\Services\OperationalForms\FormRegistry;
 use App\Services\OperationalForms\FrocTotalsCalculator;
@@ -92,6 +93,12 @@ class FormRecordController extends Controller
     {
         $employee = $this->authenticatedEmployee();
         $owned = $this->owned($employee, $record);
+        if (MemberCopyService::isReadOnlyType($owned->form_type)) {
+            return response()->json([
+                'code' => 'read_only',
+                'message' => 'This is a read-only copy of a Medical Inventory Request. It cannot be edited.',
+            ], 409);
+        }
         $data = $this->validator->validate($owned->form_type, $request->validated('data'));
         $now = now();
 

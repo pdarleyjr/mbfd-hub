@@ -1,0 +1,163 @@
+# Admin table coverage matrix
+
+Audit of every Filament table surface in the Hub (Admin, Employee, Training and Workgroups panels) as of 2026-10-23, branch `feat/ems-table-audit`. It records what each table can do today, what this release changed, and why the rest was left alone.
+
+- **Resources:** 51 Filament resource classes (`PersonnelUniformResource` and `TrainingTodoAdminResource` are subclasses and inherit their parent's table).
+- **Other surfaces:** 31 custom pages, tables inside resource pages, and hand-built Blade tables. Relation managers are not listed separately; they follow their parent resource.
+- Facts come from reading the source, not from running the app. Where a cell says "none" it means none was found in the resource or its pages.
+
+## Decision categories
+
+| Decision | Meaning |
+| --- | --- |
+| Exports added | The table now offers **Export** (header) and **Export selected** (bulk) from the shared `HasExportActions` trait. |
+| Editing added | A missing capability on legitimately editable reference or admin data was added (create, edit, filter, sort). |
+| Read-only by design | The data is evidence that must not change in place: an immutable inspection, an audit log, a signed document, a calculated report or a workflow record changed only through actions. |
+| Deferred (other workstream) | Owned by another workstream in this release. Not edited here. |
+| Skipped | Left without the shared export for the reason stated (sensitive content, access scoped some other way, not a real table). |
+
+A surface can carry more than one decision, so the counts below add up to more than the number of rows.
+
+## Counts
+
+| Decision | Resources | Other surfaces | Total |
+| --- | ---: | ---: | ---: |
+| Exports added | 31 | 0 | 31 |
+| Editing added | 5 | 0 | 5 |
+| Read-only by design | 16 | 16 | 32 |
+| Deferred (other workstream) | 4 | 7 | 11 |
+| Skipped | 16 | 16 | 32 |
+
+## The shared export
+
+`App\Filament\Concerns\HasExportActions` (trait) and `App\Services\Exports\TableExportService` (service) replace the earlier trait, which imported packages that are not installed and was never used.
+
+**For people.** Click **Export** above any table that has it, choose Excel or PDF, and choose "current view" (the filters, search and sort now applied) or "all records I can see". Tick records and use **Export selected** to export only those. The file is named `MBFD - <Table title> - YYYY-MM-DD.xlsx` (or `.pdf`).
+
+- Excel: one sheet of the table's visible columns with a frozen bold header and filters on, real numbers and real dates (shown in Eastern time), plus an "About this export" sheet with the title, time, who exported it, the scope, the filters in effect and the row count.
+- PDF: landscape letter, header row repeated on every page, wrapped cells, "Page x of y". Tables with more than 9 columns print one block per record instead of tiny text.
+- Columns come from the table itself, in the same order and with the same labels. A column hidden from this user (a `hidden()` or `visible()` rule) is never exported. Columns the user turned off in the column picker are left out unless "Also include columns turned off" is ticked. Image columns and custom view columns are skipped. Cell descriptions (the grey second line) are not exported.
+- Limits: Excel 10,000 rows and 100,000 cells (rows times columns, so 8,333 rows at 12 columns); PDF 2,000 rows (600 when the PDF uses record blocks) with text over 1,500 characters shortened and a note on the first page; 20 exports per person per minute. Over a limit the user sees "Export not created" with the reason and the dialog stays open.
+- "All records I can see" ignores filters and search but keeps the open tab on pages that have tabs, and never includes records in the trash. To export trashed or archived-by-delete records, show them with the Trash or Archive filter and use "Export selected" or the current view.
+
+**For maintainers.**
+
+1. Add `use HasExportActions;` to the resource and wrap the end of `table()`: `return static::withExportActions($table->columns([...])->...);`. Call it last so it adds to, and does not replace, existing header and bulk actions.
+2. To name the columns yourself, override `public static function exportColumns(): ?array` and return table column names and/or `Column` objects.
+3. Authorization is server-side. The action is visible and runs only if the user passes `Gate::viewAny` on the model **and** the resource's own `canViewAny()`. It is checked again when the download is built. The records are always re-queried from the table's own authorized query; for "selected" the keys are intersected with that query, so an id the user cannot see is ignored.
+4. Every export writes a `security_action_events` row (`table_export`, result `allowed`, `denied` or `refused`, with resource, scope, format, row count and filters) and an `info` log line.
+5. Text is made formula-safe twice: it is written as an explicit string cell, and anything starting with `=`, `+`, `-`, `@`, a control character or a fullwidth/compatibility form of those gets a leading apostrophe. Numbers and dates are never altered.
+
+Filament's own queued exporters (`app/Filament/Exports`, `app/Filament/Workgroup/Exports`) now extend `SafeExporter`, which applies the same neutralization to every value they write. Their columns are unchanged.
+
+## Resources
+
+| Resource | Panel | Nav group | Model | Editable today | Search | Filters | Sort | Bulk actions | Export (before → after) | Decision |
+| --- | --- | --- | --- | --- | --- | ---: | --- | --- | --- | --- |
+| `DepartmentUpdateResource` | admin | Communications | DepartmentUpdate | create, edit, soft delete | yes | 5 | publish_at desc | Export selected | none → shared XLSX/PDF + export selected | Exports added - Table shows title, category, status and dates only; post bodies are not exported. Already editable. |
+| `HubSupportTicketResource` | admin | Communications | HubSupportTicket | deactivate/archive | yes | 6 | created_at desc | Export selected | none → shared XLSX/PDF + export selected | Exports added + Read-only by design - Table has ticket number, generated title, reporter, component, impact and status; ticket text is not in the table. Lifecycle rules apply to every role. |
+| `InboundEmailResource` | admin | Communications | InboundEmail | view only | yes | 0 | received_at desc | none | attachment download on detail page → unchanged | Skipped + Read-only by design - Inbound mail log: sender addresses and subjects, message bodies on the detail page. Immutable. No export of message content. |
+| `OutboundEmailResource` | admin | Communications | OutboundEmail | view only | yes | 4 | created_at desc | none | attachment download on detail page → unchanged | Skipped + Read-only by design - Outbound mail log: recipient addresses, subjects and provider message ids. Immutable delivery record. No export of message content. |
+| `ApparatusResource` | admin | Fleet | Apparatus | create, edit, delete | yes | 5 | designation asc | DeleteBulkAction, Export selected | none → shared XLSX/PDF + export selected | Exports added - Already editable. Only the table gained the export; the Defects relation manager was not touched. |
+| `InspectionResource` | admin | Fleet | ApparatusInspection | view only | yes | 6 | completed_at desc | Export selected | per-record PDF on the view page → shared XLSX/PDF + export selected | Exports added + Read-only by design - Submitted vehicle inspections are immutable evidence; corrections go through the review actions. |
+| `InventoryCorrectionResource` | admin | Fleet | ApparatusInventoryCorrection | view only | no | 3 | created_at desc | Export selected | none → shared XLSX/PDF + export selected | Exports added + Read-only by design - Corrections are immutable records reviewed by action. Search was not added (not editable reference data). |
+| `TakeHomeVehicleInspectionResource` | admin | Fleet | TakeHomeVehicleInspection | view only | yes | 3 | submitted_at desc | Export selected | per-row PDF link → shared XLSX/PDF + export selected | Exports added + Read-only by design - Take-home inspections are immutable submissions. |
+| `UnitMasterVehicleResource` | admin | Fleet | UnitMasterVehicle | create, edit, delete | yes | 6 | veh_number asc | DeleteBulkAction | Excel and PDF header exports (UnitMaster exporters) → unchanged | Deferred (other workstream) - Unit Master Vehicle is owned by another workstream. |
+| `EquipmentItemResource` | admin | Logistics | EquipmentItem | create, edit, delete, deactivate | yes | 5 | none | DeleteBulkAction, Export selected | none → shared XLSX/PDF + export selected | Exports added + Editing added - Added a name sort so the catalog opens alphabetically. |
+| `InventoryItemResource` | admin | Logistics | InventoryItem | create, edit, delete, deactivate | yes | 2 | none | DeleteBulkAction, Export selected | none → shared XLSX/PDF + export selected | Exports added + Editing added - Added a name sort so the catalog opens alphabetically. |
+| `InventoryLocationResource` | admin | Logistics | InventoryLocation | create, edit, delete | yes | 2 | none | DeleteBulkAction, Export selected | none → shared XLSX/PDF + export selected | Exports added + Editing added - Added a location-name sort so locations open alphabetically. |
+| `RecommendationResource` | admin | Logistics | ApparatusDefectRecommendation | edit, delete | yes | 3 | created_at desc | DeleteBulkAction | none → none | Deferred (other workstream) - Model is ApparatusDefectRecommendation and the resolve action calls DefectCorrectiveActionService, so it belongs to the off-limits defect files. One-line change for the lead: see report. |
+| `ShopWorkResource` | admin | Logistics | ShopWork | create, edit, delete | yes | 0 | none | DeleteBulkAction, Export selected | none → shared XLSX/PDF + export selected | Exports added + Editing added - Create was broken (the model had no fillable list, so saving threw). Fixed it, made Status a checked choice that matches the database enum, showed the apparatus by designation, and added Status and Completed filters and a newest-first sort. |
+| `SingleGasMeterResource` | admin | Logistics | SingleGasMeter | create, edit, delete | yes | 3 | expiration_date asc | Delete, Export selected | native ExportAction + ExportBulkAction (SingleGasMetersExporter) → shared XLSX/PDF + export selected (native action removed; exporter sanitized) | Exports added - Replaced the native Filament export with the shared one. The native exporter class stays and is sanitized. |
+| `UniformResource` | admin | Logistics | Uniform | create, edit, delete | yes | 3 | item_name asc | Export selected | none → shared XLSX/PDF + export selected | Exports added - Already editable. Uniforms are never deleted from the table because issued equipment history refers to them. |
+| `ApparatusInspectionExceptionResource` | admin | Operations | ApparatusInspectionException | view only | yes | 4 | created_at desc | Export selected | none → shared XLSX/PDF + export selected | Exports added + Read-only by design - Exceptions are reviewed through dedicated review actions, never edited in place. |
+| `ApparatusServiceTicketResource` | admin | Operations | ApparatusServiceTicket | deactivate/archive | yes | 7 | created_at desc | Export selected | none → shared XLSX/PDF + export selected | Exports added + Read-only by design - Append-only ticket history; status changes go through transition actions on the view page. |
+| `DefectResource` | admin | Operations | ApparatusDefect | edit | yes | 5 | reported_date desc | none | none → none | Deferred (other workstream) - Defect workflow is off-limits for this release. |
+| `FireEquipmentRequestResource` | admin | Operations | FireEquipmentRequest | view only | yes | 2 | created_at desc | Export selected | none → shared XLSX/PDF (hidden: resource is unreachable) | Exports added - canViewAny is hard false, so the resource is registered but unreachable and the export never shows. Added so it works if the resource is re-opened. |
+| `OperationalFormRecordResource` | admin | Operations | OperationalFormRecord | deactivate/archive | yes | 3 | updated_at desc | Move selected to trash, Export selected | none → shared XLSX/PDF + export selected | Exports added + Read-only by design - Signed and submitted forms are read-only; the table has form type, title, status and PDF version only. |
+| `RoomAssetResource` | admin | Operations | RoomAsset | create, edit, deactivate/archive | yes | 2 | updated_at desc | Export selected | none → shared XLSX/PDF + export selected | Exports added - Already editable; assets are deactivated, never deleted, so history stays. |
+| `StationInspectionResource` | admin | Operations | StationInspection | deactivate/archive | yes | 3 | inspection_date desc | Export selected | none → shared XLSX/PDF + export selected | Exports added + Read-only by design - Station inspections are immutable submissions; review goes through actions. |
+| `StationRequestResource` | admin | Operations | StationRequest | deactivate/archive | yes | 7 | created_at desc | Export selected | none → shared XLSX/PDF + export selected | Exports added - Requests move through the view page; export lists the table columns. |
+| `StationResource` | admin | Operations | Station | create, edit, delete | yes | 1 | none | Export selected | none (inventory PDF on a relation manager) → shared XLSX/PDF + export selected | Exports added + Editing added - Already editable. Added a station-number sort so stations open in order. |
+| `VehicleSwapRequestResource` | admin | Operations | ApparatusVehicleSwapRequest | view only | yes | 1 | created_at desc | Export selected | none → shared XLSX/PDF + export selected | Exports added + Read-only by design - Swap decisions go through the decision action; requests are not edited. |
+| `AccountProfileResource` | admin | Personnel | User | edit | yes | 0 | none | none | none → none | Skipped - Account identity data (email, account status; phone on the edit form). Left to the access-administration workstream. |
+| `EmployeeEquipmentRequestResource` | admin | Personnel | EmployeeEquipmentRequest | deactivate/archive | yes | 2 | created_at desc | Export selected | none → shared XLSX/PDF + export selected | Exports added + Read-only by design - Requests are processed from the view page. |
+| `EmployeeResource` | admin | Personnel | Employee | create, edit, deactivate/archive | yes | 1 | name asc | Send onboarding invitations, Export selected | none → shared XLSX/PDF + export selected | Exports added - Already editable. Export carries the columns this viewer already sees (name, rank, station, roster and account status). |
+| `PersonnelAssignmentResource` | admin | Personnel | AssignedEquipment | edit, deactivate/archive | yes | 3 | expires_at asc | Export selected | none → shared XLSX/PDF + export selected | Exports added - Equipment issuance list; same viewer already sees every column. Issued through the uniform flow, edited here only to return or retire. |
+| `PersonnelEmployeeResource` | admin | Personnel | Employee | view only | yes | 0 | name asc | none | none → none | Deferred (other workstream) - Roster hub that overlaps the Master Personnel Directory workstream; view-only here. |
+| `PersonnelRequestResource` | admin | Personnel | PersonnelRequest | deactivate/archive | yes | 4 | created_at desc | Export selected | none → shared XLSX/PDF + export selected | Exports added + Read-only by design - Workflow requests change only through view-page actions. Export has names, rank and status; request notes and attachments are not in the table. |
+| `PersonnelUniformResource` | admin | Personnel | Uniform | create, edit | yes | 3 | item_name asc | Export selected | none → shared XLSX/PDF + export selected | Exports added - Inherits the export from UniformResource. Its own canViewAny (admin.personnel.view) and the Uniform policy must both pass. |
+| `CandidateProductResource` | admin | Programs (admin); Workgroup Management (workgroups panel) | CandidateProduct | create, edit, delete | yes | 2 | none | DeleteBulkAction | none → none | Skipped - Rows are scoped by workgroup membership (WorkgroupAccess), not by a viewAny rule, so the shared export cannot decide who may export. Evaluation data is exported by the sanitized native Workgroup exporters. |
+| `CapitalProjectResource` | admin | Programs | CapitalProject | create, edit, delete | yes | 3 | none | DeleteBulkAction, Export selected | none → shared XLSX/PDF + export selected | Exports added - Already fully editable. |
+| `TodoResource` | admin | Programs | Todo | create, edit, delete | yes | 2 | created_at desc (second defaultSort wins) | DeleteBulkAction, Export selected | none → shared XLSX/PDF + export selected | Exports added - Already editable. Known quirk left alone: defaultSort is called twice, so only the last call (newest first) takes effect. |
+| `Under25kProjectResource` | admin | Programs | Under25kProject | create, edit, delete | yes | 3 | created_at desc | DeleteBulkAction, Export selected | none → shared XLSX/PDF + export selected | Exports added - Already fully editable. |
+| `UserResource` | admin | System | User | create, edit | no | 0 | n/a | none | none → none | Skipped - Not a table: every page is a legacy redirect stub to the employee screens. |
+| `TrainingCourseResource` | training; admin | Training | TrainingCourse | create, edit | yes | 0 | name asc | none | matrix page workbook (TrainingMatrixExportService) → unchanged | Skipped + Read-only by design - Roster and attendance data follow TrainingRosterPolicy, which applies even to super administrators. The matrix workbook export already exists on the matrix page. |
+| `TrainingSessionResource` | training; admin | Training | TrainingSession | create | yes | 4 | held_on desc | none | per-session PDF/XLSX roster routes → unchanged | Skipped + Read-only by design - Roster, signatures and certification are immutable (void and correct transitions); per-session PDF and XLSX roster exports already exist. |
+| `TrainingTodoAdminResource` | admin | Training | TrainingTodo | create, edit, soft delete | yes | 4 | created_at desc (second defaultSort wins) | Move selected to Trash, Export selected | none → shared XLSX/PDF + export selected | Exports added - Shares its table with TrainingTodoResource; one trait use covers both panels. Soft delete (Move to Trash) already exists. |
+| `TrainingTodoResource` | training only | Training | TrainingTodo | create, edit, soft delete | yes | 4 | created_at desc (second defaultSort wins) | Move selected to Trash, Export selected | none → shared XLSX/PDF + export selected | Exports added - Training-panel copy of the same table; soft delete (Move to Trash) and restore already exist. |
+| `EvaluationCategoryResource` | admin | Workgroup Management | EvaluationCategory | create, edit, delete | yes | 2 | display_order asc | DeleteBulkAction | none → none | Skipped - Workgroup reference data scoped by WorkgroupAccess; small lists, edited here already. |
+| `EvaluationCriterionResource` | admin only | Workgroup Management | EvaluationCriterion | create, edit, delete | yes | 1 | display_order asc | DeleteBulkAction | none → none | Skipped - Deprecated and hidden rubric table; edited here already. |
+| `EvaluationSubmissionResource` | admin only | Workgroup Management | EvaluationSubmission | view only | yes | 2 | none | native Export selected | native ExportAction + ExportBulkAction (EvaluationSubmissionExporter) → unchanged (native, now sanitized) | Skipped + Read-only by design - Keeps its native Filament export, now sanitized. Submitted evaluations are evidence and read-only. |
+| `EvaluationTemplateResource` | admin only | Workgroup Management | EvaluationTemplate | create, edit, delete | yes | 2 | none | DeleteBulkAction | none → none | Skipped - Deprecated and hidden rubric table; edited here already. |
+| `SurveyResource` | admin | Workgroup Management | WorkgroupSurvey | create, edit | yes | 0 | none (columns not sortable) | none | none → none | Skipped - Scoped by WorkgroupAccess. Candidate for a later pass: columns are not sortable. |
+| `WorkgroupFileResource` | admin | Workgroup Management | WorkgroupFile | create, edit, delete | yes | 3 | none | DeleteBulkAction | per-row file download → unchanged | Skipped - Scoped by WorkgroupAccess; files are downloaded one at a time through an authorized route. |
+| `WorkgroupMemberResource` | admin | Workgroup Management | WorkgroupMember | create, edit, delete | yes | 3 | none | DeleteBulkAction | none → none | Skipped - Scoped by WorkgroupAccess; member email and role are managed here already. |
+| `WorkgroupResource` | admin | Workgroup Management | Workgroup | create, edit, delete | yes | 1 | none | DeleteBulkAction | none → none | Skipped - Scoped by WorkgroupAccess; deletion is blocked when evidence is retained. |
+| `WorkgroupSessionResource` | admin | Workgroup Management | WorkgroupSession | create, edit, delete | yes | 2 | none | DeleteBulkAction | none → none | Skipped - Scoped by WorkgroupAccess; deletion is blocked when evidence is retained. |
+
+## Other table surfaces
+
+| Surface | Kind | Panel | Model | Editable today | Search | Filters | Bulk actions | Export (before → after) | Decision |
+| --- | --- | --- | --- | --- | --- | ---: | --- | --- | --- |
+| `MyVehicleInspections` | Filament page table | employee | ApparatusInspection | none | yes | 4 | none | per-row PDF link → unchanged | Skipped + Read-only by design - Member self-service list of the member's own submissions (immutable). Per-row PDF already exists. |
+| `TrainingHistoryPage` | Filament page table | employee | TrainingAttendance | none | yes | 2 | none | none → none | Skipped + Read-only by design - Member self-service list of certified attendance. |
+| `Surveys` | Filament page table | workgroups | WorkgroupSurvey | none | yes | 0 | none | none → none | Skipped - Workgroup member page scoped by membership. |
+| `SharedUploads` | Filament page table | workgroups | WorkgroupSharedUpload | soft delete | yes | 1 | none | per-row download → unchanged | Skipped - Workgroup member page; soft delete and restore already exist; file names only. |
+| `Notes` | Filament page table | workgroups | WorkgroupNote | soft delete | yes | 1 | none | none → none | Skipped - Private and shared workgroup notes: note text must not leave through a bulk export. |
+| `Files` | Filament page table | workgroups | WorkgroupFile | none | yes | 0 | none | per-row download (route workgroup.file.download) → unchanged | Skipped - Workgroup member page; files are downloaded one at a time through an authorized route. |
+| `Evaluations` | Filament page table | workgroups | CandidateProduct | none | yes | 0 | none | none → none | Skipped - Member's own evaluation status per product. |
+| `ViewTrainingSession (table on resource view page)` | Filament table on a resource page | training | TrainingAttendance / TrainingPaperAttendance | none | yes | 0 | none | PDF and XLSX roster export routes → unchanged | Read-only by design - Roster attendance and signatures; certify, correct and void transitions are the only edits. PDF and XLSX roster export routes exist. |
+| `ManageTrainingModules (route modules)` | Filament table on a resource page | training | TrainingModule | none | yes | 0 | none | none → none | Skipped - Training module setup tables; edited with the existing create and edit actions. |
+| `ReviewTrainingPaper (route paper)` | Filament table on a resource page | training | TrainingPaperAttendance | none | no | 1 | none | none → none | Skipped + Read-only by design - Scanned paper roster evidence with raw transcription; review actions only. |
+| `ReviewVehicleDocuments (route import-review)` | Filament table on a resource page | admin | VehicleDocument | none | yes | 2 | none | per-row download → unchanged | Deferred (other workstream) - Part of UnitMasterVehicleResource (other workstream). |
+| `MasterPersonnelDirectory` | Filament page table | admin | Employee | not assessed (restricted) | yes | schema-driven | Export selected | PersonnelTableExporter → unchanged | Deferred (other workstream) - Master Personnel Directory workstream. Has its own PersonnelTableExporter. |
+| `CustomPersonnelTables` | Filament page table | admin | PersonnelTable | not assessed (restricted) | yes | 1 | none | none → none | Deferred (other workstream) - Custom personnel tables workstream. |
+| `PersonnelTableEditor` | Filament page table | admin | PersonnelTable members | not assessed (restricted) | yes | schema-driven | Export selected, remove members | PersonnelTableExporter → unchanged | Deferred (other workstream) - Custom personnel tables workstream. Has its own PersonnelTableExporter. |
+| `KnowledgeBase` | Blade table | admin | KnowledgeBaseDocument | delete | no | none | none | none → none | Skipped - Blade list of chatbot documents with delete already present; no export value. |
+| `MediaControlMedia` | Blade table | admin | Media Control library item | deactivate/archive | no | none | none | none → none | Skipped - Remote media library (Media Control API), archive action exists; not a Hub table. |
+| `TrtTrailerInventory` | Blade table | admin | TrtInventorySession and items | deactivate/archive | no | archive selector | none | none → none | Read-only by design - Dated inventory sessions are evidence; archive with a reason is the only change. |
+| `MyEquipmentPage` | Blade table | employee | AssignedEquipment | none | no | none | none | none → none | Skipped + Read-only by design - Member self-service view of issued equipment. |
+| `MyVehicleInspectionView` | Blade table | employee | ApparatusInspection checklist items | none | no | none | none | per-record PDF → unchanged | Skipped + Read-only by design - Member's own inspection record with issue threads. Per-record PDF exists. |
+| `TrainingHistoryPage (paper attendance section)` | Blade table | employee | TrainingPaperAttendance | none | no | none | none | none → none | Skipped + Read-only by design - Member self-service paper attendance. |
+| `PersonnelReconciliation` | Blade table | admin | PersonnelWorkbookReconciler report rows | none | no | none | none | sanitized CSV → unchanged | Deferred (other workstream) + Read-only by design - Personnel workbook reconciliation report (calculated); already exports a sanitized CSV. |
+| `SessionResultsPage` | Blade table | workgroups | evaluation results | none | no | none | none | several CSV downloads → unchanged | Read-only by design - Calculated ranking reports with CSV exports. The CSVs now go through CellSanitizer::putCsv, so text that looks like a formula is neutralized. |
+| `SurveyResultsPage` | Blade table | workgroups | survey analytics | none | no | none | none | CSV and PDF downloads → unchanged | Read-only by design - Calculated anonymised survey analytics with CSV and PDF. The CSV now goes through CellSanitizer::putCsv, so text that looks like a formula is neutralized. |
+| `ViewTrainingMatrix` | Blade table | training | TrainingAttendance coverage matrix | none | no | filter form | Export current view, Complete workbook | workbook export (TrainingMatrixExportService) → unchanged | Read-only by design - Calculated attendance matrix with its own workbook export. |
+| `InspectionResource ViewInspection` | Blade table | admin | ApparatusInspection checklist | none | no | none | none | per-record PDF → unchanged | Read-only by design - Inspection detail tables inside an immutable submission; per-record PDF exists. |
+| `ViewOperationalFormRecord` | Blade table | admin | OperationalFormDocument versions | deactivate/archive | no | none | none | document version actions (view/download) → unchanged | Read-only by design - Signed and submitted document version history. |
+| `EmployeeAccessSchema application-access modal` | Blade table | admin | application access registry | none | no | none | none | none → none | Skipped - Access grants are managed with the access actions; not a list to export. |
+| `EmployeeAccessSchema workgroups-history modal` | Blade table | admin | security audit events | none | no | none | none | none → none | Read-only by design - Security audit trail. |
+| `ListUniforms view_employee_record modal` | Blade table | admin | AssignedEquipment for a selected employee | none | no | none | none | none → none | Skipped - One selected employee's issued equipment; the Assigned Equipment list covers the full set. |
+| `ViewUnitMasterVehicle partials` | Blade table | admin | vehicle change, inspection and proposed-correction history | none | no | none | none | none → none | Deferred (other workstream) - Part of UnitMasterVehicleResource (other workstream). |
+| `personnel-table-history partial` | Blade table | admin | personnel table change events | none | no | none | none | none → none | Deferred (other workstream) + Read-only by design - Personnel tables workstream audit trail. |
+
+## Findings
+
+1. **Formula injection in other CSV writers.** Fixed here: `SessionResultsPage` (six CSV downloads) and `SurveyResultsPage` (one CSV) wrote product, brand and survey prompt text with plain `fputcsv`, so a value starting with `=`, `+`, `-` or `@` would be evaluated by Excel. They now use `CellSanitizer::putCsv`. Still open and not touched: `IdentityReconciliationExporter` writes plain `fputcsv` (identity workstream; same one-line fix). `PersonnelTableExporter` and `PersonnelReconciliation` already guard their CSVs. The hand-built Excel writers (`TrainingMatrixExportService`, `TrainingRosterExportService`, `TrainingCrewPlanExporter`, `UnitMasterRosterExporter`, `UnitMasterVehicleProfileExporter`) store text as explicit strings, which Excel does not evaluate, but they do not add the apostrophe.
+2. **Shop Needs could not be created.** `ShopWork` had no fillable list, so the create form threw a mass-assignment error. Fixed with the form fields as fillable, a `ShopWork::apparatus()` relation, and a Status choice limited to the five values the database enum accepts.
+3. **`FireEquipmentRequestResource` is unreachable** (`canViewAny()` returns false). It still carries the export so it works if the resource is opened again.
+4. **`UserResource` is not a table**: every page is a legacy redirect stub.
+5. **Duplicate surface:** `TrainingTodoResource` (Training panel) and `TrainingTodoAdminResource` (Admin panel) share one model and one table.
+6. **Authorization shape.** `EmployeeEquipmentRequest`, `InventoryItem` and `StationInspection` have no policy class; they rely on `AdminCapabilityGate` alone. `Uniform` is not in `config/admin-capabilities.php`, so only `UniformPolicy` applies. `TodoPolicy::viewAny` returns true for everyone, so anyone who can open the Todo list can export it. The export honours exactly the same rule as the list.
+7. **Query budget.** The export actions add no database work to page render: their visibility check is one Gate call that reuses the role and permission data the list page already loads (asserted in `TableExportLivewireTest`).
+
+## Candidate changes considered and not made
+
+- `TodoResource` calls `defaultSort` twice, so "incomplete first" is dead code. Changing the order people see was not in scope.
+- `InventoryCorrectionResource` has no search. It is an immutable record, so it was left read-only rather than extended.
+- `SurveyResource` columns are not sortable and `TrainingCourseResource` has no filters. Workgroup and training lists are scoped by their own access rules, so they were left to their owners.
+- `UniformResource` has no delete or deactivate in the table, and no `is_active` column. Issued equipment refers to uniforms, so a delete would break history; deactivation needs a column and a migration.
+- `EquipmentItemResource` has a commented-out low-stock filter. It needs a threshold definition from Logistics first.
+- A bulk activate/deactivate for stations and rooms was not added; there is no request for it and the single-row edit already works.
+- A date-range filter on tickets, requests and inspections would help exports but each needs its own date column decision.

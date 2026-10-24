@@ -8,6 +8,7 @@ use App\Enums\ApparatusServiceTicketPriority;
 use App\Enums\DailyCheckoutChecklistTemplate;
 use App\Enums\DailyCheckoutRequirement;
 use App\Filament\Concerns\EnterpriseTable;
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\ApparatusResource\Pages;
 use App\Filament\Resources\ApparatusResource\RelationManagers;
 use App\Jobs\SyncApparatusToSheetJob;
@@ -31,6 +32,8 @@ class ApparatusResource extends Resource
     protected static ?int $navigationSort = 10;
 
     use EnterpriseTable;
+
+    use HasExportActions;
 
     protected static ?string $model = Apparatus::class;
 
@@ -203,7 +206,7 @@ class ApparatusResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return self::applyEnterpriseDefaults($table)
+        return static::withExportActions(self::applyEnterpriseDefaults($table)
             ->columns([
                 // ── Default visible columns (5 max for alignment) ──
                 Tables\Columns\TextColumn::make('designation')
@@ -706,7 +709,7 @@ class ApparatusResource extends Resource
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
-            ]);
+            ]));
     }
 
     public static function getRelations(): array

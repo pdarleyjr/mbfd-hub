@@ -637,6 +637,40 @@ body[data-hub-ui="2"] {
 [data-hub-ui="2"] .hub-tiles--rail .hub-tile { min-height: 56px; padding: 8px 16px; border-top-width: 1px; }
 [data-hub-ui="2"] .hub-tiles--rail .hub-tile:hover { border-top-color: rgb(var(--tile-accent) / 0.4); }
 
+/* Additional Links: one native <details> card in the rail. The summary is the tile row; links stack beneath it. */
+[data-hub-ui="2"] .hub-additional,
+[data-hub-ui="2"] .hub-tiles--rail .hub-additional { display: block; min-height: 0; padding: 0; }
+[data-hub-ui="2"] .hub-additional:hover { background: rgb(var(--hub-glass) / var(--hub-glass-alpha)); }
+[data-hub-ui="2"] .hub-additional__summary {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 56px;
+    padding: 8px 16px;
+    border-radius: var(--hub-radius-card);
+    cursor: pointer;
+    list-style: none;
+}
+[data-hub-ui="2"] .hub-additional__summary::-webkit-details-marker { display: none; }
+[data-hub-ui="2"] .hub-additional__summary:hover { background: rgb(var(--hub-well)); }
+[data-hub-ui="2"] .hub-additional__summary:focus-visible,
+[data-hub-ui="2"] .hub-additional__link:focus-visible { outline: 2px solid rgb(var(--hub2-focus)); outline-offset: -2px; }
+[data-hub-ui="2"] .hub-additional__chevron { transition: transform var(--hub2-duration-fast) var(--hub2-ease-enter); }
+[data-hub-ui="2"] .hub-additional[open] .hub-additional__chevron { transform: rotate(90deg); }
+[data-hub-ui="2"] .hub-additional__list { margin: 0; padding: 0; list-style: none; border-top: 1px solid rgb(var(--hub2-n-200)); }
+[data-hub-ui="2"] .hub-additional__list li + li { border-top: 1px solid rgb(var(--hub2-n-200)); }
+[data-hub-ui="2"] .hub-additional__link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 56px;
+    padding: 8px 16px;
+    color: rgb(var(--hub2-n-900));
+    text-decoration: none;
+}
+[data-hub-ui="2"] .hub-additional__link:hover { background: rgb(var(--hub-well)); }
+[data-hub-ui="2"] .hub-additional__list li:last-child .hub-additional__link { border-radius: 0 0 var(--hub-radius-card) var(--hub-radius-card); }
+
 /* ------------------------------------------------------------------ */
 /* Motion preferences                                                  */
 /* ------------------------------------------------------------------ */

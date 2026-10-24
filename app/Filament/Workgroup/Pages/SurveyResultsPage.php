@@ -68,12 +68,12 @@ class SurveyResultsPage extends Page
 
         return response()->streamDownload(function () use ($analytics): void {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['Question', 'Type', 'Metric', 'Value']);
+            \App\Services\Exports\CellSanitizer::putCsv($handle, ['Question', 'Type', 'Metric', 'Value']);
             foreach ($analytics['summary'] as $metric => $value) {
-                fputcsv($handle, ['Survey summary', '', $metric, $value]);
+                \App\Services\Exports\CellSanitizer::putCsv($handle, ['Survey summary', '', $metric, $value]);
             }
             foreach ($analytics['questions'] as $question) {
-                fputcsv($handle, [$question['prompt'], $question['type'], 'metrics', json_encode($question['metrics'], JSON_UNESCAPED_SLASHES)]);
+                \App\Services\Exports\CellSanitizer::putCsv($handle, [$question['prompt'], $question['type'], 'metrics', json_encode($question['metrics'], JSON_UNESCAPED_SLASHES)]);
             }
             fclose($handle);
         }, $filename, ['Content-Type' => 'text/csv']);

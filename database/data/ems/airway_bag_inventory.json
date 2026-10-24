@@ -1,0 +1,2543 @@
+{
+  "schema": "mbfd.ems.source_form.v1",
+  "source": {
+    "key": "airway-bag",
+    "title": "AIRWAY BAG INVENTORY",
+    "version_label": "undated",
+    "file_name": "Airway_bag_inventory.pdf",
+    "sha256": "017c463cae414ff142ed426a9527f0eba8d37ba01f99023cdede6a14d065e06f",
+    "pages": 1,
+    "columns": [
+      "ITEM",
+      "MIN",
+      "NEED"
+    ],
+    "notes": [
+      "No revision date is printed on the form.",
+      "Two-column layout: left column = bag compartments (TOP, LEFT, RIGHT, INNER, MAIN incl. BVM BAG SET UP); right column = AIRWAY ROLL.",
+      "NEED columns are blank (to be filled in during inspection).",
+      "Table row numbers in source_ref count the yellow title banner as row 1 and the header row (TOP COMPARTMENT / AIRWAY ROLL) as row 2; first item row is row 3."
+    ]
+  },
+  "sections": [
+    {
+      "key": "airway-top",
+      "label": "Top Compartment",
+      "source_label": "TOP COMPARTMENT",
+      "kind": "compartment",
+      "parent_key": null,
+      "sort": 10,
+      "items": [
+        {
+          "item_ref": "airway.top.stethoscope",
+          "catalog_ref": "stethoscope",
+          "label": "Stethoscope",
+          "source_label": "STETHOSCOPE",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 3
+          }
+        },
+        {
+          "item_ref": "airway.top.bp-cuff-adult",
+          "catalog_ref": "bp-cuff-adult",
+          "label": "BP Cuff (Adult)",
+          "source_label": "BP CUFF(ADULT)",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 4
+          }
+        },
+        {
+          "item_ref": "airway.top.gloves",
+          "catalog_ref": "gloves-airway-bag",
+          "label": "Gloves",
+          "source_label": "GLOVES",
+          "min_text": "3 SETS",
+          "min_qty": 3,
+          "min_unit": "set",
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Min stated as '3 SETS'; glove size/material not stated on the form.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 5
+          }
+        },
+        {
+          "item_ref": "airway.top.sleeves",
+          "catalog_ref": "sleeves-airway-bag",
+          "label": "Sleeves",
+          "source_label": "SLEEVES",
+          "min_text": "3 SETS",
+          "min_qty": 3,
+          "min_unit": "set",
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Min stated as '3 SETS'; sleeve type not stated on the form.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 6
+          }
+        },
+        {
+          "item_ref": "airway.top.red-bags-small",
+          "catalog_ref": "red-bag-small-airway-bag",
+          "label": "Red Bags (Small)",
+          "source_label": "RED BAGS (Small)",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 7
+          }
+        }
+      ]
+    },
+    {
+      "key": "airway-left",
+      "label": "Left Compartment",
+      "source_label": "LEFT COMPARTMENT",
+      "kind": "compartment",
+      "parent_key": null,
+      "sort": 20,
+      "notes": [
+        "MIN cell on the header row is black-filled in the rendered image (header row, not an item)."
+      ],
+      "items": [
+        {
+          "item_ref": "airway.left.non-rebreather-adult",
+          "catalog_ref": "non-rebreather-mask-adult",
+          "label": "Non-Rebreather Adult",
+          "source_label": "Non-rebreather adult",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 9
+          }
+        },
+        {
+          "item_ref": "airway.left.nasal-cannula-adult",
+          "catalog_ref": "nasal-cannula-adult",
+          "label": "Nasal Cannula Adult",
+          "source_label": "Nasal cannula adult",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 10
+          }
+        },
+        {
+          "item_ref": "airway.left.nebulizer-adult",
+          "catalog_ref": "nebulizer-mask-adult",
+          "label": "Nebulizer Adult",
+          "source_label": "Nebulizer adult",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 11
+          }
+        },
+        {
+          "item_ref": "airway.left.t-nebulizer-adult",
+          "catalog_ref": "t-nebulizer-adult",
+          "label": "T-Nebulizer Adult",
+          "source_label": "T-nebulizer adult",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 12
+          }
+        },
+        {
+          "item_ref": "airway.left.nasal-capnoline-adult",
+          "catalog_ref": "nasal-capnoline-adult",
+          "label": "Nasal Capnoline Adult",
+          "source_label": "Nasal Capnoline adult",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 13
+          }
+        }
+      ]
+    },
+    {
+      "key": "airway-right",
+      "label": "Right Compartment",
+      "source_label": "RIGHT COMPARTMENT",
+      "kind": "compartment",
+      "parent_key": null,
+      "sort": 30,
+      "notes": [
+        "MIN cell on the header row is black-filled in the rendered image (header row, not an item)."
+      ],
+      "items": [
+        {
+          "item_ref": "airway.right.non-rebreather-pedi",
+          "catalog_ref": "non-rebreather-pedi",
+          "label": "Non-Rebreather Pedi",
+          "source_label": "Non-rebreather pedi",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 15
+          }
+        },
+        {
+          "item_ref": "airway.right.nasal-cannula-pedi",
+          "catalog_ref": "nasal-cannula-pedi",
+          "label": "Nasal Cannula Pedi",
+          "source_label": "Nasal cannula pedi",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 16
+          }
+        },
+        {
+          "item_ref": "airway.right.nebulizer-pedi",
+          "catalog_ref": "nebulizer-mask-pedi",
+          "label": "Nebulizer Pedi",
+          "source_label": "Nebulizer pedi",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 17
+          }
+        },
+        {
+          "item_ref": "airway.right.nasal-capnoline-pedi",
+          "catalog_ref": "nasal-capnoline-pedi",
+          "label": "Nasal Capnoline Pedi",
+          "source_label": "Nasal Capnoline pedi",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 18
+          }
+        },
+        {
+          "item_ref": "airway.right.non-rebreather-infant",
+          "catalog_ref": "non-rebreather-infant",
+          "label": "Non-Rebreather Infant",
+          "source_label": "Non-rebreather infant",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 19
+          }
+        }
+      ]
+    },
+    {
+      "key": "airway-inner",
+      "label": "Inner Compartment",
+      "source_label": "INNER COMPARTMENT",
+      "kind": "compartment",
+      "parent_key": null,
+      "sort": 40,
+      "notes": [
+        "MIN cell on the header row is black-filled in the rendered image (header row, not an item)."
+      ],
+      "items": [
+        {
+          "item_ref": "airway.inner.adult-quick-trach",
+          "catalog_ref": "adult-quick-trach",
+          "label": "Adult Quick-Trach",
+          "source_label": "Adult Quik-trach",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Source spells 'Quik-trach' on this row and 'Quick-trach' on the pedi row; label normalised to 'Quick-Trach'.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 21
+          }
+        },
+        {
+          "item_ref": "airway.inner.pedi-quick-trach",
+          "catalog_ref": "pedi-quick-trach",
+          "label": "Pedi Quick-Trach",
+          "source_label": "Pedi Quick-trach",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 22
+          }
+        },
+        {
+          "item_ref": "airway.inner.safety-glasses",
+          "catalog_ref": "safety-glasses",
+          "label": "Safety Glasses",
+          "source_label": "Safety Glassess",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Typo corrected in label only: 'Glassess' -> 'Glasses'.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 23
+          }
+        },
+        {
+          "item_ref": "airway.inner.bougie-10fr",
+          "catalog_ref": "bougie-10fr",
+          "label": "Bougie 10Fr",
+          "source_label": "Bougie 10Fr",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 24
+          }
+        },
+        {
+          "item_ref": "airway.inner.bougie-15fr",
+          "catalog_ref": "bougie-15fr",
+          "label": "Bougie 15Fr",
+          "source_label": "Bougie 15Fr",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 25
+          }
+        },
+        {
+          "item_ref": "airway.inner.bite-stick",
+          "catalog_ref": "bite-stick",
+          "label": "Bite Stick",
+          "source_label": "Bite stick",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 26
+          }
+        }
+      ]
+    },
+    {
+      "key": "airway-main",
+      "label": "Main Compartment",
+      "source_label": "MAIN COMPARTMENT",
+      "kind": "compartment",
+      "parent_key": null,
+      "sort": 50,
+      "notes": [
+        "Header row; MIN cell is black-filled in the rendered image. The PDF text layer holds a stray '1' in that MIN cell (hidden black-on-black); treated as a header, not an item."
+      ],
+      "items": [
+        {
+          "item_ref": "airway.main.manual-suction-device",
+          "catalog_ref": "manual-suction-device",
+          "label": "Manual Suction Device",
+          "source_label": "Detail Airway Bags Only- (1) Manual Suction Device",
+          "min_text": "(1)",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": true,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Yellow italic note row spanning the label/MIN/NEED cells; quantity '(1)' is inside the note text. Applies to detail airway bags only (per lead's reading of the image).",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 28
+          }
+        },
+        {
+          "item_ref": "airway.main.cpap",
+          "catalog_ref": "cpap",
+          "label": "CPAP",
+          "source_label": "CPAP",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 29
+          }
+        },
+        {
+          "item_ref": "airway.main.tracheostomy-mask-set",
+          "catalog_ref": "tracheostomy-mask-set",
+          "label": "Tracheostomy Mask Set",
+          "source_label": "Tracheostomy mask set",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 30
+          }
+        },
+        {
+          "item_ref": "airway.main.air-trach-camera",
+          "catalog_ref": "air-trach-camera",
+          "label": "Air-Trach Camera",
+          "source_label": "Air-Trach camera",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 31
+          }
+        },
+        {
+          "item_ref": "airway.main.air-trach-blade-2-5-3-5",
+          "catalog_ref": "air-trach-blade-2-5-3-5",
+          "label": "Air-Trach Blade 2.5-3.5",
+          "source_label": "Air-Trach blade 2.5-3.5",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Size range is part of the blade product name; one row, not expanded.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 32
+          }
+        },
+        {
+          "item_ref": "airway.main.air-trach-blade-4-0-5-5",
+          "catalog_ref": "air-trach-blade-4-0-5-5",
+          "label": "Air-Trach Blade 4.0-5.5",
+          "source_label": "Air-Trach blade 4.0-5.5",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Size range is part of the blade product name; one row, not expanded.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 33
+          }
+        },
+        {
+          "item_ref": "airway.main.air-trach-blade-7-0-8-5",
+          "catalog_ref": "air-trach-blade-7-0-8-5",
+          "label": "Air-Trach Blade 7.0-8.5",
+          "source_label": "Air-Trach blade 7.0-8.5",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Size range is part of the blade product name; one row, not expanded.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 34
+          }
+        },
+        {
+          "item_ref": "airway.main.d-cylinder-with-regulator",
+          "catalog_ref": "d-cylinder-with-regulator",
+          "label": "D Cylinder w/ Regulator",
+          "source_label": "D cylinder w/ Regulator",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 35
+          }
+        }
+      ]
+    },
+    {
+      "key": "airway-bvm-setup",
+      "label": "BVM Bag Set Up",
+      "source_label": "BVM BAG SET UP",
+      "kind": "subsection",
+      "parent_key": "airway-main",
+      "sort": 55,
+      "notes": [
+        "Orange header row; MIN cell is black-filled in the rendered image. The PDF text layer holds a stray '1' in that MIN cell (hidden black-on-black); treated as a header, not an item.",
+        "Items below are the last rows of the left column and sit under this header by position."
+      ],
+      "items": [
+        {
+          "item_ref": "airway.bvm.bvm-with-adult-pedi-mask",
+          "catalog_ref": "bvm-with-adult-pedi-mask",
+          "label": "BVM w/ Adult/Pedi Mask",
+          "source_label": "BVM w/ adult/pedi mask",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Kept as a single item (no '(each)' marker).",
+          "needs_review": true,
+          "review_reason": "Unclear whether MIN 1 means one BVM that includes both adult and pedi masks, or one of each; no '(each)' marker on the row.",
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 37
+          }
+        },
+        {
+          "item_ref": "airway.bvm.peep-valve",
+          "catalog_ref": "peep-valve",
+          "label": "PEEP Valve",
+          "source_label": "PEEP valve",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 38
+          }
+        },
+        {
+          "item_ref": "airway.bvm.et-tube-extension",
+          "catalog_ref": "et-tube-extension",
+          "label": "ET Tube Extension",
+          "source_label": "ET tube extension",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 39
+          }
+        },
+        {
+          "item_ref": "airway.bvm.filter",
+          "catalog_ref": "bvm-filter",
+          "label": "Filter",
+          "source_label": "Filter",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 40
+          }
+        },
+        {
+          "item_ref": "airway.bvm.bvm-capnoline",
+          "catalog_ref": "bvm-capnoline",
+          "label": "BVM Capnoline",
+          "source_label": "BVM Capnoline",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 41
+          }
+        },
+        {
+          "item_ref": "airway.bvm.igel-3",
+          "catalog_ref": "igel-3",
+          "label": "i-gel Size 3",
+          "source_label": "Igel Size 3,4,5",
+          "min_text": "1 (each)",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "Igel Size 3,4,5",
+          "variant_label": "Size 3",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Combined row 'Igel Size 3,4,5 | 1 (each)' expanded to one item per size; min applies to each size.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 42
+          }
+        },
+        {
+          "item_ref": "airway.bvm.igel-4",
+          "catalog_ref": "igel-4",
+          "label": "i-gel Size 4",
+          "source_label": "Igel Size 3,4,5",
+          "min_text": "1 (each)",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "Igel Size 3,4,5",
+          "variant_label": "Size 4",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Combined row 'Igel Size 3,4,5 | 1 (each)' expanded to one item per size; min applies to each size.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 42
+          }
+        },
+        {
+          "item_ref": "airway.bvm.igel-5",
+          "catalog_ref": "igel-5",
+          "label": "i-gel Size 5",
+          "source_label": "Igel Size 3,4,5",
+          "min_text": "1 (each)",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "Igel Size 3,4,5",
+          "variant_label": "Size 5",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Combined row 'Igel Size 3,4,5 | 1 (each)' expanded to one item per size; min applies to each size.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 42
+          }
+        }
+      ]
+    },
+    {
+      "key": "airway-roll",
+      "label": "Airway Roll",
+      "source_label": "AIRWAY ROLL",
+      "kind": "compartment",
+      "parent_key": null,
+      "sort": 60,
+      "notes": [
+        "Red header cell at the top of the right column; every right-column row below it belongs to the roll."
+      ],
+      "items": [
+        {
+          "item_ref": "airway.roll.et-tube-2-5-cuffed",
+          "catalog_ref": "et-tube-2-5-cuffed",
+          "label": "ET Tube 2.5 (cuffed)",
+          "source_label": "ET tube 2.5 (cuffed)",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 3
+          }
+        },
+        {
+          "item_ref": "airway.roll.et-tube-3-0-cuffed",
+          "catalog_ref": "et-tube-3-0-cuffed",
+          "label": "ET Tube 3.0 (cuffed)",
+          "source_label": "ET tube 3.0 (cuffed)",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 4
+          }
+        },
+        {
+          "item_ref": "airway.roll.et-tube-3-5-cuffed",
+          "catalog_ref": "et-tube-3-5-cuffed",
+          "label": "ET Tube 3.5 (cuffed)",
+          "source_label": "ET tube 3.5 (cuffed)",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 5
+          }
+        },
+        {
+          "item_ref": "airway.roll.et-tube-4-0-cuffed",
+          "catalog_ref": "et-tube-4-0-cuffed",
+          "label": "ET Tube 4.0 (cuffed)",
+          "source_label": "ET tube 4.0 (cuffed)",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 6
+          }
+        },
+        {
+          "item_ref": "airway.roll.et-tube-4-5-cuffed",
+          "catalog_ref": "et-tube-4-5-cuffed",
+          "label": "ET Tube 4.5 (cuffed)",
+          "source_label": "ET tube 4.5 (cuffed)",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 7
+          }
+        },
+        {
+          "item_ref": "airway.roll.et-tube-5-0-cuffed",
+          "catalog_ref": "et-tube-5-0-cuffed",
+          "label": "ET Tube 5.0 (cuffed)",
+          "source_label": "ET tube 5.0 (cuffed)",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 8
+          }
+        },
+        {
+          "item_ref": "airway.roll.et-tube-5-5-cuffed",
+          "catalog_ref": "et-tube-5-5-cuffed",
+          "label": "ET Tube 5.5 (cuffed)",
+          "source_label": "ET tube 5.5 (cuffed)",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 9
+          }
+        },
+        {
+          "item_ref": "airway.roll.et-tube-6-0-cuffed",
+          "catalog_ref": "et-tube-6-0-cuffed",
+          "label": "ET Tube 6.0 (cuffed)",
+          "source_label": "ET tube 6.0 (cuffed)",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 10
+          }
+        },
+        {
+          "item_ref": "airway.roll.et-tube-6-5-cuffed",
+          "catalog_ref": "et-tube-6-5-cuffed",
+          "label": "ET Tube 6.5 (cuffed)",
+          "source_label": "ET tube 6.5 (cuffed)",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 11
+          }
+        },
+        {
+          "item_ref": "airway.roll.et-tube-7-0-cuffed",
+          "catalog_ref": "et-tube-7-0-cuffed",
+          "label": "ET Tube 7.0 (cuffed)",
+          "source_label": "ET tube 7.0 (cuffed)",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 12
+          }
+        },
+        {
+          "item_ref": "airway.roll.et-tube-7-5-cuffed",
+          "catalog_ref": "et-tube-7-5-cuffed",
+          "label": "ET Tube 7.5 (cuffed)",
+          "source_label": "ET tube 7.5 (cuffed)",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 13
+          }
+        },
+        {
+          "item_ref": "airway.roll.et-tube-8-0-cuffed",
+          "catalog_ref": "et-tube-8-0-cuffed",
+          "label": "ET Tube 8.0 (cuffed)",
+          "source_label": "ET tube 8.0 (cuffed)",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 14
+          }
+        },
+        {
+          "item_ref": "airway.roll.et-tube-8-5-cuffed",
+          "catalog_ref": "et-tube-8-5-cuffed",
+          "label": "ET Tube 8.5 (cuffed)",
+          "source_label": "ET tube 8.5 (cuffed)",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 15
+          }
+        },
+        {
+          "item_ref": "airway.roll.et-tube-9-0-cuffed",
+          "catalog_ref": "et-tube-9-0-cuffed",
+          "label": "ET Tube 9.0 (cuffed)",
+          "source_label": "ET tube 9.0 (cuffed)",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 16
+          }
+        },
+        {
+          "item_ref": "airway.roll.npa-12",
+          "catalog_ref": "npa-12",
+          "label": "NPA #12",
+          "source_label": "NPA #12",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 17
+          }
+        },
+        {
+          "item_ref": "airway.roll.npa-14",
+          "catalog_ref": "npa-14",
+          "label": "NPA #14",
+          "source_label": "NPA #14",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 18
+          }
+        },
+        {
+          "item_ref": "airway.roll.npa-16",
+          "catalog_ref": "npa-16",
+          "label": "NPA #16",
+          "source_label": "NPA #16",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 19
+          }
+        },
+        {
+          "item_ref": "airway.roll.npa-18",
+          "catalog_ref": "npa-18",
+          "label": "NPA #18",
+          "source_label": "NPA #18",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 20
+          }
+        },
+        {
+          "item_ref": "airway.roll.npa-20",
+          "catalog_ref": "npa-20",
+          "label": "NPA #20",
+          "source_label": "NPA #20",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 21
+          }
+        },
+        {
+          "item_ref": "airway.roll.npa-22",
+          "catalog_ref": "npa-22",
+          "label": "NPA #22",
+          "source_label": "NPA #22",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 22
+          }
+        },
+        {
+          "item_ref": "airway.roll.npa-24",
+          "catalog_ref": "npa-24",
+          "label": "NPA #24",
+          "source_label": "NPA #24",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 23
+          }
+        },
+        {
+          "item_ref": "airway.roll.npa-26",
+          "catalog_ref": "npa-26",
+          "label": "NPA #26",
+          "source_label": "NPA #26",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 24
+          }
+        },
+        {
+          "item_ref": "airway.roll.npa-28",
+          "catalog_ref": "npa-28",
+          "label": "NPA #28",
+          "source_label": "NPA #28",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 25
+          }
+        },
+        {
+          "item_ref": "airway.roll.npa-30",
+          "catalog_ref": "npa-30",
+          "label": "NPA #30",
+          "source_label": "NPA #30",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 26
+          }
+        },
+        {
+          "item_ref": "airway.roll.opa-40mm",
+          "catalog_ref": "opa-40mm",
+          "label": "OPA #40mm",
+          "source_label": "OPA #40mm",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 27
+          }
+        },
+        {
+          "item_ref": "airway.roll.opa-50mm",
+          "catalog_ref": "opa-50mm",
+          "label": "OPA #50mm",
+          "source_label": "OPA #50mm",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 28
+          }
+        },
+        {
+          "item_ref": "airway.roll.opa-60mm",
+          "catalog_ref": "opa-60mm",
+          "label": "OPA #60mm",
+          "source_label": "OPA #60mm",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 29
+          }
+        },
+        {
+          "item_ref": "airway.roll.opa-80mm",
+          "catalog_ref": "opa-80mm",
+          "label": "OPA #80mm",
+          "source_label": "OPA #80mm",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 30
+          }
+        },
+        {
+          "item_ref": "airway.roll.opa-90mm",
+          "catalog_ref": "opa-90mm",
+          "label": "OPA #90mm",
+          "source_label": "OPA #90mm",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 31
+          }
+        },
+        {
+          "item_ref": "airway.roll.opa-100mm",
+          "catalog_ref": "opa-100mm",
+          "label": "OPA #100mm",
+          "source_label": "OPA #100mm",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 32
+          }
+        },
+        {
+          "item_ref": "airway.roll.opa-110mm",
+          "catalog_ref": "opa-110mm",
+          "label": "OPA #110mm",
+          "source_label": "OPA #110mm",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 33
+          }
+        },
+        {
+          "item_ref": "airway.roll.suction-cath-6fr",
+          "catalog_ref": "suction-catheter-6fr",
+          "label": "Suction Catheter 6 Fr",
+          "source_label": "Suction cath 6Fr-18Fr",
+          "min_text": "1(each)",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "Suction cath 6Fr-18Fr",
+          "variant_label": "6 Fr",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Range '6Fr-18Fr' expanded to 6/8/10/12/14/16/18 Fr because the supply-room form lists exactly those seven sizes (G1 'Suction Catheters French #6..#18') as separate rows.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 34
+          }
+        },
+        {
+          "item_ref": "airway.roll.suction-cath-8fr",
+          "catalog_ref": "suction-catheter-8fr",
+          "label": "Suction Catheter 8 Fr",
+          "source_label": "Suction cath 6Fr-18Fr",
+          "min_text": "1(each)",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "Suction cath 6Fr-18Fr",
+          "variant_label": "8 Fr",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Range '6Fr-18Fr' expanded to 6/8/10/12/14/16/18 Fr because the supply-room form lists exactly those seven sizes (G1 'Suction Catheters French #6..#18') as separate rows.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 34
+          }
+        },
+        {
+          "item_ref": "airway.roll.suction-cath-10fr",
+          "catalog_ref": "suction-catheter-10fr",
+          "label": "Suction Catheter 10 Fr",
+          "source_label": "Suction cath 6Fr-18Fr",
+          "min_text": "1(each)",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "Suction cath 6Fr-18Fr",
+          "variant_label": "10 Fr",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Range '6Fr-18Fr' expanded to 6/8/10/12/14/16/18 Fr because the supply-room form lists exactly those seven sizes (G1 'Suction Catheters French #6..#18') as separate rows.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 34
+          }
+        },
+        {
+          "item_ref": "airway.roll.suction-cath-12fr",
+          "catalog_ref": "suction-catheter-12fr",
+          "label": "Suction Catheter 12 Fr",
+          "source_label": "Suction cath 6Fr-18Fr",
+          "min_text": "1(each)",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "Suction cath 6Fr-18Fr",
+          "variant_label": "12 Fr",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Range '6Fr-18Fr' expanded to 6/8/10/12/14/16/18 Fr because the supply-room form lists exactly those seven sizes (G1 'Suction Catheters French #6..#18') as separate rows.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 34
+          }
+        },
+        {
+          "item_ref": "airway.roll.suction-cath-14fr",
+          "catalog_ref": "suction-catheter-14fr",
+          "label": "Suction Catheter 14 Fr",
+          "source_label": "Suction cath 6Fr-18Fr",
+          "min_text": "1(each)",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "Suction cath 6Fr-18Fr",
+          "variant_label": "14 Fr",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Range '6Fr-18Fr' expanded to 6/8/10/12/14/16/18 Fr because the supply-room form lists exactly those seven sizes (G1 'Suction Catheters French #6..#18') as separate rows.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 34
+          }
+        },
+        {
+          "item_ref": "airway.roll.suction-cath-16fr",
+          "catalog_ref": "suction-catheter-16fr",
+          "label": "Suction Catheter 16 Fr",
+          "source_label": "Suction cath 6Fr-18Fr",
+          "min_text": "1(each)",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "Suction cath 6Fr-18Fr",
+          "variant_label": "16 Fr",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Range '6Fr-18Fr' expanded to 6/8/10/12/14/16/18 Fr because the supply-room form lists exactly those seven sizes (G1 'Suction Catheters French #6..#18') as separate rows.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 34
+          }
+        },
+        {
+          "item_ref": "airway.roll.suction-cath-18fr",
+          "catalog_ref": "suction-catheter-18fr",
+          "label": "Suction Catheter 18 Fr",
+          "source_label": "Suction cath 6Fr-18Fr",
+          "min_text": "1(each)",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "Suction cath 6Fr-18Fr",
+          "variant_label": "18 Fr",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Range '6Fr-18Fr' expanded to 6/8/10/12/14/16/18 Fr because the supply-room form lists exactly those seven sizes (G1 'Suction Catheters French #6..#18') as separate rows.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 34
+          }
+        },
+        {
+          "item_ref": "airway.roll.mac-2",
+          "catalog_ref": "mac-blade-2",
+          "label": "Mac #2",
+          "source_label": "Mac #2,3,4",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "unclear",
+          "variant_group": "Mac #2,3,4",
+          "variant_label": "Mac #2",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Expanded per listed size; min_applies_to unclear because the row has no '(each)' marker (compare 'Miller #0,1,2,3, 1(each)').",
+          "needs_review": true,
+          "review_reason": "Row lists sizes 2,3,4 with min '1' and no '(each)'; unclear whether 1 total or 1 per size.",
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 35
+          }
+        },
+        {
+          "item_ref": "airway.roll.mac-3",
+          "catalog_ref": "mac-blade-3",
+          "label": "Mac #3",
+          "source_label": "Mac #2,3,4",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "unclear",
+          "variant_group": "Mac #2,3,4",
+          "variant_label": "Mac #3",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Expanded per listed size; min_applies_to unclear because the row has no '(each)' marker (compare 'Miller #0,1,2,3, 1(each)').",
+          "needs_review": true,
+          "review_reason": "Row lists sizes 2,3,4 with min '1' and no '(each)'; unclear whether 1 total or 1 per size.",
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 35
+          }
+        },
+        {
+          "item_ref": "airway.roll.mac-4",
+          "catalog_ref": "mac-blade-4",
+          "label": "Mac #4",
+          "source_label": "Mac #2,3,4",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "unclear",
+          "variant_group": "Mac #2,3,4",
+          "variant_label": "Mac #4",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Expanded per listed size; min_applies_to unclear because the row has no '(each)' marker (compare 'Miller #0,1,2,3, 1(each)').",
+          "needs_review": true,
+          "review_reason": "Row lists sizes 2,3,4 with min '1' and no '(each)'; unclear whether 1 total or 1 per size.",
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 35
+          }
+        },
+        {
+          "item_ref": "airway.roll.miller-0",
+          "catalog_ref": "miller-blade-0",
+          "label": "Miller #0",
+          "source_label": "Miller #0,1,2,3,",
+          "min_text": "1(each)",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "Miller #0,1,2,3,",
+          "variant_label": "Miller #0",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Trailing comma preserved in source_label/variant_group. Supply room stocks Miller 0-4.",
+          "needs_review": true,
+          "review_reason": "Source size list ends with a trailing comma ('Miller #0,1,2,3,'); a further size (e.g. 4) may have been cut off. Only 0-3 are recorded.",
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 36
+          }
+        },
+        {
+          "item_ref": "airway.roll.miller-1",
+          "catalog_ref": "miller-blade-1",
+          "label": "Miller #1",
+          "source_label": "Miller #0,1,2,3,",
+          "min_text": "1(each)",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "Miller #0,1,2,3,",
+          "variant_label": "Miller #1",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Trailing comma preserved in source_label/variant_group. Supply room stocks Miller 0-4.",
+          "needs_review": true,
+          "review_reason": "Source size list ends with a trailing comma ('Miller #0,1,2,3,'); a further size (e.g. 4) may have been cut off. Only 0-3 are recorded.",
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 36
+          }
+        },
+        {
+          "item_ref": "airway.roll.miller-2",
+          "catalog_ref": "miller-blade-2",
+          "label": "Miller #2",
+          "source_label": "Miller #0,1,2,3,",
+          "min_text": "1(each)",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "Miller #0,1,2,3,",
+          "variant_label": "Miller #2",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Trailing comma preserved in source_label/variant_group. Supply room stocks Miller 0-4.",
+          "needs_review": true,
+          "review_reason": "Source size list ends with a trailing comma ('Miller #0,1,2,3,'); a further size (e.g. 4) may have been cut off. Only 0-3 are recorded.",
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 36
+          }
+        },
+        {
+          "item_ref": "airway.roll.miller-3",
+          "catalog_ref": "miller-blade-3",
+          "label": "Miller #3",
+          "source_label": "Miller #0,1,2,3,",
+          "min_text": "1(each)",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "Miller #0,1,2,3,",
+          "variant_label": "Miller #3",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Trailing comma preserved in source_label/variant_group. Supply room stocks Miller 0-4.",
+          "needs_review": true,
+          "review_reason": "Source size list ends with a trailing comma ('Miller #0,1,2,3,'); a further size (e.g. 4) may have been cut off. Only 0-3 are recorded.",
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 36
+          }
+        },
+        {
+          "item_ref": "airway.roll.et-tube-madd-device",
+          "catalog_ref": "et-madd-device",
+          "label": "ET Tube MADD Device",
+          "source_label": "ET tube MADD Device",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 37
+          }
+        },
+        {
+          "item_ref": "airway.roll.et-lube",
+          "catalog_ref": "et-lube",
+          "label": "ET Lube",
+          "source_label": "ET lube",
+          "min_text": "5",
+          "min_qty": 5,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 38
+          }
+        },
+        {
+          "item_ref": "airway.roll.magill-forceps-adult",
+          "catalog_ref": "magill-forceps-adult",
+          "label": "Magill Forceps Adult",
+          "source_label": "Magill forceps(adult/pedi)",
+          "min_text": "1(each)",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "Magill forceps(adult/pedi)",
+          "variant_label": "Adult",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 39
+          }
+        },
+        {
+          "item_ref": "airway.roll.magill-forceps-pedi",
+          "catalog_ref": "magill-forceps-pedi",
+          "label": "Magill Forceps Pedi",
+          "source_label": "Magill forceps(adult/pedi)",
+          "min_text": "1(each)",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "Magill forceps(adult/pedi)",
+          "variant_label": "Pedi",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 39
+          }
+        },
+        {
+          "item_ref": "airway.roll.syringe-10cc",
+          "catalog_ref": "syringe-10cc-airway-bag",
+          "label": "10cc Syringe",
+          "source_label": "10cc syringe",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 40
+          }
+        },
+        {
+          "item_ref": "airway.roll.tube-holder-adult",
+          "catalog_ref": "tube-holder-adult",
+          "label": "Tube Holder Adult",
+          "source_label": "Tube holder(adult/pedi)",
+          "min_text": "1(each)",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "Tube holder(adult/pedi)",
+          "variant_label": "Adult",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 41
+          }
+        },
+        {
+          "item_ref": "airway.roll.tube-holder-pedi",
+          "catalog_ref": "tube-holder-pedi",
+          "label": "Tube Holder Pedi",
+          "source_label": "Tube holder(adult/pedi)",
+          "min_text": "1(each)",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "Tube holder(adult/pedi)",
+          "variant_label": "Pedi",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 41
+          }
+        },
+        {
+          "item_ref": "airway.roll.meconium-aspirator",
+          "catalog_ref": "meconium-aspirator",
+          "label": "Meconium Aspirator",
+          "source_label": "Meconium Aspiratpor",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Typo corrected in label only: 'Aspiratpor' -> 'Aspirator'.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 42
+          }
+        }
+      ]
+    }
+  ]
+}

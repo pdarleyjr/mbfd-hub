@@ -28,15 +28,15 @@ async function screenshot(page: Page, testInfo: TestInfo, name: string, fullPage
   await page.screenshot({ path: testInfo.outputPath(`${name}.png`), fullPage });
 }
 
-test('homepage exposes the exact station and uniform-specific destinations', async ({ page }, testInfo) => {
+test('homepage exposes the exact vehicle checkout and uniform-specific destinations', async ({ page }, testInfo) => {
   await page.goto('/login');
   await page.getByLabel('Employee ID').fill('99003');
   await page.getByLabel('Password').fill(requiredPassword('PERSONNEL_REQUESTS_E2E_ADMIN_PASSWORD'));
   await page.getByRole('button', { name: /sign in/i }).click();
   await expect(page).toHaveURL(/\/$/);
-  const stations = page.getByRole('link', { name: 'Stations', exact: true });
-  await expect(stations).toBeVisible();
-  await expect(stations).toHaveAttribute('href', '/daily/stations');
+  const vehicleCheckout = page.getByRole('link', { name: 'Vehicle Checkout', exact: true });
+  await expect(vehicleCheckout).toBeVisible();
+  await expect(vehicleCheckout).toHaveAttribute('href', '/daily/vehicle-inspections');
   await expect(page.getByText('request approved uniform items')).toBeVisible();
   await expectViewportFit(page);
   await screenshot(page, testInfo, 'homepage');

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Training\Resources;
 
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Training\Resources\TrainingTodoResource\Pages;
 use App\Models\Training\TrainingTodo;
 use App\Models\User;
@@ -18,6 +19,8 @@ use Illuminate\Support\Str;
 
 class TrainingTodoResource extends Resource
 {
+    use HasExportActions;
+
     protected static ?string $model = TrainingTodo::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-list-bullet';
@@ -73,7 +76,7 @@ class TrainingTodoResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->columns([
                 Split::make([
                     TextColumn::make('status')
@@ -166,7 +169,7 @@ class TrainingTodoResource extends Resource
                 ]),
             ])
             ->defaultSort('status', 'asc')
-            ->defaultSort('created_at', 'desc');
+            ->defaultSort('created_at', 'desc'));
     }
 
     public static function getPages(): array

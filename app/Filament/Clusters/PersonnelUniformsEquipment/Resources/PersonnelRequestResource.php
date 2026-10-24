@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Clusters\PersonnelUniformsEquipment\Resources;
 
+use App\Filament\Concerns\HasExportActions;
 use App\Enums\PersonnelRequestStatus;
 use App\Enums\PersonnelRequestType;
 use App\Filament\Clusters\PersonnelUniformsEquipment;
@@ -27,6 +28,8 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class PersonnelRequestResource extends Resource
 {
+    use HasExportActions;
+
     protected static ?string $model = PersonnelRequest::class;
 
     protected static ?string $cluster = PersonnelUniformsEquipment::class;
@@ -41,7 +44,7 @@ class PersonnelRequestResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table->columns([
+        return static::withExportActions($table->columns([
             TextColumn::make('request_number')->label('Request')->searchable()->sortable(),
             TextColumn::make('type')->badge()->formatStateUsing(fn (PersonnelRequestType $state) => $state->label())->color(fn (PersonnelRequestType $state) => $state === PersonnelRequestType::Uniform ? 'info' : 'warning'),
             TextColumn::make('beneficiary_name')->label('Member')->description(fn (PersonnelRequest $record) => trim("{$record->beneficiary_rank} · {$record->beneficiary_employee_number}"))->searchable(['beneficiary_name', 'beneficiary_employee_number'])->sortable(),
@@ -66,7 +69,7 @@ class PersonnelRequestResource extends Resource
             SelectFilter::make('status')->options(collect(PersonnelRequestStatus::cases())->mapWithKeys(fn ($status) => [$status->value => $status->label()])->all())->multiple(),
             Filter::make('over_allowance')->label('Over annual allowance')->toggle()
                 ->query(fn (Builder $query): Builder => $query->where('over_allowance', true)),
-        ])->actions([ViewAction::make()])->bulkActions([])->defaultSort('created_at', 'desc')->poll('30s');
+        ])->actions([ViewAction::make()])->bulkActions([])->defaultSort('created_at', 'desc')->poll('30s'));
     }
 
     public static function infolist(Infolist $infolist): Infolist

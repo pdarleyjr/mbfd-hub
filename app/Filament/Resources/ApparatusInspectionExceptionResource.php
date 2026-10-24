@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\ApparatusInspectionExceptionResource\Pages\ListInspectionExceptions;
 use App\Filament\Support\InspectionWorkspace;
 use App\Models\ApparatusInspectionException;
@@ -25,6 +26,8 @@ use Illuminate\Database\Eloquent\Builder;
 
 final class ApparatusInspectionExceptionResource extends Resource
 {
+    use HasExportActions;
+
     protected static ?string $model = ApparatusInspectionException::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';
@@ -44,7 +47,7 @@ final class ApparatusInspectionExceptionResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table->defaultSort('created_at', 'desc')->columns([
+        return static::withExportActions($table->defaultSort('created_at', 'desc')->columns([
             Tables\Columns\TextColumn::make('apparatus.designation')
                 ->wrap()
                 ->extraAttributes(['class' => 'hub-phone-summary'])
@@ -127,7 +130,7 @@ final class ApparatusInspectionExceptionResource extends Resource
                         Notification::make()->success()->title('Decision recorded')->send();
                     }),
             ])->label('Actions')->icon('heroicon-m-ellipsis-horizontal')->button()->color('gray'),
-        ])->bulkActions([]);
+        ])->bulkActions([]));
     }
 
     private static function observation(ApparatusInspectionException $record): string

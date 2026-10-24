@@ -4,10 +4,9 @@ namespace App\Filament\Exports;
 
 use App\Models\SingleGasMeter;
 use Filament\Actions\Exports\ExportColumn;
-use Filament\Actions\Exports\Exporter;
 use Filament\Actions\Exports\Models\Export;
 
-class SingleGasMetersExporter extends Exporter
+class SingleGasMetersExporter extends SafeExporter
 {
     protected static ?string $model = SingleGasMeter::class;
 

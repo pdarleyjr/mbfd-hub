@@ -4,10 +4,9 @@ namespace App\Filament\Exports;
 
 use App\Models\EvaluationSubmission;
 use Filament\Actions\Exports\ExportColumn;
-use Filament\Actions\Exports\Exporter;
 use Filament\Actions\Exports\Models\Export;
 
-class EvaluationSubmissionExporter extends Exporter
+class EvaluationSubmissionExporter extends SafeExporter
 {
     protected static ?string $model = EvaluationSubmission::class;
 

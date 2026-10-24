@@ -9,12 +9,14 @@ use App\Filament\Concerns\InteractsWithPersonnelTracking;
 use App\Filament\Resources\EmployeeResource;
 use App\Models\Employee;
 use App\Models\PersonnelTable;
+use App\Models\PromotionalList;
 use App\Models\User;
 use App\Services\Identity\EmployeeProfileService;
 use App\Services\Personnel\PersonnelSource;
 use App\Services\Personnel\PersonnelTableExporter;
 use App\Services\Personnel\PersonnelTableService;
 use App\Services\Personnel\PersonnelWorkbookReconciler;
+use App\Services\Personnel\Promotions\PromotionalDirectory;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\Radio;
@@ -22,6 +24,7 @@ use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
+use Filament\Support\Enums\MaxWidth;
 use Filament\Tables;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
@@ -48,6 +51,12 @@ final class MasterPersonnelDirectory extends Page implements HasTable
 
     protected static string $view = 'filament.pages.master-personnel-directory';
 
+    /** Columns whose values also appear beneath another column (main column => companions). */
+    private const STACKED = ['shift' => ['a_day'], 'unit' => ['bid_position', 'division'], 'city_email' => ['email_match_status']];
+
+    /** Companion columns that start hidden because their values show under a main column. */
+    private const SECONDARY = ['a_day', 'bid_position', 'division', 'email_match_status'];
+
     #[Locked]
     public int $personnelTableId;
 
@@ -58,6 +67,8 @@ final class MasterPersonnelDirectory extends Page implements HasTable
     private ?array $emailStatuses = null;
 
     private ?bool $employeeProfilesAccessible = null;
+
+    private ?PersonnelSource $personnelSource = null;
 
     public static function canAccess(): bool
     {
@@ -86,14 +97,15 @@ final class MasterPersonnelDirectory extends Page implements HasTable
     public function table(Table $table): Table
     {
         $definition = $this->personnelTable();
-        $source = app(PersonnelSource::class);
+        $source = $this->personnelSource();
         $columns = [];
-        foreach ($definition->source_columns ?? [] as $key) {
-            if (! array_key_exists($key, $source->fields())) {
-                continue;
-            }
-            $column = $this->sourceColumn($key, $source->fields()[$key], $key === ($definition->source_columns[0] ?? null));
-            $columns[] = $column;
+        $chosen = array_values(array_filter($definition->source_columns ?? [], fn (string $key): bool => array_key_exists($key, $source->fields())));
+        foreach ($chosen as $key) {
+            $columns[] = $this->sourceColumn($key, $source->fields()[$key], $key === ($definition->source_columns[0] ?? null));
+        }
+        // Promotional list fields are always in the column chooser, hidden until someone turns them on.
+        foreach (array_diff(array_keys(PromotionalDirectory::FIELDS), $chosen) as $key) {
+            $columns[] = $this->sourceColumn($key, $source->fields()[$key], false)->toggleable(isToggledHiddenByDefault: true);
         }
 
         return self::applyEnterpriseDefaults($table)
@@ -110,6 +122,11 @@ final class MasterPersonnelDirectory extends Page implements HasTable
                     ->options(fn (): array => $this->optionsFor($key))
                     ->query(fn (Builder $query, array $data): Builder => empty($data['values']) ? $query : $source->filter($query, [$key => $data['values']])),
                     ['rank', 'shift', 'a_day', 'station', 'division', 'unit', 'bid_position', 'roster_status']),
+                Tables\Filters\SelectFilter::make('promotional_list_type')->label('Promotional list')->multiple()
+                    ->options(PromotionalList::types())
+                    ->query(fn (Builder $query, array $data): Builder => empty($data['values']) ? $query : $source->filter($query, ['promotional_list_type' => $data['values']])),
+                Tables\Filters\Filter::make('promotional_on_list')->label('On an active promotional list')->toggle()
+                    ->query(fn (Builder $query): Builder => $source->filter($query, ['promotional_on_list' => true])),
                 Tables\Filters\SelectFilter::make('email_match_status')->label('Email match status')
                     ->options(fn (): array => array_combine(array_values(array_unique($this->statuses())), array_values(array_unique($this->statuses()))))
                     ->query(function (Builder $query, array $data): Builder {
@@ -118,7 +135,7 @@ final class MasterPersonnelDirectory extends Page implements HasTable
                 ...$this->trackingFilters($definition),
             ])
             ->actions([
-                Tables\Actions\Action::make('details')->label('Details')->icon('heroicon-o-eye')
+                Tables\Actions\Action::make('details')->label('Details')->icon('heroicon-o-eye')->iconButton()->tooltip('Details: every field for this member')
                     ->modalHeading(fn (Employee $record): string => $record->name)
                     ->modalContent(fn (Employee $record) => view('filament.pages.partials.personnel-table-member-details', [
                         'fields' => $source->fields(), 'record' => $record, 'source' => $source,
@@ -126,10 +143,13 @@ final class MasterPersonnelDirectory extends Page implements HasTable
                         'trackingColumns' => $this->personnelTable()->columns ?? [],
                         'trackingValues' => $this->trackingEntry($record)->values ?? [],
                     ]))->modalSubmitAction(false)->modalCancelActionLabel('Close'),
-                Tables\Actions\Action::make('employee')->label('Edit profile / employment')->icon('heroicon-o-pencil-square')
-                    ->visible(fn (Employee $record): bool => $this->canAccessEmployeeProfiles() && EmployeeResource::canEdit($record))
-                    ->url(fn (Employee $record): string => EmployeeResource::getUrl('edit', ['record' => $record])),
-                ...$this->trackingRowActions($definition),
+                // Edit actions sit behind one menu so the actions column stays narrow and sticky.
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\Action::make('employee')->label('Edit profile / employment')->icon('heroicon-o-pencil-square')
+                        ->visible(fn (Employee $record): bool => $this->canAccessEmployeeProfiles() && EmployeeResource::canEdit($record))
+                        ->url(fn (Employee $record): string => EmployeeResource::getUrl('edit', ['record' => $record])),
+                    ...$this->trackingRowActions($definition),
+                ])->label('More actions')->tooltip('More actions'),
             ])
             ->bulkActions([
                 Tables\Actions\BulkAction::make('exportSelected')->label('Export selected members')
@@ -191,7 +211,7 @@ final class MasterPersonnelDirectory extends Page implements HasTable
 
     private function sourceColumn(string $key, string $label, bool $first): Tables\Columns\Column
     {
-        $source = app(PersonnelSource::class);
+        $source = $this->personnelSource();
         if (in_array($key, Employee::PROFILE_FIELDS, true)) {
             $column = Tables\Columns\TextInputColumn::make($key)->label($label)
                 ->disabled(fn (Employee $record): bool => ! $this->canAccessEmployeeProfiles()
@@ -206,11 +226,28 @@ final class MasterPersonnelDirectory extends Page implements HasTable
                     return $updated->{$key};
                 });
         } else {
+            $promotional = array_key_exists($key, PromotionalDirectory::FIELDS);
             $column = Tables\Columns\TextColumn::make($key)->label($label)
-                ->state(fn (Employee $record): mixed => $key === 'email_match_status' ? ($this->statuses()[$record->getKey()] ?? null) : $source->value($record, $key))
-                ->placeholder('Not recorded')->wrap();
+                ->state(fn (Employee $record): mixed => match (true) {
+                    $key === 'email_match_status' => $this->statuses()[$record->getKey()] ?? null,
+                    $promotional => $source->promotionalLines($record, $key) ?: null,
+                    default => $source->value($record, $key),
+                })
+                ->placeholder($promotional ? 'Not on a list' : 'Not recorded')->wrap();
+            if ($promotional) {
+                $column->listWithLineBreaks();
+            }
             if ($key === 'employee_id') {
-                $column->description(fn (Employee $record): string => $record->name.' · '.($record->rank ?: 'Rank not recorded'));
+                $column->description(fn (Employee $record): string => $record->rank ?: 'Rank not recorded');
+            }
+            // Companion values appear under their main column, so the table needs fewer columns. Each
+            // companion stays its own sortable, toggleable and exportable column.
+            if (isset(self::STACKED[$key])) {
+                $companions = self::STACKED[$key];
+                $column->description(fn (Employee $record): ?string => collect($companions)
+                    ->map(fn (string $companion): mixed => $companion === 'email_match_status'
+                        ? $this->statuses()[$record->getKey()] ?? null : $source->value($record, $companion))
+                    ->filter()->implode(' · ') ?: null);
             }
         }
         if ($key !== 'employee_id' && ! $first) {
@@ -223,7 +260,13 @@ final class MasterPersonnelDirectory extends Page implements HasTable
             $column->searchable();
         }
 
-        return $column->toggleable();
+        return $column->toggleable(isToggledHiddenByDefault: $this->hiddenByDefault($key));
+    }
+
+    /** Low-priority columns start hidden. They remain in the column chooser and the Details view. */
+    private function hiddenByDefault(string $key): bool
+    {
+        return in_array($key, self::SECONDARY, true);
     }
 
     private function optionsFor(string $key): array
@@ -286,9 +329,7 @@ final class MasterPersonnelDirectory extends Page implements HasTable
         if (array_key_exists($key, $this->trackingSortOptions($definition))) {
             return $this->orderTrackingColumn($query, $definition, $key, $direction);
         }
-        $aliases = ['shift', 'a_day', 'division', 'unit', 'bid_position', 'bid_station', 'bid_term', 'assignment_source'];
-
-        return $query->orderBy(in_array($key, $aliases, true) ? 'source_'.$key : 'employees.'.$key, $direction === 'desc' ? 'desc' : 'asc');
+        return $this->personnelSource()->order($query, $key, $direction);
     }
 
     private function sortOptions(): array
@@ -299,8 +340,24 @@ final class MasterPersonnelDirectory extends Page implements HasTable
 
     private function exportColumns(): array
     {
+        $shown = array_keys(array_filter($this->getTable()->getColumns(), fn (Tables\Columns\Column $column): bool => ! $column->isToggledHidden() && ! $column->isHidden()));
+        // A value printed beneath another column is exported in its own column, so nothing the page shows is lost.
+        $columns = [];
+        foreach ($shown as $key) {
+            $columns[] = $key;
+            foreach (self::STACKED[$key] ?? [] as $companion) {
+                $columns[] = $companion;
+            }
+        }
+        $available = array_keys($this->getTable()->getColumns());
+
         return array_map(fn (string $key): string => str_starts_with($key, 'tracking_') ? substr($key, 9) : $key,
-            array_keys(array_filter($this->getTable()->getColumns(), fn (Tables\Columns\Column $column): bool => ! $column->isToggledHidden() && ! $column->isHidden())));
+            array_values(array_unique(array_filter($columns, fn (string $key): bool => in_array($key, $available, true)))));
+    }
+
+    public function getMaxContentWidth(): MaxWidth|string|null
+    {
+        return MaxWidth::Full;
     }
 
     private function exportDirectory(array $data): StreamedResponse
@@ -318,6 +375,12 @@ final class MasterPersonnelDirectory extends Page implements HasTable
         }, $query->get()->all()));
 
         return app(PersonnelTableExporter::class)->export($this->actor(), $definition, $employees, $this->exportColumns(), $data['format'], $scope);
+    }
+
+    /** One source per request so promotional display values are loaded once, not once per column. */
+    private function personnelSource(): PersonnelSource
+    {
+        return $this->personnelSource ??= app(PersonnelSource::class);
     }
 
     private function actor(): User

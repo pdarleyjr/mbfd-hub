@@ -57,11 +57,22 @@ final class TakeHomeVehicleInspectionTest extends TestCase
             ->assertSee('instrument cluster');
     }
 
-    public function test_home_card_links_to_the_inspection_for_a_member_without_a_profile(): void
+    public function test_home_has_no_inspection_card_for_a_member_with_a_profile(): void
+    {
+        $this->actingAsCanonicalFixture();
+
+        $this->get('/')->assertOk()
+            ->assertDontSee('Take Home Vehicle Inspection')
+            ->assertDontSee('Complete a take-home vehicle inspection.')
+            ->assertDontSee('href="'.route('take-home-inspections.index').'"', false);
+    }
+
+    public function test_home_keeps_a_path_to_the_inspection_for_a_member_without_a_profile(): void
     {
         $response = $this->actingAs($this->member())->get('/')
             ->assertOk()
-            ->assertSee('Take Home Vehicle Inspection')
+            ->assertDontSee('Take Home Vehicle Inspection')
+            ->assertSee('Take Home Inspection')
             ->assertSee('Complete a take-home vehicle inspection.')
             ->assertSee(route('take-home-inspections.index'), false);
 

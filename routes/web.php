@@ -27,6 +27,7 @@ use App\Http\Controllers\Employee\PersonnelRequestAttachmentController;
 use App\Http\Controllers\Employee\PersonnelRequestDetailController;
 use App\Http\Controllers\Employee\PersonnelRequestResponseController;
 use App\Http\Controllers\Employee\PersonnelRosterSearchController;
+use App\Http\Controllers\Employee\ResourceDocumentController;
 use App\Http\Controllers\Employee\VehicleInspectionImageController;
 use App\Http\Controllers\Employee\VehicleInspectionPdfController;
 use App\Http\Controllers\Employee\VideoConferencing\CommandAuthorizationController;
@@ -246,6 +247,19 @@ Route::prefix('employee')
         Route::get('/personnel-request-attachments/{attachment}', [PersonnelRequestAttachmentController::class, 'download'])
             ->middleware('throttle:30,1')
             ->name('attachments.download');
+    });
+
+// Employee > Resources library files. Streamed from private storage; unpublished or deleted documents are 404.
+Route::prefix('employee/resources')
+    ->middleware([EnsureEmployeeAuthenticated::class, 'throttle:120,1'])
+    ->name('employee.resources.')
+    ->group(function (): void {
+        Route::get('/{document}/preview', [ResourceDocumentController::class, 'preview'])
+            ->whereUuid('document')
+            ->name('preview');
+        Route::get('/{document}/download', [ResourceDocumentController::class, 'download'])
+            ->whereUuid('document')
+            ->name('download');
     });
 
 // Photo attached to a Daily Checkout inventory correction (Logistics and the reporting member).
@@ -627,3 +641,4 @@ Route::middleware(['auth', 'workgroup.access'])->group(function () {
     Route::get('/reports/saver-report/pdf', [ReportExportController::class, 'exportSaverReport'])->name('reports.saver.pdf');
 });
 Route::get('/health', HealthReadinessController::class)->name('health.readiness');
+require __DIR__.'/ems.php';

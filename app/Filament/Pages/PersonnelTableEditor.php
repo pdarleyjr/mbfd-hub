@@ -322,7 +322,7 @@ final class PersonnelTableEditor extends Page implements HasTable
             return $this->orderTrackingColumn($query, $this->personnelTable(), $field, $direction);
         }
 
-        return $query->orderBy(in_array($field, ['shift', 'a_day', 'division', 'unit', 'bid_position', 'bid_station', 'bid_term', 'assignment_source'], true) ? 'source_'.$field : 'employees.'.$field, $direction);
+        return app(PersonnelSource::class)->order($query, $field, $direction);
     }
 
     private function sortOptions(): array

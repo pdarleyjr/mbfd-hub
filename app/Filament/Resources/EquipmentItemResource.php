@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Concerns\EnterpriseTable;
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\EquipmentItemResource\Pages;
 use App\Models\AdminAlertEvent;
 use App\Models\EquipmentItem;
@@ -20,6 +21,8 @@ class EquipmentItemResource extends Resource
     protected static ?string $navigationLabel = 'Equipment';
 
     use EnterpriseTable;
+
+    use HasExportActions;
 
     protected static ?string $model = EquipmentItem::class;
 
@@ -110,7 +113,7 @@ class EquipmentItemResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return self::applyEnterpriseDefaults($table)
+        return static::withExportActions(self::applyEnterpriseDefaults($table)
             ->modifyQueryUsing(fn (Builder $query): Builder => EquipmentItem::withStockTotal($query))
             ->columns([
                 Tables\Columns\TextColumn::make('name')
@@ -161,6 +164,7 @@ class EquipmentItemResource extends Resource
                     ->since()
                     ->sortable(),
             ])
+            ->defaultSort('name')
             ->filters([
                 // FIXME: This filter needs proper implementation once stock mutations logic is finalized
                 // Tables\Filters\Filter::make('low_stock')
@@ -347,7 +351,7 @@ class EquipmentItemResource extends Resource
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
-            ]);
+            ]));
     }
 
     public static function getRelations(): array
