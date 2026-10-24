@@ -1,6 +1,7 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { resolve } from 'node:path';
 import type { CommandOverview } from '../../resources/js/daily-checkout/src/types';
+import { SHIFT_BASE, handleShiftRoute, newShiftServer } from './support/command300-shift';
 
 const stations = [1, 2, 3, 4, 6].map((stationNumber) => ({
   id: stationNumber,
@@ -56,8 +57,12 @@ async function mockDailySelectorApi(page: Page): Promise<void> {
     return route.fulfill({ status: 204 });
   });
   await page.route('**/favicon*', (route) => route.fulfill({ status: 204 }));
+  const shift = newShiftServer();
   await page.route('**/api/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
+
+    // 300: the shift line on the page and on the stations-list card.
+    if (path.startsWith(SHIFT_BASE)) return handleShiftRoute(route, path, shift);
 
     // Captain 5 card: the station list probes the summary; a 200 shows the card in the grid at every viewport.
     if (path === '/api/captain5/summary') {
@@ -216,6 +221,8 @@ test('Command 300 tabs open on Communications, show one station at a time and pr
 
   await page.goto('/daily/command-300');
   await expect(page.getByRole('heading', { name: '300', exact: true })).toBeVisible();
+  await expect(page.getByTestId('command-duty-line')).toHaveText('A Shift 300: Division Chief Jane Smith');
+  await expect(page.getByTestId('command-acting-open')).toHaveText('Acting as 300 today? Click here.');
   const commandBoard = page.getByRole('link', { name: /^Open Command Board/ });
   await expect(commandBoard).toHaveCount(1);
   await expect(commandBoard).toHaveAttribute('href', 'https://cmd.mbfdhub.com');
@@ -371,6 +378,7 @@ test('station selector stays visible, touchable, and horizontally contained at e
     })).toBe(true);
   }
   // 300 Command frames its photo exactly like the station cards: same fit, same frame height.
+  await expect(page.getByTestId('daily-command-duty')).toHaveText('A Shift 300: Division Chief Jane Smith');
   const commandPhoto = page.getByTestId('daily-command-card').getByRole('img');
   await commandPhoto.scrollIntoViewIfNeeded();
   await expect.poll(() => commandPhoto.evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);

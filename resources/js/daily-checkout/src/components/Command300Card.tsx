@@ -4,6 +4,9 @@ import { ChevronRight } from 'lucide-react';
 import { COMMAND_300_IMAGE, bundledImageSize } from '../types';
 import { fetchCommandSummary } from '../utils/commandCommunicationsApi';
 import StationCardMedia from './StationCardMedia';
+import { COMMAND_300_ACTING } from './acting/command300Role';
+import { dutyLine, dutyTone } from './acting/format';
+import { useCommand300Shift } from './acting/useCommand300Shift';
 import Tag from './ui/Tag';
 
 /** Quiet by design: a failed summary simply shows no badge; the Command page has the full state. */
@@ -26,6 +29,8 @@ function useUnreadCount(): number {
  */
 export default function Command300Card() {
   const unread = useUnreadCount();
+  // Quiet on purpose: while loading, or on any failure, no shift line is better than a wrong name.
+  const onDuty = useCommand300Shift({ poll: false }).data?.on_duty ?? null;
 
   return (
     <Link
@@ -42,6 +47,11 @@ export default function Command300Card() {
 
       <div className="p-4 sm:p-5 2xl:p-6">
         <h3 className="mb-3 text-lg font-bold text-hub-ink font-heading 2xl:text-xl">300</h3>
+        {onDuty && (
+          <p className="mb-2" data-testid="daily-command-duty">
+            <Tag tone={dutyTone(onDuty)} className="!whitespace-normal !py-1 max-w-full break-words">{dutyLine(onDuty, COMMAND_300_ACTING)}</Tag>
+          </p>
+        )}
         <p className="text-sm text-hub-n-600">Morning Lineup, Command Board, messages, Department Updates, and a read-only readiness overview of every station.</p>
         {unread > 0 && (
           <p className="mt-3" data-testid="daily-command-unread">

@@ -1,3 +1,5 @@
+import type { ActingState, OnDuty } from '../acting/types';
+
 /** Shapes of /api/captain5/* (docs/captain5-ems-operations-center.md). Only what the page reads. */
 
 export type IssueKind = 'rescue' | 'medical';
@@ -19,20 +21,8 @@ export interface Captain5Access {
   authority_label: string;
 }
 
-export type ShiftLetter = 'A' | 'B' | 'C';
-
-export interface OnDuty {
-  duty_date: string;
-  shift: ShiftLetter | null;
-  /** 'acting' is an approved acting member; 'bid_holder' is the shift's bid holder. */
-  source: 'acting' | 'bid_holder' | 'unknown';
-  resolved: boolean;
-  name: string | null;
-  rank: string | null;
-  /** ISO time an approved acting member stops being shown. */
-  acting_until: string | null;
-  acting_request_id: number | null;
-}
+// The shift line and acting request shapes are shared with the 300 page, so they live in ../acting/types.
+export type { ActingDuration, ActingRequest, ActingResult, ActingState, OnDuty, ShiftLetter } from '../acting/types';
 
 export interface IssueDetails {
   parts_ordered?: string;
@@ -154,38 +144,6 @@ export interface HandoffNote {
 export interface Handoff {
   duty_date: string;
   notes: HandoffNote[];
-}
-
-export type ActingDuration = '12h' | '24h' | 'custom';
-
-/** A request to be shown as (or to stop showing) the acting Captain 5. Display only; an administrator approves. */
-export interface ActingRequest {
-  id: number;
-  kind: 'act' | 'end';
-  requested_by: string;
-  name: string | null;
-  rank: string | null;
-  duration: ActingDuration | null;
-  shift: ShiftLetter | null;
-  ends_at: string | null;
-  requested_at: string | null;
-  own: boolean;
-}
-
-export interface ActingState {
-  can_approve: boolean;
-  /** The viewer's own request that is waiting for approval. */
-  mine: ActingRequest | null;
-  /** Everything waiting for approval; filled only for people who can approve. */
-  pending: ActingRequest[];
-  /** When a 12 or 24 hour stint would end, as the server computes it. */
-  choices: { '12h': string | null; '24h': string | null };
-}
-
-/** Answer of every acting-request call: what is shown now, and the acting state. */
-export interface ActingResult {
-  on_duty: OnDuty;
-  acting: ActingState;
 }
 
 export interface Workspace {

@@ -4,8 +4,9 @@ import { RefreshCw } from 'lucide-react';
 import { CAPTAIN_5_IMAGE } from '../types';
 import { useOffline } from '../hooks/useOffline';
 import DailyPageNav from './DailyPageNav';
-import ActingApprovals from './captain5/ActingApprovals';
-import ActingControl from './captain5/ActingControl';
+import ActingApprovals from './acting/ActingApprovals';
+import ActingControl from './acting/ActingControl';
+import { CAPTAIN_5_ACTING } from './captain5/actingRole';
 import Captain5Denied from './captain5/Captain5Denied';
 import Captain5Messages from './captain5/Captain5Messages';
 import HistoryTab from './captain5/HistoryTab';
@@ -186,7 +187,7 @@ export default function Captain5Page() {
             <p className="flex flex-wrap items-center gap-2 text-sm" data-testid="captain5-duty-line">
               <Tag tone={dutyTone(data.on_duty)} className="!text-sm !whitespace-normal !py-1 max-w-full break-words">{dutyLine(data.on_duty)}</Tag>
             </p>
-            <ActingControl onDuty={data.on_duty} acting={data.acting} onChange={actingChanged} />
+            <ActingControl role={CAPTAIN_5_ACTING} onDuty={data.on_duty} acting={data.acting} onChange={actingChanged} />
             <p className="text-[13px] leading-5 text-hub-n-600" data-testid="captain5-authority">Your access: {access.authority_label || 'Captain 5'}</p>
           </div>
           <button
@@ -205,7 +206,7 @@ export default function Captain5Page() {
         </div>
       </section>
 
-      <ActingApprovals acting={data.acting} onChange={actingChanged} />
+      <ActingApprovals role={CAPTAIN_5_ACTING} acting={data.acting} onChange={actingChanged} />
 
       {ws.error && (
         <div className="hub-callout hub-callout--warning p-3 text-sm" role="alert">
