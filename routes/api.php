@@ -68,6 +68,9 @@ Route::prefix('public')->middleware(['auth:sanctum', 'canonical.api', 'throttle:
     Route::get('apparatuses/{apparatus}/service-notices', [PublicApparatusServiceTicketController::class, 'apparatusNotices']);
     Route::post('apparatuses/{apparatus}/inspections', [ApparatusController::class, 'storeInspection']);
     Route::post('apparatuses/{apparatus}/inventory-corrections', [\App\Http\Controllers\Api\InventoryCorrectionController::class, 'store'])->middleware(['throttle:30,1']);
+    // One-time vehicle questions outside a checkout (Captain 5 page); the unit is authorized per request.
+    Route::get('apparatuses/{apparatus}/vehicle-identification', [\App\Http\Controllers\Api\VehicleIdentificationController::class, 'show'])->whereNumber('apparatus');
+    Route::post('apparatuses/{apparatus}/vehicle-identification', [\App\Http\Controllers\Api\VehicleIdentificationController::class, 'store'])->whereNumber('apparatus')->middleware(['throttle:30,1']);
     Route::get('employees/list', [ApparatusController::class, 'employees']);
 
     // Public Station Routes for Daily Checkout SPA

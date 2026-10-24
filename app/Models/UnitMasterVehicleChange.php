@@ -37,6 +37,9 @@ class UnitMasterVehicleChange extends Model
     /** Edited directly on the Master Vehicle Inventory. */
     public const SOURCE_MASTER_INVENTORY = 'master_inventory';
 
+    /** A crew reported it through a one-time vehicle identification question (Daily Checkout or unit page). */
+    public const SOURCE_DAILY_CHECKOUT = 'daily_checkout';
+
     protected $fillable = [
         'unit_master_vehicle_id',
         'field',

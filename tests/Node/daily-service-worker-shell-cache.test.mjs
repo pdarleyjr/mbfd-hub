@@ -709,7 +709,8 @@ const assetResponse = (name) => fakeResponse({ body: `bundle ${name}`, url: `${O
 test('every station and apparatus read the Daily app makes is either served offline or deliberately live (audit of utils/api.ts)', async () => {
   const live = [/\/service-tickets$/, /\/service-notices$/];
   // apparatuses/{id}/{endpoint} is the checklist GET plus the inspection-session POSTs; the GET is checked explicitly below.
-  const writes =[/^apparatuses\/1\/inspections$/, /^apparatuses\/1\/1$/];
+  // apparatuses/{id}/vehicle-identification is the Captain 5 page's one-time vehicle answers POST (online only).
+  const writes =[/^apparatuses\/1\/inspections$/, /^apparatuses\/1\/1$/, /^apparatuses\/1\/vehicle-identification$/];
   const paths = new Set();
   for (const match of apiSource.matchAll(/`\$\{API_BASE\}\/public\/((?:stations|apparatuses)[^`]*)`/g)) {
     paths.add(match[1].replace(/\$\{[^}]+\}/g, '1').replace(/\?.*$/, ''));

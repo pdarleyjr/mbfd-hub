@@ -104,6 +104,60 @@ export interface PhysicalVehicleReport {
   note?: string;
 }
 
+/** One open "one-time vehicle information" question. The server decides which are open. */
+export interface VehicleIdentificationQuestion {
+  /** Server field key, for example plate, vin, year. */
+  field: string;
+  label: string;
+  hint: string | null;
+  /** 'year' is a 4 digit number; everything else is text. */
+  input: 'text' | 'year';
+  max: number;
+  /** What the Hub has on record, shown only when `confirm` is true. */
+  current_value: string | null;
+  /** The crew confirms the value on record or enters what is on the vehicle. */
+  confirm: boolean;
+}
+
+export interface VehicleIdentificationReason {
+  code: string;
+  label: string;
+  needs_note: boolean;
+}
+
+/** The server's block of open questions; kept outside the hashed checklist. */
+export interface VehicleIdentification {
+  note: string;
+  /** False when this person may only read the questions (Fleet or a Captain 5 officer answers). Missing means true. */
+  can_answer: boolean;
+  kind: 'vehicle' | 'boat';
+  questions: VehicleIdentificationQuestion[];
+  reasons: VehicleIdentificationReason[];
+  questions_version: string;
+}
+
+/** The crew's working answer to one question. */
+export interface VehicleIdentificationAnswer {
+  /** '' means not answered yet. 'confirm' is only valid for questions that ask to confirm. */
+  mode: '' | 'value' | 'confirm' | 'unavailable';
+  value: string;
+  reason: string;
+  note: string;
+}
+
+/** Working answers keyed by question field; kept in the draft. */
+export type VehicleIdentificationAnswers = Record<string, VehicleIdentificationAnswer>;
+
+/** One answer as sent to the server. */
+export type VehicleIdentificationSubmittedAnswer =
+  | { field: string; value: string }
+  | { field: string; unavailable_reason: string; note: string | null };
+
+export interface VehicleIdentificationSubmission {
+  questions_version: string;
+  answers: VehicleIdentificationSubmittedAnswer[];
+}
+
 export interface OfficerInfo {
   name: string;
   rank: Rank;
@@ -225,6 +279,8 @@ export interface ChecklistData {
   /** Hash of the baseline template without inventory overlays; equal across overlay-only changes. */
   checklist_base_version?: string;
   pending_corrections?: PendingInventoryCorrection[];
+  /** Open one-time vehicle information questions. Absent when nothing is open. */
+  vehicle_identification?: VehicleIdentification;
   checklist_version: string;
   checklist_type?: string;
   schema_version: 1 | 2;
@@ -291,6 +347,8 @@ export interface InspectionSubmission {
   employee_id?: number;
   /** The member's confirmed physical vehicle. Older queued submissions do not have it. */
   physical_vehicle?: PhysicalVehicleReport;
+  /** Answers to the one-time vehicle information questions. Omitted when none were open. */
+  vehicle_identification?: VehicleIdentificationSubmission;
   engine_hours?: number | null;
   miles?: number | null;
   defects: Defect[];
@@ -324,6 +382,8 @@ export interface InspectionData {
   reviewFlag?: ReviewFlagDraft;
   /** Created once per draft; sent as `inspection_draft_id` with inventory corrections and `inventory_draft_id` with the inspection. */
   draftId?: string;
+  /** Working answers to the one-time vehicle information questions. */
+  vehicleIdentification?: VehicleIdentificationAnswers;
   actorUserId?: number;
   actorSecurityVersion?: number;
   checklist_version: string;

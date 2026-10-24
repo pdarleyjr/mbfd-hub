@@ -1,4 +1,7 @@
-import type { FleetVehicle, OfficerInfo, Shift, SwapAnswer, VehicleConfirmation } from '../types';
+import { useRef, useState } from 'react';
+import type { FleetVehicle, OfficerInfo, Shift, SwapAnswer, VehicleConfirmation, VehicleIdentification, VehicleIdentificationAnswers } from '../types';
+import { activeVehicleIdentification, firstIncompleteField } from '../utils/vehicleIdentification';
+import VehicleIdentificationCard, { focusIdentificationField } from './VehicleIdentificationCard';
 import {
   MAX_VEHICLE_ID_LENGTH,
   NOT_LISTED,
@@ -18,7 +21,15 @@ interface Props {
   fleetVehicles: FleetVehicle[];
   /** The unit designation (for example E2) shown beside its assigned vehicle. */
   assignedDesignation?: string;
+  /** Open one-time vehicle information questions; nothing is shown or required without them. */
+  identification?: VehicleIdentification;
+  identificationAnswers?: VehicleIdentificationAnswers;
+  onIdentificationChange?: (answers: VehicleIdentificationAnswers) => void;
+  /** Show what is missing even before Continue is pressed (a blocked submit sent the member here). */
+  showIdentificationErrors?: boolean;
 }
+
+const NO_ANSWERS: VehicleIdentificationAnswers = {};
 
 const READ_ONLY = 'mt-1 block min-h-11 w-full rounded-hub-control border border-hub-glass-border bg-hub-n-50 px-3 py-2.5 font-normal text-hub-ink';
 const CONTROL = 'mt-1 block min-h-11 w-full rounded-hub-control border border-hub-control-border bg-hub-well px-3 py-2.5 font-normal text-hub-ink';
@@ -27,7 +38,14 @@ const SWAP_ANSWERS: ReadonlyArray<{ value: SwapAnswer; label: string }> = [
   { value: 'unknown', label: 'Unknown, not sure why' },
 ];
 
-export default function OfficerStep({ initialData, onSubmit, onChange, continueLabel, fleetVehicles, assignedDesignation }: Props) {
+export default function OfficerStep({
+  initialData, onSubmit, onChange, continueLabel, fleetVehicles, assignedDesignation,
+  identification, identificationAnswers = NO_ANSWERS, onIdentificationChange, showIdentificationErrors = false,
+}: Props) {
+  const sectionRef = useRef<HTMLElement>(null);
+  // Hidden, not asked and not required while a different physical vehicle is reported.
+  const activeIdentification = activeVehicleIdentification(identification, initialData);
+  const [identificationAttempted, setIdentificationAttempted] = useState(false);
   const confirmation: VehicleConfirmation = initialData.vehicleConfirmation ?? defaultVehicleConfirmation('');
   const assigned = confirmation.assignedVehicle;
   const mismatch = isVehicleMismatch(confirmation);
@@ -39,10 +57,17 @@ export default function OfficerStep({ initialData, onSubmit, onChange, continueL
     vehicleConfirmation: { ...confirmation, ...patch, confirmed: false },
   });
 
-  return <section data-hub-ui="2" className="inspection-panel mx-auto max-w-lg p-4 sm:p-5">
+  return <section ref={sectionRef} data-hub-ui="2" className="inspection-panel mx-auto max-w-lg p-4 sm:p-5">
     <h2 className="mb-5 text-xl font-semibold">Member / Vehicle Info</h2>
     <form onSubmit={event => {
       event.preventDefault();
+      // Every open one-time question needs an answer, or "not available" with its reason.
+      const unanswered = firstIncompleteField(activeIdentification, identificationAnswers);
+      if (unanswered) {
+        setIdentificationAttempted(true);
+        focusIdentificationField(sectionRef.current, unanswered);
+        return;
+      }
       const data = new FormData(event.currentTarget);
       onSubmit({ ...initialData, shift: data.get('shift') as Shift, vehicleConfirmation: { ...confirmation, confirmed: true } });
     }}>
@@ -120,6 +145,12 @@ export default function OfficerStep({ initialData, onSubmit, onChange, continueL
           </button>
         </fieldset>}
         <label className="text-sm font-semibold">Shift<select name="shift" required value={initialData.shift} onChange={event => onChange({ ...initialData, shift: event.target.value as Shift })} className={CONTROL}><option value="">Choose shift</option>{(['A', 'B', 'C'] as const).map(shift => <option key={shift} value={shift}>Shift {shift}</option>)}</select></label>
+        {activeIdentification && <VehicleIdentificationCard
+          block={activeIdentification}
+          answers={identificationAnswers}
+          onChange={answers => onIdentificationChange?.(answers)}
+          showErrors={identificationAttempted || showIdentificationErrors}
+        />}
       </div>
       <p className="my-4 text-sm text-hub-n-600">Recorded under your signed-in member account.</p>
       <button type="submit" className="hub-btn hub-btn--primary hub-btn--wrap inspection-review-button w-full">{continueLabel}</button>

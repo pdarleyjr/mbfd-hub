@@ -131,7 +131,7 @@ class ApparatusResource extends Resource
                             ->disabled(fn (?Apparatus $record): bool => self::isLinked($record))
                             ->dehydrated(fn (?Apparatus $record): bool => ! self::isLinked($record))
                             ->helperText(fn (?Apparatus $record): string => self::isLinked($record)
-                                ? 'Set by the linked vehicle record. Use "Link vehicle record" to point this unit at a different vehicle.'
+                                ? 'Set by the linked vehicle record. Use "Change vehicle record" under More to point this unit at a different vehicle.'
                                 : 'Links this unit to the Master Vehicle Inventory vehicle with the same number.'),
                         Forms\Components\TextInput::make('year')
                             ->numeric()
@@ -546,6 +546,8 @@ class ApparatusResource extends Resource
             RelationManagers\VehicleSwapReportsRelationManager::class,
             RelationManagers\DefectsRelationManager::class,
             RelationManagers\InventoryCorrectionsRelationManager::class,
+            // A rare Fleet task, so it follows the everyday tabs.
+            RelationManagers\IdentificationQuestionsRelationManager::class,
         ];
     }
 
