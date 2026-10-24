@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Ems;
 
+use App\Filament\Support\EmsLabels;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Ems\Concerns\RespondsWithEnvelope;
 use App\Models\Ems\InventorySnapshot;
 use App\Models\Ems\SupplyItem;
-use App\Filament\Support\EmsLabels;
 use App\Models\User;
 use App\Services\Ems\EmsException;
 use App\Services\Ems\EmsValidator;
@@ -20,9 +20,9 @@ use App\Services\Ems\SnapshotPresenter;
 use App\Services\Ems\SupplyItemMaintenance;
 use App\Services\Ems\SupplyOrderService;
 use App\Services\Ems\SupplyRoomQuery;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Carbon\CarbonImmutable;
 use Symfony\Component\HttpFoundation\Response;
 
 /** Medical Supply Room API: items, counts, reconciliation, advisories, orders, movements, snapshots. */
@@ -116,13 +116,15 @@ final class SupplyRoomController extends Controller
         return $this->guarded(fn (): JsonResponse => $this->ok($this->snapshots->detail($this->findSnapshot($uuid), withItems: true)));
     }
 
-    /** Excel copy of one count or reconciliation: the same file the Admin page offers. Needs iew. */
+    /** Excel copy of one count or reconciliation: the same file the Admin page offers. Needs
+iew. */
     public function exportSnapshotExcel(string $uuid): Response
     {
         return $this->snapshotDownload($uuid, 'xlsx');
     }
 
-    /** PDF copy of one count or reconciliation. Needs iew. */
+    /** PDF copy of one count or reconciliation. Needs
+iew. */
     public function exportSnapshotPdf(string $uuid): Response
     {
         return $this->snapshotDownload($uuid, 'pdf');

@@ -34,7 +34,7 @@ class ShopWork extends Model
         'completed_date' => 'date',
     ];
 
-    /** @return BelongsTo<Apparatus, \> */
+    /** @return BelongsTo<Apparatus, $this> */
     public function apparatus(): BelongsTo
     {
         return $this->belongsTo(Apparatus::class);
