@@ -8,6 +8,7 @@ use App\Jobs\GenerateOperationalFormPdf;
 use App\Models\OperationalFormDocument;
 use App\Models\OperationalFormGeneration;
 use App\Models\OperationalFormRecord;
+use App\Services\Ems\MemberCopyService;
 use App\Services\OperationalForms\FormDataValidator;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,6 +26,12 @@ class FormGenerationController extends Controller
             ->where('employee_id', $this->authenticatedEmployee()->getKey())
             ->findOrFail($record);
 
+        if (MemberCopyService::isReadOnlyType($owned->form_type)) {
+            return response()->json([
+                'code' => 'read_only',
+                'message' => 'This is a read-only copy of a Medical Inventory Request. It already has its PDF.',
+            ], 409);
+        }
         $validator->validate($owned->form_type, $owned->data, true);
         $generation = OperationalFormGeneration::query()->firstOrCreate(
             ['form_record_id' => $owned->id, 'source_revision' => $owned->revision],

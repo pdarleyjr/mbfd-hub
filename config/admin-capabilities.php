@@ -43,6 +43,7 @@ return [
         App\Models\CapitalProject::class => 'admin.projects',
         App\Models\Under25kProject::class => 'admin.projects',
         App\Models\Todo::class => 'admin.notifications',
+        App\Models\ResourceDocument::class => 'admin.resources',
         App\Models\InboundEmail::class => 'admin.communications',
         App\Models\OutboundEmail::class => 'admin.communications',
         App\Models\DepartmentUpdate::class => [

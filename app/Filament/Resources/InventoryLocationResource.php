@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\InventoryLocationResource\Pages;
 use App\Models\InventoryLocation;
 use Filament\Forms;
@@ -13,6 +14,8 @@ use Illuminate\Database\Eloquent\Builder;
 
 class InventoryLocationResource extends Resource
 {
+    use HasExportActions;
+
     protected static ?string $navigationLabel = 'Locations';
 
     protected static ?string $model = InventoryLocation::class;
@@ -58,7 +61,7 @@ class InventoryLocationResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->columns([
                 Tables\Columns\TextColumn::make('full_location')
                     ->label('Location')
@@ -79,6 +82,7 @@ class InventoryLocationResource extends Resource
                     ->since()
                     ->sortable(),
             ])
+            ->defaultSort('location_name')
             ->filters([
                 Tables\Filters\SelectFilter::make('shelf')
                     ->options([
@@ -115,7 +119,7 @@ class InventoryLocationResource extends Resource
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
-            ]);
+            ]));
     }
 
     public static function getRelations(): array

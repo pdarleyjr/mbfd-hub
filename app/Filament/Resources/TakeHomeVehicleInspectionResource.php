@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Concerns\EnterpriseTable;
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\TakeHomeVehicleInspectionResource\Pages;
 use App\Models\TakeHomeVehicleInspection;
 use Carbon\Carbon;
@@ -20,6 +21,7 @@ use Illuminate\Database\Eloquent\Model;
 class TakeHomeVehicleInspectionResource extends Resource
 {
     use EnterpriseTable;
+    use HasExportActions;
 
     private const TIMEZONE = 'America/New_York';
 
@@ -54,7 +56,7 @@ class TakeHomeVehicleInspectionResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return self::applyEnterpriseDefaults($table)
+        return static::withExportActions(self::applyEnterpriseDefaults($table)
             ->columns([
                 Tables\Columns\TextColumn::make('submitted_at')
                     ->label('Submitted (ET)')
@@ -147,7 +149,7 @@ class TakeHomeVehicleInspectionResource extends Resource
                     ->icon('heroicon-o-arrow-down-tray')
                     ->url(fn (TakeHomeVehicleInspection $record): string => route('take-home-inspections.pdf', $record->reference)),
             ])
-            ->defaultSort('submitted_at', 'desc');
+            ->defaultSort('submitted_at', 'desc'));
     }
 
     public static function getRelations(): array

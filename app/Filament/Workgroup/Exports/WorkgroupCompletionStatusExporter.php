@@ -2,18 +2,17 @@
 
 namespace App\Filament\Workgroup\Exports;
 
-use App\Models\CandidateProduct;
+use App\Filament\Exports\SafeExporter;
 use App\Models\EvaluationSubmission;
 use App\Models\WorkgroupMember;
 use App\Models\WorkgroupSession;
 use Filament\Actions\Exports\ExportColumn;
-use Filament\Actions\Exports\Exporter;
 use Filament\Actions\Exports\Models\Export;
 
 /**
  * Exporter for per-user completion status - who has completed what evaluations.
  */
-class WorkgroupCompletionStatusExporter extends Exporter
+class WorkgroupCompletionStatusExporter extends SafeExporter
 {
     protected static ?string $model = WorkgroupMember::class;
 
@@ -61,14 +60,13 @@ class WorkgroupCompletionStatusExporter extends Exporter
     protected function getCompletedCount(WorkgroupMember $record): int
     {
         $session = WorkgroupSession::active()->first();
-        
-        if (!$session) {
+
+        if (! $session) {
             return 0;
         }
 
         return EvaluationSubmission::where('workgroup_member_id', $record->id)
-            ->whereHas('candidateProduct', fn($q) => 
-                $q->where('workgroup_session_id', $session->id)
+            ->whereHas('candidateProduct', fn ($q) => $q->where('workgroup_session_id', $session->id)
             )
             ->where('status', 'submitted')
             ->count();
@@ -77,8 +75,8 @@ class WorkgroupCompletionStatusExporter extends Exporter
     protected function getPendingCount(WorkgroupMember $record): int
     {
         $session = WorkgroupSession::active()->first();
-        
-        if (!$session) {
+
+        if (! $session) {
             return 0;
         }
 
@@ -91,8 +89,8 @@ class WorkgroupCompletionStatusExporter extends Exporter
     protected function getTotalProducts(WorkgroupMember $record): int
     {
         $session = WorkgroupSession::active()->first();
-        
-        if (!$session) {
+
+        if (! $session) {
             return 0;
         }
 
@@ -102,7 +100,7 @@ class WorkgroupCompletionStatusExporter extends Exporter
     protected function getCompletionPercentage(WorkgroupMember $record): string
     {
         $total = $this->getTotalProducts($record);
-        
+
         if ($total === 0) {
             return '0%';
         }
@@ -116,7 +114,7 @@ class WorkgroupCompletionStatusExporter extends Exporter
     protected function getStatus(WorkgroupMember $record): string
     {
         $total = $this->getTotalProducts($record);
-        
+
         if ($total === 0) {
             return 'No Products';
         }
@@ -135,14 +133,13 @@ class WorkgroupCompletionStatusExporter extends Exporter
     protected function getEvaluatedProducts(WorkgroupMember $record): string
     {
         $session = WorkgroupSession::active()->first();
-        
-        if (!$session) {
+
+        if (! $session) {
             return '';
         }
 
         $products = EvaluationSubmission::where('workgroup_member_id', $record->id)
-            ->whereHas('candidateProduct', fn($q) => 
-                $q->where('workgroup_session_id', $session->id)
+            ->whereHas('candidateProduct', fn ($q) => $q->where('workgroup_session_id', $session->id)
             )
             ->where('status', 'submitted')
             ->with('candidateProduct')
@@ -155,10 +152,10 @@ class WorkgroupCompletionStatusExporter extends Exporter
 
     public static function getCompletedNotificationBody(Export $export): string
     {
-        $body = 'Completion status export completed. ' . number_format($export->successful_rows) . ' member records exported.';
+        $body = 'Completion status export completed. '.number_format($export->successful_rows).' member records exported.';
 
         if ($failedRowsCount = $export->getFailedRowsCount()) {
-            $body .= ' ' . number_format($failedRowsCount) . ' rows failed to export.';
+            $body .= ' '.number_format($failedRowsCount).' rows failed to export.';
         }
 
         return $body;

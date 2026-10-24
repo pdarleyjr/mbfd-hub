@@ -2,20 +2,18 @@
 
 namespace App\Filament\Workgroup\Exports;
 
-use App\Models\CandidateProduct;
+use App\Filament\Exports\SafeExporter;
 use App\Models\EvaluationScore;
 use App\Models\EvaluationSubmission;
 use App\Models\WorkgroupSession;
 use Filament\Actions\Exports\ExportColumn;
-use Filament\Actions\Exports\Exporter;
 use Filament\Actions\Exports\Models\Export;
-use Illuminate\Support\Facades\DB;
 
 /**
  * Exporter for full scoring details - all scores per product per evaluator.
  * Updated to include SAVER rubric category scores and decision metadata.
  */
-class WorkgroupScoresExporter extends Exporter
+class WorkgroupScoresExporter extends SafeExporter
 {
     protected static ?string $model = EvaluationSubmission::class;
 
@@ -121,7 +119,7 @@ class WorkgroupScoresExporter extends Exporter
     protected static function formatCriterionScores(EvaluationSubmission $record): string
     {
         // First try new rubric format
-        if (!empty($record->criterion_payload['ratings'])) {
+        if (! empty($record->criterion_payload['ratings'])) {
             $ratings = $record->criterion_payload['ratings'];
             $parts = [];
             foreach ($ratings as $criterionId => $rating) {
@@ -129,6 +127,7 @@ class WorkgroupScoresExporter extends Exporter
                     $parts[] = "{$criterionId}: {$rating}";
                 }
             }
+
             return implode(' | ', $parts);
         }
 
@@ -141,31 +140,30 @@ class WorkgroupScoresExporter extends Exporter
             return 'No scores';
         }
 
-        return $scores->map(fn($score) => 
-            "{$score->criterion->name}: {$score->score}/{$score->criterion->max_score}"
+        return $scores->map(fn ($score) => "{$score->criterion->name}: {$score->score}/{$score->criterion->max_score}"
         )->join(' | ');
     }
 
     protected static function formatNarrative(EvaluationSubmission $record): string
     {
         $narrative = $record->narrative_payload ?? [];
-        
+
         if (empty($narrative)) {
             return '';
         }
 
         $parts = [];
-        
-        if (!empty($narrative['strongest_advantages'])) {
-            $parts[] = "Pros: " . substr($narrative['strongest_advantages'], 0, 200);
+
+        if (! empty($narrative['strongest_advantages'])) {
+            $parts[] = 'Pros: '.substr($narrative['strongest_advantages'], 0, 200);
         }
-        
-        if (!empty($narrative['biggest_weaknesses'])) {
-            $parts[] = "Cons: " . substr($narrative['biggest_weaknesses'], 0, 200);
+
+        if (! empty($narrative['biggest_weaknesses'])) {
+            $parts[] = 'Cons: '.substr($narrative['biggest_weaknesses'], 0, 200);
         }
-        
-        if (!empty($narrative['safety_concerns'])) {
-            $parts[] = "Safety: " . substr($narrative['safety_concerns'], 0, 200);
+
+        if (! empty($narrative['safety_concerns'])) {
+            $parts[] = 'Safety: '.substr($narrative['safety_concerns'], 0, 200);
         }
 
         return implode("\n", $parts);
@@ -173,10 +171,10 @@ class WorkgroupScoresExporter extends Exporter
 
     public static function getCompletedNotificationBody(Export $export): string
     {
-        $body = 'Scoring export completed. ' . number_format($export->successful_rows) . ' submissions exported.';
+        $body = 'Scoring export completed. '.number_format($export->successful_rows).' submissions exported.';
 
         if ($failedRowsCount = $export->getFailedRowsCount()) {
-            $body .= ' ' . number_format($failedRowsCount) . ' rows failed to export.';
+            $body .= ' '.number_format($failedRowsCount).' rows failed to export.';
         }
 
         return $body;
@@ -188,14 +186,13 @@ class WorkgroupScoresExporter extends Exporter
     public static function getBaseQuery(): \Illuminate\Database\Eloquent\Builder
     {
         $session = WorkgroupSession::active()->first();
-        
-        if (!$session) {
+
+        if (! $session) {
             return EvaluationSubmission::query()->whereRaw('1 = 0');
         }
 
         return EvaluationSubmission::query()
-            ->whereHas('candidateProduct', fn($q) => 
-                $q->where('workgroup_session_id', $session->id)
+            ->whereHas('candidateProduct', fn ($q) => $q->where('workgroup_session_id', $session->id)
             )
             ->with([
                 'candidateProduct.category',

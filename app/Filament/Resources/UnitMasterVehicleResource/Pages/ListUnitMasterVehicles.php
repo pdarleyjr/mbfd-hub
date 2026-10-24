@@ -8,6 +8,7 @@ use App\Services\Fleet\UnitMasterRosterExporter;
 use Filament\Actions;
 use Filament\Forms\Components\Radio;
 use Filament\Resources\Pages\ListRecords;
+use Filament\Support\Enums\MaxWidth;
 use Filament\Tables\Filters\SelectFilter;
 use Illuminate\Database\Eloquent\Collection;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -15,6 +16,12 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class ListUnitMasterVehicles extends ListRecords
 {
     protected static string $resource = UnitMasterVehicleResource::class;
+
+    /** The inventory is a wide table; let it use the whole content area. */
+    public function getMaxContentWidth(): MaxWidth|string|null
+    {
+        return MaxWidth::Full;
+    }
 
     protected function getHeaderActions(): array
     {

@@ -6,12 +6,18 @@ import {
 import {
     AlertTriangle, ArrowLeft, BookOpen, Check, ChevronRight, ClipboardList, Clock3, Cloud, Copy, Download,
     Bot, Eye, FileArchive, FileCheck2, FilePenLine, FilePlus2, FileUp, Home, Library, LoaderCircle, Plus, Printer, RefreshCw, Save,
-    ShieldCheck, Sparkles, Trash2, UsersRound, WifiOff,
+    ShieldCheck, Sparkles, Stethoscope, Trash2, Truck, UsersRound, WifiOff,
 } from 'lucide-react';
 import { ApiError, createApi } from './api';
 import { validateImportFile } from './importLimits.js';
 import { recoveryDrafts, type RecoveryDraft } from './draftsDb';
-import type { BootstrapData, EditableFormType, EmployeeSuggestion, FormDefinition, FormDocument, FormRecord, FormType, FrocImportConfig, FrocImportSummary } from './types';
+import { createEmsApi } from './ems/emsApi';
+import { EmsApp } from './ems/EmsApp';
+import { isDocumentRecordType, recordTypeLabel, searchForView, viewFromDeepLink, viewFromSearch } from './ems/emsLogic.js';
+import type { EmsOutboxEntry, EmsView } from './ems/emsTypes';
+import { PendingRequests } from './ems/PendingRequests';
+import { useEmsOutbox, type EmsOutbox } from './ems/useEmsOutbox';
+import type { BootstrapData, EditableFormType, EmployeeSuggestion, FormDefinition, FormDocument, FormRecord, FormType, FrocImportConfig, FrocImportSummary, LibraryLink } from './types';
 
 const PdfPreview = lazy(() => import('./PdfPreview').then((module) => ({ default: module.PdfPreview })));
 
@@ -52,7 +58,7 @@ function clone<T>(value: T): T { return JSON.parse(JSON.stringify(value)); }
 function stamp(value?: string | null) { return value ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : 'Not yet saved'; }
 function typeLabel(type: FormType) {
     if (type === 'ics_214') return 'ICS 214';
-    if (type === 'uploaded_file') return 'Submitted file';
+    if (isDocumentRecordType(type)) return recordTypeLabel(type);
     return 'F-ROC Daily Activity Report';
 }
 function latestDocument(record: FormRecord) { return [...record.documents].sort((a, b) => b.version_number - a.version_number)[0] || null; }
@@ -75,6 +81,12 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
     const [activeSection, setActiveSection] = useState('overview');
     const [isGenerating, setIsGenerating] = useState(false);
 
+    // Medical Inventory Request: its own views inside this app, reachable by deep link (?form=... or ?ems_request=...).
+    const emsEndpoints = bootstrap.endpoints.ems ?? null;
+    const emsApi = useMemo(() => (emsEndpoints ? createEmsApi(emsEndpoints, bootstrap.csrf_token) : null), [emsEndpoints, bootstrap.csrf_token]);
+    const [emsView, setEmsView] = useState<EmsView | null>(() => (emsEndpoints ? viewFromDeepLink(bootstrap.deep_link) : null));
+    const [emsEdit, setEmsEdit] = useState<EmsOutboxEntry | null>(null);
+
     useEffect(() => { currentRef.current = current; }, [current]);
 
     const refreshLibrary = useCallback(async () => {
@@ -88,6 +100,30 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
     }, [api]);
 
     useEffect(() => { void refreshLibrary(); }, [refreshLibrary]);
+
+    // The PDF copy of a sent request appears in Recent records a moment later; refresh the list without a spinner.
+    const refreshRecordsQuietly = useCallback(async () => {
+        try { setRecords(await api.records()); } catch { /* the list refreshes on the next visit */ }
+    }, [api]);
+    const emsOutbox = useEmsOutbox(emsApi, String(bootstrap.employee.id), refreshRecordsQuietly);
+
+    const goEms = useCallback((view: EmsView | null) => {
+        setEmsView(view);
+        const url = `${window.location.pathname}${searchForView(view)}`;
+        if (`${window.location.pathname}${window.location.search}` !== url) window.history.pushState({}, '', url);
+        window.scrollTo({ top: 0 });
+        if (view === null) void refreshRecordsQuietly();
+    }, [refreshRecordsQuietly]);
+
+    useEffect(() => {
+        if (!emsEndpoints) return;
+        const onPop = () => setEmsView(viewFromSearch(window.location.search));
+        window.addEventListener('popstate', onPop);
+        return () => window.removeEventListener('popstate', onPop);
+    }, [emsEndpoints]);
+
+    const editQueuedRequest = useCallback((entry: EmsOutboxEntry) => { setEmsEdit(entry); goEms({ name: 'form' }); }, [goEms]);
+    const openEmsPdf = useCallback((url: string, name: string) => setPreview({ preview_url: url, display_name: name } as FormDocument), []);
 
     const openRecord = useCallback(async (record: FormRecord) => {
         setBusy(true);
@@ -271,14 +307,20 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
                 </header>
                 <div className="of-layout">
                     <nav className="of-rail" aria-label="Forms navigation">
-                        <button className={!current ? 'active' : ''} onClick={() => setCurrent(null)}><Library size={19} /><span>Library</span></button>
+                        <button className={!current && !emsView ? 'active' : ''} onClick={() => { setCurrent(null); if (emsView) goEms(null); }}><Library size={19} /><span>Library</span></button>
                         {current && <button className="active"><FilePenLine size={19} /><span>Editor</span></button>}
+                        {emsView && emsApi && <button className="active" aria-current="page"><ClipboardList size={19} /><span>Medical</span></button>}
                         <a href="/employee/dashboard"><Home size={19} /><span>Portal</span></a>
                     </nav>
                     <main className="of-main">
                         {message && <MessageBar intent={message.intent}><MessageBarBody>{message.text}</MessageBarBody></MessageBar>}
-                        {!current ? (
-                            <LibraryView definitions={definitions} records={records} busy={busy} createRecord={createRecord} uploadFile={uploadFile} openRecord={openRecord} refresh={refreshLibrary} openDocument={openDocument} guideUrl={bootstrap.endpoints.guide} />
+                        {emsView && emsApi && !current ? (
+                            <EmsApp
+                                api={emsApi} owner={String(bootstrap.employee.id)} view={emsView} outbox={emsOutbox} edit={emsEdit} onEditConsumed={() => setEmsEdit(null)}
+                                navigate={goEms} goForms={() => goEms(null)} editEntry={editQueuedRequest} openPdf={openEmsPdf} onSubmitted={() => void refreshRecordsQuietly()}
+                            />
+                        ) : !current ? (
+                            <LibraryView definitions={definitions} records={records} busy={busy} createRecord={createRecord} uploadFile={uploadFile} openRecord={openRecord} refresh={refreshLibrary} openDocument={openDocument} guideUrl={bootstrap.endpoints.guide} libraryLinks={bootstrap.library_links ?? []} openEms={emsApi ? goEms : undefined} emsOutbox={emsApi ? emsOutbox : undefined} editQueuedRequest={editQueuedRequest} />
                         ) : (
                             <EditorView
                                 record={current} definition={definitions.find((item) => item.form_type === current.form_type)}
@@ -299,16 +341,41 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
     );
 }
 
-function LibraryView({ definitions, records, busy, createRecord, uploadFile, openRecord, refresh, openDocument, guideUrl }: {
+/** A plain click opens the in-app view; a modified click or "open in new tab" follows the shareable deep link. */
+function inAppClick(open: () => void) {
+    return (event: React.MouseEvent) => {
+        if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+        open();
+    };
+}
+
+function LibraryLinkCard({ entry, openEms }: { entry: LibraryLink; openEms?: (view: EmsView) => void }) {
+    const inApp = entry.in_app === true && openEms !== undefined;
+    return <article className="of-form-card" data-library-link={entry.key}>
+        <div className="of-form-card-icon">{entry.in_app ? <Stethoscope /> : <Truck />}</div>
+        <div><h3>{entry.title}</h3><p>{entry.description}</p></div>
+        <div className="ems-card-actions">
+            <Button as="a" appearance="primary" href={entry.href} onClick={inApp ? inAppClick(() => openEms?.({ name: 'form' })) : undefined} icon={<ChevronRight size={17} />} iconPosition="after">{entry.action_label}</Button>
+            {entry.secondary && <Button as="a" href={entry.secondary.href} onClick={inApp ? inAppClick(() => openEms?.({ name: 'mine' })) : undefined}>{entry.secondary.label}</Button>}
+        </div>
+    </article>;
+}
+
+function LibraryView({ definitions, records, busy, createRecord, uploadFile, openRecord, refresh, openDocument, guideUrl, libraryLinks, openEms, emsOutbox, editQueuedRequest }: {
     definitions: FormDefinition[]; records: FormRecord[]; busy: boolean;
     createRecord: (type: EditableFormType) => Promise<void>;
     uploadFile: (name: string, file: File) => Promise<void>;
     openRecord: (record: FormRecord) => void; refresh: () => void; openDocument: (doc: FormDocument) => void; guideUrl: string;
+    libraryLinks: LibraryLink[];
+    openEms?: (view: EmsView) => void; emsOutbox?: EmsOutbox; editQueuedRequest: (entry: EmsOutboxEntry) => void;
 }) {
     return <div className="of-library">
         <div className="of-page-heading"><div><p className="of-eyebrow">Controlled records workspace</p><h1>Operational Forms</h1><p>Start, resume, generate, or submit incident and reimbursement records.</p></div><div className="of-heading-actions"><Button as="a" href={guideUrl} target="_blank" icon={<BookOpen size={16} />}>User guide</Button><Button icon={<RefreshCw size={16} />} onClick={refresh} disabled={busy}>Refresh</Button></div></div>
+        {emsOutbox && openEms && <PendingRequests outbox={emsOutbox} openRequest={(id) => openEms({ name: 'detail', id })} editEntry={editQueuedRequest} />}
         <section aria-labelledby="start-form"><h2 id="start-form">Start a form</h2><div className="of-form-cards">
             {definitions.map((definition) => <article className="of-form-card" key={definition.form_type}><div className="of-form-card-icon">{definition.form_type === 'ics_214' ? <ClipboardList /> : <FileCheck2 />}</div><div><Badge appearance="outline">Version {definition.form_version}</Badge><h3>{definition.display_name}</h3><p>{definition.form_type === 'ics_214' ? 'Document unit resources and chronological incident activity.' : 'Capture firefighter labor, equipment, mileage, materials, and certification—with optional AI-assisted note import.'}</p></div><Button appearance="primary" icon={<FilePlus2 size={17} />} onClick={() => void createRecord(definition.form_type)}>Create form</Button></article>)}
+            {libraryLinks.map((entry) => <LibraryLinkCard key={entry.key} entry={entry} openEms={openEms} />)}
         </div></section>
         <FileSubmissionCard upload={uploadFile} />
         <section aria-labelledby="recent-records"><div className="of-section-heading"><h2 id="recent-records">Recent records</h2><span>{records.length} record{records.length === 1 ? '' : 's'}</span></div>
@@ -316,8 +383,10 @@ function LibraryView({ definitions, records, busy, createRecord, uploadFile, ope
                 {records.length === 0 && <tr><td colSpan={5} className="of-empty">No records yet. Start with one of the controlled forms above.</td></tr>}
                 {records.map((record) => {
                     const document = latestDocument(record);
-                    const open = () => record.form_type === 'uploaded_file' && document ? openDocument(document) : openRecord(record);
-                    return <tr key={record.id} onDoubleClick={open}><td data-label="Record"><strong>{record.title}</strong><small>{typeLabel(record.form_type)} · rev {record.revision}</small></td><td data-label="Status"><StatusBadge status={record.status} /></td><td data-label="Last saved">{stamp(record.last_autosaved_at)}</td><td data-label="Document">{document ? <Button appearance="subtle" icon={<Eye size={16} />} aria-label={`Open document for ${record.title}`} onClick={() => openDocument(document)}>{record.form_type === 'uploaded_file' ? 'Open file' : `PDF v${document.version_number}`}</Button> : 'Not generated'}</td><td data-label="Open"><Button appearance="subtle" icon={<ChevronRight size={17} />} aria-label={`Open ${record.title}`} onClick={open} /></td></tr>;
+                    // A Medical Inventory Request copy is a read-only PDF: it opens the file and never an editor.
+                    const isMedicalCopy = record.form_type === 'medical_inventory_request';
+                    const open = () => isDocumentRecordType(record.form_type) && document ? openDocument(document) : (isMedicalCopy ? undefined : openRecord(record));
+                    return <tr key={record.id} onDoubleClick={open}><td data-label="Record"><strong>{record.title}</strong><small>{typeLabel(record.form_type)}{isMedicalCopy ? '' : ` · rev ${record.revision}`}</small></td><td data-label="Status"><StatusBadge status={record.status} /></td><td data-label="Last saved">{stamp(record.last_autosaved_at)}</td><td data-label="Document">{document ? <Button appearance="subtle" icon={<Eye size={16} />} aria-label={`Open document for ${record.title}`} onClick={() => openDocument(document)}>{record.form_type === 'uploaded_file' ? 'Open file' : record.form_type === 'medical_inventory_request' ? 'Open PDF copy' : `PDF v${document.version_number}`}</Button> : (record.form_type === 'medical_inventory_request' ? 'Being prepared' : 'Not generated')}</td><td data-label="Open"><Button appearance="subtle" icon={<ChevronRight size={17} />} aria-label={`Open ${record.title}`} onClick={open} /></td></tr>;
                 })}
             </tbody></table></div>
         </section>

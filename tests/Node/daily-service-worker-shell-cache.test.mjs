@@ -510,6 +510,20 @@ test('only allowlisted read models are cached, and they are served offline; ever
   for (const path of denied) await assert.rejects(apiGet(worker, path), /offline/, `${path} must not be answered from a stored copy`);
 });
 
+test('EMS staff API reads always reach the network and are never stored in any cache', async () => {
+  const seen = [];
+  let network = (url, init) => { seen.push({ url, cache: init?.cache }); return json(url, { url }); };
+  const worker = loadWorker((url, init) => network(url, init));
+  const paths = ['/ems/api/requests', '/ems/api/requests/0b9f2c1e-7d3a-4f5b-9c8d-1a2b3c4d5e6f', '/ems/api/supply/items', '/ems/api/statistics'];
+
+  for (const path of paths) assert.equal((await apiGet(worker, path)).status, 200, path);
+  assert.ok(seen.length === paths.length && seen.every((entry) => entry.cache === 'no-store'), 'EMS reads never come from the HTTP cache');
+  assert.equal([...worker.stores.values()].some((store) => [...store.keys()].some((key) => String(key).includes('/ems/api/'))), false);
+
+  network = offline;
+  for (const path of paths) await assert.rejects(apiGet(worker, path), /offline/, `${path} must not be answered from a stored copy`);
+});
+
 test('an uncached read model with no network answers a JSON 503 instead of failing the page', async () => {
   const worker = loadWorker(offline);
   const response = await apiGet(worker, '/api/public/stations');

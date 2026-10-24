@@ -7,6 +7,7 @@ namespace App\Filament\Resources;
 use App\Enums\StationRequestStatus;
 use App\Enums\StationRequestType;
 use App\Filament\Concerns\EnterpriseTable;
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\StationRequestResource\Pages;
 use App\Filament\Support\ArchiveFilter;
 use App\Models\Station;
@@ -22,6 +23,7 @@ use Illuminate\Database\Eloquent\Model;
 class StationRequestResource extends Resource
 {
     use EnterpriseTable;
+    use HasExportActions;
 
     protected static ?string $model = StationRequest::class;
 
@@ -35,7 +37,7 @@ class StationRequestResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return self::applyEnterpriseDefaults($table)
+        return static::withExportActions(self::applyEnterpriseDefaults($table)
             ->columns([
                 Tables\Columns\TextColumn::make('request_number')
                     ->wrap()
@@ -132,7 +134,7 @@ class StationRequestResource extends Resource
                     ),
             ])
             ->defaultSort('created_at', 'desc')
-            ->actions([Tables\Actions\ViewAction::make()]);
+            ->actions([Tables\Actions\ViewAction::make()]));
     }
 
     public static function infolist(Infolist $infolist): Infolist

@@ -2,19 +2,18 @@
 
 namespace App\Filament\Workgroup\Exports;
 
+use App\Filament\Exports\SafeExporter;
 use App\Models\CandidateProduct;
-use App\Models\EvaluationCategory;
 use App\Models\EvaluationScore;
 use App\Models\EvaluationSubmission;
 use App\Models\WorkgroupSession;
 use Filament\Actions\Exports\ExportColumn;
-use Filament\Actions\Exports\Exporter;
 use Filament\Actions\Exports\Models\Export;
 
 /**
  * Exporter for finalists - top 2 products per rankable category.
  */
-class WorkgroupFinalistsExporter extends Exporter
+class WorkgroupFinalistsExporter extends SafeExporter
 {
     protected static ?string $model = CandidateProduct::class;
 
@@ -56,8 +55,8 @@ class WorkgroupFinalistsExporter extends Exporter
     protected function getPosition(CandidateProduct $record): string
     {
         $session = WorkgroupSession::active()->first();
-        
-        if (!$session) {
+
+        if (! $session) {
             return 'N/A';
         }
 
@@ -65,13 +64,12 @@ class WorkgroupFinalistsExporter extends Exporter
             ->where('category_id', $record->category_id)
             ->get()
             ->map(function ($product) {
-                $avgScore = EvaluationScore::whereHas('submission', fn($q) => 
-                    $q->where('candidate_product_id', $product->id)
-                        ->where('status', 'submitted')
+                $avgScore = EvaluationScore::whereHas('submission', fn ($q) => $q->where('candidate_product_id', $product->id)
+                    ->where('status', 'submitted')
                 )
-                ->join('evaluation_criteria', 'evaluation_scores.criterion_id', '=', 'evaluation_criteria.id')
-                ->selectRaw('COALESCE(AVG(evaluation_scores.score * evaluation_criteria.weight), 0) as weighted_avg')
-                ->value('weighted_avg');
+                    ->join('evaluation_criteria', 'evaluation_scores.criterion_id', '=', 'evaluation_criteria.id')
+                    ->selectRaw('COALESCE(AVG(evaluation_scores.score * evaluation_criteria.weight), 0) as weighted_avg')
+                    ->value('weighted_avg');
 
                 return [
                     'id' => $product->id,
@@ -81,7 +79,7 @@ class WorkgroupFinalistsExporter extends Exporter
             ->sortByDesc('score')
             ->values();
 
-        $position = $products->search(fn($p) => $p['id'] === $record->id) + 1;
+        $position = $products->search(fn ($p) => $p['id'] === $record->id) + 1;
 
         return match ($position) {
             1 => 'Gold Medalist',
@@ -92,13 +90,12 @@ class WorkgroupFinalistsExporter extends Exporter
 
     protected function calculateWeightedScore(CandidateProduct $record): float
     {
-        $avgScore = EvaluationScore::whereHas('submission', fn($q) => 
-            $q->where('candidate_product_id', $record->id)
-                ->where('status', 'submitted')
+        $avgScore = EvaluationScore::whereHas('submission', fn ($q) => $q->where('candidate_product_id', $record->id)
+            ->where('status', 'submitted')
         )
-        ->join('evaluation_criteria', 'evaluation_scores.criterion_id', '=', 'evaluation_criteria.id')
-        ->selectRaw('COALESCE(AVG(evaluation_scores.score * evaluation_criteria.weight), 0) as weighted_avg')
-        ->value('weighted_avg');
+            ->join('evaluation_criteria', 'evaluation_scores.criterion_id', '=', 'evaluation_criteria.id')
+            ->selectRaw('COALESCE(AVG(evaluation_scores.score * evaluation_criteria.weight), 0) as weighted_avg')
+            ->value('weighted_avg');
 
         return round($avgScore ?? 0, 2);
     }
@@ -112,10 +109,10 @@ class WorkgroupFinalistsExporter extends Exporter
 
     public static function getCompletedNotificationBody(Export $export): string
     {
-        $body = 'Finalists export completed. ' . number_format($export->successful_rows) . ' finalists exported.';
+        $body = 'Finalists export completed. '.number_format($export->successful_rows).' finalists exported.';
 
         if ($failedRowsCount = $export->getFailedRowsCount()) {
-            $body .= ' ' . number_format($failedRowsCount) . ' rows failed to export.';
+            $body .= ' '.number_format($failedRowsCount).' rows failed to export.';
         }
 
         return $body;
@@ -127,15 +124,14 @@ class WorkgroupFinalistsExporter extends Exporter
     public static function getBaseQuery(): \Illuminate\Database\Eloquent\Builder
     {
         $session = WorkgroupSession::active()->first();
-        
-        if (!$session) {
+
+        if (! $session) {
             return CandidateProduct::query()->whereRaw('1 = 0');
         }
 
         return CandidateProduct::query()
             ->where('workgroup_session_id', $session->id)
-            ->whereHas('category', fn($q) => 
-                $q->where('is_rankable', true)
+            ->whereHas('category', fn ($q) => $q->where('is_rankable', true)
             )
             ->with(['category', 'session']);
     }

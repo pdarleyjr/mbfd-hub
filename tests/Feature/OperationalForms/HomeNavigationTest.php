@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Tests\Feature\OperationalForms;
 
+use App\Enums\AccountStatus;
 use App\Models\DepartmentUpdate;
+use App\Models\User;
 use App\Support\HubShellNavigation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Permission;
@@ -30,11 +32,38 @@ class HomeNavigationTest extends TestCase
             ->assertSee('src="/images/mbfd-official-seal-256.png"', false)
             ->assertSee('<span>Hub</span>', false)
             ->assertSee('hub-checkout-icon', false)
-            ->assertSee('Stations')
-            ->assertSee('href="'.url('/daily/stations').'"', false)
+            ->assertSee('Vehicle Checkout')
+            ->assertSee('href="'.url('/daily/vehicle-inspections').'"', false)
             ->assertDontSee('Start Daily Checkout')
-            ->assertSee('ICS Forms')
-            ->assertSee('href="'.url('/employee/forms').'"', false);
+            ->assertDontSee('ICS Forms')
+            ->assertDontSee('href="'.url('/employee/forms').'"', false);
+    }
+
+    public function test_vehicle_checkout_button_replaces_stations_and_points_at_vehicle_selection(): void
+    {
+        $this->withoutVite();
+        $this->actingAsCanonicalFixture();
+
+        $response = $this->get('/')->assertOk();
+        $buttons = $this->xpath($response->getContent())
+            ->query('//section[contains(@class,"home-today")]//a[contains(@class,"hub-btn--primary")]');
+
+        self::assertSame(1, $buttons->length);
+        self::assertSame(url('/daily/vehicle-inspections'), $buttons->item(0)->getAttribute('href'));
+        self::assertSame('Vehicle Checkout', trim(preg_replace('/\s+/', ' ', $buttons->item(0)->textContent)));
+        self::assertStringContainsString('hub-btn--field', $buttons->item(0)->getAttribute('class'));
+        self::assertTrue($buttons->item(0)->hasAttribute('data-important-target'));
+    }
+
+    public function test_vehicle_checkout_button_keeps_its_employee_portal_visibility_rule(): void
+    {
+        $this->withoutVite();
+        $this->actingAs(User::factory()->create(['account_status' => AccountStatus::Active]));
+
+        $content = $this->get('/')->assertOk()->getContent();
+
+        self::assertSame(0, $this->xpath($content)->query('//section[contains(@class,"home-today")]//a[contains(@class,"hub-btn--primary")]')->length);
+        self::assertStringNotContainsString('Vehicle Checkout', $content);
     }
 
     public function test_meeting_launch_requires_current_access_and_verified_consumer_configuration(): void
@@ -57,6 +86,8 @@ class HomeNavigationTest extends TestCase
         $user->givePermissionTo([
             Permission::findOrCreate('app.media_control.access', 'web'),
             Permission::findOrCreate('admin.workgroups.view', 'web'),
+            Permission::findOrCreate('admin.access', 'web'),
+            Permission::findOrCreate('admin.fleet.manage', 'web'),
         ]);
         config(['services.media_control.authorization.service_token' => 'test-media-control-token']);
 
@@ -69,9 +100,9 @@ class HomeNavigationTest extends TestCase
         $response->assertSee('Quick Access');
         $response->assertSeeInOrder([
             'Station / Vehicles / Equipment',
-            'Take Home Vehicle Inspection',
             'Employee Portal',
-            'ICS Forms',
+            'Additional Links',
+            'Fleet operations',
             'Workgroup Dashboard',
             'Pump Panel',
             'Videos',
@@ -79,7 +110,6 @@ class HomeNavigationTest extends TestCase
         ]);
         $response->assertSee('Station forms, Vehicle Checkouts, Video Conferencing');
         $response->assertSee('View assigned gear, track requests, and request approved uniform items');
-        $response->assertSee('ICS 214 &amp; F-ROC reports', false);
         $response->assertSee('Evaluations &amp; reviews', false);
         $response->assertSee('Training simulator');
         $response->assertSee('Training videos, support services content, and live media');
@@ -87,9 +117,8 @@ class HomeNavigationTest extends TestCase
 
         foreach ([
             url('/daily/stations'),
-            route('take-home-inspections.index'),
             url('/employee'),
-            url('/employee/forms'),
+            url('/admin/apparatuses'),
             url('/workgroups'),
             'https://pdarleyjr.github.io/puc-sim-manual-ui/',
             'https://videos.mbfdhub.com',
@@ -97,6 +126,13 @@ class HomeNavigationTest extends TestCase
         ] as $destination) {
             $response->assertSee('href="'.$destination.'"', false);
         }
+
+        // The retired cards are gone from Home; their apps and routes still exist.
+        foreach (['ICS Forms', 'ICS 214 &amp; F-ROC reports', 'Take Home Vehicle Inspection', 'Complete a take-home vehicle inspection.'] as $removed) {
+            $response->assertDontSee($removed, false);
+        }
+        $response->assertDontSee('href="'.route('take-home-inspections.index').'"', false);
+        $response->assertDontSee('href="'.url('/employee/forms').'"', false);
 
         $response->assertDontSee('/workgroups/login', false);
         $response->assertDontSee('MBFD Support Assistant');
@@ -206,8 +242,123 @@ class HomeNavigationTest extends TestCase
         $response->assertDontSee('https://media.mbfdhub.com/api/auth/hub/start', false);
     }
 
+    public function test_additional_links_is_one_collapsed_native_disclosure_with_the_five_items_in_order(): void
+    {
+        $this->withoutVite();
+        $user = $this->actingAsCanonicalFixture();
+        $user->assignRole(Role::findOrCreate('admin', 'web'));
+        $user->givePermissionTo([
+            Permission::findOrCreate('app.media_control.access', 'web'),
+            Permission::findOrCreate('admin.workgroups.view', 'web'),
+            Permission::findOrCreate('admin.access', 'web'),
+            Permission::findOrCreate('admin.fleet.manage', 'web'),
+        ]);
+        config(['services.media_control.authorization.service_token' => 'test-media-control-token']);
+
+        $xpath = $this->xpath($this->get('/')->assertOk()->getContent());
+
+        $cards = $xpath->query('//details[@data-additional-links]');
+        self::assertSame(1, $cards->length, 'exactly one Additional Links card');
+        $card = $cards->item(0);
+        self::assertFalse($card->hasAttribute('open'), 'collapsed by default');
+        self::assertSame(1, $xpath->query('.//summary', $card)->length);
+        self::assertSame('Additional Links', trim($xpath->query('.//summary//*[contains(@class,"hub-tile__title")]', $card)->item(0)->textContent));
+        self::assertSame(1, $xpath->query('ancestor::aside[@data-home-column="rail"]', $card)->length);
+
+        $links = $xpath->query('.//a[@data-additional-link]', $card);
+        $actual = [];
+        foreach ($links as $link) {
+            $actual[] = [
+                trim($xpath->query('.//*[contains(@class,"hub-tile__title")]', $link)->item(0)->textContent),
+                $link->getAttribute('href'),
+                $link->getAttribute('target'),
+                $link->getAttribute('rel'),
+            ];
+        }
+        self::assertSame([
+            ['Fleet operations', url('/admin/apparatuses'), '', ''],
+            ['Workgroup Dashboard', url('/workgroups'), '', ''],
+            ['Pump Panel', 'https://pdarleyjr.github.io/puc-sim-manual-ui/', '_blank', 'noopener noreferrer'],
+            ['Videos', 'https://videos.mbfdhub.com', '_blank', 'noopener noreferrer'],
+            ['Media Control', 'https://media.mbfdhub.com/api/auth/hub/start', '_blank', 'noopener noreferrer'],
+        ], $actual);
+
+        // External links keep the new-tab announcement; internal links do not.
+        self::assertStringContainsString('(opens in a new tab)', $xpath->query('(.//a[@data-additional-link])[3]', $card)->item(0)->textContent);
+        self::assertStringNotContainsString('(opens in a new tab)', $xpath->query('(.//a[@data-additional-link])[1]', $card)->item(0)->textContent);
+
+        // The five are not repeated as standalone cards.
+        $standalone = $xpath->query('//a[@data-quick-access-card]');
+        self::assertSame(['Station / Vehicles / Equipment', 'Employee Portal'], array_map(
+            fn (\DOMNode $node): string => trim($xpath->query('.//*[contains(@class,"hub-tile__title")]', $node)->item(0)->textContent),
+            iterator_to_array($standalone),
+        ));
+    }
+
+    public function test_additional_links_hides_unentitled_items_from_the_markup(): void
+    {
+        $this->withoutVite();
+        $this->actingAsCanonicalFixture();
+
+        $response = $this->get('/')->assertOk();
+        $xpath = $this->xpath($response->getContent());
+
+        $titles = [];
+        foreach ($xpath->query('//details[@data-additional-links]//a[@data-additional-link]') as $link) {
+            $titles[] = trim($xpath->query('.//*[contains(@class,"hub-tile__title")]', $link)->item(0)->textContent);
+        }
+        self::assertSame(['Pump Panel', 'Videos'], $titles);
+
+        $response->assertDontSee('Fleet operations');
+        $response->assertDontSee('/admin/apparatuses', false);
+        $response->assertDontSee('Workgroup Dashboard');
+        $response->assertDontSee('href="'.url('/workgroups').'"', false);
+        $response->assertDontSee('Media Control');
+        $response->assertDontSee('https://media.mbfdhub.com/api/auth/hub/start', false);
+    }
+
+    public function test_profile_less_account_keeps_a_path_to_the_take_home_inspection(): void
+    {
+        $this->withoutVite();
+        $this->actingAs(User::factory()->create(['account_status' => AccountStatus::Active]));
+        $inspection = route('take-home-inspections.index');
+
+        $response = $this->get('/')->assertOk()
+            ->assertDontSee('Vehicle Checkout')
+            ->assertDontSee('Take Home Vehicle Inspection')
+            ->assertSee('Take Home Inspection')
+            ->assertSee('href="'.$inspection.'"', false);
+
+        $xpath = $this->xpath($response->getContent());
+        self::assertSame(1, $xpath->query('//a[@data-quick-access-card and @href="'.$inspection.'"]')->length);
+        self::assertSame(0, $xpath->query('//a[@href="'.url('/employee/forms').'"]')->length);
+    }
+
+    public function test_profile_less_shell_navigation_lists_the_inspection_and_members_do_not(): void
+    {
+        $profileLess = User::factory()->create(['account_status' => AccountStatus::Active]);
+        $more = HubShellNavigation::forUser($profileLess, [])['moreNavigation'];
+        self::assertSame(['updates', 'support', 'take-home-inspection'], array_column($more, 'key'));
+        self::assertSame(
+            ['key' => 'take-home-inspection', 'label' => 'Take Home Inspection', 'href' => route('take-home-inspections.index', absolute: false)],
+            $more[2],
+        );
+
+        $member = $this->actingAsCanonicalFixture();
+        self::assertSame(['updates', 'support'], array_column(HubShellNavigation::forUser($member, [])['moreNavigation'], 'key'));
+        self::assertSame([], HubShellNavigation::forUser(null)['moreNavigation']);
+    }
+
     public function test_anonymous_home_requires_canonical_login(): void
     {
         $this->get('/')->assertRedirect('/login');
+    }
+
+    private function xpath(string $html): \DOMXPath
+    {
+        $document = new \DOMDocument;
+        @$document->loadHTML($html);
+
+        return new \DOMXPath($document);
     }
 }

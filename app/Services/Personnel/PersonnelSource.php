@@ -6,8 +6,11 @@ namespace App\Services\Personnel;
 
 use App\Models\Employee;
 use App\Models\EmployeeBidAssignment;
+use App\Models\PromotionalList;
+use App\Services\Personnel\Promotions\PromotionalDirectory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 final class PersonnelSource
@@ -20,6 +23,11 @@ final class PersonnelSource
         'bid_term' => 'term_label', 'assignment_source' => 'assignment_source',
     ];
 
+    /** Filter criteria for promotional lists; list types come from config/promotional_lists.php. */
+    public const PROMOTIONAL_CRITERIA = ['promotional_list_type', 'promotional_on_list'];
+
+    private ?PromotionalDirectory $promotions = null;
+
     /** @return array<string, string> */
     public function fields(): array
     {
@@ -31,6 +39,7 @@ final class PersonnelSource
             'email_match_status' => 'Email match status', 'bid_station' => 'Station (published bid)',
             'bid_term' => 'Published bid term', 'assignment_source' => 'Assignment source',
             'roster_status' => 'Employment status', 'phone' => 'Phone', 'display_name' => 'Display name',
+            ...PromotionalDirectory::FIELDS,
         ];
     }
 
@@ -42,8 +51,29 @@ final class PersonnelSource
             $query->selectSub($this->currentBid()->select($field)
                 ->whereColumn('employee_profile_id', 'employees.id')->limit(1), 'source_'.$key);
         }
+        // Sort keys for the promotional fields; display values come from PromotionalDirectory::lines().
+        foreach (array_keys(PromotionalDirectory::FIELDS) as $key) {
+            $query->selectSub(PromotionalDirectory::sortSubquery($key), 'source_'.$key);
+        }
 
         return $query;
+    }
+
+    /**
+     * Order a directory query by one source field. Published-bid and promotional fields sort on
+     * their sub-select; unranked members always sort last.
+     *
+     * @param  Builder<Employee>  $query
+     * @return Builder<Employee>
+     */
+    public function order(Builder $query, string $key, string $direction): Builder
+    {
+        $direction = $direction === 'desc' ? 'desc' : 'asc';
+        if (array_key_exists($key, PromotionalDirectory::FIELDS)) {
+            return $query->orderByRaw('source_'.$key.' '.$direction.' nulls last');
+        }
+
+        return $query->orderBy(isset(self::BID[$key]) ? 'source_'.$key : 'employees.'.$key, $direction);
     }
 
     /**
@@ -72,7 +102,13 @@ final class PersonnelSource
                     }));
             });
         }
-        foreach (array_diff(array_keys($criteria), ['active_only', 'search']) as $key) {
+        if ($criteria['promotional_on_list'] ?? false) {
+            $query->whereIn('employees.id', PromotionalDirectory::employeeIds(eligibleOnly: true));
+        }
+        if (! empty($criteria['promotional_list_type'])) {
+            $query->whereIn('employees.id', PromotionalDirectory::employeeIds(array_values((array) $criteria['promotional_list_type'])));
+        }
+        foreach (array_diff(array_keys($criteria), ['active_only', 'search'], self::PROMOTIONAL_CRITERIA) as $key) {
             $values = is_array($criteria[$key]) ? $criteria[$key] : [$criteria[$key]];
             if ($values === [] || $values === [''] || $values === [null]) {
                 continue;
@@ -89,12 +125,17 @@ final class PersonnelSource
 
     public function validateCriteria(array $criteria): array
     {
-        $allowed = [...self::PROFILE, ...array_keys(self::BID), 'search', 'active_only'];
+        $allowed = [...self::PROFILE, ...array_keys(self::BID), ...self::PROMOTIONAL_CRITERIA, 'search', 'active_only'];
         if (array_diff(array_keys($criteria), $allowed) !== []) {
             throw ValidationException::withMessages(['criteria' => 'Choose a supported personnel filter.']);
         }
-        Validator::make($criteria, ['search' => ['sometimes', 'nullable', 'string', 'max:150'], 'active_only' => ['sometimes', 'boolean']])->validate();
-        foreach (array_diff(array_keys($criteria), ['active_only', 'search']) as $key) {
+        Validator::make($criteria, [
+            'search' => ['sometimes', 'nullable', 'string', 'max:150'], 'active_only' => ['sometimes', 'boolean'],
+            'promotional_on_list' => ['sometimes', 'boolean'],
+            'promotional_list_type' => ['sometimes', 'array', 'max:30'],
+            'promotional_list_type.*' => ['string', Rule::in(array_keys(PromotionalList::types()))],
+        ])->validate();
+        foreach (array_diff(array_keys($criteria), ['active_only', 'search'], self::PROMOTIONAL_CRITERIA) as $key) {
             Validator::make(['values' => is_array($criteria[$key]) ? $criteria[$key] : [$criteria[$key]]], [
                 'values' => ['array', 'max:30'], 'values.*' => ['nullable', 'string', 'max:255'],
             ])->validate();
@@ -111,8 +152,21 @@ final class PersonnelSource
         if ($key === 'email_match_status') {
             return null; // Private reconciliation metadata is resolved by its authorized reader.
         }
+        if (array_key_exists($key, PromotionalDirectory::FIELDS)) {
+            return implode('; ', $this->promotionalLines($employee, $key)) ?: null;
+        }
 
         return $employee->getAttribute(isset(self::BID[$key]) ? 'source_'.$key : $key);
+    }
+
+    /**
+     * One display line per promotional list in effect (newest first); empty when the member is on none.
+     *
+     * @return list<string>
+     */
+    public function promotionalLines(Employee $employee, string $key): array
+    {
+        return ($this->promotions ??= new PromotionalDirectory)->lines($employee, $key);
     }
 
     /** @return Builder<EmployeeBidAssignment> */

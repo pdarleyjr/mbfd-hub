@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Concerns\EnterpriseTable;
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\EmployeeEquipmentRequestResource\Pages;
 use App\Models\Employee;
 use App\Models\EmployeeEquipmentRequest;
@@ -20,6 +21,7 @@ use Filament\Tables\Table;
 class EmployeeEquipmentRequestResource extends Resource
 {
     use EnterpriseTable;
+    use HasExportActions;
 
     public static function shouldRegisterNavigation(): bool
     {
@@ -62,7 +64,7 @@ class EmployeeEquipmentRequestResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return self::applyEnterpriseDefaults($table)
+        return static::withExportActions(self::applyEnterpriseDefaults($table)
             ->columns([
                 TextColumn::make('employee.name')
                     ->label('Employee')
@@ -169,7 +171,7 @@ class EmployeeEquipmentRequestResource extends Resource
                     ->hidden(fn ($record) => ! $record->is_archived)
                     ->action(fn ($record) => $record->update(['status' => 'Pending', 'is_archived' => false, 'reason' => null])),
             ])
-            ->bulkActions([]);
+            ->bulkActions([]));
     }
 
     public static function getPages(): array

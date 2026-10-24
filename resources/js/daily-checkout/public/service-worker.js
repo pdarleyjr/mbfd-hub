@@ -563,7 +563,10 @@ self.addEventListener('fetch', (event) => {
 
   // Identity and member-specific follow-ups must always be authorized live.
   // Only the allowlisted station/apparatus read models may use the API cache.
-  if (isSameOrigin && url.pathname.startsWith('/api/') && !isOfflineReadModelRequest) {
+  // /ems/api/* (Captain 5 Rescue Inventory and Supply Room) carries member names, messages
+  // and stock, so it is never stored either.
+  const isLiveApiPath = url.pathname.startsWith('/api/') || url.pathname.startsWith('/ems/api/');
+  if (isSameOrigin && isLiveApiPath && !isOfflineReadModelRequest) {
     event.respondWith(fetch(request, { cache: 'no-store' }));
     return;
   }

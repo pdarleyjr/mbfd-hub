@@ -50,15 +50,13 @@ async function action(page: Page, name: string) {
     return dialog;
 }
 
-test('homepage card preserves the signed-in inspection route and responsive directory remains usable', async ({ page }, info) => {
+test('the signed-in inspection route survives the Home cleanup and responsive directory remains usable', async ({ page }, info) => {
     await login(page);
     await page.goto('/');
-    const card = page.locator('[data-quick-access-card]').filter({ hasText: 'Take Home Vehicle Inspection' });
-    await expect(card).toBeVisible();
-    await expect(card).toContainText('Complete a take-home vehicle inspection.');
+    await expect(page.locator('[data-quick-access-card]').filter({ hasText: 'Take Home Vehicle Inspection' })).toHaveCount(0);
     await expect(page.locator('footer')).not.toContainText('Take Home Vehicle Inspection');
     await expect(page.locator('footer')).toContainText('Security & Standards');
-    await card.click();
+    await page.goto('/take-home-vehicle-inspections');
     await expect(page).toHaveURL(/\/take-home-vehicle-inspections$/);
     await expect(page.getByRole('link', { name: 'New inspection', exact: true })).toBeVisible();
     await page.getByRole('link', { name: 'New inspection', exact: true }).click();

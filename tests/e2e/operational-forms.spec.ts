@@ -47,18 +47,25 @@ test('entitled home exposes the exact unified Quick Access destinations', async 
   await expect(page.getByRole('heading', { name: 'Quick Access' })).toBeVisible();
 
   const cards = page.locator('[data-quick-access-card]');
-  await expect(cards).toHaveCount(7);
+  await expect(cards).toHaveCount(3);
   await expect(cards).toHaveText([
     /Station \/ Vehicles \/ Equipment/,
     /Employee Portal/,
-    /ICS Forms/,
+    /Additional Links/,
+  ]);
+  await expect(page.getByRole('link', { name: /ICS Forms/i })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /Take Home Vehicle Inspection/i })).toHaveCount(0);
+  const additional = page.locator('[data-additional-links]');
+  await expect(additional).not.toHaveAttribute('open', '');
+  await additional.locator('summary').click();
+  await expect(additional.locator('[data-additional-link]')).toHaveText([
+    /Fleet operations/,
     /Workgroup Dashboard/,
     /Pump Panel/,
     /Videos/,
     /Media Control/,
   ]);
   await expect(page.getByRole('link', { name: /Station \/ Vehicles \/ Equipment/i })).toHaveAttribute('href', /\/daily\/stations$/);
-  await expect(page.getByRole('link', { name: /ICS Forms/i })).toHaveAttribute('href', /\/employee\/forms$/);
   await expect(page.getByRole('link', { name: /Workgroup Dashboard/i })).toHaveAttribute('href', /\/workgroups$/);
   await expect(page.getByRole('link', { name: /Pump Panel/i })).toHaveAttribute('href', 'https://pdarleyjr.github.io/puc-sim-manual-ui/');
   await expect(page.getByRole('link', { name: /Videos/i })).toHaveAttribute('href', 'https://videos.mbfdhub.com');
@@ -72,6 +79,7 @@ test('authorized user enters Workgroups without a second login', async ({ page }
 
   await page.goto('/');
   await login(page, adminEmployeeId, adminPassword);
+  await page.locator('[data-additional-links] summary').click();
   await page.getByRole('link', { name: /Workgroup Dashboard/i }).click();
   await expect(page).toHaveURL(/\/workgroups(?:\/dashboard)?\/?$/, { timeout: 30_000 });
   await expect(page).not.toHaveURL(/\/login/);

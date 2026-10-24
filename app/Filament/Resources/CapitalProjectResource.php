@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Enums\ProjectPriority;
 use App\Enums\ProjectStatus;
 use App\Filament\Concerns\EnterpriseTable;
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\CapitalProjectResource\Pages;
 use App\Filament\Resources\CapitalProjectResource\RelationManagers;
 use App\Models\CapitalProject;
@@ -20,6 +21,7 @@ use Illuminate\Database\Eloquent\Builder;
 class CapitalProjectResource extends Resource
 {
     use EnterpriseTable;
+    use HasExportActions;
 
     protected static ?string $model = CapitalProject::class;
 
@@ -137,7 +139,7 @@ class CapitalProjectResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return self::applyEnterpriseDefaults($table)
+        return static::withExportActions(self::applyEnterpriseDefaults($table)
             ->modifyQueryUsing(fn (Builder $query): Builder => CapitalProject::withMilestoneProgress($query))
             ->columns([
                 Tables\Columns\TextColumn::make('project_number')
@@ -213,7 +215,7 @@ class CapitalProjectResource extends Resource
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
-            ]);
+            ]));
     }
 
     public static function infolist(Infolist $infolist): Infolist

@@ -145,12 +145,6 @@ parameters:
 			path: app/Filament/Admin/Pages/TrtTrailerInventory.php
 
 		-
-			message: '#^Trait App\\Filament\\Concerns\\HasExportActions is used zero times and is not analysed\.$#'
-			identifier: trait.unused
-			count: 1
-			path: app/Filament/Concerns/HasExportActions.php
-
-		-
 			message: '#^Access to an undefined property App\\Filament\\Pages\\NotificationSettings\:\:\$form\.$#'
 			identifier: property.notFound
 			count: 2
@@ -477,12 +471,6 @@ parameters:
 
 		-
 			message: '#^Relation ''apparatus'' is not found in App\\Models\\ApparatusDefect model\.$#'
-			identifier: larastan.relationExistence
-			count: 1
-			path: app/Filament/Widgets/SmartUpdatesWidget.php
-
-		-
-			message: '#^Relation ''apparatus'' is not found in App\\Models\\ShopWork model\.$#'
 			identifier: larastan.relationExistence
 			count: 1
 			path: app/Filament/Widgets/SmartUpdatesWidget.php
@@ -2374,12 +2362,6 @@ parameters:
 
 		-
 			message: '#^Relation ''apparatus'' is not found in App\\Models\\ApparatusDefect model\.$#'
-			identifier: larastan.relationExistence
-			count: 1
-			path: app/Services/CommandCenterAiService.php
-
-		-
-			message: '#^Relation ''apparatus'' is not found in App\\Models\\ShopWork model\.$#'
 			identifier: larastan.relationExistence
 			count: 1
 			path: app/Services/CommandCenterAiService.php

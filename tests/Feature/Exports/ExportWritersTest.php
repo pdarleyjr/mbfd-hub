@@ -1,0 +1,218 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Tests\Feature\Exports;
+
+use App\Services\Exports\ExportCell;
+use App\Services\Exports\ExportDataset;
+use App\Services\Exports\PdfExportWriter;
+use App\Services\Exports\TableExportService;
+use App\Services\Exports\XlsxExportWriter;
+use Carbon\CarbonImmutable;
+use PhpOffice\PhpSpreadsheet\Cell\DataType;
+use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Shared\Date;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use Tests\TestCase;
+
+final class ExportWritersTest extends TestCase
+{
+    private function load(string $bytes): Spreadsheet
+    {
+        $path = tempnam(sys_get_temp_dir(), 'mbfd-writer-');
+        file_put_contents($path, $bytes);
+        try {
+            return IOFactory::load($path);
+        } finally {
+            @unlink($path);
+        }
+    }
+
+    /** @param  list<list<ExportCell>>  $rows
+     * @param  list<string>  $headers */
+    private function dataset(array $headers, array $rows, string $title = 'Service Tickets'): ExportDataset
+    {
+        return new ExportDataset(
+            title: $title,
+            headers: $headers,
+            rows: $rows,
+            generatedAt: CarbonImmutable::parse('2026-10-23 21:30:00', 'America/New_York'),
+            generatedBy: 'Test Officer',
+            scopeLabel: 'Current view (filters, search and sort applied)',
+            filterSummary: ['Status: Open', 'Search: "pump"'],
+            sortSummary: 'Created (descending)',
+        );
+    }
+
+    public function test_xlsx_cells_are_typed_and_text_is_formula_safe(): void
+    {
+        $instant = CarbonImmutable::parse('2026-01-15 03:30:00', 'UTC'); // 10:30 PM on Jan 14 in New York
+        $book = $this->load((new XlsxExportWriter)->write($this->dataset(
+            ['Unit', 'Miles', 'Service date', 'Opened', 'Note', 'Blank', 'Evil header', 'Count text'],
+            [[
+                ExportCell::text('Engine 1'),
+                ExportCell::number(14250),
+                ExportCell::date(CarbonImmutable::parse('2026-03-05')),
+                ExportCell::dateTime($instant),
+                ExportCell::text('=HYPERLINK("http://example.test","x")'),
+                ExportCell::blank(),
+                ExportCell::text("\u{FF1D}1+1"),
+                ExportCell::text('00123'),
+            ]],
+        )));
+        $sheet = $book->getSheet(0);
+
+        self::assertSame('Service Tickets', $sheet->getTitle());
+        self::assertSame(DataType::TYPE_STRING, $sheet->getCell('A2')->getDataType());
+        self::assertSame(DataType::TYPE_NUMERIC, $sheet->getCell('B2')->getDataType());
+        self::assertSame(14250, (int) $sheet->getCell('B2')->getValue());
+
+        // Dates are real Excel dates; the instant is shown as New York wall-clock time.
+        self::assertSame(DataType::TYPE_NUMERIC, $sheet->getCell('C2')->getDataType());
+        self::assertSame('yyyy-mm-dd', $sheet->getStyle('C2')->getNumberFormat()->getFormatCode());
+        self::assertSame('2026-03-05', Date::excelToDateTimeObject($sheet->getCell('C2')->getValue())->format('Y-m-d'));
+        self::assertSame('yyyy-mm-dd hh:mm', $sheet->getStyle('D2')->getNumberFormat()->getFormatCode());
+        self::assertSame('2026-01-14 22:30', Date::excelToDateTimeObject($sheet->getCell('D2')->getValue())->format('Y-m-d H:i'));
+
+        // Text that looks like a formula is stored as an explicit string with a leading apostrophe.
+        self::assertSame(DataType::TYPE_STRING, $sheet->getCell('E2')->getDataType());
+        self::assertSame('\'=HYPERLINK("http://example.test","x")', $sheet->getCell('E2')->getValue());
+        self::assertSame("'\u{FF1D}1+1", $sheet->getCell('G2')->getValue());
+        self::assertNull($sheet->getCell('F2')->getValue());
+
+        // Leading zeros survive because identifiers stay text.
+        self::assertSame(DataType::TYPE_STRING, $sheet->getCell('H2')->getDataType());
+        self::assertSame('00123', $sheet->getCell('H2')->getValue());
+    }
+
+    public function test_xlsx_has_frozen_header_autofilter_and_about_sheet(): void
+    {
+        $book = $this->load((new XlsxExportWriter)->write($this->dataset(
+            ['Unit', 'Status'],
+            [[ExportCell::text('E1'), ExportCell::text('Open')], [ExportCell::text('E2'), ExportCell::text('Closed')]],
+        )));
+        $sheet = $book->getSheet(0);
+
+        self::assertSame('A2', $sheet->getFreezePane());
+        self::assertSame('A1:B3', $sheet->getAutoFilter()->getRange());
+        self::assertTrue($sheet->getStyle('A1')->getFont()->getBold());
+        self::assertGreaterThanOrEqual(10, $sheet->getColumnDimension('A')->getWidth());
+
+        $about = $book->getSheetByName('About this export');
+        self::assertNotNull($about);
+        $facts = [];
+        foreach ($about->toArray() as [$label, $value]) {
+            $facts[$label] = $value;
+        }
+        self::assertSame('Service Tickets', $facts['Title']);
+        self::assertSame('Test Officer', $facts['Generated by']);
+        self::assertSame('Current view (filters, search and sort applied)', $facts['Scope']);
+        self::assertSame('Status: Open; Search: "pump"', $facts['Filters and search']);
+        self::assertSame('Created (descending)', $facts['Sort']);
+        self::assertSame('2', $facts['Row count']);
+        self::assertStringContainsString('Oct 23, 2026 9:30 PM', $facts['Generated']);
+    }
+
+    public function test_xlsx_sheet_title_drops_characters_excel_rejects(): void
+    {
+        $book = $this->load((new XlsxExportWriter)->write($this->dataset(['A'], [], 'Stations / Units: [North]? 0123456789012345')));
+
+        self::assertSame('Stations Units North 0123456789', $book->getSheet(0)->getTitle());
+    }
+
+    public function test_empty_export_still_produces_a_valid_workbook_with_headers(): void
+    {
+        $book = $this->load((new XlsxExportWriter)->write($this->dataset(['Unit', 'Status'], [])));
+
+        self::assertSame('Unit', $book->getSheet(0)->getCell('A1')->getValue());
+        self::assertSame('A1:B1', $book->getSheet(0)->getAutoFilter()->getRange());
+    }
+
+    public function test_pdf_repeats_the_header_row_wraps_cells_and_escapes_html(): void
+    {
+        $writer = new PdfExportWriter;
+        $dataset = $this->dataset(['Unit', 'Status'], [[ExportCell::text('<script>alert(1)</script>'), ExportCell::text('Open')]]);
+        $html = $writer->html($dataset);
+
+        self::assertSame('table', $writer->layoutFor($dataset));
+        self::assertStringContainsString('table-header-group', $html);
+        self::assertMatchesRegularExpression('/<thead>\s*<tr>.*<th[^>]*>Unit<\/th>.*<\/thead>/s', $html);
+        self::assertStringContainsString('page-break-inside: avoid', $html);
+        self::assertStringContainsString('overflow-wrap: break-word', $html);
+        self::assertStringContainsString('pt;', $html);
+        self::assertStringNotContainsString('<script>alert(1)</script>', $html);
+        self::assertStringContainsString('&lt;script&gt;', $html);
+        self::assertStringContainsString('Test Officer', $html);
+        self::assertStringContainsString('Status: Open; Search: &quot;pump&quot;', $html);
+    }
+
+    public function test_pdf_with_many_columns_uses_one_block_per_record(): void
+    {
+        $headers = array_map(static fn (int $index): string => 'Column '.$index, range(1, PdfExportWriter::MAX_TABLE_COLUMNS + 1));
+        $row = array_map(static fn (string $header): ExportCell => ExportCell::text('Value for '.$header), $headers);
+        $writer = new PdfExportWriter;
+        $dataset = $this->dataset($headers, [$row, $row]);
+        $html = $writer->html($dataset);
+
+        self::assertSame('blocks', $writer->layoutFor($dataset));
+        self::assertStringContainsString('class="record"', $html);
+        self::assertStringNotContainsString('<table class="grid">', $html);
+        self::assertSame(2, substr_count($html, '<table class="record">'));
+        self::assertStringContainsString('each record is printed as its own block', $html);
+        self::assertStringStartsWith('%PDF', $writer->write($dataset));
+    }
+
+    public function test_pdf_output_spans_pages_for_long_tables(): void
+    {
+        $rows = [];
+        foreach (range(1, 220) as $index) {
+            $rows[] = [ExportCell::text('Unit '.$index), ExportCell::text(str_repeat('wrapped text ', 12)), ExportCell::number($index)];
+        }
+        $bytes = (new PdfExportWriter)->write($this->dataset(['Unit', 'Detail', 'Number'], $rows));
+
+        self::assertStringStartsWith('%PDF', $bytes);
+        $pages = preg_match_all('#/Type\s*/Page(?!s)#', $bytes);
+        self::assertGreaterThan(2, $pages);
+
+        // Every page carries "Page x of y" (footer text is drawn with a core font, so it is readable in the content streams).
+        $text = '';
+        preg_match_all('/stream\r?\n(.*?)\r?\nendstream/s', $bytes, $streams);
+        foreach ($streams[1] as $stream) {
+            $text .= (string) @gzuncompress($stream).$stream;
+        }
+        self::assertStringContainsString('Page 1 of '.$pages, $text);
+        self::assertStringContainsString('Page '.$pages.' of '.$pages, $text);
+    }
+
+    public function test_pdf_shortens_very_long_text_and_says_so(): void
+    {
+        $long = str_repeat('x', PdfExportWriter::MAX_CELL_CHARS + 400);
+        $html = (new PdfExportWriter)->html($this->dataset(['Note'], [[ExportCell::text($long)]]));
+
+        self::assertStringContainsString('[shortened]', $html);
+        self::assertStringContainsString('shortened in this PDF', $html);
+        self::assertStringNotContainsString($long, $html);
+    }
+
+    public function test_cells_keep_their_type_and_display_in_new_york_time(): void
+    {
+        self::assertSame('Jan 14, 2026 10:30 PM', ExportCell::dateTime(CarbonImmutable::parse('2026-01-15 03:30:00', 'UTC'))->display());
+        self::assertSame('Mar 5, 2026', ExportCell::date(CarbonImmutable::parse('2026-03-05 00:00:00', 'UTC'))->display());
+        self::assertSame(ExportCell::DATETIME, ExportCell::dateTime(CarbonImmutable::now())->kind);
+        self::assertSame('1,234.5', ExportCell::number(1234.5)->display());
+        self::assertSame('42', ExportCell::number(42)->display());
+        self::assertTrue(ExportCell::blank()->isBlank());
+        self::assertFalse(ExportCell::text('0')->isBlank());
+    }
+
+    public function test_filename_is_safe_and_dated_in_new_york(): void
+    {
+        $at = CarbonImmutable::parse('2026-10-24 02:30:00', 'UTC'); // still Oct 23 in New York
+
+        self::assertSame('MBFD - Service Tickets - 2026-10-23.xlsx', TableExportService::filename('Service Tickets', 'xlsx', $at));
+        self::assertSame('MBFD - Station Units - 2026-10-23.pdf', TableExportService::filename("Station/Units\\: *?\"<>|\x00", 'pdf', $at));
+        self::assertSame('MBFD - Export - 2026-10-23.xlsx', TableExportService::filename('///', 'xlsx', $at));
+        self::assertLessThanOrEqual(120, strlen(TableExportService::filename(str_repeat('Long title ', 40), 'xlsx', $at)));
+    }
+}

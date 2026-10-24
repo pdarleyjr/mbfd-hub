@@ -36,10 +36,12 @@ final class HubShellNavigation
                 $navigation['applications'][] = ['key' => $key, ...$application];
             }
         }
+        $canAccessEmployeePanel = false;
         foreach (['employee' => 'Employee', 'workgroups' => 'Workgroups', 'training' => 'Training'] as $key => $label) {
             if ($user->canAccessPanel(Filament::getPanel($key))) {
                 $navigation['applications'][] = ['key' => $key, 'label' => $label, 'href' => '/'.$key];
                 if ($key === 'employee') {
+                    $canAccessEmployeePanel = true;
                     $navigation['memberNavigation'] = [...$navigation['memberNavigation'],
                         ['key' => 'checkout', 'label' => 'Checkout', 'href' => '/daily/stations'],
                         ['key' => 'employee', 'label' => 'Employee', 'href' => '/employee'],
@@ -53,6 +55,15 @@ final class HubShellNavigation
             ['key' => 'updates', 'label' => 'Updates', 'href' => route('updates.index', absolute: false)],
             ['key' => 'support', 'label' => 'Support', 'href' => route('hub-support.index', absolute: false)],
         ];
+        // Members with an employee profile reach the inspection through Employee > Forms.
+        // Accounts without a profile cannot open that panel, so they keep a direct entry here.
+        if (! $canAccessEmployeePanel) {
+            $navigation['moreNavigation'][] = [
+                'key' => 'take-home-inspection',
+                'label' => 'Take Home Inspection',
+                'href' => route('take-home-inspections.index', absolute: false),
+            ];
+        }
 
         return $navigation;
     }

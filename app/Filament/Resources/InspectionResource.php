@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Concerns\EnterpriseTable;
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\InspectionResource\Pages;
 use App\Filament\Support\InspectionTestFilter;
 use App\Filament\Support\InspectionWorkspace;
@@ -25,6 +26,7 @@ class InspectionResource extends Resource
     protected static ?string $navigationGroup = 'Fleet';
 
     use EnterpriseTable;
+    use HasExportActions;
 
     protected static ?string $model = ApparatusInspection::class;
 
@@ -51,7 +53,7 @@ class InspectionResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return self::applyEnterpriseDefaults($table)
+        return static::withExportActions(self::applyEnterpriseDefaults($table)
             ->columns([
                 Tables\Columns\TextColumn::make('test_excluded_at')
                     ->label('Classification')
@@ -167,7 +169,7 @@ class InspectionResource extends Resource
             ->actions([
                 Tables\Actions\ViewAction::make(),
             ])
-            ->defaultSort('completed_at', 'desc');
+            ->defaultSort('completed_at', 'desc'));
     }
 
     public static function getRelations(): array

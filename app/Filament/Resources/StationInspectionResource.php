@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Concerns\EnterpriseTable;
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\StationInspectionResource\Pages;
 use App\Filament\Support\ArchiveFilter;
 use App\Models\StationInspection;
@@ -16,6 +17,7 @@ use Filament\Tables\Table;
 class StationInspectionResource extends Resource
 {
     use EnterpriseTable;
+    use HasExportActions;
 
     protected static ?string $model = StationInspection::class;
 
@@ -29,7 +31,7 @@ class StationInspectionResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return self::applyEnterpriseDefaults($table)
+        return static::withExportActions(self::applyEnterpriseDefaults($table)
             ->columns([
                 Tables\Columns\TextColumn::make('id')->label('ID')->sortable(),
                 Tables\Columns\TextColumn::make('station.station_number')
@@ -106,7 +108,7 @@ class StationInspectionResource extends Resource
                     ->requiresConfirmation()
                     ->visible(fn (StationInspection $record): bool => self::canEdit($record) && $record->isArchived())
                     ->action(fn (StationInspection $record) => app(OperationalEvidenceArchiveService::class)->restore($record, auth()->user())),
-            ]);
+            ]));
     }
 
     public static function infolist(Infolist $infolist): Infolist
