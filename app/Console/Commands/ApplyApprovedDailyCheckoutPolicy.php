@@ -16,7 +16,7 @@ final class ApplyApprovedDailyCheckoutPolicy extends Command
 {
     protected $signature = 'daily-checkout:apply-approved-policy
                             {--dry-run : Validate and report without mutation}
-                            {--verify : Fail unless all and only the 14 approved units are already configured; never mutates}
+                            {--verify : Fail unless the 14 approved units are configured and every other required unit is an In Service replacement for an approved unit that is Out of Service; never mutates}
                             {--confirm= : Must equal APPLY_APPROVED_FRONTLINE_DAILY_POLICY}';
 
     protected $description = 'Apply the owner-approved frontline Daily Checkout requirement and template mapping.';
@@ -49,19 +49,34 @@ final class ApplyApprovedDailyCheckoutPolicy extends Command
             return self::FAILURE;
         }
 
+        $approvedIds = is_array($result['approved_ids']) ? $result['approved_ids'] : [];
+        unset($result['approved_ids']);
+
         if ($verify) {
-            $requiredCount = Apparatus::query()
+            $required = Apparatus::query()
                 ->where('daily_checkout_requirement', 'required')
+                ->get(['id', 'unit_id', 'status']);
+            // Only the 14 approved units are required, except that a reserve unit put In Service to
+            // cover an approved unit that is Out of Service also needs its Daily Checkout. Replacement
+            // coverage is the only accepted extra: one In Service extra per approved unit out of service.
+            $additional = $required->reject(fn (Apparatus $apparatus): bool => in_array((int) $apparatus->getKey(), $approvedIds, true));
+            $replacementCapacity = $required
+                ->filter(fn (Apparatus $apparatus): bool => in_array((int) $apparatus->getKey(), $approvedIds, true)
+                    && $apparatus->getAttribute('status') === 'Out of Service')
                 ->count();
+            $additionalAreReplacements = $additional->every(fn (Apparatus $apparatus): bool => $apparatus->getAttribute('status') === 'In Service')
+                && $additional->count() <= $replacementCapacity;
             $verified = $result['updated'] === 0
                 && $result['created'] === 0
                 && $result['already_configured'] === 14
-                && $requiredCount === 14;
+                && $additionalAreReplacements;
             $result['status'] = $verified
                 ? 'VERIFIED_APPROVED_FRONTLINE_DAILY_POLICY'
                 : 'APPROVED_FRONTLINE_DAILY_POLICY_NOT_APPLIED';
             $result['verified'] = $verified;
-            $result['required_count'] = $requiredCount;
+            $result['required_count'] = $required->count();
+            $result['additional_required'] = $additional->map(fn (Apparatus $apparatus): string => (string) $apparatus->getAttribute('unit_id'))->values()->all();
+            $result['replacement_capacity'] = $replacementCapacity;
             $this->line(json_encode($result, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES));
 
             return $verified ? self::SUCCESS : self::FAILURE;
@@ -72,7 +87,7 @@ final class ApplyApprovedDailyCheckoutPolicy extends Command
         return self::SUCCESS;
     }
 
-    /** @return array<string, int|string|bool> */
+    /** @return array<string, int|string|bool|list<int>> */
     private function apply(bool $dryRun): array
     {
         /** @var list<array{unit_id: string, station: int, template: string}> $policy */
@@ -175,6 +190,11 @@ final class ApplyApprovedDailyCheckoutPolicy extends Command
             'already_configured' => $alreadyConfigured,
         ];
         Log::notice('daily_checkout_approved_policy_evaluated', $result);
+
+        $result['approved_ids'] = array_values(array_filter(array_map(
+            static fn (array $pair): ?int => $pair[1] instanceof Apparatus ? (int) $pair[1]->getKey() : null,
+            $targets,
+        )));
 
         return $result;
     }

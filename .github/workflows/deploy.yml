@@ -361,6 +361,7 @@ jobs:
           REMOTE
 
       - name: Enter maintenance mode and verify queue safety
+        id: enter-maintenance
         env:
           RELEASE_SHA: ${{ github.sha }}
         run: |
@@ -661,3 +662,29 @@ jobs:
           MARKER_SHA="$(ssh -F "$HUB_SSH_CONFIG" deploy-target 'docker exec -u sail mbfd-hub-laravel cat /var/www/html/storage/app/private/deploy-marker.json' | jq -er '.sha')"
           test "$MARKER_SHA" = "$RELEASE_SHA"
           test "$(curl --silent --show-error --max-time 15 --output /dev/null --write-out '%{http_code}' https://www.mbfdhub.com/deploy-marker.json)" = '404'
+
+      # A failure after maintenance mode was entered must not leave members on a 503 page. While the
+      # previous release is still the running container (activation never happened), bring it back up.
+      # If the candidate image is already running, a later gate failed on the new release: keep
+      # maintenance mode and fail loudly so the previous image is restored deliberately, not exposed.
+      - name: Recover service after a failed activation
+        if: ${{ failure() && steps.enter-maintenance.outcome != '' && steps.enter-maintenance.outcome != 'skipped' }}
+        env:
+          FINAL_IMAGE_DIGEST: ${{ inputs.final_image_digest }}
+        run: |
+          set -euo pipefail
+          ssh -F "$HUB_SSH_CONFIG" deploy-target "FINAL_IMAGE_DIGEST='$FINAL_IMAGE_DIGEST' PREVIOUS_PRODUCTION_SHA='${PREVIOUS_PRODUCTION_SHA:-unknown}' bash -s" <<'REMOTE'
+          set -euo pipefail
+          HUB_APP_CONTAINER=mbfd-hub-laravel
+          RUNNING_IMAGE="$(docker inspect --format '{{.Config.Image}}' "$HUB_APP_CONTAINER")"
+          case "$RUNNING_IMAGE" in
+            *"@$FINAL_IMAGE_DIGEST")
+              echo "The candidate image is running but a later gate failed; maintenance mode is kept. Restore the previous production image ($PREVIOUS_PRODUCTION_SHA) before bringing members back." >&2
+              exit 1
+              ;;
+          esac
+          docker exec -u sail "$HUB_APP_CONTAINER" php artisan up
+          test "$(docker exec "$HUB_APP_CONTAINER" curl -sS -o /dev/null -w '%{http_code}' http://localhost:8081/up)" = '200'
+          sudo -n rm -f -- /run/mbfd-maintenance/mbfd-hub.json
+          echo "Activation failed before the candidate went live; the previous release ($RUNNING_IMAGE) is serving members again."
+          REMOTE
