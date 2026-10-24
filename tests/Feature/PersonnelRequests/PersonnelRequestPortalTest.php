@@ -300,7 +300,8 @@ class PersonnelRequestPortalTest extends TestCase
         $this->actingAsCanonicalFixture();
         $this->get('/')
             ->assertOk()
-            ->assertSee('Stations')
+            ->assertSee('Vehicle Checkout')
+            ->assertSee('/daily/vehicle-inspections')
             ->assertSee('/daily/stations')
             ->assertSee('request approved uniform items')
             ->assertDontSee('submit equipment requests');
