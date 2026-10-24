@@ -215,6 +215,38 @@ final class NotificationSettingsPageTest extends TestCase
         $this->assertSame(0, $member->notificationSubscriptions()->count());
     }
 
+    public function test_an_ordinary_save_confirms_without_a_warning(): void
+    {
+        $member = $this->rosterMember();
+        $this->actingAs($member);
+
+        Livewire::test(NotificationSettings::class)
+            ->set('data.department_updates.webpush', false)
+            ->call('save')
+            ->assertNotified(
+                \Filament\Notifications\Notification::make()
+                    ->title('Notification preferences saved')
+                    ->success()
+                    ->body('Your alert choices are saved.'),
+            );
+    }
+
+    public function test_a_crafted_category_still_draws_the_warning(): void
+    {
+        $member = $this->rosterMember();
+        $this->actingAs($member);
+
+        Livewire::test(NotificationSettings::class)
+            ->set('data.station_requests', ['database' => true])
+            ->call('save')
+            ->assertNotified(
+                \Filament\Notifications\Notification::make()
+                    ->title('Notification preferences saved')
+                    ->warning()
+                    ->body('Some settings are not available to your account and were not saved.'),
+            );
+    }
+
     public function test_a_crafted_save_for_a_category_the_member_is_not_eligible_for_is_ignored(): void
     {
         $member = $this->rosterMember();
