@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\OperationalFormDeletionController;
 use App\Http\Controllers\Admin\OperationalFormDocumentController;
 use App\Http\Controllers\Admin\PersonnelRequestAttachmentController as AdminPersonnelRequestAttachmentController;
 use App\Http\Controllers\Admin\QueueStatusController;
+use App\Http\Controllers\Admin\ResourceDocumentVersionController as AdminResourceDocumentVersionController;
 use App\Http\Controllers\Admin\VideoConferenceHealthController;
 use App\Http\Controllers\Api\Bid\AuthorizationController as BidAuthorizationController;
 use App\Http\Controllers\Api\MediaControl\AuthorizationController as MediaControlAuthorizationController;
@@ -266,6 +267,17 @@ Route::prefix('employee/resources')
         Route::get('/{document}/download', [ResourceDocumentController::class, 'download'])
             ->whereUuid('document')
             ->name('download');
+    });
+
+// Admin > Resource Library: a superseded file of a document. Managers only; authorized in the controller.
+Route::prefix('admin/resource-library')
+    ->middleware(['auth:web', 'throttle:30,1'])
+    ->name('admin.resources.')
+    ->group(function (): void {
+        Route::get('/{document}/versions/{version}/download', [AdminResourceDocumentVersionController::class, 'download'])
+            ->whereUuid('document')
+            ->whereNumber('version')
+            ->name('versions.download');
     });
 
 // Photo attached to a Daily Checkout inventory correction (Logistics and the reporting member).
