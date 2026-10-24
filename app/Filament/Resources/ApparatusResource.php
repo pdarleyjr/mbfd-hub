@@ -130,7 +130,7 @@ class ApparatusResource extends Resource
                             ->maxLength(50)
                             ->disabled(fn (?Apparatus $record): bool => self::isLinked($record))
                             ->dehydrated(fn (?Apparatus $record): bool => ! self::isLinked($record))
-                            ->helperText(fn (?Apparatus $record): ?string => self::isLinked($record)
+                            ->helperText(fn (?Apparatus $record): string => self::isLinked($record)
                                 ? 'Set by the linked vehicle record. Use "Link vehicle record" to point this unit at a different vehicle.'
                                 : 'Links this unit to the Master Vehicle Inventory vehicle with the same number.'),
                         Forms\Components\TextInput::make('year')
@@ -187,7 +187,7 @@ class ApparatusResource extends Resource
                             ->numeric()
                             ->disabled()
                             ->dehydrated(false)
-                            ->visible(fn (?Apparatus $record): bool => filled($record?->mileage) && (float) $record->mileage > 0),
+                            ->visible(fn (?Apparatus $record): bool => (float) $record?->getAttribute('mileage') > 0),
                     ])
                     ->columns(4)
                     ->collapsible()
@@ -202,7 +202,7 @@ class ApparatusResource extends Resource
                 ->with(['station', 'masterVehicle'])
                 ->withCount([
                     'openDefects as open_defects_count',
-                    'serviceTickets as open_tickets_count' => fn (Builder $tickets): Builder => $tickets->open(),
+                    'serviceTickets as open_tickets_count' => fn ($tickets) => $tickets->open(),
                 ]))
             ->columns([
                 // Default columns: what a Fleet manager scans for first.
@@ -272,9 +272,7 @@ class ApparatusResource extends Resource
                 Tables\Columns\TextColumn::make('daily_checkout_requirement')->visibleFrom('md')
                     ->label('Daily Checkout')
                     ->badge()
-                    ->getStateUsing(fn (Apparatus $record): string => $record->daily_checkout_requirement instanceof DailyCheckoutRequirement
-                        ? $record->daily_checkout_requirement->value
-                        : DailyCheckoutRequirement::Unknown->value)
+                    ->getStateUsing(fn (Apparatus $record): string => ($record->getAttribute('daily_checkout_requirement') ?? DailyCheckoutRequirement::Unknown)->value)
                     ->formatStateUsing(fn (string $state): string => DailyCheckoutRequirement::options()[$state] ?? 'Unknown - needs policy confirmation')
                     ->color(fn (string $state): string => match ($state) {
                         DailyCheckoutRequirement::Required->value => 'success',
@@ -285,9 +283,7 @@ class ApparatusResource extends Resource
                 Tables\Columns\TextColumn::make('daily_checkout_template')->visibleFrom('md')
                     ->label('Checkout template')
                     ->badge()
-                    ->getStateUsing(fn (Apparatus $record): string => $record->daily_checkout_template instanceof DailyCheckoutChecklistTemplate
-                        ? $record->daily_checkout_template->value
-                        : DailyCheckoutChecklistTemplate::Pending->value)
+                    ->getStateUsing(fn (Apparatus $record): string => ($record->getAttribute('daily_checkout_template') ?? DailyCheckoutChecklistTemplate::Pending)->value)
                     ->formatStateUsing(fn (string $state): string => DailyCheckoutChecklistTemplate::options()[$state] ?? 'Invalid template configuration')
                     ->color(fn (string $state): string => $state === DailyCheckoutChecklistTemplate::Pending->value ? 'warning' : 'gray')
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -310,7 +306,7 @@ class ApparatusResource extends Resource
                 Tables\Columns\TextColumn::make('notes')->visibleFrom('md')
                     ->label('Fleet notes')
                     ->limit(30)
-                    ->tooltip(fn (Apparatus $record): ?string => $record->notes)
+                    ->tooltip(fn (Apparatus $record): ?string => $record->getAttribute('notes'))
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->placeholder('—'),
                 Tables\Columns\TextColumn::make('inspections_count')->visibleFrom('md')
@@ -467,7 +463,7 @@ class ApparatusResource extends Resource
 
     private static function unitSummary(Apparatus $record): string
     {
-        $vehicle = trim(implode(' ', array_filter([$record->year, $record->make, $record->model])));
+        $vehicle = trim(implode(' ', array_filter([$record->getAttribute('year'), $record->getAttribute('make'), $record->getAttribute('model')])));
         $parts = ['Veh '.($record->vehicle_number ?: 'not recorded')];
         if ($vehicle !== '') {
             $parts[] = $vehicle;
@@ -520,7 +516,7 @@ class ApparatusResource extends Resource
         /** @var Apparatus $record */
         return array_filter([
             'Vehicle #' => (string) $record->vehicle_number,
-            'Status' => (string) $record->status,
+            'Status' => (string) $record->getAttribute('status'),
         ]);
     }
 

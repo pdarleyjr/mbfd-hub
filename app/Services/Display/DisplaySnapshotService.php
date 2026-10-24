@@ -518,11 +518,8 @@ final class DisplaySnapshotService
             ->chunk(200, function (Collection $chunk) use (&$counts): void {
                 foreach ($chunk as $apparatus) {
                     $health = $apparatus->getPmHealthStatus();
-                    $status = $health['status'] ?? 'green';
-                    if (isset($counts[$status])) {
-                        $counts[$status]++;
-                    }
-                    if (($health['overdue'] ?? false) === true) {
+                    $counts[$health['status']]++;
+                    if ($health['overdue']) {
                         $counts['critical_overdue']++;
                     }
                 }
@@ -747,12 +744,12 @@ final class DisplaySnapshotService
                 'type' => $a->type !== null ? strtolower((string) $a->type) : null,
                 'status' => $this->classifyApparatusStatus($a->status),
                 'pm_health' => [
-                    'status' => $health['status'] ?? null,
-                    'hours_since_pm' => $health['hours_since_pm'] ?? null,
-                    'miles_since_pm' => $health['miles_since_pm'] ?? null,
-                    'overdue' => $health['overdue'] ?? null,
-                    'interval_hours' => $health['interval_hours'] ?? null,
-                    'last_pm_date' => $health['last_pm_date'] ?? null,
+                    'status' => $health['status'],
+                    'hours_since_pm' => $health['hours_since_pm'],
+                    'miles_since_pm' => $health['miles_since_pm'],
+                    'overdue' => $health['overdue'],
+                    'interval_hours' => $health['interval_hours'],
+                    'last_pm_date' => $health['last_pm_date'],
                 ],
                 'open_defects_count' => $a->relationLoaded('openDefects')
                     ? $a->openDefects->count()

@@ -239,7 +239,7 @@ class Apparatus extends Model
      *  - YELLOW: 250-300 hours (approaching PM window)
      *  - RED: > 300 hours (PM due) or > 305 hours (5+ hours overdue = critical)
      *
-     * @return array{status: string, hours: float, miles: int, overdue: bool}
+     * @return array{status: 'green'|'red'|'yellow', hours_since_pm: float, miles_since_pm: int, overdue: bool, interval_hours: int, last_pm_date: string|null}
      */
     public function getPmHealthStatus(): array
     {

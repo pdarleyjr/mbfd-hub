@@ -54,7 +54,7 @@ final class ApparatusWorkflowActions
                 Forms\Components\Select::make('status')
                     ->label('Operational status')
                     ->options(self::STATUS_OPTIONS)
-                    ->default(fn (Apparatus $record): ?string => $record->status)
+                    ->default(fn (Apparatus $record): ?string => $record->getAttribute('status'))
                     ->native(false)
                     ->required(),
             ])
@@ -350,7 +350,7 @@ final class ApparatusWorkflowActions
 
     public static function unitLabel(Apparatus $record): string
     {
-        return (string) ($record->designation ?: $record->name ?: $record->unit_id ?: 'Apparatus #'.$record->getKey());
+        return (string) ($record->designation ?: $record->name ?: $record->getAttribute('unit_id') ?: 'Apparatus #'.$record->getKey());
     }
 
     private static function canManageService(Apparatus $record): bool

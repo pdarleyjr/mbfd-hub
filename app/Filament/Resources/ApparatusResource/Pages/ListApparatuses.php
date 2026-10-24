@@ -5,6 +5,7 @@ namespace App\Filament\Resources\ApparatusResource\Pages;
 use App\Enums\DailyCheckoutRequirement;
 use App\Filament\Resources\ApparatusResource;
 use App\Models\Apparatus;
+use App\Models\ApparatusServiceTicket;
 use Filament\Actions;
 use Filament\Resources\Components\Tab;
 use Filament\Resources\Pages\ListRecords;
@@ -57,7 +58,7 @@ class ListApparatuses extends ListRecords
         return $query->where(fn (Builder $q): Builder => $q
             ->whereIn('status', self::OUT_OF_SERVICE_STATUSES)
             ->orWhereHas('openDefects')
-            ->orWhereHas('serviceTickets', fn (Builder $tickets): Builder => $tickets->open())
+            ->orWhereIn('id', ApparatusServiceTicket::query()->open()->select('apparatus_id'))
             ->orWhere(fn (Builder $pm): Builder => ApparatusResource::wherePm($pm, 'attention'))
             ->orWhere(fn (Builder $link): Builder => self::needsVehicleRecordReview($link)));
     }

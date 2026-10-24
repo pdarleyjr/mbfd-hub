@@ -169,10 +169,10 @@ class ViewUnitMasterVehicle extends ViewRecord
                                 : null)
                             ->weight('bold'),
                         TextEntry::make('apparatus_status')->label('Operational status')->badge()
-                            ->getStateUsing(fn (UnitMasterVehicle $record): ?string => $record->apparatus?->status)
+                            ->getStateUsing(fn (UnitMasterVehicle $record): ?string => $record->apparatus?->getAttribute('status'))
                             ->color(fn (?string $state): string => ApparatusResource::statusColor($state)),
                         TextEntry::make('apparatus_station')->label('Station')
-                            ->getStateUsing(fn (UnitMasterVehicle $record): ?string => $record->apparatus?->station ? 'Station '.$record->apparatus->station->station_number : null),
+                            ->getStateUsing(fn (UnitMasterVehicle $record): ?string => $record->apparatus?->station instanceof \App\Models\Station ? 'Station '.$record->apparatus->station->getAttribute('station_number') : null),
                         TextEntry::make('apparatus_open_work')->label('Open work')
                             ->getStateUsing(function (UnitMasterVehicle $record): ?string {
                                 if (! $record->apparatus instanceof Apparatus) {

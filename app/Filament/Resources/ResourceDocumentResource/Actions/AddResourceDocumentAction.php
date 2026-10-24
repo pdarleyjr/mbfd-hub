@@ -29,7 +29,7 @@ use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
  */
 final class AddResourceDocumentAction extends Action
 {
-    public static function getDefaultName(): ?string
+    public static function getDefaultName(): string
     {
         return 'addDocument';
     }
