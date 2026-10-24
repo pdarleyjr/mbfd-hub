@@ -21,7 +21,6 @@ class EquipmentItemResource extends Resource
     protected static ?string $navigationLabel = 'Equipment';
 
     use EnterpriseTable;
-
     use HasExportActions;
 
     protected static ?string $model = EquipmentItem::class;

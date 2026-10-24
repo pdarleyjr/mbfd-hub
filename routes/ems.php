@@ -6,8 +6,8 @@ use App\Http\Controllers\Ems\MemberRequestController;
 use App\Http\Controllers\Ems\StaffRequestController;
 use App\Http\Controllers\Ems\StatisticsController;
 use App\Http\Controllers\Ems\SupplyRoomController;
-use App\Http\Middleware\EnsureEmployeeAuthenticated;
 use App\Http\Middleware\Ems\EnsureEmsAccess;
+use App\Http\Middleware\EnsureEmployeeAuthenticated;
 use Illuminate\Support\Facades\Route;
 
 /*

@@ -26,7 +26,6 @@ class InspectionResource extends Resource
     protected static ?string $navigationGroup = 'Fleet';
 
     use EnterpriseTable;
-
     use HasExportActions;
 
     protected static ?string $model = ApparatusInspection::class;

@@ -19,7 +19,6 @@ class SingleGasMeterResource extends Resource
     protected static ?int $navigationSort = 60;
 
     use EnterpriseTable;
-
     use HasExportActions;
 
     protected static ?string $model = SingleGasMeter::class;

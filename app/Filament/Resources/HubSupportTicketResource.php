@@ -27,7 +27,6 @@ final class HubSupportTicketResource extends Resource
     protected static ?int $navigationSort = 50;
 
     use EnterpriseTable;
-
     use HasExportActions;
 
     protected static ?string $model = HubSupportTicket::class;
@@ -42,7 +41,7 @@ final class HubSupportTicketResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return static::withExportActions(self::applyEnterpriseDefaults($table)
+        return self::withExportActions(self::applyEnterpriseDefaults($table)
             ->columns([
                 Tables\Columns\TextColumn::make('ticket_number')
                     ->wrap()

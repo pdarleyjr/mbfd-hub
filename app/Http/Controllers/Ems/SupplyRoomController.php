@@ -42,7 +42,8 @@ final class SupplyRoomController extends Controller
     {
         return $this->guarded(function () use ($request): JsonResponse {
             $bool = ['nullable', 'in:0,1,true,false'];
-            $page = ['nullable', 'integer', 'min:1', 'max:100000']; $perPage = ['nullable', 'integer', 'min:1', 'max:200']; 
+            $page = ['nullable', 'integer', 'min:1', 'max:100000'];
+            $perPage = ['nullable', 'integer', 'min:1', 'max:200'];
             $result = $this->query->items($this->filters($request, [
                 'q' => ['nullable', 'string', 'max:100'], 'location' => ['nullable', 'string', 'max:24'],
                 'below_threshold' => $bool, 'needs_review' => $bool, 'controlled' => $bool, 'active' => $bool,
@@ -71,7 +72,8 @@ final class SupplyRoomController extends Controller
     public function movements(Request $request): JsonResponse
     {
         return $this->guarded(function () use ($request): JsonResponse {
-            $page = ['nullable', 'integer', 'min:1', 'max:100000']; $perPage = ['nullable', 'integer', 'min:1', 'max:200'];
+            $page = ['nullable', 'integer', 'min:1', 'max:100000'];
+            $perPage = ['nullable', 'integer', 'min:1', 'max:200'];
             $result = $this->query->movements($this->filters($request, [
                 'supply_item_id' => ['nullable', 'integer', 'min:1'], 'type' => ['nullable', 'in:issued,received,adjusted'],
                 'page' => $page, 'per_page' => $perPage,

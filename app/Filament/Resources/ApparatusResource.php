@@ -32,7 +32,6 @@ class ApparatusResource extends Resource
     protected static ?int $navigationSort = 10;
 
     use EnterpriseTable;
-
     use HasExportActions;
 
     protected static ?string $model = Apparatus::class;

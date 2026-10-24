@@ -47,7 +47,7 @@ final class ApparatusInspectionExceptionResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return static::withExportActions($table->defaultSort('created_at', 'desc')->columns([
+        return self::withExportActions($table->defaultSort('created_at', 'desc')->columns([
             Tables\Columns\TextColumn::make('apparatus.designation')
                 ->wrap()
                 ->extraAttributes(['class' => 'hub-phone-summary'])

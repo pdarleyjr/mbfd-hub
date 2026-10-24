@@ -9,7 +9,6 @@ use App\Models\Ems\InventorySnapshotLine;
 use App\Models\Ems\StorageLocation;
 use App\Models\Ems\SupplyItem;
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**

@@ -329,6 +329,7 @@ final class MasterPersonnelDirectory extends Page implements HasTable
         if (array_key_exists($key, $this->trackingSortOptions($definition))) {
             return $this->orderTrackingColumn($query, $definition, $key, $direction);
         }
+
         return $this->personnelSource()->order($query, $key, $direction);
     }
 

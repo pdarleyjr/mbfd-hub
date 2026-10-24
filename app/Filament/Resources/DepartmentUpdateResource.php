@@ -168,7 +168,7 @@ final class DepartmentUpdateResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return static::withExportActions(self::applyEnterpriseDefaults($table)
+        return self::withExportActions(self::applyEnterpriseDefaults($table)
             ->columns([
                 Tables\Columns\TextColumn::make('title')->searchable()->limit(60)->sortable(),
                 Tables\Columns\TextColumn::make('category')

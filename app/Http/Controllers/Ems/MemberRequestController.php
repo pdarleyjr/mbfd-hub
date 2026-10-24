@@ -27,8 +27,8 @@ use Throwable;
 /** Employee Portal side of the Medical Inventory Request: any signed-in member, their own requests only. */
 final class MemberRequestController extends Controller
 {
-    use RespondsWithEnvelope;
     use ResolvesCanonicalEmployee;
+    use RespondsWithEnvelope;
 
     public function __construct(
         private readonly RequestFormDefinition $form,

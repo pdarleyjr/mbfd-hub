@@ -2,10 +2,9 @@
 
 namespace App\Filament\Workgroup\Exports;
 
-use App\Models\EvaluationComment;
-use App\Models\EvaluationSubmission;
-use App\Models\WorkgroupSession;
 use App\Filament\Exports\SafeExporter;
+use App\Models\EvaluationComment;
+use App\Models\WorkgroupSession;
 use Filament\Actions\Exports\ExportColumn;
 use Filament\Actions\Exports\Models\Export;
 
@@ -48,10 +47,10 @@ class WorkgroupFeedbackExporter extends SafeExporter
 
     public static function getCompletedNotificationBody(Export $export): string
     {
-        $body = 'Feedback export completed. ' . number_format($export->successful_rows) . ' feedback entries exported.';
+        $body = 'Feedback export completed. '.number_format($export->successful_rows).' feedback entries exported.';
 
         if ($failedRowsCount = $export->getFailedRowsCount()) {
-            $body .= ' ' . number_format($failedRowsCount) . ' rows failed to export.';
+            $body .= ' '.number_format($failedRowsCount).' rows failed to export.';
         }
 
         return $body;
@@ -63,20 +62,17 @@ class WorkgroupFeedbackExporter extends SafeExporter
     public static function getBaseQuery(): \Illuminate\Database\Eloquent\Builder
     {
         $session = WorkgroupSession::active()->first();
-        
-        if (!$session) {
+
+        if (! $session) {
             return EvaluationComment::query()->whereRaw('1 = 0');
         }
 
         return EvaluationComment::query()
-            ->whereHas('submission', fn($query) => 
-                $query->where('status', 'submitted')
-                    ->whereHas('candidateProduct', fn($q) => 
-                        $q->where('workgroup_session_id', $session->id)
-                            ->whereHas('category', fn($cq) => 
-                                $cq->where('is_rankable', false)
-                            )
+            ->whereHas('submission', fn ($query) => $query->where('status', 'submitted')
+                ->whereHas('candidateProduct', fn ($q) => $q->where('workgroup_session_id', $session->id)
+                    ->whereHas('category', fn ($cq) => $cq->where('is_rankable', false)
                     )
+                )
             )
             ->with([
                 'submission.candidateProduct.category',

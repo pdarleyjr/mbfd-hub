@@ -571,5 +571,4 @@ final class RequestWorkflowService
 
         return $state;
     }
-
 }

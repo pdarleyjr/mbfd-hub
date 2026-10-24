@@ -2,10 +2,10 @@
 
 namespace App\Filament\Workgroup\Exports;
 
+use App\Filament\Exports\SafeExporter;
 use App\Models\CandidateProduct;
 use App\Models\WorkgroupSession;
 use App\Services\Workgroup\WorkgroupAIService;
-use App\Filament\Exports\SafeExporter;
 use Filament\Actions\Exports\ExportColumn;
 use Filament\Actions\Exports\Models\Export;
 use Illuminate\Support\Facades\Cache;
