@@ -9,11 +9,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
 
 /**
- * Append-only history of imports, replacements and visibility changes for a library document.
+ * Append-only history of imports, replacements, visibility, wording and order changes for a library document.
  *
  * @property int $id
  * @property int $resource_document_id
- * @property string $event imported|replaced|published|unpublished
+ * @property string $event imported|replaced|published|unpublished|details_changed|reordered
  * @property int|null $actor_id
  * @property array<string, mixed>|null $metadata
  * @property \Carbon\CarbonImmutable $created_at
@@ -36,6 +36,12 @@ class ResourceDocumentEvent extends Model
     {
         static::updating(fn () => throw new LogicException('Resource document events are append-only.'));
         static::deleting(fn () => throw new LogicException('Resource document events are append-only.'));
+    }
+
+    /** @return BelongsTo<User, $this> */
+    public function actor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'actor_id');
     }
 
     /** @return BelongsTo<ResourceDocument, $this> */
