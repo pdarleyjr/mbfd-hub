@@ -59,6 +59,7 @@ use App\Http\Controllers\Workgroup\FileDownloadController;
 use App\Http\Controllers\Workgroup\WorkgroupReportController;
 use App\Http\Middleware\EnsureEmployeeAuthenticated;
 use App\Http\Middleware\PreventPreviousUrlStorage;
+use App\Support\Http\StatelessRoute;
 use App\Support\Workgroups\WorkgroupReportSessionResolver;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -354,11 +355,14 @@ Route::get('/manifest.json', function () {
     $response->headers->set('Expires', '0');
 
     return $response;
-});
+})->withoutMiddleware(StatelessRoute::WITHOUT_MIDDLEWARE);
 
 // --- Admin Desktop-PWA -----------------------------------------------------
+// The manifests and service-worker scripts below are fetched by the browser on its own, cookies attached,
+// while a member is mid-form. They must not open (and so age) the session: see StatelessRoute.
 Route::redirect('/site.webmanifest', '/manifest.json', 301)
-    ->middleware(PreventPreviousUrlStorage::class);
+    ->middleware(PreventPreviousUrlStorage::class)
+    ->withoutMiddleware(StatelessRoute::WITHOUT_MIDDLEWARE);
 
 // These two routes serve the scoped admin manifest + service worker with
 // the correct Content-Type and Service-Worker-Allowed scope header. The
@@ -370,7 +374,7 @@ Route::get('/admin-pwa/manifest.webmanifest', function () {
         'Content-Type' => 'application/manifest+json',
         'Cache-Control' => 'public, max-age=300, must-revalidate',
     ]);
-})->middleware(PreventPreviousUrlStorage::class);
+})->middleware(PreventPreviousUrlStorage::class)->withoutMiddleware(StatelessRoute::WITHOUT_MIDDLEWARE);
 
 // Keep the worker URL inside its intended scope. Production web servers may
 // serve /admin-pwa/* directly and bypass Laravel's Service-Worker-Allowed
@@ -381,7 +385,7 @@ Route::get('/admin/service-worker.js', function () {
         'Service-Worker-Allowed' => '/admin/',
         'Cache-Control' => 'no-cache, must-revalidate',
     ]);
-})->middleware(PreventPreviousUrlStorage::class);
+})->middleware(PreventPreviousUrlStorage::class)->withoutMiddleware(StatelessRoute::WITHOUT_MIDDLEWARE);
 
 Route::get('/admin/pulse/queues.json', QueueStatusController::class)
     ->middleware(['auth', PreventPreviousUrlStorage::class, 'throttle:60,1'])
@@ -393,7 +397,7 @@ Route::get('/admin-pwa/service-worker.js', function () {
         'Service-Worker-Allowed' => '/admin/',
         'Cache-Control' => 'no-cache, must-revalidate',
     ]);
-})->middleware(PreventPreviousUrlStorage::class);
+})->middleware(PreventPreviousUrlStorage::class)->withoutMiddleware(StatelessRoute::WITHOUT_MIDDLEWARE);
 // --- End Admin Desktop-PWA -------------------------------------------------
 
 // Shared 300 Command / Captain 5 communications attachment download (private disk). Signed-in
@@ -462,15 +466,7 @@ Route::get('/__version', function () {
 // device probing on return to the app and when the network comes back, so it is generous but bounded.
 Route::get('/app-release', function (\App\Support\Release\DeployedRelease $release) {
     return response()->json(['release' => $release->short()])->header('Cache-Control', 'no-store');
-})->middleware('throttle:600,1')->withoutMiddleware([
-    \Illuminate\Session\Middleware\StartSession::class,
-    \Illuminate\View\Middleware\ShareErrorsFromSession::class,
-    \Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class,
-    \App\Http\Middleware\EnforceMemberBootstrapBoundary::class,
-    \App\Http\Middleware\EnsureCanonicalSessionIsCurrent::class,
-    \App\Http\Middleware\ForcePasswordChange::class,
-    \App\Http\Middleware\EnsureCityEmailReview::class,
-])->name('app-release');
+})->middleware('throttle:600,1')->withoutMiddleware(StatelessRoute::WITHOUT_MIDDLEWARE)->name('app-release');
 
 // Station Inventory PDF Download
 Route::get('/inventory-pdf/{submission}', [StationInventoryController::class, 'downloadPdf'])
