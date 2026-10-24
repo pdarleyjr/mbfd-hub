@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "documents": [
+    {
+      "slug": "uniform-guidelines",
+      "title": "Uniform Guidelines",
+      "category": "Policies & Guidelines",
+      "description": "Miami Beach Fire Department Uniform Guideline, 1st Edition 2026: uniform classifications, badges and insignia, and award citations.",
+      "sort": 10,
+      "published": true,
+      "page_count": 35,
+      "original": {
+        "file": "2026 Uniform Guideline FINAL.docx",
+        "sha256": "59a1b16fbdbdeb49b7ca7f3e28b4a264cc94fef3fe8727d077ec0f78125f2292"
+      },
+      "preview": {
+        "file": "2026 Uniform Guideline FINAL.pdf",
+        "sha256": "06e41fdb77df937312ff8b95154a6a589fdad7e5b1e17393a835f545e8577161"
+      }
+    },
+    {
+      "slug": "driver-engineer-manual-2026",
+      "title": "MBFD Driver/Engineer Manual 2026",
+      "category": "Manuals",
+      "description": "Driver Engineer Manual, 2026 Edition (departmental review copy): apparatus readiness, driving, pump operations, water supply, and aerial operations.",
+      "sort": 10,
+      "published": true,
+      "page_count": 244,
+      "original": {
+        "file": "MBFD_Driver_Engineer_Manual_2026.pdf",
+        "sha256": "bd2c6f7666213a27422bfeba01d62dee76995d3524dbb74d8f6219dad87a048a"
+      },
+      "preview": null
+    },
+    {
+      "slug": "back-to-basics-officers-task-book",
+      "title": "Back to Basics: Officers Task Book",
+      "category": "Officer Development",
+      "description": "Back to Basics Officers Task Book, review edition 1.2 (15 Oct 2026): eight company exercises between Modules 2 and 5.",
+      "sort": 10,
+      "published": true,
+      "page_count": 12,
+      "original": {
+        "file": "MBFD_Back_to_Basics_Officers_Task_Book.pdf",
+        "sha256": "ab58dc72b63ee4a657452ff00173deaa18aa2ad3a8c3a98c255cad459b3d6ed7"
+      },
+      "preview": null
+    },
+    {
+      "slug": "puc-manual-2019",
+      "title": "PUC Manual 2019",
+      "category": "Apparatus Manuals",
+      "description": "Pierce Manufacturing operation and maintenance manual for the Pierce pumper, 2019 (Part No. PM-P-OM260-0319).",
+      "sort": 10,
+      "published": true,
+      "page_count": 66,
+      "original": {
+        "file": "PUC Manual 2019.pdf",
+        "sha256": "c956f5a185a94adde849b2aadd617ad184573abbda8eb80394e4ca59352cf538"
+      },
+      "preview": null
+    },
+    {
+      "slug": "pierce-mid-mount-manual",
+      "title": "Pierce Mid-Mount Manual",
+      "category": "Apparatus Manuals",
+      "description": "Pierce Manufacturing operator's manual for the Ascendant 100 ft heavy-duty aerial tower with Command Zone controls (Part No. PM-A-OM1000-0926).",
+      "sort": 20,
+      "published": true,
+      "page_count": 128,
+      "original": {
+        "file": "pierce_mid_mount_manual.pdf",
+        "sha256": "725d34d2bdefc0a3d2dda3ea7e4402f2d86c5b6c455d9cc53ec3ca65afefbfe3"
+      },
+      "preview": null
+    }
+  ]
+}

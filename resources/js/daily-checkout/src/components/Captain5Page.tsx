@@ -14,6 +14,9 @@ import IssueSheet from './captain5/IssueSheet';
 import IssuesTab from './captain5/IssuesTab';
 import ReplacementsTab from './captain5/ReplacementsTab';
 import TodayTab from './captain5/TodayTab';
+import RescueInventoryTab, { type RescueView } from './captain5/ems/RescueInventoryTab';
+import SupplyRoomTab, { isSupplyView, type SupplyView } from './captain5/ems/SupplyRoomTab';
+import { useEmsAccess, useOpenRequestCount } from './captain5/ems/useEmsAccess';
 import { isKindFilter, isQueueFilter, type KindFilter, type QueueFilter } from './captain5/filters';
 import { dutyLine, dutyTone, isReplacementTracked } from './captain5/format';
 import type { ActingResult, Workspace } from './captain5/types';
@@ -21,20 +24,28 @@ import { useWorkspace } from './captain5/useWorkspace';
 import DepartmentUpdatesPanel from './department-updates/DepartmentUpdatesPanel';
 import Tabs, { type TabItem } from './ui/Tabs';
 import Tag from './ui/Tag';
-import { LoadError } from './ui/StateViews';
+import { LoadError, SkeletonRows } from './ui/StateViews';
 
-type TabId = 'today' | 'issues' | 'replacements' | 'messages' | 'updates' | 'history';
+type TabId = 'today' | 'issues' | 'replacements' | 'rescue' | 'supply' | 'messages' | 'updates' | 'history';
 
-const TAB_IDS: TabId[] = ['today', 'issues', 'replacements', 'messages', 'updates', 'history'];
+const TAB_IDS: TabId[] = ['today', 'issues', 'replacements', 'rescue', 'supply', 'messages', 'updates', 'history'];
 const isTab = (value: string | null): value is TabId => TAB_IDS.includes(value as TabId);
+const isEmsTab = (value: string | null): boolean => value === 'rescue' || value === 'supply';
 const positiveInt = (value: string | null): number | null => (value !== null && /^\d{1,12}$/.test(value) && Number(value) > 0 ? Number(value) : null);
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function tabsFor(workspace: Workspace, unread: number): Array<TabItem<TabId>> {
+interface EmsTabs { show: boolean; openRequests: number }
+
+function tabsFor(workspace: Workspace, unread: number, ems: EmsTabs): Array<TabItem<TabId>> {
   const tracked = workspace.issues.filter(isReplacementTracked).length;
   return [
     { id: 'today', label: 'Today' },
     { id: 'issues', label: 'Issues', badge: workspace.counts.open, badgeLabel: 'open issues' },
     { id: 'replacements', label: 'Replacements', badge: tracked, badgeLabel: 'in progress' },
+    ...(ems.show ? [
+      { id: 'rescue' as const, label: 'Rescue Inventory', badge: ems.openRequests, badgeLabel: 'open requests' },
+      { id: 'supply' as const, label: 'Supply Room' },
+    ] : []),
     { id: 'messages', label: 'Messages', badge: unread, badgeLabel: 'unread messages' },
     { id: 'updates', label: 'Department Updates' },
     { id: 'history', label: 'History' },
@@ -60,9 +71,19 @@ export default function Captain5Page() {
   const [inspectionId, setInspectionId] = useState<number | null>(null);
   const [version, setVersion] = useState(0);
   const pushedIssue = useRef(false);
+  const pushedRequest = useRef(false);
+  const ems = useEmsAccess();
 
   const requestedTab = searchParams.get('tab');
   const issueId = positiveInt(searchParams.get('issue'));
+  // The EMS tabs exist only for people the EMS API admits. A deep link keeps its tab while that is being checked.
+  const emsShown = ems.status === 'ready' || ((ems.status === 'loading' || ems.status === 'error') && isEmsTab(requestedTab));
+  const openRequests = useOpenRequestCount(ems.status === 'ready');
+  const requestParam = searchParams.get('request');
+  const requestId = requestParam !== null && UUID.test(requestParam) ? requestParam.toLowerCase() : null;
+  const rescueView: RescueView = searchParams.get('view') === 'stats' ? 'stats' : 'requests';
+  const sectionParam = searchParams.get('section');
+  const supplyView: SupplyView = isSupplyView(sectionParam) ? sectionParam : 'stock';
   const queue: QueueFilter = isQueueFilter(searchParams.get('filter')) ? searchParams.get('filter') as QueueFilter : 'all';
   const kind: KindFilter = isKindFilter(searchParams.get('kind')) ? searchParams.get('kind') as KindFilter : 'all';
 
@@ -80,6 +101,12 @@ export default function Captain5Page() {
   const closeIssue = useCallback(() => {
     if (pushedIssue.current) { pushedIssue.current = false; navigate(-1); } else update({ issue: null });
   }, [navigate, update]);
+
+  useEffect(() => { if (requestId === null) pushedRequest.current = false; }, [requestId]);
+  const openRequest = useCallback((uuid: string) => { pushedRequest.current = true; update({ request: uuid }, true); }, [update]);
+  const closeRequest = useCallback(() => {
+    if (pushedRequest.current) { pushedRequest.current = false; navigate(-1); } else update({ request: null });
+  }, [navigate, update]);
   const changed = useCallback(() => { setVersion((n) => n + 1); void load('silent'); }, [load]);
   const actingChanged = useCallback((result: ActingResult) => { ws.patch({ on_duty: result.on_duty, acting: result.acting }); void load('silent'); }, [ws.patch, load]);
 
@@ -95,9 +122,30 @@ export default function Captain5Page() {
   }
 
   const { access } = data;
-  const tabs = tabsFor(data, ws.unread);
+  const tabs = tabsFor(data, ws.unread, { show: emsShown, openRequests: openRequests.count });
   const active: TabId = isTab(requestedTab) && tabs.some((tab) => tab.id === requestedTab) ? requestedTab : 'today';
   const refreshLabel = isOffline ? 'Refresh unavailable while offline' : ws.refreshing ? 'Refreshing Captain 5' : 'Refresh Captain 5';
+
+  const renderEms = (id: 'rescue' | 'supply') => {
+    if (ems.status === 'loading') return <SkeletonRows rows={4} />;
+    if (ems.status === 'error') return <LoadError title={id === 'rescue' ? 'Rescue Inventory could not be loaded' : 'The Supply Room could not be loaded'} message={ems.error} onRetry={ems.reload} />;
+    if (ems.status !== 'ready') return null;
+    return id === 'rescue'
+      ? (
+        <RescueInventoryTab
+          meta={ems.meta}
+          requestId={requestId}
+          view={rescueView}
+          onView={(next) => update({ view: next === 'stats' ? 'stats' : null, request: null })}
+          onOpenRequest={openRequest}
+          onCloseRequest={closeRequest}
+          tick={openRequests.tick}
+          onChanged={openRequests.refresh}
+          onForbidden={ems.deny}
+        />
+      )
+      : <SupplyRoomTab meta={ems.meta} view={supplyView} onView={(next) => update({ section: next === 'stock' ? null : next })} onForbidden={ems.deny} />;
+  };
 
   const renderPanel = (id: TabId) => {
     switch (id) {
@@ -107,6 +155,9 @@ export default function Captain5Page() {
         return <IssuesTab workspace={data} queue={queue} kind={kind} onFilter={(nextQueue, nextKind) => update({ filter: nextQueue, kind: nextKind })} onOpen={openIssue} />;
       case 'replacements':
         return <ReplacementsTab issues={data.issues} onOpen={openIssue} />;
+      case 'rescue':
+      case 'supply':
+        return renderEms(id);
       case 'messages':
         return <Captain5Messages onDenied={ws.markForbidden} onOpenUpdates={() => update({ tab: 'updates', filter: null, kind: null })} />;
       case 'updates':
@@ -166,7 +217,7 @@ export default function Captain5Page() {
         <Tabs
           tabs={tabs}
           active={active}
-          onChange={(id) => update({ tab: id === 'today' ? null : id, filter: null, kind: null })}
+          onChange={(id) => update({ tab: id === 'today' ? null : id, filter: null, kind: null, request: null, view: null, section: null })}
           label="Captain 5 workspace"
           idPrefix="captain5"
           panelClassName="p-4 sm:p-5"

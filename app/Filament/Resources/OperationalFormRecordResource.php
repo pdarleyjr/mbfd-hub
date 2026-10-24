@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Concerns\EnterpriseTable;
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\OperationalFormRecordResource\Pages;
 use App\Models\OperationalFormRecord;
 use App\Services\OperationalEvidenceArchiveService;
@@ -18,6 +19,7 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 class OperationalFormRecordResource extends Resource
 {
     use EnterpriseTable;
+    use HasExportActions;
 
     protected static ?string $model = OperationalFormRecord::class;
 
@@ -42,7 +44,7 @@ class OperationalFormRecordResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return self::applyEnterpriseDefaults($table)
+        return static::withExportActions(self::applyEnterpriseDefaults($table)
             ->modifyQueryUsing(fn ($query) => $query->with(['employee', 'latestDocument']))
             ->columns([
                 Tables\Columns\TextColumn::make('employee.name')->label('Employee')->searchable()->sortable(),
@@ -50,14 +52,15 @@ class OperationalFormRecordResource extends Resource
                 Tables\Columns\TextColumn::make('form_type')->label('Form')->badge()->formatStateUsing(fn (string $state) => match ($state) {
                     'ics_214' => 'ICS 214',
                     'uploaded_file' => 'Submitted file',
+                    'medical_inventory_request' => 'Medical Inventory Request',
                     default => 'F-ROC Daily Activity Report',
-                })->color(fn (string $state) => $state === 'uploaded_file' ? 'gray' : 'info'),
+                })->color(fn (string $state) => in_array($state, ['uploaded_file', 'medical_inventory_request'], true) ? 'gray' : 'info'),
                 Tables\Columns\TextColumn::make('title')->searchable()->limit(44),
                 Tables\Columns\TextColumn::make('status')->badge()->color(fn (string $state) => $state === 'completed' ? 'success' : 'warning'),
                 Tables\Columns\TextColumn::make('last_autosaved_at')->label('Last saved')->since()->dateTimeTooltip()->sortable(),
                 Tables\Columns\TextColumn::make('latest_pdf_version')->label('Document')->formatStateUsing(
                     fn ($state, OperationalFormRecord $record) => $state
-                        ? ($record->form_type === 'uploaded_file' ? 'Submitted file' : "PDF version {$state}")
+                        ? (in_array($record->form_type, ['uploaded_file', 'medical_inventory_request'], true) ? 'Submitted file' : "PDF version {$state}")
                         : '—',
                 ),
                 Tables\Columns\TextColumn::make('latestDocument.created_at')->label('Submitted / generated')->since()->dateTimeTooltip()->placeholder('—'),
@@ -80,6 +83,7 @@ class OperationalFormRecordResource extends Resource
                     'ics_214' => 'ICS 214',
                     'froc_log_001_ff' => 'F-ROC Daily Activity Report',
                     'uploaded_file' => 'Submitted file',
+                    'medical_inventory_request' => 'Medical Inventory Request',
                 ]),
                 SelectFilter::make('status')->options(['draft' => 'Draft', 'completed' => 'Completed']),
             ])
@@ -125,7 +129,7 @@ class OperationalFormRecordResource extends Resource
                     })
                     ->deselectRecordsAfterCompletion(),
             ])
-            ->defaultSort('updated_at', 'desc');
+            ->defaultSort('updated_at', 'desc'));
     }
 
     public static function canViewAny(): bool

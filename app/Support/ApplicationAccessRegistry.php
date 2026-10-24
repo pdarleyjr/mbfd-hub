@@ -64,6 +64,8 @@ final class ApplicationAccessRegistry
             'notifications' => 'Notifications', 'communications' => 'Communications',
             'system' => 'System', 'department_updates' => 'Department updates',
             'support' => 'Website / App Issue Reports',
+            'resources' => 'Resource library',
+            'ems' => 'EMS',
         ] as $key => $label) {
             foreach (['view' => 'view', 'manage' => 'manage'] as $action => $actionLabel) {
                 if ($key === 'communications' && $action === 'manage') {
@@ -88,6 +90,7 @@ final class ApplicationAccessRegistry
         $options['personnel.tables.share'] = 'Custom personnel tables — share';
         $options['personnel.tables.export'] = 'Custom personnel tables — export';
         $options['personnel.tables.archive'] = 'Custom personnel tables — archive / restore';
+        $options['personnel.promotions.manage'] = 'Promotional lists - manage';
 
         return $options;
     }

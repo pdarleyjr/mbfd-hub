@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\ShopWorkResource\Pages;
 use App\Models\ShopWork;
 use Filament\Forms;
@@ -12,6 +13,17 @@ use Filament\Tables\Table;
 
 class ShopWorkResource extends Resource
 {
+    use HasExportActions;
+
+    /** The database stores status as an enum; these are the only values it accepts. */
+    public const STATUSES = [
+        'Pending' => 'Pending',
+        'In Progress' => 'In Progress',
+        'Waiting for Parts' => 'Waiting for Parts',
+        'Completed' => 'Completed',
+        'Cancelled' => 'Cancelled',
+    ];
+
     protected static ?int $navigationSort = 50;
 
     protected static ?string $model = ShopWork::class;
@@ -35,10 +47,14 @@ class ShopWorkResource extends Resource
                     ->maxLength(255),
                 Forms\Components\Textarea::make('description')
                     ->columnSpanFull(),
-                Forms\Components\TextInput::make('apparatus_id')
-                    ->numeric(),
+                Forms\Components\Select::make('apparatus_id')
+                    ->label('Apparatus')
+                    ->relationship('apparatus', 'designation')
+                    ->searchable()
+                    ->preload(),
                 Forms\Components\Select::make('status')
-                    ->options(array_combine(ShopWork::STATUSES, ShopWork::STATUSES))
+                    ->options(self::STATUSES)
+                    ->in(array_keys(self::STATUSES))
                     ->required()
                     ->default('Pending'),
                 Forms\Components\Textarea::make('parts_list')
@@ -58,12 +74,13 @@ class ShopWorkResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->columns([
                 Tables\Columns\TextColumn::make('project_name')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('apparatus_id')
-                    ->numeric()
+                Tables\Columns\TextColumn::make('apparatus.designation')
+                    ->label('Apparatus')
+                    ->placeholder('Not tied to a unit')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('status')
                     ->searchable(),
@@ -90,8 +107,17 @@ class ShopWorkResource extends Resource
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
+            ->defaultSort('created_at', 'desc')
             ->filters([
-                //
+                Tables\Filters\SelectFilter::make('status')
+                    ->options(self::STATUSES),
+                Tables\Filters\TernaryFilter::make('completed')
+                    ->label('Completed')
+                    ->placeholder('All shop needs')
+                    ->trueLabel('Completed')
+                    ->falseLabel('Not completed yet')
+                    ->nullable()
+                    ->attribute('completed_date'),
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
@@ -100,7 +126,7 @@ class ShopWorkResource extends Resource
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
-            ]);
+            ]));
     }
 
     public static function getRelations(): array

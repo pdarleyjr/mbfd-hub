@@ -1,0 +1,2943 @@
+{
+  "schema": "mbfd.ems.source_form.v1",
+  "source": {
+    "key": "als-med-bag",
+    "title": "ALS MED BAG or BOX INVENTORY",
+    "version_label": "3/2023",
+    "file_name": "ALS_Med_bag_inventory.pdf",
+    "sha256": "65eab0e2828191cdcc6bc09aa868f3c4c96a7128db6d02c2c84d5592a407a4f6",
+    "pages": 1,
+    "columns": [
+      "ITEM",
+      "AMOUNT MIN",
+      "NEED"
+    ],
+    "notes": [
+      "Totals can include amounts in Bobo Bag.",
+      "Printed banner: 'ALS MED BAG or BOX INVENTORY   3/2023 Totals can include amounts in Bobo Bag.' (the rendered banner is clipped after 'Bag'; the trailing period is in the text layer).",
+      "Two-column layout. Left column: TRAUMA, IV SUPPLIES, MEDICATIONS. Right column: continuation of MEDICATIONS (RACEMIC EPI .. NORMAL SALINE 1000CCC, no header of its own), then MISCELLANEOUS, then a green RESCUE ONLY sub-section.",
+      "Only the left header cell reads 'AMOUNT MIN'; the right column has no column headers. NEED columns are blank.",
+      "Table row numbers in source_ref count the yellow title banner as row 1 and the header row (TRAUMA / RACEMIC EPI) as row 2. RACEMIC EPI sits on the same table row as the TRAUMA header."
+    ]
+  },
+  "sections": [
+    {
+      "key": "als-trauma",
+      "label": "Trauma",
+      "source_label": "TRAUMA",
+      "kind": "category",
+      "parent_key": null,
+      "sort": 10,
+      "items": [
+        {
+          "item_ref": "als.trauma.multi-trauma-dressing",
+          "catalog_ref": "multi-trauma-dressing",
+          "label": "Multi Trauma Dressing",
+          "source_label": "MULTI TRAUMA DRESSING",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 3
+          }
+        },
+        {
+          "item_ref": "als.trauma.asherman-chest-seal",
+          "catalog_ref": "asherman-chest-seal",
+          "label": "Asherman Chest Seal",
+          "source_label": "ASHERMAN CHEST SEAL",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 4
+          }
+        },
+        {
+          "item_ref": "als.trauma.burn-dressing-4x4",
+          "catalog_ref": "burn-dressing-4x4",
+          "label": "Burn Dressing 4x4",
+          "source_label": "BURN DRESSING 4X4",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 5
+          }
+        },
+        {
+          "item_ref": "als.trauma.burn-dressing-4x16",
+          "catalog_ref": "burn-dressing-4x16",
+          "label": "Burn Dressing 4x16",
+          "source_label": "BURN DRESSING 4X16",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 6
+          }
+        },
+        {
+          "item_ref": "als.trauma.burn-gel-small-packet",
+          "catalog_ref": "burn-gel-small-packet",
+          "label": "Burn Gel Small Packet",
+          "source_label": "BURN GEL SMALL PACKET",
+          "min_text": "4",
+          "min_qty": 4,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 7
+          }
+        },
+        {
+          "item_ref": "als.trauma.burn-gel-face-mask",
+          "catalog_ref": "burn-gel-face-mask",
+          "label": "Burn Gel Face Mask",
+          "source_label": "Burn Gel Face Mask",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 8
+          }
+        },
+        {
+          "item_ref": "als.trauma.quick-clot-gauze",
+          "catalog_ref": "quikclot-gauze",
+          "label": "QuikClot Gauze",
+          "source_label": "QUICK CLOT GAUZE",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 9
+          }
+        }
+      ]
+    },
+    {
+      "key": "als-iv-supplies",
+      "label": "IV Supplies",
+      "source_label": "IV SUPPLIES",
+      "kind": "category",
+      "parent_key": null,
+      "sort": 20,
+      "items": [
+        {
+          "item_ref": "als.iv.iv-14g-16g-14g",
+          "catalog_ref": "iv-catheter-14g",
+          "label": "IV 14G",
+          "source_label": "IV 14G/16G",
+          "min_text": "2 EACH",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "IV 14G/16G",
+          "variant_label": "14G",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Combined row expanded to IV 14G and IV 16G; '2 EACH' applies to each gauge.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 11
+          }
+        },
+        {
+          "item_ref": "als.iv.iv-14g-16g-16g",
+          "catalog_ref": "iv-catheter-16g",
+          "label": "IV 16G",
+          "source_label": "IV 14G/16G",
+          "min_text": "2 EACH",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "IV 14G/16G",
+          "variant_label": "16G",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Combined row expanded to IV 14G and IV 16G; '2 EACH' applies to each gauge.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 11
+          }
+        },
+        {
+          "item_ref": "als.iv.iv-18g-20g-22g-24g-18g",
+          "catalog_ref": "iv-catheter-18g",
+          "label": "IV 18G",
+          "source_label": "IV 18G/20G/22G/24G",
+          "min_text": "4 EACH",
+          "min_qty": 4,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "IV 18G/20G/22G/24G",
+          "variant_label": "18G",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Combined row expanded to four gauges; '4 EACH' applies to each gauge.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 12
+          }
+        },
+        {
+          "item_ref": "als.iv.iv-18g-20g-22g-24g-20g",
+          "catalog_ref": "iv-catheter-20g",
+          "label": "IV 20G",
+          "source_label": "IV 18G/20G/22G/24G",
+          "min_text": "4 EACH",
+          "min_qty": 4,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "IV 18G/20G/22G/24G",
+          "variant_label": "20G",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Combined row expanded to four gauges; '4 EACH' applies to each gauge.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 12
+          }
+        },
+        {
+          "item_ref": "als.iv.iv-18g-20g-22g-24g-22g",
+          "catalog_ref": "iv-catheter-22g",
+          "label": "IV 22G",
+          "source_label": "IV 18G/20G/22G/24G",
+          "min_text": "4 EACH",
+          "min_qty": 4,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "IV 18G/20G/22G/24G",
+          "variant_label": "22G",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Combined row expanded to four gauges; '4 EACH' applies to each gauge.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 12
+          }
+        },
+        {
+          "item_ref": "als.iv.iv-18g-20g-22g-24g-24g",
+          "catalog_ref": "iv-catheter-24g",
+          "label": "IV 24G",
+          "source_label": "IV 18G/20G/22G/24G",
+          "min_text": "4 EACH",
+          "min_qty": 4,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "IV 18G/20G/22G/24G",
+          "variant_label": "24G",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Combined row expanded to four gauges; '4 EACH' applies to each gauge.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 12
+          }
+        },
+        {
+          "item_ref": "als.iv.ez-set-21ga-butterfly",
+          "catalog_ref": "ez-set-21ga-butterfly",
+          "label": "EZ Set 21GA (Butterfly)",
+          "source_label": "EZ SET 21GA (Butterfly)",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 13
+          }
+        },
+        {
+          "item_ref": "als.iv.ars-decomp-14ga-needle",
+          "catalog_ref": "ars-decomp-14ga-needle",
+          "label": "ARS Decomp 14ga Needle",
+          "source_label": "ARS Decomp 14ga Needle",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 14
+          }
+        },
+        {
+          "item_ref": "als.iv.veniguard",
+          "catalog_ref": "veniguard",
+          "label": "Veniguard",
+          "source_label": "VENIGUARD",
+          "min_text": "5",
+          "min_qty": 5,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 15
+          }
+        },
+        {
+          "item_ref": "als.iv.iv-tourniquet",
+          "catalog_ref": "iv-tourniquet",
+          "label": "IV Tourniquet",
+          "source_label": "IV TOURNIQUET",
+          "min_text": "5",
+          "min_qty": 5,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 16
+          }
+        },
+        {
+          "item_ref": "als.iv.flush-10cc",
+          "catalog_ref": "flush-10cc-als-bag",
+          "label": "10 cc Flush",
+          "source_label": "10 CC FLUSH",
+          "min_text": "5",
+          "min_qty": 5,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 17
+          }
+        },
+        {
+          "item_ref": "als.iv.alcohol-preps",
+          "catalog_ref": "alcohol-prep",
+          "label": "Alcohol Preps",
+          "source_label": "ALCOHOL PREPS",
+          "min_text": "10",
+          "min_qty": 10,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 18
+          }
+        },
+        {
+          "item_ref": "als.iv.betadine-preps",
+          "catalog_ref": "betadine-prep",
+          "label": "Betadine Preps",
+          "source_label": "BETADINE PREPS",
+          "min_text": "5",
+          "min_qty": 5,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 19
+          }
+        },
+        {
+          "item_ref": "als.iv.mini-maxi-drip-mini",
+          "catalog_ref": "mini-drip-set",
+          "label": "Mini Drip",
+          "source_label": "MINI DRIP / MAXI DRIP",
+          "min_text": "2 EACH",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "MINI DRIP / MAXI DRIP",
+          "variant_label": "Mini Drip",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Combined row expanded; '2 EACH' applies to each set type.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 20
+          }
+        },
+        {
+          "item_ref": "als.iv.mini-maxi-drip-maxi",
+          "catalog_ref": "maxi-drip-set",
+          "label": "Maxi Drip",
+          "source_label": "MINI DRIP / MAXI DRIP",
+          "min_text": "2 EACH",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "MINI DRIP / MAXI DRIP",
+          "variant_label": "Maxi Drip",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Combined row expanded; '2 EACH' applies to each set type.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 20
+          }
+        },
+        {
+          "item_ref": "als.iv.three-way-stopcock",
+          "catalog_ref": "three-way-stopcock",
+          "label": "3-Way Stopcock",
+          "source_label": "3-WAY STOPCOCK",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 21
+          }
+        },
+        {
+          "item_ref": "als.iv.sharps-shuttle",
+          "catalog_ref": "sharps-shuttle",
+          "label": "Sharps Shuttle",
+          "source_label": "SHARPS SHUTTLE",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 22
+          }
+        },
+        {
+          "item_ref": "als.iv.extension-set-j-loop",
+          "catalog_ref": "extension-set-j-loop",
+          "label": "Extension Set (J Loop)",
+          "source_label": "EXTENSION SET (J LOOP)",
+          "min_text": "5",
+          "min_qty": 5,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 23
+          }
+        }
+      ]
+    },
+    {
+      "key": "als-medications",
+      "label": "Medications",
+      "source_label": "MEDICATIONS",
+      "kind": "category",
+      "parent_key": null,
+      "sort": 30,
+      "notes": [
+        "Right-column rows RACEMIC EPI .. NORMAL SALINE 1000CCC (table rows 2-8) have no header of their own and continue this category in reading order (left column, then right column)."
+      ],
+      "items": [
+        {
+          "item_ref": "als.med.adenocard-12mg",
+          "catalog_ref": "adenocard-12mg",
+          "label": "Adenocard 12 mg",
+          "source_label": "ADENOCARD 12 MG",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 25
+          }
+        },
+        {
+          "item_ref": "als.med.amiodarone",
+          "catalog_ref": "amiodarone",
+          "label": "Amiodarone",
+          "source_label": "AMIODARONE",
+          "min_text": "4",
+          "min_qty": 4,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 26
+          }
+        },
+        {
+          "item_ref": "als.med.ammonia-inhalants",
+          "catalog_ref": "ammonia-inhalants-als-bag",
+          "label": "Ammonia Inhalants",
+          "source_label": "AMMONIA INHALANTS",
+          "min_text": "1 BOX",
+          "min_qty": 1,
+          "min_unit": "box",
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 27
+          }
+        },
+        {
+          "item_ref": "als.med.aspirin",
+          "catalog_ref": "aspirin",
+          "label": "Aspirin",
+          "source_label": "ASPIRIN",
+          "min_text": "1 BOTTLE",
+          "min_qty": 1,
+          "min_unit": "bottle",
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 28
+          }
+        },
+        {
+          "item_ref": "als.med.atropine",
+          "catalog_ref": "atropine",
+          "label": "Atropine",
+          "source_label": "ATROPINE",
+          "min_text": "3",
+          "min_qty": 3,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 29
+          }
+        },
+        {
+          "item_ref": "als.med.benadryl",
+          "catalog_ref": "benadryl",
+          "label": "Benadryl",
+          "source_label": "BENADRYL",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 30
+          }
+        },
+        {
+          "item_ref": "als.med.calcium-chloride",
+          "catalog_ref": "calcium-chloride",
+          "label": "Calcium Chloride",
+          "source_label": "CALCIUM CHLORIDE",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 31
+          }
+        },
+        {
+          "item_ref": "als.med.cardene",
+          "catalog_ref": "cardene",
+          "label": "Cardene",
+          "source_label": "CARDENE",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 32
+          }
+        },
+        {
+          "item_ref": "als.med.dextrose-25",
+          "catalog_ref": "dextrose-25",
+          "label": "Dextrose 25%",
+          "source_label": "DEXTROSE 25%",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 33
+          }
+        },
+        {
+          "item_ref": "als.med.dextrose-50",
+          "catalog_ref": "dextrose-50",
+          "label": "Dextrose 50%",
+          "source_label": "DEXTROSE 50%",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 34
+          }
+        },
+        {
+          "item_ref": "als.med.duoneb",
+          "catalog_ref": "duoneb-als-bag",
+          "label": "DuoNeb",
+          "source_label": "DUONEB",
+          "min_text": "4",
+          "min_qty": 4,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 35
+          }
+        },
+        {
+          "item_ref": "als.med.d5w-50cc",
+          "catalog_ref": "d5w-50cc",
+          "label": "D5W 50 cc Bag",
+          "source_label": "D5W 50 CC BAG",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 36
+          }
+        },
+        {
+          "item_ref": "als.med.epi-1-10000",
+          "catalog_ref": "epi-1-10000",
+          "label": "Epi 1:10,000",
+          "source_label": "EPI 1:10,000",
+          "min_text": "5",
+          "min_qty": 5,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 37
+          }
+        },
+        {
+          "item_ref": "als.med.dopamine",
+          "catalog_ref": "dopamine",
+          "label": "Dopamine",
+          "source_label": "DOPAMINE",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 38
+          }
+        },
+        {
+          "item_ref": "als.med.epi-1-1000",
+          "catalog_ref": "epi-1-1000",
+          "label": "Epi 1:1000",
+          "source_label": "EPI 1:1000",
+          "min_text": "4",
+          "min_qty": 4,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 39
+          }
+        },
+        {
+          "item_ref": "als.med.etomidate",
+          "catalog_ref": "etomidate",
+          "label": "Etomidate",
+          "source_label": "ETOMIDATE",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 40
+          }
+        },
+        {
+          "item_ref": "als.med.glucagon",
+          "catalog_ref": "glucagon",
+          "label": "Glucagon",
+          "source_label": "GLUCAGON",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 41
+          }
+        },
+        {
+          "item_ref": "als.med.glucose-gel",
+          "catalog_ref": "glucose-gel",
+          "label": "Glucose Gel",
+          "source_label": "GLUCOSE GEL",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 42
+          }
+        },
+        {
+          "item_ref": "als.med.lasix",
+          "catalog_ref": "lasix",
+          "label": "Lasix",
+          "source_label": "LASIX",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 43
+          }
+        },
+        {
+          "item_ref": "als.med.lidocaine",
+          "catalog_ref": "lidocaine",
+          "label": "Lidocaine",
+          "source_label": "LIDOCAINE",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 44
+          }
+        },
+        {
+          "item_ref": "als.med.mag-sulfate",
+          "catalog_ref": "mag-sulfate",
+          "label": "Mag Sulfate",
+          "source_label": "MAG SULFATE",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 45
+          }
+        },
+        {
+          "item_ref": "als.med.nitro-spray",
+          "catalog_ref": "nitro-spray-als-bag",
+          "label": "Nitro Spray",
+          "source_label": "NITRO SPRAY",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 46
+          }
+        },
+        {
+          "item_ref": "als.med.narcan",
+          "catalog_ref": "narcan",
+          "label": "Narcan",
+          "source_label": "NARCAN",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "left",
+            "row": 47
+          }
+        },
+        {
+          "item_ref": "als.med.racemic-epi",
+          "catalog_ref": "racemic-epi",
+          "label": "Racemic Epi",
+          "source_label": "RACEMIC EPI",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 2
+          }
+        },
+        {
+          "item_ref": "als.med.sodium-bicarb-4-2",
+          "catalog_ref": "sodium-bicarb-4-2",
+          "label": "Sodium Bicarb 4.2%",
+          "source_label": "SODIUM BICARB 4.2%",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 3
+          }
+        },
+        {
+          "item_ref": "als.med.sodium-bicarb-8-4",
+          "catalog_ref": "sodium-bicarb-8-4",
+          "label": "Sodium Bicarb 8.4%",
+          "source_label": "SODIUM BICARB 8.4%",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 4
+          }
+        },
+        {
+          "item_ref": "als.med.solu-medrol",
+          "catalog_ref": "solu-medrol",
+          "label": "Solu-Medrol",
+          "source_label": "SOLU-MEDEROL",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Typo corrected in label only: 'MEDEROL' -> 'Medrol'.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 5
+          }
+        },
+        {
+          "item_ref": "als.med.tetracaine-drops",
+          "catalog_ref": "tetracaine-drops",
+          "label": "Tetracaine Drops",
+          "source_label": "TETRACAINE DROPS",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 6
+          }
+        },
+        {
+          "item_ref": "als.med.zofran-iv",
+          "catalog_ref": "zofran-iv",
+          "label": "Zofran IV",
+          "source_label": "ZOFRAN",
+          "min_text": "2 IV / 6 ORAL",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "ZOFRAN",
+          "variant_label": "IV",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Cell '2 IV / 6 ORAL' expanded: IV minimum 2 (oral minimum 6 is the separate Zofran Oral item). min_text keeps the full cell text.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 7
+          }
+        },
+        {
+          "item_ref": "als.med.zofran-oral",
+          "catalog_ref": "zofran-oral",
+          "label": "Zofran Oral",
+          "source_label": "ZOFRAN",
+          "min_text": "2 IV / 6 ORAL",
+          "min_qty": 6,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": "ZOFRAN",
+          "variant_label": "ORAL",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Cell '2 IV / 6 ORAL' expanded: oral minimum 6 (IV minimum 2 is the separate Zofran IV item). min_text keeps the full cell text.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 7
+          }
+        },
+        {
+          "item_ref": "als.med.normal-saline-1000",
+          "catalog_ref": "normal-saline-1000",
+          "label": "Normal Saline 1000 cc",
+          "source_label": "NORMAL SALINE 1000CCC",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Typo corrected in label only: '1000CCC' -> '1000 cc'. Source text kept in source_label.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 8
+          }
+        }
+      ]
+    },
+    {
+      "key": "als-miscellaneous",
+      "label": "Miscellaneous",
+      "source_label": "MISCELLANEOUS",
+      "kind": "category",
+      "parent_key": null,
+      "sort": 40,
+      "items": [
+        {
+          "item_ref": "als.misc.foil-rescue-blanket",
+          "catalog_ref": "foil-rescue-blanket",
+          "label": "Foil Rescue Blanket",
+          "source_label": "FOIL RESCUE BLANKET",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 10
+          }
+        },
+        {
+          "item_ref": "als.misc.needles-19g",
+          "catalog_ref": "needle-19g",
+          "label": "Needle 19G",
+          "source_label": "NEEDLES 19G/21G/23G/25G",
+          "min_text": "2 EACH",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "NEEDLES 19G/21G/23G/25G",
+          "variant_label": "19G",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Combined row expanded to four gauges; '2 EACH' applies to each gauge.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 11
+          }
+        },
+        {
+          "item_ref": "als.misc.needles-21g",
+          "catalog_ref": "needle-21g",
+          "label": "Needle 21G",
+          "source_label": "NEEDLES 19G/21G/23G/25G",
+          "min_text": "2 EACH",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "NEEDLES 19G/21G/23G/25G",
+          "variant_label": "21G",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Combined row expanded to four gauges; '2 EACH' applies to each gauge.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 11
+          }
+        },
+        {
+          "item_ref": "als.misc.needles-23g",
+          "catalog_ref": "needle-23g",
+          "label": "Needle 23G",
+          "source_label": "NEEDLES 19G/21G/23G/25G",
+          "min_text": "2 EACH",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "NEEDLES 19G/21G/23G/25G",
+          "variant_label": "23G",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Combined row expanded to four gauges; '2 EACH' applies to each gauge.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 11
+          }
+        },
+        {
+          "item_ref": "als.misc.needles-25g",
+          "catalog_ref": "needle-25g",
+          "label": "Needle 25G",
+          "source_label": "NEEDLES 19G/21G/23G/25G",
+          "min_text": "2 EACH",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "NEEDLES 19G/21G/23G/25G",
+          "variant_label": "25G",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Combined row expanded to four gauges; '2 EACH' applies to each gauge.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 11
+          }
+        },
+        {
+          "item_ref": "als.misc.triangle-bandage",
+          "catalog_ref": "triangle-bandage",
+          "label": "Triangle Bandage",
+          "source_label": "TRIANGLE BANDAGE",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 12
+          }
+        },
+        {
+          "item_ref": "als.misc.eye-cover",
+          "catalog_ref": "eye-cover",
+          "label": "Eye Cover",
+          "source_label": "EYE COVER",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 13
+          }
+        },
+        {
+          "item_ref": "als.misc.band-aides-small",
+          "catalog_ref": "band-aid-small",
+          "label": "Band Aides Small",
+          "source_label": "BAND AIDES SMALL",
+          "min_text": "10",
+          "min_qty": 10,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 14
+          }
+        },
+        {
+          "item_ref": "als.misc.band-aides-large",
+          "catalog_ref": "band-aid-large",
+          "label": "Band Aides Large",
+          "source_label": "BAND AIDES LARGE",
+          "min_text": "10",
+          "min_qty": 10,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 15
+          }
+        },
+        {
+          "item_ref": "als.misc.arm-board-9",
+          "catalog_ref": "arm-board-9in",
+          "label": "Arm Board 9\"",
+          "source_label": "ARM BOARD 9\"",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 16
+          }
+        },
+        {
+          "item_ref": "als.misc.arm-board-18",
+          "catalog_ref": "arm-board-18in",
+          "label": "Arm Board 18\"",
+          "source_label": "ARM BOARD 18\"",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 17
+          }
+        },
+        {
+          "item_ref": "als.misc.stethoscope",
+          "catalog_ref": "stethoscope",
+          "label": "Stethoscope",
+          "source_label": "STETHESCOPE",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Typo corrected in label only: 'STETHESCOPE' -> 'Stethoscope'.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 18
+          }
+        },
+        {
+          "item_ref": "als.misc.bp-cuff-adult",
+          "catalog_ref": "bp-cuff-adult",
+          "label": "BP Cuff (Adult)",
+          "source_label": "BP CUFF (ADULT)",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 19
+          }
+        },
+        {
+          "item_ref": "als.misc.tape-half-in",
+          "catalog_ref": "tape-1-2in",
+          "label": "Tape 1/2\"",
+          "source_label": "TAPE 1/2\" - 1\" - 3\"",
+          "min_text": "1 EACH",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "TAPE 1/2\" - 1\" - 3\"",
+          "variant_label": "1/2\"",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Combined row expanded to 1/2\", 1\" and 3\" tape; '1 EACH' applies to each width.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 20
+          }
+        },
+        {
+          "item_ref": "als.misc.tape-1-in",
+          "catalog_ref": "tape-1in",
+          "label": "Tape 1\"",
+          "source_label": "TAPE 1/2\" - 1\" - 3\"",
+          "min_text": "1 EACH",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "TAPE 1/2\" - 1\" - 3\"",
+          "variant_label": "1\"",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Combined row expanded to 1/2\", 1\" and 3\" tape; '1 EACH' applies to each width.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 20
+          }
+        },
+        {
+          "item_ref": "als.misc.tape-3-in",
+          "catalog_ref": "tape-3in",
+          "label": "Tape 3\"",
+          "source_label": "TAPE 1/2\" - 1\" - 3\"",
+          "min_text": "1 EACH",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "TAPE 1/2\" - 1\" - 3\"",
+          "variant_label": "3\"",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Combined row expanded to 1/2\", 1\" and 3\" tape; '1 EACH' applies to each width.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 20
+          }
+        },
+        {
+          "item_ref": "als.misc.cat-tourniquet",
+          "catalog_ref": "cat-tourniquet",
+          "label": "CAT Tourniquet",
+          "source_label": "CAT TOURNIQUET",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 21
+          }
+        },
+        {
+          "item_ref": "als.misc.ace-bandage-4-in",
+          "catalog_ref": "ace-bandage-4in",
+          "label": "Ace Bandage 4\"",
+          "source_label": "ACE BANDAGE 4\"/6\"",
+          "min_text": "4 EACH",
+          "min_qty": 4,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "ACE BANDAGE 4\"/6\"",
+          "variant_label": "4\"",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Combined row expanded to 4\" and 6\"; '4 EACH' applies to each size.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 22
+          }
+        },
+        {
+          "item_ref": "als.misc.ace-bandage-6-in",
+          "catalog_ref": "ace-bandage-6in",
+          "label": "Ace Bandage 6\"",
+          "source_label": "ACE BANDAGE 4\"/6\"",
+          "min_text": "4 EACH",
+          "min_qty": 4,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "ACE BANDAGE 4\"/6\"",
+          "variant_label": "6\"",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Combined row expanded to 4\" and 6\"; '4 EACH' applies to each size.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 22
+          }
+        },
+        {
+          "item_ref": "als.misc.kling-6-in",
+          "catalog_ref": "kling-6in",
+          "label": "Kling 6\"",
+          "source_label": "KLING 6\"/4\"/2\"",
+          "min_text": "4 EACH",
+          "min_qty": 4,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "KLING 6\"/4\"/2\"",
+          "variant_label": "6\"",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Combined row expanded to 6\", 4\" and 2\"; '4 EACH' applies to each size.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 23
+          }
+        },
+        {
+          "item_ref": "als.misc.kling-4-in",
+          "catalog_ref": "kling-4in",
+          "label": "Kling 4\"",
+          "source_label": "KLING 6\"/4\"/2\"",
+          "min_text": "4 EACH",
+          "min_qty": 4,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "KLING 6\"/4\"/2\"",
+          "variant_label": "4\"",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Combined row expanded to 6\", 4\" and 2\"; '4 EACH' applies to each size.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 23
+          }
+        },
+        {
+          "item_ref": "als.misc.kling-2-in",
+          "catalog_ref": "kling-2in",
+          "label": "Kling 2\"",
+          "source_label": "KLING 6\"/4\"/2\"",
+          "min_text": "4 EACH",
+          "min_qty": 4,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "KLING 6\"/4\"/2\"",
+          "variant_label": "2\"",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Combined row expanded to 6\", 4\" and 2\"; '4 EACH' applies to each size.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 23
+          }
+        },
+        {
+          "item_ref": "als.misc.steri-pads-2x2",
+          "catalog_ref": "steri-pad-2x2",
+          "label": "Steri Pad 2x2",
+          "source_label": "2X2 / 4X4 / 5X9 STERI PADS",
+          "min_text": "5 EACH",
+          "min_qty": 5,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "2X2 / 4X4 / 5X9 STERI PADS",
+          "variant_label": "2x2",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Combined row expanded to 2x2, 4x4 and 5x9; '5 EACH' applies to each size.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 24
+          }
+        },
+        {
+          "item_ref": "als.misc.steri-pads-4x4",
+          "catalog_ref": "steri-pad-4x4",
+          "label": "Steri Pad 4x4",
+          "source_label": "2X2 / 4X4 / 5X9 STERI PADS",
+          "min_text": "5 EACH",
+          "min_qty": 5,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "2X2 / 4X4 / 5X9 STERI PADS",
+          "variant_label": "4x4",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Combined row expanded to 2x2, 4x4 and 5x9; '5 EACH' applies to each size.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 24
+          }
+        },
+        {
+          "item_ref": "als.misc.steri-pads-5x9",
+          "catalog_ref": "steri-pad-5x9",
+          "label": "Steri Pad 5x9",
+          "source_label": "2X2 / 4X4 / 5X9 STERI PADS",
+          "min_text": "5 EACH",
+          "min_qty": 5,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "2X2 / 4X4 / 5X9 STERI PADS",
+          "variant_label": "5x9",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Combined row expanded to 2x2, 4x4 and 5x9; '5 EACH' applies to each size.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 24
+          }
+        },
+        {
+          "item_ref": "als.misc.ice-packs",
+          "catalog_ref": "ice-pack",
+          "label": "Ice Packs",
+          "source_label": "ICE PACKS",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 25
+          }
+        },
+        {
+          "item_ref": "als.misc.nasal-maddet",
+          "catalog_ref": "nasal-maddet",
+          "label": "Nasal MADDET",
+          "source_label": "NASAL MADDET",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "'MADDET' kept as printed (likely a mucosal atomization device); not interpreted.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 26
+          }
+        },
+        {
+          "item_ref": "als.misc.syringe-1-3-10-12-1cc",
+          "catalog_ref": "syringe-1cc",
+          "label": "Syringe 1cc",
+          "source_label": "SYRINGE 1cc / 3cc / 10 or 12cc",
+          "min_text": "3",
+          "min_qty": 3,
+          "min_unit": null,
+          "min_applies_to": "unclear",
+          "variant_group": "SYRINGE 1cc / 3cc / 10 or 12cc",
+          "variant_label": "1cc",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "'10 or 12cc' kept as one variant (either size).",
+          "needs_review": true,
+          "review_reason": "Row lists three syringe sizes with min '3' and no '(each)'; unclear whether 3 total or 3 per size.",
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 27
+          }
+        },
+        {
+          "item_ref": "als.misc.syringe-1-3-10-12-3cc",
+          "catalog_ref": "syringe-3cc",
+          "label": "Syringe 3cc",
+          "source_label": "SYRINGE 1cc / 3cc / 10 or 12cc",
+          "min_text": "3",
+          "min_qty": 3,
+          "min_unit": null,
+          "min_applies_to": "unclear",
+          "variant_group": "SYRINGE 1cc / 3cc / 10 or 12cc",
+          "variant_label": "3cc",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "'10 or 12cc' kept as one variant (either size).",
+          "needs_review": true,
+          "review_reason": "Row lists three syringe sizes with min '3' and no '(each)'; unclear whether 3 total or 3 per size.",
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 27
+          }
+        },
+        {
+          "item_ref": "als.misc.syringe-1-3-10-12-10-or-12cc",
+          "catalog_ref": "syringe-10-12cc",
+          "label": "Syringe 10 or 12cc",
+          "source_label": "SYRINGE 1cc / 3cc / 10 or 12cc",
+          "min_text": "3",
+          "min_qty": 3,
+          "min_unit": null,
+          "min_applies_to": "unclear",
+          "variant_group": "SYRINGE 1cc / 3cc / 10 or 12cc",
+          "variant_label": "10 or 12cc",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "'10 or 12cc' kept as one variant (either size).",
+          "needs_review": true,
+          "review_reason": "Row lists three syringe sizes with min '3' and no '(each)'; unclear whether 3 total or 3 per size.",
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 27
+          }
+        },
+        {
+          "item_ref": "als.misc.syringe-60cc",
+          "catalog_ref": "syringe-60cc",
+          "label": "Syringe 60 cc",
+          "source_label": "SYRINGE 60 CC",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 28
+          }
+        },
+        {
+          "item_ref": "als.misc.vomex-bag",
+          "catalog_ref": "vomex-bag",
+          "label": "Vomex Bag",
+          "source_label": "VOMEX BAG",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 29
+          }
+        },
+        {
+          "item_ref": "als.misc.steril-water",
+          "catalog_ref": "sterile-water",
+          "label": "Sterile Water",
+          "source_label": "STERIL WATER",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Typo corrected in label only: 'STERIL' -> 'Sterile'.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 30
+          }
+        },
+        {
+          "item_ref": "als.misc.peroxide",
+          "catalog_ref": "peroxide",
+          "label": "Peroxide",
+          "source_label": "PEROXIDE",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 31
+          }
+        },
+        {
+          "item_ref": "als.misc.trauma-shears",
+          "catalog_ref": "trauma-shears",
+          "label": "Trauma Shears",
+          "source_label": "TRAUMA SHEARS",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 32
+          }
+        },
+        {
+          "item_ref": "als.misc.magill-forceps",
+          "catalog_ref": "magill-forceps-als-bag",
+          "label": "Magill Forceps",
+          "source_label": "MAGELL FORCEPS",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Typo corrected in label only: 'MAGELL' -> 'Magill'. No adult/pedi size stated on this form.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 33
+          }
+        },
+        {
+          "item_ref": "als.misc.gloves",
+          "catalog_ref": "gloves-als-bag",
+          "label": "Gloves",
+          "source_label": "GLOVES",
+          "min_text": "2 PAIR",
+          "min_qty": 2,
+          "min_unit": "pair",
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Min stated as '2 PAIR'; glove size/material not stated.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 34
+          }
+        },
+        {
+          "item_ref": "als.misc.safety-goggles",
+          "catalog_ref": "safety-goggles",
+          "label": "Safety Goggles",
+          "source_label": "SAFETY GOGGLES",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 35
+          }
+        },
+        {
+          "item_ref": "als.misc.pen-light",
+          "catalog_ref": "pen-light",
+          "label": "Pen Light",
+          "source_label": "PEN LIGHT",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 36
+          }
+        },
+        {
+          "item_ref": "als.misc.surge-n95-surge",
+          "catalog_ref": "surge-mask",
+          "label": "SURGE",
+          "source_label": "SURGE/N95",
+          "min_text": "2 EACH",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "SURGE/N95",
+          "variant_label": "SURGE",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Combined row expanded to SURGE and N95; '2 EACH' applies to each.",
+          "needs_review": true,
+          "review_reason": "'SURGE' is not defined on the form (possibly a surgical/surge mask); recorded as printed.",
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 37
+          }
+        },
+        {
+          "item_ref": "als.misc.surge-n95-n95",
+          "catalog_ref": "n95-respirator",
+          "label": "N95",
+          "source_label": "SURGE/N95",
+          "min_text": "2 EACH",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "each_variant",
+          "variant_group": "SURGE/N95",
+          "variant_label": "N95",
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": "Combined row expanded to SURGE and N95; '2 EACH' applies to each.",
+          "needs_review": true,
+          "review_reason": "'SURGE' is not defined on the form (possibly a surgical/surge mask); recorded as printed.",
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 37
+          }
+        },
+        {
+          "item_ref": "als.misc.red-bag",
+          "catalog_ref": "red-bag-als-bag",
+          "label": "Red Bag",
+          "source_label": "RED BAG",
+          "min_text": "2",
+          "min_qty": 2,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 38
+          }
+        },
+        {
+          "item_ref": "als.misc.bite-stick",
+          "catalog_ref": "bite-stick",
+          "label": "Bite Stick",
+          "source_label": "BITE STICK",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 39
+          }
+        },
+        {
+          "item_ref": "als.misc.ring-cutter",
+          "catalog_ref": "ring-cutter",
+          "label": "Ring Cutter",
+          "source_label": "RING CUTTER",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 40
+          }
+        },
+        {
+          "item_ref": "als.misc.thermometer-strip",
+          "catalog_ref": "thermometer-strip",
+          "label": "Thermometer Strip",
+          "source_label": "THERMOMETER STRIP",
+          "min_text": "5",
+          "min_qty": 5,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 41
+          }
+        },
+        {
+          "item_ref": "als.misc.glucometer",
+          "catalog_ref": "glucometer",
+          "label": "Glucometer",
+          "source_label": "GLUCOMETER",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 42
+          }
+        },
+        {
+          "item_ref": "als.misc.lancets",
+          "catalog_ref": "lancets",
+          "label": "Lancets",
+          "source_label": "LANCETS",
+          "min_text": "25",
+          "min_qty": 25,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 43
+          }
+        },
+        {
+          "item_ref": "als.misc.test-strips",
+          "catalog_ref": "test-strips",
+          "label": "Test Strips",
+          "source_label": "TEST STRIPS",
+          "min_text": "25",
+          "min_qty": 25,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": false,
+            "refrigerated": false,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 44
+          }
+        }
+      ]
+    },
+    {
+      "key": "als-rescue-only",
+      "label": "Rescue Only",
+      "source_label": "RESCUE ONLY",
+      "kind": "subsection",
+      "parent_key": "als-miscellaneous",
+      "sort": 45,
+      "notes": [
+        "Green sub-header at the bottom of the right column (table row 45); items below are for rescue units only."
+      ],
+      "items": [
+        {
+          "item_ref": "als.rescue.cardizem-refrigerated",
+          "catalog_ref": "cardizem",
+          "label": "Cardizem (Refrigerated)",
+          "source_label": "CARDIZEM (REFRIGERATED)",
+          "min_text": "1",
+          "min_qty": 1,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "quantity",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": true,
+            "refrigerated": true,
+            "controlled_substance": false
+          },
+          "notes": null,
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 46
+          }
+        },
+        {
+          "item_ref": "als.rescue.narcs-box",
+          "catalog_ref": "narcs-box",
+          "label": "Narcs Box",
+          "source_label": "NARCS BOX",
+          "min_text": "Y / N",
+          "min_qty": null,
+          "min_unit": null,
+          "min_applies_to": "item",
+          "variant_group": null,
+          "variant_label": null,
+          "response_type": "yes_no",
+          "flags": {
+            "detail_airway_bag_only": false,
+            "rescue_only": true,
+            "refrigerated": false,
+            "controlled_substance": true
+          },
+          "notes": "Yes/No check (is the narcotics box present); no quantity.",
+          "needs_review": false,
+          "review_reason": null,
+          "source_ref": {
+            "page": 1,
+            "column": "right",
+            "row": 47
+          }
+        }
+      ]
+    }
+  ]
+}

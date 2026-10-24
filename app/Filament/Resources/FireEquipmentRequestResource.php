@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Concerns\EnterpriseTable;
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\FireEquipmentRequestResource\Pages;
 use App\Models\FireEquipmentRequest;
 use App\Support\Security\Base64Image;
@@ -17,6 +18,7 @@ use Illuminate\Support\Facades\Storage;
 class FireEquipmentRequestResource extends Resource
 {
     use EnterpriseTable;
+    use HasExportActions;
 
     protected static ?string $model = FireEquipmentRequest::class;
 
@@ -49,7 +51,7 @@ class FireEquipmentRequestResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return self::applyEnterpriseDefaults($table)
+        return static::withExportActions(self::applyEnterpriseDefaults($table)
             ->columns([
                 Tables\Columns\TextColumn::make('id')->label('ID')->sortable(),
                 Tables\Columns\TextColumn::make('station.station_number')
@@ -102,7 +104,7 @@ class FireEquipmentRequestResource extends Resource
             ->defaultSort('created_at', 'desc')
             ->actions([
                 Tables\Actions\ViewAction::make(),
-            ]);
+            ]));
     }
 
     public static function infolist(Infolist $infolist): Infolist

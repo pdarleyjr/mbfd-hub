@@ -62,7 +62,8 @@ test('station, room, and apparatus service APIs cannot remain stale', () => {
   assert.match(serviceWorker, /url\.pathname\.endsWith\('\/service-tickets'\)/);
   assert.match(serviceWorker, /if \(isLiveServiceRequest\) \{[\s\S]*fetch\(request, \{ cache: 'no-store' \}\)/);
   assert.match(serviceWorker, /if \(isOfflineReadModelRequest\)/);
-  assert.match(serviceWorker, /url\.pathname\.startsWith\('\/api\/'\) && !isOfflineReadModelRequest/);
+  assert.match(serviceWorker, /const isLiveApiPath = url\.pathname\.startsWith\('\/api\/'\) \|\| url\.pathname\.startsWith\('\/ems\/api\/'\);/);
+  assert.match(serviceWorker, /isLiveApiPath && !isOfflineReadModelRequest/);
   assert.match(api, /fetch(?:WithTimeout)?\(`\$\{API_BASE\}\/public\/stations`, \{[\s\S]*cache: 'no-store'/);
   assert.match(api, /fetch(?:WithTimeout)?\(`\$\{API_BASE\}\/public\/stations\/\$\{id\}`, \{[\s\S]*cache: 'no-store'/);
 });

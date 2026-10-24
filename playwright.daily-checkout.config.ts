@@ -42,7 +42,7 @@ const responsiveViewports = [
  */
 export default defineConfig({
   testDir: './tests/e2e',
-  testMatch: /(canonical-login-responsive|command-communications|daily-checkout-(inspection|responsive|service-worker|workspace|mobile|vehicle-confirmation)|daily-issue-report|daily-inventory-correction|captain5-workspace)\.spec\.ts/,
+  testMatch: /(canonical-login-responsive|command-communications|daily-checkout-(inspection|responsive|service-worker|workspace|mobile|vehicle-confirmation)|daily-issue-report|daily-inventory-correction|captain5-workspace|captain5-ems)\.spec\.ts/,
   timeout: 45_000,
   retries: process.env.CI ? 1 : 0,
   workers: 1,
@@ -99,6 +99,11 @@ export default defineConfig({
     {
       name: 'captain5-chromium',
       testMatch: /captain5-workspace\.spec\.ts/,
+      use: { browserName: 'chromium', viewport: { width: 1280, height: 800 } },
+    },
+    {
+      name: 'captain5-ems-chromium',
+      testMatch: /captain5-ems\.spec\.ts/,
       use: { browserName: 'chromium', viewport: { width: 1280, height: 800 } },
     },
     {

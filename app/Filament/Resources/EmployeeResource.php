@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources;
 
 use App\Filament\Concerns\EnterpriseTable;
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\EmployeeResource\Pages;
 use App\Filament\Support\EmployeeAccessSchema;
 use App\Jobs\IssueMemberOnboardingInvitation;
@@ -21,6 +22,7 @@ use Illuminate\Support\HtmlString;
 class EmployeeResource extends Resource
 {
     use EnterpriseTable;
+    use HasExportActions;
 
     protected static ?string $model = Employee::class;
 
@@ -83,7 +85,7 @@ class EmployeeResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return self::applyEnterpriseDefaults($table)
+        return static::withExportActions(self::applyEnterpriseDefaults($table)
             // Avoid a deferred Livewire rerender racing the bulk-selection Alpine component.
             ->deferLoading(false)
             ->modifyQueryUsing(fn ($query) => $query->with('user.memberOnboardingInvitation'))
@@ -195,7 +197,7 @@ class EmployeeResource extends Resource
                     ])
                     ->action(fn (array $data, Collection $records, Pages\ListEmployees $livewire) => $livewire->queueSelectedInvitations($records, $data)),
             ])
-            ->searchPlaceholder('Search by name, ID, or rank...');
+            ->searchPlaceholder('Search by name, ID, or rank...'));
     }
 
     public static function getRelations(): array

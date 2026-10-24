@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\UniformResource\Pages;
 use App\Models\Employee;
 use App\Models\Uniform;
@@ -20,6 +21,8 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class UniformResource extends Resource
 {
+    use HasExportActions;
+
     protected static ?int $navigationSort = 40;
 
     public static function shouldRegisterNavigation(): bool
@@ -134,7 +137,7 @@ class UniformResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->defaultSort('item_name')
             ->columns([
                 Tables\Columns\TextColumn::make('item_name')
@@ -204,7 +207,7 @@ class UniformResource extends Resource
                 Tables\Actions\EditAction::make(),
             ])
             ->emptyStateHeading('No PPE or uniforms in stock yet')
-            ->emptyStateDescription('Add items you have on hand so they can be assigned to members.');
+            ->emptyStateDescription('Add items you have on hand so they can be assigned to members.'));
     }
 
     /** @return array<string, string> */

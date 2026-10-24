@@ -4,6 +4,7 @@
         $formLabel = match ($this->record->form_type) {
             'ics_214' => 'ICS 214',
             'uploaded_file' => 'Submitted file',
+            'medical_inventory_request' => 'Medical Inventory Request',
             default => 'F-ROC Daily Activity Report',
         };
     @endphp

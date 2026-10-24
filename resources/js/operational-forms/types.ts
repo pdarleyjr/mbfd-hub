@@ -1,5 +1,8 @@
+import type { EmsDeepLink, EmsEndpoints } from './ems/emsTypes';
+
 export type EditableFormType = 'ics_214' | 'froc_log_001_ff';
-export type FormType = EditableFormType | 'uploaded_file';
+/** medical_inventory_request is the read-only PDF copy of a Medical Inventory Request, created by the server. */
+export type FormType = EditableFormType | 'uploaded_file' | 'medical_inventory_request';
 
 export interface FormDefinition {
     form_type: EditableFormType;
@@ -115,9 +118,26 @@ export interface FrocImportConfig {
     max_zip_entries: number;
 }
 
+/**
+ * A form that opens from its own library card. In-app forms (ICS 214, F-ROC) come from the form definitions instead.
+ * An in_app entry (the Medical Inventory Request) opens inside this app; href is its shareable deep link.
+ */
+export interface LibraryLink {
+    key: string;
+    title: string;
+    description: string;
+    href: string;
+    action_label: string;
+    in_app?: boolean;
+    secondary?: { label: string; href: string };
+}
+
 export interface BootstrapData {
     employee: { id: number; employee_id: string; name: string; rank?: string | null };
-    endpoints: { form_types: string; records: string; uploads: string; guide: string };
+    endpoints: { form_types: string; records: string; uploads: string; guide: string; ems?: EmsEndpoints };
+    /** Which Medical Inventory Request view the page was opened on (from ?form= or ?ems_request=). */
+    deep_link?: EmsDeepLink;
+    library_links: LibraryLink[];
     csrf_token: string;
     build: string;
     froc_import: FrocImportConfig;

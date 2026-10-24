@@ -9,6 +9,7 @@ use App\Enums\DepartmentUpdateCategory;
 use App\Enums\DepartmentUpdatePriority;
 use App\Enums\DepartmentUpdateStatus;
 use App\Filament\Concerns\EnterpriseTable;
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\DepartmentUpdateResource\Pages;
 use App\Jobs\SendDepartmentUpdateNotification;
 use App\Models\DepartmentUpdate;
@@ -28,6 +29,7 @@ use Illuminate\Database\Eloquent\Model;
 final class DepartmentUpdateResource extends Resource
 {
     use EnterpriseTable;
+    use HasExportActions;
 
     protected static ?string $model = DepartmentUpdate::class;
 
@@ -166,7 +168,7 @@ final class DepartmentUpdateResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return self::applyEnterpriseDefaults($table)
+        return self::withExportActions(self::applyEnterpriseDefaults($table)
             ->columns([
                 Tables\Columns\TextColumn::make('title')->searchable()->limit(60)->sortable(),
                 Tables\Columns\TextColumn::make('category')
@@ -247,7 +249,7 @@ final class DepartmentUpdateResource extends Resource
                 Tables\Actions\DeleteAction::make(),
                 Tables\Actions\RestoreAction::make(),
             ])
-            ->bulkActions([]);
+            ->bulkActions([]));
     }
 
     public static function infolist(Infolist $infolist): Infolist

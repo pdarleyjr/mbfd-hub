@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ShopWork extends Model
 {
@@ -32,4 +33,10 @@ class ShopWork extends Model
         'started_date' => 'date',
         'completed_date' => 'date',
     ];
+
+    /** @return BelongsTo<Apparatus, $this> */
+    public function apparatus(): BelongsTo
+    {
+        return $this->belongsTo(Apparatus::class);
+    }
 }

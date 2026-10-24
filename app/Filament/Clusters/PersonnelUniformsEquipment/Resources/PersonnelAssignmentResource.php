@@ -6,6 +6,7 @@ namespace App\Filament\Clusters\PersonnelUniformsEquipment\Resources;
 
 use App\Filament\Clusters\PersonnelUniformsEquipment;
 use App\Filament\Clusters\PersonnelUniformsEquipment\Resources\PersonnelAssignmentResource\Pages;
+use App\Filament\Concerns\HasExportActions;
 use App\Models\AssignedEquipment;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
@@ -21,6 +22,8 @@ use Illuminate\Database\Eloquent\Builder;
 
 class PersonnelAssignmentResource extends Resource
 {
+    use HasExportActions;
+
     protected static ?string $model = AssignedEquipment::class;
 
     protected static ?string $cluster = PersonnelUniformsEquipment::class;
@@ -50,7 +53,7 @@ class PersonnelAssignmentResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table->columns([
+        return static::withExportActions($table->columns([
             TextColumn::make('employee.name')->label('Employee')->description(fn (AssignedEquipment $record) => "{$record->employee?->rank} · {$record->employee?->employee_id}")->searchable()->sortable(),
             TextColumn::make('item_description')->label('Item')->searchable()->sortable(),
             TextColumn::make('category')->badge()->searchable(),
@@ -66,7 +69,7 @@ class PersonnelAssignmentResource extends Resource
                 default => $query,
             }),
             SelectFilter::make('category')->options(fn () => AssignedEquipment::query()->distinct()->orderBy('category')->pluck('category', 'category')->all()),
-        ])->actions([EditAction::make()])->bulkActions([])->defaultSort('expires_at');
+        ])->actions([EditAction::make()])->bulkActions([])->defaultSort('expires_at'));
     }
 
     public static function getPages(): array

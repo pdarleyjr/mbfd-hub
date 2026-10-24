@@ -69,9 +69,9 @@ class SessionResultsPage extends Page
 
             return response()->streamDownload(function () use ($t1) {
                 $handle = fopen('php://output', 'w');
-                fputcsv($handle, ['Product', 'Brand', 'Overall Score', 'Capability', 'Usability', 'Affordability', 'Maintainability', 'Deployability', 'Responses']);
+                \App\Services\Exports\CellSanitizer::putCsv($handle, ['Product', 'Brand', 'Overall Score', 'Capability', 'Usability', 'Affordability', 'Maintainability', 'Deployability', 'Responses']);
                 if ($t1) {
-                    fputcsv($handle, [
+                    \App\Services\Exports\CellSanitizer::putCsv($handle, [
                         $t1['name'] ?? '',
                         $t1['brand'] ?? '',
                         $t1['avg_score'] ?? '',
@@ -92,9 +92,9 @@ class SessionResultsPage extends Page
 
             return response()->streamDownload(function () use ($brands) {
                 $handle = fopen('php://output', 'w');
-                fputcsv($handle, ['Rank', 'Brand', 'Overall Avg', 'Tool Count', 'Capability', 'Usability', 'Affordability', 'Maintainability', 'Deployability']);
+                \App\Services\Exports\CellSanitizer::putCsv($handle, ['Rank', 'Brand', 'Overall Avg', 'Tool Count', 'Capability', 'Usability', 'Affordability', 'Maintainability', 'Deployability']);
                 foreach ($brands as $b) {
-                    fputcsv($handle, [
+                    \App\Services\Exports\CellSanitizer::putCsv($handle, [
                         $b['rank'] ?? '',
                         $b['brand'] ?? '',
                         $b['overall_avg'] ?? '',
@@ -115,9 +115,9 @@ class SessionResultsPage extends Page
 
         return response()->streamDownload(function () use ($items) {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['Rank', 'Product', 'Brand', 'Overall Score', 'Capability', 'Usability', 'Affordability', 'Maintainability', 'Deployability', 'Advance Yes', 'Advance No', 'Deal Breakers', 'Responses']);
+            \App\Services\Exports\CellSanitizer::putCsv($handle, ['Rank', 'Product', 'Brand', 'Overall Score', 'Capability', 'Usability', 'Affordability', 'Maintainability', 'Deployability', 'Advance Yes', 'Advance No', 'Deal Breakers', 'Responses']);
             foreach ($items as $idx => $item) {
-                fputcsv($handle, [
+                \App\Services\Exports\CellSanitizer::putCsv($handle, [
                     $idx + 1,
                     $item['name'] ?? ($item['product']->name ?? ''),
                     $item['brand'] ?? '',
@@ -153,10 +153,10 @@ class SessionResultsPage extends Page
 
         return response()->streamDownload(function () use ($targetCat) {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['Rank', 'Product', 'Manufacturer', 'Model', 'Overall Score', 'Responses', 'Meets Threshold']);
+            \App\Services\Exports\CellSanitizer::putCsv($handle, ['Rank', 'Product', 'Manufacturer', 'Model', 'Overall Score', 'Responses', 'Meets Threshold']);
             if ($targetCat) {
                 foreach ($targetCat['rankings'] as $idx => $item) {
-                    fputcsv($handle, [
+                    \App\Services\Exports\CellSanitizer::putCsv($handle, [
                         $idx + 1,
                         $item['product']->name ?? '',
                         $item['product']->manufacturer ?? '',
@@ -188,11 +188,11 @@ class SessionResultsPage extends Page
 
         return response()->streamDownload(function () use ($rankings) {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['Category', 'Group', 'Rank', 'Product', 'Brand', 'Avg Score', 'Responses']);
+            \App\Services\Exports\CellSanitizer::putCsv($handle, ['Category', 'Group', 'Rank', 'Product', 'Brand', 'Avg Score', 'Responses']);
             foreach ($rankings as $cat) {
                 foreach ($cat['groups'] as $group) {
                     foreach ($group['rankings'] as $idx => $r) {
-                        fputcsv($handle, [
+                        \App\Services\Exports\CellSanitizer::putCsv($handle, [
                             $cat['category_name'],
                             $group['group_name'],
                             $idx + 1,
@@ -222,11 +222,11 @@ class SessionResultsPage extends Page
 
         return response()->streamDownload(function () use ($results) {
             $handle = fopen('php://output', 'w');
-            fputcsv($handle, ['Category', 'Rank', 'Product', 'Manufacturer', 'Avg Score', 'Responses']);
+            \App\Services\Exports\CellSanitizer::putCsv($handle, ['Category', 'Rank', 'Product', 'Manufacturer', 'Avg Score', 'Responses']);
             foreach ($results['rankable_categories'] as $cat) {
                 $rankings = collect($cat['rankings'])->filter(fn ($r) => $r['meets_threshold'])->take(2);
                 foreach ($rankings as $idx => $item) {
-                    fputcsv($handle, [
+                    \App\Services\Exports\CellSanitizer::putCsv($handle, [
                         $cat['category_name'],
                         $idx + 1,
                         $item['product']->name ?? '',

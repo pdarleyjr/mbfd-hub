@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\TodoResource\Pages;
 use App\Models\Todo;
 use App\Models\User;
@@ -16,6 +17,8 @@ use Illuminate\Support\Str;
 
 class TodoResource extends Resource
 {
+    use HasExportActions;
+
     protected static ?string $model = Todo::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-list-bullet';
@@ -56,7 +59,7 @@ class TodoResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->columns([
                 Split::make([
                     Tables\Columns\ToggleColumn::make('is_completed')
@@ -129,7 +132,7 @@ class TodoResource extends Resource
                 ]),
             ])
             ->defaultSort('is_completed', 'asc')
-            ->defaultSort('created_at', 'desc');
+            ->defaultSort('created_at', 'desc'));
     }
 
     public static function getPages(): array

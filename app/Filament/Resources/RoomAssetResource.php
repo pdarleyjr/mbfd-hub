@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources;
 
 use App\Filament\Concerns\EnterpriseTable;
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\RoomAssetResource\Pages;
 use App\Models\RoomAsset;
 use Filament\Forms;
@@ -20,6 +21,7 @@ use Illuminate\Database\Eloquent\Model;
 class RoomAssetResource extends Resource
 {
     use EnterpriseTable;
+    use HasExportActions;
 
     protected static ?string $model = RoomAsset::class;
 
@@ -68,7 +70,7 @@ class RoomAssetResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return self::applyEnterpriseDefaults($table)->columns([
+        return static::withExportActions(self::applyEnterpriseDefaults($table)->columns([
             Tables\Columns\TextColumn::make('room.station.station_number')->label('Station')->sortable(),
             Tables\Columns\TextColumn::make('room.name')->label('Room')->searchable()->sortable(),
             Tables\Columns\TextColumn::make('asset_tag')->label('Asset Tag')->searchable(),
@@ -84,7 +86,7 @@ class RoomAssetResource extends Resource
         ])->actions([
             Tables\Actions\ViewAction::make(),
             Tables\Actions\EditAction::make(),
-        ])->defaultSort('updated_at', 'desc');
+        ])->defaultSort('updated_at', 'desc'));
     }
 
     public static function infolist(Infolist $infolist): Infolist
