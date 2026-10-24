@@ -31,8 +31,8 @@ use Illuminate\Validation\ValidationException;
  *
  * Who may ask: Captain 5 = anyone who can use the Captain 5 page (Captain5Access); 300 = anyone
  * Command300Access allows (Captains, Division Chiefs, the 300 seat, administrators and explicit 300
- * grants). Who approves: ActingApprovers (Captain 5 = Captain 5 administrators; 300 = any
- * administrator); nobody approves their own request except a super admin.
+ * grants). Who approves (both roles): any administrator (ActingApprovers); nobody approves their own
+ * request except a super admin.
  */
 final class Captain5ActingService
 {
@@ -300,9 +300,7 @@ final class Captain5ActingService
     {
         $allowed = $role === null ? $this->approvers->canApproveAny($admin) : $this->approvers->can($admin, $role);
         if (! $allowed) {
-            throw new AuthorizationException($role === Captain5ActingRequest::ROLE_COMMAND_300
-                ? 'Only administrators approve acting 300 requests.'
-                : 'Only Captain 5 administrators approve acting Captain 5 requests.');
+            throw new AuthorizationException('Only administrators approve acting requests.');
         }
     }
 

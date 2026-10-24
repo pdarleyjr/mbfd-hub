@@ -464,11 +464,7 @@ final class NotificationCategoryRegistry
         }
     }
 
-    /**
-     * Who decides acting requests: anyone ActingApprovers allows for some role (Captain 5
-     * administrators for acting Captain 5, any administrator for acting 300). Captain5Notifier
-     * still asks only the approvers of the request's own role.
-     */
+    /** Who decides acting Captain 5 and acting 300 requests: any administrator (ActingApprovers), the same people Captain5Notifier asks. */
     private static function captain5ManagesAssignments(User $user): bool
     {
         try {

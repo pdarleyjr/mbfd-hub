@@ -161,7 +161,7 @@ final class Command300ShiftTest extends TestCase
         app(Captain5ActingService::class)->approve($this->admin, $own->id);
     }
 
-    public function test_any_administrator_approves_acting_300_but_only_captain5_administrators_approve_acting_captain5(): void
+    public function test_any_administrator_is_asked_and_approves_both_acting_300_and_acting_captain5(): void
     {
         $panelAdmin = $this->officer('Firefighter', 'Panel Admin');
         $panelAdmin->givePermissionTo(Permission::findOrCreate('admin.access', 'web'));
@@ -173,14 +173,22 @@ final class Command300ShiftTest extends TestCase
         $asC5 = $service->request($this->officer('Captain', 'Acting Five'), ['role' => 'captain_5', 'kind' => 'act', 'duration' => '12h']);
         $asked = fn (Captain5ActingRequest $r): array => DB::table('inspection_notification_deliveries')
             ->where('event_key', 'captain5:acting:'.$r->id.':requested')->orderBy('recipient_user_id')->pluck('recipient_user_id')->map(fn ($id): int => (int) $id)->all();
-        self::assertSame([(int) $this->admin->id, (int) $panelAdmin->id], $asked($as300), 'Any administrator is asked about acting 300');
-        self::assertSame([(int) $this->admin->id], $asked($asC5), 'Acting Captain 5 still goes to Captain 5 administrators');
+        $expected = [(int) $this->admin->id, (int) $panelAdmin->id];
+        self::assertSame($expected, $asked($as300), 'Any administrator is asked about acting 300');
+        self::assertSame($expected, $asked($asC5), 'and about acting Captain 5 (the same approver set)');
 
-        $this->actAs($panelAdmin);
+        $this->actAs($panelAdmin); // Admin Panel rights only, no captain5.admin
         $this->getJson(self::SHIFT)->assertJsonPath('acting.can_approve', true)->assertJsonPath('acting.pending.0.id', $as300->id);
-        $this->postJson('/api/captain5/acting-requests/'.$asC5->id.'/approve', [])->assertForbidden();
+        $this->getJson('/api/captain5/workspace')->assertJsonPath('acting.can_approve', true)->assertJsonPath('acting.pending.0.id', $asC5->id);
         $this->postJson(self::ACTING.'/'.$as300->id.'/approve', [])->assertOk()->assertJsonPath('on_duty.name', 'Acting Three');
-        self::assertSame(Captain5ActingRequest::PENDING, $asC5->fresh()->status);
+        $this->postJson('/api/captain5/acting-requests/'.$asC5->id.'/approve', [])->assertOk()->assertJsonPath('on_duty.name', 'Acting Five');
+
+        // Losing Admin Panel rights removes the ability to approve.
+        $panelAdmin->revokePermissionTo(Permission::findByName('admin.access', 'web'));
+        $this->forgetCaptain5Memo();
+        $late = $service->request($this->officer('Captain', 'Late Request'), ['role' => 'command_300', 'kind' => 'act', 'duration' => '12h']);
+        $this->actAs($panelAdmin->fresh());
+        $this->postJson(self::ACTING.'/'.$late->id.'/approve', [])->assertForbidden();
     }
 
     public function test_only_300_page_users_ask_and_members_without_admin_rights_never_approve(): void

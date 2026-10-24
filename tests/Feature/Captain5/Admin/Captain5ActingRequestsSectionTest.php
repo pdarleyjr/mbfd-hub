@@ -328,16 +328,16 @@ final class Captain5ActingRequestsSectionTest extends TestCase
         $this->actAs($admin);
         $page = Livewire::test(Captain5Operations::class)->assertSee('Pending Pat');
 
-        // The permission is revoked while the page is open: the next action is refused and writes nothing.
-        $admin->revokePermissionTo(Captain5Access::PERMISSION_ADMIN);
+        // Admin Panel rights are revoked while the page is open: the next action is refused and writes nothing.
+        $admin->revokePermissionTo(Permission::findByName('admin.access', 'web'));
         $this->forgetCaptain5Memo();
         $page->call('mountAction', 'approveActing', ['request' => $request->getKey()])->assertForbidden();
         self::assertSame(Captain5ActingRequest::PENDING, $request->fresh()->status);
 
-        // The service refuses a caller without the permission as well.
+        // The service refuses a caller who is no longer an administrator (any administrator approves).
         try {
             app(Captain5ActingService::class)->approve($admin->fresh(), (int) $request->getKey());
-            self::fail('The service must refuse a caller without Captain 5 administration.');
+            self::fail('The service must refuse a caller without Admin Panel rights.');
         } catch (AuthorizationException) {
             self::assertSame(Captain5ActingRequest::PENDING, $request->fresh()->status);
         }

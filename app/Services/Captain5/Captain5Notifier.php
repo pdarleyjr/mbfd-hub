@@ -345,7 +345,7 @@ final class Captain5Notifier
             $requester = User::query()->find($request->requested_by_user_id);
             $name = trim((string) ($requester?->display_name ?: $requester?->name)) ?: 'A member';
             $label = Captain5ActingRequest::roleLabel($request->role);
-            // Captain 5: Captain 5 administrators; 300: any administrator (ActingApprovers).
+            // Any administrator, for both roles (ActingApprovers).
             $approvers = app(ActingApprovers::class)->users($request->role);
             $what = $request->kind === Captain5ActingRequest::KIND_END
                 ? "{$name} asked to end the current acting {$label} display."
