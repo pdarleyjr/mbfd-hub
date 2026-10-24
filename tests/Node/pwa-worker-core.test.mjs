@@ -521,11 +521,16 @@ test('messages from another origin, or with no client source, are ignored', asyn
     await world.dispatch('message', { source, data: { type: 'GET_VERSION' }, ports: [port] });
   }
 
+  // A foreign event origin is refused even when the source looks local.
+  await world.dispatch('message', { origin: 'https://evil.example', source: { url: `${ORIGIN}/admin` }, data: { type: 'SKIP_WAITING' } });
+
   assert.equal(world.world.skipWaitingCalls, 0);
   assert.deepEqual(replies, []);
 
+  await world.dispatch('message', { origin: ORIGIN, source: { url: `${ORIGIN}/daily/` }, data: { type: 'SKIP_WAITING' } });
+  assert.equal(world.world.skipWaitingCalls, 1, 'a same-origin client with a matching event origin drives the update');
   await world.dispatch('message', { source: { url: `${ORIGIN}/daily/` }, data: { type: 'SKIP_WAITING' } });
-  assert.equal(world.world.skipWaitingCalls, 1, 'a same-origin client still drives the update');
+  assert.equal(world.world.skipWaitingCalls, 2, 'an engine that leaves event.origin empty falls back to the client URL');
 });
 
 test('GET_VERSION reports unknown when the worker declares no build id', async () => {

@@ -508,6 +508,14 @@ const MBFD_WORKER_CORE_VERSION = '2026-10-23.2';
   }
 
   function onMessage(event) {
+    if (!event) {
+      return;
+    }
+    // ExtendableMessageEvent.origin is the sending client's origin. A few older engines leave it
+    // empty; there the client's own URL decides. Either way the sender must be a Hub client.
+    if (event.origin !== scope.location.origin && !(event.origin === '' || event.origin === undefined)) {
+      return;
+    }
     if (!isSameOriginSource(event)) {
       return;
     }
