@@ -1184,7 +1184,10 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
                 </nav>}
                 <div>
                     <span className="vc-eyebrow"><ShieldCheck size={15} /> MBFD secure conference</span>
-                    <h1>{bootstrap.entry_mode === 'command' ? 'Morning Lineup — 300' : bootstrap.display_name}</h1>
+                    {/* Embedded in an Employee page, the page already has its H1. */}
+                    {embedded
+                        ? <h2>{bootstrap.entry_mode === 'command' ? 'Morning Lineup — 300' : bootstrap.display_name}</h2>
+                        : <h1>{bootstrap.entry_mode === 'command' ? 'Morning Lineup — 300' : bootstrap.display_name}</h1>}
                     <p>{bootstrap.entry_mode === 'station'
                         ? 'Camera and microphone check, then stand by for 300.'
                         : bootstrap.entry_mode === 'command'

@@ -172,8 +172,11 @@ class NotificationSettings extends Page implements HasForms
         $data = $this->form->getState();
         $evaluator = app(NotificationRecipientEvaluator::class);
 
-        // Anything submitted for a category the member cannot receive is dropped and noted.
-        $unavailable = collect(array_keys((array) $this->data))
+        // Anything submitted for a category the member cannot receive is dropped and noted. Only
+        // channel choices count: each category's description field ("{key}_about") holds no choice.
+        $submittedState = (array) $this->data;
+        $unavailable = collect(array_keys($submittedState))
+            ->filter(fn (mixed $key): bool => is_array($submittedState[$key] ?? null))
             ->reject(fn (mixed $key): bool => is_string($key) && $eligible->has($key))
             ->values();
         if ($unavailable->isNotEmpty()) {
