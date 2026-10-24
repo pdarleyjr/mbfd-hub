@@ -18,6 +18,8 @@ use Illuminate\Support\Str;
 
 final class CheckoutSubmissionTest extends IdentificationTestCase
 {
+    private const SIGNATURE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+
     protected function tearDown(): void
     {
         CarbonImmutable::setTestNow();
@@ -40,7 +42,7 @@ final class CheckoutSubmissionTest extends IdentificationTestCase
         $questions = ApparatusIdentificationQuestion::query()->where('apparatus_id', $this->unit->id)->pluck('answered_value', 'field')->all();
         $this->assertEquals(['plate' => 'XE1234', 'year' => '2022', 'make' => 'Pierce', 'model' => 'Enforcer'], $questions);
         $this->assertSame(
-            ['answered' => 4, 'master_filled' => 4],
+            ['answered' => 4, 'master_filled' => 3, 'proposed' => 1],
             ApparatusIdentificationEvent::query()->where('apparatus_id', $this->unit->id)->selectRaw('event, count(*) as total')->groupBy('event')->pluck('total', 'event')->map(fn ($n): int => (int) $n)->all(),
         );
         $answered = ApparatusIdentificationEvent::query()->where('event', 'answered')->where('field', 'plate')->sole();
@@ -49,11 +51,13 @@ final class CheckoutSubmissionTest extends IdentificationTestCase
         $this->assertSame($csid, $answered->client_submission_id);
 
         $master = $this->unitMaster();
-        $this->assertSame(['XE1234', '2022', 'Pierce', 'Enforcer'], [$master->tag_number, $master->year, $master->make, $master->model]);
-        $filled = UnitMasterVehicleChange::query()->where('unit_master_vehicle_id', $master->id)->where('source', UnitMasterVehicleChange::SOURCE_DAILY_CHECKOUT)->where('field', 'tag_number')->sole();
+        $this->assertSame([null, '2022', 'Pierce', 'Enforcer'], [$master->tag_number, $master->year, $master->make, $master->model], 'year, make and model are filled; the plate waits for Fleet');
+        $filled = UnitMasterVehicleChange::query()->where('unit_master_vehicle_id', $master->id)->where('source', UnitMasterVehicleChange::SOURCE_DAILY_CHECKOUT)->where('field', 'make')->sole();
         $this->assertSame($this->member->id, $filled->user_id);
         $this->assertStringStartsWith('Reported in Daily Checkout by Swap Reporter on ', (string) $filled->note);
         $this->assertSame('applied', $filled->status);
+        $proposal = UnitMasterVehicleChange::query()->where('unit_master_vehicle_id', $master->id)->where('field', 'tag_number')->sole();
+        $this->assertSame(['proposed', 'XE1234', UnitMasterVehicleChange::SOURCE_DAILY_CHECKOUT, $this->member->id], [$proposal->status, $proposal->new_value, $proposal->source, $proposal->user_id]);
         $unit = $this->unit->fresh();
         $this->assertSame(['Pierce', 'Enforcer', 2022], [$unit->make, $unit->model, (int) $unit->year], 'shared fields sync to the apparatus');
         $this->assertSame([], $this->openFields($this->unit));
@@ -84,7 +88,33 @@ final class CheckoutSubmissionTest extends IdentificationTestCase
         $this->postJson($this->submissionUrl(), $payload)
             ->assertStatus(409)
             ->assertJsonPath('code', 'DAILY_CHECKOUT_SUBMISSION_REPLAY_CONFLICT');
-        $this->assertSame('XE1234', $this->unitMaster()->tag_number);
+        $this->assertSame('XE1234', ApparatusIdentificationQuestion::query()->where('field', 'plate')->sole()->answered_value);
+    }
+
+    public function test_the_cleaned_section_is_kept_on_the_inspection_with_its_kind(): void
+    {
+        $payload = $this->checkout([$this->answer('plate', 'xe 1234'), ['field' => 'odometer', 'value' => '1']]);
+        $this->postJson($this->submissionUrl(), $payload)->assertCreated();
+
+        $stored = ApparatusInspection::query()->sole()->vehicle_identification;
+
+        $this->assertSame('vehicle', $stored['kind']);
+        $this->assertSame([['field' => 'plate', 'value' => 'XE1234']], $stored['answers']);
+    }
+
+    public function test_a_replay_is_cleaned_with_the_kind_it_was_stored_with(): void
+    {
+        // A 12 character hull ID is a real value for a boat and is dropped for a road vehicle.
+        Apparatus::query()->whereKey($this->unit->id)->toBase()->update(['type' => 'Rescue Boat']);
+        $payload = $this->checkout([$this->answer('vin', 'MTK12345A515')]);
+        $this->postJson($this->submissionUrl(), $payload)->assertCreated();
+        $this->assertSame('boat', ApparatusInspection::query()->sole()->vehicle_identification['kind']);
+
+        // Fleet corrects the unit's type afterwards; the retry of the same queued payload must still match.
+        Apparatus::query()->whereKey($this->unit->id)->toBase()->update(['type' => 'Engine']);
+        $this->postJson($this->submissionUrl(), $payload)->assertOk();
+
+        $this->assertSame(1, ApparatusInspection::query()->count());
     }
 
     public function test_malformed_items_are_dropped_and_never_reject_the_checkout(): void
@@ -245,6 +275,43 @@ final class CheckoutSubmissionTest extends IdentificationTestCase
         $this->assertSame('linked', $boat->master_link_status, 'a boat nobody could match is created for Fleet to verify');
         $this->assertSame('boat', $boat->masterVehicle->asset_category);
         $this->assertSame([], $this->openFields($boat));
+    }
+
+    public function test_the_fire_boat_still_identifies_when_its_checkout_reports_a_physical_vehicle(): void
+    {
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-08-31 09:00:00', 'America/New_York'));
+        $this->actingAsCanonicalUser($this->member);
+        $station = Station::query()->create(['station_number' => 6, 'name' => 'Station 6', 'address' => '123 Marine Drive', 'is_active' => true]);
+        $boat = Apparatus::query()->create([
+            'station_id' => $station->id, 'unit_id' => 'FB6', 'name' => 'Fire Boat 6', 'designation' => 'Fire Boat 6',
+            'type' => 'Fire Boat', 'slug' => 'fb6', 'daily_checkout_requirement' => 'required',
+            'daily_checkout_template' => DailyCheckoutChecklistTemplate::FireBoat6->value,
+        ]);
+        $start = $this->postJson("/api/public/apparatuses/{$boat->id}/inspection-sessions")->assertCreated();
+        $cookie = collect($start->headers->getCookies())->first(fn ($c): bool => $c->getName() === 'daily_checkout_inspection_browser');
+        $this->withCredentials()->withUnencryptedCookie($cookie->getName(), $cookie->getValue());
+        $payload = $this->fireBoatCheckout($boat, $start->json('inspection_session'));
+        $payload['processing_version'] = 1;
+        $payload['compartments'] = array_map(fn (array $compartment): array => [
+            ...$compartment,
+            'items' => array_map(fn (array $item): array => [...$item, 'observed' => true], $compartment['items']),
+        ], $payload['compartments']);
+        $payload['scheduled_tasks'] = array_map(fn (array $task): array => [...$task, 'observed' => true], $payload['scheduled_tasks']);
+        $payload['shift'] = 'A';
+        $payload['officer_signature'] = self::SIGNATURE;
+        $payload['physical_vehicle'] = ['vehicle_number' => 'FB-6', 'swap_answer' => 'swap_completed', 'note' => 'Named at the vehicle confirmation step.'];
+        $payload['vehicle_identification'] = [
+            'questions_version' => $start->json('vehicle_identification.questions_version'),
+            'answers' => [$this->answer('vehicle_number', 'FB-6'), $this->answer('vin', 'mtk 12345 a515')],
+        ];
+
+        $response = $this->postJson("/api/public/apparatuses/{$boat->id}/inspections", $payload);
+
+        $response->assertCreated();
+        $this->assertSame(1, \App\Models\ApparatusVehicleSwapRequest::query()->count(), 'the swap hold itself is unchanged');
+        $this->assertSame(0, ApparatusIdentificationEvent::query()->where('event', 'superseded')->count(), 'nothing was dropped');
+        $this->assertSame(['FB-6', 'MTK12345A515'], ApparatusIdentificationQuestion::query()->where('state', 'answered')->orderBy('id')->pluck('answered_value')->all());
+        $this->assertSame('boat', $boat->fresh()->masterVehicle?->asset_category, 'resolved into a boat record for Fleet to verify');
     }
 
     /**

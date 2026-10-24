@@ -6,6 +6,7 @@ namespace Tests\Feature\Fleet\VehicleIdentification;
 
 use App\Models\ApparatusIdentificationQuestion;
 use App\Models\ApparatusInspection;
+use App\Models\UnitMasterVehicle;
 use App\Models\User;
 use App\Notifications\Channels\BudgetedMailChannel;
 use App\Notifications\NewSubmissionNotification;
@@ -22,7 +23,15 @@ final class FleetNotificationTest extends IdentificationTestCase
     /** @return list<array<string, mixed>> answers that create a new vehicle record for an unlinked E2 */
     private function creatingAnswers(): array
     {
-        return [$this->answer('vehicle_number', 'V-777'), $this->answer('vin', self::VIN_B)];
+        return [$this->answer('vehicle_number', 'V-202'), $this->answer('vin', self::VIN_B)];
+    }
+
+    /** E2 not linked, and no record holds its number: a VIN is then enough to create one. */
+    private function unitReadyForNewRecord(): void
+    {
+        $masterId = $this->unitMaster()->id;
+        $this->unlink($this->unit);
+        UnitMasterVehicle::query()->whereKey($masterId)->toBase()->update(['veh_number' => 'OLD-1']);
     }
 
     public function test_the_category_is_a_fleet_alert_with_database_and_email_on_by_default(): void
@@ -55,7 +64,7 @@ final class FleetNotificationTest extends IdentificationTestCase
     {
         $manager = $this->fleetOperationsManager('fleet.manager@example.test');
         $viewer = $this->fleetViewer();
-        $this->unlink($this->unit);
+        $this->unitReadyForNewRecord();
 
         $this->submitCheckout($this->creatingAnswers())->assertCreated();
 
@@ -65,7 +74,7 @@ final class FleetNotificationTest extends IdentificationTestCase
         $notification = Notification::sent($manager, NewSubmissionNotification::class)->first();
         $payload = $notification->toDatabase($manager);
         $this->assertSame('New vehicle record to verify for E2', $payload['title']);
-        $this->assertStringContainsString('V-777', $payload['body']);
+        $this->assertStringContainsString('V-202', $payload['body']);
         $this->assertStringEndsWith('/admin/apparatuses/'.$this->unit->id, $payload['actions'][0]['url']);
         $this->assertSame('New vehicle record to verify for E2', $notification->toBudgetedEmail($manager)['subject']);
     }
@@ -75,7 +84,7 @@ final class FleetNotificationTest extends IdentificationTestCase
         $manager = $this->fleetOperationsManager('fleet.manager@example.test');
         $silent = $this->fleetOperationsManager('second.manager@example.test');
         $silent->notificationSubscriptions()->updateOrCreate(['event_key' => self::EVENT], ['database_enabled' => false, 'webpush_enabled' => false, 'email_enabled' => false]);
-        $this->unlink($this->unit);
+        $this->unitReadyForNewRecord();
 
         $this->submitCheckout($this->creatingAnswers())->assertCreated();
 
@@ -87,7 +96,7 @@ final class FleetNotificationTest extends IdentificationTestCase
     {
         $this->fleetOperationsManager('fleet.manager@example.test');
 
-        $this->submitCheckout([$this->answer('plate', 'XE1234')])->assertCreated();
+        $this->submitCheckout([$this->answer('year', '2022')])->assertCreated();
 
         Notification::assertNothingSent();
     }
@@ -102,7 +111,7 @@ final class FleetNotificationTest extends IdentificationTestCase
                 throw new RuntimeException('The mail service is down.');
             }
         });
-        $this->unlink($this->unit);
+        $this->unitReadyForNewRecord();
 
         $this->submitCheckout($this->creatingAnswers())->assertCreated();
 
