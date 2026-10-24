@@ -33,9 +33,9 @@ final class VehicleIdentificationController extends Controller
     public function show(Request $request, int $apparatus): JsonResponse
     {
         $unit = Apparatus::query()->findOrFail($apparatus);
-        $this->authorizeUnit($request, $unit);
+        $user = $this->authorizeUnit($request, $unit);
 
-        return response()->json(['vehicle_identification' => $this->planner->block($unit)]);
+        return response()->json(['vehicle_identification' => $this->planner->block($unit, $this->planner->canAnswer($user, $unit))]);
     }
 
     /**
@@ -46,6 +46,8 @@ final class VehicleIdentificationController extends Controller
     {
         $unit = Apparatus::query()->findOrFail($apparatus);
         $user = $this->authorizeUnit($request, $unit);
+        // Answering writes to vehicle records: seeing the questions is not enough.
+        abort_unless($this->planner->canAnswer($user, $unit), 403);
         $validated = $request->validate([
             'client_submission_id' => ['required', 'uuid'],
             'questions_version' => ['required', 'string', 'max:64'],
@@ -75,14 +77,16 @@ final class VehicleIdentificationController extends Controller
 
         return response()->json([
             'replayed' => $replayed,
-            'vehicle_identification' => $this->planner->block($unit->refresh()),
+            'vehicle_identification' => $this->planner->block($unit->refresh(), true),
         ]);
     }
 
     /**
-     * Who may see and answer a unit's questions: Fleet managers for any unit; for the Captain 5
-     * unit, anyone the Captain 5 page is open to; for a Daily Checkout unit, members who may submit
-     * its checkout. A unit that is not asked questions does not exist as far as this route goes.
+     * Who may see a unit's questions: Fleet managers for any unit; for the Captain 5 unit, anyone
+     * the Captain 5 page is open to (view access); for a Daily Checkout unit, members who may
+     * submit its checkout. Writing answers is narrower, see VehicleIdentificationPlanner::canAnswer
+     * (the Captain 5 unit needs act access). A unit that is not asked questions does not exist as
+     * far as this route goes.
      */
     private function authorizeUnit(Request $request, Apparatus $unit): User
     {

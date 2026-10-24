@@ -72,7 +72,7 @@ final class Captain5Controller extends Controller
     {
         $user = $this->user($request);
 
-        return $this->json($this->workspace()->overview($user, $this->access()->decide($user)) + $this->vehicleIdentification());
+        return $this->json($this->workspace()->overview($user, $this->access()->decide($user)) + $this->vehicleIdentification($user));
     }
 
     /**
@@ -82,14 +82,15 @@ final class Captain5Controller extends Controller
      *
      * @return array<string, mixed>
      */
-    private function vehicleIdentification(): array
+    private function vehicleIdentification(User $viewer): array
     {
         $planner = app(VehicleIdentificationPlanner::class);
         $unit = $planner->captain5Unit();
 
+        // can_answer is false for a viewer who may see the page but not write: the card shows no submit path.
         return $unit === null ? [] : [
             'apparatus_id' => $unit->getKey(),
-            'vehicle_identification' => $planner->block($unit),
+            'vehicle_identification' => $planner->block($unit, $planner->canAnswer($viewer, $unit)),
         ];
     }
 

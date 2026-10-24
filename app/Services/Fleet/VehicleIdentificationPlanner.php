@@ -9,6 +9,8 @@ use App\Models\Apparatus;
 use App\Models\ApparatusIdentificationQuestion;
 use App\Models\UnitMasterVehicle;
 use App\Models\UnitMasterVehicleChange;
+use App\Models\User;
+use App\Services\Security\Captain5Access;
 use App\Support\Fleet\VehicleIdentificationFields as Fields;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -63,10 +65,36 @@ final class VehicleIdentificationPlanner
         return false;
     }
 
+    /** The Captain 5 unit, found with a narrow query (a handful of rows), never by loading every apparatus. */
     public function captain5Unit(): ?Apparatus
     {
-        return Apparatus::query()->orderBy('id')->get()
+        return Apparatus::query()
+            ->where(function ($query): void {
+                foreach (['designation', 'unit_id', 'name'] as $column) {
+                    $query->orWhereRaw("LOWER({$column}) LIKE ?", ['%captain%5%']);
+                }
+            })
+            ->orderBy('id')
+            ->limit(10)
+            ->get()
             ->first(fn (Apparatus $apparatus): bool => self::isCaptain5($apparatus) && $this->isEligible($apparatus));
+    }
+
+    /**
+     * Whether this person may write answers for the unit: Fleet managers anywhere, the Captain 5
+     * unit only with Captain 5 act access (view alone is not enough, since answering writes), and
+     * a checkout unit for anyone who may submit its checkout.
+     */
+    public function canAnswer(?User $user, Apparatus $apparatus): bool
+    {
+        if (! $user instanceof User) {
+            return false;
+        }
+        if ($user->canManageFleetSwaps()) {
+            return true;
+        }
+
+        return self::isCaptain5($apparatus) ? $user->can(Captain5Access::GATE_ACT) : true;
     }
 
     /**
@@ -75,17 +103,17 @@ final class VehicleIdentificationPlanner
      *
      * @return array<string, mixed>
      */
-    public function block(Apparatus $apparatus): array
+    public function block(Apparatus $apparatus, bool $canAnswer = true): array
     {
         try {
-            return $this->assemble(Fields::kindFor($apparatus), $this->questions($apparatus));
+            return $this->assemble(Fields::kindFor($apparatus), $this->questions($apparatus), $canAnswer);
         } catch (Throwable $exception) {
             Log::warning('Vehicle identification questions could not be planned.', [
                 'apparatus_id' => $apparatus->getKey(),
                 'exception' => $exception->getMessage(),
             ]);
 
-            return $this->assemble(Fields::kindFor($apparatus), []);
+            return $this->assemble(Fields::kindFor($apparatus), [], $canAnswer);
         }
     }
 
@@ -93,10 +121,12 @@ final class VehicleIdentificationPlanner
      * @param  list<array<string, mixed>>  $questions
      * @return array<string, mixed>
      */
-    public function assemble(string $kind, array $questions): array
+    public function assemble(string $kind, array $questions, bool $canAnswer = true): array
     {
         return [
             'required' => $questions !== [],
+            // False for a viewer who may see the questions but not write answers: the screen shows no way to submit.
+            'can_answer' => $canAnswer,
             'note' => self::NOTE,
             'kind' => $kind,
             'questions' => $questions,
