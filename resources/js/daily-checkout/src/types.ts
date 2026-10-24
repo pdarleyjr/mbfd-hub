@@ -396,13 +396,13 @@ export interface Station {
 }
 
 // Bundled station artwork (station_number → image path), the fallback when no photo is recorded.
-// WebP derivatives (max 1200px wide, about 30-170 KB) of the original PNGs, which stay in the repo.
+// WebP derivatives (max 1200px wide, about 30-220 KB) of the original PNGs, which stay in the repo.
 export const STATION_IMAGES: Record<number, string> = {
   1: '/images/stations/station-1.webp',
   2: '/images/stations/station-2.webp',
   3: '/images/stations/station-3.webp',
   4: '/images/stations/station-4.webp',
-  6: '/images/stations/station-6.webp',
+  6: '/images/stations/station-6.webp?v=0457f603b620',
 };
 
 export interface ImageSize {
@@ -416,7 +416,7 @@ export const BUNDLED_IMAGE_SIZES: Record<string, ImageSize> = {
   '/images/stations/station-2.webp': { width: 1200, height: 470 },
   '/images/stations/station-3.webp': { width: 1200, height: 742 },
   '/images/stations/station-4.webp': { width: 1200, height: 680 },
-  '/images/stations/station-6.webp': { width: 1200, height: 506 },
+  '/images/stations/station-6.webp?v=0457f603b620': { width: 1200, height: 900 },
   '/images/stations/command-300-wide.webp': { width: 1200, height: 800 },
   '/images/stations/captain-5-wide.webp': { width: 1200, height: 800 },
 };
