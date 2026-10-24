@@ -10,7 +10,10 @@ use App\Models\ApparatusDefect;
 use App\Models\User;
 use App\Services\ApparatusDefectServiceTicketService;
 use App\Services\Defects\DefectCorrectiveActionService;
+use App\Services\Defects\NoActionClosureGuard;
 use App\Support\Fleet\DefectActionStatus;
+use App\Support\Fleet\DefectNoActionClosure;
+use App\Support\Fleet\DefectSeverityCorrection;
 use Closure;
 use Filament\Actions\MountableAction as Action;
 use Filament\Forms;
@@ -49,13 +52,34 @@ final class DefectCorrectiveActions
 
     public const TICKET = 'linkServiceTicket';
 
-    /** @var array<string, string> */
+    public const CORRECT_SEVERITY = 'correctSeverity';
+
+    /**
+     * Every resolution type that can exist on a row, for rendering. Old rows may still say
+     * 'report_corrected'; new resolutions cannot choose it (see RESOLUTION_OPTIONS).
+     *
+     * @var array<string, string>
+     */
     public const RESOLUTION_LABELS = [
         'replacement_installed' => 'Replacement installed',
         'spare_issued' => 'Spare issued',
         'repair_completed' => 'Repair completed',
         'item_located' => 'Item located',
         'report_corrected' => 'Report was corrected',
+        'other' => 'Other',
+    ];
+
+    /**
+     * What a person may pick for a NEW resolution. "The report was wrong" is now
+     * Close — No Action Required, which does not claim a repair.
+     *
+     * @var array<string, string>
+     */
+    public const RESOLUTION_OPTIONS = [
+        'replacement_installed' => 'Replacement installed',
+        'spare_issued' => 'Spare issued',
+        'repair_completed' => 'Repair completed',
+        'item_located' => 'Item located',
         'other' => 'Other',
     ];
 
@@ -85,9 +109,20 @@ final class DefectCorrectiveActions
             $appearsCorrected ? self::VERIFY : null,
             self::RESOLVE,
             self::CLASSIFY,
+            self::CORRECT_SEVERITY,
             $defect->service_ticket_id === null ? self::TICKET : null,
-            self::DISMISS,
+            // Offered only when the guard would let it through; closeBlockedReason() explains the rest.
+            self::closeBlockedReason($defect) === null ? self::DISMISS : null,
         ]));
+    }
+
+    /**
+     * Why Close — No Action Required would be refused for this issue right now, or null when it would
+     * be allowed. Reads only: the same guard the service runs, asked without writing anything.
+     */
+    public static function closeBlockedReason(ApparatusDefect $defect): ?string
+    {
+        return app(NoActionClosureGuard::class)->refusal($defect);
     }
 
     public static function canManage(?User $user): bool
@@ -219,7 +254,7 @@ final class DefectCorrectiveActions
                 Forms\Components\Hidden::make('idempotency_key'),
                 Forms\Components\Select::make('resolution_type')
                     ->label('How was it resolved?')
-                    ->options(self::RESOLUTION_LABELS)
+                    ->options(self::RESOLUTION_OPTIONS)
                     ->selectablePlaceholder(false)
                     ->native(),
                 Forms\Components\Textarea::make('resolution_notes')
@@ -243,17 +278,25 @@ final class DefectCorrectiveActions
      */
     public static function dismiss(Action $action, Closure $defectOf): Action
     {
-        return self::base($action, $defectOf, 'Dismiss', 'heroicon-o-x-circle', 'gray')
-            ->modalHeading('Close with no further action')
-            ->modalDescription('Use this when the report was a mistake or nothing needs to be done. The history is kept.')
-            ->modalSubmitActionLabel('Close issue')
+        // Stored as 'dismissed' (action name, status, event type and service method are unchanged);
+        // only the words people read are the department's.
+        return self::base($action, $defectOf, DefectNoActionClosure::ACTION_LABEL, 'heroicon-o-x-circle', 'gray')
+            ->modalHeading(DefectNoActionClosure::ACTION_LABEL)
+            ->modalDescription(DefectNoActionClosure::DIALOG_TEXT)
+            ->modalSubmitActionLabel(DefectNoActionClosure::SUBMIT_LABEL)
             ->mountUsing(fn (Forms\ComponentContainer $form) => $form->fill(['idempotency_key' => self::newKey()]))
             ->form([
                 Forms\Components\Hidden::make('idempotency_key'),
-                Forms\Components\Textarea::make('reason')->label('Reason')->required()->rows(3)->maxLength(5000),
+                Forms\Components\Textarea::make('reason')
+                    ->label(DefectNoActionClosure::REASON_LABEL)
+                    ->helperText(DefectNoActionClosure::REASON_HELPER)
+                    ->required()
+                    ->minLength(DefectNoActionClosure::MIN_REASON_LENGTH)
+                    ->rows(3)
+                    ->maxLength(5000),
                 ...array_slice(self::messageFields(), 1),
             ])
-            ->action(fn (array $data, Action $action) => self::run($action, $defectOf, $data, 'Issue closed',
+            ->action(fn (array $data, Action $action) => self::run($action, $defectOf, $data, DefectNoActionClosure::SUCCESS,
                 fn (int $id, User $user, array $payload, ?string $key) => app(DefectCorrectiveActionService::class)->dismiss($id, $user, $payload, $key)));
     }
 
@@ -296,7 +339,7 @@ final class DefectCorrectiveActions
             ->mountUsing(fn (Forms\ComponentContainer $form) => $form->fill(['idempotency_key' => self::newKey(), 'resolution_type' => 'item_located']))
             ->form([
                 Forms\Components\Hidden::make('idempotency_key'),
-                Forms\Components\Select::make('resolution_type')->label('How was it corrected?')->options(self::RESOLUTION_LABELS)->native(),
+                Forms\Components\Select::make('resolution_type')->label('How was it corrected?')->options(self::RESOLUTION_OPTIONS)->native(),
                 Forms\Components\Textarea::make('notes')->label('Notes')->rows(2)->maxLength(5000),
                 ...array_slice(self::messageFields(), 1),
             ])
@@ -336,6 +379,50 @@ final class DefectCorrectiveActions
             ])
             ->action(fn (array $data, Action $action) => self::run($action, $defectOf, $data, 'Operational impact saved',
                 fn (int $id, User $user, array $payload, ?string $key) => app(DefectCorrectiveActionService::class)->classifyImpact($id, $user, $payload, $key)));
+    }
+
+    /**
+     * @template TAction of Action
+     *
+     * @param  TAction  $action
+     * @param  Closure(Action): ?ApparatusDefect  $defectOf
+     * @return TAction
+     */
+    public static function correctSeverity(Action $action, Closure $defectOf): Action
+    {
+        return self::base($action, $defectOf, DefectSeverityCorrection::ACTION_LABEL, 'heroicon-o-adjustments-horizontal', 'gray')
+            ->modalHeading(DefectSeverityCorrection::ACTION_LABEL)
+            ->modalDescription(DefectSeverityCorrection::DIALOG_TEXT)
+            ->modalSubmitActionLabel(DefectSeverityCorrection::SUBMIT_LABEL)
+            ->mountUsing(function (Forms\ComponentContainer $form, Action $action) use ($defectOf): void {
+                $defect = $defectOf($action);
+                abort_unless($defect instanceof ApparatusDefect, 404);
+                $current = (string) ($defect->severity ?: DefectSeverityCorrection::ROUTINE);
+                $form->fill([
+                    'idempotency_key' => self::newKey(),
+                    // Starts on the other level: opening this dialog means the recorded one is wrong.
+                    'severity' => $current === DefectSeverityCorrection::SIGNIFICANT ? DefectSeverityCorrection::ROUTINE : DefectSeverityCorrection::SIGNIFICANT,
+                ]);
+            })
+            ->form([
+                Forms\Components\Hidden::make('idempotency_key'),
+                Forms\Components\Select::make('severity')
+                    ->label('Severity')
+                    ->options(DefectSeverityCorrection::LABELS)
+                    ->required()
+                    ->selectablePlaceholder(false)
+                    ->native(),
+                Forms\Components\Textarea::make('reason')
+                    ->label(DefectSeverityCorrection::REASON_LABEL)
+                    ->helperText(DefectSeverityCorrection::REASON_HELPER)
+                    ->required()
+                    ->minLength(DefectNoActionClosure::MIN_REASON_LENGTH)
+                    ->rows(3)
+                    ->maxLength(5000),
+                ...array_slice(self::messageFields(), 1),
+            ])
+            ->action(fn (array $data, Action $action) => self::run($action, $defectOf, $data, DefectSeverityCorrection::SUCCESS,
+                fn (int $id, User $user, array $payload, ?string $key) => app(DefectCorrectiveActionService::class)->correctSeverity($id, $user, $payload, $key)));
     }
 
     /**

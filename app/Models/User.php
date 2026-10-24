@@ -3,6 +3,8 @@
 namespace App\Models;
 
 use App\Enums\AccountStatus;
+use App\Services\Notifications\NotificationCategoryRegistry;
+use App\Services\Notifications\PushDeviceHealth;
 use App\Support\Workgroups\WorkgroupAccess;
 use DateTimeInterface;
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
@@ -13,6 +15,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -38,6 +41,9 @@ class User extends Authenticatable implements FilamentUser
     }
 
     public const NOTIFICATION_PREFERENCE_VEHICLE_INSPECTIONS = 'vehicle_inspections';
+
+    /** Opt-in: a message for every Daily Checkout as it is submitted (reviewers only, all channels off until chosen). */
+    public const NOTIFICATION_PREFERENCE_DAILY_CHECKOUT_EVERY_SUBMISSION = 'daily_checkout_every_submission';
 
     public const NOTIFICATION_PREFERENCE_STATION_INSPECTIONS = 'station_inspections';
 
@@ -94,6 +100,7 @@ class User extends Authenticatable implements FilamentUser
 
     public const DEFAULT_NOTIFICATION_PREFERENCES = [
         self::NOTIFICATION_PREFERENCE_VEHICLE_INSPECTIONS => true,
+        self::NOTIFICATION_PREFERENCE_DAILY_CHECKOUT_EVERY_SUBMISSION => false,
         self::NOTIFICATION_PREFERENCE_STATION_INSPECTIONS => true,
         self::NOTIFICATION_PREFERENCE_FIRE_EQUIPMENT_REQUESTS => true,
         self::NOTIFICATION_PREFERENCE_STATION_REQUESTS => true,
@@ -329,73 +336,52 @@ class User extends Authenticatable implements FilamentUser
         );
     }
 
+    /**
+     * Every alert category with its plain-language label and description. The
+     * list lives in NotificationCategoryRegistry; this keeps the legacy shape.
+     *
+     * @return array<string, array{label: string, description: string, essential_in_app?: bool}>
+     */
     public static function notificationPreferenceDefinitions(): array
     {
-        return [
-            self::NOTIFICATION_PREFERENCE_VEHICLE_INSPECTIONS => [
-                'label' => 'Vehicle Inspections',
-                'description' => 'Receive alerts when a vehicle inspection is submitted.',
-            ],
-            self::NOTIFICATION_PREFERENCE_STATION_INSPECTIONS => [
-                'label' => 'Station Inspections',
-                'description' => 'Receive alerts when a station inspection is submitted.',
-            ],
-            self::NOTIFICATION_PREFERENCE_FIRE_EQUIPMENT_REQUESTS => [
-                'label' => 'Fire Equipment Requests',
-                'description' => 'Receive alerts when a fire equipment request is submitted.',
-            ],
-            self::NOTIFICATION_PREFERENCE_STATION_REQUESTS => [
-                'label' => 'Station Requests',
-                'description' => 'Receive alerts for station repair, service, and equipment requests.',
-            ],
-            self::NOTIFICATION_PREFERENCE_APPARATUS_SERVICE_TICKETS => [
-                'label' => 'Apparatus Service Tickets',
-                'description' => 'Receive alerts for apparatus repair, maintenance, and service tickets.',
-            ],
-            self::NOTIFICATION_PREFERENCE_WORKGROUP_EVALUATIONS => [
-                'label' => 'Workgroup Evaluations',
-                'description' => 'Receive alerts when a workgroup evaluation is submitted.',
-            ],
-            self::NOTIFICATION_PREFERENCE_STATION_INVENTORY_ALERTS => [
-                'label' => 'Station Inventory Alerts',
-                'description' => 'Receive alerts when a station inventory submission is received.',
-            ],
-            self::NOTIFICATION_PREFERENCE_DEPARTMENT_UPDATES => [
-                'label' => 'Department Updates',
-                'description' => 'Receive published department notices and operational updates.',
-            ],
-            self::NOTIFICATION_PREFERENCE_HUB_SUPPORT_TICKETS => [
-                'label' => 'Website / App Issue Reports',
-                'description' => 'Receive reports from members about MBFD Hub problems.',
-            ],
-            self::NOTIFICATION_PREFERENCE_UNIFORM_REQUESTS => [
-                'label' => 'Uniform Requests',
-                'description' => 'Receive new uniform orders and member replies for Support Services review.',
-            ],
-            self::NOTIFICATION_PREFERENCE_PERSONNEL_EQUIPMENT_REQUESTS => [
-                'label' => 'Personnel Equipment Requests',
-                'description' => 'Receive personal equipment requests and member replies for Support Services review.',
-            ],
-            self::NOTIFICATION_PREFERENCE_MEMBER_REQUEST_UPDATES => [
-                'label' => 'My Request Updates',
-                'description' => 'Messages, item arrivals, and issue updates for your own requests. In-app alerts remain enabled.',
-                'essential_in_app' => true,
-            ],
-            self::NOTIFICATION_PREFERENCE_VEHICLE_SWAP_REPORTED => [
-                'label' => 'Vehicle swap reported',
-                'description' => 'A member reported a different physical vehicle than the one assigned to a unit at Daily Checkout. Fleet managers only.',
-                'requires_fleet_manage' => true,
-            ],
-        ];
+        return app(NotificationCategoryRegistry::class)->legacyDefinitions();
     }
 
-    /** Preference keys this member can actually receive, so settings never show alerts they cannot act on. */
+    /**
+     * The member's push devices. The package trait types this as its own PushSubscription; the
+     * Hub's configured model (config/webpush.php) is HubPushSubscription, which carries device health.
+     *
+     * @return MorphMany<HubPushSubscription, $this>
+     */
+    public function pushSubscriptions(): MorphMany
+    {
+        return $this->morphMany(HubPushSubscription::class, 'subscribable');
+    }
+
+    /**
+     * Push devices an alert may be sent to: healthy ones, or exactly the devices a
+     * notification asks for (the "send a test" button targets one of the member's own).
+     *
+     * @return \Illuminate\Database\Eloquent\Collection<int, HubPushSubscription>
+     */
+    public function routeNotificationForWebPush(mixed $notification = null): \Illuminate\Database\Eloquent\Collection
+    {
+        if (is_object($notification) && method_exists($notification, 'pushDevicesFor')) {
+            return $notification->pushDevicesFor($this);
+        }
+
+        return PushDeviceHealth::scopeHealthy($this->pushSubscriptions())->get();
+    }
+
+    /**
+     * Preference keys this member is eligible for right now, so settings never show alerts
+     * they cannot act on. Evaluated from current roles and permissions, never stored.
+     *
+     * @return list<string>
+     */
     public function visibleNotificationPreferenceKeys(): array
     {
-        return collect(self::notificationPreferenceDefinitions())
-            ->reject(fn (array $definition): bool => ($definition['requires_fleet_manage'] ?? false) && ! $this->canManageFleetSwaps())
-            ->keys()
-            ->all();
+        return app(NotificationCategoryRegistry::class)->forUser($this)->keys()->all();
     }
 
     /** Server-side Fleet manage access: super administrators and the admin.fleet.manage capability. */
@@ -409,8 +395,8 @@ class User extends Authenticatable implements FilamentUser
     {
         return match ($submissionType) {
             'apparatus_inspection' => self::NOTIFICATION_PREFERENCE_VEHICLE_INSPECTIONS,
+            'daily_checkout_every_submission' => self::NOTIFICATION_PREFERENCE_DAILY_CHECKOUT_EVERY_SUBMISSION,
             'station_inspection' => self::NOTIFICATION_PREFERENCE_STATION_INSPECTIONS,
-            'fire_equipment_request' => self::NOTIFICATION_PREFERENCE_FIRE_EQUIPMENT_REQUESTS,
             'station_request' => self::NOTIFICATION_PREFERENCE_STATION_REQUESTS,
             'apparatus_service_ticket' => self::NOTIFICATION_PREFERENCE_APPARATUS_SERVICE_TICKETS,
             'evaluation_submission' => self::NOTIFICATION_PREFERENCE_WORKGROUP_EVALUATIONS,
@@ -434,16 +420,10 @@ class User extends Authenticatable implements FilamentUser
         return (bool) ($this->getResolvedNotificationPreferences()[$preferenceKey] ?? true);
     }
 
+    /** Every active member has alert settings; which categories appear depends on what they may receive. */
     public function canManageNotificationSettings(): bool
     {
-        return $this->isAuthenticationAllowed() && ($this->hasDirectWebPermission('admin.support.view') || $this->canManageFleetSwaps() || $this->hasAnyRole([
-            'super_admin',
-            'admin',
-            'logistics_admin',
-            'training_admin',
-            'workgroup_admin',
-            'workgroup_facilitator',
-        ]));
+        return $this->isAuthenticationAllowed();
     }
 
     /**

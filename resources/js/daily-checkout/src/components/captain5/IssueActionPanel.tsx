@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { isApiAuthenticationError, redirectToLoginAfterSessionExpiry } from '../../utils/api';
 import { Captain5ApiError, isRetryable, performIssueAction } from '../../utils/captain5Api';
 import {
-  ACTIONS, EMPTY_VALUES, RESOLUTION_TYPES, primaryAction, toFields, validate,
+  ACTIONS, EMPTY_VALUES, REASON_LABELS, RESOLUTION_TYPES, primaryAction, toFields, validate,
   type FieldKey, type FormValues,
 } from './actionForms';
 import { newKey, todayYmd } from './format';
@@ -76,7 +76,7 @@ function ActionFields({ action, values, errors, disabled, canInternal, set }: Fi
           {err('verified_in_place')}
         </div>
       )}
-      {area('reason', 'Reason', true)}
+      {area('reason', REASON_LABELS[action] ?? 'Reason', true)}
       <details className="rounded-hub-control border border-hub-border bg-hub-well px-3 py-2">
         <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-hub-ink">Add a message (optional)</summary>
         <div className="space-y-3 pb-2">

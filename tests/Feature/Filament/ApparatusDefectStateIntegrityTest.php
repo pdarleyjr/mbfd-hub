@@ -124,6 +124,35 @@ final class ApparatusDefectStateIntegrityTest extends TestCase
             ->assertCanSeeTableRecords([$missing, $damaged]);
     }
 
+    public function test_default_defect_list_shows_all_unresolved_work_and_hides_closed_issues(): void
+    {
+        $apparatus = $this->createApparatus();
+        $byStatus = [];
+        foreach (['reported', 'acknowledged', 'action_pending', 'replacement_available', 'repair_scheduled', 'resolved', 'dismissed'] as $actionStatus) {
+            $byStatus[$actionStatus] = ApparatusDefect::query()->create([
+                'apparatus_id' => $apparatus->id,
+                'compartment' => 'Cab',
+                'item' => 'Item '.$actionStatus,
+                'status' => 'open',
+                'issue_type' => 'missing',
+                'reported_date' => now()->toDateString(),
+                'action_status' => $actionStatus,
+            ]);
+        }
+
+        $this->actingAs($this->defectManager());
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->withoutVite();
+
+        Livewire::test(ListDefects::class)
+            ->call('loadTable')
+            ->assertCanSeeTableRecords(array_values(array_intersect_key($byStatus, array_flip(['reported', 'acknowledged', 'action_pending', 'replacement_available', 'repair_scheduled']))))
+            ->assertCanNotSeeTableRecords([$byStatus['resolved'], $byStatus['dismissed']])
+            ->filterTable('unresolved', false)
+            ->assertCanSeeTableRecords([$byStatus['resolved'], $byStatus['dismissed']])
+            ->assertCanNotSeeTableRecords([$byStatus['acknowledged'], $byStatus['repair_scheduled']]);
+    }
+
     public function test_filament_resolution_updates_the_profile_resolution_state(): void
     {
         $apparatus = $this->createApparatus();

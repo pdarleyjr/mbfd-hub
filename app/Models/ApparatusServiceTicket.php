@@ -129,6 +129,16 @@ class ApparatusServiceTicket extends Model
         return $this->belongsTo(User::class, 'assigned_to_user_id');
     }
 
+    /**
+     * The equipment issues this ticket was opened for (apparatus_defects.service_ticket_id).
+     *
+     * @return HasMany<ApparatusDefect, $this>
+     */
+    public function defects(): HasMany
+    {
+        return $this->hasMany(ApparatusDefect::class, 'service_ticket_id');
+    }
+
     /** @return HasMany<ApparatusServiceTicketUpdate, $this> */
     public function updates(): HasMany
     {

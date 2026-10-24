@@ -1,6 +1,6 @@
 <x-filament-panels::page data-hub-ui="2" data-hub-portal="employee">
-    <div class="mr-intro">
-        <div><span>REQUEST LEDGER</span><h2>Uniform and personnel equipment requests</h2><p>This timeline includes uniforms you requested and firefighting equipment submitted for you by an officer.</p></div>
+    <div class="mr-toolbar">
+        <p>Uniform and personnel equipment requests, including firefighting equipment an officer submitted for you.</p>
         <a href="{{ \App\Filament\Employee\Pages\RequestEquipmentPage::getUrl(panel: 'employee') }}">Request Uniforms</a>
     </div>
 

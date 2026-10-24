@@ -14,6 +14,7 @@ use App\Services\Identity\EmployeeIdentifier;
 use App\Services\Identity\FederationLoginAttempt;
 use App\Services\Identity\MemberSelfServiceActivation;
 use App\Services\Identity\SessionRegistry;
+use App\Services\Notifications\PushSessionBinding;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -134,6 +135,9 @@ final class CanonicalLoginController extends Controller
         $user = $request->user('web');
         $registryId = $request->session()->get('auth.canonical_session_id');
         if ($user instanceof User && is_string($registryId)) {
+            // A shared browser must not keep showing this member's alerts: the push devices enrolled
+            // from this sign-in go with it. Other sign-ins of the member are untouched.
+            app(PushSessionBinding::class)->detachForSessions($user, [$registryId]);
             $sessions->revoke($user, $registryId, 'logout', CarbonImmutable::now());
             Log::info('canonical_authentication_logout', [
                 'user_id' => $user->id,

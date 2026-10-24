@@ -5,8 +5,10 @@ namespace App\Console\Commands;
 use App\Exceptions\AIServiceUnavailable;
 use App\Models\CapitalProject;
 use App\Models\User;
+use App\Notifications\OperationalAlertNotification;
 use App\Services\CloudflareAIService;
-use Filament\Notifications\Notification;
+use App\Services\Notifications\NotificationCategoryRegistry;
+use App\Services\Notifications\NotificationDispatchService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
@@ -30,14 +32,14 @@ class GenerateWeeklySummary extends Command
 
             $overdueProjects = CapitalProject::where('target_completion_date', '<', now())
                 ->whereNull('actual_completion')
-                ->whereNotIn('status', ['completed', 'on-hold'])
+                ->whereNotIn('status', ['completed', 'on_hold'])
                 ->count();
 
-            $highPriorityProjects = CapitalProject::whereNotIn('status', ['completed', 'on-hold'])
+            $highPriorityProjects = CapitalProject::whereNotIn('status', ['completed', 'on_hold'])
                 ->whereIn('priority', ['critical', 'high'])
                 ->count();
 
-            $activeProjects = CapitalProject::whereNotIn('status', ['completed', 'on-hold'])->get();
+            $activeProjects = CapitalProject::whereNotIn('status', ['completed', 'on_hold'])->get();
 
             $totalBudget = $activeProjects->sum('budget_amount');
             $spentBudget = 0; // spend column was removed in migration
@@ -76,21 +78,24 @@ class GenerateWeeklySummary extends Command
                 $query->where('name', 'admin');
             })->get();
 
+            $delivered = 0;
             foreach ($recipients as $user) {
-                Notification::make()
-                    ->title('📊 Weekly Project Summary')
-                    ->body($summaryBody)
-                    ->icon('heroicon-o-chart-bar')
-                    ->iconColor('info')
-                    ->actions([
-                        \Filament\Notifications\Actions\Action::make('view')
-                            ->label('View All Projects')
-                            ->url(route('filament.admin.resources.capital-projects.index')),
-                    ])
-                    ->sendToDatabase($user);
+                // Only administrators who may act on projects right now are told (the project alert category).
+                $sent = app(NotificationDispatchService::class)->notifyUser(NotificationCategoryRegistry::PROJECT_ALERTS, $user, new OperationalAlertNotification(
+                    category: NotificationCategoryRegistry::PROJECT_ALERTS,
+                    title: '📊 Weekly Project Summary',
+                    body: $summaryBody,
+                    url: route('filament.admin.resources.capital-projects.index'),
+                    icon: 'heroicon-o-chart-bar',
+                    iconColor: 'info',
+                    actionLabel: 'View All Projects',
+                ));
+                if ($sent) {
+                    $delivered++;
+                }
             }
 
-            $this->info("✓ Weekly summary sent to {$recipients->count()} admin users");
+            $this->info("✓ Weekly summary sent to {$delivered} admin users");
 
             // Display summary in console
             $this->newLine();
@@ -115,7 +120,7 @@ class GenerateWeeklySummary extends Command
                 'completed_this_week' => $completedThisWeek,
                 'overdue_count' => $overdueProjects,
                 'high_priority_count' => $highPriorityProjects,
-                'recipients' => $recipients->count(),
+                'recipients' => $delivered,
             ]);
 
             return Command::SUCCESS;

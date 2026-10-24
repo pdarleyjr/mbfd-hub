@@ -440,8 +440,13 @@ final class DailyInspectionAcceptanceScenariosTest extends TestCase
         $this->assertSame([$defect->id], $hold->metadata['defect_ids']);
         // Findings are facts even while held: the next inspector sees them.
         $this->assertSame(1, ApparatusDefectObservation::query()->where('apparatus_defect_id', $defect->id)->count());
-        $this->assertGreaterThanOrEqual(1, $this->sentCount($this->reviewer, 'inspection_review_required'));
-        $this->assertSame(1, $this->sentCount($this->reviewer, 'issue_escalated'));
+        // Reviewers get ONE message about new significant damage, and it names the damaged item.
+        $this->assertSame(1, $this->sentCount($this->reviewer, 'inspection_review_required'));
+        $this->assertSame(0, $this->sentCount($this->reviewer, 'issue_escalated'));
+        $this->assertStringContainsString(
+            $defect->item,
+            Notification::sent($this->reviewer, InspectionEventNotification::class)->firstWhere('kind', 'inspection_review_required')->body,
+        );
 
         $approved = app(InspectionReviewService::class)->approve($inspection->id, $this->reviewer, 'Reviewed the photo.', false);
 
@@ -491,7 +496,7 @@ final class DailyInspectionAcceptanceScenariosTest extends TestCase
         $this->assertSame('significant', $defect->fresh()->severity);
         $this->assertSame(1, ApparatusDefectEvent::query()->where('event_type', 'escalated')->count());
         $this->assertSame('significant_damage', ApparatusInspectionException::query()->sole()->field);
-        $this->assertSame(1, $this->sentCount($this->reviewer, 'issue_escalated'));
+        $this->assertSame(0, $this->sentCount($this->reviewer, 'issue_escalated'));
     }
 
     // ---------------------------------------------------------------- scenario H
@@ -521,7 +526,8 @@ final class DailyInspectionAcceptanceScenariosTest extends TestCase
 
         $this->actAs($this->alpha);
         $html = $this->get('/employee/my-vehicle-inspections/'.$inspection->id)->assertOk()->getContent();
-        $this->assertStringContainsString('Needs approval', $html);
+        $this->assertStringContainsString('Waiting for Logistics review', $html);
+        $this->assertStringNotContainsString('Needs approval', $html);
         $this->assertStringContainsString('You flagged this for review', $html);
 
         $approved = app(InspectionReviewService::class)->approve($inspection->id, $this->reviewer, 'Gauge looked normal on inspection.');
@@ -650,7 +656,7 @@ final class DailyInspectionAcceptanceScenariosTest extends TestCase
         );
 
         $html = $this->get('/employee/my-vehicle-inspections/'.$inspection->id)->assertOk()->getContent();
-        $this->assertStringContainsString('Needs approval', $html);
+        $this->assertStringContainsString('Waiting for Logistics review', $html);
         $this->assertStringContainsString('Fleet is confirming which vehicle you inspected', $html);
         $this->get(route('employee.vehicle-inspections.pdf', $inspection))->assertOk();
 
@@ -778,9 +784,8 @@ final class DailyInspectionAcceptanceScenariosTest extends TestCase
         $defect = ApparatusDefect::query()->sole();
 
         $review = Notification::sent($this->reviewer, InspectionEventNotification::class)->firstWhere('kind', 'inspection_review_required');
-        $escalated = Notification::sent($this->reviewer, InspectionEventNotification::class)->firstWhere('kind', 'issue_escalated');
         $this->assertSame('/admin/inspections/'.$inspection->id.'#approval', $review->url);
-        $this->assertSame('/admin/inspections/'.$inspection->id.'#issue-'.$defect->id, $escalated->url);
+        $this->assertNull(Notification::sent($this->reviewer, InspectionEventNotification::class)->firstWhere('kind', 'issue_escalated'), 'One alert per event: the approval alert already covers the damage.');
 
         $this->actAs($this->reviewer);
         $admin = $this->get(strtok($review->url, '#'))->assertOk()->getContent();

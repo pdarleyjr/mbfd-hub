@@ -402,7 +402,8 @@
 .fi-body :is(a, button, input, select, textarea, [tabindex]):focus-visible {
     outline: 2px solid rgb(var(--hub-focus));
     outline-offset: 2px;
-    scroll-margin-block: 5rem;
+    /* Keep a focused control clear of the sticky bar (inset included) with 1.5rem to spare. */
+    scroll-margin-block: calc(var(--hub-bar-total) + 1.5rem);
 }
 
 .fi-topbar :is(a, button, input):focus-visible,
@@ -1457,30 +1458,9 @@ body.mbfd-command-display .mbfd-station-command-board { font-size: 1rem; }
     body.mbfd-pwa .fi-main {
         padding-bottom: 1.75rem; /* room for status bar */
     }
-    /* The OS chrome handles back/forward; hide our breadcrumb top padding */
-    body.mbfd-pwa .fi-page-header-heading {
-        padding-top: 0.25rem;
-    }
 }
 
-/* --- Window Controls Overlay (Chromium 102+) -------------------------- */
-@media (display-mode: window-controls-overlay) {
-    body.mbfd-pwa .fi-topbar {
-        position: sticky;
-        top: 0;
-        z-index: 40;
-        padding-left: env(titlebar-area-x, 0);
-        padding-right: calc(100vw - env(titlebar-area-width, 100vw) - env(titlebar-area-x, 0));
-        -webkit-app-region: drag;
-    }
-    body.mbfd-pwa .fi-topbar a,
-    body.mbfd-pwa .fi-topbar button,
-    body.mbfd-pwa .fi-topbar input,
-    body.mbfd-pwa .fi-topbar summary,
-    body.mbfd-pwa .fi-global-search {
-        -webkit-app-region: no-drag;
-    }
-}
+/* Window Controls Overlay (installed desktop window): see hub-admin-v2.css, keyed on display-mode alone. */
 
 /* --- Active-row highlight from keyboard j/k nav ----------------------- */
 .fi-ta-row.admin-row-focused {

@@ -5,6 +5,7 @@ namespace App\Services\VideoConferencing;
 use App\Contracts\VideoConferencing\ConferenceProvider;
 use App\Data\VideoConferencing\IssuedConferenceToken;
 use App\Enums\VideoConferencing\ConferenceJoinRole;
+use App\Exceptions\VideoConferencing\ConferenceRoomFullException;
 use App\Exceptions\VideoConferencing\EndpointInUseException;
 use App\Models\Employee;
 use App\Models\VideoConferenceParticipation;
@@ -18,6 +19,8 @@ class ConferenceTokenService
     public function __construct(
         private readonly ConferenceProvider $provider,
         private readonly ConferenceIdentityService $identities,
+        private readonly ConferenceSeatService $seats,
+        private readonly LineupTimeLimit $timeLimit,
     ) {}
 
     /** @return array{issued: IssuedConferenceToken, participation: VideoConferenceParticipation} */
@@ -62,18 +65,31 @@ class ConferenceTokenService
         }
 
         try {
-            $participation = DB::transaction(fn (): VideoConferenceParticipation => VideoConferenceParticipation::query()->create([
-                'session_id' => $session->id,
-                'employee_id' => $employee?->getKey(),
-                'participant_identity' => $identity,
-                'active_identity_key' => $activeKey,
-                'join_as' => $role,
-                'display_name' => $displayName,
-                'launch_context_hash' => $launchContext === null
-                    ? null
-                    : hash_hmac('sha256', $launchContext, (string) config('app.key')),
-                'token_issued_at' => now(),
-            ]));
+            $participation = DB::transaction(function () use ($session, $employee, $role, $identity, $activeKey, $displayName, $launchContext): VideoConferenceParticipation {
+                if ($role === ConferenceJoinRole::Self) {
+                    // Seats are counted under a row lock on the session: two members racing
+                    // for the last seat serialize here, so the second one sees the first one's
+                    // participation and is refused before any row or token exists. (SQLite, used
+                    // by tests, serializes writers itself and ignores the lock hint.)
+                    VideoConferenceSession::query()->whereKey($session->getKey())->lockForUpdate()->first();
+                    if ($this->seats->isFull($session, $identity)) {
+                        throw new ConferenceRoomFullException('Morning Lineup is full right now. You can watch for a seat to open; try again in a moment.');
+                    }
+                }
+
+                return VideoConferenceParticipation::query()->create([
+                    'session_id' => $session->id,
+                    'employee_id' => $employee?->getKey(),
+                    'participant_identity' => $identity,
+                    'active_identity_key' => $activeKey,
+                    'join_as' => $role,
+                    'display_name' => $displayName,
+                    'launch_context_hash' => $launchContext === null
+                        ? null
+                        : hash_hmac('sha256', $launchContext, (string) config('app.key')),
+                    'token_issued_at' => now(),
+                ]);
+            });
         } catch (UniqueConstraintViolationException $exception) {
             throw new EndpointInUseException($role->label().' is already being connected.', 0, $exception);
         }
@@ -109,8 +125,16 @@ class ConferenceTokenService
     private function authorizeRoleForSession(VideoConferenceSession $session, ConferenceJoinRole $role): void
     {
         if ($session->type->value === 'lineup') {
-            $date = CarbonImmutable::now((string) config('video-conferencing.timezone'))->toDateString();
-            abort_unless($session->logical_key === 'lineup:'.$date, 410, 'This Morning Lineup has ended.');
+            // A lineup belongs to the Eastern day it started on and stays joinable until its own
+            // time limit, even past midnight, so today's and yesterday's keys are both valid; the
+            // time limit (not the date) is what ends it.
+            $now = CarbonImmutable::now((string) config('video-conferencing.timezone'));
+            abort_unless(
+                in_array($session->logical_key, ['lineup:'.$now->toDateString(), 'lineup:'.$now->subDay()->toDateString()], true)
+                    && ! $this->timeLimit->hasExpired($session),
+                410,
+                'This Morning Lineup has ended.',
+            );
 
             return;
         }

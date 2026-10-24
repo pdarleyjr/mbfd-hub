@@ -13,6 +13,7 @@ use App\Models\StationRequest;
 use App\Models\StationRequestItem;
 use App\Models\User;
 use App\Services\StationRequestWorkflowService;
+use App\Support\DecisionReason;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Notifications\Notification;
@@ -43,7 +44,8 @@ class ViewStationRequest extends ViewRecord
                 ->form([
                     Forms\Components\Select::make('status')
                         ->options(collect(StationRequestStatus::cases())->mapWithKeys(fn ($status) => [$status->value => $status->label()])->all())
-                        ->required(),
+                        ->required()
+                        ->live(),
                     Forms\Components\Select::make('assigned_to_user_id')
                         ->options(fn (): array => User::query()
                             ->orderBy('name')
@@ -52,8 +54,13 @@ class ViewStationRequest extends ViewRecord
                         ->label('Assigned To'),
                     Forms\Components\TextInput::make('assigned_vendor')->maxLength(255),
                     Forms\Components\Textarea::make('public_note')
-                        ->label('Public Update')
-                        ->helperText('Visible to station staff in request history.')
+                        ->label(fn (Forms\Get $get): string => $this->isDecision($get('status')) ? 'Reason (shown to the station)' : 'Public Update')
+                        ->helperText(fn (Forms\Get $get): string => $this->isDecision($get('status'))
+                            ? 'Required. The station sees "'.StationRequestStatus::tryFrom((string) $get('status'))?->label().': your reason" as the latest response.'
+                            : 'Visible to station staff in request history.')
+                        ->required(fn (Forms\Get $get): bool => $this->isDecision($get('status')))
+                        ->minLength(fn (Forms\Get $get): ?int => $this->isDecision($get('status')) ? DecisionReason::MIN_LENGTH : null)
+                        ->maxLength(fn (Forms\Get $get): int => $this->isDecision($get('status')) ? DecisionReason::MAX_LENGTH : 5000)
                         ->rows(3),
                     Forms\Components\Textarea::make('internal_note')
                         ->label('Internal Note')
@@ -114,6 +121,13 @@ class ViewStationRequest extends ViewRecord
                     Notification::make()->title('Station request updated')->success()->send();
                 }),
         ];
+    }
+
+    /** Deny and Cancel are the two moves that must tell the station why. */
+    private function isDecision(mixed $status): bool
+    {
+        return in_array($status, [StationRequestStatus::Denied->value, StationRequestStatus::Cancelled->value], true)
+            && $this->stationRequest()->status !== $status;
     }
 
     private function stationRequest(): StationRequest

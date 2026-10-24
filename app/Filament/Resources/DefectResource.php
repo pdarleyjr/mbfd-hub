@@ -12,6 +12,7 @@ use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
 use App\Support\Fleet\DefectActionStatus;
 use App\Support\Fleet\DefectFollowUpState;
+use App\Support\Fleet\DefectNoActionClosure;
 use Filament\Actions\MountableAction;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -43,20 +44,30 @@ class DefectResource extends Resource
     {
         return $form
             ->schema([
+                // What the report is about (which unit, where, which item, how it failed) is the record's
+                // identity. Readiness counts, continuity matching and notifications all key on it, and an edit
+                // leaves no event, actor or reason, so on edit it is shown but never written from this form.
+                // A report entered against the wrong unit or item is closed with Close — No Action Required.
                 Forms\Components\Select::make('apparatus_id')
                     ->relationship('apparatus', 'name')
                     ->getOptionLabelFromRecordUsing(fn (Apparatus $record): string => $record->name ?: $record->designation ?: $record->vehicle_number ?: (string) $record->getKey())
                     ->required()
                     ->searchable()
-                    ->preload(),
+                    ->preload()
+                    ->disabledOn('edit')
+                    ->dehydrated(fn (string $operation): bool => $operation !== 'edit'),
 
                 Forms\Components\TextInput::make('compartment')
                     ->required()
-                    ->maxLength(255),
+                    ->maxLength(255)
+                    ->disabledOn('edit')
+                    ->dehydrated(fn (string $operation): bool => $operation !== 'edit'),
 
                 Forms\Components\TextInput::make('item')
                     ->required()
-                    ->maxLength(255),
+                    ->maxLength(255)
+                    ->disabledOn('edit')
+                    ->dehydrated(fn (string $operation): bool => $operation !== 'edit'),
 
                 Forms\Components\Select::make('issue_type')
                     ->required()
@@ -66,7 +77,9 @@ class DefectResource extends Resource
                         'expired' => 'Expired',
                         'low_quantity' => 'Low Quantity',
                         'other' => 'Other',
-                    ]),
+                    ])
+                    ->disabledOn('edit')
+                    ->dehydrated(fn (string $operation): bool => $operation !== 'edit'),
 
                 Forms\Components\Textarea::make('notes')
                     ->columnSpanFull()
@@ -82,27 +95,27 @@ class DefectResource extends Resource
 
                 // The lifecycle is changed only by the corrective-action workflow (the inspection page
                 // or the Mark Resolved action), never by editing these fields, so they are display-only.
-                Forms\Components\Select::make('status')
-                    ->helperText('Change it with the issue actions on the inspection page, or Mark Resolved in the list.')
-                    ->options([
-                        'open' => 'Open',
-                        'in_progress' => 'In Progress',
-                        'resolved' => 'Resolved',
-                    ])
-                    ->disabled()
-                    ->dehydrated(false),
+                // Shown from action_status so "Closed — no action required" is never read as "Resolved".
+                Forms\Components\Placeholder::make('lifecycle')
+                    ->label('Status')
+                    ->content(fn (?ApparatusDefect $record): string => DefectActionStatus::label($record?->action_status))
+                    ->helperText('Change it with the issue actions on the inspection page, or Mark Resolved in the list.'),
 
                 Forms\Components\Textarea::make('resolution_notes')
+                    ->label(fn (?ApparatusDefect $record): string => $record?->isClosedNoAction()
+                        ? DefectNoActionClosure::REASON_LABEL
+                        : 'Resolution notes')
                     ->columnSpanFull()
                     ->rows(3)
                     ->disabled()
                     ->dehydrated(false)
-                    ->visible(fn (Forms\Get $get) => $get('status') === 'resolved'),
+                    ->visible(fn (?ApparatusDefect $record): bool => (bool) $record?->resolved),
 
                 Forms\Components\DateTimePicker::make('resolved_at')
+                    ->label(fn (?ApparatusDefect $record): string => $record?->isClosedNoAction() ? 'Closed at' : 'Resolved at')
                     ->disabled()
                     ->dehydrated(false)
-                    ->visible(fn (Forms\Get $get) => $get('status') === 'resolved'),
+                    ->visible(fn (?ApparatusDefect $record): bool => (bool) $record?->resolved),
             ]);
     }
 
@@ -114,7 +127,7 @@ class DefectResource extends Resource
                 Tables\Columns\TextColumn::make('apparatus.name')
                     ->wrap()
                     ->extraAttributes(['class' => 'hub-phone-summary'])
-                    ->description(fn (ApparatusDefect $record): string => $record->compartment.' / '.$record->item.' · '.str($record->issue_type)->headline().' · '.str($record->status)->headline())
+                    ->description(fn (ApparatusDefect $record): string => $record->compartment.' / '.$record->item.' · '.str($record->issue_type)->headline().' · '.DefectActionStatus::label($record->action_status))
                     ->label('Apparatus')
                     ->searchable()
                     ->sortable(),
@@ -140,12 +153,17 @@ class DefectResource extends Resource
                 Tables\Columns\TextColumn::make('item')->visibleFrom('md')
                     ->searchable(),
 
-                Tables\Columns\TextColumn::make('status')->visibleFrom('md')
-                    ->colors([
-                        'danger' => 'open',
-                        'warning' => 'in_progress',
-                        'success' => 'resolved',
-                    ]),
+                // From action_status: "Resolved" (fixed) and "Closed — no action required" are different outcomes.
+                Tables\Columns\TextColumn::make('action_status')->visibleFrom('md')
+                    ->label('Status')
+                    ->badge()
+                    ->formatStateUsing(fn (?string $state): string => DefectActionStatus::label($state))
+                    ->color(fn (?string $state): string => match ($state) {
+                        DefectActionStatus::RESOLVED => 'success',
+                        DefectActionStatus::DISMISSED => 'gray',
+                        DefectActionStatus::REPORTED, null => 'danger',
+                        default => 'warning',
+                    }),
 
                 Tables\Columns\TextColumn::make('follow_up')->visibleFrom('md')
                     ->label('Follow-up')
@@ -168,30 +186,45 @@ class DefectResource extends Resource
                     ->sortable(),
 
                 Tables\Columns\TextColumn::make('resolved_at')->visibleFrom('md')
-                    ->label('Resolved')
+                    ->label('Closed')
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
+                // `open` here means "reported, not yet acknowledged"; it is a narrowing filter,
+                // not the default, so acknowledged / scheduled issues are never hidden.
                 SelectFilter::make('status')
+                    ->label('Acknowledgement')
                     ->options([
-                        'open' => 'Open',
-                        'in_progress' => 'In Progress',
-                        'resolved' => 'Resolved',
-                    ])
-                    ->default('open'),
+                        'open' => 'Not yet acknowledged',
+                        'in_progress' => 'In progress',
+                    ]),
 
-                // Matches the station profile's "Unresolved equipment issues"
-                // count: open and in-progress issues (resolved = false).
+                // Exact lifecycle stage. "Resolved" is a repair; "Closed — no action required" is not.
+                // Choosing one replaces the Open / Closed view below, so asking for a closed status is
+                // never silently combined with "Open" into an empty list.
+                SelectFilter::make('action_status')
+                    ->label('Exact status')
+                    ->placeholder('Any')
+                    ->options(DefectActionStatus::labels()),
+
+                // Default view: all open work (reported, acknowledged, action pending, replacement
+                // available, repair scheduled). Matches the station profile's "Unresolved equipment
+                // issues" count (resolved = false). "All" shows closed issues too.
                 Tables\Filters\TernaryFilter::make('unresolved')
-                    ->label('Unresolved')
-                    ->trueLabel('Unresolved (open or in progress)')
-                    ->falseLabel('Resolved')
-                    ->queries(
-                        true: fn (Builder $query): Builder => $query->where('resolved', false),
-                        false: fn (Builder $query): Builder => $query->where('resolved', true),
-                    ),
+                    ->label('Open or closed')
+                    ->placeholder('All')
+                    ->default(true)
+                    ->trueLabel('Open (reported, in progress)')
+                    ->falseLabel('Closed (resolved or no action required)')
+                    ->query(function (Builder $query, array $data, mixed $livewire): Builder {
+                        if (blank($data['value'] ?? null) || self::exactStatusChosen($livewire)) {
+                            return $query;
+                        }
+
+                        return $query->where('resolved', ! $data['value']);
+                    }),
 
                 SelectFilter::make('follow_up')
                     ->label('Follow-up')
@@ -254,6 +287,12 @@ class DefectResource extends Resource
                 ])->label('Actions')->icon('heroicon-m-ellipsis-horizontal')->button()->color('gray'),
             ])
             ->defaultSort('reported_date', 'desc');
+    }
+
+    /** True while the "Exact status" filter has a value; that choice replaces the Open / Closed view. */
+    private static function exactStatusChosen(mixed $livewire): bool
+    {
+        return is_object($livewire) && filled(data_get($livewire->tableFilters ?? [], 'action_status.value'));
     }
 
     /** The inspection that first reported this issue, else the one that created the record, else the latest to observe it. */

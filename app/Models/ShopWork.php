@@ -6,5 +6,30 @@ use Illuminate\Database\Eloquent\Model;
 
 class ShopWork extends Model
 {
-    //
+    /** Allowed values of the `shop_works.status` database enum. */
+    public const STATUSES = ['Pending', 'In Progress', 'Waiting for Parts', 'Completed', 'Cancelled'];
+
+    protected $fillable = [
+        'project_name',
+        'category',
+        'description',
+        'quantity',
+        'apparatus_id',
+        'status',
+        'priority',
+        'parts_list',
+        'estimated_cost',
+        'actual_cost',
+        'started_date',
+        'completed_date',
+        'assigned_to',
+        'notes',
+    ];
+
+    protected $casts = [
+        'estimated_cost' => 'decimal:2',
+        'actual_cost' => 'decimal:2',
+        'started_date' => 'date',
+        'completed_date' => 'date',
+    ];
 }

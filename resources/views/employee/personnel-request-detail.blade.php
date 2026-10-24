@@ -24,6 +24,18 @@
                 <p class="mt-2 text-sm text-hub-ink-secondary">Submitted by {{ $request->requester_rank }} {{ $request->requester_name }} on {{ $request->created_at->format('M j, Y \a\t g:i A') }}</p>
             </header>
 
+            @if(in_array($request->status, [\App\Enums\PersonnelRequestStatus::Denied, \App\Enums\PersonnelRequestStatus::Cancelled], true))
+                @php
+                    $decisionUpdate = $request->updates->where('event', 'status_changed')->where('status', $request->status)->sortByDesc('id')->first();
+                    $decisionReason = filled($decisionUpdate?->employee_visible_note) ? $decisionUpdate->employee_visible_note : $request->employee_response;
+                @endphp
+                @if(filled($decisionReason))
+                    <div class="hub-callout hub-callout--warning mx-5 mt-6 p-5 sm:mx-7" role="status" data-decision-reason>
+                        <p class="whitespace-pre-wrap text-sm font-semibold leading-6">{{ \App\Support\DecisionReason::memberLine($request->status->label(), $decisionReason) }}</p>
+                    </div>
+                @endif
+            @endif
+
             <div class="grid gap-7 px-5 py-6 sm:px-7 lg:grid-cols-[1fr_0.8fr]">
                 <section>
                     <h2 class="text-lg font-semibold">Requested items</h2>

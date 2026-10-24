@@ -21,9 +21,11 @@ const expires = Date.parse('2026-11-12T00:00:00Z');
 // 2026-10-23: re-pinned for the zod 3 -> 4.6.7 upgrade (HIGH GHSA-mrhx-c7xc-m3w5),
 // postcss 8.5.29, hono 4.13.13 and wrangler 4.149.0 (drops miniflare's zod 3).
 // Tailwind 3 and its braces graph are unchanged.
+// 2026-10-23: root package.json re-pinned for five added npm scripts (service-worker build/check and
+// PWA test runners). No dependency, version or lock change; package-lock.json is byte-identical.
 const inputs = {
     '.': {
-        'package.json': '66b565f0dbc7f41b5257264f01c85d624e9c874644764b618ea55dc6f719c570',
+        'package.json': 'ea20b8a1de13043d13f0ea5c880e090b8feac8b48d57144cd2a715267412abbe',
         'package-lock.json': 'd2716fe1c072e7aff6741ea5f738a3d2760a19e7230f94871e6a2312924a0010',
     },
     'resources/js/daily-checkout': {

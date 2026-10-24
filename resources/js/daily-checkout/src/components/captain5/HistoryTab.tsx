@@ -28,6 +28,7 @@ function ClosedRow({ issue, onOpen }: { issue: IssueSummary; onOpen: (id: number
         <span className={`${HINT} break-words`}>
           {issue.compartment} · Closed {dateTimeText(issue.resolved_at)}{issue.resolution_type ? ` · ${humanize(issue.resolution_type)}` : ''}
         </span>
+        {issue.closure === 'closed_no_action' && issue.closure_reason && <span className={`${HINT} break-words`}>Reason: {issue.closure_reason}</span>}
         <span className="flex flex-wrap gap-1.5"><Tag tone={status.tone}>{status.label}</Tag><Tag>{kindLabel(issue.kind)}</Tag></span>
       </button>
     </li>
@@ -72,7 +73,7 @@ export default function HistoryTab({ onOpen, version, onForbidden }: Props) {
       {error && <LoadError title="Closed issues could not be loaded" message={error} onRetry={retry} />}
       {!error && issues === null && <SkeletonRows rows={3} />}
       {!error && issues !== null && issues.length === 0 && (
-        <EmptyState icon={<History className="hub-empty__icon" aria-hidden="true" />} title={query ? 'No closed issues match your search' : 'No closed issues yet'} body={query ? 'Try a shorter word, or clear the search.' : 'Resolved and dismissed issues appear here.'} />
+        <EmptyState icon={<History className="hub-empty__icon" aria-hidden="true" />} title={query ? 'No closed issues match your search' : 'No closed issues yet'} body={query ? 'Try a shorter word, or clear the search.' : 'Resolved issues and issues closed with no action required appear here.'} />
       )}
       {!error && issues !== null && issues.length > 0 && (
         <ul className="space-y-2" aria-label="Closed issues" data-testid="captain5-history-list">

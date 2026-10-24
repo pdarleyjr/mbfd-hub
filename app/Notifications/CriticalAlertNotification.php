@@ -2,19 +2,24 @@
 
 namespace App\Notifications;
 
+use App\Notifications\Concerns\EvaluatesDelivery;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Notification;
 use NotificationChannels\WebPush\WebPushMessage;
-use NotificationChannels\WebPush\WebPushChannel;
 
 class CriticalAlertNotification extends Notification
 {
+    use EvaluatesDelivery;
     use Queueable;
 
     protected string $title;
+
     protected string $message;
+
     protected ?int $alertId;
+
     protected ?string $url;
+
     protected string $alertType;
 
     /**
@@ -36,7 +41,22 @@ class CriticalAlertNotification extends Notification
      */
     public function via(object $notifiable): array
     {
-        return [WebPushChannel::class];
+        return $this->evaluatedChannels($notifiable);
+    }
+
+    protected function deliveryCategory(): string
+    {
+        return 'system_alerts';
+    }
+
+    /**
+     * This notification only has a push representation; the in-app copy is a separate Filament notice.
+     *
+     * @return list<string>
+     */
+    protected function deliveryChannelMask(): array
+    {
+        return ['webpush'];
     }
 
     /**
@@ -44,7 +64,7 @@ class CriticalAlertNotification extends Notification
      */
     public function toWebPush(object $notifiable, $notification): WebPushMessage
     {
-        $actionUrl = $this->url ?? ($this->alertId ? url('/admin/alerts/' . $this->alertId) : url('/admin'));
+        $actionUrl = $this->url ?? ($this->alertId ? url('/admin/alerts/'.$this->alertId) : url('/admin'));
 
         return (new WebPushMessage)
             ->title($this->title)
@@ -52,9 +72,9 @@ class CriticalAlertNotification extends Notification
             ->badge('/images/mbfd-logo.png')
             ->body($this->message)
             ->action('View Alert', 'view_alert')
-            ->tag($this->alertType . '-' . ($this->alertId ?? time()))
+            ->tag($this->alertType.'-'.($this->alertId ?? time()))
             ->data([
-                'url' => $actionUrl,
+                'url' => $this->deliveryUrl($notifiable, $actionUrl),
                 'alertType' => $this->alertType,
                 'alertId' => $this->alertId,
             ]);

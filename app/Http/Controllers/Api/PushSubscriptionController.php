@@ -6,6 +6,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\Notifications\PushDeviceLabel;
+use App\Services\Notifications\PushSessionBinding;
 use Closure;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
@@ -37,6 +39,9 @@ class PushSubscriptionController extends Controller
                     }
                 },
             ],
+            'label' => ['nullable', 'string', 'max:80'],
+            // RFC 8291 aes128gcm is what Apple requires and every current browser supports.
+            'content_encoding' => ['nullable', 'string', 'in:aes128gcm,aesgcm'],
             'keys.p256dh' => [
                 'bail',
                 'required',
@@ -81,7 +86,11 @@ class PushSubscriptionController extends Controller
                 $user,
                 $validated['endpoint'],
                 $validated['keys']['p256dh'],
-                $validated['keys']['auth']
+                $validated['keys']['auth'],
+                (string) $request->userAgent(),
+                is_string($validated['label'] ?? null) ? $validated['label'] : null,
+                is_string($validated['content_encoding'] ?? null) ? $validated['content_encoding'] : 'aes128gcm',
+                PushSessionBinding::forRequest($request),
             );
 
             if ($subscription === null) {
@@ -186,9 +195,21 @@ class PushSubscriptionController extends Controller
         ]);
     }
 
-    private function saveSubscription(User $user, string $endpoint, string $publicKey, string $authToken): ?PushSubscription
+    /**
+     * An endpoint already registered to another member moves to this member only when the
+     * request proves possession of the same subscription keys (a shared station browser
+     * signing in as someone else); any other claim on it is refused.
+     */
+    private function saveSubscription(User $user, string $endpoint, string $publicKey, string $authToken, string $userAgent, ?string $labelHint, string $contentEncoding, ?string $sessionBinding = null): ?PushSubscription
     {
-        return DB::transaction(function () use ($user, $endpoint, $publicKey, $authToken): ?PushSubscription {
+        $deviceMeta = [
+            'content_encoding' => $contentEncoding,
+            'session_binding' => $sessionBinding,
+            'user_agent' => $userAgent === '' ? null : mb_substr($userAgent, 0, 255),
+            'device_label' => PushDeviceLabel::fromUserAgent($userAgent, $labelHint),
+        ];
+
+        return DB::transaction(function () use ($user, $endpoint, $publicKey, $authToken, $deviceMeta): ?PushSubscription {
             /** @var PushSubscription|null $subscription */
             $subscription = app(config('webpush.model'))
                 ->newQuery()
@@ -197,13 +218,28 @@ class PushSubscriptionController extends Controller
                 ->first();
 
             if ($subscription !== null && ! $user->ownsPushSubscription($subscription)) {
-                return null;
+                if (! $this->provesPossession($subscription, $publicKey, $authToken)) {
+                    return null;
+                }
+
+                Log::notice('Push subscription moved to the member who proved possession of its keys', [
+                    'previous_subscribable_id' => $subscription->subscribable_id,
+                    'user_id' => $user->id,
+                    'endpoint_hash' => $this->endpointHash($endpoint),
+                ]);
+                $subscription->subscribable_id = $user->getKey();
+                $subscription->subscribable_type = $user->getMorphClass();
             }
 
             if ($subscription !== null) {
-                $subscription->public_key = $publicKey;
-                $subscription->auth_token = $authToken;
-                $subscription->save();
+                $subscription->forceFill([
+                    'public_key' => $publicKey,
+                    'auth_token' => $authToken,
+                    ...$deviceMeta,
+                    'failure_count' => 0,
+                    'last_failure_reason' => null,
+                    'backoff_until' => null,
+                ])->save();
 
                 return $subscription;
             }
@@ -213,10 +249,19 @@ class PushSubscriptionController extends Controller
                 'endpoint' => $endpoint,
                 'public_key' => $publicKey,
                 'auth_token' => $authToken,
+                ...$deviceMeta,
             ]);
 
             return $createdSubscription;
         });
+    }
+
+    private function provesPossession(PushSubscription $subscription, string $publicKey, string $authToken): bool
+    {
+        return is_string($subscription->public_key) && is_string($subscription->auth_token)
+            && $subscription->public_key !== '' && $subscription->auth_token !== ''
+            && hash_equals($subscription->public_key, $publicKey)
+            && hash_equals($subscription->auth_token, $authToken);
     }
 
     private function endpointIsOwnedByAnotherUser(User $user, string $endpoint): bool
@@ -262,7 +307,32 @@ class PushSubscriptionController extends Controller
 
         $host = $this->normalizeHost($parts['host']);
 
-        return $host !== null && in_array($host, $this->allowedEndpointHosts(), true);
+        return $host !== null && $this->hostIsAllowed($host);
+    }
+
+    /**
+     * Exact match, or `*.base`, which matches one or more whole labels before the base:
+     * `wns2-ch1p.notify.windows.com` yes; `notify.windows.com.evil.test`,
+     * `evilnotify.windows.com` and the bare base itself no.
+     */
+    private function hostIsAllowed(string $host): bool
+    {
+        foreach ($this->allowedEndpointHosts() as $allowed) {
+            if (! str_starts_with($allowed, '*.')) {
+                if ($host === $allowed) {
+                    return true;
+                }
+
+                continue;
+            }
+
+            // "*.base" => ".base": the dot keeps the match on a label boundary.
+            if (str_ends_with($host, substr($allowed, 1))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -279,7 +349,7 @@ class PushSubscriptionController extends Controller
         $normalizedHosts = [];
 
         foreach ($hosts as $host) {
-            $normalizedHost = $this->normalizeHost($host);
+            $normalizedHost = $this->normalizeAllowlistEntry($host);
 
             if ($normalizedHost !== null) {
                 $normalizedHosts[] = $normalizedHost;
@@ -287,6 +357,21 @@ class PushSubscriptionController extends Controller
         }
 
         return array_values(array_unique($normalizedHosts));
+    }
+
+    /**
+     * Allow-list entries are exact hosts or `*.base`. A wildcard base needs at least three
+     * labels (`notify.windows.com`), so `*.com` or `*.googleapis.com` cannot be configured.
+     */
+    private function normalizeAllowlistEntry(mixed $entry): ?string
+    {
+        if (! is_string($entry) || ! str_starts_with(trim($entry), '*.')) {
+            return $this->normalizeHost($entry);
+        }
+
+        $base = $this->normalizeHost(substr(trim($entry), 2));
+
+        return $base !== null && substr_count($base, '.') >= 2 ? '*.'.$base : null;
     }
 
     private function normalizeHost(mixed $host): ?string

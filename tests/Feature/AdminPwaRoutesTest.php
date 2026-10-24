@@ -55,7 +55,7 @@ class AdminPwaRoutesTest extends TestCase
             "addEventListener('install'",
             $worker,
         );
-        $this->assertStringContainsString("const VERSION = 'mbfd-admin-v3'", $worker);
+        $this->assertStringContainsString("const VERSION = 'mbfd-admin-v4'", $worker);
         $this->assertStringNotContainsString('networkOnlyAdminNavigation', $worker);
     }
 

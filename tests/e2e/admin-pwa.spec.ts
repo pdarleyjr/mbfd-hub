@@ -77,9 +77,12 @@ test.describe('admin PWA unauthenticated', () => {
     const res = await request.get('/sw.js');
     expect(res.status()).toBe(200);
     const body = await res.text();
-    expect(body).toContain("sameOriginNavigation(data.url)");
-    expect(body).toContain("? candidate.pathname + candidate.search + candidate.hash");
-    expect(body).toContain(": '/';");
+    // The shared core (inlined from resources/js/pwa/worker-core.js) owns the
+    // same-origin rule; tests/Node/pwa-worker-core.test.mjs exercises it behaviorally.
+    expect(body).toContain('function sameOriginNavigation(value, fallback)');
+    expect(body).toContain('candidate.origin === origin()');
+    expect(body).toContain('? candidate.pathname + candidate.search + candidate.hash');
+    expect(body).toContain('sameOriginNavigation(data.url, DEFAULT_URL)');
   });
 
   test('/up health endpoint responds 200', async ({ request }) => {

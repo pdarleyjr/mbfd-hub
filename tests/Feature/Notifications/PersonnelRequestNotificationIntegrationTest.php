@@ -98,7 +98,7 @@ final class PersonnelRequestNotificationIntegrationTest extends TestCase
     public function test_uniform_admin_option_preserves_default_delivery_and_respects_explicit_channel_opt_out(): void
     {
         Role::findOrCreate('logistics_admin', 'web');
-        $admin = User::factory()->create();
+        $admin = User::factory()->create(['account_status' => 'active']);
         $admin->assignRole('logistics_admin');
         $other = User::factory()->create();
         $request = $this->request($this->employee('ADMIN-OPTION'));
@@ -121,7 +121,7 @@ final class PersonnelRequestNotificationIntegrationTest extends TestCase
         $employee = $this->employee('EXTERNAL-CHANNELS');
         $employee->update(['city_email' => 'member@miamibeachfl.gov']);
         $user = $this->account($employee);
-        $notice = new NewSubmissionNotification('member_request_update', 'Order update', 'Items arrived.', essentialInApp: true);
+        $notice = new NewSubmissionNotification('member_request_update', 'Order update', 'Items arrived.');
         $this->assertSame(['database'], $notice->via($user));
         UserNotificationSubscription::ensurePersonnelRequestsForUser($user);
         $subscription = $user->notificationSubscriptions()->where('event_key', User::NOTIFICATION_PREFERENCE_MEMBER_REQUEST_UPDATES)->sole();

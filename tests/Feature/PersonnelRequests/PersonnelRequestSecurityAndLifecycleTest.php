@@ -175,9 +175,11 @@ class PersonnelRequestSecurityAndLifecycleTest extends TestCase
     {
         Carbon::setTestNow('2026-08-18 08:00:00');
         $employee = $this->employee('26001');
-        $admin = User::factory()->create();
+        // An active administrator who may manage assigned equipment AND enter the admin panel (alerts land where they can open them).
+        $admin = User::factory()->create(['account_status' => 'active']);
         Role::findOrCreate('logistics_admin', 'web');
         $admin->assignRole('logistics_admin');
+        $admin->givePermissionTo(\Spatie\Permission\Models\Permission::findOrCreate('admin.access', 'web'), \Spatie\Permission\Models\Permission::findOrCreate('admin.equipment.view', 'web'));
         $assignment = AssignedEquipment::query()->create([
             'employee_portal_id' => $employee->id,
             'user_id' => null,

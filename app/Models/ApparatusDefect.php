@@ -105,6 +105,25 @@ class ApparatusDefect extends Model
         return $query->where('resolved', false);
     }
 
+    /**
+     * `resolved = true` only means "no longer open": it is also true for an issue closed with
+     * no action required. Use these two when the question is HOW it ended.
+     */
+    public function scopeFixed(Builder $query): Builder
+    {
+        return $query->where('action_status', DefectActionStatus::RESOLVED);
+    }
+
+    public function scopeClosedNoAction(Builder $query): Builder
+    {
+        return $query->where('action_status', DefectActionStatus::DISMISSED);
+    }
+
+    public function isClosedNoAction(): bool
+    {
+        return DefectActionStatus::isNoAction($this->action_status);
+    }
+
     public function scopeMissing(Builder $query): Builder
     {
         return $query->where('issue_type', 'missing');

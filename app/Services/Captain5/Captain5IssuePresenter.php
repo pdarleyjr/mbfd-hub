@@ -87,6 +87,9 @@ final class Captain5IssuePresenter
             'last_observed_at' => $this->iso($defect->last_observed_at),
             'resolved_at' => $this->iso($defect->resolved_at),
             'resolution_type' => $defect->resolution_type,
+            // How it ended: 'resolved' (fixed) is not 'closed_no_action' (nothing was repaired); the reason shows in history.
+            'closure' => DefectActionStatus::closureKind($defect->action_status),
+            'closure_reason' => $defect->isClosedNoAction() ? $defect->resolution_notes : null,
             'state_token' => ($defect->action_status ?: DefectActionStatus::REPORTED).':'.$lastEventId,
         ];
     }
@@ -201,7 +204,7 @@ final class Captain5IssuePresenter
     private function publicDetails(ApparatusDefectEvent $event): array
     {
         $details = is_array($event->details) ? $event->details : [];
-        $keep = array_intersect_key($details, array_flip(['resolution_type', 'resolution_notes', 'reason', 'details', 'changed_details', 'actor_context']));
+        $keep = array_intersect_key($details, array_flip(['resolution_type', 'resolution_notes', 'reason', 'previous_action_status', 'details', 'changed_details', 'actor_context']));
         if (isset($keep['details']) && is_array($keep['details'])) {
             $keep['details'] = array_intersect_key($keep['details'], array_flip(Captain5ActorContext::DETAIL_KEYS));
         }

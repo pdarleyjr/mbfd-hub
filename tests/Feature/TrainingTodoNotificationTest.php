@@ -9,18 +9,37 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use NotificationChannels\WebPush\WebPushChannel;
 use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 use Tests\TestCase;
 
 class TrainingTodoNotificationTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
+        foreach (['training_admin', 'training_viewer'] as $role) {
+            Role::findOrCreate($role, 'web');
+        }
+    }
+
+    /** A member who can open Training: only they can be told about training tasks. */
+    private function trainingMember(string $role = 'training_viewer'): User
+    {
+        $user = User::factory()->create(['account_status' => 'active']);
+        $user->assignRole($role);
+
+        return $user;
+    }
+
     public function test_training_todo_creation_notifies_assignees(): void
     {
         Notification::fake();
 
-        $creator = User::factory()->create();
-        $assignee = User::factory()->create();
+        $creator = $this->trainingMember();
+        $assignee = $this->trainingMember();
 
         $this->actingAs($creator);
 
@@ -42,22 +61,35 @@ class TrainingTodoNotificationTest extends TestCase
         Notification::assertNotSentTo($creator, TrainingTodoAssignedNotification::class);
     }
 
-    public function test_unassigned_training_todo_creation_notifies_training_panel_users(): void
+    public function test_an_assignee_who_can_no_longer_open_training_is_not_notified(): void
     {
-        app(\Spatie\Permission\PermissionRegistrar::class)->forgetCachedPermissions();
-
-        Role::create(['name' => 'training_admin', 'guard_name' => 'web']);
-        Role::create(['name' => 'training_viewer', 'guard_name' => 'web']);
-
         Notification::fake();
 
-        $creator = User::factory()->create();
-        $trainingAdmin = User::factory()->create();
-        $trainingViewer = User::factory()->create();
-        $unrelatedUser = User::factory()->create();
+        $creator = $this->trainingMember();
+        $assignee = User::factory()->create(['account_status' => 'active']);
 
-        $trainingAdmin->assignRole('training_admin');
-        $trainingViewer->assignRole('training_viewer');
+        $this->actingAs($creator);
+
+        TrainingTodo::create([
+            'title' => 'Prepare academy drill packets',
+            'description' => null,
+            'status' => 'pending',
+            'priority' => 'high',
+            'assigned_to' => [(string) $assignee->id],
+            'created_by' => $creator->id,
+        ]);
+
+        Notification::assertNotSentTo($assignee, TrainingTodoAssignedNotification::class);
+    }
+
+    public function test_unassigned_training_todo_creation_notifies_training_panel_users(): void
+    {
+        Notification::fake();
+
+        $creator = User::factory()->create(['account_status' => 'active']);
+        $trainingAdmin = $this->trainingMember('training_admin');
+        $trainingViewer = $this->trainingMember('training_viewer');
+        $unrelatedUser = User::factory()->create(['account_status' => 'active']);
 
         $this->actingAs($creator);
 
@@ -78,9 +110,9 @@ class TrainingTodoNotificationTest extends TestCase
 
     public function test_training_todo_update_notifies_only_new_assignees(): void
     {
-        $creator = User::factory()->create();
-        $existingAssignee = User::factory()->create();
-        $newAssignee = User::factory()->create();
+        $creator = $this->trainingMember();
+        $existingAssignee = $this->trainingMember();
+        $newAssignee = $this->trainingMember();
 
         $this->actingAs($creator);
 
@@ -106,7 +138,7 @@ class TrainingTodoNotificationTest extends TestCase
 
     public function test_training_todo_notification_uses_webpush_for_subscribed_users(): void
     {
-        $user = User::factory()->create();
+        $user = $this->trainingMember();
         $user->updatePushSubscription(
             'https://fcm.googleapis.com/fcm/send/test-endpoint',
             str_repeat('a', 88),
@@ -121,5 +153,21 @@ class TrainingTodoNotificationTest extends TestCase
         );
 
         $this->assertContains(WebPushChannel::class, $notification->via($user));
+    }
+
+    public function test_a_member_who_turned_push_off_still_gets_the_in_app_copy_only(): void
+    {
+        $user = $this->trainingMember();
+        $user->updatePushSubscription('https://fcm.googleapis.com/fcm/send/test-endpoint', str_repeat('a', 88), str_repeat('b', 24));
+        $user->notificationSubscriptions()->create([
+            'event_key' => 'training_assignments',
+            'database_enabled' => true,
+            'webpush_enabled' => false,
+            'email_enabled' => false,
+        ]);
+
+        $notification = new TrainingTodoAssignedNotification(1, 'Review roster', 'high', '/training');
+
+        $this->assertSame(['database'], $notification->via($user));
     }
 }

@@ -19,10 +19,13 @@ use App\Models\ApparatusInventoryCorrectionEvent;
 use App\Models\ApparatusIssueMessage;
 use App\Models\User;
 use App\Notifications\Inspections\InspectionEventNotification;
+use App\Notifications\Inspections\InspectionNotificationCategory;
 use App\Notifications\Inspections\InspectionNotificationKind as Kind;
 use App\Services\Captain5\Captain5Notifier;
 use App\Services\Inventory\InventoryCorrectionReason;
+use App\Services\Notifications\NotificationRecipientEvaluator;
 use App\Support\Fleet\DefectActionStatus;
+use App\Support\Fleet\DefectSeverityCorrection;
 use App\Support\Fleet\InspectionReviewers;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
@@ -53,7 +56,7 @@ final class InspectionNotificationDispatcher
 
     private const EXCERPT_LENGTH = 240;
 
-    /** @var array{user: int, sent: bool}|null set only while redeliver() replays one ledger row */
+    /** @var array{user: int, key: string, sent: bool}|null set only while redeliver() replays one ledger row */
     private ?array $replay = null;
 
     /** A new blocking hold needs a reviewer's decision. */
@@ -65,8 +68,8 @@ final class InspectionNotificationDispatcher
                 ->where('blocks_acceptance', true)
                 ->whereNotIn('status', ['resolved', 'dismissed'])
                 ->orderBy('id')
-                ->get(['id', 'reason']);
-            $reasons = $holds->pluck('reason')->map(fn ($reason): string => $this->holdReason((string) $reason))->unique()->values();
+                ->get(['id', 'reason', 'metadata']);
+            $reasons = $holds->map(fn (ApparatusInspectionException $hold): string => $this->holdReasonFor($hold))->unique()->values();
             $unit = $this->unitLabel($this->physicalApparatus($inspection), $inspection->designation_at_time);
             $operator = trim((string) $inspection->operator_name) ?: 'A member';
             $body = $reasons->isEmpty()
@@ -124,7 +127,7 @@ final class InspectionNotificationDispatcher
             $submitted = $this->date($inspection->completed_at ?? $inspection->created_at);
             $body = $decision === 'approved'
                 ? "Your Daily Checkout of {$unit} submitted on {$submitted} was approved."
-                : "Your Daily Checkout of {$unit} submitted on {$submitted} was rejected. Open it for details or contact Logistics.";
+                : "Your Daily Checkout of {$unit} submitted on {$submitted} was rejected, so it does not count as done. Open it to see why, then submit a new Daily Checkout.";
 
             $this->queue(
                 'inspection:'.$inspection->getKey().':decided:'.$decision,
@@ -235,6 +238,124 @@ final class InspectionNotificationDispatcher
                 $this->defectFollowers($defect),
                 fn (User $recipient): array => [
                     'title' => "{$unit}: previously reported issue resolved",
+                    'body' => $body,
+                    'url' => $this->urlFor($recipient, $defect),
+                ],
+                $actor,
+            );
+        });
+    }
+
+    /**
+     * An issue was closed with NO action required (stored as `dismissed`). Always sent, from every
+     * door, to the reporter and every participant: the recorded reason is the message, and the text
+     * says plainly that nothing was repaired or replaced. Reuses the member-update kind, so each
+     * person's saved preferences for issue updates apply.
+     */
+    public function issueClosedNoAction(ApparatusDefect $defect, ApparatusDefectEvent $event): void
+    {
+        $this->guard('issueClosedNoAction', function () use ($defect, $event): void {
+            $unit = $this->unitLabel($defect->getRelationValue('apparatus'));
+            $actor = $event->actor_user_id !== null ? User::query()->find($event->actor_user_id) : null;
+
+            $this->queue(
+                'defect:'.$defect->getKey().':closed:'.$event->getKey(),
+                Kind::ISSUE_MEMBER_UPDATE,
+                $this->defectFollowers($defect),
+                fn (User $recipient): array => [
+                    'title' => "{$unit}: issue closed, no action required",
+                    'body' => $this->closedNoActionBody($defect, $event),
+                    'url' => $this->urlFor($recipient, $defect),
+                ],
+                $actor,
+            );
+        });
+    }
+
+    /** The one sentence every door uses to tell people an issue was closed with no action required. */
+    public function closedNoActionBody(ApparatusDefect $defect, ApparatusDefectEvent $event): string
+    {
+        $reportedOn = $this->date($defect->first_reported_at ?? $defect->reported_date ?? $defect->created_at);
+        $reason = $this->excerpt((string) (($event->details['reason'] ?? null) ?: $defect->resolution_notes));
+        $message = $this->excerpt((string) $event->member_message);
+
+        return sprintf(
+            'The %s reported on %s was closed with no action required on %s. Reason: %s. It was not repaired or replaced.%s',
+            $this->issuePhrase($defect),
+            $reportedOn,
+            $this->date($event->created_at),
+            rtrim($reason, '.') ?: 'not recorded',
+            $message !== '' ? ' '.$message : '',
+        );
+    }
+
+    /**
+     * A closed issue (resolved, or closed with no action required) is open again. Always sent, to the
+     * reporter and every participant but the person who reopened it: they were told it was closed, so
+     * they must be told it is not. The reopening reason is not copied (it is not written as a
+     * member-facing text); a message the administrator typed for the member is added.
+     */
+    public function issueReopened(ApparatusDefect $defect, ApparatusDefectEvent $event): void
+    {
+        $this->guard('issueReopened', function () use ($defect, $event): void {
+            $unit = $this->unitLabel($defect->getRelationValue('apparatus'));
+            $actor = $event->actor_user_id !== null ? User::query()->find($event->actor_user_id) : null;
+            $was = $event->from_status === DefectActionStatus::DISMISSED
+                ? 'closed with no action required'
+                : 'marked resolved';
+            $message = $this->excerpt((string) $event->member_message);
+            $body = sprintf(
+                'The %s reported on %s was %s, and Logistics reopened it on %s. It is being looked at again.%s',
+                $this->issuePhrase($defect),
+                $this->date($defect->first_reported_at ?? $defect->reported_date ?? $defect->created_at),
+                $was,
+                $this->date($event->created_at),
+                $message !== '' ? ' '.$message : '',
+            );
+
+            $this->queue(
+                'defect:'.$defect->getKey().':reopened:'.$event->getKey(),
+                Kind::ISSUE_MEMBER_UPDATE,
+                $this->defectFollowers($defect),
+                fn (User $recipient): array => [
+                    'title' => "{$unit}: issue reopened",
+                    'body' => $body,
+                    'url' => $this->urlFor($recipient, $defect),
+                ],
+                $actor,
+            );
+        });
+    }
+
+    /**
+     * Logistics corrected how serious the issue was recorded as. Sent to the reporter and every
+     * participant but the person who made the change, with the recorded reason.
+     */
+    public function issueSeverityCorrected(ApparatusDefect $defect, ApparatusDefectEvent $event): void
+    {
+        $this->guard('issueSeverityCorrected', function () use ($defect, $event): void {
+            $unit = $this->unitLabel($defect->getRelationValue('apparatus'));
+            $actor = $event->actor_user_id !== null ? User::query()->find($event->actor_user_id) : null;
+            $details = is_array($event->details) ? $event->details : [];
+            $reason = rtrim($this->excerpt((string) ($details['reason'] ?? '')), '.');
+            $message = $this->excerpt((string) $event->member_message);
+            $body = sprintf(
+                'Logistics changed the severity of the %s reported on %s from %s to %s on %s.%s%s',
+                $this->issuePhrase($defect),
+                $this->date($defect->first_reported_at ?? $defect->reported_date ?? $defect->created_at),
+                mb_strtolower(DefectSeverityCorrection::label((string) ($details['from_severity'] ?? ''))),
+                mb_strtolower(DefectSeverityCorrection::label((string) ($details['to_severity'] ?? ''))),
+                $this->date($event->created_at),
+                $reason !== '' ? " Reason: {$reason}." : '',
+                $message !== '' ? ' '.$message : '',
+            );
+
+            $this->queue(
+                'defect:'.$defect->getKey().':severity:'.$event->getKey(),
+                Kind::ISSUE_MEMBER_UPDATE,
+                $this->defectFollowers($defect),
+                fn (User $recipient): array => [
+                    'title' => "{$unit}: issue severity corrected",
                     'body' => $body,
                     'url' => $this->urlFor($recipient, $defect),
                 ],
@@ -420,7 +541,7 @@ final class InspectionNotificationDispatcher
         }
 
         $fresh = [];
-        foreach ($this->distinctRecipients($candidates, $actor) as $recipient) {
+        foreach ($this->distinctRecipients($candidates, $actor, $kind, $eventKey) as $recipient) {
             $inserted = DB::table('inspection_notification_deliveries')->insertOrIgnore([
                 'event_key' => $eventKey,
                 'recipient_user_id' => $recipient->getKey(),
@@ -470,7 +591,7 @@ final class InspectionNotificationDispatcher
      */
     public function redeliver(string $eventKey, string $kind, int $recipientUserId): bool
     {
-        $this->replay = ['user' => $recipientUserId, 'sent' => false];
+        $this->replay = ['user' => $recipientUserId, 'key' => $eventKey, 'sent' => false];
 
         try {
             $parts = explode(':', $eventKey);
@@ -481,6 +602,9 @@ final class InspectionNotificationDispatcher
                 $parts[0] === 'inspection' && ($parts[2] ?? '') === 'decided' => $this->withInspection($subjectId, fn ($i) => $this->inspectionDecided($i, $tail)),
                 $parts[0] === 'defect' && ($parts[2] ?? '') === 'escalated' => $this->withDefect($subjectId, fn ($d) => $this->withInspection((int) $tail, fn ($i) => $this->issueEscalated($d, $i))),
                 $parts[0] === 'defect' && ($parts[2] ?? '') === 'resolved' => $this->withDefect($subjectId, fn ($d) => $this->withEvent((int) $tail, fn ($e) => $this->issueResolved($d, $e))),
+                $parts[0] === 'defect' && ($parts[2] ?? '') === 'closed' => $this->withDefect($subjectId, fn ($d) => $this->withEvent((int) $tail, fn ($e) => $this->issueClosedNoAction($d, $e))),
+                $parts[0] === 'defect' && ($parts[2] ?? '') === 'reopened' => $this->withDefect($subjectId, fn ($d) => $this->withEvent((int) $tail, fn ($e) => $this->issueReopened($d, $e))),
+                $parts[0] === 'defect' && ($parts[2] ?? '') === 'severity' => $this->withDefect($subjectId, fn ($d) => $this->withEvent((int) $tail, fn ($e) => $this->issueSeverityCorrected($d, $e))),
                 $parts[0] === 'defect' && ($parts[2] ?? '') === 'update' => $this->withDefect($subjectId, fn ($d) => $this->withEvent((int) $tail, fn ($e) => $this->issueMemberUpdate($d, $e))),
                 $parts[0] === 'message' => $this->withMessage($subjectId, fn ($m) => $this->messagePosted($m, $kind === Kind::CLARIFICATION_REQUESTED ? $kind : null)),
                 $parts[0] === 'correction' && ($parts[2] ?? '') === 'submitted' => $this->withCorrection($subjectId, fn ($c) => $this->inventoryCorrectionSubmitted($c)),
@@ -549,7 +673,7 @@ final class InspectionNotificationDispatcher
      */
     private function deliverReplay(string $kind, Collection $candidates, Closure $content, ?User $actor): void
     {
-        $recipient = $this->distinctRecipients($candidates, $actor)
+        $recipient = $this->distinctRecipients($candidates, $actor, $kind, $this->replay['key'])
             ->first(fn (User $user): bool => (int) $user->getKey() === $this->replay['user']);
         if ($recipient === null) {
             return; // no longer an eligible recipient (inactive, now the actor, or no longer following)
@@ -557,7 +681,7 @@ final class InspectionNotificationDispatcher
 
         try {
             $payload = $content($recipient);
-            $recipient->notify(new InspectionEventNotification($kind, $payload['title'], $payload['body'], $payload['url']));
+            $recipient->notify(new InspectionEventNotification($kind, $payload['title'], $payload['body'], $payload['url'], $this->replay['key']));
             $this->replay['sent'] = true;
         } catch (Throwable $exception) {
             Log::error('Inspection notification retry could not be dispatched', [
@@ -603,12 +727,18 @@ final class InspectionNotificationDispatcher
      * Active accounts only, never the acting person (any of their accounts), and one
      * account per employee: the most recently active one.
      *
+     * When the notification kind is given, each candidate must also be eligible for that
+     * kind's registry category right now (the evaluator's answer, never a saved preference).
+     * Callers that choose their recipients with their own access check (Captain5Notifier)
+     * may omit it: the notification evaluates the same category again at delivery.
+     *
      * @param  Collection<int, User>  $candidates
      * @return Collection<int, User>
      */
-    public function distinctRecipients(Collection $candidates, ?User $actor = null): Collection
+    public function distinctRecipients(Collection $candidates, ?User $actor = null, ?string $kind = null, ?string $eventKey = null): Collection
     {
         $actorPerson = $actor !== null ? $this->person($actor) : null;
+        $evaluator = $kind !== null ? app(NotificationRecipientEvaluator::class) : null;
 
         return $candidates
             ->unique(fn (User $user): int => (int) $user->getKey())
@@ -616,6 +746,8 @@ final class InspectionNotificationDispatcher
                 (int) $user->getKey() === (int) $actor->getKey() || $this->person($user) === $actorPerson
             ))
             ->filter(fn (User $user): bool => $user->isAuthenticationAllowed())
+            ->filter(fn (User $user): bool => $evaluator === null
+                || $evaluator->isEligible($user, InspectionNotificationCategory::for($kind, $user, $eventKey)))
             ->groupBy(fn (User $user): string => $this->person($user))
             ->map(fn (Collection $accounts): User => $accounts
                 ->sortByDesc(fn (User $user): string => sprintf(
@@ -669,7 +801,7 @@ final class InspectionNotificationDispatcher
      *
      * @return Collection<int, User>
      */
-    private function defectFollowers(ApparatusDefect $defect): Collection
+    public function defectFollowers(ApparatusDefect $defect): Collection
     {
         $ids = DB::table('apparatus_defect_participants')
             ->where('apparatus_defect_id', $defect->getKey())
@@ -798,6 +930,32 @@ final class InspectionNotificationDispatcher
     }
 
     // ---------------------------------------------------------------------- copy
+
+    /**
+     * A new-significant-damage hold names the items, so this one notification carries everything
+     * a separate "significant damage reported" alert would (reviewers get ONE message, not two).
+     */
+    private function holdReasonFor(ApparatusInspectionException $hold): string
+    {
+        if ((string) $hold->reason !== 'new_significant_damage') {
+            return $this->holdReason((string) $hold->reason);
+        }
+        $ids = array_values(array_filter(array_map('intval', (array) (($hold->metadata ?? [])['defect_ids'] ?? []))));
+        $items = $ids === []
+            ? collect()
+            : ApparatusDefect::query()->whereIn('id', $ids)->orderBy('id')->get(['id', 'item', 'compartment'])
+                ->map(function (ApparatusDefect $defect): string {
+                    $where = trim((string) $defect->compartment);
+
+                    return trim((string) $defect->item).($where !== '' ? " ({$where})" : '');
+                })
+                ->filter()->values();
+
+        return $items->isEmpty()
+            ? $this->holdReason('new_significant_damage')
+            : 'new significant damage was reported to '.$items->take(4)->implode(', ')
+                .($items->count() > 4 ? ' and '.($items->count() - 4).' more' : '');
+    }
 
     private function holdReason(string $reason): string
     {

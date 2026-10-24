@@ -1,26 +1,5 @@
 <x-filament-panels::page data-hub-ui="2" data-hub-portal="employee"
     x-init="window.matchMedia('(max-width: 1023px)').matches && $store.sidebar.close()">
-    {{-- Hero Identity Strip --}}
-    <div class="ep-hero">
-        <div class="ep-hero-badge">
-            <svg class="ep-hero-badge-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/>
-            </svg>
-        </div>
-        <div class="ep-hero-info">
-            <h2 class="ep-hero-name">{{ $user->name }}</h2>
-            <div class="ep-hero-meta">
-                @if($user->rank)
-                    <span class="ep-hero-rank">{{ $user->rank }}</span>
-                    <span class="ep-hero-sep">·</span>
-                @endif
-                <span class="ep-hero-id">
-                    ID: {{ $user->employee_id ?? 'Not assigned' }}
-                </span>
-            </div>
-        </div>
-    </div>
-
     {{-- Stats Bar --}}
     <div class="ep-stats-bar">
         <div class="ep-stat">

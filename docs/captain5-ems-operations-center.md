@@ -79,7 +79,7 @@ enrolls the actor as participant (`enrollment_source=captain5`) and routes notif
 | Available for pickup | `updateAction(replacement_available, pickup_instructions)` |
 | Replaced / returned to service | `resolve(replacement_installed|spare_issued|repair_completed, notes)` — requires an explicit "verified in place" confirmation |
 | Verify member's correction | `verifyCorrection` |
-| Dismiss | `dismiss` (any Captain 5 page user since the follow-up) |
+| Close — No Action Required | `dismiss` (any Captain 5 page user since the follow-up). Same reason rules and refusals as Logistics (significant damage, out of service / needs repair, repair or replacement arranged, open or completed service ticket); Captain 5 is told to ask Logistics to correct the severity. The reporter and participants are told once, with the reason. |
 | Reopen | `reopen` |
 | Message submitter / followers | `IssueMessageService::post` (issue thread) |
 | Request clarification | `IssueMessageService::post(kind=clarification_requested)` on the originating inspection |

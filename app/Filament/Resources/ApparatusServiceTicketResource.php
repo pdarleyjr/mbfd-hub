@@ -10,7 +10,11 @@ use App\Enums\ApparatusServiceTicketStatus;
 use App\Filament\Concerns\EnterpriseTable;
 use App\Filament\Resources\ApparatusServiceTicketResource\Pages;
 use App\Filament\Support\ArchiveFilter;
+use App\Filament\Support\InspectionWorkspace;
+use App\Models\ApparatusDefect;
+use App\Models\ApparatusInspection;
 use App\Models\ApparatusServiceTicket;
+use App\Support\Fleet\DefectActionStatus;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
@@ -122,6 +126,26 @@ class ApparatusServiceTicketResource extends Resource
                         ->formatStateUsing(fn (string $state): string => ApparatusServiceTicketStatus::from($state)->label())
                         ->color(fn (string $state): string => ApparatusServiceTicketStatus::from($state)->color()),
                     Infolists\Components\TextEntry::make('requester_name_snapshot')->label('Requested By')->placeholder('Fleet'),
+                    // Backlink to the equipment issue this ticket was opened for. Completing or cancelling
+                    // the ticket does not close that issue, so its current status is shown beside the link.
+                    Infolists\Components\TextEntry::make('linked_equipment_issue')
+                        ->label('Equipment issue')
+                        ->state(function (ApparatusServiceTicket $record): ?string {
+                            $defect = $record->defects()->first();
+
+                            return $defect instanceof ApparatusDefect
+                                ? $defect->item.' ('.DefectActionStatus::label($defect->action_status).')'
+                                : null;
+                        })
+                        ->url(function (ApparatusServiceTicket $record): ?string {
+                            $defect = $record->defects()->first();
+                            $inspectionId = $defect->first_reported_inspection_id ?? $defect->apparatus_inspection_id ?? $defect?->last_observed_inspection_id;
+
+                            return $defect instanceof ApparatusDefect && $inspectionId !== null && auth()->user()?->can('viewAny', ApparatusInspection::class)
+                                ? InspectionWorkspace::url((int) $inspectionId, 'issue-'.$defect->getKey())
+                                : null;
+                        })
+                        ->visible(fn (ApparatusServiceTicket $record): bool => $record->defects()->exists()),
                     Infolists\Components\TextEntry::make('title')->columnSpanFull(),
                     Infolists\Components\TextEntry::make('description')->columnSpanFull(),
                     Infolists\Components\TextEntry::make('current_public_response')->label('Current Public Update')->placeholder('—')->columnSpanFull(),

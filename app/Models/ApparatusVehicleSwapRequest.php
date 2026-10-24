@@ -90,7 +90,7 @@ class ApparatusVehicleSwapRequest extends Model
             self::STATUS_PENDING => 'Pending decision',
             self::STATUS_APPROVED_SWAP => 'Approved, trucks traded',
             self::STATUS_APPROVED_REPLACE => 'Approved, old truck demoted',
-            self::STATUS_REJECTED => 'Rejected, no change',
+            self::STATUS_REJECTED => 'No swap, assigned truck kept',
             default => str($status)->headline()->toString(),
         };
     }

@@ -8,8 +8,8 @@ use App\Models\StationRequest;
 use App\Models\User;
 use App\Notifications\NewSubmissionNotification;
 use App\Services\Display\DisplaySnapshotService;
+use App\Services\Notifications\NotificationDispatchService;
 use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Notification;
 
 class StationRequestSideEffectService
 {
@@ -17,23 +17,21 @@ class StationRequestSideEffectService
     {
         $this->forgetReadModels($request);
 
-        $recipients = User::query()
-            ->whereHas('notificationSubscriptions', fn ($query) => $query
-                ->where('event_key', User::NOTIFICATION_PREFERENCE_STATION_REQUESTS)
-                ->where(fn ($channels) => $channels
-                    ->where('database_enabled', true)
-                    ->orWhere('webpush_enabled', true)
-                    ->orWhere('email_enabled', true)))
-            ->get();
+        $eventKey = NotificationDispatchService::eventKey(User::NOTIFICATION_PREFERENCE_STATION_REQUESTS, 'station_request', $request->id, 'created');
 
-        if ($recipients->isNotEmpty()) {
-            Notification::send($recipients, new NewSubmissionNotification(
+        // Everyone eligible for station requests right now; saved choices only narrow channels. Queued after the
+        // request's write commits, and a failure here can never undo that write.
+        app(NotificationDispatchService::class)->dispatch(
+            User::NOTIFICATION_PREFERENCE_STATION_REQUESTS,
+            new NewSubmissionNotification(
                 submissionType: 'station_request',
                 title: 'New Station Request',
                 body: "{$request->request_number}: {$request->title}",
                 actionUrl: '/admin/station-requests/'.$request->id,
-            ));
-        }
+                eventKey: $eventKey,
+            ),
+            eventKey: $eventKey,
+        );
     }
 
     public function requestChanged(StationRequest $request): void

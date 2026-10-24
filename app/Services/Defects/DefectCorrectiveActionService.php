@@ -16,6 +16,8 @@ use App\Services\Captain5\Captain5IssueScope;
 use App\Services\Captain5\Captain5Notifier;
 use App\Services\Inspections\InspectionNotificationDispatcher;
 use App\Support\Fleet\DefectActionStatus;
+use App\Support\Fleet\DefectNoActionClosure;
+use App\Support\Fleet\DefectSeverityCorrection;
 use App\Support\Fleet\PostgresLockRetry;
 use Carbon\Carbon;
 use Closure;
@@ -57,6 +59,16 @@ final class DefectCorrectiveActionService
         'replacement_installed', 'spare_issued', 'repair_completed', 'item_located', 'report_corrected', 'other',
     ];
 
+    /**
+     * What a NEW resolution may be. `report_corrected` still exists on old rows (and still renders),
+     * but "the report was wrong" is now Close — No Action Required, which does not claim a repair.
+     *
+     * @var list<string>
+     */
+    public const NEW_RESOLUTION_TYPES = [
+        'replacement_installed', 'spare_issued', 'repair_completed', 'item_located', 'other',
+    ];
+
     /** @var list<string> */
     public const ACTION_STATUSES = [
         DefectActionStatus::ACTION_PENDING,
@@ -85,6 +97,7 @@ final class DefectCorrectiveActionService
         private readonly ApparatusDefectServiceTicketService $tickets,
         private readonly Captain5IssueScope $captain5Scope,
         private readonly Captain5Notifier $captain5Notifier,
+        private readonly NoActionClosureGuard $noActionGuard,
     ) {}
 
     /** A copy that acts as Captain 5 under the given authority snapshot. */
@@ -131,9 +144,11 @@ final class DefectCorrectiveActionService
         }
 
         if (! $this->captain5->mayPerform($operation)) {
-            throw new AuthorizationException($operation === 'dismiss'
-                ? 'Only the on-duty Captain 5, the EMS Captain or Logistics can dismiss an issue.'
-                : 'Captain 5 cannot perform this action.');
+            throw new AuthorizationException(match ($operation) {
+                'dismiss' => 'Only the on-duty Captain 5, the EMS Captain or Logistics can close an issue with no action required.',
+                'correct_severity' => 'Ask Logistics to correct the severity.',
+                default => 'Captain 5 cannot perform this action.',
+            });
         }
         $probe = ApparatusDefect::query()->find($defectId);
         if ($probe === null || ! $this->captain5Scope->inScope($probe)) {
@@ -248,16 +263,18 @@ final class DefectCorrectiveActionService
     public function resolve(int $defectId, User $actor, array $data, ?string $idempotencyKey = null): ApparatusDefect
     {
         $data = $this->validate($data, [
-            'resolution_type' => ['required', Rule::in(self::RESOLUTION_TYPES)],
+            'resolution_type' => ['required', Rule::in(self::NEW_RESOLUTION_TYPES)],
             'resolution_notes' => ['required', 'string', 'max:5000'],
             ...$this->messageRules(),
+        ], [
+            'resolution_type.in' => 'Choose how it was fixed. If the report was entered incorrectly, use '.DefectNoActionClosure::ACTION_LABEL.' instead.',
         ]);
 
         return $this->run('resolve', $defectId, $actor, $idempotencyKey, false, function (ApparatusDefect $defect) use ($actor, $data): ?array {
             if ($defect->action_status === DefectActionStatus::RESOLVED) {
                 return null; // another administrator already resolved it
             }
-            $this->assertOpen($defect, 'This issue was dismissed. Reopen it before resolving it.');
+            $this->assertOpen($defect, 'This issue was closed with no action required. Reopen it before resolving it.');
 
             return $this->close($defect, $actor, DefectActionStatus::RESOLVED, 'resolved', $data['resolution_type'], $data['resolution_notes'], $data);
         });
@@ -266,18 +283,40 @@ final class DefectCorrectiveActionService
     /** @param array{reason?: string, member_message?: ?string, internal_note?: ?string} $data */
     public function dismiss(int $defectId, User $actor, array $data, ?string $idempotencyKey = null): ApparatusDefect
     {
+        // Who may close comes first, so a member (or an unauthorised officer) is refused whatever they typed.
+        $this->authorizedProbe('dismiss', $defectId, $actor);
         $data = $this->validate($data, [
             'reason' => ['required', 'string', 'max:5000'],
             ...$this->messageRules(),
-        ]);
+        ], ['reason.required' => (string) DefectNoActionClosure::reasonProblem('')]);
+        // Enforced here, not in a form: every door (admin, Captain 5, any future caller) shares it.
+        $problem = DefectNoActionClosure::reasonProblem($data['reason']);
+        if ($problem !== null) {
+            throw ValidationException::withMessages(['reason' => $problem]);
+        }
 
         return $this->run('dismiss', $defectId, $actor, $idempotencyKey, false, function (ApparatusDefect $defect) use ($actor, $data): ?array {
             if ($defect->action_status === DefectActionStatus::DISMISSED) {
                 return null;
             }
-            $this->assertOpen($defect, 'This issue was already resolved. Reopen it before dismissing it.');
+            $this->assertOpen($defect, 'This issue was already resolved. Reopen it before closing it with no action required.');
+            $refusal = $this->noActionGuard->refusal($defect, $this->captain5 !== null);
+            if ($refusal !== null) {
+                throw ValidationException::withMessages(['defect' => $refusal]);
+            }
 
-            return $this->close($defect, $actor, DefectActionStatus::DISMISSED, 'dismissed', null, $data['reason'], $data, ['reason' => trim($data['reason'])]);
+            // Who and when are the event's actor_user_id and created_at; from_status and
+            // `previous_action_status` record what the issue was before it was closed.
+            return $this->close(
+                $defect,
+                $actor,
+                DefectActionStatus::DISMISSED,
+                'dismissed',
+                null,
+                $data['reason'],
+                $data,
+                ['reason' => trim($data['reason']), 'previous_action_status' => (string) $defect->action_status],
+            );
         });
     }
 
@@ -329,15 +368,17 @@ final class DefectCorrectiveActionService
     {
         $data = $this->validate($data, [
             'notes' => ['nullable', 'string', 'max:5000'],
-            'resolution_type' => ['nullable', Rule::in(self::RESOLUTION_TYPES)],
+            'resolution_type' => ['nullable', Rule::in(self::NEW_RESOLUTION_TYPES)],
             ...$this->messageRules(),
+        ], [
+            'resolution_type.in' => 'Choose how it was corrected. If the report was entered incorrectly, use '.DefectNoActionClosure::ACTION_LABEL.' instead.',
         ]);
 
         return $this->run('verify_correction', $defectId, $actor, $idempotencyKey, false, function (ApparatusDefect $defect) use ($actor, $data): ?array {
             if ($defect->action_status === DefectActionStatus::RESOLVED) {
                 return null;
             }
-            $this->assertOpen($defect, 'This issue was dismissed. Reopen it before verifying a correction.');
+            $this->assertOpen($defect, 'This issue was closed with no action required. Reopen it before verifying a correction.');
 
             $latest = ApparatusDefectObservation::query()
                 ->where('apparatus_defect_id', $defect->getKey())
@@ -400,6 +441,45 @@ final class DefectCorrectiveActionService
                 'from_impact' => $previous,
                 'to_impact' => $impact,
                 'apparatus_status_changed' => $statusChanged,
+            ]);
+        });
+    }
+
+    /**
+     * Corrects how serious the issue was recorded as ('routine' or 'significant'). Reviewers only:
+     * Captain 5 is refused whatever its scope, and members never reach this class. The change, the
+     * reason and who made it are an event, and the reporter and participants are told.
+     *
+     * @param  array{severity?: string, reason?: string, member_message?: ?string, internal_note?: ?string}  $data
+     */
+    public function correctSeverity(int $defectId, User $actor, array $data, ?string $idempotencyKey = null): ApparatusDefect
+    {
+        // Who may correct comes first, so a member (or Captain 5) is refused whatever they typed.
+        $this->authorizedProbe('correct_severity', $defectId, $actor);
+        $data = $this->validate($data, [
+            'severity' => ['required', Rule::in([DefectSeverityCorrection::ROUTINE, DefectSeverityCorrection::SIGNIFICANT])],
+            'reason' => ['required', 'string', 'max:5000'],
+            ...$this->messageRules(),
+        ], ['reason.required' => (string) DefectSeverityCorrection::reasonProblem('')]);
+        $problem = DefectSeverityCorrection::reasonProblem($data['reason']);
+        if ($problem !== null) {
+            throw ValidationException::withMessages(['reason' => $problem]);
+        }
+
+        return $this->run('correct_severity', $defectId, $actor, $idempotencyKey, false, function (ApparatusDefect $defect) use ($data): ?array {
+            $this->assertOpen($defect);
+            $from = (string) ($defect->severity ?: DefectSeverityCorrection::ROUTINE);
+            $to = (string) $data['severity'];
+            if ($from === $to) {
+                return null; // already at that severity (a concurrent correction won)
+            }
+            $defect->severity = $to;
+            $defect->save();
+
+            return $this->spec('severity_corrected', (string) $defect->action_status, (string) $defect->action_status, $data, [
+                'from_severity' => $from,
+                'to_severity' => $to,
+                'reason' => trim($data['reason']),
             ]);
         });
     }
@@ -511,6 +591,14 @@ final class DefectCorrectiveActionService
                 $this->captain5Notifier->issueUpdated($defect, $event);
             } elseif (in_array($spec['type'], self::RESOLVING_EVENTS, true)) {
                 $this->notifications->issueResolved($defect, $event);
+            } elseif ($spec['type'] === 'dismissed') {
+                // Told from every door: the reason is the message, so nobody has to remember to type one.
+                $this->notifications->issueClosedNoAction($defect, $event);
+            } elseif ($spec['type'] === 'reopened') {
+                // Whoever was told it was closed is told it is open again, typed message or not.
+                $this->notifications->issueReopened($defect, $event);
+            } elseif ($spec['type'] === 'severity_corrected') {
+                $this->notifications->issueSeverityCorrected($defect, $event);
             } elseif ($spec['member_message'] !== null) {
                 $this->notifications->issueMemberUpdate($defect, $event);
             }
@@ -583,11 +671,12 @@ final class DefectCorrectiveActionService
     /**
      * @param  array<string, mixed>  $data
      * @param  array<string, list<mixed>>  $rules
+     * @param  array<string, string>  $messages
      * @return array<string, mixed> validated, with blank strings normalized to null
      */
-    private function validate(array $data, array $rules): array
+    private function validate(array $data, array $rules, array $messages = []): array
     {
-        $validated = Validator::make($data, $rules)->validate();
+        $validated = Validator::make($data, $rules, $messages)->validate();
         foreach (['member_message', 'internal_note'] as $field) {
             $text = isset($validated[$field]) ? trim((string) $validated[$field]) : '';
             $validated[$field] = $text === '' ? null : $text;

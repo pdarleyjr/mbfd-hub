@@ -60,7 +60,9 @@ final class VehicleSwapDecisionAction
                 Notification::make()
                     ->success()
                     ->title(ApparatusVehicleSwapRequest::statusLabel($decided->status))
-                    ->body('The held checkout findings were applied.')
+                    ->body($decided->status === ApparatusVehicleSwapRequest::STATUS_REJECTED
+                        ? 'No swap was recorded. The held checkout findings and meter readings were applied to the assigned truck.'
+                        : 'The held checkout findings were applied to the confirmed truck.')
                     ->send();
             });
     }
@@ -88,16 +90,16 @@ final class VehicleSwapDecisionAction
                 ->options([
                     VehicleSwapService::DECISION_APPROVE_SWAP => 'Approve swap: the two trucks trade unit designations',
                     VehicleSwapService::DECISION_APPROVE_REPLACE => 'Approve: the reported truck takes this unit, the old truck is demoted',
-                    VehicleSwapService::DECISION_REJECT => 'Reject: no change, findings go to the assigned truck',
+                    VehicleSwapService::DECISION_REJECT => 'No swap: keep the assigned truck, the findings are applied to it',
                 ])
                 ->descriptions([
                     VehicleSwapService::DECISION_APPROVE_SWAP => 'Each truck keeps its own vehicle ID, VIN, meters, defects and history; only the unit designation, station and frontline role move.',
                     VehicleSwapService::DECISION_APPROVE_REPLACE => 'The old truck loses the designation and becomes Reserve or Out of Service below.',
-                    VehicleSwapService::DECISION_REJECT => 'No designation or status changes.',
+                    VehicleSwapService::DECISION_REJECT => 'No designation or status changes. The held checkout findings and meter readings are applied to the truck now assigned to this unit.',
                 ]),
             Forms\Components\Select::make('mapped_apparatus_id')
                 ->label('Which truck record is vehicle '.$record->reported_vehicle_number.'?')
-                ->helperText('This vehicle ID is not on a truck record. Pick the existing record it is, or reject the report. No record is created.')
+                ->helperText('This vehicle ID is not on a truck record. Pick the existing record it is, or choose "No swap". No record is created.')
                 ->searchable()
                 ->getSearchResultsUsing(fn (string $search): array => Apparatus::query()
                     ->where('id', '!=', $record->apparatus_id)

@@ -6,6 +6,11 @@ namespace App\Notifications\Inspections;
 
 use App\Models\User;
 use App\Notifications\Channels\BudgetedMailChannel;
+use App\Notifications\Concerns\EvaluatesDelivery;
+use App\Services\Captain5\Captain5Notifier;
+use App\Services\Notifications\NotificationDecision;
+use App\Services\Notifications\NotificationRecipientEvaluator;
+use App\Services\Notifications\PushPrivacy;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -17,17 +22,23 @@ use Throwable;
 /**
  * One queued notification for every daily-inspection workflow event.
  *
- * The in-app (Filament bell) copy is always delivered: these are accountability
- * messages about a member's own checkout or an issue they follow. Web push and
- * the city email follow the recipient's existing `user_notification_subscriptions`
- * row, so no new preference store or vendor is introduced.
+ * Every kind belongs to a registry category (InspectionNotificationKind::categoryTable,
+ * refined per recipient by InspectionNotificationCategory). Who may receive it is the
+ * evaluator's answer for that category NOW, both when queued and when delivered. The
+ * in-app (Filament bell) copy is always delivered to an eligible recipient: these are
+ * accountability messages. Web push and the city email follow the recipient's saved
+ * choices, which can only narrow what eligibility allows.
  *
  * Only member-safe text ever reaches this class. Internal notes are never
  * passed in by the dispatcher.
  */
 final class InspectionEventNotification extends Notification implements ShouldQueue
 {
+    use EvaluatesDelivery;
     use Queueable;
+
+    /** @var array<int, string> recipient id => category, so one delivery evaluates it once */
+    private array $categoryByRecipient = [];
 
     public function __construct(
         public readonly string $kind,
@@ -39,26 +50,79 @@ final class InspectionEventNotification extends Notification implements ShouldQu
         $this->onQueue('notifications');
     }
 
-    /** @return list<string> */
+    /**
+     * Reviewer kinds must still be reviewer-eligible when they are queued AND when
+     * the worker delivers them; member kinds need an active account. Either way the
+     * in-app copy is kept (accountability message) while push and email follow the
+     * member's saved choices.
+     *
+     * @return list<string>
+     */
     public function via(object $notifiable): array
     {
-        if (! $notifiable instanceof User) {
+        $decision = $this->evaluateDelivery($notifiable);
+        if ($decision === null || ! $decision->eligible) {
             return [];
         }
 
-        $subscription = $notifiable->notificationSubscriptions()
-            ->where('event_key', $this->preferenceKey())
-            ->first();
+        return ['database', ...array_values(array_filter(
+            $decision->laravelChannels(),
+            static fn (string $channel): bool => $channel !== 'database',
+        ))];
+    }
 
-        $channels = ['database'];
-        if ($subscription?->webpush_enabled && $notifiable->pushSubscriptions()->count() > 0) {
-            $channels[] = WebPushChannel::class;
+    /** Re-evaluated at delivery from a fresh copy of the member. */
+    public function shouldSend(object $notifiable, string $channel): bool
+    {
+        if (! $notifiable instanceof User) {
+            return false;
         }
-        if ($subscription?->email_enabled && filled($notifiable->employeeProfile?->city_email)) {
-            $channels[] = BudgetedMailChannel::class;
+        $fresh = User::query()->find($notifiable->getKey());
+        $decision = $fresh instanceof User ? $this->evaluateDelivery($fresh) : null;
+        if ($decision === null || ! $decision->eligible) {
+            return false;
         }
 
-        return $channels;
+        return $channel === 'database' || $decision->allows($channel);
+    }
+
+    /** The category for a recipient with no special relationship to the subject. */
+    protected function deliveryCategory(): string
+    {
+        return InspectionNotificationKind::category($this->kind);
+    }
+
+    /** The category this kind has FOR THIS RECIPIENT (an owner's own update is a member update). */
+    public function categoryFor(User $recipient): string
+    {
+        return $this->categoryByRecipient[(int) $recipient->getKey()]
+            ??= InspectionNotificationCategory::for($this->kind, $recipient, $this->eventKey);
+    }
+
+    protected function evaluateDelivery(object $notifiable): ?NotificationDecision
+    {
+        if (! $notifiable instanceof User) {
+            return null;
+        }
+
+        return app(NotificationRecipientEvaluator::class)->decide($notifiable, $this->categoryFor($notifiable), $this->deliveryChannelMask());
+    }
+
+    /** @return array{category: ?string, rule: ?string, event_key: ?string} */
+    protected function deliveryProvenance(object $notifiable): array
+    {
+        $decision = $this->evaluateDelivery($notifiable);
+
+        return [
+            'category' => $decision->category ?? $this->deliveryCategory(),
+            'rule' => $decision?->rule,
+            'event_key' => $this->eventKey,
+        ];
+    }
+
+    protected function deliveryEventKey(): ?string
+    {
+        return $this->eventKey;
     }
 
     /** @return array<string, mixed> Filament-compatible database notification. */
@@ -75,13 +139,14 @@ final class InspectionEventNotification extends Notification implements ShouldQu
                 [
                     'name' => 'view',
                     'label' => 'View',
-                    'url' => $this->url,
+                    'url' => $this->deliveryUrl($notifiable, $this->url),
                     'color' => 'primary',
                     'isOutlined' => false,
                 ],
             ],
             // Not rendered by Filament; lets support trace a bell entry to its ledger row.
             'inspection_event' => ['kind' => $this->kind, 'event_key' => $this->eventKey],
+            'provenance' => $this->deliveryProvenance($notifiable),
         ];
     }
 
@@ -97,15 +162,76 @@ final class InspectionEventNotification extends Notification implements ShouldQu
         ];
     }
 
+    /**
+     * Kinds whose text carries a person's words, a reason or a name. Their lock-screen copy is generic
+     * ("New message about E3 - open MBFD Hub to read it."); the in-app copy keeps the full text.
+     *
+     * @return list<string>
+     */
+    public static function messageBearingKinds(): array
+    {
+        return [
+            InspectionNotificationKind::INSPECTION_MESSAGE,
+            InspectionNotificationKind::CLARIFICATION_REQUESTED,
+            InspectionNotificationKind::MEMBER_REPLY,
+            InspectionNotificationKind::ISSUE_MEMBER_UPDATE,
+            InspectionNotificationKind::INSPECTION_DECIDED,
+            InspectionNotificationKind::INVENTORY_CORRECTION_SUBMITTED,
+            InspectionNotificationKind::INVENTORY_CORRECTION_UPDATE,
+            InspectionNotificationKind::INVENTORY_CORRECTION_REPLY,
+            Captain5Notifier::KIND_MESSAGE,
+            Captain5Notifier::KIND_MEMBER_REPLY,
+            Captain5Notifier::KIND_COMMUNICATION,
+            Captain5Notifier::KIND_ISSUE_UPDATE,
+        ];
+    }
+
+    /**
+     * What may appear on a lock screen. Titles of the other kinds are fixed phrases led by the unit ("E3: ...");
+     * the messages (including the administration post, whose title is the author's subject line) get a generic
+     * title. No kind ever puts its body on the lock screen: bodies name members, equipment and reasons.
+     *
+     * @return array{title: string, body: string}
+     */
+    public function pushText(): array
+    {
+        $unit = $this->kind === Captain5Notifier::KIND_COMMUNICATION ? null : PushPrivacy::subjectFromTitle($this->title);
+
+        if (in_array($this->kind, self::messageBearingKinds(), true)) {
+            return [
+                'title' => $unit !== null ? "{$unit}: new message" : 'New message',
+                'body' => PushPrivacy::messageBody($unit),
+            ];
+        }
+
+        return [
+            'title' => $this->title,
+            'body' => PushPrivacy::detailBody(),
+        ];
+    }
+
     public function toWebPush(object $notifiable, $notification): WebPushMessage
     {
+        $push = $this->pushText();
+
         return (new WebPushMessage)
-            ->title($this->title)
-            ->body($this->body)
+            ->title($push['title'])
+            ->body($push['body'])
             ->icon('/images/mbfd-logo.png')
             ->badge('/images/mbfd-logo.png')
-            ->tag('mbfd-inspection-'.$this->kind)
-            ->data(['url' => $this->url]);
+            ->tag($this->pushTag())
+            ->data(['url' => $this->deliveryUrl($notifiable, $this->url)]);
+    }
+
+    /**
+     * One lock-screen entry per EVENT: every device of a recipient gets the same tag, so a
+     * retry or a second device collapses into one entry, while two different events of the
+     * same kind (two issues, two messages) never replace each other.
+     */
+    public function pushTag(): string
+    {
+        return 'mbfd-inspection-'.$this->kind
+            .($this->eventKey !== null ? '-'.substr(sha1($this->eventKey), 0, 12) : '');
     }
 
     /** @return array<string, string> */
@@ -125,12 +251,5 @@ final class InspectionEventNotification extends Notification implements ShouldQu
             'event_key' => $this->eventKey,
             'exception' => $exception->getMessage(),
         ]);
-    }
-
-    private function preferenceKey(): string
-    {
-        return InspectionNotificationKind::isForReviewers($this->kind)
-            ? (string) User::preferenceKeyForSubmissionType('apparatus_inspection')
-            : (string) User::preferenceKeyForSubmissionType('member_request_update');
     }
 }

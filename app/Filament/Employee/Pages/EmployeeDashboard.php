@@ -7,7 +7,9 @@ namespace App\Filament\Employee\Pages;
 use App\Concerns\ResolvesCanonicalEmployee;
 use App\Enums\PersonnelRequestStatus;
 use App\Models\AssignedEquipment;
+use App\Models\Employee;
 use Filament\Pages\Page;
+use Illuminate\Contracts\Support\Htmlable;
 
 class EmployeeDashboard extends Page
 {
@@ -27,9 +29,29 @@ class EmployeeDashboard extends Page
 
     protected static ?string $slug = 'dashboard';
 
+    private ?Employee $member = null;
+
+    private function member(): Employee
+    {
+        return $this->member ??= $this->authenticatedEmployee();
+    }
+
+    /** The member's identity is the page title: name as the heading, rank and ID as its subheading. */
+    public function getHeading(): string|Htmlable
+    {
+        return $this->member()->name ?: $this->getTitle();
+    }
+
+    public function getSubheading(): ?string
+    {
+        $employee = $this->member();
+
+        return collect([$employee->rank ?: null, 'ID: '.($employee->employee_id ?? 'Not assigned')])->filter()->implode(' · ');
+    }
+
     public function getViewData(): array
     {
-        $employee = $this->authenticatedEmployee();
+        $employee = $this->member();
         $bidAssignment = $employee->bidAssignments()->whereNull('superseded_at')->orderByDesc('bid_year')->first();
 
         $equipmentCount = AssignedEquipment::where('employee_portal_id', $employee->id)->where('status', 'active')->count();

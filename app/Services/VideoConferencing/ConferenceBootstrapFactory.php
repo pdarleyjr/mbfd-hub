@@ -73,6 +73,7 @@ class ConferenceBootstrapFactory
                 'command_start' => route('employee.video-conferencing.api.lineup.start'),
                 'command_end' => route('employee.video-conferencing.api.lineup.end'),
                 'command_direct' => route('employee.video-conferencing.api.direct.start'),
+                'lineup_status' => route('employee.video-conferencing.api.lineup.status'),
                 'sessions' => route('employee.video-conferencing.api.sessions'),
                 'api_base' => url('/employee/video-conferencing/api'),
                 'connectivity_failures' => route('employee.video-conferencing.api.connectivity-failures'),

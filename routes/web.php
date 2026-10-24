@@ -207,6 +207,11 @@ Route::prefix('employee/video-conferencing/api')
             ->name('lineup.command.authorize');
         Route::get('/lineup/command/status', CommandLineupStatusController::class)
             ->name('lineup.command.status');
+        // Waiting members poll this; it has its own limiter so it can never starve stations or 300.
+        Route::get('/lineup/status', \App\Http\Controllers\Employee\VideoConferencing\MemberLineupStatusController::class)
+            ->withoutMiddleware('throttle:conference-controls')
+            ->middleware('throttle:conference-lineup-status')
+            ->name('lineup.status');
         Route::post('/lineup/start', StartMorningLineupController::class)->name('lineup.start');
         Route::post('/lineup/end', EndMorningLineupController::class)->name('lineup.end');
         Route::post('/direct/start', StartDirectCallController::class)->name('direct.start');
@@ -415,7 +420,11 @@ Route::get('/daily/{path?}', function (?string $path = null) {
     abort_unless(is_string($index), 404);
 
     $canonicalOrigin = rtrim((string) config('app.url'), '/');
-    $runtimeConfig = '<script>window.__MBFD_CANONICAL_ORIGIN__ = '.json_encode(
+    // The release this shell was rendered by. The page-side update registrar (resources/js/pwa)
+    // compares it with /app-release, so a shell restored from the offline cache after days is
+    // recognised as old instead of being mistaken for the current release.
+    $releaseMeta = '<meta name="mbfd-release" content="'.e(app(\App\Support\Release\DeployedRelease::class)->short()).'">';
+    $runtimeConfig = $releaseMeta.'<script>window.__MBFD_CANONICAL_ORIGIN__ = '.json_encode(
         $canonicalOrigin,
         JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT,
     ).';window.__MBFD_HUB_NAVIGATION__ = '.json_encode(
@@ -445,6 +454,23 @@ Route::get('/__version', function () {
         'build_time' => $buildTime,
     ]);
 })->middleware(['auth', PreventPreviousUrlStorage::class]);
+
+// Release identity for PWA update checks (resources/js/pwa/update-registrar.ts). Public, stateless
+// (no session start or write, no member-state redirects) and never cached; it exposes only the
+// first 12 characters of the commit of the build that is serving it, the same value as
+// <meta name="mbfd-release">. The limit is per address and stations share one egress address with every
+// device probing on return to the app and when the network comes back, so it is generous but bounded.
+Route::get('/app-release', function (\App\Support\Release\DeployedRelease $release) {
+    return response()->json(['release' => $release->short()])->header('Cache-Control', 'no-store');
+})->middleware('throttle:600,1')->withoutMiddleware([
+    \Illuminate\Session\Middleware\StartSession::class,
+    \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+    \Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class,
+    \App\Http\Middleware\EnforceMemberBootstrapBoundary::class,
+    \App\Http\Middleware\EnsureCanonicalSessionIsCurrent::class,
+    \App\Http\Middleware\ForcePasswordChange::class,
+    \App\Http\Middleware\EnsureCityEmailReview::class,
+])->name('app-release');
 
 // Station Inventory PDF Download
 Route::get('/inventory-pdf/{submission}', [StationInventoryController::class, 'downloadPdf'])

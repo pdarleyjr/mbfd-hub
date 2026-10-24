@@ -218,7 +218,7 @@ final class DailyInspectionSecurityTest extends TestCase
         $known = [
             'mount', 'getTitle', 'getHeading',
             'acknowledgeIssueAction', 'updateIssueAction', 'resolveIssueAction', 'dismissIssueAction', 'reopenIssueAction',
-            'verifyCorrectionAction', 'classifyImpactAction', 'linkServiceTicketAction',
+            'verifyCorrectionAction', 'classifyImpactAction', 'correctSeverityAction', 'linkServiceTicketAction',
             'acceptMeterReadingAction', 'enterVerifiedReadingAction', 'requestMeterClarificationAction', 'keepCurrentReadingAction',
             'postIssueMessage',
         ];

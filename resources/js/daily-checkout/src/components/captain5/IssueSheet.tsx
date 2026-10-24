@@ -33,9 +33,15 @@ function Summary({ issue }: { issue: IssueDetail }) {
       <Fact label="Vendor reference">{issue.details.vendor_reference}</Fact>
       <Fact label="Expected delivery">{issue.expected_delivery ? `${dayText(issue.expected_delivery)}${issue.overdue ? ' (overdue)' : ''}` : null}</Fact>
       <Fact label="Pickup instructions">{issue.details.pickup_instructions}</Fact>
-      <Fact label="Resolution">{issue.resolution_type ? humanize(issue.resolution_type) : null}</Fact>
-      <Fact label="Resolution notes">{issue.resolution_notes}</Fact>
-      <Fact label="Closed">{issue.resolved_at ? dateTimeText(issue.resolved_at) : null}</Fact>
+      {issue.closure === 'closed_no_action'
+        ? <Fact label="Why no action was needed">{issue.resolution_notes}</Fact>
+        : (
+          <>
+            <Fact label="Resolution">{issue.resolution_type ? humanize(issue.resolution_type) : null}</Fact>
+            <Fact label="Resolution notes">{issue.resolution_notes}</Fact>
+          </>
+        )}
+      <Fact label={issue.closure === 'closed_no_action' ? 'Closed (no action required)' : 'Closed'}>{issue.resolved_at ? dateTimeText(issue.resolved_at) : null}</Fact>
     </dl>
   );
 }

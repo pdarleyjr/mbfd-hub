@@ -23,7 +23,8 @@ class EditDefect extends EditRecord
                 Actions\Action::make(DefectServiceTicketActions::CREATE),
                 fn (): ApparatusDefect => $this->defect(),
             )->after(fn () => $this->defect()->refresh()),
-            Actions\DeleteAction::make(),
+            // No delete: a defect and its history are apparatus records. A report entered in
+            // error is closed with "Close — No Action Required", which keeps the reason on file.
         ];
     }
 

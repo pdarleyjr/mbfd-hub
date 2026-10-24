@@ -37,8 +37,27 @@ final class DefectActionStatus
             self::REPLACEMENT_AVAILABLE => 'Replacement available',
             self::REPAIR_SCHEDULED => 'Repair scheduled',
             self::RESOLVED => 'Resolved',
-            self::DISMISSED => 'Closed, no further action',
+            self::DISMISSED => DefectNoActionClosure::STATUS_LABEL,
         ];
+    }
+
+    /**
+     * 'dismissed' is stored as a closed state (so every "is it still open?" query keeps working),
+     * but it is NOT a repair. Anything a person reads must tell the two apart.
+     */
+    public static function isNoAction(?string $status): bool
+    {
+        return $status === self::DISMISSED;
+    }
+
+    /** How a closed issue ended: 'resolved' (fixed), 'closed_no_action', or null while it is open. */
+    public static function closureKind(?string $status): ?string
+    {
+        return match ($status) {
+            self::RESOLVED => 'resolved',
+            self::DISMISSED => 'closed_no_action',
+            default => null,
+        };
     }
 
     /** @return list<string> */

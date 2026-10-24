@@ -7,6 +7,7 @@ namespace App\Services;
 use App\Models\StationInventoryAudit;
 use App\Models\StationSupplyRequest;
 use App\Models\User;
+use App\Support\DecisionReason;
 use Illuminate\Support\Facades\DB;
 
 final class StationSupplyRequestWorkflowService
@@ -18,6 +19,14 @@ final class StationSupplyRequestWorkflowService
             'admin_notes' => ['nullable', 'string', 'max:5000'],
             'public_response' => ['nullable', 'string', 'max:5000'],
         ])->validate();
+        if ($validated['status'] === 'denied') {
+            if ($request->status !== 'denied') {
+                // Denying tells the member no, so it must say why. The member reads public_response.
+                $validated['public_response'] = DecisionReason::require($validated['public_response'] ?? null, 'public_response', 'denied');
+            } elseif (filled($validated['public_response'] ?? null)) {
+                $validated['public_response'] = DecisionReason::require($validated['public_response'], 'public_response', 'denied');
+            }
+        }
         $this->change($request, $actor, $validated, 'request_updated');
     }
 

@@ -391,6 +391,11 @@ final class AccountSecurityService
             ->where('tokenable_id', $user->id)
             ->delete();
 
+        // Every sign-in ends, so the push devices enrolled from any of them go too (a password change on
+        // a shared browser must not leave the previous alerts showing).
+        // After the surrounding transaction commits, so push housekeeping can never poison or roll back the revocation.
+        DB::afterCommit(static fn () => app(\App\Services\Notifications\PushSessionBinding::class)->detachForAllSessions($user));
+
         AuthenticationSession::query()
             ->where('user_id', $user->id)
             ->whereNull('revoked_at')

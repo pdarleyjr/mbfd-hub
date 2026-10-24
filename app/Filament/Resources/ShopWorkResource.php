@@ -37,9 +37,9 @@ class ShopWorkResource extends Resource
                     ->columnSpanFull(),
                 Forms\Components\TextInput::make('apparatus_id')
                     ->numeric(),
-                Forms\Components\TextInput::make('status')
+                Forms\Components\Select::make('status')
+                    ->options(array_combine(ShopWork::STATUSES, ShopWork::STATUSES))
                     ->required()
-                    ->maxLength(255)
                     ->default('Pending'),
                 Forms\Components\Textarea::make('parts_list')
                     ->columnSpanFull(),

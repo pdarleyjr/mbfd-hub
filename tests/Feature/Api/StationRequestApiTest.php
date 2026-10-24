@@ -514,8 +514,15 @@ class StationRequestApiTest extends TestCase
         $this->actingAsCanonicalUser($this->makeAdmin('logistics_admin'));
         $this->patchJson("/api/admin/station-requests/{$denied->id}/transition", [
             'status' => 'denied',
+        ])->assertUnprocessable()->assertJsonValidationErrors('public_note');
+        $this->assertNull($denied->refresh()->denied_at);
+        $this->patchJson("/api/admin/station-requests/{$denied->id}/transition", [
+            'status' => 'denied',
+            'public_note' => 'Covered by the existing Station 2 stock.',
         ])->assertOk();
         $this->assertNotNull($denied->refresh()->denied_at);
+        $this->assertSame('Denied: Covered by the existing Station 2 stock.', $denied->current_public_response);
+        $this->assertSame('Covered by the existing Station 2 stock.', $denied->updates()->where('status', 'denied')->value('public_note'));
 
         $payload = $this->equipmentPayload();
         $payload['client_submission_id'] = '2b232c61-ecc5-4df1-b980-3ec408088fbe';
@@ -525,7 +532,13 @@ class StationRequestApiTest extends TestCase
         $this->actingAsCanonicalUser($this->makeAdmin('logistics_admin'));
         $this->patchJson("/api/admin/station-requests/{$cancelled->id}/transition", [
             'status' => 'cancelled',
+            'public_note' => 'too short',
+        ])->assertUnprocessable()->assertJsonValidationErrors('public_note');
+        $this->patchJson("/api/admin/station-requests/{$cancelled->id}/transition", [
+            'status' => 'cancelled',
+            'public_note' => 'Duplicate of the request filed this morning.',
         ])->assertOk();
+        $this->assertSame('Cancelled: Duplicate of the request filed this morning.', $cancelled->refresh()->current_public_response);
         $this->assertNotNull($cancelled->refresh()->cancelled_at);
     }
 

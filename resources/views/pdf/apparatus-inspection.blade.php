@@ -146,6 +146,11 @@
                     </td>
                     <td>
                         {{ $finding['follow_up']['stage'] }}
+                        @if($finding['follow_up']['closed_no_action'] ?? false)
+                            <br>@if($finding['follow_up']['closed_at'])Closed {{ $finding['follow_up']['closed_at']->format('M j, Y') }}. @endif
+                            @if($finding['follow_up']['closed_reason'])Reason: {{ rtrim($finding['follow_up']['closed_reason'], '.') }}. @endif
+                            Nothing was repaired or replaced.
+                        @endif
                         @if($finding['follow_up']['ticket_number'])
                             <br>Ticket {{ $finding['follow_up']['ticket_number'] }}: {{ $finding['follow_up']['ticket_status'] }}
                         @endif

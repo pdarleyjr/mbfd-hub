@@ -10,6 +10,7 @@ use App\Models\RoomAsset;
 use App\Models\StationRequest;
 use App\Models\StationRequestItem;
 use App\Models\User;
+use App\Support\DecisionReason;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -28,6 +29,7 @@ class StationRequestWorkflowService
             $newStatus = (string) $data['status'];
             $wasCompleted = $request->status === StationRequestStatus::Completed->value;
             $assetOperations = (array) ($data['asset_operations'] ?? []);
+            $memberLine = null;
 
             if (in_array($request->status, StationRequestStatus::terminalValues(), true)
                 && $request->status !== $newStatus) {
@@ -48,6 +50,15 @@ class StationRequestWorkflowService
                 ]);
             }
 
+            if ($request->status !== $newStatus
+                && in_array($newStatus, [StationRequestStatus::Denied->value, StationRequestStatus::Cancelled->value], true)) {
+                // The requester reads this, so Deny / Cancel always say why. The history keeps the
+                // raw reason; the "latest response" the station sees reads "Denied: <reason>".
+                $isDenial = $newStatus === StationRequestStatus::Denied->value;
+                $data['public_note'] = DecisionReason::require($data['public_note'] ?? null, 'public_note', $isDenial ? 'denied' : 'cancelled');
+                $memberLine = DecisionReason::memberLine($isDenial ? 'Denied' : 'Cancelled', $data['public_note']);
+            }
+
             $attributes = [
                 'status' => $newStatus,
                 'status_detail' => $data['status_detail'] ?? $request->status_detail,
@@ -59,7 +70,7 @@ class StationRequestWorkflowService
                     : $request->assigned_vendor,
             ];
             if (filled($data['public_note'] ?? null)) {
-                $attributes['current_public_response'] = trim((string) $data['public_note']);
+                $attributes['current_public_response'] = $memberLine ?? trim((string) $data['public_note']);
             }
             if ($newStatus === StationRequestStatus::Acknowledged->value && $request->acknowledged_at === null) {
                 $attributes['acknowledged_at'] = now();

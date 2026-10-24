@@ -6,6 +6,7 @@ use App\Filament\Support\ArchiveFilter;
 use App\Models\StationInventoryAudit;
 use App\Models\StationSupplyRequest;
 use App\Services\StationSupplyRequestWorkflowService;
+use App\Support\DecisionReason;
 use Filament\Forms;
 use Filament\Infolists;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -102,11 +103,15 @@ class StationSupplyRequestsRelationManager extends RelationManager
                                 'replenished' => 'Replenished',
                                 'denied' => 'Denied',
                             ])
-                            ->required(),
+                            ->required()
+                            ->live(),
                         Forms\Components\Textarea::make('admin_notes')
                             ->label('Internal Notes')->maxLength(5000),
                         Forms\Components\Textarea::make('public_response')
-                            ->label('Member response')->maxLength(5000),
+                            ->label(fn (Forms\Get $get): string => $get('status') === 'denied' ? 'Reason for denying (shown to the member)' : 'Member response')
+                            ->required(fn (Forms\Get $get, StationSupplyRequest $record): bool => $get('status') === 'denied' && $record->status !== 'denied')
+                            ->minLength(fn (Forms\Get $get): ?int => $get('status') === 'denied' ? DecisionReason::MIN_LENGTH : null)
+                            ->maxLength(5000),
                     ]),
                 Tables\Actions\Action::make('archive')
                     ->label('Archive')->icon('heroicon-o-archive-box')->color('gray')

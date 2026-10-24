@@ -1,5 +1,6 @@
 import { InspectionData } from '../types';
 import { db } from '../lib/db';
+import { setUnsavedWork } from '../pwa/draftBusy.ts';
 
 const STORAGE_KEYS = {
   AUTOSAVE: 'mbfd_autosave_inspection',
@@ -161,6 +162,11 @@ export interface DraftAutosaver {
    * in IndexedDB, then start writing it.
    */
   persistBeforeUnload(): void;
+  /**
+   * The owner went away (the screen unmounted). Nothing is left in memory to
+   * protect, so stop reporting unsaved work to the update registrar.
+   */
+  dispose(): void;
 }
 
 /**
@@ -177,6 +183,10 @@ export const createDraftAutosaver = (
   let unconfirmed: DraftAutosaveRequest | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   let writes: Promise<void> = Promise.resolve();
+  // Edits that are not confirmed in IndexedDB yet keep the page "busy", so an app
+  // update never reloads it underneath the member. A failed write stays busy.
+  const busyToken = Symbol('inspection-autosave');
+  const reportUnsaved = () => setUnsavedWork(busyToken, unconfirmed !== null);
 
   const clearTimer = () => {
     if (timer !== null) clearTimeout(timer);
@@ -191,6 +201,7 @@ export const createDraftAutosaver = (
       writes = writes.then(async () => {
         const succeeded = await saveInspectionProgress(request.apparatusSlug, request.data);
         if (succeeded && unconfirmed === request) unconfirmed = null;
+        reportUnsaved();
         if (succeeded && request.clearSessionStartKeyFor) {
           clearInspectionSessionStartKey(request.apparatusSlug, request.clearSessionStartKeyFor);
         }
@@ -205,6 +216,7 @@ export const createDraftAutosaver = (
     schedule(request, immediate = false) {
       pending = request;
       unconfirmed = request;
+      reportUnsaved();
       clearTimer();
       if (immediate) {
         void flush();
@@ -217,10 +229,14 @@ export const createDraftAutosaver = (
       clearTimer();
       pending = null;
       unconfirmed = null;
+      reportUnsaved();
     },
     persistBeforeUnload() {
       if (unconfirmed) saveInspectionProgressSnapshot(unconfirmed.apparatusSlug, unconfirmed.data);
       void flush();
+    },
+    dispose() {
+      setUnsavedWork(busyToken, false);
     },
   };
 };

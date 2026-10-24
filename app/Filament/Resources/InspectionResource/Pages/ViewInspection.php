@@ -149,7 +149,7 @@ class ViewInspection extends ViewRecord
                 ->icon('heroicon-o-x-circle')
                 ->color('danger')
                 ->requiresConfirmation()
-                ->modalDescription('The submitted evidence is kept. The reported meter readings and findings are not applied to the apparatus. The member sees the reason you give below.')
+                ->modalDescription('The submitted evidence is kept, and any missing or damaged findings stay on record for follow-up. Meter readings that passed the checks were already applied; a reading held for review is not (the current reading is kept). A rejected checkout does not count as done, so the member will need to submit a new one. The member sees the reason you give below.')
                 ->form([
                     Forms\Components\Textarea::make('reason')
                         ->label('Reason shared with the member')
@@ -249,6 +249,11 @@ class ViewInspection extends ViewRecord
     public function classifyImpactAction(): Action
     {
         return DefectCorrectiveActions::classify(Action::make(DefectCorrectiveActions::CLASSIFY), $this->defectResolver());
+    }
+
+    public function correctSeverityAction(): Action
+    {
+        return DefectCorrectiveActions::correctSeverity(Action::make(DefectCorrectiveActions::CORRECT_SEVERITY), $this->defectResolver());
     }
 
     public function linkServiceTicketAction(): Action

@@ -28,6 +28,7 @@ use App\Services\Inspections\IssueMessageService;
 use App\Services\Inventory\InventoryCorrectionReason;
 use App\Support\Captain5\EventActorLabel;
 use App\Support\Fleet\DefectActionStatus;
+use App\Support\Fleet\DefectEventNarrative;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Collection;
@@ -44,23 +45,6 @@ final class InspectionWorkspace
 
     /** Exception statuses that no longer need a decision. */
     private const CLOSED_EXCEPTION = ['resolved', 'dismissed'];
-
-    private const EVENT_LABELS = [
-        'reported' => 'Issue reported',
-        'observed_again' => 'Observed again',
-        'appears_corrected' => 'Member reported it appears corrected',
-        'escalated' => 'Escalated to significant damage',
-        'acknowledged' => 'Acknowledged',
-        'action_updated' => 'Corrective action updated',
-        'replacement_available' => 'Replacement available',
-        'repair_scheduled' => 'Repair scheduled',
-        'resolved' => 'Resolved',
-        'dismissed' => 'Closed with no further action',
-        'reopened' => 'Reopened',
-        'correction_verified' => 'Correction verified',
-        'ticket_linked' => 'Service ticket linked',
-        'impact_classified' => 'Operational impact classified',
-    ];
 
     private const OBSERVATION_LABELS = [
         'first_reported' => 'Reported for the first time',
@@ -377,6 +361,10 @@ final class InspectionWorkspace
         $users = $userIds === [] ? collect() : User::query()->whereIn('id', $userIds)->pluck('name', 'id');
 
         $threads = $canReview ? $this->issueThreads($defects->modelKeys()) : null;
+        // A recurrence after a no-action closure means that closure was probably wrong; say so.
+        $predecessorIds = $defects->pluck('recurrence_of_defect_id')->filter()->unique()->values()->all();
+        $closedNoActionPredecessors = $predecessorIds === [] ? [] : ApparatusDefect::query()->whereIn('id', $predecessorIds)
+            ->where('action_status', DefectActionStatus::DISMISSED)->pluck('id')->map(fn (mixed $key): int => (int) $key)->all();
         $cards = [];
         foreach ($defects as $defect) {
             $observation = $observations->get($defect->getKey());
@@ -411,7 +399,15 @@ final class InspectionWorkspace
                 'closed' => $closed,
                 'action_status' => (string) ($defect->action_status ?? DefectActionStatus::REPORTED),
                 'action_label' => DefectActionStatus::label($defect->action_status),
-                'action_tone' => $closed ? 'success' : ($defect->action_status === DefectActionStatus::REPORTED ? 'warning' : 'info'),
+                // Fixed is green; closed with no action required is neutral (nothing was repaired).
+                'action_tone' => $defect->isClosedNoAction() ? 'neutral' : ($closed ? 'success' : ($defect->action_status === DefectActionStatus::REPORTED ? 'warning' : 'info')),
+                'closed_no_action' => $defect->isClosedNoAction(),
+                'closure' => $closed ? [
+                    'kind' => DefectActionStatus::closureKind($defect->action_status),
+                    'at' => $this->eastern($defect->resolved_at)?->format('M j, Y g:i A'),
+                    'reason' => $defect->isClosedNoAction() ? ($defect->resolution_notes ?: null) : null,
+                    'notes' => ! $defect->isClosedNoAction() ? ($defect->resolution_notes ?: null) : null,
+                ] : null,
                 'significant' => $defect->severity === 'significant',
                 'severity_label' => $defect->severity === 'significant' ? 'Significant damage' : 'Routine',
                 'first_reported_at' => $this->eastern($defect->first_reported_at ?? $defect->created_at)?->format('M j, Y g:i A'),
@@ -430,6 +426,7 @@ final class InspectionWorkspace
                 'trail' => $trail,
                 'trail_count' => count($trail),
                 'recurrence' => $defect->recurrence_of_defect_id !== null,
+                'recurrence_after_no_action' => in_array((int) $defect->recurrence_of_defect_id, $closedNoActionPredecessors, true),
                 'ticket' => $ticket !== null ? [
                     'number' => $ticket->ticket_number ?: 'Ticket #'.$ticket->getKey(),
                     'status' => str((string) $ticket->status)->replace('_', ' ')->headline()->toString(),
@@ -441,6 +438,7 @@ final class InspectionWorkspace
                 'actions' => $canManage
                     ? DefectCorrectiveActions::applicable($defect, $trailRows->get($defect->getKey(), collect())->last()?->observation === 'appears_corrected')
                     : [],
+                'close_blocked' => $canManage && ! $closed ? DefectCorrectiveActions::closeBlockedReason($defect) : null,
                 'thread' => $threads === null ? null : $this->messageRows($threads->get($defect->getKey(), collect())),
             ];
         }
@@ -568,11 +566,16 @@ final class InspectionWorkspace
         if ($defectIds !== []) {
             $names = ApparatusDefect::query()->whereIn('id', $defectIds)->pluck('item', 'id');
             foreach (ApparatusDefectEvent::query()->with('actor:id,name')->whereIn('apparatus_defect_id', $defectIds)->orderBy('id')->get() as $event) {
-                $label = self::EVENT_LABELS[$event->event_type] ?? str((string) $event->event_type)->replace('_', ' ')->headline()->toString();
+                $label = DefectEventNarrative::label((string) $event->event_type);
                 $item = (string) ($names->get($event->apparatus_defect_id) ?? 'equipment issue');
+                // A closure prints its reason and prior status here, so the timeline is the authoritative record.
+                $body = implode("\n", array_filter([
+                    ...DefectEventNarrative::lines($event),
+                    filled($event->member_message) ? 'Message to member: '.$event->member_message : null,
+                ]));
                 $push($event->created_at, 'defect', $label.': '.$item, [
                     'actor' => EventActorLabel::for($event),
-                    'body' => filled($event->member_message) ? 'Message to member: '.$event->member_message : null,
+                    'body' => $body !== '' ? $body : null,
                     'anchor' => 'issue-'.$event->apparatus_defect_id,
                 ]);
                 if ($canReview && filled($event->internal_note)) {

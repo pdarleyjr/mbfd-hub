@@ -5,13 +5,18 @@ namespace App\Observers;
 use App\Models\Training\TrainingTodo;
 use App\Models\User;
 use App\Notifications\TrainingTodoAssignedNotification;
-use Illuminate\Support\Facades\Notification;
+use App\Services\Notifications\NotificationDispatchService;
+use Illuminate\Support\Str;
 
 class TrainingTodoObserver
 {
     public function created(TrainingTodo $todo): void
     {
-        $this->notifyRecipients($todo, $this->recipientIdsForCreatedTodo($todo));
+        $assigneeIds = $this->normalizeUserIds($todo->assigned_to);
+
+        // Notify assignees when present. For an unassigned list-wide task, the training panel audience is told
+        // (found by the queued fan-out) so the todo is still visible to mobile users.
+        $this->notifyRecipients($todo, $assigneeIds === [] ? null : $assigneeIds, 'created');
     }
 
     public function updated(TrainingTodo $todo): void
@@ -24,61 +29,50 @@ class TrainingTodoObserver
         $newAssignees = $this->normalizeUserIds($todo->assigned_to);
         $newlyAssigned = array_values(array_diff($newAssignees, $oldAssignees));
 
-        $this->notifyRecipients($todo, $newlyAssigned);
+        if ($newlyAssigned === []) {
+            return;
+        }
+
+        // Each assignment is its own event (its key carries a fresh id): unassigning and assigning the same person
+        // again is a new alert. The key still collapses a retry of this very fan-out.
+        $this->notifyRecipients($todo, $newlyAssigned, 'assigned:'.Str::uuid());
     }
 
     /**
-     * Notify assignees when present. For unassigned list-wide tasks, notify the
-     * training panel audience so the todo is still visible to mobile users.
+     * Never fails or slows the todo's own save: the fan-out is queued after commit and guarded.
      *
-     * @return array<int>
+     * @param  list<int>|null  $userIds  null tells the whole training audience
      */
-    private function recipientIdsForCreatedTodo(TrainingTodo $todo): array
+    private function notifyRecipients(TrainingTodo $todo, ?array $userIds, string $event): void
     {
-        $assigneeIds = $this->normalizeUserIds($todo->assigned_to);
+        try {
+            $actorId = auth()->id();
+            $candidates = null;
+            if ($userIds !== null) {
+                $recipientIds = collect($userIds)
+                    ->map(fn ($id): int => (int) $id)
+                    ->filter(fn (int $id): bool => $id > 0 && $id !== $actorId)
+                    ->unique()
+                    ->values();
+                if ($recipientIds->isEmpty()) {
+                    return;
+                }
+                $candidates = User::query()->whereIn('id', $recipientIds)->get();
+                if ($candidates->isEmpty()) {
+                    return;
+                }
+            }
 
-        if ($assigneeIds !== []) {
-            return $assigneeIds;
+            // Only people who can still open Training are told; the same person is told once per assignment event.
+            app(NotificationDispatchService::class)->dispatch('training_assignments', new TrainingTodoAssignedNotification(
+                todoId: $todo->id,
+                title: $todo->title,
+                priority: $todo->priority ?? 'medium',
+                actionUrl: route('filament.training.resources.training-todos.view', ['record' => $todo]),
+            ), $candidates, NotificationDispatchService::eventKey('training_assignments', 'todo', $todo->id, $event), $userIds === null && $actorId !== null ? (int) $actorId : null);
+        } catch (\Throwable $exception) {
+            report($exception);
         }
-
-        return User::query()
-            ->whereHas('roles', fn ($query) => $query->whereIn('name', [
-                'super_admin',
-                'training_admin',
-                'training_viewer',
-            ]))
-            ->pluck('id')
-            ->map(fn ($id): int => (int) $id)
-            ->all();
-    }
-
-    private function notifyRecipients(TrainingTodo $todo, array $userIds): void
-    {
-        $actorId = auth()->id();
-        $recipientIds = collect($userIds)
-            ->map(fn ($id): int => (int) $id)
-            ->filter(fn (int $id): bool => $id > 0 && $id !== $actorId)
-            ->unique()
-            ->values();
-
-        if ($recipientIds->isEmpty()) {
-            return;
-        }
-
-        $recipients = User::query()
-            ->whereIn('id', $recipientIds)
-            ->get();
-
-        if ($recipients->isEmpty()) {
-            return;
-        }
-
-        Notification::send($recipients, new TrainingTodoAssignedNotification(
-            todoId: $todo->id,
-            title: $todo->title,
-            priority: $todo->priority ?? 'medium',
-            actionUrl: route('filament.training.resources.training-todos.view', ['record' => $todo]),
-        ));
     }
 
     /**
