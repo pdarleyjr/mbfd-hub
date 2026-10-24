@@ -37,6 +37,9 @@
                             @else
                                 {{ $valueLabel($change, $change->old_value) }} &rarr; {{ $valueLabel($change, $change->new_value) }}
                             @endif
+                            @if ($change->note)
+                                <br><small>{{ $change->note }}</small>
+                            @endif
                         </td>
                         <td><x-filament::badge :color="$statusColors[$change->status] ?? 'gray'">{{ ucfirst($change->status) }}</x-filament::badge></td>
                         <td>{{ $sources[$change->source] ?? $change->source }}</td>

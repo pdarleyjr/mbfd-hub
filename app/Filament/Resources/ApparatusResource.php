@@ -260,8 +260,8 @@ class ApparatusResource extends Resource
                     ->label('Location')
                     ->getStateUsing(fn (Apparatus $record): string => self::locationLabel($record))
                     ->searchable(query: fn (Builder $query, string $search): Builder => $query->where(fn (Builder $q): Builder => $q
-                        ->where('assignment', 'like', "%{$search}%")
-                        ->orWhere('current_location', 'like', "%{$search}%"))),
+                        ->whereRaw('LOWER(assignment) LIKE ?', ['%'.mb_strtolower($search).'%'])
+                        ->orWhereRaw('LOWER(current_location) LIKE ?', ['%'.mb_strtolower($search).'%']))),
 
                 // Optional columns.
                 Tables\Columns\TextColumn::make('vehicle_number')->visibleFrom('md')

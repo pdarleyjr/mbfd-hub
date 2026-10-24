@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Services\Fleet\ApparatusMasterVehicleLink;
 use App\Services\Fleet\UnitMasterVehicleChangeRecorder;
 use App\Support\Fleet\MasterVehicleSyncGuard;
+use LogicException;
 
 /**
  * Master vehicle side of the apparatus <-> master vehicle sync.
@@ -57,9 +58,12 @@ final class UnitMasterVehicleSyncObserver
         $this->link->propagateMasterToApparatus($vehicle, $changed);
     }
 
+    /** A vehicle that is a fire apparatus keeps its master record; Fleet unlinks or retires the unit first. */
     public function deleting(UnitMasterVehicle $vehicle): void
     {
-        $this->link->masterRemoved($vehicle);
+        if ($vehicle->apparatus()->exists()) {
+            throw new LogicException('This vehicle is linked to an apparatus and its master record cannot be deleted.');
+        }
     }
 
     private function text(mixed $value): ?string

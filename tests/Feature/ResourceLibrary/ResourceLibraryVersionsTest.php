@@ -115,7 +115,7 @@ final class ResourceLibraryVersionsTest extends TestCase
         $document = $this->importFixture('manual', 'Manual', 'Manuals', $old);
         app(ResourceLibraryService::class)->store(['slug' => 'manual', 'title' => 'Manual', 'category' => 'Manuals'], new ResourceFileInput($this->makePdf('Manual New.pdf', 'New text'), 'Manual New.pdf'));
 
-        $this->actingAs($this->manager());
+        $this->actingAsCanonicalUser($this->manager());
         $response = $this->get($this->versionUrl($document, 1))->assertOk();
 
         self::assertSame('application/pdf', $response->headers->get('Content-Type'));
@@ -138,7 +138,7 @@ final class ResourceLibraryVersionsTest extends TestCase
         $document = $this->importFixture('manual', 'Manual', 'Manuals', $old);
         app(ResourceLibraryService::class)->store(['slug' => 'manual', 'title' => 'Manual', 'category' => 'Manuals'], new ResourceFileInput($this->makePdf('new.pdf', 'New text'), 'new.pdf'));
 
-        $this->actingAs($this->superAdmin());
+        $this->actingAsCanonicalUser($this->superAdmin());
 
         self::assertSame(file_get_contents($old), $this->get($this->versionUrl($document, 1))->assertOk()->streamedContent());
     }
@@ -149,16 +149,16 @@ final class ResourceLibraryVersionsTest extends TestCase
         app(ResourceLibraryService::class)->store(['slug' => 'manual', 'title' => 'Manual', 'category' => 'Manuals'], new ResourceFileInput($this->makePdf('new.pdf', 'New text'), 'new.pdf'));
         $url = $this->versionUrl($document, 1);
 
-        $this->actingAs($this->viewer());
+        $this->actingAsCanonicalUser($this->viewer());
         $this->get($url)->assertForbidden();
 
-        $this->actingAs($this->adminWith(['admin.access', 'admin.forms.manage', 'admin.department_updates.manage']));
+        $this->actingAsCanonicalUser($this->adminWith(['admin.access', 'admin.forms.manage', 'admin.department_updates.manage']));
         $this->get($url)->assertForbidden();
 
-        $this->actingAs($this->adminWith(['admin.resources.manage']));
+        $this->actingAsCanonicalUser($this->adminWith(['admin.resources.manage']));
         $this->get($url)->assertForbidden();
 
-        $this->actingAs(User::factory()->create(['account_status' => AccountStatus::Active]));
+        $this->actingAsCanonicalUser(User::factory()->create(['account_status' => AccountStatus::Active]));
         $this->get($url)->assertForbidden();
 
         $this->actingAsCanonicalFixture();
@@ -166,6 +166,18 @@ final class ResourceLibraryVersionsTest extends TestCase
 
         auth()->guard('web')->logout();
         $this->get($url)->assertRedirect();
+    }
+
+    public function test_a_manager_without_a_current_hub_session_cannot_download_a_previous_version(): void
+    {
+        $document = $this->importFixture('manual', 'Manual', 'Manuals', $this->makePdf('manual.pdf', 'Old text'));
+        app(ResourceLibraryService::class)->store(['slug' => 'manual', 'title' => 'Manual', 'category' => 'Manuals'], new ResourceFileInput($this->makePdf('manual-2026.pdf', 'New text'), 'manual-2026.pdf'));
+
+        // A plain Laravel login without a current canonical Hub session (revoked or expired elsewhere).
+        $this->actingAs($this->manager(), 'web');
+        $response = $this->get($this->versionUrl($document, 1));
+        self::assertContains($response->getStatusCode(), [302, 401, 403], 'Refused (sent to sign in) without a current Hub session.');
+        self::assertStringNotContainsString('%PDF', (string) $response->getContent());
     }
 
     public function test_the_edit_page_lists_earlier_versions_for_managers_and_viewers_cannot_open_it(): void

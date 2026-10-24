@@ -13,6 +13,7 @@ use App\Support\Fleet\VehicleIdentity;
 use App\Support\Fleet\VehicleNumber;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Keeps one physical vehicle as one master record (record keeper) plus at most one
@@ -248,22 +249,65 @@ final class ApparatusMasterVehicleLink
                 return;
             }
             $designation = $this->label($apparatus);
+            $this->assertVinIsNotAnotherVehicles($apparatus, $master, $masterFields);
             MasterVehicleSyncGuard::propagating(function () use ($apparatus, $master, $masterFields, $user, $designation): void {
+                $restore = [];
                 foreach (self::APPARATUS_EDITABLE_FIELDS as $masterField => $apparatusField) {
                     if (! in_array($masterField, $masterFields, true)) {
                         continue;
                     }
                     $value = $this->apparatusValue($apparatus, $apparatusField);
-                    if ($masterField === 'year' && $value === null && ! $this->isBlank($apparatus->getAttribute('year'))) {
-                        continue; // not a real four digit year: leave the master as it is
+                    if ($value === null) {
+                        // A cleared (or unreadable) field on the apparatus page never erases the master
+                        // record: the apparatus copy goes back to the master value instead.
+                        if ($this->hasUsableValue($master->getAttribute($masterField), $masterField)) {
+                            $restore[$apparatusField] = $masterField === 'year'
+                                ? (int) $this->masterValue($master, $masterField)
+                                : $this->masterValue($master, $masterField);
+                        }
+
+                        continue;
                     }
                     $this->recorder->apply($master, $masterField, $value, UnitMasterVehicleChange::SOURCE_APPARATUS_PAGE, [
                         'user' => $user,
                         'note' => "Edited on apparatus {$designation}",
                     ]);
                 }
+                if ($restore !== []) {
+                    Apparatus::query()->lockForUpdate()->findOrFail($apparatus->getKey())->forceFill($restore)->save();
+                    $apparatus->forceFill($restore)->syncOriginalAttributes(array_keys($restore));
+                }
             });
         });
+    }
+
+    /**
+     * A VIN typed on the apparatus page that another master vehicle already carries means the
+     * wrong truck is being described; refuse the save instead of copying it to this record.
+     *
+     * @param  list<string>  $masterFields
+     *
+     * @throws ValidationException
+     */
+    private function assertVinIsNotAnotherVehicles(Apparatus $apparatus, UnitMasterVehicle $master, array $masterFields): void
+    {
+        if (! in_array('serial_number', $masterFields, true)) {
+            return;
+        }
+        $vin = VehicleIdentity::vinKey(VehicleIdentity::text($apparatus->getAttribute('vin')));
+        if ($vin === null) {
+            return;
+        }
+        $other = UnitMasterVehicle::query()
+            ->whereKeyNot($master->getKey())
+            ->whereNotNull('serial_number')
+            ->get(['id', 'veh_number', 'serial_number'])
+            ->first(fn (UnitMasterVehicle $vehicle): bool => VehicleIdentity::vinKey(VehicleIdentity::text($vehicle->serial_number)) === $vin);
+        if ($other instanceof UnitMasterVehicle) {
+            throw ValidationException::withMessages([
+                'data.vin' => "This VIN belongs to master vehicle #{$other->veh_number}. Use Link vehicle record if this unit is that truck.",
+            ]);
+        }
     }
 
     /**
@@ -308,15 +352,6 @@ final class ApparatusMasterVehicleLink
                 MasterVehicleSyncGuard::propagating(static fn (): bool => $row->save());
             }
         });
-    }
-
-    /** The linked master was deleted: tell Fleet instead of leaving a dangling link. */
-    public function masterRemoved(UnitMasterVehicle $master): void
-    {
-        $row = Apparatus::query()->where('unit_master_vehicle_id', $master->getKey())->first();
-        if ($row !== null) {
-            $this->markNeedsReview($row, 'Master vehicle record was removed.');
-        }
     }
 
     /**

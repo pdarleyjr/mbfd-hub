@@ -284,11 +284,11 @@ class UnitMasterVehicleResource extends Resource
                     Tables\Actions\DeleteBulkAction::make()
                         ->action(function (\Illuminate\Database\Eloquent\Collection $records): void {
                             // Vehicles with take-home inspection history are kept (the history is immutable).
-                            $kept = $records->filter(fn (\Illuminate\Database\Eloquent\Model $vehicle): bool => $vehicle instanceof UnitMasterVehicle && ($vehicle->takeHomeInspections()->exists() || $vehicle->documents()->exists()));
+                            $kept = $records->filter(fn (\Illuminate\Database\Eloquent\Model $vehicle): bool => $vehicle instanceof UnitMasterVehicle && ($vehicle->takeHomeInspections()->exists() || $vehicle->documents()->exists() || $vehicle->apparatus()->exists()));
                             $records->diff($kept)->each->delete();
                             if ($kept->isNotEmpty()) {
                                 \Filament\Notifications\Notification::make()
-                                    ->title($kept->count().' vehicle(s) kept because they have inspection or document history')
+                                    ->title($kept->count().' vehicle(s) kept because they have inspection or document history or are fire apparatus')
                                     ->warning()
                                     ->send();
                             }

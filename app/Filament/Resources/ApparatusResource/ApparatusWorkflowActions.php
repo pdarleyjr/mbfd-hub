@@ -16,6 +16,7 @@ use App\Services\Fleet\ApparatusMasterVehicleLink;
 use Filament\Actions\MountableAction;
 use Filament\Forms;
 use Filament\Notifications\Notification;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Str;
 
 /**
@@ -299,7 +300,16 @@ final class ApparatusWorkflowActions
                     return;
                 }
 
-                $changes = app(ApparatusMasterVehicleLink::class)->link($record, $master, self::actor());
+                try {
+                    $changes = app(ApparatusMasterVehicleLink::class)->link($record, $master, self::actor());
+                } catch (UniqueConstraintViolationException) {
+                    Notification::make()->danger()
+                        ->title('That vehicle was just linked to another unit')
+                        ->body('Refresh the page and choose again.')
+                        ->send();
+
+                    return;
+                }
                 $record->refresh();
 
                 Notification::make()->success()
@@ -312,15 +322,15 @@ final class ApparatusWorkflowActions
     /** @return array<int, string> master vehicles not linked to another apparatus, matching the search */
     private static function linkableVehicles(Apparatus $record, string $search): array
     {
-        $term = '%'.trim($search).'%';
+        $term = '%'.mb_strtolower(trim($search)).'%';
 
         return UnitMasterVehicle::query()
             ->whereDoesntHave('apparatus', fn ($query) => $query->whereKeyNot($record->getKey()))
             ->when(trim($search) !== '', fn ($query) => $query->where(fn ($q) => $q
-                ->where('veh_number', 'like', $term)
-                ->orWhere('make', 'like', $term)
-                ->orWhere('model', 'like', $term)
-                ->orWhere('serial_number', 'like', $term)))
+                ->whereRaw('LOWER(veh_number) LIKE ?', [$term])
+                ->orWhereRaw('LOWER(make) LIKE ?', [$term])
+                ->orWhereRaw('LOWER(model) LIKE ?', [$term])
+                ->orWhereRaw('LOWER(serial_number) LIKE ?', [$term])))
             ->orderBy('veh_number')
             ->limit(50)
             ->get()

@@ -259,17 +259,20 @@ final class ApparatusMasterVehicleLinkTest extends TestCase
         $this->assertSame('Master vehicle record no longer has a vehicle number.', $fresh->master_link_note);
     }
 
-    public function test_deleting_a_linked_master_flags_the_apparatus(): void
+    public function test_a_linked_master_record_cannot_be_deleted(): void
     {
         $master = $this->master('20503');
         $apparatus = $this->liveApparatus('E1', '20503');
 
-        $master->delete();
+        try {
+            $master->delete();
+            $this->fail('A master vehicle that is a fire apparatus must not be deleted.');
+        } catch (\LogicException) {
+        }
 
-        $fresh = $apparatus->fresh();
-        $this->assertNull($fresh->unit_master_vehicle_id);
-        $this->assertSame('needs_review', $fresh->master_link_status);
-        $this->assertSame('Master vehicle record was removed.', $fresh->master_link_note);
+        $this->assertNotNull($master->fresh());
+        $this->assertSame($master->id, $apparatus->fresh()->unit_master_vehicle_id);
+        $this->assertSame('linked', $apparatus->fresh()->master_link_status);
     }
 
     // ---- apparatus edit -> master ----------------------------------------------
@@ -305,10 +308,9 @@ final class ApparatusMasterVehicleLinkTest extends TestCase
         $this->assertSame($first->id, $apparatus->fresh()->unit_master_vehicle_id);
         $this->actingAsSuperAdmin();
 
-        Livewire::test(EditApparatus::class, ['record' => $apparatus->getKey()])
-            ->fillForm(['vehicle_number' => '1032'])
-            ->call('save')
-            ->assertHasNoFormErrors();
+        // On the Admin form a linked unit's number is set by "Link vehicle record"
+        // (ApparatusFleetWorkspaceTest); any other writer that changes it relinks.
+        $apparatus->fresh()->update(['vehicle_number' => '1032']);
 
         $fresh = $apparatus->fresh();
         $this->assertSame($second->id, $fresh->unit_master_vehicle_id);
@@ -316,10 +318,7 @@ final class ApparatusMasterVehicleLinkTest extends TestCase
         $this->assertSame(['1031', 'AAA', '2005'], [$first->fresh()->veh_number, $first->fresh()->make, $first->fresh()->year]);
         $this->assertNull($first->apparatus()->first());
 
-        Livewire::test(EditApparatus::class, ['record' => $apparatus->getKey()])
-            ->fillForm(['vehicle_number' => '9999'])
-            ->call('save')
-            ->assertHasNoFormErrors();
+        $apparatus->fresh()->update(['vehicle_number' => '9999']);
 
         $fresh = $apparatus->fresh();
         $this->assertNull($fresh->unit_master_vehicle_id);

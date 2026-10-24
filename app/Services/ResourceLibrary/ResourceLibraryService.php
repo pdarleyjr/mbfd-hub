@@ -294,7 +294,12 @@ final class ResourceLibraryService
     private function stage(string $finalPath, string $localPath, string $sha): array
     {
         if ($this->storage->disk()->exists($finalPath)) {
-            throw new ResourceImportException('Another change to this document is in progress. Wait a moment and try again.');
+            // A file at a fresh version path that no document or version row points to was left by an
+            // interrupted replacement: it was never committed, so it is removed and the path reused.
+            if ($this->isReferenced($finalPath)) {
+                throw new ResourceImportException('Another change to this document is in progress. Wait a moment and try again.');
+            }
+            $this->storage->delete($finalPath);
         }
         $stagedPath = $finalPath.ResourceLibraryStorage::INCOMING_SUFFIX;
         $this->storeProven($stagedPath, $localPath, $sha);
@@ -394,6 +399,12 @@ final class ResourceLibraryService
         }
 
         return $sha;
+    }
+
+    private function isReferenced(string $path): bool
+    {
+        return ResourceDocument::withTrashed()->where('original_path', $path)->orWhere('preview_path', $path)->exists()
+            || ResourceDocumentVersion::query()->where('original_path', $path)->orWhere('preview_path', $path)->exists();
     }
 
     /** A genuine Office package is a zip with [Content_Types].xml and at least one part under its type's folder. */

@@ -271,7 +271,7 @@ Route::prefix('employee/resources')
 
 // Admin > Resource Library: a superseded file of a document. Managers only; authorized in the controller.
 Route::prefix('admin/resource-library')
-    ->middleware(['auth:web', 'throttle:30,1'])
+    ->middleware(['auth:web', 'admin.capability:admin.resources.manage', 'throttle:30,1'])
     ->name('admin.resources.')
     ->group(function (): void {
         Route::get('/{document}/versions/{version}/download', [AdminResourceDocumentVersionController::class, 'download'])

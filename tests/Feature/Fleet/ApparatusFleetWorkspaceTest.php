@@ -195,6 +195,40 @@ final class ApparatusFleetWorkspaceTest extends TestCase
         self::assertSame('VELOCITY', $unit->masterVehicle?->model, 'Shared fields still write through to the master.');
     }
 
+    public function test_clearing_a_shared_field_on_the_apparatus_never_erases_the_master(): void
+    {
+        $master = $this->master('20504', ['make' => 'PIERCE', 'serial_number' => 'TESTVIN000000504']);
+        $unit = $this->legacyApparatus('E 4', '20504');
+        app(ApparatusMasterVehicleLink::class)->reconcile($unit);
+        $this->actingAs($this->fleetManager());
+
+        Livewire::test(EditApparatus::class, ['record' => $unit->getRouteKey()])
+            ->fillForm(['make' => '', 'vin' => ''])
+            ->call('save')
+            ->assertHasNoFormErrors();
+
+        self::assertSame('PIERCE', $master->fresh()->make);
+        self::assertSame('TESTVIN000000504', $master->fresh()->serial_number);
+        self::assertSame('PIERCE', $unit->fresh()->make, 'The apparatus copy goes back to the master value.');
+        self::assertSame('TESTVIN000000504', $unit->fresh()->vin);
+    }
+
+    public function test_a_vin_that_belongs_to_another_vehicle_is_refused(): void
+    {
+        $this->master('20504', ['serial_number' => 'TESTVIN000000504']);
+        $this->master('20503', ['serial_number' => 'TESTVIN000000503']);
+        $unit = $this->legacyApparatus('E 4', '20504');
+        app(ApparatusMasterVehicleLink::class)->reconcile($unit);
+        $this->actingAs($this->fleetManager());
+
+        Livewire::test(EditApparatus::class, ['record' => $unit->getRouteKey()])
+            ->fillForm(['vin' => 'testvin-000000503'])
+            ->call('save')
+            ->assertHasFormErrors(['vin']);
+
+        self::assertSame('TESTVIN000000504', $unit->fresh()->vin);
+    }
+
     public function test_master_profile_shows_the_linked_apparatus(): void
     {
         $master = $this->master('17505', ['make' => 'PIERCE', 'model' => 'ARROW XT']);
