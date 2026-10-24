@@ -11,13 +11,16 @@ use App\Models\StationInspection;
 use App\Models\StationInventorySubmission;
 use App\Models\Todo;
 use App\Models\Training\TrainingTodo;
+use App\Models\UnitMasterVehicle;
 use App\Models\User;
 use App\Models\WorkgroupSharedUpload;
 use App\Notifications\NewSubmissionNotification;
 use App\Observers\ApparatusDefectObserver;
+use App\Observers\ApparatusMasterLinkObserver;
 use App\Observers\ApparatusObserver;
 use App\Observers\TodoObserver;
 use App\Observers\TrainingTodoObserver;
+use App\Observers\UnitMasterVehicleSyncObserver;
 use App\Observers\UpstreamIdentityObserver;
 use App\Observers\WorkgroupSharedUploadObserver;
 use Filament\Support\Assets\Js;
@@ -168,7 +171,10 @@ class AppServiceProvider extends ServiceProvider
 
         Todo::observe(TodoObserver::class);
         TrainingTodo::observe(TrainingTodoObserver::class);
+        // Order matters: the link observer reads change tracking that ApparatusObserver's re-save replaces.
+        Apparatus::observe(ApparatusMasterLinkObserver::class);
         Apparatus::observe(ApparatusObserver::class);
+        UnitMasterVehicle::observe(UnitMasterVehicleSyncObserver::class);
         ApparatusDefect::observe(ApparatusDefectObserver::class);
         User::observe(UpstreamIdentityObserver::class);
 
