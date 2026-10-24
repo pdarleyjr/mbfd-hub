@@ -101,6 +101,14 @@ final class VehicleIdentificationFields
     /** Master values that count as "nothing there". */
     private const BLANK_MARKERS = ['N/A', 'NA', 'NONE', '-'];
 
+    /** What people type when they have nothing to say; never a real identifier, never matched or accepted. */
+    private const PLACEHOLDERS = ['N/A', 'NA', 'NONE', '-', '0', 'UNKNOWN', 'X'];
+
+    /** Shortest real value per identifier field (plate, vehicle number, hull ID). */
+    private const MIN_LENGTH = [self::PLATE => 2, self::VEHICLE_NUMBER => 4];
+
+    private const MIN_HIN_LENGTH = 6;
+
     /** @return list<string> */
     public static function fields(): array
     {
@@ -197,6 +205,22 @@ final class VehicleIdentificationFields
     }
 
     /**
+     * True for an empty value, a blank marker (N/A, NA, NONE, -) and the other placeholders people
+     * type instead of an identifier (0, UNKNOWN, X). Used to keep such values out of matching.
+     */
+    public static function isPlaceholderValue(mixed $value): bool
+    {
+        $text = VehicleIdentity::text($value);
+        if ($text === null) {
+            return true;
+        }
+        $upper = mb_strtoupper($text);
+        $bare = (string) preg_replace('/[^A-Z0-9]/', '', $upper);
+
+        return in_array($upper, self::PLACEHOLDERS, true) || in_array($bare, ['NA', 'NONE', 'UNKNOWN', 'X', '0'], true);
+    }
+
+    /**
      * Clean a typed answer. Returns the value to store, or null when it cannot be a real value
      * for this field and kind.
      */
@@ -207,13 +231,39 @@ final class VehicleIdentificationFields
             return null;
         }
 
-        return match ($field) {
+        $value = match ($field) {
             self::VEHICLE_NUMBER => self::cleanVehicleNumber($text),
             self::VIN => self::cleanVin($text, $kind),
             self::PLATE => self::cleanPlate($text),
             self::YEAR => self::cleanYear($text),
             default => self::cleanDescription($text),
         };
+
+        if ($value === null) {
+            return null;
+        }
+
+        return self::isIdentifier($field) && self::looksLikeFiller($field, $kind, $value) ? null : $value;
+    }
+
+    private static function isIdentifier(string $field): bool
+    {
+        return in_array($field, [self::VEHICLE_NUMBER, self::VIN, self::PLATE], true);
+    }
+
+    /** A placeholder, a run of one repeated character, or too short to be what it claims to be. */
+    private static function looksLikeFiller(string $field, string $kind, string $value): bool
+    {
+        if (self::isPlaceholderValue($value)) {
+            return true;
+        }
+        $key = (string) VehicleIdentity::vinKey($value);
+        if (mb_strlen($key) >= 2 && preg_match('/\A(.)\1+\z/u', $key) === 1) {
+            return true;
+        }
+        $minimum = $field === self::VIN && $kind === self::KIND_BOAT ? self::MIN_HIN_LENGTH : (self::MIN_LENGTH[$field] ?? 0);
+
+        return mb_strlen($field === self::VEHICLE_NUMBER ? $value : $key) < $minimum;
     }
 
     /** The plain-language reason a value was refused, for the screen that asked. */
