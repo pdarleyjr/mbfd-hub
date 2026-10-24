@@ -122,6 +122,40 @@ final class ApplyApprovedDailyCheckoutPolicyTest extends TestCase
         $this->assertSame(Command::FAILURE, $verifyExtraRequired, Artisan::output());
         $this->assertFalse($verifyExtraRequiredResult['verified']);
         $this->assertSame(15, $verifyExtraRequiredResult['required_count']);
+        $this->assertSame(['A1'], $verifyExtraRequiredResult['additional_required']);
+        $this->assertSame(0, $verifyExtraRequiredResult['replacement_capacity']);
+
+        // A reserve unit put In Service while an approved unit is Out of Service is replacement coverage.
+        $r3 = Apparatus::query()->where('unit_id', 'R3')->sole();
+        $r3->forceFill(['status' => 'Out of Service'])->save();
+        $verifyReplacement = Artisan::call('daily-checkout:apply-approved-policy', ['--verify' => true]);
+        $verifyReplacementResult = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame(Command::SUCCESS, $verifyReplacement, Artisan::output());
+        $this->assertTrue($verifyReplacementResult['verified']);
+        $this->assertSame(['A1'], $verifyReplacementResult['additional_required']);
+        $this->assertSame(1, $verifyReplacementResult['replacement_capacity']);
+
+        // A required extra that is not In Service is not coverage.
+        $support->forceFill(['status' => 'Available'])->save();
+        $this->assertSame(Command::FAILURE, Artisan::call('daily-checkout:apply-approved-policy', ['--verify' => true]), Artisan::output());
+
+        // More extras than approved units out of service is not coverage either.
+        $support->forceFill(['status' => 'In Service'])->save();
+        Apparatus::query()->create([
+            'station_id' => $stations[3]->id,
+            'unit_id' => 'R-RESERVE-2',
+            'designation' => 'R Reserve 2',
+            'name' => 'Rescue Reserve 2',
+            'type' => 'Rescue',
+            'slug' => 'r-reserve-2',
+            'status' => 'In Service',
+            'daily_checkout_requirement' => 'required',
+            'daily_checkout_template' => 'rescue',
+        ]);
+        $verifyTooMany = Artisan::call('daily-checkout:apply-approved-policy', ['--verify' => true]);
+        $verifyTooManyResult = json_decode(Artisan::output(), true, 512, JSON_THROW_ON_ERROR);
+        $this->assertSame(Command::FAILURE, $verifyTooMany, Artisan::output());
+        $this->assertSame(['A1', 'R-RESERVE-2'], $verifyTooManyResult['additional_required']);
     }
 
     public function test_fb6_alias_collision_fails_closed_without_mutating_any_policy(): void
