@@ -157,6 +157,18 @@ class Apparatus extends Model
         return $this->hasMany(ApparatusVehicleSwapRequest::class);
     }
 
+    /** @return HasMany<ApparatusIdentificationQuestion, $this> the one-time vehicle questions asked of crews for this unit */
+    public function identificationQuestions(): HasMany
+    {
+        return $this->hasMany(ApparatusIdentificationQuestion::class);
+    }
+
+    /** @return HasMany<ApparatusIdentificationEvent, $this> */
+    public function identificationEvents(): HasMany
+    {
+        return $this->hasMany(ApparatusIdentificationEvent::class);
+    }
+
     /** @return HasMany<ApparatusServiceTicket, $this> */
     public function serviceTickets(): HasMany
     {
