@@ -210,3 +210,33 @@ with `captain5.communications_enabled=false` first if needed).
   Checkouts, Video Conferencing".
 - **Rollback.** The migration is additive. Old code ignores `captain5_acting_requests` and the two new
   `department_updates` columns; posts made from the pages stay ordinary published Department Updates.
+
+## 12. Shift 300 display and acting 300 (2026-10-24)
+
+- **Shift 300 line.** The 300 page and the 300 card on the stations list show
+  "<Shift> Shift 300: <rank> <name>" (A green, B blue, C red; the shift letter is always in the text). It comes
+  from `Captain5DutyRoster::command300OnDuty()`: an approved acting 300 request that is showing, otherwise the
+  verified current bid seat `unit_label` "300" whose bid shift is the on-duty rotation shift (08:00 boundary,
+  2026-03-09 = A). Production has one Division Chief seat per A/B/C. When nobody resolves, the page says
+  "Shift 300 not set"; it never guesses from rank.
+- **One engine for both roles.** `captain5_acting_requests.role` (`captain_5` default | `command_300`), added by
+  the additive migration `2026_10_24_120000_add_role_to_captain5_acting_requests` (one column with a default and an
+  index; it creates, grants and changes no permission or role). `Captain5ActingService`, `Captain5Notifier`
+  (same kinds and `captain5:acting:{id}:*` ledger keys, so the notification evaluator is unchanged; wording and
+  the linked page follow the role), the request history and the Admin > Captain 5 Operations queue (one list,
+  labelled by role) cover both. Takeover and end act only within the request's role.
+- **Who may ask for acting 300:** anyone `Command300Access` allows: Captains, Division Chiefs, the 300 bid seat,
+  administrators and explicit `command.300.access` grants. **Who approves (both roles):** Captain 5
+  administrators (`Captain5Access::canConfigure`: super_admin, or Admin Panel plus `captain5.admin`); nobody
+  approves their own request except a super admin. Same durations as acting Captain 5 (12 hours to the next 08:00
+  or 20:00, 24 hours to the next day's 08:00, or a custom end 15 minutes to 72 hours ahead). An expired request
+  cannot be approved; the display ends on its own at `ends_at`.
+- **Display only.** Being shown as acting 300 grants no access and changes nothing else; forgetting to use it
+  affects nothing.
+- **API:** `GET /api/command-300/shift` → `{on_duty, acting}`; `POST /api/command-300/acting-requests`
+  (`kind`, `duration`, `ends_at`, `client_request_id`) and `/{id}/approve|reject|withdraw`, behind
+  `access-command-300`. The 300 routes decide only 300 requests and the Captain 5 routes only Captain 5 requests
+  (another role's id answers 404); the route, never the request body, sets the role.
+- **Rollback.** Old code ignores the `role` column, but it would treat a showing acting 300 row as an acting
+  Captain 5. Before rolling back, end any showing acting 300 request (Admin > Captain 5 Operations, or approve an
+  end request).

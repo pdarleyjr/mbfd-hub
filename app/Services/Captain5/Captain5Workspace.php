@@ -10,7 +10,6 @@ use App\Models\ApparatusInspection;
 use App\Models\Captain5\Captain5ActingRequest;
 use App\Models\Captain5\Captain5HandoffNote;
 use App\Models\User;
-use App\Services\Security\Captain5Access;
 use App\Services\Security\Captain5AccessDecision;
 use App\Support\Captain5\DutyCalendar;
 use App\Support\Fleet\DefectActionStatus;
@@ -35,7 +34,6 @@ final class Captain5Workspace
         private readonly Captain5IssueScope $scope,
         private readonly Captain5IssuePresenter $presenter,
         private readonly DutyCalendar $calendar,
-        private readonly Captain5Access $access,
     ) {}
 
     /** @return array<string, mixed> */
