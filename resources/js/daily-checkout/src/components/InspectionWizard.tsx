@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router';
-import { Apparatus, ApparatusServiceTicketSummary, FleetVehicle, OfficerInfo, ChecklistData, ChecklistFieldValue, Compartment, Defect, InspectionData, MeterData, InspectionSubmission, ReviewFlagDraft, ScheduledChecklistTaskResult } from '../types';
+import { Apparatus, ApparatusServiceTicketSummary, FleetVehicle, OfficerInfo, ChecklistData, ChecklistFieldValue, Compartment, Defect, InspectionData, MeterData, InspectionSubmission, ReviewFlagDraft, ScheduledChecklistTaskResult, VehicleIdentificationAnswers } from '../types';
 import { ApiClient, READ_TIMEOUT_MS } from '../utils/api';
 import {
   DAILY_CHECKOUT_QUEUE_SYNC_EVENT,
@@ -35,6 +35,7 @@ import { inspectionProgress, inspectionReadiness } from '../utils/inspectionProg
 import { identityForQueueCapture, type OfflineIdentity } from '../lib/offlineIdentity';
 import { EMPTY_REVIEW_FLAG, buildReviewFlag, normalizeReviewFlagDraft, reviewFlagExplanationMissing } from '../utils/reviewFlag';
 import { defaultVehicleConfirmation, paperVehicleValue, reconcileVehicleConfirmation, toPhysicalVehicleReport } from '../utils/vehicleConfirmation';
+import { toVehicleIdentificationSubmission } from '../utils/vehicleIdentification';
 import { ClipboardList, Gauge, Truck, Users } from 'lucide-react';
 
 type Step = 'officer' | 'meter' | 'details' | 'compartments' | 'submit';
@@ -113,6 +114,7 @@ const readinessExplanation = (readiness: ReadinessSummary): string => {
   }
   if (readiness.missingFields.length > 0 || readiness.missingDuties.length > 0) return 'Complete the required checklist details.';
   if (readiness.missingVehicle) return 'Confirm the physical vehicle under Member / Vehicle Info.';
+  if (readiness.missingIdentification) return 'Answer the one-time vehicle information under Member / Vehicle Info, or mark it not available with a reason.';
   if (readiness.missingShift) return 'Select your shift under Member / Vehicle Info.';
   if (readiness.invalidMeters) return 'Correct the vehicle readings.';
 
@@ -159,6 +161,8 @@ export default function InspectionWizard() {
     miles: null,
   });
   const [fleetVehicles, setFleetVehicles] = useState<FleetVehicle[]>([]);
+  // Working answers to the one-time vehicle information questions; kept in the draft.
+  const [vehicleIdentification, setVehicleIdentification] = useState<VehicleIdentificationAnswers>({});
   const [compartments, setCompartments] = useState<Compartment[]>([]);
   const [fieldValues, setFieldValues] = useState<Array<{ id: string; value: ChecklistFieldValue }>>([]);
   const [scheduledTasks, setScheduledTasks] = useState<ScheduledChecklistTaskResult[]>([]);
@@ -193,12 +197,13 @@ export default function InspectionWizard() {
   const supersededDraftRef = useRef<{ slug: string; version: string; owner: OfflineIdentity } | null>(null);
   const loadedContractRef = useRef<{ slug: string; apparatus: Apparatus; checklist: ChecklistData } | null>(null);
   const inventoryMarkers = useInventoryMarkers(apparatus?.id, memberIdentity?.userId, checklist?.pending_corrections);
-  const readiness = inspectionReadiness(checklist, compartments, fieldValues, scheduledTasks, officerInfo, meterData);
+  const readiness = inspectionReadiness(checklist, compartments, fieldValues, scheduledTasks, officerInfo, meterData, vehicleIdentification);
   const continueLabel = readiness.nextStep === 'compartments' ? 'Continue: Apparatus' : readiness.label;
   // On the Member step the Continue button is the vehicle confirmation, so its label
   // names what comes after confirming (Shift, Readings, Review & Sign), not the confirmation itself.
+  // Continue is also blocked until the one-time vehicle questions are answered, so the label looks past them.
   const officerReadiness = inspectionReadiness(
-    checklist,
+    checklist ? { ...checklist, vehicle_identification: undefined } : checklist,
     compartments,
     fieldValues,
     scheduledTasks,
@@ -464,6 +469,7 @@ export default function InspectionWizard() {
           vehicleConfirmation: defaultVehicleConfirmation(foundApparatus.vehicle_number ?? ''),
         });
         setMeterData({ engine_hours: null, miles: null });
+        setVehicleIdentification({});
         setSignature(null);
         setReviewFlag(EMPTY_REVIEW_FLAG);
         setDraftId(createClientSubmissionId());
@@ -509,6 +515,7 @@ export default function InspectionWizard() {
             if (saved.meter) {
               setMeterData(saved.meter);
             }
+            setVehicleIdentification(saved.vehicleIdentification ?? {});
             setCompartments(restoredCompartments);
             {
               if (saved.fieldValues) {
@@ -583,6 +590,7 @@ export default function InspectionWizard() {
         signature,
         reviewFlag,
         ...(draftId ? { draftId } : {}),
+        ...(Object.keys(vehicleIdentification).length > 0 ? { vehicleIdentification } : {}),
         meter: meterData,
         compartments,
         fieldValues,
@@ -592,7 +600,7 @@ export default function InspectionWizard() {
       },
       clearSessionStartKeyFor: checklist.schema_version === 2 && checklist.inspection_session ? checklist.checklist_version : undefined,
     }, stepChanged);
-  }, [officerInfo, meterData, compartments, fieldValues, scheduledTasks, currentStep, slug, apparatus, checklist, memberIdentity, loading, signature, reviewFlag, draftId, submitting, queuedSubmissionBlocker, autosaver]);
+  }, [officerInfo, meterData, compartments, fieldValues, scheduledTasks, currentStep, slug, apparatus, checklist, memberIdentity, loading, signature, reviewFlag, draftId, vehicleIdentification, submitting, queuedSubmissionBlocker, autosaver]);
 
   useEffect(() => {
     if (readiness.ready) setShowNotReady(false);
@@ -612,7 +620,7 @@ export default function InspectionWizard() {
   const handleOfficerSubmit = (info: OfficerInfo) => {
     handleOfficerChange(info);
     // Continue confirms the vehicle, so the next step is judged on the confirmed answer.
-    setCurrentStep(inspectionReadiness(checklist, compartments, fieldValues, scheduledTasks, info, meterData).nextStep);
+    setCurrentStep(inspectionReadiness(checklist, compartments, fieldValues, scheduledTasks, info, meterData, vehicleIdentification).nextStep);
   };
 
   const handleMetersChange = (data: MeterData) => {
@@ -680,6 +688,7 @@ export default function InspectionWizard() {
         vehicleConfirmation: defaultVehicleConfirmation(apparatus.vehicle_number ?? ''),
       });
       setMeterData({ engine_hours: null, miles: null });
+      setVehicleIdentification({});
       setSignature(null);
       setReviewFlag(EMPTY_REVIEW_FLAG);
       setDraftId(createClientSubmissionId());
@@ -762,6 +771,8 @@ export default function InspectionWizard() {
       });
 
       const flag = buildReviewFlag(reviewFlag, compartments);
+      // Omitted when no question is open, so a checkout without questions is byte for byte what it was.
+      const identificationReport = toVehicleIdentificationSubmission(checklist.vehicle_identification, vehicleIdentification);
       const submission: InspectionSubmission = {
         processing_version: 1,
         meter_baseline_token: apparatus.meter_baseline_token,
@@ -800,6 +811,7 @@ export default function InspectionWizard() {
         officer_signature: signature,
         ...(flag ? { review_flag: flag } : {}),
         ...(draftId ? { inventory_draft_id: draftId } : {}),
+        ...(identificationReport ? { vehicle_identification: identificationReport } : {}),
       };
       clientSubmissionIdRef.current = submission.client_submission_id;
       const queueId = await queueSubmission(apparatus.id, submission, currentIdentity, checklist.checklist_base_version);
@@ -1119,6 +1131,10 @@ export default function InspectionWizard() {
           onChange={handleOfficerChange}
           fleetVehicles={fleetVehicles}
           assignedDesignation={apparatus.designation ?? apparatus.name}
+          identification={checklist.vehicle_identification}
+          identificationAnswers={vehicleIdentification}
+          onIdentificationChange={setVehicleIdentification}
+          showIdentificationErrors={showNotReady}
         />
       )}
 
