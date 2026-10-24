@@ -180,38 +180,7 @@ final class Captain5Workspace
      */
     public function acting(User $viewer, Captain5AccessDecision $decision): array
     {
-        $pending = Captain5ActingRequest::query()->pending()->with(['requester:id,name,display_name', 'employee:id,name,display_name,rank'])
-            ->orderBy('id')->limit(50)->get();
-        $canApprove = $this->access->canConfigure($viewer);
-        $mine = $pending->first(fn (Captain5ActingRequest $r): bool => (int) $r->requested_by_user_id === (int) $viewer->getKey());
-
-        return [
-            'can_approve' => $canApprove,
-            'mine' => $mine instanceof Captain5ActingRequest ? $this->presentActing($mine, $viewer) : null,
-            'pending' => $canApprove ? $pending->map(fn (Captain5ActingRequest $r): array => $this->presentActing($r, $viewer))->values()->all() : [],
-            'choices' => [
-                '12h' => $this->presenter->iso($this->calendar->actingEnd('12h')),
-                '24h' => $this->presenter->iso($this->calendar->actingEnd('24h')),
-            ],
-        ];
-    }
-
-    /** @return array<string, mixed> */
-    private function presentActing(Captain5ActingRequest $request, User $viewer): array
-    {
-        $requester = $request->requester;
-
-        return [
-            'id' => (int) $request->getKey(),
-            'kind' => $request->kind,
-            'requested_by' => $requester instanceof User ? $this->presenter->name($requester) : 'A member',
-            'name' => $request->employee !== null ? trim((string) ($request->employee->display_name ?: $request->employee->name)) : null,
-            'rank' => $request->employee?->rank,
-            'duration' => $request->duration,
-            'shift' => $request->shift_letter,
-            'ends_at' => $this->presenter->iso($request->ends_at),
-            'requested_at' => $this->presenter->iso($request->created_at),
-            'own' => (int) $request->requested_by_user_id === (int) $viewer->getKey(),
-        ];
+        // Same engine and presenter as the 300 page (Captain5ActingService::state), Captain 5 role.
+        return app(Captain5ActingService::class)->state($viewer, Captain5ActingRequest::ROLE_CAPTAIN_5);
     }
 }

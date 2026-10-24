@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
+use App\Models\Captain5\Captain5ActingRequest;
 use App\Models\User;
 use App\Services\Captain5\Captain5ActingService;
 use App\Services\Captain5\Captain5HandoffService;
@@ -191,15 +192,16 @@ final class Captain5Controller extends Controller
     /** "Acting as Captain 5 today?" (display only; an administrator approves). */
     public function requestActing(Request $request, Captain5ActingService $acting): JsonResponse
     {
-        $acting->request($this->user($request), $request->only(['kind', 'duration', 'ends_at', 'client_request_id']));
+        $acting->request($this->user($request), ['role' => Captain5ActingRequest::ROLE_CAPTAIN_5] + $request->only(['kind', 'duration', 'ends_at', 'client_request_id']));
 
         return $this->json($this->actingState($this->user($request)), 201);
     }
 
+    // These routes decide Captain 5 requests only; a 300 request id answers 404 here.
     public function approveActing(Request $request, Captain5ActingService $acting, int $actingRequest): JsonResponse
     {
         $valid = $request->validate(['note' => ['nullable', 'string', 'max:500']]);
-        $acting->approve($this->user($request), $actingRequest, $valid['note'] ?? null);
+        $acting->approve($this->user($request), $actingRequest, $valid['note'] ?? null, Captain5ActingRequest::ROLE_CAPTAIN_5);
 
         return $this->json($this->actingState($this->user($request)));
     }
@@ -207,14 +209,14 @@ final class Captain5Controller extends Controller
     public function rejectActing(Request $request, Captain5ActingService $acting, int $actingRequest): JsonResponse
     {
         $valid = $request->validate(['note' => ['required', 'string', 'max:500']]);
-        $acting->reject($this->user($request), $actingRequest, $valid['note']);
+        $acting->reject($this->user($request), $actingRequest, $valid['note'], Captain5ActingRequest::ROLE_CAPTAIN_5);
 
         return $this->json($this->actingState($this->user($request)));
     }
 
     public function withdrawActing(Request $request, Captain5ActingService $acting, int $actingRequest): JsonResponse
     {
-        $acting->withdraw($this->user($request), $actingRequest);
+        $acting->withdraw($this->user($request), $actingRequest, Captain5ActingRequest::ROLE_CAPTAIN_5);
 
         return $this->json($this->actingState($this->user($request)));
     }

@@ -216,7 +216,7 @@ final class Captain5ActingRequestsSectionTest extends TestCase
         $this->forgetCaptain5Memo();
         $onDuty = app(Captain5DutyRoster::class)->onDuty();
         self::assertSame((int) $second->employee_profile_id, (int) $onDuty->employee?->getKey());
-        self::assertSame(1, Captain5ActingRequest::query()->showingAt(now())->count(), 'Only one acting display at a time');
+        self::assertSame(1, Captain5ActingRequest::query()->showingAt(now(), Captain5ActingRequest::ROLE_CAPTAIN_5)->count(), 'Only one acting display at a time');
 
         $page->assertSee('Second Acting Sam')->assertSee('Ended early');
     }

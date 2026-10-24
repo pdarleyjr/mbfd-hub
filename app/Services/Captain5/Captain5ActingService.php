@@ -8,9 +8,11 @@ use App\Models\Captain5\Captain5ActingRequest;
 use App\Models\Employee;
 use App\Models\User;
 use App\Services\Security\Captain5Access;
+use App\Services\Security\Command300Access;
 use App\Support\Captain5\DutyCalendar;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -18,13 +20,18 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 /**
- * "Acting as Captain 5 today?" (docs/captain5-ems-operations-center.md section 11).
+ * "Acting as Captain 5 today?" and "Acting as 300 today?" (docs/captain5-ems-operations-center.md
+ * sections 11 and 12): one engine for both shift roles.
  *
- * A member who can use the Captain 5 page asks to be shown as the shift's acting Captain 5 for
- * 12 hours, 24 hours or until a custom time, or asks to end the current acting display. A Captain 5
- * administrator approves or rejects. Approval only changes the name shown at the top of the page
- * (and who the shift's Captain 5 notifications go to); it never grants or limits any action, and the
- * display ends on its own at the chosen time.
+ * A member asks to be shown as the shift's acting Captain 5 or acting 300 for 12 hours, 24 hours or
+ * until a custom time, or asks to end that role's current acting display. A Captain 5 administrator
+ * approves or rejects. Approval only changes the name shown for that role (and, for Captain 5, who
+ * the shift's Captain 5 notifications go to); it never grants or limits any action, and the display
+ * ends on its own at the chosen time. The two roles never affect each other.
+ *
+ * Who may ask: Captain 5 = anyone who can use the Captain 5 page (Captain5Access); 300 = anyone
+ * Command300Access allows (Captains, Division Chiefs, the 300 seat, administrators and explicit 300
+ * grants). Who approves (both roles): Captain 5 administrators (Captain5Access::canConfigure).
  */
 final class Captain5ActingService
 {
@@ -35,19 +42,38 @@ final class Captain5ActingService
 
     public function __construct(
         private readonly Captain5Access $access,
+        private readonly Command300Access $command300,
         private readonly DutyCalendar $calendar,
         private readonly Captain5Notifier $notifier,
+        private readonly Captain5IssuePresenter $presenter,
     ) {}
 
+    /** May this member ask to be shown as acting in this role? */
+    public function canRequest(?User $user, string $role): bool
+    {
+        return match ($role) {
+            Captain5ActingRequest::ROLE_CAPTAIN_5 => $this->access->decide($user)->canViewData,
+            Captain5ActingRequest::ROLE_COMMAND_300 => $this->command300->allows($user),
+            default => false,
+        };
+    }
+
     /**
-     * @param  array{kind?: mixed, duration?: mixed, ends_at?: mixed, client_request_id?: mixed}  $data
+     * @param  array{role?: mixed, kind?: mixed, duration?: mixed, ends_at?: mixed, client_request_id?: mixed}  $data
      *
      * @throws AuthorizationException|ValidationException
      */
     public function request(User $requester, array $data): Captain5ActingRequest
     {
-        if (! $this->access->decide($requester)->canViewData) {
-            throw new AuthorizationException('Only members who can use the Captain 5 page can ask to act as Captain 5.');
+        $role = (string) ($data['role'] ?? Captain5ActingRequest::ROLE_CAPTAIN_5);
+        if (! in_array($role, Captain5ActingRequest::ROLES, true)) {
+            throw ValidationException::withMessages(['role' => 'Choose Captain 5 or 300.']);
+        }
+        $label = Captain5ActingRequest::roleLabel($role);
+        if (! $this->canRequest($requester, $role)) {
+            throw new AuthorizationException($role === Captain5ActingRequest::ROLE_COMMAND_300
+                ? 'Only members who can use the 300 page can ask to act as 300.'
+                : 'Only members who can use the Captain 5 page can ask to act as Captain 5.');
         }
         $valid = Validator::make($data, [
             'kind' => ['required', Rule::in([Captain5ActingRequest::KIND_ACT, Captain5ActingRequest::KIND_END])],
@@ -64,24 +90,25 @@ final class Captain5ActingService
         $now = CarbonImmutable::now();
         $attributes = [
             'kind' => $valid['kind'],
+            'role' => $role,
             'requested_by_user_id' => $requester->getKey(),
             'shift_letter' => $this->calendar->shiftFor($this->calendar->dutyDate($now)),
             'status' => Captain5ActingRequest::PENDING,
             'client_request_id' => $valid['client_request_id'] ?? null,
         ];
         if ($valid['kind'] === Captain5ActingRequest::KIND_ACT) {
-            $employee = $this->employeeOf($requester);
+            $employee = $this->employeeOf($requester, $label);
             $attributes['employee_profile_id'] = $employee->getKey();
             $attributes['duration'] = $valid['duration'];
             $attributes['ends_at'] = $this->endsAt((string) $valid['duration'], $valid['ends_at'] ?? null, $now);
-        } elseif (Captain5ActingRequest::query()->showingAt($now)->doesntExist()) {
-            throw ValidationException::withMessages(['kind' => 'No acting Captain 5 is shown right now, so there is nothing to end.']);
+        } elseif (Captain5ActingRequest::query()->showingAt($now, $role)->doesntExist()) {
+            throw ValidationException::withMessages(['kind' => "No acting {$label} is shown right now, so there is nothing to end."]);
         }
 
         try {
-            $request = DB::transaction(function () use ($requester, $attributes): Captain5ActingRequest {
-                // One open request per member: a new one replaces their earlier pending request.
-                Captain5ActingRequest::query()->pending()->where('requested_by_user_id', $requester->getKey())
+            $request = DB::transaction(function () use ($requester, $attributes, $role): Captain5ActingRequest {
+                // One open request per member and role: a new one replaces their earlier pending request.
+                Captain5ActingRequest::query()->pending()->forRole($role)->where('requested_by_user_id', $requester->getKey())
                     ->lockForUpdate()->get()
                     ->each(fn (Captain5ActingRequest $old) => $old->forceFill(['status' => Captain5ActingRequest::WITHDRAWN, 'decided_at' => now()])->save());
 
@@ -96,16 +123,21 @@ final class Captain5ActingService
         return $request;
     }
 
-    /** @throws AuthorizationException|ValidationException */
-    public function approve(User $admin, int $requestId, ?string $note = null): Captain5ActingRequest
+    /**
+     * @param  string|null  $role  when given (from the page's route), the request must be of this role
+     *
+     * @throws AuthorizationException|ValidationException
+     */
+    public function approve(User $admin, int $requestId, ?string $note = null, ?string $role = null): Captain5ActingRequest
     {
         $this->authorizeApprover($admin);
 
-        $request = DB::transaction(function () use ($admin, $requestId, $note): Captain5ActingRequest {
-            $request = Captain5ActingRequest::query()->lockForUpdate()->findOrFail($requestId);
+        $request = DB::transaction(function () use ($admin, $requestId, $note, $role): Captain5ActingRequest {
+            $request = $this->locked($requestId, $role);
             $this->assertDecidable($admin, $request);
+            $label = Captain5ActingRequest::roleLabel($request->role);
             $now = CarbonImmutable::now();
-            $showing = Captain5ActingRequest::query()->showingAt($now)->lockForUpdate()->get();
+            $showing = Captain5ActingRequest::query()->showingAt($now, $request->role)->lockForUpdate()->get();
 
             if ($request->kind === Captain5ActingRequest::KIND_ACT) {
                 if ($request->ends_at === null || $request->ends_at->lessThanOrEqualTo($now)) {
@@ -113,10 +145,10 @@ final class Captain5ActingService
                 }
                 $request->forceFill(['starts_at' => $now]);
             } elseif ($showing->isEmpty()) {
-                throw ValidationException::withMessages(['request' => 'No acting Captain 5 is shown any more, so there is nothing to end.']);
+                throw ValidationException::withMessages(['request' => "No acting {$label} is shown any more, so there is nothing to end."]);
             }
 
-            // Approving takes over (act) or removes (end) whoever is shown now.
+            // Approving takes over (act) or removes (end) whoever is shown now in the same role.
             $showing->reject(fn (Captain5ActingRequest $current): bool => $current->is($request))
                 ->each(fn (Captain5ActingRequest $current) => $current->forceFill(['ended_at' => $now, 'ended_by_request_id' => $request->getKey()])->save());
 
@@ -137,13 +169,13 @@ final class Captain5ActingService
     }
 
     /** @throws AuthorizationException|ValidationException */
-    public function reject(User $admin, int $requestId, string $note): Captain5ActingRequest
+    public function reject(User $admin, int $requestId, string $note, ?string $role = null): Captain5ActingRequest
     {
         $this->authorizeApprover($admin);
         $note = $this->note($note) ?? throw ValidationException::withMessages(['note' => 'Say why the request is not approved.']);
 
-        $request = DB::transaction(function () use ($admin, $requestId, $note): Captain5ActingRequest {
-            $request = Captain5ActingRequest::query()->lockForUpdate()->findOrFail($requestId);
+        $request = DB::transaction(function () use ($admin, $requestId, $note, $role): Captain5ActingRequest {
+            $request = $this->locked($requestId, $role);
             $this->assertDecidable($admin, $request);
             $request->forceFill([
                 'status' => Captain5ActingRequest::REJECTED,
@@ -161,10 +193,10 @@ final class Captain5ActingService
     }
 
     /** The requester takes back a request that is still pending. */
-    public function withdraw(User $requester, int $requestId): Captain5ActingRequest
+    public function withdraw(User $requester, int $requestId, ?string $role = null): Captain5ActingRequest
     {
-        return DB::transaction(function () use ($requester, $requestId): Captain5ActingRequest {
-            $request = Captain5ActingRequest::query()->lockForUpdate()->findOrFail($requestId);
+        return DB::transaction(function () use ($requester, $requestId, $role): Captain5ActingRequest {
+            $request = $this->locked($requestId, $role);
             if ((int) $request->requested_by_user_id !== (int) $requester->getKey()) {
                 throw new AuthorizationException('Only the person who asked can withdraw this request.');
             }
@@ -174,6 +206,66 @@ final class Captain5ActingService
 
             return $request;
         }, 3);
+    }
+
+    /**
+     * The acting block a page shows for one role: the viewer's own pending request, the pending queue
+     * (approvers only) and the end times the 12 / 24 hour choices would have now.
+     *
+     * @return array{role: string, can_request: bool, can_approve: bool, mine: array<string, mixed>|null, pending: list<array<string, mixed>>, choices: array{'12h': string|null, '24h': string|null}}
+     */
+    public function state(User $viewer, string $role): array
+    {
+        $pending = Captain5ActingRequest::query()->pending()->forRole($role)
+            ->with(['requester:id,name,display_name', 'employee:id,name,display_name,rank'])
+            ->orderBy('id')->limit(50)->get();
+        $canApprove = $this->access->canConfigure($viewer);
+        $mine = $pending->first(fn (Captain5ActingRequest $r): bool => (int) $r->requested_by_user_id === (int) $viewer->getKey());
+
+        return [
+            'role' => $role,
+            'can_request' => $this->canRequest($viewer, $role),
+            'can_approve' => $canApprove,
+            'mine' => $mine instanceof Captain5ActingRequest ? $this->present($mine, $viewer) : null,
+            'pending' => $canApprove ? $pending->map(fn (Captain5ActingRequest $r): array => $this->present($r, $viewer))->values()->all() : [],
+            'choices' => [
+                '12h' => $this->presenter->iso($this->calendar->actingEnd('12h')),
+                '24h' => $this->presenter->iso($this->calendar->actingEnd('24h')),
+            ],
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function present(Captain5ActingRequest $request, User $viewer): array
+    {
+        $requester = $request->requester;
+
+        return [
+            'id' => (int) $request->getKey(),
+            'role' => $request->role,
+            'role_label' => Captain5ActingRequest::roleLabel($request->role),
+            'kind' => $request->kind,
+            'requested_by' => $requester instanceof User ? $this->presenter->name($requester) : 'A member',
+            'name' => $request->employee !== null ? trim((string) ($request->employee->display_name ?: $request->employee->name)) : null,
+            'rank' => $request->employee?->rank,
+            'duration' => $request->duration,
+            'shift' => $request->shift_letter,
+            'ends_at' => $this->presenter->iso($request->ends_at),
+            'requested_at' => $this->presenter->iso($request->created_at),
+            'own' => (int) $request->requested_by_user_id === (int) $viewer->getKey(),
+        ];
+    }
+
+    /** Lock one request; a role from the page's route must match, so one page never decides the other's requests. */
+    private function locked(int $requestId, ?string $role): Captain5ActingRequest
+    {
+        $query = Captain5ActingRequest::query()->lockForUpdate();
+        if ($role !== null) {
+            $query->forRole($role);
+        }
+        $request = $query->find($requestId);
+
+        return $request instanceof Captain5ActingRequest ? $request : throw (new ModelNotFoundException)->setModel(Captain5ActingRequest::class, [$requestId]);
     }
 
     private function endsAt(string $duration, mixed $customEndsAt, CarbonImmutable $now): CarbonImmutable
@@ -189,11 +281,11 @@ final class Captain5ActingService
         return $ends;
     }
 
-    private function employeeOf(User $user): Employee
+    private function employeeOf(User $user, string $label): Employee
     {
         $employee = $user->employee_profile_id !== null ? Employee::query()->find($user->employee_profile_id) : null;
         if (! $employee instanceof Employee || $employee->roster_status === 'departed') {
-            throw ValidationException::withMessages(['kind' => 'Your account is not linked to a current personnel profile, so your name cannot be shown as Captain 5.']);
+            throw ValidationException::withMessages(['kind' => "Your account is not linked to a current personnel profile, so your name cannot be shown as {$label}."]);
         }
 
         return $employee;
@@ -202,7 +294,7 @@ final class Captain5ActingService
     private function authorizeApprover(User $admin): void
     {
         if (! $this->access->canConfigure($admin)) {
-            throw new AuthorizationException('Only Captain 5 administrators approve acting Captain 5 requests.');
+            throw new AuthorizationException('Only Captain 5 administrators approve acting requests.');
         }
     }
 
