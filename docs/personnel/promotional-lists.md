@@ -62,9 +62,9 @@ php artisan personnel:import-promotional-list {csv} --type= --title= --effective
   permission (`personnel.directory.view`, `admin.personnel.view`, `admin.members.view`, or the legacy
   personnel managers). The uniform and PPE manager set is not a personnel manager and sees nothing.
 * **Changing** anything needs the direct capability **`personnel.promotions.manage`** (or `super_admin`),
-  on top of directory view. The migration grants it once to accounts that already hold direct
-  `personnel.directory.edit` or `admin.personnel.manage` (uniform-manager-only accounts excluded).
-  It is also grantable per member in the access administration screen ("Promotional lists - manage").
+  on top of directory view. The migration only creates the permission: an administrator grants it
+  per member in the access administration screen ("Promotional lists - manage"). Migrations never
+  grant access, because the production deploy gate refuses permission changes on existing accounts.
 * **Exporting** (Excel, PDF) needs directory export rights (`personnel.directory.export`, or manage, or
   the legacy personnel managers).
 * Every service method re-reads the account and re-checks, so hidden buttons, stale sessions or forged
