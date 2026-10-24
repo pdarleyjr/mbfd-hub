@@ -1,5 +1,6 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 import type { CommandPost } from '../../resources/js/daily-checkout/src/components/command-communications/types';
+import { SHIFT_BASE, handleShiftRoute, newShiftServer, type ShiftServer } from './support/command300-shift';
 
 /**
  * 300 Command communications, with every API response mocked. The server contract is
@@ -40,11 +41,13 @@ interface ServerState {
   parents: Array<string | null>;
   pinBodies: unknown[];
   readCalls: number;
+  /** /api/command-300 (who is the shift's 300, and acting requests): covered in command-300-shift.spec.ts. */
+  shift: ShiftServer;
   onCreate?: (route: Route) => Promise<boolean>;
 }
 
 function newServer(overrides: Partial<ServerState> = {}): ServerState {
-  return { posts: [], unread: 0, capability: true, overviewStatus: 200, postsStatus: 200, created: 0, requests: [], submissions: [], parents: [], pinBodies: [], readCalls: 0, ...overrides };
+  return { posts: [], unread: 0, capability: true, overviewStatus: 200, postsStatus: 200, created: 0, requests: [], submissions: [], parents: [], pinBodies: [], readCalls: 0, shift: newShiftServer(), ...overrides };
 }
 
 const stations = [1, 2].map((number) => ({
@@ -124,6 +127,7 @@ async function mockApi(page: Page, server: ServerState): Promise<void> {
       return route.fulfill({ json: pageOf(server, url.searchParams.get('before'), Number(url.searchParams.get('limit') ?? 20)) });
     }
     if (pathname === `${BASE}/posts` && method === 'POST') return handleCreate(route, server);
+    if (pathname.startsWith(SHIFT_BASE)) return handleShiftRoute(route, pathname, server.shift);
     if (pathname === `${BASE}/summary`) return route.fulfill({ json: { unread_count: server.unread, latest_activity_at: null } });
     if (pathname === `${BASE}/read`) {
       server.readCalls += 1;
@@ -416,12 +420,28 @@ test('accounts without 300 Command access see no card and an explanatory page, a
   await page.getByRole('link', { name: 'Back to stations' }).click();
   await expect(page).toHaveURL(/\/daily\/stations$/);
   expect(server.requests.filter((request) => request.includes(BASE))).toEqual([]);
+  // A refused account never asks who the shift's 300 is.
+  expect(server.requests.filter((request) => request.includes(SHIFT_BASE))).toEqual([]);
 });
 
-test('eligible accounts see the card with an unread count', async ({ page }) => {
+test('eligible accounts see the card with an unread count and the shift 300', async ({ page }) => {
   await open(page, newServer({ unread: 2 }), '/daily/stations');
   await expect(page.getByTestId('daily-command-card')).toBeVisible();
   await expect(page.getByTestId('daily-command-unread')).toContainText('2 unread messages');
+  await expect(page.getByTestId('daily-command-duty')).toHaveText('A Shift 300: Division Chief Jane Smith');
+  await expect(page.getByTestId('daily-command-card')).not.toContainText('Click here');
+});
+
+test('the 300 page leads with the shift 300 and the acting control, and still works while that line fails to load', async ({ page }) => {
+  const server = newServer({ shift: newShiftServer({ status: 503 }) });
+  await open(page, server);
+  await expect(page.getByTestId('command-duty-error')).toContainText('The shift 300 could not be loaded.');
+  await expect(page.getByTestId('command-comms')).toBeVisible();
+  server.shift.status = 200;
+  await page.getByTestId('command-duty-error').getByRole('button', { name: 'Try again' }).click();
+  await expect(page.getByTestId('command-duty-line')).toHaveText('A Shift 300: Division Chief Jane Smith');
+  await expect(page.getByTestId('command-acting-open')).toHaveText('Acting as 300 today? Click here.');
+  await expectNoHorizontalOverflow(page);
 });
 
 test('a 403 from the station overview closes the page even when the capability said yes', async ({ page }) => {

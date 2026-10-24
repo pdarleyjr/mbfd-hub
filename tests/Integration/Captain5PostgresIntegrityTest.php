@@ -58,6 +58,7 @@ final class Captain5PostgresIntegrityTest extends TestCase
 
         try {
             $active = Captain5ActingRequest::query()->create($row($first, $key));
+            $this->assertSame(Captain5ActingRequest::ROLE_CAPTAIN_5, $active->fresh()->role, 'Rows written without a role stay Captain 5 requests');
             try {
                 DB::transaction(fn () => Captain5ActingRequest::query()->create($row($second, $key)));
                 $this->fail('A retried acting request must violate the client_request_id unique index.');

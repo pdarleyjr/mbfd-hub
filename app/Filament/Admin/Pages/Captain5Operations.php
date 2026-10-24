@@ -33,7 +33,7 @@ use Livewire\Attributes\Locked;
 
 /**
  * Administrator surface for the Captain 5 EMS Operations Center: who can use it, access
- * overrides (automatic, allow, deny), acting Captain 5 requests, and the medical scope review.
+ * overrides (automatic, allow, deny), acting Captain 5 and 300 requests, and the medical scope review.
  *
  * Every decision is made by Captain5Access / Captain5AdministrationService /
  * Captain5ActingService, which authorize again and write the history and audit rows. This
@@ -73,11 +73,20 @@ final class Captain5Operations extends Page
     /** @var array<string, mixed>|null per-request memo of the medical scope review */
     private ?array $reviewMemo = null;
 
+    /** Per-request memo of canAccess() for the many row actions (never persisted between requests). */
+    private ?bool $configureMemo = null;
+
     public static function canAccess(): bool
     {
         $user = auth()->user();
 
         return $user instanceof User && app(Captain5Access::class)->canConfigure($user);
+    }
+
+    /** canAccess() once per request, so each row's action does not repeat the permission queries. */
+    private function canConfigureThisRequest(): bool
+    {
+        return $this->configureMemo ??= self::canAccess();
     }
 
     public function mount(): void
@@ -128,17 +137,22 @@ final class Captain5Operations extends Page
             ->label('Approve')
             ->color('success')
             ->size('sm')
-            ->authorize(fn (): bool => self::canAccess())
+            ->authorize(fn (): bool => $this->canConfigureThisRequest())
             ->modalHeading(fn (array $arguments): string => 'Approve '.($this->actingRequestSummary($arguments) ?? 'this request').'?')
-            ->modalDescription('Only the Captain 5 name shown for the shift changes. Nobody gains or loses access to the Captain 5 page. If someone else is shown now, this replaces them.')
+            ->modalDescription(function (array $arguments): string {
+                $label = $this->actingRequestRoleLabel($arguments);
+
+                return "Only the {$label} name shown for the shift changes. Nobody gains or loses access. If someone else is shown as {$label} now, this replaces them.";
+            })
             ->modalSubmitActionLabel('Approve')
             ->form([
                 Textarea::make('note')->label('Note (optional)')->maxLength(500)->rows(2),
             ])
             ->action(function (array $data, array $arguments, Action $action): void {
+                // Role null: either role may be decided here. The service reads the role from the request row.
                 $this->decideActing($action, $arguments, ['note'], function (User $actor, int $requestId) use ($data): void {
-                    app(Captain5ActingService::class)->approve($actor, $requestId, (string) ($data['note'] ?? ''));
-                }, 'Request approved', 'The Captain 5 name shown for the shift is updated.');
+                    app(Captain5ActingService::class)->approve($actor, $requestId, (string) ($data['note'] ?? ''), null);
+                }, 'Acting {role} request approved', 'The {role} name shown for the shift is updated.');
             });
     }
 
@@ -149,7 +163,7 @@ final class Captain5Operations extends Page
             ->color('danger')
             ->outlined()
             ->size('sm')
-            ->authorize(fn (): bool => self::canAccess())
+            ->authorize(fn (): bool => $this->canConfigureThisRequest())
             ->modalHeading(fn (array $arguments): string => 'Not approve '.($this->actingRequestSummary($arguments) ?? 'this request').'?')
             ->modalDescription('The member is told it was not approved and sees your note. The request stays in the record.')
             ->modalSubmitActionLabel('Not approved')
@@ -158,8 +172,8 @@ final class Captain5Operations extends Page
             ])
             ->action(function (array $data, array $arguments, Action $action): void {
                 $this->decideActing($action, $arguments, ['note'], function (User $actor, int $requestId) use ($data): void {
-                    app(Captain5ActingService::class)->reject($actor, $requestId, (string) ($data['note'] ?? ''));
-                }, 'Request not approved', 'The member is told, with your note.');
+                    app(Captain5ActingService::class)->reject($actor, $requestId, (string) ($data['note'] ?? ''), null);
+                }, 'Acting {role} request not approved', 'The member is told, with your note.');
             });
     }
 
@@ -197,7 +211,7 @@ final class Captain5Operations extends Page
         return Action::make($name)
             ->label($label)
             ->icon($name === 'setAccess' ? 'heroicon-o-shield-check' : null)
-            ->authorize(fn (): bool => self::canAccess())
+            ->authorize(fn (): bool => $this->canConfigureThisRequest())
             ->modalHeading('Set Captain 5 access')
             ->modalDescription('Automatic follows rank, seat and administrator access. Allow and Deny override that for one member. The change is recorded with your reason.')
             ->modalSubmitActionLabel('Save access')
@@ -235,7 +249,7 @@ final class Captain5Operations extends Page
     {
         return Action::make($name)
             ->label($label)
-            ->authorize(fn (): bool => self::canAccess())
+            ->authorize(fn (): bool => $this->canConfigureThisRequest())
             ->modalHeading(fn (array $arguments): string => 'Classify '.($this->reviewItem($arguments)['item_name'] ?? 'checklist item'))
             ->modalDescription(fn (array $arguments): string => ($this->reviewItem($arguments)['checklist_label'] ?? '')
                 .' checklist. Medical items are handled by Captain 5; everything else stays with Fleet. Captain 5 sees nothing from this item until you decide.')
@@ -433,14 +447,14 @@ final class Captain5Operations extends Page
     }
 
     /**
-     * Who is shown as the shift's Captain 5 now, the requests waiting for a decision, and the
-     * last decided ones. Display information only: none of it changes who can use the page.
+     * Who is shown as the shift's Captain 5 and 300 now, the requests of both roles waiting for a
+     * decision (one list), and the last decided ones (one list). Display information only: none of
+     * it changes who can use the page.
      *
-     * @return array{shown: array<string, mixed>, pending: list<array<string, mixed>>, decided: list<array<string, mixed>>}
+     * @return array{shown: list<array<string, mixed>>, pending: list<array<string, mixed>>, decided: list<array<string, mixed>>}
      */
     private function actingData(string $timezone): array
     {
-        $onDuty = app(Captain5DutyRoster::class)->onDuty();
         $actor = auth()->user();
         $isSuperAdmin = $actor instanceof User && $actor->hasRole('super_admin');
 
@@ -464,21 +478,40 @@ final class Captain5Operations extends Page
                 'note' => (string) $row->decision_note,
             ])->values()->all();
 
+        $roster = app(Captain5DutyRoster::class);
+
         return [
             'shown' => [
-                'date' => $onDuty->dutyDate->format('l, M j'),
-                'shift' => $onDuty->shiftLetter,
-                'name' => $onDuty->employee !== null ? $this->memberName($onDuty->employee) : null,
-                'rank' => (string) ($onDuty->employee->rank ?? ''),
-                'source' => match ($onDuty->source) {
-                    OnDutyCaptain5::SOURCE_ACTING => 'Acting Captain 5 (approved request)',
-                    OnDutyCaptain5::SOURCE_BID => 'Captain 5 bid seat',
-                    default => null,
-                },
-                'until' => $onDuty->source === OnDutyCaptain5::SOURCE_ACTING ? $this->format($onDuty->actingRequest?->ends_at, $timezone) : null,
+                $this->shownBlock(Captain5ActingRequest::ROLE_CAPTAIN_5, $roster->onDuty(), $timezone),
+                $this->shownBlock(Captain5ActingRequest::ROLE_COMMAND_300, $roster->command300OnDuty(), $timezone),
             ],
             'pending' => $pending,
             'decided' => $decided,
+        ];
+    }
+
+    /**
+     * One "Shown now" block for a shift role.
+     *
+     * @return array<string, mixed>
+     */
+    private function shownBlock(string $role, OnDutyCaptain5 $onDuty, string $timezone): array
+    {
+        $label = Captain5ActingRequest::roleLabel($role);
+
+        return [
+            'role' => $role,
+            'label' => $label,
+            'date' => $onDuty->dutyDate->format('l, M j'),
+            'shift' => $onDuty->shiftLetter,
+            'name' => $onDuty->employee !== null ? $this->memberName($onDuty->employee) : null,
+            'rank' => (string) ($onDuty->employee->rank ?? ''),
+            'source' => match ($onDuty->source) {
+                OnDutyCaptain5::SOURCE_ACTING => "Acting {$label} (approved request)",
+                OnDutyCaptain5::SOURCE_BID => "{$label} bid seat",
+                default => 'Not set',
+            },
+            'until' => $onDuty->source === OnDutyCaptain5::SOURCE_ACTING ? $this->format($onDuty->actingRequest?->ends_at, $timezone) : null,
         ];
     }
 
@@ -490,7 +523,8 @@ final class Captain5Operations extends Page
         return [
             'id' => (int) $row->getKey(),
             'kind' => $row->kind,
-            'kind_label' => $isEnd ? 'End the acting display' : 'Be shown as acting Captain 5',
+            'role' => $row->role,
+            'role_label' => Captain5ActingRequest::roleLabel((string) $row->role),
             'requester' => (string) ($row->requester->name ?? 'A former member'),
             'member' => $isEnd ? null : $this->memberName($row->employee),
             'rank' => $isEnd ? '' : (string) ($row->employee->rank ?? ''),
@@ -547,11 +581,16 @@ final class Captain5Operations extends Page
             return;
         }
 
-        $this->perform($action, $fields, fn (User $user) => $work($user, $requestId), $successTitle, $successBody);
+        $label = Captain5ActingRequest::roleLabel((string) $request->role);
+        $this->perform(
+            $action, $fields, fn (User $user) => $work($user, $requestId),
+            str_replace('{role}', $label, $successTitle), str_replace('{role}', $label, $successBody),
+        );
     }
 
     /**
-     * "Name's request to ..." for the decision modals; null when the request is not found.
+     * What the decision modals name: "acting 300 for Name" or "ending the acting 300 display";
+     * null when the request is not found.
      *
      * @param  array<string, mixed>  $arguments
      */
@@ -561,10 +600,19 @@ final class Captain5Operations extends Page
         if (! $request instanceof Captain5ActingRequest) {
             return null;
         }
+        $label = Captain5ActingRequest::roleLabel((string) $request->role);
 
         return $request->kind === Captain5ActingRequest::KIND_END
-            ? ($request->requester->name ?? 'a member')."'s request to end the acting display"
-            : $this->memberName($request->employee)."'s request to act as Captain 5";
+            ? "ending the acting {$label} display (asked by ".($request->requester->name ?? 'a member').')'
+            : "acting {$label} for ".$this->memberName($request->employee);
+    }
+
+    /** Role name for the modal copy; reads only the role column. @param  array<string, mixed>  $arguments */
+    private function actingRequestRoleLabel(array $arguments): string
+    {
+        $role = Captain5ActingRequest::query()->whereKey((int) ($arguments['request'] ?? 0))->value('role');
+
+        return Captain5ActingRequest::roleLabel((string) $role);
     }
 
     /**

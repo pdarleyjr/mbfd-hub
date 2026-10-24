@@ -12,12 +12,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
 
 /**
- * A request to be shown as the shift's acting Captain 5 (`act`) or to end the current acting
- * display (`end`), decided by an administrator. Display only: it never grants or limits access.
- * Rows are never deleted; once decided, only `ended_at` / `ended_by_request_id` may change.
+ * A request to be shown as the shift's acting Captain 5 or acting 300 (`role`), as `act`, or to end
+ * that role's current acting display (`end`), decided by an administrator. Display only: it never
+ * grants or limits access. Rows are never deleted; once decided, only `ended_at` /
+ * `ended_by_request_id` may change. Each role has its own display: approving a 300 request never
+ * touches the Captain 5 display and the other way round.
  *
  * @property int $id
  * @property string $kind
+ * @property string $role
  * @property int|null $employee_profile_id
  * @property int $requested_by_user_id
  * @property string|null $duration
@@ -49,6 +52,15 @@ final class Captain5ActingRequest extends Model
 
     public const DURATIONS = ['12h', '24h', 'custom'];
 
+    public const ROLE_CAPTAIN_5 = 'captain_5';
+
+    public const ROLE_COMMAND_300 = 'command_300';
+
+    public const ROLES = [self::ROLE_CAPTAIN_5, self::ROLE_COMMAND_300];
+
+    /** How each role is named to members ("acting Captain 5", "acting 300"). */
+    public const ROLE_LABELS = [self::ROLE_CAPTAIN_5 => 'Captain 5', self::ROLE_COMMAND_300 => '300'];
+
     protected $table = 'captain5_acting_requests';
 
     protected $guarded = ['id'];
@@ -69,22 +81,36 @@ final class Captain5ActingRequest extends Model
         self::updating(static function (self $request): void {
             if ($request->getOriginal('status') !== self::PENDING
                 && array_diff(array_keys($request->getDirty()), self::AFTER_DECISION) !== []) {
-                throw new LogicException('A decided acting Captain 5 request is history.');
+                throw new LogicException('A decided acting request is history.');
             }
         });
-        self::deleting(static fn (): never => throw new LogicException('Acting Captain 5 requests are never deleted.'));
+        self::deleting(static fn (): never => throw new LogicException('Acting requests are never deleted.'));
+    }
+
+    public static function roleLabel(string $role): string
+    {
+        return self::ROLE_LABELS[$role] ?? self::ROLE_LABELS[self::ROLE_CAPTAIN_5];
     }
 
     /**
-     * Approved acting display covering the moment.
+     * Approved acting display of one role covering the moment.
      *
      * @param  Builder<self>  $query
      * @return Builder<self>
      */
-    public function scopeShowingAt(Builder $query, \DateTimeInterface $moment): Builder
+    public function scopeShowingAt(Builder $query, \DateTimeInterface $moment, string $role): Builder
     {
-        return $query->where('kind', self::KIND_ACT)->where('status', self::APPROVED)->whereNull('ended_at')
+        return $query->where('role', $role)->where('kind', self::KIND_ACT)->where('status', self::APPROVED)->whereNull('ended_at')
             ->where('starts_at', '<=', $moment)->where('ends_at', '>', $moment);
+    }
+
+    /**
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
+    public function scopeForRole(Builder $query, string $role): Builder
+    {
+        return $query->where('role', $role);
     }
 
     /**

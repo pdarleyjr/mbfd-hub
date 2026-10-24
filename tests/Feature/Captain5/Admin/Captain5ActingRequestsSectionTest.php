@@ -71,6 +71,22 @@ final class Captain5ActingRequestsSectionTest extends TestCase
             ->assertDontSee('No requests are waiting.');
     }
 
+    public function test_the_section_covers_both_roles_and_labels_a_captain_5_request_with_its_role(): void
+    {
+        $member = $this->officer('Captain', 'Labelled Lee');
+        $this->requestActing($member, '12h');
+        $this->actAs($this->captain5Administrator());
+
+        Livewire::test(Captain5Operations::class)
+            ->assertSee('Acting Captain 5 and 300 requests')
+            ->assertSee('Shown as Captain 5 now')->assertSee('Shown as 300 now')
+            ->assertSee('No one is shown as 300 right now')
+            ->assertSeeHtml('data-role="captain_5"')->assertDontSeeHtml('data-role="command_300"')
+            ->assertSee('Labelled Lee')->assertSee('asks to be shown as acting Captain 5')
+            ->mountAction('approveActing', ['request' => Captain5ActingRequest::query()->value('id')])
+            ->assertSee('Approve acting Captain 5 for Labelled Lee?');
+    }
+
     public function test_approve_with_an_optional_note_shows_the_member_without_changing_anyones_access(): void
     {
         $holder = $this->officer('Captain', 'Bid Holder Bo');
@@ -216,7 +232,7 @@ final class Captain5ActingRequestsSectionTest extends TestCase
         $this->forgetCaptain5Memo();
         $onDuty = app(Captain5DutyRoster::class)->onDuty();
         self::assertSame((int) $second->employee_profile_id, (int) $onDuty->employee?->getKey());
-        self::assertSame(1, Captain5ActingRequest::query()->showingAt(now())->count(), 'Only one acting display at a time');
+        self::assertSame(1, Captain5ActingRequest::query()->showingAt(now(), Captain5ActingRequest::ROLE_CAPTAIN_5)->count(), 'Only one acting display at a time');
 
         $page->assertSee('Second Acting Sam')->assertSee('Ended early');
     }
@@ -312,16 +328,16 @@ final class Captain5ActingRequestsSectionTest extends TestCase
         $this->actAs($admin);
         $page = Livewire::test(Captain5Operations::class)->assertSee('Pending Pat');
 
-        // The permission is revoked while the page is open: the next action is refused and writes nothing.
-        $admin->revokePermissionTo(Captain5Access::PERMISSION_ADMIN);
+        // Admin Panel rights are revoked while the page is open: the next action is refused and writes nothing.
+        $admin->revokePermissionTo(Permission::findByName('admin.access', 'web'));
         $this->forgetCaptain5Memo();
         $page->call('mountAction', 'approveActing', ['request' => $request->getKey()])->assertForbidden();
         self::assertSame(Captain5ActingRequest::PENDING, $request->fresh()->status);
 
-        // The service refuses a caller without the permission as well.
+        // The service refuses a caller who is no longer an administrator (any administrator approves).
         try {
             app(Captain5ActingService::class)->approve($admin->fresh(), (int) $request->getKey());
-            self::fail('The service must refuse a caller without Captain 5 administration.');
+            self::fail('The service must refuse a caller without Admin Panel rights.');
         } catch (AuthorizationException) {
             self::assertSame(Captain5ActingRequest::PENDING, $request->fresh()->status);
         }

@@ -1,5 +1,6 @@
 import type { Tone } from '../ui/status';
 import { humanize } from '../ui/status';
+import { dutyLine as roleDutyLine, dutyUnset } from '../acting/format';
 import { NO_ACTION_STATUS } from './actionForms';
 import type { IssueSummary, OnDuty } from './types';
 
@@ -23,28 +24,10 @@ export const statusLabel = (status: string | null | undefined): string => (statu
 
 export const kindLabel = (kind: string): string => (kind === 'medical' ? 'Medical' : 'Rescue');
 
-const MINUTE = 60_000;
-const HOUR = 60 * MINUTE;
-const DAY = 24 * HOUR;
+const DAY = 24 * 60 * 60_000;
 
-/** "5 min ago", "3 h ago", "2 d ago": coarse on purpose, with the exact time in a title/aria-label. */
-export function ageText(iso: string | null | undefined, now = Date.now()): string {
-  if (!iso) return 'Unknown time';
-  const elapsed = now - new Date(iso).getTime();
-  if (!Number.isFinite(elapsed)) return 'Unknown time';
-  if (elapsed < MINUTE) return 'just now';
-  if (elapsed < HOUR) return `${Math.floor(elapsed / MINUTE)} min ago`;
-  if (elapsed < DAY) return `${Math.floor(elapsed / HOUR)} h ago`;
-  return `${Math.floor(elapsed / DAY)} d ago`;
-}
-
-export function dateTimeText(iso: string | null | undefined): string {
-  if (!iso) return 'Unknown time';
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime())
-    ? 'Unknown time'
-    : date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-}
+// Time wording, the idempotency key and the tone of the shift line are shared with the 300 page (../acting/format).
+export { ageText, dateTimeText, dutyTone, newKey } from '../acting/format';
 
 /** A Y-m-d duty or delivery date, shown without any time-zone shift. */
 export function dayText(ymd: string | null | undefined): string {
@@ -65,30 +48,15 @@ export function daysBetween(a: string, b: string): number {
   return Math.round((toUtc(b) - toUtc(a)) / DAY);
 }
 
-export const DUTY_UNSET = 'Shift Captain 5 not set';
+const CAPTAIN_5_DUTY = { label: 'Captain 5', withRank: false } as const;
+
+export const DUTY_UNSET = dutyUnset(CAPTAIN_5_DUTY);
 
 /**
- * The line at the top of the page and on the station-list card: "A Shift Captain 5: Oscar Lima", or
- * "A Shift Acting Captain 5: Oscar Lima until Oct 24, 8:00 AM" for an approved acting member. The name
- * is whatever the server resolved; nothing here knows a person.
+ * Captain 5's shift line: "A Shift Captain 5: Oscar Lima", or "A Shift Acting Captain 5: Oscar Lima until
+ * Oct 24, 8:00 AM". The wording is built in ../acting/format, shared with the 300 page; Captain 5 shows no rank.
  */
-export function dutyLine(onDuty: OnDuty): string {
-  if (!onDuty.resolved || !onDuty.name) return DUTY_UNSET;
-  const shift = onDuty.shift ? `${onDuty.shift} Shift ` : '';
-  if (onDuty.source === 'acting') {
-    const until = onDuty.acting_until ? ` until ${dateTimeText(onDuty.acting_until)}` : '';
-    return `${shift}Acting Captain 5: ${onDuty.name}${until}`;
-  }
-  return `${shift}Captain 5: ${onDuty.name}`;
-}
-
-const SHIFT_TONE: Record<string, Tone> = { A: 'success', B: 'info', C: 'danger' };
-
-/** A is green, B is blue, C is red. The text always names the shift, so colour never carries it alone. */
-export function dutyTone(onDuty: OnDuty): Tone {
-  if (!onDuty.resolved || !onDuty.name || !onDuty.shift) return 'neutral';
-  return SHIFT_TONE[onDuty.shift] ?? 'neutral';
-}
+export const dutyLine = (onDuty: OnDuty): string => roleDutyLine(onDuty, CAPTAIN_5_DUTY);
 
 /** Rescue-first, then newest: the order the queue is read in. */
 export function sortQueue(issues: IssueSummary[]): IssueSummary[] {
@@ -106,14 +74,3 @@ export function sortReplacements(issues: IssueSummary[]): IssueSummary[] {
 
 export const isReplacementTracked = (issue: IssueSummary): boolean => issue.open
   && (issue.action_status === 'action_pending' || issue.action_status === 'replacement_available' || issue.overdue);
-
-/** Version 4 UUID; crypto.randomUUID needs a secure context, so fall back to getRandomValues. */
-export function newKey(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
-  const bytes = new Uint8Array(16);
-  crypto.getRandomValues(bytes);
-  bytes[6] = (bytes[6] & 0x0f) | 0x40;
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
-  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}

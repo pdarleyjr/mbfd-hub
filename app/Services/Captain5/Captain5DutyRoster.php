@@ -8,17 +8,19 @@ use App\Models\Captain5\Captain5ActingRequest;
 use App\Models\Employee;
 use App\Models\EmployeeBidAssignment;
 use App\Models\User;
+use App\Services\Security\Command300Access;
 use App\Support\Captain5\DutyCalendar;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Support\Collection;
 
 /**
- * Resolves who is shown as the shift's Captain 5 (display and notification routing only, never a
- * permission):
- *  1. an administrator-approved acting request showing at the moment;
- *  2. otherwise the verified Captain 5 bid holder whose bid shift is the on-duty rotation shift;
- *  3. otherwise unknown (callers fall back to the seat holders). Never inferred from rank.
+ * Resolves who is shown as the shift's Captain 5 or the shift's 300 (Division Chief): display and
+ * notification routing only, never a permission:
+ *  1. an administrator-approved acting request of that role showing at the moment;
+ *  2. otherwise the verified bid holder of that seat ("Captain 5" / "300") whose bid shift is the
+ *     on-duty rotation shift;
+ *  3. otherwise unknown (shown as "not set"). Never inferred from rank.
  */
 final class Captain5DutyRoster
 {
@@ -35,16 +37,30 @@ final class Captain5DutyRoster
         return $this->calendar;
     }
 
-    public function onDuty(?DateTimeInterface $moment = null): OnDutyCaptain5
+    public function onDuty(?DateTimeInterface $moment = null, string $role = Captain5ActingRequest::ROLE_CAPTAIN_5): OnDutyCaptain5
     {
         $moment = CarbonImmutable::instance($moment ?? now());
 
-        return $this->memo[$moment->format('Y-m-d H:i')] ??= $this->resolve($moment);
+        return $this->memo[$role.'@'.$moment->format('Y-m-d H:i')] ??= $this->resolve($moment, $role);
     }
 
-    public function actingAt(DateTimeInterface $moment): ?Captain5ActingRequest
+    /** The shift's 300 (Division Chief): the approved acting 300 when showing, otherwise the 300 bid holder. */
+    public function command300OnDuty(?DateTimeInterface $moment = null): OnDutyCaptain5
     {
-        return Captain5ActingRequest::query()->showingAt($moment)->with('employee')->orderByDesc('starts_at')->orderByDesc('id')->first();
+        return $this->onDuty($moment, Captain5ActingRequest::ROLE_COMMAND_300);
+    }
+
+    public function actingAt(DateTimeInterface $moment, string $role = Captain5ActingRequest::ROLE_CAPTAIN_5): ?Captain5ActingRequest
+    {
+        return Captain5ActingRequest::query()->showingAt($moment, $role)->with('employee')->orderByDesc('starts_at')->orderByDesc('id')->first();
+    }
+
+    /** @return Collection<int, EmployeeBidAssignment> keyed by employee_profile_id */
+    public function seatsFor(string $role): Collection
+    {
+        return $role === Captain5ActingRequest::ROLE_COMMAND_300
+            ? $this->seats->holders(Command300Access::COMMAND_UNIT_LABEL)
+            : $this->captain5Seats();
     }
 
     /** @return Collection<int, EmployeeBidAssignment> keyed by employee_profile_id */
@@ -108,18 +124,18 @@ final class Captain5DutyRoster
         $this->seats->flush();
     }
 
-    private function resolve(CarbonImmutable $moment): OnDutyCaptain5
+    private function resolve(CarbonImmutable $moment, string $role): OnDutyCaptain5
     {
         $dutyDate = $this->calendar->dutyDate($moment);
         $shift = $this->calendar->shiftFor($dutyDate);
 
-        $acting = $this->actingAt($moment);
+        $acting = $this->actingAt($moment, $role);
         if ($acting !== null && $acting->employee instanceof Employee) {
             return new OnDutyCaptain5($dutyDate, $shift ?? $acting->shift_letter, OnDutyCaptain5::SOURCE_ACTING, $acting->employee, $acting);
         }
 
         if ($shift !== null) {
-            $seat = $this->captain5Seats()
+            $seat = $this->seatsFor($role)
                 ->first(fn (EmployeeBidAssignment $row): bool => DutyCalendar::letterFromBidShift($row->shift_label) === $shift);
             $employee = $seat !== null ? Employee::query()->find($seat->employee_profile_id) : null;
             if ($employee instanceof Employee && $employee->roster_status !== 'departed') {

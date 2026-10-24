@@ -14,6 +14,7 @@ use App\Models\Station;
 use App\Models\StationInspection;
 use App\Models\Todo;
 use App\Models\User;
+use App\Services\Captain5\ActingApprovers;
 use App\Services\Security\Captain5Access;
 use App\Services\Security\Command300Access;
 use App\Support\Fleet\InspectionReviewers;
@@ -422,11 +423,11 @@ final class NotificationCategoryRegistry
                 eligibility: static fn (EligibilityContext $c): ?string => self::captain5Allows($c->user)
                     ? 'captain5_duty_access' : null,
             ),
-            // Whoever may approve an acting Captain 5 (not the same people as the workspace audience).
+            // Whoever may approve an acting Captain 5 or acting 300 (not the same people as the workspace audience).
             new NotificationCategory(
                 key: self::CAPTAIN5_ASSIGNMENT_REQUESTS,
-                label: 'Captain 5 acting requests',
-                description: 'A member asked to act as Captain 5 and someone who assigns Captain 5 duty needs to decide. In-app alerts for these are always on.',
+                label: 'Acting Captain 5 and 300 requests',
+                description: 'A member asked to be shown as acting Captain 5 or acting 300 and an administrator needs to decide. In-app alerts for these are always on.',
                 group: self::GROUP_COMMAND,
                 channels: $all,
                 locked: [$db],
@@ -476,11 +477,11 @@ final class NotificationCategoryRegistry
         }
     }
 
-    /** Who decides acting Captain 5 requests: the same people Captain5Notifier::actingRequested() asks (canConfigure). */
+    /** Who decides acting Captain 5 and acting 300 requests: any administrator (ActingApprovers), the same people Captain5Notifier asks. */
     private static function captain5ManagesAssignments(User $user): bool
     {
         try {
-            return app(Captain5Access::class)->decide($user)->canConfigure;
+            return app(ActingApprovers::class)->canApproveAny($user);
         } catch (Throwable) {
             return false;
         }

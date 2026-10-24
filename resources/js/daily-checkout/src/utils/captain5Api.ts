@@ -1,6 +1,6 @@
+import type { ActingApi, ActingRequest, ActingResult, ActingState, OnDuty } from '../components/acting/types';
 import type {
-  ActingDuration, ActingRequest, ActingResult, ActingState, Captain5Summary, Handoff, InspectionView, IssueActionRequest,
-  IssueDetail, IssueSummary, OnDuty, Workspace,
+  Captain5Summary, Handoff, InspectionView, IssueActionRequest, IssueDetail, IssueSummary, Workspace,
 } from '../components/captain5/types';
 import { ApiRequestError, fetchWithTimeout, mutationHeaders } from './api';
 import { parseVehicleIdentification } from './vehicleIdentification';
@@ -51,35 +51,46 @@ const FALLBACKS: Record<number, string> = {
   429: 'Too many requests. Wait a moment and try again.',
 };
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const method = (init.method ?? 'GET').toUpperCase();
-  if (method !== 'GET' && typeof navigator !== 'undefined' && navigator.onLine === false) {
-    throw new Captain5ApiError(OFFLINE_MESSAGE, 0);
-  }
-  let response: Response;
-  try {
-    response = await fetchWithTimeout(`${BASE}${path}`, {
-      credentials: 'same-origin',
-      cache: 'no-store',
-      ...init,
-      headers: method === 'GET' ? { Accept: 'application/json' } : mutationHeaders(),
-    });
-  } catch {
-    // A timeout, an abort and a dropped connection all leave the outcome unknown.
-    throw new Captain5ApiError(typeof navigator !== 'undefined' && navigator.onLine === false ? OFFLINE_MESSAGE : NETWORK_MESSAGE, 0);
-  }
-  const payload = asRecord(await response.json().catch(() => null));
-  if (response.ok) return payload as T;
-  const message = typeof payload.message === 'string' && payload.message !== ''
-    ? payload.message
-    : FALLBACKS[response.status] ?? (response.status >= 500 ? 'The server had a problem. Try again in a moment.' : 'The request could not be completed.');
-  throw new Captain5ApiError(
-    message,
-    response.status,
-    response.status === 409 ? normalizeDetail(payload.issue) : undefined,
-    response.status === 422 ? fieldErrors(payload) : {},
-  );
+export type Requester = <T>(path: string, init?: RequestInit) => Promise<T>;
+
+/**
+ * Binds the fetch, CSRF and error handling to one API base. The 300 shift API (command300ShiftApi) uses the
+ * same handling with its own 403 wording, so both areas fail the same way. `status` 0 always means "no answer".
+ */
+export function createRequester(base: string, forbiddenMessage: string = FALLBACKS[403]): Requester {
+  const fallbacks: Record<number, string> = { ...FALLBACKS, 403: forbiddenMessage };
+  return async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+    const method = (init.method ?? 'GET').toUpperCase();
+    if (method !== 'GET' && typeof navigator !== 'undefined' && navigator.onLine === false) {
+      throw new Captain5ApiError(OFFLINE_MESSAGE, 0);
+    }
+    let response: Response;
+    try {
+      response = await fetchWithTimeout(`${base}${path}`, {
+        credentials: 'same-origin',
+        cache: 'no-store',
+        ...init,
+        headers: method === 'GET' ? { Accept: 'application/json' } : mutationHeaders(),
+      });
+    } catch {
+      // A timeout, an abort and a dropped connection all leave the outcome unknown.
+      throw new Captain5ApiError(typeof navigator !== 'undefined' && navigator.onLine === false ? OFFLINE_MESSAGE : NETWORK_MESSAGE, 0);
+    }
+    const payload = asRecord(await response.json().catch(() => null));
+    if (response.ok) return payload as T;
+    const message = typeof payload.message === 'string' && payload.message !== ''
+      ? payload.message
+      : fallbacks[response.status] ?? (response.status >= 500 ? 'The server had a problem. Try again in a moment.' : 'The request could not be completed.');
+    throw new Captain5ApiError(
+      message,
+      response.status,
+      response.status === 409 ? normalizeDetail(payload.issue) : undefined,
+      response.status === 422 ? fieldErrors(payload) : {},
+    );
+  };
 }
+
+const request = createRequester(BASE);
 
 const json = (body: unknown): RequestInit => ({ method: 'POST', body: JSON.stringify(body) });
 
@@ -109,6 +120,8 @@ function normalizeActingRequest(raw: unknown): ActingRequest {
   const item = asRecord(raw);
   return {
     id: typeof item.id === 'number' ? item.id : 0,
+    ...(typeof item.role === 'string' ? { role: item.role } : {}),
+    ...(typeof item.role_label === 'string' ? { role_label: item.role_label } : {}),
     kind: item.kind === 'end' ? 'end' : 'act',
     requested_by: typeof item.requested_by === 'string' ? item.requested_by : 'A member',
     name: typeof item.name === 'string' && item.name !== '' ? item.name : null,
@@ -126,6 +139,9 @@ export function normalizeActing(raw: unknown): ActingState {
   const acting = asRecord(raw);
   const choices = asRecord(acting.choices);
   return {
+    ...(typeof acting.role === 'string' ? { role: acting.role } : {}),
+    // Older answers omit it; only an explicit false hides the "Click here" control.
+    can_request: acting.can_request !== false,
     can_approve: acting.can_approve === true,
     mine: acting.mine ? normalizeActingRequest(acting.mine) : null,
     pending: asArray(acting.pending).map(normalizeActingRequest),
@@ -133,7 +149,7 @@ export function normalizeActing(raw: unknown): ActingState {
   };
 }
 
-const normalizeOnDuty = (raw: unknown): OnDuty => {
+export const normalizeOnDuty = (raw: unknown): OnDuty => {
   const duty = asRecord(raw) as unknown as OnDuty;
   return { ...duty, acting_until: asIso(duty.acting_until), acting_request_id: typeof duty.acting_request_id === 'number' ? duty.acting_request_id : null };
 };
@@ -206,35 +222,28 @@ export async function acknowledgeHandoff(noteId: number): Promise<Handoff> {
   return handoffOf(await request(`/handoff/${noteId}/acknowledge`, { method: 'POST', body: '{}' }));
 }
 
-const actingResult = (payload: { on_duty?: unknown; acting?: unknown }): ActingResult => ({
+export const actingResult = (payload: { on_duty?: unknown; acting?: unknown }): ActingResult => ({
   on_duty: normalizeOnDuty(payload.on_duty),
   acting: normalizeActing(payload.acting),
 });
 
-export interface ActingRequestInput {
-  kind: 'act' | 'end';
-  duration?: ActingDuration;
-  /** Custom end, exactly as the datetime-local field gives it; the server reads it as Miami Beach time. */
-  ends_at?: string;
-  client_request_id: string;
+export type { ActingRequestInput } from '../components/acting/types';
+
+/**
+ * The four acting calls against one API base. `kind: 'act'` is "Acting as ... today?" (also a takeover) and
+ * `kind: 'end'` is "End the current acting ...". The Captain 5 workspace and the 300 page each bind their own.
+ */
+export function buildActingApi(call: Requester): ActingApi {
+  return {
+    requestActing: async (input) => actingResult(await call('/acting-requests', json(input))),
+    approveActing: async (id, note = '') => actingResult(await call(`/acting-requests/${id}/approve`, json(note.trim() === '' ? {} : { note: note.trim() }))),
+    rejectActing: async (id, note) => actingResult(await call(`/acting-requests/${id}/reject`, json({ note: note.trim() }))),
+    withdrawActing: async (id) => actingResult(await call(`/acting-requests/${id}/withdraw`, { method: 'POST', body: '{}' })),
+  };
 }
 
-/** "Acting as Captain 5 today?" (kind 'act', also a takeover) or "End the current acting Captain 5" (kind 'end'). */
-export async function requestActing(input: ActingRequestInput): Promise<ActingResult> {
-  return actingResult(await request('/acting-requests', json(input)));
-}
-
-export async function approveActing(id: number, note = ''): Promise<ActingResult> {
-  return actingResult(await request(`/acting-requests/${id}/approve`, json(note.trim() === '' ? {} : { note: note.trim() })));
-}
-
-export async function rejectActing(id: number, note: string): Promise<ActingResult> {
-  return actingResult(await request(`/acting-requests/${id}/reject`, json({ note: note.trim() })));
-}
-
-export async function withdrawActing(id: number): Promise<ActingResult> {
-  return actingResult(await request(`/acting-requests/${id}/withdraw`, { method: 'POST', body: '{}' }));
-}
+export const captain5ActingApi: ActingApi = buildActingApi(request);
+export const { requestActing, approveActing, rejectActing, withdrawActing } = captain5ActingApi;
 
 /** The first message a 422 carries for a field, else the response message. */
 export function firstFieldError(error: Captain5ApiError): string {

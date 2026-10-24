@@ -7,6 +7,10 @@ import { ApiClient, isApiAuthenticationError, redirectToLoginAfterSessionExpiry 
 import { isForbiddenError } from '../utils/commandCommunicationsApi';
 import { useOffline } from '../hooks/useOffline';
 import DailyPageNav from './DailyPageNav';
+import ActingApprovals from './acting/ActingApprovals';
+import Command300ShiftSection from './acting/Command300ShiftSection';
+import { COMMAND_300_ACTING } from './acting/command300Role';
+import { useCommand300Shift } from './acting/useCommand300Shift';
 import AccessDenied from './command-communications/AccessDenied';
 import CommunicationsPanel from './command-communications/CommunicationsPanel';
 import DepartmentUpdatesPanel from './department-updates/DepartmentUpdatesPanel';
@@ -185,6 +189,8 @@ export default function Command300Page() {
     onDenied,
   });
   const { refresh: refreshFeed } = comms.feed;
+  const shift = useCommand300Shift({ enabled: (access === 'allowed' || access === 'unknown') && !forbidden });
+  const { refresh: refreshShift } = shift;
 
   // Stations load once and on the manual refresh button; only messages poll.
   const load = useCallback(async (manual = false) => {
@@ -221,6 +227,7 @@ export default function Command300Page() {
 
   const onRefresh = () => {
     void load(true);
+    refreshShift();
     if (!onStationTab && !updatesOpen) refreshFeed().catch(() => undefined);
   };
 
@@ -258,7 +265,10 @@ export default function Command300Page() {
           <div className="min-w-0 flex-1">
             <p className="text-[13px] font-semibold text-hub-n-600">Command unit</p>
             <h1 id="command-heading" className="font-heading text-2xl font-bold text-hub-ink sm:text-3xl">300</h1>
-            <p className={`mt-1 max-w-prose ${SECONDARY}`}>Shift Division Chief. Join the command Morning Lineup, open the Command Board, message Administration and Captain 5, post to Department Updates, or review station readiness below.</p>
+            <div className="mt-2">
+              <Command300ShiftSection shift={shift} />
+            </div>
+            <p className={`mt-2 max-w-prose ${SECONDARY}`}>Shift Division Chief. Join the command Morning Lineup, open the Command Board, message Administration and Captain 5, post to Department Updates, or review station readiness below.</p>
             <nav aria-label="300 actions" className="mt-4 grid gap-2.5 sm:grid-cols-2">
               <a href={COMMAND_LINEUP_HREF} className={ACTION_PRIMARY}>
                 <ClipboardCheck size={20} aria-hidden="true" />
@@ -272,6 +282,8 @@ export default function Command300Page() {
           </div>
         </div>
       </section>
+
+      {shift.data && <ActingApprovals role={COMMAND_300_ACTING} acting={shift.data.acting} onChange={shift.apply} />}
 
       <section aria-labelledby="command-overview-heading" className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">

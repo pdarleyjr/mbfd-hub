@@ -61,6 +61,8 @@ final class Captain5Notifier
 
     public const WORKSPACE_PATH = '/daily/captain-5';
 
+    public const COMMAND_300_PATH = '/daily/command-300';
+
     /** Captain 5 events that tell the crew something changed even without a typed message. */
     private const NOTIFYING_EVENTS = ['replacement_available', 'resolved', 'correction_verified', 'dismissed'];
 
@@ -332,45 +334,54 @@ final class Captain5Notifier
         });
     }
 
-    /** A member asked to be shown as (or to end) the acting Captain 5: Captain 5 administrators approve. */
+    /**
+     * A member asked to be shown as (or to end) the acting Captain 5 or acting 300: that role's
+     * approvers are asked (ActingApprovers). Same kinds and ledger keys for both roles (the request id
+     * is unique); only the wording, the approvers and the page linked differ.
+     */
     public function actingRequested(Captain5ActingRequest $request): void
     {
         $this->guard('actingRequested', function () use ($request): void {
             $requester = User::query()->find($request->requested_by_user_id);
             $name = trim((string) ($requester?->display_name ?: $requester?->name)) ?: 'A member';
-            $approvers = User::query()
-                ->where(fn ($query) => $query->whereHas('roles', fn ($roles) => $roles->where('name', 'super_admin'))
-                    ->orWhereHas('permissions', fn ($permissions) => $permissions->where('name', Captain5Access::PERMISSION_ADMIN)))
-                ->get()->filter(fn (User $user): bool => $this->access->canConfigure($user))->values();
+            $label = Captain5ActingRequest::roleLabel($request->role);
+            // Any administrator, for both roles (ActingApprovers).
+            $approvers = app(ActingApprovers::class)->users($request->role);
             $what = $request->kind === Captain5ActingRequest::KIND_END
-                ? "{$name} asked to end the current acting Captain 5 display."
-                : "{$name} asked to be shown as acting Captain 5 until ".$this->localTime($request->ends_at).'.';
+                ? "{$name} asked to end the current acting {$label} display."
+                : "{$name} asked to be shown as acting {$label} until ".$this->localTime($request->ends_at).'.';
 
             $this->queue('captain5:acting:'.$request->getKey().':requested', self::KIND_ACTING_REQUEST, $approvers, fn (): array => [
-                'title' => 'Acting Captain 5: approval needed',
+                'title' => "Acting {$label}: approval needed",
                 'body' => $what,
-                'url' => self::WORKSPACE_PATH.'?tab=today',
+                'url' => $this->actingPage($request).($request->role === Captain5ActingRequest::ROLE_CAPTAIN_5 ? '?tab=today' : ''),
             ], $requester);
         });
     }
 
-    /** Tells the requester how their acting Captain 5 request was decided. */
+    /** Tells the requester how their acting Captain 5 or acting 300 request was decided. */
     public function actingDecided(Captain5ActingRequest $request): void
     {
         $this->guard('actingDecided', function () use ($request): void {
             $approved = $request->status === Captain5ActingRequest::APPROVED;
+            $label = Captain5ActingRequest::roleLabel($request->role);
             $decider = $request->decided_by_user_id !== null ? User::query()->find($request->decided_by_user_id) : null;
             $body = match (true) {
-                $approved && $request->kind === Captain5ActingRequest::KIND_END => 'The acting Captain 5 display was ended.',
-                $approved => 'You are shown as acting Captain 5 until '.$this->localTime($request->ends_at).'.',
-                default => 'Your acting Captain 5 request was not approved.'.($request->decision_note ? ' '.$this->excerpt($request->decision_note) : ''),
+                $approved && $request->kind === Captain5ActingRequest::KIND_END => "The acting {$label} display was ended.",
+                $approved => "You are shown as acting {$label} until ".$this->localTime($request->ends_at).'.',
+                default => "Your acting {$label} request was not approved.".($request->decision_note ? ' '.$this->excerpt($request->decision_note) : ''),
             };
             $this->queue('captain5:acting:'.$request->getKey().':decided', self::KIND_ACTING_DECISION, User::query()->whereKey($request->requested_by_user_id)->get(), fn (): array => [
-                'title' => $approved ? 'Acting Captain 5 approved' : 'Acting Captain 5 not approved',
+                'title' => $approved ? "Acting {$label} approved" : "Acting {$label} not approved",
                 'body' => $body,
-                'url' => self::WORKSPACE_PATH,
+                'url' => $this->actingPage($request),
             ], $decider);
         });
+    }
+
+    private function actingPage(Captain5ActingRequest $request): string
+    {
+        return $request->role === Captain5ActingRequest::ROLE_COMMAND_300 ? self::COMMAND_300_PATH : self::WORKSPACE_PATH;
     }
 
     private function localTime(?\DateTimeInterface $moment): string

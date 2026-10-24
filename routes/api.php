@@ -341,6 +341,20 @@ Route::prefix('command-communications/department-updates')
         Route::post('/{update}/take-down', 'takeDown')->defaults('origin', 'command_300')->whereNumber('update')->name('take-down');
     });
 
+// The shift's 300 (Division Chief) shown on the 300 page and card, and "Acting as 300 today?".
+// Display only; the acting service re-checks who may ask and who may approve.
+Route::prefix('command-300')
+    ->middleware(['auth:sanctum', 'canonical.api', 'can:access-command-300', 'throttle:120,1'])
+    ->name('api.command-300.')
+    ->controller(\App\Http\Controllers\Api\Command300ShiftController::class)
+    ->group(function () {
+        Route::get('/shift', 'show')->name('shift');
+        Route::post('/acting-requests', 'requestActing')->middleware('throttle:20,1,command300-acting')->name('acting.store');
+        Route::post('/acting-requests/{actingRequest}/approve', 'approveActing')->whereNumber('actingRequest')->name('acting.approve');
+        Route::post('/acting-requests/{actingRequest}/reject', 'rejectActing')->whereNumber('actingRequest')->name('acting.reject');
+        Route::post('/acting-requests/{actingRequest}/withdraw', 'withdrawActing')->whereNumber('actingRequest')->name('acting.withdraw');
+    });
+
 // The same conversation as seen from the Captain 5 page: the `captain_5` channel of the shared
 // posts (audience captain_5 or both). Same controller and service; only the gate and channel differ.
 Route::prefix('captain5/communications')
