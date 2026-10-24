@@ -272,6 +272,7 @@ Staff (session `auth:web`, middleware `EnsureEmsAccess:view|act|configure`), bas
 | GET `/supply/orders`; POST `/supply/orders`; POST `/supply/orders/{id}/receive` `/cancel` | `supply.orders.*` | view / act |
 | POST `/supply/adjustments` (signed units, reason) | `supply.adjustments.store` | act |
 | GET `/supply/movements`, `/supply/snapshots`, `/supply/snapshots/{uuid}` | `supply.movements`, `supply.snapshots.*` | view |
+| GET `/supply/snapshots/{uuid}/export/xlsx` and `/export/pdf` | `supply.snapshots.export.xlsx`, `supply.snapshots.export.pdf` | view (same files as the Admin page, `Cache-Control: private, no-store`) |
 | GET `/statistics` (`apparatus_id`, `target_kind`, `date_from`, `date_to`) | `statistics` | view |
 
 ### 9.4 Statistics definitions (requests, not consumption)
@@ -322,3 +323,15 @@ page; everyone else goes through `EmsAccess` unchanged.
 - **Exports.** `App\Services\Ems\Exports\ReportWriter` writes workbooks with explicit cell types (text is always a string cell, counts are numbers) and
   puts a leading apostrophe on text that starts with `=`, `+`, `-`, `@`, a control character or the fullwidth forms of those. PDFs are DomPDF
   landscape with repeated header rows; the request list PDF is cut at 1,500 rows and says so (the workbook always has every row).
+
+## 11. Captain 5 tabs (as built, branch feat/ems-captain5-tabs)
+
+The Daily Checkout app's Captain 5 page (`/daily/captain-5`) gains two tabs built only on the staff API above. No second ticket engine and no new tables.
+
+- **Rescue Inventory** (`?tab=rescue`; `&request=<uuid>` opens that request; `&view=stats` opens Unit statistics). Open = submitted, reviewed, prepared or partly issued; chips Issued, Closed (includes cancelled) and All. The tab badge is `meta.total` of a one-row list with the four open statuses, refreshed on focus and once a minute while the page is visible. `EmsLinks::staff()` produces exactly this URL.
+- **Supply Room** (`?tab=supply`; `&section=stock|counts|reconcile|reorder|movements|snapshots`).
+- **Who sees the tabs.** Only people for whom `GET /ems/api/meta` says `permissions.view`. The Captain 5 page also admits people the EMS API does not (an Admin Panel user with no EMS grant), so the tabs are never shown from the page gate alone. A deep link keeps its tab while access is being checked and falls back to Today only after a 403 or `view: false`.
+- **Writes.** Every write sends an `Idempotency-Key`: one key per user action, sent again unchanged on a retry of the same content and replaced after the server confirmed. A 409 refreshes the sheet and keeps what was typed; `stale_preview` shows the message and reloads the reconciliation preview.
+- **Corrections** start from the quantity an issuance stands at now, found by replaying `issue_corrected` events (`payload.corrects_event_id`, `new_quantity`) over the original `issued` event.
+- **Downloads.** Snapshots download through the two export routes in section 9.3. They are plain links, outside the Daily service worker's `/daily/` scope, and the worker never stores `/ems/api/` responses.
+- **Tests.** `tests/Node/ems-captain5-logic.test.mjs` (pure helpers), `tests/e2e/captain5-ems.spec.ts` (mocked API, project `captain5-ems-chromium`), `tests/Feature/Ems/EmsSnapshotExportApiTest.php` and `EmsRetryNotificationsTest.php`.

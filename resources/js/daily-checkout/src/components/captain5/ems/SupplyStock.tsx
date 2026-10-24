@@ -75,7 +75,7 @@ function ItemCard({ item, meta, onChanged, onForbidden }: { item: SupplyItem; me
       </div>
       <p className="text-sm text-hub-ink">
         <span className="text-base font-bold tabular-nums">{stockText(item)}</span>
-        <span className={`${HINT} ml-2`}>{item.current_basis_label ?? 'Not counted yet'}</span>
+        {item.current_quantity !== null && <span className={`${HINT} ml-2`}>{item.current_basis_label ?? 'Counted'}</span>}
       </p>
       <p className={HINT}>{thresholdText(item)}. {packageText(item)}.</p>
       <button type="button" className={`${BTN_SECONDARY} !min-h-11 gap-1.5`} aria-expanded={open} onClick={() => setOpen((value) => !value)}>
