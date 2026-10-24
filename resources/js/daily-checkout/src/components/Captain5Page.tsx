@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { RefreshCw } from 'lucide-react';
-import { CAPTAIN_5_IMAGE } from '../types';
+import { CAPTAIN_5_IMAGE, type VehicleIdentification } from '../types';
 import { useOffline } from '../hooks/useOffline';
 import DailyPageNav from './DailyPageNav';
 import ActingApprovals from './captain5/ActingApprovals';
@@ -14,6 +14,7 @@ import IssueSheet from './captain5/IssueSheet';
 import IssuesTab from './captain5/IssuesTab';
 import ReplacementsTab from './captain5/ReplacementsTab';
 import TodayTab from './captain5/TodayTab';
+import VehicleIdentificationPanel from './captain5/VehicleIdentificationPanel';
 import RescueInventoryTab, { type RescueView } from './captain5/ems/RescueInventoryTab';
 import SupplyRoomTab, { isSupplyView, type SupplyView } from './captain5/ems/SupplyRoomTab';
 import { useEmsAccess, useOpenRequestCount } from './captain5/ems/useEmsAccess';
@@ -70,6 +71,7 @@ export default function Captain5Page() {
   const isOffline = useOffline();
   const [inspectionId, setInspectionId] = useState<number | null>(null);
   const [version, setVersion] = useState(0);
+  const [identificationSaved, setIdentificationSaved] = useState(false);
   const pushedIssue = useRef(false);
   const pushedRequest = useRef(false);
   const ems = useEmsAccess();
@@ -108,6 +110,11 @@ export default function Captain5Page() {
     if (pushedRequest.current) { pushedRequest.current = false; navigate(-1); } else update({ request: null });
   }, [navigate, update]);
   const changed = useCallback(() => { setVersion((n) => n + 1); void load('silent'); }, [load]);
+  const identificationChanged = useCallback((next: VehicleIdentification | undefined) => {
+    setIdentificationSaved(true);
+    ws.patch({ vehicle_identification: next });
+    void load('silent');
+  }, [ws.patch, load]);
   const actingChanged = useCallback((result: ActingResult) => { ws.patch({ on_duty: result.on_duty, acting: result.acting }); void load('silent'); }, [ws.patch, load]);
 
   if (ws.forbidden) return <Captain5Denied />;
@@ -206,6 +213,15 @@ export default function Captain5Page() {
       </section>
 
       <ActingApprovals acting={data.acting} onChange={actingChanged} />
+
+      {data.vehicle_identification && data.apparatus_id !== undefined && (
+        <VehicleIdentificationPanel apparatusId={data.apparatus_id} block={data.vehicle_identification} onSaved={identificationChanged} />
+      )}
+      {identificationSaved && !data.vehicle_identification && (
+        <p role="status" className="hub-callout p-3 text-sm" data-testid="captain5-vehicle-identification-saved">
+          Vehicle information saved. Thank you.
+        </p>
+      )}
 
       {ws.error && (
         <div className="hub-callout hub-callout--warning p-3 text-sm" role="alert">
