@@ -151,7 +151,8 @@ final class StationOperationsCommandBoardTest extends TestCase
 
         $this->get(Dashboard::getUrl())
             ->assertOk()
-            ->assertSee('Station Operations Command Board')
+            ->assertSee('Logistics Dashboard')
+            ->assertDontSee('Station Operations Command Board')
             ->assertSee('Today’s Truck Checkouts')
             ->assertSee('New / Needs Attention');
 
