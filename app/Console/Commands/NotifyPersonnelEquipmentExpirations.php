@@ -5,8 +5,13 @@ declare(strict_types=1);
 namespace App\Console\Commands;
 
 use App\Models\AssignedEquipment;
+use App\Models\Employee;
 use App\Models\EquipmentExpirationNotification;
 use App\Models\User;
+use App\Notifications\OperationalAlertNotification;
+use App\Services\Notifications\NotificationCategoryRegistry;
+use App\Services\Notifications\NotificationDispatchService;
+use App\Services\Notifications\NotificationRecipientEvaluator;
 use Filament\Notifications\Actions\Action;
 use Filament\Notifications\Notification;
 use Illuminate\Console\Command;
@@ -29,7 +34,8 @@ class NotifyPersonnelEquipmentExpirations extends Command
             ->whereNotNull('expires_at')
             ->with('employee')
             ->chunkById(100, function ($assignments) use ($thresholds, &$sent): void {
-                $admins = User::query()->whereHas('roles', fn ($query) => $query->whereIn('name', ['super_admin', 'admin', 'logistics_admin']))->get();
+                // Whoever may manage assigned equipment right now (the policy, not a role-name list).
+                $admins = app(NotificationRecipientEvaluator::class)->recipients(NotificationCategoryRegistry::EQUIPMENT_EXPIRATIONS);
                 foreach ($assignments as $assignment) {
                     $days = today()->diffInDays($assignment->expires_at, false);
                     $threshold = $thresholds->first(fn (int $candidate) => $candidate >= $days);
@@ -69,16 +75,57 @@ class NotifyPersonnelEquipmentExpirations extends Command
             }
 
             $expired = $assignment->expires_at->isBefore(today());
-            Notification::make()
-                ->title($expired ? 'Assigned equipment expired' : 'Assigned equipment expiring soon')
-                ->body("{$assignment->item_description} for {$assignment->employee?->name} ".($expired ? 'expired' : 'expires')." on {$assignment->expires_at->format('M j, Y')}.")
-                ->icon($expired ? 'heroicon-o-exclamation-triangle' : 'heroicon-o-clock')
-                ->actions([
-                    Action::make('view')->url($recipientType === 'employee' ? '/employee/my-equipment-page' : '/admin/personnel-uniforms-equipment/assignments')->markAsRead(),
-                ])
-                ->sendToDatabase($recipient);
+            $title = $expired ? 'Assigned equipment expired' : 'Assigned equipment expiring soon';
+            $body = "{$assignment->item_description} for {$assignment->employee?->name} ".($expired ? 'expired' : 'expires')." on {$assignment->expires_at->format('M j, Y')}.";
+            $icon = $expired ? 'heroicon-o-exclamation-triangle' : 'heroicon-o-clock';
+            $url = $recipientType === 'employee' ? '/employee/my-equipment-page' : '/admin/personnel-uniforms-equipment/assignments';
+
+            if ($recipient instanceof Employee) {
+                $this->notifyEmployee($recipient, $title, $body, $icon, $url);
+
+                return true;
+            }
+
+            app(NotificationDispatchService::class)->notifyUser(NotificationCategoryRegistry::EQUIPMENT_EXPIRATIONS, $recipient, new OperationalAlertNotification(
+                category: NotificationCategoryRegistry::EQUIPMENT_EXPIRATIONS,
+                title: $title,
+                body: $body,
+                url: $url,
+                icon: $icon,
+                iconColor: $expired ? 'danger' : 'warning',
+                actionLabel: 'View',
+            ));
 
             return true;
         });
+    }
+
+    /**
+     * The member's own equipment: an update about something of theirs, decided by the evaluator for their account.
+     * Personnel with no bound account keep the personnel inbox (carried over to the account at first sign-in).
+     */
+    private function notifyEmployee(Employee $employee, string $title, string $body, string $icon, string $url): void
+    {
+        $account = $employee->user;
+        if ($account instanceof User && $account->employee_id === $employee->employee_id) {
+            app(NotificationDispatchService::class)->notifyUser(User::NOTIFICATION_PREFERENCE_MEMBER_REQUEST_UPDATES, $account, new OperationalAlertNotification(
+                category: User::NOTIFICATION_PREFERENCE_MEMBER_REQUEST_UPDATES,
+                title: $title,
+                body: $body,
+                url: $url,
+                icon: $icon,
+                iconColor: 'warning',
+                actionLabel: 'View',
+            ));
+
+            return;
+        }
+
+        Notification::make()
+            ->title($title)
+            ->body($body)
+            ->icon($icon)
+            ->actions([Action::make('view')->url($url)->markAsRead()])
+            ->sendToDatabase($employee);
     }
 }

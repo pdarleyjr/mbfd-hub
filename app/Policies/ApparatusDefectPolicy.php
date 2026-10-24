@@ -28,7 +28,7 @@ class ApparatusDefectPolicy
     }
 
     /**
-     * Acknowledge, update, resolve, dismiss, reopen, verify, classify or link a ticket
+     * Acknowledge, update, resolve, close with no action required (stored as "dismiss"), reopen, verify, classify or link a ticket
      * on an equipment issue, and write internal notes. Same rule as approving an
      * inspection: an administrative role OR the Fleet manage capability.
      */

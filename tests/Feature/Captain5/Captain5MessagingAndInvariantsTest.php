@@ -172,7 +172,10 @@ final class Captain5MessagingAndInvariantsTest extends TestCase
         $this->submit($payload, $this->rescue)->assertSuccessful();
         $defect = ApparatusDefect::query()->where('item_key', self::RESCUE_ITEM)->sole();
 
-        self::assertDatabaseHas('inspection_notification_deliveries', ['notification_type' => InspectionNotificationKind::ISSUE_ESCALATED, 'recipient_user_id' => $reviewer->id]);
+        // Reviewers get ONE message for this event: the held-checkout alert, which already names the damaged item.
+        self::assertDatabaseHas('inspection_notification_deliveries', ['notification_type' => InspectionNotificationKind::REVIEW_REQUIRED, 'recipient_user_id' => $reviewer->id]);
+        self::assertDatabaseMissing('inspection_notification_deliveries', ['notification_type' => InspectionNotificationKind::ISSUE_ESCALATED, 'recipient_user_id' => $reviewer->id]);
+        Notification::assertSentToTimes($reviewer, \App\Notifications\Inspections\InspectionEventNotification::class, 1);
         $byKey = fn (string $suffix): array => DB::table('inspection_notification_deliveries')
             ->where('event_key', 'captain5:inspection:'.$defect->first_reported_inspection_id.':'.$suffix)
             ->pluck('recipient_user_id')->map(fn ($id): int => (int) $id)->sort()->values()->all();

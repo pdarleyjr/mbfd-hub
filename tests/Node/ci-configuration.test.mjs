@@ -1075,10 +1075,13 @@ test("ordinary CI builds cannot inherit Sentry upload capability or production i
   assert.doesNotMatch(workflow, /\$\{\{\s*secrets\./i);
 });
 
-test("the PHP server makes the unhashed Daily service workers always revalidate", () => {
+test("the PHP server makes every unhashed service worker always revalidate", () => {
   const server = readFileSync(resolve(root, "server.php"), "utf8");
 
-  assert.ok(server.includes("$uri === '/daily/sw.js' || $uri === '/daily/service-worker.js'"));
+  for (const worker of ["/sw.js", "/admin-pwa/service-worker.js", "/daily/sw.js", "/daily/service-worker.js"]) {
+    assert.ok(server.includes(`'${worker}'`), `${worker} must revalidate at the edge`);
+  }
+  assert.ok(server.includes("in_array($uri, $serviceWorkers, true)"));
   assert.ok(server.includes("header('Cache-Control: no-cache, must-revalidate');"));
   assert.ok(server.includes("header('Content-Type: text/javascript; charset=UTF-8');"));
 });

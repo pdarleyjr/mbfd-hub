@@ -152,6 +152,77 @@ final class CanonicalInspectionActionsTest extends TestCase
         $this->assertSame([1, 1], [$this->events('dismissed'), $this->events('reopened')]);
     }
 
+    public function test_the_close_action_uses_the_departments_words_dialog_and_required_reason(): void
+    {
+        $page = $this->page();
+        $html = $page->html();
+        $this->assertStringContainsString('data-issue-action="dismissIssue"', $html);
+        $this->assertStringContainsString('Close — No Action Required', $html);
+        $this->assertDoesNotMatchRegularExpression('/data-issue-action="dismissIssue"[^>]*>\s*Dismiss\s*</', $html);
+
+        $page->mountAction('dismissIssue', ['defect' => $this->defect->id])
+            ->assertSee('Why is no corrective action necessary?')
+            ->assertSee('Use this only when the report was entered incorrectly, is a duplicate, or no corrective action is necessary. Closing it does not mean the equipment was repaired or replaced. The reason and original report remain in the apparatus history.')
+            ->assertSee('Close issue');
+
+        // The reason is required and meaningful in the form, and the service re-checks it.
+        $this->page()
+            ->callAction('dismissIssue', ['idempotency_key' => 'dis-x', 'reason' => 'n/a'], ['defect' => $this->defect->id])
+            ->assertHasActionErrors(['reason']);
+        $this->assertSame('reported', $this->defect->fresh()->action_status);
+        $this->assertSame(0, ApparatusDefectEvent::query()->count());
+    }
+
+    public function test_the_close_action_shows_the_service_refusal_in_plain_language_when_the_issue_affects_readiness(): void
+    {
+        $this->defect->forceFill(['severity' => 'significant'])->save();
+
+        $this->page()
+            ->callAction('dismissIssue', ['idempotency_key' => 'dis-sig', 'reason' => 'Logged against the wrong rig.'], ['defect' => $this->defect->id])
+            ->assertNotified('That could not be saved');
+
+        $this->assertSame('reported', $this->defect->fresh()->action_status);
+        $this->assertSame(0, $this->events('dismissed'));
+    }
+
+    public function test_a_closed_issue_card_and_timeline_show_the_reason_and_the_status_before(): void
+    {
+        $this->page()
+            ->callAction('acknowledgeIssue', ['idempotency_key' => 'ack-2'], ['defect' => $this->defect->id]);
+        $this->page()
+            ->callAction('dismissIssue', ['idempotency_key' => 'dis-2', 'reason' => 'Logged against the wrong rig.'], ['defect' => $this->defect->id])
+            ->assertHasNoActionErrors();
+
+        $html = $this->page()->html();
+        $flat = preg_replace('/\s+/', ' ', strip_tags($html));
+
+        $this->assertStringContainsString('data-issue-closure', $html);
+        $this->assertStringContainsString('Closed — no action required', $flat);
+        $this->assertStringContainsString('Why no corrective action was necessary: Logged against the wrong rig.', $flat);
+        $this->assertStringContainsString('Nothing was repaired or replaced.', $flat);
+        // The timeline row carries the reason and the status the issue was in.
+        $this->assertStringContainsString('Reason: Logged against the wrong rig.', $flat);
+        $this->assertStringContainsString('Status before it was closed: Acknowledged by Logistics', $flat);
+        $this->assertSame(['reopenIssue'], $this->offered($html), 'Reopen stays available on a closed-no-action card.');
+        $this->assertStringContainsString('hub-insp-badge--neutral', $html, 'Not the green "resolved" tone.');
+    }
+
+    public function test_the_defects_list_labels_and_filters_keep_no_action_closures_apart_from_repairs(): void
+    {
+        $resolved = $this->openDefect($this->rig, $this->inspection, $this->reporter, 'Resolved Hose Nozzle');
+        $service = app(\App\Services\Defects\DefectCorrectiveActionService::class);
+        $service->dismiss($this->defect->id, $this->admin, ['reason' => 'Logged against the wrong rig.']);
+        $service->resolve($resolved->id, $this->admin, ['resolution_type' => 'repair_completed', 'resolution_notes' => 'Nozzle replaced.']);
+
+        Livewire::test(ListDefects::class)->call('loadTable')
+            ->removeTableFilter('unresolved')
+            ->filterTable('action_status', 'dismissed')
+            ->assertCanSeeTableRecords([$this->defect])->assertCanNotSeeTableRecords([$resolved])
+            ->assertSee('Closed — no action required')
+            ->filterTable('action_status', 'resolved')
+            ->assertCanSeeTableRecords([$resolved])->assertCanNotSeeTableRecords([$this->defect]);
+    }
+
     public function test_verify_correction_resolves_when_the_latest_observation_appears_corrected(): void
     {
         $next = $this->inspectionBy($this->rig, $this->reporter, '2026-10-20 09:00:00');
@@ -189,7 +260,7 @@ final class CanonicalInspectionActionsTest extends TestCase
     public function test_only_the_actions_that_apply_to_the_current_status_are_offered(): void
     {
         $this->assertSame(
-            ['acknowledgeIssue', 'updateIssue', 'resolveIssue', 'classifyImpact', 'linkServiceTicket', 'dismissIssue'],
+            ['acknowledgeIssue', 'updateIssue', 'resolveIssue', 'classifyImpact', 'correctSeverity', 'linkServiceTicket', 'dismissIssue'],
             $this->offered($this->page()->html()),
         );
 
@@ -228,7 +299,7 @@ final class CanonicalInspectionActionsTest extends TestCase
         $this->actAs($this->viewOnly());
         $page = $this->page();
 
-        foreach (['acknowledgeIssue', 'updateIssue', 'resolveIssue', 'dismissIssue', 'reopenIssue', 'verifyCorrection', 'classifyImpact', 'linkServiceTicket'] as $name) {
+        foreach (['acknowledgeIssue', 'updateIssue', 'resolveIssue', 'dismissIssue', 'reopenIssue', 'verifyCorrection', 'classifyImpact', 'correctSeverity', 'linkServiceTicket'] as $name) {
             $page->mountAction($name, ['defect' => $this->defect->id])->assertActionNotMounted($name);
         }
         foreach (['acceptMeterReading', 'enterVerifiedReading', 'requestMeterClarification', 'keepCurrentReading'] as $name) {

@@ -20,7 +20,7 @@
             <p class="text-sm">Your unfinished inspection was restored. <button type="button" class="hub-link" data-thvi-reset>Start over</button></p>
         </div>
 
-        <form id="thvi-form" novalidate data-config='@json($config)'>
+        <form id="thvi-form" novalidate data-mbfd-unsaved-work-guard data-config='@json($config)'>
             <ol class="thvi-progress" aria-label="Inspection steps">
                 <li><button type="button" data-goto="0"><span class="thvi-progress__num">Step 1</span>Vehicle &amp; driver</button></li>
                 <li><button type="button" data-goto="1"><span class="thvi-progress__num">Step 2</span>Condition</button></li>

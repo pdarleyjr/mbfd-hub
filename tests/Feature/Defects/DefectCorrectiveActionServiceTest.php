@@ -377,7 +377,9 @@ final class DefectCorrectiveActionServiceTest extends TestCase
         $this->assertNull($defect->resolution_type);
         $this->assertSame('Item was never assigned to this rig.', $defect->resolution_notes);
         $this->assertSame(1, $this->eventsOf('dismissed'));
-        $this->assertSame(0, DB::table('inspection_notification_deliveries')->count());
+        // Closing with no action required always tells the reporter (and participants), with the reason.
+        $this->assertSame(1, DB::table('inspection_notification_deliveries')->where('recipient_user_id', $this->reporter->id)->count());
+        Notification::assertSentTo($this->reporter, InspectionEventNotification::class, fn (InspectionEventNotification $n): bool => str_contains($n->body, 'Item was never assigned to this rig'));
 
         $this->expectException(ValidationException::class);
         $this->service->resolve($this->defect->id, $this->admin, $this->resolveData());

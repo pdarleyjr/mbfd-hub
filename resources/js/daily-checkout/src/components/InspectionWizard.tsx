@@ -275,7 +275,9 @@ export default function InspectionWizard() {
     return () => {
       window.removeEventListener('pagehide', persistBeforeUnload);
       document.removeEventListener('visibilitychange', onVisibilityChange);
-      void autosaver.flush();
+      // After the last write settles (or fails) nothing is left in memory to protect, unless this
+      // effect already re-ran (a development remount) and the editor is live again.
+      void autosaver.flush().catch(() => undefined).then(() => { if (!mountedRef.current) autosaver.dispose(); });
       mountedRef.current = false;
     };
   }, [autosaver]);

@@ -10,6 +10,7 @@ use App\Filament\Employee\Pages\OperationalForms;
 use App\Filament\Employee\Pages\PersonnelEquipmentRequestPage;
 use App\Filament\Employee\Pages\RequestEquipmentPage;
 use App\Filament\Employee\Pages\VideoConferencing;
+use App\Filament\Pages\NotificationSettings;
 use App\Filament\Pages\SetPasswordPage;
 use App\Filament\Support\HubPalette;
 use App\Http\Controllers\Auth\CanonicalPanelLoginRedirectController;
@@ -72,6 +73,7 @@ class EmployeePanelProvider extends PanelProvider
                 RequestEquipmentPage::class,
                 ApparatusServiceRequestPage::class,
                 PersonnelEquipmentRequestPage::class,
+                NotificationSettings::class,
                 SetPasswordPage::class,
             ])
             ->widgets([])
@@ -81,6 +83,10 @@ class EmployeePanelProvider extends PanelProvider
             ])
             ->userMenuItems([
                 MenuItem::make()->label('My Account')->url(fn (): string => route('account.show'))->icon('heroicon-o-user-circle'),
+                MenuItem::make()
+                    ->label('Notification settings')
+                    ->url(fn (): string => NotificationSettings::getUrl(panel: 'employee'))
+                    ->icon('heroicon-o-bell'),
                 MenuItem::make()->label('Change Password')->url(fn (): string => SetPasswordPage::getUrl(panel: 'employee'))->icon('heroicon-o-key'),
                 MenuItem::make()
                     ->label('City email & verification')

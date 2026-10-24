@@ -10,6 +10,7 @@ use App\Models\PersonnelRequestItem;
 use App\Models\User;
 use App\Models\UserNotificationSubscription;
 use App\Notifications\NewSubmissionNotification;
+use App\Services\Notifications\NotificationDispatchService;
 use Filament\Notifications\Actions\Action;
 use Filament\Notifications\Notification;
 
@@ -24,9 +25,14 @@ final class PersonnelRequestNotifier
         }
     }
 
-    public function statusChanged(PersonnelRequest $request): void
+    public function statusChanged(PersonnelRequest $request, ?string $reason = null): void
     {
-        $this->notifyMember($request, "Request {$request->status->label()}", "{$request->request_number} is now {$request->status->label()}.");
+        $body = "{$request->request_number} is now {$request->status->label()}.";
+        if (filled($reason)) {
+            // Deny and Cancel carry the admin's reason so the member is not left guessing.
+            $body = "{$request->request_number} - {$request->status->label()}: {$reason}";
+        }
+        $this->notifyMember($request, "Request {$request->status->label()}", $body);
     }
 
     public function employeeResponded(PersonnelRequest $request, string $event = 'response'): void
@@ -58,20 +64,44 @@ final class PersonnelRequestNotifier
 
     private function notifyAdmins(PersonnelRequest $request, string $title, string $body): void
     {
-        $admins = User::query()->whereHas('roles', fn ($query) => $query->whereIn('name', ['super_admin', 'admin', 'logistics_admin']))->get();
-        foreach ($admins as $admin) {
-            UserNotificationSubscription::ensurePersonnelRequestsForUser($admin);
-            $admin->notify(new NewSubmissionNotification(
-                submissionType: $request->type === PersonnelRequestType::Uniform ? 'uniform_request' : 'personnel_equipment_request',
-                title: $title,
-                body: $body,
-                actionUrl: '/admin/personnel-uniforms-equipment/personnel-requests/'.$request->getRouteKey(),
-                icon: 'heroicon-o-clipboard-document-check',
-            ));
+        $this->guarded(fn () => $this->queueAdminAlert($request, $title, $body));
+    }
+
+    /** Telling people about a request never fails or rolls back the request's own write. */
+    private function guarded(callable $notify): void
+    {
+        try {
+            $notify();
+        } catch (\Throwable $exception) {
+            report($exception);
         }
     }
 
+    private function queueAdminAlert(PersonnelRequest $request, string $title, string $body): void
+    {
+        $submissionType = $request->type === PersonnelRequestType::Uniform ? 'uniform_request' : 'personnel_equipment_request';
+        $category = (string) User::preferenceKeyForSubmissionType($submissionType);
+
+        // Whoever may review personnel requests right now (the policy, not a role-name list) is worked out by
+        // the queued fan-out; a member with no saved choice gets the category defaults, so no row is needed.
+        // Queued after the surrounding write commits; the lock screen names the request, never the member or the message.
+        app(NotificationDispatchService::class)->dispatch($category, new NewSubmissionNotification(
+            submissionType: $submissionType,
+            title: $title,
+            body: $body,
+            actionUrl: '/admin/personnel-uniforms-equipment/personnel-requests/'.$request->getRouteKey(),
+            icon: 'heroicon-o-clipboard-document-check',
+            messageBearing: true,
+            pushSubject: $request->request_number,
+        ));
+    }
+
     private function notifyMember(PersonnelRequest $request, string $title, string $body, ?PersonnelRequestItem $item = null): void
+    {
+        $this->guarded(fn () => $this->queueMemberAlert($request, $title, $body, $item));
+    }
+
+    private function queueMemberAlert(PersonnelRequest $request, string $title, string $body, ?PersonnelRequestItem $item = null): void
     {
         $employee = $request->beneficiary;
         if (! $employee) {
@@ -81,14 +111,15 @@ final class PersonnelRequestNotifier
         $user = $employee->user;
         if ($user instanceof User && $user->employee_id === $employee->employee_id) {
             UserNotificationSubscription::ensurePersonnelRequestsForUser($user);
-            $user->notify(new NewSubmissionNotification(
+            app(NotificationDispatchService::class)->dispatch(User::NOTIFICATION_PREFERENCE_MEMBER_REQUEST_UPDATES, new NewSubmissionNotification(
                 submissionType: 'member_request_update',
                 title: $title,
                 body: $body,
                 actionUrl: $url,
                 icon: 'heroicon-o-chat-bubble-left-right',
-                essentialInApp: true,
-            ));
+                messageBearing: true,
+                pushSubject: $request->request_number,
+            ), [$user]);
 
             return;
         }

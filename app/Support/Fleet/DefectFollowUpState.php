@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Fleet;
 
+use App\Enums\ApparatusServiceTicketStatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusServiceTicket;
 use Illuminate\Database\Eloquent\Builder;
@@ -23,9 +24,17 @@ final class DefectFollowUpState
 
     public const SERVICE_FOLLOW_UP = 'service_follow_up';
 
+    /** The linked service ticket was completed (the work was done). */
     public const TICKET_CLOSED = 'ticket_closed';
 
+    /** The linked service ticket was cancelled: nothing was done, so this is NOT a finished repair. */
+    public const TICKET_CANCELLED = 'ticket_cancelled';
+
+    /** Fixed: resolved by a person (repaired, replaced, located). */
     public const RESOLVED = 'resolved';
+
+    /** Closed with no action required: no longer open, but nothing was repaired or replaced. */
+    public const CLOSED_NO_ACTION = 'closed_no_action';
 
     /** Reviewer classifications that mean an administrator has looked at the issue. */
     private const REVIEWED_IMPACTS = ['non_blocking', 'needs_repair', 'out_of_service'];
@@ -40,8 +49,10 @@ final class DefectFollowUpState
             self::AWAITING_REVIEW => 'Awaiting review',
             self::ACKNOWLEDGED => 'Acknowledged',
             self::SERVICE_FOLLOW_UP => 'Under service follow-up',
-            self::TICKET_CLOSED => 'Service ticket closed',
+            self::TICKET_CLOSED => 'Service ticket completed',
+            self::TICKET_CANCELLED => 'Service ticket cancelled',
             self::RESOLVED => 'Resolved',
+            self::CLOSED_NO_ACTION => DefectNoActionClosure::STATUS_LABEL,
         ];
     }
 
@@ -58,7 +69,9 @@ final class DefectFollowUpState
             self::ACKNOWLEDGED => 'info',
             self::SERVICE_FOLLOW_UP => 'primary',
             self::TICKET_CLOSED => 'gray',
+            self::TICKET_CANCELLED => 'warning',
             self::RESOLVED => 'success',
+            self::CLOSED_NO_ACTION => 'gray',
             default => 'gray',
         };
     }
@@ -66,16 +79,23 @@ final class DefectFollowUpState
     /** Requires the serviceTicket relation to be loaded for a linked ticket. */
     public static function for(ApparatusDefect $defect): string
     {
+        if ($defect->isClosedNoAction()) {
+            return self::CLOSED_NO_ACTION;
+        }
         if ($defect->resolved || $defect->status === 'resolved') {
             return self::RESOLVED;
         }
 
         if ($defect->service_ticket_id !== null) {
             $ticket = $defect->getRelationValue('serviceTicket');
+            if ($ticket instanceof ApparatusServiceTicket && ! $ticket->is_open) {
+                // A cancelled ticket is not a completed one: the issue may still need real work.
+                return $ticket->status === ApparatusServiceTicketStatus::Cancelled->value
+                    ? self::TICKET_CANCELLED
+                    : self::TICKET_CLOSED;
+            }
 
-            return $ticket instanceof ApparatusServiceTicket && ! $ticket->is_open
-                ? self::TICKET_CLOSED
-                : self::SERVICE_FOLLOW_UP;
+            return self::SERVICE_FOLLOW_UP;
         }
 
         $impact = $defect->operational_impact;
@@ -97,12 +117,19 @@ final class DefectFollowUpState
     public static function applyFilter(Builder $query, ?string $state): Builder
     {
         return match ($state) {
-            self::RESOLVED => $query->where('resolved', true),
+            self::RESOLVED => $query->where('resolved', true)
+                ->where(fn (Builder $kind) => $kind->whereNull('action_status')->orWhere('action_status', '!=', DefectActionStatus::DISMISSED)),
+            self::CLOSED_NO_ACTION => $query->where('action_status', DefectActionStatus::DISMISSED),
             self::SERVICE_FOLLOW_UP => $query->where('resolved', false)
                 ->whereHas('serviceTicket', fn (Builder $ticket) => $ticket->scopes('open')),
             self::TICKET_CLOSED => $query->where('resolved', false)
                 ->whereNotNull('service_ticket_id')
-                ->whereDoesntHave('serviceTicket', fn (Builder $ticket) => $ticket->scopes('open')),
+                ->whereDoesntHave('serviceTicket', fn (Builder $ticket) => $ticket->scopes('open'))
+                ->whereDoesntHave('serviceTicket', fn (Builder $ticket) => $ticket->where('status', ApparatusServiceTicketStatus::Cancelled->value)),
+            self::TICKET_CANCELLED => $query->where('resolved', false)
+                ->whereNotNull('service_ticket_id')
+                ->whereDoesntHave('serviceTicket', fn (Builder $ticket) => $ticket->scopes('open'))
+                ->whereHas('serviceTicket', fn (Builder $ticket) => $ticket->where('status', ApparatusServiceTicketStatus::Cancelled->value)),
             self::AWAITING_REVIEW => $query->where('resolved', false)
                 ->whereNull('service_ticket_id')
                 ->where('operational_impact', self::REVIEW_PENDING_IMPACT),

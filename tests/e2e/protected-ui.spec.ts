@@ -304,7 +304,8 @@ for (const route of pages) test(`authenticated ${route.name} fits and remains na
         for (const link of await page.locator('.ep-panel-link').all()) {
           expect.soft((await link.boundingBox())!.height).toBeGreaterThanOrEqual(44);
         }
-        const rendering = await page.locator('.ep-hero').evaluate(element => {
+        // The member identity now lives in the page header (name as the title, rank and ID as its subheading).
+        const rendering = await page.locator('main .fi-header').evaluate(element => {
           const ancestors = [];
           for (let node: Element | null = element; node; node = node.parentElement) {
             const style = getComputedStyle(node);

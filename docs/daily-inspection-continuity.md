@@ -143,6 +143,9 @@ All additive; no table drops; safe on existing data; PostgreSQL and SQLite compa
   `apparatus_inspection_id`/`created_at`; `last_observed_*` from latest observation.
 - Model hook: `action_status` is the lifecycle source of truth. When `action_status` is dirty:
   `resolved = in(resolved, dismissed)`, `status = resolved ? 'resolved' : (action_status === 'reported' ? 'open' : 'in_progress')`.
+  `resolved = true` therefore only means "no longer open". HOW an issue ended is `action_status`: `resolved` (fixed) versus
+  `dismissed`, which people read as "Closed — no action required" and which must never be labelled, filtered or counted as
+  Resolved (`DefectActionStatus::closureKind()`, `ApparatusDefect::fixed()` / `closedNoAction()`).
   When legacy code sets `status`/`resolved` directly, derive `action_status` (`resolved` -> `resolved`, unresolved -> keep or `reported`).
   `apparatus_inspection_id` keeps meaning "origin inspection" and is never overwritten after creation.
 
@@ -244,7 +247,18 @@ optional `member_message` also creates a member-visible `apparatus_issue_message
 - `acknowledge(data: member_message?)`
 - `updateAction(data: action_status in [action_pending, replacement_available, repair_scheduled], details{...}, member_message?, internal_note?)`
 - `resolve(data: resolution_type, resolution_notes (required), member_message?)` -> `action_status=resolved`, `resolved_by_user_id`, notify participants once (event key `defect:{id}:resolved:{event_id}`).
-- `dismiss(data: reason)`; `reopen(data: reason)` (same row, event `reopened`, preserves history); `verifyCorrection(data: notes)` = resolve with `resolution_type=item_located` default when latest observation is `appears_corrected`.
+- `dismiss(data: reason)` = the action named **Close — No Action Required** (stored values unchanged: `action_status=dismissed`, event `dismissed`).
+  Rules enforced here for every door (admin page, Captain 5):
+  - `reason` is required, trimmed, at least 15 characters, and not a placeholder (`n/a`, `na`, `none`, `test`, `.`, `-`, "no action required", one repeated word...). See `DefectNoActionClosure::reasonProblem()`.
+  - Refused (plain-language message, nothing written) while the issue is significant damage, `operational_impact` is `out_of_service` or `needs_repair`,
+    repair or replacement is already arranged (`repair_scheduled`, `replacement_available`, or order/vendor/appointment details on record), or a service ticket is open
+    (`NoActionClosureGuard`). Advice: the impact has an audited path (Classify impact, then close); severity has none ("Resolve it once repaired, or ask Fleet to correct the report"); Captain 5 is told to ask Logistics.
+  - The event records the actor (`actor_user_id`), time (`created_at`), `from_status`, and `details.reason` / `details.previous_action_status`; the reason is printed on the issue card, the issue timeline, the Defects history, the member inspection page, the PDF and the Captain 5 history.
+  - The reporter and every participant are ALWAYS notified with the reason (`InspectionNotificationDispatcher::issueClosedNoAction`, key `defect:{id}:closed:{event}`;
+    from Captain 5 the single sender is `Captain5Notifier` with key `captain5:defect:{id}:closed:{event}` and the same recipient set), so nobody is told twice.
+  - Reopen works on it like on a resolved issue (`reopen(data: reason)`: same row, event `reopened`, preserves history and the original close reason in `previous_resolution_notes`).
+  `resolve()` no longer accepts `resolution_type=report_corrected` for NEW resolutions ("the report was wrong" is Close — No Action Required); old rows keep the value and its label.
+- `verifyCorrection(data: notes)` = resolve with `resolution_type=item_located` default when latest observation is `appears_corrected`.
 - `classifyImpact(data: operational_impact)` existing values; `out_of_service` additionally authorizes `update` on apparatus and sets status explicitly.
 - `linkTicket` reuses `ApparatusDefectServiceTicketService`.
 Ticket completion does NOT auto-resolve a defect (resolution requires an explicit decision).
@@ -276,6 +290,8 @@ WebPush/mail only where `user_notification_subscriptions` already enables them. 
   - `member_reply` -> reviewers who participated in that thread, else reviewers.
   - `issue_resolved` -> all participants + assigned admin, once per resolution event; inactive users skipped;
     multiple user accounts of the same employee collapse to one (most recent active user).
+  - Closed with no action required (`dismissed`) -> the same people, always (kind `issue_member_update`, wording "closed with no action required ... It was not repaired or replaced"), once per event.
+  - New significant damage holds the checkout, so reviewers get ONE `inspection_review_required` message that names the damaged items; `issue_escalated` is sent only when the checkout was not held.
 - Member links: `MyVehicleInspectionView` URL for the related inspection (employee panel) with `#issue-{id}`.
   Admin links: `InspectionResource::getUrl('view', ['record' => id])` with anchor.
 - No daily repeat alert for a known unresolved issue (`observed_again` never notifies).

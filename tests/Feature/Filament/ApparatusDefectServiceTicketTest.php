@@ -348,7 +348,9 @@ final class ApparatusDefectServiceTicketTest extends TestCase
         $ticketed = $this->makeDefect('Ladder', ['service_ticket_id' => $this->ticket('submitted')->id]);
         $closed = $this->makeDefect('Light', ['service_ticket_id' => $this->ticket('completed')->id]);
         $resolved = $this->makeDefect('Rope', ['status' => 'resolved', 'resolution_notes' => 'Done.']);
-        $all = [$this->defect, $awaiting, $acknowledged, $ticketed, $closed, $resolved];
+        $cancelled = $this->makeDefect('Strap', ['service_ticket_id' => $this->ticket('cancelled')->id]);
+        $noAction = $this->makeDefect('Duplicate lamp', ['action_status' => 'dismissed', 'resolution_notes' => 'Duplicate of an earlier report.']);
+        $all = [$this->defect, $awaiting, $acknowledged, $ticketed, $closed, $resolved, $cancelled, $noAction];
 
         $manager = $this->defectsManager();
         foreach ([
@@ -357,7 +359,9 @@ final class ApparatusDefectServiceTicketTest extends TestCase
             DefectFollowUpState::ACKNOWLEDGED => $acknowledged,
             DefectFollowUpState::SERVICE_FOLLOW_UP => $ticketed,
             DefectFollowUpState::TICKET_CLOSED => $closed,
+            DefectFollowUpState::TICKET_CANCELLED => $cancelled,
             DefectFollowUpState::RESOLVED => $resolved,
+            DefectFollowUpState::CLOSED_NO_ACTION => $noAction,
         ] as $tab => $expected) {
             $others = array_values(array_filter($all, fn (ApparatusDefect $defect): bool => $defect->id !== $expected->id));
             $manager->set('followUpTab', $tab)
@@ -382,6 +386,8 @@ final class ApparatusDefectServiceTicketTest extends TestCase
             $this->makeDefect('F', ['service_ticket_id' => $open->id, 'operational_impact' => 'needs_admin_review']),
             $this->makeDefect('G', ['service_ticket_id' => $done->id, 'status' => 'in_progress']),
             $this->makeDefect('H', ['status' => 'resolved', 'service_ticket_id' => $open->id, 'resolution_notes' => 'x']),
+            $this->makeDefect('I', ['action_status' => 'dismissed', 'resolution_notes' => 'Duplicate of an earlier report.']),
+            $this->makeDefect('J', ['service_ticket_id' => $this->ticket('completed')->id]),
         ];
 
         $expected = [];
@@ -398,6 +404,46 @@ final class ApparatusDefectServiceTicketTest extends TestCase
             $ids = DefectFollowUpState::applyFilter(ApparatusDefect::query(), $state)->orderBy('id')->pluck('id')->all();
             $this->assertSame($expected[$state], $ids, "SQL filter disagrees with the resolver for {$state}.");
         }
+    }
+
+    public function test_the_defects_tab_has_no_status_back_door_and_a_hand_made_defect_always_starts_open(): void
+    {
+        $this->actAsPanelUser('logistics_admin');
+        // Create and Edit exist on the apparatus edit page (the view page is read-only).
+        $manager = Livewire::test(DefectsRelationManager::class, [
+            'ownerRecord' => $this->apparatus,
+            'pageClass' => \App\Filament\Resources\ApparatusResource\Pages\EditApparatus::class,
+            'lazy' => false,
+        ])->call('loadTable');
+
+        // The create/edit form has no status field at all (only the report itself).
+        $livewire = $manager->instance();
+        $fields = array_keys($livewire->form(\Filament\Forms\Form::make($livewire))->getFlatFields());
+        $this->assertContains('item', $fields);
+        $this->assertNotContains('status', $fields);
+        $this->assertNotContains('resolved', $fields);
+
+        // A forged status in the request cannot close the defect.
+        $manager->callTableAction('create', data: [
+            'compartment' => 'Cab', 'item' => 'Hand made item', 'issue_type' => 'missing',
+            'status' => 'resolved', 'resolved' => true, 'action_status' => 'resolved',
+        ])->assertHasNoTableActionErrors();
+        $made = ApparatusDefect::query()->where('item', 'Hand made item')->firstOrFail();
+        $this->assertSame('reported', $made->action_status);
+        $this->assertSame('open', $made->status);
+        $this->assertFalse((bool) $made->resolved);
+        $this->assertNull($made->resolved_at);
+
+        // Editing the report cannot close it either: no event, no actor, no notes would exist.
+        $manager->callTableAction('edit', $made, data: [
+            'compartment' => 'Cab', 'item' => 'Hand made item', 'issue_type' => 'missing', 'notes' => 'Edited',
+            'status' => 'resolved', 'resolved' => true, 'action_status' => 'dismissed',
+        ])->assertHasNoTableActionErrors();
+        $made->refresh();
+        $this->assertSame('Edited', $made->notes);
+        $this->assertSame('reported', $made->action_status);
+        $this->assertFalse((bool) $made->resolved);
+        $this->assertSame(0, \App\Models\ApparatusDefectEvent::query()->where('apparatus_defect_id', $made->id)->count());
     }
 
     /* -------------------------------------------------------------- profile */

@@ -180,7 +180,7 @@
 .hub-swap-notice a { color: rgb(var(--hub-warning-strong)); font-weight: 650; text-decoration: underline; }
 
 /* Canonical admin inspection workspace (/admin/inspections/{record}) and the dashboard inspection queues. */
-.hub-insp-anchor { scroll-margin-top: calc(var(--hub-shell-bar-height, 3.5rem) + 1rem); }
+.hub-insp-anchor { scroll-margin-top: calc(var(--hub-bar-total, 3.5rem) + 1rem); }
 .hub-insp :is(a, summary):focus-visible, .hub-insp-queues a:focus-visible { outline: 2px solid rgb(var(--hub-focus)); outline-offset: 2px; border-radius: 4px; }
 .hub-insp-link { display: inline-flex; align-items: center; min-height: 2.75rem; padding-inline: .25rem; color: rgb(var(--hub-action-primary)); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
 .hub-insp-badge--info { border-color: rgb(var(--hub-info-border)); background: rgb(var(--hub-info-bg)); color: rgb(var(--hub-info)); }

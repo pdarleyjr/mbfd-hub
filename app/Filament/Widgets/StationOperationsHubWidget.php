@@ -17,6 +17,7 @@ use App\Filament\Resources\VehicleSwapRequestResource;
 use App\Filament\Support\InspectionWorkspace;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
+use App\Models\ApparatusDefectObservation;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusInspectionException;
 use App\Models\ApparatusServiceTicket;
@@ -38,6 +39,9 @@ use Illuminate\Support\Facades\DB;
 
 final class StationOperationsHubWidget extends Widget
 {
+    /** Queue flag for an open issue whose latest checkout observation is "appears corrected". */
+    public const MEMBER_REPORTS_CORRECTED = 'Member reports corrected — verify';
+
     protected static string $view = 'filament.widgets.station-operations-hub-widget';
 
     protected static ?int $sort = 3;
@@ -336,6 +340,10 @@ final class StationOperationsHubWidget extends Widget
         // Query 2: every unresolved issue in a queue state; new/escalated wins over corrective action.
         $defects = ApparatusDefect::query()
             ->select(['id', 'apparatus_id', 'item', 'issue_type', 'severity', 'action_status', 'acknowledged_at', 'first_reported_inspection_id', 'apparatus_inspection_id', 'last_observed_inspection_id', 'first_reported_at', 'created_at'])
+            // The member-facing checkout promises "Logistics will verify" when a member marks an
+            // issue present; carry the latest observation along (no extra query) so the row can say so.
+            ->addSelect(['latest_observation' => ApparatusDefectObservation::query()->select('observation')
+                ->whereColumn('apparatus_defect_id', 'apparatus_defects.id')->orderByDesc('id')->limit(1)])
             ->whereIn('apparatus_id', $apparatusIds)->unresolved()
             ->whereIn('action_status', [
                 DefectActionStatus::REPORTED, DefectActionStatus::ACKNOWLEDGED, DefectActionStatus::ACTION_PENDING,
@@ -346,6 +354,10 @@ final class StationOperationsHubWidget extends Widget
             $apparatus = $apparatusById->get((int) $record->apparatus_id);
             $sourceId = $record->first_reported_inspection_id ?? $record->apparatus_inspection_id ?? $record->last_observed_inspection_id;
             $status = DefectActionStatus::label($record->action_status).($record->severity === 'significant' ? ' · Significant damage' : '');
+            if ($record->getAttribute('latest_observation') === 'appears_corrected') {
+                // Read-only flag: Verify (or Reopen) is still the admin's call on the issue card.
+                $status = self::MEMBER_REPORTS_CORRECTED.' · '.$status;
+            }
 
             return $this->attentionRow(
                 (int) $record->id, $type, ($apparatus instanceof Apparatus ? $this->apparatusLabel($apparatus) : 'Apparatus').' · '.($record->item ?: $this->headline((string) $record->issue_type)),

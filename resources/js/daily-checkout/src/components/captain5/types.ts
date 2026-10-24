@@ -62,6 +62,10 @@ export interface IssueSummary {
   last_observed_at: string | null;
   resolved_at: string | null;
   resolution_type: string | null;
+  /** How a closed issue ended: fixed, or closed with no action required. */
+  closure?: 'resolved' | 'closed_no_action' | null;
+  /** Why no corrective action was necessary, for closure = closed_no_action. */
+  closure_reason?: string | null;
   state_token: string;
 }
 

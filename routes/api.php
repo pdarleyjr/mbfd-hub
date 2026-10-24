@@ -157,7 +157,9 @@ Route::middleware(['web', AuthenticateSession::class, 'auth', 'throttle:10,1'])
     ->withoutMiddleware(EnsureFrontendRequestsAreStateful::class)->group(function () {
         Route::post('push-subscriptions', [PushSubscriptionController::class, 'store']);
         Route::delete('push-subscriptions', [PushSubscriptionController::class, 'destroy']);
-        Route::post('push/test', [TestNotificationController::class, 'sendTestNotification']);
+        // A test alert is a real push to the member's own devices: three a minute is plenty.
+        Route::post('push/test', [TestNotificationController::class, 'sendTestNotification'])
+            ->middleware('throttle:3,1,push-test');
     });
 
 // Admin lookup endpoints — powers the desktop-PWA Dexie prefetch + future typeahead.

@@ -38,6 +38,10 @@ final class AccountController extends Controller
             'securityState' => $securityState,
             'localCredentials' => $localCredentials,
             'changePasswordUrl' => $user->employee_profile_id !== null ? '/employee/set-password' : '/admin/set-password',
+            // The settings page lives in a panel; a member with neither a personnel record nor Admin access has no panel to host it.
+            'notificationSettingsUrl' => $user->employee_profile_id !== null
+                ? '/employee/notification-settings'
+                : ($user->hasCurrentAdminPanelEntitlement() ? '/admin/notification-settings' : null),
             'enrollmentUrls' => ! $localCredentials && $link instanceof UserIdentityLink && $identities->enabledFor($user)
                 ? $identities->enrollmentUrls($user) : null,
             'activeSessionCount' => AuthenticationSession::query()

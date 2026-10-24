@@ -14,6 +14,7 @@ use App\Models\Uniform;
 use App\Services\PersonnelRequests\PersonnelRequestFulfillmentService;
 use App\Services\PersonnelRequests\PersonnelRequestLifecycleService;
 use App\Services\PersonnelRequests\PersonnelRequestWorkflowService;
+use App\Support\DecisionReason;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\CheckboxList;
@@ -58,7 +59,7 @@ class ViewPersonnelRequest extends ViewRecord
                 ->requiresConfirmation()
                 ->action(fn () => $this->performItemAction(fn () => app(PersonnelRequestLifecycleService::class)->restore($this->getRecord(), auth()->user()), 'Order restored from Trash')),
             ...$this->getArchiveActions(),
-            Action::make('delete_order')->label('Delete order')->icon('heroicon-o-trash')->color('danger')
+            Action::make('delete_order')->label('Move to Trash')->icon('heroicon-o-trash')->color('danger')
                 ->authorize(fn (): bool => auth()->user()?->can('delete', $this->getRecord()) ?? false)
                 ->visible(fn (): bool => ! $this->getRecord()->trashed() && $this->getRecord()->type === PersonnelRequestType::Uniform)
                 ->modalDescription('Move this cancelled or denied, unissued order to Trash. The original order, items, history, and private evidence are retained for recovery.')
@@ -356,15 +357,24 @@ class ViewPersonnelRequest extends ViewRecord
     {
         /** @var PersonnelRequest $request */
         $request = $this->record;
+        $needsReason = in_array($status, [PersonnelRequestStatus::Denied, PersonnelRequestStatus::Cancelled], true);
+        $workflow = fn (): PersonnelRequestWorkflowService => app(PersonnelRequestWorkflowService::class);
 
         return Action::make($name)
             ->authorize('update', $request)
             ->label($label)
             ->icon($icon)
             ->color($color)
-            ->visible(fn (): bool => app(PersonnelRequestWorkflowService::class)->canTransition($request, $status))
+            // Complete only appears once every item is issued; the service enforces the same rule.
+            ->visible(fn (): bool => $status === PersonnelRequestStatus::Completed
+                ? $workflow()->canComplete($request)
+                : $workflow()->canTransition($request, $status))
             ->form([
-                Textarea::make('employee_note')->label('Employee-visible note')->maxLength(2000),
+                $needsReason
+                    ? Textarea::make('employee_note')->label('Reason (shown to the member)')
+                        ->helperText('Say what happened in plain words. The member sees "'.$status->label().': your reason" on their request.')
+                        ->required()->minLength(DecisionReason::MIN_LENGTH)->maxLength(DecisionReason::MAX_LENGTH)
+                    : Textarea::make('employee_note')->label('Employee-visible note')->maxLength(2000),
                 Textarea::make('internal_note')->label('Admin-only internal note')->maxLength(2000),
             ])->requiresConfirmation()
             ->action(function (array $data) use ($request, $status): void {

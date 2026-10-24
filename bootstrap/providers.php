@@ -4,6 +4,8 @@ return [
     App\Providers\AppServiceProvider::class,
     App\Providers\HubOidcServiceProvider::class,
     App\Providers\HealthServiceProvider::class,
+    App\Providers\ConferenceRateLimitServiceProvider::class,
+    App\Providers\NotificationServiceProvider::class,
     App\Providers\ResponsiveTablesServiceProvider::class,
     App\Providers\Filament\AdminPanelProvider::class,
     App\Providers\Filament\TrainingPanelProvider::class,

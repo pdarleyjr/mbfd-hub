@@ -560,7 +560,7 @@ test.describe('Issues and the detail sheet', () => {
     const group = page.getByRole('group', { name: 'Issue actions' });
     await expect(group.getByRole('button')).toHaveText(['Mark available for pickup', 'Mark ordered', 'Update delivery', 'Replaced / returned to service']);
     await expect(group.getByRole('button', { name: 'Acknowledge' })).toHaveCount(0);
-    await expect(group.getByRole('button', { name: 'Close: no action required' })).toHaveCount(0);
+    await expect(group.getByRole('button', { name: 'Close — No Action Required' })).toHaveCount(0);
     await expect(group.getByRole('button').first()).toHaveClass(/hub-btn--primary/);
   });
 
@@ -623,9 +623,9 @@ test.describe('Issues and the detail sheet', () => {
   test('Dismiss requires a reason', async ({ page }) => {
     const server = newServer();
     await open(page, server, '/daily/captain-5?issue=1');
-    await page.getByRole('group', { name: 'Issue actions' }).getByRole('button', { name: 'Close: no action required' }).click();
-    await actionForm(page).getByRole('button', { name: 'Close with no action' }).click();
-    await expect(actionForm(page).getByText('Give a reason.')).toBeVisible();
+    await page.getByRole('group', { name: 'Issue actions' }).getByRole('button', { name: 'Close — No Action Required' }).click();
+    await actionForm(page).getByRole('button', { name: 'Close issue' }).click();
+    await expect(actionForm(page).getByText('Say why no corrective action is necessary.')).toBeVisible();
     expect(server.actionBodies).toHaveLength(0);
   });
 
@@ -760,9 +760,12 @@ test.describe('Replacements, History and Messages', () => {
   });
 
   test('History searches closed issues through the server', async ({ page }) => {
-    const server = newServer({ closed: [makeIssue(8, { item: 'Glucometer', open: false, action_status: 'resolved', resolved_at: minutesAgo(2000), resolution_type: 'replacement_installed', actions: ['reopen'] }), makeIssue(9, { item: 'Bandage shears', open: false, action_status: 'dismissed', resolved_at: minutesAgo(3000), actions: ['reopen'] })] });
+    const server = newServer({ closed: [makeIssue(8, { item: 'Glucometer', open: false, action_status: 'resolved', resolved_at: minutesAgo(2000), resolution_type: 'replacement_installed', actions: ['reopen'] }), makeIssue(9, { item: 'Bandage shears', open: false, action_status: 'dismissed', closure: 'closed_no_action', closure_reason: 'Duplicate of the report entered on Oct 20', resolved_at: minutesAgo(3000), actions: ['reopen'] })] });
     await open(page, server, '/daily/captain-5?tab=history');
     await expect(page.getByTestId('captain5-history-row')).toHaveCount(2);
+    await expect(page.getByTestId('captain5-history-row').filter({ hasText: 'Bandage shears' })).toContainText('Closed — no action required');
+    await expect(page.getByTestId('captain5-history-row').filter({ hasText: 'Bandage shears' })).toContainText('Reason: Duplicate of the report entered on Oct 20');
+    await expect(page.getByTestId('captain5-history-row').filter({ hasText: 'Glucometer' })).not.toContainText('no action required');
     await page.getByLabel('Search closed issues').fill('gluco');
     await expect(page.getByTestId('captain5-history-row')).toHaveCount(1);
     await expect(page.getByTestId('captain5-history-row')).toContainText('Glucometer');

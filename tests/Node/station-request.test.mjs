@@ -45,12 +45,24 @@ test('station, room, and apparatus service APIs cannot remain stale', () => {
   const serviceWorker = read('resources/js/daily-checkout/public/service-worker.js');
   const api = read('resources/js/daily-checkout/src/utils/api.ts');
 
-  assert.match(serviceWorker, /mbfd-checkout-v11/);
-  assert.match(serviceWorker, /url\.pathname\.startsWith\('\/api\/public\/stations'\)/);
+  assert.match(serviceWorker, /mbfd-checkout-v12/);
+  // Only an explicit allowlist of read models (every station-wide read the Daily screens make, as the
+  // baseline cached by prefix) is ever stored, network first, purged on sign-out and user switch.
+  // Service tickets/notices, identity and everything else always reach the network.
+  assert.match(serviceWorker, /const OFFLINE_READ_MODELS = \[/);
+  assert.ok(serviceWorker.includes(String.raw`/^\/api\/public\/stations$/,`), 'the station list is on the allowlist');
+  // Station requests and activity are station-scoped with requester identity redacted, not member-private,
+  // and every API cache is purged on sign-out and user switch (see docs/pwa-service-worker-architecture.md 7.2).
+  assert.ok(serviceWorker.includes(String.raw`/^\/api\/public\/stations\/[^/]+\/activity$/`), 'station activity works offline again');
+  assert.ok(serviceWorker.includes(String.raw`/^\/api\/public\/stations\/[^/]+\/requests$/`), 'station requests work offline again');
+  assert.ok(!serviceWorker.includes(String.raw`/service-tickets$/,`), 'service tickets are live data, not an offline read model');
+  assert.doesNotMatch(serviceWorker, /url\.pathname\.startsWith\('\/api\/public\/stations'\)/);
+  assert.doesNotMatch(serviceWorker, /startsWith\('\/api\/public\/apparatuses'\)/);
   assert.match(serviceWorker, /url\.pathname\.endsWith\('\/service-notices'\)/);
   assert.match(serviceWorker, /url\.pathname\.endsWith\('\/service-tickets'\)/);
   assert.match(serviceWorker, /if \(isLiveServiceRequest\) \{[\s\S]*fetch\(request, \{ cache: 'no-store' \}\)/);
-  assert.match(serviceWorker, /if \(isStationApiRequest \|\| isApparatusApiRequest\)/);
+  assert.match(serviceWorker, /if \(isOfflineReadModelRequest\)/);
+  assert.match(serviceWorker, /url\.pathname\.startsWith\('\/api\/'\) && !isOfflineReadModelRequest/);
   assert.match(api, /fetch(?:WithTimeout)?\(`\$\{API_BASE\}\/public\/stations`, \{[\s\S]*cache: 'no-store'/);
   assert.match(api, /fetch(?:WithTimeout)?\(`\$\{API_BASE\}\/public\/stations\/\$\{id\}`, \{[\s\S]*cache: 'no-store'/);
 });

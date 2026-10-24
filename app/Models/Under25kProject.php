@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Builder;
 
 class Under25kProject extends Model
 {
@@ -53,8 +53,8 @@ class Under25kProject extends Model
         static::addGlobalScope('fireDepartment', function (Builder $builder) {
             $builder->where(function ($query) {
                 $query->where('project_number', 'LIKE', 'FIRE-%')
-                      ->orWhere('project_number', 'LIKE', 'NEW-%')
-                      ->orWhere('project_number', 'LIKE', '*NEW*%');
+                    ->orWhere('project_number', 'LIKE', 'NEW-%')
+                    ->orWhere('project_number', 'LIKE', '*NEW*%');
             });
         });
     }
@@ -76,7 +76,10 @@ class Under25kProject extends Model
     // Scopes
     public function scopeActive($query)
     {
-        return $query->where('status', '!=', 'Completed');
+        // Status is stored as free text: the admin form writes the lower-case ProjectStatus value
+        // ('completed') while imports and the station panel use 'Completed'. Compare case-insensitively
+        // and keep rows with no status (not yet classified) in the active list.
+        return $query->where(fn ($scope) => $scope->whereNull('status')->orWhereRaw('LOWER(status) != ?', ['completed']));
     }
 
     public function scopeHighPriority($query)
@@ -93,8 +96,8 @@ class Under25kProject extends Model
     // Accessors
     public function getIsOverdueAttribute(): bool
     {
-        return $this->target_completion_date 
-            && $this->target_completion_date->isPast() 
-            && !$this->actual_completion_date;
+        return $this->target_completion_date
+            && $this->target_completion_date->isPast()
+            && ! $this->actual_completion_date;
     }
 }

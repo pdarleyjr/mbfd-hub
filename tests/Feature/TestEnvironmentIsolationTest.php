@@ -50,10 +50,14 @@ final class TestEnvironmentIsolationTest extends TestCase
             'webpush.vapid.private_key',
             'webpush.vapid.public_key',
             'webpush.vapid.subject',
-            'webpush.allowed_endpoint_hosts',
         ] as $configuration) {
             $this->assertEmpty(config($configuration), $configuration.' must be blank in PHPUnit');
         }
+        // A blank WEBPUSH_ALLOWED_ENDPOINT_HOSTS means the official browser push services, never "reject everything".
+        $this->assertSame(
+            ['fcm.googleapis.com', 'updates.push.services.mozilla.com', 'web.push.apple.com', '*.notify.windows.com'],
+            config('webpush.allowed_endpoint_hosts'),
+        );
 
         $this->assertFalse((bool) config('cloudflare.ai.enabled'));
         $this->assertFalse((bool) config('google_sheets.apparatus_sync_enabled'));

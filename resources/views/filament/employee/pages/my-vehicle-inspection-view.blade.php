@@ -9,6 +9,8 @@
     };
     $statusText = fn (string $status): string => $status === 'Present' ? 'Pass' : $status;
     $acceptance = $detail['acceptance'];
+    // The member cannot approve anything; say what is actually happening.
+    $waitingForReview = 'Waiting for Logistics review';
     $reviewTone = match ($acceptance['state']) {
         'accepted' => 'success',
         'rejected' => 'danger',
@@ -32,13 +34,13 @@
                         @if($detail['station_label']) · {{ $detail['station_label'] }}@endif
                     </p>
                 </div>
-                <span class="hub-insp-badge hub-insp-badge--lg hub-insp-badge--{{ $reviewTone }}">{{ $acceptance['headline'] }}</span>
+                <span class="hub-insp-badge hub-insp-badge--lg hub-insp-badge--{{ $reviewTone }}">{{ $acceptance['state'] === 'needs_approval' ? $waitingForReview : $acceptance['headline'] }}</span>
             </div>
 
             <div id="acceptance" class="hub-insp-accept" style="margin-top: 1rem;">
                 <p>
                     @if($acceptance['state'] === 'needs_approval')
-                        Needs approval{{ count($acceptance['reasons']) > 0 ? ': '.implode('; ', $acceptance['reasons']) : '' }}
+                        {{ $waitingForReview }}{{ count($acceptance['reasons']) > 0 ? ': '.implode('; ', $acceptance['reasons']) : '' }}
                     @else
                         {{ $acceptance['headline'] }}
                     @endif
@@ -74,7 +76,7 @@
                 <div><dt>Checklist version</dt><dd style="font-family: var(--hub-font-mono);">{{ $detail['checklist_version_short'] ?? '—' }}</dd></div>
                 <div><dt>Review</dt>
                     <dd>
-                        {{ $detail['review_label'] }}
+                        {{ $detail['review_status'] === 'pending_review' ? $waitingForReview : $detail['review_label'] }}
                         @if($detail['reviewed_at'])
                             <small>Reviewed {{ $detail['reviewed_at']->format('M j, Y g:i A') }}</small>
                         @elseif($detail['review_status'] === 'approved' && $detail['automatically_accepted'])
@@ -136,6 +138,27 @@
                             @if($followUp['resolved_at'])
                                 <p class="hub-insp-finding__follow">
                                     <span class="hub-insp-finding__done">Resolved on {{ $followUp['resolved_at']->format('M j, Y') }}.</span>
+                                    What you recorded on this inspection is unchanged.
+                                </p>
+                            @elseif($followUp['closed_no_action'] ?? false)
+                                {{-- Closed with no action required is NOT "Resolved": nothing was repaired or replaced. --}}
+                                <p class="hub-insp-finding__follow" data-closed-no-action>
+                                    <strong>{{ \App\Support\Fleet\DefectNoActionClosure::STATUS_LABEL }}</strong>@if($followUp['closed_at']) on {{ $followUp['closed_at']->format('M j, Y') }}@endif.
+                                    @if($followUp['closed_reason'])
+                                        Reason: {{ rtrim($followUp['closed_reason'], '.') }}.
+                                    @endif
+                                    Nothing was repaired or replaced. What you recorded on this inspection is unchanged.
+                                </p>
+                            @endif
+                            @if(! empty($followUp['severity_correction']))
+                                @php($correction = $followUp['severity_correction'])
+                                <p class="hub-insp-finding__follow" data-severity-corrected>
+                                    <strong>Severity corrected</strong>@if($correction['at']) on {{ $correction['at']->format('M j, Y') }}@endif:
+                                    Logistics changed it from {{ strtolower(\App\Support\Fleet\DefectSeverityCorrection::label($correction['from'])) }}
+                                    to {{ strtolower(\App\Support\Fleet\DefectSeverityCorrection::label($correction['to'])) }}.
+                                    @if($correction['reason'])
+                                        Reason: {{ rtrim($correction['reason'], '.') }}.
+                                    @endif
                                     What you recorded on this inspection is unchanged.
                                 </p>
                             @endif

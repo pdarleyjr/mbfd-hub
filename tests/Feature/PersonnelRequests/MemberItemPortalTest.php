@@ -230,9 +230,14 @@ final class MemberItemPortalTest extends TestCase
     private function admin(): User
     {
         Role::findOrCreate('logistics_admin', 'web');
-        $admin = User::factory()->create();
+        $admin = User::factory()->create(['account_status' => 'active']);
         $admin->assignRole('logistics_admin');
+        // Provisioned like production: the Admin Panel entitlement plus the personnel capability,
+        // so the alert's link into the admin panel is one this admin may open.
+        foreach (['admin.access', 'admin.personnel.view', 'admin.personnel.manage'] as $permission) {
+            $admin->givePermissionTo(\Spatie\Permission\Models\Permission::findOrCreate($permission, 'web'));
+        }
 
-        return $admin;
+        return $admin->fresh();
     }
 }

@@ -77,13 +77,18 @@ final class ApparatusInspectionProcessingService
     private function notifyReviewers(ApparatusInspection $inspection, FindingsResult $findings): void
     {
         $notifications = app(InspectionNotificationDispatcher::class);
-        if ($inspection->processing_status === self::STATUS_HELD) {
+        $held = $inspection->processing_status === self::STATUS_HELD;
+        if ($held) {
+            // New significant damage always holds the checkout, and this one message already names the
+            // damaged items, so reviewers are not sent a second "significant damage" alert for the same event.
             $notifications->reviewRequired($inspection);
         }
-        foreach ($findings->significantNewOrEscalatedDefectIds as $defectId) {
-            $defect = ApparatusDefect::query()->find($defectId);
-            if ($defect !== null) {
-                $notifications->issueEscalated($defect, $inspection);
+        if (! $held) {
+            foreach ($findings->significantNewOrEscalatedDefectIds as $defectId) {
+                $defect = ApparatusDefect::query()->find($defectId);
+                if ($defect !== null) {
+                    $notifications->issueEscalated($defect, $inspection);
+                }
             }
         }
         // The on-duty Captain 5 hears about new Rescue and medical findings (never a repeat alert).

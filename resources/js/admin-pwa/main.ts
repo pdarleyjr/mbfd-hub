@@ -2,7 +2,9 @@
  * Admin PWA bootstrap.
  *
  * What it does:
- *   1. On admin pages, registers /admin/service-worker.js with scope /admin/.
+ *   1. On admin pages, registers /admin/service-worker.js with scope /admin/
+ *      (the one and only registration of that URL) and hands the scope to the
+ *      shared update registrar, which owns update prompts on every device.
  *   2. Captures the `beforeinstallprompt` event and shows a custom prompt
  *      ONLY when the device is wide + pointer:fine (desktop with mouse).
  *      Touch-primary devices never see the prompt because the event listener
@@ -17,6 +19,7 @@
  */
 
 import { prefetchAdminLookups } from './prefetch';
+import { startUpdateRegistrar } from '../pwa/update-registrar';
 
 interface BeforeInstallPromptEvent extends Event {
     prompt: () => Promise<void>;
@@ -50,36 +53,9 @@ async function registerServiceWorker(): Promise<void> {
 
         // Check for updates every 30 minutes — admins won't reload often
         setInterval(() => reg.update().catch(() => {}), 30 * 60_000);
-
-        reg.addEventListener('updatefound', () => {
-            const installing = reg.installing;
-            if (!installing) return;
-            installing.addEventListener('statechange', () => {
-                if (installing.state === 'installed' && navigator.serviceWorker.controller) {
-                    // New SW waiting — notify the user (but never block)
-                    showSwUpdateToast();
-                }
-            });
-        });
     } catch (err) {
         // Silent failure — the app still works without a SW
     }
-}
-
-function showSwUpdateToast(): void {
-    if (!DESKTOP_MEDIA.matches) return;
-    const toast = document.createElement('div');
-    toast.dataset.adminPwaUpdate = 'true';
-    toast.style.cssText = [
-        'position:fixed', 'bottom:48px', 'right:16px', 'z-index:99999',
-        'background:#1e293b', 'color:#fff', 'padding:12px 16px',
-        'border-radius:8px', 'box-shadow:0 10px 25px rgba(0,0,0,0.25)',
-        'font:500 13px/1.4 system-ui', 'cursor:pointer', 'max-width:320px',
-    ].join(';');
-    toast.textContent = 'A new version of the admin console is available. Click to reload.';
-    toast.addEventListener('click', () => window.location.reload());
-    document.body.appendChild(toast);
-    setTimeout(() => toast.remove(), 30_000);
 }
 
 /**
@@ -149,6 +125,9 @@ function setupInstallPrompt(): void {
 function bootstrap(): void {
     markBodyClasses();
     registerServiceWorker();
+    // Release checks, the update banner (all platforms, never while busy) and chunk-load
+    // recovery. No scriptUrl: the registration above stays the only one for this worker.
+    startUpdateRegistrar({ scope: '/admin/' });
     setupInstallPrompt();
     // Login and password-recovery pages share this bundle but must not call
     // protected lookup APIs before the web guard has authenticated a user.

@@ -1212,6 +1212,14 @@
       "route_name": "filament.employee.pages.my-requests"
     },
     {
+      "route": "/employee/notification-settings",
+      "name": "NotificationSettings",
+      "panel": "employee",
+      "scope": "IN SCOPE",
+      "parent": "/account",
+      "route_name": "filament.employee.pages.notification-settings"
+    },
+    {
       "route": "/employee/request-equipment",
       "name": "RequestEquipmentPage",
       "panel": "employee",

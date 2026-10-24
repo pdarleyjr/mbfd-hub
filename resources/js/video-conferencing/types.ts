@@ -42,6 +42,7 @@ export interface ConferenceBootstrap {
         command_start: string;
         command_end: string;
         command_direct: string;
+        lineup_status: string;
         sessions: string;
         api_base: string;
         connectivity_failures: string;
@@ -56,6 +57,8 @@ export interface SessionResponse {
         target_station: StationRole | null;
         scheduled_for: string | null;
         lineup_time_configured: boolean;
+        /** Time limit of this lineup (lineup sessions only). */
+        ends_at?: string | null;
     };
 }
 
@@ -87,6 +90,19 @@ export interface LineupState {
     session_id: string | null;
     started_at: string | null;
     ends_at: string | null;
+}
+
+/** GET lineup/status for any signed-in member: read-only, never carries rooms, people or tokens. */
+export interface MemberLineupStatus {
+    state: 'not_started' | 'starting' | 'active' | 'ended' | 'unavailable';
+    session_id: string | null;
+    started_at: string | null;
+    ends_at: string | null;
+    ended_at: string | null;
+    scheduled_for: string | null;
+    /** Active lineup with no member seat free for this member right now. */
+    full?: boolean;
+    server_time: string;
 }
 
 export interface StationStatusResponse {

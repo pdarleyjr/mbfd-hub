@@ -1,3 +1,5 @@
+import { startUpdateRegistrar } from './pwa/update-registrar';
+
 function closeMenu(menu, restoreFocus = false) {
     menu.open = false;
     if (restoreFocus) menu.querySelector('summary')?.focus();
@@ -68,3 +70,8 @@ function updateConnection() {
 updateConnection();
 window.addEventListener('online', updateConnection);
 window.addEventListener('offline', updateConnection);
+
+// Release checks, the "update ready" banner, chunk-load recovery and notification deep links for every
+// Hub page. Scope '/' only attaches to the root push worker if this device already has it; it never
+// registers a worker itself (the push settings page does that, at /sw.js).
+startUpdateRegistrar({ scope: '/' });

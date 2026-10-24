@@ -11,3 +11,5 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="MBFD Hub">
+{{-- Release the page was rendered by. resources/js/pwa/update-registrar.ts compares it with /app-release. --}}
+<meta name="mbfd-release" content="{{ app(\App\Support\Release\DeployedRelease::class)->short() }}">

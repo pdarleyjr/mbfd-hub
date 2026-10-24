@@ -22,6 +22,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Arr;
 
 class DefectsRelationManager extends RelationManager
 {
@@ -53,13 +54,21 @@ class DefectsRelationManager extends RelationManager
     {
         return $form
             ->schema([
+                // Where, what and how it failed identify the report: readiness counts, continuity matching and
+                // notifications key on them, and an edit leaves no event, actor or reason. They are typed when a
+                // defect is reported by hand and read-only afterwards (the apparatus is the owner record and never
+                // changes). A report entered in error is closed with Close — No Action Required.
                 Forms\Components\TextInput::make('compartment')
                     ->required()
-                    ->maxLength(255),
+                    ->maxLength(255)
+                    ->disabledOn('edit')
+                    ->dehydrated(fn (string $operation): bool => $operation !== 'edit'),
 
                 Forms\Components\TextInput::make('item')
                     ->required()
-                    ->maxLength(255),
+                    ->maxLength(255)
+                    ->disabledOn('edit')
+                    ->dehydrated(fn (string $operation): bool => $operation !== 'edit'),
 
                 Forms\Components\Select::make('issue_type')
                     ->required()
@@ -69,7 +78,9 @@ class DefectsRelationManager extends RelationManager
                         'expired' => 'Expired',
                         'low_quantity' => 'Low Quantity',
                         'other' => 'Other',
-                    ]),
+                    ])
+                    ->disabledOn('edit')
+                    ->dehydrated(fn (string $operation): bool => $operation !== 'edit'),
 
                 Forms\Components\Textarea::make('notes')
                     ->rows(3),
@@ -81,16 +92,31 @@ class DefectsRelationManager extends RelationManager
                     ->image()
                     ->imageEditor(),
 
-                Forms\Components\Select::make('status')
-                    ->required()
-                    ->default('open')
-                    ->options([
-                        'open' => 'Open',
-                        'in_progress' => 'In Progress',
-                        'resolved' => 'Resolved',
-                    ]),
+                // There is deliberately NO status field here. An issue's status changes only through
+                // DefectCorrectiveActions (Acknowledge, Update, Resolve, Close — No Action Required, Reopen),
+                // which record who did what and why and tell the people involved. A status select here once let
+                // an administrator close a defect with no event, actor, notes or notification.
             ]);
     }
+
+    /**
+     * Fields no create or edit form on this page may ever write, even if a request tries to send them.
+     *
+     * @var list<string>
+     */
+    private const LIFECYCLE_FIELDS = [
+        'status', 'resolved', 'resolved_at', 'resolved_by_user_id', 'resolution_type', 'resolution_notes',
+        'action_status', 'action_details', 'operational_impact', 'service_ticket_id', 'severity',
+        'acknowledged_at', 'acknowledged_by_user_id',
+    ];
+
+    /**
+     * What identifies the report. Typed once when it is created; an edit can never rewrite them, even
+     * if a request sends them.
+     *
+     * @var list<string>
+     */
+    private const IDENTITY_FIELDS = ['apparatus_id', 'compartment', 'item', 'issue_type'];
 
     public function table(Table $table): Table
     {
@@ -174,7 +200,14 @@ class DefectsRelationManager extends RelationManager
                 //
             ])
             ->headerActions([
-                Tables\Actions\CreateAction::make(),
+                // Reporting a defect by hand is fine; it always starts as a new, open, reported issue.
+                Tables\Actions\CreateAction::make()
+                    ->mutateFormDataUsing(fn (array $data): array => [
+                        ...Arr::except($data, self::LIFECYCLE_FIELDS),
+                        'status' => 'open',
+                        'action_status' => DefectActionStatus::REPORTED,
+                        'resolved' => false,
+                    ]),
             ])
             ->actions([
                 // The ticket step stays one tap away as an icon button (tooltip and screen-reader label carry the words);
@@ -249,7 +282,9 @@ class DefectsRelationManager extends RelationManager
                             return redirect()->to(RecommendationResource::getUrl('edit', ['record' => $recommendation]));
                         }),
 
-                    Tables\Actions\EditAction::make(),
+                    // Edits describe the report (item, notes, photo). They can never change its status.
+                    Tables\Actions\EditAction::make()
+                        ->mutateFormDataUsing(fn (array $data): array => Arr::except($data, [...self::LIFECYCLE_FIELDS, ...self::IDENTITY_FIELDS])),
                 ])
                     ->label('More actions')
                     ->icon('heroicon-m-ellipsis-vertical')

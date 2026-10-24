@@ -71,8 +71,21 @@ const serviceWorkerCopyPlugin = {
       .filter(file => /\.(js|css|png)$/.test(file)).sort().map(file => `/daily/assets/${file}`)
     const source = fs.readFileSync(customSwPath, 'utf-8')
     if (!source.includes('/* DAILY_BUILD_ASSETS */ []')) throw new Error('Service worker asset marker is missing')
-    fs.writeFileSync(outputSwPath, source.replace('/* DAILY_BUILD_ASSETS */ []', JSON.stringify(assets)))
+    // The shared core (push, notification routing, update protocol) must be inlined;
+    // `npm run build:service-workers` does that and CI fails on drift.
+    if (!source.includes('/* MBFD_WORKER_CORE:START */') || !source.includes('MBFD_WORKER_CORE_VERSION')) {
+      throw new Error('Service worker is missing the inlined shared core; run npm run build:service-workers')
+    }
+    const built = source.replace('/* DAILY_BUILD_ASSETS */ []', JSON.stringify(assets))
+    fs.writeFileSync(outputSwPath, built)
     console.log(`[service-worker-copy] \u2713 ${outputSwPath}`)
+    // /daily/service-worker.js used to be the raw template (empty precache list, no
+    // asset list). Nothing in the repo registers it, but a device from an earlier era
+    // might still check that URL for updates. Publish the real worker there too, byte
+    // for byte, so any registration that still points at it receives the working
+    // worker with the same scope rules, never the unsubstituted template.
+    fs.writeFileSync(path.join(dailyOutDir, 'service-worker.js'), built)
+    console.log(`[service-worker-copy] \u2713 ${path.join(dailyOutDir, 'service-worker.js')} (identical to sw.js)`)
   }
 }
 
@@ -82,6 +95,14 @@ const hubManifestPreviewPlugin = {
   name: 'hub-manifest-preview',
   configurePreviewServer(server) {
     server.middlewares.use((request, response, next) => {
+      // Laravel answers the update registrar's release probe (GET /app-release) in production.
+      // The preview has no release, so it reports a constant one: no update is ever announced.
+      if (request.url === '/app-release') {
+        response.setHeader('Content-Type', 'application/json')
+        response.setHeader('Cache-Control', 'no-store')
+        response.end(JSON.stringify({ release: '000000000000' }))
+        return
+      }
       const assets = {
         '/manifest.json': ['manifest.json', 'application/manifest+json'],
         '/images/mbfd-official-seal-256.png': ['images/mbfd-official-seal-256.png', 'image/png'],

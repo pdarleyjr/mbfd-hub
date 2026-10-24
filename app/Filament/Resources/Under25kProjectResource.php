@@ -95,7 +95,7 @@ class Under25kProjectResource extends Resource
                         Forms\Components\DatePicker::make('actual_completion_date')
                             ->displayFormat('M d, Y')
                             ->native(false)
-                            ->disabled(fn ($get) => $get('status') !== 'Completed')
+                            ->disabled(fn ($get) => strtolower((string) $get('status')) !== ProjectStatus::Completed->value)
                             ->label('Actual Completion Date'),
                     ])
                     ->columns(3),

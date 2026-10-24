@@ -13,6 +13,7 @@ use App\Models\ApparatusServiceTicket;
 use App\Models\Station;
 use App\Models\User;
 use App\Support\Fleet\DefectActionStatus;
+use App\Support\Fleet\DefectNoActionClosure;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
@@ -84,7 +85,7 @@ final class EmployeeInspectionHistoryService
      */
     public function withFollowUpCounts(Builder $query): Builder
     {
-        $defects = fn (bool $openOnly) => DB::table('apparatus_defects as d')
+        $defects = fn (bool $openOnly, bool $noActionOnly = false) => DB::table('apparatus_defects as d')
             ->selectRaw('count(*)')
             ->where(function ($scope): void {
                 $scope->whereColumn('d.apparatus_inspection_id', 'apparatus_inspections.id')
@@ -96,11 +97,14 @@ final class EmployeeInspectionHistoryService
                             ->whereIn('o.observation', self::REPORTED_OBSERVATIONS);
                     });
             })
-            ->when($openOnly, fn ($q) => $q->where('d.resolved', false));
+            ->when($openOnly, fn ($q) => $q->where('d.resolved', false))
+            // "Closed — no action required" is also resolved = true; count it apart so it is never read as a repair.
+            ->when($noActionOnly, fn ($q) => $q->where('d.action_status', DefectActionStatus::DISMISSED));
 
         return $query->select('apparatus_inspections.*')->addSelect([
             'followup_total' => $defects(false),
             'followup_open' => $defects(true),
+            'followup_no_action' => $defects(false, true),
         ]);
     }
 
@@ -155,6 +159,7 @@ final class EmployeeInspectionHistoryService
         $findings = $this->countFindings($inspection->results);
         $total = (int) ($inspection->getAttribute('followup_total') ?? 0);
         $open = (int) ($inspection->getAttribute('followup_open') ?? 0);
+        $noAction = (int) ($inspection->getAttribute('followup_no_action') ?? 0);
 
         if ($total === 0) {
             if ($findings['missing'] + $findings['damaged'] === 0) {
@@ -166,15 +171,26 @@ final class EmployeeInspectionHistoryService
                 : 'No defect record linked';
         }
 
-        return $open === 0
-            ? ($total === 1 ? 'Resolved' : "All {$total} resolved")
-            : "{$open} of {$total} open";
+        if ($open > 0) {
+            return "{$open} of {$total} open";
+        }
+        // Every issue is closed; say HOW. Closed with no action required is not "resolved".
+        if ($noAction === 0) {
+            return $total === 1 ? 'Resolved' : "All {$total} resolved";
+        }
+        if ($noAction === $total) {
+            return $total === 1 ? DefectNoActionClosure::STATUS_LABEL : "All {$total} ".lcfirst(DefectNoActionClosure::STATUS_LABEL);
+        }
+        $fixed = $total - $noAction;
+
+        return "{$fixed} resolved, {$noAction} ".lcfirst(DefectNoActionClosure::STATUS_LABEL);
     }
 
     public function reviewStatusLabel(?string $status): string
     {
         return match ($status) {
-            'pending_review' => 'Needs approval',
+            // The member cannot approve anything; say what is actually happening.
+            'pending_review' => 'Waiting for Logistics review',
             'approved' => 'Accepted',
             'rejected' => 'Rejected',
             default => 'Submitted',
@@ -196,6 +212,9 @@ final class EmployeeInspectionHistoryService
     {
         $status = strtolower((string) $defect->status);
 
+        if ($defect->isClosedNoAction()) {
+            return DefectNoActionClosure::STATUS_LABEL;
+        }
         if ($defect->resolved || $status === 'resolved') {
             return 'Resolved';
         }
@@ -451,10 +470,26 @@ final class EmployeeInspectionHistoryService
                         ->select('apparatus_defect_id'));
             })
             ->orderBy('id')
-            ->get(['id', 'apparatus_id', 'apparatus_inspection_id', 'compartment', 'item', 'status', 'issue_type', 'resolved', 'resolved_at', 'service_ticket_id', 'action_status', 'first_reported_at']);
+            ->get(['id', 'apparatus_id', 'apparatus_inspection_id', 'compartment', 'item', 'status', 'issue_type', 'resolved', 'resolved_at', 'resolution_notes', 'service_ticket_id', 'action_status', 'first_reported_at']);
+
+        // The latest "severity corrected" event of each issue, in one query, so the page can say it changed.
+        $corrections = $rows->isEmpty() ? collect() : DB::table('apparatus_defect_events')
+            ->where('event_type', 'severity_corrected')
+            ->whereIn('apparatus_defect_id', $rows->modelKeys())
+            ->orderBy('id')
+            ->get(['apparatus_defect_id', 'details', 'created_at'])
+            ->keyBy('apparatus_defect_id');
 
         $keyed = [];
         foreach ($rows as $defect) {
+            $correction = $corrections->get($defect->getKey());
+            $details = $correction !== null ? json_decode((string) $correction->details, true) : null;
+            $defect->setAttribute('severity_correction', is_array($details) ? [
+                'from' => (string) ($details['from_severity'] ?? ''),
+                'to' => (string) ($details['to_severity'] ?? ''),
+                'reason' => isset($details['reason']) ? trim((string) $details['reason']) : null,
+                'at' => $this->eastern(CarbonImmutable::parse($correction->created_at)),
+            ] : null);
             $keyed[$this->identityKey($defect->compartment, $defect->item)] = $defect;
         }
 
@@ -477,15 +512,23 @@ final class EmployeeInspectionHistoryService
                 'action_label' => null,
                 'first_reported_at' => null,
                 'resolved_at' => null,
+                'closed_no_action' => false,
+                'closed_at' => null,
+                'closed_reason' => null,
+                'severity_correction' => null,
             ];
         }
 
         $ticket = $defect->service_ticket_id !== null ? $defect->getRelationValue('serviceTicket') : null;
         $ticket = $ticket instanceof ApparatusServiceTicket ? $ticket : null;
 
+        // resolved = true also covers an issue closed with no action required; only a fix is "resolved" to a member.
+        $noAction = $defect->isClosedNoAction();
+        $closedAt = $defect->resolved && $defect->resolved_at !== null ? $this->eastern($defect->resolved_at) : null;
+
         return [
             'stage' => $this->defectStageLabel($defect),
-            'resolved' => (bool) $defect->resolved,
+            'resolved' => (bool) $defect->resolved && ! $noAction,
             'ticket_number' => $ticket?->ticket_number,
             'ticket_status' => $ticket !== null ? $this->ticketStatusLabel($ticket->status) : null,
             'repair_completed' => $ticket !== null && $ticket->status === ApparatusServiceTicketStatus::Completed->value,
@@ -495,7 +538,11 @@ final class EmployeeInspectionHistoryService
             'action_label' => DefectActionStatus::label($defect->action_status),
             'first_reported_at' => $this->eastern($defect->first_reported_at),
             // A later fact shown beside the unchanged historical observation.
-            'resolved_at' => $defect->resolved && $defect->resolved_at !== null ? $this->eastern($defect->resolved_at) : null,
+            'resolved_at' => $noAction ? null : $closedAt,
+            'closed_no_action' => $noAction,
+            'closed_at' => $noAction ? $closedAt : null,
+            'closed_reason' => $noAction && filled($defect->resolution_notes) ? (string) $defect->resolution_notes : null,
+            'severity_correction' => $defect->getAttribute('severity_correction'),
         ];
     }
 
@@ -528,7 +575,7 @@ final class EmployeeInspectionHistoryService
             ->values()
             ->all();
 
-        return ['state' => 'needs_approval', 'headline' => 'Needs approval', 'reasons' => $reasons];
+        return ['state' => 'needs_approval', 'headline' => 'Waiting for Logistics review', 'reasons' => $reasons];
     }
 
     public function holdLabel(string $field, string $reason): string

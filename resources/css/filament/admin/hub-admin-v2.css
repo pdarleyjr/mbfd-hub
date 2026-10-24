@@ -14,9 +14,25 @@
 
 /* ---------- App bar ---------- */
 
-:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) :is(.fi-topbar > nav, .fi-sidebar-header) {
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-topbar > nav {
     height: var(--hub-shell-bar-height);
     min-height: var(--hub-shell-bar-height);
+}
+
+/*
+ * The bar owns the top safe-area inset (status bar and notch of an installed window, 0 in a browser tab):
+ * the outer .fi-topbar paints the navy under the inset and pushes the nav (and its controls) below it, and
+ * the drawer header does the same, so both end on the same row (bar + inset). Side insets (landscape notch)
+ * are added to the same outer element; the nav keeps Filament's own padding.
+ */
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-sidebar-header {
+    box-sizing: border-box;
+    height: var(--hub-bar-total);
+    min-height: var(--hub-bar-total);
+    padding-top: var(--hub-safe-top);
+}
+
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) :is(.fi-topbar > nav, .fi-sidebar-header) {
     border: 0;
     box-shadow: inset 0 -1px 0 rgb(var(--hub-header-deep));
     background: rgb(var(--hub-header));
@@ -24,6 +40,32 @@
 
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-topbar {
     border-bottom: 0;
+    padding-top: var(--hub-safe-top);
+    padding-inline: var(--hub-safe-left) var(--hub-safe-right);
+}
+
+/* The page body clears the side insets too, never narrower than Filament's own gutter. */
+:is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-main {
+    padding-inline: max(var(--hub-frame-inline), var(--hub-safe-left)) max(var(--hub-frame-inline), var(--hub-safe-right));
+}
+
+/*
+ * Installed desktop window with the title bar merged into the page (Window Controls Overlay): the bar
+ * stretches under the caption buttons and is the drag handle; its controls stay clickable. Keyed on the
+ * display mode alone, so every Hub panel gets it whether or not the Admin PWA script set body.mbfd-pwa.
+ */
+@media (display-mode: window-controls-overlay) {
+    :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-topbar {
+        position: sticky;
+        top: 0;
+        z-index: 40;
+        padding-inline: env(titlebar-area-x, 0px) calc(100vw - env(titlebar-area-width, 100vw) - env(titlebar-area-x, 0px));
+        -webkit-app-region: drag;
+    }
+
+    :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) :is(.fi-topbar a, .fi-topbar button, .fi-topbar input, .fi-topbar summary, .fi-topbar .fi-global-search) {
+        -webkit-app-region: no-drag;
+    }
 }
 
 /* Notification counts are one of red's sanctioned meanings. */
@@ -713,4 +755,71 @@ html:not(.dark) :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .
     .fi-page > .hub-page-nav { flex-wrap: nowrap; gap: .375rem; }
     .fi-page > .hub-page-nav > * { flex: none; padding-inline: .625rem; }
     .fi-page > .hub-page-nav .hub-page-nav__label { display: none; }
+}
+
+/*
+ * ---------- Employee page frame ----------
+ *
+ * Back / Hub Home and the page title are one header row instead of two stacked bands. The shared
+ * page-nav partial is emitted by a global PAGE_START hook, so in the DOM it is the first child of
+ * .fi-page, before Filament's <section>. Rather than fork Filament's page view or move the hook,
+ * .fi-page becomes a two-column grid and the section dissolves (display: contents):
+ *
+ *     [ Back  Hub Home ]  [ Page title ...................... header actions ]
+ *     [ content, full width .............................................. ]
+ *
+ * The DOM, the [data-hub-*] hooks and every accessible name are untouched, so a page that has no
+ * Filament header (or no nav) still lays out. The same rule replaces Filament's py-8 / gap-y-8 with the
+ * --hub-page-* tokens, drops the empty header-actions box that left a 16px gap on phones, and
+ * replaces the one-page :has(.uo-builder) workaround. A full-bleed workspace opts out with
+ * data-hub-page-frame="bleed". Other panels adopt the frame by widening the first selector.
+ * Spacing uses margins rather than row-gap so the invisible modal hosts Filament appends after the
+ * section cannot add empty rows.
+ */
+.fi-panel-employee .fi-page:not([data-hub-page-frame="bleed"]) {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-content: start;
+    padding-block: var(--hub-page-pad-top) var(--hub-page-pad-bottom);
+}
+
+.fi-panel-employee .fi-page:not([data-hub-page-frame="bleed"]) > section { display: contents; }
+
+.fi-panel-employee .fi-page:not([data-hub-page-frame="bleed"]) > .hub-page-nav {
+    grid-area: 1 / 1;
+    align-self: center;
+    flex-wrap: nowrap;
+    margin: 0 var(--hub-page-gap) var(--hub-page-gap) 0;
+}
+
+.fi-panel-employee .fi-page:not([data-hub-page-frame="bleed"]) > section > .fi-header {
+    grid-area: 1 / 1 / 2 / -1;
+    align-self: center;
+    min-width: 0;
+    margin-bottom: var(--hub-page-gap);
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: .25rem var(--hub-page-gap);
+}
+
+.fi-panel-employee .fi-page:not([data-hub-page-frame="bleed"]):has(> .hub-page-nav) > section > .fi-header { grid-column: 2; }
+
+/* Filament's actions box is always rendered; empty, it only added a phantom gap when the header stacked. */
+.fi-panel-employee .fi-page:not([data-hub-page-frame="bleed"]) > section > .fi-header > div:last-child:not(:first-child):not(:has(*)) { display: none; }
+
+.fi-panel-employee .fi-page:not([data-hub-page-frame="bleed"]) .fi-header-subheading { margin-top: .125rem; max-width: none; }
+
+.fi-panel-employee .fi-page:not([data-hub-page-frame="bleed"]) > section > :not(.fi-header) { grid-column: 1 / -1; min-width: 0; }
+
+.fi-panel-employee .fi-page:not([data-hub-page-frame="bleed"]) > section > div,
+.fi-panel-employee .fi-page:not([data-hub-page-frame="bleed"]) > section > div > .auto-cols-fr { row-gap: var(--hub-page-gap); }
+
+.fi-panel-employee .fi-page:not([data-hub-page-frame="bleed"]) > section > div ~ * { margin-top: var(--hub-page-gap); }
+
+/* Phones: Hub Home is icon-only (aria-label keeps its name; the bottom bar also has Home) so the title keeps its width. */
+@media (max-width: 39.9375rem) {
+    .fi-panel-employee .fi-page:not([data-hub-page-frame="bleed"]) > .hub-page-nav { gap: .375rem; }
+    .fi-panel-employee .fi-page:not([data-hub-page-frame="bleed"]) > .hub-page-nav > * { flex: none; padding-inline: .625rem; }
+    .fi-panel-employee .fi-page:not([data-hub-page-frame="bleed"]) > .hub-page-nav .hub-page-nav__label { display: none; }
 }

@@ -32,10 +32,18 @@ interface ActionMeta {
   required: FieldKey[];
 }
 
+/** The department's wording for closing an issue with no corrective action (mirrors App\Support\Fleet\DefectNoActionClosure). */
+export const NO_ACTION_LABEL = 'Close — No Action Required';
+export const NO_ACTION_STATUS = 'Closed — no action required';
+export const NO_ACTION_REASON_LABEL = 'Why is no corrective action necessary?';
+export const NO_ACTION_DIALOG = 'Use this only when the report was entered incorrectly, is a duplicate, or no corrective action is necessary. Closing it does not mean the equipment was repaired or replaced. The reason and original report remain in the apparatus history.';
+const MIN_NO_ACTION_REASON = 15;
+const PLACEHOLDER_REASONS = ['na', 'none', 'no', 'nothing', 'test', 'testing', 'tbd', 'ok', 'okay', 'x', 'xx', 'xxx', 'asdf', 'abc', 'noaction', 'noactionneeded', 'noactionrequired', 'nocorrectiveaction', 'nocorrectiveactionnecessary', 'nothingneeded', 'notneeded', 'unnecessary', 'dismiss', 'dismissed', 'close', 'closed', 'closeissue', 'noreason', 'reason', 'duplicate', 'mistake', 'error'];
+
 export const ACTIONS: Record<IssueActionName, ActionMeta> = {
   acknowledge: {
     label: 'Acknowledge', confirm: 'Acknowledge', done: 'Acknowledged.',
-    intro: 'Confirms you have seen this issue. It stays open until it is replaced or dismissed.', fields: [], required: [],
+    intro: 'Confirms you have seen this issue. It stays open until it is replaced or closed.', fields: [], required: [],
   },
   ordered: {
     label: 'Mark ordered', confirm: 'Save as ordered', done: 'Saved as ordered.',
@@ -59,8 +67,8 @@ export const ACTIONS: Record<IssueActionName, ActionMeta> = {
     intro: 'A crew member reported this as corrected. Confirm you checked it.', fields: ['resolution_notes'], required: [],
   },
   dismiss: {
-    label: 'Close: no action required', confirm: 'Close with no action', done: 'Closed with no action required.',
-    intro: 'Closes the issue with no further action. The reason is kept in its history.', fields: ['reason'], required: ['reason'],
+    label: NO_ACTION_LABEL, confirm: 'Close issue', done: 'Issue closed. No action required.',
+    intro: NO_ACTION_DIALOG, fields: ['reason'], required: ['reason'],
   },
   reopen: {
     label: 'Reopen', confirm: 'Reopen issue', done: 'Issue reopened.',
@@ -73,6 +81,28 @@ export const REQUIRED_MESSAGES: Partial<Record<FieldKey, string>> = {
   verified_in_place: 'Confirm the replacement is in place on the unit before closing the issue.',
   reason: 'Give a reason.',
 };
+
+/** The reason box is shared by two actions; each asks its own question. */
+export const REASON_LABELS: Partial<Record<IssueActionName, string>> = {
+  dismiss: NO_ACTION_REASON_LABEL,
+  reopen: 'Why is it being reopened?',
+};
+
+const REASON_REQUIRED: Partial<Record<IssueActionName, string>> = {
+  dismiss: 'Say why no corrective action is necessary.',
+  reopen: 'Say why it is being reopened.',
+};
+
+/** Mirrors the server rule (App\Support\Fleet\DefectNoActionClosure::reasonProblem); the server still decides. */
+export function noActionReasonProblem(reason: string): string | null {
+  const text = reason.replace(/\s+/g, ' ').trim();
+  const message = `${NO_ACTION_REASON_LABEL} Write at least ${MIN_NO_ACTION_REASON} characters, for example "Duplicate of the report from Oct 20" or "Entered on the wrong unit".`;
+  if (text.length < MIN_NO_ACTION_REASON) return message;
+  const letters = text.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+  const words = text.split(' ').filter((word) => /[\p{L}\p{N}]/u.test(word));
+  if (PLACEHOLDER_REASONS.includes(letters) || words.length < 2 || new Set(letters).size < 4) return message;
+  return null;
+}
 
 /** The one action to emphasise for this state; the rest are offered quietly. */
 export function primaryAction(issue: IssueDetail): IssueActionName | null {
@@ -87,7 +117,13 @@ export function validate(action: IssueActionName, values: FormValues): Partial<R
   const errors: Partial<Record<FieldKey, string>> = {};
   for (const key of ACTIONS[action].required) {
     const value = values[key];
-    if (key === 'verified_in_place' ? value !== true : String(value).trim() === '') errors[key] = REQUIRED_MESSAGES[key] ?? 'This is required.';
+    if (key === 'verified_in_place' ? value !== true : String(value).trim() === '') {
+      errors[key] = key === 'reason' ? (REASON_REQUIRED[action] ?? REQUIRED_MESSAGES.reason ?? 'This is required.') : (REQUIRED_MESSAGES[key] ?? 'This is required.');
+    }
+  }
+  if (action === 'dismiss' && !errors.reason) {
+    const problem = noActionReasonProblem(values.reason);
+    if (problem) errors.reason = problem;
   }
   return errors;
 }

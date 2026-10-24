@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
     Camera,
     CameraOff,
@@ -17,7 +17,6 @@ import {
     Radio,
     RefreshCw,
     ShieldCheck,
-    Sparkles,
     Users,
     Video,
     Volume2,
@@ -38,6 +37,7 @@ import {
     VideoPresets,
     VideoQuality,
 } from 'livekit-client';
+import { clearBusy, markBusy } from '../pwa/busy';
 import { ApiError, getJson, postJson } from './api';
 import { subscribeToLineupChanges } from './conference-events';
 import {
@@ -53,6 +53,7 @@ import { ConferenceDialog } from './ConferenceDialog';
 import { buildGallerySlots, expectedEndpointIdentities } from './gallery-order';
 import { InactiveConfirmation } from './inactive-confirmation';
 import { LineupStartAlert } from './session-transition';
+import type { MediaReleaseReason, MemberWaitingRoomProps } from './MemberWaitingRoom';
 import lineupStartTone from './lineup-start.mp3';
 import {
     accumulateInboundRtcStats,
@@ -72,6 +73,12 @@ import type {
     StationStatusResponse,
     TokenResponse,
 } from './types';
+
+// The member waiting room (status polling, copy, idle release) loads on demand so the
+// always-loaded bundle stays small. If it cannot load, a plain Join button still works.
+const MemberWaitingRoom = lazy(() => import('./MemberWaitingRoom').catch(() => ({
+    default: (fallback: MemberWaitingRoomProps) => <button className="vc-button vc-button--primary" type="button" disabled={fallback.busy || !fallback.mediaReady} onClick={() => fallback.onJoin()}>Join Morning Lineup</button>,
+})));
 
 interface ConferenceAppProps {
     bootstrap: ConferenceBootstrap;
@@ -97,7 +104,7 @@ const MAX_REJOIN_ATTEMPTS = 3;
 const REJOIN_DELAYS_MS = [2_000, 6_000, 12_000];
 /** A connection this old is considered healthy, so the next drop gets a fresh set of attempts. */
 const STABLE_CONNECTION_MS = 60_000;
-const DROPPED_MESSAGE = 'The conference connection ended. Check your Internet connection and try again.';
+const DROPPED_MESSAGE = 'You were disconnected from Morning Lineup and your camera and microphone were turned off. If it is still running, you can rejoin below.';
 const SUPERSEDED_MESSAGE = 'This endpoint connected from another device or browser tab, so this connection was closed.';
 
 // SDK debug/info output includes signaling URLs. Never emit it in production.
@@ -149,12 +156,19 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
     const [pendingDirectStation, setPendingDirectStation] = useState<StationRole | null>(null);
     const [room, setRoom] = useState<Room | null>(null);
     const [clock, setClock] = useState(() => Date.now());
+    // Member waiting room: preview released while idle, the lineup last joined, and a nudge to re-read its state.
+    const [releasedReason, setReleasedReason] = useState<MediaReleaseReason | null>(null);
+    const idleReleased = releasedReason !== null;
+    const [lastJoinedSessionId, setLastJoinedSessionId] = useState<string | null>(null);
+    const [waitRefresh, setWaitRefresh] = useState(0);
 
     const previewVideoRef = useRef<HTMLVideoElement>(null);
     const previewTracksRef = useRef<LocalTrack[]>([]);
     const roomRef = useRef<Room | null>(null);
     const participationIdRef = useRef<string | null>(null);
     const joiningRef = useRef(false);
+    // True from the instant Join is pressed until the attempt ends, set synchronously (state would lag a timer).
+    const joinInFlightRef = useRef(false);
     const stationTokenRequestRef = useRef(false);
     const stationStatusRequestRef = useRef(false);
     const commandStatusRequestRef = useRef(false);
@@ -170,6 +184,7 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
     const stationInactiveRef = useRef(new InactiveConfirmation());
     const commandInactiveRef = useRef(new InactiveConfirmation());
     const selfInactiveRef = useRef(new InactiveConfirmation());
+    const lineupEndsAtRef = useRef<string | null>(null);
     const rejoinAttemptsRef = useRef(0);
     const connectedAtRef = useRef(0);
     const userLeftRef = useRef(false);
@@ -302,9 +317,14 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
     }, [cleanupRoom, refreshDevices, returnFromConference]);
 
     const connectWithCredentials = useCallback(async (credentials: TokenResponse, confirmedTakeover = false) => {
-        if (terminatingRef.current || joiningRef.current || roomRef.current) return;
+        if (terminatingRef.current || joiningRef.current || roomRef.current) {
+            // A token was minted but will not be used: give its seat back.
+            notifyLeave(credentials.participation_id);
+            return;
+        }
         if (previewTracksRef.current.length === 0) {
-            setError('Camera or microphone preparation is required before joining.');
+            notifyLeave(credentials.participation_id);
+            setError('Your camera and microphone are off. Turn them on, then press Join again.');
             return;
         }
         joiningRef.current = true;
@@ -359,13 +379,17 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
                 rtcConfig: forceRelay ? { iceTransportPolicy: 'relay' } : undefined,
                 websocketTimeout: 10_000,
             });
-            if (terminatingRef.current) return;
+            if (terminatingRef.current) {
+                notifyLeave(credentials.participation_id);
+                return;
+            }
 
             preparedTracks = [...previewTracksRef.current];
             previewTracksRef.current = [];
             for (const track of preparedTracks) {
                 if (terminatingRef.current) {
                     preparedTracks.forEach((prepared) => prepared.stop());
+                    notifyLeave(credentials.participation_id);
                     return;
                 }
                 if (track.kind === Track.Kind.Audio && (bootstrap.entry_mode === 'station' || !microphoneEnabled)) {
@@ -381,6 +405,7 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
             inboundRtcAccumulatorRef.current = emptyInboundRtcAccumulator();
             connectedSessionRef.current = credentials.session?.id ?? lineup.session_id;
             setSessionId(connectedSessionRef.current);
+            setLastJoinedSessionId(connectedSessionRef.current);
             setRoom(nextRoom);
             setAudioBlocked(!nextRoom.canPlaybackAudio);
             if (nextRoom.canPlaybackAudio) await nextRoom.startAudio().catch(() => setAudioBlocked(true));
@@ -392,6 +417,10 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
             [stationInactiveRef, commandInactiveRef, selfInactiveRef].forEach((ref) => ref.current.reset());
             setPhase('connected');
         } catch (joinError) {
+            // The token was minted, so a participation holds a seat (and, for a fixed endpoint, its
+            // identity) until it is released. Any failed connect gives it back, or the next try would
+            // meet "already connected" or a falsely full room.
+            notifyLeave(credentials.participation_id);
             if (terminatingRef.current) return;
             // Tracks already handed to the room were taken from the preview list; stop any
             // that were never published so the camera light does not stay on.
@@ -422,7 +451,7 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
         } finally {
             if (!roomRef.current) joiningRef.current = false;
         }
-    }, [attachRoomEvents, bootstrap, cameraEnabled, forceRelay, lineup.session_id, microphoneEnabled]);
+    }, [attachRoomEvents, bootstrap, cameraEnabled, forceRelay, lineup.session_id, microphoneEnabled, notifyLeave]);
 
     const requestStationToken = useCallback(async (requestedRoom: 'lineup' | 'direct', confirmedTakeover = false) => {
         if (terminatingRef.current || !bootstrap.launch_context || stationTokenRequestRef.current || joiningRef.current || roomRef.current) return;
@@ -558,6 +587,7 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
     /** `keepOptedOut` re-arms the camera but leaves a superseded station from auto-rejoining. */
     const prepareMedia = useCallback(async (options: { keepOptedOut?: boolean } = {}) => {
         setError(null);
+        setReleasedReason(null);
         setNotice('Requesting camera and microphone access…');
         if (!options.keepOptedOut) stationOptedOutRef.current = false;
         setPhase('requesting_media');
@@ -626,6 +656,25 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
 
         return () => document.documentElement.classList.remove('vc-conference-active');
     }, [phase]);
+
+    // A call in progress (including a reconnect) must never be interrupted by an app
+    // update reload. Keyed on the boolean, not the phase, so connected <-> reconnecting
+    // never flashes "idle"; leaving, ending the call or unmounting releases it.
+    const inCall = phase === 'connected' || phase === 'reconnecting';
+    useEffect(() => {
+        if (inCall) markBusy('active-call');
+        else clearBusy('active-call');
+    }, [inCall]);
+    useEffect(() => () => clearBusy('active-call'), []);
+
+    // A join in progress (token requests and connecting) is as unsafe to reload as a call: an update
+    // reload here would orphan the participation. Cleared the moment the join settles or unmounts.
+    const joinBusy = phase === 'joining' || actionBusy === 'join-self' || actionBusy === 'start' || (actionBusy?.startsWith('direct:') ?? false);
+    useEffect(() => {
+        if (joinBusy) markBusy('joining');
+        else clearBusy('joining');
+    }, [joinBusy]);
+    useEffect(() => () => clearBusy('joining'), []);
 
     useEffect(() => () => {
         stopPreview();
@@ -871,30 +920,56 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
     };
 
     const joinAsSelf = async (confirmedTakeover = false) => {
+        joinInFlightRef.current = true;
         setActionBusy('join-self');
         setError(null);
         try {
             const active = await postJson<SessionResponse>(bootstrap.endpoints.sessions, bootstrap.csrf_token, { room: 'lineup' });
+            // The end time of the lineup actually being joined, from the server: a restart between
+            // polls can never leave the previous lineup's end time on the countdown.
+            lineupEndsAtRef.current = active.session.ends_at ?? null;
             const credentials = await postJson<TokenResponse>(
                 `${bootstrap.endpoints.api_base}/sessions/${active.session.id}/token`,
                 bootstrap.csrf_token,
                 { join_as: 'self', confirmed_takeover: confirmedTakeover },
             );
-            setLineup({ ...emptyLineup, active: true, session_id: active.session.id });
+            setLineup({ ...emptyLineup, active: true, session_id: active.session.id, ends_at: lineupEndsAtRef.current });
             await connectWithCredentials({ ...credentials, session: active.session }, confirmedTakeover);
         } catch (joinError) {
-            if (joinError instanceof ApiError && joinError.status === 409 && joinError.payload.code === 'endpoint_in_use') {
-                // The same member is already in this lineup (another tab or device).
-                setTakeover(true);
-                setError('You are already connected to this Morning Lineup from another tab or device.');
-            } else {
-                setError(joinError instanceof Error ? joinError.message : 'No active Morning Lineup is available.');
-            }
+            const failure = {
+                status: joinError instanceof ApiError ? joinError.status : null,
+                code: joinError instanceof ApiError && typeof joinError.payload.code === 'string' ? joinError.payload.code : null,
+            };
+            const outcome = await import('./waiting-room').then((words) => words.describeJoinFailure(failure)).catch(() => ({
+                kind: failure.code === 'endpoint_in_use' ? 'takeover' as const : 'error' as const,
+                message: 'Morning Lineup could not be joined. Press Join to try again.',
+                refresh: true,
+            }));
+            // Not starting yet, or already over, is a state the waiting room shows, not an error.
+            if (outcome.kind === 'takeover') setTakeover(true);
+            if (outcome.kind === 'notice') {
+                // The waiting room already shows the real state; keep this reassurance only briefly.
+                setNotice(outcome.message);
+                window.setTimeout(() => setNotice((current) => current === outcome.message ? null : current), 8_000);
+            } else setError(outcome.message);
+            if (outcome.refresh) setWaitRefresh((value) => value + 1);
             setPhase('ready');
         } finally {
+            joinInFlightRef.current = false;
             setActionBusy(null);
         }
     };
+
+    /** Turns off a camera and microphone that sat unused in the waiting room, or after the lineup ended. */
+    const releaseIdlePreview = useCallback((reason: MediaReleaseReason) => {
+        // Never while a join is starting (even before its first request returns) or connected.
+        if (previewTracksRef.current.length === 0 || joinInFlightRef.current || joiningRef.current || roomRef.current) return;
+        stopPreview();
+        setCameraReady(false);
+        setMicrophoneReady(false);
+        setReleasedReason(reason);
+        setNotice(null);
+    }, [stopPreview]);
 
     /**
      * Credentials for rejoining the lineup this endpoint was in, or null when the
@@ -1138,7 +1213,7 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
                         </div>
                         <div className="vc-preview__video">
                             <video ref={previewVideoRef} autoPlay playsInline muted />
-                            {!cameraReady && <div className="vc-preview__empty">{phase === 'requesting_media' ? <LoaderCircle size={32} className="vc-spin" /> : <CameraOff size={32} />}<span>{phase === 'requesting_media' ? 'Waiting for browser permission…' : 'No camera preview — audio-only is available'}</span></div>}
+                            {!cameraReady && <div className="vc-preview__empty">{phase === 'requesting_media' ? <LoaderCircle size={32} className="vc-spin" /> : <CameraOff size={32} />}<span>{phase === 'requesting_media' ? 'Waiting for browser permission…' : idleReleased ? 'Camera turned off while waiting' : 'No camera preview — audio-only is available'}</span></div>}
                         </div>
                         <div className="vc-readiness" aria-label="Media readiness">
                             <span className={cameraReady ? 'is-ready' : 'is-warning'}>{cameraReady ? <Check size={16} /> : <CameraOff size={16} />} Camera {cameraReady ? 'Ready' : 'Unavailable'}</span>
@@ -1188,10 +1263,21 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
                             <button className="vc-button vc-button--start" type="button" onClick={() => void startLineup(false)} disabled={actionBusy !== null || !microphoneReady || providerApiHealthy !== true}>{actionBusy === 'start' ? <LoaderCircle size={20} className="vc-spin" /> : <Video size={20} />} {lineup.active ? 'Reconnect to Morning Lineup' : 'Start Morning Lineup'}</button>
                         </div>}
 
-                        {bootstrap.entry_mode === 'self' && <div className="vc-self-entry">
-                            <div className="vc-room-summary"><Sparkles size={22} /><div><strong>Join as {bootstrap.display_name}</strong><span>Your server-derived employee identity and display name will be used.</span></div></div>
-                            <button className="vc-button vc-button--primary" type="button" onClick={() => void joinAsSelf(false)} disabled={actionBusy !== null || !microphoneReady}>{actionBusy === 'join-self' ? <LoaderCircle size={20} className="vc-spin" /> : <Video size={20} />} Join active Morning Lineup</button>
-                        </div>}
+                        {bootstrap.entry_mode === 'self' && <Suspense fallback={<p role="status">Checking Morning Lineup…</p>}>
+                            <MemberWaitingRoom
+                                bootstrap={bootstrap}
+                                observing={['requesting_media', 'ready', 'failed'].includes(phase) && actionBusy === null}
+                                mediaReady={microphoneReady}
+                                previewActive={phase === 'ready' && (cameraReady || microphoneReady)}
+                                releasedReason={releasedReason}
+                                busy={actionBusy !== null}
+                                lastJoinedSessionId={lastJoinedSessionId}
+                                refreshToken={waitRefresh}
+                                onJoin={() => void joinAsSelf(false)}
+                                onIdleRelease={releaseIdlePreview}
+                                onResumeMedia={() => void prepareMedia()}
+                            />
+                        </Suspense>}
                     </section>
                 </div>
             ) : (
@@ -1243,7 +1329,7 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
                             // Leaving stops the camera and microphone; joining again needs a fresh device check.
                             setCameraReady(false);
                             setMicrophoneReady(false);
-                            setNotice('You left the conference. Press Test Camera & Microphone to join again.');
+                            setNotice('You left Morning Lineup and your camera and microphone are off. You can rejoin below while it is running.');
                             setPhase('ready');
                         }}><PhoneOff /><span>Leave</span></button>}
                     </nav>

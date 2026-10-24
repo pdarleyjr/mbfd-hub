@@ -15,6 +15,8 @@ return [
     'enabled' => (bool) env('VIDEO_CONFERENCING_ENABLED', false),
     'timezone' => 'America/New_York',
     'lineup_time' => $lineupTime,
+    // Individual member (self) places in one Morning Lineup. Stations and 300 never use these.
+    'member_seats' => (int) env('VIDEO_CONFERENCING_MEMBER_SEATS', 6),
     'lineup_max_minutes' => (int) env('VIDEO_CONFERENCING_LINEUP_MAX_MINUTES', 15),
     'readiness' => [
         'poll_seconds' => (int) env('VIDEO_CONFERENCING_STATUS_POLL_SECONDS', 5),
@@ -59,5 +61,8 @@ return [
         'token_ttl_seconds' => (int) env('LIVEKIT_TOKEN_TTL_SECONDS', 600),
         'empty_timeout_seconds' => (int) env('LIVEKIT_EMPTY_TIMEOUT_SECONDS', 300),
         'max_participants' => (int) env('LIVEKIT_MAX_PARTICIPANTS', 12),
+        // Runbook plan: 300 plus five stations always keep their six places; the rest of the
+        // room is for individual members. The member seat limit is derived from both numbers.
+        'reserved_endpoint_slots' => 6,
     ],
 ];

@@ -7,6 +7,7 @@ namespace App\Notifications;
 use App\Enums\DepartmentUpdatePriority;
 use App\Models\DepartmentUpdate;
 use App\Models\User;
+use App\Notifications\Concerns\EvaluatesDelivery;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -15,6 +16,7 @@ use NotificationChannels\WebPush\WebPushMessage;
 
 final class DepartmentUpdateNotification extends Notification implements ShouldQueue
 {
+    use EvaluatesDelivery;
     use Queueable;
 
     public function __construct(
@@ -40,31 +42,33 @@ final class DepartmentUpdateNotification extends Notification implements ShouldQ
         );
     }
 
+    protected function deliveryCategory(): string
+    {
+        return User::NOTIFICATION_PREFERENCE_DEPARTMENT_UPDATES;
+    }
+
+    protected function deliveryEventKey(): string
+    {
+        return 'department_updates:update:'.$this->updateId.':published';
+    }
+
+    /**
+     * The publisher decides which channels this notice may use.
+     *
+     * @return list<string>
+     */
+    protected function deliveryChannelMask(): array
+    {
+        return array_values(array_filter([
+            $this->sendInApp ? 'database' : null,
+            $this->sendWebPush ? 'webpush' : null,
+        ]));
+    }
+
     /** @return list<string> */
     public function via(object $notifiable): array
     {
-        if (! $notifiable instanceof User) {
-            return [];
-        }
-
-        $subscription = $notifiable->notificationSubscriptions()
-            ->where('event_key', User::NOTIFICATION_PREFERENCE_DEPARTMENT_UPDATES)
-            ->first();
-        if ($subscription === null) {
-            return [];
-        }
-
-        $channels = [];
-
-        if ($this->sendInApp && $subscription->database_enabled) {
-            $channels[] = 'database';
-        }
-
-        if ($this->sendWebPush && $subscription->webpush_enabled && $notifiable->pushSubscriptions()->exists()) {
-            $channels[] = WebPushChannel::class;
-        }
-
-        return $channels;
+        return $this->evaluatedChannels($notifiable);
     }
 
     /** @return array<string, mixed> */
@@ -80,10 +84,11 @@ final class DepartmentUpdateNotification extends Notification implements ShouldQ
             'actions' => [[
                 'name' => 'view',
                 'label' => 'View update',
-                'url' => route('updates.show', $this->updateId),
+                'url' => $this->deliveryUrl($notifiable, route('updates.show', $this->updateId)),
                 'color' => $this->priority->color(),
                 'isOutlined' => false,
             ]],
+            'provenance' => $this->deliveryProvenance($notifiable),
         ];
     }
 
@@ -95,7 +100,7 @@ final class DepartmentUpdateNotification extends Notification implements ShouldQ
             ->icon('/images/mbfd-logo.png')
             ->badge('/images/mbfd-logo.png')
             ->tag('department-update-'.$this->updateId)
-            ->data(['url' => route('updates.show', $this->updateId)]);
+            ->data(['url' => $this->deliveryUrl($notifiable, route('updates.show', $this->updateId))]);
     }
 
     /** @return array<string, string> */

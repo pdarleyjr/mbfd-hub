@@ -7,8 +7,10 @@ use App\Models\AIAnalysisLog;
 use App\Models\CapitalProject;
 use App\Models\NotificationTracking;
 use App\Models\User;
+use App\Notifications\OperationalAlertNotification;
 use App\Services\CloudflareAIService;
-use Filament\Notifications\Notification;
+use App\Services\Notifications\NotificationCategoryRegistry;
+use App\Services\Notifications\NotificationDispatchService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
@@ -34,7 +36,7 @@ class AnalyzeProjectPriorities extends Command
             $this->info('Starting project priority analysis...');
 
             // Fetch all active projects (status != Completed/Cancelled)
-            $activeProjects = CapitalProject::whereNotIn('status', ['Completed', 'Cancelled'])
+            $activeProjects = CapitalProject::whereNotIn('status', ['completed', 'Cancelled'])
                 ->orderBy('id')
                 ->get();
 
@@ -202,18 +204,19 @@ class AnalyzeProjectPriorities extends Command
                 continue; // Skip if already notified recently
             }
 
-            // Create Filament notification
-            Notification::make()
-                ->title('High Priority Project Alert')
-                ->body("**{$project->name}** requires attention. Priority Rank: #{$project->ai_priority_rank}")
-                ->icon('heroicon-o-exclamation-triangle')
-                ->iconColor('warning')
-                ->actions([
-                    \Filament\Notifications\Actions\Action::make('view')
-                        ->label('View Project')
-                        ->url(route('filament.admin.resources.capital-projects.edit', $project)),
-                ])
-                ->sendToDatabase($user);
+            // Only people who may act on projects right now are told (the project alert category).
+            $sent = app(NotificationDispatchService::class)->notifyUser(NotificationCategoryRegistry::PROJECT_ALERTS, $user, new OperationalAlertNotification(
+                category: NotificationCategoryRegistry::PROJECT_ALERTS,
+                title: 'High Priority Project Alert',
+                body: "**{$project->name}** requires attention. Priority Rank: #{$project->ai_priority_rank}",
+                url: route('filament.admin.resources.capital-projects.edit', $project),
+                icon: 'heroicon-o-exclamation-triangle',
+                iconColor: 'warning',
+                actionLabel: 'View Project',
+            ));
+            if (! $sent) {
+                continue;
+            }
 
             // Track notification
             NotificationTracking::create([

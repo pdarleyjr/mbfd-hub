@@ -1,8 +1,5 @@
 <x-filament-panels::page data-hub-ui="2" data-hub-portal="employee">
-    <div class="ppe-heading">
-        <div class="ppe-mark" aria-hidden="true">PPE</div>
-        <div><span>OFFICER-AUTHORIZED WORKFLOW</span><h2>Replace personally issued firefighting equipment</h2><p>This request is for an individual member. Station inventory and repair requests remain in the Stations workspace.</p></div>
-    </div>
+    <p class="hub-portal-intro">Replace personally issued firefighting equipment. This request is for an individual member. Station inventory and repair requests remain in the Stations workspace.</p>
 
     <form wire:submit="submit" class="ppe-form">
         {{ $this->form }}

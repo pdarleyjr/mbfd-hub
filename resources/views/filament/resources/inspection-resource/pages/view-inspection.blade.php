@@ -20,8 +20,9 @@
         'verifyCorrection' => 'Verify correction',
         'resolveIssue' => 'Resolve',
         'classifyImpact' => 'Classify impact',
+        'correctSeverity' => \App\Support\Fleet\DefectSeverityCorrection::ACTION_LABEL,
         'linkServiceTicket' => 'Create service ticket',
-        'dismissIssue' => 'Dismiss',
+        'dismissIssue' => \App\Support\Fleet\DefectNoActionClosure::ACTION_LABEL,
         'reopenIssue' => 'Reopen',
     ];
     $hasIssues = $workspace['legacy_pending'] || $workspace['swap'] || count($workspace['holds']) > 0
@@ -308,7 +309,9 @@
                                 @if($defect['significant'])
                                     <span class="hub-insp-badge hub-insp-badge--danger">{{ $defect['severity_label'] }}</span>
                                 @endif
-                                @if($defect['recurrence'])
+                                @if($defect['recurrence_after_no_action'] ?? false)
+                                    <span class="hub-insp-badge hub-insp-badge--danger">Reported again after it was closed with no action</span>
+                                @elseif($defect['recurrence'])
                                     <span class="hub-insp-badge hub-insp-badge--warning">Recurring issue</span>
                                 @endif
                             </div>
@@ -377,6 +380,20 @@
                             </div>
                         @endif
 
+                        @if($defect['closure'])
+                            <div class="hub-insp-observation" data-issue-closure>
+                                <p class="hub-insp-observation__label">
+                                    {{ $defect['closed_no_action'] ? \App\Support\Fleet\DefectNoActionClosure::STATUS_LABEL : 'Resolved' }}@if($defect['closure']['at']) · {{ $defect['closure']['at'] }}@endif
+                                </p>
+                                @if($defect['closed_no_action'])
+                                    <p class="hub-insp-item__text">Why no corrective action was necessary: {{ $defect['closure']['reason'] ?? 'Not recorded' }}</p>
+                                    <p class="hub-insp-note">Nothing was repaired or replaced. The reason and the original report stay in the apparatus history.</p>
+                                @elseif($defect['closure']['notes'])
+                                    <p class="hub-insp-item__text">{{ $defect['closure']['notes'] }}</p>
+                                @endif
+                            </div>
+                        @endif
+
                         @if(count($defect['actions']) > 0)
                             <div class="hub-insp-actions" role="group" aria-label="Actions for {{ $defect['item'] }}" data-issue-actions>
                                 @foreach($defect['actions'] as $actionName)
@@ -388,6 +405,9 @@
                                     >{{ $actionLabels[$actionName] ?? $actionName }}</button>
                                 @endforeach
                             </div>
+                        @endif
+                        @if(! empty($defect['close_blocked']))
+                            <p class="hub-insp-note" data-close-blocked>{{ \App\Support\Fleet\DefectNoActionClosure::ACTION_LABEL }} is not available: {{ $defect['close_blocked'] }}</p>
                         @endif
 
                         @if(is_array($defect['thread']))
@@ -574,7 +594,7 @@
                                 @endif
                             </p>
                             @if(filled($entry['body']))
-                                <p class="hub-insp-item__text">{{ $entry['body'] }}</p>
+                                <p class="hub-insp-item__text" style="white-space: pre-line;">{{ $entry['body'] }}</p>
                             @endif
                             @if(is_array($entry['evidence']))
                                 <x-inspection-checklist-v2-evidence :evidence="$entry['evidence']" />

@@ -248,40 +248,70 @@ class AppServiceProvider extends ServiceProvider
         // Dispatch NewSubmissionNotification (database + web push) when new
         // user-facing forms are submitted across the MBFD Hub platform.
 
-        StationInspection::created(function (StationInspection $inspection) {
+        // Every hook below is guarded: whatever goes wrong while telling people about a submission is reported
+        // and never fails or rolls back the submission itself.
+        StationInspection::created(fn (StationInspection $inspection) => $this->guardNotificationHook(function () use ($inspection): void {
             $stationName = $inspection->station?->name ?? 'Unknown Station';
             $this->notifySubmissionRoles(
                 'station_inspection',
                 'New Station Inspection Submitted',
                 "A station inspection for {$stationName} has been submitted.",
                 '/admin/station-inspections/'.$inspection->id,
+                $inspection->id,
             );
-        });
+        }));
 
-        EvaluationSubmission::created(function (EvaluationSubmission $submission) {
+        // An evaluation is created as a DRAFT the moment a member opens it, so "has been submitted"
+        // is only true when its status becomes 'submitted' (or when one is created already submitted).
+        $notifyEvaluationSubmitted = fn (EvaluationSubmission $submission) => $this->guardNotificationHook(function () use ($submission): void {
             $productName = $submission->candidateProduct?->name ?? 'a product';
+            // Each submission of the evaluation is its own event (its key carries a fresh id), so returning it for edits
+            // and resubmitting it alerts again. The key still collapses a retry of this very fan-out.
+            $revision = 'submitted:'.\Illuminate\Support\Str::uuid();
             $this->notifySubmissionRoles(
                 'evaluation_submission',
                 'New Evaluation Submitted',
                 "An evaluation for {$productName} has been submitted.",
                 '/admin/evaluation-submissions/'.$submission->id,
+                $submission->id,
+                event: $revision,
             );
         });
+        EvaluationSubmission::created(function (EvaluationSubmission $submission) use ($notifyEvaluationSubmitted): void {
+            if ($submission->status === 'submitted') {
+                $notifyEvaluationSubmitted($submission);
+            }
+        });
+        EvaluationSubmission::updated(function (EvaluationSubmission $submission) use ($notifyEvaluationSubmitted): void {
+            if ($submission->wasChanged('status') && $submission->status === 'submitted') {
+                $notifyEvaluationSubmitted($submission);
+            }
+        });
 
-        ApparatusInspection::created(function (ApparatusInspection $inspection) {
+        // Daily Checkouts have no default fan-out. Reviewers are told by InspectionNotificationDispatcher
+        // (review required, significant damage, member replies) and a routine accepted checkout notifies
+        // nobody (docs/daily-inspection-continuity.md section 4.5). The ONE exception is the opt-in
+        // category "Every Daily Checkout as it's submitted": it defaults to all channels off, goes only to
+        // reviewers who turned it on, and skips excluded tests and the submitter.
+        ApparatusInspection::created(fn (ApparatusInspection $inspection) => $this->guardNotificationHook(function () use ($inspection): void {
+            if ($inspection->test_excluded_at !== null) {
+                return;
+            }
             $unitName = $inspection->designation_at_time
                 ?? $inspection->unit_number
                 ?? $inspection->apparatus?->designation
                 ?? 'Unknown';
             $this->notifySubmissionRoles(
-                'apparatus_inspection',
-                'New Vehicle Inspection',
-                "A vehicle inspection for {$unitName} has been submitted.",
+                'daily_checkout_every_submission',
+                'New Daily Checkout',
+                "A Daily Checkout for {$unitName} has been submitted.",
                 \App\Filament\Support\InspectionWorkspace::url($inspection),
+                $inspection->id,
+                $inspection->actor_user_id !== null ? (int) $inspection->actor_user_id : null,
             );
-        });
+        }));
 
-        StationInventorySubmission::created(function (StationInventorySubmission $submission) {
+        StationInventorySubmission::created(fn (StationInventorySubmission $submission) => $this->guardNotificationHook(function () use ($submission): void {
             $stationName = $submission->station?->station_number ?? 'Unknown Station';
             $employeeName = $submission->employee_name ?: 'Unknown employee';
             $shift = $submission->shift ?: 'Unknown shift';
@@ -298,8 +328,9 @@ class AppServiceProvider extends ServiceProvider
                         true,
                     ),
                 ], panel: 'admin'),
+                $submission->id,
             );
-        });
+        }));
     }
 
     /**
@@ -319,41 +350,51 @@ class AppServiceProvider extends ServiceProvider
     }
 
     /**
-     * Dispatch a NewSubmissionNotification to explicitly subscribed users.
+     * Notification hooks run inside the workflow's own save. Whatever they do, the write must stand:
+     * any failure is reported and swallowed here.
+     */
+    private function guardNotificationHook(callable $hook): void
+    {
+        try {
+            $hook();
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
+    }
+
+    /**
+     * Queue a NewSubmissionNotification for the people who are eligible for its category right now (roles
+     * and permissions, evaluated live by the queued fan-out after the write commits). A saved preference
+     * can only narrow the channels; it never chooses the recipients.
      */
     private function notifySubmissionRoles(
         string $submissionType,
         string $title,
         string $body,
         string $actionUrl,
+        int|string $subjectId,
+        ?int $exceptUserId = null,
+        string $event = 'created',
     ): void {
-        $preferenceKey = User::preferenceKeyForSubmissionType($submissionType);
+        $category = User::preferenceKeyForSubmissionType($submissionType);
 
-        if ($preferenceKey === null) {
+        if ($category === null) {
             return;
         }
 
-        $recipients = User::query()
-            ->whereHas('notificationSubscriptions', fn ($query) => $query
-                ->where('event_key', $preferenceKey)
-                ->where(fn ($channels) => $channels
-                    ->where('database_enabled', true)
-                    ->orWhere('webpush_enabled', true)
-                    ->orWhere('email_enabled', true)))
-            ->get();
+        $eventKey = \App\Services\Notifications\NotificationDispatchService::eventKey($category, $submissionType, $subjectId, $event);
 
-        if ($recipients->isEmpty()) {
-            return;
-        }
-
-        \Illuminate\Support\Facades\Notification::send(
-            $recipients,
+        app(\App\Services\Notifications\NotificationDispatchService::class)->dispatch(
+            $category,
             new NewSubmissionNotification(
                 submissionType: $submissionType,
                 title: $title,
                 body: $body,
                 actionUrl: $actionUrl,
+                eventKey: $eventKey,
             ),
+            eventKey: $eventKey,
+            exceptUserId: $exceptUserId,
         );
     }
 }

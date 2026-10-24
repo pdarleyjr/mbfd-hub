@@ -8,6 +8,7 @@ use App\Concerns\ResolvesCanonicalEmployee;
 use App\Filament\Support\HasNavigationParent;
 use App\Models\ApparatusInspection;
 use App\Models\User;
+use App\Services\ApparatusInspectionExceptionService;
 use App\Services\Inspections\EmployeeInspectionHistoryService;
 use App\Services\Inspections\IssueMessageService;
 use App\Services\Inspections\MemberInspectionConversation;
@@ -57,6 +58,9 @@ class MyVehicleInspectionView extends Page implements HasNavigationParent
         $this->validate(['inspectionReply' => $this->replyRules()], [], ['inspectionReply' => 'message']);
 
         $this->deliver($user, 'inspection', ['inspection_id' => $inspection->getKey(), 'body' => $this->inspectionReply], 'inspectionReply');
+        // A reply on the inspection thread answers any meter clarification waiting on this member:
+        // hand it back to the reviewers' queue instead of leaving it on "Your input is requested".
+        app(ApparatusInspectionExceptionService::class)->markMemberReplied((int) $inspection->getKey(), $user);
         $this->inspectionReply = '';
     }
 

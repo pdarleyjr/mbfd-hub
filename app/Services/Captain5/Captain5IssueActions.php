@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Services\Defects\DefectCorrectiveActionService;
 use App\Services\Security\Captain5AccessDecision;
 use App\Support\Fleet\DefectActionStatus;
+use App\Support\Fleet\DefectNoActionClosure;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -86,7 +87,7 @@ final class Captain5IssueActions
             ], $key),
             'replaced' => $this->replaced($engine, $defectId, $actor, $valid, $messages, $key),
             'verify' => $engine->verifyCorrection($defectId, $actor, [...$messages, 'notes' => $valid['resolution_notes'] ?? null], $key),
-            'dismiss' => $engine->dismiss($defectId, $actor, [...$messages, 'reason' => $this->required($valid, 'reason', 'Explain why this issue is being dismissed.')], $key),
+            'dismiss' => $engine->dismiss($defectId, $actor, [...$messages, 'reason' => $this->required($valid, 'reason', DefectNoActionClosure::REASON_LABEL)], $key),
             'reopen' => $engine->reopen($defectId, $actor, [...$messages, 'reason' => $this->required($valid, 'reason', 'Explain why this issue is being reopened.')], $key),
             default => throw ValidationException::withMessages(['action' => 'Unknown action.']),
         };

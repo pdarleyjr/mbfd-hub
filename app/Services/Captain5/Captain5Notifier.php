@@ -142,11 +142,22 @@ final class Captain5Notifier
             $resolving = in_array($event->event_type, ['resolved', 'correction_verified'], true);
             $ordered = $event->event_type === 'action_updated' && $event->to_status === DefectActionStatus::ACTION_PENDING
                 && $event->from_status !== DefectActionStatus::ACTION_PENDING;
-            if ($message === '' && ! $ordered && ! in_array($event->event_type, self::NOTIFYING_EVENTS, true)) {
-                return; // acknowledgements, notes and reopenings stay in history
+            $reopened = $event->event_type === 'reopened';
+            if ($message === '' && ! $ordered && ! $reopened && ! in_array($event->event_type, self::NOTIFYING_EVENTS, true)) {
+                return; // acknowledgements and notes stay in history
             }
             $actor = $event->actor_user_id !== null ? User::query()->find($event->actor_user_id) : null;
             $unit = $this->unitLabel($defect->getRelationValue('apparatus'));
+            if ($event->event_type === 'dismissed') {
+                $this->closedNoAction($defect, $event, $unit, $actor);
+
+                return;
+            }
+            if ($reopened) {
+                $this->reopenedIssue($defect, $event, $unit, $actor);
+
+                return;
+            }
             $label = DefectActionStatus::label($event->to_status ?: $defect->action_status);
             $phrase = $this->issuePhrase($defect);
             $body = $resolving
@@ -165,6 +176,51 @@ final class Captain5Notifier
                 $actor,
             );
         });
+    }
+
+    /**
+     * An issue closed with no action required from the Captain 5 door. The reporter and every
+     * participant are always told (the same people the Logistics door tells), plus the crew and
+     * Captain 5 officers on this issue, and each person gets exactly ONE alert: this method is the
+     * only sender for a Captain 5 close, so InspectionNotificationDispatcher stays out of it.
+     */
+    private function closedNoAction(ApparatusDefect $defect, ApparatusDefectEvent $event, string $unit, ?User $actor): void
+    {
+        $this->queue(
+            'captain5:defect:'.$defect->getKey().':closed:'.$event->getKey(),
+            self::KIND_ISSUE_UPDATE,
+            $this->involved($defect)->merge($this->dispatcher->defectFollowers($defect)),
+            fn (User $recipient): array => [
+                'title' => "{$unit}: issue closed, no action required",
+                'body' => $this->dispatcher->closedNoActionBody($defect, $event),
+                'url' => $this->urlFor($recipient, $defect),
+            ],
+            $actor,
+        );
+    }
+
+    /**
+     * A closed issue reopened from the Captain 5 door. Everyone who was told it was closed is told it
+     * is open again (one alert each, never the person who reopened it), as the Logistics door does.
+     */
+    private function reopenedIssue(ApparatusDefect $defect, ApparatusDefectEvent $event, string $unit, ?User $actor): void
+    {
+        $was = $event->from_status === DefectActionStatus::DISMISSED ? 'closed with no action required' : 'marked resolved';
+        $message = trim((string) $event->member_message);
+        $body = "The {$this->issuePhrase($defect)} was {$was}, and Captain 5 reopened it. It is being looked at again."
+            .($message !== '' ? ' '.$this->excerpt($message) : '');
+
+        $this->queue(
+            'captain5:defect:'.$defect->getKey().':reopened:'.$event->getKey(),
+            self::KIND_ISSUE_UPDATE,
+            $this->involved($defect)->merge($this->dispatcher->defectFollowers($defect)),
+            fn (User $recipient): array => [
+                'title' => "{$unit}: issue reopened",
+                'body' => $body,
+                'url' => $this->urlFor($recipient, $defect),
+            ],
+            $actor,
+        );
     }
 
     /** A Captain 5 message (member-visible) on an issue or inspection thread. */
@@ -482,7 +538,9 @@ final class Captain5Notifier
      */
     private function queue(string $eventKey, string $kind, Collection $candidates, Closure $content, ?User $actor = null): void
     {
-        $recipients = $this->dispatcher->distinctRecipients($candidates, $actor);
+        // Passing the kind lets the dispatcher drop people who cannot receive this category before a
+        // ledger row says "dispatched" for them.
+        $recipients = $this->dispatcher->distinctRecipients($candidates, $actor, $kind, $eventKey);
         if ($this->replay !== null) {
             if ($eventKey !== $this->replay['key']) {
                 return; // another notification built by the same method; not the row being retried
@@ -606,7 +664,8 @@ final class Captain5Notifier
             return $inspectionId !== null ? $this->dispatcher->adminUrl((int) $inspectionId, 'issue-'.$defect->getKey()) : $this->workspaceUrl((int) $defect->getKey());
         }
         if (DB::table('apparatus_defect_participants')->where('apparatus_defect_id', $defect->getKey())
-            ->where('user_id', $recipient->getKey())->where('enrollment_source', 'captain5')->exists()) {
+            ->where('user_id', $recipient->getKey())->where('enrollment_source', 'captain5')->exists()
+            && $this->access->decide($recipient)->canViewData) { // someone who lost Captain 5 access gets the member link, not a dead end
             return $this->workspaceUrl((int) $defect->getKey());
         }
 

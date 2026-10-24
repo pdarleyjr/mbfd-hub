@@ -1,5 +1,6 @@
 import type { Tone } from '../ui/status';
 import { humanize } from '../ui/status';
+import { NO_ACTION_STATUS } from './actionForms';
 import type { IssueSummary, OnDuty } from './types';
 
 /** Status wording for Captain 5. `reported` is "needs acknowledgement" here, not the member-facing label. */
@@ -10,7 +11,8 @@ const STATUS: Record<string, { label: string; tone: Tone }> = {
   replacement_available: { label: 'Ready for pickup', tone: 'success' },
   repair_scheduled: { label: 'Repair scheduled', tone: 'info' },
   resolved: { label: 'Resolved', tone: 'success' },
-  dismissed: { label: 'Closed, no action', tone: 'neutral' },
+  // Not 'Resolved': nothing was repaired or replaced.
+  dismissed: { label: NO_ACTION_STATUS, tone: 'neutral' },
 };
 
 export function statusOf(issue: Pick<IssueSummary, 'action_status' | 'action_label'>): { label: string; tone: Tone } {
