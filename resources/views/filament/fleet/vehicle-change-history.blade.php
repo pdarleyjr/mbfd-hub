@@ -5,6 +5,9 @@
         \App\Models\UnitMasterVehicleChange::SOURCE_FY27 => 'FY27 fleet list',
         \App\Models\UnitMasterVehicleChange::SOURCE_TAKE_HOME => 'Take home inspection',
         \App\Models\UnitMasterVehicleChange::SOURCE_TAKE_HOME_NEW => 'New vehicle (take home inspection)',
+        \App\Models\UnitMasterVehicleChange::SOURCE_APPARATUS_LINK => 'Linked to apparatus',
+        \App\Models\UnitMasterVehicleChange::SOURCE_APPARATUS_PAGE => 'Apparatus page',
+        \App\Models\UnitMasterVehicleChange::SOURCE_MASTER_INVENTORY => 'Master Vehicle Inventory',
     ];
     $statusColors = ['applied' => 'info', 'accepted' => 'success', 'rejected' => 'gray'];
 @endphp
@@ -33,6 +36,9 @@
                                 Record {{ $change->new_value }}
                             @else
                                 {{ $valueLabel($change, $change->old_value) }} &rarr; {{ $valueLabel($change, $change->new_value) }}
+                            @endif
+                            @if ($change->note)
+                                <br><small>{{ $change->note }}</small>
                             @endif
                         </td>
                         <td><x-filament::badge :color="$statusColors[$change->status] ?? 'gray'">{{ ucfirst($change->status) }}</x-filament::badge></td>

@@ -49,7 +49,7 @@
                     @foreach($documents as $document)
                         <li class="rl-card" wire:key="rl-doc-{{ $document->uuid }}">
                             <div class="rl-card__body">
-                                <h4 class="rl-card__title">{{ $document->title }}</h4>
+                                <h4 class="rl-card__title">{{ $document->title }}@if($document->isNew()) <span class="rl-badge-new">New</span>@endif</h4>
                                 <p class="rl-card__meta">
                                     @if($document->page_count){{ $document->page_count }} {{ $document->page_count === 1 ? 'page' : 'pages' }} &middot; @endif{{ $document->fileTypeLabel() }} &middot; {{ $document->readableSize() }}
                                 </p>

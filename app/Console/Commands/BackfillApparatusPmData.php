@@ -7,15 +7,16 @@ use Illuminate\Console\Command;
 
 /**
  * Backfill apparatus vehicle details, mileage and engine hours from combined data sources.
- * 
+ *
  * Vehicle details from: MBFD Vehicle Master Status Sheet 01.20 (Master Inventory)
  * Mileage/Hours from: PM Cycles - Sheet1.csv (Latest PM data)
- * 
+ *
  * Usage: php artisan apparatus:backfill-pm-data
  */
 class BackfillApparatusPmData extends Command
 {
     protected $signature = 'apparatus:backfill-pm-data';
+
     protected $description = 'Backfill apparatus vehicle details, mileage, engine hours from Master Inventory and PM Cycles';
 
     /**
@@ -175,18 +176,19 @@ class BackfillApparatusPmData extends Command
                 ->first();
 
             // If not found, try by vehicle number
-            if (!$apparatus) {
+            if (! $apparatus) {
                 $vehNum = $data['vehicle_number'];
                 $masterVehNum = $data['master_vehicle_number'] ?? null;
-                
+
                 $apparatus = Apparatus::where('vehicle_number', $vehNum)
                     ->orWhere('vehicle_number', $masterVehNum)
                     ->first();
             }
 
-            if (!$apparatus) {
+            if (! $apparatus) {
                 $this->warn("  Skipping {$designation}: No matching apparatus found in database");
                 $skipped++;
+
                 continue;
             }
 
@@ -200,54 +202,66 @@ class BackfillApparatusPmData extends Command
                 'last_service_type' => $apparatus->last_service_type,
             ];
 
+            // Once an apparatus is linked to its master vehicle record, the vehicle number, make,
+            // model and year belong to the master. This one-off seed must not overwrite them.
+            $ownedByMaster = $apparatus->unit_master_vehicle_id !== null;
+
             // Update with combined data
-            $apparatus->vehicle_number = $data['vehicle_number'];
+            if (! $ownedByMaster) {
+                $apparatus->vehicle_number = $data['vehicle_number'];
+            }
             $apparatus->current_miles = $data['miles'];
             $apparatus->mileage = $data['miles'];
             $apparatus->current_engine_hours = $data['hours'];
             $apparatus->last_service_type = $data['service_type'];
-            
+
             // Update vehicle details from Master Inventory
-            if ($data['year']) {
-                $apparatus->year = $data['year'];
+            if (! $ownedByMaster) {
+                if ($data['year']) {
+                    $apparatus->year = $data['year'];
+                }
+                if ($data['make']) {
+                    $apparatus->make = $data['make'];
+                }
+                if ($data['model']) {
+                    $apparatus->model = $data['model'];
+                }
             }
-            if ($data['make']) {
-                $apparatus->make = $data['make'];
-            }
-            if ($data['model']) {
-                $apparatus->model = $data['model'];
-            }
-            
+
             // Set PM baseline if not already set
-            if (!$apparatus->last_pm_engine_hours) {
+            if (! $apparatus->last_pm_engine_hours) {
                 $apparatus->last_pm_engine_hours = max(0, $data['hours'] - 300);
             }
-            if (!$apparatus->last_pm_mileage) {
+            if (! $apparatus->last_pm_mileage) {
                 $apparatus->last_pm_mileage = max(0, $data['miles'] - 5000);
             }
 
             $apparatus->save();
 
             $this->info("  ✓ {$designation} (ID: {$apparatus->id}) - {$data['unit_name']}");
-            $this->line("    Vehicle #: {$oldValues['vehicle_number']} → {$data['vehicle_number']}");
-            if ($data['year']) {
-                $this->line("    Year: " . ($oldValues['year'] ?? 'NULL') . " → {$data['year']}");
+            if ($ownedByMaster) {
+                $this->line('    Vehicle #, year, make and model kept: owned by the linked master vehicle record');
+            } else {
+                $this->line("    Vehicle #: {$oldValues['vehicle_number']} → {$data['vehicle_number']}");
+                if ($data['year']) {
+                    $this->line('    Year: '.($oldValues['year'] ?? 'NULL')." → {$data['year']}");
+                }
+                if ($data['make']) {
+                    $this->line('    Make: '.($oldValues['make'] ?? 'NULL')." → {$data['make']}");
+                }
+                if ($data['model']) {
+                    $this->line('    Model: '.($oldValues['model'] ?? 'NULL')." → {$data['model']}");
+                }
             }
-            if ($data['make']) {
-                $this->line("    Make: " . ($oldValues['make'] ?? 'NULL') . " → {$data['make']}");
-            }
-            if ($data['model']) {
-                $this->line("    Model: " . ($oldValues['model'] ?? 'NULL') . " → {$data['model']}");
-            }
-            $this->line("    Miles: " . ($oldValues['current_miles'] ?? 'NULL') . " → " . number_format($data['miles']));
-            $this->line("    Hours: " . ($oldValues['current_engine_hours'] ?? 'NULL') . " → " . number_format($data['hours'], 1));
-            $this->line("    Service: " . ($oldValues['last_service_type'] ?? 'NULL') . " → {$data['service_type']}");
+            $this->line('    Miles: '.($oldValues['current_miles'] ?? 'NULL').' → '.number_format($data['miles']));
+            $this->line('    Hours: '.($oldValues['current_engine_hours'] ?? 'NULL').' → '.number_format($data['hours'], 1));
+            $this->line('    Service: '.($oldValues['last_service_type'] ?? 'NULL')." → {$data['service_type']}");
             $this->newLine();
 
             $updated++;
         }
 
-        $this->info("Summary:");
+        $this->info('Summary:');
         $this->info("  Updated: {$updated}");
         $this->info("  Skipped: {$skipped}");
 

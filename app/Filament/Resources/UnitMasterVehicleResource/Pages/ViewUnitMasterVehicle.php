@@ -2,7 +2,9 @@
 
 namespace App\Filament\Resources\UnitMasterVehicleResource\Pages;
 
+use App\Filament\Resources\ApparatusResource;
 use App\Filament\Resources\UnitMasterVehicleResource;
+use App\Models\Apparatus;
 use App\Models\Employee;
 use App\Models\TakeHomeVehicleInspection;
 use App\Models\UnitMasterVehicle;
@@ -10,6 +12,7 @@ use App\Models\UnitMasterVehicleChange;
 use App\Models\User;
 use App\Models\VehicleDocument;
 use App\Services\Fleet\UnitMasterVehicleChangeRecorder;
+use App\Support\Fleet\ApparatusOverview;
 use App\Support\Fleet\VehicleDocumentAccess;
 use Filament\Actions;
 use Filament\Forms;
@@ -151,6 +154,36 @@ class ViewUnitMasterVehicle extends ViewRecord
                         TextEntry::make('needs_fleet_review')->label('Fleet review')->badge()
                             ->getStateUsing(fn (UnitMasterVehicle $record): string => $record->needs_fleet_review ? 'Needs review' : 'Reviewed')
                             ->color(fn (string $state): string => $state === 'Needs review' ? 'warning' : 'gray'),
+                    ]))
+                    ->columns(['default' => 1, 'md' => 2, 'xl' => 4])
+                    ->compact(),
+
+                Section::make('Apparatus')
+                    ->description('Daily operations for this vehicle: status, open work, PM, Daily Checkout and service. Vehicle #, make, model, year and VIN stay in sync with this record.')
+                    ->visible(fn (UnitMasterVehicle $record): bool => $record->apparatus instanceof Apparatus)
+                    ->schema(array_map(fn (TextEntry $entry): TextEntry => $entry->placeholder('—'), [
+                        TextEntry::make('apparatus_unit')->label('Unit')
+                            ->getStateUsing(fn (UnitMasterVehicle $record): ?string => $record->apparatus?->designation ?: $record->apparatus?->name)
+                            ->url(fn (UnitMasterVehicle $record): ?string => $record->apparatus instanceof Apparatus && (auth()->user()?->can('view', $record->apparatus) ?? false)
+                                ? ApparatusResource::getUrl('view', ['record' => $record->apparatus])
+                                : null)
+                            ->weight('bold'),
+                        TextEntry::make('apparatus_status')->label('Operational status')->badge()
+                            ->getStateUsing(fn (UnitMasterVehicle $record): ?string => $record->apparatus?->getAttribute('status'))
+                            ->color(fn (?string $state): string => ApparatusResource::statusColor($state)),
+                        TextEntry::make('apparatus_station')->label('Station')
+                            ->getStateUsing(fn (UnitMasterVehicle $record): ?string => $record->apparatus?->station instanceof \App\Models\Station ? 'Station '.$record->apparatus->station->getAttribute('station_number') : null),
+                        TextEntry::make('apparatus_open_work')->label('Open work')
+                            ->getStateUsing(function (UnitMasterVehicle $record): ?string {
+                                if (! $record->apparatus instanceof Apparatus) {
+                                    return null;
+                                }
+                                $overview = ApparatusOverview::for($record->apparatus);
+
+                                return $overview->openDefects + $overview->openTickets === 0
+                                    ? 'Clear'
+                                    : $overview->openDefects.' open issues, '.$overview->openTickets.' open service tickets';
+                            }),
                     ]))
                     ->columns(['default' => 1, 'md' => 2, 'xl' => 4])
                     ->compact(),

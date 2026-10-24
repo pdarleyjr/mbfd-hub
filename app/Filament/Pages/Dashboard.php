@@ -9,7 +9,7 @@ use Filament\Support\Enums\MaxWidth;
 
 class Dashboard extends BaseDashboard
 {
-    protected static ?string $navigationLabel = 'Command Board';
+    protected static ?string $navigationLabel = 'Logistics Dashboard';
 
     protected static ?int $navigationSort = 10;
 
@@ -17,13 +17,13 @@ class Dashboard extends BaseDashboard
 
     protected static ?string $navigationIcon = 'heroicon-o-rectangle-group';
 
-    protected static ?string $title = 'Station Operations Command Board';
+    protected static ?string $title = 'Logistics Dashboard';
 
     protected ?string $maxContentWidth = MaxWidth::Full->value;
 
     public function getSubheading(): ?string
     {
-        return 'Department-wide activity and exceptions for the active operational day.';
+        return 'Department-wide checkouts, equipment issues and station activity for the active operational day.';
     }
 
     public function getWidgets(): array

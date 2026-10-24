@@ -41,7 +41,7 @@ class PmAlertNotificationJob implements ShouldQueue
         // Only send if status worsened (green→yellow, yellow→red, green→red)
         $statusRank = ['green' => 0, 'yellow' => 1, 'red' => 2];
         $previousRank = $statusRank[$this->previousStatus] ?? 0;
-        $currentRank = $statusRank[$currentStatus] ?? 0;
+        $currentRank = $statusRank[$currentStatus];
 
         if ($currentRank <= $previousRank) {
             return; // No escalation, skip notification

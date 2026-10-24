@@ -86,6 +86,12 @@ class UnitMasterVehicle extends Model
         return $this->belongsTo(Employee::class, 'current_driver_employee_id');
     }
 
+    /** @return HasOne<Apparatus, $this> the operational profile of this vehicle, when it is a fire apparatus */
+    public function apparatus(): HasOne
+    {
+        return $this->hasOne(Apparatus::class, 'unit_master_vehicle_id');
+    }
+
     /** @return HasMany<UnitMasterVehicleChange, $this> */
     public function changes(): HasMany
     {

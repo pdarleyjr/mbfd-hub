@@ -65,8 +65,8 @@ Accepted originals: PDF, DOCX, XLSX, PPTX, DOC, XLS, PPT. A file whose first byt
 
 ## Replace a document
 
-- **Same link, new file (command):** change the file in the folder, update that entry's `sha256` (and `preview` when it applies), and run `resources:import` again. The slug is unchanged, so the document keeps its link, title and category; the new bytes are written next to the old ones, checked, and swapped in together with a `replaced` event that records the previous checksum. Old files are removed only after the swap succeeds.
-- **Same link, new file (Admin):** Admin > Resource Library > open the document > "Replace file". Upload the new original, and a preview PDF when the original is not a PDF. This uses the same code as the command. Uploads in Admin are limited to 50 MB; use the command for bigger files.
+- **Same link, new file (command):** change the file in the folder, update that entry's `sha256` (and `preview` when it applies), and run `resources:import` again. The slug is unchanged, so the document keeps its link, title and category; the new bytes are written next to the old ones, checked, and swapped in together with a `replaced` event that records the previous checksum. The previous files are never deleted: they become a numbered version that managers can download from the document's edit page.
+- **Same link, new file (Admin):** Admin > Resource Library > open the document > "Replace file". Upload the new original, and a preview PDF when the original is not a PDF. This uses the same code as the command. The library accepts files up to 50 MB however they arrive. Adding new documents, hiding them and reordering are covered in [resource-library-admin-uploads.md](resource-library-admin-uploads.md).
 - Replacing a Word file without supplying a new preview removes the old preview, because it would show the old version, and the document becomes download-only until a new preview is added.
 - The same bytes cannot be stored as two documents.
 

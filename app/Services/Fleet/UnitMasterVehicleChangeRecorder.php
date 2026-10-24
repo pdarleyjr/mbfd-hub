@@ -7,6 +7,7 @@ namespace App\Services\Fleet;
 use App\Models\UnitMasterVehicle;
 use App\Models\UnitMasterVehicleChange;
 use App\Models\User;
+use App\Support\Fleet\MasterVehicleSyncGuard;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -39,7 +40,26 @@ final class UnitMasterVehicleChangeRecorder
         }
 
         $vehicle->setAttribute($field, $new);
-        $vehicle->save();
+        // The row is logged below, so the master observer must not log this save again.
+        MasterVehicleSyncGuard::recording(static fn (): bool => $vehicle->save());
+
+        return $this->record($vehicle, $field, $old, $new, UnitMasterVehicleChange::STATUS_APPLIED, $source, $context);
+    }
+
+    /**
+     * Log a change that already happened elsewhere: a master edit made outside the
+     * recorder, or an apparatus copy aligned to the master. The master row is not touched.
+     *
+     * @param  array{source_reference?: ?string, user?: ?User, inspection_id?: ?int, note?: ?string}  $context
+     */
+    public function recordApplied(UnitMasterVehicle $vehicle, string $field, ?string $oldValue, ?string $newValue, string $source, array $context = []): ?UnitMasterVehicleChange
+    {
+        $this->assertField($field);
+        $old = $this->normalize($oldValue);
+        $new = $this->normalize($newValue);
+        if ($old === $new) {
+            return null;
+        }
 
         return $this->record($vehicle, $field, $old, $new, UnitMasterVehicleChange::STATUS_APPLIED, $source, $context);
     }
@@ -83,7 +103,8 @@ final class UnitMasterVehicleChangeRecorder
             $vehicle = UnitMasterVehicle::query()->lockForUpdate()->findOrFail($locked->unit_master_vehicle_id);
             $current = $this->stringValue($vehicle->getAttribute($locked->field));
             $vehicle->setAttribute($locked->field, $locked->new_value);
-            $vehicle->save();
+            // The accepted proposal is the history row; the master observer must not add another.
+            MasterVehicleSyncGuard::recording(static fn (): bool => $vehicle->save());
 
             $stale = $current !== $locked->old_value
                 ? 'Master value had changed to "'.($current ?? '(blank)').'" before acceptance.'

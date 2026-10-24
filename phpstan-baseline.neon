@@ -151,42 +151,6 @@ parameters:
 			path: app/Filament/Pages/NotificationSettings.php
 
 		-
-			message: '#^Access to an undefined property Illuminate\\Database\\Eloquent\\Model\:\:\$station_number\.$#'
-			identifier: property.notFound
-			count: 1
-			path: app/Filament/Resources/ApparatusResource.php
-
-		-
-			message: '#^Anonymous function never returns null so it can be removed from the return type\.$#'
-			identifier: return.unusedType
-			count: 1
-			path: app/Filament/Resources/ApparatusResource.php
-
-		-
-			message: '#^Offset ''hours_since_pm'' does not exist on array\{status\: string, hours\: float, miles\: int, overdue\: bool\}\.$#'
-			identifier: offsetAccess.notFound
-			count: 3
-			path: app/Filament/Resources/ApparatusResource.php
-
-		-
-			message: '#^Offset ''interval_hours'' does not exist on array\{status\: string, hours\: float, miles\: int, overdue\: bool\}\.$#'
-			identifier: offsetAccess.notFound
-			count: 1
-			path: app/Filament/Resources/ApparatusResource.php
-
-		-
-			message: '#^Offset ''last_pm_date'' on array\{status\: string, hours\: float, miles\: int, overdue\: bool\} on left side of \?\? does not exist\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: app/Filament/Resources/ApparatusResource.php
-
-		-
-			message: '#^Offset ''miles_since_pm'' does not exist on array\{status\: string, hours\: float, miles\: int, overdue\: bool\}\.$#'
-			identifier: offsetAccess.notFound
-			count: 1
-			path: app/Filament/Resources/ApparatusResource.php
-
-		-
 			message: '#^Using nullsafe property access "\?\-\>designation" on left side of \?\? is unnecessary\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
 			count: 1
@@ -2139,24 +2103,6 @@ parameters:
 			path: app/Jobs/GenerateOperationalFormPdf.php
 
 		-
-			message: '#^Offset ''hours_since_pm'' does not exist on array\{status\: string, hours\: float, miles\: int, overdue\: bool\}\.$#'
-			identifier: offsetAccess.notFound
-			count: 1
-			path: app/Jobs/PmAlertNotificationJob.php
-
-		-
-			message: '#^Offset ''interval_hours'' does not exist on array\{status\: string, hours\: float, miles\: int, overdue\: bool\}\.$#'
-			identifier: offsetAccess.notFound
-			count: 1
-			path: app/Jobs/PmAlertNotificationJob.php
-
-		-
-			message: '#^Method App\\Models\\Apparatus\:\:getPmHealthStatus\(\) should return array\{status\: string, hours\: float, miles\: int, overdue\: bool\} but returns array\{status\: ''green''\|''red''\|''yellow'', hours_since_pm\: float, miles_since_pm\: int, overdue\: bool, interval_hours\: int, last_pm_date\: non\-falsy\-string\|null\}\.$#'
-			identifier: return.type
-			count: 1
-			path: app/Models/Apparatus.php
-
-		-
 			message: '#^Access to an undefined property App\\Models\\EquipmentItem\:\:\$stock\.$#'
 			identifier: property.notFound
 			count: 1
@@ -2471,42 +2417,6 @@ parameters:
 		-
 			message: '#^Called ''env'' outside of the config directory which returns null when the config is cached, use ''config''\.$#'
 			identifier: larastan.noEnvCallsOutsideOfConfig
-			count: 2
-			path: app/Services/Display/DisplaySnapshotService.php
-
-		-
-			message: '#^Offset ''hours_since_pm'' on array\{status\: string, hours\: float, miles\: int, overdue\: bool\} on left side of \?\? does not exist\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: app/Services/Display/DisplaySnapshotService.php
-
-		-
-			message: '#^Offset ''interval_hours'' on array\{status\: string, hours\: float, miles\: int, overdue\: bool\} on left side of \?\? does not exist\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: app/Services/Display/DisplaySnapshotService.php
-
-		-
-			message: '#^Offset ''last_pm_date'' on array\{status\: string, hours\: float, miles\: int, overdue\: bool\} on left side of \?\? does not exist\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: app/Services/Display/DisplaySnapshotService.php
-
-		-
-			message: '#^Offset ''miles_since_pm'' on array\{status\: string, hours\: float, miles\: int, overdue\: bool\} on left side of \?\? does not exist\.$#'
-			identifier: nullCoalesce.offset
-			count: 1
-			path: app/Services/Display/DisplaySnapshotService.php
-
-		-
-			message: '#^Offset ''overdue'' on array\{status\: string, hours\: float, miles\: int, overdue\: bool\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
-			count: 2
-			path: app/Services/Display/DisplaySnapshotService.php
-
-		-
-			message: '#^Offset ''status'' on array\{status\: string, hours\: float, miles\: int, overdue\: bool\} on left side of \?\? always exists and is not nullable\.$#'
-			identifier: nullCoalesce.offset
 			count: 2
 			path: app/Services/Display/DisplaySnapshotService.php
 

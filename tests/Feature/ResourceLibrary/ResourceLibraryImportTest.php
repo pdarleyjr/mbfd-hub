@@ -188,7 +188,12 @@ final class ResourceLibraryImportTest extends TestCase
         self::assertNotSame($firstSha, $document->original_sha256);
         self::assertSame(hash_file('sha256', $replacement), $document->original_sha256);
         self::assertSame(file_get_contents($replacement), Storage::disk('local')->get($document->original_path));
-        self::assertSame([$document->original_path], Storage::disk('local')->allFiles(), 'one copy, no staged leftovers');
+        // Intentional change: a replacement no longer deletes the superseded bytes; they stay as version 1.
+        $files = Storage::disk('local')->allFiles();
+        sort($files);
+        self::assertSame([$first->original_path, $document->original_path], $files, 'old and new copy, no staged leftovers');
+        self::assertNotSame($first->original_path, $document->original_path, 'new bytes never overwrite the old path');
+        self::assertSame($firstSha, $document->versions()->sole()->original_sha256);
 
         $text = (string) ResourceDocument::query()->whereKey($document->id)->value('search_text');
         self::assertStringContainsString('pump panel', $text);
@@ -200,7 +205,7 @@ final class ResourceLibraryImportTest extends TestCase
         self::assertSame($document->original_sha256, $events[1]->metadata['sha256']);
     }
 
-    public function test_replacing_a_docx_without_a_new_preview_drops_the_stale_preview_and_warns(): void
+    public function test_replacing_a_docx_without_a_new_preview_unlinks_the_stale_preview_keeps_it_in_history_and_warns(): void
     {
         $preview = $this->makePdf('guide.pdf', 'Old guide text');
         $document = $this->importFixture('guide', 'Guide', 'Policies', $this->makeDocx('guide.docx', 'Old guide'), $preview);
@@ -213,8 +218,13 @@ final class ResourceLibraryImportTest extends TestCase
         self::assertNull($result->document->preview_path);
         self::assertNull($result->document->preview_sha256);
         self::assertNotEmpty($result->warnings);
-        self::assertFalse(Storage::disk('local')->exists($oldPreviewPath));
-        self::assertSame([$result->document->original_path], Storage::disk('local')->allFiles());
+        // Intentional change: the old preview is no longer deleted; it stays with version 1 and members just stop seeing it.
+        self::assertTrue(Storage::disk('local')->exists($oldPreviewPath));
+        self::assertSame($oldPreviewPath, $document->versions()->sole()->preview_path);
+        self::assertEqualsCanonicalizing(
+            [$document->original_path, $oldPreviewPath, $result->document->original_path],
+            Storage::disk('local')->allFiles(),
+        );
         self::assertNull(ResourceDocument::query()->whereKey($document->id)->value('search_text'));
     }
 
