@@ -18,7 +18,16 @@ class Apparatus extends Model
 {
     use HasFactory;
 
+    /** The apparatus row is tied to exactly one master vehicle record. */
+    public const MASTER_LINK_LINKED = 'linked';
+
+    /** No safe single match: Fleet decides. master_link_note says why. */
+    public const MASTER_LINK_NEEDS_REVIEW = 'needs_review';
+
     protected $fillable = [
+        'unit_master_vehicle_id',
+        'master_link_status',
+        'master_link_note',
         'unit_id',
         'name',
         'type',
@@ -55,6 +64,7 @@ class Apparatus extends Model
     ];
 
     protected $casts = [
+        'unit_master_vehicle_id' => 'integer',
         'daily_checkout_requirement' => DailyCheckoutRequirement::class,
         'daily_checkout_template' => DailyCheckoutChecklistTemplate::class,
         'mileage' => 'decimal:2',
@@ -123,6 +133,12 @@ class Apparatus extends Model
     public function station(): BelongsTo
     {
         return $this->belongsTo(Station::class);
+    }
+
+    /** @return BelongsTo<UnitMasterVehicle, $this> the master record that keeps this truck's identity and history */
+    public function masterVehicle(): BelongsTo
+    {
+        return $this->belongsTo(UnitMasterVehicle::class, 'unit_master_vehicle_id');
     }
 
     public function inspections()

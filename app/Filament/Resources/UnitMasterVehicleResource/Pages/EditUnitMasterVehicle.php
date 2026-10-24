@@ -5,10 +5,22 @@ namespace App\Filament\Resources\UnitMasterVehicleResource\Pages;
 use App\Filament\Resources\UnitMasterVehicleResource;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class EditUnitMasterVehicle extends EditRecord
 {
     protected static string $resource = UnitMasterVehicleResource::class;
+
+    /**
+     * The master edit, its history rows and the apparatus copy update commit or roll back together.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    protected function handleRecordUpdate(Model $record, array $data): Model
+    {
+        return DB::transaction(fn (): Model => parent::handleRecordUpdate($record, $data));
+    }
 
     protected function getHeaderActions(): array
     {

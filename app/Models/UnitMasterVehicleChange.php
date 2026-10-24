@@ -28,6 +28,15 @@ class UnitMasterVehicleChange extends Model
 
     public const SOURCE_TAKE_HOME_NEW = 'take_home_new_vehicle';
 
+    /** An apparatus copy was aligned to the master, or a link filled a blank master field. */
+    public const SOURCE_APPARATUS_LINK = 'apparatus_link';
+
+    /** Edited on the apparatus page and written through to the master. */
+    public const SOURCE_APPARATUS_PAGE = 'apparatus_page';
+
+    /** Edited directly on the Master Vehicle Inventory. */
+    public const SOURCE_MASTER_INVENTORY = 'master_inventory';
+
     protected $fillable = [
         'unit_master_vehicle_id',
         'field',
