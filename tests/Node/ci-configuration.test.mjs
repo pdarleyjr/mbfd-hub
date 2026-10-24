@@ -1075,6 +1075,22 @@ test("ordinary CI builds cannot inherit Sentry upload capability or production i
   assert.doesNotMatch(workflow, /\$\{\{\s*secrets\./i);
 });
 
+test("a failed activation never leaves members on the maintenance page while the previous release still runs", () => {
+  const deploy = readFileSync(resolve(root, ".github/workflows/deploy.yml"), "utf8");
+
+  assert.match(deploy, /- name: Enter maintenance mode and verify queue safety\r?\n\s+id: enter-maintenance\r?\n/);
+  const recovery = deploy.slice(deploy.indexOf("- name: Recover service after a failed activation"));
+  assert.ok(recovery.startsWith("- name: Recover service after a failed activation"), "the recovery step must exist");
+  assert.match(recovery, /if: \$\{\{ failure\(\) && steps\.enter-maintenance\.outcome != '' && steps\.enter-maintenance\.outcome != 'skipped' \}\}/);
+  // It only brings back the release that is still running; a running candidate keeps maintenance mode.
+  const guard = recovery.indexOf('*"@$FINAL_IMAGE_DIGEST")');
+  const up = recovery.indexOf("php artisan up");
+  assert.ok(guard > 0 && up > guard, "artisan up must come after the running-candidate guard");
+  assert.match(recovery, /exit 1\r?\n\s+;;/);
+  assert.match(recovery, /http:\/\/localhost:8081\/up\)" = '200'/);
+  assert.match(recovery, /rm -f -- \/run\/mbfd-maintenance\/mbfd-hub\.json/);
+});
+
 test("the PHP server makes every unhashed service worker always revalidate", () => {
   const server = readFileSync(resolve(root, "server.php"), "utf8");
 
