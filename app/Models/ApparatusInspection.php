@@ -57,6 +57,7 @@ class ApparatusInspection extends Model
         'review_flag_items',
         'processed_apparatus_id',
         'inventory_draft_id',
+        'vehicle_identification',
         'completed_at',
     ];
 
@@ -65,6 +66,7 @@ class ApparatusInspection extends Model
         'checklist_evidence' => 'array',
         'pending_effects' => 'array',
         'review_flag_items' => 'array',
+        'vehicle_identification' => 'array',
         'engine_hours' => 'decimal:1',
         'miles' => 'integer',
         'completed_at' => 'datetime',

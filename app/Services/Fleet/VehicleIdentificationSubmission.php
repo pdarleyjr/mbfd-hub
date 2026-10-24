@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Fleet;
 
 use App\Support\Fleet\VehicleIdentificationFields as Fields;
+use App\Support\Fleet\VehicleIdentity;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -23,7 +24,7 @@ final class VehicleIdentificationSubmission
     public const MAX_NOTE = 200;
 
     /**
-     * @return array{section: array{questions_version: string, answers: list<array<string, mixed>>}|null, errors: array<string, string>, dropped: int}
+     * @return array{section: array{kind: string, questions_version: string, answers: list<array<string, mixed>>}|null, errors: array<string, string>, dropped: int}
      */
     public function clean(mixed $raw, string $kind, bool $strict = false): array
     {
@@ -61,7 +62,9 @@ final class VehicleIdentificationSubmission
         }
 
         return [
-            'section' => ['questions_version' => $version, 'answers' => $answers],
+            // The kind the values were checked against travels with the section, so replaying a stored
+            // submission cleans it the same way even if the unit's type was edited in between.
+            'section' => ['kind' => $kind, 'questions_version' => $version, 'answers' => $answers],
             'errors' => $errors,
             'dropped' => $dropped,
         ];
@@ -84,9 +87,17 @@ final class VehicleIdentificationSubmission
         if (is_string($item['value'] ?? null) || is_int($item['value'] ?? null)) {
             $value = Fields::clean($field, $kind, $item['value']);
 
-            return $value === null
-                ? [null, Fields::refusal($field, $kind)]
-                : [['field' => $field, 'value' => $value], null];
+            if ($value === null) {
+                return [null, Fields::refusal($field, $kind)];
+            }
+            $answer = ['field' => $field, 'value' => $value];
+            // A confirmation carries the value the crew was shown, so a record that changed in between is noticed.
+            $shown = VehicleIdentity::text($item['current_value'] ?? null);
+            if ($shown !== null) {
+                $answer['current_value'] = mb_substr($shown, 0, 64);
+            }
+
+            return [$answer, null];
         }
 
         $reason = $item['unavailable_reason'] ?? null;
