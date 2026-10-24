@@ -151,7 +151,7 @@ final class MedicalDataStatistics extends Page
             'kinds' => EmsLabels::TARGET_KIND,
             'problems' => $this->problems(),
             'filterText' => $this->filterText(),
-            'monthlyMax' => max(1, (int) collect($monthly?->rows ?? [])->max(1)),
+            'monthlyMax' => max(1, (int) collect($monthly->rows ?? [])->max(fn (array $row): mixed => $row[1] ?? null)),
             'definitionsLabel' => EmsStatistics::LABEL,
         ];
     }

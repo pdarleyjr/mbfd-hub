@@ -125,7 +125,7 @@ class InventoryRequestResource extends Resource
             ->withCount('lines')
             ->withSum(['lines as qty_requested' => fn ($lines) => $lines->where('response_type', 'quantity')], 'requested_qty')
             ->withSum(['lines as qty_issued' => fn ($lines) => $lines->where('response_type', 'quantity')], 'issued_qty')
-            ->addSelect(['last_message_context' => static::lastMessageContext()]);
+            ->addSelect(['last_message_context' => self::lastMessageContext()]);
     }
 
     /** @return Builder<InventoryRequestMessage> */
@@ -196,7 +196,11 @@ class InventoryRequestResource extends Resource
                         return $indicators;
                     }),
                 Filter::make('waiting_for_reply')->label('Member message waiting for a reply')
-                    ->query(fn (Builder $query): Builder => $query->where(static::lastMessageContext(), 'member')),
+                    ->query(function (Builder $query): Builder {
+                        $lastContext = self::lastMessageContext();
+
+                        return $query->whereRaw('('.$lastContext->toSql().') = ?', [...$lastContext->getBindings(), 'member']);
+                    }),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make()->label('Open'),

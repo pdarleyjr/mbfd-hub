@@ -41,7 +41,7 @@ class ViewInventoryRequest extends ViewRecord
 
     public function getTitle(): string
     {
-        return 'Request '.$this->getRecord()->number;
+        return 'Request '.$this->getRecord()->getAttribute('number');
     }
 
     /** Runs on every Livewire request, so an open page loses its actions when access is withdrawn. */

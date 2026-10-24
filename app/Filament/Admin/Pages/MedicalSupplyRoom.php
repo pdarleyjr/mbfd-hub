@@ -110,7 +110,7 @@ final class MedicalSupplyRoom extends Page implements HasTable
         $this->emsActor('view');
     }
 
-    public function getSubheading(): ?string
+    public function getSubheading(): string
     {
         return 'Stock on hand, counts, reorders and orders for the Captain 5 supply room. A request never changes stock. Only issuing, receiving, adjusting, counting and reconciling do.';
     }

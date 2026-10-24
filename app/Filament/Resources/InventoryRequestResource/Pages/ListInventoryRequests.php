@@ -6,6 +6,7 @@ namespace App\Filament\Resources\InventoryRequestResource\Pages;
 
 use App\Filament\Resources\InventoryRequestResource;
 use App\Filament\Support\EmsLabels;
+use App\Models\Ems\InventoryRequest;
 use App\Services\Ems\Exports\RequestListExporter;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
@@ -66,9 +67,11 @@ class ListInventoryRequests extends ListRecords
     }
 
     /** The table as filtered and searched, in a stable order so repeated exports match. */
+    /** @return Collection<int, InventoryRequest> */
     private function exportRequests(): Collection
     {
-        return $this->getFilteredTableQuery()->reorder()->orderByDesc('submitted_at')->orderBy('id')->get();
+        return $this->getFilteredTableQuery()->reorder()->orderByDesc('submitted_at')->orderBy('id')->get()
+            ->whereInstanceOf(InventoryRequest::class);
     }
 
     /** Words for the active search and filters, "None" when empty. */

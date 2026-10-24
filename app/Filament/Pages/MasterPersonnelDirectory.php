@@ -356,7 +356,7 @@ final class MasterPersonnelDirectory extends Page implements HasTable
             array_values(array_unique(array_filter($columns, fn (string $key): bool => in_array($key, $available, true)))));
     }
 
-    public function getMaxContentWidth(): MaxWidth|string|null
+    public function getMaxContentWidth(): MaxWidth
     {
         return MaxWidth::Full;
     }

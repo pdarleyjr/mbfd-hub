@@ -13,6 +13,7 @@ use App\Services\Personnel\Promotions\PromotionalListService;
 use Filament\Actions;
 use Filament\Resources\Pages\ViewRecord;
 use Livewire\Attributes\On;
+use LogicException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ViewPromotionalList extends ViewRecord
@@ -35,7 +36,7 @@ class ViewPromotionalList extends ViewRecord
                 ->visible(fn (): bool => $access()->canManage(auth()->user(), false))
                 ->modalHeading('Add an entry')->modalWidth('3xl')->form(PromotionalListForms::entryFields())
                 ->action(function (array $data, Actions\Action $action): void {
-                    PromotionalListForms::run($action, fn () => app(PromotionalListService::class)->addEntry(auth()->user(), $this->getRecord(), $data), 'Entry added');
+                    PromotionalListForms::run($action, fn () => app(PromotionalListService::class)->addEntry(auth()->user(), $this->promotionalList(), $data), 'Entry added');
                     $this->afterChange();
                 }),
             Actions\Action::make('changeStatus')->label('Change list status')->icon('heroicon-o-arrow-path')->color('gray')
@@ -43,7 +44,7 @@ class ViewPromotionalList extends ViewRecord
                 ->form(PromotionalListForms::listStatusFields())
                 ->action(function (array $data, Actions\Action $action): void {
                     PromotionalListForms::run($action, fn () => app(PromotionalListService::class)
-                        ->changeListStatus(auth()->user(), $this->getRecord(), $data['status'], $data['reason']), 'List status changed');
+                        ->changeListStatus(auth()->user(), $this->promotionalList(), $data['status'], $data['reason']), 'List status changed');
                     $this->afterChange();
                 }),
             Actions\ActionGroup::make([
@@ -56,7 +57,7 @@ class ViewPromotionalList extends ViewRecord
             Actions\Action::make('history')->label('History')->icon('heroicon-o-clock')->color('gray')
                 ->modalHeading('List history')->modalWidth('3xl')
                 ->modalContent(fn () => view('filament.resources.promotional-list.history', [
-                    'events' => $this->getRecord()->events()->with(['actor:id,name', 'entry'])->orderByDesc('id')->limit(200)->get(),
+                    'events' => $this->promotionalList()->events()->with(['actor:id,name', 'entry'])->orderByDesc('id')->limit(200)->get(),
                 ]))->modalSubmitAction(false)->modalCancelActionLabel('Close'),
             Actions\EditAction::make()->label('Edit list details'),
         ];
@@ -64,10 +65,17 @@ class ViewPromotionalList extends ViewRecord
 
     private function export(string $format): StreamedResponse
     {
-        /** @var PromotionalList $list */
-        $list = $this->getRecord();
+        return app(PromotionalListExporter::class)->export(auth()->user(), $this->promotionalList(), $format);
+    }
 
-        return app(PromotionalListExporter::class)->export(auth()->user(), $list, $format);
+    private function promotionalList(): PromotionalList
+    {
+        $record = $this->getRecord();
+        if (! $record instanceof PromotionalList) {
+            throw new LogicException('Expected a promotional list, got '.$record::class.'.');
+        }
+
+        return $record;
     }
 
     private function afterChange(): void
