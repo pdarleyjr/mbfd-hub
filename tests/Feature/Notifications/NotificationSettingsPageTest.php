@@ -112,7 +112,7 @@ final class NotificationSettingsPageTest extends TestCase
 
         $keys = $this->visibleKeys($reviewer);
 
-        foreach (['vehicle_inspections', 'vehicle_swap_reports', 'vehicle_maintenance_alerts', ...self::EVERYONE] as $key) {
+        foreach (['vehicle_inspections', 'vehicle_swap_reports', 'vehicle_identification_reports', 'vehicle_maintenance_alerts', ...self::EVERYONE] as $key) {
             $this->assertContains($key, $keys);
         }
         foreach (['uniform_requests', 'system_alerts', 'hub_support_tickets', 'station_requests', 'training_assignments'] as $key) {
@@ -129,7 +129,7 @@ final class NotificationSettingsPageTest extends TestCase
         foreach (['uniform_requests', 'personnel_equipment_requests', 'apparatus_service_tickets', 'vehicle_inspections', ...self::EVERYONE] as $key) {
             $this->assertContains($key, $keys);
         }
-        foreach (['system_alerts', 'hub_support_tickets', 'vehicle_swap_reports'] as $key) {
+        foreach (['system_alerts', 'hub_support_tickets', 'vehicle_swap_reports', 'vehicle_identification_reports'] as $key) {
             $this->assertNotContains($key, $keys);
         }
     }

@@ -202,6 +202,19 @@ final class NotificationCategoryRegistry
                 candidates: $audience(['super_admin'], ['admin.fleet.manage']),
             ),
             new NotificationCategory(
+                key: User::NOTIFICATION_PREFERENCE_VEHICLE_IDENTIFICATION,
+                label: 'Vehicle identification for Fleet',
+                description: 'A crew answer created a new vehicle record to verify, or does not match the vehicle record we hold, and Fleet needs to look.',
+                group: self::GROUP_FLEET,
+                channels: $all,
+                locked: [],
+                defaults: ['database' => true, 'webpush' => false, 'email' => true],
+                significance: 'important',
+                eligibility: static fn (EligibilityContext $c): ?string => $c->user->canManageFleetSwaps()
+                    ? 'fleet_swap_manager' : null,
+                candidates: $audience(['super_admin'], ['admin.fleet.manage']),
+            ),
+            new NotificationCategory(
                 key: User::NOTIFICATION_PREFERENCE_APPARATUS_SERVICE_TICKETS,
                 label: 'Apparatus service tickets',
                 description: 'A member opened a repair, maintenance or service ticket for an apparatus.',
