@@ -139,6 +139,8 @@ All timestamps `timestampTz`. All "actor" columns are `user_id` FKs (`nullOnDele
 | `admin.ems.manage` | same actions as captain5-act from the admin panel |
 
 `admin.ems.view` / `admin.ems.manage` are new direct permissions (AdminCapabilityGate prefix `admin.ems`), listed in the Admin capability editor.
+The migration only creates them and grants them to nobody; administrators grant them in the capability editor. Migrations never grant
+access: the production deploy gate refuses role or permission changes on established accounts (`tests/Unit/Migrations/MigrationsDoNotGrantAccessTest.php`).
 Server-side checks on every endpoint; the UI only hides what the server refuses anyway.
 
 ## 8. Notifications

@@ -11,8 +11,9 @@ use Illuminate\Support\Facades\Schema;
  * Additive only. Member-facing document library (Employee > Resources).
  *
  * Document bytes live on the private disk; these tables hold metadata, extracted search text and an
- * append-only import/replace history. Also provisions the Admin capability pair that manages the
- * library and grants it to everyone who already holds the direct `admin.access` permission.
+ * append-only import/replace history. Also creates the Admin capability pair that manages the
+ * library. It is granted to nobody here: the production deploy gate refuses permission changes on
+ * established accounts, so access is given deliberately in the Admin capability editor.
  */
 return new class extends Migration
 {
@@ -65,13 +66,12 @@ return new class extends Migration
 
     private function provisionPermissions(): void
     {
-        if (! Schema::hasTable('permissions') || ! Schema::hasTable('model_has_permissions')) {
+        if (! Schema::hasTable('permissions')) {
             return;
         }
 
         $now = now();
-        $names = ['admin.resources.view', 'admin.resources.manage'];
-        foreach ($names as $permission) {
+        foreach (['admin.resources.view', 'admin.resources.manage'] as $permission) {
             DB::table('permissions')->insertOrIgnore([
                 'name' => $permission,
                 'guard_name' => 'web',
@@ -79,31 +79,5 @@ return new class extends Migration
                 'updated_at' => $now,
             ]);
         }
-
-        $adminAccessPermissionId = DB::table('permissions')
-            ->where('guard_name', 'web')
-            ->where('name', 'admin.access')
-            ->value('id');
-        $permissionIds = DB::table('permissions')
-            ->where('guard_name', 'web')
-            ->whereIn('name', $names)
-            ->pluck('id');
-        if ($adminAccessPermissionId === null || $permissionIds->count() !== count($names)) {
-            return;
-        }
-
-        DB::table('model_has_permissions')
-            ->where('permission_id', $adminAccessPermissionId)
-            ->where('model_type', 'App\\Models\\User')
-            ->pluck('model_id')
-            ->each(function (int $userId) use ($permissionIds): void {
-                $permissionIds->each(function (int $permissionId) use ($userId): void {
-                    DB::table('model_has_permissions')->insertOrIgnore([
-                        'permission_id' => $permissionId,
-                        'model_type' => 'App\\Models\\User',
-                        'model_id' => $userId,
-                    ]);
-                });
-            });
     }
 };

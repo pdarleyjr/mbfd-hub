@@ -100,24 +100,25 @@ final class ResourceLibraryAdminTest extends TestCase
         self::assertSame('Resource library — manage', $options['admin.resources.manage']);
     }
 
-    public function test_the_migration_grants_the_capability_to_current_admin_access_holders_only(): void
+    public function test_the_migration_creates_the_capability_but_grants_it_to_nobody(): void
     {
+        // The production deploy gate refuses permission changes on established accounts; the library
+        // capability is granted deliberately in the capability editor, never by a migration.
         $holder = $this->adminWith(['admin.access']);
         $member = User::factory()->create(['account_status' => AccountStatus::Active]);
-        $viewOnlyHolder = $this->adminWith(['admin.access', 'admin.department_updates.view']);
         DB::table('permissions')->whereIn('name', ['admin.resources.view', 'admin.resources.manage'])->delete();
+        $before = DB::table('model_has_permissions')->count();
 
         $this->runPermissionProvisioning();
         $this->runPermissionProvisioning(); // idempotent
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-        foreach ([$holder, $viewOnlyHolder] as $user) {
-            $user = $user->fresh();
-            self::assertTrue($user->hasDirectWebPermission('admin.resources.view'));
-            self::assertTrue($user->hasDirectWebPermission('admin.resources.manage'));
+        foreach ([$holder, $member] as $user) {
+            self::assertFalse($user->fresh()->hasDirectWebPermission('admin.resources.view'));
+            self::assertFalse($user->fresh()->hasDirectWebPermission('admin.resources.manage'));
         }
-        self::assertFalse($member->fresh()->hasDirectWebPermission('admin.resources.view'));
         self::assertSame(2, Permission::query()->whereIn('name', ['admin.resources.view', 'admin.resources.manage'])->count());
+        self::assertSame($before, DB::table('model_has_permissions')->count());
     }
 
     public function test_a_viewer_can_list_but_not_open_the_edit_form(): void
