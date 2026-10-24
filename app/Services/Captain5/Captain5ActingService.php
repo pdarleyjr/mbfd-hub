@@ -31,7 +31,8 @@ use Illuminate\Validation\ValidationException;
  *
  * Who may ask: Captain 5 = anyone who can use the Captain 5 page (Captain5Access); 300 = anyone
  * Command300Access allows (Captains, Division Chiefs, the 300 seat, administrators and explicit 300
- * grants). Who approves (both roles): Captain 5 administrators (Captain5Access::canConfigure).
+ * grants). Who approves: ActingApprovers (Captain 5 = Captain 5 administrators; 300 = any
+ * administrator); nobody approves their own request except a super admin.
  */
 final class Captain5ActingService
 {
@@ -46,6 +47,7 @@ final class Captain5ActingService
         private readonly DutyCalendar $calendar,
         private readonly Captain5Notifier $notifier,
         private readonly Captain5IssuePresenter $presenter,
+        private readonly ActingApprovers $approvers,
     ) {}
 
     /** May this member ask to be shown as acting in this role? */
@@ -130,10 +132,11 @@ final class Captain5ActingService
      */
     public function approve(User $admin, int $requestId, ?string $note = null, ?string $role = null): Captain5ActingRequest
     {
-        $this->authorizeApprover($admin);
+        $this->authorizeApprover($admin, $role);
 
         $request = DB::transaction(function () use ($admin, $requestId, $note, $role): Captain5ActingRequest {
             $request = $this->locked($requestId, $role);
+            $this->authorizeApprover($admin, $request->role);
             $this->assertDecidable($admin, $request);
             $label = Captain5ActingRequest::roleLabel($request->role);
             $now = CarbonImmutable::now();
@@ -171,11 +174,12 @@ final class Captain5ActingService
     /** @throws AuthorizationException|ValidationException */
     public function reject(User $admin, int $requestId, string $note, ?string $role = null): Captain5ActingRequest
     {
-        $this->authorizeApprover($admin);
+        $this->authorizeApprover($admin, $role);
         $note = $this->note($note) ?? throw ValidationException::withMessages(['note' => 'Say why the request is not approved.']);
 
         $request = DB::transaction(function () use ($admin, $requestId, $note, $role): Captain5ActingRequest {
             $request = $this->locked($requestId, $role);
+            $this->authorizeApprover($admin, $request->role);
             $this->assertDecidable($admin, $request);
             $request->forceFill([
                 'status' => Captain5ActingRequest::REJECTED,
@@ -219,7 +223,7 @@ final class Captain5ActingService
         $pending = Captain5ActingRequest::query()->pending()->forRole($role)
             ->with(['requester:id,name,display_name', 'employee:id,name,display_name,rank'])
             ->orderBy('id')->limit(50)->get();
-        $canApprove = $this->access->canConfigure($viewer);
+        $canApprove = $this->approvers->can($viewer, $role);
         $mine = $pending->first(fn (Captain5ActingRequest $r): bool => (int) $r->requested_by_user_id === (int) $viewer->getKey());
 
         return [
@@ -291,10 +295,14 @@ final class Captain5ActingService
         return $employee;
     }
 
-    private function authorizeApprover(User $admin): void
+    /** With no role yet (an admin queue decision before the row is read), approving some role is enough to proceed. */
+    private function authorizeApprover(User $admin, ?string $role): void
     {
-        if (! $this->access->canConfigure($admin)) {
-            throw new AuthorizationException('Only Captain 5 administrators approve acting requests.');
+        $allowed = $role === null ? $this->approvers->canApproveAny($admin) : $this->approvers->can($admin, $role);
+        if (! $allowed) {
+            throw new AuthorizationException($role === Captain5ActingRequest::ROLE_COMMAND_300
+                ? 'Only administrators approve acting 300 requests.'
+                : 'Only Captain 5 administrators approve acting Captain 5 requests.');
         }
     }
 

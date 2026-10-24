@@ -335,9 +335,9 @@ final class Captain5Notifier
     }
 
     /**
-     * A member asked to be shown as (or to end) the acting Captain 5 or acting 300: Captain 5
-     * administrators approve both roles. Same kinds and ledger keys for both roles (the request id
-     * is unique); only the wording and the page linked differ.
+     * A member asked to be shown as (or to end) the acting Captain 5 or acting 300: that role's
+     * approvers are asked (ActingApprovers). Same kinds and ledger keys for both roles (the request id
+     * is unique); only the wording, the approvers and the page linked differ.
      */
     public function actingRequested(Captain5ActingRequest $request): void
     {
@@ -345,10 +345,8 @@ final class Captain5Notifier
             $requester = User::query()->find($request->requested_by_user_id);
             $name = trim((string) ($requester?->display_name ?: $requester?->name)) ?: 'A member';
             $label = Captain5ActingRequest::roleLabel($request->role);
-            $approvers = User::query()
-                ->where(fn ($query) => $query->whereHas('roles', fn ($roles) => $roles->where('name', 'super_admin'))
-                    ->orWhereHas('permissions', fn ($permissions) => $permissions->where('name', Captain5Access::PERMISSION_ADMIN)))
-                ->get()->filter(fn (User $user): bool => $this->access->canConfigure($user))->values();
+            // Captain 5: Captain 5 administrators; 300: any administrator (ActingApprovers).
+            $approvers = app(ActingApprovers::class)->users($request->role);
             $what = $request->kind === Captain5ActingRequest::KIND_END
                 ? "{$name} asked to end the current acting {$label} display."
                 : "{$name} asked to be shown as acting {$label} until ".$this->localTime($request->ends_at).'.';

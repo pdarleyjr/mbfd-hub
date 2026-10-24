@@ -71,6 +71,22 @@ final class Captain5ActingRequestsSectionTest extends TestCase
             ->assertDontSee('No requests are waiting.');
     }
 
+    public function test_the_section_covers_both_roles_and_labels_a_captain_5_request_with_its_role(): void
+    {
+        $member = $this->officer('Captain', 'Labelled Lee');
+        $this->requestActing($member, '12h');
+        $this->actAs($this->captain5Administrator());
+
+        Livewire::test(Captain5Operations::class)
+            ->assertSee('Acting Captain 5 and 300 requests')
+            ->assertSee('Shown as Captain 5 now')->assertSee('Shown as 300 now')
+            ->assertSee('No one is shown as 300 right now')
+            ->assertSeeHtml('data-role="captain_5"')->assertDontSeeHtml('data-role="command_300"')
+            ->assertSee('Labelled Lee')->assertSee('asks to be shown as acting Captain 5')
+            ->mountAction('approveActing', ['request' => Captain5ActingRequest::query()->value('id')])
+            ->assertSee('Approve acting Captain 5 for Labelled Lee?');
+    }
+
     public function test_approve_with_an_optional_note_shows_the_member_without_changing_anyones_access(): void
     {
         $holder = $this->officer('Captain', 'Bid Holder Bo');

@@ -93,7 +93,7 @@ final class Command300ShiftTest extends TestCase
         self::assertSame('2026-10-20 20:00', $request->ends_at->setTimezone('America/New_York')->format('Y-m-d H:i'));
         self::assertSame(1, DB::table('inspection_notification_deliveries')
             ->where('event_key', 'captain5:acting:'.$request->id.':requested')->where('recipient_user_id', $this->admin->id)->count(),
-            'Captain 5 administrators are asked to approve acting 300 too');
+            'Administrators are asked to approve acting 300');
 
         $this->actAs($this->admin);
         $this->getJson(self::SHIFT)->assertJsonPath('acting.can_approve', true)->assertJsonPath('acting.pending.0.id', $request->id);
@@ -161,7 +161,29 @@ final class Command300ShiftTest extends TestCase
         app(Captain5ActingService::class)->approve($this->admin, $own->id);
     }
 
-    public function test_only_300_page_users_ask_and_only_captain5_administrators_approve(): void
+    public function test_any_administrator_approves_acting_300_but_only_captain5_administrators_approve_acting_captain5(): void
+    {
+        $panelAdmin = $this->officer('Firefighter', 'Panel Admin');
+        $panelAdmin->givePermissionTo(Permission::findOrCreate('admin.access', 'web'));
+        $this->forgetCaptain5Memo();
+        $panelAdmin = $panelAdmin->fresh();
+        $service = app(Captain5ActingService::class);
+
+        $as300 = $service->request($this->officer('Captain', 'Acting Three'), ['role' => 'command_300', 'kind' => 'act', 'duration' => '12h']);
+        $asC5 = $service->request($this->officer('Captain', 'Acting Five'), ['role' => 'captain_5', 'kind' => 'act', 'duration' => '12h']);
+        $asked = fn (Captain5ActingRequest $r): array => DB::table('inspection_notification_deliveries')
+            ->where('event_key', 'captain5:acting:'.$r->id.':requested')->orderBy('recipient_user_id')->pluck('recipient_user_id')->map(fn ($id): int => (int) $id)->all();
+        self::assertSame([(int) $this->admin->id, (int) $panelAdmin->id], $asked($as300), 'Any administrator is asked about acting 300');
+        self::assertSame([(int) $this->admin->id], $asked($asC5), 'Acting Captain 5 still goes to Captain 5 administrators');
+
+        $this->actAs($panelAdmin);
+        $this->getJson(self::SHIFT)->assertJsonPath('acting.can_approve', true)->assertJsonPath('acting.pending.0.id', $as300->id);
+        $this->postJson('/api/captain5/acting-requests/'.$asC5->id.'/approve', [])->assertForbidden();
+        $this->postJson(self::ACTING.'/'.$as300->id.'/approve', [])->assertOk()->assertJsonPath('on_duty.name', 'Acting Three');
+        self::assertSame(Captain5ActingRequest::PENDING, $asC5->fresh()->status);
+    }
+
+    public function test_only_300_page_users_ask_and_members_without_admin_rights_never_approve(): void
     {
         $this->actAs($this->officer('Lieutenant'));
         $this->getJson(self::SHIFT)->assertForbidden(); // Lieutenants do not use the 300 page
@@ -175,7 +197,7 @@ final class Command300ShiftTest extends TestCase
         self::assertTrue(app(Captain5ActingService::class)->canRequest($grant->fresh(), 'command_300'), 'Explicit 300 access may ask');
 
         $request = app(Captain5ActingService::class)->request($this->officer('Captain'), ['role' => 'command_300', 'kind' => 'act', 'duration' => '12h']);
-        $this->actAs($this->chiefB); // a Division Chief, but not a Captain 5 administrator
+        $this->actAs($this->chiefB); // a Division Chief without Admin Panel rights
         $this->getJson(self::SHIFT)->assertOk()->assertJsonPath('acting.can_approve', false)->assertJsonPath('acting.pending', []);
         $this->postJson(self::ACTING.'/'.$request->id.'/approve', [])->assertForbidden();
         self::assertSame(Captain5ActingRequest::PENDING, $request->fresh()->status);
