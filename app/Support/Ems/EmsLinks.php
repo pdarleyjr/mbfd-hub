@@ -24,7 +24,7 @@ final class EmsLinks
 
     public static function staff(string $uuid): string
     {
-        return self::STAFF_WORKSPACE.'?tab=rescue-inventory&request='.$uuid;
+        return self::STAFF_WORKSPACE.'?tab=rescue&request='.$uuid;
     }
 
     public static function admin(string $uuid): string

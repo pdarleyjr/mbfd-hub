@@ -8,9 +8,11 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Ems\Concerns\RespondsWithEnvelope;
 use App\Models\Ems\InventorySnapshot;
 use App\Models\Ems\SupplyItem;
+use App\Filament\Support\EmsLabels;
 use App\Models\User;
 use App\Services\Ems\EmsException;
 use App\Services\Ems\EmsValidator;
+use App\Services\Ems\Exports\SnapshotExporter;
 use App\Services\Ems\InventoryCountService;
 use App\Services\Ems\ReconciliationService;
 use App\Services\Ems\ReorderAdvisor;
@@ -20,6 +22,8 @@ use App\Services\Ems\SupplyOrderService;
 use App\Services\Ems\SupplyRoomQuery;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Carbon\CarbonImmutable;
+use Symfony\Component\HttpFoundation\Response;
 
 /** Medical Supply Room API: items, counts, reconciliation, advisories, orders, movements, snapshots. */
 final class SupplyRoomController extends Controller
@@ -112,8 +116,19 @@ final class SupplyRoomController extends Controller
         return $this->guarded(fn (): JsonResponse => $this->ok($this->snapshots->detail($this->findSnapshot($uuid), withItems: true)));
     }
 
-    // --------------------------------------------------------------- writes
+    /** Excel copy of one count or reconciliation: the same file the Admin page offers. Needs iew. */
+    public function exportSnapshotExcel(string $uuid): Response
+    {
+        return $this->snapshotDownload($uuid, 'xlsx');
+    }
 
+    /** PDF copy of one count or reconciliation. Needs iew. */
+    public function exportSnapshotPdf(string $uuid): Response
+    {
+        return $this->snapshotDownload($uuid, 'pdf');
+    }
+
+    // --------------------------------------------------------------- writes
     public function startCount(Request $request): JsonResponse
     {
         return $this->guarded(fn (): JsonResponse => $this->written($this->counts->start(
@@ -194,6 +209,27 @@ final class SupplyRoomController extends Controller
         }
 
         return $user;
+    }
+
+    private function snapshotDownload(string $uuid, string $format): Response
+    {
+        try {
+            $detail = $this->snapshots->detail($this->findSnapshot($uuid));
+            $exporter = app(SnapshotExporter::class);
+            $at = CarbonImmutable::now(EmsLabels::TIMEZONE);
+            $pdf = $format === 'pdf';
+            $bytes = $pdf ? $exporter->pdf($detail, $at) : $exporter->xlsx($detail, $at);
+
+            return response()->streamDownload(
+                static function () use ($bytes): void {
+                    echo $bytes;
+                },
+                $exporter->filename($detail, $format, $at),
+                ['Content-Type' => $pdf ? 'application/pdf' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'Cache-Control' => 'private, no-store'],
+            );
+        } catch (EmsException $exception) {
+            return $this->fail($exception->getMessage(), $exception->errorCode, $exception->status, $exception->fields);
+        }
     }
 
     private function findSnapshot(string $uuid): InventorySnapshot

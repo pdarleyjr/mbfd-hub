@@ -52,6 +52,8 @@ Route::prefix('ems/api')
             Route::get('/supply/movements', [SupplyRoomController::class, 'movements'])->name('supply.movements');
             Route::get('/supply/snapshots', [SupplyRoomController::class, 'snapshots'])->name('supply.snapshots.index');
             Route::get('/supply/snapshots/{uuid}', [SupplyRoomController::class, 'snapshot'])->whereUuid('uuid')->name('supply.snapshots.show');
+            Route::get('/supply/snapshots/{uuid}/export/xlsx', [SupplyRoomController::class, 'exportSnapshotExcel'])->whereUuid('uuid')->name('supply.snapshots.export.xlsx');
+            Route::get('/supply/snapshots/{uuid}/export/pdf', [SupplyRoomController::class, 'exportSnapshotPdf'])->whereUuid('uuid')->name('supply.snapshots.export.pdf');
 
             Route::get('/statistics', StatisticsController::class)->name('statistics');
         });
