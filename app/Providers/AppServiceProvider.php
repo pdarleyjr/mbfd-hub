@@ -38,6 +38,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // Lucide icons Heroicons lacks (e.g. the EMS navigation group's medical bag), as lucide-* blade icons.
+        $this->callAfterResolving(\BladeUI\Icons\Factory::class, static function (\BladeUI\Icons\Factory $icons): void {
+            $icons->add('lucide', ['path' => resource_path('svg/lucide'), 'prefix' => 'lucide']);
+        });
         $this->app->bind(
             \App\Contracts\Identity\IdentityProvider::class,
             \App\Services\Identity\AuthentikIdentityProvider::class,
