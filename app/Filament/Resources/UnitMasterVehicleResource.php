@@ -39,6 +39,9 @@ class UnitMasterVehicleResource extends Resource
         return $form
             ->schema([
                 Forms\Components\Section::make('Vehicle Information')
+                    ->description(fn (?UnitMasterVehicle $record): ?string => $record?->apparatus instanceof \App\Models\Apparatus
+                        ? 'Vehicle #, make, model, year and VIN are shared with Apparatus '.($record->apparatus->designation ?: $record->apparatus->name).'. Saving here updates that unit too.'
+                        : null)
                     ->schema([
                         Forms\Components\TextInput::make('veh_number')
                             ->label('Veh #')

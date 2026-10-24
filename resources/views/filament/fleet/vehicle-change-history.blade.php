@@ -5,6 +5,9 @@
         \App\Models\UnitMasterVehicleChange::SOURCE_FY27 => 'FY27 fleet list',
         \App\Models\UnitMasterVehicleChange::SOURCE_TAKE_HOME => 'Take home inspection',
         \App\Models\UnitMasterVehicleChange::SOURCE_TAKE_HOME_NEW => 'New vehicle (take home inspection)',
+        \App\Models\UnitMasterVehicleChange::SOURCE_APPARATUS_LINK => 'Linked to apparatus',
+        \App\Models\UnitMasterVehicleChange::SOURCE_APPARATUS_PAGE => 'Apparatus page',
+        \App\Models\UnitMasterVehicleChange::SOURCE_MASTER_INVENTORY => 'Master Vehicle Inventory',
     ];
     $statusColors = ['applied' => 'info', 'accepted' => 'success', 'rejected' => 'gray'];
 @endphp

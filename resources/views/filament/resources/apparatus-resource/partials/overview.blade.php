@@ -10,6 +10,14 @@
     };
     $station = $apparatus->station;
     $last = $overview->lastInspection;
+    $pm = $apparatus->getPmHealthStatus();
+    $master = $apparatus->masterVehicle;
+    $canOpenMaster = $master && (auth()->user()?->can('view', $master) ?? false);
+    $documentCount = $canOpenMaster && \App\Support\Fleet\VehicleDocumentAccess::canViewVehicle(auth()->user(), $master)
+        ? $master->documents()
+            ->when(! \App\Support\Fleet\VehicleDocumentAccess::canSensitive(auth()->user()), fn ($q) => $q->where('is_sensitive', false))
+            ->count()
+        : null;
 @endphp
 
 {{-- Layout and colour: semantic hub-insp-* classes in resources/css/filament/hub-inspection-views.css. --}}
@@ -50,6 +58,26 @@
         </div>
     </dl>
 
+    @if ($master)
+        <div class="hub-insp-card" data-vehicle-record>
+            <p><strong>Vehicle record</strong> &bull; Master Vehicle Inventory #{{ $master->veh_number }}</p>
+            <p>{{ trim(implode(' ', array_filter([$master->year, $master->make, $master->model]))) ?: 'Year, make and model not recorded' }}@if ($master->serial_number) &bull; VIN {{ $master->serial_number }}@endif @if ($master->tag_number) &bull; Plate {{ $master->tag_number }}@endif</p>
+            @if ($canOpenMaster)
+                <p>
+                    <a href="{{ \App\Filament\Resources\UnitMasterVehicleResource::getUrl('view', ['record' => $master]) }}">Open vehicle record</a>
+                    @if ($documentCount !== null)
+                        &bull; {{ $documentCount }} {{ $documentCount === 1 ? 'document' : 'documents' }} (accidents, repairs, registration, history)
+                    @endif
+                </p>
+            @endif
+        </div>
+    @else
+        <div class="hub-insp-card hub-insp-card--warning" data-vehicle-record-review>
+            <p><strong>Vehicle record needs review.</strong> {{ $apparatus->master_link_note ?: 'This unit is not linked to a Master Vehicle Inventory record yet.' }}</p>
+            <p>Use "Link vehicle record" under More to connect it to the right vehicle.</p>
+        </div>
+    @endif
+
     <div class="hub-insp-metrics">
         <div @class(['hub-insp-metric', 'hub-insp-metric--danger' => $overview->openDefects > 0])>
             <p class="hub-insp-metric__value" data-overview-open-defects>{{ $overview->openDefects }}</p>
@@ -58,6 +86,10 @@
         <div @class(['hub-insp-metric', 'hub-insp-metric--warning' => $overview->openTickets > 0])>
             <p class="hub-insp-metric__value" data-overview-open-tickets>{{ $overview->openTickets }}</p>
             <p class="hub-insp-metric__label">Open service tickets</p>
+        </div>
+        <div @class(['hub-insp-metric', 'hub-insp-metric--danger' => $pm['status'] === 'red', 'hub-insp-metric--warning' => $pm['status'] === 'yellow'])>
+            <p class="hub-insp-metric__value" data-overview-pm>{{ $pm['hours_since_pm'] }} <small>of {{ $pm['interval_hours'] }} h</small></p>
+            <p class="hub-insp-metric__label">Engine hours since PM &bull; last PM {{ $pm['last_pm_date'] ? \Illuminate\Support\Carbon::parse($pm['last_pm_date'])->format('M j, Y') : 'not recorded' }}</p>
         </div>
         <div class="hub-insp-metric">
             @if ($last)
