@@ -226,9 +226,12 @@ with `captain5.communications_enabled=false` first if needed).
   the linked page follow the role), the request history and the Admin > Captain 5 Operations queue (one list,
   labelled by role) cover both. Takeover and end act only within the request's role.
 - **Who may ask for acting 300:** anyone `Command300Access` allows: Captains, Division Chiefs, the 300 bid seat,
-  administrators and explicit `command.300.access` grants. **Who approves (both roles):** Captain 5
-  administrators (`Captain5Access::canConfigure`: super_admin, or Admin Panel plus `captain5.admin`); nobody
-  approves their own request except a super admin. Same durations as acting Captain 5 (12 hours to the next 08:00
+  administrators and explicit `command.300.access` grants. **Who approves acting 300 (the user's rule):** any
+  administrator, i.e. an active account with Admin Panel rights (super_admin or a direct `admin.access` grant).
+  **Acting Captain 5** keeps its rule: Captain 5 administrators (super_admin, or Admin Panel plus
+  `captain5.admin`). Both live in `ActingApprovers`; the notifier asks only the approvers of the request's role, and
+  the alert category "Acting Captain 5 and 300 requests" is open to anyone who may approve either. Nobody approves
+  their own request except a super admin. Same durations as acting Captain 5 (12 hours to the next 08:00
   or 20:00, 24 hours to the next day's 08:00, or a custom end 15 minutes to 72 hours ahead). An expired request
   cannot be approved; the display ends on its own at `ends_at`.
 - **Display only.** Being shown as acting 300 grants no access and changes nothing else; forgetting to use it
