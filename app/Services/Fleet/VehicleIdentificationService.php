@@ -211,7 +211,7 @@ class VehicleIdentificationService
         $masterValue = $master?->getAttribute($column);
         $unit = $ledger->apparatus->designation ?: $ledger->apparatus->name ?: 'A unit';
 
-        if ($master !== null && ! Fields::isBlankValue($masterValue)) {
+        if ($master !== null && ! Fields::isEmptyOnRecord($field, $masterValue)) {
             if (Fields::key($field, $masterValue) === Fields::key($field, $value)) {
                 return [];
             }

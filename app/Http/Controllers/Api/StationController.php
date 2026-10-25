@@ -20,12 +20,15 @@ use App\Models\RoomAudit;
 use App\Models\RoomAuditItem;
 use App\Models\Station;
 use App\Services\DailyCheckoutComplianceService;
+use App\Services\Fleet\VehicleIdentificationPlanner;
 use App\Services\StationStaffingService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
+use Throwable;
 
 class StationController extends Controller
 {
@@ -227,6 +230,8 @@ class StationController extends Controller
                 ];
             })->values()->all(),
             'daily_checkout' => $dailyCheckout,
+            // One-time vehicle information asked on this page for units that have no Daily Checkout (empty when none).
+            'vehicle_identification_units' => $this->vehicleIdentificationUnits($request, $stationApparatuses),
             'rooms' => $station->rooms->map(function ($room) use ($roomsHaveIsActive) {
                 return [
                     'id' => $room->id,
@@ -316,6 +321,24 @@ class StationController extends Controller
         }
 
         return response()->json($payload);
+    }
+
+    /**
+     * The units at this station whose one-time vehicle questions are asked on the station page.
+     * A planning problem never keeps the station page from loading: it just shows no questions.
+     *
+     * @param  Collection<int, Apparatus>  $apparatuses
+     * @return list<array{apparatus_id: int, designation: string, vehicle_identification: array<string, mixed>}>
+     */
+    private function vehicleIdentificationUnits(Request $request, Collection $apparatuses): array
+    {
+        try {
+            return app(VehicleIdentificationPlanner::class)->stationUnits($apparatuses, $request->user());
+        } catch (Throwable $exception) {
+            Log::warning('Station vehicle identification questions could not be planned.', ['exception' => $exception->getMessage()]);
+
+            return [];
+        }
     }
 
     /**

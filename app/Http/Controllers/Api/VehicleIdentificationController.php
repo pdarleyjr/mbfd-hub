@@ -83,8 +83,8 @@ final class VehicleIdentificationController extends Controller
 
     /**
      * Who may see a unit's questions: Fleet managers for any unit; for the Captain 5 unit, anyone
-     * the Captain 5 page is open to (view access); for a Daily Checkout unit, members who may
-     * submit its checkout. Writing answers is narrower, see VehicleIdentificationPlanner::canAnswer
+     * the Captain 5 page is open to (view access); for any other unit (a Daily Checkout unit, or a
+     * unit asked on its station page), active members with an employee profile. Writing answers is narrower, see VehicleIdentificationPlanner::canAnswer
      * (the Captain 5 unit needs act access). A unit that is not asked questions does not exist as
      * far as this route goes.
      */
@@ -97,11 +97,14 @@ final class VehicleIdentificationController extends Controller
         if ($user->canManageFleetSwaps()) {
             return $user;
         }
+        // A unit with no checkout, no Captain 5 page and no station has no screen that asks about it.
+        abort_if($this->planner->surface($unit) === null, 404);
         if (VehicleIdentificationPlanner::isCaptain5($unit)) {
             abort_unless(app(Captain5Access::class)->canView($user), 403);
 
             return $user;
         }
+        // Checkout units and station-page units: any active member with an employee profile.
         app(AuthenticatedMemberContextResolver::class)->resolve($request)->actor()->requireEmployee();
 
         return $user;
