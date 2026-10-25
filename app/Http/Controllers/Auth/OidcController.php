@@ -93,7 +93,7 @@ final class OidcController
             $authorization->setAuthorizationApproved(true);
 
             return $server->completeAuthorizationRequest($authorization, new PsrResponse);
-        });
+        }, handoff: $request);
     }
 
     public function token(Request $request, AuthorizationServer $server): Response
@@ -142,7 +142,14 @@ final class OidcController
         return (new PsrHttpFactory($factory, $factory, $factory, $factory))->createRequest($request);
     }
 
-    private function respond(\Closure $operation, bool $resource = false): Response
+    /**
+     * @param  Request|null  $handoff  The authorize request. When the browser reports that the whole navigation chain
+     *                                 is same-origin (the login form POST that just signed the member in), a 302 to the
+     *                                 application is replaced by a no-store handoff page: browsers apply the login page's
+     *                                 form-action 'self' to a redirect chain that began at a form submit, so a direct
+     *                                 cross-origin 302 is blocked and the member is left on a spent login form.
+     */
+    private function respond(\Closure $operation, bool $resource = false, ?Request $handoff = null): Response
     {
         try {
             $response = DB::transaction($operation);
@@ -152,9 +159,23 @@ final class OidcController
                 $response = $response->withStatus(401);
             }
         }
+        if ($handoff !== null && $this->endsFormNavigation($handoff, $response)) {
+            $page = response()->view('auth.oidc-handoff', ['destination' => $response->getHeaderLine('Location')]);
+            $page->headers->set('Cache-Control', 'no-store, private');
+            $page->headers->set('Pragma', 'no-cache');
+
+            return $page;
+        }
         $result = (new HttpFoundationFactory)->createResponse($response);
         $result->headers->set('Cache-Control', 'no-store, private');
 
         return $result;
+    }
+
+    private function endsFormNavigation(Request $request, \Psr\Http\Message\ResponseInterface $response): bool
+    {
+        return $request->headers->get('Sec-Fetch-Site') === 'same-origin'
+            && in_array($response->getStatusCode(), [301, 302, 303], true)
+            && $response->getHeaderLine('Location') !== '';
     }
 }
