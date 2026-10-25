@@ -15,7 +15,7 @@ final class OidcIdentityPolicy
     public function application(string $clientId): string
     {
         $matches = [];
-        foreach (['cmd', 'cloud', 'meeting'] as $application) {
+        foreach (['cmd', 'cloud', 'meeting', 'prompt_studio'] as $application) {
             if ($clientId !== '' && config('oidc.clients.'.$application) === $clientId) {
                 $matches[] = $application;
             }
@@ -37,14 +37,23 @@ final class OidcIdentityPolicy
         // The Command Board admits exactly the 300 Command population. A Hub
         // administrator without a personnel record signs in as their canonical
         // Hub user; any account that claims a personnel link must still match it.
-        $identityMatches = $application === 'cmd'
-            ? ($linkedEmployee || ($employee === null && $user?->employee_profile_id === null))
-            : $linkedEmployee;
+        $identityMatches = match ($application) {
+            'cmd' => $linkedEmployee || ($employee === null && $user?->employee_profile_id === null),
+            // Prompt Studio admits every active canonical Hub user. A linked user
+            // must match their personnel record exactly; an unlinked user must not
+            // claim a personnel number either (a half-linked identity is denied).
+            'prompt_studio' => $linkedEmployee
+                || ($user !== null && $employee === null && $user->employee_profile_id === null && blank($user->employee_id)),
+            default => $linkedEmployee,
+        };
         if ($client === null || $client->revoked || ! $client->confidential()
             || $user === null || ! $user->isAuthenticationAllowed() || $user->must_change_password
             || ! $identityMatches
             || ($application === 'cmd' && ! app(\App\Services\Security\Command300Access::class)->allows($user))
-            || ($application !== 'cmd' && ! $user->hasRole('super_admin') && ! $user->hasDirectWebPermission('app.'.$application.'.access'))
+            // Prompt Studio, like the Command Board, has no per-app Hub permission:
+            // sign-in is open to any active canonical account. What a signed-in
+            // member can do inside Prompt Studio is decided by Prompt Studio.
+            || (! in_array($application, ['cmd', 'prompt_studio'], true) && ! $user->hasRole('super_admin') && ! $user->hasDirectWebPermission('app.'.$application.'.access'))
             || ($session !== null && ($session->revoked_at !== null || $session->user_id !== $user->id
                 || $session->employee_profile_id !== $employee?->id || $session->security_version !== (int) $user->security_version
                 || $session->client_id !== $clientId || $session->application !== $application))) {

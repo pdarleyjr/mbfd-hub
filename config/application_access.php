@@ -11,5 +11,6 @@ return [
         'cmd' => env('CMD_IDENTITY_RUNTIME_VERIFIED', false),
         'cloud' => env('CLOUD_IDENTITY_RUNTIME_VERIFIED', false),
         'meeting' => env('MEETING_IDENTITY_RUNTIME_VERIFIED', false),
+        'prompt_studio' => env('PROMPT_STUDIO_IDENTITY_RUNTIME_VERIFIED', false),
     ],
 ];

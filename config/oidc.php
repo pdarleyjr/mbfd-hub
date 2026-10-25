@@ -8,5 +8,6 @@ return [
         'cmd' => env('OIDC_CMD_CLIENT_ID', ''),
         'cloud' => env('OIDC_CLOUD_CLIENT_ID', ''),
         'meeting' => env('OIDC_MEETING_CLIENT_ID', ''),
+        'prompt_studio' => env('OIDC_PROMPT_STUDIO_CLIENT_ID', ''),
     ],
 ];
