@@ -260,6 +260,10 @@ final class VehicleIdentificationFields
         if ($value === null) {
             return null;
         }
+        // N/A, NONE, a dash, 0 or UNKNOWN is not a make or model ("X" is: a Tesla Model X).
+        if (($field === self::MAKE || $field === self::MODEL) && self::isEmptyOnRecord($field, $value)) {
+            return null;
+        }
 
         return self::isIdentifier($field) && self::looksLikeFiller($field, $kind, $value) ? null : $value;
     }

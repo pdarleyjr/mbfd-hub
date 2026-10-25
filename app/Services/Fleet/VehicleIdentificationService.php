@@ -211,6 +211,22 @@ class VehicleIdentificationService
         $masterValue = $master?->getAttribute($column);
         $unit = $ledger->apparatus->designation ?: $ledger->apparatus->name ?: 'A unit';
 
+        if ($master !== null && $field === Fields::VEHICLE_NUMBER) {
+            // The link defines a linked unit's vehicle number: never proposed, never closed silently.
+            if (Fields::key($field, $masterValue) === Fields::key($field, $value)) {
+                return [];
+            }
+            $ledger->record($field, ApparatusIdentificationEvent::EVENT_CONFLICT, [
+                'value' => $value,
+                'note' => 'The vehicle number is defined by the link and was not changed.',
+                'metadata' => ['master_id' => $master->getKey(), 'record_value' => trim((string) $masterValue)],
+            ]);
+
+            return [['type' => VehicleIdentificationResolver::ALERT_CONFLICT, 'message' => Fields::isBlankValue($masterValue)
+                ? sprintf('%s: a crew reported vehicle number "%s", but the linked vehicle record has no vehicle number. Nothing was changed.', $unit, $value)
+                : sprintf('%s: a crew reported vehicle number "%s", the linked vehicle record has "%s". Nothing was changed.', $unit, $value, trim((string) $masterValue))]];
+        }
+
         if ($master !== null && ! Fields::isEmptyOnRecord($field, $masterValue)) {
             if (Fields::key($field, $masterValue) === Fields::key($field, $value)) {
                 return [];

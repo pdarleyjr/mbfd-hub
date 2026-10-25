@@ -7,6 +7,7 @@ namespace App\Services\Fleet;
 use App\Enums\DailyCheckoutRequirement;
 use App\Models\Apparatus;
 use App\Models\ApparatusIdentificationQuestion;
+use App\Models\Employee;
 use App\Models\UnitMasterVehicle;
 use App\Models\UnitMasterVehicleChange;
 use App\Models\User;
@@ -25,7 +26,7 @@ use Throwable;
  *  - the Captain 5 unit: its own page;
  *  - any other unit: the page of the station it belongs to (a unit with no station is not asked).
  *  - Unlinked unit: every question for its kind.
- *  - Linked unit: only the fields that are blank on its master vehicle record.
+ *  - Linked unit: only the fields that are blank on its master vehicle record, never the vehicle number (the link defines it).
  *  - Captain 5 additionally confirms the plate while Fleet holds a proposed plate change.
  * A field whose question is answered, or closed as not applicable, is not asked again.
  */
@@ -145,7 +146,12 @@ final class VehicleIdentificationPlanner
             return true;
         }
 
-        return self::isCaptain5($apparatus) ? $user->can(Captain5Access::GATE_ACT) : true;
+        if (self::isCaptain5($apparatus)) {
+            return $user->can(Captain5Access::GATE_ACT);
+        }
+
+        // Checkout and station-page units: an active member with an employee profile (the same test the endpoint applies).
+        return $user->isAuthenticationAllowed() && $user->employeeProfile instanceof Employee;
     }
 
     /**
@@ -210,6 +216,10 @@ final class VehicleIdentificationPlanner
         $questions = [];
         foreach (Fields::fields() as $field) {
             if ($closed->has($field)) {
+                continue;
+            }
+            // Once a unit is linked, the link defines its vehicle number: the crew is never asked for it.
+            if ($master !== null && $field === Fields::VEHICLE_NUMBER) {
                 continue;
             }
             $masterValue = $master === null ? null : $master->getAttribute(Fields::masterColumn($field));

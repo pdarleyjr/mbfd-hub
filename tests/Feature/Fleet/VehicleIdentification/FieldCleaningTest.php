@@ -67,4 +67,31 @@ final class FieldCleaningTest extends TestCase
             $this->assertFalse(Fields::isPlaceholderValue($real), $real);
         }
     }
+
+    /** @return array<string, array{string, string}> */
+    public static function descriptionFiller(): array
+    {
+        $sets = [];
+        foreach (['N/A', 'n/a', 'NA', 'NONE', 'none', '-', '--', '0', 'UNKNOWN', 'unknown'] as $filler) {
+            foreach ([Fields::MAKE, Fields::MODEL] as $field) {
+                $sets["{$field} {$filler}"] = [$field, $filler];
+            }
+        }
+
+        return $sets;
+    }
+
+    #[DataProvider('descriptionFiller')]
+    public function test_make_and_model_refuse_placeholders(string $field, string $value): void
+    {
+        $this->assertNull(Fields::clean($field, Fields::KIND_VEHICLE, $value));
+    }
+
+    public function test_make_and_model_keep_a_real_x_and_ordinary_names(): void
+    {
+        $this->assertSame('X', Fields::clean(Fields::MODEL, Fields::KIND_VEHICLE, ' X '), 'a Tesla Model X');
+        $this->assertSame('Model X', Fields::clean(Fields::MODEL, Fields::KIND_VEHICLE, 'Model X'));
+        $this->assertSame('Pierce', Fields::clean(Fields::MAKE, Fields::KIND_VEHICLE, 'Pierce'));
+        $this->assertSame('F-250', Fields::clean(Fields::MODEL, Fields::KIND_VEHICLE, 'F-250'));
+    }
 }

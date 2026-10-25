@@ -9,10 +9,17 @@ use App\Models\ApparatusIdentificationEvent;
 use App\Models\ApparatusIdentificationQuestion;
 use App\Models\UnitMasterVehicle;
 use App\Models\UnitMasterVehicleChange;
+use App\Models\User;
 use App\Support\Fleet\MasterVehicleSyncGuard;
 use App\Support\Fleet\VehicleIdentificationFields as Fields;
 use App\Support\Fleet\VehicleIdentity;
+use Illuminate\Contracts\Cache\LockTimeoutException;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Turns the crew's answers into the right vehicle record, without guessing.
@@ -41,6 +48,8 @@ final class VehicleIdentificationResolver
     public const ALERT_MASTER_CREATED = 'master_created';
 
     public const ALERT_CONFLICT = 'conflict';
+
+    private const CREATE_LOCK_PREFIX = 'vehicle-identification-create:';
 
     public function __construct(
         private readonly ApparatusMasterVehicleLink $link,
@@ -124,20 +133,27 @@ final class VehicleIdentificationResolver
     private function checkVehicleNumber(VehicleIdentificationLedger $ledger, UnitMasterVehicle $master, string $value): array
     {
         $current = $master->getAttribute('veh_number');
-        $same = ! Fields::isBlankValue($current) && Fields::key(Fields::VEHICLE_NUMBER, $current) === Fields::key(Fields::VEHICLE_NUMBER, $value);
+        $blank = Fields::isBlankValue($current);
+        $same = ! $blank && Fields::key(Fields::VEHICLE_NUMBER, $current) === Fields::key(Fields::VEHICLE_NUMBER, $value);
         $ledger->record(Fields::VEHICLE_NUMBER, $same ? ApparatusIdentificationEvent::EVENT_CONFIRMED : ApparatusIdentificationEvent::EVENT_CONFLICT, [
             'value' => $value,
             'note' => $same ? null : 'The vehicle number is defined by the link and was not changed.',
             'metadata' => ['master_id' => $master->getKey(), 'column' => 'veh_number'],
         ]);
-        if ($same || Fields::isBlankValue($current)) {
+        if ($same) {
             return [];
         }
 
-        return [$this->conflictAlert(sprintf(
-            '%s: the crew reported vehicle number "%s", the linked vehicle record has "%s". Nothing was changed.',
-            $this->unitName($ledger->apparatus), $value, trim((string) $current),
-        ))];
+        // Never closed silently: a number the record does not have is one conflict for Fleet to settle.
+        return [$this->conflictAlert($blank
+            ? sprintf(
+                '%s: the crew reported vehicle number "%s", but the linked vehicle record has no vehicle number. Nothing was changed; please add it to the vehicle record if it is right.',
+                $this->unitName($ledger->apparatus), $value,
+            )
+            : sprintf(
+                '%s: the crew reported vehicle number "%s", the linked vehicle record has "%s". Nothing was changed.',
+                $this->unitName($ledger->apparatus), $value, trim((string) $current),
+            ))];
     }
 
     /**
@@ -254,7 +270,7 @@ final class VehicleIdentificationResolver
     }
 
     /** @return list<array{type: string, message: string}> */
-    private function resolveUnlinked(VehicleIdentificationLedger $ledger): array
+    private function resolveUnlinked(VehicleIdentificationLedger $ledger, bool $holdsCreationLock = false): array
     {
         $apparatus = $ledger->apparatus;
         $answers = $this->allAnswers($apparatus);
@@ -265,7 +281,7 @@ final class VehicleIdentificationResolver
             return []; // e. nothing to match on yet
         }
 
-        $masters = UnitMasterVehicle::query()->get(['id', 'veh_number', 'serial_number', 'tag_number']);
+        $masters = UnitMasterVehicle::query()->get(['id', 'veh_number', 'serial_number', 'tag_number', 'not_apparatus_at']);
         $byVin = $vin === null ? collect() : $this->withKey($masters, 'serial_number', Fields::VIN, $vin);
         $byNumber = $number === null ? collect() : $this->withKey($masters, 'veh_number', Fields::VEHICLE_NUMBER, $number);
         $byPlate = $plate === null ? collect() : $this->withKey($masters, 'tag_number', Fields::PLATE, $plate);
@@ -274,7 +290,8 @@ final class VehicleIdentificationResolver
         if ($vin !== null && $byVin->count() === 1) {
             /** @var UnitMasterVehicle $candidate */
             $candidate = $byVin->first();
-            $problem = $this->contradiction($candidate, $number, $plate, $byNumber, $byPlate)
+            $problem = $this->markedProblem($candidate)
+                ?? $this->contradiction($candidate, $number, $plate, $byNumber, $byPlate)
                 ?? $this->takenBy($apparatus, $candidate)
                 ?? $this->ownIdentityProblem($apparatus, $candidate->veh_number, $candidate->serial_number);
 
@@ -290,7 +307,8 @@ final class VehicleIdentificationResolver
         if ($number !== null && $byNumber->count() === 1) {
             /** @var UnitMasterVehicle $candidate */
             $candidate = $byNumber->first();
-            $problem = $this->contradiction($candidate, $number, $plate, $byNumber, $byPlate, $vin)
+            $problem = $this->markedProblem($candidate)
+                ?? $this->contradiction($candidate, $number, $plate, $byNumber, $byPlate, $vin)
                 ?? $this->takenBy($apparatus, $candidate)
                 ?? $this->ownIdentityProblem($apparatus, $candidate->veh_number, $candidate->serial_number);
             $backed = $plate !== null && $byPlate->contains(fn (UnitMasterVehicle $m): bool => $m->getKey() === $candidate->getKey());
@@ -312,11 +330,17 @@ final class VehicleIdentificationResolver
         // d. No candidate at all (no record has that VIN/HIN, number or plate) and the crew gave a
         //    VIN/HIN or a vehicle number: create the record for Fleet to verify, and link it.
         if ($vin !== null || $number !== null) {
-            $problem = $this->ownIdentityProblem($apparatus, $number, $vin);
+            // The unit's own number or VIN may already be on a record the crew's answers did not name:
+            // creating another record would duplicate the vehicle.
+            $problem = $this->ownIdentityProblem($apparatus, $number, $vin)
+                ?? $this->ownIdentifierOnRecord($apparatus, $masters);
+            if ($problem !== null) {
+                return $this->needsReview($ledger, $answers, $problem);
+            }
 
-            return $problem !== null
-                ? $this->needsReview($ledger, $answers, $problem)
-                : $this->createAndLink($ledger, $answers);
+            return $holdsCreationLock
+                ? $this->createAndLink($ledger, $answers)
+                : $this->createUnderLock($ledger, $answers, $vin, $number);
         }
 
         return []; // e. only a plate, year, make or model so far: wait
@@ -330,7 +354,16 @@ final class VehicleIdentificationResolver
     {
         $apparatus = $ledger->apparatus;
         $locked = UnitMasterVehicle::query()->lockForUpdate()->findOrFail($master->getKey());
-        $this->link->link($apparatus, $locked, $ledger->actor);
+        // Look again now that the record is locked: another unit may have taken it since the candidates were read.
+        $problem = $this->markedProblem($locked) ?? $this->takenBy($apparatus, $locked);
+        if ($problem !== null) {
+            return $this->needsReview($ledger, $answers, $problem);
+        }
+        try {
+            $this->link->link($apparatus, $locked, $ledger->actor);
+        } catch (UniqueConstraintViolationException) {
+            return $this->needsReview($ledger, $answers, "Vehicle record {$locked->veh_number} was linked to another unit at the same moment.");
+        }
         $apparatus->refresh();
         $ledger->record(VehicleIdentificationLedger::RECORD, ApparatusIdentificationEvent::EVENT_MATCHED, [
             'value' => $locked->veh_number,
@@ -338,7 +371,108 @@ final class VehicleIdentificationResolver
             'metadata' => ['rule' => $rule, 'master_id' => $locked->getKey()],
         ]);
 
-        return $this->fillLinked($ledger, $locked->refresh(), $answers);
+        return $this->fillAsAnswerers($ledger, $locked->refresh(), $answers);
+    }
+
+    /**
+     * Write the answers gathered over several checkouts, each credited to the member who gave it
+     * (and the place they gave it), never to whoever answered last.
+     *
+     * @param  array<string, string>  $answers
+     * @return list<array{type: string, message: string}>
+     */
+    private function fillAsAnswerers(VehicleIdentificationLedger $ledger, UnitMasterVehicle $master, array $answers): array
+    {
+        $sources = $this->answerSources($ledger->apparatus);
+        $alerts = [];
+        foreach ($answers as $field => $value) {
+            $source = $sources[$field] ?? null;
+            $asAnswerer = $source === null ? $ledger : $ledger->forAnswer($source['user'], $source['inspection_id']);
+            array_push($alerts, ...$this->settle($asAnswerer, $master, $field, $value, null));
+        }
+
+        return $alerts;
+    }
+
+    /** @return array<string, array{user: ?User, inspection_id: ?int}> who answered each answered field, and in which checkout */
+    private function answerSources(Apparatus $apparatus): array
+    {
+        $answered = ApparatusIdentificationQuestion::query()
+            ->where('apparatus_id', $apparatus->getKey())
+            ->where('state', ApparatusIdentificationQuestion::STATE_ANSWERED)
+            ->whereNotNull('answered_value')
+            ->get(['field', 'resolved_by_user_id']);
+        $users = User::query()->whereIn('id', $answered->pluck('resolved_by_user_id')->filter()->all())->get()->keyBy('id');
+        $inspections = ApparatusIdentificationEvent::query()
+            ->where('apparatus_id', $apparatus->getKey())
+            ->where('event', ApparatusIdentificationEvent::EVENT_ANSWERED)
+            ->orderBy('id')
+            ->get(['field', 'apparatus_inspection_id'])
+            ->mapWithKeys(fn (ApparatusIdentificationEvent $event): array => [$event->field => $event->apparatus_inspection_id]);
+
+        $sources = [];
+        foreach ($answered as $question) {
+            $user = $question->resolved_by_user_id === null ? null : $users->get($question->resolved_by_user_id);
+            $inspectionId = $inspections->get($question->field);
+            $sources[$question->field] = [
+                'user' => $user instanceof User ? $user : null,
+                'inspection_id' => $inspectionId === null ? null : (int) $inspectionId,
+            ];
+        }
+
+        return $sources;
+    }
+
+    /**
+     * Nobody else may be creating the same vehicle record at this moment: a short lock keyed on the
+     * VIN/HIN (or the number), held until this transaction ends. The candidates are then read again,
+     * so a record another crew just created is found instead of duplicated.
+     *
+     * @param  array<string, string>  $answers
+     * @return list<array{type: string, message: string}>
+     */
+    private function createUnderLock(VehicleIdentificationLedger $ledger, array $answers, ?string $vin, ?string $number): array
+    {
+        $key = VehicleIdentity::vinKey($vin) ?? VehicleIdentity::numberKey($number);
+        try {
+            $lock = Cache::lock(self::CREATE_LOCK_PREFIX.sha1((string) $key), 30);
+            $lock->block(5);
+            DB::afterCommit(static fn () => $lock->release());
+            DB::afterRollBack(static fn () => $lock->release());
+        } catch (LockTimeoutException) {
+            return $this->needsReview($ledger, $answers, 'Another crew is creating this vehicle record right now.');
+        } catch (Throwable $exception) {
+            // No lock service: the unique indexes and the checks below still stop a double link.
+            Log::warning('Vehicle record creation lock unavailable.', ['exception' => $exception->getMessage()]);
+        }
+
+        return $this->resolveUnlinked($ledger, true);
+    }
+
+    /** The unit's own vehicle number or VIN already sits on a vehicle record: creating another would duplicate it. */
+    private function ownIdentifierOnRecord(Apparatus $apparatus, Collection $masters): ?string
+    {
+        $ownNumber = VehicleIdentity::text($apparatus->vehicle_number);
+        if ($ownNumber !== null && ! Fields::isPlaceholderValue($ownNumber)) {
+            $holder = $this->withKey($masters, 'veh_number', Fields::VEHICLE_NUMBER, $ownNumber)->first();
+            if ($holder instanceof UnitMasterVehicle) {
+                return "This unit's own vehicle number {$ownNumber} already belongs to another vehicle record (#{$holder->getKey()}).";
+            }
+        }
+        $ownVin = VehicleIdentity::text($apparatus->getAttribute('vin'));
+        if ($ownVin !== null && ! Fields::isPlaceholderValue($ownVin)) {
+            $holder = $this->withKey($masters, 'serial_number', Fields::VIN, $ownVin)->first();
+            if ($holder instanceof UnitMasterVehicle) {
+                return "This unit's own VIN/HIN {$ownVin} already belongs to another vehicle record (#{$holder->getKey()}).";
+            }
+        }
+
+        return null;
+    }
+
+    private function markedProblem(UnitMasterVehicle $candidate): ?string
+    {
+        return $candidate->isMarkedNotApparatus() ? 'Fleet marked this record as not an apparatus.' : null;
     }
 
     /**
@@ -346,6 +480,20 @@ final class VehicleIdentificationResolver
      * @return list<array{type: string, message: string}>
      */
     private function createAndLink(VehicleIdentificationLedger $ledger, array $answers): array
+    {
+        try {
+            // A savepoint: a lost race on the unique index rolls back the new record, not the whole submission.
+            return DB::transaction(fn (): array => $this->createRecordAndLink($ledger, $answers));
+        } catch (UniqueConstraintViolationException) {
+            return $this->needsReview($ledger, $answers, 'A vehicle record for this unit was created at the same moment.');
+        }
+    }
+
+    /**
+     * @param  array<string, string>  $answers
+     * @return list<array{type: string, message: string}>
+     */
+    private function createRecordAndLink(VehicleIdentificationLedger $ledger, array $answers): array
     {
         $apparatus = $ledger->apparatus;
         $kind = Fields::kindFor($apparatus);

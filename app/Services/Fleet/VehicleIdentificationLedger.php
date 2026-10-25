@@ -29,6 +29,15 @@ final class VehicleIdentificationLedger
         public readonly ?int $inspectionId,
     ) {}
 
+    /**
+     * The same submission seen as the member who actually gave an earlier answer, so a value another
+     * crew reported at an earlier checkout is credited to that crew when it is finally written.
+     */
+    public function forAnswer(?User $actor, ?int $inspectionId): self
+    {
+        return new self($this->apparatus, $actor, $this->clientSubmissionId, $inspectionId);
+    }
+
     /** The question row for a field, locked; created the first time it is needed. */
     public function question(string $field): ApparatusIdentificationQuestion
     {
