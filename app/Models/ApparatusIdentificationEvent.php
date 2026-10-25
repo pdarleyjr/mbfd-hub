@@ -14,7 +14,7 @@ use LogicException;
  * @property int $id
  * @property int $apparatus_id
  * @property string $field
- * @property string $event answered|unavailable|superseded|reopened|matched|master_created|master_filled|conflict|confirmed|proposed
+ * @property string $event answered|unavailable|superseded|reopened|matched|master_created|master_filled|conflict|confirmed|proposed|corroborated
  * @property string|null $value
  * @property string|null $reason
  * @property string|null $note
@@ -49,6 +49,9 @@ class ApparatusIdentificationEvent extends Model
     /** A crew-read VIN or plate waiting for Fleet to accept it on the vehicle record. */
     public const EVENT_PROPOSED = 'proposed';
 
+    /** A crew read the very value a pending proposal holds, so the proposal was accepted on their word. */
+    public const EVENT_CORROBORATED = 'corroborated';
+
     public const EVENT_LABELS = [
         self::EVENT_ANSWERED => 'Answered',
         self::EVENT_UNAVAILABLE => 'Not available',
@@ -60,6 +63,7 @@ class ApparatusIdentificationEvent extends Model
         self::EVENT_CONFLICT => 'Needs Fleet review',
         self::EVENT_CONFIRMED => 'Confirmed',
         self::EVENT_PROPOSED => 'Proposed to Fleet',
+        self::EVENT_CORROBORATED => 'Confirmed a pending change',
     ];
 
     protected $fillable = [

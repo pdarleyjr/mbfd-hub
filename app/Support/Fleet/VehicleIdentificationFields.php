@@ -221,6 +221,24 @@ final class VehicleIdentificationFields
     }
 
     /**
+     * True when a vehicle record says nothing for this field: empty, or one of the placeholders
+     * people type instead of a value (N/A, NA, NONE, -, 0, UNKNOWN, X). A crew answer may be written
+     * into such a field. "X" stays a real value for make and model (a Tesla Model X).
+     */
+    public static function isEmptyOnRecord(string $field, mixed $value): bool
+    {
+        if (self::isBlankValue($value)) {
+            return true;
+        }
+        $isDescription = $field === self::MAKE || $field === self::MODEL;
+        if ($isDescription && mb_strtoupper((string) VehicleIdentity::text($value)) === 'X') {
+            return false;
+        }
+
+        return self::isPlaceholderValue($value);
+    }
+
+    /**
      * Clean a typed answer. Returns the value to store, or null when it cannot be a real value
      * for this field and kind.
      */
@@ -240,6 +258,10 @@ final class VehicleIdentificationFields
         };
 
         if ($value === null) {
+            return null;
+        }
+        // N/A, NONE, a dash, 0 or UNKNOWN is not a make or model ("X" is: a Tesla Model X).
+        if (($field === self::MAKE || $field === self::MODEL) && self::isEmptyOnRecord($field, $value)) {
             return null;
         }
 

@@ -80,9 +80,9 @@ final class ResolutionTest extends IdentificationTestCase
         $this->assertSame('a', $matched->metadata['rule']);
         $this->assertSame($this->member->id, $matched->actor_user_id);
         $this->assertSame('2022', $master->fresh()->year, 'a blank year is filled from the answers');
-        $this->assertNull($master->fresh()->tag_number, 'a plate is only proposed; Fleet accepts it');
-        $proposal = UnitMasterVehicleChange::query()->where('unit_master_vehicle_id', $master->id)->where('field', 'tag_number')->sole();
-        $this->assertSame(['proposed', 'XE1234', UnitMasterVehicleChange::SOURCE_DAILY_CHECKOUT], [$proposal->status, $proposal->new_value, $proposal->source]);
+        $this->assertSame('XE1234', $master->fresh()->tag_number, 'a blank plate is written at once, as the member');
+        $filled = UnitMasterVehicleChange::query()->where('unit_master_vehicle_id', $master->id)->where('field', 'tag_number')->sole();
+        $this->assertSame(['applied', 'XE1234', UnitMasterVehicleChange::SOURCE_DAILY_CHECKOUT, $this->member->id], [$filled->status, $filled->new_value, $filled->source, $filled->user_id]);
         $this->assertSame(0, $this->eventsOf('master_created'));
         $this->assertSame(self::VIN_A, $unit->vin, 'the unit takes the record identity');
     }
@@ -215,37 +215,66 @@ final class ResolutionTest extends IdentificationTestCase
 
     public function test_near_misses_never_link_to_a_lookalike_record(): void
     {
+        $manager = $this->fleetOperationsManager('fleet.manager@example.test');
         $original = $this->unlinkedUnitWithMaster(['serial_number' => self::VIN_A]);
         $this->withoutOwnNumber();
         $before = $this->masterCount();
 
-        // "V202" is not "V-202": dashes are never stripped, so this is a different vehicle number.
-        // A number alone never links and never creates a record: it goes to Fleet.
+        // "V202" is not "V-202": dashes are never stripped, so this is a different vehicle number and
+        // matches no record. The unit is never linked to the lookalike; a record is created for Fleet to verify.
         $this->crewAnswers([$this->answer('vehicle_number', 'V202'), $this->answer('year', '2022')]);
 
         $unit = $this->unit->fresh();
-        $this->assertNull($unit->unit_master_vehicle_id);
-        $this->assertStringContainsString('no VIN/HIN was given', (string) $unit->master_link_note);
-        $this->assertStringContainsString('vehicle number V202', (string) $unit->master_link_note);
-        $this->assertSame($before, $this->masterCount());
+        $created = UnitMasterVehicle::query()->where('veh_number', 'V202')->sole();
+        $this->assertNotSame($original->id, $created->id);
+        $this->assertSame($created->id, $unit->unit_master_vehicle_id);
+        $this->assertSame($before + 1, $this->masterCount());
+        $this->assertTrue($created->needs_fleet_review);
         $this->assertSame(self::VIN_A, $original->fresh()->serial_number, 'the lookalike record is untouched');
-        $this->assertSame(1, $this->eventsOf('conflict'));
+        $this->assertSame(1, $this->eventsOf('master_created'));
+        Notification::assertSentTo($manager, NewSubmissionNotification::class);
     }
 
-    public function test_a_vehicle_number_alone_with_no_candidate_never_creates_a_record(): void
+    public function test_a_vehicle_number_alone_with_no_candidate_creates_a_record_for_fleet_to_verify(): void
     {
         $manager = $this->fleetOperationsManager('fleet.manager@example.test');
         $this->unlinkedUnitWithMaster([]);
         $this->withoutOwnNumber();
         $before = $this->masterCount();
 
-        $this->crewAnswers([$this->answer('vehicle_number', 'V-777'), $this->answer('plate', 'NEW7777')]);
+        $this->crewAnswers([$this->answer('vehicle_number', 'V-777')]);
 
-        $this->assertSame($before, $this->masterCount());
-        $this->assertNull($this->unit->fresh()->unit_master_vehicle_id);
-        $this->assertSame(0, $this->eventsOf('master_created'));
-        $this->assertStringContainsString('V-777', (string) $this->unit->fresh()->master_link_note);
-        Notification::assertSentTo($manager, NewSubmissionNotification::class);
+        $this->assertSame($before + 1, $this->masterCount());
+        $created = UnitMasterVehicle::query()->where('veh_number', 'V-777')->sole();
+        $this->assertSame([null, null, 'daily_checkout', true], [$created->serial_number, $created->tag_number, $created->record_source, $created->needs_fleet_review]);
+        $this->assertSame($created->id, $this->unit->fresh()->unit_master_vehicle_id);
+        $this->assertSame(Apparatus::MASTER_LINK_LINKED, $this->unit->fresh()->master_link_status);
+        $history = UnitMasterVehicleChange::query()->where('unit_master_vehicle_id', $created->id)->where('field', 'record')->sole();
+        $this->assertSame('Created from Daily Checkout, pending Fleet verification', $history->note);
+        $this->assertSame(1, $this->eventsOf('master_created'));
+        Notification::assertSentTo($manager, NewSubmissionNotification::class, fn (NewSubmissionNotification $n): bool => str_contains($n->toDatabase($manager)['title'], 'New vehicle record to verify'));
+    }
+
+    public function test_a_hull_id_alone_with_no_candidate_creates_a_boat_record_and_a_plate_alone_waits(): void
+    {
+        $boat = Apparatus::query()->create([
+            'unit_id' => 'FB6', 'name' => 'Fire Boat 6', 'designation' => 'Fire Boat 6', 'type' => 'Fire Boat', 'slug' => 'fb6',
+            'daily_checkout_requirement' => 'required', 'daily_checkout_template' => 'fireboat6',
+        ]);
+        $before = $this->masterCount();
+
+        $submit = fn (array $answers): bool => app(VehicleIdentificationService::class)->submitStandalone($boat->fresh(), app(VehicleIdentificationSubmission::class)->clean([
+            'questions_version' => 'x', 'answers' => $answers,
+        ], 'boat', strict: true)['section'], $this->member, (string) Str::uuid());
+
+        $submit([$this->answer('plate', 'FL1234AB')]);
+        $this->assertSame($before, $this->masterCount(), 'a plate alone is not enough to create a record');
+        $this->assertNull($boat->fresh()->unit_master_vehicle_id);
+
+        $submit([$this->answer('vin', 'MTK12345A515')]);
+        $created = UnitMasterVehicle::query()->where('serial_number', 'MTK12345A515')->sole();
+        $this->assertSame(['boat', 'FL1234AB', true], [$created->asset_category, $created->tag_number, $created->needs_fleet_review], 'the earlier plate answer counts');
+        $this->assertSame($created->id, $boat->fresh()->unit_master_vehicle_id);
     }
 
     public function test_a_match_that_would_replace_the_units_own_vehicle_number_goes_to_fleet(): void

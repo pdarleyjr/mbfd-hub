@@ -13,10 +13,14 @@ import {
   ApparatusServiceTicketSummary,
   StationActivityEntry,
   SingleGasMeterSummary,
+  VehicleIdentification,
+  VehicleIdentificationUnit,
   stationImageUrl,
 } from '../types';
 import { ApiClient, isApiAuthenticationError, redirectToLoginAfterSessionExpiry } from '../utils/api';
+import { parseVehicleIdentificationUnits } from '../utils/vehicleIdentification';
 import PreviousPageButton from './PreviousPageButton';
+import StationVehicleIdentification from './StationVehicleIdentification';
 import DailyPageNav from './DailyPageNav';
 import { identityForQueueCapture } from '../lib/offlineIdentity';
 import { groupRoomsByArea, stationComplement } from '../utils/stationRoomBlueprint';
@@ -43,6 +47,8 @@ export default function StationDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stationLoadAttempt, setStationLoadAttempt] = useState(0);
+  // Units at this station with open one-time vehicle questions; answered ones leave this list.
+  const [identificationUnits, setIdentificationUnits] = useState<VehicleIdentificationUnit[]>([]);
   const [activeTab, setActiveTab] = useState<TabId>('overview');
 
   // Tab data (lazy loaded)
@@ -91,6 +97,7 @@ export default function StationDetailPage() {
         const data = await ApiClient.getStation(stationId);
         if (cancelled) return;
         setStation(data);
+        setIdentificationUnits(parseVehicleIdentificationUnits(data.vehicle_identification_units));
         setError(null);
       } catch (err) {
         if (isApiAuthenticationError(err)) {
@@ -169,6 +176,14 @@ export default function StationDetailPage() {
       loadTabData();
     }
   }, [activeTab, id, tabDataLoaded]);
+
+  const identificationSaved = (apparatusId: number, next: VehicleIdentification | undefined) => {
+    setIdentificationUnits((units) => units.flatMap((unit): VehicleIdentificationUnit[] => {
+      if (unit.apparatus_id !== apparatusId) return [unit];
+
+      return next ? [{ ...unit, vehicle_identification: next }] : [];
+    }));
+  };
 
   const retryTabData = (tab: TabId) => {
     setTabDataError(prev => ({ ...prev, [tab]: '' }));
@@ -472,6 +487,9 @@ export default function StationDetailPage() {
           </ul>
         </nav>
       </section>
+
+      {/* One-time vehicle questions for units without a Daily Checkout or Captain 5 page */}
+      <StationVehicleIdentification units={identificationUnits} onUnitSaved={identificationSaved} />
 
       {/* Tabbed detail view */}
       <section className="hub-panel overflow-hidden" aria-label="Station details">

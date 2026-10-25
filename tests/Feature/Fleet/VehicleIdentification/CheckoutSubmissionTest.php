@@ -42,7 +42,7 @@ final class CheckoutSubmissionTest extends IdentificationTestCase
         $questions = ApparatusIdentificationQuestion::query()->where('apparatus_id', $this->unit->id)->pluck('answered_value', 'field')->all();
         $this->assertEquals(['plate' => 'XE1234', 'year' => '2022', 'make' => 'Pierce', 'model' => 'Enforcer'], $questions);
         $this->assertSame(
-            ['answered' => 4, 'master_filled' => 3, 'proposed' => 1],
+            ['answered' => 4, 'master_filled' => 4],
             ApparatusIdentificationEvent::query()->where('apparatus_id', $this->unit->id)->selectRaw('event, count(*) as total')->groupBy('event')->pluck('total', 'event')->map(fn ($n): int => (int) $n)->all(),
         );
         $answered = ApparatusIdentificationEvent::query()->where('event', 'answered')->where('field', 'plate')->sole();
@@ -51,13 +51,13 @@ final class CheckoutSubmissionTest extends IdentificationTestCase
         $this->assertSame($csid, $answered->client_submission_id);
 
         $master = $this->unitMaster();
-        $this->assertSame([null, '2022', 'Pierce', 'Enforcer'], [$master->tag_number, $master->year, $master->make, $master->model], 'year, make and model are filled; the plate waits for Fleet');
+        $this->assertSame(['XE1234', '2022', 'Pierce', 'Enforcer'], [$master->tag_number, $master->year, $master->make, $master->model], 'a blank plate, year, make and model are written at once');
         $filled = UnitMasterVehicleChange::query()->where('unit_master_vehicle_id', $master->id)->where('source', UnitMasterVehicleChange::SOURCE_DAILY_CHECKOUT)->where('field', 'make')->sole();
         $this->assertSame($this->member->id, $filled->user_id);
         $this->assertStringStartsWith('Reported in Daily Checkout by Swap Reporter on ', (string) $filled->note);
         $this->assertSame('applied', $filled->status);
-        $proposal = UnitMasterVehicleChange::query()->where('unit_master_vehicle_id', $master->id)->where('field', 'tag_number')->sole();
-        $this->assertSame(['proposed', 'XE1234', UnitMasterVehicleChange::SOURCE_DAILY_CHECKOUT, $this->member->id], [$proposal->status, $proposal->new_value, $proposal->source, $proposal->user_id]);
+        $plate = UnitMasterVehicleChange::query()->where('unit_master_vehicle_id', $master->id)->where('field', 'tag_number')->sole();
+        $this->assertSame(['applied', 'XE1234', UnitMasterVehicleChange::SOURCE_DAILY_CHECKOUT, $this->member->id], [$plate->status, $plate->new_value, $plate->source, $plate->user_id], 'attributed to the answering member, never proposed');
         $unit = $this->unit->fresh();
         $this->assertSame(['Pierce', 'Enforcer', 2022], [$unit->make, $unit->model, (int) $unit->year], 'shared fields sync to the apparatus');
         $this->assertSame([], $this->openFields($this->unit));

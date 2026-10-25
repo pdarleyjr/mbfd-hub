@@ -90,7 +90,18 @@ final class UnitMasterVehicleChangeRecorder
     /** Record a whole-record event (for example "created from a take-home inspection"). */
     public function recordCreated(UnitMasterVehicle $vehicle, string $source, array $context = []): UnitMasterVehicleChange
     {
-        return $this->record($vehicle, 'record', null, 'created', UnitMasterVehicleChange::STATUS_APPLIED, $source, $context);
+        return $this->recordEvent($vehicle, 'created', $source, $context);
+    }
+
+    /**
+     * Record a whole-record event that is not a field change ("not an apparatus", "apparatus record
+     * created"). The master row is not touched.
+     *
+     * @param  array{source_reference?: ?string, user?: ?User, inspection_id?: ?int, note?: ?string}  $context
+     */
+    public function recordEvent(UnitMasterVehicle $vehicle, string $event, string $source, array $context = []): UnitMasterVehicleChange
+    {
+        return $this->record($vehicle, 'record', null, $event, UnitMasterVehicleChange::STATUS_APPLIED, $source, $context);
     }
 
     public function accept(UnitMasterVehicleChange $change, User $decidedBy, ?string $note = null): void

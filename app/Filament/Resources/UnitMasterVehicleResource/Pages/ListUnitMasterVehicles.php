@@ -7,9 +7,11 @@ use App\Models\UnitMasterVehicle;
 use App\Services\Fleet\UnitMasterRosterExporter;
 use Filament\Actions;
 use Filament\Forms\Components\Radio;
+use Filament\Resources\Components\Tab;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Support\Enums\MaxWidth;
 use Filament\Tables\Filters\SelectFilter;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -21,6 +23,23 @@ class ListUnitMasterVehicles extends ListRecords
     public function getMaxContentWidth(): MaxWidth|string|null
     {
         return MaxWidth::Full;
+    }
+
+    /**
+     * "Apparatus review": master records in the fire apparatus section with no apparatus row yet.
+     * Fleet creates the apparatus record or marks the vehicle "not an apparatus".
+     *
+     * @return array<string, Tab>
+     */
+    public function getTabs(): array
+    {
+        return [
+            'all' => Tab::make('All vehicles'),
+            'apparatus_review' => Tab::make('Apparatus review')
+                ->modifyQueryUsing(fn (Builder $query): Builder => UnitMasterVehicle::constrainToApparatusReview($query))
+                ->badge(fn (): int => UnitMasterVehicle::query()->needingApparatusReview()->count())
+                ->badgeColor('warning'),
+        ];
     }
 
     protected function getHeaderActions(): array
@@ -98,6 +117,10 @@ class ListUnitMasterVehicles extends ListRecords
     private function describeFilters(): string
     {
         $parts = [];
+
+        if ($this->activeTab === 'apparatus_review') {
+            $parts[] = 'Apparatus review list';
+        }
 
         $search = trim((string) $this->tableSearch);
         if ($search !== '') {

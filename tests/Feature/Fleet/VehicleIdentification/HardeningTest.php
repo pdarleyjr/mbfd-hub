@@ -118,7 +118,7 @@ final class HardeningTest extends IdentificationTestCase
         $this->assertStringContainsString('limit', (string) $selects->first());
     }
 
-    public function test_a_vin_or_plate_on_a_linked_unit_is_proposed_not_applied_and_announced_once(): void
+    public function test_a_vin_or_plate_on_a_linked_unit_is_written_at_once_without_alerting_fleet(): void
     {
         $manager = $this->fleetOperationsManager('fleet.manager@example.test');
         $this->unitMaster()->forceFill(['serial_number' => null])->save();
@@ -127,20 +127,21 @@ final class HardeningTest extends IdentificationTestCase
         $this->crewAnswers($answers);
 
         $master = $this->unitMaster();
-        $this->assertSame([null, null, '2022'], [$master->serial_number, $master->tag_number, $master->year]);
-        $proposals = UnitMasterVehicleChange::query()->where('unit_master_vehicle_id', $master->id)->where('status', 'proposed')->pluck('new_value', 'field')->all();
-        $this->assertEquals(['serial_number' => self::VIN_A, 'tag_number' => 'XE1234'], $proposals);
-        $this->assertSame(2, ApparatusIdentificationEvent::query()->where('event', 'proposed')->count());
-        Notification::assertSentToTimes($manager, NewSubmissionNotification::class, 1);
+        $this->assertSame([self::VIN_A, 'XE1234', '2022'], [$master->serial_number, $master->tag_number, $master->year]);
+        $this->assertSame(0, UnitMasterVehicleChange::query()->where('status', 'proposed')->count(), 'nothing waits for Fleet');
+        $this->assertSame(3, ApparatusIdentificationEvent::query()->where('event', 'master_filled')->count());
+        Notification::assertNotSentTo($manager, NewSubmissionNotification::class);
 
-        // Fleet asks again and a second crew reads the same values: the proposals already exist.
+        // A second crew reads the same values: the record already has them, so nothing is asked or changed.
         foreach (['vin', 'plate'] as $field) {
             app(VehicleIdentificationService::class)->reopen($this->unit->fresh(), $field, $this->fleetOperationsManager());
         }
         $this->crewAnswers([$this->answer('vin', self::VIN_A), $this->answer('plate', 'XE1234')]);
 
-        $this->assertSame(2, UnitMasterVehicleChange::query()->where('status', 'proposed')->count(), 'no duplicate proposals');
-        Notification::assertSentToTimes($manager, NewSubmissionNotification::class, 1);
+        $this->assertSame(0, UnitMasterVehicleChange::query()->where('status', 'proposed')->count());
+        $this->assertSame(2, ApparatusIdentificationEvent::query()->where('event', 'superseded')->count());
+        $this->assertSame(3, ApparatusIdentificationEvent::query()->where('event', 'master_filled')->count(), 'no second write');
+        Notification::assertNotSentTo($manager, NewSubmissionNotification::class);
     }
 
     public function test_the_vehicle_number_of_a_linked_unit_is_never_filled_from_an_answer(): void

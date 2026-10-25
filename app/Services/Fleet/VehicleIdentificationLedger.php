@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Fleet;
 
+use App\Enums\DailyCheckoutRequirement;
 use App\Models\Apparatus;
 use App\Models\ApparatusIdentificationEvent;
 use App\Models\ApparatusIdentificationQuestion;
@@ -27,6 +28,15 @@ final class VehicleIdentificationLedger
         public readonly ?string $clientSubmissionId,
         public readonly ?int $inspectionId,
     ) {}
+
+    /**
+     * The same submission seen as the member who actually gave an earlier answer, so a value another
+     * crew reported at an earlier checkout is credited to that crew when it is finally written.
+     */
+    public function forAnswer(?User $actor, ?int $inspectionId): self
+    {
+        return new self($this->apparatus, $actor, $this->clientSubmissionId, $inspectionId);
+    }
 
     /** The question row for a field, locked; created the first time it is needed. */
     public function question(string $field): ApparatusIdentificationQuestion
@@ -76,11 +86,32 @@ final class VehicleIdentificationLedger
         return $name !== '' ? $name : 'a crew member';
     }
 
-    /** "Reported in Daily Checkout by Name on Oct 24, 2026" for the master record's change history. */
+    /**
+     * "Reported in Daily Checkout by Name on Oct 24, 2026" (or "on the station page") for the vehicle
+     * record's change history.
+     */
     public function historyNote(): string
     {
-        $where = $this->inspectionId !== null ? 'in Daily Checkout' : 'on the unit page';
+        $where = $this->inspectionId !== null ? 'in Daily Checkout' : 'on the '.$this->pageName().' page';
 
         return "Reported {$where} by {$this->actorName()} on ".now('America/New_York')->format('M j, Y');
+    }
+
+    /** The page the crew answered on when it was not a checkout. */
+    public function pageName(): string
+    {
+        return match (true) {
+            VehicleIdentificationPlanner::isCaptain5($this->apparatus) => 'Captain 5',
+            $this->apparatus->daily_checkout_requirement !== DailyCheckoutRequirement::Required && $this->apparatus->station_id !== null => 'station',
+            default => 'unit',
+        };
+    }
+
+    /** "Confirmed by Name in Daily Checkout" (or "on the Captain 5 page"): the note on a proposal a crew's answer accepted. */
+    public function confirmationNote(): string
+    {
+        $where = $this->inspectionId !== null ? 'in Daily Checkout' : 'on the '.$this->pageName().' page';
+
+        return "Confirmed by {$this->actorName()} {$where}";
     }
 }

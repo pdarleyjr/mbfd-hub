@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Concerns\EnterpriseTable;
+use App\Filament\Resources\UnitMasterVehicleResource\ApparatusReviewActions;
 use App\Filament\Resources\UnitMasterVehicleResource\Pages;
 use App\Models\Employee;
 use App\Models\UnitMasterVehicle;
@@ -125,7 +126,7 @@ class UnitMasterVehicleResource extends Resource
     {
         return self::applyEnterpriseDefaults($table)
             ->modifyQueryUsing(fn (Builder $query): Builder => $query
-                ->with(['currentDriver', 'latestTakeHomeInspection'])
+                ->with(['currentDriver', 'latestTakeHomeInspection', 'apparatus'])
                 ->withCount(['documents as visible_documents_count' => function (Builder $documents): void {
                     if (! \App\Support\Fleet\VehicleDocumentAccess::canSensitive(auth()->user())) {
                         $documents->where('is_sensitive', false);
@@ -278,6 +279,10 @@ class UnitMasterVehicleResource extends Resource
             ->recordUrl(fn (UnitMasterVehicle $record): string => static::getUrl('view', ['record' => $record]))
             ->actions([
                 Tables\Actions\EditAction::make(),
+                // The Apparatus review worklist's decisions; each shows only when it applies to the row.
+                ApparatusReviewActions::createApparatus(Tables\Actions\Action::make('createApparatusRecord')),
+                ApparatusReviewActions::notApparatus(Tables\Actions\Action::make('markNotApparatus')),
+                ApparatusReviewActions::undoNotApparatus(Tables\Actions\Action::make('undoNotApparatus')),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([

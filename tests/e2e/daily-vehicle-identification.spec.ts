@@ -201,8 +201,13 @@ test.describe('one-time vehicle information in the Daily Checkout', () => {
       ['Fleet vehicle number', 'abc', `A vehicle number has 4 to 32 characters: letters, numbers, spaces and . / # -. ${HELP}`],
       ['Fleet vehicle number', 'unknown', NOT_REAL],
       ['Fleet vehicle number', '0', NOT_REAL],
-      ['Make', 'x', NOT_REAL],
+      // X is a placeholder for an identifier, but a real model (Tesla Model X), so make and model accept it.
+      ['License plate', 'x', NOT_REAL],
+      ['Fleet vehicle number', 'X', NOT_REAL],
       ['Make', 'none', NOT_REAL],
+      ['Make', 'n/a', NOT_REAL],
+      ['Make', '0', NOT_REAL],
+      ['Make', '-', NOT_REAL],
     ];
     for (const [label, value, message] of cases) {
       await group(page, label).getByRole('textbox').fill(value);
@@ -213,6 +218,28 @@ test.describe('one-time vehicle information in the Daily Checkout', () => {
     await group(page, 'License plate').getByRole('textbox').fill('ab 1-2');
     await group(page, 'Fleet vehicle number').getByRole('textbox').fill('E-2/12');
     await group(page, 'Make').getByRole('textbox').fill('Pierce');
+    await continueButton(page).click();
+    await expect(vehicleSelect(page)).toHaveCount(0);
+  });
+
+  test('make and model accept X (Tesla Model X) while placeholders are still refused', async ({ page }) => {
+    await mobileInspectionFixture(page, engine2, { vehicleIdentification: {
+      ...identification,
+      questions: [
+        { field: 'make', label: 'Make', hint: null, input: 'text', max: 64, current_value: null, confirm: false },
+        { field: 'model', label: 'Model', hint: null, input: 'text', max: 64, current_value: null, confirm: false },
+      ],
+    } });
+    await openMemberStep(page);
+    await chooseShiftA(page);
+
+    await group(page, 'Make').getByRole('textbox').fill('Tesla');
+    await group(page, 'Model').getByRole('textbox').fill('unknown');
+    await continueButton(page).click();
+    await expect(group(page, 'Model').getByRole('alert')).toHaveText(`That is not a real value. ${HELP}`);
+    await expect(group(page, 'Make').getByRole('alert')).toHaveCount(0);
+
+    await group(page, 'Model').getByRole('textbox').fill('x');
     await continueButton(page).click();
     await expect(vehicleSelect(page)).toHaveCount(0);
   });

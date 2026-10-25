@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,6 +13,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 /**
  * @property-read int|null $pending_changes_count
  * @property-read int|null $visible_documents_count
+ * @property \Illuminate\Support\Carbon|null $not_apparatus_at
+ * @property int|null $not_apparatus_by_user_id
+ * @property string|null $not_apparatus_note
  */
 class UnitMasterVehicle extends Model
 {
@@ -78,7 +82,46 @@ class UnitMasterVehicle extends Model
     protected $casts = [
         'year' => 'string',
         'needs_fleet_review' => 'boolean',
+        'not_apparatus_at' => 'datetime',
     ];
+
+    /** The master inventory section that lists frontline and reserve fire apparatus. */
+    public const APPARATUS_SECTION = 'Frontline and Reserve Fire Apparatus';
+
+    /**
+     * The Apparatus review worklist: road vehicles in the fire apparatus section that have no
+     * apparatus row yet and that Fleet has not marked "not an apparatus".
+     *
+     * @param  Builder<UnitMasterVehicle>  $query
+     * @return Builder<UnitMasterVehicle>
+     */
+    public function scopeNeedingApparatusReview(Builder $query): Builder
+    {
+        return self::constrainToApparatusReview($query);
+    }
+
+    /** The worklist constraint for any query on this table (the list tab hands over a plain builder). */
+    public static function constrainToApparatusReview(Builder $query): Builder
+    {
+        return $query
+            ->whereDoesntHave('apparatus')
+            ->whereNull('not_apparatus_at')
+            ->whereRaw('LOWER(TRIM(section)) = ?', [mb_strtolower(self::APPARATUS_SECTION)])
+            ->where(fn (Builder $categories): Builder => $categories
+                ->whereNull('asset_category')
+                ->orWhere('asset_category', self::CATEGORY_VEHICLE));
+    }
+
+    public function isMarkedNotApparatus(): bool
+    {
+        return $this->not_apparatus_at !== null;
+    }
+
+    /** @return BelongsTo<User, $this> */
+    public function notApparatusBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'not_apparatus_by_user_id');
+    }
 
     /** @return BelongsTo<Employee, $this> */
     public function currentDriver(): BelongsTo

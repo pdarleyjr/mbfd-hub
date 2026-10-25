@@ -136,6 +136,17 @@ export interface VehicleIdentification {
   questions_version: string;
 }
 
+/**
+ * One unit on a station page that needs one-time vehicle information but has no Daily Checkout or
+ * Captain 5 page. The station detail read model carries a list of these under
+ * `vehicle_identification_units` (empty or missing when none).
+ */
+export interface VehicleIdentificationUnit {
+  apparatus_id: number;
+  designation: string;
+  vehicle_identification: VehicleIdentification;
+}
+
 /** The crew's working answer to one question. */
 export interface VehicleIdentificationAnswer {
   /** '' means not answered yet. 'confirm' is only valid for questions that ask to confirm. */
@@ -689,6 +700,8 @@ export interface StationDetail extends Station {
   active_shop_works?: ShopWork[];
   summary?: StationSummary;
   daily_checkout?: DailyCheckoutSummary;
+  /** Units at this station with open one-time vehicle questions; empty or missing when none. Parse before use. */
+  vehicle_identification_units?: VehicleIdentificationUnit[];
 }
 
 export interface StationSummary {

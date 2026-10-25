@@ -121,17 +121,22 @@ final class StandaloneEndpointTest extends IdentificationTestCase
         Notification::assertSentTo($manager, NewSubmissionNotification::class);
     }
 
-    public function test_a_proposal_fleet_already_holds_is_not_announced_again(): void
+    public function test_a_plate_the_crew_reads_that_matches_the_pending_proposal_is_accepted_without_alerting_fleet(): void
     {
         $manager = $this->fleetOperationsManager('fleet.manager@example.test');
         $unit = $this->captainFive('XK4560');
-        $this->captainUser();
+        $crew = $this->captainUser();
 
         // The crew reads the very plate the FY27 list already proposed.
-        $this->postJson($this->url($unit), $this->body($unit, [$this->answer('plate', 'XK4560')]))->assertOk();
+        $this->postJson($this->url($unit), $this->body($unit, [$this->answer('plate', 'XK4560')]))->assertOk()
+            ->assertJsonPath('vehicle_identification.required', false);
 
-        $this->assertSame(1, ApparatusIdentificationEvent::query()->where('event', 'conflict')->count());
-        $this->assertTrue(ApparatusIdentificationEvent::query()->where('event', 'conflict')->sole()->metadata['already_proposed']);
+        $this->assertSame('XK4560', $unit->fresh()->masterVehicle->tag_number);
+        $accepted = UnitMasterVehicleChange::query()->where('new_value', 'XK4560')->sole();
+        $this->assertSame(['accepted', $crew->id], [$accepted->status, $accepted->decided_by_user_id]);
+        $this->assertStringContainsString('Confirmed by Captain Five on the Captain 5 page', (string) $accepted->note);
+        $this->assertSame(1, ApparatusIdentificationEvent::query()->where('event', 'corroborated')->count());
+        $this->assertSame(0, ApparatusIdentificationEvent::query()->where('event', 'conflict')->count());
         Notification::assertNotSentTo($manager, NewSubmissionNotification::class);
     }
 
@@ -249,13 +254,24 @@ final class StandaloneEndpointTest extends IdentificationTestCase
 
     public function test_units_that_are_not_asked_do_not_exist_to_this_route(): void
     {
-        $administrative = $this->legacyApparatus('A 9', null, ['daily_checkout_requirement' => 'administrative']);
+        $inactive = $this->legacyApparatus('E 77', null, ['daily_checkout_requirement' => 'inactive']);
         $test = $this->legacyApparatus('ZZ-VERIFY', null, ['unit_id' => 'ZZ-VERIFY']);
         $this->actingAsCanonicalUser($this->fleetOperationsManager());
 
-        $this->getJson($this->url($administrative))->assertNotFound();
+        $this->getJson($this->url($inactive))->assertNotFound();
         $this->getJson($this->url($test))->assertNotFound();
-        $this->postJson($this->url($administrative), $this->body($administrative, [$this->answer('plate', 'XE1234')]))->assertNotFound();
+        $this->postJson($this->url($inactive), $this->body($inactive, [$this->answer('plate', 'XE1234')]))->assertNotFound();
         $this->getJson('/api/public/apparatuses/999999/vehicle-identification')->assertNotFound();
+    }
+
+    public function test_a_unit_with_no_screen_that_asks_about_it_is_not_reachable_by_a_member(): void
+    {
+        $noStation = $this->legacyApparatus('A 9', null, ['daily_checkout_requirement' => 'administrative']);
+
+        $this->actingAsCanonicalUser($this->member);
+        $this->getJson($this->url($noStation))->assertNotFound();
+
+        $this->actingAsCanonicalUser($this->fleetOperationsManager());
+        $this->getJson($this->url($noStation))->assertOk();
     }
 }

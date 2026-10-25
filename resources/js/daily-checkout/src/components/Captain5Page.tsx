@@ -15,7 +15,7 @@ import IssueSheet from './captain5/IssueSheet';
 import IssuesTab from './captain5/IssuesTab';
 import ReplacementsTab from './captain5/ReplacementsTab';
 import TodayTab from './captain5/TodayTab';
-import VehicleIdentificationPanel from './captain5/VehicleIdentificationPanel';
+import VehicleIdentificationPanel from './VehicleIdentificationPanel';
 import VehicleIdentificationCard from './VehicleIdentificationCard';
 import RescueInventoryTab, { type RescueView } from './captain5/ems/RescueInventoryTab';
 import SupplyRoomTab, { isSupplyView, type SupplyView } from './captain5/ems/SupplyRoomTab';
@@ -220,7 +220,7 @@ export default function Captain5Page() {
         <VehicleIdentificationCard block={data.vehicle_identification} answers={{}} onChange={() => undefined} readOnly />
       )}
       {data.vehicle_identification?.can_answer && data.apparatus_id !== undefined && (
-        <VehicleIdentificationPanel apparatusId={data.apparatus_id} block={data.vehicle_identification} onSaved={identificationChanged} />
+        <VehicleIdentificationPanel apparatusId={data.apparatus_id} block={data.vehicle_identification} onSaved={identificationChanged} testId="captain5-vehicle-identification" />
       )}
       {identificationSaved && !data.vehicle_identification && (
         <p role="status" className="hub-callout p-3 text-sm" data-testid="captain5-vehicle-identification-saved">

@@ -4,6 +4,7 @@ namespace App\Filament\Resources\UnitMasterVehicleResource\Pages;
 
 use App\Filament\Resources\ApparatusResource;
 use App\Filament\Resources\UnitMasterVehicleResource;
+use App\Filament\Resources\UnitMasterVehicleResource\ApparatusReviewActions;
 use App\Models\Apparatus;
 use App\Models\Employee;
 use App\Models\TakeHomeVehicleInspection;
@@ -84,6 +85,9 @@ class ViewUnitMasterVehicle extends ViewRecord
                     ]);
                     $this->js('window.location.assign('.Js::from($url).')');
                 }),
+            ApparatusReviewActions::createApparatus(Actions\Action::make('createApparatusRecord')),
+            ApparatusReviewActions::notApparatus(Actions\Action::make('markNotApparatus')),
+            ApparatusReviewActions::undoNotApparatus(Actions\Action::make('undoNotApparatus')),
             Actions\EditAction::make(),
         ];
     }
@@ -154,6 +158,12 @@ class ViewUnitMasterVehicle extends ViewRecord
                         TextEntry::make('needs_fleet_review')->label('Fleet review')->badge()
                             ->getStateUsing(fn (UnitMasterVehicle $record): string => $record->needs_fleet_review ? 'Needs review' : 'Reviewed')
                             ->color(fn (string $state): string => $state === 'Needs review' ? 'warning' : 'gray'),
+                        TextEntry::make('not_apparatus')->label('Not an apparatus')
+                            ->visible(fn (UnitMasterVehicle $record): bool => $record->isMarkedNotApparatus())
+                            ->getStateUsing(fn (UnitMasterVehicle $record): string => trim(implode(' ', array_filter([
+                                'Marked by '.($record->notApparatusBy()->value('name') ?? 'Fleet').' on '.$record->not_apparatus_at?->timezone('America/New_York')->format('M j, Y').'.',
+                                $record->not_apparatus_note,
+                            ])))),
                     ]))
                     ->columns(['default' => 1, 'md' => 2, 'xl' => 4])
                     ->compact(),

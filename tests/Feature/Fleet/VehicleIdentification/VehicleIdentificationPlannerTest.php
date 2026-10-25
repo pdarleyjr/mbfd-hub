@@ -9,6 +9,7 @@ use App\Models\Apparatus;
 use App\Models\ApparatusIdentificationQuestion;
 use App\Models\UnitMasterVehicleChange;
 use App\Services\Fleet\UnitMasterVehicleChangeRecorder;
+use App\Services\Fleet\VehicleIdentificationPlanner;
 
 final class VehicleIdentificationPlannerTest extends IdentificationTestCase
 {
@@ -88,14 +89,50 @@ final class VehicleIdentificationPlannerTest extends IdentificationTestCase
         $test = $this->legacyApparatus('ZZ-VERIFY', null, ['unit_id' => 'ZZ-VERIFY', 'daily_checkout_requirement' => 'inactive']);
         $zzRequired = $this->legacyApparatus('ZZ 9', null, ['unit_id' => 'ZZ 9']);
         $inactive = $this->legacyApparatus('E 77', null, ['daily_checkout_requirement' => 'inactive']);
-        $reserve = $this->legacyApparatus('RE 5', null, ['daily_checkout_requirement' => 'reserve']);
-        $administrative = $this->legacyApparatus('A 2', null, ['daily_checkout_requirement' => 'administrative']);
-        $unknown = $this->legacyApparatus('U 1', null, ['daily_checkout_requirement' => 'unknown']);
 
-        foreach ([$test, $zzRequired, $inactive, $reserve, $administrative, $unknown] as $unit) {
+        foreach ([$test, $zzRequired, $inactive] as $unit) {
             $this->assertSame([], $this->openFields($unit), $unit->designation.' is not asked');
             $this->assertFalse($this->block($unit)['required']);
         }
+    }
+
+    public function test_every_other_unit_is_asked_whatever_its_daily_checkout_policy(): void
+    {
+        foreach (['reserve', 'administrative', 'unknown', 'exempt', 'required'] as $index => $requirement) {
+            $unit = $this->legacyApparatus('P '.$index, null, ['daily_checkout_requirement' => $requirement]);
+
+            $this->assertTrue(app(VehicleIdentificationPlanner::class)->isEligible($unit), $requirement);
+            $this->assertContains('plate', $this->openFields($unit), $requirement);
+        }
+    }
+
+    public function test_each_unit_is_asked_in_exactly_one_place(): void
+    {
+        $planner = app(VehicleIdentificationPlanner::class);
+        $station = $this->unit->station_id;
+        $checkout = $this->legacyApparatus('P 1', null, ['station_id' => $station]);
+        $reserve = $this->legacyApparatus('P 2', null, ['station_id' => $station, 'daily_checkout_requirement' => 'administrative']);
+        $noStation = $this->legacyApparatus('P 3', null, ['daily_checkout_requirement' => 'administrative']);
+        $captain = $this->captain5();
+        $inactive = $this->legacyApparatus('P 4', null, ['station_id' => $station, 'daily_checkout_requirement' => 'inactive']);
+
+        $this->assertSame(VehicleIdentificationPlanner::SURFACE_CHECKOUT, $planner->surface($checkout));
+        $this->assertSame(VehicleIdentificationPlanner::SURFACE_STATION, $planner->surface($reserve));
+        $this->assertNull($planner->surface($noStation), 'no station, no page that asks');
+        $this->assertSame(VehicleIdentificationPlanner::SURFACE_CAPTAIN5, $planner->surface($captain));
+        $this->assertNull($planner->surface($inactive));
+    }
+
+    public function test_placeholders_such_as_unknown_zero_and_x_count_as_empty_but_a_model_x_is_real(): void
+    {
+        $this->completeMasterExcept($this->unit);
+        foreach (['UNKNOWN', '0', 'x'] as $placeholder) {
+            $this->unitMaster()->forceFill(['tag_number' => $placeholder])->save();
+            $this->assertSame(['plate'], $this->openFields($this->unit), "'{$placeholder}' says nothing");
+        }
+
+        $this->unitMaster()->forceFill(['tag_number' => 'XE1234', 'model' => 'X'])->save();
+        $this->assertSame([], $this->openFields($this->unit), 'a Tesla Model X is a real model');
     }
 
     public function test_answered_and_closed_questions_are_not_asked_again_but_temporary_ones_are(): void
