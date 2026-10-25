@@ -192,6 +192,23 @@ test.describe('one-time vehicle information on the station page', () => {
     expect(mock.saves).toHaveLength(0);
   });
 
+  test('a model of X is a real answer for make and model, but a plate of X is refused', async ({ page }) => {
+    const modelQuestion = { field: 'model', label: 'Model', hint: null, input: 'text', max: 64, current_value: null, confirm: false };
+    const mock = await openStation(page, { vehicle_identification_units: [a2({ questions: [plateQuestion, modelQuestion] })] });
+
+    await field(page, 'License plate').getByRole('textbox').fill('x');
+    await field(page, 'Model').getByRole('textbox').fill('x');
+    await save(page).click();
+    await expect(field(page, 'License plate').getByRole('alert')).toContainText('That is not a real value.');
+    await expect(field(page, 'Model').getByRole('alert')).toHaveCount(0);
+    expect(mock.saves).toHaveLength(0);
+
+    await field(page, 'License plate').getByRole('textbox').fill('ab12cd');
+    await save(page).click();
+    await expect(unitCard(page, 'A 2')).toHaveCount(0);
+    expect(mock.saves[0].body.answers).toEqual([{ field: 'plate', value: 'AB12CD' }, { field: 'model', value: 'x' }]);
+  });
+
   test('answered questions are hidden using the response; the card stays only for what is still open', async ({ page }) => {
     const mock = await openStation(
       page,
