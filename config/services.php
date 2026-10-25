@@ -169,4 +169,10 @@ return [
         'service_token' => env('COMMAND_BOARD_SERVICE_TOKEN'),
     ],
 
+    // Prompt Studio is a separate application that only borrows Hub sign-in. The
+    // Hub never calls it; this origin pins the OIDC client's registered redirect.
+    'prompt_studio' => [
+        'url' => env('PROMPT_STUDIO_URL', 'https://prompt.mbfdhub.com'),
+    ],
+
 ];
