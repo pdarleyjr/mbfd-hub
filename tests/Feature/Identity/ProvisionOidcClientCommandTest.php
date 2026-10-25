@@ -125,6 +125,72 @@ final class ProvisionOidcClientCommandTest extends TestCase
         self::assertSame(0, Client::query()->count());
     }
 
+    public function test_prompt_studio_client_is_pinned_to_its_exact_callback_and_never_prints_the_secret(): void
+    {
+        $callback = 'https://prompt.mbfdhub.com/auth/callback';
+        foreach ([
+            'https://evil.example.test/auth/callback',
+            'https://prompt.mbfdhub.com.evil.example.test/auth/callback',
+            'https://prompt.mbfdhub.com:8443/auth/callback',
+            'https://prompt.mbfdhub.com/other',
+            'https://prompt.mbfdhub.com/auth/callback/',
+            'https://prompt.mbfdhub.com/auth/callback?next=https://evil.example.test',
+            'https://cmd.mbfdhub.com/auth/callback',
+        ] as $redirect) {
+            [$exit] = $this->provision('prompt_studio', $redirect, $this->directory.'/refused');
+
+            self::assertSame(Command::INVALID, $exit, $redirect);
+        }
+        self::assertSame(0, Client::query()->count());
+        self::assertFileDoesNotExist($this->directory.'/refused');
+
+        $path = $this->directory.'/prompt-studio-secret';
+        [$exit, $output] = $this->provision('prompt_studio', $callback, $path);
+
+        self::assertSame(Command::SUCCESS, $exit, $output);
+        $client = Client::query()->sole();
+        $secret = (string) file_get_contents($path);
+        self::assertSame('MBFD Prompt Studio', $client->name);
+        self::assertSame([$callback], $client->redirect_uris);
+        self::assertSame(['authorization_code'], $client->grant_types);
+        self::assertTrue($client->confidential());
+        self::assertTrue(Hash::check($secret, (string) $client->secret));
+        self::assertStringNotContainsString($secret, $output);
+        self::assertStringContainsString('OIDC_PROMPT_STUDIO_CLIENT_ID='.$client->id, $output);
+
+        [$exit, $output] = $this->provision('prompt_studio', $callback, $this->directory.'/again');
+        self::assertSame(Command::SUCCESS, $exit, $output);
+        self::assertStringContainsString('Reused existing client '.$client->id, $output);
+        self::assertSame(1, Client::query()->count());
+    }
+
+    public function test_prompt_studio_redirect_is_refused_when_its_url_is_unusable(): void
+    {
+        config(['services.prompt_studio.url' => 'http://prompt.mbfdhub.com']);
+
+        [$exit, $output] = $this->provision('prompt_studio', 'https://prompt.mbfdhub.com/auth/callback', $this->directory.'/secret');
+
+        self::assertSame(Command::INVALID, $exit);
+        self::assertStringContainsString('PROMPT_STUDIO_URL', $output);
+        self::assertSame(0, Client::query()->count());
+    }
+
+    public function test_adding_prompt_studio_does_not_change_the_other_applications_registration(): void
+    {
+        [$exit] = $this->provision('cmd', self::REDIRECT, $this->directory.'/cmd');
+        self::assertSame(Command::SUCCESS, $exit);
+        [$exit] = $this->provision('meeting', 'https://meet.mbfdhub.com/auth/callback', $this->directory.'/meeting');
+        self::assertSame(Command::SUCCESS, $exit);
+        [$exit] = $this->provision('prompt_studio', 'https://prompt.mbfdhub.com/auth/callback', $this->directory.'/prompt');
+        self::assertSame(Command::SUCCESS, $exit);
+
+        self::assertEqualsCanonicalizing(
+            ['MBFD Command Board', 'MBFD Meeting Intelligence', 'MBFD Prompt Studio'],
+            Client::query()->pluck('name')->all(),
+        );
+        self::assertSame(['cmd', 'cloud', 'meeting', 'prompt_studio'], array_keys(config('oidc.clients')));
+    }
+
     public function test_failure_prints_a_generic_message_and_logs_detail_without_the_secret(): void
     {
         Log::spy();

@@ -23,7 +23,7 @@ use Throwable;
 final class ProvisionOidcClient extends Command
 {
     protected $signature = 'oidc:provision-client
-                            {application : Hub OIDC application: cmd, cloud, or meeting}
+                            {application : Hub OIDC application: cmd, cloud, meeting, or prompt_studio}
                             {--redirect= : Exact https redirect URI the application registers}
                             {--secret-file= : New file (mode 0600) that receives the client secret; required to create a client}';
 
@@ -33,11 +33,16 @@ final class ProvisionOidcClient extends Command
         'cmd' => ['name' => 'MBFD Command Board', 'client_env' => 'OIDC_CMD_CLIENT_ID', 'verified_env' => 'CMD_IDENTITY_RUNTIME_VERIFIED'],
         'cloud' => ['name' => 'MBFD Cloud', 'client_env' => 'OIDC_CLOUD_CLIENT_ID', 'verified_env' => 'CLOUD_IDENTITY_RUNTIME_VERIFIED'],
         'meeting' => ['name' => 'MBFD Meeting Intelligence', 'client_env' => 'OIDC_MEETING_CLIENT_ID', 'verified_env' => 'MEETING_IDENTITY_RUNTIME_VERIFIED'],
+        'prompt_studio' => ['name' => 'MBFD Prompt Studio', 'client_env' => 'OIDC_PROMPT_STUDIO_CLIENT_ID', 'verified_env' => 'PROMPT_STUDIO_IDENTITY_RUNTIME_VERIFIED'],
     ];
 
-    /** Applications whose redirect URI must stay on the host of a configured origin. */
+    /**
+     * Applications whose redirect URI must stay on the host of a configured origin.
+     * An optional path additionally pins the exact callback path.
+     */
     private const PINNED_REDIRECT_HOSTS = [
         'cmd' => ['config' => 'services.command_board.url', 'env' => 'COMMAND_BOARD_URL'],
+        'prompt_studio' => ['config' => 'services.prompt_studio.url', 'env' => 'PROMPT_STUDIO_URL', 'path' => '/auth/callback'],
     ];
 
     private const FAILURE_LOG = 'oidc.provision_client.failed';
@@ -204,10 +209,15 @@ final class ProvisionOidcClient extends Command
             return $pin['env'].' is not a valid https URL, so the '.$application.' redirect URI cannot be checked. Nothing was changed.';
         }
         $actual = self::authority($redirect);
+        if ($actual !== $expected) {
+            return 'The '.$application.' redirect URI must be on '.$expected.' (the host in '.$pin['env'].'), not '.($actual ?? 'an invalid host').'. Nothing was changed.';
+        }
+        $path = $pin['path'] ?? null;
+        if ($path !== null && ((string) parse_url($redirect, PHP_URL_PATH) !== $path || parse_url($redirect, PHP_URL_QUERY) !== null)) {
+            return 'The '.$application.' redirect URI must be exactly '.$path.' on '.$expected.' with no query string. Nothing was changed.';
+        }
 
-        return $actual === $expected
-            ? null
-            : 'The '.$application.' redirect URI must be on '.$expected.' (the host in '.$pin['env'].'), not '.($actual ?? 'an invalid host').'. Nothing was changed.';
+        return null;
     }
 
     private static function authority(string $url): ?string
