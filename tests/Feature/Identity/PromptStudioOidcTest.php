@@ -207,6 +207,39 @@ final class PromptStudioOidcTest extends TestCase
         self::assertStringNotContainsString('code=', $location);
     }
 
+    public function test_a_same_origin_login_chain_ends_in_a_handoff_page_not_a_cross_origin_redirect(): void
+    {
+        $this->withoutVite(); // the handoff page uses the shared auth layout; assets are not built in tests
+        [$user, $client] = $this->linkedFixture();
+        $url = '/oauth/authorize?'.http_build_query($this->authorizationQuery($client));
+
+        // The browser marks the redirect chain that started at Hub's own login form as same-origin.
+        $response = $this->actingAs($user)->withHeaders(['Sec-Fetch-Site' => 'same-origin'])->get($url);
+
+        $response->assertOk()->assertHeader('Cache-Control', 'no-store, private')->assertSee('Opening your MBFD application');
+        $destination = html_entity_decode((string) preg_replace('/.*<a href="([^"]+)".*/s', '$1', $response->getContent()));
+        self::assertStringStartsWith(self::CALLBACK.'?', $destination);
+        parse_str((string) parse_url($destination, PHP_URL_QUERY), $returned);
+        self::assertSame('test-state', $returned['state']);
+        self::assertNotEmpty($returned['code']);
+        // The handoff carries a real, single-use code: it exchanges exactly once.
+        $this->exchange($client, $returned['code'])->assertOk();
+        $this->exchange($client, $returned['code'])->assertStatus(400);
+    }
+
+    public function test_other_navigations_keep_the_plain_redirect_and_denials_never_leak_a_code_through_the_handoff(): void
+    {
+        [$user, $client] = $this->linkedFixture();
+        $query = $this->authorizationQuery($client);
+        foreach ([[], ['Sec-Fetch-Site' => 'same-site'], ['Sec-Fetch-Site' => 'cross-site']] as $headers) {
+            $this->actingAs($user)->withHeaders($headers)->get('/oauth/authorize?'.http_build_query($query))
+                ->assertRedirect()->assertHeader('Cache-Control', 'no-store, private');
+        }
+        // A request that fails validation is never turned into a handoff page.
+        $this->actingAs($user)->withHeaders(['Sec-Fetch-Site' => 'same-origin'])
+            ->get('/oauth/authorize?'.http_build_query([...$query, 'redirect_uri' => 'https://attacker.invalid/auth/callback']))->assertUnauthorized();
+    }
+
     private function idTokenClaims(string $idToken): object
     {
         $jwks = $this->getJson('/oauth/jwks')->assertOk()->json();
