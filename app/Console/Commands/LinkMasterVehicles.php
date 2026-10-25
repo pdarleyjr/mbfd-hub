@@ -23,7 +23,7 @@ use Throwable;
 final class LinkMasterVehicles extends Command
 {
     /** The master inventory section that lists frontline and reserve fire apparatus. */
-    public const APPARATUS_SECTION = 'Frontline and Reserve Fire Apparatus';
+    public const APPARATUS_SECTION = UnitMasterVehicle::APPARATUS_SECTION;
 
     protected $signature = 'fleet:link-master-vehicles
                             {--dry-run : Report what would change and write nothing}
@@ -88,10 +88,9 @@ final class LinkMasterVehicles extends Command
     /** @return list<array<string, mixed>> */
     private function masterOnly(): array
     {
+        // Same list as the Apparatus review worklist: records Fleet marked "not an apparatus" are left out.
         return UnitMasterVehicle::query()
-            ->whereDoesntHave('apparatus')
-            ->whereRaw('LOWER(TRIM(section)) = ?', [mb_strtolower(self::APPARATUS_SECTION)])
-            ->where(fn ($query) => $query->whereNull('asset_category')->orWhere('asset_category', UnitMasterVehicle::CATEGORY_VEHICLE))
+            ->needingApparatusReview()
             ->orderBy('id')
             ->get()
             ->map(fn (UnitMasterVehicle $vehicle): array => [
