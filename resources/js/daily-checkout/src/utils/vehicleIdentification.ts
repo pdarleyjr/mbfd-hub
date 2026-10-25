@@ -8,6 +8,7 @@ import type {
   VehicleIdentificationReason,
   VehicleIdentificationSubmission,
   VehicleIdentificationSubmittedAnswer,
+  VehicleIdentificationUnit,
 } from '../types';
 
 /** Longest note a crew member can attach to "Information not available". */
@@ -83,6 +84,27 @@ export function parseVehicleIdentification(raw: unknown): VehicleIdentification 
 export const parseVehicleIdentificationResponse = (payload: unknown): VehicleIdentification | undefined => (
   parseVehicleIdentification(record(payload)?.vehicle_identification ?? payload)
 );
+
+/**
+ * The station page's `vehicle_identification_units`, rebuilt unit by unit. A missing key, a non-list, a
+ * unit without a numeric apparatus id, or a unit whose block has no open question all mean "nothing to
+ * show" for that unit, so the page renders nothing for them and never throws on an older or newer server.
+ */
+export function parseVehicleIdentificationUnits(raw: unknown): VehicleIdentificationUnit[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<number>();
+
+  return raw.flatMap((entry): VehicleIdentificationUnit[] => {
+    const row = record(entry);
+    const apparatusId = row?.apparatus_id;
+    if (!row || typeof apparatusId !== 'number' || !Number.isInteger(apparatusId) || apparatusId <= 0 || seen.has(apparatusId)) return [];
+    const block = parseVehicleIdentification(row.vehicle_identification);
+    if (!block) return [];
+    seen.add(apparatusId);
+
+    return [{ apparatus_id: apparatusId, designation: text(row.designation) ?? `Unit ${apparatusId}`, vehicle_identification: block }];
+  });
+}
 
 /**
  * The block that applies to this checkout, or undefined. It does not apply when the server says the crew
