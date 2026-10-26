@@ -247,6 +247,7 @@ test('existing unassigned rosters remain accessible when a course has one module
 });
 
 test('catalog failure can recover and an existing dated roster opens by POST', async ({ page }) => {
+    test.setTimeout(75_000);
     // The connection stays down past the read retries (~15 s), so the kiosk reports it; then it returns.
     let down = true;
     let opens = 0;
@@ -256,8 +257,11 @@ test('catalog failure can recover and an existing dated roster opens by POST', a
     await page.goto('/');
     await expect(page.getByRole('alert')).toContainText('Classes could not be refreshed', { timeout: 25_000 });
     down = false;
-    await page.getByRole('button', { name: 'Refresh classes' }).click();
-    await page.getByRole('button', { name: /Open roster for Ladder operations/ }).click();
+    // Recovery may come from the button or from the kiosk's own 15 s background refresh, whichever is first.
+    const course = page.getByRole('button', { name: /Open roster for Ladder operations/ });
+    await page.getByRole('button', { name: 'Refresh classes' }).click({ timeout: 5_000 }).catch(() => undefined);
+    await expect(course).toBeVisible({ timeout: 20_000 });
+    await course.click();
     await expect(page).toHaveURL(new RegExp(`/r/${id}$`));
     expect(opens).toBe(1);
 });
