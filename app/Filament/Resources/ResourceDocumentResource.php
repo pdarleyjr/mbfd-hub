@@ -181,7 +181,7 @@ final class ResourceDocumentResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         // The extracted text can be megabytes per document; the admin list never shows it.
-        return parent::getEloquentQuery()->select([
+        return parent::getEloquentQuery()->shared()->select([
             'id', 'uuid', 'slug', 'title', 'category', 'description', 'original_filename', 'original_mime', 'original_size',
             'original_sha256', 'original_path', 'preview_path', 'preview_sha256', 'page_count', 'published', 'sort', 'published_at',
             'created_at', 'updated_at', 'deleted_at',

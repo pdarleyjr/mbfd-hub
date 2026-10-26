@@ -33,6 +33,7 @@ final class ResourceDocumentController extends Controller
         return ResourceDocument::query()
             ->select(['id', 'uuid', 'slug', 'title', 'original_filename', 'original_mime', 'original_size', 'original_path', 'preview_path', 'published'])
             ->published()
+            ->shared()
             ->where('uuid', $uuid)
             ->firstOrFail();
     }

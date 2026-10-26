@@ -67,6 +67,7 @@ class EmployeePanelProvider extends PanelProvider
                 \App\Filament\Employee\Pages\MyInventoryCorrectionView::class,
                 OperationalForms::class,
                 \App\Filament\Employee\Pages\ResourceLibrary::class,
+                \App\Filament\Employee\Pages\Taskbooks::class,
                 VideoConferencing::class,
                 MyEquipmentPage::class,
                 MyRequestsPage::class,

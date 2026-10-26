@@ -80,7 +80,7 @@ final class ResourceLibraryService
     }
 
     /**
-     * @param  array{slug: string, title: string, category: string, description?: string|null, sort?: int, published?: bool}  $attributes
+     * @param  array{slug: string, title: string, category: string, description?: string|null, sort?: int, published?: bool, recipient_employee_id?: int|null}  $attributes
      *
      * @throws ResourceImportException
      */
@@ -106,6 +106,10 @@ final class ResourceLibraryService
         if ($existing?->trashed()) {
             throw new ResourceImportException('"'.$attributes['slug'].'" belongs to a deleted library document. Restore it in Admin before importing a new file.');
         }
+        $recipient = $attributes['recipient_employee_id'] ?? null;
+        if ($existing !== null && $existing->recipient_employee_id !== $recipient) {
+            throw new ResourceImportException('"'.$attributes['slug'].'" belongs to a different recipient. Nothing was imported.');
+        }
         $this->assertChecksumIsFree($originalSha, $existing?->id);
 
         if ($existing !== null
@@ -115,6 +119,9 @@ final class ResourceLibraryService
         }
 
         $inspection = $this->inspect($original, $extension, $preview);
+        if ($recipient !== null && ($extension !== 'pdf' || $inspection['pages'] !== 16)) {
+            throw new ResourceImportException('A personal taskbook must be a verified 16-page PDF. Nothing was imported.');
+        }
         if ($expectedPages !== null && $inspection['pages'] !== null && $inspection['pages'] !== $expectedPages) {
             throw new ResourceImportException('"'.$attributes['slug'].'" should have '.$expectedPages.' pages but the PDF has '.$inspection['pages'].'. Nothing was imported.');
         }
@@ -159,7 +166,9 @@ final class ResourceLibraryService
                     'category' => $attributes['category'],
                     'description' => $attributes['description'] ?? null,
                     'sort' => $attributes['sort'] ?? 0,
-                    'published' => $attributes['published'] ?? true,
+                    'recipient_employee_id' => $attributes['recipient_employee_id'] ?? null,
+                    'published' => isset($attributes['recipient_employee_id']) ? false : ($attributes['published'] ?? true),
+                    'taskbook_published' => isset($attributes['recipient_employee_id']) && ($attributes['published'] ?? true),
                     'original_filename' => $this->safeFilename($original->filename),
                     'original_mime' => self::TYPES[$input['extension']][0],
                     'original_size' => (int) filesize($original->localPath),
@@ -462,6 +471,6 @@ final class ResourceLibraryService
             'size' => $document->original_size,
             'preview_sha256' => $document->preview_sha256,
             'pages' => $document->page_count,
-        ];
+        ] + ($document->recipient_employee_id === null ? [] : ['recipient_employee_id' => $document->recipient_employee_id]);
     }
 }

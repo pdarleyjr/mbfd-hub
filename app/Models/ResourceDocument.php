@@ -31,6 +31,8 @@ use Illuminate\Support\Str;
  * @property int|null $page_count
  * @property string|null $search_text
  * @property bool $published
+ * @property int|null $recipient_employee_id
+ * @property bool $taskbook_published
  * @property int $sort
  * @property \Carbon\CarbonImmutable|null $published_at
  */
@@ -50,7 +52,7 @@ class ResourceDocument extends Model
         'slug', 'title', 'category', 'description',
         'original_filename', 'original_mime', 'original_size', 'original_sha256', 'original_path',
         'preview_path', 'preview_sha256', 'page_count', 'search_text',
-        'published', 'sort', 'published_at',
+        'published', 'sort', 'published_at', 'recipient_employee_id', 'taskbook_published',
     ];
 
     /** Extracted text can be megabytes; it is only ever read by the search query. */
@@ -62,6 +64,8 @@ class ResourceDocument extends Model
             'original_size' => 'integer',
             'page_count' => 'integer',
             'published' => 'boolean',
+            'recipient_employee_id' => 'integer',
+            'taskbook_published' => 'boolean',
             'sort' => 'integer',
             'published_at' => 'immutable_datetime',
         ];
@@ -77,7 +81,16 @@ class ResourceDocument extends Model
         });
 
         static::saving(function (self $document): void {
-            if ($document->published && $document->published_at === null) {
+            if ($document->exists && $document->isDirty('recipient_employee_id')) {
+                throw new \LogicException('A personal document recipient cannot be changed.');
+            }
+            // Keep personal files invisible to the shared query even after an older-image rollback.
+            if ($document->recipient_employee_id !== null) {
+                $document->published = false;
+            } else {
+                $document->taskbook_published = false;
+            }
+            if (($document->published || $document->taskbook_published) && $document->published_at === null) {
                 $document->published_at = now()->toImmutable();
             }
         });
@@ -161,6 +174,18 @@ class ResourceDocument extends Model
     public function scopePublished(Builder $query): Builder
     {
         return $query->where('published', true);
+    }
+
+    /** @param Builder<self> $query */
+    public function scopeShared(Builder $query): Builder
+    {
+        return $query->whereNull('recipient_employee_id');
+    }
+
+    /** @param Builder<self> $query */
+    public function scopeTaskbooksFor(Builder $query, int $employeeId): Builder
+    {
+        return $query->where('recipient_employee_id', $employeeId)->where('taskbook_published', true);
     }
 
     public function isPdf(): bool
