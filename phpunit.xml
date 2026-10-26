@@ -28,10 +28,10 @@
         </include>
     </source>
     <php>
-        <!-- One process runs ~3,400 tests and retains ~0.1 MB per test (framework state, compiled views,
-             loaded classes); a late XLSX export test then reads 16 MB chunks. 512M had ~16 MB of headroom
-             left (tests/TestCase::tearDown already releases leaked Livewire applications). -->
-        <ini name="memory_limit" value="768M"/>
+        <!-- The full suite retains framework metadata and loaded classes across thousands of fixtures.
+             Even with teardown cycle collection, 768M exhausted during a late XLSX ZIP buffer allocation.
+             This test-only budget does not change production request or export limits. -->
+        <ini name="memory_limit" value="1024M"/>
         <env name="APP_ENV" value="testing" force="true"/>
         <env name="APP_KEY" value="base64:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" force="true"/>
         <env name="APP_URL" value="http://localhost" force="true"/>
