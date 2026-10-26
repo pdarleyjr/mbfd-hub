@@ -17,6 +17,8 @@ use App\Models\StationRequestUpdate;
 use App\Models\StationSupplyRequest;
 use App\Services\DailyCheckoutComplianceService;
 use App\Services\StationStaffingService;
+use App\Support\HubTimezone;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
@@ -151,7 +153,7 @@ final class DisplaySnapshotService
         $inspectionsToday = $dailyCheckout['completed'];
         $stationInspections30d = StationInspection::query()
             ->where('station_id', $id)
-            ->where('inspection_date', '>=', Carbon::now()->subDays(30))
+            ->where('inspection_date', '>=', HubTimezone::today()->subDays(30)->toDateString())
             ->count();
         $requestQuery = StationRequest::query()->where('station_id', $id);
         $stationRequests = (clone $requestQuery)->count();
@@ -279,7 +281,7 @@ final class DisplaySnapshotService
 
         $stationInspections = StationInspection::query()
             ->where('station_id', $id)
-            ->where('inspection_date', '>=', Carbon::now()->subDays(30))
+            ->where('inspection_date', '>=', HubTimezone::today()->subDays(30)->toDateString())
             ->orderByDesc('inspection_date')
             ->limit(25)
             ->get(['id', 'station_id', 'inspection_date', 'inspection_type', 'overall_status', 'created_at']);
@@ -580,8 +582,9 @@ final class DisplaySnapshotService
     /** @param array<string, mixed> $dailyCheckout */
     private function submissionSummary(array $dailyCheckout): array
     {
+        $localNow = CarbonImmutable::now(HubTimezone::NAME);
         $stationInspections30d = StationInspection::query()
-            ->where('inspection_date', '>=', Carbon::now()->subDays(30));
+            ->where('inspection_date', '>=', HubTimezone::today()->subDays(30)->toDateString());
 
         $passCount = (clone $stationInspections30d)->where('overall_status', 'pass')->count();
         $totalRecent = $stationInspections30d->count();
@@ -604,8 +607,8 @@ final class DisplaySnapshotService
             'daily_checkout' => $dailyCheckout,
             'inspections' => [
                 'today' => $dailyCheckout['completed'],
-                'this_week' => ApparatusInspection::query()->operational()->where('completed_at', '>=', Carbon::now()->startOfWeek())->count(),
-                'this_month' => ApparatusInspection::query()->operational()->where('completed_at', '>=', Carbon::now()->startOfMonth())->count(),
+                'this_week' => ApparatusInspection::query()->operational()->where('completed_at', '>=', $localNow->startOfWeek()->utc())->count(),
+                'this_month' => ApparatusInspection::query()->operational()->where('completed_at', '>=', $localNow->startOfMonth()->utc())->count(),
                 'pending_review' => $dailyCheckout['review_pending'],
                 'history_records_pending_review' => $apparatusPendingReview,
             ],
@@ -887,9 +890,10 @@ final class DisplaySnapshotService
             return [];
         }
 
+        $today = HubTimezone::today();
         $rows = StationInspection::query()
             ->whereIn('station_id', $stationIds)
-            ->where('inspection_date', '>=', Carbon::now()->subDays(30))
+            ->where('inspection_date', '>=', $today->subDays(30)->toDateString())
             ->orderByDesc('inspection_date')
             ->get(['station_id', 'inspection_date', 'overall_status']);
 
@@ -905,7 +909,7 @@ final class DisplaySnapshotService
 
             $result[$row->station_id] = [
                 'status' => $row->overall_status,
-                'age_days' => (int) $date->startOfDay()->diffInDays(Carbon::now()->startOfDay()),
+                'age_days' => (int) $date->copy()->startOfDay()->diffInDays($today),
             ];
         }
 

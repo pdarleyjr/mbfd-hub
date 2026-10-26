@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Shift, InventoryV2Item, InventoryV2Category, SupplyRequest } from '../types';
 import { ApiClient } from '../utils/api';
+import { HUB_TIMEZONE } from '../../../shared/timezone.ts';
 
 interface InventoryCountPageProps {
   stationId: number;
@@ -429,7 +430,7 @@ export default function InventoryCountPage({
                     <p className="text-sm text-gray-700 mb-2">{request.request_text}</p>
                     {request.public_response && <p className="mb-2 text-sm text-hub-blue"><strong>Support Services:</strong> {request.public_response}</p>}
                     <div className="text-xs text-gray-500">
-                      {new Date(request.created_at).toLocaleDateString()} {new Date(request.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {new Date(request.created_at).toLocaleString('en-US', { timeZone: HUB_TIMEZONE, dateStyle: 'short', timeStyle: 'short' })}
                     </div>
                   </div>
                 ))

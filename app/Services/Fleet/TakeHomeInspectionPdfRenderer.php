@@ -47,7 +47,7 @@ final class TakeHomeInspectionPdfRenderer
             'issuePhotos' => $issues,
             'signature' => $signature,
             'logo' => $this->logo(),
-            'generatedAt' => now('America/New_York'),
+            'generatedAt' => now(\App\Support\HubTimezone::NAME),
         ]);
         $pdf->setPaper('letter', 'portrait');
         $pdf->render();

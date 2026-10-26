@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\PromotionalListResource\RelationManagers;
 
+use App\Filament\Concerns\HasRelationExportActions;
 use App\Filament\Support\PromotionalListForms;
 use App\Models\PromotionalList;
 use App\Models\PromotionalListEntry;
+use App\Services\Exports\ExportableTable;
 use App\Services\Personnel\Promotions\PromotionalListAccess;
 use App\Services\Personnel\Promotions\PromotionalListService;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -16,8 +18,10 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Livewire\Attributes\On;
 
-final class EntriesRelationManager extends RelationManager
+final class EntriesRelationManager extends RelationManager implements ExportableTable
 {
+    use HasRelationExportActions;
+
     protected static string $relationship = 'entries';
 
     protected static ?string $title = 'Entries';
@@ -51,7 +55,7 @@ final class EntriesRelationManager extends RelationManager
             $scoreColumns[] = $column;
         }
 
-        return $table
+        return self::withExportActions($table
             ->recordTitleAttribute('last_name')
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('employee:id,name,employee_id,roster_status'))
             ->defaultSort('original_rank')
@@ -97,7 +101,7 @@ final class EntriesRelationManager extends RelationManager
                 ])->icon('heroicon-m-ellipsis-vertical')->visible($manage),
             ])
             ->emptyStateHeading('No entries yet')
-            ->emptyStateDescription('Add entries one at a time, or import a CSV with the personnel:import-promotional-list command.');
+            ->emptyStateDescription('Add entries one at a time, or import a CSV with the personnel:import-promotional-list command.'));
     }
 
     private function change(Tables\Actions\Action $action, string $success, \Closure $work): void

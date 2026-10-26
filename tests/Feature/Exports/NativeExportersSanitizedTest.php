@@ -7,9 +7,12 @@ namespace Tests\Feature\Exports;
 use App\Filament\Exports\EvaluationSubmissionExporter;
 use App\Filament\Exports\SafeExporter;
 use App\Filament\Exports\SingleGasMetersExporter;
+use App\Filament\Workgroup\Exports\WorkgroupAIReportExporter;
 use App\Models\Apparatus;
+use App\Models\CandidateProduct;
 use App\Models\Employee;
 use App\Models\SingleGasMeter;
+use Carbon\CarbonImmutable;
 use Filament\Actions\Exports\ExportColumn;
 use Filament\Actions\Exports\Models\Export;
 use Tests\TestCase;
@@ -72,5 +75,18 @@ final class NativeExportersSanitizedTest extends TestCase
         $row = (new SingleGasMetersExporter(new Export, $map, []))($meter);
 
         self::assertSame(["'=cmd|calc", "'@SUM(1)"], $row);
+    }
+
+    public function test_workgroup_report_generation_stamp_uses_the_eastern_day_at_midnight(): void
+    {
+        foreach ([
+            '2026-10-26T03:59:59Z' => '2026-10-25 23:59:59 EDT',
+            '2026-10-26T04:00:00Z' => '2026-10-26 00:00:00 EDT',
+        ] as $instant => $label) {
+            $this->travelTo(CarbonImmutable::parse($instant));
+            $row = (new WorkgroupAIReportExporter(new Export, ['exported_at' => 'Report Generated'], []))(new CandidateProduct);
+
+            self::assertSame([$label], $row);
+        }
     }
 }

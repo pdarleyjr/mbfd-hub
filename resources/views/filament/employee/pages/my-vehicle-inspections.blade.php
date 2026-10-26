@@ -20,7 +20,7 @@
                         <li class="hub-insp-history__row" data-inventory-correction-row="{{ $correction['id'] }}">
                             <div class="hub-insp-history__main">
                                 <a class="hub-insp-link hub-insp-history__title" href="{{ $correction['url'] }}">{{ $correction['apparatus'] }} · {{ $correction['item'] }}</a>
-                                <p class="hub-insp-item__sub">{{ $correction['reason'] }}@if($correction['compartment']) · {{ $correction['compartment'] }}@endif · {{ $correction['reported_at']?->timezone('America/New_York')->format('M j, Y') }}</p>
+                                <p class="hub-insp-item__sub">{{ $correction['reason'] }}@if($correction['compartment']) · {{ $correction['compartment'] }}@endif · {{ $correction['reported_at']?->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y') }}</p>
                             </div>
                             <span @class(['hub-insp-badge', 'hub-insp-badge--info' => $correction['needs_reply'], 'hub-insp-badge--success' => $correction['status'] === 'applied', 'hub-insp-badge--warning' => $correction['status'] === 'submitted'])>{{ $correction['needs_reply'] ? 'Reply needed' : $correction['status_label'] }}</span>
                         </li>

@@ -2,20 +2,24 @@
 
 namespace App\Filament\Resources\StationResource\RelationManagers;
 
+use App\Filament\Concerns\HasRelationExportActions;
+use App\Services\Exports\ExportableTable;
 use Filament\Forms;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
 
-class StationInventoryItemsRelationManager extends RelationManager
+class StationInventoryItemsRelationManager extends RelationManager implements ExportableTable
 {
+    use HasRelationExportActions;
+
     protected static string $relationship = 'inventoryItems';
 
     protected static ?string $title = 'Inventory Items';
 
     public function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->recordTitleAttribute('id')
             ->columns([
                 Tables\Columns\TextColumn::make('inventoryItem.name')
@@ -51,7 +55,7 @@ class StationInventoryItemsRelationManager extends RelationManager
                     ->label('Last Updated')
                     ->dateTime('M j, Y g:i A')
                     ->sortable()
-                    ->timezone('America/New_York'),
+                    ->timezone(\App\Support\HubTimezone::NAME),
             ])
             ->defaultSort('status', 'asc')
             ->filters([
@@ -119,7 +123,7 @@ class StationInventoryItemsRelationManager extends RelationManager
                         $record->save();
                     }),
             ])
-            ->bulkActions([]);
+            ->bulkActions([]));
     }
 
     /**

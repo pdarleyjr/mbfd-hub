@@ -133,7 +133,7 @@
                         } }}"></div>
                         <div class="ep-list-body">
                             <span class="ep-list-primary line-clamp-1">{{ Str::limit($req->items->pluck('item_name')->join(', '), 45) }}</span>
-                            <span class="ep-list-secondary">{{ $req->created_at->format('M j, Y') }}</span>
+                            <span class="ep-list-secondary">{{ $req->created_at->copy()->timezone(config('hub.timezone'))->format('M j, Y') }}</span>
                         </div>
                         <span class="ep-status-badge">{{ $req->status->label() }}</span>
                     </div>

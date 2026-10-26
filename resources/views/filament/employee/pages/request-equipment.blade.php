@@ -303,7 +303,7 @@
                     <summary>Recent requests</summary>
                     <header><a href="/employee/my-requests">View all requests</a></header>
                     @forelse($recentRequests as $request)
-                        <a class="uo-recent-request" href="/employee/my-requests/{{ $request->public_id }}"><strong>{{ $request->request_number }}</strong><span>{{ $request->items_count }} item(s) · {{ $request->created_at->format('M j, Y') }}</span><span class="{{ $request->status->tagClass() }}">{{ $request->status->label() }}</span></a>
+                        <a class="uo-recent-request" href="/employee/my-requests/{{ $request->public_id }}"><strong>{{ $request->request_number }}</strong><span>{{ $request->items_count }} item(s) · {{ $request->created_at->copy()->timezone(config('hub.timezone'))->format('M j, Y') }}</span><span class="{{ $request->status->tagClass() }}">{{ $request->status->label() }}</span></a>
                     @empty
                         <p>Your submitted uniform requests will appear here.</p>
                     @endforelse

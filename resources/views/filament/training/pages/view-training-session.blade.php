@@ -12,10 +12,10 @@
         </div>
         <p class="mt-4 text-sm">{{ implode(' · ', $session->classifications ?? []) }}</p>
         @if ($session->submitted_at)
-            <p class="mt-4 text-sm">Submitted {{ $session->submitted_at->timezone('America/New_York')->format('M j, Y g:i:s A T') }} · approving account #{{ $session->submitted_by }}. The saved submission preserves every member's signature time.</p>
+            <p class="mt-4 text-sm">Submitted {{ $session->submitted_at->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i:s A T') }} · approving account #{{ $session->submitted_by }}. The saved submission preserves every member's signature time.</p>
         @endif
         @if ($instructorSignoff)
-            <p class="mt-2 text-sm">Lead signature: {{ $instructorSignoff['lead_snapshot']['display_name'] }} · {{ \Carbon\CarbonImmutable::parse($instructorSignoff['signed_at'])->timezone('America/New_York')->format('M j, Y g:i:s A T') }}. Recorded with confirmation by submitting account #{{ $instructorSignoff['recorded_by'] }}.</p>
+            <p class="mt-2 text-sm">Lead signature: {{ $instructorSignoff['lead_snapshot']['display_name'] }} · {{ \Carbon\CarbonImmutable::parse($instructorSignoff['signed_at'])->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i:s A T') }}. Recorded with confirmation by submitting account #{{ $instructorSignoff['recorded_by'] }}.</p>
         @endif
         <p class="mt-4 text-sm">Module: {{ $session->module?->name ?: 'Unassigned' }}</p>
         @if ($session->attendance_source === 'paper')
@@ -34,7 +34,7 @@
         <div class="space-y-3">
             @forelse ($versions as $version)
                 <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 p-3">
-                    <div><strong>Revision {{ $version->revision }}</strong><span class="ml-2 text-sm">{{ $version->certified_at ? 'Certified' : (!empty($version->snapshot['submission']) ? 'Submitted' : 'Provisional') }} · {{ $version->created_at->timezone('America/New_York')->format('M j, Y g:i A') }}</span></div>
+                    <div><strong>Revision {{ $version->revision }}</strong><span class="ml-2 text-sm">{{ $version->certified_at ? 'Certified' : (!empty($version->snapshot['submission']) ? 'Submitted' : 'Provisional') }} · {{ $version->created_at->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A') }}</span></div>
                     <div class="flex gap-3">
                         <x-filament::link :href="route('training.rosters.versions.export', ['session' => $session, 'version' => $version, 'format' => 'pdf'])">Download PDF</x-filament::link>
                         <x-filament::link :href="route('training.rosters.versions.export', ['session' => $session, 'version' => $version, 'format' => 'xlsx'])">Download Excel</x-filament::link>
@@ -52,7 +52,7 @@
             @forelse ($audits as $audit)
                 <li class="border-b border-gray-100 pb-3 text-sm">
                     <strong>{{ str_replace('_', ' ', ucfirst($audit->action)) }}</strong>
-                    <span class="text-gray-500"> · {{ $audit->created_at->timezone('America/New_York')->format('M j, Y g:i A') }}{{ $audit->actor_user_id ? ' · account #'.$audit->actor_user_id : '' }}</span>
+                    <span class="text-gray-500"> · {{ $audit->created_at->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A') }}{{ $audit->actor_user_id ? ' · account #'.$audit->actor_user_id : '' }}</span>
                     @if ($audit->reason)<p class="mt-1">{{ $audit->reason }}</p>@endif
                 </li>
             @empty

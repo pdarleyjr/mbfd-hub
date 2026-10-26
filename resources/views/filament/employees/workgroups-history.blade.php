@@ -29,7 +29,7 @@
         <h3 class="text-base font-semibold">Personnel and identity audit — latest 50 events</h3>
         <ul class="mt-2 space-y-2 text-sm">
             @forelse ($profileEvents as $event)
-                <li>{{ $event->created_at->format('M j, Y g:i A') }} — {{ $event->action }} / {{ $event->result }} · Administrator account {{ $event->actor_user_id }} · {{ $event->reason ?? 'Profile fields updated' }}</li>
+                <li>{{ $event->created_at->copy()->timezone(config('hub.timezone'))->format('M j, Y g:i A') }} — {{ $event->action }} / {{ $event->result }} · Administrator account {{ $event->actor_user_id }} · {{ $event->reason ?? 'Profile fields updated' }}</li>
             @empty
                 <li class="text-gray-500">No recorded personnel changes.</li>
             @endforelse
@@ -42,7 +42,7 @@
                 <thead><tr><th scope="col" class="p-2">Time</th><th scope="col" class="p-2">Action / result</th><th scope="col" class="p-2">Administrator</th><th scope="col" class="p-2">Reason</th></tr></thead>
                 <tbody>
                     @forelse ($events as $event)
-                        <tr><td class="p-2">{{ $event->created_at->format('M j, Y g:i A') }}</td><td class="p-2">{{ $event->action }} / {{ $event->result }}</td><td class="p-2">{{ $event->actor?->name ?? 'Retained actor ID '.$event->actor_user_id }}</td><td class="p-2">{{ $event->reason ?? '—' }}</td></tr>
+                        <tr><td class="p-2">{{ $event->created_at->copy()->timezone(config('hub.timezone'))->format('M j, Y g:i A') }}</td><td class="p-2">{{ $event->action }} / {{ $event->result }}</td><td class="p-2">{{ $event->actor?->name ?? 'Retained actor ID '.$event->actor_user_id }}</td><td class="p-2">{{ $event->reason ?? '—' }}</td></tr>
                     @empty
                         <tr><td colspan="4" class="p-2 text-gray-500">No recorded security actions.</td></tr>
                     @endforelse

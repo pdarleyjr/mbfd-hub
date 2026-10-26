@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\UnitMasterVehicleResource\RelationManagers;
 
+use App\Filament\Concerns\HasRelationExportActions;
 use App\Models\UnitMasterVehicle;
 use App\Models\User;
 use App\Models\VehicleDocument;
+use App\Services\Exports\ExportableTable;
 use App\Services\Fleet\VehicleDocumentLibrary;
 use App\Support\Fleet\VehicleDocumentAccess;
 use Filament\Forms;
@@ -23,8 +25,10 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 
-final class DocumentsRelationManager extends RelationManager
+final class DocumentsRelationManager extends RelationManager implements ExportableTable
 {
+    use HasRelationExportActions;
+
     protected static string $relationship = 'documents';
 
     protected static ?string $title = 'Documents';
@@ -63,7 +67,7 @@ final class DocumentsRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return $table
+        return self::withExportActions($table
             ->heading('Documents')
             ->description('Original records, photographs and supporting files for this vehicle.')
             ->modifyQueryUsing(function (Builder $query): Builder {
@@ -123,7 +127,7 @@ final class DocumentsRelationManager extends RelationManager
                         ->fillForm(fn (VehicleDocument $record): array => [
                             ...$record->only(['original_filename', 'source_type', 'sha256']),
                             'uploaded_by_name' => $record->uploader->name ?? 'Historical import',
-                            'uploaded_at' => $record->created_at?->timezone('America/New_York')->format('M j, Y g:i A'),
+                            'uploaded_at' => $record->created_at?->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A'),
                             'source_references' => $record->sources()->pluck('source_relative_path')->implode("\n"),
                         ]),
                     Tables\Actions\Action::make('editMetadata')->label('Edit details / vehicle links')->icon('heroicon-o-pencil-square')
@@ -147,7 +151,7 @@ final class DocumentsRelationManager extends RelationManager
             ->emptyStateDescription('Add vehicle records here. Sensitive documents appear only for authorized Fleet staff.')
             ->emptyStateIcon('heroicon-o-document-text')
             ->defaultSort('document_date', 'desc')
-            ->paginated([10, 25, 50]);
+            ->paginated([10, 25, 50]));
     }
 
     private function uploadAction(): Tables\Actions\Action

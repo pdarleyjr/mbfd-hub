@@ -2,17 +2,20 @@
 
 namespace App\Filament\Resources\Workgroup\RelationManagers;
 
+use App\Filament\Concerns\HasRelationExportActions;
 use App\Filament\Resources\Workgroup\RelationManagers\Concerns\AuthorizesWorkgroupOwner;
 use App\Models\WorkgroupSession;
+use App\Services\Exports\ExportableTable;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
 
-class SessionsRelationManager extends RelationManager
+class SessionsRelationManager extends RelationManager implements ExportableTable
 {
     use AuthorizesWorkgroupOwner;
+    use HasRelationExportActions;
 
     protected static string $relationship = 'sessions';
 
@@ -44,7 +47,7 @@ class SessionsRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->recordTitleAttribute('name')
             ->columns([
                 Tables\Columns\TextColumn::make('name')
@@ -77,6 +80,6 @@ class SessionsRelationManager extends RelationManager
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
-            ]);
+            ]));
     }
 }

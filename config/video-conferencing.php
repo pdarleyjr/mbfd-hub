@@ -13,7 +13,7 @@ $livekitProfile = in_array($livekitProfile, ['cloud', 'self_hosted'], true)
 
 return [
     'enabled' => (bool) env('VIDEO_CONFERENCING_ENABLED', false),
-    'timezone' => 'America/New_York',
+    'timezone' => \App\Support\HubTimezone::NAME,
     'lineup_time' => $lineupTime,
     // Individual member (self) places in one Morning Lineup. Stations and 300 never use these.
     'member_seats' => (int) env('VIDEO_CONFERENCING_MEMBER_SEATS', 6),

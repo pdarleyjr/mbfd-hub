@@ -10,6 +10,7 @@ use Filament\Resources\Pages\EditRecord;
 
 class EditEmployee extends EditRecord
 {
+    use \App\Filament\Concerns\HasRecordHistoryExportAction;
     use \App\Filament\Concerns\ManagesEmployeeAccess;
 
     protected static string $resource = EmployeeResource::class;
@@ -25,6 +26,7 @@ class EditEmployee extends EditRecord
     protected function getHeaderActions(): array
     {
         $actions = [
+            $this->recordHistoryExportAction(),
             Actions\Action::make('createLoginAccount')->label('Create login account')
                 ->visible(fn (): bool => $this->canCorrectIdentity() && $this->accountOrNull() === null && $this->getRecord()->roster_status === 'active')
                 ->form($this->securityFields(true))
@@ -61,7 +63,7 @@ class EditEmployee extends EditRecord
             ...$this->accountActions(),
         ];
 
-        return [Actions\ActionGroup::make(array_slice($actions, 0, 4))->label('Identity & profile')->color('gray')->button(), ...array_slice($actions, 4)];
+        return [$actions[0], Actions\ActionGroup::make(array_slice($actions, 1, 4))->label('Identity & profile')->color('gray')->button(), ...array_slice($actions, 5)];
     }
 
     public function getTitle(): string

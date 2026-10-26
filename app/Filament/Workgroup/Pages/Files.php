@@ -2,10 +2,12 @@
 
 namespace App\Filament\Workgroup\Pages;
 
+use App\Filament\Concerns\HasWorkgroupTableExportActions;
 use App\Models\User;
 use App\Models\WorkgroupFile;
 use App\Models\WorkgroupMember;
 use App\Models\WorkgroupSharedUpload;
+use App\Services\Exports\ExportableTable;
 use App\Support\Workgroups\WorkgroupAccess;
 use App\Support\Workgroups\WorkgroupContext;
 use Filament\Actions\Action;
@@ -17,8 +19,9 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 
-class Files extends Page implements HasTable
+class Files extends Page implements ExportableTable, HasTable
 {
+    use HasWorkgroupTableExportActions;
     use InteractsWithTable;
 
     protected static ?string $navigationIcon = 'heroicon-o-document-duplicate';
@@ -50,7 +53,7 @@ class Files extends Page implements HasTable
 
     public function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->query($this->getFilesQuery())
             ->columns([
                 TextColumn::make('filename')
@@ -102,7 +105,7 @@ class Files extends Page implements HasTable
                     ->url(fn ($record) => $this->getDownloadUrl($record))
                     ->openUrlInNewTab(),
             ])
-            ->emptyStateHeading('No files found');
+            ->emptyStateHeading('No files found'));
     }
 
     protected function getFilesQuery(): Builder

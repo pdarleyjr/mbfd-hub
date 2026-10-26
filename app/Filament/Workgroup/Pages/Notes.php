@@ -2,10 +2,12 @@
 
 namespace App\Filament\Workgroup\Pages;
 
+use App\Filament\Concerns\HasWorkgroupTableExportActions;
 use App\Models\User;
 use App\Models\WorkgroupMember;
 use App\Models\WorkgroupNote;
 use App\Models\WorkgroupSession;
+use App\Services\Exports\ExportableTable;
 use App\Support\Workgroups\WorkgroupAccess;
 use App\Support\Workgroups\WorkgroupContext;
 use Filament\Actions\Action;
@@ -26,8 +28,9 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 
-class Notes extends Page implements HasTable
+class Notes extends Page implements ExportableTable, HasTable
 {
+    use HasWorkgroupTableExportActions;
     use InteractsWithTable;
 
     protected static ?string $navigationIcon = 'heroicon-o-pencil-square';
@@ -132,7 +135,7 @@ class Notes extends Page implements HasTable
 
     public function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->query($this->getNotesQuery())
             ->columns([
                 TextColumn::make('title')
@@ -251,7 +254,7 @@ class Notes extends Page implements HasTable
                     ->visible(fn (WorkgroupNote $record) => $record->trashed() && $record->workgroup_member_id === $this->currentMember()->id),
             ])
             ->emptyStateHeading('No notes yet')
-            ->emptyStateDescription('Create your first note to get started. You can also share notes with your workgroup members.');
+            ->emptyStateDescription('Create your first note to get started. You can also share notes with your workgroup members.'));
     }
 
     protected function getNotesQuery(): Builder

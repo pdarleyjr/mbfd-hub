@@ -46,7 +46,7 @@ final class StationOperationsSection
 
                         return $latest === null
                             ? 'No checkouts recorded'
-                            : 'Last '.$latest->timezone('America/New_York')->format('M j, g:i A');
+                            : 'Last '.$latest->timezone(\App\Support\HubTimezone::NAME)->format('M j, g:i A');
                     })
                     ->badge()
                     ->color('info')

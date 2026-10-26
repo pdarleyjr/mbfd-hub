@@ -75,10 +75,10 @@ final class StaffRequestController extends Controller
                 $query->where('target_kind', $f['target_kind']);
             }
             if (! empty($f['date_from'])) {
-                $query->where('submitted_at', '>=', CarbonImmutable::parse($f['date_from'], 'America/New_York')->startOfDay()->utc());
+                $query->where('submitted_at', '>=', CarbonImmutable::parse($f['date_from'], \App\Support\HubTimezone::NAME)->startOfDay()->utc());
             }
             if (! empty($f['date_to'])) {
-                $query->where('submitted_at', '<=', CarbonImmutable::parse($f['date_to'], 'America/New_York')->endOfDay()->utc());
+                $query->where('submitted_at', '<=', CarbonImmutable::parse($f['date_to'], \App\Support\HubTimezone::NAME)->endOfDay()->utc());
             }
             $text = trim((string) ($f['q'] ?? ''));
             if ($text !== '') {

@@ -2,14 +2,18 @@
 
 namespace App\Filament\Resources\Workgroup\RelationManagers;
 
+use App\Filament\Concerns\HasRelationExportActions;
+use App\Services\Exports\ExportableTable;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
 
-class CriteriaRelationManager extends RelationManager
+class CriteriaRelationManager extends RelationManager implements ExportableTable
 {
+    use HasRelationExportActions;
+
     protected static string $relationship = 'criteria';
 
     protected static ?string $title = 'Criteria';
@@ -45,7 +49,7 @@ class CriteriaRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->recordTitleAttribute('name')
             ->columns([
                 Tables\Columns\TextColumn::make('display_order')
@@ -73,6 +77,6 @@ class CriteriaRelationManager extends RelationManager
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
-            ]);
+            ]));
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\PromotionalListResource\Pages;
 use App\Filament\Resources\PromotionalListResource\RelationManagers\EntriesRelationManager;
 use App\Filament\Support\PromotionalListForms;
@@ -24,6 +25,8 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class PromotionalListResource extends Resource
 {
+    use HasExportActions;
+
     protected static ?string $model = PromotionalList::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-list-bullet';
@@ -71,7 +74,7 @@ class PromotionalListResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->withCount([
                 'entries as eligible_entries_count' => fn (Builder $entries) => $entries->where('status', PromotionalListEntry::STATUS_ELIGIBLE),
             ]))
@@ -95,7 +98,7 @@ class PromotionalListResource extends Resource
             ->recordUrl(fn (PromotionalList $record): string => static::getUrl('view', ['record' => $record]))
             ->actions([Tables\Actions\ViewAction::make()])
             ->emptyStateHeading('No promotional lists yet')
-            ->emptyStateDescription('Create a list to record an official promotional result.');
+            ->emptyStateDescription('Create a list to record an official promotional result.'));
     }
 
     public static function getRelations(): array

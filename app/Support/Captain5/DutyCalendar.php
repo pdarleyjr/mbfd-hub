@@ -19,7 +19,7 @@ final class DutyCalendar
 {
     public function timezone(): string
     {
-        return (string) config('captain5.timezone', 'America/New_York');
+        return (string) config('captain5.timezone', \App\Support\HubTimezone::NAME);
     }
 
     /** The calendar date (Y-m-d, local) of the duty day containing $moment. */

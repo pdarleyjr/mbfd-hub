@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Filament\Training\Resources\TrainingCourseResource\Pages;
 
+use App\Filament\Concerns\HasPageTableExportActions;
 use App\Filament\Training\Resources\TrainingCourseResource;
 use App\Filament\Training\Resources\TrainingSessionResource;
 use App\Models\Training\TrainingCourse;
 use App\Models\Training\TrainingPaperAttendance;
 use App\Models\Training\TrainingPaperRosterImport;
+use App\Services\Exports\ExportableTable;
 use App\Services\Training\TrainingPaperRosterService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Hidden;
@@ -23,8 +25,9 @@ use Filament\Tables\Table;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
-class ReviewTrainingPaper extends Page implements HasTable
+class ReviewTrainingPaper extends Page implements ExportableTable, HasTable
 {
+    use HasPageTableExportActions;
     use InteractsWithTable;
 
     protected static string $resource = TrainingCourseResource::class;
@@ -32,6 +35,11 @@ class ReviewTrainingPaper extends Page implements HasTable
     protected static string $view = 'filament.training.pages.course-paper';
 
     public TrainingCourse $course;
+
+    protected function tableExportOwner(): TrainingCourse
+    {
+        return $this->course;
+    }
 
     public function mount(int|string $record): void
     {
@@ -57,11 +65,11 @@ class ReviewTrainingPaper extends Page implements HasTable
     {
         Gate::authorize('view', $this->course);
 
-        return $table->query(TrainingPaperAttendance::query()->whereHas('session', fn ($query) => $query->where('training_course_id', $this->course->id))->with(['session', 'employee', 'sourceImport']))
+        return static::withExportActions($table->query(TrainingPaperAttendance::query()->whereHas('session', fn ($query) => $query->where('training_course_id', $this->course->id))->with(['session', 'employee', 'sourceImport']))
             ->columns([
                 Tables\Columns\TextColumn::make('session.held_on')->label('Class date')->date()->sortable(),
                 Tables\Columns\TextColumn::make('employee.name')->label('Verified member')->placeholder('Not linked'),
-                Tables\Columns\TextColumn::make('raw_transcription')->label('Written name / transcription')->wrap()
+                Tables\Columns\TextColumn::make('raw_transcription')->label('Written name / transcription')->searchable()->wrap()
                     ->visible(fn (): bool => Gate::allows('update', $this->course)),
                 Tables\Columns\TextColumn::make('source_page')->label('Page'),
                 Tables\Columns\TextColumn::make('source_row')->label('Row / region'),
@@ -89,7 +97,7 @@ class ReviewTrainingPaper extends Page implements HasTable
                         app(TrainingPaperRosterService::class)->review($record, auth()->user(), $data['decision'], isset($data['employee_profile_id']) ? (int) $data['employee_profile_id'] : null, $data['reason'], (int) $data['expected_version']);
                     }),
             ])->defaultSort('id')->paginationPageOptions([25, 50, 100])->emptyStateHeading('No paper roster entries')
-            ->emptyStateDescription('Reviewed historical sources will appear here after a guarded paper import.');
+            ->emptyStateDescription('Reviewed historical sources will appear here after a guarded paper import.'));
     }
 
     protected function getViewData(): array

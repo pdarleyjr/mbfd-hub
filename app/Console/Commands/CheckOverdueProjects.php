@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Notifications\OperationalAlertNotification;
 use App\Services\Notifications\NotificationCategoryRegistry;
 use App\Services\Notifications\NotificationDispatchService;
+use App\Support\HubTimezone;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
@@ -27,13 +28,13 @@ class CheckOverdueProjects extends Command
 
         try {
             // Find overdue projects - using correct column names
-            $overdueProjects = CapitalProject::where('target_completion_date', '<', now())
+            $overdueProjects = CapitalProject::where('target_completion_date', '<', now(HubTimezone::NAME))
                 ->whereNull('actual_completion')
                 ->whereNotIn('status', ['completed', 'on_hold'])
                 ->get();
 
             // Find overdue milestones
-            $overdueMilestones = ProjectMilestone::where('due_date', '<', now())
+            $overdueMilestones = ProjectMilestone::where('due_date', '<', now(HubTimezone::NAME))
                 ->where('completed', false)
                 ->with('project')
                 ->get();
@@ -86,7 +87,7 @@ class CheckOverdueProjects extends Command
             $query->whereIn('name', ['admin', 'project-manager']);
         })->get();
 
-        $daysOverdue = now()->diffInDays($project->target_completion_date);
+        $daysOverdue = HubTimezone::today()->diffInDays($project->target_completion_date);
 
         foreach ($recipients as $user) {
             // Check if we've notified this user today about this project
@@ -94,7 +95,7 @@ class CheckOverdueProjects extends Command
                 ->where('notifiable_type', CapitalProject::class)
                 ->where('notifiable_id', $project->id)
                 ->where('notification_type', 'overdue_project')
-                ->where('created_at', '>=', now()->startOfDay())
+                ->where('created_at', '>=', now(HubTimezone::NAME)->startOfDay()->utc())
                 ->exists();
 
             if ($recentNotification) {
@@ -133,7 +134,7 @@ class CheckOverdueProjects extends Command
             $query->whereIn('name', ['admin', 'project-manager']);
         })->get();
 
-        $daysOverdue = now()->diffInDays($milestone->due_date);
+        $daysOverdue = HubTimezone::today()->diffInDays($milestone->due_date);
 
         foreach ($recipients as $user) {
             // Check if we've notified this user today about this milestone
@@ -141,7 +142,7 @@ class CheckOverdueProjects extends Command
                 ->where('notifiable_type', ProjectMilestone::class)
                 ->where('notifiable_id', $milestone->id)
                 ->where('notification_type', 'overdue_milestone')
-                ->where('created_at', '>=', now()->startOfDay())
+                ->where('created_at', '>=', now(HubTimezone::NAME)->startOfDay()->utc())
                 ->exists();
 
             if ($recentNotification) {

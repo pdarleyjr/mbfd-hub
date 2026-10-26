@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\ApparatusResource\RelationManagers;
 
+use App\Filament\Concerns\HasRelationExportActions;
 use App\Models\Apparatus;
 use App\Models\ApparatusIdentificationEvent;
 use App\Models\ApparatusIdentificationQuestion;
 use App\Models\User;
+use App\Services\Exports\ExportableTable;
 use App\Services\Fleet\VehicleIdentificationPlanner;
 use App\Services\Fleet\VehicleIdentificationService;
 use App\Support\Fleet\VehicleIdentificationFields;
@@ -24,8 +26,10 @@ use Illuminate\Database\Eloquent\Model;
  * The one-time vehicle questions crews were asked about this unit: what was answered, what was
  * reported as not available, the history of each question, and "Ask again" for Fleet.
  */
-class IdentificationQuestionsRelationManager extends RelationManager
+class IdentificationQuestionsRelationManager extends RelationManager implements ExportableTable
 {
+    use HasRelationExportActions;
+
     protected static string $relationship = 'identificationQuestions';
 
     protected static ?string $title = 'Identification';
@@ -60,13 +64,14 @@ class IdentificationQuestionsRelationManager extends RelationManager
         $unit = $this->getOwnerRecord();
         $kind = $unit instanceof Apparatus ? VehicleIdentificationFields::kindFor($unit) : VehicleIdentificationFields::KIND_VEHICLE;
 
-        return $table
+        return static::withExportActions($table
             ->recordTitleAttribute('field')
             ->heading('Identification questions')
             ->description('Asked of crews once, then closed. A question answered or closed as not applicable is not asked again until you ask again.')
             ->columns([
                 TextColumn::make('field')
                     ->label('Question')
+                    ->searchable()->sortable()
                     ->formatStateUsing(fn (string $state): string => VehicleIdentificationFields::label($state, $kind)),
                 TextColumn::make('state')
                     ->label('State')
@@ -77,13 +82,13 @@ class IdentificationQuestionsRelationManager extends RelationManager
                         ApparatusIdentificationQuestion::STATE_NOT_APPLICABLE => 'gray',
                         default => 'warning',
                     }),
-                TextColumn::make('answered_value')->label('Answer')->placeholder('None'),
+                TextColumn::make('answered_value')->label('Answer')->searchable()->placeholder('None'),
                 TextColumn::make('last_reason')
                     ->label('Last reason given')
                     ->formatStateUsing(fn (?string $state): ?string => VehicleIdentificationFields::reasonLabel($state))
                     ->placeholder('None')
                     ->wrap(),
-                TextColumn::make('resolved_at')->label('Closed')->dateTime('M j, Y g:i A', 'America/New_York')->placeholder('Open'),
+                TextColumn::make('resolved_at')->label('Closed')->dateTime('M j, Y g:i A', \App\Support\HubTimezone::NAME)->placeholder('Open'),
                 TextColumn::make('resolvedBy.name')->label('By')->placeholder('None'),
                 TextColumn::make('next_checkout')
                     ->label('Asked at next checkout')
@@ -99,6 +104,24 @@ class IdentificationQuestionsRelationManager extends RelationManager
             ->defaultSort('id')
             ->paginated(false)
             ->actions([
+                Action::make('exportHistory')->label('Export history')->icon('heroicon-o-arrow-down-tray')->color('gray')
+                    ->visible(fn (): bool => auth()->user() instanceof User && $this->canExportTableData(auth()->user()))
+                    ->form([\Filament\Forms\Components\Radio::make('format')->label('File type')->options(['xlsx' => 'Excel (.xlsx)', 'pdf' => 'PDF'])->default('xlsx')->required()])
+                    ->action(function (ApparatusIdentificationQuestion $record, array $data, Action $action) {
+                        try {
+                            return app(\App\Services\Exports\TableExportService::class)->downloadDataset(
+                                auth()->user(), static::class, (string) ($data['format'] ?? ''),
+                                fn (): bool => $this->canExportTableData(auth()->user()) && (int) $record->apparatus_id === (int) $this->getOwnerRecord()->getKey(),
+                                fn (): \App\Services\Exports\ExportDataset => app(\App\Services\Exports\RecordHistoryDatasets::class)->build(auth()->user(), $record, 'identification'),
+                                'identification question history',
+                            );
+                        } catch (\App\Services\Exports\ExportFailedException $exception) {
+                            Notification::make()->title('Export not created')->body($exception->getMessage())->danger()->send();
+                            $action->halt();
+
+                            return null;
+                        }
+                    }),
                 Action::make('history')
                     ->label('History')
                     ->icon('heroicon-m-clock')
@@ -140,6 +163,6 @@ class IdentificationQuestionsRelationManager extends RelationManager
                         }
                         Notification::make()->title('Crews will be asked again.')->success()->send();
                     }),
-            ]);
+            ]));
     }
 }

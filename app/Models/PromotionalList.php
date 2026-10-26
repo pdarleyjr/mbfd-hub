@@ -61,7 +61,7 @@ class PromotionalList extends Model
     /** Today in the department's timezone, as stored in date columns. */
     public static function today(): string
     {
-        return now('America/New_York')->toDateString();
+        return now(\App\Support\HubTimezone::NAME)->toDateString();
     }
 
     public function typeName(): string

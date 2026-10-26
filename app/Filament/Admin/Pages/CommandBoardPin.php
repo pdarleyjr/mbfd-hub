@@ -46,7 +46,7 @@ class CommandBoardPin extends Page
 
     protected static string $view = 'filament.admin.pages.command-board-pin';
 
-    private const TIMEZONE = 'America/New_York';
+    private const TIMEZONE = \App\Support\HubTimezone::NAME;
 
     private const AUDIT_FAILED_NOTE = 'The Hub could not write its audit record for this change. The failure was logged; let a Hub administrator know so the change can be recorded.';
 

@@ -11,6 +11,7 @@ import {
 import { db } from '../lib/db';
 import { identityForQueueCapture } from '../lib/offlineIdentity';
 import { redirectToLoginAfterSessionExpiry } from '../utils/api';
+import { HUB_TIMEZONE } from '../../../shared/timezone.ts';
 
 /** Safety net only: queue changes normally arrive as events. */
 const FALLBACK_POLL_MS = 20_000;
@@ -51,6 +52,7 @@ const genericQueueSummary = async () => {
 };
 
 const savedAt = (value: Date): string => new Intl.DateTimeFormat('en-US', {
+  timeZone: HUB_TIMEZONE,
   month: 'short',
   day: 'numeric',
   hour: 'numeric',

@@ -65,7 +65,7 @@ class TrainingHistoryPage extends Page implements HasTable
             Tables\Columns\TextColumn::make('session.location')->label('Location')->placeholder('Not specified'),
             Tables\Columns\TextColumn::make('snapshot.rank')->label('Recorded rank')->toggleable(),
             Tables\Columns\TextColumn::make('snapshot.shift')->label('Recorded shift')->placeholder('Unassigned')->toggleable(),
-            Tables\Columns\TextColumn::make('signed_at')->label('Signed (Eastern)')->dateTime('M j, Y g:i A')->timezone('America/New_York')->sortable(),
+            Tables\Columns\TextColumn::make('signed_at')->label('Signed (Eastern)')->dateTime('M j, Y g:i A')->timezone(\App\Support\HubTimezone::NAME)->sortable(),
             Tables\Columns\TextColumn::make('attendance_status')->label('Attendance')->badge()
                 ->getStateUsing(fn (TrainingAttendance $record): string => $record->was_corrected ? 'Attendance corrected' : 'Attendance recorded'),
             Tables\Columns\TextColumn::make('certification_status')->label('Certification')->badge()

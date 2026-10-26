@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Concerns\EnterpriseTable;
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\DefectResource\Pages;
 use App\Filament\Support\DefectCorrectiveActions;
 use App\Filament\Support\DefectServiceTicketActions;
@@ -25,6 +26,7 @@ use Illuminate\Database\Eloquent\Builder;
 class DefectResource extends Resource
 {
     use EnterpriseTable;
+    use HasExportActions;
 
     protected static ?string $model = ApparatusDefect::class;
 
@@ -121,7 +123,7 @@ class DefectResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return self::applyEnterpriseDefaults($table)
+        return static::withExportActions(self::applyEnterpriseDefaults($table)
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('serviceTicket'))
             ->columns([
                 Tables\Columns\TextColumn::make('apparatus.name')
@@ -286,7 +288,7 @@ class DefectResource extends Resource
                     Tables\Actions\EditAction::make(),
                 ])->label('Actions')->icon('heroicon-m-ellipsis-horizontal')->button()->color('gray'),
             ])
-            ->defaultSort('reported_date', 'desc');
+            ->defaultSort('reported_date', 'desc'));
     }
 
     /** True while the "Exact status" filter has a value; that choice replaces the Open / Closed view. */

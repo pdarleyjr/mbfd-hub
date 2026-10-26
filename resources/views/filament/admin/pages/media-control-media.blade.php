@@ -225,7 +225,7 @@
                                             · {{ $item['uploaded_by'] }}
                                         @endif
                                         @if ($item['created_at'])
-                                            <span class="block text-gray-500">{{ \Illuminate\Support\Str::limit($item['created_at'], 10, '') }}</span>
+                                            <span class="block text-gray-500">{{ \App\Services\MediaControl\MediaControlContent::createdAt($item['created_at'])?->format('M j, Y') ?? 'Time unavailable' }}</span>
                                         @endif
                                     </td>
                                     <td class="px-3 py-3">

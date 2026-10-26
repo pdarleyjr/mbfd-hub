@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Workgroup\Pages;
 
+use App\Filament\Concerns\HasWorkgroupTableExportActions;
 use App\Models\User;
 use App\Models\WorkgroupSurvey;
+use App\Services\Exports\ExportableTable;
 use App\Services\Workgroup\SurveyResponseService;
 use App\Support\Workgroups\WorkgroupAccess;
 use App\Support\Workgroups\WorkgroupContext;
@@ -17,8 +19,9 @@ use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
-class Surveys extends Page implements HasTable
+class Surveys extends Page implements ExportableTable, HasTable
 {
+    use HasWorkgroupTableExportActions;
     use InteractsWithTable;
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-list';
@@ -33,9 +36,9 @@ class Surveys extends Page implements HasTable
 
     public function table(Table $table): Table
     {
-        return $table->query($this->surveysQuery())
+        return static::withExportActions($table->query($this->surveysQuery())
             ->columns([
-                TextColumn::make('title')->wrap()->searchable(),
+                TextColumn::make('title')->wrap()->searchable()->sortable(),
                 TextColumn::make('status')->badge(),
                 TextColumn::make('completion')->label('Your response')->getStateUsing(function (WorkgroupSurvey $survey): string {
                     $user = auth()->user();
@@ -50,7 +53,7 @@ class Surveys extends Page implements HasTable
             ->actions([
                 Action::make('respond')->label(fn (WorkgroupSurvey $survey): string => $survey->isOpen() ? 'Respond' : 'View')->url(fn (WorkgroupSurvey $survey): string => SurveyFormPage::getUrl(['surveyId' => $survey->id])),
                 Action::make('results')->label('Results')->visible(fn (WorkgroupSurvey $survey): bool => $this->canManage($survey))->url(fn (WorkgroupSurvey $survey): string => SurveyResultsPage::getUrl(['surveyId' => $survey->id])),
-            ]);
+            ]));
     }
 
     public static function canAccess(): bool

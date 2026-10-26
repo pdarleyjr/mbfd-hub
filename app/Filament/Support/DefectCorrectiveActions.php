@@ -214,7 +214,11 @@ final class DefectCorrectiveActions
                     Forms\Components\TextInput::make('details.parts_ordered')->label('Parts ordered')->maxLength(255),
                     Forms\Components\TextInput::make('details.vendor_reference')->label('Vendor or PO reference')->maxLength(255),
                     Forms\Components\DatePicker::make('details.expected_delivery')->label('Expected delivery'),
-                    Forms\Components\DateTimePicker::make('details.repair_appointment')->label('Repair appointment'),
+                    Forms\Components\DateTimePicker::make('details.repair_appointment')->label('Repair appointment (Eastern)')
+                        // This JSON field is normalized as Eastern by the service, so preserve the offset.
+                        ->dehydrateStateUsing(static fn (?string $state): ?string => filled($state)
+                            ? \Carbon\CarbonImmutable::parse($state, (string) config('hub.timezone'))->toIso8601String()
+                            : null),
                     Forms\Components\TextInput::make('details.assigned_to')->label('Assigned to')->maxLength(255),
                     Forms\Components\TextInput::make('details.assigned_department')->label('Assigned department')->maxLength(255),
                 ]),

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Models\Concerns\HasArchive;
+use App\Support\HubTimezone;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -42,7 +43,7 @@ class TrtInventorySession extends Model
     public static function findOrCreateForToday(?int $trailerId = null): self
     {
         $now = now();
-        $sessionDate = $now->toDateString();
+        $sessionDate = HubTimezone::today()->toDateString();
 
         self::query()->insertOrIgnore([
             'trailer_id' => $trailerId,

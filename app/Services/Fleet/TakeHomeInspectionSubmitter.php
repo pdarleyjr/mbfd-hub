@@ -231,7 +231,7 @@ final class TakeHomeInspectionSubmitter
             return [true, sprintf(
                 'Lower than the previous reading of %s mi on %s (%s).',
                 number_format((int) $previous->odometer),
-                $previous->submitted_at->clone()->timezone('America/New_York')->format('M j, Y'),
+                $previous->submitted_at->clone()->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y'),
                 $previous->reference,
             )];
         }
@@ -363,7 +363,7 @@ final class TakeHomeInspectionSubmitter
     private function newReference(CarbonImmutable $now): string
     {
         do {
-            $reference = 'THI-'.$now->timezone('America/New_York')->format('ymd').'-'.Str::upper(Str::random(6));
+            $reference = 'THI-'.$now->timezone(\App\Support\HubTimezone::NAME)->format('ymd').'-'.Str::upper(Str::random(6));
             $reference = preg_replace('/[^A-Z0-9\-]/', 'X', $reference);
         } while (TakeHomeVehicleInspection::query()->where('reference', $reference)->exists());
 

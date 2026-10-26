@@ -23,7 +23,7 @@ return [
     // the verified 300 seat and Captain 5 administrators).
     'assignment_manager_ranks' => ['Division Chief'],
 
-    'timezone' => 'America/New_York',
+    'timezone' => \App\Support\HubTimezone::NAME,
 
     // Duty day boundary (TeleStaff daily print: 08:00 to 08:00).
     'duty_day_start_hour' => (int) env('CAPTAIN5_DUTY_DAY_START_HOUR', 8),

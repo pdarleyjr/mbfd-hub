@@ -2,8 +2,11 @@
 
 namespace App\Filament\Resources\StationResource\RelationManagers;
 
+use App\Filament\Concerns\HasRelationExportActions;
 use App\Models\Apparatus;
 use App\Models\SingleGasMeter;
+use App\Services\Exports\ExportableTable;
+use App\Support\HubTimezone;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -11,8 +14,10 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
-class SingleGasMetersRelationManager extends RelationManager
+class SingleGasMetersRelationManager extends RelationManager implements ExportableTable
 {
+    use HasRelationExportActions;
+
     protected static string $relationship = 'singleGasMeters';
 
     protected static ?string $title = 'Single Gas Meters';
@@ -28,13 +33,14 @@ class SingleGasMetersRelationManager extends RelationManager
                     ->options(function (RelationManager $livewire) {
                         // Get only apparatuses at this station
                         $station = $livewire->getOwnerRecord();
+
                         return Apparatus::where('current_location', $station->station_number)
                             ->pluck('designation', 'id');
                     })
                     ->required()
                     ->searchable()
                     ->helperText('Select the apparatus this meter is assigned to'),
-                
+
                 Forms\Components\TextInput::make('serial_number')
                     ->label('Serial Number')
                     ->required()
@@ -44,7 +50,7 @@ class SingleGasMetersRelationManager extends RelationManager
                     ->unique(SingleGasMeter::class, 'serial_number', ignoreRecord: true)
                     ->helperText('Enter the last 5 digits of the serial number')
                     ->placeholder('12345'),
-                
+
                 Forms\Components\DatePicker::make('activation_date')
                     ->label('Activation Date')
                     ->required()
@@ -56,7 +62,7 @@ class SingleGasMetersRelationManager extends RelationManager
                             $set('expiration_date', \Carbon\Carbon::parse($state)->addYears(2)->format('Y-m-d'));
                         }
                     }),
-                
+
                 Forms\Components\DatePicker::make('expiration_date')
                     ->label('Expiration Date')
                     ->disabled()
@@ -67,29 +73,29 @@ class SingleGasMetersRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->recordTitleAttribute('serial_number')
             ->columns([
                 Tables\Columns\TextColumn::make('apparatus.designation')
                     ->label('Apparatus')
                     ->searchable()
                     ->sortable(),
-                
+
                 Tables\Columns\TextColumn::make('serial_number')
                     ->label('Serial Number')
                     ->searchable()
                     ->sortable(),
-                
+
                 Tables\Columns\TextColumn::make('activation_date')
                     ->label('Activation Date')
                     ->date()
                     ->sortable(),
-                
+
                 Tables\Columns\TextColumn::make('expiration_date')
                     ->label('Expiration Date')
                     ->date()
                     ->sortable(),
-                
+
                 Tables\Columns\TextColumn::make('status')
                     ->label('Status')
                     ->badge()
@@ -98,7 +104,7 @@ class SingleGasMetersRelationManager extends RelationManager
                         'Expired' => 'danger',
                         default => 'gray',
                     }),
-                
+
                 Tables\Columns\TextColumn::make('daysUntilExpiration')
                     ->label('Days Until Expiration')
                     ->state(function (SingleGasMeter $record): int {
@@ -112,13 +118,13 @@ class SingleGasMetersRelationManager extends RelationManager
             ->defaultSort('expiration_date', 'asc')
             ->filters([
                 Tables\Filters\Filter::make('expired')
-                    ->query(fn ($query) => $query->where('expiration_date', '<', now()))
+                    ->query(fn ($query) => $query->where('expiration_date', '<', now(HubTimezone::NAME)))
                     ->label('Expired Only'),
-                
+
                 Tables\Filters\Filter::make('expiring_soon')
                     ->query(fn ($query) => $query
-                        ->where('expiration_date', '>', now())
-                        ->where('expiration_date', '<=', now()->addDays(90)))
+                        ->where('expiration_date', '>', now(HubTimezone::NAME))
+                        ->where('expiration_date', '<=', now(HubTimezone::NAME)->addDays(90)))
                     ->label('Expiring in 90 Days'),
             ])
             ->headerActions([
@@ -133,6 +139,6 @@ class SingleGasMetersRelationManager extends RelationManager
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
-            ]);
+            ]));
     }
 }

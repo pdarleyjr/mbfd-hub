@@ -20,7 +20,7 @@
             <tbody>
                 @foreach ($events as $event)
                     <tr>
-                        <td>{{ $event->created_at?->timezone('America/New_York')->format('M j, Y g:i A') }}</td>
+                        <td>{{ $event->created_at?->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A') }}</td>
                         <td>{{ $labels[$event->event] ?? $event->event }}</td>
                         <td>{{ $event->value ?? '' }}</td>
                         <td>

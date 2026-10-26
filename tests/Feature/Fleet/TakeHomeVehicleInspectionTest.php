@@ -57,6 +57,29 @@ final class TakeHomeVehicleInspectionTest extends TestCase
             ->assertSee('instrument cluster');
     }
 
+    public function test_server_owns_the_recorded_time_and_bootstraps_an_eastern_clock(): void
+    {
+        $this->travelTo(\Carbon\CarbonImmutable::parse('2026-10-26T03:59:59Z'));
+        $user = $this->member();
+        $vehicle = $this->vehicle(['veh_number' => '22514']);
+
+        $this->actingAs($user)->get(self::BASE.'/new')->assertOk()
+            ->assertViewHas('config', fn (array $config): bool => $config['serverNow'] === '2026-10-25T23:59:59-04:00' && $config['timezone'] === 'America/New_York');
+
+        $response = $this->actingAs($user)->postJson(self::BASE, [
+            'client_submission_id' => (string) Str::uuid(),
+            'vehicle_id' => $vehicle->id,
+            'acknowledged' => true,
+            'signature' => $this->signature(true),
+            'submitted_at' => '2099-01-01T00:00:00Z',
+        ])->assertCreated();
+
+        $inspection = TakeHomeVehicleInspection::query()->where('reference', $response->json('reference'))->firstOrFail();
+        self::assertSame('2026-10-26 03:59:59', $inspection->getRawOriginal('submitted_at'));
+        self::assertSame('2026-10-26 03:59:59', $inspection->getRawOriginal('acknowledged_at'));
+        $this->get(self::BASE.'/'.$inspection->reference)->assertOk()->assertSee('Oct 25, 2026 11:59 PM EDT');
+    }
+
     public function test_home_has_no_inspection_card_for_a_member_with_a_profile(): void
     {
         $this->actingAsCanonicalFixture();

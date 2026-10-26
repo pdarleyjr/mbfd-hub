@@ -2,9 +2,11 @@
 
 namespace App\Filament\Resources\StationResource\RelationManagers;
 
+use App\Filament\Concerns\HasRelationExportActions;
 use App\Filament\Support\ArchiveFilter;
 use App\Models\StationInventoryAudit;
 use App\Models\StationSupplyRequest;
+use App\Services\Exports\ExportableTable;
 use App\Services\StationSupplyRequestWorkflowService;
 use App\Support\DecisionReason;
 use Filament\Forms;
@@ -13,8 +15,10 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
 
-class StationSupplyRequestsRelationManager extends RelationManager
+class StationSupplyRequestsRelationManager extends RelationManager implements ExportableTable
 {
+    use HasRelationExportActions;
+
     protected static string $relationship = 'supplyRequests';
 
     protected static ?string $title = 'Supply Requests';
@@ -26,7 +30,7 @@ class StationSupplyRequestsRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->recordTitleAttribute('id')
             ->columns([
                 Tables\Columns\TextColumn::make('request_text')
@@ -61,7 +65,7 @@ class StationSupplyRequestsRelationManager extends RelationManager
                     ->label('Requested')
                     ->dateTime('M j, Y g:i A')
                     ->sortable()
-                    ->timezone('America/New_York'),
+                    ->timezone(\App\Support\HubTimezone::NAME),
             ])
             ->defaultSort('created_at', 'desc')
             ->filters([
@@ -84,7 +88,7 @@ class StationSupplyRequestsRelationManager extends RelationManager
                     Infolists\Components\TextEntry::make('history')->label('History')
                         ->state(fn (StationSupplyRequest $record): string => StationInventoryAudit::query()
                             ->where('station_id', $record->station_id)->where('to_value->request_id', $record->id)
-                            ->orderBy('id')->get()->map(fn (StationInventoryAudit $event): string => $event->created_at->timezone('America/New_York')->format('M j, Y g:i A').' · '.$event->actor_name.' · '.str($event->action)->headline()
+                            ->orderBy('id')->get()->map(fn (StationInventoryAudit $event): string => $event->created_at->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A').' · '.$event->actor_name.' · '.str($event->action)->headline()
                                 .' · '.($event->to_value['status'] ?? '')
                             )->implode("\n"))->columnSpanFull(),
                 ]),
@@ -123,6 +127,6 @@ class StationSupplyRequestsRelationManager extends RelationManager
                     ->visible(fn (StationSupplyRequest $record): bool => auth()->user()->can('admin.stations.manage') && $record->isArchived())
                     ->action(fn (StationSupplyRequest $record) => app(StationSupplyRequestWorkflowService::class)->restore($record, auth()->user())),
             ])
-            ->bulkActions([]);
+            ->bulkActions([]));
     }
 }

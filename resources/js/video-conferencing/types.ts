@@ -24,6 +24,8 @@ export interface ConferenceBootstrap {
     lineup_max_minutes: number;
     status_poll_ms: number;
     heartbeat_ms: number;
+    timezone?: string;
+    server_time?: string;
     realtime: {
         key: string;
         host: string;
@@ -59,6 +61,7 @@ export interface SessionResponse {
         lineup_time_configured: boolean;
         /** Time limit of this lineup (lineup sessions only). */
         ends_at?: string | null;
+        server_time?: string;
     };
 }
 
@@ -90,6 +93,7 @@ export interface LineupState {
     session_id: string | null;
     started_at: string | null;
     ends_at: string | null;
+    server_time?: string;
 }
 
 /** GET lineup/status for any signed-in member: read-only, never carries rooms, people or tokens. */

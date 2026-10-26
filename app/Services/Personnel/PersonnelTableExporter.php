@@ -78,7 +78,7 @@ final class PersonnelTableExporter
         }
 
         $title = (string) $table->name;
-        $generated = now('America/New_York')->format('M j, Y g:i A T');
+        $generated = now(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A T');
         $bytes = match ($format) {
             'csv' => $this->csv($headers, $rows),
             'xlsx' => $this->xlsx($title, $headers, $rows, $scope, $generated, array_map(fn (string $key): string => $definitions[$key]['type'], $columns)),
@@ -87,7 +87,7 @@ final class PersonnelTableExporter
         };
         PersonnelTableEvent::query()->create(['table_id' => $table->getKey(), 'actor_user_id' => $actor->getKey(),
             'action' => 'export_generated', 'metadata' => ['format' => $format, 'scope' => $scope, 'record_count' => count($rows), 'columns' => $columns]]);
-        $name = 'MBFD - '.Str::limit(Str::slug($title, ' '), 90, '').' - '.now('America/New_York')->format('Y-m-d').'.'.$format;
+        $name = 'MBFD - '.Str::limit(Str::slug($title, ' '), 90, '').' - '.now(\App\Support\HubTimezone::NAME)->format('Y-m-d').'.'.$format;
 
         return response()->streamDownload(static function () use ($bytes): void {
             echo $bytes;

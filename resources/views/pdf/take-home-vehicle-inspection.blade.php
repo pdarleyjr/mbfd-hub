@@ -70,7 +70,7 @@
 </div>
 
 <h1>Take Home Vehicle Inspection</h1>
-<div class="muted">Submitted {{ $inspection->submittedAtLocal() }}@if($inspection->started_at) · Started {{ $inspection->started_at->clone()->timezone('America/New_York')->format('g:i A T') }}@endif</div>
+<div class="muted">Submitted {{ $inspection->submittedAtLocal() }}@if($inspection->started_at) · Started {{ $inspection->started_at->clone()->timezone(\App\Support\HubTimezone::NAME)->format('g:i A T') }}@endif</div>
 
 @if($inspection->acceptable_for_use === null)
     <div class="callout">Acceptability for use was not answered.</div>
@@ -137,7 +137,7 @@
     <div class="signature">
         @if($signature)<img src="{{ $signature }}" alt="Signature">@else<span class="missing">Signature image unavailable</span>@endif
     </div>
-    <div><strong>{{ $inspection->inspector_name }}</strong> · Signed {{ $inspection->acknowledged_at->clone()->timezone('America/New_York')->format('M j, Y g:i A T') }}</div>
+    <div><strong>{{ $inspection->inspector_name }}</strong> · Signed {{ $inspection->acknowledged_at->clone()->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A T') }}</div>
     <div class="muted">Signature SHA-256 {{ $inspection->signature_sha256 }}</div>
 </div>
 

@@ -74,8 +74,8 @@ class ApparatusController extends Controller
             'inspection_date' => ['nullable', 'date_format:Y-m-d'],
         ])['inspection_date'] ?? null;
         $inspectionDate = CarbonImmutable::parse(
-            $inspectionDateInput ?? CarbonImmutable::now(config('app.timezone'))->toDateString(),
-            config('app.timezone'),
+            $inspectionDateInput ?? CarbonImmutable::now((string) config('hub.timezone'))->toDateString(),
+            (string) config('hub.timezone'),
         )->startOfDay();
         $apparatus = Apparatus::findOrFail($id);
 
@@ -602,7 +602,7 @@ class ApparatusController extends Controller
 
                 // The client may display a unit number, but the persisted identity must
                 // always come from the apparatus selected by its unique route ID.
-                $today = now()->format('Y-m-d');
+                $today = now((string) config('hub.timezone'))->format('Y-m-d');
                 $designation = $lockedApparatus->designation ?? $lockedApparatus->name ?? 'UNK';
                 $designationTag = preg_replace('/[^A-Z0-9]/i', '', $designation) ?: 'UNK';
                 $hasCriticalDefects = false;

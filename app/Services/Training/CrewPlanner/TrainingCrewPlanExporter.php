@@ -25,7 +25,7 @@ final class TrainingCrewPlanExporter
 
     private const LOGO_PATH = 'images/training/mbfd-logo.png';
 
-    private const TZ = 'America/New_York';
+    private const TZ = \App\Support\HubTimezone::NAME;
 
     public function pdf(array $projection): string
     {
@@ -86,7 +86,7 @@ final class TrainingCrewPlanExporter
                 ['Unassigned', $report['unassigned_total']],
                 ['Notes', self::INTRO],
                 ['Eligibility', self::LEGEND],
-                ['Time zone', 'America/New_York'],
+                ['Time zone', \App\Support\HubTimezone::NAME],
                 [],
                 ['Session', 'Time (Eastern)', 'Personnel'],
                 ...array_map(static fn (array $group): array => [$group['label'], $group['time'], count($group['rows'])], $sessions),

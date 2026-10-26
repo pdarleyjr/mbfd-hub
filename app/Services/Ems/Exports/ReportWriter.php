@@ -21,7 +21,7 @@ use RuntimeException;
  */
 final class ReportWriter
 {
-    public const TIMEZONE = 'America/New_York';
+    public const TIMEZONE = \App\Support\HubTimezone::NAME;
 
     private const LOGO_PATH = 'images/mbfd_logo-256.png';
 

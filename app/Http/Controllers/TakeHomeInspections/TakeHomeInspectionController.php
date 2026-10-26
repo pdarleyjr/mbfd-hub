@@ -50,7 +50,8 @@ final class TakeHomeInspectionController extends Controller
             'config' => [
                 'userKey' => hash('sha256', 'thvi:'.$user->getKey()),
                 'inspectorName' => (string) ($user->display_name ?: $user->name),
-                'serverNow' => now()->toIso8601String(),
+                'serverNow' => now((string) config('hub.timezone'))->toIso8601String(),
+                'timezone' => config('hub.timezone'),
                 'checks' => collect(TakeHomeVehicleInspection::CHECKS)
                     ->map(fn (array $check, string $key): array => ['key' => $key, 'label' => $check[0], 'hint' => $check[1]])
                     ->values(),

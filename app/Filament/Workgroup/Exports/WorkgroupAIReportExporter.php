@@ -105,7 +105,7 @@ class WorkgroupAIReportExporter extends SafeExporter
             // Export metadata
             ExportColumn::make('exported_at')
                 ->label('Report Generated')
-                ->state(fn (): string => now()->format('Y-m-d H:i:s T')),
+                ->state(fn (): string => now((string) config('hub.timezone'))->format('Y-m-d H:i:s T')),
         ];
     }
 

@@ -9,6 +9,7 @@ import {
     ShieldCheck, Sparkles, Stethoscope, Trash2, Truck, UsersRound, WifiOff,
 } from 'lucide-react';
 import { ApiError, createApi } from './api';
+import { HUB_TIMEZONE } from '../shared/timezone.ts';
 import { validateImportFile } from './importLimits.js';
 import { recoveryDrafts, type RecoveryDraft } from './draftsDb';
 import { createEmsApi } from './ems/emsApi';
@@ -55,7 +56,7 @@ const EMPTY_ROWS: Record<string, Record<string, any>> = {
 };
 
 function clone<T>(value: T): T { return JSON.parse(JSON.stringify(value)); }
-function stamp(value?: string | null) { return value ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : 'Not yet saved'; }
+function stamp(value?: string | null) { return value ? new Intl.DateTimeFormat(undefined, { timeZone: HUB_TIMEZONE, dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : 'Not yet saved'; }
 function typeLabel(type: FormType) {
     if (type === 'ics_214') return 'ICS 214';
     if (isDocumentRecordType(type)) return recordTypeLabel(type);
@@ -141,7 +142,7 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
         setBusy(true);
         try {
             const now = new Date();
-            const title = `${typeLabel(formType)} — ${new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(now)}`;
+            const title = `${typeLabel(formType)} — ${new Intl.DateTimeFormat(undefined, { timeZone: HUB_TIMEZONE, dateStyle: 'medium' }).format(now)}`;
             const created = await api.create(formType, title);
             setRecords((items) => [created, ...items.filter((item) => item.id !== created.id)]); currentRef.current = created; setCurrent(created); dirtyRef.current = false; setSaveState('saved'); setActiveSection('overview');
         } catch (error) { setMessage({ intent: 'error', text: error instanceof Error ? error.message : 'The record could not be created.' }); }

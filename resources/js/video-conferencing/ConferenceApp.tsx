@@ -40,6 +40,7 @@ import {
 import { clearBusy, markBusy } from '../pwa/busy';
 import { ApiError, getJson, postJson } from './api';
 import { subscribeToLineupChanges } from './conference-events';
+import { ServerClock } from './clock';
 import {
     deviceLabel,
     enumerateMediaDevices,
@@ -155,7 +156,8 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
     const [roomMode, setRoomMode] = useState<'lineup' | 'direct'>('lineup');
     const [pendingDirectStation, setPendingDirectStation] = useState<StationRole | null>(null);
     const [room, setRoom] = useState<Room | null>(null);
-    const [clock, setClock] = useState(() => Date.now());
+    const serverClockRef = useRef(new ServerClock(bootstrap.server_time));
+    const [clock, setClock] = useState(() => serverClockRef.current.now());
     // Member waiting room: preview released while idle, the lineup last joined, and a nudge to re-read its state.
     const [releasedReason, setReleasedReason] = useState<MediaReleaseReason | null>(null);
     const idleReleased = releasedReason !== null;
@@ -412,7 +414,7 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
             setForcedStationMic(bootstrap.entry_mode === 'station');
             setMicrophoneEnabled(bootstrap.entry_mode !== 'station' && microphoneEnabled);
             setNotice(null);
-            connectedAtRef.current = Date.now();
+            connectedAtRef.current = performance.now();
             userLeftRef.current = false;
             [stationInactiveRef, commandInactiveRef, selfInactiveRef].forEach((ref) => ref.current.reset());
             setPhase('connected');
@@ -487,12 +489,13 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
                 `${bootstrap.endpoints.station_status}?launch_context=${encodeURIComponent(bootstrap.launch_context)}`,
             );
             if (terminatingRef.current) return;
+            serverClockRef.current.sync(status.lineup.server_time);
             setLineup(status.lineup);
             const current = roomMode === 'direct' ? status.direct : status.lineup;
             if (connectedSessionRef.current && (!current.active || current.session_id !== connectedSessionRef.current)) {
                 // A single inactive reading may be a transient blip; only a
                 // repeated one sends the station away. ROOM_DELETED stays immediate.
-                if (stationInactiveRef.current.observe(true, Date.now())) await returnFromConference();
+                if (stationInactiveRef.current.observe(true, performance.now())) await returnFromConference();
                 return;
             }
             if (alertRef.current.observe(status.lineup.active, status.lineup.session_id,
@@ -512,9 +515,9 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
                 setNotice('300 is calling this station directly. Joining automatically…');
                 if (!stationOptedOutRef.current && !roomRef.current && !joiningRef.current) await requestStationToken('direct', false);
             } else if (activeLineupSeenRef.current && roomRef.current && roomMode === 'lineup') {
-                if (stationInactiveRef.current.observe(true, Date.now())) await returnFromConference();
+                if (stationInactiveRef.current.observe(true, performance.now())) await returnFromConference();
             } else if (activeDirectSeenRef.current && roomRef.current && roomMode === 'direct') {
-                if (stationInactiveRef.current.observe(true, Date.now())) {
+                if (stationInactiveRef.current.observe(true, performance.now())) {
                     activeDirectSeenRef.current = false;
                     await returnFromConference();
                 }
@@ -543,13 +546,14 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
         commandStatusRequestRef.current = true;
         try {
             const status = await getJson<CommandStatusResponse>(bootstrap.endpoints.command_status);
+            serverClockRef.current.sync(status.lineup.server_time);
             setProviderApiHealthy(status.provider_api_healthy);
             setLineup(status.lineup);
             setStationReadiness(status.stations);
             setUsage(status.usage);
             if (status.lineup.active) activeLineupSeenRef.current = true;
             const lineupEnded = !status.lineup.active && activeLineupSeenRef.current && roomRef.current !== null && roomMode === 'lineup';
-            if (commandInactiveRef.current.observe(lineupEnded, Date.now())) await returnFromConference();
+            if (commandInactiveRef.current.observe(lineupEnded, performance.now())) await returnFromConference();
         } catch (statusError) {
             if (denyCommandAccess(statusError)) return;
             else setError(statusError instanceof Error ? statusError.message : 'Unable to refresh station readiness.');
@@ -732,7 +736,7 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
     }, [bootstrap, commandAuthorized, refreshCommandStatus, refreshStationStatus]);
 
     useEffect(() => {
-        const timer = window.setInterval(() => setClock(Date.now()), 1000);
+        const timer = window.setInterval(() => setClock(serverClockRef.current.now()), 1000);
 
         return () => window.clearInterval(timer);
     }, []);
@@ -746,8 +750,9 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
         const poll = async () => {
             if (terminatingRef.current) return;
             try {
-                const status = await getJson<{ active: boolean }>(`${bootstrap.endpoints.api_base}/sessions/${sessionId}/status`);
-                if (selfInactiveRef.current.observe(!status.active, Date.now())) await returnFromConference();
+                const status = await getJson<{ active: boolean; server_time?: string }>(`${bootstrap.endpoints.api_base}/sessions/${sessionId}/status`);
+                serverClockRef.current.sync(status.server_time);
+                if (selfInactiveRef.current.observe(!status.active, performance.now())) await returnFromConference();
             } catch { /* Transient status failures leave LiveKit reconnect in control. */ }
         };
         const timer = window.setInterval(() => void poll(), bootstrap.status_poll_ms);
@@ -775,7 +780,7 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
             if (joined !== undefined) return joined;
             const known = firstSeenRef.current.get(participant.identity);
             if (known !== undefined) return known;
-            firstSeenRef.current.set(participant.identity, Date.now());
+            firstSeenRef.current.set(participant.identity, serverClockRef.current.now() ?? 0);
 
             return firstSeenRef.current.get(participant.identity);
         },
@@ -919,12 +924,14 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
         }
     };
 
-    const joinAsSelf = async (confirmedTakeover = false) => {
+    const joinAsSelf = async (confirmedTakeover = false): Promise<boolean> => {
+        if (joinInFlightRef.current || joiningRef.current || roomRef.current || terminatingRef.current) return false;
         joinInFlightRef.current = true;
         setActionBusy('join-self');
         setError(null);
         try {
             const active = await postJson<SessionResponse>(bootstrap.endpoints.sessions, bootstrap.csrf_token, { room: 'lineup' });
+            serverClockRef.current.sync(active.session.server_time);
             // The end time of the lineup actually being joined, from the server: a restart between
             // polls can never leave the previous lineup's end time on the countdown.
             lineupEndsAtRef.current = active.session.ends_at ?? null;
@@ -935,6 +942,7 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
             );
             setLineup({ ...emptyLineup, active: true, session_id: active.session.id, ends_at: lineupEndsAtRef.current });
             await connectWithCredentials({ ...credentials, session: active.session }, confirmedTakeover);
+            return false;
         } catch (joinError) {
             const failure = {
                 status: joinError instanceof ApiError ? joinError.status : null,
@@ -954,6 +962,7 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
             } else setError(outcome.message);
             if (outcome.refresh) setWaitRefresh((value) => value + 1);
             setPhase('ready');
+            return failure.code === 'room_full' || failure.code === 'lineup_not_started';
         } finally {
             joinInFlightRef.current = false;
             setActionBusy(null);
@@ -1024,7 +1033,7 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
         const station = bootstrap.entry_mode === 'station';
         const lineupSessionId = connectedSessionRef.current;
         // Only a fresh drop after a stable connection earns new attempts; our own retries must not.
-        if (!isRetry && Date.now() - connectedAtRef.current > STABLE_CONNECTION_MS) rejoinAttemptsRef.current = 0;
+        if (!isRetry && performance.now() - connectedAtRef.current > STABLE_CONNECTION_MS) rejoinAttemptsRef.current = 0;
         const canRejoin = !superseded && !station && roomMode === 'lineup' && lineupSessionId !== null
             && rejoinAttemptsRef.current < MAX_REJOIN_ATTEMPTS;
         if (!canRejoin || lineupSessionId === null) {
@@ -1170,7 +1179,7 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
     };
 
     const connected = phase === 'connected' || phase === 'reconnecting';
-    const remainingSeconds = lineup.ends_at
+    const remainingSeconds = lineup.ends_at && clock !== null
         ? Math.max(0, Math.floor((new Date(lineup.ends_at).getTime() - clock) / 1000))
         : null;
     const endLabel = roomMode === 'direct' ? 'End Direct Call' : 'End Conference';
@@ -1276,7 +1285,7 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
                                 busy={actionBusy !== null}
                                 lastJoinedSessionId={lastJoinedSessionId}
                                 refreshToken={waitRefresh}
-                                onJoin={() => void joinAsSelf(false)}
+                                onJoin={() => joinAsSelf(false)}
                                 onIdleRelease={releaseIdlePreview}
                                 onResumeMedia={() => void prepareMedia()}
                             />

@@ -27,7 +27,7 @@ final class TrainingPlannerAttendanceLookup
         Gate::forUser($actor)->authorize('create', TrainingCourse::class);
         Gate::forUser($actor)->authorize('view', $course);
         $course = TrainingCourse::query()->findOrFail($course->getKey());
-        $personnelAsOf ??= $asOf->setTimezone('America/New_York')->toDateString();
+        $personnelAsOf ??= $asOf->setTimezone(\App\Support\HubTimezone::NAME)->toDateString();
         Validator::make(['personnel_as_of' => $personnelAsOf], ['personnel_as_of' => ['required', 'date_format:Y-m-d']])->validate();
         $module = $moduleId === null ? null : TrainingModule::query()->where('training_course_id', $course->id)->find($moduleId);
         if ($moduleId !== null && $module === null) {
@@ -37,7 +37,7 @@ final class TrainingPlannerAttendanceLookup
         $sessions = TrainingSession::query()->where('training_course_id', $course->id)
             ->when($moduleId !== null, fn ($query) => $query->where(fn ($scope) => $scope->where('training_module_id', $moduleId)->orWhereNull('training_module_id')))
             ->orderBy('held_on')->orderBy('starts_at')->orderBy('id')->get();
-        $prior = $sessions->filter(fn (TrainingSession $session): bool => $session->held_on->toDateString() <= $asOf->setTimezone('America/New_York')->toDateString()
+        $prior = $sessions->filter(fn (TrainingSession $session): bool => $session->held_on->toDateString() <= $asOf->setTimezone(\App\Support\HubTimezone::NAME)->toDateString()
             && ($session->starts_at === null || $session->starts_at->lessThanOrEqualTo($asOf)))->keyBy('id');
         $proofs = $this->archivedProofs($prior->all(), $asOf);
         $entries = $exceptions = [];

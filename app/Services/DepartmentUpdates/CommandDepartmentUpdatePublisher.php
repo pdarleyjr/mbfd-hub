@@ -132,7 +132,7 @@ final class CommandDepartmentUpdatePublisher
                 'is_pinned' => false,
                 'publish_at' => $now,
                 'first_published_at' => $now,
-                'expires_at' => isset($valid['expires_at']) ? CarbonImmutable::parse((string) $valid['expires_at'], 'America/New_York')->utc() : null,
+                'expires_at' => isset($valid['expires_at']) ? CarbonImmutable::parse((string) $valid['expires_at'], \App\Support\HubTimezone::NAME)->utc() : null,
                 'send_in_app' => false,
                 'send_web_push' => false,
                 'author_id' => $author->getKey(),

@@ -10,6 +10,7 @@ use App\Models\TrtInventoryEntry;
 use App\Models\TrtInventorySession;
 use App\Models\User;
 use App\Services\OperationalEvidenceArchiveService;
+use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -152,6 +153,29 @@ class TrtTrailerInventoryTest extends TestCase
             ->set('selectedSessionId', $historical->id)
             ->assertActionHidden('archiveSession')
             ->assertActionHidden('restoreSession');
+    }
+
+    public function test_current_eastern_session_stays_protected_after_utc_midnight(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-10-26T00:30:00Z'));
+        $session = TrtInventorySession::create(['session_date' => '2026-10-25']);
+        $manager = $this->equipmentAdmin(manage: true);
+        $this->actingAs($manager);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $this->withoutVite();
+        Livewire::test(TrtTrailerInventory::class)->assertActionHidden('archiveSession');
+
+        try {
+            app(OperationalEvidenceArchiveService::class)->archive($session, $manager, 'Synthetic midnight protection');
+            self::fail('UTC midnight must not make the current Eastern session historical.');
+        } catch (ValidationException) {
+            self::assertNull($session->fresh()->archived_at);
+        }
+
+        $this->travelTo(CarbonImmutable::parse('2026-10-26T04:00:00Z'));
+        Livewire::test(TrtTrailerInventory::class)->assertActionVisible('archiveSession');
+        app(OperationalEvidenceArchiveService::class)->archive($session, $manager, 'Synthetic historical session');
+        self::assertNotNull($session->fresh()->archived_at);
     }
 
     private function equipmentAdmin(bool $manage): User

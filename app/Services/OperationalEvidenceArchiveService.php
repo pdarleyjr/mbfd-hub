@@ -10,6 +10,7 @@ use App\Models\StationInspection;
 use App\Models\StationInventorySubmission;
 use App\Models\TrtInventorySession;
 use App\Models\User;
+use App\Support\HubTimezone;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
@@ -31,7 +32,7 @@ final class OperationalEvidenceArchiveService
             if ($locked instanceof OperationalFormRecord && $locked->trashed()) {
                 abort(409, 'Restore the trashed form before archiving it.');
             }
-            if ($locked instanceof TrtInventorySession && ! $locked->session_date->isBefore(today())) {
+            if ($locked instanceof TrtInventorySession && ! $locked->session_date->isBefore(HubTimezone::today())) {
                 throw ValidationException::withMessages([
                     'session' => 'Today’s shared inventory session must remain active for incoming submissions.',
                 ]);

@@ -11,6 +11,7 @@ use App\Http\Controllers\Controller;
 use App\Models\VideoConferenceSession;
 use App\Services\VideoConferencing\ConferenceCommandAuthorizationService;
 use App\Services\VideoConferencing\ConferenceSessionService;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -24,7 +25,10 @@ class ConferenceSessionController extends Controller
         $employee = $this->authenticatedEmployee();
         abort_unless($session->participations()->where('employee_id', $employee->getKey())->exists(), 403);
 
-        return response()->json(['active' => $session->ended_at === null && $session->active_key !== null])
+        return response()->json([
+            'active' => $session->ended_at === null && $session->active_key !== null,
+            'server_time' => CarbonImmutable::now((string) config('hub.timezone'))->toIso8601String(),
+        ])
             ->header('Cache-Control', 'no-store');
     }
 

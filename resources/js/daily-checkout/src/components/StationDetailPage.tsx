@@ -29,6 +29,7 @@ import QuickLink, { type QuickLinkProps } from './ui/QuickLink';
 import Tag, { StatusTag } from './ui/Tag';
 import { EmptyState, LoadError, SkeletonRows } from './ui/StateViews';
 import { humanize, type Tone } from './ui/status';
+import { formatHubDate, HUB_TIMEZONE } from '../../../shared/timezone.ts';
 
 type TabId = 'requests' | 'service-repair' | 'overview' | 'rooms' | 'apparatus' | 'gas-meters' | 'inspections' | 'activity';
 
@@ -38,8 +39,8 @@ const LAZY_TABS: TabId[] = ['inspections', 'requests', 'service-repair', 'gas-me
 const ROW = 'hub-well p-4';
 const SECONDARY = 'text-[13px] leading-5 text-hub-n-600';
 
-const formatDate = (dateStr: string): string => new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-const formatTime = (dateStr: string): string => new Date(dateStr).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+const formatDate = formatHubDate;
+const formatTime = (dateStr: string): string => new Date(dateStr).toLocaleTimeString('en-US', { timeZone: HUB_TIMEZONE, hour: 'numeric', minute: '2-digit' });
 
 export default function StationDetailPage() {
   const { id } = useParams<{ id: string }>();

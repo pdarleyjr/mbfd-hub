@@ -14,7 +14,7 @@ use LogicException;
 
 final class DailyCheckoutInspectionSessionService
 {
-    public const TIMEZONE = 'America/New_York';
+    public const TIMEZONE = \App\Support\HubTimezone::NAME;
 
     /**
      * @param  array<string, mixed>  $checklist

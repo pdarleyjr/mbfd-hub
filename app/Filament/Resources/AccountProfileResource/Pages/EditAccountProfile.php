@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class EditAccountProfile extends EditRecord
 {
+    use \App\Filament\Concerns\HasRecordHistoryExportAction;
     use ManagesEmployeeAccess;
 
     protected static string $resource = AccountProfileResource::class;
@@ -34,6 +35,7 @@ class EditAccountProfile extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            $this->recordHistoryExportAction(),
             Action::make('changeRecoveryEmail')->label('Change recovery email')
                 ->visible(fn (): bool => $this->canManageAccountAccess())
                 ->form([

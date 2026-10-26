@@ -18,7 +18,7 @@ class TrainingAssignmentProvider
     public function candidates(string $asOf): array
     {
         Validator::make(['as_of' => $asOf], ['as_of' => ['required', 'date_format:Y-m-d']])->validate();
-        $publishedBefore = CarbonImmutable::parse($asOf, 'America/New_York')->addDay()->startOfDay()->utc();
+        $publishedBefore = CarbonImmutable::parse($asOf, \App\Support\HubTimezone::NAME)->addDay()->startOfDay()->utc();
         $published = EmployeeBidAssignment::query()->where('payload_version', 2)->where('created_at', '<', $publishedBefore)
             ->where(fn ($query) => $query->whereNull('superseded_at')->orWhere('superseded_at', '>=', $publishedBefore));
         $bidYear = (clone $published)->max('bid_year');

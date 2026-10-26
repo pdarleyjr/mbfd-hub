@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Workgroup;
 
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\Workgroup\Concerns\ResolvesWorkgroupAccess;
 use App\Models\EvaluationCategory;
 use App\Support\Workgroups\UniversalEvaluationRubric;
@@ -16,6 +17,7 @@ use Illuminate\Database\Eloquent\Builder;
 
 class EvaluationCategoryResource extends Resource
 {
+    use HasExportActions;
     use ResolvesWorkgroupAccess;
 
     protected static ?string $model = EvaluationCategory::class;
@@ -121,7 +123,7 @@ class EvaluationCategoryResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->columns([
                 Tables\Columns\TextColumn::make('display_order')
                     ->sortable()
@@ -166,7 +168,7 @@ class EvaluationCategoryResource extends Resource
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ])
-            ->defaultSort('display_order');
+            ->defaultSort('display_order'));
     }
 
     public static function getPages(): array

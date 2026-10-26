@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Workgroup;
 
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Exports\EvaluationSubmissionExporter;
 use App\Filament\Resources\Workgroup\Concerns\ResolvesWorkgroupAccess;
 use App\Models\EvaluationSubmission;
@@ -16,6 +17,7 @@ use Illuminate\Database\Eloquent\Builder;
 
 class EvaluationSubmissionResource extends Resource
 {
+    use HasExportActions;
     use ResolvesWorkgroupAccess;
 
     protected static ?string $model = EvaluationSubmission::class;
@@ -71,7 +73,7 @@ class EvaluationSubmissionResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             // The legacy score fallback reads each submission's scores and criteria.
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['scores.criterion']))
             ->columns([
@@ -132,7 +134,7 @@ class EvaluationSubmissionResource extends Resource
                 Tables\Actions\ExportBulkAction::make()
                     ->exporter(EvaluationSubmissionExporter::class)
                     ->visible(fn () => (auth()->user()?->hasAnyRole(['super_admin', 'admin', 'logistics_admin']) ?? false)),
-            ]);
+            ]));
     }
 
     public static function getPages(): array

@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\StationResource\RelationManagers;
 
+use App\Filament\Concerns\HasRelationExportActions;
 use App\Filament\Resources\DefectResource;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
+use App\Services\Exports\ExportableTable;
 use App\Support\Fleet\DefectActionStatus;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
@@ -22,8 +24,10 @@ use Illuminate\Database\Eloquent\Builder;
  * The relationship joins apparatuses (which also has a status column), so
  * every filter and sort is qualified with the defects table.
  */
-class EquipmentIssuesRelationManager extends RelationManager
+class EquipmentIssuesRelationManager extends RelationManager implements ExportableTable
 {
+    use HasRelationExportActions;
+
     protected static string $relationship = 'apparatusDefects';
 
     protected static ?string $title = 'Equipment Issues';
@@ -32,7 +36,7 @@ class EquipmentIssuesRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('apparatus:id,designation,unit_id'))
             ->columns([
                 Tables\Columns\TextColumn::make('unit')
@@ -41,7 +45,7 @@ class EquipmentIssuesRelationManager extends RelationManager
                     ->badge()
                     ->color('info'),
                 Tables\Columns\TextColumn::make('compartment'),
-                Tables\Columns\TextColumn::make('item')->weight('bold'),
+                Tables\Columns\TextColumn::make('item')->searchable()->weight('bold'),
                 Tables\Columns\TextColumn::make('issue_type')
                     ->label('Issue')
                     ->badge()
@@ -92,7 +96,7 @@ class EquipmentIssuesRelationManager extends RelationManager
                     ->icon('heroicon-o-arrow-top-right-on-square')
                     ->visible(fn (ApparatusDefect $record): bool => DefectResource::canEdit($record))
                     ->url(fn (ApparatusDefect $record): string => DefectResource::getUrl('edit', ['record' => $record])),
-            ]);
+            ]));
     }
 
     private static function unitLabel(mixed $apparatus): string

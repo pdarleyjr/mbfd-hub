@@ -105,14 +105,14 @@ class InventoryCorrectionResource extends Resource
             ->columns([
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Reported')
-                    ->dateTime('M j, Y g:i A', 'America/New_York')
+                    ->dateTime('M j, Y g:i A', \App\Support\HubTimezone::NAME)
                     ->sortable()
                     ->wrap()
                     ->extraAttributes(['class' => 'hub-phone-summary'])
                     ->description(fn (ApparatusInventoryCorrection $record): string => self::unitLabel($record).' · '.self::itemLabel($record)),
                 Tables\Columns\TextColumn::make('apparatus.designation')->label('Apparatus')->visibleFrom('md')
                     ->formatStateUsing(fn (ApparatusInventoryCorrection $record): string => self::unitLabel($record)),
-                Tables\Columns\TextColumn::make('item')->label('Item')->visibleFrom('md')->wrap()
+                Tables\Columns\TextColumn::make('item')->label('Item')->visibleFrom('md')->searchable(['target_snapshot->name', 'proposal->name', 'member_note'])->wrap()
                     ->state(fn (ApparatusInventoryCorrection $record): string => self::itemLabel($record)),
                 Tables\Columns\TextColumn::make('reason')->label('Reported problem')->wrap()
                     ->formatStateUsing(fn (?string $state): string => InventoryCorrectionReason::label($state)),

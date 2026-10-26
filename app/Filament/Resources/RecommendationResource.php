@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Concerns\EnterpriseTable;
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\RecommendationResource\Pages;
 use App\Models\AdminAlertEvent;
 use App\Models\ApparatusDefectRecommendation;
@@ -23,6 +24,7 @@ use Illuminate\Support\Facades\DB;
 class RecommendationResource extends Resource
 {
     use EnterpriseTable;
+    use HasExportActions;
 
     protected static ?string $model = ApparatusDefectRecommendation::class;
 
@@ -92,7 +94,7 @@ class RecommendationResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return self::applyEnterpriseDefaults($table)
+        return static::withExportActions(self::applyEnterpriseDefaults($table)
             ->columns([
                 Tables\Columns\TextColumn::make('defect.apparatus.unit_id')
                     ->label('Apparatus')
@@ -316,7 +318,7 @@ class RecommendationResource extends Resource
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ])
-            ->defaultSort('created_at', 'desc');
+            ->defaultSort('created_at', 'desc'));
     }
 
     public static function getRelations(): array

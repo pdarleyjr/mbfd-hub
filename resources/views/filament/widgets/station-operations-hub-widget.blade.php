@@ -12,13 +12,25 @@
         wire:poll.20s="refreshBoard"
         wire:key="station-operations-command-board"
         x-data="{
-            now: Date.now(),
+            now: performance.now(),
+            receivedAt: performance.now(),
+            receivedStamp: null,
             timer: null,
-            init() { this.timer = window.setInterval(() => this.now = Date.now(), 5000) },
+            observeRefresh() {
+                const stamp = this.$root.dataset.lastUpdated
+                if (stamp !== this.receivedStamp) {
+                    this.receivedStamp = stamp
+                    this.receivedAt = performance.now()
+                }
+            },
+            init() {
+                this.observeRefresh()
+                this.timer = window.setInterval(() => { this.observeRefresh(); this.now = performance.now() }, 5000)
+            },
             destroy() { window.clearInterval(this.timer) },
             get stale() {
                 const refreshed = Date.parse(this.$root.dataset.lastUpdated)
-                return Number.isNaN(refreshed) || (this.now - refreshed) > 65000
+                return Number.isNaN(refreshed) || (this.now - this.receivedAt) > 65000
             },
         }"
     >
@@ -26,7 +38,7 @@
             <div>
                 <p class="mbfd-command-eyebrow">Operational day</p>
                 <p class="mbfd-command-window">{{ $operationalWindow['label'] }}</p>
-                <p class="mbfd-command-timezone">America/New_York · records at 08:00 begin the new display day</p>
+                <p class="mbfd-command-timezone">{{ $operationalWindow['timezone'] }} · records at 08:00 begin the new display day</p>
             </div>
 
             <div class="mbfd-command-live" role="status" aria-live="polite">
@@ -38,6 +50,10 @@
 
             <div class="mbfd-command-actions">
                 <button type="button" wire:click="refreshBoard" wire:loading.attr="disabled" wire:target="refreshBoard">Refresh</button>
+                @if($this->canExportBoard())
+                    <button type="button" wire:click="exportBoard('xlsx')" wire:loading.attr="disabled" wire:target="exportBoard">Export Excel</button>
+                    <button type="button" wire:click="exportBoard('pdf')" wire:loading.attr="disabled" wire:target="exportBoard">Export PDF</button>
+                @endif
                 @if($displayMode)
                     <a href="{{ \App\Filament\Pages\Dashboard::getUrl() }}">Exit Display Mode</a>
                 @endif

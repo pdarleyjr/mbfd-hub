@@ -22,7 +22,7 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 
 final class TrainingCrewPlanner extends Page
 {
-    private const TZ = 'America/New_York';
+    private const TZ = \App\Support\HubTimezone::NAME;
 
     /** A rejected roster upload's message, held until the page itself loads and shows it. */
     public const UPLOAD_ERROR_KEY = 'training_crew_planner_upload_error';

@@ -6,6 +6,7 @@ use App\Models\Employee;
 use App\Models\OperationalFormDocument;
 use App\Models\OperationalFormEvent;
 use App\Models\OperationalFormRecord;
+use App\Support\HubTimezone;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
@@ -214,7 +215,7 @@ final class PdfGenerationService
         $prefix = $record->form_type === 'ics_214' ? 'ICS214' : 'FROC_LOG_001_FF';
         $title = Str::of($record->title)->ascii()->replaceMatches('/[^A-Za-z0-9]+/', '_')->trim('_')->limit(80, '');
 
-        return sprintf('%s_%s_%s_v%d.pdf', $prefix, now()->format('Ymd'), $title ?: 'Record', $version);
+        return sprintf('%s_%s_%s_v%d.pdf', $prefix, HubTimezone::today()->format('Ymd'), $title ?: 'Record', $version);
     }
 
     private function canonicalJson(array $value): string

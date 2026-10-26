@@ -23,7 +23,7 @@ use Illuminate\Support\Facades\Schema;
  */
 final class DailyCheckoutComplianceService
 {
-    public const TIMEZONE = 'America/New_York';
+    public const TIMEZONE = \App\Support\HubTimezone::NAME;
 
     /**
      * @param  Collection<int, Apparatus>  $apparatuses

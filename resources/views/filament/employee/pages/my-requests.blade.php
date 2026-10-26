@@ -11,7 +11,7 @@
                     <div class="mr-top"><strong>{{ $request->request_number }}</strong><span class="{{ $request->status->tagClass() }}">{{ $request->status->label() }}</span></div>
                     <h3>{{ $request->type->label() }}</h3>
                     <p>{{ $request->items->pluck('item_name')->join(', ') }}</p>
-                    <small>Submitted by {{ $request->requester_rank }} {{ $request->requester_name }} · {{ $request->created_at->format('M j, Y') }}</small>
+                    <small>Submitted by {{ $request->requester_rank }} {{ $request->requester_name }} · {{ $request->created_at->copy()->timezone(config('hub.timezone'))->format('M j, Y') }}</small>
                 </div>
                 <div class="mr-arrow" aria-hidden="true">→</div>
             </a>
@@ -25,7 +25,7 @@
         <details class="mr-legacy">
             <summary>Historical legacy requests ({{ $legacyRequests->count() }})</summary>
             @foreach($legacyRequests as $legacy)
-                <div><strong>{{ $legacy->status }}</strong><p>{{ $legacy->requested_items }}</p><small>{{ $legacy->created_at->format('M j, Y') }}</small></div>
+                <div><strong>{{ $legacy->status }}</strong><p>{{ $legacy->requested_items }}</p><small>{{ $legacy->created_at->copy()->timezone(config('hub.timezone'))->format('M j, Y') }}</small></div>
             @endforeach
         </details>
     @endif

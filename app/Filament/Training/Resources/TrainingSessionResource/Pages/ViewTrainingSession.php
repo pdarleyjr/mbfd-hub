@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Training\Resources\TrainingSessionResource\Pages;
 
+use App\Filament\Concerns\HasPageTableExportActions;
 use App\Filament\Training\Resources\TrainingSessionResource;
 use App\Models\Employee;
 use App\Models\Training\TrainingAttendance;
@@ -11,6 +12,7 @@ use App\Models\Training\TrainingModule;
 use App\Models\Training\TrainingPaperAttendance;
 use App\Models\Training\TrainingPaperRosterImport;
 use App\Models\Training\TrainingSession;
+use App\Services\Exports\ExportableTable;
 use App\Services\Training\TrainingCourseModuleService;
 use App\Services\Training\TrainingRosterService;
 use Filament\Actions\Action;
@@ -29,8 +31,9 @@ use Filament\Tables\Table;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
 
-class ViewTrainingSession extends ViewRecord implements HasTable
+class ViewTrainingSession extends ViewRecord implements ExportableTable, HasTable
 {
+    use HasPageTableExportActions;
     use InteractsWithTable;
 
     protected static string $resource = TrainingSessionResource::class;
@@ -80,7 +83,7 @@ class ViewTrainingSession extends ViewRecord implements HasTable
             Action::make('nextSession')->label('Create next session')->color('gray')
                 ->visible(fn (): bool => Gate::allows('create', TrainingSession::class))
                 ->form(TrainingSessionResource::sessionFields())
-                ->fillForm(fn (): array => $this->getRecord()->only(['course_name', 'location', 'oic_employee_profile_id', 'classifications']) + ['held_on' => now('America/New_York')->toDateString()])
+                ->fillForm(fn (): array => $this->getRecord()->only(['course_name', 'location', 'oic_employee_profile_id', 'classifications']) + ['held_on' => now(\App\Support\HubTimezone::NAME)->toDateString()])
                 ->action(function (array $data): void {
                     Gate::authorize('create', TrainingSession::class);
                     $next = app(TrainingRosterService::class)->createSession($this->getRecord()->course, $data + ['training_module_id' => $this->getRecord()->training_module_id], auth()->user());
@@ -135,23 +138,23 @@ class ViewTrainingSession extends ViewRecord implements HasTable
     public function table(Table $table): Table
     {
         if ($this->getRecord()->attendance_source === 'paper') {
-            return $table->query(TrainingPaperAttendance::query()->where('training_session_id', $this->getRecord()->id)->with('employee'))
+            return static::withExportActions($table->query(TrainingPaperAttendance::query()->where('training_session_id', $this->getRecord()->id)->with('employee'))
                 ->columns([
                     Tables\Columns\TextColumn::make('employee.name')->label('Verified member')->placeholder('Pending identity review'),
                     Tables\Columns\TextColumn::make('source_page')->label('Original page'),
                     Tables\Columns\TextColumn::make('source_row')->label('Row / region'),
                     Tables\Columns\TextColumn::make('review_status')->label('Paper review')->badge(),
-                ])->defaultSort('id')->paginationPageOptions([25, 50, 100]);
+                ])->defaultSort('id')->paginationPageOptions([25, 50, 100]));
         }
 
-        return $table->query(fn () => TrainingAttendance::query()->where('training_session_id', $this->getRecord()->id))
+        return static::withExportActions($table->query(fn () => TrainingAttendance::query()->where('training_session_id', $this->getRecord()->id))
             ->columns([
                 Tables\Columns\TextColumn::make('snapshot.display_name')->label('Employee')->searchable(query: fn ($query, string $search) => $query->where('snapshot->display_name', 'like', '%'.$search.'%')),
                 Tables\Columns\TextColumn::make('snapshot.employee_id')->label('Employee ID'),
                 Tables\Columns\TextColumn::make('snapshot.rank')->label('Rank'),
                 Tables\Columns\TextColumn::make('snapshot.shift')->label('Shift')->placeholder('Unassigned'),
-                Tables\Columns\TextColumn::make('signed_at')->label('Signed (Eastern)')->dateTime('M j, Y g:i A')->timezone('America/New_York')->sortable(),
-                Tables\Columns\TextColumn::make('signature_signed_at')->label('Signature collected (Eastern)')->dateTime('M j, Y g:i:s A')->timezone('America/New_York')->toggleable(),
+                Tables\Columns\TextColumn::make('signed_at')->label('Signed (Eastern)')->dateTime('M j, Y g:i A')->timezone(\App\Support\HubTimezone::NAME)->sortable(),
+                Tables\Columns\TextColumn::make('signature_signed_at')->label('Signature collected (Eastern)')->dateTime('M j, Y g:i:s A')->timezone(\App\Support\HubTimezone::NAME)->toggleable(),
                 Tables\Columns\ImageColumn::make('signature_preview')->label('Signature')
                     ->getStateUsing(fn (TrainingAttendance $record): string => route('training.rosters.attendance.signature', ['session' => $this->getRecord(), 'attendance' => $record]))
                     ->height(48)->width(130),
@@ -173,7 +176,7 @@ class ViewTrainingSession extends ViewRecord implements HasTable
                         Gate::authorize('correct', $this->getRecord());
                         $this->mutate(fn () => app(TrainingRosterService::class)->void($record, auth()->user(), $data['reason'], (int) $data['expected_revision']), 'Attendance voided');
                     }),
-            ])->defaultSort('signed_at')->paginationPageOptions([25, 50, 100])->emptyStateHeading('No attendees have signed yet');
+            ])->defaultSort('signed_at')->paginationPageOptions([25, 50, 100])->emptyStateHeading('No attendees have signed yet'));
     }
 
     protected function getViewData(): array

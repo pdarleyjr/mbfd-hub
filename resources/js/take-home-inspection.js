@@ -11,6 +11,8 @@
  * - Submission is idempotent: one client_submission_id per inspection.
  */
 
+import { ServerClock } from './shared/server-clock.ts';
+
 const form = document.getElementById('thvi-form');
 
 if (form) {
@@ -588,8 +590,12 @@ function initTakeHomeInspection(form) {
 
     // ---------- step 1: inspector, time, odometer ----------
     $('[data-inspector-name]').value = config.inspectorName;
-    const clockFormat = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', dateStyle: 'medium', timeStyle: 'short' });
-    const tick = () => { $('[data-now]').value = `${clockFormat.format(new Date())} ET (saved when you submit)`; };
+    const clockFormat = new Intl.DateTimeFormat('en-US', { timeZone: config.timezone, dateStyle: 'medium', timeStyle: 'short' });
+    const serverClock = new ServerClock(config.serverNow);
+    const tick = () => {
+        const now = serverClock.now();
+        $('[data-now]').value = now === null ? 'Recorded by the server when you submit' : `${clockFormat.format(new Date(now))} ET (saved when you submit)`;
+    };
     tick();
     window.setInterval(tick, 30000);
 

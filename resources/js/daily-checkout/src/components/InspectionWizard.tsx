@@ -1,3 +1,4 @@
+import { HUB_TIMEZONE } from '../../../shared/timezone.ts';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router';
 import { Apparatus, ApparatusServiceTicketSummary, FleetVehicle, OfficerInfo, ChecklistData, ChecklistFieldValue, Compartment, Defect, InspectionData, MeterData, InspectionSubmission, ReviewFlagDraft, ScheduledChecklistTaskResult, VehicleIdentificationAnswers } from '../types';
@@ -48,7 +49,7 @@ const inspectionSessionIsExpired = (session: InspectionData['inspectionSession']
 
 const easternDutyDate = (): string => {
   const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/New_York',
+    timeZone: HUB_TIMEZONE,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',

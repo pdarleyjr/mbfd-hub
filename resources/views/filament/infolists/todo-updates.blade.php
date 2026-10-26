@@ -21,7 +21,7 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-2">
-                    <span class="text-xs text-gray-400">{{ $update->created_at->format('M d, Y g:i A') }}</span>
+                    <span class="text-xs text-gray-400">{{ $update->created_at->copy()->timezone(config('hub.timezone'))->format('M d, Y g:i A') }}</span>
                     @if($updatesSoftDelete && $update->trashed())
                         <span class="text-xs text-gray-500">Trash</span>
                     @endif

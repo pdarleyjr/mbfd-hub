@@ -23,7 +23,7 @@ use RuntimeException;
  */
 final class UnitMasterRosterExporter
 {
-    public const TIMEZONE = 'America/New_York';
+    public const TIMEZONE = \App\Support\HubTimezone::NAME;
 
     public const TITLE = 'MBFD Master Vehicle Inventory';
 

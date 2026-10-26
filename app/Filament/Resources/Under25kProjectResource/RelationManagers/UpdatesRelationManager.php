@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Under25kProjectResource\RelationManagers;
 
+use App\Filament\Concerns\HasRelationExportActions;
+use App\Services\Exports\ExportableTable;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -9,8 +11,10 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Auth;
 
-class UpdatesRelationManager extends RelationManager
+class UpdatesRelationManager extends RelationManager implements ExportableTable
 {
+    use HasRelationExportActions;
+
     protected static string $relationship = 'updates';
 
     public function form(Form $form): Form
@@ -42,7 +46,7 @@ class UpdatesRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->recordTitleAttribute('title')
             ->columns([
                 Tables\Columns\TextColumn::make('title')
@@ -89,6 +93,6 @@ class UpdatesRelationManager extends RelationManager
                         ->visible(fn (): bool => Auth::user()?->can('admin.projects.manage') ?? false),
                 ]),
             ])
-            ->defaultSort('created_at', 'desc');
+            ->defaultSort('created_at', 'desc'));
     }
 }

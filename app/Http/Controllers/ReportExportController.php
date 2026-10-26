@@ -36,13 +36,13 @@ class ReportExportController extends Controller
         $pdf = Pdf::loadView('filament.workgroup.pages.saver-report-pdf', [
             'title' => $title,
             'reportHtml' => $reportHtml,
-            'generatedAt' => now()->format('F j, Y g:i A'),
+            'generatedAt' => now((string) config('hub.timezone'))->format('F j, Y g:i A'),
             'workgroupName' => $workgroup->name,
         ]);
 
         $pdf->setPaper('letter', 'portrait');
 
-        $filename = 'MBFD_Executive_Report_'.$session->name.'_'.now()->format('Y-m-d').'.pdf';
+        $filename = 'MBFD_Executive_Report_'.$session->name.'_'.now((string) config('hub.timezone'))->format('Y-m-d').'.pdf';
 
         return $pdf->download($filename);
     }
@@ -72,13 +72,13 @@ class ReportExportController extends Controller
         $pdf = Pdf::loadView('filament.workgroup.pages.saver-report-pdf', [
             'title' => $title,
             'reportHtml' => $reportHtml,
-            'generatedAt' => now()->format('F j, Y g:i A'),
+            'generatedAt' => now((string) config('hub.timezone'))->format('F j, Y g:i A'),
             'workgroupName' => $workgroup->name,
         ]);
 
         $pdf->setPaper('letter', 'portrait');
 
-        $filename = 'MBFD_SAVER_Report_'.$session->name.'_'.now()->format('Y-m-d').'.pdf';
+        $filename = 'MBFD_SAVER_Report_'.$session->name.'_'.now((string) config('hub.timezone'))->format('Y-m-d').'.pdf';
 
         return $pdf->download($filename);
     }

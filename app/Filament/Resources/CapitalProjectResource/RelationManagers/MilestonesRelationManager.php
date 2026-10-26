@@ -2,16 +2,19 @@
 
 namespace App\Filament\Resources\CapitalProjectResource\RelationManagers;
 
+use App\Filament\Concerns\HasRelationExportActions;
+use App\Services\Exports\ExportableTable;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
-class MilestonesRelationManager extends RelationManager
+class MilestonesRelationManager extends RelationManager implements ExportableTable
 {
+    use HasRelationExportActions;
+
     protected static string $relationship = 'milestones';
 
     public function form(Form $form): Form
@@ -40,7 +43,7 @@ class MilestonesRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->recordTitleAttribute('title')
             ->columns([
                 Tables\Columns\TextColumn::make('title')
@@ -77,6 +80,6 @@ class MilestonesRelationManager extends RelationManager
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ])
-            ->defaultSort('due_date', 'asc');
+            ->defaultSort('due_date', 'asc'));
     }
 }
