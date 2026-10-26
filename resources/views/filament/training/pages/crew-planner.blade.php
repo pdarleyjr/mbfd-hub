@@ -47,9 +47,9 @@
                 <p class="mt-3 text-sm" role="status">Leaving out members who already attended {{ $draft['module_id'] ? 'this module' : 'any session of this course' }} (verified records only). Courses with no earlier sessions work without creating a class.</p>
                 <p class="mt-1 text-sm">
                     @if ($cutoffIsClassStart)
-                        Attendance is checked as it stood when class begins ({{ $cutoff->setTimezone('America/New_York')->format('M j, Y g:i A T') }}).
+                        Attendance is checked as it stood when class begins ({{ $cutoff->setTimezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A T') }}).
                     @else
-                        Attendance is checked against current verified Hub records as of {{ $cutoff->setTimezone('America/New_York')->format('M j, Y g:i A T') }}.
+                        Attendance is checked against current verified Hub records as of {{ $cutoff->setTimezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A T') }}.
                     @endif
                 </p>
             @endif

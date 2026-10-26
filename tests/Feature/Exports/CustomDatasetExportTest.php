@@ -74,7 +74,9 @@ final class CustomDatasetExportTest extends ExportTestCase
     public function test_training_matrix_adds_pdf_and_excel_for_the_same_filtered_projection(): void
     {
         $course = app(TrainingRosterService::class)->createCourse(['name' => 'Synthetic export course', 'classifications' => ['EMS Training'], 'track_attendance_matrix' => true], $this->admin);
-        $page = Livewire::test(ViewTrainingMatrix::class, ['record' => $course->id]);
+        $page = Livewire::test(ViewTrainingMatrix::class, ['record' => $course->id])
+            ->assertActionHasLabel('exportData', 'Export table (PDF or Excel)')
+            ->assertActionHasLabel('exportView', 'Export current view');
         foreach (['xlsx', 'pdf'] as $format) {
             $page->callAction('exportData', ['format' => $format])->assertHasNoActionErrors();
             self::assertStringStartsWith($format === 'pdf' ? '%PDF' : 'PK', $this->downloadedBytes($page));

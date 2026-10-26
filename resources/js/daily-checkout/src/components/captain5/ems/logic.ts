@@ -1,14 +1,15 @@
+import { HUB_TIMEZONE } from '../../../../../shared/timezone.ts';
 /**
  * Pure helpers for the Rescue Inventory and Supply Room tabs: wording, grouping, payload building and the
- * checks that run before anything is sent. No React, no fetch, no DOM, and only type imports, so `node --test`
- * can load this file directly (tests/Node/ems-captain5-logic.test.mjs).
+ * checks that run before anything is sent. No React or fetch; the shared timezone supports `node --test`
+ * loading this file directly (tests/Node/ems-captain5-logic.test.mjs).
  */
 import type {
   Advisory, CountItem, HistoryEvent, IssuanceView, LineGroup, ReconcileRow, RequestDetail, RequestFilters, RequestLine,
   RequestSummary, StatisticsReport, SupplyItem,
 } from './types.ts';
 
-export const TIMEZONE = 'America/New_York';
+export const TIMEZONE = HUB_TIMEZONE;
 
 const plural = (count: number, one: string, many = `${one}s`): string => `${count} ${count === 1 ? one : many}`;
 

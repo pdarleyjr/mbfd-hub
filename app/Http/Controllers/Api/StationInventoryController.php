@@ -138,7 +138,7 @@ class StationInventoryController extends Controller
             'items' => $orderedItems,
             'notes' => $validated['notes'] ?? '',
             'categories' => $this->categories,
-            'generated_at' => now()->timezone('America/New_York')->format('M j, Y g:i A T'),
+            'generated_at' => now()->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A T'),
             'generated_by' => $employee->name,
         ];
 
@@ -164,7 +164,7 @@ class StationInventoryController extends Controller
                 'pdf_path' => $pdfPath,
                 'created_by' => $actor->userId(),
                 'actor_employee_id' => $employee->getKey(),
-                'submitted_at' => now()->timezone('America/New_York'),
+                'submitted_at' => now()->timezone(\App\Support\HubTimezone::NAME),
             ]));
         } catch (\Throwable $exception) {
             try {

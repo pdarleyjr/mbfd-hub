@@ -65,7 +65,7 @@ class StationSupplyRequestsRelationManager extends RelationManager implements Ex
                     ->label('Requested')
                     ->dateTime('M j, Y g:i A')
                     ->sortable()
-                    ->timezone('America/New_York'),
+                    ->timezone(\App\Support\HubTimezone::NAME),
             ])
             ->defaultSort('created_at', 'desc')
             ->filters([
@@ -88,7 +88,7 @@ class StationSupplyRequestsRelationManager extends RelationManager implements Ex
                     Infolists\Components\TextEntry::make('history')->label('History')
                         ->state(fn (StationSupplyRequest $record): string => StationInventoryAudit::query()
                             ->where('station_id', $record->station_id)->where('to_value->request_id', $record->id)
-                            ->orderBy('id')->get()->map(fn (StationInventoryAudit $event): string => $event->created_at->timezone('America/New_York')->format('M j, Y g:i A').' · '.$event->actor_name.' · '.str($event->action)->headline()
+                            ->orderBy('id')->get()->map(fn (StationInventoryAudit $event): string => $event->created_at->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A').' · '.$event->actor_name.' · '.str($event->action)->headline()
                                 .' · '.($event->to_value['status'] ?? '')
                             )->implode("\n"))->columnSpanFull(),
                 ]),

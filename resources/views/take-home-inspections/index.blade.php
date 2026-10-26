@@ -46,8 +46,8 @@
                         @foreach($inspections as $inspection)
                             <li class="thvi-history__item">
                                 <div>
-                                    <p class="font-bold tabular-nums">{{ $inspection->submitted_at->clone()->timezone('America/New_York')->format('M j, Y') }}</p>
-                                    <p class="text-sm text-hub-muted">{{ $inspection->submitted_at->clone()->timezone('America/New_York')->format('g:i A T') }} · {{ $inspection->reference }}</p>
+                                    <p class="font-bold tabular-nums">{{ $inspection->submitted_at->clone()->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y') }}</p>
+                                    <p class="text-sm text-hub-muted">{{ $inspection->submitted_at->clone()->timezone(\App\Support\HubTimezone::NAME)->format('g:i A T') }} · {{ $inspection->reference }}</p>
                                 </div>
                                 <div class="min-w-0">
                                     <p class="font-semibold">{{ $inspection->vehicleLabel() }}</p>

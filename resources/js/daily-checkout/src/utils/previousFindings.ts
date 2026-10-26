@@ -1,3 +1,4 @@
+import { HUB_TIMEZONE } from '../../../shared/timezone.ts';
 import type { ChecklistItem, Compartment, OpenFinding } from '../types';
 
 /** A previously reported issue resolved to the checklist item it describes. */
@@ -50,7 +51,7 @@ export function formatReportedDate(value: string | null | undefined): string | n
   if (!value) return null;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/New_York' });
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: HUB_TIMEZONE });
 }
 
 /** Current status line: the corrective action wording when the server has one, else the verification wait. */

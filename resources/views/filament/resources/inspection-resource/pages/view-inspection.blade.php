@@ -70,7 +70,7 @@
             <details class="hub-insp-card" data-inspection-test-history>
                 <summary>Test classification history</summary>
                 @foreach($inspection->testClassificationEvents as $event)
-                    <p>{{ ucfirst($event->action) }} {{ $event->created_at->clone()->timezone('America/New_York')->format('M j, Y g:i A T') }}
+                    <p>{{ ucfirst($event->action) }} {{ $event->created_at->clone()->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A T') }}
                         by {{ $event->actor?->display_name ?: $event->actor?->name }} — {{ $event->reason }}</p>
                 @endforeach
             </details>

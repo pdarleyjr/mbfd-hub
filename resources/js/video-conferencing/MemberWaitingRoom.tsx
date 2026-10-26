@@ -1,3 +1,4 @@
+import { HUB_TIMEZONE } from '../shared/timezone.ts';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CameraOff, CircleAlert, Clock3, LoaderCircle, Radio, RefreshCw, Sparkles, Video } from 'lucide-react';
 import lineupStartTone from './lineup-start.mp3';
@@ -151,7 +152,7 @@ export default function MemberWaitingRoom(props: MemberWaitingRoomProps) {
     const rejoin = props.lastJoinedSessionId !== null && props.lastJoinedSessionId === model.sessionId;
     const copy = useMemo(() => describeWaitingRoom(model, {
         rejoin,
-        formatTime: (iso) => formatConferenceTime(iso, bootstrap.timezone ?? 'America/New_York'),
+        formatTime: (iso) => formatConferenceTime(iso, bootstrap.timezone ?? HUB_TIMEZONE),
     }), [bootstrap.timezone, model, rejoin]);
     const joinable = !waitingRequested && canWaitForLineup(model, { mediaReady: props.mediaReady, busy: props.busy });
     const Icon = model.state === 'checking' || model.state === 'starting'

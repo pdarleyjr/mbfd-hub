@@ -43,7 +43,7 @@
                 <div><dt>Apparatus</dt><dd>
                     @if($apparatusUrl)<a class="hub-insp-link" href="{{ $apparatusUrl }}">{{ \App\Filament\Resources\InventoryCorrectionResource::unitLabel($correction) }}</a>@else{{ \App\Filament\Resources\InventoryCorrectionResource::unitLabel($correction) }}@endif
                 </dd></div>
-                <div><dt>Reported (Eastern)</dt><dd>{{ $correction->created_at?->timezone('America/New_York')->format('M j, Y g:i A T') }}</dd></div>
+                <div><dt>Reported (Eastern)</dt><dd>{{ $correction->created_at?->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A T') }}</dd></div>
                 <div><dt>Member</dt><dd>{{ $reporterName }}@if($correction->reporterEmployee?->rank) · {{ $correction->reporterEmployee->rank }}@endif</dd></div>
                 <div><dt>Inspection</dt><dd>
                     @if($inspectionUrl)<a class="hub-insp-link" href="{{ $inspectionUrl }}">Open the inspection</a>@else Reported while the inspection was in progress @endif
@@ -154,7 +154,7 @@
                                     <span class="hub-insp-badge">Member-visible</span>
                                 @endif
                             </div>
-                            <p class="hub-insp-item__sub">{{ $event->created_at?->timezone('America/New_York')->format('M j, Y g:i A') }} · {{ $event->actor?->display_name ?: $event->actor?->name ?: 'System' }}</p>
+                            <p class="hub-insp-item__sub">{{ $event->created_at?->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A') }} · {{ $event->actor?->display_name ?: $event->actor?->name ?: 'System' }}</p>
                             @if(filled($event->body))
                                 <p class="hub-insp-item__text">{{ $event->body }}</p>
                             @endif

@@ -2,7 +2,7 @@
     use App\Models\TakeHomeVehicleInspection as Inspection;
     $snapshot = $inspection->vehicle_snapshot ?? [];
     $value = fn ($v): string => filled($v) ? (string) $v : 'Not recorded';
-    $local = fn ($date): string => $date->clone()->timezone('America/New_York')->format('M j, Y g:i A T');
+    $local = fn ($date): string => $date->clone()->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A T');
     $tag = fn (?string $status): string => match ($status) { 'good' => 'hub-tag--success', 'issue' => 'hub-tag--danger', default => 'hub-tag--warning' };
 @endphp
 <!DOCTYPE html>

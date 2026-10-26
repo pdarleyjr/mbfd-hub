@@ -87,7 +87,7 @@ final class TrainingRosterService
     {
         return DB::transaction(function () use ($course, $sessionPublicId, $moduleId): TrainingSession {
             $course = TrainingCourse::query()->lockForUpdate()->findOrFail($course->id);
-            $today = now('America/New_York')->toDateString();
+            $today = now(\App\Support\HubTimezone::NAME)->toDateString();
             $this->validateModule($course, $moduleId);
             if ($sessionPublicId !== null) {
                 $session = $course->sessions()->where('public_id', $sessionPublicId)->lockForUpdate()->first();
@@ -320,7 +320,7 @@ final class TrainingRosterService
             $before = $attendance->toArray();
             $snapshot = (int) $attendance->employee_profile_id === (int) $data['employee_profile_id']
                 ? $attendance->snapshot
-                : $this->candidate((int) $data['employee_profile_id'], $attendance->signed_at->setTimezone('America/New_York')->toDateString());
+                : $this->candidate((int) $data['employee_profile_id'], $attendance->signed_at->setTimezone(\App\Support\HubTimezone::NAME)->toDateString());
             $attendance->update([
                 'employee_profile_id' => $data['employee_profile_id'], 'snapshot' => $snapshot,
                 'signature' => $this->signatures->store($data['signature'], 'training-rosters'),
@@ -354,7 +354,7 @@ final class TrainingRosterService
                 'employee_profile_id' => $employeeProfileId,
                 'snapshot' => $names + ['employee_id' => (string) $employee->employee_id, 'display_name' => (string) $employee->name,
                     'rank' => $employee->rank, 'shift' => null, 'term_label' => null, 'assignment_source' => 'supervised_exception',
-                    'assignment_id' => null, 'as_of' => now('America/New_York')->toDateString(), 'name_source' => 'instructor_confirmed'],
+                    'assignment_id' => null, 'as_of' => now(\App\Support\HubTimezone::NAME)->toDateString(), 'name_source' => 'instructor_confirmed'],
                 'signature' => $this->signatures->store($signature, 'training-rosters'), 'signed_at' => now()->utc(), 'signature_signed_at' => now()->utc(),
                 'voided_at' => null, 'client_submission_id' => (string) Str::uuid(),
                 'request_hash' => $this->requestHash($session->id, $employeeProfileId, $signature),
@@ -441,7 +441,7 @@ final class TrainingRosterService
 
     private function candidate(int $employeeProfileId, ?string $asOf = null): array
     {
-        foreach ($this->assignments->candidates($asOf ?? now('America/New_York')->toDateString()) as $candidate) {
+        foreach ($this->assignments->candidates($asOf ?? now(\App\Support\HubTimezone::NAME)->toDateString()) as $candidate) {
             if ($candidate['employee_profile_id'] === $employeeProfileId) {
                 return $candidate;
             }

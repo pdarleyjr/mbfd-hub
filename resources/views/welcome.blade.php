@@ -17,7 +17,7 @@
             && $currentUser->employeeProfile()->exists();
         $showWorkgroups = $currentUser instanceof \App\Models\User
             && app(\App\Support\Workgroups\WorkgroupAccess::class)->canEnterPanel($currentUser);
-        $now = now('America/New_York');
+        $now = now(\App\Support\HubTimezone::NAME);
         $greeting = $now->hour < 12 ? 'Good morning' : ($now->hour < 18 ? 'Good afternoon' : 'Good evening');
         $displayName = (string) ($currentUser?->display_name ?: $currentUser?->name);
         $firstName = trim((string) strtok($displayName, ' '));
@@ -163,7 +163,7 @@
                                 <p class="update-preview">{{ $update->excerpt(180) }}</p>
                                 <div class="home-update__footer">
                                     <p class="hub-caption home-update__stamp">
-                                        <time datetime="{{ $update->publish_at?->toIso8601String() }}">{{ $update->publish_at?->timezone('America/New_York')->format('M j · g:i A') }}</time>
+                                        <time datetime="{{ $update->publish_at?->toIso8601String() }}">{{ $update->publish_at?->timezone(\App\Support\HubTimezone::NAME)->format('M j · g:i A') }}</time>
                                         @if($update->attribution())<span aria-hidden="true"> · </span>Posted by {{ $update->attribution() }}@endif
                                     </p>
                                     <a href="{{ route('updates.show', $update) }}" data-important-target class="hub-link hub-link--standalone">Read update<span class="hub-visually-hidden">: {{ $update->title }}</span></a>

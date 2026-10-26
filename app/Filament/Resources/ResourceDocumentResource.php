@@ -128,7 +128,7 @@ final class ResourceDocumentResource extends Resource
                     ->description(fn (ResourceDocument $record): ?string => $record->hasPreview() ? null : 'Download only - add a PDF copy to allow preview'),
                 Tables\Columns\TextColumn::make('page_count')->label('Pages')->placeholder('Unknown')->sortable(),
                 Tables\Columns\TextColumn::make('size')->label('Size')->state(fn (ResourceDocument $record): string => $record->readableSize()),
-                Tables\Columns\TextColumn::make('updated_at')->label('Updated')->dateTime(timezone: 'America/New_York')->sortable(),
+                Tables\Columns\TextColumn::make('updated_at')->label('Updated')->dateTime(timezone: \App\Support\HubTimezone::NAME)->sortable(),
             ])
             ->defaultSort(fn (Builder $query): Builder => $query->orderBy('category')->orderBy('sort')->orderBy('title'))
             ->reorderable('sort')

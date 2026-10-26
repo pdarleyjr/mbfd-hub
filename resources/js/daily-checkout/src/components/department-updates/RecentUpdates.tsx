@@ -14,7 +14,7 @@ const BTN = 'hub-btn !min-h-11';
 const day = (iso: string | null): string => {
   if (!iso) return '';
   const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric' });
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('en-US', { timeZone: HUB_TIMEZONE, month: 'short', day: 'numeric' });
 };
 
 const when = (iso: string | null): string => {

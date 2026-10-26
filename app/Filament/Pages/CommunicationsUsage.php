@@ -52,12 +52,12 @@ final class CommunicationsUsage extends Page
         }
 
         return ExportDataset::fromRows($actor, 'Communications Usage', ['Metric', 'Value', 'Unit'], [
-            ['Billing cycle start', $budget->cycle_start, 'America/New_York'],
-            ['Billing cycle end', $budget->cycle_end, 'America/New_York'],
+            ['Billing cycle start', $budget->cycle_start, \App\Support\HubTimezone::NAME],
+            ['Billing cycle end', $budget->cycle_end, \App\Support\HubTimezone::NAME],
             ['Provider usage', $budget->provider_chargeable_used, 'chargeable destinations'],
             ['Current-cycle Hub reservations', $this->getReservedUnits(), 'destinations'],
             ['Safe ceiling', min(2850, $budget->hub_safe_ceiling, (int) config('communications.cloudflare.safe_email_ceiling', 2850)), 'destinations'],
-            ['Last reconciled', $budget->reconciled_at, 'America/New_York'],
+            ['Last reconciled', $budget->reconciled_at, \App\Support\HubTimezone::NAME],
             ['Provider daily usage', $budget->provider_daily_used, 'destinations'],
             ['Provider daily quota', $budget->provider_daily_quota, 'destinations'],
             ['Worker requests', $budget->worker_requests_used, 'requests'],

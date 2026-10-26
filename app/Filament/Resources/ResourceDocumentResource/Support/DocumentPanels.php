@@ -49,7 +49,7 @@ final class DocumentPanels
         $canDownload = Gate::allows('update', ResourceDocument::class);
         $rows = $record->versions()->with('replacedBy:id,name')->orderByDesc('version')->get()->map(function ($version) use ($record, $canDownload): string {
             $line = 'Version '.$version->version.' · '.$version->original_filename.' · '.$version->fileTypeLabel().' · '.$version->readableSize()
-                .' · replaced '.$version->replaced_at->timezone('America/New_York')->format('M j, Y g:i A')
+                .' · replaced '.$version->replaced_at->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A')
                 .($version->replacedBy ? ' by '.$version->replacedBy->name : '');
             $link = $canDownload
                 ? ' <a class="fi-link text-primary-600 underline" href="'.e(route('admin.resources.versions.download', ['document' => $record->uuid, 'version' => $version->version])).'">Download</a>'
@@ -71,7 +71,7 @@ final class DocumentPanels
         $rows = $record->events()->with('actor:id,name')->latest('id')->limit(15)->get()->map(function (ResourceDocumentEvent $event): string {
             $sha = (string) ($event->metadata['sha256'] ?? '');
             $line = (self::EVENT_LABELS[$event->event] ?? ucfirst(str_replace('_', ' ', $event->event)))
-                .' · '.$event->created_at->timezone('America/New_York')->format('M j, Y g:i A')
+                .' · '.$event->created_at->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A')
                 .($event->actor ? ' · '.$event->actor->name : '')
                 .($sha !== '' && in_array($event->event, ['imported', 'replaced'], true) ? ' · '.substr($sha, 0, 12) : '');
 

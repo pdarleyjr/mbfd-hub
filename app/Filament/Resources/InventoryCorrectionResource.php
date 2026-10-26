@@ -105,7 +105,7 @@ class InventoryCorrectionResource extends Resource
             ->columns([
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Reported')
-                    ->dateTime('M j, Y g:i A', 'America/New_York')
+                    ->dateTime('M j, Y g:i A', \App\Support\HubTimezone::NAME)
                     ->sortable()
                     ->wrap()
                     ->extraAttributes(['class' => 'hub-phone-summary'])

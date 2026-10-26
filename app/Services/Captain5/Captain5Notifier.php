@@ -386,7 +386,7 @@ final class Captain5Notifier
 
     private function localTime(?\DateTimeInterface $moment): string
     {
-        return $moment !== null ? \Carbon\CarbonImmutable::instance($moment)->setTimezone('America/New_York')->format('D g:i A') : 'the end of the shift';
+        return $moment !== null ? \Carbon\CarbonImmutable::instance($moment)->setTimezone(\App\Support\HubTimezone::NAME)->format('D g:i A') : 'the end of the shift';
     }
 
     /** Replays one queued ledger row (inspections:retry-notifications). */

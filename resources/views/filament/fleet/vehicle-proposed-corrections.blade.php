@@ -34,7 +34,7 @@
                         <td><strong>{{ $valueLabel($change, $change->new_value) }}</strong></td>
                         <td>{{ $sources[$change->source] ?? $change->source }}@if (filled($change->source_reference)) <small>({{ $change->source_reference }})</small>@endif</td>
                         <td>{{ $change->user?->name ?? 'System' }}</td>
-                        <td>{{ $change->created_at?->timezone('America/New_York')->format('M j, Y g:i A') }}</td>
+                        <td>{{ $change->created_at?->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A') }}</td>
                         @if ($canDecide)
                             <td>
                                 <x-filament::button size="xs" color="success" wire:click="mountAction('acceptChange', @js(['change' => $change->id]))">Accept</x-filament::button>

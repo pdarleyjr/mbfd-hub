@@ -164,7 +164,7 @@ class ViewUnitMasterVehicle extends ViewRecord
                         TextEntry::make('not_apparatus')->label('Not an apparatus')
                             ->visible(fn (UnitMasterVehicle $record): bool => $record->isMarkedNotApparatus())
                             ->getStateUsing(fn (UnitMasterVehicle $record): string => trim(implode(' ', array_filter([
-                                'Marked by '.($record->notApparatusBy()->value('name') ?? 'Fleet').' on '.$record->not_apparatus_at?->timezone('America/New_York')->format('M j, Y').'.',
+                                'Marked by '.($record->notApparatusBy()->value('name') ?? 'Fleet').' on '.$record->not_apparatus_at?->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y').'.',
                                 $record->not_apparatus_note,
                             ])))),
                     ]))

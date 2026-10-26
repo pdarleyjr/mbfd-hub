@@ -127,7 +127,7 @@ final class DocumentsRelationManager extends RelationManager implements Exportab
                         ->fillForm(fn (VehicleDocument $record): array => [
                             ...$record->only(['original_filename', 'source_type', 'sha256']),
                             'uploaded_by_name' => $record->uploader->name ?? 'Historical import',
-                            'uploaded_at' => $record->created_at?->timezone('America/New_York')->format('M j, Y g:i A'),
+                            'uploaded_at' => $record->created_at?->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A'),
                             'source_references' => $record->sources()->pluck('source_relative_path')->implode("\n"),
                         ]),
                     Tables\Actions\Action::make('editMetadata')->label('Edit details / vehicle links')->icon('heroicon-o-pencil-square')

@@ -18,7 +18,7 @@
             @forelse($reports as $report)
                 <a href="{{ route('hub-support.show', $report) }}" class="block hub-panel p-5 shadow-sm transition-colors hover:border-hub-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-hub-focus focus-visible:ring-offset-2">
                     <span class="block font-semibold">{{ $report->generated_title }}</span>
-                    <span class="mt-2 block text-sm text-hub-muted">{{ $report->status->memberLabel() }} · {{ $report->created_at->timezone('America/New_York')->diffForHumans() }}</span>
+                    <span class="mt-2 block text-sm text-hub-muted">{{ $report->status->memberLabel() }} · {{ $report->created_at->timezone(\App\Support\HubTimezone::NAME)->diffForHumans() }}</span>
                 </a>
             @empty
                 <div class="hub-empty">

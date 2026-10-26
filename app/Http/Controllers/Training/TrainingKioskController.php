@@ -31,7 +31,7 @@ final class TrainingKioskController extends Controller
 
     public function catalog(): JsonResponse
     {
-        $today = now('America/New_York')->toDateString();
+        $today = now(\App\Support\HubTimezone::NAME)->toDateString();
         $courses = TrainingCourse::query()->with(['modules:id,training_course_id,name', 'sessions' => fn ($query) => $query->where('status', 'open')->where('attendance_source', 'digital')->with('module:id,name')->orderByDesc('held_on')->orderBy('starts_at')->orderBy('id')])
             ->withCount(['sessions as today_session_count' => fn ($query) => $query->whereDate('held_on', $today)->where('status', 'open')->where('attendance_source', 'digital')])
             ->withExists(['sessions as staff_session_today' => fn ($query) => $query->whereDate('held_on', $today)->where(fn ($staff) => $staff->whereNotNull('created_by')->orWhereNotNull('training_module_id')->orWhere('attendance_source', 'paper'))])
@@ -50,7 +50,7 @@ final class TrainingKioskController extends Controller
                 ])->all(),
             ]);
 
-        return response()->json(['courses' => $courses, 'today' => now('America/New_York')->toDateString(), 'csrf_token' => csrf_token()]);
+        return response()->json(['courses' => $courses, 'today' => now(\App\Support\HubTimezone::NAME)->toDateString(), 'csrf_token' => csrf_token()]);
     }
 
     public function startCourse(Request $request, TrainingCourse $course, TrainingRosterService $rosters, TrainingKioskService $kiosk, TrainingRosterSubmissionAuthenticator $authenticator): JsonResponse
@@ -157,7 +157,7 @@ final class TrainingKioskController extends Controller
     {
         $kiosk->requireDevice($request, $session);
         abort_unless($session->status === 'open', 409, 'Sign-in is closed.');
-        $members = collect($provider->candidates(now('America/New_York')->toDateString()))->map(fn (array $member): array => [
+        $members = collect($provider->candidates(now(\App\Support\HubTimezone::NAME)->toDateString()))->map(fn (array $member): array => [
             'id' => $member['employee_profile_id'],
             'first_name' => $member['first_name'],
             'last_name' => $member['last_name'],

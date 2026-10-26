@@ -88,7 +88,7 @@ class IdentificationQuestionsRelationManager extends RelationManager implements 
                     ->formatStateUsing(fn (?string $state): ?string => VehicleIdentificationFields::reasonLabel($state))
                     ->placeholder('None')
                     ->wrap(),
-                TextColumn::make('resolved_at')->label('Closed')->dateTime('M j, Y g:i A', 'America/New_York')->placeholder('Open'),
+                TextColumn::make('resolved_at')->label('Closed')->dateTime('M j, Y g:i A', \App\Support\HubTimezone::NAME)->placeholder('Open'),
                 TextColumn::make('resolvedBy.name')->label('By')->placeholder('None'),
                 TextColumn::make('next_checkout')
                     ->label('Asked at next checkout')

@@ -61,7 +61,7 @@ final class Captain5IssuePresenter
         $apparatus = $defect->getRelationValue('apparatus');
         $details = is_array($defect->action_details) ? $defect->action_details : [];
         $expected = isset($details['expected_delivery']) ? (string) $details['expected_delivery'] : null;
-        $today = CarbonImmutable::now('America/New_York')->format('Y-m-d');
+        $today = CarbonImmutable::now(\App\Support\HubTimezone::NAME)->format('Y-m-d');
         $open = ! DefectActionStatus::isClosed($defect->action_status);
         $lastEventId ??= (int) ApparatusDefectEvent::query()->where('apparatus_defect_id', $defect->getKey())->max('id');
         $reporter = $defect->getRelationValue('firstReporter');

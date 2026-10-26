@@ -36,7 +36,7 @@
                 <div class="eyebrow">MIAMI BEACH FIRE DEPARTMENT</div>
                 <h1>Master Vehicle Inventory</h1>
                 <div class="vehicle">{{ $vehicle->displayName() }}</div>
-                <div class="meta">Generated {{ \Carbon\Carbon::parse($manifest['generated_at'])->timezone('America/New_York')->format('M j, Y g:i A T') }}</div>
+                <div class="meta">Generated {{ \Carbon\Carbon::parse($manifest['generated_at'])->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A T') }}</div>
             </td>
         </tr>
     </table>
@@ -77,7 +77,7 @@
         <thead><tr><th style="width: 35%;">Reference</th><th style="width: 35%;">Submitted (Eastern)</th><th style="width: 30%;">Acceptable for use</th></tr></thead>
         <tbody>
             @forelse ($inspections as $inspection)
-                <tr><td>{{ $inspection->reference }}</td><td>{{ $inspection->submitted_at?->clone()->timezone('America/New_York')->format('M j, Y g:i A T') ?? 'Not recorded' }}</td><td>{{ $inspection->acceptableLabel() }}</td></tr>
+                <tr><td>{{ $inspection->reference }}</td><td>{{ $inspection->submitted_at?->clone()->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A T') ?? 'Not recorded' }}</td><td>{{ $inspection->acceptableLabel() }}</td></tr>
             @empty
                 <tr><td colspan="3" class="muted">No take-home inspections recorded.</td></tr>
             @endforelse

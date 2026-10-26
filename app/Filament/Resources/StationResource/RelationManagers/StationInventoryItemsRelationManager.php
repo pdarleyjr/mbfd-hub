@@ -55,7 +55,7 @@ class StationInventoryItemsRelationManager extends RelationManager implements Ex
                     ->label('Last Updated')
                     ->dateTime('M j, Y g:i A')
                     ->sortable()
-                    ->timezone('America/New_York'),
+                    ->timezone(\App\Support\HubTimezone::NAME),
             ])
             ->defaultSort('status', 'asc')
             ->filters([

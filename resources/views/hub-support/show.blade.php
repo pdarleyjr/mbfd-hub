@@ -39,7 +39,7 @@
             <section class="mt-4 hub-panel p-5 shadow-sm">
                 <p class="text-sm font-semibold">{{ $update->changed_by_user_id === $report->reported_by_user_id ? 'You' : 'Support team' }} · {{ $update->status->memberLabel() }}</p>
                 <p class="mt-2 whitespace-pre-wrap">{{ $update->public_response ?: ($update->metadata['resolution_summary'] ?? $update->status->memberLabel()) }}</p>
-                <p class="mt-2 text-xs text-hub-muted">{{ $update->created_at->timezone('America/New_York')->format('M j, Y · g:i A') }}</p>
+                <p class="mt-2 text-xs text-hub-muted">{{ $update->created_at->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y · g:i A') }}</p>
             </section>
         @endforeach
         @if(! $report->isArchived())

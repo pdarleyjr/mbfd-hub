@@ -60,7 +60,7 @@ class InventorySubmissionsRelationManager extends RelationManager implements Exp
                     ->label('Submitted')
                     ->dateTime('M j, Y g:i A')
                     ->sortable()
-                    ->timezone('America/New_York'),
+                    ->timezone(\App\Support\HubTimezone::NAME),
                 Tables\Columns\TextColumn::make('creator.name')
                     ->label('Created By')
                     ->sortable(),
@@ -82,7 +82,7 @@ class InventorySubmissionsRelationManager extends RelationManager implements Exp
                     ->infolist([
                         Infolists\Components\TextEntry::make('employee_name')->label('Submitted by')->placeholder('Unknown employee'),
                         Infolists\Components\TextEntry::make('shift')->label('Shift')->placeholder('—'),
-                        Infolists\Components\TextEntry::make('submitted_at')->label('Submitted')->dateTime('M j, Y g:i A')->timezone('America/New_York'),
+                        Infolists\Components\TextEntry::make('submitted_at')->label('Submitted')->dateTime('M j, Y g:i A')->timezone(\App\Support\HubTimezone::NAME),
                         Infolists\Components\TextEntry::make('archived_at')->label('Archived At')->dateTime()->placeholder('Active'),
                         Infolists\Components\TextEntry::make('archivedBy.name')->label('Archived By')->placeholder('—'),
                         Infolists\Components\TextEntry::make('archive_reason')->label('Archive Reason')->placeholder('—'),

@@ -211,7 +211,7 @@ class TakeHomeVehicleInspection extends Model
 
     public function submittedAtLocal(): string
     {
-        return $this->submitted_at->clone()->timezone('America/New_York')->format('M j, Y g:i A T');
+        return $this->submitted_at->clone()->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A T');
     }
 
     public function vehicleLabel(): string

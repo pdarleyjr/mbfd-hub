@@ -83,7 +83,7 @@ class ViewTrainingSession extends ViewRecord implements ExportableTable, HasTabl
             Action::make('nextSession')->label('Create next session')->color('gray')
                 ->visible(fn (): bool => Gate::allows('create', TrainingSession::class))
                 ->form(TrainingSessionResource::sessionFields())
-                ->fillForm(fn (): array => $this->getRecord()->only(['course_name', 'location', 'oic_employee_profile_id', 'classifications']) + ['held_on' => now('America/New_York')->toDateString()])
+                ->fillForm(fn (): array => $this->getRecord()->only(['course_name', 'location', 'oic_employee_profile_id', 'classifications']) + ['held_on' => now(\App\Support\HubTimezone::NAME)->toDateString()])
                 ->action(function (array $data): void {
                     Gate::authorize('create', TrainingSession::class);
                     $next = app(TrainingRosterService::class)->createSession($this->getRecord()->course, $data + ['training_module_id' => $this->getRecord()->training_module_id], auth()->user());
@@ -153,8 +153,8 @@ class ViewTrainingSession extends ViewRecord implements ExportableTable, HasTabl
                 Tables\Columns\TextColumn::make('snapshot.employee_id')->label('Employee ID'),
                 Tables\Columns\TextColumn::make('snapshot.rank')->label('Rank'),
                 Tables\Columns\TextColumn::make('snapshot.shift')->label('Shift')->placeholder('Unassigned'),
-                Tables\Columns\TextColumn::make('signed_at')->label('Signed (Eastern)')->dateTime('M j, Y g:i A')->timezone('America/New_York')->sortable(),
-                Tables\Columns\TextColumn::make('signature_signed_at')->label('Signature collected (Eastern)')->dateTime('M j, Y g:i:s A')->timezone('America/New_York')->toggleable(),
+                Tables\Columns\TextColumn::make('signed_at')->label('Signed (Eastern)')->dateTime('M j, Y g:i A')->timezone(\App\Support\HubTimezone::NAME)->sortable(),
+                Tables\Columns\TextColumn::make('signature_signed_at')->label('Signature collected (Eastern)')->dateTime('M j, Y g:i:s A')->timezone(\App\Support\HubTimezone::NAME)->toggleable(),
                 Tables\Columns\ImageColumn::make('signature_preview')->label('Signature')
                     ->getStateUsing(fn (TrainingAttendance $record): string => route('training.rosters.attendance.signature', ['session' => $this->getRecord(), 'attendance' => $record]))
                     ->height(48)->width(130),

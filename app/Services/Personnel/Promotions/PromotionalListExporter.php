@@ -33,7 +33,7 @@ final class PromotionalListExporter
         $entries = $list->entries()->with('employee:id,employee_id')->orderBy('original_rank')->get();
         $headers = $this->headers();
         $rows = $entries->map(fn (PromotionalListEntry $entry): array => $this->row($entry))->all();
-        $generated = now('America/New_York')->format('M j, Y g:i A T');
+        $generated = now(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A T');
         $about = [
             'Title' => $list->title, 'List type' => $list->typeName(), 'Effective date' => $list->effective_date->toDateString(),
             'Expires on' => $list->expires_on?->toDateString() ?? 'No expiry date', 'Status' => $list->statusLabel(),
@@ -44,7 +44,7 @@ final class PromotionalListExporter
             : Pdf::loadView('pdf.promotional-list', ['title' => $list->title, 'about' => $about, 'headers' => $headers, 'rows' => $rows])
                 ->setPaper('letter', 'landscape')->output();
         $this->service->recordEvent($actor, $list, 'exported', null, ['format' => $format, 'entries' => count($rows)]);
-        $name = 'MBFD - Promotional list - '.Str::limit(Str::slug($list->title, ' '), 80, '').' - '.now('America/New_York')->format('Y-m-d').'.'.$format;
+        $name = 'MBFD - Promotional list - '.Str::limit(Str::slug($list->title, ' '), 80, '').' - '.now(\App\Support\HubTimezone::NAME)->format('Y-m-d').'.'.$format;
 
         return response()->streamDownload(static function () use ($bytes): void {
             echo $bytes;

@@ -85,7 +85,7 @@ class ViewTrainingMatrix extends Page
     protected function getHeaderActions(): array
     {
         return [
-            $this->datasetExportAction(),
+            $this->datasetExportAction()->label('Export table (PDF or Excel)'),
             Action::make('exportView')->label('Export current view')->icon('heroicon-o-arrow-down-tray')
                 ->action(fn (): StreamedResponse => $this->download(false)),
             Action::make('exportComplete')->label('Complete workbook')->color('gray')

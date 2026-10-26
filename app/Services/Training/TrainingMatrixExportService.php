@@ -64,7 +64,7 @@ final class TrainingMatrixExportService
         $sheets['Sessions'] = [['Session ID', 'Module', 'Class date', 'Start time (Eastern)', 'Location', 'Roster status', 'Source']];
         foreach ($snapshot['sessions'] as $session) {
             $sheets['Sessions'][] = [$session['id'], $session['module_name'], CarbonImmutable::parse($session['held_on']),
-                $session['starts_at'] === null ? null : CarbonImmutable::parse($session['starts_at'])->setTimezone('America/New_York'),
+                $session['starts_at'] === null ? null : CarbonImmutable::parse($session['starts_at'])->setTimezone(\App\Support\HubTimezone::NAME),
                 $session['location'], $session['status'], $session['source']];
         }
         $sheets['Attendance Evidence'] = [['Employee ID', 'Session ID', 'Module', 'Class date', 'Evidence source', 'Evidence status',
@@ -147,7 +147,7 @@ final class TrainingMatrixExportService
         foreach ($columns as $column) {
             $headers[] = $view === 'sessions'
                 ? $column['module_name'].' | '.$column['held_on'].' | Session '.$column['id']
-                    .($column['starts_at'] === null ? '' : ' | '.CarbonImmutable::parse($column['starts_at'])->setTimezone('America/New_York')->format('H:i T'))
+                    .($column['starts_at'] === null ? '' : ' | '.CarbonImmutable::parse($column['starts_at'])->setTimezone(\App\Support\HubTimezone::NAME)->format('H:i T'))
                     .(blank($column['location']) ? '' : ' | '.$column['location'])
                 : $column['name'].($column['is_required'] ? '' : ' (Optional)');
         }

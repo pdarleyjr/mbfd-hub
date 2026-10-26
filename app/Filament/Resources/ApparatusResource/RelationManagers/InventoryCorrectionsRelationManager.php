@@ -56,7 +56,7 @@ class InventoryCorrectionsRelationManager extends RelationManager implements Exp
                 : 'This unit\'s Daily Checkout checklist matches its template.')
             ->defaultSort('created_at', 'desc')
             ->columns([
-                Tables\Columns\TextColumn::make('created_at')->label('Reported')->dateTime('M j, Y', 'America/New_York')->sortable(),
+                Tables\Columns\TextColumn::make('created_at')->label('Reported')->dateTime('M j, Y', \App\Support\HubTimezone::NAME)->sortable(),
                 Tables\Columns\TextColumn::make('item')->label('Item')->searchable(['target_snapshot->name', 'proposal->name', 'member_note'])->wrap()
                     ->state(fn (ApparatusInventoryCorrection $record): string => InventoryCorrectionResource::itemLabel($record)),
                 Tables\Columns\TextColumn::make('reason')->label('Reported problem')->wrap()

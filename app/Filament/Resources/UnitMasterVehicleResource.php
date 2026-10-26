@@ -203,7 +203,7 @@ class UnitMasterVehicleResource extends Resource
                     ->visibleFrom('md'),
                 Tables\Columns\TextColumn::make('latestTakeHomeInspection.submitted_at')
                     ->label('Last take-home inspection')
-                    ->dateTime('M j, Y g:i A', 'America/New_York')
+                    ->dateTime('M j, Y g:i A', \App\Support\HubTimezone::NAME)
                     ->placeholder('None')
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('pending_changes_count')
