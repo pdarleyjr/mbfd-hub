@@ -29,6 +29,7 @@ use App\Http\Controllers\Employee\PersonnelRequestDetailController;
 use App\Http\Controllers\Employee\PersonnelRequestResponseController;
 use App\Http\Controllers\Employee\PersonnelRosterSearchController;
 use App\Http\Controllers\Employee\ResourceDocumentController;
+use App\Http\Controllers\Employee\TaskbookController;
 use App\Http\Controllers\Employee\VehicleInspectionImageController;
 use App\Http\Controllers\Employee\VehicleInspectionPdfController;
 use App\Http\Controllers\Employee\VideoConferencing\CommandAuthorizationController;
@@ -267,6 +268,16 @@ Route::prefix('employee/resources')
         Route::get('/{document}/download', [ResourceDocumentController::class, 'download'])
             ->whereUuid('document')
             ->name('download');
+    });
+
+Route::prefix('employee/taskbooks')
+    ->middleware([EnsureEmployeeAuthenticated::class, 'throttle:120,1'])
+    ->name('employee.taskbooks.')
+    ->group(function (): void {
+        Route::get('/{document}/preview', [TaskbookController::class, 'preview'])
+            ->whereUuid('document')->name('preview');
+        Route::get('/{document}/download', [TaskbookController::class, 'download'])
+            ->whereUuid('document')->name('download');
     });
 
 // Admin > Resource Library: a superseded file of a document. Managers only; authorized in the controller.

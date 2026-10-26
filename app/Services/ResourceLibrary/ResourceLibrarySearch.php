@@ -25,6 +25,7 @@ final class ResourceLibrarySearch
             // The extracted text is large; it is filtered on in SQL and never loaded into the page.
             ->select(['id', 'uuid', 'slug', 'title', 'category', 'description', 'original_filename', 'original_mime', 'original_size', 'original_path', 'preview_path', 'page_count', 'sort', 'published_at'])
             ->published()
+            ->shared()
             ->orderBy('category')
             ->orderBy('sort')
             ->orderBy('title');
@@ -42,7 +43,7 @@ final class ResourceLibrarySearch
     /** @return list<string> */
     public function categories(): array
     {
-        return ResourceDocument::query()->published()->distinct()->orderBy('category')->pluck('category')->all();
+        return ResourceDocument::query()->published()->shared()->distinct()->orderBy('category')->pluck('category')->all();
     }
 
     /** @return list<string> */
