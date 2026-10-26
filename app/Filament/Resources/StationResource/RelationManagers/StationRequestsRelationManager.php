@@ -6,13 +6,17 @@ namespace App\Filament\Resources\StationResource\RelationManagers;
 
 use App\Enums\StationRequestStatus;
 use App\Enums\StationRequestType;
+use App\Filament\Concerns\HasRelationExportActions;
 use App\Filament\Resources\StationRequestResource;
+use App\Services\Exports\ExportableTable;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
 
-class StationRequestsRelationManager extends RelationManager
+class StationRequestsRelationManager extends RelationManager implements ExportableTable
 {
+    use HasRelationExportActions;
+
     protected static string $relationship = 'stationRequests';
 
     protected static ?string $title = 'Requests';
@@ -21,7 +25,7 @@ class StationRequestsRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->columns([
                 Tables\Columns\TextColumn::make('request_number')->label('Request')->searchable()->sortable(),
                 Tables\Columns\TextColumn::make('room.name')
@@ -54,6 +58,6 @@ class StationRequestsRelationManager extends RelationManager
                     ->label('Open')
                     ->icon('heroicon-o-arrow-top-right-on-square')
                     ->url(fn ($record): string => StationRequestResource::getUrl('view', ['record' => $record])),
-            ]);
+            ]));
     }
 }

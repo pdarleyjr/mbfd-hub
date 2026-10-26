@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\OutboundEmailResource\Pages;
 use App\Models\OutboundEmail;
 use Filament\Forms;
@@ -14,6 +15,8 @@ use Illuminate\Database\Eloquent\Builder;
 
 final class OutboundEmailResource extends Resource
 {
+    use HasExportActions;
+
     protected static ?int $navigationSort = 40;
 
     protected static ?string $model = OutboundEmail::class;
@@ -26,7 +29,7 @@ final class OutboundEmailResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['recipients', 'initiatedBy']))->columns([
+        return self::withExportActions($table->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['recipients', 'initiatedBy']))->columns([
             Tables\Columns\Layout\Split::make([
                 Tables\Columns\Layout\Stack::make([
                     Tables\Columns\TextColumn::make('recipient_summary')->label('To')
@@ -88,7 +91,7 @@ final class OutboundEmailResource extends Resource
             ])->query(fn (Builder $query, array $data): Builder => $query
                 ->when($data['from'] ?? null, fn (Builder $query, $date): Builder => $query->whereDate('created_at', '>=', $date))
                 ->when($data['until'] ?? null, fn (Builder $query, $date): Builder => $query->whereDate('created_at', '<=', $date))),
-        ])->defaultSort('created_at', 'desc')->actions([Tables\Actions\ViewAction::make()->label('Open')->color('primary')])->bulkActions([]);
+        ])->defaultSort('created_at', 'desc')->actions([Tables\Actions\ViewAction::make()->label('Open')->color('primary')])->bulkActions([]));
     }
 
     public static function getPages(): array

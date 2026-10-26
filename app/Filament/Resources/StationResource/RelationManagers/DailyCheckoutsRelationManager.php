@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\StationResource\RelationManagers;
 
+use App\Filament\Concerns\HasRelationExportActions;
 use App\Filament\Support\InspectionTestFilter;
 use App\Filament\Support\InspectionWorkspace;
 use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
 use App\Models\Station;
+use App\Services\Exports\ExportableTable;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -22,8 +24,10 @@ use Illuminate\Database\Eloquent\Builder;
  * The relationship joins apparatuses, so every column used in a query is
  * qualified with the inspections table.
  */
-class DailyCheckoutsRelationManager extends RelationManager
+class DailyCheckoutsRelationManager extends RelationManager implements ExportableTable
 {
+    use HasRelationExportActions;
+
     protected static string $relationship = 'apparatusInspections';
 
     protected static ?string $title = 'Daily Checkouts';
@@ -32,7 +36,7 @@ class DailyCheckoutsRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->modifyQueryUsing(fn (Builder $query): Builder => $query
                 ->with('apparatus:id,designation,unit_id,vehicle_number')
                 ->withCount('defects'))
@@ -47,7 +51,7 @@ class DailyCheckoutsRelationManager extends RelationManager
                     ->state(fn (ApparatusInspection $record): string => self::unitLabel($record))
                     ->badge()
                     ->color('info'),
-                Tables\Columns\TextColumn::make('operator_name')->label('Operator'),
+                Tables\Columns\TextColumn::make('operator_name')->label('Operator')->searchable(),
                 Tables\Columns\TextColumn::make('shift')->badge()->color('gray'),
                 Tables\Columns\TextColumn::make('inspection_status')
                     ->label('Status')
@@ -102,7 +106,7 @@ class DailyCheckoutsRelationManager extends RelationManager
                     ->label('View results')
                     ->icon('heroicon-o-eye')
                     ->url(fn (ApparatusInspection $record): string => InspectionWorkspace::url($record)),
-            ]);
+            ]));
     }
 
     /** @return array<int, string> */

@@ -39,6 +39,8 @@ export interface ActingRequest {
 }
 
 export interface ActingState {
+  /** Server clock used for custom-end bounds; absent in older cached responses. */
+  server_time?: string;
   /** 'captain_5' or 'command_300'; older Captain 5 answers omit it. */
   role?: string;
   /** False hides the "Click here" control. Absent (older Captain 5 answers) means the viewer may ask. */

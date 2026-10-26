@@ -216,7 +216,7 @@ final class Captain5ActingService
      * The acting block a page shows for one role: the viewer's own pending request, the pending queue
      * (approvers only) and the end times the 12 / 24 hour choices would have now.
      *
-     * @return array{role: string, can_request: bool, can_approve: bool, mine: array<string, mixed>|null, pending: list<array<string, mixed>>, choices: array{'12h': string|null, '24h': string|null}}
+     * @return array{role: string, server_time: string, can_request: bool, can_approve: bool, mine: array<string, mixed>|null, pending: list<array<string, mixed>>, choices: array{'12h': string|null, '24h': string|null}}
      */
     public function state(User $viewer, string $role): array
     {
@@ -228,6 +228,7 @@ final class Captain5ActingService
 
         return [
             'role' => $role,
+            'server_time' => now((string) config('hub.timezone'))->toIso8601String(),
             'can_request' => $this->canRequest($viewer, $role),
             'can_approve' => $canApprove,
             'mine' => $mine instanceof Captain5ActingRequest ? $this->present($mine, $viewer) : null,

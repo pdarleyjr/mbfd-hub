@@ -2,22 +2,26 @@
 
 namespace App\Filament\Resources\StationResource\RelationManagers;
 
+use App\Filament\Concerns\HasRelationExportActions;
 use App\Filament\Resources\CapitalProjectResource;
 use App\Models\CapitalProject;
+use App\Services\Exports\ExportableTable;
 use Filament\Forms;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
 
-class CapitalProjectsRelationManager extends RelationManager
+class CapitalProjectsRelationManager extends RelationManager implements ExportableTable
 {
+    use HasRelationExportActions;
+
     protected static string $relationship = 'capitalProjects';
 
     protected static ?string $title = 'Capital Projects';
 
     public function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->recordTitleAttribute('name')
             ->columns([
                 Tables\Columns\TextColumn::make('name')
@@ -73,7 +77,7 @@ class CapitalProjectsRelationManager extends RelationManager
                     ->url(fn (CapitalProject $record): string => CapitalProjectResource::getUrl('view', ['record' => $record]))
                     ->openUrlInNewTab(false),
             ])
-            ->bulkActions([]);
+            ->bulkActions([]));
     }
 
     /**

@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Filament\Training\Resources\TrainingCourseResource\Pages;
 
+use App\Filament\Concerns\HasPageTableExportActions;
 use App\Filament\Training\Resources\TrainingCourseResource;
 use App\Filament\Training\Resources\TrainingSessionResource;
 use App\Models\Employee;
 use App\Models\Training\TrainingCourse;
 use App\Models\Training\TrainingModule;
+use App\Services\Exports\ExportableTable;
 use App\Services\Training\TrainingCourseModuleService;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Select;
@@ -22,8 +24,9 @@ use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Gate;
 
-class ManageTrainingModules extends Page implements HasTable
+class ManageTrainingModules extends Page implements ExportableTable, HasTable
 {
+    use HasPageTableExportActions;
     use InteractsWithTable;
 
     protected static string $resource = TrainingCourseResource::class;
@@ -31,6 +34,11 @@ class ManageTrainingModules extends Page implements HasTable
     protected static string $view = 'filament.training.pages.course-modules';
 
     public TrainingCourse $course;
+
+    protected function tableExportOwner(): TrainingCourse
+    {
+        return $this->course;
+    }
 
     public function mount(int|string $record): void
     {
@@ -82,9 +90,9 @@ class ManageTrainingModules extends Page implements HasTable
     {
         Gate::authorize('view', $this->course);
 
-        return $table->query(TrainingModule::query()->where('training_course_id', $this->course->id))
+        return static::withExportActions($table->query(TrainingModule::query()->where('training_course_id', $this->course->id))
             ->columns([
-                Tables\Columns\TextColumn::make('name')->searchable()->weight('semibold'),
+                Tables\Columns\TextColumn::make('name')->searchable()->sortable()->weight('semibold'),
                 Tables\Columns\TextColumn::make('description')->wrap(),
                 Tables\Columns\IconColumn::make('is_required')->label('Required')->boolean(),
                 Tables\Columns\TextColumn::make('audience.ranks')->label('Ranks')->separator(', ')->placeholder('All ranks'),
@@ -98,6 +106,6 @@ class ManageTrainingModules extends Page implements HasTable
                         app(TrainingCourseModuleService::class)->updateModule($record, $data, auth()->user());
                     }),
             ])->defaultSort('sort_order')->emptyStateHeading('Add the first module')
-            ->emptyStateDescription('Each module can have any number of dated sessions. Existing unassigned sessions remain available.');
+            ->emptyStateDescription('Each module can have any number of dated sessions. Existing unassigned sessions remain available.'));
     }
 }

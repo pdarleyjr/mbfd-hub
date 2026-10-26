@@ -2,22 +2,26 @@
 
 namespace App\Filament\Resources\StationResource\RelationManagers;
 
+use App\Filament\Concerns\HasRelationExportActions;
 use App\Filament\Resources\Under25kProjectResource;
 use App\Models\Under25kProject;
+use App\Services\Exports\ExportableTable;
 use Filament\Forms;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
 
-class Under25kProjectsRelationManager extends RelationManager
+class Under25kProjectsRelationManager extends RelationManager implements ExportableTable
 {
+    use HasRelationExportActions;
+
     protected static string $relationship = 'under25kProjects';
 
     protected static ?string $title = 'Under $25k Projects';
 
     public function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->recordTitleAttribute('name')
             ->columns([
                 Tables\Columns\TextColumn::make('name')
@@ -78,7 +82,7 @@ class Under25kProjectsRelationManager extends RelationManager
                     ->url(fn (Under25kProject $record): string => Under25kProjectResource::getUrl('view', ['record' => $record]))
                     ->openUrlInNewTab(false),
             ])
-            ->bulkActions([]);
+            ->bulkActions([]));
     }
 
     /**

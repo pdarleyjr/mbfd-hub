@@ -33,7 +33,7 @@ class ListUniforms extends ListRecords
                 ->color('info')
                 ->modalHeading('Employee Equipment Record')
                 ->modalWidth('4xl')
-                ->modalSubmitAction(false)
+                ->modalSubmitActionLabel('Download table')
                 ->modalCancelActionLabel('Close')
                 ->form([
                     \Filament\Forms\Components\Select::make('employee_portal_id')
@@ -49,9 +49,25 @@ class ListUniforms extends ListRecords
                         ->searchable()
                         ->required()
                         ->live(),
+                    Select::make('section')->label('Table')->options(['equipment' => 'Assigned equipment', 'legacy_requests' => 'Request history'])->default('equipment')->required(),
+                    \Filament\Forms\Components\Radio::make('format')->label('File type')->options(['xlsx' => 'Excel (.xlsx)', 'pdf' => 'PDF'])->default('xlsx')->required(),
                 ])
-                ->action(function (array $data, Actions\Action $action): void {
-                    // No-op — record-viewing is shown via the modal content below
+                ->action(function (array $data, Actions\Action $action) {
+                    try {
+                        return app(\App\Services\Exports\TableExportService::class)->downloadDataset(
+                            auth()->user(), static::class, (string) ($data['format'] ?? ''),
+                            fn (): bool => UniformResource::canViewAny() && in_array($data['section'] ?? '', ['equipment', 'legacy_requests'], true),
+                            fn (): \App\Services\Exports\ExportDataset => app(\App\Services\Exports\RecordHistoryDatasets::class)->build(
+                                auth()->user(), Employee::query()->findOrFail($data['employee_portal_id']), (string) $data['section'],
+                            ),
+                            'employee record table',
+                        );
+                    } catch (\App\Services\Exports\ExportFailedException $exception) {
+                        Notification::make()->title('Export not created')->body($exception->getMessage())->danger()->send();
+                        $action->halt();
+
+                        return null;
+                    }
                 })
                 ->modalContent(function ($livewire) {
                     $empId = data_get($livewire->mountedActionsData[0] ?? [], 'employee_portal_id');

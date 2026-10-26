@@ -23,6 +23,8 @@ use Illuminate\Validation\ValidationException;
 
 class ViewPersonnelEmployee extends ViewRecord
 {
+    use \App\Filament\Concerns\HasRecordHistoryExportAction;
+
     protected static string $resource = PersonnelEmployeeResource::class;
 
     protected static string $view = 'filament.clusters.personnel-uniforms-equipment.resources.employee-record';
@@ -33,6 +35,7 @@ class ViewPersonnelEmployee extends ViewRecord
         $employee = $this->record;
 
         return [
+            $this->recordHistoryExportAction(),
             Action::make('issue_uniform')->label('Issue Uniform')->icon('heroicon-o-shopping-bag')->color('primary')->form([
                 Select::make('uniform_id')->label('Uniform inventory')->options(fn () => Uniform::query()->where('quantity_on_hand', '>', 0)->orderBy('item_name')->get()->mapWithKeys(fn (Uniform $uniform) => [$uniform->id => "{$uniform->item_name} — {$uniform->size} — {$uniform->quantity_on_hand} on hand"]))->searchable()->required(),
                 TextInput::make('quantity')->numeric()->minValue(1)->maxValue(20)->default(1)->required(),
@@ -77,6 +80,14 @@ class ViewPersonnelEmployee extends ViewRecord
                 $prefix.'.'.($key === 'employee' ? 'quantity' : $key) => $messages,
             ])->all());
         }
+    }
+
+    /** @return array<string, string> */
+    protected function recordHistoryOptions(): array
+    {
+        return array_intersect_key(app(\App\Services\Exports\RecordHistoryDatasets::class)->sections($this->getRecord()), array_flip([
+            'equipment', 'requests', 'legacy_requests',
+        ]));
     }
 
     protected function getViewData(): array

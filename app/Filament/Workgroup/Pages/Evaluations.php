@@ -2,11 +2,13 @@
 
 namespace App\Filament\Workgroup\Pages;
 
+use App\Filament\Concerns\HasWorkgroupTableExportActions;
 use App\Models\CandidateProduct;
 use App\Models\EvaluationSubmission;
 use App\Models\User;
 use App\Models\WorkgroupMember;
 use App\Models\WorkgroupSession;
+use App\Services\Exports\ExportableTable;
 use App\Services\Workgroup\EvaluationService;
 use App\Support\Workgroups\WorkgroupAccess;
 use App\Support\Workgroups\WorkgroupContext;
@@ -22,8 +24,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
-class Evaluations extends Page implements HasTable
+class Evaluations extends Page implements ExportableTable, HasTable
 {
+    use HasWorkgroupTableExportActions;
     use InteractsWithTable;
 
     protected static ?string $navigationIcon = 'heroicon-o-clipboard-document-check';
@@ -168,7 +171,7 @@ class Evaluations extends Page implements HasTable
     {
         $member = $this->getCurrentMember();
 
-        return $table
+        return static::withExportActions($table
             ->query($this->getEvaluationsQuery())
             ->columns([
                 TextColumn::make('name')
@@ -251,7 +254,7 @@ class Evaluations extends Page implements HasTable
                     ->url(fn ($record) => EvaluationFormPage::getUrl(['productId' => $record->id])),
             ])
             ->emptyStateHeading('No products to evaluate')
-            ->emptyStateDescription('No candidate products have been added to this session yet, or you have not been marked as attending this session.');
+            ->emptyStateDescription('No candidate products have been added to this session yet, or you have not been marked as attending this session.'));
     }
 
     protected function getEvaluationsQuery(): Builder

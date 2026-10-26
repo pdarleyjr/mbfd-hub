@@ -25,7 +25,7 @@ final class TrainingCrewPlanExporter
 
     private const LOGO_PATH = 'images/training/mbfd-logo.png';
 
-    private const TZ = 'America/New_York';
+    private const TZ = \App\Support\HubTimezone::NAME;
 
     public function pdf(array $projection): string
     {

@@ -2,9 +2,12 @@
 
 namespace App\Filament\Workgroup\Pages;
 
+use App\Filament\Concerns\HasDatasetExportActions;
 use App\Models\User;
 use App\Models\Workgroup;
 use App\Models\WorkgroupSession;
+use App\Services\Exports\ExportDataset;
+use App\Services\Exports\TableExportService;
 use App\Services\Workgroup\EvaluationService;
 use App\Services\Workgroup\WorkgroupAIService;
 use App\Support\Workgroups\WorkgroupAccess;
@@ -24,6 +27,8 @@ use Illuminate\Support\Facades\Log;
  */
 class SessionResultsPage extends Page
 {
+    use HasDatasetExportActions;
+
     protected static ?string $navigationIcon = 'heroicon-o-trophy';
 
     protected static ?string $title = 'Session Results';
@@ -62,7 +67,7 @@ class SessionResultsPage extends Page
         $evalService = app(EvaluationService::class);
         $granular = $evalService->getGranularToolGroupings($sessionId);
 
-        $filename = $tableKey.'_results_'.now()->format('Y-m-d').'.csv';
+        $filename = $tableKey.'_results_'.now(TableExportService::TIMEZONE)->format('Y-m-d').'.csv';
 
         if ($tableKey === 't1_standalone') {
             $t1 = $granular['t1_standalone'] ?? null;
@@ -147,7 +152,7 @@ class SessionResultsPage extends Page
         $sessionId = $session->id;
         $results = $evalService->getSessionResults($sessionId);
 
-        $filename = str_replace(' ', '_', strtolower($categoryName)).'_rankings_'.now()->format('Y-m-d').'.csv';
+        $filename = str_replace(' ', '_', strtolower($categoryName)).'_rankings_'.now(TableExportService::TIMEZONE)->format('Y-m-d').'.csv';
 
         $targetCat = collect($results['rankable_categories'])->first(fn ($c) => $c['category_name'] === $categoryName);
 
@@ -180,7 +185,7 @@ class SessionResultsPage extends Page
         $evalService = app(EvaluationService::class);
         $workgroup = $session->workgroup;
 
-        $filename = 'competitor_group_rankings_'.now()->format('Y-m-d').'.csv';
+        $filename = 'competitor_group_rankings_'.now(TableExportService::TIMEZONE)->format('Y-m-d').'.csv';
 
         $rankings = $workgroup instanceof Workgroup
             ? $evalService->getCompetitorGroupRankings($workgroup, $session)
@@ -218,7 +223,7 @@ class SessionResultsPage extends Page
         $sessionId = $session->id;
         $results = $evalService->getSessionResults($sessionId);
 
-        $filename = 'finalists_'.now()->format('Y-m-d').'.csv';
+        $filename = 'finalists_'.now(TableExportService::TIMEZONE)->format('Y-m-d').'.csv';
 
         return response()->streamDownload(function () use ($results) {
             $handle = fopen('php://output', 'w');
@@ -443,7 +448,96 @@ class SessionResultsPage extends Page
     {
         // Session switching is now handled by inline pill navigation in the blade view
         // (wire:click calls switchSession() Livewire method directly)
-        return [];
+        return [$this->datasetExportAction()->label('Export results tables')];
+    }
+
+    public function canExportData(User $actor): bool
+    {
+        return static::canAccess() && app(WorkgroupContext::class)->current($actor) !== null
+            && ($session = $this->getSelectedSession()) !== null
+            && app(WorkgroupAccess::class)->canViewSession($actor, $session);
+    }
+
+    protected function exportDataset(User $actor): ExportDataset
+    {
+        $data = $this->getViewData();
+        $session = $data['session'];
+        $rows = [];
+        $add = static function (string $table, string $group, ?int $rank, string $product, string $brand, array $metrics) use (&$rows): void {
+            foreach ($metrics as $metric => $value) {
+                $rows[] = [$table, $group, $rank, $product, $brand,
+                    str($metric)->replace('_', ' ')->headline()->toString(), $value];
+            }
+        };
+        $productMetrics = static fn (array $item): array => array_intersect_key($item, array_flip([
+            'weighted_average', 'avg_score', 'response_count', 'meets_threshold', 'capability_avg', 'usability_avg',
+            'affordability_avg', 'maintainability_avg', 'deployability_avg', 'advance_yes', 'advance_no', 'deal_breakers',
+        ]));
+
+        $add('Session progress', $session->name, null, '', '', $data['progress']);
+        foreach ($data['categoryResults'] as $category) {
+            foreach ($category['rankings'] as $index => $item) {
+                $product = $item['product'];
+                $add('Category rankings', $category['category_name'], $index + 1, $product->name,
+                    (string) ($product->manufacturer ?? ''), $productMetrics($item));
+            }
+            foreach (collect($category['rankings'])->filter(fn (array $item): bool => $item['meets_threshold'])->take(2) as $index => $item) {
+                $product = $item['product'];
+                $add('Finalists', $category['category_name'], $index + 1, $product->name,
+                    (string) ($product->manufacturer ?? ''), array_intersect_key($item, array_flip(['weighted_average', 'response_count'])));
+            }
+        }
+        foreach ($data['competitorGroupRankings'] as $category) {
+            foreach ($category['groups'] as $group) {
+                foreach ($group['rankings'] as $index => $item) {
+                    $add('Competitor groups', $category['category_name'].' · '.$group['group_name'], $index + 1,
+                        (string) ($item['name'] ?? ''), (string) ($item['brand'] ?? ''), $productMetrics($item));
+                }
+            }
+        }
+        foreach ($data['granularToolGroupings'] as $group => $items) {
+            $items = $group === 't1_standalone' ? ($items === null ? [] : [$items]) : $items;
+            foreach ($items as $index => $item) {
+                $metrics = $productMetrics($item) + array_intersect_key($item, array_flip(['overall_avg', 'tool_count']));
+                foreach ($item['saver_breakdown'] ?? [] as $metric => $value) {
+                    $metrics[$metric] = $value;
+                }
+                $add($group === 'brand_overall' ? 'Brand comparison' : 'Tool comparison',
+                    str($group)->replace('_', ' ')->headline()->toString(), $index + 1,
+                    (string) ($item['name'] ?? ''), (string) ($item['brand'] ?? ''), $metrics);
+            }
+        }
+
+        foreach ($data['brandGroupedAnalysis'] as $group) {
+            foreach ($group['brand_rankings'] as $rank => $brand) {
+                $add('Package purchase comparison', $group['category_name'], $rank + 1, '', $brand['brand'],
+                    array_intersect_key($brand, array_flip(['composite_score', 'product_count', 'scored_product_count'])));
+                foreach ($brand['product_scores'] as $item) {
+                    $add('Package product scores', $group['category_name'], $rank + 1, $item['product']->name, $brand['brand'], $productMetrics($item));
+                }
+            }
+        }
+        foreach ($data['isolatedProducts'] as $item) {
+            $add('Standalone product analysis', $item['category_name'], null, $item['name'], (string) ($item['brand'] ?? ''),
+                $productMetrics($item) + ($item['saver_breakdown'] ?? []) + ['note' => $item['note']]);
+        }
+        foreach ($data['nonRankableFeedback'] as $category) {
+            foreach ($category['feedback'] as $item) {
+                $metrics = ['evaluator' => $item['evaluator'], 'score' => $item['score']];
+                foreach ($item['comments'] as $index => $comment) {
+                    $metrics['comment_'.($index + 1)] = $comment;
+                }
+                $add('Non-rankable feedback', $category['category_name'], null, $item['product'], '', $metrics);
+            }
+        }
+
+        return ExportDataset::fromRows($actor, 'Workgroup Session '.$session->id.' Results',
+            ['Table', 'Category / group', 'Rank', 'Product', 'Brand', 'Measure', 'Value'], $rows,
+            'Selected workgroup session; submitted, countable evaluations',
+            ['Session: '.$session->name,
+                'Session begins: '.($session->start_date?->format('Y-m-d') ?? 'Not recorded'),
+                'Session ends: '.($session->end_date?->format('Y-m-d') ?? 'Not recorded'),
+                'Data through: '.now(TableExportService::TIMEZONE)->format('M j, Y g:i A T')]);
     }
 
     // ─── View Data (passed to blade) ────────────────────────────────

@@ -57,7 +57,8 @@ final class Captain5ActingRequestTest extends TestCase
         $lieutenant = $this->officer('Lieutenant', 'Rita Acting');
         $this->actAs($lieutenant);
         $this->postJson('/api/captain5/acting-requests', ['kind' => 'act', 'duration' => '12h', 'client_request_id' => (string) Str::uuid()])
-            ->assertCreated()->assertJsonPath('on_duty.source', OnDutyCaptain5::SOURCE_BID)->assertJsonPath('acting.mine.kind', 'act');
+            ->assertCreated()->assertJsonPath('on_duty.source', OnDutyCaptain5::SOURCE_BID)->assertJsonPath('acting.mine.kind', 'act')
+            ->assertJsonPath('acting.server_time', '2026-10-20T10:00:00-04:00');
         $request = Captain5ActingRequest::query()->sole();
         self::assertSame(Captain5ActingRequest::PENDING, $request->status);
         self::assertSame('2026-10-20 20:00', $request->ends_at->setTimezone('America/New_York')->format('Y-m-d H:i'));
@@ -88,6 +89,7 @@ final class Captain5ActingRequestTest extends TestCase
         $service->approve($this->admin, $one->id);
 
         $two = $service->request($second, ['kind' => 'act', 'duration' => 'custom', 'ends_at' => '2026-10-20 18:30']);
+        self::assertSame('2026-10-20 22:30:00', $two->fresh()->getRawOriginal('ends_at'));
         $this->forgetCaptain5Memo();
         self::assertSame('First Acting', app(Captain5Access::class)->decide($first)->onDuty->toArray()['name'], 'Pending takeover changes nothing yet');
         $service->approve($this->admin, $two->id);

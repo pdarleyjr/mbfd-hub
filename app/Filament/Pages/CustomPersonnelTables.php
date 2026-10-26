@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Filament\Pages;
 
 use App\Filament\Concerns\EnterpriseTable;
+use App\Filament\Concerns\HasPageTableExportActions;
 use App\Filament\Support\PersonnelTableSchema;
 use App\Models\PersonnelTable;
 use App\Models\User;
+use App\Services\Exports\ExportableTable;
 use App\Services\Personnel\PersonnelSource;
 use App\Services\Personnel\PersonnelTableService;
 use Filament\Actions\Action;
@@ -21,9 +23,10 @@ use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
-final class CustomPersonnelTables extends Page implements HasTable
+final class CustomPersonnelTables extends Page implements ExportableTable, HasTable
 {
     use EnterpriseTable, InteractsWithTable;
+    use HasPageTableExportActions;
 
     protected static ?string $navigationGroup = 'Personnel';
 
@@ -47,7 +50,7 @@ final class CustomPersonnelTables extends Page implements HasTable
 
     public function table(Table $table): Table
     {
-        return self::applyEnterpriseDefaults($table)->deferLoading(false)
+        return self::withExportActions(self::applyEnterpriseDefaults($table)->deferLoading(false)
             ->query(fn (): Builder => app(PersonnelTableService::class)->accessibleQuery(auth()->user())
                 ->withTrashed()->whereNull('directory_key'))
             ->columns([
@@ -90,7 +93,7 @@ final class CustomPersonnelTables extends Page implements HasTable
                     }),
             ])->emptyStateHeading('Create your first personnel table')
             ->emptyStateDescription('Choose members and add tracking columns for your administrative work.')
-            ->searchPlaceholder('Search saved tables');
+            ->searchPlaceholder('Search saved tables'));
     }
 
     protected function getHeaderActions(): array

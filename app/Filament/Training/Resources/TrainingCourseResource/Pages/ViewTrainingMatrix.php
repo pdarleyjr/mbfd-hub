@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace App\Filament\Training\Resources\TrainingCourseResource\Pages;
 
+use App\Filament\Concerns\HasDatasetExportActions;
 use App\Filament\Training\Resources\TrainingCourseResource;
 use App\Models\Training\TrainingCourse;
+use App\Models\User;
+use App\Services\Exports\ExportDataset;
 use App\Services\Training\TrainingAttendanceMatrixService;
 use App\Services\Training\TrainingMatrixExportService;
 use Filament\Actions\Action;
@@ -20,7 +23,20 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ViewTrainingMatrix extends Page
 {
+    use HasDatasetExportActions;
     use WithPagination;
+
+    public function canExportData(User $actor): bool
+    {
+        return $this->course->track_attendance_matrix && Gate::forUser($actor)->allows('view', $this->course);
+    }
+
+    protected function exportDataset(User $actor): ExportDataset
+    {
+        $this->authorizeMatrix();
+
+        return app(TrainingMatrixExportService::class)->dataset($actor, $this->course, $this->filters, $this->display === 'sessions' ? 'sessions' : 'modules');
+    }
 
     protected static string $resource = TrainingCourseResource::class;
 
@@ -69,6 +85,7 @@ class ViewTrainingMatrix extends Page
     protected function getHeaderActions(): array
     {
         return [
+            $this->datasetExportAction(),
             Action::make('exportView')->label('Export current view')->icon('heroicon-o-arrow-down-tray')
                 ->action(fn (): StreamedResponse => $this->download(false)),
             Action::make('exportComplete')->label('Complete workbook')->color('gray')

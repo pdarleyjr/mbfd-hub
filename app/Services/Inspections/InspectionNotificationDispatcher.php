@@ -52,7 +52,7 @@ use Throwable;
  */
 final class InspectionNotificationDispatcher
 {
-    public const TIMEZONE = 'America/New_York';
+    public const TIMEZONE = \App\Support\HubTimezone::NAME;
 
     private const EXCERPT_LENGTH = 240;
 

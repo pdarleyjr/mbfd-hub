@@ -2,9 +2,11 @@
 
 namespace App\Filament\Resources\Workgroup\RelationManagers;
 
+use App\Filament\Concerns\HasRelationExportActions;
 use App\Filament\Resources\Workgroup\RelationManagers\Concerns\AuthorizesWorkgroupOwner;
 use App\Filament\Resources\Workgroup\WorkgroupFileResource;
 use App\Models\Workgroup;
+use App\Services\Exports\ExportableTable;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -12,9 +14,10 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use LogicException;
 
-class FilesRelationManager extends RelationManager
+class FilesRelationManager extends RelationManager implements ExportableTable
 {
     use AuthorizesWorkgroupOwner;
+    use HasRelationExportActions;
 
     protected static string $relationship = 'files';
 
@@ -39,12 +42,12 @@ class FilesRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->recordTitleAttribute('filename')
             ->columns([
                 Tables\Columns\TextColumn::make('filename')
                     ->label('Filename')
-                    ->searchable(),
+                    ->searchable()->sortable(),
                 Tables\Columns\TextColumn::make('session.name')
                     ->label('Session')
                     ->searchable(),
@@ -81,7 +84,7 @@ class FilesRelationManager extends RelationManager
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
-            ]);
+            ]));
     }
 
     /** @param array<string, mixed> $data */

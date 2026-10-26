@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\UnitMasterVehicleResource\Pages;
 
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\UnitMasterVehicleResource;
 use App\Filament\Resources\UnitMasterVehicleResource\RelationManagers\DocumentsRelationManager;
 use App\Models\UnitMasterVehicle;
 use App\Models\User;
 use App\Models\VehicleDocument;
 use App\Models\VehicleDocumentSource;
+use App\Services\Exports\ExportableTable;
 use App\Services\Fleet\VehicleDocumentLibrary;
 use App\Support\Fleet\VehicleDocumentAccess;
 use Filament\Actions;
@@ -23,9 +25,20 @@ use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 
-final class ReviewVehicleDocuments extends Page implements HasTable
+final class ReviewVehicleDocuments extends Page implements ExportableTable, HasTable
 {
+    use HasExportActions;
     use InteractsWithTable;
+
+    public function canExportTableData(User $actor): bool
+    {
+        return VehicleDocumentAccess::canManage($actor);
+    }
+
+    public function tableExportTitle(): string
+    {
+        return 'Historical Vehicle Document Review';
+    }
 
     protected static string $resource = UnitMasterVehicleResource::class;
 
@@ -60,11 +73,11 @@ final class ReviewVehicleDocuments extends Page implements HasTable
 
     public function table(Table $table): Table
     {
-        return $table->query($this->visibleDocuments()->where('review_status', '!=', 'verified')->with('sources'))
+        return self::withExportActions($table->query($this->visibleDocuments()->where('review_status', '!=', 'verified')->with('sources'))
             ->columns([
                 Split::make([
                     Stack::make([
-                        Tables\Columns\TextColumn::make('title')->searchable()->wrap()->weight('semibold'),
+                        Tables\Columns\TextColumn::make('title')->searchable()->sortable()->wrap()->weight('semibold'),
                         Tables\Columns\TextColumn::make('original_filename')->searchable()->color('gray')->wrap(),
                     ]),
                     Tables\Columns\TextColumn::make('category')->formatStateUsing(fn (VehicleDocument $record): string => $record->categoryLabel())->badge(),
@@ -113,7 +126,7 @@ final class ReviewVehicleDocuments extends Page implements HasTable
             ])
             ->emptyStateHeading('No documents waiting for review')
             ->emptyStateDescription('Verified documents are available within their vehicle profiles.')
-            ->defaultSort('id')->paginated([10, 25, 50]);
+            ->defaultSort('id')->paginated([10, 25, 50]));
     }
 
     private function visibleDocuments(): \Illuminate\Database\Eloquent\Builder

@@ -112,7 +112,7 @@ class InventoryCorrectionResource extends Resource
                     ->description(fn (ApparatusInventoryCorrection $record): string => self::unitLabel($record).' · '.self::itemLabel($record)),
                 Tables\Columns\TextColumn::make('apparatus.designation')->label('Apparatus')->visibleFrom('md')
                     ->formatStateUsing(fn (ApparatusInventoryCorrection $record): string => self::unitLabel($record)),
-                Tables\Columns\TextColumn::make('item')->label('Item')->visibleFrom('md')->wrap()
+                Tables\Columns\TextColumn::make('item')->label('Item')->visibleFrom('md')->searchable(['target_snapshot->name', 'proposal->name', 'member_note'])->wrap()
                     ->state(fn (ApparatusInventoryCorrection $record): string => self::itemLabel($record)),
                 Tables\Columns\TextColumn::make('reason')->label('Reported problem')->wrap()
                     ->formatStateUsing(fn (?string $state): string => InventoryCorrectionReason::label($state)),

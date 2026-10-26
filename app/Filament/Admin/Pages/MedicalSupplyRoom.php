@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Filament\Admin\Pages;
 
 use App\Filament\Admin\Pages\Concerns\SupplyRoomCounts;
+use App\Filament\Admin\Pages\Concerns\SupplyRoomDataExports;
 use App\Filament\Admin\Pages\Concerns\SupplyRoomStockTable;
+use App\Filament\Concerns\HasPageTableExportActions;
 use App\Filament\Concerns\RunsEmsActions;
 use App\Filament\Resources\InventoryRequestResource;
 use App\Filament\Support\EmsLabels;
@@ -22,6 +24,7 @@ use App\Services\Ems\ReorderAdvisor;
 use App\Services\Ems\SnapshotPresenter;
 use App\Services\Ems\SupplyOrderService;
 use App\Services\Ems\SupplyRoomQuery;
+use App\Services\Exports\ExportableTable;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Hidden;
@@ -42,13 +45,15 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  * reconciling and ordering need act; changing an item's threshold or package size needs configure.
  * Every write goes through the EMS services, which check access again.
  */
-final class MedicalSupplyRoom extends Page implements HasTable
+final class MedicalSupplyRoom extends Page implements ExportableTable, HasTable
 {
+    use HasPageTableExportActions;
     use InteractsWithTable, SupplyRoomStockTable {
         SupplyRoomStockTable::table insteadof InteractsWithTable;
     }
     use RunsEmsActions;
     use SupplyRoomCounts;
+    use SupplyRoomDataExports;
 
     public const TABS = [
         'stock' => 'Stock',

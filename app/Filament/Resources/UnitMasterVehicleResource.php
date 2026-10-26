@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Concerns\EnterpriseTable;
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\UnitMasterVehicleResource\ApparatusReviewActions;
 use App\Filament\Resources\UnitMasterVehicleResource\Pages;
 use App\Models\Employee;
@@ -18,6 +19,7 @@ use Illuminate\Database\Eloquent\Builder;
 class UnitMasterVehicleResource extends Resource
 {
     use EnterpriseTable;
+    use HasExportActions;
 
     protected static ?string $model = UnitMasterVehicle::class;
 
@@ -124,7 +126,7 @@ class UnitMasterVehicleResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return self::applyEnterpriseDefaults($table)
+        return static::withExportActions(self::applyEnterpriseDefaults($table)
             ->modifyQueryUsing(fn (Builder $query): Builder => $query
                 ->with(['currentDriver', 'latestTakeHomeInspection', 'apparatus'])
                 ->withCount(['documents as visible_documents_count' => function (Builder $documents): void {
@@ -300,7 +302,7 @@ class UnitMasterVehicleResource extends Resource
                         }),
                 ]),
             ])
-            ->defaultSort('veh_number');
+            ->defaultSort('veh_number'));
     }
 
     public static function getRelations(): array

@@ -9,6 +9,7 @@ import Tabs, { type TabItem } from './ui/Tabs';
 import Tag, { StatusTag } from './ui/Tag';
 import { EmptyState, LoadError, SkeletonRows } from './ui/StateViews';
 import { humanize } from './ui/status';
+import { HUB_TIMEZONE } from '../../../shared/timezone.ts';
 
 type ProfileTab = 'assets' | 'open' | 'history' | 'events';
 
@@ -16,7 +17,7 @@ const ATTENTION_CONDITIONS = ['poor', 'critical', 'damaged', 'needs_repair', 'ou
 const SECONDARY = 'text-[13px] leading-5 text-hub-n-600';
 
 const formatDate = (value: string) => new Date(value).toLocaleString('en-US', {
-  month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+  timeZone: HUB_TIMEZONE, month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
 });
 
 export default function RoomAssetTracker() {

@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\ApparatusResource\RelationManagers;
 
+use App\Filament\Concerns\HasRelationExportActions;
 use App\Filament\Resources\InventoryCorrectionResource;
 use App\Models\Apparatus;
 use App\Models\ApparatusInventoryChange;
 use App\Models\ApparatusInventoryCorrection;
+use App\Services\Exports\ExportableTable;
 use App\Services\Inventory\InventoryCorrectionReason;
 use App\Support\Fleet\InventoryCorrectionAccess;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -16,8 +18,10 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
 
 /** Member-reported checklist corrections for this unit and the approved changes now in effect. */
-class InventoryCorrectionsRelationManager extends RelationManager
+class InventoryCorrectionsRelationManager extends RelationManager implements ExportableTable
 {
+    use HasRelationExportActions;
+
     protected static string $relationship = 'inventoryCorrections';
 
     protected static ?string $title = 'Inventory corrections';
@@ -46,14 +50,14 @@ class InventoryCorrectionsRelationManager extends RelationManager
             ? ApparatusInventoryChange::query()->where('apparatus_id', $owner->getKey())->active()->count()
             : 0;
 
-        return $table
+        return static::withExportActions($table
             ->description($active > 0
                 ? "{$active} approved ".($active === 1 ? 'change is' : 'changes are').' in effect on this unit\'s Daily Checkout checklist.'
                 : 'This unit\'s Daily Checkout checklist matches its template.')
             ->defaultSort('created_at', 'desc')
             ->columns([
                 Tables\Columns\TextColumn::make('created_at')->label('Reported')->dateTime('M j, Y', 'America/New_York')->sortable(),
-                Tables\Columns\TextColumn::make('item')->label('Item')->wrap()
+                Tables\Columns\TextColumn::make('item')->label('Item')->searchable(['target_snapshot->name', 'proposal->name', 'member_note'])->wrap()
                     ->state(fn (ApparatusInventoryCorrection $record): string => InventoryCorrectionResource::itemLabel($record)),
                 Tables\Columns\TextColumn::make('reason')->label('Reported problem')->wrap()
                     ->formatStateUsing(fn (?string $state): string => InventoryCorrectionReason::label($state)),
@@ -69,6 +73,6 @@ class InventoryCorrectionsRelationManager extends RelationManager
             ->actions([
                 Tables\Actions\Action::make('review')->label('Review')
                     ->url(fn (ApparatusInventoryCorrection $record): string => InventoryCorrectionResource::getUrl('view', ['record' => $record])),
-            ]);
+            ]));
     }
 }

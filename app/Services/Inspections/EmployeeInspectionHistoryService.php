@@ -29,7 +29,7 @@ use Illuminate\Support\Facades\Storage;
  */
 final class EmployeeInspectionHistoryService
 {
-    public const TIMEZONE = 'America/New_York';
+    public const TIMEZONE = \App\Support\HubTimezone::NAME;
 
     /** Directories under the public disk this feature may ever serve. */
     private const IMAGE_DIRECTORIES = ['signatures/', 'defects/'];

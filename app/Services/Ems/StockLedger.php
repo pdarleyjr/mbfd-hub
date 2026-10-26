@@ -27,7 +27,7 @@ use RuntimeException;
  */
 final class StockLedger
 {
-    public const TIMEZONE = 'America/New_York';
+    public const TIMEZONE = \App\Support\HubTimezone::NAME;
 
     /** Largest stock quantity (in base units) accepted in one entry, so integer columns can never overflow. */
     public const MAX_BASE = 10_000_000;

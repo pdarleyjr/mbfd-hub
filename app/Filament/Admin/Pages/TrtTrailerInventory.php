@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Pages;
 
+use App\Filament\Concerns\HasDatasetExportActions;
 use App\Models\TrtInventoryCatalogItem;
 use App\Models\TrtInventoryEntry;
 use App\Models\TrtInventorySession;
+use App\Models\User;
+use App\Services\Exports\ExportDataset;
 use App\Services\OperationalEvidenceArchiveService;
 use Filament\Actions;
 use Filament\Forms;
@@ -16,6 +19,28 @@ use Illuminate\Support\Facades\Storage;
 
 class TrtTrailerInventory extends Page
 {
+    use HasDatasetExportActions;
+
+    public function canExportData(User $actor): bool
+    {
+        return $actor->can('admin.equipment.view');
+    }
+
+    protected function exportDataset(User $actor): ExportDataset
+    {
+        abort_unless((string) auth()->id() === (string) $actor->getKey() && $this->canExportData($actor), 403);
+        $data = $this->getViewData();
+        $session = TrtInventorySession::find($this->selectedSessionId);
+
+        return ExportDataset::fromRows($actor, 'TRT Trailer Inventory',
+            ['Item', 'Category', 'Expected quantity', 'Present', 'Actual quantity', 'Condition', 'Action', 'Updated (Eastern)'],
+            array_map(static fn (array $item): array => [
+                $item['item_name'], $item['category'], $item['expected_qty'], $item['present'],
+                $item['actual_qty'], $item['condition'], $item['action'], $item['last_updated'],
+            ], $data['aggregatedItems']), 'Selected inventory session',
+            ['Session date: '.($session?->session_date->format('Y-m-d') ?? 'None selected')]);
+    }
+
     protected static ?string $navigationIcon = 'heroicon-o-truck';
 
     protected static ?string $navigationLabel = 'TRT Trailer';
@@ -72,6 +97,7 @@ class TrtTrailerInventory extends Page
     protected function getHeaderActions(): array
     {
         return [
+            $this->datasetExportAction(),
             Actions\Action::make('archiveSession')
                 ->label('Archive session')
                 ->icon('heroicon-o-archive-box')
@@ -198,7 +224,7 @@ class TrtTrailerInventory extends Page
                     'action' => $latest->action,
                     'images' => $images,
                     'missing_images' => $missingImages,
-                    'last_updated' => $latest->created_at->format('M j, g:i A'),
+                    'last_updated' => $latest->created_at->copy()->timezone(config('hub.timezone'))->format('M j, g:i A'),
                 ];
             })->all();
 
@@ -219,7 +245,7 @@ class TrtTrailerInventory extends Page
                             'action' => $entry->action,
                             'image_path' => $imageExists ? $imagePath : null,
                             'image_missing' => filled($imagePath) && ! $imageExists,
-                            'created_at' => $entry->created_at->format('M j, g:i A'),
+                            'created_at' => $entry->created_at->copy()->timezone(config('hub.timezone'))->format('M j, g:i A'),
                         ];
                     })
                     ->all();

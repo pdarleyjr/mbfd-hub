@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Pages;
 
+use App\Filament\Concerns\HasDatasetExportActions;
 use App\Models\RagDocument;
+use App\Models\User;
+use App\Services\Exports\ExportDataset;
 use App\Services\KnowledgeBaseService;
 use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Concerns\InteractsWithForms;
@@ -21,7 +24,30 @@ use Illuminate\Support\Collection;
  */
 class KnowledgeBase extends Page implements HasForms
 {
+    use HasDatasetExportActions;
     use InteractsWithForms;
+
+    protected function getHeaderActions(): array
+    {
+        return [$this->datasetExportAction()];
+    }
+
+    public function canExportData(User $actor): bool
+    {
+        return $actor->can('admin.system.manage');
+    }
+
+    protected function exportDataset(User $actor): ExportDataset
+    {
+        abort_unless((string) auth()->id() === (string) $actor->getKey() && $this->canExportData($actor), 403);
+
+        return ExportDataset::fromRows($actor, 'AI Knowledge Base',
+            ['Document', 'Chunks', 'Size (KB)', 'Uploaded by', 'Uploaded (Eastern)'],
+            $this->getDocumentsProperty()->map(fn (RagDocument $document): array => [
+                $document->filename, $document->chunk_count, round($document->size / 1024),
+                $document->uploader instanceof User ? $document->uploader->name : null, $document->created_at,
+            ])->all(), 'Current document metadata');
+    }
 
     protected static ?string $navigationIcon = 'heroicon-o-book-open';
 

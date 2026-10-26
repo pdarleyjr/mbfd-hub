@@ -636,6 +636,16 @@ jobs:
         run: |
           bash scripts/ci/prepare-ubuntu-apt-mirror.sh
           npx playwright install --with-deps chromium webkit
+      - name: Verify individual Morning Lineup lobby
+        if: ${{ matrix.lane == 'chromium-pwa-and-displays' }}
+        run: npx playwright test --config=playwright.member-lineup.config.ts
+      - name: Retain Morning Lineup browser evidence
+        if: ${{ always() && matrix.lane == 'chromium-pwa-and-displays' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: member-lineup-browser-evidence
+          path: test-results/member-lineup
+          retention-days: 7
       - name: Run mocked Daily Checkout Playwright
         env:
           DAILY_CHECKOUT_E2E_BASE_URL: http://127.0.0.1:4176

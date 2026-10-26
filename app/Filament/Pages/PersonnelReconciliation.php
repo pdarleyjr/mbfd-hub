@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages;
 
+use App\Filament\Concerns\HasDatasetExportActions;
 use App\Models\PersonnelReconciliation as Report;
+use App\Models\User;
+use App\Services\Exports\ExportDataset;
 use App\Services\Personnel\PersonnelWorkbookReconciler;
 use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
@@ -16,6 +19,32 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class PersonnelReconciliation extends Page
 {
+    use HasDatasetExportActions;
+
+    public function canExportData(User $actor): bool
+    {
+        return $this->reportId !== null && PersonnelWorkbookReconciler::canExport($actor);
+    }
+
+    protected function exportDataset(User $actor): ExportDataset
+    {
+        abort_unless((string) auth()->id() === (string) $actor->getKey() && $this->canExportData($actor), 403);
+        $report = $this->report();
+        abort_if($report === null, 404);
+        $rows = [];
+        foreach ($this->filteredRows($report) as $row) {
+            $fields = $row['differences'] !== [] ? $row['differences'] : (empty($row['live']) ? array_keys($row['workbook']) : ['']);
+            foreach ($fields as $field) {
+                $rows[] = [$row['employee_id'], $row['name'], $row['classification'], $field,
+                    $row['workbook'][$field] ?? '', $row['live'][$field] ?? '', implode(' | ', [...$row['flags'], $row['qa_note']])];
+            }
+        }
+
+        return ExportDataset::fromRows($actor, 'Personnel Workbook Reconciliation',
+            ['Employee ID', 'Name', 'Review category', 'Field', 'Workbook proposal', 'Hub value', 'Review notes'],
+            $rows, 'Current comparison filters', ['Comparison generated: '.$report->created_at->setTimezone(\App\Services\Exports\TableExportService::TIMEZONE)->format('M j, Y g:i A T')]);
+    }
+
     protected static ?string $navigationGroup = 'Personnel';
 
     protected static ?string $navigationIcon = 'heroicon-o-document-magnifying-glass';
@@ -70,6 +99,7 @@ final class PersonnelReconciliation extends Page
             Action::make('export')->label('Export comparison CSV')->color('gray')
                 ->visible(fn (): bool => $this->reportId !== null && PersonnelWorkbookReconciler::canExport(auth()->user()))
                 ->action(fn (): StreamedResponse => $this->exportReport()),
+            $this->datasetExportAction(),
         ];
     }
 

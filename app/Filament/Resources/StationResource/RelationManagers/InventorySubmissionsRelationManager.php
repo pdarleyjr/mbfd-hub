@@ -2,10 +2,12 @@
 
 namespace App\Filament\Resources\StationResource\RelationManagers;
 
+use App\Filament\Concerns\HasRelationExportActions;
 use App\Filament\Resources\StationResource;
 use App\Filament\Support\ArchiveFilter;
 use App\Models\Station;
 use App\Models\StationInventorySubmission;
+use App\Services\Exports\ExportableTable;
 use App\Services\OperationalEvidenceArchiveService;
 use Filament\Infolists;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -13,8 +15,10 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
 
-class InventorySubmissionsRelationManager extends RelationManager
+class InventorySubmissionsRelationManager extends RelationManager implements ExportableTable
 {
+    use HasRelationExportActions;
+
     protected static string $relationship = 'inventorySubmissions';
 
     protected static ?string $title = 'Inventory Submissions';
@@ -33,7 +37,7 @@ class InventorySubmissionsRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->recordTitleAttribute('id')
             ->columns([
                 Tables\Columns\TextColumn::make('id')
@@ -123,6 +127,6 @@ class InventorySubmissionsRelationManager extends RelationManager
                     ->visible(fn (StationInventorySubmission $record): bool => (auth()->user()?->can('admin.stations.manage') ?? false) && $record->isArchived())
                     ->action(fn (StationInventorySubmission $record) => app(OperationalEvidenceArchiveService::class)->restore($record, auth()->user())),
             ])
-            ->bulkActions([]);
+            ->bulkActions([]));
     }
 }

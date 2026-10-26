@@ -4,6 +4,8 @@ import { requestFailureMessage } from '../../utils/captain5Api';
 import { BTN_PRIMARY, BTN_SECONDARY, FIELD, HINT, LABEL, Sheet } from '../captain5/ui';
 import { dateTimeText, newKey } from './format';
 import type { ActingDuration, ActingResult, ActingRole, ActingState, OnDuty } from './types';
+import { hubDateInput } from '../../../../shared/timezone.ts';
+import { ServerClock } from '../../../../shared/server-clock.ts';
 
 interface Props {
   /** Wording, test ids and the endpoint: Captain 5 and 300 share everything else. */
@@ -17,11 +19,6 @@ interface Props {
 /** Server limit for a custom end time: 15 minutes to 72 hours from now. */
 const CUSTOM_MIN_MS = 15 * 60_000;
 const CUSTOM_MAX_MS = 72 * 3_600_000;
-
-const pad = (n: number) => String(n).padStart(2, '0');
-
-/** The value a datetime-local input understands, in the member's own time zone. */
-const localInput = (date: Date): string => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 
 export const ACTING_EXPLANATION = 'An administrator approves this. It only changes the name shown at the top; your work on this page is always recorded under your own name, whether or not you use this.';
 
@@ -49,6 +46,8 @@ function ActingSheet({ open, onClose, role, onDuty, acting, onChange }: Props & 
   const [error, setError] = useState<{ kind: 'act' | 'end'; text: string } | null>(null);
   const actAttempt = useRef<Attempt | null>(null);
   const endAttempt = useRef<Attempt | null>(null);
+  const serverClock = useRef(new ServerClock(acting.server_time));
+  useEffect(() => { serverClock.current.sync(acting.server_time); }, [acting.server_time]);
   // One idempotency key per opened form; it is reused while a retry sends the same thing.
   const actKey = useRef(newKey());
   const endKey = useRef(newKey());
@@ -123,7 +122,7 @@ function ActingSheet({ open, onClose, role, onDuty, acting, onChange }: Props & 
     }
   };
 
-  const now = Date.now();
+  const now = serverClock.current.now();
   const showing = onDuty.source === 'acting' && onDuty.name;
   const shiftName = onDuty.shift ? `${onDuty.shift} Shift ${label}` : `usual ${label}`;
   const radioGroup = `${idPrefix}-acting-duration`;
@@ -144,14 +143,14 @@ function ActingSheet({ open, onClose, role, onDuty, acting, onChange }: Props & 
             <DurationChoice name={radioGroup} value="custom" checked={duration === 'custom'} title="Custom end time" hint="Pick the date and time you stop." onSelect={setDuration} disabled={busy !== null} />
             {duration === 'custom' && (
               <div className="pl-1">
-                <label className={LABEL} htmlFor={`${idPrefix}-acting-end`}>Stop acting at</label>
+                <label className={LABEL} htmlFor={`${idPrefix}-acting-end`}>Stop acting at (Eastern)</label>
                 <input
                   id={`${idPrefix}-acting-end`}
                   type="datetime-local"
                   className={`${FIELD} sm:max-w-xs`}
                   value={customEnd}
-                  min={localInput(new Date(now + CUSTOM_MIN_MS))}
-                  max={localInput(new Date(now + CUSTOM_MAX_MS))}
+                  min={now === null ? undefined : hubDateInput(new Date(now + CUSTOM_MIN_MS), true)}
+                  max={now === null ? undefined : hubDateInput(new Date(now + CUSTOM_MAX_MS), true)}
                   disabled={busy !== null}
                   onChange={(event) => { setCustomEnd(event.target.value); setError(null); }}
                 />

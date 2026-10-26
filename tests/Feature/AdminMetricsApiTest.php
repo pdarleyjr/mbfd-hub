@@ -174,6 +174,36 @@ class AdminMetricsApiTest extends TestCase
         }
     }
 
+    public function test_today_counts_records_on_the_eastern_day_across_utc_midnight(): void
+    {
+        $this->travelTo(\Carbon\CarbonImmutable::parse('2026-10-26T04:00:01Z'));
+        $this->actingAsAdminUser();
+        $station = Station::create(['station_number' => 1, 'name' => 'Station 1', 'address' => 'Timezone test fixture', 'is_active' => true]);
+        $apparatus = Apparatus::create([
+            'station_id' => $station->id, 'unit_id' => 'TZ1', 'type' => 'Engine',
+            'identifier' => 'TZ1', 'name' => 'Timezone fixture', 'slug' => 'timezone-fixture',
+            'status' => 'In Service', 'is_reserve' => false,
+        ]);
+
+        foreach (['2026-10-26 03:59:59', '2026-10-26 04:00:00'] as $instant) {
+            ApparatusInspection::create([
+                'apparatus_id' => $apparatus->id,
+                'operator_name' => 'Timezone fixture',
+                'rank' => 'Lieutenant',
+                'completed_at' => $instant,
+            ]);
+        }
+
+        $this->getJson('/api/admin/metrics')->assertOk()
+            ->assertJsonPath('inspections.today', 1)
+            ->assertJsonPath('inspections.this_week', 1);
+
+        self::assertSame(
+            ['2026-10-26 03:59:59', '2026-10-26 04:00:00'],
+            ApparatusInspection::query()->orderBy('id')->pluck('completed_at')->map(fn ($at) => $at->format('Y-m-d H:i:s'))->all(),
+        );
+    }
+
     private function actingAsAdminUser(): User
     {
         app(PermissionRegistrar::class)->forgetCachedPermissions();

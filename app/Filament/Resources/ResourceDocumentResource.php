@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources;
 
 use App\Filament\Concerns\EnterpriseTable;
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\ResourceDocumentResource\Actions\AddResourceDocumentAction;
 use App\Filament\Resources\ResourceDocumentResource\Pages;
 use App\Filament\Resources\ResourceDocumentResource\Support\DocumentPanels;
@@ -27,6 +28,7 @@ use Illuminate\Support\Facades\Gate;
 final class ResourceDocumentResource extends Resource
 {
     use EnterpriseTable;
+    use HasExportActions;
 
     protected static ?string $model = ResourceDocument::class;
 
@@ -110,7 +112,7 @@ final class ResourceDocumentResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return self::applyEnterpriseDefaults($table)
+        return self::withExportActions(self::applyEnterpriseDefaults($table)
             ->columns([
                 Tables\Columns\TextColumn::make('title')->searchable()->sortable()->limit(60),
                 Tables\Columns\TextColumn::make('category')->badge()->searchable()->sortable(),
@@ -147,7 +149,7 @@ final class ResourceDocumentResource extends Resource
             ->emptyStateDescription(fn (): string => Gate::allows('create', ResourceDocument::class)
                 ? 'Choose Add document at the top of this page, pick a PDF or Office file, give it a title and a category, and members see it in Employee > Resources.'
                 : 'A resource library manager adds documents here. Members see them in Employee > Resources.')
-            ->emptyStateIcon('heroicon-o-book-open');
+            ->emptyStateIcon('heroicon-o-book-open'));
     }
 
     /** Hide or show. This is the only way to take a document off the member page; nothing is deleted. */

@@ -95,7 +95,7 @@
             @if ($last)
                 <p class="hub-insp-metric__value hub-insp-metric__value--text" data-overview-last-inspection>
                     <a href="{{ \App\Filament\Support\InspectionWorkspace::url($last) }}">
-                        {{ $last->completed_at?->format('M j, Y g:i A') ?? 'Date unavailable' }}
+                        {{ $last->completed_at?->copy()->timezone(config('hub.timezone'))->format('M j, Y g:i A') ?? 'Date unavailable' }}
                     </a>
                 </p>
                 <p class="hub-insp-metric__label">Last inspection &bull; {{ $last->displayStatus() }}</p>

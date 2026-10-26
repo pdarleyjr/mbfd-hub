@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Workgroup;
 
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\Workgroup\Concerns\ResolvesWorkgroupAccess;
 use App\Models\User;
 use App\Models\Workgroup;
@@ -15,6 +16,7 @@ use Illuminate\Database\Eloquent\Builder;
 
 class WorkgroupMemberResource extends Resource
 {
+    use HasExportActions;
     use ResolvesWorkgroupAccess;
 
     protected static ?string $model = WorkgroupMember::class;
@@ -71,7 +73,7 @@ class WorkgroupMemberResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->columns([
                 Tables\Columns\TextColumn::make('user.name')
                     ->searchable()
@@ -134,7 +136,7 @@ class WorkgroupMemberResource extends Resource
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
-            ]);
+            ]));
     }
 
     public static function getPages(): array

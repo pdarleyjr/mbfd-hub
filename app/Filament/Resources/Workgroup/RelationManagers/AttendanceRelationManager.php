@@ -2,17 +2,20 @@
 
 namespace App\Filament\Resources\Workgroup\RelationManagers;
 
+use App\Filament\Concerns\HasRelationExportActions;
 use App\Filament\Resources\Workgroup\RelationManagers\Concerns\AuthorizesWorkgroupOwner;
 use App\Models\WorkgroupMember;
+use App\Services\Exports\ExportableTable;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
 
-class AttendanceRelationManager extends RelationManager
+class AttendanceRelationManager extends RelationManager implements ExportableTable
 {
     use AuthorizesWorkgroupOwner;
+    use HasRelationExportActions;
 
     protected static string $relationship = 'attendees';
 
@@ -27,7 +30,7 @@ class AttendanceRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->recordTitleAttribute('id')
             ->heading('Attendance — Members who attended this session')
             ->columns([
@@ -107,6 +110,6 @@ class AttendanceRelationManager extends RelationManager
                     Tables\Actions\DetachBulkAction::make()
                         ->label('Remove Selected'),
                 ]),
-            ]);
+            ]));
     }
 }

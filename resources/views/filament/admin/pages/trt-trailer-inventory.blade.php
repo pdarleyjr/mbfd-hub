@@ -32,7 +32,7 @@
                     @foreach($archiveHistory as $event)
                         <li class="trt-archive__item">
                             {{ $event['event_type'] === 'record_archived' ? 'Archived' : 'Restored' }}
-                            · {{ $event['actor_name'] }} · {{ \Illuminate\Support\Carbon::parse($event['created_at'])->format('M j, Y g:i A') }}
+                            · {{ $event['actor_name'] }} · {{ \Illuminate\Support\Carbon::parse($event['created_at'])->timezone(config('hub.timezone'))->format('M j, Y g:i A') }}
                             <p>{{ $event['metadata']['archive_reason'] }}</p>
                         </li>
                     @endforeach

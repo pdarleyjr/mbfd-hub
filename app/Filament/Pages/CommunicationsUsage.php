@@ -4,13 +4,18 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages;
 
+use App\Filament\Concerns\HasDatasetExportActions;
 use App\Models\CloudflareUsageBudget;
+use App\Models\User;
 use App\Services\Communications\CloudflareCostGuard;
+use App\Services\Exports\ExportDataset;
 use Carbon\CarbonImmutable;
 use Filament\Pages\Page;
 
 final class CommunicationsUsage extends Page
 {
+    use HasDatasetExportActions;
+
     protected static ?int $navigationSort = 60;
 
     protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
@@ -24,6 +29,45 @@ final class CommunicationsUsage extends Page
     public static function canAccess(): bool
     {
         return auth()->user()?->can('admin.communications.view') ?? false;
+    }
+
+    public function canExportData(User $actor): bool
+    {
+        return $actor->can('admin.communications.view');
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [$this->datasetExportAction()];
+    }
+
+    protected function exportDataset(User $actor): ExportDataset
+    {
+        abort_unless($this->canExportData($actor), 403);
+        $budget = $this->getBudget();
+        if ($budget === null) {
+            return ExportDataset::fromRows($actor, 'Communications Usage', ['Metric', 'Value', 'Unit'], [
+                ['Snapshot status', 'No reconciled current billing-cycle snapshot; outbound email is blocked.', null],
+            ], 'Current billing cycle');
+        }
+
+        return ExportDataset::fromRows($actor, 'Communications Usage', ['Metric', 'Value', 'Unit'], [
+            ['Billing cycle start', $budget->cycle_start, 'America/New_York'],
+            ['Billing cycle end', $budget->cycle_end, 'America/New_York'],
+            ['Provider usage', $budget->provider_chargeable_used, 'chargeable destinations'],
+            ['Current-cycle Hub reservations', $this->getReservedUnits(), 'destinations'],
+            ['Safe ceiling', min(2850, $budget->hub_safe_ceiling, (int) config('communications.cloudflare.safe_email_ceiling', 2850)), 'destinations'],
+            ['Last reconciled', $budget->reconciled_at, 'America/New_York'],
+            ['Provider daily usage', $budget->provider_daily_used, 'destinations'],
+            ['Provider daily quota', $budget->provider_daily_quota, 'destinations'],
+            ['Worker requests', $budget->worker_requests_used, 'requests'],
+            ['Worker request threshold', $budget->worker_request_threshold, 'requests'],
+            ['Worker CPU time', $budget->worker_cpu_ms_used, 'ms'],
+            ['Worker CPU threshold', $budget->worker_cpu_ms_threshold, 'ms'],
+        ], 'Current billing cycle', [
+            'Billing cycle: '.CarbonImmutable::parse($budget->cycle_start)->timezone((string) config('hub.timezone'))->format('Y-m-d H:i T')
+                .' to '.CarbonImmutable::parse($budget->cycle_end)->timezone((string) config('hub.timezone'))->format('Y-m-d H:i T'),
+        ]);
     }
 
     public function getBudget(): ?CloudflareUsageBudget

@@ -2,17 +2,21 @@
 
 namespace App\Filament\Resources\ApparatusResource\RelationManagers;
 
+use App\Filament\Concerns\HasRelationExportActions;
 use App\Filament\Support\InspectionTestFilter;
 use App\Filament\Support\InspectionWorkspace;
 use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
+use App\Services\Exports\ExportableTable;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
 
-class InspectionsRelationManager extends RelationManager
+class InspectionsRelationManager extends RelationManager implements ExportableTable
 {
+    use HasRelationExportActions;
+
     protected static string $relationship = 'inspections';
 
     protected static ?string $title = 'Inspections';
@@ -26,7 +30,7 @@ class InspectionsRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->recordTitleAttribute('completed_at')
             ->recordUrl(fn (ApparatusInspection $record): string => self::resultsUrl($record))
             ->columns([
@@ -94,7 +98,7 @@ class InspectionsRelationManager extends RelationManager
                     ->color('info')
                     ->url(fn (ApparatusInspection $record): string => self::resultsUrl($record)),
             ])
-            ->defaultSort('completed_at', 'desc');
+            ->defaultSort('completed_at', 'desc'));
     }
 
     /** Same-tab navigation to the one canonical inspection page; its Back control returns here. */

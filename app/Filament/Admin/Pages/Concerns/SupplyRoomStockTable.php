@@ -67,7 +67,7 @@ trait SupplyRoomStockTable
 
     public function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->query(fn (): Builder => SupplyItem::query()->with('location:id,code,label')->where('active', true)->where('controlled_substance', false))
             ->heading('Current stock')
             ->description('What is on hand and how we know it. Calculated means a count plus the movements since, not a new count.')
@@ -120,7 +120,7 @@ trait SupplyRoomStockTable
                 Filter::make('needs_review')->label('Needs review')->toggle()
                     ->query(fn (Builder $query): Builder => $query->where('needs_review', true)),
             ])
-            ->actions([$this->settingsAction()]);
+            ->actions([$this->settingsAction()]));
     }
 
     private function settingsAction(): Tables\Actions\Action

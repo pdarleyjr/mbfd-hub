@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace App\Services\MediaControl;
 
+use App\Support\HubTimezone;
+use Carbon\CarbonImmutable;
+use Carbon\Exceptions\InvalidFormatException;
+
 /**
  * Normalises Media Control ContentSummary payloads into the small, scalar
  * shape the admin page renders. Untrusted fields are type-checked and bounded;
@@ -62,6 +66,20 @@ final class MediaControlContent
     public static function layoutLabel(?int $span): string
     {
         return $span === null ? 'Unsorted' : self::DISPLAY_LAYOUTS[$span];
+    }
+
+    /** API timestamps describe UTC instants; malformed upstream values must not break the library. */
+    public static function createdAt(?string $value): ?CarbonImmutable
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        try {
+            return CarbonImmutable::parse($value, 'UTC')->setTimezone(HubTimezone::NAME);
+        } catch (InvalidFormatException) {
+            return null;
+        }
     }
 
     public static function span(mixed $value): ?int

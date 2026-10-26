@@ -2,10 +2,12 @@
 
 namespace App\Filament\Resources\Workgroup\RelationManagers;
 
+use App\Filament\Concerns\HasRelationExportActions;
 use App\Filament\Resources\Workgroup\RelationManagers\Concerns\AuthorizesWorkgroupOwner;
 use App\Models\User;
 use App\Models\Workgroup;
 use App\Models\WorkgroupMember;
+use App\Services\Exports\ExportableTable;
 use App\Services\Workgroup\WorkgroupMembershipService;
 use Filament\Forms;
 use Filament\Forms\Form;
@@ -15,9 +17,10 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
-class MembersRelationManager extends RelationManager
+class MembersRelationManager extends RelationManager implements ExportableTable
 {
     use AuthorizesWorkgroupOwner;
+    use HasRelationExportActions;
 
     protected static string $relationship = 'members';
 
@@ -63,7 +66,7 @@ class MembersRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->recordTitleAttribute('user.name')
             ->columns([
                 Tables\Columns\TextColumn::make('user.name')
@@ -159,6 +162,6 @@ class MembersRelationManager extends RelationManager
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
-            ]);
+            ]));
     }
 }

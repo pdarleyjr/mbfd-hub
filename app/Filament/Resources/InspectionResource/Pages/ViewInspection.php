@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\InspectionResource\Pages;
 
+use App\Filament\Concerns\HasDatasetExportActions;
 use App\Filament\Resources\ApparatusResource;
 use App\Filament\Resources\InspectionResource;
 use App\Filament\Support\DefectCorrectiveActions;
@@ -14,6 +15,7 @@ use App\Models\ApparatusInspection;
 use App\Models\ApparatusInspectionException;
 use App\Models\ApparatusIssueMessage;
 use App\Models\User;
+use App\Services\Exports\ExportDataset;
 use App\Services\Inspections\InspectionHold;
 use App\Services\Inspections\InspectionReviewService;
 use App\Services\Inspections\IssueMessageService;
@@ -36,6 +38,8 @@ use Illuminate\Validation\ValidationException;
  */
 class ViewInspection extends ViewRecord
 {
+    use HasDatasetExportActions;
+
     protected static string $resource = InspectionResource::class;
 
     protected static string $view = 'filament.resources.inspection-resource.pages.view-inspection';
@@ -81,9 +85,55 @@ class ViewInspection extends ViewRecord
         ];
     }
 
+    public function canExportData(User $actor): bool
+    {
+        $inspection = $this->inspection();
+        $apparatus = $inspection->getRelationValue('apparatus');
+
+        return InspectionResource::canViewAny() && InspectionResource::canView($inspection)
+            && (! $apparatus instanceof Apparatus || ApparatusResource::canView($apparatus));
+    }
+
+    protected function exportDataset(User $actor): ExportDataset
+    {
+        $workspace = app(InspectionWorkspace::class)->build($this->inspection(), $actor);
+        $rows = [];
+        foreach ($workspace['checklist']['compartments'] as $compartment) {
+            foreach ($compartment['items'] as $item) {
+                $rows[] = ['Submitted checklist', $compartment['name'], $item['name'],
+                    $item['status'] === 'Present' ? 'Pass' : $item['status'], $item['value'], $item['notes']];
+            }
+        }
+        $addEvidence = static function (string $section, ?array $evidence) use (&$rows): void {
+            foreach ($evidence['field_values'] ?? [] as $field) {
+                $value = $field['value'] ?? null;
+                $rows[] = [$section, '', $field['name'] ?? $field['id'] ?? 'Unnamed field',
+                    ucfirst((string) ($field['input_type'] ?? 'unknown')),
+                    is_bool($value) ? ($value ? 'Yes' : 'No') : ($value === null || $value === '' ? 'Not reported' : (string) $value), ''];
+            }
+            foreach ($evidence['scheduled_tasks'] ?? [] as $task) {
+                $rows[] = [$section, 'Scheduled duties', $task['name'] ?? $task['id'] ?? 'Unnamed duty',
+                    $task['status'] ?? 'Reported', $task['recurrence_label'] ?? '', $task['notes'] ?? ''];
+            }
+        };
+        $addEvidence('Submitted checklist evidence', $workspace['pending_effects']['checklist_v2'] ?? null);
+        foreach ($workspace['timeline'] as $entry) {
+            if (is_array($entry['evidence'] ?? null)) {
+                $addEvidence($entry['title'].' · '.($entry['at'] ?? 'Time not recorded'), $entry['evidence']);
+            }
+        }
+
+        return ExportDataset::fromRows($actor, 'Inspection '.$this->inspection()->getKey().' Checklist',
+            ['Section', 'Compartment', 'Item / field', 'Status / type', 'Value', 'Notes'], $rows,
+            'Original submitted checklist and visible revision evidence',
+            ['Submitted: '.($workspace['checklist']['submitted_at']?->format('M j, Y g:i A T') ?? 'Not recorded'),
+                'Submitted observations are immutable; review decisions are recorded separately.']);
+    }
+
     protected function getHeaderActions(): array
     {
         return [
+            $this->datasetExportAction()->label('Export checklist'),
             Action::make('approveInspection')
                 ->label('Approve inspection')
                 ->icon('heroicon-o-check-circle')

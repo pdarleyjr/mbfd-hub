@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Training\Resources;
 
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Training\Resources\TrainingSessionResource\Pages;
 use App\Models\Employee;
 use App\Models\Training\TrainingCourse;
@@ -25,6 +26,8 @@ use Illuminate\Database\Eloquent\Builder;
 
 class TrainingSessionResource extends Resource
 {
+    use HasExportActions;
+
     protected static ?string $model = TrainingSession::class;
 
     protected static ?string $navigationGroup = 'Training';
@@ -91,7 +94,7 @@ class TrainingSessionResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table->modifyQueryUsing(fn (Builder $query) => $query->withCount([
+        return static::withExportActions($table->modifyQueryUsing(fn (Builder $query) => $query->withCount([
             'attendances as active_attendances_count' => fn (Builder $q) => $q->whereNull('voided_at'),
             'paperAttendances as approved_paper_attendances_count' => fn (Builder $q) => $q->where('review_status', 'approved')->where('evidence_present', true)
                 ->whereNotNull('employee_profile_id')->whereNotNull('reviewed_by')->whereNotNull('reviewed_at'),
@@ -127,7 +130,7 @@ class TrainingSessionResource extends Resource
                     ->visible(fn (TrainingSession $record): bool => $record->attendance_source !== 'paper')
                     ->url(fn (TrainingSession $record): string => route('training.rosters.export', ['session' => $record, 'format' => 'xlsx'])),
             ])->defaultSort('held_on', 'desc')->paginationPageOptions([25, 50, 100])
-            ->emptyStateHeading('No training sessions yet')->emptyStateDescription('Create a session, open sign-in, and launch the classroom roster.');
+            ->emptyStateHeading('No training sessions yet')->emptyStateDescription('Create a session, open sign-in, and launch the classroom roster.'));
     }
 
     public static function getPages(): array

@@ -2,12 +2,14 @@
 
 namespace App\Filament\Workgroup\Widgets;
 
+use App\Filament\Concerns\HasWorkgroupTableExportActions;
 use App\Models\CandidateProduct;
 use App\Models\EvaluationCategory;
 use App\Models\EvaluationSubmission;
 use App\Models\User;
 use App\Models\WorkgroupMember;
 use App\Models\WorkgroupSession;
+use App\Services\Exports\ExportableTable;
 use App\Support\Workgroups\WorkgroupContext;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -19,8 +21,10 @@ use Illuminate\Support\Facades\DB;
  * Widget showing top products per rankable category with weighted scores
  * and response counts. Now uses the universal rubric overall_score field.
  */
-class CategoryRankingsWidget extends BaseWidget
+class CategoryRankingsWidget extends BaseWidget implements ExportableTable
 {
+    use HasWorkgroupTableExportActions;
+
     public ?WorkgroupSession $session = null;
 
     public ?EvaluationCategory $category = null;
@@ -31,7 +35,7 @@ class CategoryRankingsWidget extends BaseWidget
     {
         $session = $this->resolveSession();
 
-        return $table
+        return static::withExportActions($table
             ->query($this->getQuery($session))
             ->columns([
                 TextColumn::make('rank')
@@ -69,7 +73,7 @@ class CategoryRankingsWidget extends BaseWidget
                     ->toggleable(),
             ])
             ->defaultSort('weighted_score', 'desc')
-            ->paginated(false);
+            ->paginated(false));
     }
 
     protected function getQuery(?WorkgroupSession $session)

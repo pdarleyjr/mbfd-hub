@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\Workgroup;
 
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\Workgroup\Concerns\ResolvesWorkgroupAccess;
 use App\Models\User;
 use App\Models\WorkgroupSurvey;
@@ -17,6 +18,7 @@ use Illuminate\Support\Facades\DB;
 
 class SurveyResource extends Resource
 {
+    use HasExportActions;
     use ResolvesWorkgroupAccess;
 
     protected static ?string $model = WorkgroupSurvey::class;
@@ -65,8 +67,8 @@ class SurveyResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table->columns([
-            Tables\Columns\TextColumn::make('title')->searchable()->wrap(),
+        return static::withExportActions($table->columns([
+            Tables\Columns\TextColumn::make('title')->searchable()->sortable()->wrap(),
             Tables\Columns\TextColumn::make('revision')->label('Revision'),
             Tables\Columns\TextColumn::make('status')->badge(),
             Tables\Columns\IconColumn::make('is_anonymous')->boolean()->label('De-identified'),
@@ -91,7 +93,7 @@ class SurveyResource extends Resource
                         }
                     });
                 }),
-        ]);
+        ]));
     }
 
     public static function getPages(): array

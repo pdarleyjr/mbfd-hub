@@ -1,5 +1,6 @@
 import type { Tone } from '../ui/status';
 import type { ActingRole, OnDuty } from './types';
+import { HUB_TIMEZONE } from '../../../../shared/timezone.ts';
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -21,7 +22,7 @@ export function dateTimeText(iso: string | null | undefined): string {
   const date = new Date(iso);
   return Number.isNaN(date.getTime())
     ? 'Unknown time'
-    : date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    : date.toLocaleString('en-US', { timeZone: HUB_TIMEZONE, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
 /** Version 4 UUID; crypto.randomUUID needs a secure context, so fall back to getRandomValues. */

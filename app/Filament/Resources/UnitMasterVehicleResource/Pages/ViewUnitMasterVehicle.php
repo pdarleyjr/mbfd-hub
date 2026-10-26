@@ -32,6 +32,8 @@ use Illuminate\Support\Js;
  */
 class ViewUnitMasterVehicle extends ViewRecord
 {
+    use \App\Filament\Concerns\HasRecordHistoryExportAction;
+
     protected static string $resource = UnitMasterVehicleResource::class;
 
     private const HISTORY_LIMIT = 50;
@@ -52,6 +54,7 @@ class ViewUnitMasterVehicle extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            $this->recordHistoryExportAction(),
             Actions\Action::make('exportVehicleProfile')
                 ->label('Export Vehicle Profile')
                 ->icon('heroicon-o-document-arrow-down')

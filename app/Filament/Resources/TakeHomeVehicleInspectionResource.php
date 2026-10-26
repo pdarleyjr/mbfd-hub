@@ -23,7 +23,7 @@ class TakeHomeVehicleInspectionResource extends Resource
     use EnterpriseTable;
     use HasExportActions;
 
-    private const TIMEZONE = 'America/New_York';
+    private const TIMEZONE = \App\Support\HubTimezone::NAME;
 
     protected static ?string $model = TakeHomeVehicleInspection::class;
 

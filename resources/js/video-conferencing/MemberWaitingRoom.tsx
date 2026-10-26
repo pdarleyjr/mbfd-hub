@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CameraOff, CircleAlert, Clock3, LoaderCircle, Radio, RefreshCw, Sparkles, Video } from 'lucide-react';
 import lineupStartTone from './lineup-start.mp3';
 import { LineupStartAlert } from './session-transition';
 import type { ConferenceBootstrap } from './types';
 import { useMemberLineupStatus } from './useMemberLineupStatus';
+import { ServerClock, formatConferenceTime } from './clock';
 import {
     alertObservation,
     canJoin,
+    canWaitForLineup,
     decideMediaRelease,
     describeWaitingRoom,
 } from './waiting-room';
@@ -30,20 +32,13 @@ export interface MemberWaitingRoomProps {
     lastJoinedSessionId: string | null;
     /** Bumped when a join attempt learned the lineup state changed. */
     refreshToken: number;
-    onJoin: () => void;
+    /** True only when the server says to keep waiting (not started or no seat). */
+    onJoin: () => Promise<boolean>;
     onIdleRelease: (reason: MediaReleaseReason) => void;
     onResumeMedia: () => void;
 }
 
 const MEDIA_CHECK_MS = 15_000;
-
-function formatClock(iso: string): string {
-    const date = new Date(iso);
-
-    return Number.isNaN(date.getTime())
-        ? 'the scheduled time'
-        : date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-}
 
 function releaseHint(reason: MediaReleaseReason | null, live: boolean, mediaReady: boolean, full: boolean): string | null {
     if (reason === 'ended') {
@@ -58,12 +53,18 @@ function releaseHint(reason: MediaReleaseReason | null, live: boolean, mediaRead
 
 /**
  * The member's waiting room: shows the lineup's real state next to the existing
- * device check, and offers one explicit Join. It never joins on its own and never
- * asks for a token; the Join action in ConferenceApp is the only place that does.
+ * device check. An explicit Join gives consent to wait and join when 300 starts;
+ * opening the page alone never admits a member. ConferenceApp still owns admission.
  */
 export default function MemberWaitingRoom(props: MemberWaitingRoomProps) {
     const { bootstrap, previewActive } = props;
     const { model, recheck } = useMemberLineupStatus(bootstrap, props.observing, props.refreshToken);
+    const [waitingRequested, setWaitingRequested] = useState(false);
+    const waitingRef = useRef(false);
+    const attemptedModelRef = useRef<typeof model | null>(null);
+    const nextAttemptAtRef = useRef(0);
+    const waitingSessionRef = useRef<string | null>(null);
+    const serverClockRef = useRef(new ServerClock(bootstrap.server_time));
     const alertRef = useRef(new LineupStartAlert());
     const idleReleaseRef = useRef(props.onIdleRelease);
     const modelRef = useRef(model);
@@ -74,8 +75,33 @@ export default function MemberWaitingRoom(props: MemberWaitingRoomProps) {
         idleReleaseRef.current = props.onIdleRelease;
         modelRef.current = model;
         busyRef.current = props.busy;
+        waitingRef.current = waitingRequested;
         if (model.state === 'starting' || model.state === 'active') sawLiveRef.current = true;
-    }, [model, props.busy, props.onIdleRelease]);
+    }, [model, props.busy, props.onIdleRelease, waitingRequested]);
+
+    useEffect(() => {
+        serverClockRef.current.sync(model.serverTime);
+    }, [model.serverTime]);
+
+    useEffect(() => {
+        if (['ended', 'signed_out', 'forbidden', 'disabled'].includes(model.state)) {
+            setWaitingRequested(false);
+            return;
+        }
+        if (waitingSessionRef.current !== null && (model.state === 'not_started'
+            || (model.state === 'active' && model.sessionId !== waitingSessionRef.current))) {
+            setWaitingRequested(false);
+            return;
+        }
+        if (waitingRequested && model.state === 'active') waitingSessionRef.current = model.sessionId;
+        if (!waitingRequested || !props.observing || !canJoin(model, { mediaReady: props.mediaReady, busy: props.busy })) return;
+        if (attemptedModelRef.current === model || performance.now() < nextAttemptAtRef.current) return;
+        attemptedModelRef.current = model;
+        nextAttemptAtRef.current = performance.now() + 10_000;
+        void props.onJoin().then((keepWaiting) => {
+            if (!keepWaiting) setWaitingRequested(false);
+        }).catch(() => setWaitingRequested(false));
+    }, [model, props.busy, props.mediaReady, props.observing, props.onJoin, waitingRequested]);
 
     const standingBy = props.observing && previewActive && !props.busy;
     useEffect(() => {
@@ -90,12 +116,13 @@ export default function MemberWaitingRoom(props: MemberWaitingRoomProps) {
     // 10 minutes of not-live idleness, and at once when a lineup this page watched has ended.
     useEffect(() => {
         if (!previewActive) return undefined;
-        let idleSince = Date.now();
+        let idleSince = serverClockRef.current.now() ?? 0;
         const evaluate = () => {
             const decision = decideMediaRelease({
                 model: modelRef.current,
-                now: Date.now(),
+                now: serverClockRef.current.now() ?? 0,
                 joinInFlight: busyRef.current,
+                waitingRequested: waitingRef.current,
                 idleSince,
                 sawLive: sawLiveRef.current,
             });
@@ -122,8 +149,11 @@ export default function MemberWaitingRoom(props: MemberWaitingRoomProps) {
     }, [model.state, props.busy]);
 
     const rejoin = props.lastJoinedSessionId !== null && props.lastJoinedSessionId === model.sessionId;
-    const copy = useMemo(() => describeWaitingRoom(model, { rejoin, formatTime: formatClock }), [model, rejoin]);
-    const joinable = canJoin(model, { mediaReady: props.mediaReady, busy: props.busy });
+    const copy = useMemo(() => describeWaitingRoom(model, {
+        rejoin,
+        formatTime: (iso) => formatConferenceTime(iso, bootstrap.timezone ?? 'America/New_York'),
+    }), [bootstrap.timezone, model, rejoin]);
+    const joinable = !waitingRequested && canWaitForLineup(model, { mediaReady: props.mediaReady, busy: props.busy });
     const Icon = model.state === 'checking' || model.state === 'starting'
         ? LoaderCircle
         : copy.tone === 'warn' ? CircleAlert : copy.tone === 'muted' ? Clock3 : Radio;
@@ -137,9 +167,13 @@ export default function MemberWaitingRoom(props: MemberWaitingRoomProps) {
                 {/* The only live region in the waiting room: one polite announcement per change. */}
                 <div id="vc-wait-status" className="vc-wait__text" role="status" aria-live="polite">
                     <strong>{copy.headline}</strong>
-                    <span>{copy.detail}</span>
+                    <span>{waitingRequested
+                        ? model.full
+                            ? 'You are waiting for a seat. You will join automatically when one opens.'
+                            : 'You are in the lobby. You will join automatically when 300 starts Morning Lineup.'
+                        : copy.detail}</span>
                 </div>
-                <small>{copy.footnote}</small>
+                <small>{waitingRequested ? 'Your camera and microphone will be shared when you join. You can cancel waiting below.' : copy.footnote}</small>
                 {copy.offersRecheck && (model.state === 'signed_out'
                     ? <button type="button" className="vc-button vc-button--secondary" onClick={() => window.location.reload()}><RefreshCw size={18} /> Reload page</button>
                     : <button type="button" className="vc-button vc-button--secondary" onClick={() => void recheck()}><RefreshCw size={18} /> Check again</button>)}
@@ -152,12 +186,17 @@ export default function MemberWaitingRoom(props: MemberWaitingRoomProps) {
                 aria-busy={props.busy}
                 aria-describedby={hint ? 'vc-wait-status vc-join-hint' : 'vc-wait-status'}
                 onClick={() => {
-                    if (joinable) props.onJoin();
+                    if (joinable) {
+                        waitingSessionRef.current = model.state === 'active' ? model.sessionId : null;
+                        setWaitingRequested(true);
+                    }
                 }}
             >
-                {props.busy ? <LoaderCircle size={20} className="vc-spin" /> : <Video size={20} />} {props.busy ? 'Joining Morning Lineup' : copy.joinLabel}
+                {props.busy ? <LoaderCircle size={20} className="vc-spin" /> : <Video size={20} />} {props.busy ? 'Joining Morning Lineup' : waitingRequested ? 'Waiting to join Morning Lineup' : copy.joinLabel}
             </button>
+            {waitingRequested && !props.busy && <button type="button" className="vc-button vc-button--secondary" onClick={() => setWaitingRequested(false)}>Cancel waiting</button>}
             {hint && <p id="vc-join-hint" className="vc-wait__hint">{hint}</p>}
+            {!props.mediaReady && props.releasedReason === null && <p className="vc-wait__hint">Microphone access is needed to join. Allow microphone access in your browser and try the device check again.</p>}
             {props.releasedReason !== null && <button type="button" className="vc-button vc-button--secondary" onClick={props.onResumeMedia}><CameraOff size={18} /> Turn camera back on</button>}
         </div>
     );

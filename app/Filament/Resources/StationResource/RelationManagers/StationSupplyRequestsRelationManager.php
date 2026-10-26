@@ -2,9 +2,11 @@
 
 namespace App\Filament\Resources\StationResource\RelationManagers;
 
+use App\Filament\Concerns\HasRelationExportActions;
 use App\Filament\Support\ArchiveFilter;
 use App\Models\StationInventoryAudit;
 use App\Models\StationSupplyRequest;
+use App\Services\Exports\ExportableTable;
 use App\Services\StationSupplyRequestWorkflowService;
 use App\Support\DecisionReason;
 use Filament\Forms;
@@ -13,8 +15,10 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
 
-class StationSupplyRequestsRelationManager extends RelationManager
+class StationSupplyRequestsRelationManager extends RelationManager implements ExportableTable
 {
+    use HasRelationExportActions;
+
     protected static string $relationship = 'supplyRequests';
 
     protected static ?string $title = 'Supply Requests';
@@ -26,7 +30,7 @@ class StationSupplyRequestsRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->recordTitleAttribute('id')
             ->columns([
                 Tables\Columns\TextColumn::make('request_text')
@@ -123,6 +127,6 @@ class StationSupplyRequestsRelationManager extends RelationManager
                     ->visible(fn (StationSupplyRequest $record): bool => auth()->user()->can('admin.stations.manage') && $record->isArchived())
                     ->action(fn (StationSupplyRequest $record) => app(StationSupplyRequestWorkflowService::class)->restore($record, auth()->user())),
             ])
-            ->bulkActions([]);
+            ->bulkActions([]));
     }
 }

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\InboundEmailResource\Pages;
 use App\Models\InboundEmail;
 use Filament\Resources\Resource;
@@ -12,6 +13,8 @@ use Filament\Tables\Table;
 
 final class InboundEmailResource extends Resource
 {
+    use HasExportActions;
+
     protected static ?int $navigationSort = 30;
 
     protected static ?string $model = InboundEmail::class;
@@ -24,7 +27,7 @@ final class InboundEmailResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table->columns([
+        return self::withExportActions($table->columns([
             Tables\Columns\Layout\Split::make([
                 Tables\Columns\TextColumn::make('from_address')->label('From')->searchable(),
                 Tables\Columns\TextColumn::make('subject')->searchable()->limit(70),
@@ -33,7 +36,7 @@ final class InboundEmailResource extends Resource
             ])->from('md'),
         ])->defaultSort('received_at', 'desc')->actions([
             Tables\Actions\ViewAction::make(),
-        ])->bulkActions([]);
+        ])->bulkActions([]));
     }
 
     public static function getPages(): array

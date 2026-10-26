@@ -3,6 +3,7 @@ import { humanize } from '../ui/status';
 import { dutyLine as roleDutyLine, dutyUnset } from '../acting/format';
 import { NO_ACTION_STATUS } from './actionForms';
 import type { IssueSummary, OnDuty } from './types';
+import { hubDateInput } from '../../../../shared/timezone.ts';
 
 /** Status wording for Captain 5. `reported` is "needs acknowledgement" here, not the member-facing label. */
 const STATUS: Record<string, { label: string; tone: Tone }> = {
@@ -38,8 +39,7 @@ export function dayText(ymd: string | null | undefined): string {
 }
 
 export function todayYmd(now = new Date()): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+  return hubDateInput(now);
 }
 
 /** Whole days between two Y-m-d dates (b - a). */

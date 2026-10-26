@@ -2,10 +2,12 @@
 
 namespace App\Filament\Workgroup\Pages;
 
+use App\Filament\Concerns\HasWorkgroupTableExportActions;
 use App\Models\User;
 use App\Models\WorkgroupMember;
 use App\Models\WorkgroupSession;
 use App\Models\WorkgroupSharedUpload;
+use App\Services\Exports\ExportableTable;
 use App\Support\Workgroups\WorkgroupAccess;
 use App\Support\Workgroups\WorkgroupContext;
 use Filament\Actions\Action;
@@ -21,8 +23,9 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
 
-class SharedUploads extends Page implements HasTable
+class SharedUploads extends Page implements ExportableTable, HasTable
 {
+    use HasWorkgroupTableExportActions;
     use InteractsWithTable;
 
     protected static ?string $navigationIcon = 'heroicon-o-cloud-arrow-up';
@@ -112,7 +115,7 @@ class SharedUploads extends Page implements HasTable
 
     public function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->query($this->getUploadsQuery())
             ->columns([
                 TextColumn::make('filename')
@@ -166,7 +169,7 @@ class SharedUploads extends Page implements HasTable
                     ->visible(fn (WorkgroupSharedUpload $record) => $record->trashed() && $this->isCurrentUploader($record)),
             ])
             ->emptyStateHeading('No files uploaded yet')
-            ->emptyStateDescription('Upload a file to share with your workgroup.');
+            ->emptyStateDescription('Upload a file to share with your workgroup.'));
     }
 
     protected function getUploadsQuery(): Builder
