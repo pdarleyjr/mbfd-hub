@@ -16,9 +16,16 @@ const STATUS: Record<string, { label: string; tone: Tone }> = {
   dismissed: { label: NO_ACTION_STATUS, tone: 'neutral' },
 };
 
-export function statusOf(issue: Pick<IssueSummary, 'action_status' | 'action_label'>): { label: string; tone: Tone } {
-  return STATUS[issue.action_status] ?? { label: issue.action_label || humanize(issue.action_status), tone: 'neutral' };
+export function statusOf(issue: Pick<IssueSummary, 'action_status' | 'action_label' | 'action_by'>): { label: string; tone: Tone } {
+  const status = STATUS[issue.action_status] ?? { label: issue.action_label || humanize(issue.action_status), tone: 'neutral' };
+  const who = issue.action_by?.trim();
+  if (!who) return status;
+  if (issue.action_status === 'reported') return { ...status, label: `${status.label} · reported by ${who}` };
+  return { ...status, label: READS_AS_BY.has(issue.action_status) ? `${status.label} by ${who}` : `${status.label} · ${who}` };
 }
+
+/** Statuses that read naturally as "<status> by <name>"; the rest show "<status> · <name>". */
+const READS_AS_BY = new Set(['acknowledged', 'action_pending', 'repair_scheduled', 'resolved']);
 
 export const statusLabel = (status: string | null | undefined): string => (status ? STATUS[status]?.label ?? humanize(status) : 'Not recorded');
 

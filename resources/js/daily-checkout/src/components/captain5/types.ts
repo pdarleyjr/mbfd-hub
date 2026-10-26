@@ -44,6 +44,8 @@ export interface IssueSummary {
   severity: string;
   action_status: string;
   action_label: string;
+  /** Who put the issue into its current status (Captain 5 actions carry their authority label). */
+  action_by?: string | null;
   open: boolean;
   details: IssueDetails;
   expected_delivery: string | null;

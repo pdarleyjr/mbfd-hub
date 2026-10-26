@@ -98,7 +98,7 @@ class DefectResource extends Resource
                 // Shown from action_status so "Closed — no action required" is never read as "Resolved".
                 Forms\Components\Placeholder::make('lifecycle')
                     ->label('Status')
-                    ->content(fn (?ApparatusDefect $record): string => DefectActionStatus::label($record?->action_status))
+                    ->content(fn (?ApparatusDefect $record): string => $record?->attributedActionLabel() ?? DefectActionStatus::label(null))
                     ->helperText('Change it with the issue actions on the inspection page, or Mark Resolved in the list.'),
 
                 Forms\Components\Textarea::make('resolution_notes')
@@ -122,12 +122,12 @@ class DefectResource extends Resource
     public static function table(Table $table): Table
     {
         return self::applyEnterpriseDefaults($table)
-            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('serviceTicket'))
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['serviceTicket', 'latestStatusEvent.actor:id,name,display_name']))
             ->columns([
                 Tables\Columns\TextColumn::make('apparatus.name')
                     ->wrap()
                     ->extraAttributes(['class' => 'hub-phone-summary'])
-                    ->description(fn (ApparatusDefect $record): string => $record->compartment.' / '.$record->item.' · '.str($record->issue_type)->headline().' · '.DefectActionStatus::label($record->action_status))
+                    ->description(fn (ApparatusDefect $record): string => $record->compartment.' / '.$record->item.' · '.str($record->issue_type)->headline().' · '.$record->attributedActionLabel())
                     ->label('Apparatus')
                     ->searchable()
                     ->sortable(),
@@ -157,7 +157,7 @@ class DefectResource extends Resource
                 Tables\Columns\TextColumn::make('action_status')->visibleFrom('md')
                     ->label('Status')
                     ->badge()
-                    ->formatStateUsing(fn (?string $state): string => DefectActionStatus::label($state))
+                    ->formatStateUsing(fn (ApparatusDefect $record): string => $record->attributedActionLabel())
                     ->color(fn (?string $state): string => match ($state) {
                         DefectActionStatus::RESOLVED => 'success',
                         DefectActionStatus::DISMISSED => 'gray',

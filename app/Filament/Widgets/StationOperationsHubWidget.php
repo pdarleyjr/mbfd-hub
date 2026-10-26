@@ -27,8 +27,12 @@ use App\Models\StationInspection;
 use App\Models\StationInventorySubmission;
 use App\Models\StationRequest;
 use App\Models\StationSupplyRequest;
+use App\Models\User;
 use App\Services\Display\DisplaySnapshotService;
+use App\Support\Fleet\DailyCheckoutNotesFeed;
 use App\Support\Fleet\DefectActionStatus;
+use App\Support\Fleet\DefectStatusAttribution;
+use App\Support\Fleet\InspectionReviewers;
 use App\Support\OperationalDisplayWindow;
 use BackedEnum;
 use Filament\Widgets\Widget;
@@ -120,6 +124,8 @@ final class StationOperationsHubWidget extends Widget
                 'openDefects' => $attention['defects']->count(),
                 'openStationRequests' => $attention['stationRequests']->count(),
                 'inspectionQueues' => $this->inspectionQueues($apparatusIds, $apparatusById),
+                // Internal notes are staff-only, so the card is built only for inspection reviewers.
+                'dailyNotes' => auth()->user() instanceof User && InspectionReviewers::canReview(auth()->user()) ? DailyCheckoutNotesFeed::build() : null,
                 'links' => [
                     'apparatus' => ApparatusResource::getUrl('index'),
                     'inspections' => InspectionResource::getUrl('index'),
@@ -344,16 +350,22 @@ final class StationOperationsHubWidget extends Widget
             // issue present; carry the latest observation along (no extra query) so the row can say so.
             ->addSelect(['latest_observation' => ApparatusDefectObservation::query()->select('observation')
                 ->whereColumn('apparatus_defect_id', 'apparatus_defects.id')->orderByDesc('id')->limit(1)])
+            // Who set the current status and when, in the same query (the board has a query budget).
+            ->addSelect(DefectStatusAttribution::subselects())
             ->whereIn('apparatus_id', $apparatusIds)->unresolved()
             ->whereIn('action_status', [
                 DefectActionStatus::REPORTED, DefectActionStatus::ACKNOWLEDGED, DefectActionStatus::ACTION_PENDING,
                 DefectActionStatus::REPLACEMENT_AVAILABLE, DefectActionStatus::REPAIR_SCHEDULED,
             ])
             ->orderByRaw('COALESCE(first_reported_at, created_at) DESC')->orderByDesc('id')->get();
-        $defectRow = function (ApparatusDefect $record, string $type) use ($apparatusById): array {
+        // Name the person behind each status ("Acknowledged by Jane Smith").
+        $attribution = DefectStatusAttribution::fromSelected($defects);
+        $defectRow = function (ApparatusDefect $record, string $type) use ($apparatusById, $attribution): array {
             $apparatus = $apparatusById->get((int) $record->apparatus_id);
             $sourceId = $record->first_reported_inspection_id ?? $record->apparatus_inspection_id ?? $record->last_observed_inspection_id;
-            $status = DefectActionStatus::label($record->action_status).($record->severity === 'significant' ? ' · Significant damage' : '');
+            $status = DefectStatusAttribution::labelFor($record, $attribution).($record->severity === 'significant' ? ' · Significant damage' : '');
+            // New issues are dated when first reported; corrective actions when they entered their current status.
+            $statusAt = $type === 'corrective_action' ? ($attribution[(int) $record->getKey()]['at'] ?? null) : null;
             if ($record->getAttribute('latest_observation') === 'appears_corrected') {
                 // Read-only flag: Verify (or Reopen) is still the admin's call on the issue card.
                 $status = self::MEMBER_REPORTS_CORRECTED.' · '.$status;
@@ -365,7 +377,7 @@ final class StationOperationsHubWidget extends Widget
                 $sourceId !== null ? InspectionWorkspace::url((int) $sourceId, 'issue-'.$record->id) : DefectResource::getUrl('index'),
                 $apparatus instanceof Apparatus ? (int) $apparatus->station_id : null,
                 $record->severity === 'significant' ? 'critical' : 'warning',
-                $record->first_reported_at ?: $record->created_at,
+                $statusAt ?? ($record->first_reported_at ?: $record->created_at),
             );
         };
         [$newOrEscalated, $inProgress] = $defects->partition(fn (ApparatusDefect $record): bool => $record->action_status === DefectActionStatus::REPORTED
