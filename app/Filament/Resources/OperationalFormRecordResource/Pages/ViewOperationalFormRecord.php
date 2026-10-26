@@ -11,6 +11,8 @@ use Filament\Resources\Pages\ViewRecord;
 
 class ViewOperationalFormRecord extends ViewRecord
 {
+    use \App\Filament\Concerns\HasRecordHistoryExportAction;
+
     protected static string $resource = OperationalFormRecordResource::class;
 
     protected static string $view = 'filament.resources.operational-form-record.view';
@@ -31,6 +33,7 @@ class ViewOperationalFormRecord extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
+            $this->recordHistoryExportAction(),
             Actions\Action::make('archive')
                 ->label('Archive')
                 ->icon('heroicon-o-archive-box')

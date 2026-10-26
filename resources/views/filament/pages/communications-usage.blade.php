@@ -6,7 +6,7 @@
         </x-filament::section>
     @else
         <x-filament::section heading="Monthly billing cycle">
-            <p>{{ $budget->cycle_start->utc()->format('M j, Y H:i') }} – {{ $budget->cycle_end->utc()->format('M j, Y H:i') }} UTC</p>
+            <p>{{ $budget->cycle_start->timezone(config('hub.timezone'))->format('M j, Y H:i T') }} – {{ $budget->cycle_end->timezone(config('hub.timezone'))->format('M j, Y H:i T') }}</p>
             <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">The monthly allowance resets automatically with Cloudflare's next billing cycle. Usage refreshes every five minutes. Uncertain deliveries remain reserved across a cycle boundary until resolved.</p>
         </x-filament::section>
         <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -20,7 +20,7 @@
                 {{ number_format(min(2850, $budget->hub_safe_ceiling, (int) config('communications.cloudflare.safe_email_ceiling', 2850))) }} destinations
             </x-filament::section>
             <x-filament::section heading="Last reconciled">
-                {{ $budget->reconciled_at?->toDayDateTimeString() ?? 'Never - sending blocked' }}
+                {{ $budget->reconciled_at?->timezone(config('hub.timezone'))->toDayDateTimeString() ?? 'Never - sending blocked' }}
             </x-filament::section>
         </div>
         <p class="text-sm text-gray-600 dark:text-gray-400">Provider and Hub counts are added conservatively; some usage may appear in both. Daily quotas reset separately, and the Hub also limits sending to five recipient units per minute. Worker statistics below are informational: outbound email uses the direct REST API, not a Worker.</p>

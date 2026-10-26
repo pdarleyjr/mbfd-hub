@@ -72,6 +72,7 @@ class AdminPanelProvider extends PanelProvider
             ->colors(HubPalette::colors())
             ->font('Plus Jakarta Sans Variable', provider: LocalFontProvider::class)
             ->viteTheme('resources/css/filament/admin/theme.css')
+            ->resources([\App\Filament\Resources\RoleResource::class])
             ->plugin(FilamentShieldPlugin::make())
             ->plugin(
                 FilamentSpatieLaravelHealthPlugin::make()

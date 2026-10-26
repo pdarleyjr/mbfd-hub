@@ -9,7 +9,7 @@ use DateTimeInterface;
 
 final readonly class OperationalDisplayWindow
 {
-    public const TIMEZONE = 'America/New_York';
+    public const TIMEZONE = \App\Support\HubTimezone::NAME;
 
     private const START_HOUR = 8;
 

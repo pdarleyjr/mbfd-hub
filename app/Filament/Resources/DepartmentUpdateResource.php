@@ -81,13 +81,13 @@ final class DepartmentUpdateResource extends Resource
                         ->default(false),
                     Forms\Components\DateTimePicker::make('publish_at')
                         ->label('Publish at')
-                        ->timezone('America/New_York')
+                        ->timezone(\App\Support\HubTimezone::NAME)
                         ->seconds(false)
                         ->required(fn (Get $get): bool => $get('status') === DepartmentUpdateStatus::Published->value)
                         ->helperText('Times are shown in America/New_York.'),
                     Forms\Components\DateTimePicker::make('expires_at')
                         ->label('Expires at')
-                        ->timezone('America/New_York')
+                        ->timezone(\App\Support\HubTimezone::NAME)
                         ->seconds(false)
                         ->after('publish_at')
                         ->helperText('Leave blank to keep the update active until it is unpublished or archived.'),
@@ -189,8 +189,8 @@ final class DepartmentUpdateResource extends Resource
                     ->icon(fn (bool $state): string => $state ? 'heroicon-o-check-circle' : 'heroicon-o-x-circle')
                     ->iconColor(fn (bool $state): string => $state ? 'success' : 'danger'),
                 Tables\Columns\TextColumn::make('author_name')->label('Posted by')->getStateUsing(fn (DepartmentUpdate $record): ?string => $record->attribution())->placeholder('Former user'),
-                Tables\Columns\TextColumn::make('publish_at')->dateTime(timezone: 'America/New_York')->sortable(),
-                Tables\Columns\TextColumn::make('expires_at')->dateTime(timezone: 'America/New_York')->placeholder('No expiration')->sortable(),
+                Tables\Columns\TextColumn::make('publish_at')->dateTime(timezone: \App\Support\HubTimezone::NAME)->sortable(),
+                Tables\Columns\TextColumn::make('expires_at')->dateTime(timezone: \App\Support\HubTimezone::NAME)->placeholder('No expiration')->sortable(),
                 Tables\Columns\TextColumn::make('notification_delivery_status')
                     ->label('Notification')
                     ->state(fn (DepartmentUpdate $record): string => $record->notificationDeliveryStatus())
@@ -265,8 +265,8 @@ final class DepartmentUpdateResource extends Resource
                 Infolists\Components\TextEntry::make('priority')->badge(),
                 Infolists\Components\TextEntry::make('status')->badge(),
                 Infolists\Components\TextEntry::make('author_name')->label('Posted by')->getStateUsing(fn (DepartmentUpdate $record): ?string => $record->attribution())->placeholder('Former user'),
-                Infolists\Components\TextEntry::make('publish_at')->dateTime(timezone: 'America/New_York'),
-                Infolists\Components\TextEntry::make('expires_at')->dateTime(timezone: 'America/New_York')->placeholder('No expiration'),
+                Infolists\Components\TextEntry::make('publish_at')->dateTime(timezone: \App\Support\HubTimezone::NAME),
+                Infolists\Components\TextEntry::make('expires_at')->dateTime(timezone: \App\Support\HubTimezone::NAME)->placeholder('No expiration'),
             ])->columns(3),
         ]);
     }

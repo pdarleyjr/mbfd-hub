@@ -8,16 +8,22 @@ use App\Filament\Support\PersonnelTableSchema;
 use App\Models\Employee;
 use App\Models\PersonnelTable;
 use App\Models\PersonnelTableEntry;
+use App\Models\User;
+use App\Services\Exports\ExportDataset;
+use App\Services\Exports\ExportFailedException;
+use App\Services\Exports\TableExportService;
 use App\Services\Personnel\PersonnelSource;
 use App\Services\Personnel\PersonnelTableService;
 use Filament\Actions\Action;
 use Filament\Forms\Components as Forms;
 use Filament\Notifications\Notification;
 use Filament\Tables;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\Locked;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 trait InteractsWithPersonnelTracking
 {
@@ -160,6 +166,46 @@ trait InteractsWithPersonnelTracking
                         ? $query->whereNotExists($matching) : $query->whereExists($matching);
                 });
         })->all();
+    }
+
+    public function canExportPersonnelHistory(): bool
+    {
+        $actor = auth()->user();
+        if (! $actor instanceof User) {
+            return false;
+        }
+
+        try {
+            return app(PersonnelTableService::class)->canExport($actor, $this->personnelTable());
+        } catch (AuthorizationException) {
+            return false;
+        }
+    }
+
+    public function exportPersonnelHistory(string $format): ?StreamedResponse
+    {
+        try {
+            return app(TableExportService::class)->downloadDataset(
+                auth()->user(), static::class, $format,
+                fn (): bool => $this->canExportPersonnelHistory(),
+                function (): ExportDataset {
+                    $table = $this->personnelTable();
+
+                    return ExportDataset::fromRows(auth()->user(), 'Personnel Table History',
+                        ['When (Eastern)', 'Administrator', 'Change', 'Fields'],
+                        $table->events()->with('actor')->latest('id')->limit(100)->get()->map(static fn ($event): array => [
+                            $event->created_at, data_get($event, 'actor.name', 'Former administrator'),
+                            str($event->action)->replace('_', ' ')->headline()->toString(), implode(', ', $event->metadata['fields'] ?? []),
+                        ])->all(), 'Latest 100 changes for '.$table->name,
+                        ['Tracking values and personnel contact details are omitted. History is read-only.']);
+                },
+                'personnel table history',
+            );
+        } catch (ExportFailedException $exception) {
+            Notification::make()->title('Export not created')->body($exception->getMessage())->danger()->send();
+
+            return null;
+        }
     }
 
     protected function trackingHeaderActions(PersonnelTable $table): array

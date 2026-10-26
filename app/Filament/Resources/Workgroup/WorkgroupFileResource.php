@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Workgroup;
 
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\Workgroup\Concerns\ResolvesWorkgroupAccess;
 use App\Models\Workgroup;
 use App\Models\WorkgroupFile;
@@ -16,6 +17,7 @@ use Symfony\Component\Mime\MimeTypes;
 
 class WorkgroupFileResource extends Resource
 {
+    use HasExportActions;
     use ResolvesWorkgroupAccess;
 
     protected static ?string $model = WorkgroupFile::class;
@@ -93,7 +95,7 @@ class WorkgroupFileResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->columns([
                 Tables\Columns\TextColumn::make('filename')
                     ->searchable()
@@ -153,7 +155,7 @@ class WorkgroupFileResource extends Resource
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
-            ]);
+            ]));
     }
 
     public static function getPages(): array

@@ -7,14 +7,20 @@ namespace App\Filament\Concerns;
 use App\Models\User;
 use App\Services\Exports\ExportFailedException;
 use App\Services\Exports\TableExportService;
+use Carbon\CarbonImmutable;
+use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Tables\Actions\Action;
 use Filament\Tables\Actions\BulkAction;
 use Filament\Tables\Contracts\HasTable;
+use Filament\Tables\Filters\Filter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 /**
  * One shared way to export a Filament resource's list table to Excel or PDF.
@@ -45,16 +51,53 @@ trait HasExportActions
 
     public static function withExportActions(Table $table): Table
     {
+        foreach ($table->getColumns() as $column) {
+            if (! $column->isToggleable()) {
+                $column->toggleable();
+            }
+        }
+
+        if ($table->getFilters() === []) {
+            $table->filters([
+                Filter::make('created_between')->label('Created between (Eastern)')
+                    ->form([DatePicker::make('from')->label('From'), DatePicker::make('until')->label('Through')])
+                    ->query(function (Builder $query, array $data): Builder {
+                        if (! self::validExportDateRange($data)) {
+                            return $query->whereRaw('1 = 0');
+                        }
+                        $column = $query->getModel()->getQualifiedCreatedAtColumn();
+
+                        return $query
+                            ->when(filled($data['from'] ?? null), fn (Builder $query): Builder => $query->where($column, '>=', CarbonImmutable::parse($data['from'], TableExportService::TIMEZONE)->startOfDay()->utc()))
+                            ->when(filled($data['until'] ?? null), fn (Builder $query): Builder => $query->where($column, '<', CarbonImmutable::parse($data['until'], TableExportService::TIMEZONE)->startOfDay()->addDay()->utc()));
+                    })
+                    ->indicateUsing(fn (array $data): array => ! self::validExportDateRange($data)
+                        ? ['Created date range is invalid; choose valid dates in order.']
+                        : array_values(array_filter([
+                            filled($data['from'] ?? null) ? 'Created from '.$data['from'].' (Eastern)' : null,
+                            filled($data['until'] ?? null) ? 'Created through '.$data['until'].' (Eastern)' : null,
+                        ]))),
+            ]);
+        }
+
         return $table
             ->pushHeaderActions([static::makeExportHeaderAction()])
             ->pushBulkActions([static::makeExportBulkAction()]);
     }
 
-    public static function canExportTable(): bool
+    private static function validExportDateRange(array $data): bool
+    {
+        return Validator::make($data, [
+            'from' => ['nullable', 'date_format:Y-m-d'],
+            'until' => ['nullable', 'date_format:Y-m-d', Rule::when(filled($data['from'] ?? null), 'after_or_equal:from')],
+        ])->passes();
+    }
+
+    public static function canExportTable(?HasTable $livewire = null): bool
     {
         $user = auth()->user();
 
-        return $user instanceof User && app(TableExportService::class)->canExport($user, static::class);
+        return $user instanceof User && app(TableExportService::class)->canExport($user, static::class, $livewire);
     }
 
     public static function makeExportHeaderAction(): Action
@@ -65,8 +108,8 @@ trait HasExportActions
             ->label('Export')
             ->icon('heroicon-o-arrow-down-tray')
             ->color('gray')
-            ->visible(fn (): bool => $resource::canExportTable())
-            ->modalHeading(fn (): string => 'Export '.TableExportService::title($resource))
+            ->visible(fn (HasTable $livewire): bool => $resource::canExportTable($livewire))
+            ->modalHeading(fn (HasTable $livewire): string => 'Export '.TableExportService::title($resource, $livewire))
             ->modalDescription('Downloads what the table shows, in the same column order. Hidden columns are left out.')
             ->modalSubmitActionLabel('Download')
             ->modalWidth('lg')
@@ -102,8 +145,8 @@ trait HasExportActions
             ->label('Export selected')
             ->icon('heroicon-o-arrow-down-tray')
             ->color('gray')
-            ->visible(fn (): bool => $resource::canExportTable())
-            ->modalHeading(fn (): string => 'Export selected '.TableExportService::title($resource))
+            ->visible(fn (HasTable $livewire): bool => $resource::canExportTable($livewire))
+            ->modalHeading(fn (HasTable $livewire): string => 'Export selected '.TableExportService::title($resource, $livewire))
             ->modalSubmitActionLabel('Download')
             ->modalWidth('lg')
             ->deselectRecordsAfterCompletion()

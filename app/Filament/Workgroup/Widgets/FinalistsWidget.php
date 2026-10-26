@@ -2,12 +2,14 @@
 
 namespace App\Filament\Workgroup\Widgets;
 
+use App\Filament\Concerns\HasWorkgroupTableExportActions;
 use App\Models\CandidateProduct;
 use App\Models\EvaluationCategory;
 use App\Models\EvaluationSubmission;
 use App\Models\User;
 use App\Models\WorkgroupMember;
 use App\Models\WorkgroupSession;
+use App\Services\Exports\ExportableTable;
 use App\Support\Workgroups\WorkgroupContext;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
@@ -20,8 +22,10 @@ use Illuminate\Support\Facades\DB;
  * with visual distinction for gold and silver placements.
  * Now uses the universal rubric overall_score field.
  */
-class FinalistsWidget extends BaseWidget
+class FinalistsWidget extends BaseWidget implements ExportableTable
 {
+    use HasWorkgroupTableExportActions;
+
     public ?WorkgroupSession $session = null;
 
     protected int|string|array $columnSpan = 'full';
@@ -30,7 +34,7 @@ class FinalistsWidget extends BaseWidget
     {
         $session = $this->resolveSession();
 
-        return $table
+        return static::withExportActions($table
             ->query($this->getQuery($session))
             ->columns([
                 TextColumn::make('category.name')
@@ -74,7 +78,7 @@ class FinalistsWidget extends BaseWidget
             ->paginated(false)
             ->emptyStateHeading('No Finalists Yet')
             ->emptyStateDescription('Rankings will appear once evaluations are submitted.')
-            ->emptyStateIcon('heroicon-o-trophy');
+            ->emptyStateIcon('heroicon-o-trophy'));
     }
 
     protected function getQuery(?WorkgroupSession $session)

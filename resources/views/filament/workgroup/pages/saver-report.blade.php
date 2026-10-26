@@ -24,7 +24,7 @@
                 <span>·</span>
                 <span>{{ $sessionName ?? 'All Sessions' }}</span>
                 <span>·</span>
-                <span>{{ $generatedAt ?? now()->format('F j, Y') }}</span>
+                <span>{{ $generatedAt ?? now((string) config('hub.timezone'))->format('F j, Y') }}</span>
             </div>
             <div class="saver-badges">
                 <span class="saver-badge saver-badge--cap">Capability</span>
@@ -52,7 +52,7 @@
 
         <div class="report-footer">
             <p>This report was generated using AI-assisted analysis of evaluator submissions. All scores reflect aggregated evaluator assessments.</p>
-            <p>Miami Beach Fire Department · Health & Safety Committee · {{ now()->format('Y') }}</p>
+            <p>Miami Beach Fire Department · Health & Safety Committee · {{ now((string) config('hub.timezone'))->format('Y') }}</p>
         </div>
     </div>
 </body>

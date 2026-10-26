@@ -68,7 +68,7 @@
                         <div class="hub-insp-timeline__head">
                             <p class="hub-insp-timeline__title">{{ $titles[$entry['type']] ?? 'Update' }}</p>
                         </div>
-                        <p class="hub-insp-item__sub">{{ $entry['at']?->timezone('America/New_York')->format('M j, Y g:i A') }} · {{ $entry['from'] }}</p>
+                        <p class="hub-insp-item__sub">{{ $entry['at']?->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A') }} · {{ $entry['from'] }}</p>
                         @if(filled($entry['body']))
                             <p class="hub-insp-item__text">{{ $entry['body'] }}</p>
                         @endif

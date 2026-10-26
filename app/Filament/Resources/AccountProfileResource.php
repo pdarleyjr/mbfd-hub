@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\AccountProfileResource\Pages;
 use App\Filament\Support\EmployeeAccessSchema;
 use App\Models\User;
@@ -15,6 +16,8 @@ use Filament\Tables\Table;
 
 class AccountProfileResource extends Resource
 {
+    use HasExportActions;
+
     protected static ?string $navigationLabel = 'Accounts';
 
     protected static ?int $navigationSort = 40;
@@ -56,14 +59,14 @@ class AccountProfileResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table->columns([
+        return static::withExportActions($table->columns([
             Tables\Columns\TextColumn::make('name')->searchable()->sortable(),
             Tables\Columns\TextColumn::make('employee_id')->label('Recorded Employee ID')->placeholder('No Employee ID')->searchable(),
             Tables\Columns\TextColumn::make('email')->searchable(),
             Tables\Columns\TextColumn::make('account_classification')->label('Classification')->badge()
                 ->formatStateUsing(fn (?string $state): string => $state === 'approved_nonemployee' ? 'Approved nonemployee' : 'Unresolved account'),
             Tables\Columns\TextColumn::make('account_status')->badge(),
-        ])->actions([Tables\Actions\EditAction::make()->label('Open profile')])->bulkActions([]);
+        ])->actions([Tables\Actions\EditAction::make()->label('Open profile')])->bulkActions([]));
     }
 
     public static function getEloquentQuery(): \Illuminate\Database\Eloquent\Builder

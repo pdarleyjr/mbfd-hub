@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Workgroup;
 
+use App\Filament\Concerns\HasExportActions;
 use App\Models\CandidateProduct;
 use App\Models\EvaluationCategory;
 use App\Models\User;
@@ -18,6 +19,8 @@ use Illuminate\Database\Eloquent\Builder;
 
 class CandidateProductResource extends Resource
 {
+    use HasExportActions;
+
     protected static ?string $model = CandidateProduct::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-cube';
@@ -105,7 +108,7 @@ class CandidateProductResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->columns([
                 Tables\Columns\TextColumn::make('name')
                     ->searchable()
@@ -150,7 +153,7 @@ class CandidateProductResource extends Resource
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
-            ]);
+            ]));
     }
 
     public static function getPages(): array

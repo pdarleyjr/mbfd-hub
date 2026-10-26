@@ -8,6 +8,7 @@ use App\Models\Apparatus;
 use App\Models\ApparatusInspection;
 use App\Notifications\EquipmentDefectNotification;
 use App\Services\SnipeItService;
+use App\Support\HubTimezone;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -49,7 +50,7 @@ class AuditEquipmentAfterInspection implements ShouldQueue
         }
 
         $snipeitAssetId = $apparatus->snipeit_asset_id;
-        $inspectionRef = $inspection->inspection_reference ?? ('INS-'.now()->format('Y-m-d').'-'.$inspection->id);
+        $inspectionRef = $inspection->inspection_reference ?? ('INS-'.HubTimezone::today()->toDateString().'-'.$inspection->id);
 
         // 1. Get all equipment checked out to this apparatus from Snipe-IT
         $equipment = $snipeIt->getAssetsCheckedOutTo($snipeitAssetId);
@@ -74,7 +75,8 @@ class AuditEquipmentAfterInspection implements ShouldQueue
             $employee = \App\Models\Employee::find($inspection->employee_id);
             $employeeId = $employee?->employee_id ?? '';
         }
-        $inspectionDate = $inspection->completed_at?->format('Y-m-d H:i') ?? now()->format('Y-m-d H:i');
+        $inspectionDate = $inspection->completed_at?->copy()->timezone(HubTimezone::NAME)->format('Y-m-d H:i')
+            ?? now(HubTimezone::NAME)->format('Y-m-d H:i');
 
         $audited = 0;
         $damaged = 0;
@@ -303,7 +305,7 @@ EOT;
             "Defect reported during daily inspection — {$apparatusName}",
             'Repair',
             "Reported by {$rank} {$operatorName} during daily apparatus checkout of {$apparatusName}.\n\nDefect details: ".($defectNotes ?: 'Damaged — see inspection report.')."\n\nInspection Ref: {$inspectionRef}",
-            now()->format('Y-m-d')
+            HubTimezone::today()->toDateString()
         );
 
         // 4. Send notification

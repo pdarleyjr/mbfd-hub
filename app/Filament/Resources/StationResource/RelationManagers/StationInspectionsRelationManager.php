@@ -2,15 +2,19 @@
 
 namespace App\Filament\Resources\StationResource\RelationManagers;
 
+use App\Filament\Concerns\HasRelationExportActions;
 use App\Filament\Resources\StationInspectionResource;
 use App\Filament\Support\ArchiveFilter;
+use App\Services\Exports\ExportableTable;
 use Filament\Infolists\Infolist;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
 
-class StationInspectionsRelationManager extends RelationManager
+class StationInspectionsRelationManager extends RelationManager implements ExportableTable
 {
+    use HasRelationExportActions;
+
     protected static string $relationship = 'stationInspections';
 
     protected static ?string $title = 'Station Inspections';
@@ -19,7 +23,7 @@ class StationInspectionsRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->columns([
                 Tables\Columns\TextColumn::make('id')
                     ->label('ID')
@@ -69,6 +73,6 @@ class StationInspectionsRelationManager extends RelationManager
             ->actions([
                 Tables\Actions\ViewAction::make()
                     ->infolist(fn (Infolist $infolist): Infolist => StationInspectionResource::infolist($infolist)),
-            ]);
+            ]));
     }
 }

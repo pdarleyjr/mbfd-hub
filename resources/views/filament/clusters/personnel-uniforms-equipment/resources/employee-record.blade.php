@@ -38,7 +38,7 @@
             @endforeach
             @foreach($legacyRequests as $legacy)
                 <a href="/admin/employee-equipment-requests/{{ $legacy->id }}" class="pu-row">
-                    <span><strong>Legacy request · {{ $legacy->created_at->format('M j, Y') }}</strong><small>{{ \Illuminate\Support\Str::limit($legacy->requested_items, 100) }}</small></span>
+                    <span><strong>Legacy request · {{ $legacy->created_at->copy()->timezone(config('hub.timezone'))->format('M j, Y') }}</strong><small>{{ \Illuminate\Support\Str::limit($legacy->requested_items, 100) }}</small></span>
                     <span class="hub-tag">{{ $legacy->status }}</span>
                 </a>
             @endforeach

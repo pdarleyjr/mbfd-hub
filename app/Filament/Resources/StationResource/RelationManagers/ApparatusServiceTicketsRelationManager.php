@@ -6,8 +6,10 @@ namespace App\Filament\Resources\StationResource\RelationManagers;
 
 use App\Enums\ApparatusServiceTicketPriority;
 use App\Enums\ApparatusServiceTicketStatus;
+use App\Filament\Concerns\HasRelationExportActions;
 use App\Filament\Resources\ApparatusServiceTicketResource;
 use App\Models\ApparatusServiceTicket;
+use App\Services\Exports\ExportableTable;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -18,8 +20,10 @@ use Illuminate\Database\Eloquent\Builder;
  * made on the ticket itself so the workflow service records every transition.
  * Visibility follows the ApparatusServiceTicket policy (admin.fleet.view).
  */
-class ApparatusServiceTicketsRelationManager extends RelationManager
+class ApparatusServiceTicketsRelationManager extends RelationManager implements ExportableTable
 {
+    use HasRelationExportActions;
+
     protected static string $relationship = 'apparatusServiceTickets';
 
     protected static ?string $title = 'Apparatus Service';
@@ -28,7 +32,7 @@ class ApparatusServiceTicketsRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->columns([
                 Tables\Columns\TextColumn::make('ticket_number')->label('Ticket')->searchable()->sortable(),
                 Tables\Columns\TextColumn::make('unit_designation_snapshot')->label('Unit')->searchable()->weight('bold'),
@@ -67,6 +71,6 @@ class ApparatusServiceTicketsRelationManager extends RelationManager
                     ->label('Open')
                     ->icon('heroicon-o-arrow-top-right-on-square')
                     ->url(fn (ApparatusServiceTicket $record): string => ApparatusServiceTicketResource::getUrl('view', ['record' => $record])),
-            ]);
+            ]));
     }
 }

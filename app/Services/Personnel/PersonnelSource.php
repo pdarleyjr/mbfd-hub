@@ -183,7 +183,7 @@ final class PersonnelSource
     {
         // The source publishes bid terms, not effective operational placements.
         // Never promote a future term or use an older term for a missing member.
-        $year = now('America/New_York')->year;
+        $year = now(\App\Support\HubTimezone::NAME)->year;
 
         return $query->whereNull('superseded_at')->where('bid_year', '=', EmployeeBidAssignment::query()
             ->selectRaw('MAX(bid_year)')->whereNull('superseded_at')->where('bid_year', '<=', $year));

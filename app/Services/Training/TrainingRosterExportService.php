@@ -129,8 +129,8 @@ final class TrainingRosterExportService
                 'signature_bytes' => $signature,
                 'signature_url' => 'data:image/png;base64,'.base64_encode($signature),
                 'signature_signed_at' => $signatureSignedAt,
-                'date' => CarbonImmutable::parse($signatureSignedAt)->setTimezone('America/New_York')->format('m/d/Y'),
-                'time' => CarbonImmutable::parse($signatureSignedAt)->setTimezone('America/New_York')->format('H:i:s T'),
+                'date' => CarbonImmutable::parse($signatureSignedAt)->setTimezone(\App\Support\HubTimezone::NAME)->format('m/d/Y'),
+                'time' => CarbonImmutable::parse($signatureSignedAt)->setTimezone(\App\Support\HubTimezone::NAME)->format('H:i:s T'),
             ];
         }
 
@@ -138,13 +138,13 @@ final class TrainingRosterExportService
         if ($certification !== null) {
             $certification['signature_bytes'] = $this->verifiedBytes($certification['oic_signature']);
             $certification['signature_url'] = 'data:image/png;base64,'.base64_encode($certification['signature_bytes']);
-            $certification['signed_at_local'] = CarbonImmutable::parse($certification['certified_at'])->setTimezone('America/New_York')->format('m/d/Y H:i:s T');
+            $certification['signed_at_local'] = CarbonImmutable::parse($certification['certified_at'])->setTimezone(\App\Support\HubTimezone::NAME)->format('m/d/Y H:i:s T');
         }
         $instructorSignoff = $snapshot['instructor_signoff'] ?? null;
         if ($instructorSignoff !== null) {
             $instructorSignoff['signature_bytes'] = $this->verifiedBytes($instructorSignoff['signature']);
             $instructorSignoff['signature_url'] = 'data:image/png;base64,'.base64_encode($instructorSignoff['signature_bytes']);
-            $instructorSignoff['signed_at_local'] = CarbonImmutable::parse($instructorSignoff['signed_at'])->setTimezone('America/New_York')->format('m/d/Y H:i:s T');
+            $instructorSignoff['signed_at_local'] = CarbonImmutable::parse($instructorSignoff['signed_at'])->setTimezone(\App\Support\HubTimezone::NAME)->format('m/d/Y H:i:s T');
         }
         $oic = $certification !== null
             ? [...$certification, 'person' => $certification['oic_snapshot'], 'signature' => $certification['oic_signature']]

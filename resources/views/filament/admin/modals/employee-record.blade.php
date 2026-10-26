@@ -77,7 +77,7 @@
                             <div class="er-request__body">
                                 <p class="er-request__items">{{ $req->requested_items }}</p>
                                 <div class="er-request__meta">
-                                    {{ $req->created_at->format('M j, Y g:i A') }}
+                                    {{ $req->created_at->copy()->timezone(config('hub.timezone'))->format('M j, Y g:i A') }}
                                     @if($req->reason) · <span class="er-request__reason">{{ $req->reason }}</span> @endif
                                     @if($req->admin_notes) · <em>{{ $req->admin_notes }}</em> @endif
                                     @if($req->is_archived) · <span>Archived</span> @endif

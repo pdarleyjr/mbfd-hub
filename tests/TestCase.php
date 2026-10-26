@@ -191,5 +191,9 @@ abstract class TestCase extends BaseTestCase
             SupportRedirects::$redirectorCacheStack = [];
             SupportRedirects::$atLeastOneMountedComponentHasRedirected = false;
         }
+
+        // Collect the released framework and spreadsheet cycles before the next fixture.
+        // Otherwise a late XLSX ZIP buffer can exhaust the full suite's memory budget.
+        gc_collect_cycles();
     }
 }

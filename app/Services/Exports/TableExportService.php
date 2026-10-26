@@ -6,7 +6,10 @@ namespace App\Services\Exports;
 
 use App\Models\User;
 use App\Services\Security\SecurityAuditRecorder;
+use App\Support\HubTimezone;
 use Carbon\CarbonImmutable;
+use Closure;
+use Filament\Resources\Resource;
 use Filament\Tables\Contracts\HasTable;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
@@ -30,7 +33,7 @@ use function Livewire\invade;
  */
 final class TableExportService
 {
-    public const TIMEZONE = 'America/New_York';
+    public const TIMEZONE = HubTimezone::NAME;
 
     public const XLSX_ROW_CAP = 10000;
 
@@ -62,15 +65,24 @@ final class TableExportService
     ) {}
 
     /** May this user export the given resource's table? Mirrors the list page's own viewAny rule. */
-    public function canExport(?User $user, string $resource): bool
+    public function canExport(?User $user, string $resource, ?HasTable $livewire = null): bool
     {
-        if (! $user instanceof User) {
+        if (! $user instanceof User || (string) auth()->id() !== (string) $user->getKey()) {
             return false;
         }
 
-        $model = $resource::getModel();
+        if (is_subclass_of($resource, Resource::class)) {
+            $model = $resource::getModel();
 
-        return Gate::forUser($user)->allows('viewAny', $model) && $resource::canViewAny();
+            // A few native resources (for example EMS) own their access rule instead
+            // of registering a model policy. Never bypass a registered policy.
+            return (Gate::getPolicyFor($model) === null || Gate::forUser($user)->allows('viewAny', $model))
+                && $resource::canViewAny();
+        }
+
+        return $livewire instanceof ExportableTable
+            && $livewire::class === $resource
+            && $livewire->canExportTableData($user);
     }
 
     /**
@@ -91,26 +103,57 @@ final class TableExportService
             throw new ExportFailedException('Choose Excel or PDF and a supported scope.');
         }
 
-        if (! $this->canExport($actor, $resource)) {
-            $this->audit($actor, $resource, $scope, $format, 'denied', 0);
+        return $this->downloadDataset(
+            $actor, $resource, $format,
+            fn (): bool => $this->canExport($actor, $resource, $livewire),
+            fn (): ExportDataset => $this->buildDataset($actor, $livewire, $resource, $format, $scope, $includeToggledOff, $selectedKeys),
+            $scope,
+        );
+    }
+
+    /**
+     * Export a server-built chart or custom board using its native access rule.
+     * The dataset callback is evaluated only after permission and rate-limit checks.
+     */
+    public function downloadDataset(
+        ?User $actor,
+        string $source,
+        string $format,
+        Closure $authorize,
+        Closure $build,
+        string $scope = 'current view',
+    ): StreamedResponse {
+        abort_unless($actor instanceof User, 403);
+        if (! in_array($format, self::FORMATS, true)) {
+            throw new ExportFailedException('Choose Excel or PDF.');
+        }
+
+        if ((string) auth()->id() !== (string) $actor->getKey() || ! $authorize()) {
+            $this->audit($actor, $source, $scope, $format, 'denied', 0);
             abort(403);
         }
 
         $limiterKey = 'table-export:'.$actor->getKey();
         if (RateLimiter::tooManyAttempts($limiterKey, self::EXPORTS_PER_MINUTE)) {
-            $this->audit($actor, $resource, $scope, $format, 'refused', 0, ['reason' => 'rate limited']);
+            $this->audit($actor, $source, $scope, $format, 'refused', 0, ['reason' => 'rate limited']);
 
             throw new ExportFailedException('Too many exports in the last minute. Wait a moment and try again.');
         }
         RateLimiter::hit($limiterKey, 60);
 
         try {
-            $dataset = $this->buildDataset($actor, $livewire, $resource, $format, $scope, $includeToggledOff, $selectedKeys);
+            $dataset = $build();
+            if (! $dataset instanceof ExportDataset) {
+                throw new ExportFailedException('The export data is unavailable.');
+            }
+            if ($dataset->rowCount() > $this->rowCap($format, $dataset->columnCount())) {
+                throw new ExportFailedException('This export is too large. Narrow the current view and try again.');
+            }
         } catch (ExportFailedException $exception) {
-            $this->audit($actor, $resource, $scope, $format, 'refused', 0, ['reason' => $exception->getMessage()]);
+            $this->audit($actor, $source, $scope, $format, 'refused', 0, ['reason' => $exception->getMessage()]);
             if ($exception->getPrevious() instanceof Throwable) {
                 Log::error('table.export.column_failed', [
-                    'resource' => $resource,
+                    'resource' => $source,
                     'user_id' => $actor->getKey(),
                     'error' => $exception->getPrevious()->getMessage(),
                 ]);
@@ -120,7 +163,7 @@ final class TableExportService
         }
 
         $bytes = $format === 'pdf' ? $this->pdf->write($dataset) : $this->xlsx->write($dataset);
-        $this->audit($actor, $resource, $scope, $format, 'allowed', $dataset->rowCount(), [
+        $this->audit($actor, $source, $scope, $format, 'allowed', $dataset->rowCount(), [
             'columns' => $dataset->columnCount(),
             'filters' => $dataset->filterSummary,
         ]);
@@ -176,7 +219,7 @@ final class TableExportService
         }
 
         return new ExportDataset(
-            title: self::title($resource),
+            title: self::title($resource, $livewire),
             headers: $this->reader->headers($columns),
             rows: $rows,
             generatedAt: CarbonImmutable::now(self::TIMEZONE),
@@ -187,9 +230,11 @@ final class TableExportService
         );
     }
 
-    public static function title(string $resource): string
+    public static function title(string $resource, ?HasTable $livewire = null): string
     {
-        return Str::title($resource::getPluralModelLabel());
+        return $livewire instanceof ExportableTable
+            ? $livewire->tableExportTitle()
+            : Str::title($resource::getPluralModelLabel());
     }
 
     /** "MBFD - <Table title> - YYYY-MM-DD.<ext>" with characters unsafe in file names removed. */
@@ -310,7 +355,7 @@ final class TableExportService
     {
         $context = [
             'resource' => $resource,
-            'model' => $resource::getModel(),
+            'model' => is_subclass_of($resource, Resource::class) ? $resource::getModel() : null,
             'scope' => $scope,
             'format' => $format,
             'row_count' => $rows,

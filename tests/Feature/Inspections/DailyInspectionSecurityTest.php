@@ -177,7 +177,7 @@ final class DailyInspectionSecurityTest extends TestCase
 
         $page = Livewire::test(ViewInspection::class, ['record' => $inspection->getRouteKey()])->assertSuccessful();
         foreach ($page->instance()->getCachedHeaderActions() as $action) {
-            if (in_array($action->getName(), ['print', 'downloadPdf'], true)) {
+            if (in_array($action->getName(), ['print', 'downloadPdf', 'exportData'], true)) {
                 continue;
             }
             $this->assertFalse($action->isVisible(), "Header action '{$action->getName()}' must be hidden from a non-reviewer.");
@@ -191,6 +191,31 @@ final class DailyInspectionSecurityTest extends TestCase
         $this->assertSame('pending_review', $inspection->fresh()->review_status);
         $this->assertSame('held_for_review', $inspection->fresh()->processing_status);
         $this->assertSame('open', ApparatusInspectionException::query()->where('apparatus_inspection_id', $inspection->id)->sole()->status);
+    }
+
+    public function test_read_only_export_rechecks_the_authenticated_actor_and_native_record_access(): void
+    {
+        Queue::fake();
+        Notification::fake();
+        $inspection = $this->heldFlaggedInspection();
+        $viewer = $this->newViewerOnly();
+        $this->actAs($viewer);
+        Filament::setCurrentPanel(Filament::getPanel('admin'));
+        $page = Livewire::test(ViewInspection::class, ['record' => $inspection->getRouteKey()]);
+        $original = $inspection->fresh()->getRawOriginal();
+
+        $this->assertTrue($page->instance()->canExportData($viewer));
+        $this->assertFalse($page->instance()->canExportData($this->reviewer));
+        foreach (['xlsx' => 'PK', 'pdf' => '%PDF'] as $format => $signature) {
+            $page->callAction('exportData', data: ['format' => $format])->assertHasNoActionErrors();
+            $this->assertStringStartsWith($signature, base64_decode($page->effects['download']['content'], true));
+        }
+        $this->assertSame($original, $inspection->fresh()->getRawOriginal());
+
+        $this->actAs($this->stranger);
+        $this->assertFalse($page->instance()->canExportData($this->stranger));
+        $this->assertSame('pending_review', $inspection->fresh()->review_status);
+        $this->assertSame('held_for_review', $inspection->fresh()->processing_status);
     }
 
     public function test_a_plain_member_cannot_open_the_admin_page(): void
@@ -220,7 +245,7 @@ final class DailyInspectionSecurityTest extends TestCase
             'acknowledgeIssueAction', 'updateIssueAction', 'resolveIssueAction', 'dismissIssueAction', 'reopenIssueAction',
             'verifyCorrectionAction', 'classifyImpactAction', 'correctSeverityAction', 'linkServiceTicketAction',
             'acceptMeterReadingAction', 'enterVerifiedReadingAction', 'requestMeterClarificationAction', 'keepCurrentReadingAction',
-            'postIssueMessage',
+            'postIssueMessage', 'canExportData',
         ];
         $unknown = collect($reflection->getMethods(ReflectionMethod::IS_PUBLIC))
             ->filter(static fn (ReflectionMethod $method): bool => $method->getDeclaringClass()->getName() === ViewInspection::class)

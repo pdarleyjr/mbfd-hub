@@ -16,7 +16,7 @@ use Carbon\CarbonInterface;
 /** Plain firehouse wording for the Admin -> EMS screens and exports. One place, so screens and files agree. */
 final class EmsLabels
 {
-    public const TIMEZONE = 'America/New_York';
+    public const TIMEZONE = \App\Support\HubTimezone::NAME;
 
     public const STATUS = [
         InventoryRequest::SUBMITTED => 'Submitted',

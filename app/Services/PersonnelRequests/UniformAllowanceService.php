@@ -9,6 +9,7 @@ use App\Enums\PersonnelRequestType;
 use App\Models\Employee;
 use App\Models\PersonnelRequest;
 use App\Models\PersonnelRequestItem;
+use App\Support\HubTimezone;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -33,7 +34,7 @@ final class UniformAllowanceService
     /** @return array{start: CarbonImmutable, end: CarbonImmutable, label: string} */
     public function period(?CarbonImmutable $at = null): array
     {
-        $at ??= CarbonImmutable::now();
+        $at = ($at ?? CarbonImmutable::now(HubTimezone::NAME))->setTimezone(HubTimezone::NAME);
         $month = max(1, min(12, (int) config('uniform_orders.allowance_year.start_month', 1)));
         $day = max(1, min(28, (int) config('uniform_orders.allowance_year.start_day', 1)));
         $start = $at->setDate($at->year, $month, $day)->startOfDay();
@@ -45,7 +46,9 @@ final class UniformAllowanceService
             ? (string) $start->year
             : $start->format('M j, Y').' – '.$end->subDay()->format('M j, Y');
 
-        return ['start' => $start, 'end' => $end, 'label' => $label];
+        // Requests are timestamped in UTC; calculate the civil allowance year
+        // locally, then bind the equivalent UTC instants to created_at queries.
+        return ['start' => $start->utc(), 'end' => $end->utc(), 'label' => $label];
     }
 
     /**

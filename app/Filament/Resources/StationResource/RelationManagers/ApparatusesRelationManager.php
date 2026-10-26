@@ -2,21 +2,25 @@
 
 namespace App\Filament\Resources\StationResource\RelationManagers;
 
+use App\Filament\Concerns\HasRelationExportActions;
 use App\Models\Apparatus;
+use App\Services\Exports\ExportableTable;
 use Filament\Forms;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
 
-class ApparatusesRelationManager extends RelationManager
+class ApparatusesRelationManager extends RelationManager implements ExportableTable
 {
+    use HasRelationExportActions;
+
     protected static string $relationship = 'apparatuses';
 
     protected static ?string $title = 'Assigned Apparatus';
 
     public function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->recordTitleAttribute('unit_number')
             ->columns([
                 Tables\Columns\TextColumn::make('designation')
@@ -103,7 +107,7 @@ class ApparatusesRelationManager extends RelationManager
                         ]);
                     }),
             ])
-            ->bulkActions([]);
+            ->bulkActions([]));
     }
 
     /**

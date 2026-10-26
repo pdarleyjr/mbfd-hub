@@ -5,16 +5,20 @@ declare(strict_types=1);
 namespace App\Filament\Resources\ApparatusResource\RelationManagers;
 
 use App\Enums\ApparatusServiceTicketStatus;
+use App\Filament\Concerns\HasRelationExportActions;
 use App\Filament\Resources\ApparatusServiceTicketResource;
 use App\Models\Apparatus;
 use App\Models\ApparatusServiceTicket;
+use App\Services\Exports\ExportableTable;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
 
-class ServiceTicketsRelationManager extends RelationManager
+class ServiceTicketsRelationManager extends RelationManager implements ExportableTable
 {
+    use HasRelationExportActions;
+
     protected static string $relationship = 'serviceTickets';
 
     protected static ?string $title = 'Service Tickets';
@@ -29,7 +33,7 @@ class ServiceTicketsRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->modifyQueryUsing(fn ($query) => $query->active())
             ->recordTitleAttribute('ticket_number')
             ->recordUrl(fn (ApparatusServiceTicket $record): ?string => self::ticketUrl($record))
@@ -58,7 +62,7 @@ class ServiceTicketsRelationManager extends RelationManager
                     ->formatStateUsing(fn (string $state): string => ApparatusServiceTicketStatus::from($state)->label())
                     ->color(fn (string $state): string => ApparatusServiceTicketStatus::from($state)->color())
                     ->visibleFrom('md'),
-                Tables\Columns\TextColumn::make('created_at')->label('Created')->date('M j, Y')->sortable()->visibleFrom('md'),
+                Tables\Columns\TextColumn::make('created_at')->label('Created')->date('M j, Y')->timezone(config('hub.timezone'))->sortable()->visibleFrom('md'),
                 Tables\Columns\TextColumn::make('category')->badge()->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('scheduled_for')->dateTime()->placeholder('Not scheduled')->sortable()->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('completed_at')->dateTime()->placeholder('Open')->sortable()->toggleable(isToggledHiddenByDefault: true),
@@ -70,7 +74,7 @@ class ServiceTicketsRelationManager extends RelationManager
                     ->icon('heroicon-o-eye')
                     ->visible(fn (ApparatusServiceTicket $record): bool => self::ticketUrl($record) !== null)
                     ->url(fn (ApparatusServiceTicket $record): ?string => self::ticketUrl($record)),
-            ]);
+            ]));
     }
 
     /** Only administrators who may open the ticket get a link to it. */

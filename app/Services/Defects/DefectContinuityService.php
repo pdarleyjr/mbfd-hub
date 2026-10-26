@@ -13,6 +13,7 @@ use App\Models\ApparatusInspection;
 use App\Models\ApparatusIssueMessage;
 use App\Services\InspectionPaperFields;
 use App\Support\Fleet\DefectActionStatus;
+use App\Support\HubTimezone;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -450,7 +451,7 @@ final class DefectContinuityService
             'notes' => $entry['notes'],
             'photo_path' => $entry['photo_path'],
             'apparatus_inspection_id' => $inspection?->id,
-            'reported_date' => now()->toDateString(),
+            'reported_date' => HubTimezone::today()->toDateString(),
             'compartment_key' => $entry['compartment_id'],
             'item_key' => $entry['item_id'],
             'severity' => $significant ? 'significant' : 'routine',

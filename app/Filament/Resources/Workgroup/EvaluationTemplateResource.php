@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Workgroup;
 
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\Workgroup\Concerns\ResolvesWorkgroupAccess;
 use App\Models\EvaluationCategory;
 use App\Models\EvaluationTemplate;
@@ -16,6 +17,7 @@ use Illuminate\Database\Eloquent\Builder;
 
 class EvaluationTemplateResource extends Resource
 {
+    use HasExportActions;
     use ResolvesWorkgroupAccess;
 
     protected static ?string $model = EvaluationTemplate::class;
@@ -85,7 +87,7 @@ class EvaluationTemplateResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->columns([
                 Tables\Columns\TextColumn::make('name')
                     ->searchable()
@@ -123,7 +125,7 @@ class EvaluationTemplateResource extends Resource
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
-            ]);
+            ]));
     }
 
     public static function getRelations(): array

@@ -706,8 +706,8 @@ final class DefectCorrectiveActionService
                 continue;
             }
             $clean[$key] = match ($key) {
-                'expected_delivery' => Carbon::parse((string) $value, 'America/New_York')->toDateString(),
-                'repair_appointment' => Carbon::parse((string) $value, 'America/New_York')->toIso8601String(),
+                'expected_delivery' => Carbon::parse((string) $value, \App\Support\HubTimezone::NAME)->toDateString(),
+                'repair_appointment' => Carbon::parse((string) $value, \App\Support\HubTimezone::NAME)->toIso8601String(),
                 'parts_ordered' => is_bool($value) ? $value : $this->limitedString($key, $value, 255),
                 'assigned_to' => $this->assignee($value),
                 default => (string) $value,

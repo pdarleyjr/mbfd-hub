@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Filament\Admin\Pages;
 
+use App\Filament\Concerns\HasDatasetExportActions;
 use App\Models\User;
+use App\Services\Exports\ExportDataset;
 use App\Services\MediaControl\MediaControlContent;
 use App\Services\MediaControl\MediaControlMediaClient;
 use App\Services\MediaControl\MediaControlRequestFailed;
@@ -29,6 +31,32 @@ use Livewire\Attributes\Locked;
  */
 class MediaControlMedia extends Page
 {
+    use HasDatasetExportActions;
+
+    protected function getHeaderActions(): array
+    {
+        return [$this->datasetExportAction()];
+    }
+
+    public function canExportData(User $actor): bool
+    {
+        return $actor->can(self::PERMISSION);
+    }
+
+    protected function exportDataset(User $actor): ExportDataset
+    {
+        abort_unless((string) auth()->id() === (string) $actor->getKey() && $this->canExportData($actor), 403);
+
+        return ExportDataset::fromRows($actor, 'Media Control Library',
+            ['Media', 'Kind', 'Width', 'Height', 'Tags', 'Display layout', 'Category', 'Status', 'Uploaded by', 'Created (Eastern)'],
+            array_map(fn (array $item): array => [
+                $item['title'], $item['kind'], $item['width'], $item['height'], implode(', ', $item['tags']),
+                $this->layoutLabel($item['display_span']), $item['category'], $item['processing_status'] ?? 'ready',
+                $item['uploaded_by'], MediaControlContent::createdAt($item['created_at']),
+            ], $this->items), 'Currently loaded media metadata',
+            array_values(array_filter([$this->search === '' ? null : 'Search: '.$this->search, $this->kind === '' ? null : 'Kind: '.$this->kind])));
+    }
+
     public const PERMISSION = 'app.media_control.media';
 
     private const SESSION_GRANTS = 'media_control.media.grants';

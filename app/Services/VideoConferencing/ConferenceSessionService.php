@@ -9,6 +9,7 @@ use App\Exceptions\VideoConferencing\ConferenceUnavailableException;
 use App\Models\Employee;
 use App\Models\VideoConferenceSession;
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -154,14 +155,16 @@ class ConferenceSessionService
     {
         $session ??= $this->activeLineup();
         if ($session === null) {
-            return ['active' => false, 'session_id' => null, 'started_at' => null, 'ends_at' => null];
+            return ['active' => false, 'session_id' => null, 'started_at' => null, 'ends_at' => null,
+                'server_time' => CarbonImmutable::now((string) config('hub.timezone'))->toIso8601String()];
         }
 
         return [
             'active' => true,
             'session_id' => $session->id,
-            'started_at' => $session->started_at?->toIso8601String(),
+            'started_at' => $this->localTimestamp($session->started_at),
             'ends_at' => $this->lineupEndsAt($session),
+            'server_time' => CarbonImmutable::now((string) config('hub.timezone'))->toIso8601String(),
         ];
     }
 
@@ -202,15 +205,15 @@ class ConferenceSessionService
             'state' => $state,
             // Only an active lineup can be joined; a starting one cannot, so it gets no id.
             'session_id' => $active ? $session->id : null,
-            'started_at' => $session?->started_at?->toIso8601String(),
-            'ends_at' => $active ? $endsAt?->toIso8601String() : null,
-            'ended_at' => $state === 'ended' ? ($session->ended_at ?? $endsAt)?->toIso8601String() : null,
-            'scheduled_for' => ($session->scheduled_for ?? $this->scheduledFor($localNow))?->toIso8601String(),
+            'started_at' => $this->localTimestamp($session?->started_at),
+            'ends_at' => $active ? $this->localTimestamp($endsAt) : null,
+            'ended_at' => $state === 'ended' ? $this->localTimestamp($session->ended_at ?? $endsAt) : null,
+            'scheduled_for' => $this->localTimestamp($session->scheduled_for ?? $this->scheduledFor($localNow)),
             'full' => $active && $this->seats->isFull(
                 $session,
                 $viewer === null ? null : $this->identities->identity(ConferenceJoinRole::Self, $viewer),
             ),
-            'server_time' => CarbonImmutable::now()->toIso8601String(),
+            'server_time' => $localNow->toIso8601String(),
         ];
     }
 
@@ -240,7 +243,12 @@ class ConferenceSessionService
 
     private function lineupEndsAt(VideoConferenceSession $session): ?string
     {
-        return $this->timeLimit->endsAt($session)?->toIso8601String();
+        return $this->localTimestamp($this->timeLimit->endsAt($session));
+    }
+
+    private function localTimestamp(?CarbonInterface $timestamp): ?string
+    {
+        return $timestamp?->copy()->timezone((string) config('hub.timezone'))->toIso8601String();
     }
 
     /** @return array<string, mixed> */
@@ -254,16 +262,18 @@ class ConferenceSessionService
                 'ends_at' => null,
                 'type' => null,
                 'target_station' => null,
+                'server_time' => CarbonImmutable::now((string) config('hub.timezone'))->toIso8601String(),
             ];
         }
 
         return [
             'active' => true,
             'session_id' => $session->id,
-            'started_at' => $session->started_at?->toIso8601String(),
+            'started_at' => $this->localTimestamp($session->started_at),
             'ends_at' => null,
             'type' => $session->type->value,
             'target_station' => $session->target_station,
+            'server_time' => CarbonImmutable::now((string) config('hub.timezone'))->toIso8601String(),
         ];
     }
 
@@ -274,10 +284,11 @@ class ConferenceSessionService
             'id' => $session->id,
             'type' => $session->type->value,
             'target_station' => $session->target_station,
-            'scheduled_for' => $session->scheduled_for?->toIso8601String(),
+            'scheduled_for' => $this->localTimestamp($session->scheduled_for),
             'lineup_time_configured' => config('video-conferencing.lineup_time') !== null,
             // The time limit of the session actually being joined, so a banner never shows another lineup's end.
             'ends_at' => $session->type === ConferenceRoomType::Lineup ? $this->lineupEndsAt($session) : null,
+            'server_time' => CarbonImmutable::now((string) config('hub.timezone'))->toIso8601String(),
         ];
     }
 

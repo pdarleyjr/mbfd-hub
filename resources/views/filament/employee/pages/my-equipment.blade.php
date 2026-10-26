@@ -51,9 +51,9 @@
                                     <td role="cell" class="ep-eq-td ep-eq-td-right ep-eq-date" data-label="Expiration">
                                         @if(!$item->expires_at)
                                             —
-                                        @elseif($item->expires_at->isBefore(today()))
+                                        @elseif($item->expires_at->isBefore(\App\Support\HubTimezone::today()))
                                             <span class="ep-expiration ep-expiration-expired">Expired · {{ $item->expires_at->format('M j, Y') }}</span>
-                                        @elseif($item->expires_at->lte(today()->addDays(60)))
+                                        @elseif($item->expires_at->lte(\App\Support\HubTimezone::today()->addDays(60)))
                                             <span class="ep-expiration ep-expiration-soon">Expiring Soon · {{ $item->expires_at->format('M j, Y') }}</span>
                                         @else
                                             {{ $item->expires_at->format('M j, Y') }}

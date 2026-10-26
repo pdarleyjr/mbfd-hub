@@ -9,11 +9,15 @@ use App\Models\ApparatusDefectRecommendation;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusInventoryAllocation;
 use App\Models\EquipmentItem;
+use Carbon\CarbonImmutable;
 
 class AdminMetricsController extends Controller
 {
     public function index()
     {
+        $localNow = CarbonImmutable::now((string) config('hub.timezone'));
+        $dayStart = $localNow->startOfDay();
+
         return response()->json([
             // Existing metrics
             'apparatuses' => [
@@ -33,9 +37,9 @@ class AdminMetricsController extends Controller
             ],
 
             'inspections' => [
-                'today' => ApparatusInspection::operational()->whereDate('completed_at', today())->count(),
-                'this_week' => ApparatusInspection::operational()->where('completed_at', '>=', now()->startOfWeek())->count(),
-                'this_month' => ApparatusInspection::operational()->where('completed_at', '>=', now()->startOfMonth())->count(),
+                'today' => ApparatusInspection::operational()->where('completed_at', '>=', $dayStart->utc())->where('completed_at', '<', $dayStart->addDay()->utc())->count(),
+                'this_week' => ApparatusInspection::operational()->where('completed_at', '>=', $localNow->startOfWeek()->utc())->count(),
+                'this_month' => ApparatusInspection::operational()->where('completed_at', '>=', $localNow->startOfMonth()->utc())->count(),
             ],
 
             // NEW: Fire Equipment Inventory metrics
@@ -50,7 +54,7 @@ class AdminMetricsController extends Controller
                     ->filter(fn ($item) => $item->stock <= $item->reorder_min && $item->stock > 0)
                     ->count(),
                 'pending_recommendations' => ApparatusDefectRecommendation::where('status', 'pending')->count(),
-                'allocations_this_week' => ApparatusInventoryAllocation::where('allocated_at', '>=', now()->startOfWeek())->count(),
+                'allocations_this_week' => ApparatusInventoryAllocation::where('allocated_at', '>=', $localNow->startOfWeek()->utc())->count(),
             ],
 
             // NEW: Top missing items (for reorder suggestions)

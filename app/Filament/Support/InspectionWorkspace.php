@@ -42,7 +42,7 @@ use Illuminate\Support\Collection;
  */
 final class InspectionWorkspace
 {
-    public const TIMEZONE = 'America/New_York';
+    public const TIMEZONE = \App\Support\HubTimezone::NAME;
 
     /** Exception statuses that no longer need a decision. */
     private const CLOSED_EXCEPTION = ['resolved', 'dismissed'];

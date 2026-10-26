@@ -7,6 +7,7 @@ namespace App\Services\VideoConferencing;
 use App\Enums\VideoConferencing\ConferenceJoinRole;
 use App\Models\Employee;
 use App\Models\Station;
+use Carbon\CarbonImmutable;
 
 class ConferenceBootstrapFactory
 {
@@ -55,6 +56,8 @@ class ConferenceBootstrapFactory
             'lineup_max_minutes' => max(5, min(30, (int) config('video-conferencing.lineup_max_minutes', 15))),
             'status_poll_ms' => max(3000, min(15000, (int) config('video-conferencing.readiness.poll_seconds', 5) * 1000)),
             'heartbeat_ms' => max(10000, min(60000, (int) config('video-conferencing.readiness.heartbeat_seconds', 20) * 1000)),
+            'timezone' => (string) config('hub.timezone'),
+            'server_time' => CarbonImmutable::now((string) config('hub.timezone'))->toIso8601String(),
             'realtime' => [
                 'key' => (string) ($reverb['key'] ?? ''),
                 'host' => (string) ($realtime['host'] ?? parse_url((string) config('app.url'), PHP_URL_HOST)),

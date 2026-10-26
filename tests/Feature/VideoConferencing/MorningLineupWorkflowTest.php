@@ -7,6 +7,7 @@ use App\Models\Employee;
 use App\Models\User;
 use App\Models\VideoConferenceParticipation;
 use App\Models\VideoConferenceSession;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Fakes\FakeConferenceProvider;
 use Tests\TestCase;
@@ -154,6 +155,46 @@ class MorningLineupWorkflowTest extends TestCase
             ->assertJsonPath('server_url', 'wss://cloud.video.test.example');
 
         $this->assertSame('mbfd:sta1', $this->provider->issuedTokens[1]['identity']);
+    }
+
+    public function test_an_individual_waits_for_300_then_joins_the_same_lineup_across_eastern_midnight(): void
+    {
+        $member = Employee::query()->create([
+            'employee_id' => 'F044',
+            'name' => 'Individual Firefighter',
+            'rank' => 'Firefighter',
+            'password' => 'ConferenceTest!1',
+            'must_change_password' => false,
+        ]);
+        $base = '/employee/video-conferencing/api';
+        $this->travelTo(CarbonImmutable::parse('2026-08-12T03:59:00Z'));
+        $this->actingAs($member, 'employee')->getJson($base.'/lineup/status')
+            ->assertOk()->assertJsonPath('state', 'not_started');
+        $this->postJson($base.'/sessions', ['room' => 'lineup'])
+            ->assertConflict()->assertJsonPath('code', 'lineup_not_started');
+        $this->assertDatabaseCount('video_conference_sessions', 0);
+        $this->assertSame([], $this->provider->issuedTokens);
+
+        $started = $this->actingAs($this->employee, 'employee')->postJson($base.'/lineup/start')->assertOk();
+        $id = $started->json('session.id');
+        $this->assertSame('2026-08-11T23:59:00-04:00', $started->json('session.server_time'));
+        $this->travelTo(CarbonImmutable::parse('2026-08-12T04:01:00Z'));
+        $this->actingAs($member, 'employee')->getJson($base.'/lineup/status')
+            ->assertOk()->assertJsonPath('state', 'active')->assertJsonPath('session_id', $id)
+            ->assertJsonPath('server_time', '2026-08-12T00:01:00-04:00');
+        $this->postJson($base.'/sessions', ['room' => 'lineup'])->assertOk()->assertJsonPath('session.id', $id);
+        $this->postJson($base.'/sessions/'.$id.'/token', ['join_as' => 'self'])
+            ->assertOk()->assertJsonPath('participant.identity', 'mbfd:member:'.$member->id)
+            ->assertJsonPath('participant.join_as', 'self');
+        $this->assertDatabaseCount('video_conference_sessions', 1);
+        $this->assertCount(2, $this->provider->issuedTokens);
+        $this->postJson($base.'/lineup/start')->assertForbidden();
+        $this->postJson($base.'/lineup/end')->assertForbidden();
+
+        $this->actingAs($this->employee, 'employee')->postJson($base.'/lineup/end')->assertOk();
+        $this->actingAs($member, 'employee')->getJson($base.'/lineup/status')
+            ->assertOk()->assertJsonPath('state', 'not_started');
+        $this->postJson($base.'/sessions/'.$id.'/token', ['join_as' => 'self'])->assertGone();
     }
 
     public function test_authenticated_station_participant_displays_employee_name_and_fixed_station_label(): void

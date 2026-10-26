@@ -66,7 +66,7 @@ Artisan::command('inspire', function () {
 // Daily AI priority analysis at 8 AM ET
 Schedule::command('projects:analyze-priorities')
     ->dailyAt('08:00')
-    ->timezone('America/New_York')
+    ->timezone((string) config('hub.timezone'))
     ->withoutOverlapping()
     ->onOneServer()
     ->emailOutputOnFailure(env('ADMIN_EMAIL', 'admin@mbfd.org'))
@@ -75,21 +75,21 @@ Schedule::command('projects:analyze-priorities')
 // Check for overdue projects twice daily (8 AM and 5 PM)
 Schedule::command('projects:check-overdue')
     ->twiceDailyAt(8, 17)
-    ->timezone('America/New_York')
+    ->timezone((string) config('hub.timezone'))
     ->withoutOverlapping()
     ->onOneServer();
 
 // Weekly summary every Monday at 9 AM
 Schedule::command('projects:weekly-summary')
     ->weeklyOn(1, '09:00')
-    ->timezone('America/New_York')
+    ->timezone((string) config('hub.timezone'))
     ->withoutOverlapping()
     ->onOneServer();
 
 // Milestone reminders daily at 7 AM
 Schedule::command('projects:milestone-reminders')
     ->dailyAt('07:00')
-    ->timezone('America/New_York')
+    ->timezone((string) config('hub.timezone'))
     ->withoutOverlapping()
     ->onOneServer();
 
@@ -101,27 +101,27 @@ Schedule::command('model:prune', [
 // Unsubmitted Take Home Vehicle Inspection uploads (drafts are kept on the device for 72h).
 Schedule::command('fleet:prune-take-home-uploads')
     ->dailyAt('03:40')
-    ->timezone('America/New_York')
+    ->timezone((string) config('hub.timezone'))
     ->withoutOverlapping()
     ->onOneServer();
 
 // EMS idempotency keys older than 30 days (a retry window, not history).
 Schedule::command('ems:prune-idempotency')
     ->dailyAt('03:50')
-    ->timezone('America/New_York')
+    ->timezone((string) config('hub.timezone'))
     ->withoutOverlapping()
     ->onOneServer();
 
 Schedule::command('personnel-equipment:notify-expirations')
     ->dailyAt('06:30')
-    ->timezone('America/New_York')
+    ->timezone((string) config('hub.timezone'))
     ->withoutOverlapping()
     ->onOneServer();
 
 // A promotional list past its expiry date stops ranking members and shows as expired.
 Schedule::command('personnel:expire-promotional-lists')
     ->dailyAt('00:10')
-    ->timezone('America/New_York')
+    ->timezone((string) config('hub.timezone'))
     ->withoutOverlapping()
     ->onOneServer();
 

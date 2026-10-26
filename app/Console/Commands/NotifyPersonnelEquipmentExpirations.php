@@ -12,6 +12,7 @@ use App\Notifications\OperationalAlertNotification;
 use App\Services\Notifications\NotificationCategoryRegistry;
 use App\Services\Notifications\NotificationDispatchService;
 use App\Services\Notifications\NotificationRecipientEvaluator;
+use App\Support\HubTimezone;
 use Filament\Notifications\Actions\Action;
 use Filament\Notifications\Notification;
 use Illuminate\Console\Command;
@@ -37,7 +38,7 @@ class NotifyPersonnelEquipmentExpirations extends Command
                 // Whoever may manage assigned equipment right now (the policy, not a role-name list).
                 $admins = app(NotificationRecipientEvaluator::class)->recipients(NotificationCategoryRegistry::EQUIPMENT_EXPIRATIONS);
                 foreach ($assignments as $assignment) {
-                    $days = today()->diffInDays($assignment->expires_at, false);
+                    $days = HubTimezone::today()->diffInDays($assignment->expires_at, false);
                     $threshold = $thresholds->first(fn (int $candidate) => $candidate >= $days);
                     if ($threshold === null) {
                         continue;
@@ -74,7 +75,7 @@ class NotifyPersonnelEquipmentExpirations extends Command
                 return false;
             }
 
-            $expired = $assignment->expires_at->isBefore(today());
+            $expired = $assignment->expires_at->isBefore(HubTimezone::today());
             $title = $expired ? 'Assigned equipment expired' : 'Assigned equipment expiring soon';
             $body = "{$assignment->item_description} for {$assignment->employee?->name} ".($expired ? 'expired' : 'expires')." on {$assignment->expires_at->format('M j, Y')}.";
             $icon = $expired ? 'heroicon-o-exclamation-triangle' : 'heroicon-o-clock';

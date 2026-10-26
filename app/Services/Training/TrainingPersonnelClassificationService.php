@@ -16,7 +16,7 @@ final class TrainingPersonnelClassificationService
     /** Local published projection only; historical sign-in snapshots remain untouched. */
     public function population(string $asOf): array
     {
-        $boundary = CarbonImmutable::parse($asOf, 'America/New_York')->addDay()->startOfDay()->utc();
+        $boundary = CarbonImmutable::parse($asOf, \App\Support\HubTimezone::NAME)->addDay()->startOfDay()->utc();
         $published = EmployeeBidAssignment::query()->where('payload_version', 2)->where('created_at', '<', $boundary)
             ->where(fn ($query) => $query->whereNull('superseded_at')->orWhere('superseded_at', '>=', $boundary));
         $year = (clone $published)->max('bid_year');

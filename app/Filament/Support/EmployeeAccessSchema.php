@@ -48,7 +48,7 @@ final class EmployeeAccessSchema
                             return 'Hub local — not enrolled in the MBFD Identity canary.';
                         }
 
-                        return 'MBFD Identity · '.ucfirst($link->status).' · last synchronized '.($link->last_synced_at?->format('M j, Y g:i A') ?? 'not confirmed');
+                        return 'MBFD Identity · '.ucfirst($link->status).' · last synchronized '.($link->last_synced_at?->copy()->timezone(config('hub.timezone'))->format('M j, Y g:i A') ?? 'not confirmed');
                     }),
                 Forms\Placeholder::make('identity_username')->label('Identity username')
                     ->content(fn (?Model $record): string => self::account($record)?->employee_id ?: 'No canonical Employee ID — provisioning blocked.'),
@@ -81,7 +81,7 @@ final class EmployeeAccessSchema
                         }
                         $verification = app(\App\Services\Identity\CityEmailVerificationService::class)->status($user);
                         if ($verification?->verified_at !== null) {
-                            return 'Mailbox verified '.$verification->verified_at->format('M j, Y g:i A');
+                            return 'Mailbox verified '.$verification->verified_at->copy()->timezone(config('hub.timezone'))->format('M j, Y g:i A');
                         }
 
                         return app(\App\Services\Identity\CityEmailVerificationService::class)->connectedEmail($user) !== null
@@ -124,6 +124,7 @@ final class EmployeeAccessSchema
                 Forms\View::make('filament.employees.application-access'),
             ]),
             Forms\Tabs\Tab::make('Workgroups & history')->schema([
+                self::controls('record-exports', 'Export record tables', ['exportRecordHistory' => 'Export record tables'], 'Download a visible record table as PDF or Excel. Retained history remains unchanged.'),
                 self::controls('workgroups', 'Workgroup memberships', ['manageWorkgroups' => 'Manage workgroups'], 'Add multiple workgroups or change workgroup roles. Removing a membership keeps its history.'),
                 Forms\View::make('filament.employees.workgroups-history')->viewData([]),
             ]),

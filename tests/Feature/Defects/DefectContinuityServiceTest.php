@@ -15,9 +15,11 @@ use App\Models\User;
 use App\Services\Defects\DefectContinuityService;
 use App\Services\Defects\FindingsResult;
 use App\Services\InspectionPaperFields;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 final class DefectContinuityServiceTest extends TestCase
@@ -25,6 +27,31 @@ final class DefectContinuityServiceTest extends TestCase
     use RefreshDatabase;
 
     private int $sequence = 0;
+
+    #[DataProvider('localCalendarCases')]
+    public function test_new_defect_uses_the_eastern_calendar_date_and_retains_utc_instants(string $instant, string $day): void
+    {
+        $this->travelTo(CarbonImmutable::parse($instant));
+        $apparatus = $this->apparatus();
+        $inspection = $this->inspection($apparatus, [$this->compartment('cab', 'Cab', [$this->item('cab-radio', 'Radio', 'Missing')])]);
+
+        $this->record($apparatus, $inspection);
+
+        $defect = ApparatusDefect::query()->sole();
+        self::assertSame($day, $defect->reported_date->toDateString());
+        self::assertSame(CarbonImmutable::parse($instant)->utc()->format('Y-m-d H:i:s'), $defect->getRawOriginal('first_reported_at'));
+        self::assertSame(CarbonImmutable::parse($instant)->utc()->format('Y-m-d H:i:s'), $defect->getRawOriginal('created_at'));
+    }
+
+    public static function localCalendarCases(): array
+    {
+        return [
+            ['2026-10-26T03:59:59Z', '2026-10-25'], ['2026-10-26T04:00:00Z', '2026-10-26'],
+            ['2026-01-01T04:59:59Z', '2025-12-31'], ['2026-01-01T05:00:00Z', '2026-01-01'],
+            ['2026-03-08T06:59:59Z', '2026-03-08'], ['2026-03-08T07:00:00Z', '2026-03-08'],
+            ['2026-11-01T05:59:59Z', '2026-11-01'], ['2026-11-01T06:00:00Z', '2026-11-01'],
+        ];
+    }
 
     public function test_repeat_report_links_to_the_existing_defect_and_never_resets_its_status_or_origin(): void
     {

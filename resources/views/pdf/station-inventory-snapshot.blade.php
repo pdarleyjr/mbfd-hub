@@ -12,7 +12,7 @@
 </head>
 <body>
     <h1>MBFD Station {{ $station->station_number }} Inventory Record</h1>
-    <p>{{ $employee->name }} · {{ $employee->employee_id }} · Shift {{ $shift }}<br>{{ $submittedAt->timezone('America/New_York')->format('M j, Y g:i A T') }}</p>
+    <p>{{ $employee->name }} · {{ $employee->employee_id }} · Shift {{ $shift }}<br>{{ $submittedAt->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A T') }}</p>
     <p>This record preserves the saved on-hand counts at submission.</p>
     <table>
         <thead><tr><th>Category</th><th>Item</th><th>SKU</th><th>On hand</th><th>Par</th></tr></thead>

@@ -22,7 +22,7 @@
         </div>
         <div>
             <dt>Reported by</dt>
-            <dd>{{ $swap->reporter_name }}<small>{{ $swap->created_at?->timezone(config('app.timezone'))->format('M j, Y g:i A') }}</small></dd>
+            <dd>{{ $swap->reporter_name }}<small>{{ $swap->created_at?->copy()->timezone(config('hub.timezone'))->format('M j, Y g:i A') }}</small></dd>
         </div>
     </dl>
 

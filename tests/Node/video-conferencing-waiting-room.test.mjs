@@ -6,6 +6,7 @@ import test from 'node:test';
 import {
     alertObservation,
     canJoin,
+    canWaitForLineup,
     decideMediaRelease,
     describeJoinFailure,
     describeWaitingRoom,
@@ -98,6 +99,18 @@ test('joining is allowed only while live, with a seat free, devices ready and no
     assert.equal(copyFor(full).detail, ROOM_FULL_MESSAGE);
     assert.equal(observeStatus(full, status('active', { session_id: 'S1', full: false })).full, false, 'a seat opening re-enables Join');
     assert.equal(observeStatus(full, status('ended')).full, false);
+});
+
+test('a member may deliberately wait before start or for a full room, with devices ready', () => {
+    for (const state of ['not_started', 'starting', 'active']) {
+        const model = observeStatus(initialWaitingRoom, status(state, { session_id: state === 'active' ? 'S1' : null, full: true }));
+        assert.equal(canWaitForLineup(model, { mediaReady: true, busy: false }), true);
+        assert.equal(canWaitForLineup(model, { mediaReady: false, busy: false }), false);
+        assert.equal(canWaitForLineup(model, { mediaReady: true, busy: true }), false);
+    }
+    for (const state of ['ended', 'unavailable', 'signed_out', 'forbidden', 'checking']) {
+        assert.equal(canWaitForLineup({ ...initialWaitingRoom, state }, { mediaReady: true, busy: false }), false);
+    }
 });
 
 test('a lost connection becomes offline only after repeated misses and recovers on the next good read', () => {
@@ -365,14 +378,14 @@ test('a failed Join is explained in plain words, and "not started", "ended" and 
     }
 });
 
-test('the app keeps employees on manual Join: no token or session creation from the waiting room', () => {
+test('the waiting room requires explicit consent and keeps token admission in the app', () => {
     const app = read('resources/js/video-conferencing/ConferenceApp.tsx');
     const room = read('resources/js/video-conferencing/MemberWaitingRoom.tsx');
     const hook = read('resources/js/video-conferencing/useMemberLineupStatus.ts');
     const pure = read('resources/js/video-conferencing/waiting-room.ts');
 
     assert.match(app, /const MemberWaitingRoom = lazy\(/, 'the waiting room loads on demand to protect the mount bundle');
-    assert.match(app, /onJoin=\{\(\) => void joinAsSelf\(false\)\}/);
+    assert.match(app, /onJoin=\{\(\) => joinAsSelf\(false\)\}/);
     assert.doesNotMatch(app, /Join active Morning Lineup/);
 
     for (const [name, source] of Object.entries({ room, hook, pure })) {
@@ -382,8 +395,10 @@ test('the app keeps employees on manual Join: no token or session creation from 
     assert.match(hook, /bootstrap\.endpoints\.lineup_status/);
     assert.match(hook, /subscribeToLineupChanges/);
     assert.match(hook, /visibilitychange/);
-    assert.match(room, /if \(joinable\) props\.onJoin\(\)/);
-    assert.doesNotMatch(room, /onJoin\([^)]*\)\s*;?\s*\}, \[/, 'joining is never triggered from an effect');
+    assert.match(room, /if \(joinable\) \{[\s\S]*?setWaitingRequested\(true\)/);
+    assert.match(room, /if \(!waitingRequested \|\| !props\.observing \|\| !canJoin/);
+    assert.match(room, /nextAttemptAtRef\.current = performance\.now\(\) \+ 10_000/);
+    assert.match(room, /Cancel waiting/);
 });
 
 test('existing reconnect behaviour and the explicit-leave guard are unchanged', () => {

@@ -9,8 +9,11 @@ use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
 use App\Models\DailyCheckoutLedgerCutover;
 use App\Models\Station;
+use App\Models\StationInspection;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /**
@@ -131,6 +134,56 @@ class DisplaySnapshotTest extends TestCase
         $this->assertSame(1, $data['defects']['total_open']);
         $this->assertSame(1, $data['defects']['critical_missing']);
         $this->assertSame('Miami Beach Fire Department', $data['organization']['name']);
+    }
+
+    #[DataProvider('periodBoundaries')]
+    public function test_history_period_counts_follow_eastern_boundaries_without_changing_canonical_completion(string $now, string $before, string $boundary, string $late, string $period): void
+    {
+        $this->travelTo(CarbonImmutable::parse($now));
+        $station = $this->seedStationWithData();
+        $apparatus = $station->apparatuses()->sole();
+        foreach ([$before, $boundary, $late] as $completedAt) {
+            ApparatusInspection::query()->create([
+                'apparatus_id' => $apparatus->id, 'operator_name' => 'History fixture', 'rank' => 'Firefighter',
+                'shift' => 'A-Day', 'completed_at' => CarbonImmutable::parse($completedAt),
+            ]);
+        }
+
+        $response = $this->getJson('/api/display/snapshot')->assertOk();
+
+        $response->assertJsonPath('submissions.inspections.'.$period, 3)
+            ->assertJsonPath('submissions.inspections.today', 1)
+            ->assertJsonPath('submissions.daily_checkout.completed', 1)
+            ->assertJsonPath('submissions.daily_checkout.required_total', 1);
+    }
+
+    public static function periodBoundaries(): array
+    {
+        return [
+            'Sunday Eastern, Monday UTC' => ['2026-10-26T02:00:00Z', '2026-10-19T03:59:59Z', '2026-10-19T04:00:00Z', '2026-10-26T00:30:00Z', 'this_week'],
+            'October Eastern, November UTC' => ['2026-11-01T02:00:00Z', '2026-10-01T03:59:59Z', '2026-10-01T04:00:00Z', '2026-11-01T00:30:00Z', 'this_month'],
+        ];
+    }
+
+    public function test_station_calendar_date_age_and_thirty_day_window_do_not_roll_over_at_utc_midnight(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-10-26T03:30:00Z'));
+        $station = $this->seedStationWithData();
+        foreach (['2026-10-25' => 'pass', '2026-09-25' => 'fail', '2026-09-24' => 'fail'] as $date => $status) {
+            StationInspection::query()->create([
+                'client_submission_id' => (string) Str::uuid(), 'station_id' => $station->id,
+                'inspection_date' => $date, 'inspection_type' => 'weekly', 'overall_status' => $status, 'form_data' => [],
+            ]);
+        }
+
+        $response = $this->getJson('/api/display/snapshot')->assertOk();
+
+        $response->assertJsonPath('submissions.station_inspections.pass_rate_30d', 50);
+        self::assertContains('Station inspection passed 0d ago', $response->json('stations.0.readiness_reasons'));
+        $this->getJson('/api/display/stations/'.$station->id)->assertOk()->assertJsonPath('counts.station_inspections_30d', 2);
+        $this->getJson('/api/display/stations/'.$station->id.'/submissions')->assertOk()
+            ->assertJsonCount(2, 'station_inspections')
+            ->assertJsonPath('station_inspections.1.inspection_date', '2026-09-25');
     }
 
     public function test_station_inspection_pending_review_count_ignores_archived_inspections(): void

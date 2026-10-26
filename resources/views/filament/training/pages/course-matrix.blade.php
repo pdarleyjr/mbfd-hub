@@ -25,7 +25,7 @@
                                 <span class="block">{{ $session['module_name'] ?: 'Unassigned' }}</span>
                                 <span class="block text-xs font-normal tabular-nums">Session #{{ $session['id'] }}</span>
                                 <a class="underline" href="{{ \App\Filament\Training\Resources\TrainingSessionResource::getUrl('view', ['record' => $session['id']]) }}">{{ \Carbon\CarbonImmutable::parse($session['held_on'])->format('M j, Y') }}</a>
-                                <span class="block font-normal">{{ $session['starts_at'] ? \Carbon\CarbonImmutable::parse($session['starts_at'])->timezone('America/New_York')->format('g:i A T') : 'Time not recorded' }} · {{ $session['location'] ?: 'Location not recorded' }}</span>
+                                <span class="block font-normal">{{ $session['starts_at'] ? \Carbon\CarbonImmutable::parse($session['starts_at'])->timezone(\App\Support\HubTimezone::NAME)->format('g:i A T') : 'Time not recorded' }} · {{ $session['location'] ?: 'Location not recorded' }}</span>
                             </th>
                         @endforeach
                     @else

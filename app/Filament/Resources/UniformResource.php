@@ -7,6 +7,7 @@ use App\Filament\Resources\UniformResource\Pages;
 use App\Models\Employee;
 use App\Models\Uniform;
 use App\Services\UniformInventoryService;
+use App\Support\HubTimezone;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Notifications\Notification;
@@ -245,7 +246,7 @@ class UniformResource extends Resource
                     ->helperText("{$record->quantity_on_hand} on hand"),
                 Forms\Components\DatePicker::make('issued_at')
                     ->label('Date issued')
-                    ->default(today())
+                    ->default(HubTimezone::today())
                     ->required(),
                 Forms\Components\DatePicker::make('expires_at')
                     ->label('Expiration date (optional)')

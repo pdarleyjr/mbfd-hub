@@ -120,7 +120,7 @@ final class TeleStaffDailyPdfParser
                 }
                 $text = $this->column($line, 500, 650);
                 if (preg_match('/\b(\d{1,2}\/\d{1,2}\/\d{4},\s*\d{1,2}:\d{2}\s*[AP]M)\b/', $text, $match)) {
-                    $printed = DateTimeImmutable::createFromFormat('!n/j/Y, g:i A', $match[1], new DateTimeZone('America/New_York'));
+                    $printed = DateTimeImmutable::createFromFormat('!n/j/Y, g:i A', $match[1], new DateTimeZone(\App\Support\HubTimezone::NAME));
                     $snapshot['printed_at'] = $printed ? $printed->format(DATE_ATOM) : null;
                 }
             }
@@ -128,7 +128,7 @@ final class TeleStaffDailyPdfParser
             foreach ($this->lines($body) as $line) {
                 $text = $this->clean($this->column($line, 0, 600));
                 if (preg_match('/(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+([A-Z][a-z]+ \d{1,2}, \d{4})/', $text, $match)) {
-                    $date = DateTimeImmutable::createFromFormat('!F j, Y', $match[1], new DateTimeZone('America/New_York'));
+                    $date = DateTimeImmutable::createFromFormat('!F j, Y', $match[1], new DateTimeZone(\App\Support\HubTimezone::NAME));
                     $dateErrors = DateTimeImmutable::getLastErrors();
                     if (! $date || (is_array($dateErrors) && ($dateErrors['warning_count'] > 0 || $dateErrors['error_count'] > 0)) || ($snapshot['schedule_date'] !== null && $snapshot['schedule_date'] !== $date->format('Y-m-d'))) {
                         throw new InvalidArgumentException('The report contains inconsistent schedule dates.');
@@ -292,11 +292,11 @@ final class TeleStaffDailyPdfParser
         if (! preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $from) || ! preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $to) || ! is_numeric($hours) || (float) $hours <= 0 || (float) $hours > 25) {
             return null;
         }
-        $start = new DateTimeImmutable($date.'T'.$from, new DateTimeZone('America/New_York'));
+        $start = new DateTimeImmutable($date.'T'.$from, new DateTimeZone(\App\Support\HubTimezone::NAME));
         if ($from < '08:00') {
             $start = $start->modify('+1 day');
         }
-        $end = new DateTimeImmutable($start->format('Y-m-d').'T'.$to, new DateTimeZone('America/New_York'));
+        $end = new DateTimeImmutable($start->format('Y-m-d').'T'.$to, new DateTimeZone(\App\Support\HubTimezone::NAME));
         if ($end <= $start) {
             $end = $end->modify('+1 day');
         }

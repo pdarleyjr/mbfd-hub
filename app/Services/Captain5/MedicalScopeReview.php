@@ -180,7 +180,7 @@ final class MedicalScopeReview
     /** @return list<DecidedRow> */
     private function decided(): array
     {
-        $timezone = (string) config('captain5.timezone', 'America/New_York');
+        $timezone = (string) config('captain5.timezone', \App\Support\HubTimezone::NAME);
 
         return Captain5ItemClassification::query()->current()->with('decidedBy:id,name')
             ->orderByDesc('updated_at')->orderByDesc('id')->get()

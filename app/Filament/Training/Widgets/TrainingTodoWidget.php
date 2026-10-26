@@ -2,7 +2,11 @@
 
 namespace App\Filament\Training\Widgets;
 
+use App\Filament\Concerns\HasExportActions;
+use App\Filament\Training\Resources\TrainingTodoResource;
 use App\Models\Training\TrainingTodo;
+use App\Models\User;
+use App\Services\Exports\ExportableTable;
 use Filament\Tables;
 use Filament\Tables\Columns\Layout\Split;
 use Filament\Tables\Columns\TextColumn;
@@ -10,15 +14,27 @@ use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
 use Illuminate\Support\Str;
 
-class TrainingTodoWidget extends BaseWidget
+class TrainingTodoWidget extends BaseWidget implements ExportableTable
 {
+    use HasExportActions;
+
+    public function canExportTableData(User $actor): bool
+    {
+        return TrainingTodoResource::canViewAny();
+    }
+
+    public function tableExportTitle(): string
+    {
+        return 'Recent and Pending Training Todos';
+    }
+
     protected static ?int $sort = 2;
 
     protected int|string|array $columnSpan = 'full';
 
     public function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->query(
                 TrainingTodo::query()
                     ->where('is_completed', false)
@@ -78,6 +94,6 @@ class TrainingTodoWidget extends BaseWidget
             ])
             ->emptyStateHeading('No pending training todos')
             ->emptyStateDescription('All training todos are completed or no todos exist.')
-            ->emptyStateIcon('heroicon-o-check-circle');
+            ->emptyStateIcon('heroicon-o-check-circle'));
     }
 }

@@ -8,7 +8,7 @@
     @if ($report)
         <x-filament::section>
             <div class="space-y-3">
-                <p class="text-sm text-gray-600">{{ $report->source_name }} · {{ $report->created_at->timezone('America/New_York')->format('M j, Y g:i A T') }}</p>
+                <p class="text-sm text-gray-600">{{ $report->source_name }} · {{ $report->created_at->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A T') }}</p>
                 <p class="text-sm">{{ $report->summary['rules'] }}</p>
                 <dl class="grid grid-cols-2 gap-4 sm:grid-cols-4">
                     @foreach (['workbook_rows' => 'Workbook members', 'hub_rows' => 'Hub records', 'present_both' => 'Present in both', 'workbook_only' => 'Workbook only', 'hub_only' => 'Hub only', 'conflicts' => 'Different values', 'excluded' => 'Do not add', 'missing_email' => 'Missing email'] as $key => $label)

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\ApparatusResource\RelationManagers;
 
+use App\Filament\Concerns\HasRelationExportActions;
 use App\Filament\Resources\RecommendationResource;
 use App\Filament\Support\DefectCorrectiveActions;
 use App\Filament\Support\DefectHistory;
@@ -10,6 +11,7 @@ use App\Models\AdminAlertEvent;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusDefectRecommendation;
+use App\Services\Exports\ExportableTable;
 use App\Support\Fleet\DefectActionStatus;
 use App\Support\Fleet\DefectFollowUpState;
 use Filament\Actions\MountableAction;
@@ -24,8 +26,10 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 
-class DefectsRelationManager extends RelationManager
+class DefectsRelationManager extends RelationManager implements ExportableTable
 {
+    use HasRelationExportActions;
+
     protected static string $relationship = 'defects';
 
     protected static ?string $title = 'Defects';
@@ -120,7 +124,7 @@ class DefectsRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->recordTitleAttribute('item')
             ->modifyQueryUsing(fn (Builder $query): Builder => DefectFollowUpState::applyFilter(
                 $query->with('serviceTicket'),
@@ -290,7 +294,7 @@ class DefectsRelationManager extends RelationManager
                     ->icon('heroicon-m-ellipsis-vertical')
                     ->tooltip('More actions'),
             ])
-            ->defaultSort('reported_date', 'desc');
+            ->defaultSort('reported_date', 'desc'));
     }
 
     /**

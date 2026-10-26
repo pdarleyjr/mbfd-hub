@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\HubTimezone;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -49,6 +50,6 @@ class ProjectMilestone extends Model
     public function scopeOverdue($query)
     {
         return $query->where('completed', false)
-            ->where('due_date', '<', now());
+            ->where('due_date', '<', now(HubTimezone::NAME));
     }
 }

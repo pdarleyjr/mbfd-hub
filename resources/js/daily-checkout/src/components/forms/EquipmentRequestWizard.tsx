@@ -2,6 +2,7 @@ import { useState, useRef, useCallback } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
 import { submitOrQueue, type SubmissionOutcome } from '../../lib/sync';
 import PreviousPageButton from '../PreviousPageButton';
+import { hubDateInput } from '../../../../shared/timezone.ts';
 
 const STATIONS = [
   'Station 1',
@@ -55,7 +56,7 @@ export default function EquipmentRequestWizard() {
 
   const [form, setForm] = useState<FormData>({
     station: '',
-    date: new Date().toISOString().split('T')[0],
+    date: hubDateInput(new Date()),
     requestedBy: '',
     items: [createItem()],
     explanation: '',

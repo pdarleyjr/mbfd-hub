@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace App\Filament\Workgroup\Pages;
 
+use App\Filament\Concerns\HasDatasetExportActions;
 use App\Models\User;
 use App\Models\WorkgroupMember;
 use App\Models\WorkgroupSurvey;
 use App\Models\WorkgroupSurveyParticipant;
 use App\Models\WorkgroupSurveyReport;
+use App\Services\Exports\ExportDataset;
 use App\Services\Workgroup\SurveyAnalyticsService;
 use App\Services\Workgroup\SurveyExecutiveNarrativeService;
 use App\Support\Workgroups\WorkgroupAccess;
@@ -19,6 +21,8 @@ use Filament\Pages\Page;
 
 class SurveyResultsPage extends Page
 {
+    use HasDatasetExportActions;
+
     protected static string $view = 'filament-workgroup.pages.survey-results';
 
     protected static ?string $title = 'Survey Results';
@@ -36,6 +40,69 @@ class SurveyResultsPage extends Page
 
     /** @var list<array{id: int, name: string, eligible: bool, submitted: bool, included: bool}> */
     public array $roster = [];
+
+    public function canExportData(User $actor): bool
+    {
+        $survey = $this->survey instanceof WorkgroupSurvey ? WorkgroupSurvey::query()->find($this->survey->getKey()) : null;
+        $current = app(WorkgroupContext::class)->current($actor);
+
+        return $survey instanceof WorkgroupSurvey && $current !== null
+            && $current->id === $survey->workgroup_id
+            && app(WorkgroupAccess::class)->canManageSurvey($actor, $survey);
+    }
+
+    protected function getHeaderActions(): array
+    {
+        return [$this->datasetExportAction()->label('Export results and roster')];
+    }
+
+    protected function exportDataset(User $actor): ExportDataset
+    {
+        abort_unless($this->canExportData($actor), 403);
+        $survey = $this->requiredSurvey()->fresh(['questions', 'workgroup']);
+        abort_unless($survey instanceof WorkgroupSurvey, 404);
+        $this->survey = $survey;
+        $analytics = app(SurveyAnalyticsService::class)->calculate($this->requiredSurvey());
+        $this->refreshRoster();
+        $rows = [];
+        foreach ($analytics['summary'] as $metric => $value) {
+            $rows[] = ['Survey summary', $survey->title, str_replace('_', ' ', $metric), $value];
+        }
+        foreach ($analytics['questions'] as $question) {
+            $this->appendMetricRows($rows, $question['metrics'], $question['section'], $question['position'].'. '.$question['prompt']);
+        }
+        foreach ($this->roster as $participant) {
+            foreach (['eligible' => 'Eligible', 'submitted' => 'Submitted', 'included' => 'Included in analysis'] as $key => $label) {
+                $rows[] = ['Participant roster', $participant['name'], $label, $participant[$key]];
+            }
+        }
+
+        return ExportDataset::fromRows($actor, 'Survey Results', ['Section', 'Question or member', 'Metric', 'Value'], $rows,
+            'Aggregate results and separate participant roster', [
+                'Survey: '.$survey->title.'; revision '.$survey->revision,
+                'Data through: '.\Carbon\CarbonImmutable::parse($analytics['generated_at'])->timezone((string) config('hub.timezone'))->format('Y-m-d H:i:s T'),
+                'Response window: '.($survey->opens_at?->copy()->timezone((string) config('hub.timezone'))->format('Y-m-d H:i T') ?? 'Not set')
+                    .' to '.($survey->closes_at?->copy()->timezone((string) config('hub.timezone'))->format('Y-m-d H:i T') ?? 'Not set'),
+                'Answers are aggregated separately from roster completion. No raw responses, demographic categories or response tokens are exported.',
+            ]);
+    }
+
+    /** @param list<list<mixed>> $rows @param array<mixed> $metrics */
+    private function appendMetricRows(array &$rows, array $metrics, string $section, string $question, string $path = ''): void
+    {
+        foreach ($metrics as $metric => $value) {
+            if (in_array($metric, ['key', 'label'], true)) {
+                continue;
+            }
+            $label = is_string($metric) ? str_replace('_', ' ', $metric) : '';
+            if (is_array($value)) {
+                $label = $value['label'] ?? $label;
+                $this->appendMetricRows($rows, $value, $section, $question, trim($path.' / '.$label, ' /'));
+            } else {
+                $rows[] = [$section, $question, trim($path.' / '.$label, ' /'), $value];
+            }
+        }
+    }
 
     public function mount(): void
     {
@@ -64,7 +131,7 @@ class SurveyResultsPage extends Page
     public function exportCsv()
     {
         $analytics = app(SurveyAnalyticsService::class)->calculate($this->requiredSurvey());
-        $filename = 'workgroup-survey-'.$this->requiredSurvey()->id.'-'.now()->format('Y-m-d').'.csv';
+        $filename = 'workgroup-survey-'.$this->requiredSurvey()->id.'-'.now((string) config('hub.timezone'))->format('Y-m-d').'.csv';
 
         return response()->streamDownload(function () use ($analytics): void {
             $handle = fopen('php://output', 'w');
@@ -91,7 +158,7 @@ class SurveyResultsPage extends Page
 
         return response()->streamDownload(
             static fn () => print $pdf->output(),
-            'workgroup-survey-'.$survey->id.'-'.now()->format('Y-m-d').'.pdf',
+            'workgroup-survey-'.$survey->id.'-'.now((string) config('hub.timezone'))->format('Y-m-d').'.pdf',
             ['Content-Type' => 'application/pdf'],
         );
     }
@@ -106,7 +173,7 @@ class SurveyResultsPage extends Page
 
         return response()->streamDownload(
             static fn () => print $html,
-            'workgroup-survey-'.$survey->id.'-'.now()->format('Y-m-d').'.html',
+            'workgroup-survey-'.$survey->id.'-'.now((string) config('hub.timezone'))->format('Y-m-d').'.html',
             ['Content-Type' => 'text/html; charset=UTF-8'],
         );
     }

@@ -18,7 +18,7 @@ use Carbon\CarbonImmutable;
  */
 final class DefectHistory
 {
-    private const TIMEZONE = 'America/New_York';
+    private const TIMEZONE = \App\Support\HubTimezone::NAME;
 
     /**
      * @return list<array{at: string, title: string, actor: string|null, details: list<string>, member_message: string|null, internal_note: string|null}>

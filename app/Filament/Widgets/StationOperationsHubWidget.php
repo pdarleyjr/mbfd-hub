@@ -29,17 +29,25 @@ use App\Models\StationRequest;
 use App\Models\StationSupplyRequest;
 use App\Models\User;
 use App\Services\Display\DisplaySnapshotService;
+use App\Services\Exports\ExportCell;
+use App\Services\Exports\ExportDataset;
+use App\Services\Exports\ExportFailedException;
+use App\Services\Exports\TableExportService;
 use App\Support\Fleet\DailyCheckoutNotesFeed;
 use App\Support\Fleet\DefectActionStatus;
 use App\Support\Fleet\DefectStatusAttribution;
 use App\Support\Fleet\InspectionReviewers;
 use App\Support\OperationalDisplayWindow;
 use BackedEnum;
+use Carbon\CarbonImmutable;
+use Filament\Facades\Filament;
+use Filament\Notifications\Notification;
 use Filament\Widgets\Widget;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class StationOperationsHubWidget extends Widget
 {
@@ -67,6 +75,98 @@ final class StationOperationsHubWidget extends Widget
     public function refreshBoard(): void
     {
         $this->markSuccessfulRefresh();
+    }
+
+    public function canExportBoard(): bool
+    {
+        $actor = auth()->user();
+        if (! $actor instanceof \App\Models\User || ! $actor->canAccessPanel(Filament::getPanel('admin'))) {
+            return false;
+        }
+
+        // A board snapshot combines these workflows. Require access to every source,
+        // including the support queue, before allowing a combined download.
+        foreach ([StationResource::class, ApparatusResource::class, InspectionResource::class,
+            StationInspectionResource::class, StationRequestResource::class,
+            ApparatusServiceTicketResource::class, DefectResource::class, HubSupportTicketResource::class] as $resource) {
+            if (! $resource::canViewAny()) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public function exportBoard(string $format): ?StreamedResponse
+    {
+        try {
+            return app(TableExportService::class)->downloadDataset(
+                auth()->user(),
+                self::class,
+                $format,
+                fn (): bool => $this->canExportBoard(),
+                fn (): ExportDataset => $this->boardExportDataset(),
+            );
+        } catch (ExportFailedException $exception) {
+            Notification::make()->title('Export not created')->body($exception->getMessage())->danger()->send();
+
+            return null;
+        }
+    }
+
+    private function boardExportDataset(): ExportDataset
+    {
+        $data = $this->getViewData();
+        $rows = [];
+        $add = static function (string $section, string $station, string $label, string $status = '', ?int $value = null, ?string $at = null) use (&$rows): void {
+            $rows[] = [ExportCell::text($section), ExportCell::text($station), ExportCell::text($label),
+                ExportCell::text($status), $value === null ? ExportCell::blank() : ExportCell::number($value),
+                filled($at) ? ExportCell::dateTime(CarbonImmutable::parse($at)) : ExportCell::blank()];
+        };
+        $addRecords = static function (string $section, string $station, array $records) use ($add): void {
+            foreach ($records as $record) {
+                $add($section, $station, (string) $record['label'], (string) $record['status'], at: $record['timestamp'] ?? null);
+            }
+        };
+
+        foreach ($data['department']['apparatus'] as $label => $value) {
+            $add('Fleet summary', 'Department', str($label)->replace('_', ' ')->headline()->toString(), value: (int) $value);
+        }
+        foreach (['approaching', 'due', 'critical'] as $label) {
+            $add('Preventive maintenance summary', 'Department', ucfirst($label), value: (int) $data['department']['pm'][$label]);
+        }
+        foreach (['openServiceTickets', 'openDefects', 'openStationRequests'] as $label) {
+            $add('Department summary', 'Department', str($label)->snake()->replace('_', ' ')->headline()->toString(), value: (int) $data['department'][$label]);
+        }
+        $addRecords('Checkouts', 'Department', $data['department']['checkouts']);
+        $addRecords('Attention', 'Department', $data['department']['attention']);
+        $addRecords('Preventive maintenance', 'Department', $data['department']['pm']['records']);
+        foreach (['approvals', 'issues', 'actions', 'recent'] as $queue) {
+            $group = $data['department']['inspectionQueues'][$queue];
+            $add('Inspection queue summary', 'Department', ucfirst($queue), value: (int) $group['count']);
+            $addRecords('Inspection queue: '.$queue, 'Department', $group['rows']);
+        }
+        foreach ($data['stationData'] as $station) {
+            $label = 'Station '.$station['stationNumber'];
+            $addRecords('Fleet', $label, $station['apparatus']['records']);
+            $addRecords('Preventive maintenance', $label, $station['pm']);
+            $addRecords('Activity', $label, $station['activity']);
+            $addRecords('Attention', $label, $station['exceptions']);
+            foreach ($station['counts'] as $name => $count) {
+                $add('Station summary', $label, str($name)->snake()->replace('_', ' ')->headline()->toString(), value: (int) $count);
+            }
+        }
+
+        return new ExportDataset(
+            title: 'Station Operations Board',
+            headers: ['Section', 'Station', 'Item', 'Status', 'Count', 'Recorded at (Eastern)'],
+            rows: $rows,
+            generatedAt: CarbonImmutable::now(OperationalDisplayWindow::TIMEZONE),
+            generatedBy: (string) auth()->user()->name,
+            scopeLabel: 'Department and configured stations',
+            filterSummary: ['Operational window: '.$data['operationalWindow']['label'],
+                'Timezone: '.$data['operationalWindow']['timezone'], 'Persistent attention queues include older unresolved records.'],
+        );
     }
 
     /** @return array<string, mixed> */

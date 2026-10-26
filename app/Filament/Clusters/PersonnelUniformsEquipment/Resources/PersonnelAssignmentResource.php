@@ -8,6 +8,7 @@ use App\Filament\Clusters\PersonnelUniformsEquipment;
 use App\Filament\Clusters\PersonnelUniformsEquipment\Resources\PersonnelAssignmentResource\Pages;
 use App\Filament\Concerns\HasExportActions;
 use App\Models\AssignedEquipment;
+use App\Support\HubTimezone;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -59,12 +60,12 @@ class PersonnelAssignmentResource extends Resource
             TextColumn::make('category')->badge()->searchable(),
             TextColumn::make('status')->badge()->color(fn ($state) => $state === 'active' ? 'success' : 'gray'),
             TextColumn::make('issued_at')->date('M j, Y')->sortable(),
-            TextColumn::make('expires_at')->date('M j, Y')->sortable()->color(fn (AssignedEquipment $record) => $record->expires_at?->isBefore(today()) ? 'danger' : ($record->expires_at?->lte(today()->addDays(60)) ? 'warning' : null))->placeholder('—'),
+            TextColumn::make('expires_at')->date('M j, Y')->sortable()->color(fn (AssignedEquipment $record) => $record->expires_at?->isBefore(HubTimezone::today()) ? 'danger' : ($record->expires_at?->lte(HubTimezone::today()->addDays(60)) ? 'warning' : null))->placeholder('—'),
         ])->filters([
             SelectFilter::make('status')->options(['active' => 'Active', 'returned' => 'Returned', 'retired' => 'Retired']),
             SelectFilter::make('expiration')->options(['soon' => 'Expiring in 60 days', 'expired' => 'Expired', 'none' => 'No expiration date'])->query(fn (Builder $query, array $data): Builder => match ($data['value'] ?? null) {
-                'soon' => $query->where('status', 'active')->whereBetween('expires_at', [today(), today()->addDays(60)]),
-                'expired' => $query->where('status', 'active')->whereDate('expires_at', '<', today()),
+                'soon' => $query->where('status', 'active')->whereBetween('expires_at', [HubTimezone::today(), HubTimezone::today()->addDays(60)]),
+                'expired' => $query->where('status', 'active')->whereDate('expires_at', '<', HubTimezone::today()),
                 'none' => $query->whereNull('expires_at'),
                 default => $query,
             }),

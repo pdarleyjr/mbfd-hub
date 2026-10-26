@@ -1,3 +1,4 @@
+import { HUB_TIMEZONE } from '../shared/timezone.ts';
 import React, { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@fontsource-variable/plus-jakarta-sans';
@@ -92,8 +93,8 @@ function rememberApproval(item?: ApprovalRequest) {
     } catch { /* In-memory retry remains available when browser storage is disabled. */ }
 }
 const dateLabel = (date: string) => new Intl.DateTimeFormat('en-US', { dateStyle: 'full', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`));
-const signedLabel = (date: string) => new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short', timeZone: 'America/New_York' }).format(new Date(date));
-const timeLabel = (date: string) => new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short', timeZone: 'America/New_York' }).format(new Date(date));
+const signedLabel = (date: string) => new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short', timeZone: HUB_TIMEZONE }).format(new Date(date));
+const timeLabel = (date: string) => new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short', timeZone: HUB_TIMEZONE }).format(new Date(date));
 
 function Brand() {
     return <header className="brand-bar">

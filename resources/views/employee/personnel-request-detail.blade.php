@@ -21,7 +21,7 @@
                     <h1 class="text-2xl font-bold text-hub-ink">{{ $request->request_number }}</h1>
                     <span class="{{ $request->status->tagClass() }}" data-request-status>{{ $request->status->label() }}</span>
                 </div>
-                <p class="mt-2 text-sm text-hub-ink-secondary">Submitted by {{ $request->requester_rank }} {{ $request->requester_name }} on {{ $request->created_at->format('M j, Y \a\t g:i A') }}</p>
+                <p class="mt-2 text-sm text-hub-ink-secondary">Submitted by {{ $request->requester_rank }} {{ $request->requester_name }} on {{ $request->created_at->copy()->timezone(config('hub.timezone'))->format('M j, Y \a\t g:i A') }}</p>
             </header>
 
             @if(in_array($request->status, [\App\Enums\PersonnelRequestStatus::Denied, \App\Enums\PersonnelRequestStatus::Cancelled], true))
@@ -63,7 +63,7 @@
                                         <summary class="min-h-11 cursor-pointer py-2 text-sm font-semibold text-hub-blue">Item updates ({{ $itemMessages->count() }})</summary>
                                         @foreach($itemMessages as $itemMessage)
                                             <p class="mt-2 whitespace-pre-wrap text-sm text-hub-ink-secondary">{{ $itemMessage->employee_visible_note }}</p>
-                                            <time class="text-xs text-hub-ink-secondary">{{ $itemMessage->created_at->format('M j, Y · g:i A') }}</time>
+                                            <time class="text-xs text-hub-ink-secondary">{{ $itemMessage->created_at->copy()->timezone(config('hub.timezone'))->format('M j, Y · g:i A') }}</time>
                                         @endforeach
                                     </details>
                                 @endif
@@ -132,7 +132,7 @@
                                 <p class="font-bold">{{ $historyItem ? str($update->event)->replace('_', ' ')->title() : $update->status->label() }}</p>
                                 @if($historyItem)<p class="text-sm font-semibold text-hub-ink-secondary">{{ $historyItem->item_name }}</p>@endif
                                 @if($update->employee_visible_note)<p class="mt-1 text-sm leading-6 text-hub-ink-secondary">{{ $update->employee_visible_note }}</p>@endif
-                                <time class="mt-1 block text-xs text-hub-ink-secondary">{{ $update->created_at->format('M j, Y · g:i A') }}</time>
+                                <time class="mt-1 block text-xs text-hub-ink-secondary">{{ $update->created_at->copy()->timezone(config('hub.timezone'))->format('M j, Y · g:i A') }}</time>
                             </li>
                         @endforeach
                     </ol>

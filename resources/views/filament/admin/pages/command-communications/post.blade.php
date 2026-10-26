@@ -53,7 +53,7 @@
         @if ($post->isPinned() && ! $post->isDeleted())
             <x-filament::badge color="gray" size="sm" icon="heroicon-m-bookmark">Pinned</x-filament::badge>
         @endif
-        <time class="ml-auto text-xs text-gray-600" datetime="{{ $post->created_at->toIso8601String() }}" title="{{ $post->created_at->format('M j, Y g:i A') }}">
+        <time class="ml-auto text-xs text-gray-600" datetime="{{ $post->created_at->toIso8601String() }}" title="{{ $post->created_at->copy()->timezone(config('hub.timezone'))->format('M j, Y g:i A') }}">
             {{ $post->created_at->diffForHumans() }}
         </time>
     </header>
@@ -103,7 +103,7 @@
                         @if ($isNew($reply))
                             <x-filament::badge color="info" size="sm">New</x-filament::badge>
                         @endif
-                        <time class="ml-auto text-xs text-gray-600" datetime="{{ $reply->created_at->toIso8601String() }}" title="{{ $reply->created_at->format('M j, Y g:i A') }}">
+                        <time class="ml-auto text-xs text-gray-600" datetime="{{ $reply->created_at->toIso8601String() }}" title="{{ $reply->created_at->copy()->timezone(config('hub.timezone'))->format('M j, Y g:i A') }}">
                             {{ $reply->created_at->diffForHumans() }}
                         </time>
                     </div>

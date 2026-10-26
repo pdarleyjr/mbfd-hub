@@ -8,6 +8,7 @@ use App\Filament\Pages\PersonnelReconciliation as ReconciliationPage;
 use App\Models\PersonnelReconciliation;
 use App\Models\User;
 use App\Services\Personnel\PersonnelWorkbookReconciler;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -79,6 +80,7 @@ final class PersonnelReconciliationPageTest extends TestCase
 
     public function test_reconcile_and_export_permissions_authorize_different_actions(): void
     {
+        $this->travelTo(CarbonImmutable::parse('2026-10-26T00:30:00Z'));
         $editor = $this->actingAsAdminWith(['personnel.directory.view', 'personnel.directory.edit']);
         $this->report($editor);
         $component = Livewire::test(ReconciliationPage::class)->assertActionVisible('upload')->assertActionHidden('export');
@@ -86,7 +88,7 @@ final class PersonnelReconciliationPageTest extends TestCase
 
         $this->actingAsAdminWith(['personnel.directory.view', 'personnel.directory.export']);
         Livewire::test(ReconciliationPage::class)->assertActionHidden('upload')->assertActionVisible('export')
-            ->call('exportReport')->assertFileDownloaded('MBFD-Personnel-Reconciliation-'.now()->format('Y-m-d').'.csv');
+            ->call('exportReport')->assertFileDownloaded('MBFD-Personnel-Reconciliation-2026-10-25.csv');
     }
 
     public function test_authorized_upload_stores_only_an_encrypted_report_and_creates_no_personnel_or_accounts(): void

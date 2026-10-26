@@ -30,7 +30,7 @@
             <tbody>
                 @foreach ($changes as $change)
                     <tr>
-                        <td>{{ ($change->decided_at ?? $change->created_at)?->timezone('America/New_York')->format('M j, Y g:i A') }}</td>
+                        <td>{{ ($change->decided_at ?? $change->created_at)?->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A') }}</td>
                         <td>{{ $change->fieldLabel() }}</td>
                         <td>
                             @if ($change->field === 'record')

@@ -63,7 +63,8 @@ class MemberLineupStatusTest extends TestCase
 
         $response = $this->actingAsCanonicalUser(User::query()->findOrFail($unlinked->id))->getJson(self::STATUS);
 
-        $response->assertForbidden();
+        $response->assertForbidden()
+            ->assertJsonPath('message', 'An operational Employee profile is required for this action.');
         $this->assertArrayNotHasKey('state', $response->json() ?? []);
         $this->assertArrayNotHasKey('session_id', $response->json() ?? []);
     }
@@ -215,6 +216,25 @@ class MemberLineupStatusTest extends TestCase
 
         $response->assertJsonPath('state', 'not_started');
         $this->assertTrue(CarbonImmutable::parse('2026-08-11T11:00:00Z')->equalTo(CarbonImmutable::parse($response->json('scheduled_for'))));
+    }
+
+    public function test_member_payload_uses_eastern_offsets_across_dst_while_storage_remains_utc(): void
+    {
+        $captain = $this->member('Captain');
+        $firefighter = $this->member('Firefighter');
+        $this->travelTo(CarbonImmutable::parse('2026-03-08T06:59:00Z'));
+        $started = $this->startLineupAs($captain);
+
+        $this->actAs($firefighter)->getJson(self::STATUS)->assertOk()
+            ->assertJsonPath('server_time', '2026-03-08T01:59:00-05:00')
+            ->assertJsonPath('started_at', '2026-03-08T01:59:00-05:00')
+            ->assertJsonPath('ends_at', '2026-03-08T03:14:00-04:00');
+        $this->assertSame('2026-03-08 06:59:00', VideoConferenceSession::query()->findOrFail($started['session']['id'])->getRawOriginal('started_at'));
+
+        $this->travelTo(CarbonImmutable::parse('2026-03-08T07:01:00Z'));
+        $this->actAs($firefighter)->getJson(self::STATUS)->assertOk()
+            ->assertJsonPath('state', 'active')
+            ->assertJsonPath('server_time', '2026-03-08T03:01:00-04:00');
     }
 
     public function test_ended_by_300_reports_ended_with_the_end_time_and_no_join_id(): void

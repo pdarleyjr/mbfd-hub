@@ -23,8 +23,11 @@ use App\Observers\TrainingTodoObserver;
 use App\Observers\UnitMasterVehicleSyncObserver;
 use App\Observers\UpstreamIdentityObserver;
 use App\Observers\WorkgroupSharedUploadObserver;
+use Filament\Forms\Components\DateTimePicker;
+use Filament\Infolists\Components\TextEntry;
 use Filament\Support\Assets\Js;
 use Filament\Support\Facades\FilamentAsset;
+use Filament\Tables\Columns\TextColumn;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -81,6 +84,17 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Convert instants at the UI boundary, leaving calendar-only dates and UTC storage unchanged.
+        TextColumn::configureUsing(static fn (TextColumn $column) => $column->timezone(
+            static fn (): string => (string) config($column->isDateTime() || $column->isTime() ? 'hub.timezone' : 'app.timezone'),
+        ));
+        TextEntry::configureUsing(static fn (TextEntry $entry) => $entry->timezone(
+            static fn (): string => (string) config($entry->isDateTime() || $entry->isTime() ? 'hub.timezone' : 'app.timezone'),
+        ));
+        DateTimePicker::configureUsing(static fn (DateTimePicker $picker) => $picker->timezone(
+            static fn (): string => (string) config($picker->hasDate() && $picker->hasTime() ? 'hub.timezone' : 'app.timezone'),
+        ));
+
         Gate::policy(\App\Models\Training\TrainingCourse::class, \App\Policies\TrainingRosterPolicy::class);
         Gate::policy(\App\Models\Training\TrainingSession::class, \App\Policies\TrainingRosterPolicy::class);
 

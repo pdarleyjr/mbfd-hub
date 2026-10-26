@@ -37,7 +37,7 @@ final class WorkgroupReportController extends Controller
             'reportHtml' => $reportHtml,
             'workgroupName' => $workgroup->name,
             'sessionName' => $session->name,
-            'generatedAt' => now()->format('F j, Y'),
+            'generatedAt' => now((string) config('hub.timezone'))->format('F j, Y'),
         ]);
     }
 }

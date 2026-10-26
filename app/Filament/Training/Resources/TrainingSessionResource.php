@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Training\Resources;
 
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Training\Resources\TrainingSessionResource\Pages;
 use App\Models\Employee;
 use App\Models\Training\TrainingCourse;
@@ -25,6 +26,8 @@ use Illuminate\Database\Eloquent\Builder;
 
 class TrainingSessionResource extends Resource
 {
+    use HasExportActions;
+
     protected static ?string $model = TrainingSession::class;
 
     protected static ?string $navigationGroup = 'Training';
@@ -57,8 +60,8 @@ class TrainingSessionResource extends Resource
     {
         return [
             TextInput::make('course_name')->label('Course name for this session')->required()->maxLength(200),
-            DatePicker::make('held_on')->label('Class date')->required()->default(fn (): string => now('America/New_York')->toDateString()),
-            DateTimePicker::make('starts_at')->label('Start time (Eastern)')->timezone('America/New_York')->seconds(false),
+            DatePicker::make('held_on')->label('Class date')->required()->default(fn (): string => now(\App\Support\HubTimezone::NAME)->toDateString()),
+            DateTimePicker::make('starts_at')->label('Start time (Eastern)')->timezone(\App\Support\HubTimezone::NAME)->seconds(false),
             TextInput::make('location')->maxLength(255),
             self::employeeSelect('oic_employee_profile_id', 'Lead instructor / OIC')
                 ->helperText('Optional suggested lead for this session. Confirm or change the lead and collect their signature when submitting the roster.'),
@@ -91,7 +94,7 @@ class TrainingSessionResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table->modifyQueryUsing(fn (Builder $query) => $query->withCount([
+        return static::withExportActions($table->modifyQueryUsing(fn (Builder $query) => $query->withCount([
             'attendances as active_attendances_count' => fn (Builder $q) => $q->whereNull('voided_at'),
             'paperAttendances as approved_paper_attendances_count' => fn (Builder $q) => $q->where('review_status', 'approved')->where('evidence_present', true)
                 ->whereNotNull('employee_profile_id')->whereNotNull('reviewed_by')->whereNotNull('reviewed_at'),
@@ -100,7 +103,7 @@ class TrainingSessionResource extends Resource
                 Tables\Columns\TextColumn::make('course_name')->label('Course')->searchable()->weight('semibold'),
                 Tables\Columns\TextColumn::make('module.name')->label('Module')->placeholder('Unassigned'),
                 Tables\Columns\TextColumn::make('held_on')->label('Date')->date()->sortable(),
-                Tables\Columns\TextColumn::make('starts_at')->label('Time')->time('g:i A')->timezone('America/New_York'),
+                Tables\Columns\TextColumn::make('starts_at')->label('Time')->time('g:i A')->timezone(\App\Support\HubTimezone::NAME),
                 Tables\Columns\TextColumn::make('location')->toggleable(),
                 Tables\Columns\TextColumn::make('classifications')->badge()->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('attendee_count')->label('Attendees')
@@ -127,7 +130,7 @@ class TrainingSessionResource extends Resource
                     ->visible(fn (TrainingSession $record): bool => $record->attendance_source !== 'paper')
                     ->url(fn (TrainingSession $record): string => route('training.rosters.export', ['session' => $record, 'format' => 'xlsx'])),
             ])->defaultSort('held_on', 'desc')->paginationPageOptions([25, 50, 100])
-            ->emptyStateHeading('No training sessions yet')->emptyStateDescription('Create a session, open sign-in, and launch the classroom roster.');
+            ->emptyStateHeading('No training sessions yet')->emptyStateDescription('Create a session, open sign-in, and launch the classroom roster.'));
     }
 
     public static function getPages(): array

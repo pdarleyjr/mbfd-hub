@@ -4,16 +4,20 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\ApparatusResource\RelationManagers;
 
+use App\Filament\Concerns\HasRelationExportActions;
 use App\Filament\Resources\VehicleSwapRequestResource;
 use App\Models\Apparatus;
 use App\Models\ApparatusVehicleSwapRequest;
+use App\Services\Exports\ExportableTable;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
 
 /** Vehicle swap reports for this unit, with the same Fleet decision as the queue. */
-class VehicleSwapReportsRelationManager extends RelationManager
+class VehicleSwapReportsRelationManager extends RelationManager implements ExportableTable
 {
+    use HasRelationExportActions;
+
     protected static string $relationship = 'vehicleSwapRequests';
 
     protected static ?string $title = 'Vehicle swaps';
@@ -40,10 +44,10 @@ class VehicleSwapReportsRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return $table
+        return static::withExportActions($table
             ->recordTitleAttribute('reported_vehicle_number')
             ->columns(VehicleSwapRequestResource::columns(showUnit: false))
             ->defaultSort('created_at', 'desc')
-            ->actions(VehicleSwapRequestResource::rowActions());
+            ->actions(VehicleSwapRequestResource::rowActions()));
     }
 }

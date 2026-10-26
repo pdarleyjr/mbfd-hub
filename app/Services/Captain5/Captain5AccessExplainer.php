@@ -177,6 +177,6 @@ final class Captain5AccessExplainer
 
     private function when(mixed $moment): string
     {
-        return $moment === null ? '' : CarbonImmutable::parse($moment)->setTimezone((string) config('captain5.timezone', 'America/New_York'))->format('M j, Y g:i A');
+        return $moment === null ? '' : CarbonImmutable::parse($moment)->setTimezone((string) config('captain5.timezone', \App\Support\HubTimezone::NAME))->format('M j, Y g:i A');
     }
 }

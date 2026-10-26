@@ -10,10 +10,10 @@
             'Source' => $outbound ? \App\Services\Communications\EmailConversation::sourceLabel($email->source_type) : 'Inbox',
             'Initiated by' => $outbound ? $email->initiatedBy?->name : null,
             'Provider message ID' => $email->provider_message_id,
-            'Created' => $email->created_at?->format('M j, Y g:i A T'),
-            'Provider accepted' => $outbound ? $email->accepted_at?->format('M j, Y g:i A T') : null,
-            'Delivered' => $outbound ? $email->delivered_at?->format('M j, Y g:i A T') : null,
-            'Failed' => $outbound ? $email->failed_at?->format('M j, Y g:i A T') : null,
+            'Created' => $email->created_at?->copy()->timezone(config('hub.timezone'))->format('M j, Y g:i A T'),
+            'Provider accepted' => $outbound ? $email->accepted_at?->copy()->timezone(config('hub.timezone'))->format('M j, Y g:i A T') : null,
+            'Delivered' => $outbound ? $email->delivered_at?->copy()->timezone(config('hub.timezone'))->format('M j, Y g:i A T') : null,
+            'Failed' => $outbound ? $email->failed_at?->copy()->timezone(config('hub.timezone'))->format('M j, Y g:i A T') : null,
         ];
     @endphp
     <x-filament::section>
@@ -56,7 +56,7 @@
                 @forelse($email->recipients()->where('recipient_class', '!=', 'bcc')->get() as $recipient)
                     <li class="rounded-lg border border-gray-200 p-4 dark:border-gray-700">
                         <div class="break-words font-medium">{{ $recipient->address }} <span class="text-xs uppercase">{{ $recipient->recipient_class }}</span></div>
-                        <p class="mt-1 text-sm">{{ (new \App\Models\OutboundEmail(['status' => $recipient->status]))->deliveryStatusLabel() }} · {{ $recipient->last_event_at?->format('M j, Y g:i A T') ?? 'No provider event yet' }}</p>
+                        <p class="mt-1 text-sm">{{ (new \App\Models\OutboundEmail(['status' => $recipient->status]))->deliveryStatusLabel() }} · {{ $recipient->last_event_at?->copy()->timezone(config('hub.timezone'))->format('M j, Y g:i A T') ?? 'No provider event yet' }}</p>
                         @if($recipient->failure_code || $recipient->failure_detail)<p class="mt-2 break-words text-sm">{{ $recipient->failure_code }} {{ $recipient->failure_detail }}</p>@endif
                     </li>
                 @empty
@@ -69,7 +69,7 @@
                 @forelse($email->deliveryEvents()->with('recipient')->whereHas('recipient', fn ($query) => $query->where('recipient_class', '!=', 'bcc'))->reorder('occurred_at', 'desc')->limit(50)->get() as $event)
                     <li class="break-words">
                         <p class="font-medium">{{ \App\Models\OutboundEmail::statusLabel($event->status) }} · {{ $event->recipient?->address }}</p>
-                        <p class="text-gray-500">{{ $event->occurred_at?->format('M j, Y g:i A T') }}</p>
+                        <p class="text-gray-500">{{ $event->occurred_at?->copy()->timezone(config('hub.timezone'))->format('M j, Y g:i A T') }}</p>
                         @if($event->failure_code || $event->failure_detail)
                             <p>{{ $event->failure_code }} {{ \Illuminate\Support\Str::limit($event->failure_detail, 500) }}</p>
                         @endif
@@ -90,7 +90,7 @@
         <x-filament::section heading="Related messages">
             <ul class="space-y-3 text-sm">
                 @foreach(collect([$parent, $inboundParent])->filter()->concat($replies)->concat($sentReplies) as $related)
-                    <li><x-filament::link :href="$related instanceof \App\Models\OutboundEmail ? \App\Filament\Resources\OutboundEmailResource::getUrl('view', ['record' => $related]) : \App\Filament\Resources\InboundEmailResource::getUrl('view', ['record' => $related])">{{ $related->subject ?: '(No subject)' }} · {{ $related->created_at?->format('M j, Y') }}</x-filament::link></li>
+                    <li><x-filament::link :href="$related instanceof \App\Models\OutboundEmail ? \App\Filament\Resources\OutboundEmailResource::getUrl('view', ['record' => $related]) : \App\Filament\Resources\InboundEmailResource::getUrl('view', ['record' => $related])">{{ $related->subject ?: '(No subject)' }} · {{ $related->created_at?->copy()->timezone(config('hub.timezone'))->format('M j, Y') }}</x-filament::link></li>
                 @endforeach
             </ul>
         </x-filament::section>

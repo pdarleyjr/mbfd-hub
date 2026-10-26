@@ -191,7 +191,7 @@ final class Captain5Operations extends Page
     protected function getViewData(): array
     {
         $this->authorizeAccess();
-        $timezone = (string) config('captain5.timezone', 'America/New_York');
+        $timezone = (string) config('captain5.timezone', \App\Support\HubTimezone::NAME);
         $review = $this->review();
 
         return [

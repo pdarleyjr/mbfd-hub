@@ -30,6 +30,7 @@ export interface WaitingRoomModel {
     retryAfterMs: number | null;
     /** Consecutive failed status reads. */
     failures: number;
+    serverTime: string | null;
 }
 
 export const initialWaitingRoom: WaitingRoomModel = {
@@ -42,6 +43,7 @@ export const initialWaitingRoom: WaitingRoomModel = {
     full: false,
     retryAfterMs: null,
     failures: 0,
+    serverTime: null,
 };
 
 /** Two missed reads in a row before the member is told the Hub cannot be reached. */
@@ -85,6 +87,7 @@ export function observeStatus(_previous: WaitingRoomModel, status: MemberLineupS
         full: status.state === 'active' && status.full === true,
         retryAfterMs: null,
         failures: 0,
+        serverTime: status.server_time,
     };
 }
 
@@ -176,6 +179,11 @@ export function canJoin(model: WaitingRoomModel, context: JoinContext): boolean 
     return model.state === 'active' && model.sessionId !== null && !model.full && context.mediaReady && !context.busy;
 }
 
+/** Consent to wait is allowed before start and while the member seats are occupied. */
+export function canWaitForLineup(model: WaitingRoomModel, context: JoinContext): boolean {
+    return ['not_started', 'starting', 'active'].includes(model.state) && context.mediaReady && !context.busy;
+}
+
 /**
  * What to feed the start-of-lineup chime. Only definite readings count: a failed
  * read must not look like "no lineup", or an already-running lineup would chime.
@@ -199,6 +207,8 @@ export interface MediaReleaseInput {
     now: number;
     /** A Join (or any token request or connect) is in flight. */
     joinInFlight: boolean;
+    /** The member deliberately chose to wait for automatic admission. */
+    waitingRequested?: boolean;
     /** When the current stretch of idleness began, in epoch milliseconds. */
     idleSince: number;
     /** A starting or live lineup was observed while this page was open. */
@@ -228,6 +238,7 @@ export function decideMediaRelease(input: MediaReleaseInput): MediaReleaseDecisi
     const { model, now, joinInFlight, idleSince, sawLive } = input;
     if (joinInFlight) return { action: 'keep', idleSince: now };
     if (model.state === 'ended' && sawLive) return { action: 'release', reason: 'ended' };
+    if (input.waitingRequested) return { action: 'keep', idleSince: now };
     if (model.state === 'starting' || model.state === 'active' || isNearScheduledStart(model.scheduledFor, now)) {
         return { action: 'keep', idleSince: now };
     }
@@ -267,7 +278,7 @@ export function describeWaitingRoom(model: WaitingRoomModel, context: WaitingRoo
                 tone: 'idle',
                 headline: 'Waiting for Morning Lineup to start',
                 detail: (model.scheduledFor ? `It is scheduled for ${context.formatTime(model.scheduledFor)}. ` : '')
-                    + 'The Join button appears here as soon as 300 starts it.',
+                    + 'Press Join to wait in the lobby until 300 starts it.',
                 footnote: NOT_CONNECTED_FOOTNOTE,
             };
         case 'starting':
@@ -275,7 +286,7 @@ export function describeWaitingRoom(model: WaitingRoomModel, context: WaitingRoo
                 ...base,
                 tone: 'idle',
                 headline: 'Morning Lineup is starting',
-                detail: 'Almost there. The Join button appears in a moment.',
+                detail: 'Almost there. Press Join to wait for the conference to open.',
                 footnote: NOT_CONNECTED_FOOTNOTE,
             };
         case 'active':
@@ -288,7 +299,7 @@ export function describeWaitingRoom(model: WaitingRoomModel, context: WaitingRoo
                     : (context.rejoin ? 'You can rejoin now. ' : 'Press Join when you are ready. ')
                         + (model.endsAt ? `It ends automatically at ${context.formatTime(model.endsAt)}.` : ''),
                 footnote: model.full
-                    ? 'You are not connected. We keep checking and the Join button turns on when a seat opens.'
+                    ? 'Press Join to wait for a seat. We keep checking until one opens.'
                     : 'Your camera and microphone are shared only after you press Join.',
             };
         case 'ended':

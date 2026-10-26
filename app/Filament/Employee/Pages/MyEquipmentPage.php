@@ -5,6 +5,7 @@ namespace App\Filament\Employee\Pages;
 use App\Concerns\ResolvesCanonicalEmployee;
 use App\Models\AssignedEquipment;
 use App\Models\Employee;
+use App\Support\HubTimezone;
 use Filament\Pages\Page;
 
 class MyEquipmentPage extends Page
@@ -36,8 +37,8 @@ class MyEquipmentPage extends Page
         $activeEquipment = $equipment->where('status', 'active');
         $history = $equipment->where('status', '!=', 'active');
         $byCategory = $activeEquipment->groupBy('category');
-        $expired = $activeEquipment->filter(fn (AssignedEquipment $item) => $item->expires_at?->isBefore(today()));
-        $expiringSoon = $activeEquipment->filter(fn (AssignedEquipment $item) => $item->expires_at?->between(today(), today()->addDays(60)));
+        $expired = $activeEquipment->filter(fn (AssignedEquipment $item) => $item->expires_at?->isBefore(HubTimezone::today()));
+        $expiringSoon = $activeEquipment->filter(fn (AssignedEquipment $item) => $item->expires_at?->between(HubTimezone::today(), HubTimezone::today()->addDays(60)));
 
         // Use $user in blade for compatibility — it's an Employee instance
         $user = $employee;

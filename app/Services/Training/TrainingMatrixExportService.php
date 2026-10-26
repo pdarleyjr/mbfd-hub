@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Services\Training;
 
 use App\Models\Training\TrainingCourse;
+use App\Models\User;
+use App\Services\Exports\ExportDataset;
 use Carbon\CarbonImmutable;
 use Illuminate\Validation\ValidationException;
 use PhpOffice\PhpSpreadsheet\Cell\Coordinate;
@@ -17,6 +19,25 @@ use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 final class TrainingMatrixExportService
 {
     public function __construct(private readonly TrainingAttendanceMatrixService $matrix) {}
+
+    public function dataset(User $actor, TrainingCourse $course, array $filters = [], string $view = 'modules'): ExportDataset
+    {
+        if (! in_array($view, ['modules', 'sessions'], true)) {
+            throw ValidationException::withMessages(['view' => 'Choose module summary or session detail.']);
+        }
+        $snapshot = $this->matrix->snapshot($course, $filters);
+        $rows = $this->matrixRows($snapshot, $view);
+        $headers = array_shift($rows);
+        $rows = array_map(static function (array $row): array {
+            $row[6] = $row[6]->format('Y-m-d'); // Assignment as-of is a calendar date, not an instant.
+            $row[9] = $row[9] === null ? null : $row[9] * 100;
+
+            return $row;
+        }, $rows);
+
+        return ExportDataset::fromRows($actor, $course->name.' Attendance Matrix', $headers, $rows,
+            'Current '.$view.' view', ['As of: '.$snapshot['as_of']]);
+    }
 
     public function bytes(TrainingCourse $course, array $filters = [], bool $complete = false, string $view = 'modules'): string
     {
@@ -43,7 +64,7 @@ final class TrainingMatrixExportService
         $sheets['Sessions'] = [['Session ID', 'Module', 'Class date', 'Start time (Eastern)', 'Location', 'Roster status', 'Source']];
         foreach ($snapshot['sessions'] as $session) {
             $sheets['Sessions'][] = [$session['id'], $session['module_name'], CarbonImmutable::parse($session['held_on']),
-                $session['starts_at'] === null ? null : CarbonImmutable::parse($session['starts_at'])->setTimezone('America/New_York'),
+                $session['starts_at'] === null ? null : CarbonImmutable::parse($session['starts_at'])->setTimezone(\App\Support\HubTimezone::NAME),
                 $session['location'], $session['status'], $session['source']];
         }
         $sheets['Attendance Evidence'] = [['Employee ID', 'Session ID', 'Module', 'Class date', 'Evidence source', 'Evidence status',
@@ -126,7 +147,7 @@ final class TrainingMatrixExportService
         foreach ($columns as $column) {
             $headers[] = $view === 'sessions'
                 ? $column['module_name'].' | '.$column['held_on'].' | Session '.$column['id']
-                    .($column['starts_at'] === null ? '' : ' | '.CarbonImmutable::parse($column['starts_at'])->setTimezone('America/New_York')->format('H:i T'))
+                    .($column['starts_at'] === null ? '' : ' | '.CarbonImmutable::parse($column['starts_at'])->setTimezone(\App\Support\HubTimezone::NAME)->format('H:i T'))
                     .(blank($column['location']) ? '' : ' | '.$column['location'])
                 : $column['name'].($column['is_required'] ? '' : ' (Optional)');
         }

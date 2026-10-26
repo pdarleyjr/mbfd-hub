@@ -94,7 +94,7 @@ final class VehicleIdentificationLedger
     {
         $where = $this->inspectionId !== null ? 'in Daily Checkout' : 'on the '.$this->pageName().' page';
 
-        return "Reported {$where} by {$this->actorName()} on ".now('America/New_York')->format('M j, Y');
+        return "Reported {$where} by {$this->actorName()} on ".now(\App\Support\HubTimezone::NAME)->format('M j, Y');
     }
 
     /** The page the crew answered on when it was not a checkout. */

@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Notifications\OperationalAlertNotification;
 use App\Services\Notifications\NotificationCategoryRegistry;
 use App\Services\Notifications\NotificationDispatchService;
+use App\Support\HubTimezone;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 
@@ -31,7 +32,7 @@ class SendMilestoneReminders extends Command
             $totalSent = 0;
 
             foreach ($reminders as $key => $config) {
-                $targetDate = now()->addDays($config['days'])->startOfDay();
+                $targetDate = HubTimezone::today()->addDays($config['days']);
 
                 // Find milestones due on this target date
                 $milestones = ProjectMilestone::whereDate('due_date', $targetDate->toDateString())

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Training\Resources;
 
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Training\Resources\TrainingCourseResource\Pages;
 use App\Models\Training\TrainingCourse;
 use Filament\Forms\Components\TagsInput;
@@ -17,6 +18,8 @@ use Filament\Tables\Table;
 
 class TrainingCourseResource extends Resource
 {
+    use HasExportActions;
+
     protected static ?string $model = TrainingCourse::class;
 
     protected static ?string $navigationGroup = 'Training';
@@ -48,7 +51,7 @@ class TrainingCourseResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return $table->columns([
+        return static::withExportActions($table->columns([
             Tables\Columns\TextColumn::make('name')->label('Course')->searchable()->sortable()->weight('semibold'),
             Tables\Columns\TextColumn::make('classifications')->badge()->separator(', '),
             Tables\Columns\TextColumn::make('default_location')->label('Default location'),
@@ -64,7 +67,7 @@ class TrainingCourseResource extends Resource
                 ->url(fn (TrainingCourse $record): string => TrainingSessionResource::getUrl('index', ['tableFilters' => ['training_course_id' => ['value' => $record->id]]])),
             Tables\Actions\EditAction::make(),
         ])->defaultSort('name')->emptyStateHeading('Create your first training course')
-            ->emptyStateDescription('Reuse a course for every dated class. Each class keeps its own attendance and certified records.');
+            ->emptyStateDescription('Reuse a course for every dated class. Each class keeps its own attendance and certified records.'));
     }
 
     public static function getPages(): array

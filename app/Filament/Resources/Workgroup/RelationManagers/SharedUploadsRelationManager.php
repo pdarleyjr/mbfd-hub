@@ -4,17 +4,20 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\Workgroup\RelationManagers;
 
+use App\Filament\Concerns\HasRelationExportActions;
 use App\Filament\Resources\Workgroup\RelationManagers\Concerns\AuthorizesWorkgroupOwner;
 use App\Models\WorkgroupSharedUpload;
+use App\Services\Exports\ExportableTable;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 
-final class SharedUploadsRelationManager extends RelationManager
+final class SharedUploadsRelationManager extends RelationManager implements ExportableTable
 {
     use AuthorizesWorkgroupOwner;
+    use HasRelationExportActions;
 
     protected static string $relationship = 'sharedUploads';
 
@@ -27,7 +30,7 @@ final class SharedUploadsRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return $table
+        return self::withExportActions($table
             ->modifyQueryUsing(fn (Builder $query): Builder => $query
                 ->withoutGlobalScopes([SoftDeletingScope::class])
                 ->whereHas('session', fn (Builder $sessions): Builder => $sessions->where('workgroup_id', $this->getOwnerRecord()->getKey())))
@@ -44,6 +47,6 @@ final class SharedUploadsRelationManager extends RelationManager
                     ->url(fn (WorkgroupSharedUpload $record): string => route('workgroup.shared-upload.download', $record))
                     ->visible(fn (WorkgroupSharedUpload $record): bool => ! $record->trashed()),
             ])
-            ->bulkActions([]);
+            ->bulkActions([]));
     }
 }

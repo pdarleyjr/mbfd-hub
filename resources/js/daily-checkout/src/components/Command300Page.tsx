@@ -20,6 +20,7 @@ import Tabs, { type TabItem } from './ui/Tabs';
 import Tag, { StatusTag } from './ui/Tag';
 import { LoadError } from './ui/StateViews';
 import type { Tone } from './ui/status';
+import { HUB_TIMEZONE } from '../../../shared/timezone.ts';
 
 /** Morning Lineup for Command is entered through the Employee portal; its PIN flow stays server-side. */
 export const COMMAND_LINEUP_HREF = '/employee/video-conferencing/command?return_to=%2Fdaily%2Fcommand-300';
@@ -40,7 +41,7 @@ const ACTION_ORDINARY = `${ACTION} border border-hub-blue/30 bg-hub-well text-hu
 const SECONDARY = 'text-[13px] leading-5 text-hub-n-600';
 const ROW_GRID = 'md:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_5.5rem_5.5rem_minmax(0,1.3fr)]';
 
-const formatDateTime = (iso: string): string => new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+const formatDateTime = (iso: string): string => new Date(iso).toLocaleString('en-US', { timeZone: HUB_TIMEZONE, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 
 /** Unknown and stale are shown as such; only a recent recorded checkout reads as healthy. */
 function freshness(iso: string | null): { tone: Tone; text: string } {

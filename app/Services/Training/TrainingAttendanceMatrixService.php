@@ -32,7 +32,7 @@ final class TrainingAttendanceMatrixService
         Gate::authorize('view', $course);
         $course->refresh();
         abort_unless($course->track_attendance_matrix, 404);
-        $asOf ??= CarbonImmutable::now('America/New_York')->toDateString();
+        $asOf ??= CarbonImmutable::now(\App\Support\HubTimezone::NAME)->toDateString();
         Validator::make(['as_of' => $asOf], ['as_of' => ['required', 'date_format:Y-m-d']])->validate();
         $filters = $this->validateFilters($filters);
         $moduleId = filled($filters['module_id'] ?? null) ? (int) $filters['module_id'] : null;

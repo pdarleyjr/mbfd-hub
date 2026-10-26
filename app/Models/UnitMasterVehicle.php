@@ -195,7 +195,7 @@ class UnitMasterVehicle extends Model
     {
         $year = (int) preg_replace('/\D/', '', (string) $this->year);
 
-        return $year >= 1950 ? max(0, (int) now('America/New_York')->year - $year) : null;
+        return $year >= 1950 ? max(0, (int) now(\App\Support\HubTimezone::NAME)->year - $year) : null;
     }
 
     public function displayName(): string

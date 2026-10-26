@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\HubTimezone;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -89,7 +90,7 @@ class Under25kProject extends Model
 
     public function scopeOverdue($query)
     {
-        return $query->where('target_completion_date', '<', now())
+        return $query->where('target_completion_date', '<', now(HubTimezone::NAME))
             ->whereNull('actual_completion_date');
     }
 
@@ -97,7 +98,7 @@ class Under25kProject extends Model
     public function getIsOverdueAttribute(): bool
     {
         return $this->target_completion_date
-            && $this->target_completion_date->isPast()
+            && HubTimezone::calendarDate($this->target_completion_date)->isPast()
             && ! $this->actual_completion_date;
     }
 }

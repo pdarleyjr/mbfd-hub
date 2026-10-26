@@ -6,6 +6,7 @@ import { EmptyState, LoadError, SkeletonRows } from '../ui/StateViews';
 import Tag from '../ui/Tag';
 import type { UpdatesStatus } from './useDepartmentUpdates';
 import type { PostedUpdate, UpdateOrigin } from './types';
+import { HUB_TIMEZONE } from '../../../../shared/timezone.ts';
 
 const HINT = 'text-[13px] leading-5 text-hub-n-600';
 const BTN = 'hub-btn !min-h-11';
@@ -13,13 +14,13 @@ const BTN = 'hub-btn !min-h-11';
 const day = (iso: string | null): string => {
   if (!iso) return '';
   const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric' });
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString('en-US', { timeZone: HUB_TIMEZONE, month: 'short', day: 'numeric' });
 };
 
 const when = (iso: string | null): string => {
   if (!iso) return '';
   const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? '' : date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleString('en-US', { timeZone: HUB_TIMEZONE, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 };
 
 function UpdateRow({ origin, update, onChanged }: { origin: UpdateOrigin; update: PostedUpdate; onChanged: (update: PostedUpdate) => void }) {

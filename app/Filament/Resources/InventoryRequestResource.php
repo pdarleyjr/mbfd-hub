@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources;
 
 use App\Filament\Concerns\EnterpriseTable;
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\InventoryRequestResource\Pages;
 use App\Filament\Support\EmsLabels;
 use App\Filament\Support\EmsPanelAccess;
@@ -29,6 +30,7 @@ use Illuminate\Database\Eloquent\Model;
 class InventoryRequestResource extends Resource
 {
     use EnterpriseTable;
+    use HasExportActions;
 
     protected static ?string $model = InventoryRequest::class;
 
@@ -138,7 +140,7 @@ class InventoryRequestResource extends Resource
 
     public static function table(Table $table): Table
     {
-        return self::applyEnterpriseDefaults($table)
+        return static::withExportActions(self::applyEnterpriseDefaults($table)
             ->defaultSort('submitted_at', 'desc')
             ->recordUrl(fn (InventoryRequest $record): string => static::getUrl('view', ['record' => $record]))
             ->emptyStateHeading('No requests match')
@@ -205,7 +207,7 @@ class InventoryRequestResource extends Resource
             ->actions([
                 Tables\Actions\ViewAction::make()->label('Open'),
             ])
-            ->bulkActions([]);
+            ->bulkActions([]));
     }
 
     /**
