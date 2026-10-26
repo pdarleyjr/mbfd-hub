@@ -106,6 +106,36 @@
                     </article>
                 @endforeach
             </div>
+
+            @if($department['dailyNotes'] !== null)
+                @php
+                    $notes = $department['dailyNotes'];
+                @endphp
+                <article class="hub-insp-queue hub-insp-notefeed-card" data-queue="notes" aria-labelledby="mbfd-queue-notes-title">
+                    <header class="hub-insp-queue__head">
+                        <div>
+                            <p class="hub-insp-queue__eyebrow">Open items first, then the last 7 days</p>
+                            <h3 class="hub-insp-queue__title" id="mbfd-queue-notes-title">Daily Checkout notes &amp; messages</h3>
+                        </div>
+                        <span class="hub-insp-queue__count @if($notes['count'] > 0) hub-insp-queue__count--warning @endif" data-queue-count title="Notes and messages on items that are still open">{{ $notes['count'] }}</span>
+                    </header>
+                    <div class="hub-insp-queue__list" tabindex="0" aria-label="Daily Checkout notes and messages">
+                        @forelse($notes['rows'] as $note)
+                            <a @class(['hub-insp-queue__row', 'hub-insp-notefeed', 'hub-insp-notefeed--closed' => ! $note['open']]) href="{{ $note['url'] }}" data-note-kind="{{ $note['kind'] }}">
+                                <span class="hub-insp-notefeed__head">
+                                    <strong>{{ $note['subject'] }}</strong>
+                                    <span @class(['hub-insp-notefeed__kind', 'hub-insp-notefeed__kind--internal' => $note['kind'] === 'internal'])>{{ $note['kindLabel'] }}</span>
+                                    @unless($note['open'])<span class="hub-insp-notefeed__kind">Closed</span>@endunless
+                                </span>
+                                <span class="hub-insp-notefeed__body">{{ $note['excerpt'] }}</span>
+                                <small>{{ $note['author'] }} · <time datetime="{{ $note['timestamp'] }}">{{ $note['timeLabel'] }}</time></small>
+                            </a>
+                        @empty
+                            <p class="hub-insp-queue__empty">No internal notes or messages on Daily Checkouts.</p>
+                        @endforelse
+                    </div>
+                </article>
+            @endif
         </section>
 
         <section class="mbfd-command-master" aria-label="Department overview">

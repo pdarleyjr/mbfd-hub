@@ -15,6 +15,7 @@ use App\Services\Inspections\IssueMessageService;
 use App\Services\Security\Captain5AccessDecision;
 use App\Support\Captain5\EventActorLabel;
 use App\Support\Fleet\DefectActionStatus;
+use App\Support\Fleet\DefectStatusAttribution;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
@@ -46,12 +47,13 @@ final class Captain5IssuePresenter
         $lastEvent = ApparatusDefectEvent::query()->whereIn('apparatus_defect_id', $ids)
             ->selectRaw('apparatus_defect_id, max(id) as last_id')->groupBy('apparatus_defect_id')
             ->pluck('last_id', 'apparatus_defect_id');
+        $attribution = DefectStatusAttribution::forDefects($defects);
 
         return $defects->map(fn (ApparatusDefect $defect): array => $this->summary(
             $defect,
             $latestObservation->get($defect->getKey()),
             (int) ($lastEvent[$defect->getKey()] ?? 0),
-        ))->values()->all();
+        ) + ['action_by' => $attribution[(int) $defect->getKey()]['actor'] ?? null])->values()->all();
     }
 
     /** @return array<string, mixed> */

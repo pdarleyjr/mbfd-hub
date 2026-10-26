@@ -29,6 +29,7 @@ use App\Services\Inventory\InventoryCorrectionReason;
 use App\Support\Captain5\EventActorLabel;
 use App\Support\Fleet\DefectActionStatus;
 use App\Support\Fleet\DefectEventNarrative;
+use App\Support\Fleet\DefectStatusAttribution;
 use Carbon\CarbonImmutable;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Collection;
@@ -359,6 +360,7 @@ final class InspectionWorkspace
             ->get(['id', 'inspection_reference', 'completed_at', 'created_at', 'operator_name'])->keyBy('id');
         $userIds = $defects->pluck('first_reported_by_user_id')->filter()->unique()->values()->all();
         $users = $userIds === [] ? collect() : User::query()->whereIn('id', $userIds)->pluck('name', 'id');
+        $attribution = DefectStatusAttribution::forDefects($defects);
 
         $threads = $canReview ? $this->issueThreads($defects->modelKeys()) : null;
         // A recurrence after a no-action closure means that closure was probably wrong; say so.
@@ -398,7 +400,7 @@ final class InspectionWorkspace
                 'issue_label' => str((string) $defect->issue_type)->replace('_', ' ')->headline()->toString(),
                 'closed' => $closed,
                 'action_status' => (string) ($defect->action_status ?? DefectActionStatus::REPORTED),
-                'action_label' => DefectActionStatus::label($defect->action_status),
+                'action_label' => DefectStatusAttribution::labelFor($defect, $attribution),
                 // Fixed is green; closed with no action required is neutral (nothing was repaired).
                 'action_tone' => $defect->isClosedNoAction() ? 'neutral' : ($closed ? 'success' : ($defect->action_status === DefectActionStatus::REPORTED ? 'warning' : 'info')),
                 'closed_no_action' => $defect->isClosedNoAction(),

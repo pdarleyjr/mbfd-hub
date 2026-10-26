@@ -37,7 +37,7 @@ class EquipmentIssuesRelationManager extends RelationManager implements Exportab
     public function table(Table $table): Table
     {
         return static::withExportActions($table
-            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with('apparatus:id,designation,unit_id'))
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['apparatus:id,designation,unit_id', 'latestStatusEvent.actor:id,name,display_name']))
             ->columns([
                 Tables\Columns\TextColumn::make('unit')
                     ->label('Unit')
@@ -53,7 +53,7 @@ class EquipmentIssuesRelationManager extends RelationManager implements Exportab
                 // From action_status: "Resolved" (fixed) is not "Closed — no action required".
                 Tables\Columns\TextColumn::make('status')
                     ->badge()
-                    ->state(fn (ApparatusDefect $record): string => DefectActionStatus::label($record->action_status))
+                    ->state(fn (ApparatusDefect $record): string => $record->attributedActionLabel())
                     ->color(fn (ApparatusDefect $record): string => match ($record->action_status) {
                         DefectActionStatus::RESOLVED => 'success',
                         DefectActionStatus::DISMISSED => 'gray',

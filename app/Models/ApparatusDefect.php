@@ -201,6 +201,33 @@ class ApparatusDefect extends Model
         return DefectActionStatus::label($this->action_status);
     }
 
+    /** The most recent status change in the append-only history (eager-load it for tables). */
+    public function latestStatusEvent(): \Illuminate\Database\Eloquent\Relations\HasOne
+    {
+        return $this->hasOne(ApparatusDefectEvent::class)
+            ->ofMany(['id' => 'max'], static fn ($query) => $query->whereNotNull('to_status')
+                // A transition into a status, not a later note that kept it ("action_updated").
+                ->where(static fn ($transition) => $transition->whereNull('from_status')->orWhereColumn('from_status', '<>', 'to_status')));
+    }
+
+    /**
+     * Staff-facing status naming who set it ("Acknowledged by Jane Smith"). Member surfaces keep
+     * actionLabel(): they speak for the department, never for an individual staff member.
+     */
+    public function attributedActionLabel(): string
+    {
+        $event = $this->relationLoaded('latestStatusEvent')
+            ? $this->getRelation('latestStatusEvent')
+            : $this->latestStatusEvent()->with('actor:id,name,display_name')->first();
+        $actor = null;
+        if ($event instanceof ApparatusDefectEvent && $event->to_status === ($this->action_status ?: DefectActionStatus::REPORTED)) {
+            $user = $event->relationLoaded('actor') ? $event->getRelation('actor') : $event->actor()->first(['id', 'name', 'display_name']);
+            $actor = \App\Support\Captain5\EventActorLabel::for($event, $user instanceof User ? (string) ($user->display_name ?: $user->name) : null);
+        }
+
+        return \App\Support\Fleet\DefectStatusAttribution::label($this->action_status, $actor);
+    }
+
     /** @return \Illuminate\Database\Eloquent\Relations\BelongsTo<ApparatusServiceTicket, $this> */
     public function serviceTicket(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {

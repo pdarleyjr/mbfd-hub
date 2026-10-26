@@ -96,6 +96,20 @@ test('empty public catalog does not invent a course', async ({ page }) => {
     await expect(page.getByRole('button', { name: /SIGN ROSTER/ })).toHaveCount(0);
 });
 
+test('catalog rides out a short Hub restart (gateway errors) without showing an error', async ({ page }) => {
+    let calls = 0;
+    await page.route('**/catalog', route => {
+        calls++;
+        // The first two reads hit a restarting Hub: Cloudflare answers 502 and 504.
+        if (calls <= 2) return route.fulfill({ status: calls === 1 ? 502 : 504, body: 'Bad gateway' });
+        return route.fulfill({ json: { courses: [], today: '2026-10-15', csrf_token: 'test' } });
+    });
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'No courses are available' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    expect(calls).toBe(3);
+});
+
 test('modular catalog selects a module and offers today’s roster directly', async ({ page }) => {
     const second = '01SYNTHETICTRAININGROSTER02';
     await page.route('**/catalog', route => route.fulfill({ json: {
@@ -233,18 +247,21 @@ test('existing unassigned rosters remain accessible when a course has one module
 });
 
 test('catalog failure can recover and an existing dated roster opens by POST', async ({ page }) => {
-    let reads = 0;
+    test.setTimeout(75_000);
+    // The connection stays down past the read retries (~15 s), so the kiosk reports it; then it returns.
+    let down = true;
     let opens = 0;
-    await page.route('**/catalog', route => {
-        reads++;
-        return reads === 1 ? route.abort('failed') : route.fulfill({ json: { courses: [{ id: 1, name: 'Ladder operations', classifications: [], default_location: null, sessions: [{ public_id: id, held_on: '2026-10-15', location: null }] }], today: '2026-10-15', csrf_token: 'test' } });
-    });
+    await page.route('**/catalog', route => down ? route.abort('failed') : route.fulfill({ json: { courses: [{ id: 1, name: 'Ladder operations', classifications: [], default_location: null, sessions: [{ public_id: id, held_on: '2026-10-15', location: null }] }], today: '2026-10-15', csrf_token: 'test' } }));
     await page.route('**/csrf', route => route.fulfill({ json: { csrf_token: 'fresh' } }));
     await page.route(`**/r/${id}/open`, route => { opens++; expect(route.request().method()).toBe('POST'); return route.fulfill({ json: { authorized: true } }); });
     await page.goto('/');
-    await expect(page.getByRole('alert')).toContainText('Classes could not be refreshed');
-    await page.getByRole('button', { name: 'Refresh classes' }).click();
-    await page.getByRole('button', { name: /Open roster for Ladder operations/ }).click();
+    await expect(page.getByRole('alert')).toContainText('Classes could not be refreshed', { timeout: 25_000 });
+    down = false;
+    // Recovery may come from the button or from the kiosk's own 15 s background refresh, whichever is first.
+    const course = page.getByRole('button', { name: /Open roster for Ladder operations/ });
+    await page.getByRole('button', { name: 'Refresh classes' }).click({ timeout: 5_000 }).catch(() => undefined);
+    await expect(course).toBeVisible({ timeout: 20_000 });
+    await course.click();
     await expect(page).toHaveURL(new RegExp(`/r/${id}$`));
     expect(opens).toBe(1);
 });

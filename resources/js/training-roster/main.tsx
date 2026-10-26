@@ -24,8 +24,15 @@ let fragmentKey = new URLSearchParams(window.location.hash.slice(1)).get('key');
 if (window.location.hash) window.history.replaceState(null, '', window.location.pathname);
 class ApiError extends Error { constructor(message: string, readonly status: number, readonly fields: Record<string, string[]> = {}) { super(message); } }
 
+/** Gateway/origin errors seen while the Hub restarts for a release (Cloudflare 502/503/504/52x). */
+const TRANSIENT_STATUS = new Set([502, 503, 504, 520, 521, 522, 523, 524, 530]);
+/** Reads ride out a short Hub restart (~15 s of retries) instead of showing an error on the kiosk. */
+const READ_RETRY_DELAYS_MS = [1000, 2000, 4000, 8000];
+const pause = (ms: number) => new Promise<void>(resolve => window.setTimeout(resolve, ms));
+
 async function api<T>(path: string, body?: unknown): Promise<T> {
-    const response = await fetch(path.startsWith('/') ? path : `${base}/${path}`, {
+    const url = path.startsWith('/') ? path : `${base}/${path}`;
+    const send = () => fetch(url, {
         method: body === undefined ? 'GET' : 'POST',
         credentials: 'same-origin',
         cache: 'no-store',
@@ -33,6 +40,19 @@ async function api<T>(path: string, body?: unknown): Promise<T> {
         body: body === undefined ? undefined : JSON.stringify(body),
         signal: AbortSignal.timeout(15000),
     });
+    // Only reads are retried here. Writes keep their own confirm-and-retry flow (receipts, client ids).
+    let response: Response | null = null;
+    for (let attempt = 0; ; attempt++) {
+        const canRetry = body === undefined && attempt < READ_RETRY_DELAYS_MS.length;
+        try {
+            response = await send();
+            if (!canRetry || !TRANSIENT_STATUS.has(response.status)) break;
+        } catch (error) {
+            if (!canRetry) throw error;
+        }
+        await pause(READ_RETRY_DELAYS_MS[attempt]);
+    }
+    if (response === null) throw new ApiError('We could not connect to the roster. Please try again.', 0);
     const data = await response.json().catch(() => ({}));
     if (data.csrf_token) csrf = data.csrf_token;
     if (!response.ok) {
