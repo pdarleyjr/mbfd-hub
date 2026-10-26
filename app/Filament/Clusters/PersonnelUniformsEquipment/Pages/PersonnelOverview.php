@@ -10,6 +10,7 @@ use App\Models\AssignedEquipment;
 use App\Models\EmployeeEquipmentRequest;
 use App\Models\PersonnelRequest;
 use App\Models\Uniform;
+use App\Support\HubTimezone;
 use Filament\Pages\Page;
 
 class PersonnelOverview extends Page
@@ -38,8 +39,8 @@ class PersonnelOverview extends Page
             'equipment' => $this->summary((clone $base)->where('type', 'equipment'), $active),
             'recentUniform' => (clone $base)->where('type', 'uniform')->latest()->limit(5)->get(),
             'recentEquipment' => (clone $base)->where('type', 'equipment')->latest()->limit(5)->get(),
-            'expiringSoon' => AssignedEquipment::query()->where('status', 'active')->whereBetween('expires_at', [today(), today()->addDays(60)])->count(),
-            'expired' => AssignedEquipment::query()->where('status', 'active')->whereDate('expires_at', '<', today())->count(),
+            'expiringSoon' => AssignedEquipment::query()->where('status', 'active')->whereBetween('expires_at', [HubTimezone::today(), HubTimezone::today()->addDays(60)])->count(),
+            'expired' => AssignedEquipment::query()->where('status', 'active')->whereDate('expires_at', '<', HubTimezone::today())->count(),
             'lowStock' => Uniform::query()->where('reorder_level', '>', 0)->whereColumn('quantity_on_hand', '<=', 'reorder_level')->count(),
             'legacyOpen' => EmployeeEquipmentRequest::query()->where('is_archived', false)->count(),
         ];

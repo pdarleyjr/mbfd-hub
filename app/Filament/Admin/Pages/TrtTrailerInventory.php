@@ -11,6 +11,7 @@ use App\Models\TrtInventorySession;
 use App\Models\User;
 use App\Services\Exports\ExportDataset;
 use App\Services\OperationalEvidenceArchiveService;
+use App\Support\HubTimezone;
 use Filament\Actions;
 use Filament\Forms;
 use Filament\Pages\Page;
@@ -108,7 +109,7 @@ class TrtTrailerInventory extends Page
                     $session = TrtInventorySession::find($this->selectedSessionId);
 
                     return (auth()->user()?->can('admin.equipment.manage') ?? false)
-                        && $session !== null && ! $session->isArchived() && $session->session_date->isBefore(today());
+                        && $session !== null && ! $session->isArchived() && $session->session_date->isBefore(HubTimezone::today());
                 })
                 ->action(function (array $data): void {
                     app(OperationalEvidenceArchiveService::class)->archive(

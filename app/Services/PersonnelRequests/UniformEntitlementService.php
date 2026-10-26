@@ -11,6 +11,7 @@ use App\Models\Employee;
 use App\Models\PersonnelRequestItem;
 use App\Models\Uniform;
 use App\Models\User;
+use App\Support\HubTimezone;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Validator;
@@ -36,7 +37,7 @@ final class UniformEntitlementService
         $lastIssue = $this->lastJacketIssue($employee);
         $issuedAt = $lastIssue?->issued_at;
         $eligibleFrom = $issuedAt?->copy()->addYearsNoOverflow(3);
-        $recentIssue = $eligibleFrom !== null && today()->lt($eligibleFrom);
+        $recentIssue = $eligibleFrom !== null && HubTimezone::today()->lt($eligibleFrom);
         $reason = $pending ? 'You already have a jacket request awaiting issue. View it in My Requests.'
             : ($recentIssue ? 'Your last jacket was issued on '.$issuedAt->format('M j, Y').'. You may request one again from '.$eligibleFrom->format('M j, Y').'.'
                 : ($issuedAt ? 'You may request one jacket. The 3-year cycle begins when it is issued.'
@@ -62,7 +63,7 @@ final class UniformEntitlementService
         if ($quantity !== 1) {
             throw ValidationException::withMessages(['quantity' => 'Issue only one jacket per 3-year allowance.']);
         }
-        Validator::make(['issued_at' => $issuedAt], ['issued_at' => ['required', 'date', 'before_or_equal:today']])->validate();
+        Validator::make(['issued_at' => $issuedAt], ['issued_at' => ['required', 'date', 'before_or_equal:'.HubTimezone::today()->toDateString()]])->validate();
         $lastIssue = $this->lastJacketIssue($recipient);
         $eligibleFrom = $lastIssue?->issued_at?->copy()->addYearsNoOverflow(3);
         if ($eligibleFrom !== null && Carbon::parse($issuedAt)->startOfDay()->lt($eligibleFrom)) {

@@ -90,7 +90,8 @@ class ViewInspection extends ViewRecord
         $inspection = $this->inspection();
         $apparatus = $inspection->getRelationValue('apparatus');
 
-        return InspectionResource::canViewAny() && InspectionResource::canView($inspection)
+        return (string) auth()->id() === (string) $actor->getKey()
+            && InspectionResource::canViewAny() && InspectionResource::canView($inspection)
             && (! $apparatus instanceof Apparatus || ApparatusResource::canView($apparatus));
     }
 

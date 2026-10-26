@@ -6,6 +6,7 @@ use App\Filament\Concerns\HasRelationExportActions;
 use App\Models\Apparatus;
 use App\Models\SingleGasMeter;
 use App\Services\Exports\ExportableTable;
+use App\Support\HubTimezone;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -117,13 +118,13 @@ class SingleGasMetersRelationManager extends RelationManager implements Exportab
             ->defaultSort('expiration_date', 'asc')
             ->filters([
                 Tables\Filters\Filter::make('expired')
-                    ->query(fn ($query) => $query->where('expiration_date', '<', now()))
+                    ->query(fn ($query) => $query->where('expiration_date', '<', now(HubTimezone::NAME)))
                     ->label('Expired Only'),
 
                 Tables\Filters\Filter::make('expiring_soon')
                     ->query(fn ($query) => $query
-                        ->where('expiration_date', '>', now())
-                        ->where('expiration_date', '<=', now()->addDays(90)))
+                        ->where('expiration_date', '>', now(HubTimezone::NAME))
+                        ->where('expiration_date', '<=', now(HubTimezone::NAME)->addDays(90)))
                     ->label('Expiring in 90 Days'),
             ])
             ->headerActions([

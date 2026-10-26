@@ -7,6 +7,7 @@ namespace Tests\Feature;
 use App\Models\TrtInventoryCatalogItem;
 use App\Models\TrtInventorySession;
 use App\Models\TrtInventorySubmission;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -19,6 +20,21 @@ class TrtInventorySessionIntegrityTest extends TestCase
     {
         parent::setUp();
         $this->actingAsCanonicalFixture();
+    }
+
+    public function test_shared_session_date_changes_at_eastern_midnight_while_timestamps_stay_utc(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-10-26T00:30:00Z'));
+        $evening = TrtInventorySession::findOrCreateForToday();
+        self::assertSame('2026-10-25', $evening->session_date->toDateString());
+        self::assertSame('2026-10-26 00:30:00', $evening->getRawOriginal('created_at'));
+
+        $this->travelTo(CarbonImmutable::parse('2026-10-26T03:59:59Z'));
+        self::assertSame($evening->id, TrtInventorySession::findOrCreateForToday()->id);
+        $this->travelTo(CarbonImmutable::parse('2026-10-26T04:00:00Z'));
+        $morning = TrtInventorySession::findOrCreateForToday();
+        self::assertNotSame($evening->id, $morning->id);
+        self::assertSame('2026-10-26', $morning->session_date->toDateString());
     }
 
     public function test_default_session_date_is_unique_when_trailer_is_null(): void

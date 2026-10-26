@@ -9,6 +9,7 @@ use App\Models\PersonnelReconciliation as Report;
 use App\Models\User;
 use App\Services\Exports\ExportDataset;
 use App\Services\Personnel\PersonnelWorkbookReconciler;
+use App\Support\HubTimezone;
 use Filament\Actions\Action;
 use Filament\Forms\Components\FileUpload;
 use Filament\Notifications\Notification;
@@ -135,6 +136,6 @@ final class PersonnelReconciliation extends Page
                 }
             }
             fclose($stream);
-        }, 'MBFD-Personnel-Reconciliation-'.$report->created_at->format('Y-m-d').'.csv', ['Content-Type' => 'text/csv; charset=UTF-8', 'Cache-Control' => 'private, no-store']);
+        }, 'MBFD-Personnel-Reconciliation-'.$report->created_at->copy()->timezone(HubTimezone::NAME)->format('Y-m-d').'.csv', ['Content-Type' => 'text/csv; charset=UTF-8', 'Cache-Control' => 'private, no-store']);
     }
 }

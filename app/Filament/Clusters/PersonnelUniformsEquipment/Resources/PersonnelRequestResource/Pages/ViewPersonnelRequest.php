@@ -15,6 +15,7 @@ use App\Services\PersonnelRequests\PersonnelRequestFulfillmentService;
 use App\Services\PersonnelRequests\PersonnelRequestLifecycleService;
 use App\Services\PersonnelRequests\PersonnelRequestWorkflowService;
 use App\Support\DecisionReason;
+use App\Support\HubTimezone;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Forms\Components\CheckboxList;
@@ -129,7 +130,7 @@ class ViewPersonnelRequest extends ViewRecord
                     $this->issueItemSelect($request),
                     $this->inventorySelect($request)->required(),
                     $this->issueQuantity($request),
-                    DatePicker::make('issued_at')->default(today())->required(),
+                    DatePicker::make('issued_at')->default(HubTimezone::today())->required(),
                     DatePicker::make('expires_at')->label('Expiration date (optional)')->afterOrEqual('issued_at'),
                     Textarea::make('notes')->maxLength(2000),
                 ])->action(function (array $data) use ($request): void {
@@ -148,7 +149,7 @@ class ViewPersonnelRequest extends ViewRecord
                     $this->inventorySelect($request)->label('From PPE / uniform stock on hand (optional)')
                         ->helperText('Choose stock to take it off the on-hand count. Leave empty for gear ordered for this member.'),
                     $this->issueQuantity($request),
-                    DatePicker::make('issued_at')->default(today())->required(),
+                    DatePicker::make('issued_at')->default(HubTimezone::today())->required(),
                     DatePicker::make('expires_at')->label('Expiration date (optional)')->afterOrEqual('issued_at'),
                     Textarea::make('notes')->maxLength(2000),
                 ])->action(function (array $data) use ($request): void {
@@ -314,7 +315,7 @@ class ViewPersonnelRequest extends ViewRecord
                             ->required(fn (Get $get): bool => (int) $get('quantity') > 0 && $request->type === PersonnelRequestType::Uniform)
                             ->disabled(fn (Get $get): bool => (int) $get('quantity') === 0),
                     ]),
-                DatePicker::make('issued_at')->default(today())->required(),
+                DatePicker::make('issued_at')->default(HubTimezone::today())->required(),
                 DatePicker::make('expires_at')->label('Expiration date (optional)')->afterOrEqual('issued_at'),
                 Textarea::make('notes')->maxLength(2000),
             ])->action(function (array $data) use ($request): void {

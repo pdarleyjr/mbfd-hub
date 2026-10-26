@@ -7,6 +7,7 @@ namespace Tests\Feature\OperationalForms;
 use App\Models\Employee;
 use App\Models\OperationalFormDocument;
 use App\Models\OperationalFormRecord;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -35,6 +36,7 @@ class PdfGenerationTest extends TestCase
 
     public function test_ics_generation_is_flattened_private_and_immutable(): void
     {
+        $this->travelTo(CarbonImmutable::parse('2026-10-26T00:30:00Z'));
         $record = $this->record('ics_214', '1.0', $this->completeIcs());
         $this->actingAs($this->employee, 'employee');
 
@@ -50,6 +52,7 @@ class PdfGenerationTest extends TestCase
         Storage::disk('public')->assertMissing($firstModel->storage_path);
         $this->assertSame(1, $first['page_count']);
         $this->assertSame(0, $first['remaining_form_fields']);
+        $this->assertSame('ICS214_20261025_Controlled_test_record_v1.pdf', $first['display_name']);
 
         $originalBytes = Storage::disk($disk)->get($firstModel->storage_path);
         $this->assertStringStartsWith('%PDF-', $originalBytes);

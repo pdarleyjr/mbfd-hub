@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\HubTimezone;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -26,7 +27,7 @@ class SingleGasMeter extends Model
     protected static function booted(): void
     {
         static::saving(function (SingleGasMeter $meter) {
-            if (!$meter->expiration_date || $meter->isDirty('activation_date')) {
+            if (! $meter->expiration_date || $meter->isDirty('activation_date')) {
                 $meter->expiration_date = Carbon::parse($meter->activation_date)->addYears(2);
             }
         });
@@ -39,15 +40,16 @@ class SingleGasMeter extends Model
 
     public function isExpired(): bool
     {
-        return $this->expiration_date && $this->expiration_date->isPast();
+        return $this->expiration_date && HubTimezone::calendarDate($this->expiration_date)->isPast();
     }
 
     public function daysUntilExpiration(): int
     {
-        if (!$this->expiration_date) {
+        if (! $this->expiration_date) {
             return 0;
         }
-        return max(0, now()->diffInDays($this->expiration_date, false));
+
+        return max(0, (int) HubTimezone::today()->diffInDays($this->expiration_date, false));
     }
 
     public function getStatusAttribute(): string

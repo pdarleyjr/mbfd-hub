@@ -10,6 +10,7 @@ use App\Models\ApparatusDefect;
 use App\Models\CapitalProject;
 use App\Models\EquipmentItem;
 use App\Models\ShopWork;
+use App\Support\HubTimezone;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -97,7 +98,7 @@ class CommandCenterAiService
             ->get(['unit_id', 'make', 'model', 'notes']);
 
         $overdueInspections = Apparatus::whereDoesntHave('inspections', function ($q) {
-            $q->whereNull('apparatus_inspections.test_excluded_at')->where('created_at', '>=', today()->subDay());
+            $q->whereNull('apparatus_inspections.test_excluded_at')->where('created_at', '>=', now(HubTimezone::NAME)->startOfDay()->subDay()->utc());
         })->count();
 
         $openDefects = ApparatusDefect::where('resolved', false)

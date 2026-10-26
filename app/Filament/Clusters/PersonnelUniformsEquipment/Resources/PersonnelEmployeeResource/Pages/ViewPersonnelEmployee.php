@@ -10,6 +10,7 @@ use App\Models\Employee;
 use App\Models\Uniform;
 use App\Services\PersonnelRequests\UniformEntitlementService;
 use App\Services\UniformInventoryService;
+use App\Support\HubTimezone;
 use Filament\Actions\Action;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Select;
@@ -39,7 +40,7 @@ class ViewPersonnelEmployee extends ViewRecord
             Action::make('issue_uniform')->label('Issue Uniform')->icon('heroicon-o-shopping-bag')->color('primary')->form([
                 Select::make('uniform_id')->label('Uniform inventory')->options(fn () => Uniform::query()->where('quantity_on_hand', '>', 0)->orderBy('item_name')->get()->mapWithKeys(fn (Uniform $uniform) => [$uniform->id => "{$uniform->item_name} — {$uniform->size} — {$uniform->quantity_on_hand} on hand"]))->searchable()->required(),
                 TextInput::make('quantity')->numeric()->minValue(1)->maxValue(20)->default(1)->required(),
-                DatePicker::make('issued_at')->default(today())->required(),
+                DatePicker::make('issued_at')->default(HubTimezone::today())->required(),
                 DatePicker::make('expires_at')->afterOrEqual('issued_at'),
                 Textarea::make('notes')->maxLength(2000),
             ])->action(function (array $data) use ($employee): void {
@@ -50,7 +51,7 @@ class ViewPersonnelEmployee extends ViewRecord
                 Select::make('category')->options(collect(AssignedEquipment::categories())->mapWithKeys(fn ($category) => [$category => $category]))->required(),
                 TextInput::make('item_description')->label('Item description')->required()->maxLength(255),
                 TextInput::make('quantity')->numeric()->minValue(1)->maxValue(20)->default(1)->required(),
-                DatePicker::make('issued_at')->default(today())->required(),
+                DatePicker::make('issued_at')->default(HubTimezone::today())->required(),
                 DatePicker::make('expires_at')->afterOrEqual('issued_at'),
                 Textarea::make('notes')->maxLength(2000),
             ])->action(function (array $data) use ($employee): void {
@@ -100,8 +101,8 @@ class ViewPersonnelEmployee extends ViewRecord
             'employee' => $employee,
             'activeUniforms' => $assignments->where('status', 'active')->filter(fn ($item) => $item->uniform_id || str_contains(strtolower($item->category), 'uniform') || str_contains(strtolower($item->category), 'shirt')),
             'activeEquipment' => $assignments->where('status', 'active')->reject(fn ($item) => $item->uniform_id || str_contains(strtolower($item->category), 'uniform') || str_contains(strtolower($item->category), 'shirt')),
-            'expiringSoon' => $assignments->where('status', 'active')->filter(fn ($item) => $item->expires_at?->between(today(), today()->addDays(60))),
-            'expired' => $assignments->where('status', 'active')->filter(fn ($item) => $item->expires_at?->isBefore(today())),
+            'expiringSoon' => $assignments->where('status', 'active')->filter(fn ($item) => $item->expires_at?->between(HubTimezone::today(), HubTimezone::today()->addDays(60))),
+            'expired' => $assignments->where('status', 'active')->filter(fn ($item) => $item->expires_at?->isBefore(HubTimezone::today())),
             'history' => $assignments->where('status', '!=', 'active'),
             'requests' => $employee->personnelRequests()->with('items')->latest()->get(),
             'legacyRequests' => $employee->equipmentRequests()->latest()->get(),
