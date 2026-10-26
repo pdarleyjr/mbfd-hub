@@ -1,0 +1,138 @@
+/* ==========================================================================
+   MBFD Hub install experience: inline card (Home, Daily Checkout, Admin) and the /install page.
+   Self-contained: uses only --hub-* tokens (with fallbacks) and does not require [data-hub-ui="2"].
+   Imported by app.css and by the Filament admin theme.
+   ========================================================================== */
+
+.hub-install-card {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    margin: 0 0 16px;
+    padding: 14px 16px;
+    border: 1px solid rgb(var(--hub-border, 216 226 236));
+    border-radius: 12px;
+    background: rgb(var(--hub-surface, 255 255 255));
+    box-shadow: var(--hub-shadow-card, 0 1px 2px rgb(1 39 102 / .05));
+    color: rgb(var(--hub-ink, 15 23 42));
+    font-family: var(--hub-font-sans, system-ui, sans-serif);
+}
+.hub-install-card[hidden] { display: none; }
+.hub-install-card__icon { flex: none; width: 48px; height: 48px; border-radius: 11px; }
+.hub-install-card__body { min-width: 0; flex: 1; }
+.hub-install-card__title { margin: 0; font-size: 16px; line-height: 22px; font-weight: 700; color: rgb(var(--hub-header, 1 39 102)); }
+.hub-install-card__text { margin: 2px 0 0; font-size: 14px; line-height: 20px; color: rgb(var(--hub-ink-secondary, 51 65 85)); }
+.hub-install-card__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
+.hub-install-card__btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0 16px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: rgb(var(--hub-blue, 30 78 140));
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 20px;
+    text-decoration: none;
+    cursor: pointer;
+}
+.hub-install-card__btn[hidden] { display: none; }
+.hub-install-card__btn:hover { background: rgb(var(--hub-surface-muted, 241 245 249)); }
+.hub-install-card__btn--primary { background: rgb(var(--hub-blue, 30 78 140)); color: #fff; }
+.hub-install-card__btn--primary:hover { background: rgb(var(--hub-blue-strong, 29 78 216)); }
+.hub-install-card__btn:disabled { opacity: .6; cursor: default; }
+.hub-install-card__btn:focus-visible,
+.hub-install__tab:focus-visible,
+.hub-install__switcher summary:focus-visible { outline: 3px solid rgb(var(--hub-focus, 29 78 216)); outline-offset: 2px; }
+
+@media (max-width: 420px) {
+    .hub-install-card { padding: 12px; gap: 12px; }
+    .hub-install-card__actions > * { flex: 1 1 auto; }
+}
+
+/* ---------------------------------- /install page ---------------------------------- */
+
+.hub-install {
+    box-sizing: border-box;
+    width: min(100%, 36rem);
+    margin: 0 auto;
+    padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(24px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+    color: rgb(var(--hub-ink));
+    font-family: var(--hub-font-sans);
+}
+.hub-install a { color: rgb(var(--hub-blue)); font-weight: 600; }
+.hub-install a.hub-btn--primary { color: #fff; }
+.hub-install a:focus-visible, .hub-install button:focus-visible { outline: 3px solid rgb(var(--hub-focus)); outline-offset: 2px; }
+
+.hub-install__app {
+    display: flex; gap: 16px; align-items: center;
+    padding: 16px; border: 1px solid rgb(var(--hub-border)); border-radius: 12px;
+    background: rgb(var(--hub-surface)); box-shadow: var(--hub-shadow-card);
+}
+.hub-install__icon-img { flex: none; width: 72px; height: 72px; border-radius: 16px; }
+.hub-install__eyebrow { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: rgb(var(--hub-muted)); }
+.hub-install__app h1 { margin: 2px 0 0; font-size: 24px; line-height: 30px; letter-spacing: -.02em; color: rgb(var(--hub-header)); }
+.hub-install__lede { margin: 4px 0 0; font-size: 14px; line-height: 20px; color: rgb(var(--hub-ink-secondary)); }
+
+.hub-install__status { margin: 16px 2px 0; font-size: 14px; line-height: 20px; color: rgb(var(--hub-ink-secondary)); }
+.hub-install__primary { width: 100%; margin-top: 12px; }
+.hub-install__glyph-inline { width: 20px; height: 20px; }
+
+.hub-install__section-title { margin: 24px 2px 8px; font-size: 13px; font-weight: 700; color: rgb(var(--hub-muted)); text-transform: uppercase; letter-spacing: .06em; }
+.hub-install__guide { padding: 16px; border: 1px solid rgb(var(--hub-border)); border-radius: 12px; background: rgb(var(--hub-surface)); }
+.hub-install__guide + .hub-install__guide { margin-top: 12px; }
+.hub-install__guide h3 { margin: 0 0 12px; font-size: 16px; line-height: 22px; color: rgb(var(--hub-header)); }
+.hub-install__guide p { margin: 0; font-size: 14px; line-height: 21px; color: rgb(var(--hub-ink-secondary)); }
+.hub-install__guide p + p { margin-top: 8px; }
+.hub-install__steps { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+.hub-install__steps li { display: flex; gap: 12px; align-items: flex-start; font-size: 15px; line-height: 22px; color: rgb(var(--hub-ink)); }
+.hub-install__glyph {
+    flex: none; display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px; border-radius: 10px; background: rgb(var(--hub-surface-muted)); color: rgb(var(--hub-blue));
+}
+.hub-install__glyph svg { width: 22px; height: 22px; }
+.hub-install__glyph--num { font-size: 14px; font-weight: 700; }
+.hub-install__steps li > span:last-child { padding-top: 7px; }
+.hub-install__note { margin-top: 12px !important; font-size: 13px !important; color: rgb(var(--hub-muted)) !important; }
+
+/* The switcher needs JavaScript; without it every guide is already visible above. */
+.hub-install:not(.is-enhanced) .hub-install__switcher { display: none; }
+.hub-install__text-button { min-height: 44px; padding: 0; border: 0; background: none; color: rgb(var(--hub-blue)); font: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.hub-install__switcher { margin-top: 16px; }
+.hub-install__switcher summary {
+    display: flex; align-items: center; min-height: 44px; padding: 0 2px; cursor: pointer;
+    font-size: 14px; font-weight: 600; color: rgb(var(--hub-blue));
+}
+.hub-install__tabs { display: flex; flex-wrap: wrap; gap: 8px; padding: 4px 0 8px; }
+.hub-install__tab {
+    min-height: 44px; padding: 0 14px; border: 1px solid rgb(var(--hub-border-strong)); border-radius: 999px;
+    background: rgb(var(--hub-surface)); color: rgb(var(--hub-ink)); font: inherit; font-size: 14px; cursor: pointer;
+}
+.hub-install__tab[aria-selected="true"] { border-color: rgb(var(--hub-blue)); background: rgb(var(--hub-blue)); color: #fff; font-weight: 600; }
+
+.hub-install__success {
+    margin-top: 16px; padding: 16px; border: 1px solid rgb(var(--hub-success) / .35); border-radius: 12px;
+    background: rgb(var(--hub-success) / .06);
+}
+.hub-install__success h2 { margin: 0; font-size: 18px; line-height: 24px; color: rgb(var(--hub-success)); }
+.hub-install__success h2:focus { outline: none; }
+.hub-install__success p { margin: 6px 0 0; font-size: 14px; line-height: 21px; color: rgb(var(--hub-ink-secondary)); }
+.hub-install__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.hub-install__hint { font-size: 13px !important; color: rgb(var(--hub-muted)) !important; }
+.hub-install__after { margin-top: 18px; padding-top: 14px; border-top: 1px solid rgb(var(--hub-border)); }
+.hub-install__after h3 { margin: 0 0 6px; font-size: 15px; color: rgb(var(--hub-ink)); }
+.hub-install__after ul { margin: 6px 0 0; padding-left: 20px; font-size: 14px; line-height: 21px; color: rgb(var(--hub-ink-secondary)); }
+.hub-install__after li + li { margin-top: 6px; }
+.hub-install__return { margin: 20px 2px 0; font-size: 14px; }
+
+.hub-install [hidden] { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+    .hub-install *, .hub-install-card * { transition: none !important; animation: none !important; }
+}

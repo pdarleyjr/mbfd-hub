@@ -10,6 +10,7 @@ import { useCommandAccess } from './command-communications/useCommandAccess';
 import DailyPageNav from './DailyPageNav';
 import { HubPageHeader } from '../../../hub-ui/HubShell';
 import { EmptyState, LoadError } from './ui/StateViews';
+import InstallCard from './InstallCard';
 
 const GRID = 'daily-station-grid grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 lg:grid-cols-3 lg:gap-6 xl:grid-cols-4 2xl:grid-cols-5';
 
@@ -128,6 +129,7 @@ export default function StationListPage() {
         )}
       />
 
+      <InstallCard />
       <p className="sr-only" role="status" aria-live="polite">{refreshNotice}</p>
       {refreshError && (
         <div className="hub-callout hub-callout--warning mb-4" role="alert">

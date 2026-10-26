@@ -215,3 +215,13 @@ Fixed in the same branch, each with tests (node: `pwa-worker-core`, `daily-servi
 | L9 Daily cache growth | Solved by the M3 pruning for the build-listed file types |
 
 Not changed: L3 (5xx during the deploy window), L5 (CSRF on `pushsubscriptionchange` outside Chromium); both pre-existing, listed in section 10.
+
+## 12. Installing MBFD Hub (one install experience)
+
+Installing never touches the workers, scopes, manifest identity or push subscriptions above; it only reads browser install events.
+
+- **One owner of the install prompt.** The shared head (`components/hub/head.blade.php`, and the Daily shell `resources/js/daily-checkout/index.html`) captures `beforeinstallprompt` inline, before any bundle loads, onto `window.__mbfdDeferredInstall`. `resources/js/pwa/install-controller.ts` is the only code that calls `prompt()`; it is a page-wide singleton on `window.__mbfdInstallControllerV1` (bump the suffix if its shape changes).
+- **Installed** means display mode `standalone`, `window-controls-overlay` or `minimal-ui` (Firefox on Windows), or `navigator.standalone`. `fullscreen` is excluded because F11 matches it.
+- **Surfaces.** `/install` (`resources/views/install.blade.php` + `resources/js/pwa/install-ui.ts`) shows the native Install button only when the browser offers one, and otherwise the steps for the detected device, with a switcher for other devices. The inline card (`components/hub/install-card.blade.php`; React `InstallCard.tsx` in Daily Checkout) appears on Home, the Admin dashboard and the Daily station list only. Every Hub, Daily and Filament menu has "Install MBFD Hub".
+- **When the card appears.** It is shown for a native prompt, iPhone/iPad (Safari or another iOS browser) and Mac Safari 17+, but not for menu-only Chromium (no event there usually means already installed) or for in-app browsers. It is shown once per browser session, never offline, and after "Not now" (or three unanswered sessions) it stays away for 30 days.
+- **Notifications stay separate.** After installing, `/install` links to the existing Notification settings page. Nothing asks for permission automatically.

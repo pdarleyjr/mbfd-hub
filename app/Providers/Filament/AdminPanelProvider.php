@@ -138,6 +138,7 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->userMenuItems([
                 'profile' => MenuItem::make()->label('My Account')->url(fn (): string => route('account.show'))->icon('heroicon-o-user-circle'),
+                MenuItem::make()->label('Install MBFD Hub')->url(fn (): string => route('install'))->icon('heroicon-o-arrow-down-tray'),
                 MenuItem::make()->label('Change Password')->url(fn (): string => \App\Filament\Pages\SetPasswordPage::getUrl(panel: 'admin'))->icon('heroicon-o-key'),
                 \Filament\Navigation\MenuItem::make()
                     ->label('Notification settings')
@@ -210,8 +211,13 @@ class AdminPanelProvider extends PanelProvider
                 PanelsRenderHook::BODY_END,
                 fn (): string => self::safeRender('filament.admin.partials.keyboard-shortcuts')
                     .self::safeRender('filament.admin.partials.status-bar')
-                    .self::safeRender('filament.admin.partials.install-prompt')
                     .self::safeRender('filament.admin.partials.context-menu')
+            )
+            // The shared install card, inline above the dashboard content only (never over a form).
+            ->renderHook(
+                PanelsRenderHook::PAGE_START,
+                fn (): string => self::safeRender('filament.admin.partials.install-prompt'),
+                scopes: Dashboard::class,
             );
     }
 

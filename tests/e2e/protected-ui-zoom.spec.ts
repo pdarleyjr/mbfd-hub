@@ -35,7 +35,7 @@ async function capture(page: Page, cdp: CDPSession, info: TestInfo, name: string
   await page.waitForLoadState('networkidle');
   await page.evaluate(() => document.fonts.ready);
   if (state !== 'display') {
-    const later = page.locator('[data-admin-pwa-install]').getByRole('button', { name: 'Not now', exact: true });
+    const later = page.locator('[data-mbfd-install-card]').getByRole('button', { name: 'Not now', exact: true });
     if (await later.isVisible()) {
       await later.click();
       info.annotations.push({ type: 'install-prompt', description: `${name}: dismissed the optional prompt with its real Not now button before layout capture.` });
@@ -62,7 +62,7 @@ async function capture(page: Page, cdp: CDPSession, info: TestInfo, name: string
     });
     if (state === 'open' && asideRect && (asideRect.left < -1 || asideRect.right > root.clientWidth + 1)) failures.push('Open sidebar exceeds the viewport');
     if (state === 'display') {
-      for (const selector of ['.fi-sidebar', '.fi-topbar', '.fi-header', '[data-admin-pwa-install]']) {
+      for (const selector of ['.fi-sidebar', '.fi-topbar', '.fi-header', '[data-mbfd-install-card]']) {
         const element = document.querySelector(selector);
         if (element && rect(element).width && rect(element).height) failures.push(`Display Mode leaves ${selector} visible`);
       }
@@ -200,22 +200,23 @@ test('native browser zoom preserves command board and ordinary reflow', async ({
     await cdp.send('Emulation.setVisibleSize', frame);
     await expect.poll(() => page.evaluate(() => innerWidth)).toBe(width);
     if (width === 1280) {
-      // Prove Display Mode hides a real first-visit prompt before any dismissal.
+      // Prove Display Mode never shows the shared install card, whether or not this browser was offered one.
       await page.goto(`${baseURL}/admin`);
-      const banner = page.locator('[data-admin-pwa-install]');
-      await expect(banner).toBeVisible({ timeout: 15_000 });
+      const card = page.locator('[data-admin-pwa-install-mount] [data-mbfd-install-card]');
+      await expect(card).toHaveCount(1, { timeout: 15_000 });
       await page.waitForLoadState('networkidle');
+      const offered = await card.isVisible();
       await page.getByRole('link', { name: 'Display Mode', exact: true }).click();
       await expect(page.locator('body')).toHaveClass(/mbfd-command-display/);
-      await expect(banner).toHaveCount(1, { timeout: 15_000 });
-      await expect(banner).toBeHidden();
+      await expect(card).toHaveCount(1, { timeout: 15_000 });
+      await expect(card).toBeHidden();
       await page.waitForLoadState('networkidle');
       await page.getByRole('link', { name: 'Exit Display Mode', exact: true }).click();
-      await expect(banner).toBeVisible({ timeout: 15_000 });
-      await banner.getByRole('button', { name: 'Not now', exact: true }).click();
-      await expect(banner).toHaveCount(0);
       await page.waitForLoadState('networkidle');
-      info.annotations.push({ type: 'install-prompt', description: 'First-visit install prompt was visible in ordinary mode and hidden in Display Mode before dismissal; exited Display Mode and clicked the real Not now button.' });
+      const later = card.getByRole('button', { name: 'Not now', exact: true });
+      if (await later.isVisible()) await later.click();
+      await expect(card).toBeHidden();
+      info.annotations.push({ type: 'install-prompt', description: `Install card ${offered ? 'was offered in ordinary mode' : 'was not offered to this browser'}; it stayed hidden in Display Mode.` });
     }
     for (const factor of [0.8, 1, 1.25, 1.5, 2]) {
       await test.step(`${factor * 100}% actual tab zoom`, async () => {

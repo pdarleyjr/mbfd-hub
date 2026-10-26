@@ -55,19 +55,12 @@ test.describe('non-admin routes regression', () => {
       // Critical: page must contain the expected marker text.
       await expect(page.locator('body')).toContainText(route.expectedText, { timeout: 10_000 });
 
-      // Critical: no admin-PWA install prompt should ever fire on mobile/tablet.
-      // (It is gated by `matchMedia('(min-width: 1280px) and (pointer: fine)')`.)
-      if (testInfo.project.name === 'regression-mobile' || testInfo.project.name === 'regression-tablet') {
-        const installBannerVisible = await page
-          .locator('[data-admin-pwa-install]')
-          .first()
-          .isVisible()
-          .catch(() => false);
-        expect(
-          installBannerVisible,
-          'Admin PWA install banner must NEVER appear on mobile/tablet',
-        ).toBe(false);
-      }
+      // The old floating Admin install banner is gone; installing is offered only by the
+      // shared inline card (resources/views/components/hub/install-card.blade.php).
+      await expect(
+        page.locator('[data-admin-pwa-install]'),
+        'The retired floating Admin install banner must not return',
+      ).toHaveCount(0);
 
       await captureBaseline(page, `${testInfo.project.name}-${route.label}`);
 

@@ -5,39 +5,29 @@
  *   1. On admin pages, registers /admin/service-worker.js with scope /admin/
  *      (the one and only registration of that URL) and hands the scope to the
  *      shared update registrar, which owns update prompts on every device.
- *   2. Captures the `beforeinstallprompt` event and shows a custom prompt
- *      ONLY when the device is wide + pointer:fine (desktop with mouse).
- *      Touch-primary devices never see the prompt because the event listener
- *      is conditionally attached.
+ *   2. Mounts the shared install experience (resources/js/pwa/install-ui.ts): the
+ *      page-wide install controller owns `beforeinstallprompt`, and the Admin
+ *      dashboard shows the same install card as the Hub home page.
  *   3. Detects standalone mode and adds a body class for CSS hooks.
  *   4. Kicks off Dexie prefetch in the background.
- *
- * Mobile/tablet guarantee:
- *   Every line below is gated by the same matchMedia query. If a phone or
- *   tablet loads this script, the SW registers (scope-limited to /admin/),
- *   but no install banner ever appears and no UI changes happen.
  */
 
 import { prefetchAdminLookups } from './prefetch';
 import { startUpdateRegistrar } from '../pwa/update-registrar';
-
-interface BeforeInstallPromptEvent extends Event {
-    prompt: () => Promise<void>;
-    userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
-}
+import { getInstallController } from '../pwa/install-controller';
+import { mountInstallCards } from '../pwa/install-ui';
 
 const DESKTOP_MEDIA = window.matchMedia('(min-width: 1280px) and (pointer: fine)');
-const STANDALONE_MEDIA = window.matchMedia('(display-mode: standalone), (display-mode: window-controls-overlay)');
-const STORAGE_KEY = 'mbfd-admin-install-prompt-dismissed-at';
-
-/** Detect if running as installed PWA */
-function isStandalone(): boolean {
-    return STANDALONE_MEDIA.matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
-}
 
 /** Mark body so CSS can target standalone mode */
 function markBodyClasses(): void {
-    if (isStandalone()) document.body.classList.add('mbfd-pwa');
+    const install = getInstallController();
+    const markInstalled = (): void => {
+        const state = install.getState();
+        document.body.classList.toggle('mbfd-pwa', state.installed || state.installedThisSession);
+    };
+    markInstalled();
+    install.subscribe(markInstalled);
     if (DESKTOP_MEDIA.matches) document.body.classList.add('mbfd-desktop');
 }
 
@@ -58,77 +48,13 @@ async function registerServiceWorker(): Promise<void> {
     }
 }
 
-/**
- * Show the install banner. Only called from inside a desktop-gated block.
- */
-function showInstallBanner(promptEvent: BeforeInstallPromptEvent): void {
-    // Respect a recent "dismissed" timestamp (24h cooldown)
-    const dismissedAt = Number(localStorage.getItem(STORAGE_KEY) || '0');
-    if (Date.now() - dismissedAt < 24 * 60 * 60_000) return;
-    if (isStandalone()) return;
-
-    const banner = document.createElement('div');
-    banner.dataset.adminPwaInstall = 'true';
-    banner.style.cssText = [
-        'position:fixed', 'bottom:48px', 'right:16px', 'z-index:99998',
-        'background:#fff', 'color:#0f172a', 'padding:16px 18px',
-        'border-radius:10px', 'border:1px solid #e2e8f0',
-        'box-shadow:0 12px 28px rgba(15,23,42,0.18)',
-        'font:13px/1.45 "Plus Jakarta Sans", system-ui',
-        'max-width:340px', 'display:flex', 'flex-direction:column', 'gap:10px',
-    ].join(';');
-
-    banner.innerHTML = `
-        <div style="display:flex;align-items:flex-start;gap:10px;">
-            <img src="/admin-pwa/icons/icon-96.png" alt="" width="36" height="36" style="border-radius:8px;flex-shrink:0;">
-            <div>
-                <div style="font-weight:700;font-size:14px;color:#0f172a;">Install MBFD Hub</div>
-                <div style="color:#475569;margin-top:2px;">Open the Hub like a desktop app, with Admin available when authorized.</div>
-            </div>
-        </div>
-        <div style="display:flex;gap:8px;justify-content:flex-end;">
-            <button data-act="later" style="background:transparent;border:none;color:#64748b;cursor:pointer;padding:6px 10px;font:inherit;">Not now</button>
-            <button data-act="install" style="background:#dc2626;border:none;color:#fff;cursor:pointer;padding:6px 14px;border-radius:6px;font:inherit;font-weight:600;">Install</button>
-        </div>
-    `;
-
-    banner.querySelector<HTMLButtonElement>('[data-act="install"]')?.addEventListener('click', async () => {
-        banner.remove();
-        await promptEvent.prompt();
-        const choice = await promptEvent.userChoice;
-        if (choice.outcome === 'dismissed') {
-            localStorage.setItem(STORAGE_KEY, String(Date.now()));
-        }
-    });
-    banner.querySelector<HTMLButtonElement>('[data-act="later"]')?.addEventListener('click', () => {
-        localStorage.setItem(STORAGE_KEY, String(Date.now()));
-        banner.remove();
-    });
-
-    document.body.appendChild(banner);
-}
-
-function setupInstallPrompt(): void {
-    // The strict desktop gate. Touch-primary devices never reach the listener.
-    if (!DESKTOP_MEDIA.matches) return;
-
-    window.addEventListener('beforeinstallprompt', (event) => {
-        event.preventDefault();
-        showInstallBanner(event as BeforeInstallPromptEvent);
-    });
-
-    window.addEventListener('appinstalled', () => {
-        document.body.classList.add('mbfd-pwa');
-    });
-}
-
 function bootstrap(): void {
     markBodyClasses();
     registerServiceWorker();
     // Release checks, the update banner (all platforms, never while busy) and chunk-load
     // recovery. No scriptUrl: the registration above stays the only one for this worker.
     startUpdateRegistrar({ scope: '/admin/' });
-    setupInstallPrompt();
+    mountInstallCards();
     // Login and password-recovery pages share this bundle but must not call
     // protected lookup APIs before the web guard has authenticated a user.
     if (document.querySelector('meta[name="mbfd-admin-authenticated"]')) {

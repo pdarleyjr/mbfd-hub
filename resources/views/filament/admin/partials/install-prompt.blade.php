@@ -1,12 +1,9 @@
 {{--
-    Install-prompt partial: the actual prompt is rendered dynamically by
-    resources/js/admin-pwa/main.ts when:
-        - the device matches `(min-width: 1280px) and (pointer: fine)`,
-        - the user has not dismissed in the last 24h,
-        - and the browser has fired `beforeinstallprompt`.
-
-    This file exists only to keep the BODY_END render hook composition
-    symmetric with the other partials and to provide a stable element the
-    Playwright admin-pwa spec can assert against if needed.
+    Admin dashboard install card. It is the shared Hub card (components/hub/install-card), rendered
+    hidden; resources/js/pwa/install-ui.ts (loaded by resources/js/admin-pwa/main.ts) reveals it only
+    in a browser that can install MBFD Hub and has not been told "Not now" in the last 30 days.
+    Rendered at PAGE_START on the dashboard only, so it never sits over forms or tables.
 --}}
-<span data-admin-pwa-install-mount aria-hidden="true" style="position:absolute; width:0; height:0; overflow:hidden;"></span>
+<div data-admin-pwa-install-mount>
+    <x-hub.install-card />
+</div>
