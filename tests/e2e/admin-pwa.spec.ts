@@ -106,7 +106,9 @@ test.describe('install page', () => {
   test('does not show a fake install control before browser capability is available', async ({ page }) => {
     await page.goto('/install');
     await expect(page.getByRole('button', { name: 'Install MBFD Hub' })).toBeHidden();
-    await expect(page.locator('#install-guidance-steps li')).toHaveCount(3);
+    // Only the guide for this browser is shown; the others stay one tap away.
+    await expect(page.locator('[data-install-guide="desktop-chromium"]')).toBeVisible();
+    await expect(page.locator('[data-install-guide]:visible')).toHaveCount(1);
   });
 });
 
@@ -168,9 +170,9 @@ test.describe('admin PWA authenticated', () => {
     await expect(statusBar).toBeAttached({ timeout: 5_000 });
   });
 
-  test('install-prompt mount + context-menu partials are present', async ({ page }) => {
+  test('install card mount (dashboard) + context-menu partials are present', async ({ page }) => {
     await page.goto('/admin');
-    await expect(page.locator('[data-admin-pwa-install-mount]').first()).toBeAttached();
+    await expect(page.locator('[data-admin-pwa-install-mount] [data-mbfd-install-card]').first()).toBeAttached();
     await expect(page.locator('[data-admin-context-menu]').first()).toBeAttached();
   });
 

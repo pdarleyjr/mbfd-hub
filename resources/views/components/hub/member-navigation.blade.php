@@ -30,6 +30,7 @@
             <a role="menuitem" href="{{ route('updates.index') }}" class="hub-shell-menuitem">Department Updates</a>
             <a role="menuitem" href="{{ route('hub-support.index') }}" class="hub-shell-menuitem">Support</a>
             <a role="menuitem" href="{{ route('account.show') }}" class="hub-shell-menuitem">My account</a>
+            <a role="menuitem" href="{{ route('install') }}" class="hub-shell-menuitem">Install MBFD Hub</a>
         </div>
     </details>
 </nav>

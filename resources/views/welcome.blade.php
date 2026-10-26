@@ -125,6 +125,8 @@
             @endif
         </section>
 
+        <x-hub.install-card />
+
         <div class="home-layout">
             <div data-home-column="primary" class="min-w-0">
                 <section data-home-section="department-updates" aria-labelledby="department-updates-heading" class="hub-section min-w-0">

@@ -11,5 +11,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="MBFD Hub">
+{{-- The browser may offer installation before any deferred bundle runs. Keep that one-time offer for
+     resources/js/pwa/install-controller.ts, the only code that opens the install dialog. --}}
+<script>
+    addEventListener('beforeinstallprompt', function (event) { event.preventDefault(); window.__mbfdDeferredInstall = event; });
+    addEventListener('appinstalled', function () { window.__mbfdAppInstalled = true; window.__mbfdDeferredInstall = null; });
+</script>
 {{-- Release the page was rendered by. resources/js/pwa/update-registrar.ts compares it with /app-release. --}}
 <meta name="mbfd-release" content="{{ app(\App\Support\Release\DeployedRelease::class)->short() }}">

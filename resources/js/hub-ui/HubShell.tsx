@@ -170,7 +170,10 @@ export function HubShell({ module, navigation, connection, currentSection, rende
     };
     return renderLink ? renderLink(guardedProps) : <a {...guardedProps} />;
   };
-  const accountItems = navigation.account ? [{ key: 'account', label: 'My account', href: navigation.account.href }] : [];
+  const accountItems = navigation.account ? [
+    { key: 'account', label: 'My account', href: navigation.account.href },
+    { key: 'install', label: 'Install MBFD Hub', href: '/install' },
+  ] : [];
   return <div className={`hub-shell hub-shell--member ${className}`}>
     <a href="#main-content" className="hub-shell-skip">Skip to main content</a>
     <header className="hub-shell-header daily-home-nav" aria-label={`${module} navigation`}>

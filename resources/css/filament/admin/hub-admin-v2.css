@@ -748,13 +748,6 @@ html:not(.dark) :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .
 .fi-panel-admin .mbfd-admin-ai-input::placeholder { color: rgb(var(--hub2-n-600)); opacity: 1; }
 .fi-panel-admin .mbfd-admin-ai-input:disabled { background: rgb(var(--hub2-n-50)); }
 
-/* The existing install flow keeps its event/storage/SW contracts. */
-.fi-panel-admin [data-admin-pwa-install] { border-radius: .5rem !important; box-shadow: var(--hub2-elevation-2) !important; }
-.fi-panel-admin [data-admin-pwa-install] button { min-height: 2.75rem; }
-.fi-panel-admin [data-admin-pwa-install] [data-act="install"] { background: rgb(var(--hub2-action)) !important; }
-.fi-panel-admin [data-admin-pwa-install] [data-act="install"]:hover { background: rgb(var(--hub2-action-hover)) !important; }
-.fi-panel-admin [data-admin-pwa-install] [data-act="later"] { color: rgb(var(--hub2-n-600)) !important; }
-
 @media (prefers-reduced-motion: reduce) {
     .fi-panel-admin * {
         transition-duration: 0.01ms !important;

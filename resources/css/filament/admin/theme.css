@@ -2,6 +2,7 @@
 @import '../../../../vendor/filament/filament/dist/theme.css';
 @import '../../mbfd-theme.css';
 @import '../../hub-components.css';
+@import '../../hub-install.css';
 @import '../../hub-shell.css';
 @import '../hub-portals-v2.css';
 @import '../hub-inspection-views.css';
@@ -543,13 +544,13 @@
     outline-offset: -2px;
 }
 
-/* Display Mode overrides native visibility utilities and the install banner's
-   inline display value so optional installation does not cover the board. */
+/* Display Mode overrides native visibility utilities and hides the optional install card
+   so it never sits above the board. */
 body.mbfd-command-display .fi-sidebar,
 body.mbfd-command-display .fi-sidebar-close-overlay,
 body.mbfd-command-display .fi-topbar,
 body.mbfd-command-display .fi-header,
-body.mbfd-command-display [data-admin-pwa-install],
+body.mbfd-command-display [data-admin-pwa-install-mount],
 body.mbfd-command-display [data-admin-status-bar] { display: none !important; }
 body.mbfd-command-display .fi-main-ctn { margin-inline-start: 0 !important; }
 body.mbfd-command-display .fi-main { max-width: none; padding: .65rem; }

@@ -1,4 +1,6 @@
 import { startUpdateRegistrar } from './pwa/update-registrar';
+// The Home install card; install-ui mounts only where its markup is rendered.
+import './pwa/install-ui';
 
 function closeMenu(menu, restoreFocus = false) {
     menu.open = false;

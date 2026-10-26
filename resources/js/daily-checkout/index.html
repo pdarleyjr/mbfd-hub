@@ -21,6 +21,11 @@
     <link rel="manifest" href="/manifest.json" />
     
     <title>Daily Checkout | MBFD Hub</title>
+    <!-- Keep the browser's one-time install offer for resources/js/pwa/install-controller.ts (same as the Hub head). -->
+    <script>
+      addEventListener('beforeinstallprompt', function (event) { event.preventDefault(); window.__mbfdDeferredInstall = event; });
+      addEventListener('appinstalled', function () { window.__mbfdAppInstalled = true; window.__mbfdDeferredInstall = null; });
+    </script>
     <style>
     #splash-screen {
       position: fixed; inset: 0; z-index: 9999;

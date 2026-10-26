@@ -38,6 +38,7 @@
                 </summary>
                 <div id="hub-account-menu" class="hub-shell-popover" role="menu" aria-label="Account">
                     <a role="menuitem" href="{{ $navigation['account']['href'] }}" class="hub-shell-menuitem">My account</a>
+                    <a role="menuitem" href="{{ route('install') }}" class="hub-shell-menuitem" data-hub-install-link>Install MBFD Hub</a>
                     <a role="menuitem" href="{{ route('hub-support.index') }}" class="hub-shell-menuitem">My issue reports</a>
                     <a role="menuitem" href="{{ route('hub-support.create') }}" class="hub-shell-menuitem">Report an issue</a>
                     <form method="POST" action="{{ route('logout') }}">@csrf<button role="menuitem" type="submit" class="hub-shell-menuitem hub-shell-menuitem--danger">Sign out</button></form>

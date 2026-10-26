@@ -110,6 +110,12 @@ export default defineConfig({
       dependencies: ['setup'],
       testMatch: /admin-pwa\.spec\.ts/,
     },
+    // Public /install page: platform guides, native prompt handling, installed state. No sign-in.
+    {
+      name: 'pwa-install',
+      use: { serviceWorkers: 'block' },
+      testMatch: /pwa-install\.spec\.ts/,
+    },
     {
       name: 'admin-ux-acceptance',
       use: {

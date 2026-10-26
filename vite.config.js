@@ -17,6 +17,7 @@ export default defineConfig({
                 'resources/js/push-notification-widget.js',
                 // "This device" block of Notification settings (loaded only on that page).
                 'resources/js/pwa/push-enrollment.ts',
+                'resources/js/pwa/install-ui.ts',
                 'resources/css/filament/admin/theme.css',
                 'resources/js/workgroup-data-dashboard.jsx',
                 'resources/js/workgroup-l1-inventory.jsx',

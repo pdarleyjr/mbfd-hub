@@ -67,6 +67,7 @@ class TrainingPanelProvider extends PanelProvider
             ])
             ->userMenuItems([
                 MenuItem::make()->label('My Account')->url(fn (): string => route('account.show'))->icon('heroicon-o-user-circle'),
+                MenuItem::make()->label('Install MBFD Hub')->url(fn (): string => route('install'))->icon('heroicon-o-arrow-down-tray'),
                 MenuItem::make()->label('Change Password')->url(fn (): string => SetPasswordPage::getUrl(panel: 'training'))->icon('heroicon-o-key'),
                 MenuItem::make()
                     ->label('City email & verification')
