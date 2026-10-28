@@ -122,7 +122,7 @@ class HomeNavigationTest extends TestCase
             url('/admin/apparatuses'),
             url('/workgroups'),
             'https://pump-panel.pages.dev/',
-            'https://www.firesim.mbfdhub.com',
+            'https://firesim.mbfdhub.com',
             'https://videos.mbfdhub.com',
             'https://media.mbfdhub.com/api/auth/hub/start',
         ] as $destination) {
@@ -281,7 +281,7 @@ class HomeNavigationTest extends TestCase
             ['Fleet operations', url('/admin/apparatuses'), '', ''],
             ['Workgroup Dashboard', url('/workgroups'), '', ''],
             ['Pump Panel', 'https://pump-panel.pages.dev/', '_blank', 'noopener noreferrer'],
-            ['Vehicle Placement Simulator', 'https://www.firesim.mbfdhub.com', '_blank', 'noopener noreferrer'],
+            ['Vehicle Placement Simulator', 'https://firesim.mbfdhub.com', '_blank', 'noopener noreferrer'],
             ['Videos', 'https://videos.mbfdhub.com', '_blank', 'noopener noreferrer'],
             ['Media Control', 'https://media.mbfdhub.com/api/auth/hub/start', '_blank', 'noopener noreferrer'],
         ], $actual);

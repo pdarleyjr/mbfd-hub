@@ -88,7 +88,7 @@
             [
                 'title' => 'Vehicle Placement Simulator',
                 'description' => 'Training simulator',
-                'href' => 'https://www.firesim.mbfdhub.com',
+                'href' => 'https://firesim.mbfdhub.com',
                 'icon' => 'M8 17a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm12 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM3 5h11v10H3zM14 9h4l3 3v3h-7',
                 'external' => true,
                 'visible' => true,
