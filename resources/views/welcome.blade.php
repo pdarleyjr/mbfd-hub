@@ -79,8 +79,17 @@
             [
                 'title' => 'Pump Panel',
                 'description' => 'Training simulator',
-                'href' => 'https://pdarleyjr.github.io/puc-sim-manual-ui/',
+                'href' => 'https://pump-panel.pages.dev/',
                 'icon' => 'M13 10V3L4 14h7v7l9-11h-7Z',
+                'external' => true,
+                'visible' => true,
+                'domain' => 'training',
+            ],
+            [
+                'title' => 'Vehicle Placement Simulator',
+                'description' => 'Training simulator',
+                'href' => 'https://firesim.mbfdhub.com',
+                'icon' => 'M8 17a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm12 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0ZM3 5h11v10H3zM14 9h4l3 3v3h-7',
                 'external' => true,
                 'visible' => true,
                 'domain' => 'training',
