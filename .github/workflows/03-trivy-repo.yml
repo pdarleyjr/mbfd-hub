@@ -1,16 +1,19 @@
 name: Trivy Security Scan
 
+# Pull-request and push-to-main Trivy filesystem and configuration scans run in
+# the required "Hub filesystem and configuration security thresholds" job in
+# hub-release-gates.yml (same action SHA, scan-ref, severity and exit-code).
+# This workflow stays as the weekly scheduled scan, which picks up newly
+# published CVEs for an unchanged tree, and as an on-demand run.
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
   schedule:
     - cron: '0 7 * * 1'  # Weekly Monday 7am UTC
 
+# Table output only: nothing is uploaded to code scanning, so no
+# security-events permission is needed.
 permissions:
   contents: read
-  security-events: write
 
 jobs:
   trivy-fs:
@@ -18,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Trivy filesystem scan
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
@@ -34,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Trivy config scan
         uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
