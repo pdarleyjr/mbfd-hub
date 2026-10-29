@@ -1,11 +1,33 @@
 version: 2
+
+# Burst control. Every ecosystem batches routine minor and patch version
+# updates into ONE pull request per directory, and each pull request starts a
+# full release-gate run, so this keeps a weekly dependency cycle from queueing
+# dozens of runs. Major version updates stay individual pull requests so each
+# breaking change is reviewed on its own. Security updates are deliberately not
+# grouped: each vulnerability keeps its own pull request and alert, and GitHub
+# applies a separate limit to them that open-pull-requests-limit does not.
+# Directories are spread across the week so their pull requests do not all
+# arrive in the same run window. cooldown delays brand-new releases a few days
+# (it never delays security updates).
 updates:
   - package-ecosystem: "composer"
     directory: "/"
     schedule:
       interval: "weekly"
       day: "monday"
-    open-pull-requests-limit: 5
+      time: "06:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
     labels:
       - "dependencies"
       - "security"
@@ -14,8 +36,19 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 5
+      day: "tuesday"
+      time: "06:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
     labels:
       - "dependencies"
       - "security"
@@ -24,8 +57,19 @@ updates:
     directory: "/resources/js/daily-checkout"
     schedule:
       interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 5
+      day: "wednesday"
+      time: "06:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
     labels:
       - "dependencies"
       - "security"
@@ -34,8 +78,19 @@ updates:
     directory: "/cloudflare-worker"
     schedule:
       interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 5
+      day: "thursday"
+      time: "06:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
     labels:
       - "dependencies"
       - "security"
@@ -44,8 +99,19 @@ updates:
     directory: "/cloudflare-worker/vision-agent"
     schedule:
       interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 5
+      day: "thursday"
+      time: "09:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
     labels:
       - "dependencies"
       - "security"
@@ -54,8 +120,19 @@ updates:
     directory: "/vacation-app"
     schedule:
       interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 5
+      day: "friday"
+      time: "06:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 3
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
     labels:
       - "dependencies"
       - "security"
@@ -64,5 +141,15 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+      day: "sunday"
+      time: "06:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 3
+    groups:
+      actions-minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
     labels:
       - "ci"
