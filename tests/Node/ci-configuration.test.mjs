@@ -963,6 +963,7 @@ test("Daily Checkout browser acceptance uses a mocked isolated loopback build", 
   assert.match(install, /npx playwright install --with-deps "\$\{browsers\[@\]\}"/);
   const mocked = workflowStep(daily, "Run mocked Daily Checkout Playwright");
   assert.match(mocked, /DAILY_CHECKOUT_E2E_BASE_URL:\s*http:\/\/127\.0\.0\.1:4176/);
+  assert.match(mocked, /DAILY_PLAYWRIGHT_WORKERS:\s*\$\{\{\s*matrix\.workers\s*\}\}/);
   assert.match(mocked, /DAILY_PLAYWRIGHT_PROJECTS:\s*\$\{\{\s*matrix\.projects\s*\}\}/);
   assert.match(mocked, /set -euo pipefail/);
   assert.match(mocked, /test "\$\{#project_args\[@\]\}" -gt 0/);
@@ -987,6 +988,12 @@ test("Daily Checkout browser acceptance uses a mocked isolated loopback build", 
     "daily-workspace-webkit-iphone",
   ]);
   assert.deepEqual(browserViolations(lanes, projects, webkit), []);
+  assert.ok(
+    browserViolations([{ lane: "y", browsers: ["chromium", "webkit"], workers: 2, projects: ["daily-webkit-iphone"] }], projects, webkit)
+      .some((violation) => violation.includes("need one")),
+    "WebKit lanes running more than one worker must be detected",
+  );
+  assert.ok(lanes.every((lane) => lane.workers >= 1), "every lane declares its workers");
   assert.ok(
     browserViolations([{ lane: "x", browsers: ["chromium"], projects: ["daily-webkit-iphone"] }], projects, webkit)
       .some((violation) => violation.includes("does not install webkit")),

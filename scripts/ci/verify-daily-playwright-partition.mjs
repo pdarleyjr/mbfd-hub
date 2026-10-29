@@ -45,6 +45,7 @@ export function matrixLanes(workflow) {
     .map((entry) => ({
       lane: entry.match(/^lane:\s*([A-Za-z0-9_-]+)/m)?.[1] ?? "",
       browsers: (entry.match(/^ {12}browsers:[ \t]*(.+?)\r?$/m)?.[1] ?? "").split(/\s+/).filter(Boolean),
+      workers: Number(entry.match(/^ {12}workers:[ \t]*(\d+)/m)?.[1] ?? 0),
       projects: [...entry.matchAll(/--project=([A-Za-z0-9_.-]+)/g)].map((match) => match[1]),
     }));
 }
@@ -72,9 +73,15 @@ export function browserViolations(lanes, projects, webkit) {
   const webkitNames = new Set(webkit);
   const allowed = new Set(["chromium", "webkit"]);
 
-  for (const { lane, browsers = [], projects: laneProjects } of lanes) {
+  for (const { lane, browsers = [], workers, projects: laneProjects } of lanes) {
     for (const browser of browsers) {
       if (!allowed.has(browser)) violations.push(`lane ${lane} installs unknown browser ${browser}`);
+    }
+    if (workers !== undefined && !(workers >= 1 && workers <= 4)) {
+      violations.push(`lane ${lane} must declare 1-4 Playwright workers`);
+    }
+    if (workers !== undefined && workers > 1 && laneProjects.some((project) => webkitNames.has(project))) {
+      violations.push(`lane ${lane} runs WebKit projects with ${workers} workers; the long WebKit tests need one`);
     }
     if (browsers.length === 0) violations.push(`lane ${lane} must declare the browsers it installs`);
     const needsWebkit = laneProjects.some((project) => webkitNames.has(project));

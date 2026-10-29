@@ -1,0 +1,46 @@
+name: zz B PWA flake probe (temporary, never merge)
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - .github/workflows/zz-b-pwa-flake-probe.yml
+      - playwright.tmp-sw.config.ts
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    name: probe (${{ matrix.mode }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        mode: [plain, loaded]
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.sha }}
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --ignore-scripts --legacy-peer-deps
+      - run: |
+          bash scripts/ci/prepare-ubuntu-apt-mirror.sh
+          npx playwright install --with-deps chromium
+      - name: Start CPU load
+        if: ${{ matrix.mode == 'loaded' }}
+        run: |
+          for i in 1 2 3 4; do (while :; do :; done) & done
+          echo "nproc=$(nproc)"
+      - name: Repeat the SW upgrade spec
+        run: npx playwright test --config=playwright.tmp-sw.config.ts --repeat-each=60 --workers=1
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: ${{ failure() }}
+        with:
+          name: pwa-flake-probe-${{ matrix.mode }}
+          path: test-results
+          retention-days: 3

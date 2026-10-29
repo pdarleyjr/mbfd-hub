@@ -136,7 +136,24 @@ async function updateInPlace(page: Page, scope: string, expectedBuild: string) {
   return page.evaluate(
     async ({ scope, expectedBuild }) => {
       const registration = (window as unknown as { __registration: ServiceWorkerRegistration }).__registration;
+      // A timeline of the update, so a run where the new worker never takes over says where it stopped
+      // (nothing here changes what is asserted).
+      const started = performance.now();
+      const timeline: string[] = [];
+      const note = (what: string) => timeline.push(`${Math.round(performance.now() - started)}ms ${what}`);
+      const watch = (label: string, worker: ServiceWorker | null) => {
+        if (!worker) return;
+        note(`${label} is ${worker.state}`);
+        worker.addEventListener('statechange', () => note(`${label} became ${worker.state}`));
+      };
+      registration.addEventListener('updatefound', () => {
+        note('updatefound');
+        watch('installing', registration.installing);
+      });
+      watch('active', registration.active);
+      note('update() called');
       await registration.update();
+      note(`update() resolved; installing=${registration.installing?.state ?? 'none'} waiting=${registration.waiting?.state ?? 'none'} active=${registration.active?.state ?? 'none'}`);
 
       const askVersion = (worker: ServiceWorker | null) =>
         new Promise<string | null>((resolveVersion) => {
@@ -160,11 +177,13 @@ async function updateInPlace(page: Page, scope: string, expectedBuild: string) {
         await new Promise((r) => setTimeout(r, 100));
       }
 
+      note(`stopped asking; build=${build ?? 'no answer'} installing=${registration.installing?.state ?? 'none'} waiting=${registration.waiting?.state ?? 'none'} active=${registration.active?.state ?? 'none'}`);
       const all = await navigator.serviceWorker.getRegistrations();
       const same = await navigator.serviceWorker.getRegistration(scope);
       const scriptUrl = new URL(registration.active?.scriptURL ?? 'http://none.invalid/');
 
       return {
+        timeline,
         build,
         registrations: all.length,
         sameObject: same === registration,
@@ -207,7 +226,7 @@ test.describe('installed workers upgrade in place', () => {
     origin.serve('new');
     const after = await updateInPlace(page, '/', ROOT_BUILD);
 
-    expect(after.build, 'the new worker took over the existing registration').toBe(ROOT_BUILD);
+    expect(after.build, `the new worker took over the existing registration: ${after.timeline.join(' | ')}`).toBe(ROOT_BUILD);
     expect(after).toMatchObject({ scope: '/', script: '/sw.js', registrations: 1, sameObject: true });
 
     if (before.endpoint === null) {
@@ -233,7 +252,7 @@ test.describe('installed workers upgrade in place', () => {
     origin.serve('new');
     const after = await updateInPlace(page, '/admin/', ADMIN_BUILD);
 
-    expect(after.build).toBe(ADMIN_BUILD);
+    expect(after.build, `the new admin worker took over the existing registration: ${after.timeline.join(' | ')}`).toBe(ADMIN_BUILD);
     expect(after).toMatchObject({ scope: '/admin/', script: '/admin/service-worker.js', registrations: 1, sameObject: true });
     expect(after.caches).not.toContain('mbfd-admin-v3-static');
     expect(after.caches).toContain('mbfd-admin-v4-static');
@@ -247,7 +266,8 @@ test.describe('installed workers upgrade in place', () => {
     await page.goto(`${origin.url}/`);
     await registerLikeProduction(page, '/sw.js', '/', vapidStylePublicKey());
     origin.serve('new');
-    await updateInPlace(page, '/', ROOT_BUILD);
+    const upgraded = await updateInPlace(page, '/', ROOT_BUILD);
+    expect(upgraded.build, `the upgraded root worker answers before its pushes are checked: ${upgraded.timeline.join(' | ')}`).toBe(ROOT_BUILD);
 
     const worker = context.serviceWorkers().find((candidate) => candidate.url() === `${origin.url}/sw.js`);
     expect(worker, 'the upgraded root worker is running').toBeTruthy();

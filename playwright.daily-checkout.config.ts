@@ -3,6 +3,11 @@ import { loopbackBaseUrl, sanitizedTestEnvironment } from './tests/e2e/support/t
 
 const baseURL = loopbackBaseUrl('DAILY_CHECKOUT_E2E_BASE_URL', 'http://127.0.0.1:4176');
 const serverUrl = new URL(baseURL);
+const requestedWorkers = Number(process.env.DAILY_PLAYWRIGHT_WORKERS ?? 1);
+if (!Number.isInteger(requestedWorkers) || requestedWorkers < 1 || requestedWorkers > 4) {
+  throw new Error('DAILY_PLAYWRIGHT_WORKERS must be an integer from 1 to 4.');
+}
+const ciWorkers = process.env.CI ? requestedWorkers : 1;
 const browserChannel = process.env.PLAYWRIGHT_BROWSER_CHANNEL;
 
 if (browserChannel && !['chrome', 'msedge'].includes(browserChannel)) {
@@ -45,13 +50,13 @@ export default defineConfig({
   testMatch: /(canonical-login-responsive|command-communications|command-300-shift|daily-checkout-(inspection|responsive|service-worker|workspace|mobile|vehicle-confirmation)|daily-issue-report|daily-inventory-correction|daily-(?:station-)?vehicle-identification|captain5-workspace|captain5-ems)\.spec\.ts/,
   timeout: 45_000,
   retries: process.env.CI ? 1 : 0,
-  // Every spec in this config mocks the API per test in a fresh browser context
-  // and writes only to its own testInfo output directory, so tests never share
-  // state. CI runs them two at a time on the 4-vCPU hosted runner; locally the
-  // run stays serial. Retries, per-test timeouts and project selection are
-  // unchanged.
-  fullyParallel: Boolean(process.env.CI),
-  workers: process.env.CI ? 2 : 1,
+  // Every spec here mocks the API per test in a fresh browser context and writes only to its own
+  // testInfo output directory, so tests never share state. The CI matrix chooses the worker count per
+  // lane (DAILY_PLAYWRIGHT_WORKERS, default 1): the hosted 4-vCPU runner is two physical cores, so lanes
+  // with only light Chromium tests run 2-3 workers, while lanes with the long WebKit workspace tests
+  // (60-80 s against their 90 s timeout) stay serial. Retries and timeouts are unchanged.
+  fullyParallel: ciWorkers > 1,
+  workers: ciWorkers,
   reporter: 'list',
   preserveOutput: 'always',
   use: {
@@ -62,7 +67,8 @@ export default defineConfig({
     serviceWorkers: 'block',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
-    video: 'retain-on-failure',
+    // Recording every attempt costs ~8% of a runner's CPU; the first retry of a failed test still records video and a trace.
+    video: 'on-first-retry',
   },
   webServer: {
     // Exercise the production bundle and the actual signature canvas.
