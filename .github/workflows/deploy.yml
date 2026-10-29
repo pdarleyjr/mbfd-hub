@@ -662,6 +662,36 @@ jobs:
           MARKER_SHA="$(ssh -F "$HUB_SSH_CONFIG" deploy-target 'docker exec -u sail mbfd-hub-laravel cat /var/www/html/storage/app/private/deploy-marker.json' | jq -er '.sha')"
           test "$MARKER_SHA" = "$RELEASE_SHA"
           test "$(curl --silent --show-error --max-time 15 --output /dev/null --write-out '%{http_code}' https://www.mbfdhub.com/deploy-marker.json)" = '404'
+          # Release identity and worker delivery, as a member's browser sees them through the edge.
+          # A page compares /app-release with the release it was rendered by; a worker script that the
+          # edge caches (or serves with a redirect or the wrong type) keeps members on a retired release.
+          SMOKE_DIR="$(mktemp -d)"
+          trap 'rm -f -- "$APEX_HEADERS"; rm -rf -- "$SMOKE_DIR"' EXIT
+          fetch_public() {
+            curl --silent --show-error --retry 3 --retry-delay 2 --max-time 15 --header 'Cookie:' --dump-header "$SMOKE_DIR/headers" --output "$SMOKE_DIR/body" --write-out '%{http_code}' "$1"
+          }
+          public_header() {
+            awk -v name="$1:" 'tolower($1) == name { $1=""; sub(/^ /, ""); sub(/\r$/, ""); print }' "$SMOKE_DIR/headers" | tail -n 1
+          }
+          test "$(fetch_public https://www.mbfdhub.com/app-release)" = '200' || { echo "/app-release did not answer 200 directly." >&2; exit 1; }
+          APP_RELEASE_TYPE="$(public_header content-type)"
+          APP_RELEASE_CACHE="$(public_header cache-control)"
+          grep -qi 'json' <<< "$APP_RELEASE_TYPE" || { echo "/app-release is not JSON: $APP_RELEASE_TYPE" >&2; exit 1; }
+          grep -qi 'no-store' <<< "$APP_RELEASE_CACHE" || { echo "/app-release must be no-store: $APP_RELEASE_CACHE" >&2; exit 1; }
+          LIVE_RELEASE="$(jq -er '.release' "$SMOKE_DIR/body")"
+          test "$LIVE_RELEASE" = "${RELEASE_SHA:0:12}" || { echo "/app-release says $LIVE_RELEASE but this deploy is ${RELEASE_SHA:0:12}." >&2; exit 1; }
+          for WORKER_URL in /sw.js /admin/service-worker.js /admin-pwa/service-worker.js /daily/sw.js /daily/service-worker.js; do
+            test "$(fetch_public "https://www.mbfdhub.com$WORKER_URL")" = '200' || { echo "Worker $WORKER_URL did not answer 200 directly." >&2; exit 1; }
+            WORKER_TYPE="$(public_header content-type)"
+            WORKER_CACHE="$(public_header cache-control)"
+            WORKER_SCOPE="$(public_header service-worker-allowed)"
+            grep -Eqi '^(text|application)/javascript' <<< "$WORKER_TYPE" || { echo "Worker $WORKER_URL is not served as JavaScript: $WORKER_TYPE" >&2; exit 1; }
+            if grep -qi 'immutable' <<< "$WORKER_CACHE"; then echo "Worker $WORKER_URL must revalidate, not be immutable: $WORKER_CACHE" >&2; exit 1; fi
+            # Only the two admin worker URLs carry a wider scope (the server sets this header there).
+            case "$WORKER_URL" in
+              /admin/service-worker.js|/admin-pwa/service-worker.js) test "$WORKER_SCOPE" = '/admin/' || { echo "Worker $WORKER_URL lost its Service-Worker-Allowed scope: $WORKER_SCOPE" >&2; exit 1; } ;;
+            esac
+          done
 
       # A failure after maintenance mode was entered must not leave members on a 503 page. While the
       # previous release is still the running container (activation never happened), bring it back up.

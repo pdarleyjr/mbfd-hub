@@ -67,9 +67,15 @@ class EmployeeDashboard extends Page
             ->take(3)
             ->get();
 
+        $authUser = auth()->user();
+        $canMessageLogistics = \App\Filament\Employee\Pages\MyMessages::canAccess();
+        $messageUnread = $canMessageLogistics && $authUser instanceof \App\Models\User
+            ? app(\App\Services\EmployeeMessaging\EmployeeLogisticsMessagingService::class)->memberUnreadCount($authUser)
+            : 0;
+
         // For blade compatibility — use $user variable name but it's an Employee
         $user = $employee;
 
-        return compact('user', 'bidAssignment', 'equipmentCount', 'pendingRequests', 'recentEquipment', 'recentRequests');
+        return compact('user', 'bidAssignment', 'equipmentCount', 'pendingRequests', 'recentEquipment', 'recentRequests', 'messageUnread', 'canMessageLogistics');
     }
 }

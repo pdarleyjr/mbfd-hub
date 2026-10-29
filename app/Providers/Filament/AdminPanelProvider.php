@@ -5,6 +5,7 @@ namespace App\Providers\Filament;
 use App\Filament\Admin\Pages\BidAccessPin;
 use App\Filament\Admin\Pages\Captain5Operations;
 use App\Filament\Admin\Pages\CommandCommunications;
+use App\Filament\Admin\Pages\EmployeeMessages;
 use App\Filament\Admin\Pages\EquipmentIntake;
 use App\Filament\Admin\Pages\KnowledgeBase;
 use App\Filament\Admin\Pages\TrtTrailerInventory;
@@ -19,6 +20,7 @@ use App\Filament\Pages\SetPasswordPage;
 use App\Filament\Pages\Settings;
 use App\Filament\Pages\WorkgroupAdministration;
 use App\Filament\Support\HubPalette;
+use App\Filament\Widgets\EmployeeMessagesWidget;
 use App\Filament\Widgets\FleetStatsWidget;
 use App\Filament\Widgets\InventoryOverviewWidget;
 use App\Filament\Widgets\StationOperationsHubWidget;
@@ -99,6 +101,7 @@ class AdminPanelProvider extends PanelProvider
                 \App\Filament\Admin\Pages\MedicalSupplyRoom::class,
                 \App\Filament\Admin\Pages\MedicalDataStatistics::class,
                 CommandCommunications::class,
+                EmployeeMessages::class,
                 CommunicationsUsage::class,
                 ComposeEmail::class,
                 HealthCheckResults::class,
@@ -124,6 +127,7 @@ class AdminPanelProvider extends PanelProvider
                 FleetStatsWidget::class,
                 InventoryOverviewWidget::class,
                 StationOperationsHubWidget::class,
+                EmployeeMessagesWidget::class,
             ])
             ->navigationGroups([
                 NavigationGroup::make()->label('Operations')->icon('heroicon-o-clipboard-document-list')->collapsed(),

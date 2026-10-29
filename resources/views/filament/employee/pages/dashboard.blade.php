@@ -69,10 +69,36 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
             </svg>
         </a>
+        @if ($canMessageLogistics)
+        <a href="{{ \App\Filament\Employee\Pages\MyMessages::getUrl($messageUnread > 0 ? [] : ['compose' => 1], panel: 'employee') }}" class="ep-action-card emsg-dashboard-card" data-employee-messages-shortcut>
+            <div class="ep-action-icon ep-action-icon-neutral">
+                <x-heroicon-o-chat-bubble-bottom-center-text class="w-5 h-5" aria-hidden="true" />
+            </div>
+            <div class="ep-action-body">
+                <span class="ep-action-title">Message Logistics</span>
+                <span class="ep-action-desc">
+                    @if ($messageUnread > 0)
+                        {{ $messageUnread }} new {{ \Illuminate\Support\Str::plural('reply', $messageUnread) }} in My Messages
+                    @else
+                        Ask about equipment, uniforms or supplies
+                    @endif
+                </span>
+            </div>
+            @if ($messageUnread > 0)
+                <span class="emsg-unread-dot">{{ $messageUnread }}<span class="sr-only"> unread</span></span>
+            @endif
+            <svg class="ep-action-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+        </a>
+        @endif
     </div>
 
     <nav class="ep-workspace-links" aria-label="Employee tools">
         <a href="{{ \App\Filament\Employee\Pages\MyRequestsPage::getUrl(panel: 'employee') }}">Request history</a>
+        @if ($canMessageLogistics)
+            <a href="{{ \App\Filament\Employee\Pages\MyMessages::getUrl(panel: 'employee') }}">My messages</a>
+        @endif
         <a href="{{ \App\Filament\Employee\Pages\ApparatusServiceRequestPage::getUrl(panel: 'employee') }}">Apparatus service</a>
         <a href="{{ \App\Filament\Employee\Pages\OperationalForms::getUrl(panel: 'employee') }}">Operational forms</a>
         <a href="{{ \App\Filament\Employee\Pages\VideoConferencing::getUrl(panel: 'employee') }}">Video conferencing</a>

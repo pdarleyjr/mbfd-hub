@@ -119,7 +119,9 @@ final class GoLiveCapacityProbeTest extends TestCase
         fwrite(STDERR, sprintf("CAPACITY_LOGIN n=20 statuses=%s queries=%d ms=%.1f\n", json_encode($loginStatuses), $queries - $before, (hrtime(true) - $started) / 1_000_000));
         self::assertCount(300, $assessments);
         self::assertLessThanOrEqual(20, $previewQueries);
-        self::assertLessThanOrEqual(30, $adminQueries);
+        // 30 + 1: the Employee Messages unread badge (one count per admin page view, memoized per
+        // request; docs/employee-logistics-messaging.md). Any further growth needs its own reason.
+        self::assertLessThanOrEqual(31, $adminQueries);
         self::assertLessThanOrEqual(40, $searchQueries);
         self::assertLessThanOrEqual(40, $filterQueries);
     }

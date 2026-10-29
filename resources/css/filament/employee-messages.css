@@ -1,0 +1,508 @@
+/*
+ * Employee <-> Logistics messaging (docs/employee-logistics-messaging.md).
+ * Shared by the Employee Portal page, the Admin inbox and the Logistics Dashboard card.
+ * Light mode only (dark mode is disabled in every panel). No @apply (iOS Safari); every
+ * selector is prefixed with .emsg-.
+ */
+
+.emsg-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+}
+
+@media (min-width: 1024px) {
+    .emsg-layout {
+        grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+        align-items: start;
+    }
+}
+
+.emsg-panel {
+    min-width: 0;
+    background: var(--hub2-n-0, #fff);
+    border: 1px solid var(--hub2-n-200, #e5e7eb);
+    border-radius: var(--hub2-radius-lg, 12px);
+    box-shadow: var(--hub2-elevation-1, 0 1px 2px rgba(15, 23, 42, .06));
+}
+
+.emsg-panel__header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 12px;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--hub2-n-200, #e5e7eb);
+}
+
+.emsg-panel__title {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--hub2-n-900, #111827);
+}
+
+.emsg-panel__body {
+    padding: 16px;
+}
+
+.emsg-subtle {
+    margin: 0;
+    font-size: 13px;
+    color: var(--hub2-n-600, #4b5563);
+}
+
+/* ---------------------------------------------------------------- list */
+
+.emsg-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--hub2-n-200, #e5e7eb);
+}
+
+.emsg-search {
+    flex: 1 1 180px;
+    min-width: 0;
+    min-height: 44px;
+    padding: 0 12px;
+    font-size: 14px;
+    border: 1px solid var(--hub2-n-200, #d1d5db);
+    border-radius: var(--hub2-radius-md, 8px);
+    background: var(--hub2-n-0, #fff);
+}
+
+.emsg-filters {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.emsg-filter {
+    min-height: 44px;
+    padding: 0 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--hub2-n-600, #4b5563);
+    background: transparent;
+    border: 1px solid var(--hub2-n-200, #e5e7eb);
+    border-radius: var(--hub2-radius-md, 8px);
+    cursor: pointer;
+}
+
+.emsg-filter[aria-pressed="true"] {
+    color: var(--hub2-action, #1d4ed8);
+    background: var(--hub2-action-tint, #eff6ff);
+    border-color: var(--hub2-action, #1d4ed8);
+}
+
+.emsg-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.emsg-list__item + .emsg-list__item {
+    border-top: 1px solid var(--hub2-n-100, #f3f4f6);
+}
+
+.emsg-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 4px 12px;
+    align-items: start;
+    width: 100%;
+    min-height: 64px;
+    padding: 12px 16px;
+    text-align: left;
+    color: inherit;
+    text-decoration: none;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+}
+
+.emsg-row:hover {
+    background: var(--hub2-n-25, #fafafa);
+}
+
+.emsg-row:focus-visible,
+.emsg-filter:focus-visible,
+.emsg-send:focus-visible,
+.emsg-link-button:focus-visible,
+.emsg-search:focus-visible,
+.emsg-input:focus-visible,
+.emsg-textarea:focus-visible {
+    outline: 2px solid var(--hub2-focus, #2563eb);
+    outline-offset: 2px;
+}
+
+.emsg-row[aria-current="true"] {
+    background: var(--hub2-action-tint, #eff6ff);
+    box-shadow: inset 3px 0 0 var(--hub2-action, #1d4ed8);
+}
+
+.emsg-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--hub2-action, #1d4ed8);
+    background: var(--hub2-action-tint, #eff6ff);
+    border-radius: 999px;
+    flex: none;
+}
+
+.emsg-row__main {
+    min-width: 0;
+}
+
+.emsg-row__title {
+    display: block;
+    overflow: hidden;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--hub2-n-900, #111827);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.emsg-row--unread .emsg-row__title {
+    font-weight: 800;
+}
+
+.emsg-row__sub {
+    display: block;
+    overflow: hidden;
+    margin-top: 2px;
+    font-size: 12px;
+    color: var(--hub2-n-600, #4b5563);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.emsg-row__preview {
+    display: -webkit-box;
+    overflow: hidden;
+    margin-top: 4px;
+    font-size: 13px;
+    color: var(--hub2-n-600, #4b5563);
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow-wrap: anywhere;
+}
+
+.emsg-row__aside {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--hub2-n-600, #4b5563);
+    white-space: nowrap;
+}
+
+.emsg-unread-dot {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--hub2-n-0, #fff);
+    background: var(--hub2-action, #1d4ed8);
+    border-radius: 999px;
+}
+
+.emsg-tag {
+    display: inline-flex;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--hub2-n-600, #4b5563);
+    background: var(--hub2-n-50, #f9fafb);
+    border: 1px solid var(--hub2-n-200, #e5e7eb);
+    border-radius: 999px;
+}
+
+.emsg-more {
+    display: flex;
+    justify-content: center;
+    padding: 12px 16px;
+    border-top: 1px solid var(--hub2-n-100, #f3f4f6);
+}
+
+.emsg-link-button {
+    min-height: 44px;
+    padding: 0 12px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--hub2-action, #1d4ed8);
+    background: transparent;
+    border: 0;
+    border-radius: var(--hub2-radius-md, 8px);
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.emsg-link-button:hover {
+    text-decoration: underline;
+}
+
+.emsg-empty {
+    padding: 32px 16px;
+    text-align: center;
+}
+
+.emsg-empty__title {
+    margin: 8px 0 4px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--hub2-n-900, #111827);
+}
+
+.emsg-empty__icon {
+    width: 32px;
+    height: 32px;
+    margin: 0 auto;
+    color: var(--hub2-n-400, #9ca3af);
+}
+
+/* ---------------------------------------------------------------- conversation */
+
+.emsg-thread {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.emsg-thread__earlier,
+.emsg-thread__empty {
+    font-size: 13px;
+    color: var(--hub2-n-600, #4b5563);
+    text-align: center;
+}
+
+.emsg-bubble {
+    max-width: min(640px, 88%);
+    padding: 10px 14px;
+    background: var(--hub2-n-50, #f9fafb);
+    border: 1px solid var(--hub2-n-200, #e5e7eb);
+    border-radius: 14px 14px 14px 4px;
+    align-self: flex-start;
+}
+
+.emsg-bubble--mine {
+    align-self: flex-end;
+    background: var(--hub2-action-tint, #eff6ff);
+    border-color: color-mix(in srgb, var(--hub2-action, #1d4ed8) 25%, transparent);
+    border-radius: 14px 14px 4px 14px;
+}
+
+.emsg-bubble__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 8px;
+    margin-bottom: 4px;
+    font-size: 12px;
+    color: var(--hub2-n-600, #4b5563);
+}
+
+.emsg-bubble__side {
+    font-weight: 700;
+    color: var(--hub2-n-900, #111827);
+}
+
+.emsg-bubble--logistics .emsg-bubble__side {
+    color: var(--hub2-action, #1d4ed8);
+}
+
+.emsg-bubble__body {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--hub2-n-900, #111827);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.emsg-thread-scroll {
+    max-height: min(60vh, 560px);
+    overflow-y: auto;
+    padding: 16px;
+    overscroll-behavior: contain;
+}
+
+/* ---------------------------------------------------------------- composer */
+
+.emsg-composer {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 16px;
+    border-top: 1px solid var(--hub2-n-200, #e5e7eb);
+}
+
+.emsg-composer--flush {
+    padding: 0;
+    border-top: 0;
+}
+
+.emsg-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.emsg-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--hub2-n-900, #111827);
+}
+
+.emsg-optional {
+    font-weight: 400;
+    color: var(--hub2-n-600, #4b5563);
+}
+
+.emsg-input,
+.emsg-textarea {
+    width: 100%;
+    font: inherit;
+    font-size: 15px;
+    color: var(--hub2-n-900, #111827);
+    background: var(--hub2-n-0, #fff);
+    border: 1px solid var(--hub2-n-200, #d1d5db);
+    border-radius: var(--hub2-radius-md, 8px);
+}
+
+.emsg-input {
+    min-height: 44px;
+    padding: 0 12px;
+}
+
+.emsg-textarea {
+    min-height: 112px;
+    padding: 10px 12px;
+    resize: vertical;
+    line-height: 1.5;
+}
+
+.emsg-textarea[aria-invalid="true"] {
+    border-color: var(--hub2-danger, #b91c1c);
+}
+
+.emsg-composer__footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px 12px;
+}
+
+.emsg-hint {
+    margin: 0;
+    font-size: 12px;
+    color: var(--hub2-n-600, #4b5563);
+}
+
+.emsg-send {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-width: 120px;
+    min-height: 44px;
+    padding: 0 18px;
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    background: var(--hub2-action, #1d4ed8);
+    border: 0;
+    border-radius: var(--hub2-radius-md, 8px);
+    cursor: pointer;
+}
+
+.emsg-send:hover:not(:disabled) {
+    background: var(--hub2-action-hover, #1e40af);
+}
+
+.emsg-send:disabled {
+    cursor: progress;
+    opacity: .75;
+}
+
+.emsg-send__icon,
+.emsg-spinner {
+    width: 18px;
+    height: 18px;
+}
+
+.emsg-spinner {
+    animation: emsg-spin .8s linear infinite;
+}
+
+@keyframes emsg-spin {
+    to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .emsg-spinner { animation: none; }
+}
+
+.emsg-feedback:empty {
+    display: none;
+}
+
+.emsg-feedback__error,
+.emsg-feedback__status {
+    margin: 0;
+    padding: 8px 12px;
+    font-size: 13px;
+    border-radius: var(--hub2-radius-md, 8px);
+}
+
+.emsg-feedback__error {
+    color: var(--hub2-danger, #b91c1c);
+    background: var(--hub2-danger-bg, #fef2f2);
+    border: 1px solid var(--hub2-danger-border, #fecaca);
+}
+
+.emsg-feedback__status {
+    color: var(--hub2-success, #15803d);
+    background: var(--hub2-success-bg, #f0fdf4);
+    border: 1px solid var(--hub2-success-border, #bbf7d0);
+}
+
+@media (max-width: 639.98px) {
+    .emsg-send {
+        width: 100%;
+    }
+
+    .emsg-bubble {
+        max-width: 94%;
+    }
+}
+
+/* ---------------------------------------------------------------- Employee Portal dashboard card */
+
+/* Third quick action: full width under the two existing cards rather than a lone half card. */
+[data-hub-portal="employee"] .ep-actions-row > .emsg-dashboard-card {
+    grid-column: 1 / -1;
+}
+
+[data-hub-portal="employee"] .emsg-dashboard-card .emsg-unread-dot {
+    margin-left: auto;
+}

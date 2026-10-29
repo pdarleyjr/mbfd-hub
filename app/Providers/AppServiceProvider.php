@@ -44,6 +44,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // One messaging access decision per user per request (navigation, badge and page all ask).
+        $this->app->scoped(\App\Services\Security\EmployeeLogisticsMessagingAccess::class);
         // Lucide icons Heroicons lacks (e.g. the EMS navigation group's medical bag), as lucide-* blade icons.
         $this->callAfterResolving(\BladeUI\Icons\Factory::class, static function (\BladeUI\Icons\Factory $icons): void {
             $icons->add('lucide', ['path' => resource_path('svg/lucide'), 'prefix' => 'lucide']);
