@@ -1,12 +1,30 @@
 name: Security Audit
 
+# Pull-request and push audits of the Composer, root npm and Daily Checkout npm
+# dependency trees run in the required "Hub dependency security thresholds" job
+# in hub-release-gates.yml (same commands, thresholds and advisory
+# classifier). On pull requests and pushes this workflow therefore only audits
+# the trees the release gates do not cover (cloudflare-worker, its vision-agent
+# and vacation-app), and only when those paths change. The weekly schedule and
+# manual dispatch run every audit so advisories published against an unchanged
+# lockfile are still found.
 on:
+  workflow_dispatch:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+    paths:
+      - "cloudflare-worker/**"
+      - "vacation-app/**"
+      - "scripts/ci/classify-build-advisory.mjs"
+      - ".github/workflows/security.yml"
   schedule:
     - cron: '0 6 * * 1'  # Weekly Monday 6am UTC
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -19,29 +37,34 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2
+        if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+        uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2.37.0
         with:
           php-version: '8.4'
 
       - name: Install Composer dependencies
+        if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
         env:
           COMPOSER_AUTH: '{"github-oauth":{"github.com":"${{ github.token }}"}}'
         run: composer install --no-interaction --prefer-dist
 
       - name: Composer security audit
+        if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
         run: composer audit --locked --format=table
 
       - name: Setup Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: '22'
       - name: Check bounded build advisory classification
+        if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
         run: node --test tests/Node/build-advisory-classifier.test.mjs
 
       - name: NPM security audit
+        if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
         run: |
           npm ci --ignore-scripts --legacy-peer-deps
           audit_report="$RUNNER_TEMP/root-npm-audit.json"
@@ -50,6 +73,7 @@ jobs:
           node scripts/ci/classify-build-advisory.mjs . "$audit_report" "$audit_status"
 
       - name: Daily Checkout security audit
+        if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
         working-directory: resources/js/daily-checkout
         run: |
           npm ci --ignore-scripts
@@ -80,7 +104,7 @@ jobs:
           node ../scripts/ci/classify-build-advisory.mjs vacation-app "$audit_report" "$audit_status"
       - name: Preserve raw NPM security reports
         if: ${{ always() }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: hub-dependency-audits-${{ github.run_id }}-${{ github.run_attempt }}
           path: |
