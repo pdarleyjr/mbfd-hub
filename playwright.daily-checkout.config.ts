@@ -45,7 +45,13 @@ export default defineConfig({
   testMatch: /(canonical-login-responsive|command-communications|command-300-shift|daily-checkout-(inspection|responsive|service-worker|workspace|mobile|vehicle-confirmation)|daily-issue-report|daily-inventory-correction|daily-(?:station-)?vehicle-identification|captain5-workspace|captain5-ems)\.spec\.ts/,
   timeout: 45_000,
   retries: process.env.CI ? 1 : 0,
-  workers: 1,
+  // Every spec in this config mocks the API per test in a fresh browser context
+  // and writes only to its own testInfo output directory, so tests never share
+  // state. CI runs them two at a time on the 4-vCPU hosted runner; locally the
+  // run stays serial. Retries, per-test timeouts and project selection are
+  // unchanged.
+  fullyParallel: Boolean(process.env.CI),
+  workers: process.env.CI ? 2 : 1,
   reporter: 'list',
   preserveOutput: 'always',
   use: {
