@@ -718,6 +718,8 @@ jobs:
         run: |
           npm ci --ignore-scripts --legacy-peer-deps
           npm run build
+      - name: Verify Conference bundle budget after build
+        run: npm run test:video-conferencing-bundle
       - name: Verify generated assets after build
         env:
           REQUIRE_GENERATED_ASSETS: "1"
