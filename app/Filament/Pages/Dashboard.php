@@ -2,10 +2,12 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Widgets\EmployeeMessagesWidget;
 use App\Filament\Widgets\StationOperationsHubWidget;
 use Filament\Actions\Action;
 use Filament\Pages\Dashboard as BaseDashboard;
 use Filament\Support\Enums\MaxWidth;
+use Livewire\Attributes\Locked;
 
 class Dashboard extends BaseDashboard
 {
@@ -26,10 +28,23 @@ class Dashboard extends BaseDashboard
         return 'Department-wide checkouts, equipment issues and station activity for the active operational day.';
     }
 
+    /** Captured on the first request: later Livewire requests to this page do not carry ?display=1. */
+    #[Locked]
+    public bool $displayMode = false;
+
+    public function mount(): void
+    {
+        $this->displayMode = request()->boolean('display');
+    }
+
     public function getWidgets(): array
     {
+        // Employee messages are person-specific: never on the display-mode (wall) screen.
+        $display = $this->displayMode || request()->boolean('display');
+
         return [
             StationOperationsHubWidget::class,
+            ...($display ? [] : [EmployeeMessagesWidget::class]),
         ];
     }
 

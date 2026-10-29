@@ -492,7 +492,7 @@ jobs:
     needs: reuse-proof
     if: ${{ !cancelled() && needs.reuse-proof.outputs.verified != 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 50
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -570,6 +570,24 @@ jobs:
           name: operational-forms-lifecycle-evidence
           path: test-results/operational-forms-lifecycle
           retention-days: 7
+      - name: Verify PWA worker core and service-worker drift
+        id: pwa-worker-core
+        if: ${{ !cancelled() && steps.member-requests.outcome != 'skipped' }}
+        run: |
+          npm run check:service-workers
+          npm run test:pwa-worker-core
+      - name: Verify PWA update flow in Chromium
+        id: pwa-update-flow
+        if: ${{ !cancelled() && steps.member-requests.outcome != 'skipped' }}
+        run: npm run test:pwa-update-e2e
+      - name: Verify Daily PWA upgrade safety in Chromium
+        id: daily-pwa-upgrade
+        if: ${{ !cancelled() && steps.member-requests.outcome != 'skipped' }}
+        run: npm run test:daily-pwa-upgrade-e2e
+      - name: Verify Employee <-> Logistics messaging in Chromium
+        id: employee-messages
+        if: ${{ !cancelled() && steps.member-requests.outcome != 'skipped' }}
+        run: npm run test:employee-messages-e2e
 
   # Mocked Daily Checkout Playwright is partitioned by Playwright project, so
   # every project runs exactly as it did serially (same files, grep, retries

@@ -132,6 +132,7 @@ function editedSurface(target: EventTarget | null): Element | null {
 /** Record a user edit that the DOM comparison cannot see. Exported for tests; ignores untrusted events. */
 export function recordFieldEdit(event: { isTrusted: boolean; target: EventTarget | null }): void {
     if (event.isTrusted !== true) return;
+    recordTypedEdit(event);
     const surface = editedSurface(event.target);
     if (surface === null) return;
     if (isFileInput(surface) && surface.files?.length === 0) {
@@ -142,11 +143,87 @@ export function recordFieldEdit(event: { isTrusted: boolean; target: EventTarget
     dirtyFields().add(surface);
 }
 
+// ---------------------------------------------------------------------------
+// Text the member typed: what a manual refresh must never discard
+// ---------------------------------------------------------------------------
+
+/**
+ * Filament and Livewire fill form controls from script after the HTML arrives, so "value differs
+ * from the server-rendered default" (hasUnsavedFieldEdits) is true on most admin pages before the
+ * member touches anything. That comparison stays as the conservative rule for automatic reloads;
+ * a refresh the member asks for refuses only when they actually typed: a trusted `input` event on
+ * a text-entry control whose value now differs from what it held when they focused it. Selects,
+ * checkboxes and radios are not "typed work" (a filter or a toggle is cheap to redo). The record
+ * is cleared with the other field edits (a successful Livewire save, a submitted form, a Livewire
+ * navigation), and a field typed back to its starting value stops counting.
+ */
+type TypedTrackingWindow = Window & { __mbfdTypedFields?: Map<Element, string> };
+
+const NON_TEXT_INPUT_TYPES = new Set(['hidden', 'button', 'submit', 'reset', 'image', 'search', 'file', 'checkbox', 'radio', 'range', 'color']);
+
+/** Value a text-entry control held when the member focused it (before any typing). */
+const typingBaselines = new WeakMap<Element, string>();
+
+/** Typed-into control -> the value it held when the member started editing it. */
+function typedFields(): Map<Element, string> {
+    const target = window as TypedTrackingWindow;
+    if (!(target.__mbfdTypedFields instanceof Map)) {
+        target.__mbfdTypedFields = new Map<Element, string>();
+    }
+
+    return target.__mbfdTypedFields;
+}
+
+function textEntryControl(target: EventTarget | null): HTMLInputElement | HTMLTextAreaElement | null {
+    const element = target as Element | null;
+    if (element === null || typeof element.closest !== 'function' || typeof element.tagName !== 'string') return null;
+    if (element.closest(IGNORED_EDIT_AREAS)) return null;
+    if (element.tagName === 'TEXTAREA') return element as HTMLTextAreaElement;
+    if (element.tagName === 'INPUT' && !NON_TEXT_INPUT_TYPES.has((element as HTMLInputElement).type)) return element as HTMLInputElement;
+
+    return null;
+}
+
+/** Focus: remember the starting value, so typing it back counts as unchanged. Exported for tests. */
+export function rememberTypingBaseline(event: { target: EventTarget | null }): void {
+    const control = textEntryControl(event.target);
+    if (control !== null && !typedFields().has(control)) typingBaselines.set(control, control.value);
+}
+
+/** A trusted keystroke in a text-entry control. Exported for tests; ignores untrusted events. */
+export function recordTypedEdit(event: { isTrusted: boolean; target: EventTarget | null }): void {
+    if (event.isTrusted !== true) return;
+    const control = textEntryControl(event.target);
+    if (control === null) return;
+    const fields = typedFields();
+    if (!fields.has(control)) fields.set(control, typingBaselines.get(control) ?? control.defaultValue);
+}
+
+/** True while a control the member typed into holds text that differs from where they started. */
+export function hasTypedFieldEdits(root: ParentNode = document): boolean {
+    const fields = typedFields();
+    for (const [control, start] of Array.from(fields)) {
+        const field = control as HTMLInputElement | HTMLTextAreaElement;
+        if (!field.isConnected) {
+            fields.delete(control);
+            continue;
+        }
+        if (field.disabled || field.value === start) continue;
+        if (root === document || (root as Node).contains(field)) return true;
+    }
+
+    return false;
+}
+
 /** Forget recorded edits: everything, or only those inside `within` (a form that was submitted). */
 export function clearFieldEdits(within?: Element): void {
     const fields = dirtyFields();
     for (const element of Array.from(fields)) {
         if (within === undefined || within.contains(element)) fields.delete(element);
+    }
+    const typed = typedFields();
+    for (const element of Array.from(typed.keys())) {
+        if (within === undefined || within.contains(element)) typed.delete(element);
     }
 }
 
@@ -202,6 +279,7 @@ export function startFieldEditTracking(): void {
 
     document.addEventListener('input', recordFieldEdit, true);
     document.addEventListener('change', recordFieldEdit, true);
+    document.addEventListener('focusin', rememberTypingBaseline, true);
     document.addEventListener('submit', (event) => {
         // Not handled by a script, so the browser is about to navigate with the form's contents.
         const form = event.target as Element | null;
@@ -249,4 +327,22 @@ export function hasUnsavedFieldEdits(root: ParentNode = document): boolean {
     }
 
     return false;
+}
+
+/**
+ * THE safety predicate for every refresh a member can see or ask for (banner state, "Refresh
+ * now", and the final recheck before that reload): an explicit busy reason, the page guard, an
+ * edited rich-text editor or chosen file, or text the member typed and has not saved.
+ */
+export function isUnsafeToRefresh(): boolean {
+    return isBusy() || hasRecordedFieldEdits() || hasTypedFieldEdits();
+}
+
+/**
+ * Reloads and navigations nobody asked for (the hidden-tab refresh, automatic chunk recovery, a
+ * notification click while work is open) are stricter still: any control that differs from the
+ * server-rendered page also holds them back.
+ */
+export function isUnsafeForAutomaticReload(): boolean {
+    return isUnsafeToRefresh() || hasUnsavedFieldEdits();
 }

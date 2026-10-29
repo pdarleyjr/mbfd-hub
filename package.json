@@ -7,7 +7,7 @@
         "typecheck": "tsc --noEmit",
         "build:service-workers": "node scripts/pwa/build-service-workers.mjs",
         "check:service-workers": "node scripts/pwa/build-service-workers.mjs --check",
-        "test:pwa-worker-core": "node --test tests/Node/pwa-worker-core.test.mjs",
+        "test:pwa-worker-core": "node --test tests/Node/pwa-worker-core.test.mjs tests/Node/pwa-refresh-safety.test.mjs",
         "test:pwa-update-e2e": "playwright test --config=playwright.pwa-update.config.ts",
         "test:ci-configuration": "node --test tests/Node/ci-configuration.test.mjs",
         "test:changed-php-files": "node --test tests/Node/changed-php-files.test.mjs",
@@ -19,7 +19,8 @@
         "test:video-conferencing-bundle": "node scripts/ci/check-video-conferencing-bundle.mjs",
         "test:video-conferencing-node": "node --test tests/Node/video-conferencing-*.test.mjs",
         "test:video-conferencing-e2e": "playwright test --config=playwright.video-conferencing.config.ts",
-        "test:personnel-requests-e2e": "playwright test --config=playwright.personnel-requests.config.ts"
+        "test:personnel-requests-e2e": "playwright test --config=playwright.personnel-requests.config.ts",
+        "test:employee-messages-e2e": "playwright test --config=playwright.employee-messages.config.ts"
     },
     "devDependencies": {
         "@axe-core/playwright": "4.13.0",

@@ -22,7 +22,7 @@
  *  - The first call wins: later `startUpdateRegistrar` calls from other bundles
  *    only add their scope to the same instance (shared via a window global).
  */
-import { hasUnsavedFieldEdits, isBusy, onBusyChange, startFieldEditTracking } from './busy';
+import { isUnsafeForAutomaticReload, isUnsafeToRefresh, onBusyChange, startFieldEditTracking } from './busy';
 import { chunkUrlFromPreloadError, decideChunkRecovery, isMissingStatus } from './chunk-recovery';
 
 export interface UpdateReadyInfo {
@@ -350,6 +350,8 @@ function createRegistrar(first: UpdateRegistrarOptions): RegistrarState {
     // check (a return to the app, the network coming back) must try it again.
     let updateFailed = false;
     let updateGeneration = 0;
+    // Safety state the update banner was last drawn with (null: not drawn).
+    let renderedUnsafe: boolean | null = null;
 
     // -- applying ----------------------------------------------------------
 
@@ -363,7 +365,7 @@ function createRegistrar(first: UpdateRegistrarOptions): RegistrarState {
         // Activating a worker can take a moment (up to ACTIVATE_TIMEOUT_MS). If a draft, a
         // queued submission or a call started meanwhile, the page must not be reloaded
         // underneath it: give the reload back (the guard is only for reloads that happen).
-        if (isBusy() || (!manual && hasUnsavedFieldEdits())) {
+        if (manual ? isUnsafeToRefresh() : isUnsafeForAutomaticReload()) {
             unmarkReloadedFor(release);
             renderUpdateBanner();
 
@@ -373,12 +375,18 @@ function createRegistrar(first: UpdateRegistrarOptions): RegistrarState {
     }
 
     function refreshNow(): void {
-        if (isBusy() || pending === null) return;
+        if (pending === null) return;
+        // Click-time recheck: the member may have started typing since the banner last rendered.
+        if (isUnsafeToRefresh()) {
+            renderUpdateBanner();
+
+            return;
+        }
         void applyAndReload(pending, true);
     }
 
     function automaticReloadAllowed(release: string): boolean {
-        return !isBusy() && !hasReloadedFor(release) && canGuardReloads() && !hasUnsavedFieldEdits();
+        return !isUnsafeForAutomaticReload() && !hasReloadedFor(release) && canGuardReloads();
     }
 
     // -- banner state ------------------------------------------------------
@@ -386,10 +394,12 @@ function createRegistrar(first: UpdateRegistrarOptions): RegistrarState {
     function renderUpdateBanner(): void {
         if (pending === null || dismissedFor === pending) {
             removeRow('update');
+            renderedUnsafe = null;
 
             return;
         }
-        const busy = isBusy();
+        const busy = isUnsafeToRefresh();
+        renderedUnsafe = busy;
         const message = pendingReason === 'chunk' ? MESSAGE_CHUNK : busy ? MESSAGE_BUSY : MESSAGE_READY;
         renderRow('update', message, [
             { label: 'Refresh now', primary: true, disabled: busy, onActivate: refreshNow },
@@ -550,7 +560,7 @@ function createRegistrar(first: UpdateRegistrarOptions): RegistrarState {
             latestRelease: latest,
             baselineRelease: baseline,
             chunkMissing,
-            mayReload: !isBusy() && !hasUnsavedFieldEdits() && !hasReloadedFor(target) && canGuardReloads(),
+            mayReload: !isUnsafeForAutomaticReload() && !hasReloadedFor(target) && canGuardReloads(),
         });
 
         if (action === 'offline') {
@@ -613,7 +623,7 @@ function createRegistrar(first: UpdateRegistrarOptions): RegistrarState {
         if (!data || data.type !== 'MBFD_NAVIGATE') return;
 
         const href = sameOriginHref(data.url);
-        const deferred = href !== null && !isCurrentLocation(href) && (isBusy() || hasUnsavedFieldEdits());
+        const deferred = href !== null && !isCurrentLocation(href) && isUnsafeForAutomaticReload();
         // Acknowledge so the worker knows a page owns this click and opens no second window.
         try {
             event.ports?.[0]?.postMessage({ type: 'MBFD_NAVIGATE_ACK', deferred });
@@ -662,6 +672,19 @@ function createRegistrar(first: UpdateRegistrarOptions): RegistrarState {
         evaluate();
         renderNavigationBanner();
     });
+    // Typing (or clearing a field) changes whether a refresh is safe without any busy event:
+    // keep the banner honest. Cheap, and only while an update is waiting.
+    let inputRenderQueued = false;
+    const onFieldInput = (): void => {
+        if (pending === null || inputRenderQueued) return;
+        inputRenderQueued = true;
+        window.requestAnimationFrame(() => {
+            inputRenderQueued = false;
+            if (pending !== null && renderedUnsafe !== null && renderedUnsafe !== isUnsafeToRefresh()) renderUpdateBanner();
+        });
+    };
+    document.addEventListener('input', onFieldInput, true);
+    document.addEventListener('change', onFieldInput, true);
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.addEventListener('message', onWorkerMessage);
         (navigator.serviceWorker as ServiceWorkerContainer & { startMessages?: () => void }).startMessages?.();

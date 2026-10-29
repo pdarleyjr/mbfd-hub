@@ -321,6 +321,132 @@ test('a page with unsaved typed text is treated as busy even if no feature marke
   await expect(page.locator(BANNER)).toBeVisible();
 });
 
+const addUnregisteredTextarea = (page: Page) =>
+  page.evaluate(() => {
+    const field = document.createElement('textarea');
+    field.id = 'e2e-unsaved-field';
+    document.body.appendChild(field);
+  });
+
+test('one safety predicate: "Refresh now" never reloads over typed text that no feature registered', async ({ page }) => {
+  const state: ReleaseState = { served: RELEASE_A, rendered: RELEASE_A };
+  const navigations = trackNavigations(page);
+  await openHome(page, state);
+
+  await addUnregisteredTextarea(page);
+  const field = page.locator('#e2e-unsaved-field');
+  await field.fill('Engine 5 pump test notes');
+
+  state.served = RELEASE_B;
+  await checkNow(page);
+  await expect.poll(() => registrar(page).then((value) => value?.pending)).toBe(RELEASE_B);
+
+  // The manual path used to skip typed fields: the button must now be held back like every other path.
+  const banner = page.locator(BANNER);
+  await expect(banner).toContainText(BUSY_MESSAGE);
+  const refresh = banner.getByRole('button', { name: 'Refresh now' });
+  await expect(refresh).toHaveAttribute('aria-disabled', 'true');
+
+  const before = navigations();
+  await armUnloadProbe(page);
+  await refresh.click({ force: true });
+  await page.waitForTimeout(800);
+  expect(await unloadStarted(page), 'Refresh now must not unload a page holding typed text').toBe(false);
+  expect(navigations()).toBe(before);
+  await expect(field).toHaveValue('Engine 5 pump test notes');
+  await expect(banner).toContainText(BUSY_MESSAGE);
+
+  // The work is gone: the banner re-renders on the member's own edit, with no busy event involved.
+  await field.fill('');
+  await expect(banner.getByRole('button', { name: 'Refresh now' })).not.toHaveAttribute('aria-disabled', 'true');
+  await expect(banner).not.toContainText(BUSY_MESSAGE);
+});
+
+test('typing after the banner was drawn flips it to busy, and a stale click is re-checked at click time', async ({ page }) => {
+  const state: ReleaseState = { served: RELEASE_A, rendered: RELEASE_A };
+  const navigations = trackNavigations(page);
+  await openHome(page, state);
+  await addUnregisteredTextarea(page);
+  const field = page.locator('#e2e-unsaved-field');
+
+  state.served = RELEASE_B;
+  await checkNow(page);
+  const banner = page.locator(BANNER);
+  const refresh = banner.getByRole('button', { name: 'Refresh now' });
+  await expect(banner).toContainText('An update is ready.');
+  await expect(refresh).not.toHaveAttribute('aria-disabled', 'true');
+
+  // Real typing re-renders the banner (capturing input listener), no feature involved.
+  await field.fill('Hydrant 14 flow test');
+  await expect(banner).toContainText(BUSY_MESSAGE);
+  await expect(refresh).toHaveAttribute('aria-disabled', 'true');
+  await field.fill('');
+  await expect(banner).not.toContainText(BUSY_MESSAGE);
+  await expect(refresh).not.toHaveAttribute('aria-disabled', 'true');
+
+  // A value a script fills in (Livewire/Filament hydrating a form) is not work the member typed:
+  // it must not leave "Refresh now" disabled on every admin page.
+  await page.evaluate(() => {
+    const filled = document.createElement('textarea');
+    filled.id = 'e2e-script-filled-field';
+    document.body.appendChild(filled);
+    filled.value = 'Filled by the page, not typed';
+  });
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('mbfd:busy-change')));
+  await expect(banner).not.toContainText(BUSY_MESSAGE);
+  await expect(refresh).not.toHaveAttribute('aria-disabled', 'true');
+
+  // Typing again: the click-time recheck refuses even if the banner was drawn enabled a moment ago.
+  await field.fill('Typed after the banner was drawn');
+  const before = navigations();
+  await armUnloadProbe(page);
+  await refresh.click({ force: true });
+  await page.waitForTimeout(800);
+  expect(await unloadStarted(page), 'the click-time recheck must refuse to reload over typed text').toBe(false);
+  expect(navigations()).toBe(before);
+  await expect(banner).toContainText(BUSY_MESSAGE);
+  await expect(field).toHaveValue('Typed after the banner was drawn');
+});
+
+test('a registered employee-message busy reason disables Refresh now until it is cleared', async ({ page }) => {
+  const state: ReleaseState = { served: RELEASE_A, rendered: RELEASE_A };
+  const navigations = trackNavigations(page);
+  await openHome(page, state);
+
+  state.served = RELEASE_B;
+  await checkNow(page);
+  const banner = page.locator(BANNER);
+  const refresh = banner.getByRole('button', { name: 'Refresh now' });
+  await expect(refresh).not.toHaveAttribute('aria-disabled', 'true');
+
+  const reason = 'employee-message:test';
+  const toggle = (on: boolean) =>
+    page.evaluate(
+      ({ on: enabled, reason: value }) => {
+        const target = window as unknown as { __mbfdBusy?: Set<string> };
+        target.__mbfdBusy ??= new Set<string>();
+        if (enabled) target.__mbfdBusy.add(value);
+        else target.__mbfdBusy.delete(value);
+        window.dispatchEvent(new CustomEvent('mbfd:busy-change'));
+      },
+      { on, reason },
+    );
+
+  await toggle(true);
+  await expect(refresh).toHaveAttribute('aria-disabled', 'true');
+  await expect(banner).toContainText(BUSY_MESSAGE);
+
+  const before = navigations();
+  await armUnloadProbe(page);
+  await refresh.click({ force: true });
+  await page.waitForTimeout(500);
+  expect(await unloadStarted(page), 'an in-flight employee message holds the refresh back').toBe(false);
+  expect(navigations()).toBe(before);
+
+  await toggle(false);
+  await expect(banner.getByRole('button', { name: 'Refresh now' })).not.toHaveAttribute('aria-disabled', 'true');
+});
+
 // ---------------------------------------------------------------------------
 // M5: edits the DOM comparison cannot see
 // ---------------------------------------------------------------------------

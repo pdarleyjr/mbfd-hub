@@ -130,6 +130,13 @@
                         <x-heroicon-o-truck class="hub-btn__icon" aria-hidden="true" />
                         Vehicle Checkout
                     </a>
+                    {{-- Same audience as the Employee Portal, narrowed to accounts My Messages will open for (no dead button). --}}
+                    @if(app(\App\Services\Security\EmployeeLogisticsMessagingAccess::class)->canUseMemberInbox($currentUser))
+                        <a href="{{ url('/employee/messages?compose=1') }}" data-important-target data-home-message-logistics class="hub-btn hub-btn--secondary hub-btn--field">
+                            <x-heroicon-o-chat-bubble-bottom-center-text class="hub-btn__icon" aria-hidden="true" />
+                            Message Logistics
+                        </a>
+                    @endif
                 </div>
             @endif
         </section>
