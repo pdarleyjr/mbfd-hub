@@ -25,9 +25,11 @@ const expires = Date.parse('2026-11-12T00:00:00Z');
 // PWA test runners). No dependency, version or lock change; package-lock.json is byte-identical.
 // 2026-10-24: re-pinned for undici GHSA-xjj6-f33q-929c (testcontainers>undici 6.29.1,
 // miniflare>undici 7.30.1; dev tooling only). Tailwind 3 / braces graph unchanged.
+// 2026-10-29: root package.json re-pinned for two npm script changes (test:employee-messages-e2e added;
+// test:pwa-worker-core also runs pwa-refresh-safety). No dependency, version or lock change.
 const inputs = {
     '.': {
-        'package.json': 'ea20b8a1de13043d13f0ea5c880e090b8feac8b48d57144cd2a715267412abbe',
+        'package.json': '7f0109fa7099540d9fc0b3c8994509c76aaa8b1e9124de5c7d18f20de8524d5e',
         'package-lock.json': 'd2716fe1c072e7aff6741ea5f738a3d2760a19e7230f94871e6a2312924a0010',
     },
     'resources/js/daily-checkout': {
