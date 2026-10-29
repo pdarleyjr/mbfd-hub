@@ -34,7 +34,7 @@ jobs:
       - name: Start CPU load
         if: ${{ matrix.mode == 'loaded' }}
         run: |
-          for i in 1 2 3 4; do (while :; do :; done) & done
+          for _ in 1 2 3 4; do (while :; do :; done) & done
           echo "nproc=$(nproc)"
       - name: Repeat the SW upgrade spec
         run: npx playwright test --config=playwright.tmp-sw.config.ts --repeat-each=60 --workers=1

@@ -690,10 +690,6 @@ jobs:
           read -r -a browsers <<< "$PLAYWRIGHT_BROWSERS"
           test "${#browsers[@]}" -gt 0
           npx playwright install --with-deps "${browsers[@]}"
-      - name: Report runner capacity
-        run: |
-          echo "vCPU: $(nproc)"
-          free -m | sed -n '1,2p'
       - name: Verify individual Morning Lineup lobby
         if: ${{ matrix.lane == 'checkout-captain-and-displays' }}
         run: npx playwright test --config=playwright.member-lineup.config.ts
