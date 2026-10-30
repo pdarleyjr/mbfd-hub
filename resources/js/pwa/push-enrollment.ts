@@ -19,6 +19,8 @@
  * The pure helpers are exported for tests; the DOM wiring only runs where the block exists.
  */
 
+import { describeTestResult } from './test-push-result.ts';
+
 export type PermissionState = 'default' | 'granted' | 'denied' | 'unsupported';
 
 export interface DeviceEnvironment {
@@ -592,24 +594,9 @@ class EnrollmentBlock {
             const subscriptions = await this.allSubscriptions(readEnvironment(window));
             const subscription = classifySubscriptions(subscriptions, this.serverKey()).usable[0] ?? subscriptions[0] ?? null;
             const response = await api('POST', '/api/push/test', subscription === null ? {} : { endpoint: subscription.endpoint });
-            if (response.status === 429) {
-                this.say('Please wait a minute before sending another test.');
-
-                return;
-            }
-            if (!response.ok) {
-                this.say('The test could not be sent. Turn alerts off and on again on this device.');
-
-                return;
-            }
-            const result = (await response.json()) as { devices?: Array<{ accepted: boolean; failure: string | null }> };
-            const device = result.devices?.[0];
-            this.say(
-                device?.failure
-                    ? 'The push service did not accept the test. It will retry automatically; in-app alerts still arrive.'
-                    : 'Test sent. It should appear in a few seconds.',
-            );
-            notifyPage();
+            // What the push service said, per device; never "delivered" (see ./test-push-result.ts).
+            this.say(describeTestResult(response.status, response.ok ? await response.json().catch(() => null) : null));
+            if (response.ok) notifyPage();
         } catch {
             this.say('The test could not be sent. Check your connection and try again.');
         } finally {

@@ -356,7 +356,13 @@ function pushNotificationWidget() {
                 });
                 
                 if (data?.success) {
-                    alert('Test notification sent! Check your device for the notification.');
+                    // Only the push service's answer is known here, never whether the phone showed it.
+                    const summaries = Array.isArray(data.devices)
+                        ? data.devices.map(device => device?.summary).filter(summary => typeof summary === 'string' && summary !== '')
+                        : [];
+                    alert(summaries.length > 0
+                        ? summaries.join('\n')
+                        : 'Test handed to the push service. Check this device to see whether it appeared.');
                     console.log('[PushWidget] Test notification sent successfully');
                 } else {
                     alert('Error: ' + (data?.error || data?.message || 'Failed to send test notification'));
