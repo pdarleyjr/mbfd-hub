@@ -57,11 +57,12 @@ final class EmployeeLogisticsMessagingService
 
     // ---------------------------------------------------------------- member side
 
-    public function startThread(User $member, string $body, ?string $subject, string $clientRequestId): EmployeeLogisticsMessage
+    public function startThread(User $member, string $body, ?string $subject, string $clientRequestId, ?string $reason = null): EmployeeLogisticsMessage
     {
         $employee = $this->requireMember($member);
         $body = $this->normalizeBody($body);
         $subject = $this->normalizeSubject($subject);
+        $reason = $this->normalizeReason($reason);
         $clientRequestId = $this->normalizeRequestId($clientRequestId);
 
         $existing = $this->existing($member, $clientRequestId);
@@ -71,9 +72,9 @@ final class EmployeeLogisticsMessagingService
         $this->throttle($member, self::MEMBER_SENDS_PER_MINUTE);
 
         try {
-            return DB::transaction(function () use ($member, $employee, $body, $subject, $clientRequestId): EmployeeLogisticsMessage {
+            return DB::transaction(function () use ($member, $employee, $body, $subject, $reason, $clientRequestId): EmployeeLogisticsMessage {
                 $thread = new EmployeeLogisticsThread;
-                $thread->forceFill(['member_user_id' => $member->getKey(), 'subject' => $subject, 'message_count' => 0]);
+                $thread->forceFill(['member_user_id' => $member->getKey(), 'subject' => $subject, 'reason' => $reason, 'message_count' => 0]);
                 $this->snapshotMember($thread, $member, $employee);
                 $thread->save();
 
@@ -187,10 +188,14 @@ final class EmployeeLogisticsMessagingService
      *
      * @return array{threads: Collection<int, EmployeeLogisticsThread>, hasMore: bool}
      */
-    public function logisticsThreads(User $viewer, string $filter = self::FILTER_ALL, ?string $search = null, int $limit = self::THREAD_PAGE_SIZE): array
+    public function logisticsThreads(User $viewer, string $filter = self::FILTER_ALL, ?string $search = null, int $limit = self::THREAD_PAGE_SIZE, ?string $reason = null): array
     {
         $this->requireLogisticsViewer($viewer);
         $query = EmployeeLogisticsThread::query();
+
+        if (EmployeeMessageReason::isValid($reason)) {
+            $query->where('reason', $reason);
+        }
 
         if ($filter === self::FILTER_UNREAD) {
             $query->unreadForLogistics();
@@ -201,7 +206,11 @@ final class EmployeeLogisticsMessagingService
         $term = $this->searchTerm($search);
         if ($term !== null) {
             $like = '%'.$term.'%';
-            $query->where(function (Builder $q) use ($like): void {
+            $reasonKeys = EmployeeMessageReason::keysMatching(mb_strtolower(trim((string) $search)));
+            $query->where(function (Builder $q) use ($like, $reasonKeys): void {
+                if ($reasonKeys !== []) {
+                    $q->orWhereIn('reason', $reasonKeys);
+                }
                 foreach (['member_name', 'member_employee_number', 'member_station', 'subject', 'last_message_preview'] as $column) {
                     $q->orWhereRaw('LOWER('.$column.") LIKE ? ESCAPE '!'", [$like]);
                 }
@@ -219,6 +228,16 @@ final class EmployeeLogisticsMessagingService
         $this->requireLogisticsViewer($viewer);
 
         return EmployeeLogisticsThread::query()->whereKey($threadId)->firstOrFail();
+    }
+
+    /** Conversations whose newest message is the member's: the team still owes a reply. */
+    public function logisticsAwaitingCount(User $viewer): int
+    {
+        if (! $this->access->canViewLogisticsInbox($viewer)) {
+            return 0;
+        }
+
+        return EmployeeLogisticsThread::query()->where('last_message_side', EmployeeLogisticsMessage::SIDE_MEMBER)->count();
     }
 
     public function logisticsUnreadCount(User $viewer): int
@@ -380,6 +399,19 @@ final class EmployeeLogisticsMessagingService
         return $subject;
     }
 
+    private function normalizeReason(?string $reason): ?string
+    {
+        $reason = $reason === null ? null : trim($reason);
+        if ($reason === null || $reason === '') {
+            return null;
+        }
+        if (! EmployeeMessageReason::isValid($reason)) {
+            throw ValidationException::withMessages(['reason' => 'Choose one of the reasons in the list.']);
+        }
+
+        return $reason;
+    }
+
     private function normalizeRequestId(string $clientRequestId): string
     {
         $clientRequestId = trim($clientRequestId);
@@ -460,7 +492,7 @@ final class EmployeeLogisticsMessagingService
             }
         }
 
-        return 'Logistics';
+        return 'Support Services';
     }
 
     private function trimmed(mixed $value, int $max): ?string

@@ -38,7 +38,10 @@
         <div class="emsg-panel" wire:poll.30s.visible="poll" aria-labelledby="emsg-widget-title">
             <header class="emsg-panel__header">
                 <div class="flex flex-wrap items-center gap-2">
-                    <h2 id="emsg-widget-title" class="emsg-panel__title">Employee Messages</h2>
+                    <h2 id="emsg-widget-title" class="emsg-panel__title">Support Services Messages</h2>
+                    @if ($awaiting > 0)
+                        <span class="emsg-status emsg-status--attention" data-emsg-awaiting>{{ $awaiting }} awaiting reply</span>
+                    @endif
                     @if ($unread > 0)
                         <span class="emsg-unread-dot">{{ $unread }} unread</span>
                     @endif
@@ -49,12 +52,12 @@
             @if ($threads->isEmpty())
                 <div class="emsg-empty">
                     <x-filament::icon icon="heroicon-o-chat-bubble-bottom-center-text" class="emsg-empty__icon" />
-                    <p class="emsg-subtle mt-2">No employee messages yet. Messages members send from the Employee Portal appear here.</p>
+                    <p class="emsg-subtle mt-2">No Support Services messages yet. When a member sends one, such as a bunker gear cleaning request, it appears here with a Reply button.</p>
                 </div>
             @else
                 <ul
                     class="emsg-list"
-                    aria-label="Latest employee conversations"
+                    aria-label="Latest Support Services conversations"
                     x-data
                     x-on:click.capture="if ($event.target.closest('[data-emsg-row]')) window.mbfdEmployeeMessagesConfirmLeave($event)"
                 >
@@ -66,6 +69,7 @@
                             $rowDetails = $details($row);
                         @endphp
                         <li class="emsg-list__item" wire:key="emsg-widget-row-{{ $row->id }}">
+                            <div class="emsg-row-wrap">
                             <button
                                 type="button"
                                 data-emsg-row
@@ -75,28 +79,16 @@
                                 aria-controls="emsg-widget-conversation-{{ $row->id }}"
                                 aria-current="{{ $isOpen ? 'true' : 'false' }}"
                             >
-                                <span class="emsg-avatar" aria-hidden="true">{{ $initials($row->member_name) }}</span>
-                                <span class="emsg-row__main">
-                                    <span class="emsg-row__title">{{ $row->member_name }}</span>
-                                    @if ($rowDetails !== '')
-                                        <span class="emsg-row__sub">{{ $rowDetails }}</span>
-                                    @endif
-                                    @if (filled($row->last_message_preview))
-                                        <span class="emsg-row__preview">{{ $row->last_message_preview }}</span>
-                                    @endif
-                                    @if ($rowAwaiting)
-                                        <span class="emsg-tag mt-1">Awaiting reply</span>
-                                    @endif
-                                </span>
-                                <span class="emsg-row__aside">
-                                    @if ($row->last_message_at)
-                                        <time datetime="{{ $row->last_message_at->copy()->timezone($zone)->toIso8601String() }}" title="{{ $row->last_message_at->copy()->timezone($zone)->format('l, F j, Y g:i A') }}">{{ $when($row->last_message_at) }}</time>
-                                    @endif
-                                    @if ($rowUnread)
-                                        <span class="emsg-unread-dot">Unread</span>
-                                    @endif
-                                </span>
+                                <x-employee-messages.admin-row :row="$row" :initials="$initials($row->member_name)" :details="$rowDetails" :when="$when($row->last_message_at)" />
                             </button>
+                            <a
+                                data-emsg-row
+                                data-emsg-open-link
+                                class="emsg-row-action"
+                                href="{{ \App\Filament\Admin\Pages\EmployeeMessages::getUrl(['thread' => $row->id]) }}"
+                                aria-label="{{ $canReply ? 'Reply' : 'View' }} - {{ $row->member_name }}: {{ $row->title() }}"
+                            >{{ $canReply ? 'Reply' : 'View' }}</a>
+                            </div>
 
                             @if ($isOpen)
                                 <div id="emsg-widget-conversation-{{ $row->id }}" class="border-t border-gray-100">
@@ -136,12 +128,12 @@
                                         />
                                     @else
                                         <div class="emsg-composer">
-                                            <p class="emsg-subtle">You can read employee messages but not reply.</p>
+                                            <p class="emsg-subtle">You can read Support Services messages but not reply.</p>
                                         </div>
                                     @endif
 
                                     <div class="emsg-more">
-                                        <a class="emsg-link-button" href="{{ \App\Filament\Admin\Pages\EmployeeMessages::getUrl(['thread' => $row->id]) }}">Open in Employee Messages</a>
+                                        <a class="emsg-link-button" href="{{ \App\Filament\Admin\Pages\EmployeeMessages::getUrl(['thread' => $row->id]) }}">Open in Support Services Messages</a>
                                     </div>
                                 </div>
                             @endif

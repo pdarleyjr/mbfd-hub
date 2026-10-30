@@ -67,6 +67,21 @@ class ViewInspection extends ViewRecord
         return 'Inspection '.($inspection->inspection_reference ?: '#'.$inspection->getKey());
     }
 
+    /**
+     * A stable trail that does not depend on browser history: Admin > Daily Checkouts > this
+     * inspection. A direct link or a refresh shows the same trail as a click from the dashboard.
+     *
+     * @return array<int|string, string>
+     */
+    public function getBreadcrumbs(): array
+    {
+        return [
+            '/admin' => 'Admin',
+            InspectionResource::getUrl('index') => InspectionResource::getNavigationLabel(),
+            (string) $this->getTitle(),
+        ];
+    }
+
     public function getHeading(): string|Htmlable
     {
         $inspection = $this->inspection();

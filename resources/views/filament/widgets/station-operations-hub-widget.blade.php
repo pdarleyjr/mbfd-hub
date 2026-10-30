@@ -1,6 +1,8 @@
 <x-filament-widgets::widget>
     @php
         $formatType = static fn (string $type): string => str($type)->replace('_', ' ')->headline()->toString();
+        // Records opened from this board remember it (validated return_to), so Back says "Back to Admin" even after a refresh or a direct link.
+        $fromBoard = static fn (string $url): string => \App\Support\HubNavigation::withReturnTo($url, '/admin');
         $lastUpdatedLabel = filled($lastUpdated)
             ? \Illuminate\Support\Carbon::parse($lastUpdated)->timezone($operationalWindow['timezone'])->format('g:i:s A')
             : 'Waiting for first refresh';
@@ -89,7 +91,7 @@
                         </header>
                         <div class="hub-insp-queue__list" tabindex="0" aria-label="{{ $group['title'] }}">
                             @forelse($queue['rows'] as $record)
-                                <a class="hub-insp-queue__row" href="{{ $record['url'] }}">
+                                <a class="hub-insp-queue__row" href="{{ $fromBoard($record['url']) }}">
                                     <strong>{{ $record['label'] }}</strong>
                                     <small>{{ $record['status'] }}@if($record['timeLabel']) · <time datetime="{{ $record['timestamp'] }}">{{ $record['timeLabel'] }}</time>@endif</small>
                                 </a>
@@ -121,7 +123,7 @@
                     </header>
                     <div class="hub-insp-queue__list" tabindex="0" aria-label="Daily Checkout notes and messages">
                         @forelse($notes['rows'] as $note)
-                            <a @class(['hub-insp-queue__row', 'hub-insp-notefeed', 'hub-insp-notefeed--closed' => ! $note['open']]) href="{{ $note['url'] }}" data-note-kind="{{ $note['kind'] }}">
+                            <a @class(['hub-insp-queue__row', 'hub-insp-notefeed', 'hub-insp-notefeed--closed' => ! $note['open']]) href="{{ $fromBoard($note['url']) }}" data-note-kind="{{ $note['kind'] }}">
                                 <span class="hub-insp-notefeed__head">
                                     <strong>{{ $note['subject'] }}</strong>
                                     <span @class(['hub-insp-notefeed__kind', 'hub-insp-notefeed__kind--internal' => $note['kind'] === 'internal'])>{{ $note['kindLabel'] }}</span>
@@ -146,7 +148,7 @@
                 </header>
                 <div class="mbfd-command-record-list" tabindex="0" aria-label="All truck checkout records for the operational day">
                     @forelse($department['checkouts'] as $record)
-                        <a class="mbfd-command-record" href="{{ $record['url'] }}">
+                        <a class="mbfd-command-record" href="{{ $fromBoard($record['url']) }}">
                             <span><strong>{{ $record['label'] }}</strong><small>{{ $record['status'] }}</small></span>
                             <time datetime="{{ $record['timestamp'] }}">{{ $record['timeLabel'] }}</time>
                         </a>
@@ -163,7 +165,7 @@
                 </header>
                 <div class="mbfd-command-record-list" tabindex="0" aria-label="All unresolved department attention items">
                     @forelse($department['attention'] as $record)
-                        <a class="mbfd-command-record" data-tone="{{ $record['tone'] }}" href="{{ $record['url'] }}">
+                        <a class="mbfd-command-record" data-tone="{{ $record['tone'] }}" href="{{ $fromBoard($record['url']) }}">
                             <span><strong>{{ $record['label'] }}</strong><small>{{ $formatType($record['type']) }} · {{ $record['status'] }}</small></span>
                             @if($record['timeLabel'])
                                 <time datetime="{{ $record['timestamp'] }}">{{ $record['timeLabel'] }}</time>
@@ -191,7 +193,7 @@
                 </p>
                 <div class="mbfd-command-record-list mbfd-command-record-list-compact" tabindex="0" aria-label="Preventive maintenance attention items">
                     @forelse($department['pm']['records'] as $record)
-                        <a class="mbfd-command-record" data-tone="{{ $record['tone'] }}" href="{{ $record['url'] }}">
+                        <a class="mbfd-command-record" data-tone="{{ $record['tone'] }}" href="{{ $fromBoard($record['url']) }}">
                             <span><strong>{{ $record['label'] }}</strong><small>{{ $record['status'] }}</small></span>
                         </a>
                     @empty
@@ -261,7 +263,7 @@
                                 <header><h3>Assigned Apparatus</h3><a href="{{ $data['stationUrl'] }}">Full Station Profile</a></header>
                                 <div class="mbfd-command-detail-list">
                                     @forelse($apparatus['records'] ?? [] as $record)
-                                        <a href="{{ $record['url'] }}" data-tone="{{ $record['tone'] }}"><strong>{{ $record['label'] }}</strong><span>{{ $record['status'] }}</span></a>
+                                        <a href="{{ $fromBoard($record['url']) }}" data-tone="{{ $record['tone'] }}"><strong>{{ $record['label'] }}</strong><span>{{ $record['status'] }}</span></a>
                                     @empty
                                         <p class="mbfd-command-empty">No apparatus assigned.</p>
                                     @endforelse
@@ -272,7 +274,7 @@
                                 <header><h3>Open Exceptions</h3><span>{{ count($exceptions) }}</span></header>
                                 <div class="mbfd-command-detail-list">
                                     @forelse($exceptions as $record)
-                                        <a href="{{ $record['url'] }}" data-tone="{{ $record['tone'] }}">
+                                        <a href="{{ $fromBoard($record['url']) }}" data-tone="{{ $record['tone'] }}">
                                             <span><strong>{{ $record['label'] }}</strong><small>{{ $formatType($record['type']) }}</small></span><span>{{ $record['status'] }}</span>
                                         </a>
                                     @empty
@@ -285,7 +287,7 @@
                                 <header><h3>Operational-Day Activity</h3><span>{{ count($activity) }}</span></header>
                                 <div class="mbfd-command-detail-list">
                                     @forelse($activity as $record)
-                                        <a href="{{ $record['url'] }}" data-tone="{{ $record['tone'] }}">
+                                        <a href="{{ $fromBoard($record['url']) }}" data-tone="{{ $record['tone'] }}">
                                             <span><strong>{{ $record['label'] }}</strong><small>{{ $formatType($record['type']) }} · {{ $record['status'] }}</small></span><time datetime="{{ $record['timestamp'] }}">{{ $record['timeLabel'] }}</time>
                                         </a>
                                     @empty

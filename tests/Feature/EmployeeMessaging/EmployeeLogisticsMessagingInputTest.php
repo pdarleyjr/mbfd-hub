@@ -206,7 +206,7 @@ final class EmployeeLogisticsMessagingInputTest extends TestCase
         $thread = $this->storedThread($this->service()->startThread($this->messagingMember(), 'Body', $subject, $this->rid()));
 
         $this->assertNull($thread->subject);
-        $this->assertSame('Message to Logistics', $thread->title());
+        $this->assertSame('Message to Support Services', $thread->title());
     }
 
     /** @return array<string, array{0: ?string}> */

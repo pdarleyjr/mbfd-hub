@@ -1,9 +1,11 @@
-# Employee ↔ Logistics Messaging
+# Message Support Services (formerly Employee ↔ Logistics Messaging)
+
+> **Naming (2026-10-30):** everything members and admins read is now **Support Services** (home button *Message Support Services*, *Support Services Messages* inbox and admin-home card). URLs, table names, the persisted `logistics` author side and the `logistics_admin` role are unchanged so links, history and permissions keep working.
 
 **Status:** implemented on `feat/employee-logistics-messaging-20261029` (base `main` 3b93e4db).
 **Release lane:** Amber (new draft-bearing form; additive schema; no auth, worker or manifest change).
 
-A private, in-Hub way for a member to message the Logistics team and for authorized Logistics
+A private, in-Hub way for a member to message Support Services and for authorized
 administrators to read and reply. It is **not** email, a chat room, a support ticket or an
 inspection-issue thread, and it shares no table, route, permission or inbox with any of them
 (Inbound/Outbound/Compose Email, 300 Command Communications, Hub Support Tickets, Daily Checkout
@@ -13,10 +15,10 @@ issue messages, personnel/station/uniform/EMS requests).
 
 | Where | What | URL |
 |---|---|---|
-| Home (`/`) | **Message Logistics** button beside **Vehicle Checkout** (same `$showEmployeePortal` rule) | links to `/employee/messages?compose=1` |
+| Home (`/`) | **Message Support Services** button beside **Vehicle Checkout** (same `$showEmployeePortal` rule) | links to `/employee/messages?compose=1` |
 | Employee Portal | **My Messages** page, nav group *My work* (sort 5); dashboard card | `/employee/messages`, `?compose=1`, `?thread={id}` |
-| Admin Panel | **Employee Messages** inbox, nav group *Communications* (sort 35), unread badge | `/admin/employee-messages`, `?thread={id}` |
-| Logistics Dashboard | **Employee Messages** card, full width, after the Station Operations board; hidden in `?display=1` | `/admin` |
+| Admin Panel | **Support Services Messages** inbox, nav group *Communications* (sort 35), unread badge, reason filter | `/admin/employee-messages`, `?thread={id}` |
+| Admin home (`/admin`) | **Support Services Messages** card, full width, after the Station Operations board: awaiting-reply and unread counts, latest five conversations (sender, subject, reason, time, status), a **Reply** (or **View**, for read-only admins) button that deep-links to `/admin/employee-messages?thread={id}`; hidden in `?display=1` | `/admin` |
 
 ## 2. Data (`2026_10_29_120000_create_employee_logistics_messaging_tables`)
 
@@ -46,8 +48,8 @@ Code rollback never removes conversations; never restore an older database to "u
 
 * The migration **creates** the two permissions and grants them to nobody (deploy gate: no role or
   permission change on established accounts). Additional responders are granted in the Admin
-  capability editor (audited, password-confirmed): *Employee messages — view the Logistics inbox* /
-  *Employee messages — view and reply as Logistics*.
+  capability editor (audited, password-confirmed): *Support Services messages — view the inbox* /
+  *Support Services messages — view and reply*.
 * Every service method re-checks access with the signed-in actor. Member reads are scoped to
   `member_user_id = actor`; a thread outside scope is *not found*. Browser input never supplies
   owner, author or side.
@@ -105,3 +107,15 @@ deploy smoke now also checks `/app-release` (no-store) and every current/legacy 
   (`daily-authenticated-lifecycles`) next to `test:pwa-update-e2e` and `test:daily-pwa-upgrade-e2e`.
 * A reply names the conversation its box was drawn for; if the page switched conversations while it
   was being sent, the server refuses it ("Your message was not sent and is still here").
+
+## 8. Reasons (2026-10-30)
+
+A member picks a **Reason** when starting a conversation (default *General question*): General question, Equipment, Uniforms, Supplies, **Bunker gear cleaning request**. The catalog is `App\Services\EmployeeMessaging\EmployeeMessageReason`; keys are persisted in `employee_logistics_threads.reason` (nullable, added by `2026_10_30_100000`; older conversations stay null and read as before). The service validates the key (unknown keys are refused), the inbox filters on it, search also matches the reason label, and a conversation without a subject is titled by its reason. A reason is a field on the conversation, not a ticket: there is no separate queue, status workflow or table.
+
+## 9. Visual contract
+
+The stylesheet is `resources/css/filament/employee-messages.css`. Hub colour tokens (`--hub2-*`) are RGB channel triplets and **must** be written `rgb(var(--hub2-...))`. The first release wrote `var(--hub2-x, #fallback)`, which is an invalid colour, so panels, bubbles and fields rendered transparent (white on white). Surfaces: white card, gray reading well, gray bubbles and fields with a visible border; sent bubbles use the blue tint.
+
+## 10. Notifications
+
+This module sends no push, email or database notification of its own. Its in-app signals are the member's *My Messages* badge and dashboard card, and the administrators' navigation badge, admin-home card counts and per-row *Unread* / *Awaiting reply* status. Adding push is a separate change that must go through the existing notification category registry (and the Notification Settings page), not a new path.

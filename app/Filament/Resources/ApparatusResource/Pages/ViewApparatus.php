@@ -11,6 +11,21 @@ class ViewApparatus extends ViewRecord
 {
     protected static string $resource = ApparatusResource::class;
 
+    /**
+     * Admin > Fire Apparatus > this unit, the same trail whether reached from the dashboard,
+     * a direct link or a refresh.
+     *
+     * @return array<int|string, string>
+     */
+    public function getBreadcrumbs(): array
+    {
+        return [
+            '/admin' => 'Admin',
+            ApparatusResource::getUrl('index') => ApparatusResource::getPluralModelLabel(),
+            (string) $this->getRecordTitle(),
+        ];
+    }
+
     public function hasCombinedRelationManagerTabsWithContent(): bool
     {
         return true;

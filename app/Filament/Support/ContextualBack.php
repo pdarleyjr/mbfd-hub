@@ -31,7 +31,7 @@ final class ContextualBack
             // The canonical inspection page is reached from the apparatus profile, a station, the
             // dashboard or the Daily Checkouts list; HubNavigation returns to whichever one the user came from.
             if ($component instanceof \App\Filament\Resources\InspectionResource\Pages\ViewInspection) {
-                $label = 'Back to inspections';
+                $label = 'Back to Daily Checkouts';
             }
         } else {
             $parentPage = match ($page) {
@@ -48,7 +48,13 @@ final class ContextualBack
         }
 
         $url = HubNavigation::backUrl($parent);
+        $path = parse_url($url, PHP_URL_PATH);
 
-        return ['url' => $url, 'label' => parse_url($url, PHP_URL_PATH) === parse_url($parent, PHP_URL_PATH) ? $label : 'Back to previous page'];
+        // A detail opened from the admin dashboard carries return_to=/admin: say so, rather than the generic label.
+        return ['url' => $url, 'label' => match (true) {
+            $path === parse_url($parent, PHP_URL_PATH) => $label,
+            $path === '/admin' => 'Back to Admin',
+            default => 'Back to previous page',
+        }];
     }
 }

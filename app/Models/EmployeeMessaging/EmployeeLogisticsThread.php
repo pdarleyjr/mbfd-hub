@@ -6,6 +6,7 @@ namespace App\Models\EmployeeMessaging;
 
 use App\Models\Employee;
 use App\Models\User;
+use App\Services\EmployeeMessaging\EmployeeMessageReason;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -26,6 +27,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $member_rank
  * @property string|null $member_station
  * @property string|null $subject
+ * @property string|null $reason one of EmployeeMessageReason (null for conversations started before reasons existed)
  * @property string|null $last_message_preview
  * @property string|null $last_message_side
  * @property \Illuminate\Support\Carbon|null $last_message_at
@@ -85,12 +87,35 @@ class EmployeeLogisticsThread extends Model
             && $this->last_member_message_id > (int) $this->logistics_read_message_id;
     }
 
-    /** Short label for lists: the subject, else the start of the newest message. */
+    /** Short label for lists: the subject, else the reason, else a plain default. */
     public function title(): string
     {
         $subject = trim((string) $this->subject);
+        if ($subject !== '') {
+            return $subject;
+        }
 
-        return $subject !== '' ? $subject : 'Message to Logistics';
+        return EmployeeMessageReason::label($this->reason) ?? 'Message to Support Services';
+    }
+
+    /** The reason label to show as a tag; null for older conversations and the default "General question". */
+    public function reasonTag(): ?string
+    {
+        return $this->reason === EmployeeMessageReason::GENERAL ? null : EmployeeMessageReason::label($this->reason);
+    }
+
+    /** Whether the team still owes the member a reply (unread-ness is separate: see isUnreadForLogistics). */
+    public function supportStatus(): string
+    {
+        return $this->last_message_side === EmployeeLogisticsMessage::SIDE_MEMBER ? 'Awaiting reply' : 'Replied';
+    }
+
+    /** What the member sees as the state of their request. */
+    public function memberStatus(): string
+    {
+        return $this->last_message_side === EmployeeLogisticsMessage::SIDE_LOGISTICS
+            ? ($this->isUnreadForMember() ? 'New reply' : 'Replied')
+            : 'Sent, awaiting reply';
     }
 
     /** @param Builder<self> $query */

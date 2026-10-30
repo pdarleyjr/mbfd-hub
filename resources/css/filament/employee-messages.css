@@ -1,8 +1,15 @@
 /*
- * Employee <-> Logistics messaging (docs/employee-logistics-messaging.md).
- * Shared by the Employee Portal page, the Admin inbox and the Logistics Dashboard card.
- * Light mode only (dark mode is disabled in every panel). No @apply (iOS Safari); every
- * selector is prefixed with .emsg-.
+ * Support Services messaging (docs/employee-logistics-messaging.md).
+ * Shared by the Employee Portal page, the Admin inbox and the admin home card.
+ * No @apply (iOS Safari); every selector is prefixed with .emsg-.
+ *
+ * Colour tokens (--hub2-*) are space-separated RGB channels, so every use MUST be wrapped as
+ * rgb(var(--hub2-...)). The first release used var(--hub2-x, #fallback), which resolves to an
+ * invalid colour and left cards, bubbles and fields transparent (white on white). Do not
+ * reintroduce that form.
+ *
+ * Surfaces: white card (panel) > soft gray reading well (thread) > gray bubbles / gray fields
+ * with a visible border. Text is always --hub2-n-900 on those, never inherited.
  */
 
 .emsg-layout {
@@ -20,10 +27,11 @@
 
 .emsg-panel {
     min-width: 0;
-    background: var(--hub2-n-0, #fff);
-    border: 1px solid var(--hub2-n-200, #e5e7eb);
-    border-radius: var(--hub2-radius-lg, 12px);
-    box-shadow: var(--hub2-elevation-1, 0 1px 2px rgba(15, 23, 42, .06));
+    color: rgb(var(--hub2-n-900));
+    background: rgb(var(--hub2-n-0));
+    border: 1px solid rgb(var(--hub2-n-400) / .55);
+    border-radius: var(--hub-radius-card, 12px);
+    box-shadow: 0 1px 2px rgb(15 23 42 / .08);
 }
 
 .emsg-panel__header {
@@ -33,14 +41,16 @@
     justify-content: space-between;
     gap: 8px 12px;
     padding: 14px 16px;
-    border-bottom: 1px solid var(--hub2-n-200, #e5e7eb);
+    background: rgb(var(--hub2-n-50));
+    border-bottom: 1px solid rgb(var(--hub2-n-400) / .45);
+    border-radius: var(--hub-radius-card, 12px) var(--hub-radius-card, 12px) 0 0;
 }
 
 .emsg-panel__title {
     margin: 0;
     font-size: 15px;
     font-weight: 700;
-    color: var(--hub2-n-900, #111827);
+    color: rgb(var(--hub2-n-900));
 }
 
 .emsg-panel__body {
@@ -50,7 +60,12 @@
 .emsg-subtle {
     margin: 0;
     font-size: 13px;
-    color: var(--hub2-n-600, #4b5563);
+    color: rgb(var(--hub2-n-600));
+}
+
+.emsg-strong {
+    font-weight: 700;
+    color: rgb(var(--hub2-n-900));
 }
 
 /* ---------------------------------------------------------------- list */
@@ -60,7 +75,7 @@
     flex-wrap: wrap;
     gap: 8px;
     padding: 12px 16px;
-    border-bottom: 1px solid var(--hub2-n-200, #e5e7eb);
+    border-bottom: 1px solid rgb(var(--hub2-n-400) / .45);
 }
 
 .emsg-search {
@@ -69,9 +84,24 @@
     min-height: 44px;
     padding: 0 12px;
     font-size: 14px;
-    border: 1px solid var(--hub2-n-200, #d1d5db);
-    border-radius: var(--hub2-radius-md, 8px);
-    background: var(--hub2-n-0, #fff);
+    color: rgb(var(--hub2-n-900));
+    background: rgb(var(--hub2-n-50));
+    border: 1px solid rgb(var(--hub2-n-400));
+    border-radius: var(--hub-radius-control, 8px);
+}
+
+.emsg-search::placeholder,
+.emsg-input::placeholder,
+.emsg-textarea::placeholder {
+    color: rgb(var(--hub2-n-500));
+    opacity: 1;
+}
+
+.emsg-search:focus,
+.emsg-input:focus,
+.emsg-textarea:focus {
+    background: rgb(var(--hub2-n-0));
+    border-color: rgb(var(--hub2-focus));
 }
 
 .emsg-filters {
@@ -85,17 +115,21 @@
     padding: 0 12px;
     font-size: 13px;
     font-weight: 600;
-    color: var(--hub2-n-600, #4b5563);
-    background: transparent;
-    border: 1px solid var(--hub2-n-200, #e5e7eb);
-    border-radius: var(--hub2-radius-md, 8px);
+    color: rgb(var(--hub2-n-800));
+    background: rgb(var(--hub2-n-50));
+    border: 1px solid rgb(var(--hub2-n-400));
+    border-radius: var(--hub-radius-control, 8px);
     cursor: pointer;
 }
 
+.emsg-filter:hover {
+    background: rgb(var(--hub2-n-100));
+}
+
 .emsg-filter[aria-pressed="true"] {
-    color: var(--hub2-action, #1d4ed8);
-    background: var(--hub2-action-tint, #eff6ff);
-    border-color: var(--hub2-action, #1d4ed8);
+    color: rgb(var(--hub2-action));
+    background: rgb(var(--hub2-action-tint));
+    border-color: rgb(var(--hub2-action));
 }
 
 .emsg-list {
@@ -105,7 +139,7 @@
 }
 
 .emsg-list__item + .emsg-list__item {
-    border-top: 1px solid var(--hub2-n-100, #f3f4f6);
+    border-top: 1px solid rgb(var(--hub2-n-400) / .35);
 }
 
 .emsg-row {
@@ -125,7 +159,11 @@
 }
 
 .emsg-row:hover {
-    background: var(--hub2-n-25, #fafafa);
+    background: rgb(var(--hub2-n-50));
+}
+
+.emsg-row--unread {
+    background: rgb(var(--hub2-action) / .06);
 }
 
 .emsg-row:focus-visible,
@@ -134,14 +172,15 @@
 .emsg-link-button:focus-visible,
 .emsg-search:focus-visible,
 .emsg-input:focus-visible,
-.emsg-textarea:focus-visible {
-    outline: 2px solid var(--hub2-focus, #2563eb);
+.emsg-textarea:focus-visible,
+.emsg-row-action:focus-visible {
+    outline: 2px solid rgb(var(--hub2-focus));
     outline-offset: 2px;
 }
 
 .emsg-row[aria-current="true"] {
-    background: var(--hub2-action-tint, #eff6ff);
-    box-shadow: inset 3px 0 0 var(--hub2-action, #1d4ed8);
+    background: rgb(var(--hub2-action-tint));
+    box-shadow: inset 3px 0 0 rgb(var(--hub2-action));
 }
 
 .emsg-avatar {
@@ -152,8 +191,9 @@
     height: 36px;
     font-size: 13px;
     font-weight: 700;
-    color: var(--hub2-action, #1d4ed8);
-    background: var(--hub2-action-tint, #eff6ff);
+    color: rgb(var(--hub2-action));
+    background: rgb(var(--hub2-action-tint));
+    border: 1px solid rgb(var(--hub2-action) / .3);
     border-radius: 999px;
     flex: none;
 }
@@ -166,8 +206,8 @@
     display: block;
     overflow: hidden;
     font-size: 14px;
-    font-weight: 600;
-    color: var(--hub2-n-900, #111827);
+    font-weight: 700;
+    color: rgb(var(--hub2-n-900));
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -181,7 +221,18 @@
     overflow: hidden;
     margin-top: 2px;
     font-size: 12px;
-    color: var(--hub2-n-600, #4b5563);
+    color: rgb(var(--hub2-n-600));
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.emsg-row__subject {
+    display: block;
+    overflow: hidden;
+    margin-top: 4px;
+    font-size: 14px;
+    font-weight: 600;
+    color: rgb(var(--hub2-n-900));
     text-overflow: ellipsis;
     white-space: nowrap;
 }
@@ -191,7 +242,7 @@
     overflow: hidden;
     margin-top: 4px;
     font-size: 13px;
-    color: var(--hub2-n-600, #4b5563);
+    color: rgb(var(--hub2-n-600));
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow-wrap: anywhere;
@@ -203,8 +254,31 @@
     align-items: flex-end;
     gap: 6px;
     font-size: 12px;
-    color: var(--hub2-n-600, #4b5563);
+    color: rgb(var(--hub2-n-600));
     white-space: nowrap;
+}
+
+.emsg-status {
+    display: inline-flex;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 700;
+    color: rgb(var(--hub2-n-800));
+    background: rgb(var(--hub2-n-100));
+    border: 1px solid rgb(var(--hub2-n-400) / .6);
+    border-radius: 999px;
+}
+
+.emsg-status--attention {
+    color: rgb(var(--hub2-warning));
+    background: rgb(var(--hub2-warning-bg));
+    border-color: rgb(var(--hub2-warning-border));
+}
+
+.emsg-status--answered {
+    color: rgb(var(--hub2-success));
+    background: rgb(var(--hub2-success-bg));
+    border-color: rgb(var(--hub2-success-border));
 }
 
 .emsg-unread-dot {
@@ -214,8 +288,8 @@
     padding: 2px 8px;
     font-size: 11px;
     font-weight: 700;
-    color: var(--hub2-n-0, #fff);
-    background: var(--hub2-action, #1d4ed8);
+    color: #fff;
+    background: rgb(var(--hub2-action));
     border-radius: 999px;
 }
 
@@ -224,17 +298,56 @@
     padding: 2px 8px;
     font-size: 11px;
     font-weight: 600;
-    color: var(--hub2-n-600, #4b5563);
-    background: var(--hub2-n-50, #f9fafb);
-    border: 1px solid var(--hub2-n-200, #e5e7eb);
+    color: rgb(var(--hub2-n-800));
+    background: rgb(var(--hub2-n-100));
+    border: 1px solid rgb(var(--hub2-n-400) / .6);
     border-radius: 999px;
+}
+
+.emsg-tag--reason {
+    color: rgb(var(--hub2-action));
+    background: rgb(var(--hub2-action-tint));
+    border-color: rgb(var(--hub2-action) / .35);
+}
+
+/* A row's expand button plus its explicit Reply / View link (admin home card). */
+.emsg-row-wrap {
+    display: flex;
+    align-items: stretch;
+}
+
+.emsg-row-wrap > .emsg-row {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.emsg-row-action {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    min-width: 72px;
+    min-height: 44px;
+    margin: 12px 12px 12px 0;
+    padding: 0 16px;
+    align-self: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: #fff;
+    text-decoration: none;
+    background: rgb(var(--hub2-action));
+    border-radius: var(--hub-radius-control, 8px);
+}
+
+.emsg-row-action:hover {
+    background: rgb(var(--hub2-action-hover));
 }
 
 .emsg-more {
     display: flex;
     justify-content: center;
     padding: 12px 16px;
-    border-top: 1px solid var(--hub2-n-100, #f3f4f6);
+    border-top: 1px solid rgb(var(--hub2-n-400) / .35);
 }
 
 .emsg-link-button {
@@ -242,10 +355,10 @@
     padding: 0 12px;
     font-size: 14px;
     font-weight: 600;
-    color: var(--hub2-action, #1d4ed8);
+    color: rgb(var(--hub2-action));
     background: transparent;
     border: 0;
-    border-radius: var(--hub2-radius-md, 8px);
+    border-radius: var(--hub-radius-control, 8px);
     cursor: pointer;
     text-decoration: none;
     display: inline-flex;
@@ -266,14 +379,14 @@
     margin: 8px 0 4px;
     font-size: 15px;
     font-weight: 700;
-    color: var(--hub2-n-900, #111827);
+    color: rgb(var(--hub2-n-900));
 }
 
 .emsg-empty__icon {
     width: 32px;
     height: 32px;
     margin: 0 auto;
-    color: var(--hub2-n-400, #9ca3af);
+    color: rgb(var(--hub2-n-400));
 }
 
 /* ---------------------------------------------------------------- conversation */
@@ -290,23 +403,26 @@
 .emsg-thread__earlier,
 .emsg-thread__empty {
     font-size: 13px;
-    color: var(--hub2-n-600, #4b5563);
+    color: rgb(var(--hub2-n-600));
     text-align: center;
 }
 
+/* Received: gray card. Sent by the viewer: branded blue tint. Both have a visible edge. */
 .emsg-bubble {
     max-width: min(640px, 88%);
     padding: 10px 14px;
-    background: var(--hub2-n-50, #f9fafb);
-    border: 1px solid var(--hub2-n-200, #e5e7eb);
+    color: rgb(var(--hub2-n-900));
+    background: rgb(var(--hub2-n-100));
+    border: 1px solid rgb(var(--hub2-n-400) / .55);
     border-radius: 14px 14px 14px 4px;
     align-self: flex-start;
+    box-shadow: 0 1px 1px rgb(15 23 42 / .05);
 }
 
 .emsg-bubble--mine {
     align-self: flex-end;
-    background: var(--hub2-action-tint, #eff6ff);
-    border-color: color-mix(in srgb, var(--hub2-action, #1d4ed8) 25%, transparent);
+    background: rgb(var(--hub2-action-tint));
+    border-color: rgb(var(--hub2-action) / .5);
     border-radius: 14px 14px 4px 14px;
 }
 
@@ -317,23 +433,23 @@
     gap: 2px 8px;
     margin-bottom: 4px;
     font-size: 12px;
-    color: var(--hub2-n-600, #4b5563);
+    color: rgb(var(--hub2-n-600));
 }
 
 .emsg-bubble__side {
     font-weight: 700;
-    color: var(--hub2-n-900, #111827);
+    color: rgb(var(--hub2-n-900));
 }
 
 .emsg-bubble--logistics .emsg-bubble__side {
-    color: var(--hub2-action, #1d4ed8);
+    color: rgb(var(--hub2-action));
 }
 
 .emsg-bubble__body {
     margin: 0;
     font-size: 14px;
     line-height: 1.5;
-    color: var(--hub2-n-900, #111827);
+    color: rgb(var(--hub2-n-900));
     white-space: pre-wrap;
     overflow-wrap: anywhere;
 }
@@ -342,6 +458,7 @@
     max-height: min(60vh, 560px);
     overflow-y: auto;
     padding: 16px;
+    background: rgb(var(--hub2-n-50));
     overscroll-behavior: contain;
 }
 
@@ -352,7 +469,7 @@
     flex-direction: column;
     gap: 10px;
     padding: 16px;
-    border-top: 1px solid var(--hub2-n-200, #e5e7eb);
+    border-top: 1px solid rgb(var(--hub2-n-400) / .45);
 }
 
 .emsg-composer--flush {
@@ -369,12 +486,12 @@
 .emsg-label {
     font-size: 13px;
     font-weight: 600;
-    color: var(--hub2-n-900, #111827);
+    color: rgb(var(--hub2-n-900));
 }
 
 .emsg-optional {
     font-weight: 400;
-    color: var(--hub2-n-600, #4b5563);
+    color: rgb(var(--hub2-n-600));
 }
 
 .emsg-input,
@@ -382,15 +499,19 @@
     width: 100%;
     font: inherit;
     font-size: 15px;
-    color: var(--hub2-n-900, #111827);
-    background: var(--hub2-n-0, #fff);
-    border: 1px solid var(--hub2-n-200, #d1d5db);
-    border-radius: var(--hub2-radius-md, 8px);
+    color: rgb(var(--hub2-n-900));
+    background: rgb(var(--hub2-n-50));
+    border: 1px solid rgb(var(--hub2-n-400));
+    border-radius: var(--hub-radius-control, 8px);
 }
 
 .emsg-input {
     min-height: 44px;
     padding: 0 12px;
+}
+
+.emsg-select {
+    cursor: pointer;
 }
 
 .emsg-textarea {
@@ -401,7 +522,7 @@
 }
 
 .emsg-textarea[aria-invalid="true"] {
-    border-color: var(--hub2-danger, #b91c1c);
+    border-color: rgb(var(--hub2-danger));
 }
 
 .emsg-composer__footer {
@@ -415,7 +536,7 @@
 .emsg-hint {
     margin: 0;
     font-size: 12px;
-    color: var(--hub2-n-600, #4b5563);
+    color: rgb(var(--hub2-n-600));
 }
 
 .emsg-send {
@@ -429,14 +550,14 @@
     font-size: 14px;
     font-weight: 600;
     color: #fff;
-    background: var(--hub2-action, #1d4ed8);
+    background: rgb(var(--hub2-action));
     border: 0;
-    border-radius: var(--hub2-radius-md, 8px);
+    border-radius: var(--hub-radius-control, 8px);
     cursor: pointer;
 }
 
 .emsg-send:hover:not(:disabled) {
-    background: var(--hub2-action-hover, #1e40af);
+    background: rgb(var(--hub2-action-hover));
 }
 
 .emsg-send:disabled {
@@ -471,19 +592,19 @@
     margin: 0;
     padding: 8px 12px;
     font-size: 13px;
-    border-radius: var(--hub2-radius-md, 8px);
+    border-radius: var(--hub-radius-control, 8px);
 }
 
 .emsg-feedback__error {
-    color: var(--hub2-danger, #b91c1c);
-    background: var(--hub2-danger-bg, #fef2f2);
-    border: 1px solid var(--hub2-danger-border, #fecaca);
+    color: rgb(var(--hub2-danger));
+    background: rgb(var(--hub2-danger-bg));
+    border: 1px solid rgb(var(--hub2-danger-border));
 }
 
 .emsg-feedback__status {
-    color: var(--hub2-success, #15803d);
-    background: var(--hub2-success-bg, #f0fdf4);
-    border: 1px solid var(--hub2-success-border, #bbf7d0);
+    color: rgb(var(--hub2-success));
+    background: rgb(var(--hub2-success-bg));
+    border: 1px solid rgb(var(--hub2-success-border));
 }
 
 @media (max-width: 639.98px) {
@@ -494,7 +615,39 @@
     .emsg-bubble {
         max-width: 94%;
     }
+
+    /* Phones: the Reply / View link drops under the row instead of squeezing the text. */
+    .emsg-row-wrap {
+        flex-wrap: wrap;
+    }
+
+    .emsg-row-action {
+        flex: 1 1 100%;
+        margin: 0 16px 12px;
+    }
 }
+
+/* Dark appearance, for the day a panel enables it: the same surfaces, inverted. */
+.dark .emsg-panel { background: rgb(var(--hub2-n-800)); }
+.dark .emsg-panel__header,
+.dark .emsg-thread-scroll { background: rgb(var(--hub2-n-900)); }
+.dark .emsg-bubble { background: rgb(var(--hub2-n-800)); border-color: rgb(var(--hub2-n-500)); }
+.dark .emsg-bubble--mine { background: rgb(var(--hub2-action) / .35); }
+.dark .emsg-input,
+.dark .emsg-textarea,
+.dark .emsg-search { background: rgb(var(--hub2-n-900)); border-color: rgb(var(--hub2-n-500)); }
+.dark .emsg-panel,
+.dark .emsg-panel__title,
+.dark .emsg-row__title,
+.dark .emsg-row__subject,
+.dark .emsg-bubble,
+.dark .emsg-bubble__body,
+.dark .emsg-bubble__side,
+.dark .emsg-label,
+.dark .emsg-input,
+.dark .emsg-textarea,
+.dark .emsg-search,
+.dark .emsg-strong { color: rgb(var(--hub2-n-0)); }
 
 /* ---------------------------------------------------------------- Employee Portal dashboard card */
 

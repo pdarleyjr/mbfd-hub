@@ -30,7 +30,7 @@ final class EmployeeLogisticsMemberPortalTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('employee'));
     }
 
-    public function test_home_shows_message_logistics_beside_vehicle_checkout_for_members_only(): void
+    public function test_home_shows_message_support_services_beside_vehicle_checkout_for_members_only(): void
     {
         $member = $this->messagingMember();
         $html = $this->actingAsCanonicalUser($member)->get('/')->assertOk()->getContent();
@@ -41,11 +41,11 @@ final class EmployeeLogisticsMemberPortalTest extends TestCase
         $this->assertLessThan(
             strpos($html, 'data-home-message-logistics'),
             strpos($html, 'Vehicle Checkout'),
-            'Message Logistics sits after Vehicle Checkout in the same actions group.'
+            'Message Support Services sits after Vehicle Checkout in the same actions group.'
         );
     }
 
-    public function test_home_hides_message_logistics_for_an_account_without_a_personnel_profile(): void
+    public function test_home_hides_message_support_services_for_an_account_without_a_personnel_profile(): void
     {
         $admin = $this->messagingAdmin(['super_admin']);
         $html = $this->actingAsCanonicalUser($admin)->get('/')->assertOk()->getContent();
@@ -58,7 +58,7 @@ final class EmployeeLogisticsMemberPortalTest extends TestCase
         $member = $this->messagingMember();
         $html = $this->actingAsCanonicalUser($member)->get('/employee/messages?compose=1')->assertOk()->getContent();
 
-        $this->assertStringContainsString('New message to Logistics', $html);
+        $this->assertStringContainsString('New message to Support Services', $html);
         $this->assertStringContainsString('data-employee-message-composer', $html);
         $this->assertStringContainsString('mbfdEmployeeMessageComposer', $html);
     }
@@ -89,7 +89,7 @@ final class EmployeeLogisticsMemberPortalTest extends TestCase
         $this->actingAs($member);
         Livewire::test(MyMessages::class, ['threadId' => $thread->id])
             ->assertSee('Bring it to Logistics tomorrow.')
-            ->assertSee('Logistics');
+            ->assertSee('Support Services');
         $this->assertSame(0, $this->service()->memberUnreadCount($member), 'Opening the conversation reads it.');
 
         $reply = Livewire::test(MyMessages::class, ['threadId' => $thread->id])
@@ -167,7 +167,7 @@ final class EmployeeLogisticsMemberPortalTest extends TestCase
     public function test_a_malformed_thread_link_falls_back_to_the_list(): void
     {
         $member = $this->messagingMember();
-        $this->actingAsCanonicalUser($member)->get('/employee/messages?thread=abc')->assertOk()->assertSee('Conversations with Logistics');
+        $this->actingAsCanonicalUser($member)->get('/employee/messages?thread=abc')->assertOk()->assertSee('Conversations with Support Services');
         $this->get('/employee/messages?thread=999999')->assertOk()->assertSee('Conversation not found');
     }
 
@@ -225,7 +225,7 @@ final class EmployeeLogisticsMemberPortalTest extends TestCase
         $html = $this->actingAsCanonicalUser($member)->get('/employee/dashboard')->assertOk()->getContent();
 
         $this->assertStringContainsString('data-employee-messages-shortcut', $html);
-        $this->assertStringContainsString('Message Logistics', $html);
+        $this->assertStringContainsString('Message Support Services', $html);
         $this->assertStringContainsString('1 new reply in My Messages', $html);
         $this->assertStringContainsString('My Equipment', $html);
         $this->assertStringContainsString('Request Uniforms', $html);
