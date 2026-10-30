@@ -19,7 +19,9 @@ for (const [name, service] of Object.entries(config.services)) {
   assert.ok(!service.build);
   for (const port of service.ports ?? []) assert.equal(port.host_ip, '127.0.0.1');
   for (const mount of service.volumes ?? []) {
-    assert.ok(!/docker\.sock|\/opt\/|\.env$/.test(mount.source));
+    assert.ok(!mount.source.includes('docker.sock'));
+    assert.ok(!mount.source.includes('/opt/'));
+    assert.ok(!mount.source.endsWith('.env'));
     if (mount.type === 'bind') assert.equal(mount.read_only, true);
   }
   if (name !== 'tunnel') assert.deepEqual(Object.keys(service.networks), ['isolated']);
