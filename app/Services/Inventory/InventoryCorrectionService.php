@@ -261,14 +261,15 @@ final class InventoryCorrectionService
      * Impact preview for Logistics. Read-only.
      *
      * @param  array{op?: mixed, fields?: mixed}  $operation
+     * @param  list<string>  $checklistTypes  the checkout lists chosen for the "selected checkout lists" scope
      * @return array<string, mixed>
      */
-    public function preview(int $correctionId, User $reviewer, array $operation, string $scope): array
+    public function preview(int $correctionId, User $reviewer, array $operation, string $scope, array $checklistTypes = []): array
     {
         $correction = ApparatusInventoryCorrection::query()->findOrFail($correctionId);
         $this->authorizeScope($reviewer, $scope);
 
-        return $this->planner->plan($correction, $operation, $scope);
+        return $this->planner->plan($correction, $operation, $scope, checklistTypes: $checklistTypes);
     }
 
     /**
@@ -277,6 +278,7 @@ final class InventoryCorrectionService
      *
      * @param  array{op?: mixed, fields?: mixed}  $operation
      * @param  list<int|string>  $selectedApparatusIds
+     * @param  list<string>  $checklistTypes  the checkout lists chosen for the "selected checkout lists" scope
      */
     public function approve(
         int $correctionId,
@@ -289,12 +291,13 @@ final class InventoryCorrectionService
         string $idempotencyKey,
         ?string $memberMessage = null,
         ?string $internalNote = null,
+        array $checklistTypes = [],
     ): ApparatusInventoryChangeSet {
         $this->authorizeScope($reviewer, $scope);
         $memberMessage = filled($memberMessage) ? $this->messageBody((string) $memberMessage) : null;
         $internalNote = filled($internalNote) ? $this->messageBody((string) $internalNote) : null;
 
-        return DB::transaction(function () use ($correctionId, $reviewer, $operation, $scope, $selectedApparatusIds, $previewFingerprint, $expectedLock, $idempotencyKey, $memberMessage, $internalNote): ApparatusInventoryChangeSet {
+        return DB::transaction(function () use ($correctionId, $reviewer, $operation, $scope, $selectedApparatusIds, $previewFingerprint, $expectedLock, $idempotencyKey, $memberMessage, $internalNote, $checklistTypes): ApparatusInventoryChangeSet {
             $this->assertIdempotencyKey($idempotencyKey);
             // Under the correction lock, so a concurrent double submit waits and then gets the first result.
             $correction = $this->lock($correctionId);
@@ -307,7 +310,7 @@ final class InventoryCorrectionService
                 return $replay;
             }
             $this->assertDecidable($correction, $expectedLock);
-            $plan = $this->planner->plan($correction, $operation, $scope, lock: true);
+            $plan = $this->planner->plan($correction, $operation, $scope, lock: true, checklistTypes: $checklistTypes);
             if (! hash_equals($plan['fingerprint'], $previewFingerprint)) {
                 throw new InventoryCorrectionConflict(
                     InventoryCorrectionConflict::STALE_PREVIEW,
@@ -345,6 +348,7 @@ final class InventoryCorrectionService
                 'decision' => [
                     'operation' => $plan['operation'],
                     'scope' => $scope,
+                    'checklist_types' => $plan['checklist_types'],
                     'change_set_id' => $changeSet->getKey(),
                     'apparatus_ids' => array_keys($selected),
                     'modified' => $suggested != $plan['operation'],
@@ -363,6 +367,7 @@ final class InventoryCorrectionService
             $applied = $this->event($correction, $reviewer, Event::APPLIED, Event::VISIBILITY_MEMBER, null, [
                 'change_set_id' => $changeSet->getKey(),
                 'scope' => $scope,
+                'checklist_types' => $plan['checklist_types'],
                 'units' => array_values(array_map(static fn (array $result): string => $result['label'], array_filter($results, static fn (array $result): bool => $result['applied'] === true))),
                 'results' => $results,
             ]);

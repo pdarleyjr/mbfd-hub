@@ -34,6 +34,18 @@ return [
     'note_max_length' => 500,
     'rejection_note_max_length' => 500,
 
+    // The rescue units a member picks from, in the order shown. This is the only copy of the list: the form
+    // gets it from GET /api/narcotics-checks/form and the server validates against it (App\Support\Narcotics\RescueUnits).
+    'rescue_units' => ['R1', 'R11', 'R2', 'R22', 'R3', 'R4', 'R44', 'FB6'],
+    // The last option. Choosing it makes the member type the unit (at most `rescue_unit_other_max_length` characters).
+    'rescue_unit_other_option' => 'Other',
+    'rescue_unit_other_max_length' => 40,
+
+    // The seal number a member types (free text: seals mix digits, letters, dashes and spaces). Required on every
+    // new check, stored as typed after trimming (App\Support\Narcotics\SealNumber); the form reads the length from
+    // GET /api/narcotics-checks/form.
+    'seal_number_max_length' => 40,
+
     // A member cannot have more than this many checks waiting for Captain 5 at once.
     'max_pending_per_member' => (int) env('NARCOTICS_CHECK_MAX_PENDING', 10),
 

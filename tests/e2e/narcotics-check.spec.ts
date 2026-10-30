@@ -148,6 +148,25 @@ const formHeading = (page: Page) => page.getByRole('heading', { level: 1, name: 
 const uploadInput = (page: Page) => page.getByTestId('narcotics-upload-input');
 const sendButton = (page: Page) => page.getByTestId('narcotics-send');
 const photoInfo = (page: Page) => page.getByTestId('narcotics-photo-info');
+const unitSelect = (page: Page) => page.getByTestId('narcotics-unit');
+const unitOther = (page: Page) => page.getByTestId('narcotics-unit-other');
+const sealField = (page: Page) => page.getByTestId('narcotics-seal');
+/** The server's list (config/narcotics_checks.php), in the order the form must show it. */
+const UNIT_OPTIONS = ['R1', 'R11', 'R2', 'R22', 'R3', 'R4', 'R44', 'FB6', 'Other'];
+
+interface UnitChoice {
+  choice: string;
+  other?: string;
+}
+
+/** Picks the rescue unit; for Other the text box appears and is filled. */
+async function chooseUnit(page: Page, unit: UnitChoice): Promise<void> {
+  await unitSelect(page).selectOption(unit.choice);
+  if (unit.other !== undefined) {
+    await expect(unitOther(page)).toBeVisible();
+    await unitOther(page).fill(unit.other);
+  }
+}
 
 async function chooseFile(page: Page, photo: TestPhoto): Promise<void> {
   await uploadInput(page).setInputFiles({ name: photo.name, mimeType: photo.mimeType, buffer: photo.buffer });
@@ -238,6 +257,10 @@ interface ApiCheck {
   status: string;
   status_label: string;
   member_note: string | null;
+  rescue_unit: string | null;
+  rescue_unit_choice: string | null;
+  rescue_unit_other: string | null;
+  seal_number: string | null;
   decision_note: string | null;
   can_resubmit: boolean;
   resubmitted_as: string | null;
@@ -259,12 +282,14 @@ async function checkWithNote(page: Page, note: string): Promise<ApiCheck> {
   return found[0];
 }
 
-/** Opens the form, chooses the phone JPEG, types a note and sends it once; returns the new check. */
-async function sendOneCheck(page: Page, note: string, photo: TestPhoto = phoneJpeg()): Promise<ApiCheck> {
+/** Opens the form, chooses the phone JPEG and a rescue unit, types a note and sends it once; returns the new check. */
+async function sendOneCheck(page: Page, note: string, photo: TestPhoto = phoneJpeg(), unit: UnitChoice = { choice: 'R22' }, seal = 'ZX-4471'): Promise<ApiCheck> {
   await page.goto(FORM_URL);
   await expect(formHeading(page)).toBeVisible();
   await chooseFile(page, photo);
   await expect(page.getByTestId('narcotics-preview')).toBeVisible();
+  await chooseUnit(page, unit);
+  await sealField(page).fill(seal);
   await page.getByTestId('narcotics-note').fill(note);
   await sendButton(page).click();
   await expect(page.getByRole('heading', { name: SENT })).toBeVisible();
@@ -359,6 +384,121 @@ test.describe.serial('Narcotics check', () => {
     });
   });
 
+  test('member: the rescue unit is a required drop-down; Other shows a text box that hides and clears again; a picked unit is unsaved work', async ({ browser }, info) => {
+    await as(browser, info, 'member', async ({ page }) => {
+      const posts: string[] = [];
+      page.on('request', (request) => { if (request.method() === 'POST' && request.url().includes('/api/narcotics-checks')) posts.push(request.url()); });
+      await page.goto(FORM_URL);
+      await expect(formHeading(page)).toBeVisible();
+
+      // A labelled, required drop-down with exactly the server's list, Other last; no text box yet.
+      const select = unitSelect(page);
+      await expect(page.getByLabel(/^Rescue unit/)).toBeVisible(); // a required Fluent field adds " *" to its accessible name
+      await expect(select).toHaveValue('');
+      expect(await select.locator('option').evaluateAll((options) => options.map((option) => (option as HTMLOptionElement).value).filter((value) => value !== ''))).toEqual(UNIT_OPTIONS);
+      await expect(unitOther(page)).toHaveCount(0);
+      expect(await busyReasons(page), 'nothing picked, nothing to protect').toEqual([]);
+      await expectTouchTargets(info, [select]);
+      expect(await select.evaluate((element) => getComputedStyle(element).fontSize), 'a 16px picker does not make iOS zoom the page').toBe('16px');
+      await shot(page, info, '07-unit-empty');
+
+      // Picking a unit is typed work, like the note: it blocks the refresh banner.
+      await select.selectOption('R22');
+      await expect.poll(() => busyReasons(page)).toEqual([BUSY_REASON]);
+      await expect(unitOther(page)).toHaveCount(0);
+
+      // Other reveals a labelled, required text box (16px, counted); a listed unit hides and clears it.
+      await select.selectOption('Other');
+      await expect(unitOther(page)).toBeVisible();
+      await expect(page.getByLabel('Which unit?')).toBeVisible();
+      expect(await unitOther(page).evaluate((element) => getComputedStyle(element).fontSize)).toBe('16px');
+      await unitOther(page).fill('Rescue 9');
+      await expectTouchTargets(info, [unitOther(page)]);
+      await expectNoHorizontalOverflow(page);
+      await shot(page, info, '08-unit-other');
+      await select.selectOption('R44');
+      await expect(unitOther(page)).toHaveCount(0);
+      await select.selectOption('Other');
+      await expect(unitOther(page), 'the old text is gone, not just hidden').toHaveValue('');
+
+      // Required: with a photo, sending without a unit explains what is missing next to the field and sends nothing.
+      await chooseFile(page, screenshotPng());
+      await expect(page.getByTestId('narcotics-preview')).toBeVisible();
+      await select.selectOption('');
+      await sendButton(page).click();
+      await expect(select).toBeFocused();
+      await expect(select).toHaveAccessibleDescription(/Choose your rescue unit\./);
+      await expect(page.getByTestId('narcotics-unit-card')).toContainText('Choose your rescue unit.');
+
+      await select.selectOption('Other');
+      await sendButton(page).click();
+      await expect(unitOther(page)).toBeFocused();
+      await expect(unitOther(page)).toHaveAccessibleDescription(/Enter which rescue unit you are on\./);
+      await unitOther(page).fill('x'.repeat(41));
+      await expect(unitOther(page)).toHaveAccessibleDescription(/at most 40 characters/);
+      await sendButton(page).click();
+      await expect(unitOther(page)).toBeFocused();
+      await unitOther(page).fill('Rescue 9');
+      await expect(page.getByTestId('narcotics-unit-card')).not.toContainText('at most 40');
+      await shot(page, info, '09-unit-errors-cleared');
+      expect(posts, 'a missing or unusable unit is stopped before anything is sent').toEqual([]);
+    });
+  });
+
+  test('member: the seal number is a required text box with a linked error; a typed value is unsaved work; nothing is sent without it', async ({ browser }, info) => {
+    await as(browser, info, 'member', async ({ page }) => {
+      const posts: string[] = [];
+      page.on('request', (request) => { if (request.method() === 'POST' && request.url().includes('/api/narcotics-checks')) posts.push(request.url()); });
+      await page.goto(FORM_URL);
+      await expect(formHeading(page)).toBeVisible();
+
+      // A labelled, required text box that sits between Rescue unit and Photo. A required Fluent field adds " *" to its name.
+      const seal = sealField(page);
+      await expect(page.getByLabel(/^Seal number/)).toBeVisible();
+      await expect(seal).toHaveValue('');
+      const inOrder = await page.evaluate(() => {
+        const element = (id: string) => document.querySelector('[data-testid="' + id + '"]') as Element;
+        const follows = (first: Element, second: Element) => Boolean(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING);
+        return follows(element('narcotics-unit'), element('narcotics-seal')) && follows(element('narcotics-seal'), element('narcotics-take'));
+      });
+      expect(inOrder, 'Rescue unit, then Seal number, then Photo').toBe(true);
+      expect(await seal.evaluate((element) => getComputedStyle(element).fontSize), 'a 16px input does not make iOS zoom the page').toBe('16px');
+      await expect(seal).toHaveAttribute('autocomplete', 'off');
+      await expectTouchTargets(info, [seal]);
+      expect(await busyReasons(page), 'nothing typed, nothing to protect').toEqual([]);
+
+      // Letters, digits, dashes and spaces are all fine, and what is typed stays as typed.
+      await seal.fill('ab-12 C');
+      await expect(seal).toHaveValue('ab-12 C');
+      await expect.poll(() => busyReasons(page), { message: 'a typed seal number is unsaved work' }).toEqual([BUSY_REASON]);
+      await seal.fill('');
+      await expect.poll(() => busyReasons(page), { message: 'emptied again, nothing to protect' }).toEqual([]);
+      await expectNoHorizontalOverflow(page);
+      await shot(page, info, '16-seal-empty');
+
+      // Required: with a photo and a unit, sending without a seal number explains it next to the field and sends nothing.
+      await chooseFile(page, screenshotPng());
+      await expect(page.getByTestId('narcotics-preview')).toBeVisible();
+      await chooseUnit(page, { choice: 'R22' });
+      await sendButton(page).click();
+      await expect(seal).toBeFocused();
+      await expect(seal).toHaveAccessibleDescription(/Enter the seal number\./);
+      await expect(page.getByTestId('narcotics-seal-card')).toContainText('Enter the seal number.');
+      await shot(page, info, '17-seal-required');
+
+      // Unusable text is flagged as it is typed, and the message stays linked to the field.
+      await seal.fill('x'.repeat(41));
+      await expect(seal).toHaveAccessibleDescription(/at most 40 characters/);
+      await sendButton(page).click();
+      await expect(seal).toBeFocused();
+      await seal.fill('SEAL-0001');
+      await expect(page.getByTestId('narcotics-seal-card')).not.toContainText('Enter the seal number.');
+      await expect(page.getByTestId('narcotics-seal-card')).not.toContainText('at most 40');
+      await expect(seal).not.toHaveAccessibleDescription(/Enter the seal number|at most 40/);
+      expect(posts, 'a missing or unusable seal number is stopped before anything is sent').toEqual([]);
+    });
+  });
+
   test('member (desktop): Take photo without a camera explains why and keeps the upload choice', async ({ browser }, info) => {
     test.skip(info.project.name !== 'desktop', 'The in-page camera is a computer-only path; phones open the system camera.');
     await as(browser, info, 'member', async ({ page }) => {
@@ -401,6 +541,8 @@ test.describe.serial('Narcotics check', () => {
 
       await chooseFile(page, phoneJpeg());
       await expect(page.getByTestId('narcotics-preview')).toBeVisible();
+      await chooseUnit(page, { choice: 'R22' });
+      await sealField(page).fill('ZX-4471');
       await page.getByTestId('narcotics-note').fill(state.approvedNote);
       await expect.poll(() => busyReasons(page)).toEqual([BUSY_REASON]);
       await expectRefreshHeld(page, releases);
@@ -412,6 +554,8 @@ test.describe.serial('Narcotics check', () => {
       await expect(page.getByRole('heading', { name: SENT })).toHaveCount(0);
       await expect(page.getByTestId('narcotics-preview')).toBeVisible();
       await expect(page.getByTestId('narcotics-note')).toHaveValue(state.approvedNote);
+      await expect(unitSelect(page), 'the unit survives a failed upload').toHaveValue('R22');
+      await expect(sealField(page), 'the seal number survives a failed upload').toHaveValue('ZX-4471');
       await expect(sendButton(page)).toHaveText(/Send again/);
       await expect(sendButton(page)).toBeEnabled();
       expect(await busyReasons(page), 'a failed send stays unsafe to refresh').toEqual([BUSY_REASON]);
@@ -444,6 +588,11 @@ test.describe.serial('Narcotics check', () => {
       state.approvedId = check.id;
       expect(check.status).toBe('pending');
       expect(check.status_label).toBe('Sent to Captain 5');
+      expect(check.rescue_unit).toBe('R22');
+      expect(check.rescue_unit_other).toBeNull();
+      expect(check.seal_number).toBe('ZX-4471');
+      expect(bodies[1].toString('latin1'), 'the retry carries the unit').toMatch(/name="rescue_unit"\r\n\r\nR22\r\n/);
+      expect(bodies[1].toString('latin1'), 'and the seal number').toMatch(/name="seal_number"\r\n\r\nZX-4471\r\n/);
 
       // What was uploaded: an image part, no EXIF, no GPS text, no raw 4000 x 3000 original.
       expect(bodies).toHaveLength(2);
@@ -480,6 +629,8 @@ test.describe.serial('Narcotics check', () => {
       await expect(row).toContainText('Sent');
       await expect(row).toContainText(state.approvedNote);
       await expect(row).toContainText('Pending review');
+      await expect(row.getByTestId('narcotics-row-unit')).toHaveText('Rescue unit: R22');
+      await expect(row.getByTestId('narcotics-row-seal')).toHaveText('Seal number: ZX-4471');
       await expectNoHorizontalOverflow(page);
       await shot(page, info, '10-captain5-inbox');
 
@@ -494,6 +645,10 @@ test.describe.serial('Narcotics check', () => {
       await expectTouchTargets(info, [page.getByTestId('narcotics-approve'), page.getByTestId('narcotics-reject'), row]);
       await expect(sheet(page).getByTestId('narcotics-summary')).toContainText('Pat Member');
       await expect(sheet(page).getByTestId('narcotics-summary')).toContainText(state.approvedNote);
+      await expect(sheet(page).getByTestId('narcotics-summary')).toContainText('Rescue unit');
+      await expect(sheet(page).getByTestId('narcotics-summary')).toContainText('R22');
+      await expect(sheet(page).getByTestId('narcotics-summary')).toContainText('Seal number');
+      await expect(sheet(page).getByTestId('narcotics-summary')).toContainText('ZX-4471');
       await expectNoHorizontalOverflow(page);
       await shot(page, info, '11-captain5-sheet');
 
@@ -530,6 +685,8 @@ test.describe.serial('Narcotics check', () => {
       await expect(archived).toHaveCount(1);
       await expect(archived).toContainText('Pat Member');
       await expect(archived).toContainText('Approved by');
+      await expect(archived).toContainText('Rescue unit: R22');
+      await expect(archived).toContainText('Seal number: ZX-4471');
       await expectNoHorizontalOverflow(page);
       await shot(page, info, '14-captain5-archive');
     });
@@ -542,6 +699,8 @@ test.describe.serial('Narcotics check', () => {
       await row.click();
       await expect(page.getByTestId('narcotics-banner')).toContainText('Approved');
       await expect(page.getByTestId('narcotics-banner')).toContainText('Cap Five');
+      await expect(page.getByTestId('narcotics-detail-unit')).toContainText('Rescue unit: R22');
+      await expect(page.getByTestId('narcotics-detail-seal')).toContainText('Seal number: ZX-4471');
       await shot(page, info, '15-member-approved');
     });
   });
@@ -550,7 +709,9 @@ test.describe.serial('Narcotics check', () => {
     const state = run(info);
     const reason = `The seal number is not readable ${state.token}`;
     await as(browser, info, 'member', async ({ page }) => {
-      const check = await sendOneCheck(page, state.rejectedNote, screenshotPng());
+      const check = await sendOneCheck(page, state.rejectedNote, screenshotPng(), { choice: 'R44' }, 'RJ-1002');
+      expect(check.rescue_unit).toBe('R44');
+      expect(check.seal_number).toBe('RJ-1002');
       state.rejectedId = check.id;
     });
 
@@ -580,13 +741,23 @@ test.describe.serial('Narcotics check', () => {
 
       await page.getByTestId('narcotics-resubmit').click();
       await expect(page.getByText('Captain 5 did not accept your last photo')).toBeVisible();
+      // The answer starts with the rejected check's unit; it is only a prefill, so it is not unsaved work yet and it can be changed.
+      await expect(unitSelect(page)).toHaveValue('R44');
+      await expect(sealField(page)).toHaveValue('RJ-1002');
+      expect(await busyReasons(page), 'a prefilled unit and seal number alone are not unsaved work').toEqual([]);
       await chooseFile(page, phoneJpeg());
       await expect(page.getByTestId('narcotics-preview')).toBeVisible();
+      await chooseUnit(page, { choice: 'Other', other: '  Rescue 9  ' });
+      await sealField(page).fill('  RJ-1003  ');
       await page.getByTestId('narcotics-note').fill(state.resentNote);
       await sendButton(page).click();
       await expect(page.getByRole('heading', { name: SENT })).toBeVisible();
 
       const resent = await checkWithNote(page, state.resentNote);
+      expect(resent.rescue_unit, 'the typed text is trimmed and shown as the unit').toBe('Rescue 9');
+      expect(resent.rescue_unit_choice).toBe('Other');
+      expect(resent.rescue_unit_other).toBe('Rescue 9');
+      expect(resent.seal_number, 'the seal number is trimmed and editable on a resubmission').toBe('RJ-1003');
       expect(resent.status).toBe('pending');
       expect(resent.resubmission_of).toBe(state.rejectedId);
       const original = (await myChecks(page)).find((check) => check.id === state.rejectedId);
@@ -599,7 +770,8 @@ test.describe.serial('Narcotics check', () => {
   test('a reviewer cannot decide their own check; the other Captain 5 can', async ({ browser }, info) => {
     const state = run(info);
     await as(browser, info, 'captain5', async ({ page }) => {
-      const own = await sendOneCheck(page, state.ownNote);
+      const own = await sendOneCheck(page, state.ownNote, phoneJpeg(), { choice: 'Other', other: 'Spare Rescue 12' }, 'OWN 77');
+      expect(own.rescue_unit).toBe('Spare Rescue 12');
       state.ownId = own.id;
 
       await openNarcoticsTab(page);
@@ -617,7 +789,11 @@ test.describe.serial('Narcotics check', () => {
       await openNarcoticsTab(page);
       const row = reviewRow(page, state.ownNote);
       await expect(row).toContainText('Cap Five');
+      await expect(row).toContainText('Rescue unit: Spare Rescue 12');
+      await expect(row).toContainText('Seal number: OWN 77');
       await row.click();
+      await expect(sheet(page).getByTestId('narcotics-summary')).toContainText('Spare Rescue 12');
+      await expect(sheet(page).getByTestId('narcotics-summary')).toContainText('OWN 77');
       await page.getByTestId('narcotics-approve').click();
       await expect(page.getByTestId('narcotics-notice')).toContainText('Approved and archived');
     });

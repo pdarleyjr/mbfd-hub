@@ -8,7 +8,7 @@ import Tag from '../../ui/Tag';
 import { Fact, Sheet } from '../ui';
 import { BTN, BTN_PRIMARY, BTN_SECONDARY, ErrorText, FIELD, HINT, LABEL, LiveNote, useWrite } from '../ems/shared';
 import PhotoZoom from './PhotoZoom';
-import { REJECT_NOTE_MAX, STATUS_TONE, decisionText, etDateTime, memberText, rejectError } from './logic';
+import { REJECT_NOTE_MAX, STATUS_TONE, decisionText, etDateTime, memberText, rejectError, rescueUnitText, sealNumberText } from './logic';
 import type { NarcoticsCheckDetail } from './types';
 
 interface Props {
@@ -186,6 +186,8 @@ export default function CheckSheet({ uuid, onClose, onChanged, onOpen, onForbidd
 
           <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2" data-testid="narcotics-summary">
             <Fact label="Member">{memberText(check)}</Fact>
+            <Fact label="Rescue unit">{rescueUnitText(check)}</Fact>
+            <Fact label="Seal number">{sealNumberText(check)}</Fact>
             <Fact label="Sent">{etDateTime(check.submitted_at)}</Fact>
             <Fact label="Member's note">{check.member_note}</Fact>
             <Fact label="Decision">{decision}</Fact>

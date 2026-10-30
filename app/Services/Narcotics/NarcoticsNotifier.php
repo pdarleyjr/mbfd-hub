@@ -49,7 +49,11 @@ final class NarcoticsNotifier
     {
         $this->guard('checkSubmitted', function () use ($check): void {
             $submitter = $check->submitted_by_user_id !== null ? User::query()->find($check->submitted_by_user_id) : null;
-            $resubmission = $check->resubmission_of_id !== null ? ' (sent again after a rejection)' : '';
+            $details = array_values(array_filter([
+                $check->rescueUnitLabel(),
+                $check->resubmission_of_id !== null ? 'sent again after a rejection' : null,
+            ]));
+            $details = $details === [] ? '' : ' ('.implode(', ', $details).')';
 
             $this->queue(
                 'narcotics:check:'.$check->getKey().':submitted',
@@ -57,7 +61,7 @@ final class NarcoticsNotifier
                 $this->roster->notificationRecipients(),
                 fn (User $recipient): array => [
                     'title' => 'Narcotics check to review',
-                    'body' => "{$check->submitter_name} sent a narcotics check{$resubmission}. Open Captain 5 to review it.",
+                    'body' => "{$check->submitter_name} sent a narcotics check{$details}. Open Captain 5 to review it.",
                     'url' => NarcoticsLinks::staff($check->uuid),
                 ],
                 $submitter,

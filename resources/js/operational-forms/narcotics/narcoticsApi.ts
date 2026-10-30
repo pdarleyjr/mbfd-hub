@@ -73,6 +73,9 @@ export function createNarcoticsApi(endpoints: NarcoticsEndpoints, csrfToken: str
             const data = new FormData();
             data.append('photo', input.photo.blob, input.photo.processed ? photoFileName(input.photo.type) : input.photo.name);
             data.append('client_submission_id', input.clientSubmissionId);
+            data.append('rescue_unit', input.rescueUnit);
+            if (input.rescueUnitOther !== null) data.append('rescue_unit_other', input.rescueUnitOther);
+            data.append('seal_number', input.sealNumber);
             if (input.note.trim() !== '') data.append('note', input.note.trim());
             if (input.resubmissionOf) data.append('resubmission_of', input.resubmissionOf);
 

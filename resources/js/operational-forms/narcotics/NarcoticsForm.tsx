@@ -1,19 +1,28 @@
-import { useCallback, useEffect, useRef, useState, type ChangeEvent } from 'react';
-import { Button, MessageBar, MessageBarBody, ProgressBar, Spinner, Textarea } from '@fluentui/react-components';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { Button, Field, Input, MessageBar, MessageBarBody, ProgressBar, Select, Spinner, Textarea } from '@fluentui/react-components';
 import { ArrowLeft, Camera, CheckCircle2, ImageUp, RefreshCw, RotateCcw, Send, ZoomIn } from 'lucide-react';
 import { NarcoticsApiError, type NarcoticsApi } from './narcoticsApi';
 import { SENT_MESSAGE, describeFailure, formPhase, formatBytes, newSubmissionId } from './narcoticsImage.js';
-import type { NarcoticsCheckDetail, NarcoticsFormDefinition, PreparedPhoto } from './narcoticsTypes';
+import type { NarcoticsCheckSummary, NarcoticsCheckDetail, NarcoticsFormDefinition, PreparedPhoto } from './narcoticsTypes';
+import {
+    blankUnit, pickUnit, serverUnitErrors, trimUnitText, unitErrors, unitFromCheck, unitPayload, unitSettings, unitStarted,
+} from './narcoticsUnit.js';
+import { sealError, sealFromCheck, sealPayload, sealSettings, serverSealError } from './narcoticsSeal.js';
 import { CameraCapture, canUseCamera } from './CameraCapture';
 import { PhotoViewer } from './PhotoViewer';
 import { PhotoProblem, preparePhoto } from './processPhoto';
 import { useNarcoticsBusy } from './useNarcoticsBusy';
+
+/** The rejected check's stored unit and seal number, which the answer starts with. */
+export type UnitSource = Pick<NarcoticsCheckSummary, 'rescue_unit_choice' | 'rescue_unit_other' | 'seal_number'>;
 
 interface Props {
     api: NarcoticsApi;
     definition: NarcoticsFormDefinition;
     /** The rejected check this one answers (the old record is never edited). */
     resubmitOf: string | null;
+    /** Its rescue unit and seal number: prefilled, still editable. */
+    resubmitUnit?: UnitSource | null;
     goForms: () => void;
     goMine: () => void;
     goDetail: (id: string) => void;
@@ -23,10 +32,22 @@ interface Props {
 interface Failure { message: string; retry: boolean; newPhoto: boolean }
 
 /** Take or upload one photo, add an optional note, send it once. Confirmation appears only after the server has stored it. */
-export function NarcoticsForm({ api, definition, resubmitOf, goForms, goMine, goDetail, onSent }: Props) {
+export function NarcoticsForm({ api, definition, resubmitOf, resubmitUnit = null, goForms, goMine, goDetail, onSent }: Props) {
+    const unitConfig = useMemo(() => unitSettings(definition), [definition]);
     const [photo, setPhoto] = useState<PreparedPhoto | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [preparing, setPreparing] = useState(false);
+    const [unit, setUnit] = useState(() => (resubmitUnit ? unitFromCheck(resubmitUnit, unitConfig) : blankUnit()));
+    // True once the member picks or types a unit themselves: only then is it unsaved work (a prefill is not).
+    const [unitEdited, setUnitEdited] = useState(false);
+    const sealConfig = useMemo(() => sealSettings(definition), [definition]);
+    const [seal, setSeal] = useState(() => sealFromCheck(resubmitUnit));
+    // As with the unit: only a seal number the member typed is unsaved work, not a prefill.
+    const [sealEdited, setSealEdited] = useState(false);
+    const [sealServerError, setSealServerError] = useState<string | undefined>(undefined);
+    // Set when a send is attempted with something required missing: from then on the required messages show.
+    const [attempted, setAttempted] = useState(false);
+    const [unitServerErrors, setUnitServerErrors] = useState<{ choice?: string; other?: string }>({});
     const [note, setNote] = useState('');
     const [notice, setNotice] = useState<{ intent: 'info' | 'warning' | 'error'; text: string } | null>(null);
     const [cameraOpen, setCameraOpen] = useState(false);
@@ -38,11 +59,14 @@ export function NarcoticsForm({ api, definition, resubmitOf, goForms, goMine, go
 
     const takeInput = useRef<HTMLInputElement>(null);
     const pickInput = useRef<HTMLInputElement>(null);
+    const unitSelect = useRef<HTMLSelectElement>(null);
+    const unitOtherInput = useRef<HTMLInputElement>(null);
+    const sealInput = useRef<HTMLInputElement>(null);
     const submissionId = useRef(newSubmissionId());
     const sendingNow = useRef(false);
     const preparingNow = useRef(0);
 
-    const phase = formPhase({ hasPhoto: photo !== null, note, sending, failed: failure !== null, saved: sent !== null }) as
+    const phase = formPhase({ hasPhoto: photo !== null, note, hasUnit: unitEdited && unitStarted(unit), hasSeal: sealEdited && seal.trim() !== '', sending, failed: failure !== null, saved: sent !== null }) as
         'empty' | 'dirty' | 'sending' | 'failed' | 'saved';
     useNarcoticsBusy(phase);
 
@@ -93,19 +117,55 @@ export function NarcoticsForm({ api, definition, resubmitOf, goForms, goMine, go
         else setCameraOpen(true);
     };
 
+    /** Choosing an option; anything but "Other" hides and clears the typed text. */
+    const chooseUnit = (choice: string) => {
+        setUnit((current) => pickUnit(current, choice, unitConfig));
+        setUnitEdited(true);
+        setUnitServerErrors({});
+        touch();
+    };
+
+    const typeUnit = (other: string) => {
+        setUnit((current) => ({ ...current, other }));
+        setUnitEdited(true);
+        setUnitServerErrors({});
+        touch();
+    };
+
+    const typeSeal = (value: string) => {
+        setSeal(value);
+        setSealEdited(true);
+        setSealServerError(undefined);
+        touch();
+    };
+
     const send = async () => {
         if (!photo || sendingNow.current) return;
+        // The unit and the seal number are required: show what is missing next to the field and move to the first one instead of sending.
+        const problems = unitErrors(unit, unitConfig);
+        const sealProblem = sealError(seal, sealConfig);
+        if (problems.choice || problems.other || sealProblem) {
+            setAttempted(true);
+            (problems.choice ? unitSelect.current : problems.other ? unitOtherInput.current : sealInput.current)?.focus();
+            return;
+        }
         sendingNow.current = true;
         setSending(true);
         setFailure(null);
         setProgress(0);
         try {
-            const result = await api.send({ photo, note, clientSubmissionId: submissionId.current, resubmissionOf: resubmitOf }, setProgress);
+            const chosen = unitPayload(unit, unitConfig);
+            const result = await api.send({
+                photo, note, rescueUnit: chosen.rescue_unit, rescueUnitOther: chosen.rescue_unit_other, sealNumber: sealPayload(seal), clientSubmissionId: submissionId.current, resubmissionOf: resubmitOf,
+            }, setProgress);
             setSent(result.check);
             setPhoto(null);
             onSent();
         } catch (error) {
             const known = error instanceof NarcoticsApiError ? error : null;
+            // The server is authoritative: its words for the unit fields appear beside them.
+            setUnitServerErrors(serverUnitErrors(known?.fields));
+            setSealServerError(serverSealError(known?.fields));
             setFailure(describeFailure({
                 status: known?.status ?? 0, code: known?.code ?? null, message: known?.message ?? '', network: known?.network ?? true,
             }) as Failure);
@@ -118,6 +178,8 @@ export function NarcoticsForm({ api, definition, resubmitOf, goForms, goMine, go
     const startAnother = () => {
         submissionId.current = newSubmissionId();
         setSent(null); setPhoto(null); setNote(''); setFailure(null); setNotice(null); setProgress(0);
+        setUnit(blankUnit()); setUnitEdited(false); setAttempted(false); setUnitServerErrors({});
+        setSeal(''); setSealEdited(false); setSealServerError(undefined);
     };
 
     if (sent) {
@@ -138,6 +200,15 @@ export function NarcoticsForm({ api, definition, resubmitOf, goForms, goMine, go
         );
     }
 
+    const unitProblems = unitErrors(unit, unitConfig);
+    const otherTyped = trimUnitText(unit.other);
+    const choiceError = unitServerErrors.choice ?? (attempted ? unitProblems.choice : undefined);
+    // Too long or unusable text is flagged as it is typed; "required" waits until a send is attempted.
+    const otherError = unitServerErrors.other ?? (unitProblems.other && (attempted || otherTyped !== '') ? unitProblems.other : undefined);
+    const sealTyped = trimUnitText(seal);
+    const sealProblem = sealError(seal, sealConfig);
+    // Too long or unusable text is flagged as it is typed; "required" waits until a send is attempted.
+    const sealMessage = sealServerError ?? (sealProblem && (attempted || sealTyped !== '') ? sealProblem : undefined);
     const tooLong = note.length > definition.note_max_length;
     const canSend = photo !== null && !sending && !preparing && !tooLong && !(failure?.newPhoto ?? false);
 
@@ -151,7 +222,7 @@ export function NarcoticsForm({ api, definition, resubmitOf, goForms, goMine, go
             <header className="nc-head">
                 <p className="of-eyebrow">Forms</p>
                 <h1>Narcotics check</h1>
-                <p>Take or upload a photo of your narcotics check and send it to Captain 5. Make sure the labels and counts are sharp.</p>
+                <p>Choose your rescue unit, enter the seal number, then take or upload a photo of your narcotics check and send it to Captain 5. Make sure the labels and counts are sharp.</p>
             </header>
 
             {resubmitOf && <MessageBar intent="info"><MessageBarBody>Captain 5 did not accept your last photo. Send a new one. The earlier record stays as it was.</MessageBarBody></MessageBar>}
@@ -166,6 +237,71 @@ export function NarcoticsForm({ api, definition, resubmitOf, goForms, goMine, go
                     onCancel={() => setCameraOpen(false)}
                     onUnavailable={(reason) => { setCameraOpen(false); setNotice({ intent: 'warning', text: reason }); }}
                 />
+            )}
+
+            {!cameraOpen && (
+                <section className="nc-card nc-unit" data-testid="narcotics-unit-card">
+                    <Field
+                        label="Rescue unit"
+                        required
+                        hint="Not on the list? Choose Other and type it."
+                        validationState={choiceError ? 'error' : 'none'}
+                        validationMessage={choiceError}
+                    >
+                        <Select
+                            ref={unitSelect}
+                            value={unit.choice}
+                            onChange={(_event, data) => chooseUnit(data.value)}
+                            disabled={sending}
+                            data-testid="narcotics-unit"
+                        >
+                            <option value="">Choose a unit</option>
+                            {unitConfig.options.map((option) => <option key={option} value={option}>{option}</option>)}
+                        </Select>
+                    </Field>
+                    {unit.choice === unitConfig.other && (
+                        <Field
+                            label="Which unit?"
+                            required
+                            hint={`${Array.from(otherTyped).length} / ${unitConfig.otherMax}`}
+                            validationState={otherError ? 'error' : 'none'}
+                            validationMessage={otherError}
+                        >
+                            <Input
+                                ref={unitOtherInput}
+                                value={unit.other}
+                                onChange={(_event, data) => typeUnit(data.value)}
+                                disabled={sending}
+                                autoComplete="off"
+                                enterKeyHint="done"
+                                data-testid="narcotics-unit-other"
+                            />
+                        </Field>
+                    )}
+                </section>
+            )}
+
+            {!cameraOpen && (
+                <section className="nc-card nc-unit" data-testid="narcotics-seal-card">
+                    <Field
+                        label="Seal number"
+                        required
+                        hint={`${Array.from(sealTyped).length} / ${sealConfig.max}`}
+                        validationState={sealMessage ? 'error' : 'none'}
+                        validationMessage={sealMessage}
+                    >
+                        <Input
+                            ref={sealInput}
+                            value={seal}
+                            onChange={(_event, data) => typeSeal(data.value)}
+                            disabled={sending}
+                            autoComplete="off"
+                            inputMode="text"
+                            enterKeyHint="done"
+                            data-testid="narcotics-seal"
+                        />
+                    </Field>
+                </section>
             )}
 
             {!cameraOpen && (
@@ -232,6 +368,7 @@ export function NarcoticsForm({ api, definition, resubmitOf, goForms, goMine, go
                     {sending ? 'Sending…' : failure?.retry ? 'Send again' : 'Send to Captain 5'}
                 </Button>
                 {!photo && !preparing && <p className="nc-hint">Add a photo to send.</p>}
+                {photo && (unitProblems.choice || sealProblem) && !attempted && <p className="nc-hint">{unitProblems.choice ? 'Choose your rescue unit' : 'Enter the seal number'} to send.</p>}
                 {photo && failure?.newPhoto && <p className="nc-hint">Retake or choose a different photo first.</p>}
             </div>
 

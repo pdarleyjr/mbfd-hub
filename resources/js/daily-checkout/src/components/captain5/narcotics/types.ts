@@ -26,6 +26,10 @@ export interface NarcoticsCheck {
   submitter_rank: string | null;
   has_note: boolean;
   member_note: string | null;
+  /** "R22", or the text the member typed for Other. Null on checks sent before units were asked for. */
+  rescue_unit: string | null;
+  /** As the member typed it (trimmed). Null on checks sent before seal numbers were asked for. */
+  seal_number: string | null;
   decision_note: string | null;
   decided_by_name: string | null;
   decided_by_rank: string | null;

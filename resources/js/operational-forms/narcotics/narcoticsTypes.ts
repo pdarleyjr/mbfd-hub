@@ -21,6 +21,13 @@ export interface NarcoticsDeepLink {
 
 export interface NarcoticsFormDefinition {
     note_max_length: number;
+    /** The one server list of rescue units, in display order, "Other" last. Optional so an older answer still opens the form. */
+    rescue_units?: string[];
+    /** The option that asks for typed text (the last in the list). */
+    rescue_unit_other_option?: string;
+    rescue_unit_other_max_length?: number;
+    /** The longest seal number the server accepts. Optional so an older answer still opens the form. */
+    seal_number_max_length?: number;
     accepted_mime_types: string[];
     max_upload_bytes: number;
     max_edge: number;
@@ -59,6 +66,13 @@ export interface NarcoticsCheckSummary {
     submitter_rank: string | null;
     has_note: boolean;
     member_note: string | null;
+    /** "R22", or the typed text for Other; null on a check sent before units were asked for. */
+    rescue_unit: string | null;
+    /** The stored option and typed text, used to prefill the answer to a rejected check. */
+    rescue_unit_choice: string | null;
+    rescue_unit_other: string | null;
+    /** As typed (trimmed); null on a check sent before seal numbers were asked for. Also prefills the answer to a rejected check. */
+    seal_number: string | null;
     decision_note: string | null;
     decided_by_name: string | null;
     decided_by_rank: string | null;
@@ -85,6 +99,10 @@ export interface PreparedPhoto {
 
 export interface SendInput {
     photo: PreparedPhoto;
+    /** The option chosen, and the typed text only when that option is Other. */
+    rescueUnit: string;
+    rescueUnitOther: string | null;
+    sealNumber: string;
     note: string;
     clientSubmissionId: string;
     resubmissionOf: string | null;
