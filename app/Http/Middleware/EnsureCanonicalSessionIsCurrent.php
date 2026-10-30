@@ -45,7 +45,9 @@ final readonly class EnsureCanonicalSessionIsCurrent
                 hash_hmac('sha256', $request->session()->getId(), (string) config('app.key')),
             )
             && $this->sessions->isCurrent($user, $registered, CarbonImmutable::now())) {
-            $this->sessions->recordActivity($registered, CarbonImmutable::now());
+            if (! EnsureCanonicalMemberApiSession::isBackgroundRefresh($request)) {
+                $this->sessions->recordActivity($registered, CarbonImmutable::now());
+            }
 
             return $next($request);
         }

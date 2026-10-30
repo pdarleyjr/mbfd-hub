@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources;
 
+use App\Filament\Concerns\HasExportActions;
 use App\Filament\Resources\RosterImportResource\Pages;
 use App\Models\DailyRoster\RosterImport;
 use App\Services\DailyRoster\RosterImportActions;
@@ -20,6 +21,8 @@ use Filament\Tables\Table;
  */
 final class RosterImportResource extends Resource
 {
+    use HasExportActions;
+
     protected static ?int $navigationSort = 45;
 
     protected static ?string $model = RosterImport::class;
@@ -32,9 +35,13 @@ final class RosterImportResource extends Resource
 
     protected static ?string $modelLabel = 'roster import';
 
+    public const ATTEST_DESCRIPTION = 'The mail check could not vouch for this email, or its report layout is new. Only continue if you know it really came from TeleStaff. It goes back through every roster check, and accepting a new layout makes it the one later exports are compared with.';
+
+    public const RETRY_CLEANUP_DESCRIPTION = 'Tries again to remove this email and its attachment. Everything needed to explain the import stays on this page.';
+
     public static function table(Table $table): Table
     {
-        return $table
+        return self::withExportActions($table
             ->columns([
                 Tables\Columns\TextColumn::make('received_at')->label('Received')->dateTime('M j, Y g:i A', 'America/New_York')->sortable(),
                 Tables\Columns\TextColumn::make('duty_date')->label('Duty date')->date('M j, Y')->placeholder('Not read')->sortable(),
@@ -55,11 +62,13 @@ final class RosterImportResource extends Resource
             ->actions([
                 Tables\Actions\ViewAction::make(),
                 self::retryTableAction(),
+                self::attestTableAction(),
+                self::retryCleanupTableAction(),
                 self::activateTableAction(),
             ])
             ->bulkActions([])
             ->emptyStateHeading('No roster imports yet')
-            ->emptyStateDescription('The first TeleStaff email creates a row here on its own.');
+            ->emptyStateDescription('The first TeleStaff email creates a row here on its own.'));
     }
 
     public static function infolist(Infolist $infolist): Infolist
@@ -91,6 +100,13 @@ final class RosterImportResource extends Resource
             Infolists\Components\Section::make('Validation findings')->schema([
                 Infolists\Components\TextEntry::make('warnings')->label('Warnings')->listWithLineBreaks()->placeholder('None'),
                 Infolists\Components\TextEntry::make('classification.reasons')->label('Mail check')->listWithLineBreaks()->placeholder('Passed'),
+                Infolists\Components\TextEntry::make('classification.attestation_reason')->label('Confirmed genuine because')->placeholder('Not confirmed by an administrator'),
+            ]),
+            Infolists\Components\Section::make('Mail check evidence')->columns(1)->collapsed()->schema([
+                Infolists\Components\TextEntry::make('classification.evidence.envelope_from')->label('Envelope sender')->placeholder('Not recorded'),
+                Infolists\Components\TextEntry::make('classification.evidence.authentication_results')->label('Authentication-Results')->placeholder('Not recorded'),
+                Infolists\Components\TextEntry::make('classification.evidence.arc_authentication_results')->label('ARC-Authentication-Results')->placeholder('Not recorded'),
+                Infolists\Components\TextEntry::make('classification.evidence.received_spf')->label('Received-SPF')->placeholder('Not recorded'),
             ]),
             Infolists\Components\Section::make('Source email')->columns(2)->collapsed()->schema([
                 Infolists\Components\TextEntry::make('sender'),
@@ -209,6 +225,32 @@ final class RosterImportResource extends Resource
             ->icon('heroicon-o-arrow-path')
             ->visible(static fn (RosterImport $record): bool => self::canManage() && app(RosterImportActions::class)->canRetry($record))
             ->action(static fn (RosterImport $record) => app(RosterImportActions::class)->retry($record, auth()->user()));
+    }
+
+    public static function attestTableAction(): Tables\Actions\Action
+    {
+        return Tables\Actions\Action::make('retryAttested')
+            ->label('Confirm genuine and retry')
+            ->icon('heroicon-o-shield-check')
+            ->color('warning')
+            ->requiresConfirmation()
+            ->modalHeading('Confirm this email is the genuine TeleStaff export?')
+            ->modalDescription(self::ATTEST_DESCRIPTION)
+            ->form([Forms\Components\Textarea::make('reason')->label('How you confirmed it')->required()->maxLength(500)])
+            ->visible(static fn (RosterImport $record): bool => self::canManage() && app(RosterImportActions::class)->canRetryAttested($record))
+            ->action(static fn (RosterImport $record, array $data) => app(RosterImportActions::class)->retryAttested($record, auth()->user(), (string) $data['reason']));
+    }
+
+    public static function retryCleanupTableAction(): Tables\Actions\Action
+    {
+        return Tables\Actions\Action::make('retryCleanup')
+            ->label('Retry email cleanup')
+            ->icon('heroicon-o-trash')
+            ->color('gray')
+            ->requiresConfirmation()
+            ->modalDescription(self::RETRY_CLEANUP_DESCRIPTION)
+            ->visible(static fn (RosterImport $record): bool => self::canManage() && app(RosterImportActions::class)->canRetryCleanup($record))
+            ->action(static fn (RosterImport $record) => app(RosterImportActions::class)->retryCleanup($record, auth()->user()));
     }
 
     public static function activateTableAction(): Tables\Actions\Action

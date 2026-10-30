@@ -9,6 +9,7 @@ use App\Services\DailyRoster\TeleStaffMailClassification;
 use App\Services\DailyRoster\TeleStaffMailClassifier;
 use Illuminate\Support\Facades\Storage;
 use PHPUnit\Framework\Attributes\DataProvider;
+use ReflectionMethod;
 use Tests\TestCase;
 
 final class TeleStaffMailClassifierTest extends TestCase
@@ -45,15 +46,13 @@ final class TeleStaffMailClassifierTest extends TestCase
             'authres version' => ['mx.cloudflare.net 1; '.self::DKIM.'; '.self::DMARC],
             'method versions' => [$prefix.'dkim/1=pass header.d=miamibeachfl.gov; dmarc/1=pass header.from=miamibeachfl.gov'],
             'quoted property values' => [$prefix.'dkim=pass header.d="miamibeachfl.gov"; dmarc=pass header.from="miamibeachfl.gov"'],
-            'missing semicolons' => ['mx.cloudflare.net; dkim=pass header.d=miamibeachfl.gov spf=pass smtp.mailfrom=a@miamibeachfl.gov dmarc=pass'],
-            'no header.from, dkim aligned' => [$prefix.self::DKIM.'; dmarc=pass'],
-            'no header.from, spf aligned' => [$prefix.self::SPF.'; dmarc=pass'],
+            'missing semicolons' => ['mx.cloudflare.net; dkim=pass header.d=miamibeachfl.gov spf=pass smtp.mailfrom=a@miamibeachfl.gov dmarc=pass header.from=miamibeachfl.gov'],
             'dkim aligned through header.i' => [$prefix.'dkim=pass header.i=@miamibeachfl.gov; '.self::DMARC],
             'dkim on a subdomain' => [$prefix.'dkim=pass header.d=mail.miamibeachfl.gov; '.self::DMARC],
-            'spf on a subdomain' => [$prefix.'spf=pass smtp.mailfrom=bounce@mail.miamibeachfl.gov; '.self::DMARC],
-            'spf passes while dkim fails' => [$prefix.'dkim=fail header.d=miamibeachfl.gov; '.self::SPF.'; '.self::DMARC],
-            'dkim passes while spf fails' => [$prefix.self::DKIM.'; spf=fail smtp.mailfrom=a@miamibeachfl.gov; '.self::DMARC],
+            'spf on a subdomain beside dkim' => [$prefix.self::DKIM.'; spf=pass smtp.mailfrom=bounce@mail.miamibeachfl.gov; '.self::DMARC],
             'one of two signatures aligned' => [$prefix.'dkim=pass header.d=relay.example; '.self::DKIM.'; '.self::DMARC],
+            'another domain signature failed' => [$prefix.'dkim=fail header.d=relay.example; '.self::DKIM.'; '.self::DMARC],
+            'spf softfail beside aligned dkim' => [$prefix.self::DKIM.'; spf=softfail smtp.mailfrom=a@miamibeachfl.gov; '.self::DMARC],
             'arc and other methods ignored' => [$prefix.'arc=pass; compauth=pass reason=100; '.self::DKIM.'; '.self::DMARC],
         ];
     }
@@ -73,8 +72,8 @@ final class TeleStaffMailClassifierTest extends TestCase
         $prefix = 'mx.cloudflare.net; ';
 
         return [
-            'no results at all' => [$prefix.'none', 'authentication_results_unparseable'],
-            'only an authserv-id' => ['mx.cloudflare.net', 'authentication_results_unparseable'],
+            'no results at all' => [$prefix.'none', 'authentication_results_no_results'],
+            'only an authserv-id' => ['mx.cloudflare.net', 'authentication_results_no_results'],
             'nonsense' => ['not a header at all', 'authentication_results_foreign_authserv'],
             'unbalanced comment' => [$prefix.'dmarc=pass (oops', 'authentication_results_unparseable'],
             'stray closing parenthesis' => [$prefix.'dmarc=pass oops)', 'authentication_results_unparseable'],
@@ -83,11 +82,19 @@ final class TeleStaffMailClassifierTest extends TestCase
             'lookalike authserv' => ['mx.cloudflare.net.evil.example; '.self::DKIM.'; '.self::DMARC, 'authentication_results_foreign_authserv'],
             'dmarc none' => [$prefix.self::DKIM.'; dmarc=none header.from=miamibeachfl.gov', 'evidence_dmarc_not_pass'],
             'dmarc temperror' => [$prefix.self::DKIM.'; dmarc=temperror', 'evidence_dmarc_not_pass'],
+            'dmarc pass beside a non-pass' => [$prefix.self::DKIM.'; '.self::DMARC.'; dmarc=none', 'evidence_dmarc_not_pass'],
             'dmarc absent' => [$prefix.self::DKIM, 'evidence_dmarc_absent'],
             'dmarc pass hidden in a comment' => [$prefix.'dkim=none (dmarc=pass header.from=miamibeachfl.gov)', 'evidence_dmarc_absent'],
             'dmarc pass hidden in a quoted reason' => [$prefix.'dkim=none reason="dmarc=pass header.from=miamibeachfl.gov"', 'evidence_dmarc_absent'],
-            'dmarc pass without an identity' => [$prefix.'dmarc=pass header.from=miamibeachfl.gov', 'evidence_no_aligned_identity'],
-            'dkim pass without a domain' => [$prefix.'dkim=pass; dmarc=pass', 'evidence_no_aligned_identity'],
+            'dmarc pass without header.from' => [$prefix.self::DKIM.'; dmarc=pass', 'evidence_header_from_missing'],
+            'spf softfail alone' => [$prefix.'spf=softfail smtp.mailfrom=a@miamibeachfl.gov', 'evidence_dmarc_absent'],
+            'dmarc pass without an identity' => [$prefix.self::DMARC, 'dkim_not_aligned'],
+            'dkim pass without a domain' => [$prefix.'dkim=pass; '.self::DMARC, 'dkim_not_aligned'],
+            'spf only, no dkim' => [$prefix.self::SPF.'; '.self::DMARC, 'dkim_not_aligned'],
+            'dkim none beside spf' => [$prefix.'dkim=none; '.self::SPF.'; '.self::DMARC, 'dkim_not_aligned'],
+            'passes come from other domains' => [$prefix.'dkim=pass header.d=evil.example; spf=pass smtp.mailfrom=a@evil.example; '.self::DMARC, 'dkim_not_aligned'],
+            'lookalike dkim domain' => [$prefix.'dkim=pass header.d=miamibeachfl.gov.evil.example; '.self::DMARC, 'dkim_not_aligned'],
+            'a failed signature naming nobody' => [$prefix.'dkim=fail; '.self::DKIM.'; '.self::DMARC, 'evidence_dkim_fail_unattributed'],
             'truncated result' => [$prefix.self::DKIM.'; dmarc=pa', 'evidence_dmarc_not_pass'],
         ];
     }
@@ -111,10 +118,12 @@ final class TeleStaffMailClassifierTest extends TestCase
             'dmarc fail beside a pass' => [$prefix.self::DKIM.'; dmarc=pass; dmarc=fail', 'evidence_dmarc_fail'],
             'header.from is another domain' => [$prefix.'dkim=pass header.d=evil.example; dmarc=pass header.from=evil.example', 'evidence_header_from_mismatch'],
             'header.from only ends the same' => [$prefix.'dkim=pass header.d=notmiamibeachfl.gov; dmarc=pass header.from=notmiamibeachfl.gov', 'evidence_header_from_mismatch'],
-            'passes come from other domains' => [$prefix.'dkim=pass header.d=evil.example; spf=pass smtp.mailfrom=a@evil.example; dmarc=pass', 'evidence_identity_not_aligned'],
-            'lookalike dkim domain' => [$prefix.'dkim=pass header.d=miamibeachfl.gov.evil.example; dmarc=pass', 'evidence_identity_not_aligned'],
-            'dkim and spf both fail with no dmarc' => [$prefix.'dkim=fail header.d=miamibeachfl.gov; spf=fail smtp.mailfrom=a@miamibeachfl.gov', 'evidence_dkim_spf_fail'],
-            'spf softfail alone' => [$prefix.'spf=softfail smtp.mailfrom=a@miamibeachfl.gov', 'evidence_dkim_spf_fail'],
+            'header.from is a subdomain' => [$prefix.self::DKIM.'; dmarc=pass header.from=mail.miamibeachfl.gov', 'evidence_header_from_mismatch'],
+            'spf fail beside everything passing' => [$prefix.self::DKIM.'; spf=fail smtp.mailfrom=a@miamibeachfl.gov; '.self::DMARC, 'evidence_spf_fail'],
+            'sender domain signature fails beside spf' => [$prefix.'dkim=fail header.d=miamibeachfl.gov; '.self::SPF.'; '.self::DMARC, 'evidence_dkim_fail'],
+            'sender domain signature fails beside a pass' => [$prefix.'dkim=fail header.d=miamibeachfl.gov; '.self::DKIM.'; '.self::DMARC, 'evidence_dkim_fail'],
+            'subdomain signature fails through header.i' => [$prefix.'dkim=fail header.i=@mail.miamibeachfl.gov; '.self::DKIM.'; '.self::DMARC, 'evidence_dkim_fail'],
+            'dkim and spf both fail with no dmarc' => [$prefix.'dkim=fail header.d=miamibeachfl.gov; spf=fail smtp.mailfrom=a@miamibeachfl.gov', 'evidence_spf_fail'],
         ];
     }
 
@@ -127,7 +136,7 @@ final class TeleStaffMailClassifierTest extends TestCase
         self::assertContains($reason, $classification->reasons);
     }
 
-    public function test_arc_results_are_the_fallback_when_authentication_results_are_absent(): void
+    public function test_an_arc_claim_alone_can_match(): void
     {
         $classification = $this->classify(evidence: [
             'authentication_results' => null,
@@ -138,24 +147,24 @@ final class TeleStaffMailClassifierTest extends TestCase
         self::assertSame(['authenticated_by_arc_authentication_results'], $classification->reasons);
     }
 
-    public function test_arc_results_are_the_fallback_when_another_server_wrote_the_top_header(): void
+    public function test_an_arc_claim_matches_beside_another_servers_results(): void
     {
         $classification = $this->classify(evidence: [
             'authentication_results' => 'mail.miamibeach.example; dmarc=none',
-            'arc_authentication_results' => 'i = 1 ; mx.cloudflare.net; '.self::SPF.'; dmarc=pass',
+            'arc_authentication_results' => 'i = 1 ; mx.cloudflare.net; '.self::DKIM.'; '.self::DMARC,
         ]);
 
         self::assertSame(TeleStaffMailClassification::MATCH, $classification->verdict);
     }
 
-    public function test_arc_results_are_the_fallback_when_the_top_header_is_malformed(): void
+    public function test_two_passing_claims_both_vouch(): void
     {
         $classification = $this->classify(evidence: [
-            'authentication_results' => 'mx.cloudflare.net; dmarc=pass (oops',
             'arc_authentication_results' => 'i=1; mx.cloudflare.net; '.self::DKIM.'; '.self::DMARC,
         ]);
 
         self::assertSame(TeleStaffMailClassification::MATCH, $classification->verdict);
+        self::assertSame(['authenticated_by_authentication_results', 'authenticated_by_arc_authentication_results'], $classification->reasons);
     }
 
     public function test_arc_results_written_by_another_server_are_not_trusted(): void
@@ -169,14 +178,170 @@ final class TeleStaffMailClassifierTest extends TestCase
         self::assertSame(['authentication_results_missing', 'arc_authentication_results_foreign_authserv'], $classification->reasons);
     }
 
-    public function test_a_failure_from_cloudflare_is_never_overruled_by_arc(): void
+    /** @return array<string, array{array<string, ?string>}> */
+    public static function injectedPasses(): array
+    {
+        $pass = 'mx.cloudflare.net; '.self::DKIM.'; '.self::DMARC;
+        $fail = 'mx.cloudflare.net; dkim=none; spf=fail smtp.mailfrom=a@evil.example; dmarc=fail header.from=miamibeachfl.gov';
+
+        return [
+            'real failure in authentication results, injected pass in arc' => [['authentication_results' => $fail, 'arc_authentication_results' => 'i=1; '.$pass]],
+            'real failure in arc, injected pass in authentication results' => [['authentication_results' => $pass, 'arc_authentication_results' => 'i=1; '.$fail]],
+        ];
+    }
+
+    /** @param array<string, ?string> $evidence */
+    #[DataProvider('injectedPasses')]
+    public function test_a_failing_claim_is_never_overruled_by_a_passing_one(array $evidence): void
+    {
+        $classification = $this->classify(evidence: $evidence);
+
+        self::assertSame(TeleStaffMailClassification::REJECTED, $classification->verdict);
+        self::assertContains('evidence_dmarc_fail', $classification->reasons);
+    }
+
+    public function test_every_claim_must_pass_so_a_weaker_second_claim_holds_it(): void
     {
         $classification = $this->classify(evidence: [
-            'authentication_results' => 'mx.cloudflare.net; dmarc=fail header.from=miamibeachfl.gov',
+            'arc_authentication_results' => 'i=1; mx.cloudflare.net; '.self::SPF.'; '.self::DMARC,
+        ]);
+
+        self::assertSame(TeleStaffMailClassification::NEEDS_REVIEW, $classification->verdict);
+        self::assertSame(['dkim_not_aligned'], $classification->reasons);
+    }
+
+    public function test_an_unreadable_claim_holds_a_message_with_a_passing_one(): void
+    {
+        $classification = $this->classify(evidence: [
+            'authentication_results' => 'mx.cloudflare.net; dmarc=pass (oops',
             'arc_authentication_results' => 'i=1; mx.cloudflare.net; '.self::DKIM.'; '.self::DMARC,
         ]);
 
-        self::assertSame(TeleStaffMailClassification::REJECTED, $classification->verdict);
+        self::assertSame(TeleStaffMailClassification::NEEDS_REVIEW, $classification->verdict);
+        self::assertSame(['authentication_results_unparseable'], $classification->reasons);
+    }
+
+    public function test_more_than_one_claim_of_a_kind_holds_even_when_the_forwarded_one_passes(): void
+    {
+        $classification = $this->classify(evidence: [
+            'cloudflare_claims' => ['authentication_results' => 2, 'arc_authentication_results' => 0],
+        ]);
+
+        self::assertSame(TeleStaffMailClassification::NEEDS_REVIEW, $classification->verdict);
+        self::assertSame(['authentication_results_multiple_claims'], $classification->reasons);
+    }
+
+    public function test_a_claim_the_worker_counted_but_did_not_forward_holds_the_message(): void
+    {
+        // A passing ARC claim, while Cloudflare's own results sit below a foreign header.
+        $classification = $this->classify(evidence: [
+            'authentication_results' => 'relay.example; dmarc=pass',
+            'arc_authentication_results' => 'i=1; mx.cloudflare.net; '.self::DKIM.'; '.self::DMARC,
+            'cloudflare_claims' => ['authentication_results' => 1, 'arc_authentication_results' => 1],
+        ]);
+
+        self::assertSame(TeleStaffMailClassification::NEEDS_REVIEW, $classification->verdict);
+        self::assertSame(['authentication_results_claim_not_forwarded'], $classification->reasons);
+    }
+
+    public function test_a_forwarded_claim_the_worker_did_not_count_holds_the_message(): void
+    {
+        $classification = $this->classify(evidence: [
+            'cloudflare_claims' => ['authentication_results' => 0, 'arc_authentication_results' => 0],
+        ]);
+
+        self::assertSame(TeleStaffMailClassification::NEEDS_REVIEW, $classification->verdict);
+        self::assertSame(['authentication_results_claim_count_mismatch'], $classification->reasons);
+    }
+
+    public function test_a_passing_claim_without_the_workers_counts_is_held(): void
+    {
+        $classification = $this->classify(evidence: ['cloudflare_claims' => null]);
+
+        self::assertSame(TeleStaffMailClassification::NEEDS_REVIEW, $classification->verdict);
+        self::assertSame(['cloudflare_claims_missing'], $classification->reasons);
+    }
+
+    public function test_truncated_evidence_is_held_even_when_the_rest_passes(): void
+    {
+        $classification = $this->classify(evidence: ['truncated' => true]);
+
+        self::assertSame(TeleStaffMailClassification::NEEDS_REVIEW, $classification->verdict);
+        self::assertSame(['evidence_truncated'], $classification->reasons);
+    }
+
+    public function test_truncated_evidence_with_no_claim_left_to_read_is_held(): void
+    {
+        $classification = $this->classify(evidence: [
+            'authentication_results' => null,
+            'truncated' => true,
+            'cloudflare_claims' => ['authentication_results' => 1, 'arc_authentication_results' => 0],
+        ]);
+
+        self::assertSame(TeleStaffMailClassification::NEEDS_REVIEW, $classification->verdict);
+        self::assertSame(['evidence_truncated', 'authentication_results_claim_not_forwarded'], $classification->reasons);
+    }
+
+    /**
+     * The same table is in cloudflare-email-worker/tests/envelope.test.ts: a header one side reads as a
+     * claim and the other does not would let an injected claim go uncounted.
+     *
+     * @return array<string, array{string, bool, bool}>
+     */
+    public static function claimReadings(): array
+    {
+        return [
+            'plain' => ['mx.cloudflare.net; dmarc=pass', false, true],
+            'mixed case' => ['MX.CloudFlare.NET; dmarc=pass', false, true],
+            'alone' => ['mx.cloudflare.net', false, true],
+            'version' => ['mx.cloudflare.net 1; dmarc=pass', false, true],
+            'spaces' => ['  mx.cloudflare.net ;dmarc=pass', false, true],
+            'leading comment' => ['(by cloudflare) mx.cloudflare.net; dmarc=pass', false, true],
+            'quoted' => ['"mx.cloudflare.net"; dmarc=pass', false, true],
+            'unbalanced' => ['mx.cloudflare.net; dmarc=pass (oops', false, true],
+            'unbalanced foreign mentioning it' => ['relay.example; x=(mx.cloudflare.net', false, true],
+            'arc' => ['i=1; mx.cloudflare.net; dmarc=pass', true, true],
+            'arc spaced' => ['i = 12 ; mx.cloudflare.net; dmarc=pass', true, true],
+            'arc without an instance' => ['mx.cloudflare.net; dmarc=pass', true, true],
+            'instance outside arc' => ['i=1; mx.cloudflare.net; dmarc=pass', false, false],
+            'arc from another server' => ['i=1; relay.example; dmarc=pass', true, false],
+            'named only in a comment' => ['relay.example; dmarc=pass (mx.cloudflare.net)', false, false],
+            'longer domain' => ['mx.cloudflare.net.evil.example; dmarc=pass', false, false],
+            'prefixed domain' => ['notmx.cloudflare.net; dmarc=pass', false, false],
+            'comment before another server' => ['(mx.cloudflare.net) relay.example; dmarc=pass', false, false],
+            'empty' => ['', false, false],
+        ];
+    }
+
+    #[DataProvider('claimReadings')]
+    public function test_a_header_reads_as_a_cloudflare_claim_the_same_as_in_the_worker(string $header, bool $isArc, bool $expected): void
+    {
+        $reading = (new ReflectionMethod(TeleStaffMailClassifier::class, 'readClaim'))->invoke(new TeleStaffMailClassifier, $header, $isArc, 'mx.cloudflare.net');
+
+        self::assertSame($expected, $reading !== 'foreign_authserv');
+    }
+
+    public function test_the_classification_carries_the_evidence_for_the_ledger(): void
+    {
+        $classification = $this->classify(evidence: ['received_spf' => 'pass (mx.cloudflare.net)']);
+
+        self::assertEquals([
+            'envelope_from' => self::SENDER,
+            'authentication_results' => 'mx.cloudflare.net; '.self::DKIM.'; '.self::SPF.'; '.self::DMARC,
+            'arc_authentication_results' => null,
+            'received_spf' => 'pass (mx.cloudflare.net)',
+            'cloudflare_claims' => ['authentication_results' => 1, 'arc_authentication_results' => 0],
+            'truncated' => false,
+        ], $classification->evidence);
+        self::assertSame($classification->evidence, $classification->toLedger()['evidence']);
+    }
+
+    public function test_ordinary_mail_carries_no_evidence(): void
+    {
+        $classification = $this->classifyEmail($this->email(['from_address' => 'vendor@example.test', 'subject' => 'Quote', 'attachment_metadata' => null]));
+
+        self::assertTrue($classification->isOrdinary());
+        self::assertSame([], $classification->evidence);
     }
 
     public function test_missing_evidence_is_held_and_says_which(): void
@@ -185,6 +350,7 @@ final class TeleStaffMailClassifierTest extends TestCase
 
         self::assertSame(TeleStaffMailClassification::NEEDS_REVIEW, $classification->verdict);
         self::assertSame(['authentication_results_missing', 'arc_authentication_results_missing'], $classification->reasons);
+        self::assertArrayNotHasKey('evidence', $classification->toLedger());
     }
 
     /** @return array<string, array{?string, string}> */
@@ -345,17 +511,37 @@ final class TeleStaffMailClassifierTest extends TestCase
         self::assertContains($reason, $classification->reasons);
     }
 
-    /** @param array<string, ?string> $evidence */
+    /**
+     * The Worker's counts follow the headers given, unless the test says otherwise.
+     *
+     * @param  array<string, mixed>  $evidence
+     */
     private function classify(array $evidence): TeleStaffMailClassification
     {
+        $merged = array_replace([
+            'envelope_from' => self::SENDER,
+            'authentication_results' => 'mx.cloudflare.net; '.self::DKIM.'; '.self::SPF.'; '.self::DMARC,
+            'arc_authentication_results' => null,
+            'received_spf' => null,
+            'truncated' => false,
+        ], $evidence);
+
         return $this->classifyEmail($this->email([
-            'transport_evidence' => array_replace([
-                'envelope_from' => self::SENDER,
-                'authentication_results' => 'mx.cloudflare.net; '.self::DKIM.'; '.self::SPF.'; '.self::DMARC,
-                'arc_authentication_results' => null,
-                'received_spf' => null,
-            ], $evidence),
+            'transport_evidence' => [
+                ...$merged,
+                'cloudflare_claims' => array_key_exists('cloudflare_claims', $evidence) ? $evidence['cloudflare_claims'] : [
+                    'authentication_results' => self::claimCount($merged['authentication_results'], false),
+                    'arc_authentication_results' => self::claimCount($merged['arc_authentication_results'], true),
+                ],
+            ],
         ]));
+    }
+
+    private static function claimCount(?string $header, bool $isArc): int
+    {
+        $prefix = $isArc ? '(?:i\s*=\s*\d+\s*;)?' : '';
+
+        return preg_match('/^\s*'.$prefix.'\s*mx\.cloudflare\.net(?=[\s;(]|$)/i', (string) $header) === 1 ? 1 : 0;
     }
 
     private function classifyEmail(InboundEmail $email): TeleStaffMailClassification
@@ -379,6 +565,8 @@ final class TeleStaffMailClassifierTest extends TestCase
                 'authentication_results' => 'mx.cloudflare.net; '.self::DKIM.'; '.self::SPF.'; '.self::DMARC,
                 'arc_authentication_results' => null,
                 'received_spf' => null,
+                'cloudflare_claims' => ['authentication_results' => 1, 'arc_authentication_results' => 0],
+                'truncated' => false,
             ],
         ], $attributes));
     }

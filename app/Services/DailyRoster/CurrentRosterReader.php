@@ -47,26 +47,40 @@ final class CurrentRosterReader
         return $pointer === null ? null : $this->view($pointer);
     }
 
-    public function sectionForRole(?CarbonInterface $at, string $role): ?RosterSectionView
+    /**
+     * Every section carrying this role on the duty day's roster, in sheet order. A role is meant to be
+     * on one section, but the export is not ours, so consumers must see when it is on two.
+     *
+     * @return list<RosterSectionView>
+     */
+    public function sectionsForRole(?CarbonInterface $at, string $role): array
     {
         $pointer = RosterActiveVersion::query()
             ->whereDate('duty_date', $this->calendar->dutyDate($at)->format('Y-m-d'))
             ->first();
         if ($pointer === null || $pointer->roster_snapshot_id === null) {
-            return null;
+            return [];
         }
 
-        $section = RosterSection::query()
+        $sections = RosterSection::query()
             ->where('roster_snapshot_id', $pointer->roster_snapshot_id)
             ->where('section_role', $role)
-            ->first();
-        if ($section === null) {
-            return null;
+            ->orderBy('position')
+            ->get();
+        if ($sections->isEmpty()) {
+            return [];
         }
 
-        return new RosterSectionView($section, array_values(
-            RosterAssignment::query()->where('roster_section_id', $section->id)->orderBy('position')->get()->all()
-        ));
+        $assignments = RosterAssignment::query()
+            ->whereIn('roster_section_id', $sections->modelKeys())
+            ->orderBy('position')
+            ->get()
+            ->groupBy('roster_section_id');
+
+        return $sections
+            ->map(static fn (RosterSection $section): RosterSectionView => new RosterSectionView($section, array_values($assignments->get($section->id)?->all() ?? [])))
+            ->values()
+            ->all();
     }
 
     /** @return list<string> Duty dates with a published roster, newest first */
@@ -99,6 +113,6 @@ final class CurrentRosterReader
             $sections[] = new RosterSectionView($section, array_values($assignments->get($section->id)?->all() ?? []));
         }
 
-        return new RosterView($snapshot, $sections, $pointer->last_confirmed_at, $pointer->updated_at);
+        return new RosterView($snapshot, $sections, $pointer->last_confirmed_at, $pointer->updated_at?->toImmutable());
     }
 }

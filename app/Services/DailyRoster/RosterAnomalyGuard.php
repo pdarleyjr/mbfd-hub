@@ -125,11 +125,17 @@ final class RosterAnomalyGuard
         if ($this->unknownCodesAreHigh($report, $count)) {
             $reasons[] = self::UNKNOWN_CODES_HIGH;
         }
-        if ($previous->layout_fingerprint !== $report->layoutFingerprint) {
+        if ($previous->layout_fingerprint !== $report->layoutFingerprint && ! $this->isAttested($import)) {
             $reasons[] = self::LAYOUT_CHANGED;
         }
 
         return $reasons;
+    }
+
+    /** An administrator accepted this export, so a new layout becomes the baseline instead of holding it again. */
+    private function isAttested(RosterImport $import): bool
+    {
+        return in_array(RosterImportOperations::ATTESTED, (array) ($import->classification['reasons'] ?? []), true);
     }
 
     /**

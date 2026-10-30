@@ -162,7 +162,7 @@ Schedule::command('department-updates:send-due-notifications')
 
 Schedule::command('daily-roster:reconcile')
     ->everyMinute()
-    ->withoutOverlapping()
+    ->withoutOverlapping(5)
     ->onOneServer();
 
 Schedule::command('inspections:retry-notifications')

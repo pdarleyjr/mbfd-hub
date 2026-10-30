@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property array<string, mixed>|null $safe_headers
  * @property list<array{filename: string, mime_type: string, size: int, disk: string, path: string}>|null $attachment_metadata
  * @property list<string>|null $references
- * @property array{envelope_from: ?string, authentication_results: ?string, arc_authentication_results: ?string, received_spf: ?string}|null $transport_evidence
+ * @property array{envelope_from: ?string, authentication_results: ?string, arc_authentication_results: ?string, received_spf: ?string, cloudflare_claims?: array{authentication_results?: int, arc_authentication_results?: int}|null, truncated?: bool}|null $transport_evidence
  */
 final class InboundEmail extends Model
 {

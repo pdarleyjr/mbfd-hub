@@ -34,19 +34,96 @@ export function encodeBase64(content: string | ArrayBuffer | Uint8Array): string
   return btoa(binary);
 }
 
-const EVIDENCE_MAX_LENGTH = 2048;
+const EVIDENCE_MAX_LENGTH = 4096;
 
-// Email Routing prepends its own results, so only the first occurrence in raw header order is
-// Cloudflare's; later ones may have been written by the sender. message.headers merges duplicates
-// and cannot identify it, but postal-mime's parsed.headers keeps the raw top-to-bottom order.
-export function firstHeaderValue(headers: readonly { key: string; value: string }[], name: string): string | null {
-  const value = headers.find((header) => header.key === name)?.value;
-  if (value === undefined) {
-    return null;
+const CLOUDFLARE_AUTHSERV_ID = "mx.cloudflare.net";
+
+type RawHeader = { key: string; value: string };
+
+function cleanHeaderValue(value: string): string {
+  return value.replace(/[\u0000-\u001f\u007f-\u009f]/g, "");
+}
+
+// Forwards the first occurrence in raw header order. message.headers merges duplicates, but
+// postal-mime's parsed.headers keeps the raw top-to-bottom order. A value over the cap is never cut:
+// half a results header reads as a different verdict, so it goes as null with truncated set.
+export function firstHeaderValue(headers: readonly RawHeader[], name: string): { value: string | null; truncated: boolean } {
+  const raw = headers.find((header) => header.key === name)?.value;
+  const clean = raw === undefined ? "" : cleanHeaderValue(raw);
+  if (clean.length > EVIDENCE_MAX_LENGTH) {
+    return { value: null, truncated: true };
   }
-  const clean = value.replace(/[\u0000-\u001f\u007f-\u009f]/g, "").slice(0, EVIDENCE_MAX_LENGTH);
 
-  return clean === "" ? null : clean;
+  return { value: clean === "" ? null : clean, truncated: false };
+}
+
+// RFC 8601 comments may hold anything, including text shaped like an authserv-id. Null means quotes or
+// parentheses do not balance. Mirrors TeleStaffMailClassifier::stripComments in the Hub, so both sides
+// agree on what a header claims.
+function stripComments(header: string): string | null {
+  let output = "";
+  let depth = 0;
+  let inQuote = false;
+  for (let index = 0; index < header.length; index++) {
+    const character = header[index];
+    if (character === "\\" && (inQuote || depth > 0)) {
+      if (inQuote) {
+        output += character + (header[index + 1] ?? "");
+      }
+      index++;
+    } else if (inQuote) {
+      output += character;
+      inQuote = character !== '"';
+    } else if (character === "(") {
+      depth++;
+    } else if (character === ")") {
+      if (--depth < 0) {
+        return null;
+      }
+    } else if (depth === 0) {
+      output += character;
+      inQuote = character === '"';
+    }
+  }
+
+  return depth === 0 && !inQuote ? output : null;
+}
+
+// Whether this header names Cloudflare as its author. A header too damaged to read counts as a claim
+// when it mentions Cloudflare at all: counting too many only holds a message for review.
+export function claimsCloudflare(value: string, isArc: boolean): boolean {
+  const clean = cleanHeaderValue(value);
+  const text = stripComments(clean);
+  if (text === null) {
+    return clean.toLowerCase().includes(CLOUDFLARE_AUTHSERV_ID);
+  }
+  const body = isArc ? text.replace(/^[ \t]*i[ \t]*=[ \t]*\d+[ \t]*;/i, "") : text;
+  const authservId = /^[ \t]*([^ \t;]+)/.exec(body)?.[1] ?? "";
+
+  return authservId.replace(/^"|"$/g, "").toLowerCase() === CLOUDFLARE_AUTHSERV_ID;
+}
+
+function countCloudflareClaims(headers: readonly RawHeader[], name: string, isArc: boolean): number {
+  return headers.filter((header) => header.key === name && claimsCloudflare(header.value, isArc)).length;
+}
+
+// Which header Cloudflare writes has not been observed live, so nothing here assumes one kind or a
+// position. The counts let the Hub see a second claim it was not sent: the real one plus an injected one.
+export function authenticationEvidence(headers: readonly RawHeader[]) {
+  const results = firstHeaderValue(headers, "authentication-results");
+  const arcResults = firstHeaderValue(headers, "arc-authentication-results");
+  const receivedSpf = firstHeaderValue(headers, "received-spf");
+
+  return {
+    authentication_results: results.value,
+    arc_authentication_results: arcResults.value,
+    received_spf: receivedSpf.value,
+    cloudflare_claims: {
+      authentication_results: countCloudflareClaims(headers, "authentication-results", false),
+      arc_authentication_results: countCloudflareClaims(headers, "arc-authentication-results", true),
+    },
+    truncated: results.truncated || arcResults.truncated || receivedSpf.truncated,
+  };
 }
 
 export default {
@@ -86,11 +163,7 @@ export default {
       from: parsed.from?.address || message.from,
       from_name: parsed.from?.name || null,
       envelope_from: message.from,
-      authentication_evidence: {
-        authentication_results: firstHeaderValue(parsed.headers, "authentication-results"),
-        arc_authentication_results: firstHeaderValue(parsed.headers, "arc-authentication-results"),
-        received_spf: firstHeaderValue(parsed.headers, "received-spf"),
-      },
+      authentication_evidence: authenticationEvidence(parsed.headers),
       to: message.to,
       subject: parsed.subject || null,
       text: parsed.text || null,

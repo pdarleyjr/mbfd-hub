@@ -14,6 +14,11 @@ use Throwable;
  * Mail unrelated to the export leaves on the first check, touching nothing but values already
  * in memory. Sender, subject, filename and every header value are untrusted input: a From
  * header alone proves nothing, so a match also needs Cloudflare's authentication results.
+ *
+ * Which header Cloudflare writes has not been observed live, so neither kind is favoured: every
+ * forwarded header naming Cloudflare's authserv-id is a claim and every claim must pass. A forged
+ * message always carries Cloudflare's real failing claim beside any injected passing one, so
+ * all-must-pass closes injection, provided Cloudflare always adds at least one.
  */
 final class TeleStaffMailClassifier
 {
@@ -27,7 +32,41 @@ final class TeleStaffMailClassifier
 
     private const EVIDENCE_INCONCLUSIVE = 'inconclusive';
 
+    /** Forwarded header => whether it carries the ARC `i=N;` prefix. */
+    private const CLAIM_SOURCES = ['authentication_results' => false, 'arc_authentication_results' => true];
+
+    private const HEADER_MISSING = 'missing';
+
+    private const HEADER_FOREIGN = 'foreign_authserv';
+
+    private const CLAIM_UNPARSEABLE = 'unparseable';
+
+    private const CLAIM_NO_RESULTS = 'no_results';
+
     public function classify(InboundEmail $email): TeleStaffMailClassification
+    {
+        $classification = $this->decide($email);
+
+        return $classification->isOrdinary()
+            ? $classification
+            : new TeleStaffMailClassification($classification->verdict, $classification->reasons, self::evidenceSummary($email));
+    }
+
+    /**
+     * The transport facts the ledger keeps once the email is gone.
+     *
+     * @return array<string, mixed>
+     */
+    public static function evidenceSummary(InboundEmail $email): array
+    {
+        $evidence = is_array($email->transport_evidence) ? $email->transport_evidence : [];
+
+        return array_intersect_key($evidence, array_flip([
+            'envelope_from', 'authentication_results', 'arc_authentication_results', 'received_spf', 'cloudflare_claims', 'truncated',
+        ]));
+    }
+
+    private function decide(InboundEmail $email): TeleStaffMailClassification
     {
         /** @var array{sender: string, sender_domain: string, subject: string, filename: string, authserv_id: string} $rules */
         $rules = config('daily_roster.classifier');
@@ -166,155 +205,195 @@ final class TeleStaffMailClassifier
     }
 
     /**
-     * Reads the results Cloudflare authored. The topmost Authentication-Results wins; the ARC copy
-     * is only consulted when that header is absent, unparseable or written by another server.
+     * Every readable claim's failure outranks everything else: Cloudflare's real result on a forgery
+     * reads the same whatever else the message carries. Then any doubt about the claims holds it, and
+     * only claims that all pass, plus an aligned envelope, can match.
      *
      * @return array{0: string, 1: list<string>}
      */
     private function evaluateEvidence(InboundEmail $email, string $senderDomain, string $authservId): array
     {
         $evidence = is_array($email->transport_evidence) ? $email->transport_evidence : [];
-        $reasons = [];
+        [$claims, $doubts, $absences] = $this->collectClaims($evidence, $authservId);
 
-        foreach (['authentication_results' => false, 'arc_authentication_results' => true] as $source => $isArc) {
-            $header = $evidence[$source] ?? null;
-            if (! is_string($header) || trim($header) === '') {
-                $reasons[] = $source.'_missing';
-
-                continue;
-            }
-
-            $results = $this->parseResults($header, $isArc, $authservId);
-            if (is_string($results)) {
-                $reasons[] = $source.'_'.$results;
-
-                continue;
-            }
-
-            [$status, $resultReasons] = $this->judgeResults($results, $senderDomain);
-            if ($status !== self::EVIDENCE_PASS) {
-                return [$status, $resultReasons];
-            }
-
-            return $this->judgeEnvelope($evidence['envelope_from'] ?? null, $senderDomain, $source);
+        $failures = [];
+        foreach ($claims as $results) {
+            $failures = [...$failures, ...$this->claimFailures($results, $senderDomain)];
+        }
+        if ($failures !== []) {
+            return [self::EVIDENCE_FAIL, array_values(array_unique($failures))];
         }
 
-        return [self::EVIDENCE_INCONCLUSIVE, $reasons];
+        if (($evidence['truncated'] ?? false) === true) {
+            array_unshift($doubts, 'evidence_truncated');
+        }
+        if ($claims === [] && $doubts === []) {
+            return [self::EVIDENCE_INCONCLUSIVE, $absences];
+        }
+
+        foreach ($claims as $results) {
+            $doubts = [...$doubts, ...$this->claimDoubts($results, $senderDomain)];
+        }
+        if ($doubts !== []) {
+            return [self::EVIDENCE_INCONCLUSIVE, array_values(array_unique($doubts))];
+        }
+
+        return $this->judgeEnvelope($evidence['envelope_from'] ?? null, $senderDomain, array_keys($claims));
     }
 
-    /** @return array{0: string, 1: list<string>} */
-    private function judgeEnvelope(mixed $envelopeFrom, string $senderDomain, string $source): array
+    /**
+     * Reads the forwarded headers against the Worker's counts. The counts cover headers the Worker did
+     * not forward, so a claim it saw but did not send can never be passed over: one sitting below another
+     * server's header would otherwise let a clean claim of the other kind match on its own. Returns the
+     * parsed claims by source, the doubts that block a match, and which headers said nothing.
+     *
+     * @param  array<string, mixed>  $evidence
+     * @return array{0: array<string, list<array{method: string, result: string, properties: array<string, string>}>>, 1: list<string>, 2: list<string>}
+     */
+    private function collectClaims(array $evidence, string $authservId): array
+    {
+        $counts = is_array($evidence['cloudflare_claims'] ?? null) ? $evidence['cloudflare_claims'] : null;
+        $claims = [];
+        $doubts = [];
+        $absences = [];
+
+        foreach (self::CLAIM_SOURCES as $source => $isArc) {
+            $header = $evidence[$source] ?? null;
+            $reading = is_string($header) && trim($header) !== ''
+                ? $this->readClaim($header, $isArc, $authservId)
+                : self::HEADER_MISSING;
+            $count = is_int($counts[$source] ?? null) ? $counts[$source] : null;
+            $isClaim = ! in_array($reading, [self::HEADER_MISSING, self::HEADER_FOREIGN], true);
+
+            if (is_array($reading)) {
+                $claims[$source] = $reading;
+            } elseif ($isClaim) {
+                $doubts[] = $source.'_'.$reading;
+            } else {
+                $absences[] = $source.'_'.$reading;
+            }
+
+            if ($count > 1) {
+                $doubts[] = $source.'_multiple_claims';
+            } elseif ($count === 1 && ! $isClaim) {
+                $doubts[] = $source.'_claim_not_forwarded';
+            } elseif ($count === 0 && $isClaim) {
+                $doubts[] = $source.'_claim_count_mismatch';
+            }
+        }
+
+        if ($counts === null && ($claims !== [] || $doubts !== [])) {
+            $doubts[] = 'cloudflare_claims_missing';
+        }
+
+        return [$claims, $doubts, $absences];
+    }
+
+    /**
+     * @param  list<array{method: string, result: string, properties: array<string, string>}>  $results
+     * @return list<string> What this claim says went wrong for the sender's domain
+     */
+    private function claimFailures(array $results, string $senderDomain): array
+    {
+        $failures = [];
+        foreach ($results as $result) {
+            if ($result['method'] === 'dmarc' && $result['result'] === 'fail') {
+                $failures[] = 'evidence_dmarc_fail';
+            } elseif ($result['method'] === 'spf' && $result['result'] === 'fail') {
+                $failures[] = 'evidence_spf_fail';
+            } elseif ($result['method'] === 'dkim' && $result['result'] === 'fail' && self::dkimIsAligned($result, $senderDomain)) {
+                $failures[] = 'evidence_dkim_fail';
+            } elseif ($result['method'] === 'dmarc' && $result['result'] === 'pass'
+                && isset($result['properties']['header.from'])
+                && self::domainOf($result['properties']['header.from']) !== $senderDomain) {
+                // Our From said the sender's domain and Cloudflare judged a different one.
+                $failures[] = 'evidence_header_from_mismatch';
+            }
+        }
+
+        return $failures;
+    }
+
+    /**
+     * What a match still needs from one claim: DMARC passed for exactly the sender's domain, and a
+     * DKIM signature passed for it. SPF alone never matches, because it survives a forged From.
+     *
+     * @param  list<array{method: string, result: string, properties: array<string, string>}>  $results
+     * @return list<string>
+     */
+    private function claimDoubts(array $results, string $senderDomain): array
+    {
+        $dmarc = array_filter($results, static fn (array $result): bool => $result['method'] === 'dmarc');
+        $dkim = array_filter($results, static fn (array $result): bool => $result['method'] === 'dkim');
+        $doubts = [];
+
+        if ($dmarc === []) {
+            $doubts[] = 'evidence_dmarc_absent';
+        } elseif (array_filter($dmarc, static fn (array $result): bool => $result['result'] !== 'pass') !== []) {
+            $doubts[] = 'evidence_dmarc_not_pass';
+        } elseif (array_filter($dmarc, static fn (array $result): bool => ! isset($result['properties']['header.from'])) !== []) {
+            $doubts[] = 'evidence_header_from_missing';
+        }
+
+        $alignedPass = array_filter($dkim, static fn (array $result): bool => $result['result'] === 'pass' && self::dkimIsAligned($result, $senderDomain));
+        if ($alignedPass === []) {
+            $doubts[] = 'dkim_not_aligned';
+        }
+        // A failed signature that does not say whose it was could be the sender's.
+        if (array_filter($dkim, static fn (array $result): bool => $result['result'] === 'fail' && ! isset($result['properties']['header.d']) && ! isset($result['properties']['header.i'])) !== []) {
+            $doubts[] = 'evidence_dkim_fail_unattributed';
+        }
+
+        return $doubts;
+    }
+
+    /** @param array{method: string, result: string, properties: array<string, string>} $result */
+    private static function dkimIsAligned(array $result, string $senderDomain): bool
+    {
+        foreach (['header.d', 'header.i'] as $property) {
+            if (isset($result['properties'][$property]) && self::isAligned(self::domainOf($result['properties'][$property]), $senderDomain)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param  list<string>  $sources
+     * @return array{0: string, 1: list<string>}
+     */
+    private function judgeEnvelope(mixed $envelopeFrom, string $senderDomain, array $sources): array
     {
         if (! is_string($envelopeFrom) || trim($envelopeFrom) === '') {
             return [self::EVIDENCE_INCONCLUSIVE, ['envelope_from_missing']];
         }
 
         return self::isAligned(self::domainOf($envelopeFrom), $senderDomain)
-            ? [self::EVIDENCE_PASS, ['authenticated_by_'.$source]]
+            ? [self::EVIDENCE_PASS, array_map(static fn (string $source): string => 'authenticated_by_'.$source, $sources)]
             : [self::EVIDENCE_INCONCLUSIVE, ['envelope_from_not_aligned']];
     }
 
     /**
-     * @param  list<array{method: string, result: string, properties: array<string, string>}>  $results
-     * @return array{0: string, 1: list<string>}
-     */
-    private function judgeResults(array $results, string $senderDomain): array
-    {
-        $byMethod = ['dmarc' => [], 'dkim' => [], 'spf' => []];
-        foreach ($results as $result) {
-            if (isset($byMethod[$result['method']])) {
-                $byMethod[$result['method']][] = $result;
-            }
-        }
-
-        $dmarcPasses = [];
-        foreach ($byMethod['dmarc'] as $dmarc) {
-            if ($dmarc['result'] === 'fail') {
-                return [self::EVIDENCE_FAIL, ['evidence_dmarc_fail']];
-            }
-            if ($dmarc['result'] === 'pass') {
-                $dmarcPasses[] = $dmarc;
-            }
-        }
-
-        $identityResults = [...$byMethod['dkim'], ...$byMethod['spf']];
-        if ($dmarcPasses === []) {
-            return $this->judgeWithoutDmarcPass($byMethod['dmarc'], $identityResults);
-        }
-
-        foreach ($dmarcPasses as $dmarc) {
-            $headerFrom = $dmarc['properties']['header.from'] ?? null;
-            if ($headerFrom !== null && self::domainOf($headerFrom) !== $senderDomain) {
-                return [self::EVIDENCE_FAIL, ['evidence_header_from_mismatch']];
-            }
-        }
-
-        $sawForeignIdentity = false;
-        foreach ($identityResults as $result) {
-            if ($result['result'] !== 'pass') {
-                continue;
-            }
-            foreach ($result['method'] === 'dkim' ? ['header.d', 'header.i'] : ['smtp.mailfrom'] as $property) {
-                $value = $result['properties'][$property] ?? null;
-                if ($value === null) {
-                    continue;
-                }
-                if (self::isAligned(self::domainOf($value), $senderDomain)) {
-                    return [self::EVIDENCE_PASS, []];
-                }
-                $sawForeignIdentity = true;
-            }
-        }
-
-        return $sawForeignIdentity
-            ? [self::EVIDENCE_FAIL, ['evidence_identity_not_aligned']]
-            : [self::EVIDENCE_INCONCLUSIVE, ['evidence_no_aligned_identity']];
-    }
-
-    /**
-     * @param  list<array{method: string, result: string, properties: array<string, string>}>  $dmarcResults
-     * @param  list<array{method: string, result: string, properties: array<string, string>}>  $identityResults
-     * @return array{0: string, 1: list<string>}
-     */
-    private function judgeWithoutDmarcPass(array $dmarcResults, array $identityResults): array
-    {
-        if ($dmarcResults !== []) {
-            return [self::EVIDENCE_INCONCLUSIVE, ['evidence_dmarc_not_pass']];
-        }
-
-        $anyPass = false;
-        $anyFail = false;
-        foreach ($identityResults as $result) {
-            $anyPass = $anyPass || $result['result'] === 'pass';
-            $anyFail = $anyFail || in_array($result['result'], ['fail', 'softfail'], true);
-        }
-
-        return $anyFail && ! $anyPass
-            ? [self::EVIDENCE_FAIL, ['evidence_dkim_spf_fail']]
-            : [self::EVIDENCE_INCONCLUSIVE, ['evidence_dmarc_absent']];
-    }
-
-    /**
-     * RFC 8601 results, tolerant of comments, whitespace and missing semicolons. Quoted values stay
-     * values, so reason="dmarc=pass" can never be read as a result.
+     * RFC 8601 results of a header claiming Cloudflare, tolerant of comments, whitespace and missing
+     * semicolons. Quoted values stay values, so reason="dmarc=pass" can never be read as a result. A
+     * header too damaged to read counts as a claim when it mentions Cloudflare at all, matching the Worker.
      *
      * @return list<array{method: string, result: string, properties: array<string, string>}>|string
-     *                                                                                               The results, or a failure code
+     *                                                                                               The results, or a code saying why there are none
      */
-    private function parseResults(string $header, bool $isArc, string $authservId): array|string
+    private function readClaim(string $header, bool $isArc, string $authservId): array|string
     {
         $text = self::stripComments($header);
         if ($text === null) {
-            return 'unparseable';
+            return stripos($header, $authservId) === false ? self::HEADER_FOREIGN : self::CLAIM_UNPARSEABLE;
         }
         if ($isArc) {
             $text = (string) preg_replace('/^\s*i\s*=\s*\d+\s*;/i', '', $text);
         }
-        if (preg_match('/^\s*([^\s;]+)(.*)$/s', $text, $parts) !== 1) {
-            return 'unparseable';
-        }
-        if (strtolower($parts[1]) !== strtolower($authservId)) {
-            return 'foreign_authserv';
+        if (preg_match('/^\s*([^\s;]+)(.*)$/s', $text, $parts) !== 1
+            || strtolower((string) preg_replace('/^"|"$/', '', $parts[1])) !== strtolower($authservId)) {
+            return self::HEADER_FOREIGN;
         }
 
         preg_match_all(
@@ -324,20 +403,27 @@ final class TeleStaffMailClassifier
             PREG_SET_ORDER,
         );
 
-        $results = [];
+        $methods = [];
+        /** @var array<int, array<string, string>> $properties */
+        $properties = [];
         foreach ($pairs as [, $key, $value]) {
             $key = strtolower($key);
             $value = self::unquote($value);
             if (str_contains($key, '.')) {
-                if ($results !== [] && ! isset($results[array_key_last($results)]['properties'][$key])) {
-                    $results[array_key_last($results)]['properties'][$key] = strtolower($value);
+                if ($methods !== []) {
+                    $properties[count($methods) - 1][$key] ??= strtolower($value);
                 }
             } elseif ($key !== 'reason' && $key !== 'action') {
-                $results[] = ['method' => explode('/', $key)[0], 'result' => strtolower($value), 'properties' => []];
+                $methods[] = ['method' => explode('/', $key)[0], 'result' => strtolower($value)];
             }
         }
 
-        return $results === [] ? 'unparseable' : $results;
+        $results = [];
+        foreach ($methods as $index => $method) {
+            $results[] = [...$method, 'properties' => $properties[$index] ?? []];
+        }
+
+        return $results === [] ? self::CLAIM_NO_RESULTS : $results;
     }
 
     /** @return string|null Null when quotes or parentheses do not balance. */

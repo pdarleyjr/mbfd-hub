@@ -173,6 +173,20 @@ final class RosterAnomalyGuardTest extends TestCase
         self::assertSame([RosterAnomalyGuard::LAYOUT_CHANGED], $this->check(RosterPipelineFixtures::report(self::DATE, ['layout' => str_repeat('b', 64)])));
     }
 
+    public function test_an_attested_export_skips_only_the_layout_hold(): void
+    {
+        $this->publishBaseline('2026-10-29');
+        $attested = RosterPipelineFixtures::import(['classification' => ['verdict' => 'match', 'reasons' => ['operator_attested', 'evidence_dmarc_fail']]]);
+
+        $guard = app(RosterAnomalyGuard::class);
+        self::assertSame([], $guard->check($attested, RosterPipelineFixtures::report(self::DATE, ['layout' => str_repeat('b', 64)])));
+        self::assertSame(
+            [RosterAnomalyGuard::UNKNOWN_CODES_HIGH],
+            $guard->check($attested, RosterPipelineFixtures::report(self::DATE, ['layout' => str_repeat('b', 64), 'unknown_codes' => 3])),
+            'An operator vouching for the email does not silence the other checks.',
+        );
+    }
+
     public function test_normal_staffing_never_holds(): void
     {
         $this->publishBaseline('2026-10-29');

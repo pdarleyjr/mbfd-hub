@@ -27,6 +27,16 @@ final class RosterImportActions
         return $this->operations->canRetry($import);
     }
 
+    public function canRetryAttested(RosterImport $import): bool
+    {
+        return $this->operations->canRetryAttested($import);
+    }
+
+    public function canRetryCleanup(RosterImport $import): bool
+    {
+        return $this->operations->canRetryCleanup($import);
+    }
+
     public function canActivate(RosterImport $import): bool
     {
         if ($import->roster_snapshot_id === null || $import->duty_date === null) {
@@ -45,6 +55,16 @@ final class RosterImportActions
     public function retry(RosterImport $import, ?User $actor): void
     {
         $this->run('Import sent back for processing', 'The import could not be retried. It was left as it is.', fn () => $this->operations->retry($import, $actor));
+    }
+
+    public function retryAttested(RosterImport $import, ?User $actor, string $reason): void
+    {
+        $this->run('Import confirmed and sent back for processing', 'The import could not be retried. It was left as it is.', fn () => $this->operations->retryAttested($import, $actor, $reason));
+    }
+
+    public function retryCleanup(RosterImport $import, ?User $actor): void
+    {
+        $this->run('Email cleanup sent back for processing', 'The email cleanup could not be retried. It was left as it is.', fn () => $this->operations->retryCleanup($import, $actor));
     }
 
     public function activate(RosterImport $import, ?User $actor, string $reason): void

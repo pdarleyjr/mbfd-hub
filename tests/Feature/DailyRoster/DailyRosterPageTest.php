@@ -249,6 +249,19 @@ final class DailyRosterPageTest extends TestCase
             ->assertSee('has not arrived and is late');
     }
 
+    public function test_the_last_good_roster_keeps_its_last_updated_time_beside_the_honest_warning(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-10-29 09:14:25', 'America/New_York'));
+        DailyRosterSnapshotFactory::publish('2026-10-29', ['Station 2 / Engine 2' => [['employee_id' => '60001', 'name' => 'YESTERDAY, MEMBER']]]);
+        $this->travelTo(CarbonImmutable::parse('2026-10-30 11:00:00', 'America/New_York'));
+        $this->actingAsCanonicalFixture();
+
+        foreach ([self::PAGE, self::FRAGMENT] as $url) {
+            $this->get($url)->assertOk()
+                ->assertSeeInOrder(['Last updated', 'Oct 29, 9:14 AM EDT', 'Update delayed', 'has not arrived and is late', 'YESTERDAY, MEMBER']);
+        }
+    }
+
     public function test_with_nothing_published_the_page_is_an_empty_state_with_a_way_home(): void
     {
         $this->actingAsCanonicalFixture();
@@ -318,6 +331,22 @@ final class DailyRosterPageTest extends TestCase
         self::assertStringContainsString(', same seat', $html);
     }
 
+    public function test_a_continuation_row_takes_its_rank_from_the_seat(): void
+    {
+        $this->publishRoster(['Station 1 / Ladder 1' => [
+            ['employee_id' => '80001', 'name' => 'FIRST, MEMBER', 'rank' => 'Combat Captain', 'seat' => 0, 'through' => '20:00', 'hours' => 12.0],
+            ['employee_id' => '80003', 'name' => 'SECOND, MEMBER', 'rank' => 'Combat Captain', 'seat' => 0, 'continuation' => true, 'from' => '20:00', 'through' => '08:00', 'hours' => 12.0],
+        ]]);
+        // What RosterPublisher stores: the rank is on the seat, not on a continuation row.
+        RosterAssignment::query()->where('is_continuation', true)->update(['rank_label' => null]);
+        $this->actingAsCanonicalFixture();
+
+        $html = (string) $this->get(self::PAGE)->assertOk()->getContent();
+
+        self::assertStringContainsString('<span class="roster-rank-continued">Combat Captain<span class="sr-only">, same seat</span></span>', $html);
+        self::assertSame(2, substr_count($html, 'roster-rank-continued'), 'the rank cell and the phone name line, and only on the continuation row');
+    }
+
     public function test_vacancies_read_as_vacancies_and_keep_the_source_marker(): void
     {
         $this->publishRoster(['Station 1 / Engine 1' => [
@@ -362,6 +391,7 @@ final class DailyRosterPageTest extends TestCase
 
     public function test_the_home_tile_follows_access(): void
     {
+        config(['daily_roster.mode' => 'publish']);
         $this->actingAsCanonicalFixture();
         $this->get('/')->assertOk()
             ->assertSee('Daily Roster')

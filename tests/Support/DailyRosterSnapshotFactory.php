@@ -95,6 +95,7 @@ final class DailyRosterSnapshotFactory
 
             foreach (array_values($rows) as $position => $row) {
                 $kind = $row['kind'] ?? RosterAssignment::KIND_EMPLOYEE;
+                $isContinuation = (bool) ($row['continuation'] ?? false);
                 [$startsAt, $endsAt] = self::interval($dutyDate, $row['from'] ?? '08:00', $row['through'] ?? '08:00');
                 RosterAssignment::query()->create([
                     'roster_snapshot_id' => $snapshot->id,
@@ -102,8 +103,9 @@ final class DailyRosterSnapshotFactory
                     'position' => $position,
                     'seat_position' => $row['seat'] ?? $position,
                     'seat_rank' => $row['rank'] ?? 'Firefighter',
-                    'rank_label' => $row['rank'] ?? 'Firefighter',
-                    'is_continuation' => (bool) ($row['continuation'] ?? false),
+                    // As the publisher writes it: the rank is printed only on the seat's first row.
+                    'rank_label' => $isContinuation ? null : ($row['rank'] ?? 'Firefighter'),
+                    'is_continuation' => $isContinuation,
                     'kind' => $kind,
                     'employee_id' => $row['employee_id'] ?? null,
                     'raw_name' => $row['name'] ?? ($kind === RosterAssignment::KIND_EMPLOYEE ? 'SAMPLE, MEMBER' : '-,-'),

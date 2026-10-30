@@ -67,8 +67,9 @@ final class OnDutyOfficerDisplayResolver
         try {
             return $this->fromRoster($sectionRole, $moment, $seat);
         } catch (Throwable $failure) {
-            // A display line must never take the Captain 5 or 300 page down with it.
-            report($failure);
+            // A display line must never take the Captain 5 or 300 page down with it. Code only: the
+            // original can be a query error, whose bindings carry employee IDs.
+            report(new RosterPipelineException('display_failed_'.class_basename($failure)));
 
             return OnDutyOfficerDisplay::unchanged($seat);
         }
@@ -76,38 +77,53 @@ final class OnDutyOfficerDisplayResolver
 
     private function fromRoster(string $sectionRole, CarbonImmutable $moment, OnDutyCaptain5 $seat): OnDutyOfficerDisplay
     {
-        $section = $this->reader->sectionForRole($moment, $sectionRole);
-        // A null section means either no roster at all or a roster without this section; the snapshot tells them apart.
+        $sections = $this->reader->sectionsForRole($moment, $sectionRole);
+        $section = $sections[0] ?? null;
+        // No section means either no roster at all or a roster without this section; the snapshot tells them apart.
         $snapshot = $section?->section->snapshot ?? $this->reader->current($moment)?->snapshot;
 
-        if ($snapshot === null || ! $this->isUsable($snapshot, $moment)) {
+        if ($snapshot === null || ! $this->isForDutyDay($snapshot, $moment)) {
             return OnDutyOfficerDisplay::seat($seat, $this->arrivalFreshness($moment));
         }
 
         $asOf = $this->freshness->status($moment)->asOf ?? $snapshot->source_generated_at;
+        // The roster did arrive, so the page calls it current. It just cannot be trusted to name anyone.
+        if (! $this->isOnRotationShift($snapshot, $moment)) {
+            return OnDutyOfficerDisplay::seat($seat, OnDutyOfficerDisplay::FRESHNESS_CURRENT, OnDutyOfficerDisplay::REASON_NEEDS_REVIEW, $asOf);
+        }
         if ($section === null) {
             return OnDutyOfficerDisplay::seat($seat, OnDutyOfficerDisplay::FRESHNESS_CURRENT, OnDutyOfficerDisplay::REASON_SECTION_MISSING, $asOf);
+        }
+        if (count($sections) > 1) {
+            return OnDutyOfficerDisplay::unknown($seat, OnDutyOfficerDisplay::REASON_CONFLICT, $asOf);
         }
 
         return $this->fromSection($section, $snapshot, $moment, $seat, $asOf);
     }
 
-    /** Only the pointer's export for this exact duty day and rotation shift. Anything else is stale and ignored. */
-    private function isUsable(RosterSnapshot $snapshot, CarbonImmutable $moment): bool
+    /** Only the pointer's export for this exact duty day. Anything else is stale and ignored. */
+    private function isForDutyDay(RosterSnapshot $snapshot, CarbonImmutable $moment): bool
     {
-        $dutyDate = $this->calendar->dutyDate($moment)->format('Y-m-d');
-        $shift = $this->calendar->shiftFor($dutyDate);
-
-        return $shift !== null
-            && $snapshot->shift_letter === $shift
-            && $snapshot->duty_date->format('Y-m-d') === $dutyDate;
+        return $snapshot->duty_date->format('Y-m-d') === $this->calendar->dutyDate($moment)->format('Y-m-d');
     }
 
-    /** No usable roster for today: "not here yet", or "should be here by now" (late, held or unusable). */
+    /** False also with the rotation off: nothing can say whose shift this is, so nobody is guessed. */
+    private function isOnRotationShift(RosterSnapshot $snapshot, CarbonImmutable $moment): bool
+    {
+        $shift = $this->calendar->shiftFor($this->calendar->dutyDate($moment)->format('Y-m-d'));
+
+        return $shift !== null && $snapshot->shift_letter === $shift;
+    }
+
+    /**
+     * No roster for today: "not here yet", or "should be here by now". A held export has not replaced
+     * anything, so before the cutoff it reads like any other export still to come.
+     */
     private function arrivalFreshness(CarbonImmutable $moment): string
     {
         return match ($this->freshness->status($moment)->state) {
             RosterFreshness::AWAITING, RosterFreshness::NONE => OnDutyOfficerDisplay::FRESHNESS_AWAITING,
+            RosterFreshness::NEEDS_REVIEW => $this->freshness->isPastCutoff($moment) ? OnDutyOfficerDisplay::FRESHNESS_DELAYED : OnDutyOfficerDisplay::FRESHNESS_AWAITING,
             default => OnDutyOfficerDisplay::FRESHNESS_DELAYED,
         };
     }
@@ -165,7 +181,10 @@ final class OnDutyOfficerDisplayResolver
         return ! ($overridable && $positive);
     }
 
-    /** Exact-string identity. A match shows the Hub's name and rank; anything else shows only what the source printed. */
+    /**
+     * Exact-string identity. A match shows the Hub's name and rank; anything else shows only the name
+     * the source printed. The printed rank belongs to the seat, and a backfill may hold a different one.
+     */
     private function person(OnDutyCaptain5 $seat, RosterAssignment $row, string $employeeId, ?CarbonImmutable $asOf): ?OnDutyOfficerDisplay
     {
         $employee = Employee::query()->where('employee_id', $employeeId)->first();
@@ -182,7 +201,7 @@ final class OnDutyOfficerDisplayResolver
             return null;
         }
 
-        return OnDutyOfficerDisplay::fromRoster($seat, $name, $row->seat_rank ?: $row->rank_label, null, $asOf);
+        return OnDutyOfficerDisplay::fromRoster($seat, $name, null, null, $asOf);
     }
 
     private function covers(RosterAssignment $row, CarbonImmutable $moment): bool

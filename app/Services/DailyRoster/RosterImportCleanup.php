@@ -25,6 +25,8 @@ final class RosterImportCleanup
 
     private const ATTACHMENT_DISK = 'local';
 
+    private const MAX_CHAIN_DEPTH = 10;
+
     public function run(RosterImport $import): void
     {
         if (config('daily_roster.mode') !== 'publish' || ! config('daily_roster.cleanup_enabled')) {
@@ -48,6 +50,11 @@ final class RosterImportCleanup
                 'cleanup_state' => RosterImport::CLEANUP_DONE,
                 'cleaned_at' => now(),
             ]);
+        } catch (RosterPipelineException $exception) {
+            // Another run finished this row first, which is not a cleanup failure.
+            if (! $exception->isConflict()) {
+                $this->recordFailure($import, $attempts, $exception);
+            }
         } catch (Throwable $exception) {
             $this->recordFailure($import, $attempts, $exception);
         }
@@ -64,42 +71,61 @@ final class RosterImportCleanup
         return $import->cleanup_state === RosterImport::CLEANUP_ROW_DELETED || $this->isEligible($import);
     }
 
-    /** Rejected, held and failed mail is never eligible. */
+    /**
+     * Rejected, held and failed mail is never eligible. A superseded export needs its own snapshot,
+     * because a held one has none and its raw file is then the only copy.
+     */
     private function isEligible(RosterImport $import): bool
     {
         return match ($import->state) {
             RosterImport::STATE_VERIFIED => true,
-            RosterImport::STATE_DUPLICATE => $this->duplicateIsBacked($import),
+            RosterImport::STATE_DUPLICATE => $this->leadsToVerified($import),
             RosterImport::STATE_SUPERSEDED => $import->roster_snapshot_id !== null
-                && RosterSnapshot::query()->whereKey($import->roster_snapshot_id)->exists(),
+                && RosterSnapshot::query()->whereKey($import->roster_snapshot_id)->exists()
+                && $import->duplicateOf !== null
+                && $this->leadsToVerified($import->duplicateOf),
             default => false,
         };
     }
 
-    private function duplicateIsBacked(RosterImport $import): bool
+    /** Walks duplicates and superseded rows back to the import that took effect. Bounded, so a loop cannot hang a worker. */
+    private function leadsToVerified(RosterImport $import): bool
     {
-        if ($import->duplicateOf !== null && self::isVerified($import->duplicateOf)) {
-            return true;
-        }
-        if ($import->outcome !== RosterImport::OUTCOME_CONFIRMED || $import->duty_date === null) {
-            return false;
+        $current = $import;
+        for ($depth = 0; $current !== null && $depth < self::MAX_CHAIN_DEPTH; $depth++) {
+            if (in_array($current->state, [RosterImport::STATE_VERIFIED, RosterImport::STATE_CLEANED], true)) {
+                return true;
+            }
+            if (! in_array($current->state, [RosterImport::STATE_DUPLICATE, RosterImport::STATE_SUPERSEDED], true)) {
+                return false;
+            }
+
+            $current = $current->duplicateOf ?? $this->confirmedSource($current);
         }
 
-        $pointer = RosterActiveVersion::query()->whereDate('duty_date', $import->duty_date->toDateString())->first();
-        $source = $pointer?->snapshot?->import;
-
-        return $source !== null && self::isVerified($source);
+        return false;
     }
 
-    private static function isVerified(RosterImport $import): bool
+    /** A confirmed export may point at nothing because it matched the snapshot now showing. */
+    private function confirmedSource(RosterImport $import): ?RosterImport
     {
-        return in_array($import->state, [RosterImport::STATE_VERIFIED, RosterImport::STATE_CLEANED], true);
+        if ($import->outcome !== RosterImport::OUTCOME_CONFIRMED || $import->duty_date === null) {
+            return null;
+        }
+
+        return RosterActiveVersion::query()->whereDate('duty_date', $import->duty_date->toDateString())->first()?->snapshot?->import;
     }
 
     /** @return bool False when the row must stay because someone replied to it. */
     private function deleteRow(RosterImport $import): bool
     {
-        $import->forceFill(['cleanup_state' => RosterImport::CLEANUP_PENDING])->save();
+        // Conditional, so a stale read here cannot put a concurrent run's progress back.
+        $moved = RosterImport::query()->whereKey($import->getKey())
+            ->whereIn('cleanup_state', [RosterImport::CLEANUP_NONE, RosterImport::CLEANUP_PENDING])
+            ->update(['cleanup_state' => RosterImport::CLEANUP_PENDING, 'updated_at' => now()]);
+        if ($moved === 0) {
+            return $import->refresh()->cleanup_state === RosterImport::CLEANUP_ROW_DELETED;
+        }
 
         $rowDeleted = DB::transaction(function () use ($import): bool {
             $locked = RosterImport::query()->whereKey($import->getKey())->lockForUpdate()->firstOrFail();
@@ -140,10 +166,10 @@ final class RosterImportCleanup
         }
 
         $this->assertSafeAttachmentPath($import);
-        $attachments = is_array($email->attachment_metadata) ? array_values($email->attachment_metadata) : [];
+        $attachments = $email->attachment_metadata ?? [];
         if (count($attachments) !== 1
-            || ($attachments[0]['path'] ?? null) !== $import->attachment_path
-            || ($attachments[0]['disk'] ?? null) !== $import->attachment_disk) {
+            || $attachments[0]['path'] !== $import->attachment_path
+            || $attachments[0]['disk'] !== $import->attachment_disk) {
             throw new RuntimeException('cleanup_attachment_mismatch');
         }
 

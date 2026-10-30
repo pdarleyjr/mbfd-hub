@@ -406,7 +406,7 @@
 [data-hub-ui="2"] .roster-member__meta,
 [data-hub-ui="2"] .roster-cell__label { display: none; }
 
-/* A continuation row keeps its rank for screen readers; a filtered row shows it, since the first row may be hidden. */
+/* A continuation row keeps its rank for screen readers. It shows the rank only when a filter hid the seat's earlier rows. */
 [data-hub-ui="2"] .roster-cell--rank .roster-rank-continued {
     position: absolute;
     width: 1px;
@@ -416,7 +416,7 @@
     white-space: nowrap;
 }
 
-[data-hub-ui="2"] .is-filtering .roster-cell--rank .roster-rank-continued {
+[data-hub-ui="2"] .roster-row--seat-lead .roster-cell--rank .roster-rank-continued {
     position: static;
     width: auto;
     height: auto;
@@ -484,7 +484,7 @@
     }
 
     [data-hub-ui="2"] .roster-member__meta .roster-rank-continued { display: none; }
-    [data-hub-ui="2"] .is-filtering .roster-member__meta .roster-rank-continued { display: inline; }
+    [data-hub-ui="2"] .roster-row--seat-lead .roster-member__meta .roster-rank-continued { display: inline; }
 
     [data-hub-ui="2"] .roster-cell__label {
         display: block;

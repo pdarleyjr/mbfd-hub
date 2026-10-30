@@ -54,6 +54,26 @@ Wall clock in America/New_York on the duty date. `From` earlier than 08:00 moves
 
 A single unknown code is not a failure: it displays verbatim and raises a row-level review reason.
 
+### Mail classifier (`TeleStaffMailClassifier`)
+
+Cloudflare's header format has never been observed live, so the rule depends on neither `Authentication-Results` nor `ARC-Authentication-Results` alone. For each kind the Worker forwards the first header in raw order, plus `cloudflare_claims`: how many headers of that kind name `mx.cloudflare.net` as their authserv-id (after an optional `i=N;` for ARC, case-insensitive), counting headers it did not forward. A header over 4,096 characters is sent as `null` with `truncated: true`, never cut. `InboundEmailAuthenticator` stores these in `transport_evidence`.
+
+A claim is a forwarded header naming that authserv-id. Every claim must pass, because a forged message always gets Cloudflare's real failing claim next to any injected passing one. That closes injection provided Cloudflare always adds at least one claim, which the first real delivery must confirm.
+
+Checked in this order:
+
+| Verdict | When |
+|---|---|
+| `rejected` | Any claim has `dmarc=fail`, `spf=fail`, `dkim=fail` with `header.d` or `header.i` on the sender's domain, or `dmarc=pass` with a `header.from` on another domain. |
+| `needs_review` | No claim at all. Any value truncated. Any claim unparseable. A parsed claim with no results (`mx.cloudflare.net; none`). More than one claim of a kind. A counted claim that was not the header forwarded, or a forwarded claim that was not counted. No counts at all, as from an earlier Worker. |
+| `needs_review` | On any claim: DMARC absent or not `pass`, `header.from` missing, or no `dkim=pass` with `header.d` or `header.i` aligned to the sender's domain (`dkim_not_aligned`, including an SPF-only pass). A `dkim=fail` naming no domain. |
+| `needs_review` | Envelope sender missing or not aligned to the sender's domain. |
+| `match` | Otherwise, with reason `authenticated_by_<kind>` for each claim. |
+
+`spf=softfail` alone neither rejects nor matches. A `dkim=fail` for another domain is ignored, because relays sign too. Sender, subject, filename and attachment rules sit around this and are unchanged.
+
+`roster_imports.classification.evidence` keeps the two results headers, `received_spf`, the envelope sender, the counts and `truncated`, which are sender and domain data with no member data, so the proof survives deletion of the email.
+
 ### State machine (`RosterImport::STATE_*`)
 
 | From | To | Rule |
@@ -76,7 +96,7 @@ Publish decision, in order: pinned date holds (`needs_review`); hash equals acti
 
 ### Cleanup
 
-Delete only when: mode is `publish`, `cleanup_enabled` is on, the ledger row is `verified` or a `duplicate`/`superseded` of something verified, the inbound row's message-id hash and attachment hash match the ledger, and no `outbound_emails.parent_inbound_email_id` references it (`kept_replied`). Order: mark `pending`; in one transaction copy paths and delete the row, set `row_deleted`; delete the file, where already missing counts as success; set `done`, state `cleaned`. `InboundEmailResource::canDelete` stays false. Rejected, held and failed mail is never deleted. A redelivered message whose ledger row is cleaned is acknowledged without storing it.
+Delete only when: mode is `publish`, `cleanup_enabled` is on, the ledger row is `verified` or a `duplicate`/`superseded` whose chain reaches a `verified` or `cleaned` import within 10 steps (a `superseded` row also needs its own snapshot), the inbound row's message-id hash and attachment hash match the ledger, and no `outbound_emails.parent_inbound_email_id` references it (`kept_replied`). An attested import cleans like any other, because the ledger keeps its evidence. Order: mark `pending`; in one transaction copy paths and delete the row, set `row_deleted`; delete the file, where already missing counts as success; set `done`, state `cleaned`. `InboundEmailResource::canDelete` stays false. Rejected, held and failed mail is never deleted. A redelivered message whose ledger row is cleaned is acknowledged without storing it.
 
 ### Interfaces
 
@@ -100,14 +120,16 @@ App\Services\DailyRoster\RosterAnomalyGuard::check(RosterImport $import, TeleSta
 App\Services\DailyRoster\RosterPublicationVerifier::verify(RosterImport $import): bool
 App\Services\DailyRoster\RosterRollbackService::activate(User $actor, string $dutyDate, int $snapshotId, string $reason): void
 App\Services\DailyRoster\RosterRollbackService::release(User $actor, string $dutyDate, string $reason): void
-App\Services\DailyRoster\RosterImportOperations::retry(RosterImport $import, ?User $actor): void      // failed or held, source file still present
+App\Services\DailyRoster\RosterImportOperations::retry(RosterImport $import, ?User $actor): void      // failed or held, source file still present, mail check passed; else retry_needs_attestation
+App\Services\DailyRoster\RosterImportOperations::retryAttested(RosterImport $import, ?User $actor, ?string $reason = null): void  // rejected, held by the mail check, or layout_changed; records operator_attested, keeps evidence
+App\Services\DailyRoster\RosterImportOperations::retryCleanup(RosterImport $import, ?User $actor): void  // cleanup_state failed; resets attempts and state
 App\Services\DailyRoster\RosterStateRecorder::transition(RosterImport $import, string $to, array $attributes = [], ?string $reason = null, array $context = [], ?int $actorId = null): RosterImport
 
 // Read model (the only way consumers read the roster)
 App\Services\DailyRoster\CurrentRosterReader::current(?CarbonInterface $at = null): ?RosterView      // exact current duty date only
 App\Services\DailyRoster\CurrentRosterReader::forDutyDate(string $dutyDate): ?RosterView
 App\Services\DailyRoster\CurrentRosterReader::latestBefore(CarbonInterface $at): ?RosterView         // stale display only; never for command cards
-App\Services\DailyRoster\CurrentRosterReader::sectionForRole(?CarbonInterface $at, string $role): ?RosterSectionView
+App\Services\DailyRoster\CurrentRosterReader::sectionsForRole(?CarbonInterface $at, string $role): list<RosterSectionView>  // by position; more than one means conflict on the cards
 App\Services\DailyRoster\CurrentRosterReader::availableDutyDates(int $limit = 14): list<string>
 App\Services\DailyRoster\RosterFreshnessResolver::status(?CarbonInterface $at = null): RosterFreshness
     // readonly: state 'current'|'awaiting'|'delayed'|'needs_review'|'none', dutyDate, asOf, version string
@@ -144,10 +166,14 @@ Set in `/opt/mbfd/mbfd-hub/.env`, then rebuild the config cache and restart the 
 
 | Step | Flags | Proves |
 |---|---|---|
-| 1. Shadow | `DAILY_ROSTER_MODE=shadow` (default) | Real mail classifies and parses. Nothing published or deleted. |
+| 1. Shadow | `DAILY_ROSTER_MODE=shadow` (default) | Real mail classifies and parses. Nothing published or deleted. Read the first real delivery's **Mail check evidence**: this is where Cloudflare's real header format, that it always adds a claim, and the `d=` value get confirmed. |
 | 2. Publish | `DAILY_ROSTER_MODE=publish` | Members see the roster. |
 | 3. Cards | `DAILY_ROSTER_CARD_DISPLAY_ENABLED=true` | 300 and Captain 5 cards read the roster for display. |
 | 4. Cleanup | `DAILY_ROSTER_CLEANUP_ENABLED=true` | The verified email and attachment are removed. |
+
+After flipping to publish, **Retry** today's shadowed import under **System > Roster Imports**, because a shadowed import stays where it is until retried. Members see today's roster, and its email is cleaned up once cleanup is on.
+
+Enabling cleanup also sweeps earlier rows. `daily-roster:reconcile` picks up every `verified` import and every `duplicate` or `superseded` one backed by a verified import, however old, and deletes those emails and attachments within minutes. Check the list before turning it on.
 
 `DAILY_ROSTER_MODE=off` returns inbound mail to exactly its earlier behaviour. Each flag can be reversed without a deploy. Reverse order to back out.
 
@@ -157,10 +183,11 @@ The Worker is separate: `cloudflare-email-worker` needs its own `wrangler deploy
 
 | You see | Means | Do |
 |---|---|---|
-| **Update delayed** on the page, alert at 10:00 ET | No export for this duty day | Check TeleStaff's scheduled report. Members still see the last good roster, marked. Nothing to repair in the Hub. |
-| **Needs review** with "TeleStaff changed the report layout" | Sheet structure differs from the last accepted export | Open the import, read the findings. If the report really changed, update the parser first. Do not force it through. |
-| **Needs review**, transport evidence reasons | Cloudflare's result was missing or unreadable | Compare `inbound_emails.transport_evidence` with the classifier. Retry once corrected. |
-| **Rejected by the mail check** | A look-alike message, or authentication failed | Leave it unless you can confirm it is genuine. The email stays in the inbox. |
+| **Update delayed** on the page, alert at 10:00 ET | No export for this duty day | Check TeleStaff's scheduled report. Members still see the last good roster, marked. Nothing to repair in the Hub. Until a first roster has ever been published, the page reads as awaiting and no alert goes. |
+| System Health shows **cleanup failed** | An email could not be removed after 5 attempts. It is still in the inbox. | Fix the cause the import's reason names, then use **Retry email cleanup**. The count clears once that row is no longer failed. |
+| **Needs review** with "TeleStaff changed the report layout" | The table's column labels or spacing differ from the last accepted export | Open the import and read the findings. If TeleStaff really changed the report and the roster parsed correctly, use **Confirm genuine and retry**: the new layout becomes the one later exports are compared with. If the parser misread it, update the parser first. |
+| **Needs review**, mail check reasons | Cloudflare's result was missing, unreadable, ambiguous, or did not prove the sender | Open **Mail check evidence**. Confirm with the source, then use **Confirm genuine and retry**. **Retry** is refused here. |
+| **Rejected by the mail check** | A look-alike message, or authentication failed. It has its own alert. | Leave it unless you can confirm it is genuine, then use **Confirm genuine and retry**. The email stays in the inbox. |
 | **Failed** | Workbook failed closed; the reason names the check | Retry only if the cause was temporary. The last good roster stays up. |
 | Cards say **roster needs review** | The 300 or Captain 5 section could not name one person at that moment | Read that section on the Daily Roster. It corrects itself on the next good export. |
 
@@ -168,12 +195,14 @@ The Worker is separate: `cloudflare-email-worker` needs its own `wrangler deploy
 
 All need `admin.system.manage` and write a `roster_events` row. Open an import under **System > Roster Imports**:
 
-- **Retry** puts a failed or held import back through the pipeline. The stored attachment must still exist.
+- **Retry** puts a failed or held import back through the pipeline. The stored attachment must still exist. It is not offered, and is refused, for mail the mail check did not pass.
+- **Confirm genuine and retry** is the only way past the mail check, and appears only for rejected imports, imports held by the mail check, and imports held for a new layout. It needs a reason and a confirmation. It records `operator_attested` and your reason, keeps the original evidence, and sends the import back through every other roster check. A new layout then becomes the baseline. The import cleans up like any other afterwards, because the ledger keeps the evidence.
+- **Retry email cleanup** appears when a cleanup has run out of attempts, while cleanup is on. It resets the attempts and tries again.
 - **Show this version** points the duty date at that snapshot and pins it. Newer exports for that date are held until released. Nothing is deleted. Use this for rollback.
 - **Release pinned date** lets the next export publish again. It does not republish by itself.
 - **Check for stuck imports** runs `daily-roster:reconcile` now. It also runs every minute.
 
-For mail received before the Worker change, an operator can run this after confirming the message is genuine:
+For mail received before the Worker change, or a row already rejected or held by the mail check, an operator can run this after confirming the message is genuine. The email must still match the configured sender, subject, filename and attachment shape exactly:
 
 ```bash
 docker exec mbfd-hub-laravel php artisan daily-roster:import-inbound <inbound_email_id> --operator-attested
@@ -182,6 +211,10 @@ docker exec mbfd-hub-laravel php artisan daily-roster:import-inbound <inbound_em
 ### Answering "what happened to this email?"
 
 The ledger outlives the email. Find it by `attachment_sha256`, `correlation_id` or received time in `roster_imports`, with history in `roster_events`. Neither holds member names; those live in the snapshot tables, which stay after the email is gone, so a past roster can always be shown again.
+
+### Idle sign-out
+
+Automatic refreshes on the roster page and the 300 and Captain 5 cards send `X-Hub-Background-Refresh: 1`, so they do not count as activity. A screen left unattended still reaches the idle limit, and the roster then leaves the screen. The Refresh button is real activity.
 
 ### Retention
 

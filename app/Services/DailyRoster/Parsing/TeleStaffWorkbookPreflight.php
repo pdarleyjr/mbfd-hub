@@ -74,7 +74,7 @@ final class TeleStaffWorkbookPreflight
         $this->assertWorkbookContentType($parts);
         $sheetPart = $this->resolveSheetPart($parts, (string) $limits['sheet']);
 
-        return ['sheetPart' => $sheetPart, ...$this->inspectSheet($parts[$sheetPart], (int) $limits['max_rows'])];
+        return ['sheetPart' => $sheetPart, ...$this->inspectSheet($parts[$sheetPart], (int) $limits['max_rows'], (int) $limits['max_cells'])];
     }
 
     private function readFile(string $path, int $maxBytes): string
@@ -357,17 +357,22 @@ final class TeleStaffWorkbookPreflight
     }
 
     /** @return array{oddHeader: ?string, oddFooter: ?string} */
-    private function inspectSheet(string $bytes, int $maxRows): array
+    private function inspectSheet(string $bytes, int $maxRows, int $maxCells): array
     {
         $found = ['oddHeader' => null, 'oddFooter' => null];
         $rows = 0;
-        $this->walkXml($bytes, static function (XMLReader $reader) use (&$found, &$rows, $maxRows): void {
+        $cells = 0;
+        $this->walkXml($bytes, static function (XMLReader $reader) use (&$found, &$rows, &$cells, $maxRows, $maxCells): void {
             switch ($reader->localName) {
                 case 'f':
                     throw new TeleStaffWorkbookException('formula_rejected');
                 case 'c':
                     if ($reader->getAttribute('t') === 'e') {
                         throw new TeleStaffWorkbookException('formula_rejected');
+                    }
+                    // A tiny file can hold a very large grid, and the spreadsheet library would load all of it.
+                    if (++$cells > $maxCells) {
+                        throw new TeleStaffWorkbookException('zip_limit_exceeded');
                     }
                     break;
                 case 'row':

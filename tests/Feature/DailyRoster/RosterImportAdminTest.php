@@ -9,6 +9,8 @@ use App\Filament\Resources\RosterImportResource;
 use App\Filament\Resources\RosterImportResource\Pages\ListRosterImports;
 use App\Filament\Resources\RosterImportResource\Pages\ViewRosterImport;
 use App\Health\RosterImportCheck;
+use App\Jobs\DailyRoster\CleanupRosterImport;
+use App\Jobs\DailyRoster\ProcessRosterImport;
 use App\Models\DailyRoster\RosterActiveVersion;
 use App\Models\DailyRoster\RosterEvent;
 use App\Models\DailyRoster\RosterImport;
@@ -17,12 +19,19 @@ use App\Services\DailyRoster\RosterAlerts;
 use App\Services\DailyRoster\RosterFreshness;
 use App\Services\DailyRoster\RosterFreshnessResolver;
 use App\Services\DailyRoster\RosterImportActions;
+use App\Services\DailyRoster\RosterStateRecorder;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
+use Illuminate\Filesystem\Filesystem;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use RuntimeException;
 use Spatie\Health\Enums\Status;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -39,6 +48,12 @@ final class RosterImportAdminTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $this->travelTo(CarbonImmutable::parse('2026-10-30 14:00:00', 'America/New_York'));
         config(['daily_roster.mode' => 'publish']);
+
+        // A private root: Storage::fake() empties one shared directory, which parallel test processes share.
+        $root = sys_get_temp_dir().DIRECTORY_SEPARATOR.'mbfd-roster-admin-'.getmypid().'-'.Str::random(12);
+        config(['filesystems.disks.local.root' => $root]);
+        Storage::forgetDisk('local');
+        $this->beforeApplicationDestroyed(static fn () => (new Filesystem)->deleteDirectory($root));
     }
 
     public function test_only_system_administrators_reach_the_screen(): void
@@ -151,6 +166,161 @@ final class RosterImportAdminTest extends TestCase
 
         // The push copy only reaches enrolled devices; the in-app copy always goes.
         Notification::assertSentToTimes($admin, \Filament\Notifications\DatabaseNotification::class, 2);
+    }
+
+    public function test_a_rejected_import_has_its_own_alert_so_it_cannot_use_up_the_held_one(): void
+    {
+        Notification::fake();
+        $admin = $this->administrator();
+        DailyRosterSnapshotFactory::publish('2026-10-30', ['Station 2 / Captain 5' => [['employee_id' => '90001', 'name' => 'TESTER, ALPHA']]]);
+        $this->heldImport(['state' => RosterImport::STATE_REJECTED, 'duty_date' => '2026-10-30']);
+
+        $this->artisan('daily-roster:reconcile')->assertExitCode(0);
+        Notification::assertSentToTimes($admin, \Filament\Notifications\DatabaseNotification::class, 1);
+
+        $this->heldImport(['duty_date' => '2026-10-30', 'error_code' => 'layout_changed']);
+        $this->artisan('daily-roster:reconcile')->assertExitCode(0);
+        Notification::assertSentToTimes($admin, \Filament\Notifications\DatabaseNotification::class, 2);
+    }
+
+    public function test_a_late_alert_that_did_not_get_out_is_tried_again_on_the_next_tick_with_one_event(): void
+    {
+        Notification::fake();
+        Exceptions::fake();
+        $admin = $this->administrator();
+        DailyRosterSnapshotFactory::publish('2026-10-29', ['Station 2 / Captain 5' => [['employee_id' => '90001', 'name' => 'TESTER, ALPHA']]]);
+
+        $this->artisan('daily-roster:reconcile')->assertExitCode(0);
+        Notification::assertSentToTimes($admin, \Filament\Notifications\DatabaseNotification::class, 1);
+
+        // Deduplicated while the key stands; a failed send removes the key.
+        $this->artisan('daily-roster:reconcile')->assertExitCode(0);
+        Notification::assertSentToTimes($admin, \Filament\Notifications\DatabaseNotification::class, 1);
+
+        Cache::forget('daily_roster_alert:delayed:2026-10-30');
+        $this->artisan('daily-roster:reconcile')->assertExitCode(0);
+        Notification::assertSentToTimes($admin, \Filament\Notifications\DatabaseNotification::class, 2);
+
+        self::assertSame(1, RosterEvent::query()->where('action', RosterStateRecorder::ACTION_DELAYED)->count());
+        Exceptions::assertReportedCount(1);
+    }
+
+    public function test_no_late_alert_goes_before_anything_has_ever_been_published(): void
+    {
+        Notification::fake();
+        $admin = $this->administrator();
+        self::assertSame(RosterFreshness::NONE, app(RosterFreshnessResolver::class)->status()->state);
+
+        $this->artisan('daily-roster:reconcile')->assertExitCode(0);
+
+        Notification::assertNothingSentTo($admin);
+        self::assertSame(0, RosterEvent::query()->where('action', RosterStateRecorder::ACTION_DELAYED)->count());
+    }
+
+    public function test_a_cache_outage_never_stops_the_caller(): void
+    {
+        Exceptions::fake();
+        Cache::shouldReceive('add')->once()->andThrow(new RuntimeException('cache_down'));
+        Cache::shouldReceive('forget')->once()->andThrow(new RuntimeException('cache_down'));
+
+        app(RosterAlerts::class)->send('delayed', '2026-10-30');
+
+        Exceptions::assertReported(static fn (RuntimeException $exception): bool => $exception->getMessage() === 'cache_down');
+    }
+
+    public function test_an_unknown_alert_kind_sends_nothing(): void
+    {
+        Notification::fake();
+        $admin = $this->administrator();
+
+        app(RosterAlerts::class)->send('something_else', '2026-10-30');
+
+        Notification::assertNothingSentTo($admin);
+    }
+
+    public function test_confirm_genuine_and_retry_needs_a_reason_and_shows_only_when_it_applies(): void
+    {
+        Bus::fake();
+        $this->actingAs($this->administrator());
+        $held = $this->storedImport(['classification' => ['verdict' => 'needs_review', 'reasons' => ['dkim_not_aligned'], 'evidence' => ['envelope_from' => 'a@miamibeachfl.gov']]]);
+        $passed = $this->storedImport(['state' => RosterImport::STATE_PERMANENT_FAILED, 'classification' => ['verdict' => 'match', 'reasons' => []]]);
+
+        Livewire::test(ListRosterImports::class)
+            ->assertTableActionVisible('retryAttested', $held)
+            ->assertTableActionHidden('retry', $held)
+            ->assertTableActionHidden('retryAttested', $passed)
+            ->assertTableActionVisible('retry', $passed);
+
+        Livewire::test(ViewRosterImport::class, ['record' => $held->getKey()])
+            ->assertActionVisible('retryAttested')
+            ->assertActionHidden('retry')
+            ->assertSee('a@miamibeachfl.gov')
+            ->callAction('retryAttested', data: ['reason' => ''])
+            ->assertHasActionErrors(['reason' => 'required']);
+        self::assertSame(RosterImport::STATE_NEEDS_REVIEW, $held->fresh()->state);
+
+        Livewire::test(ViewRosterImport::class, ['record' => $held->getKey()])
+            ->callAction('retryAttested', data: ['reason' => 'Confirmed with the City'])
+            ->assertHasNoActionErrors();
+        $held = $held->fresh();
+        self::assertSame(RosterImport::STATE_QUEUED, $held->state);
+        self::assertSame('Confirmed with the City', $held->classification['attestation_reason']);
+        Bus::assertDispatched(ProcessRosterImport::class);
+
+        Livewire::test(ViewRosterImport::class, ['record' => $held->getKey()])->assertOk()->assertSee('Confirmed with the City');
+    }
+
+    public function test_a_member_who_can_only_view_is_offered_neither_action(): void
+    {
+        config(['daily_roster.cleanup_enabled' => true]);
+        $viewer = User::factory()->create(['account_status' => AccountStatus::Active]);
+        $viewer->givePermissionTo(Permission::findOrCreate('admin.system.view', 'web'));
+        $this->actingAs($viewer);
+        $held = $this->storedImport(['classification' => ['verdict' => 'rejected', 'reasons' => ['near_miss']], 'state' => RosterImport::STATE_REJECTED, 'cleanup_state' => RosterImport::CLEANUP_FAILED]);
+
+        Livewire::test(ViewRosterImport::class, ['record' => $held->getKey()])
+            ->assertActionHidden('retryAttested')
+            ->assertActionHidden('retryCleanup');
+    }
+
+    public function test_retry_email_cleanup_clears_the_health_check_once_it_succeeds(): void
+    {
+        Bus::fake();
+        config(['daily_roster.cleanup_enabled' => true]);
+        $this->actingAs($this->administrator());
+        DailyRosterSnapshotFactory::publish('2026-10-30', ['Station 2 / Captain 5' => [['employee_id' => '90001', 'name' => 'TESTER, ALPHA']]]);
+        $failed = $this->storedImport(['state' => RosterImport::STATE_VERIFIED, 'cleanup_state' => RosterImport::CLEANUP_FAILED, 'cleanup_attempts' => 5, 'error_code' => 'cleanup_error']);
+
+        $check = (new RosterImportCheck)->run();
+        self::assertSame(Status::failed()->value, $check->status->value);
+        self::assertSame(1, $check->meta['cleanup_failed']);
+
+        Livewire::test(ListRosterImports::class)->assertTableActionVisible('retryCleanup', $failed);
+        Livewire::test(ViewRosterImport::class, ['record' => $failed->getKey()])
+            ->callAction('retryCleanup')
+            ->assertHasNoActionErrors();
+
+        Bus::assertDispatched(CleanupRosterImport::class);
+        self::assertSame(RosterImport::CLEANUP_ROW_DELETED, $failed->fresh()->cleanup_state);
+        $check = (new RosterImportCheck)->run();
+        self::assertSame(0, $check->meta['cleanup_failed']);
+        self::assertSame(Status::ok()->value, $check->status->value);
+    }
+
+    /** @param array<string, mixed> $attributes */
+    private function storedImport(array $attributes = []): RosterImport
+    {
+        $messageId = (string) Str::uuid();
+        $path = 'inbound-email-attachments/'.hash('sha256', $messageId).'/roster.xlsx';
+        Storage::disk('local')->put($path, "PK\x03\x04synthetic");
+
+        return $this->heldImport([
+            'message_id_sha256' => hash('sha256', $messageId),
+            'attachment_disk' => 'local',
+            'attachment_path' => $path,
+            'attachment_sha256' => hash('sha256', "PK\x03\x04synthetic"),
+            ...$attributes,
+        ]);
     }
 
     /** @param array<string, mixed> $attributes */

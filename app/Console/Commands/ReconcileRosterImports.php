@@ -139,7 +139,11 @@ final class ReconcileRosterImports extends Command
         });
     }
 
-    /** One alert per duty date. It reports the absence and writes nothing that could look like a roster. */
+    /**
+     * Reports the absence and writes nothing that could look like a roster. The alert is asked for on
+     * every late tick, deduplicated by RosterAlerts, so one that failed to send is tried again; the event
+     * is written once. Before anything has ever been published no roster is late, as on the page.
+     */
     private function flagLateRoster(RosterStateRecorder $recorder, RosterAlerts $alerts, DutyCalendar $calendar, CarbonImmutable $now): int
     {
         if (config('daily_roster.mode') !== 'publish') {
@@ -152,13 +156,18 @@ final class ReconcileRosterImports extends Command
 
         if ($now->lessThan($lateFrom)
             || RosterActiveVersion::query()->whereDate('duty_date', $dutyDate)->whereNotNull('roster_snapshot_id')->exists()
-            || RosterEvent::query()->whereDate('duty_date', $dutyDate)->where('action', RosterStateRecorder::ACTION_DELAYED)->exists()) {
+            || ! RosterActiveVersion::query()->whereNotNull('roster_snapshot_id')->exists()) {
+            return 0;
+        }
+
+        $alerts->send('delayed', $dutyDate);
+
+        if (RosterEvent::query()->whereDate('duty_date', $dutyDate)->where('action', RosterStateRecorder::ACTION_DELAYED)->exists()) {
             return 0;
         }
 
         $recorder->appendEvent(null, RosterStateRecorder::ACTION_DELAYED, dutyDate: $dutyDate);
         report(new RosterPipelineException(RosterStateRecorder::ACTION_DELAYED));
-        $alerts->send('delayed', $dutyDate);
 
         return 1;
     }
@@ -180,7 +189,11 @@ final class ReconcileRosterImports extends Command
 
         foreach ($held as $import) {
             $alerts->send(
-                $import->state === RosterImport::STATE_PERMANENT_FAILED ? 'failed' : 'needs_review',
+                match ($import->state) {
+                    RosterImport::STATE_PERMANENT_FAILED => 'failed',
+                    RosterImport::STATE_REJECTED => 'rejected',
+                    default => 'needs_review',
+                },
                 $import->duty_date?->format('Y-m-d') ?? $calendar->dutyDate($import->received_at)->format('Y-m-d'),
             );
         }
@@ -188,7 +201,11 @@ final class ReconcileRosterImports extends Command
         return $held->count();
     }
 
-    /** Runs $action for rows not dispatched within the throttle window, and marks them dispatched first. */
+    /**
+     * Runs $action for rows not dispatched within the throttle window, and marks them dispatched first.
+     *
+     * @param  Builder<RosterImport>  $query
+     */
     private function eachThrottled(Builder $query, CarbonImmutable $now, CarbonImmutable $cutoff, Closure $action): int
     {
         $query->where(static fn (Builder $throttle) => $throttle->whereNull('last_dispatched_at')->orWhere('last_dispatched_at', '<=', $cutoff));

@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import worker, { firstHeaderValue } from "../src/index";
+import worker, { claimsCloudflare, firstHeaderValue } from "../src/index";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -118,7 +118,7 @@ it("forwards the envelope sender separately from the header From", async () => {
   expect(body.from).toBe("header-from@example.test");
 });
 
-it("forwards only the topmost occurrence of each authentication header", async () => {
+it("forwards the topmost occurrence of each header and counts only Cloudflare's claims", async () => {
   const body = await forwardedBody(transportMessage([
     "Authentication-Results: mx.cloudflare.net; dmarc=pass header.from=example.test",
     "ARC-Authentication-Results: i=2; mx.cloudflare.net; dkim=pass header.d=example.test",
@@ -132,36 +132,102 @@ it("forwards only the topmost occurrence of each authentication header", async (
     authentication_results: "mx.cloudflare.net; dmarc=pass header.from=example.test",
     arc_authentication_results: "i=2; mx.cloudflare.net; dkim=pass header.d=example.test",
     received_spf: "pass (mx.cloudflare.net: domain designates sender) client-ip=192.0.2.1;",
+    cloudflare_claims: { authentication_results: 1, arc_authentication_results: 1 },
+    truncated: false,
   });
 });
 
-it("forwards null for authentication headers the message does not have", async () => {
+it("forwards null and zero counts for authentication headers the message does not have", async () => {
   const body = await forwardedBody(transportMessage([]));
 
   expect(body.authentication_evidence).toEqual({
     authentication_results: null,
     arc_authentication_results: null,
     received_spf: null,
+    cloudflare_claims: { authentication_results: 0, arc_authentication_results: 0 },
+    truncated: false,
   });
 });
 
-it("unfolds, strips control characters from, and caps authentication headers", async () => {
+it("counts an injected claim below the real one, in either header", async () => {
+  const body = await forwardedBody(transportMessage([
+    "Authentication-Results: mx.cloudflare.net; dmarc=fail header.from=example.test",
+    "Authentication-Results: MX.CLOUDFLARE.NET; dmarc=pass header.from=example.test",
+    "ARC-Authentication-Results: i=1; mx.cloudflare.net; dmarc=fail",
+    "ARC-Authentication-Results: i=2; mx.cloudflare.net; dmarc=pass",
+    "ARC-Authentication-Results: mx.cloudflare.net; dmarc=pass",
+  ]));
+
+  expect(body.authentication_evidence.authentication_results).toBe("mx.cloudflare.net; dmarc=fail header.from=example.test");
+  expect(body.authentication_evidence.cloudflare_claims).toEqual({ authentication_results: 2, arc_authentication_results: 3 });
+});
+
+it("counts a claim sitting below another server's header, even though it is not the one forwarded", async () => {
+  const body = await forwardedBody(transportMessage([
+    "Authentication-Results: relay.example; dmarc=pass",
+    "Authentication-Results: mx.cloudflare.net; dmarc=fail",
+  ]));
+
+  expect(body.authentication_evidence.authentication_results).toBe("relay.example; dmarc=pass");
+  expect(body.authentication_evidence.cloudflare_claims.authentication_results).toBe(1);
+});
+
+it("unfolds and strips control characters from authentication headers", async () => {
   const folded = await forwardedBody(transportMessage([
     "Authentication-Results: mx.cloudflare.net;\r\n\tdkim=pass\r\n header.d=example.test\u0007",
-    `Received-SPF: ${"x".repeat(3000)}`,
   ]));
 
   expect(folded.authentication_evidence.authentication_results).toBe("mx.cloudflare.net; dkim=pass header.d=example.test");
-  expect(folded.authentication_evidence.received_spf).toHaveLength(2048);
+  expect(folded.authentication_evidence.cloudflare_claims.authentication_results).toBe(1);
+});
+
+it("sends null and truncated for a header over the cap, never a cut string", async () => {
+  const atCap = await forwardedBody(transportMessage([`Authentication-Results: mx.cloudflare.net; ${"x".repeat(4096 - 19)}`]));
+  expect(atCap.authentication_evidence.authentication_results).toHaveLength(4096);
+  expect(atCap.authentication_evidence.truncated).toBe(false);
+
+  const over = await forwardedBody(transportMessage([`Authentication-Results: mx.cloudflare.net; ${"x".repeat(4096 - 18)}`]));
+  expect(over.authentication_evidence.authentication_results).toBeNull();
+  expect(over.authentication_evidence.truncated).toBe(true);
+  expect(over.authentication_evidence.cloudflare_claims.authentication_results).toBe(1);
+
+  const spf = await forwardedBody(transportMessage([`Received-SPF: ${"x".repeat(4097)}`]));
+  expect(spf.authentication_evidence.received_spf).toBeNull();
+  expect(spf.authentication_evidence.truncated).toBe(true);
 });
 
 it("takes the first occurrence and treats an empty value as absent", () => {
   expect(firstHeaderValue([
     { key: "authentication-results", value: "first" },
     { key: "authentication-results", value: "second" },
-  ], "authentication-results")).toBe("first");
-  expect(firstHeaderValue([], "authentication-results")).toBeNull();
-  expect(firstHeaderValue([{ key: "received-spf", value: "\u0001" }], "received-spf")).toBeNull();
+  ], "authentication-results")).toEqual({ value: "first", truncated: false });
+  expect(firstHeaderValue([], "authentication-results")).toEqual({ value: null, truncated: false });
+  expect(firstHeaderValue([{ key: "received-spf", value: "\u0001" }], "received-spf")).toEqual({ value: null, truncated: false });
+});
+
+// The same table is in the Hub's TeleStaffMailClassifierTest, so both sides read a header alike.
+it.each([
+  ["mx.cloudflare.net; dmarc=pass", false, true],
+  ["MX.CloudFlare.NET; dmarc=pass", false, true],
+  ["mx.cloudflare.net", false, true],
+  ["mx.cloudflare.net 1; dmarc=pass", false, true],
+  ["  mx.cloudflare.net ;dmarc=pass", false, true],
+  ["(by cloudflare) mx.cloudflare.net; dmarc=pass", false, true],
+  ['"mx.cloudflare.net"; dmarc=pass', false, true],
+  ["mx.cloudflare.net; dmarc=pass (oops", false, true],
+  ["relay.example; x=(mx.cloudflare.net", false, true],
+  ["i=1; mx.cloudflare.net; dmarc=pass", true, true],
+  ["i = 12 ; mx.cloudflare.net; dmarc=pass", true, true],
+  ["mx.cloudflare.net; dmarc=pass", true, true],
+  ["i=1; mx.cloudflare.net; dmarc=pass", false, false],
+  ["i=1; relay.example; dmarc=pass", true, false],
+  ["relay.example; dmarc=pass (mx.cloudflare.net)", false, false],
+  ["mx.cloudflare.net.evil.example; dmarc=pass", false, false],
+  ["notmx.cloudflare.net; dmarc=pass", false, false],
+  ["(mx.cloudflare.net) relay.example; dmarc=pass", false, false],
+  ["", false, false],
+])("reads %j (arc %s) as a Cloudflare claim: %s", (value, isArc, expected) => {
+  expect(claimsCloudflare(value, isArc)).toBe(expected);
 });
 
 it("rejects raw messages over 3 MB even if the reported size is inaccurate", async () => {

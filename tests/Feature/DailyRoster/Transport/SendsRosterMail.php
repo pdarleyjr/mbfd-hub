@@ -32,6 +32,8 @@ trait SendsRosterMail
                 'authentication_results' => self::PASSING_RESULTS,
                 'arc_authentication_results' => null,
                 'received_spf' => null,
+                'cloudflare_claims' => ['authentication_results' => 1, 'arc_authentication_results' => 0],
+                'truncated' => false,
             ],
             'in_reply_to' => null,
             'references' => [],

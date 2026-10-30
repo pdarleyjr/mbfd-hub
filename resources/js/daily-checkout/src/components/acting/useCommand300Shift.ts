@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isApiAuthenticationError, redirectToLoginAfterSessionExpiry } from '../../utils/api';
+import { asBackgroundRefresh } from '../../utils/captain5Api';
 import { fetchCommand300Shift } from '../../utils/command300ShiftApi';
 import type { ActingResult } from './types';
 
@@ -63,7 +64,7 @@ export function useCommand300Shift({ enabled = true, poll = true }: Options = {}
 
   useEffect(() => {
     if (!enabled || !poll) return undefined;
-    const tick = () => { if (document.visibilityState === 'visible') void load('silent'); };
+    const tick = () => { if (document.visibilityState === 'visible') asBackgroundRefresh(() => { void load('silent'); }); };
     const timer = setInterval(tick, POLL_MS);
     document.addEventListener('visibilitychange', tick);
     return () => { clearInterval(timer); document.removeEventListener('visibilitychange', tick); };

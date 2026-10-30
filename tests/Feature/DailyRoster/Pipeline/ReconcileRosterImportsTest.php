@@ -48,6 +48,7 @@ final class ReconcileRosterImportsTest extends TestCase
         self::assertNotNull($event);
         self::assertSame('* * * * *', $event->expression);
         self::assertTrue($event->withoutOverlapping);
+        self::assertSame(5, $event->expiresAt, 'A crashed run must not hold the lock for the default 24 hours.');
         self::assertTrue($event->onOneServer);
     }
 
@@ -237,11 +238,16 @@ final class ReconcileRosterImportsTest extends TestCase
 
     public function test_a_missing_roster_past_the_cutoff_alerts_once_per_duty_date_and_writes_no_roster(): void
     {
+        $this->published(RosterPipelineFixtures::report('2026-10-29', ['generated_at' => '2026-10-29 13:10:00']));
+        $snapshots = RosterSnapshot::query()->count();
+        $pointers = RosterActiveVersion::query()->count();
+        $events = RosterEvent::query()->count();
+
         // 09:59 Eastern: not late yet.
         $this->travelTo(CarbonImmutable::parse('2026-10-30 09:59:00', HubTimezone::NAME));
         $this->reconcile();
         Exceptions::assertNothingReported();
-        self::assertSame(0, RosterEvent::query()->count());
+        self::assertSame($events, RosterEvent::query()->count());
 
         $this->travelTo(CarbonImmutable::parse('2026-10-30 10:00:00', HubTimezone::NAME));
         $this->reconcile();
@@ -252,8 +258,8 @@ final class ReconcileRosterImportsTest extends TestCase
         self::assertSame(self::DATE, $event->duty_date->format('Y-m-d'));
         Exceptions::assertReportedCount(1);
         Exceptions::assertReported(static fn (RosterPipelineException $exception): bool => $exception->errorCode === RosterStateRecorder::ACTION_DELAYED);
-        self::assertSame(0, RosterSnapshot::query()->count());
-        self::assertSame(0, RosterActiveVersion::query()->count());
+        self::assertSame($snapshots, RosterSnapshot::query()->count());
+        self::assertSame($pointers, RosterActiveVersion::query()->count());
 
         // Still the 30th's duty day at 07:30 on the 31st, so no second alert. The next day raises its own.
         $this->travelTo(CarbonImmutable::parse('2026-10-31 07:30:00', HubTimezone::NAME));
@@ -263,6 +269,16 @@ final class ReconcileRosterImportsTest extends TestCase
         $this->travelTo(CarbonImmutable::parse('2026-10-31 10:30:00', HubTimezone::NAME));
         $this->reconcile();
         self::assertSame(2, RosterEvent::query()->where('action', RosterStateRecorder::ACTION_DELAYED)->count());
+    }
+
+    public function test_nothing_is_late_before_anything_has_ever_been_published(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-10-30 18:00:00', HubTimezone::NAME));
+
+        $this->reconcile();
+
+        Exceptions::assertNothingReported();
+        self::assertSame(0, RosterEvent::query()->count());
     }
 
     public function test_a_published_roster_raises_no_late_alert(): void

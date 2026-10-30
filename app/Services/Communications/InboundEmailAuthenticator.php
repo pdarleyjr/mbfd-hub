@@ -21,6 +21,8 @@ use Throwable;
 
 final class InboundEmailAuthenticator
 {
+    private const EVIDENCE_HEADER_MAX_LENGTH = 4096;
+
     /** @return InboundEmail|null Null only when a cleaned roster email is redelivered: acknowledged, not stored. */
     public function persist(Request $request): ?InboundEmail
     {
@@ -140,22 +142,41 @@ final class InboundEmailAuthenticator
 
     /**
      * What the Worker saw on the wire. A field that is absent, the wrong type or over its cap stays
-     * null, so the classifier treats it as missing rather than reading a damaged value.
+     * null, so the classifier treats it as missing rather than reading a damaged value. A header over
+     * its cap also sets `truncated`, whichever side noticed.
      *
      * @param  array<string, mixed>  $payload
-     * @return array{envelope_from: ?string, authentication_results: ?string, arc_authentication_results: ?string, received_spf: ?string}|null
+     * @return array{envelope_from: ?string, authentication_results: ?string, arc_authentication_results: ?string, received_spf: ?string, cloudflare_claims: array{authentication_results: int, arc_authentication_results: int}|null, truncated: bool}|null
      */
     private function transportEvidence(array $payload): ?array
     {
         $headers = is_array($payload['authentication_evidence'] ?? null) ? $payload['authentication_evidence'] : [];
-        $evidence = [
-            'envelope_from' => $this->evidenceValue($payload['envelope_from'] ?? null, 320),
-            'authentication_results' => $this->evidenceValue($headers['authentication_results'] ?? null, 2048),
-            'arc_authentication_results' => $this->evidenceValue($headers['arc_authentication_results'] ?? null, 2048),
-            'received_spf' => $this->evidenceValue($headers['received_spf'] ?? null, 2048),
-        ];
+        $strings = ['envelope_from' => $this->evidenceValue($payload['envelope_from'] ?? null, 320)];
+        $truncated = ($headers['truncated'] ?? false) === true;
+        foreach (['authentication_results', 'arc_authentication_results', 'received_spf'] as $field) {
+            $value = $headers[$field] ?? null;
+            $strings[$field] = $this->evidenceValue($value, self::EVIDENCE_HEADER_MAX_LENGTH);
+            $truncated = $truncated || (is_string($value) && mb_strlen($value) > self::EVIDENCE_HEADER_MAX_LENGTH);
+        }
+        $claims = $this->claimCounts($headers['cloudflare_claims'] ?? null);
 
-        return array_filter($evidence, static fn (?string $value): bool => $value !== null) === [] ? null : $evidence;
+        if (array_filter($strings) === [] && $claims === null && ! $truncated) {
+            return null;
+        }
+
+        return [...$strings, 'cloudflare_claims' => $claims, 'truncated' => $truncated];
+    }
+
+    /** @return array{authentication_results: int, arc_authentication_results: int}|null Null unless both counts are readable */
+    private function claimCounts(mixed $claims): ?array
+    {
+        $results = is_array($claims) ? ($claims['authentication_results'] ?? null) : null;
+        $arcResults = is_array($claims) ? ($claims['arc_authentication_results'] ?? null) : null;
+        if (! is_int($results) || ! is_int($arcResults) || $results < 0 || $arcResults < 0) {
+            return null;
+        }
+
+        return ['authentication_results' => $results, 'arc_authentication_results' => $arcResults];
     }
 
     private function evidenceValue(mixed $value, int $maximumLength): ?string

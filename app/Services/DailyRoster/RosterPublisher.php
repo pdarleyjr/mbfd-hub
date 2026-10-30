@@ -223,7 +223,7 @@ final class RosterPublisher
             'warnings' => $report->warnings,
         ]);
 
-        $sections = array_values($report->sections);
+        $sections = $report->sections;
         foreach (array_chunk($this->sectionRows($snapshot, $sections), self::INSERT_CHUNK) as $rows) {
             RosterSection::query()->insert($rows);
         }
@@ -275,7 +275,7 @@ final class RosterPublisher
         $rows = [];
         foreach ($sections as $sectionPosition => $section) {
             $position = 0;
-            foreach (array_values($section->seats) as $seatPosition => $seat) {
+            foreach ($section->seats as $seatPosition => $seat) {
                 foreach ($seat->entries as $entry) {
                     $rows[] = [
                         'roster_snapshot_id' => $snapshot->getKey(),

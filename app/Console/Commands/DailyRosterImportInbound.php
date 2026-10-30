@@ -9,6 +9,7 @@ use App\Models\InboundEmail;
 use App\Services\DailyRoster\RosterImportOperations;
 use App\Services\DailyRoster\RosterStateRecorder;
 use App\Services\DailyRoster\TeleStaffMailClassification;
+use App\Services\DailyRoster\TeleStaffMailClassifier;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Database\UniqueConstraintViolationException;
@@ -18,9 +19,10 @@ use Illuminate\Support\Str;
 use Throwable;
 
 /**
- * Operator path for a real export already in the inbox from before the Worker carried authentication
- * results, so the classifier cannot vouch for it. The operator attests to the source, and it must still
- * match the configured sender, subject, filename and attachment shape exactly. Prints codes and counts only.
+ * Operator path for a real export the classifier cannot vouch for: mail from before the Worker carried
+ * authentication results, or a row it already rejected or held. The operator attests to the source, and
+ * it must still match the configured sender, subject, filename and attachment shape exactly. Prints codes
+ * and counts only.
  */
 final class DailyRosterImportInbound extends Command
 {
@@ -47,13 +49,20 @@ final class DailyRosterImportInbound extends Command
         }
 
         $messageHash = hash('sha256', (string) $email->provider_message_id);
-        if (RosterImport::query()->where('message_id_sha256', $messageHash)->exists()) {
+        $registered = RosterImport::query()->where('message_id_sha256', $messageHash)->first();
+        if ($registered !== null && ! $operations->canRetryAttested($registered)) {
             return $this->alreadyRegistered($messageHash);
         }
 
         $problem = $this->shapeProblem($email);
         if ($problem !== null) {
             return $this->refuse($problem);
+        }
+        if ($registered !== null) {
+            $operations->retryAttested($registered, null);
+            $this->line(sprintf('attested import=%d state=%s', $registered->getKey(), $registered->state));
+
+            return self::SUCCESS;
         }
 
         /** @var array{filename: string, disk: string, path: string} $attachment */
@@ -81,7 +90,11 @@ final class DailyRosterImportInbound extends Command
                     'attachment_disk' => $attachment['disk'],
                     'attachment_path' => $attachment['path'],
                     'received_at' => $email->received_at,
-                    'classification' => ['verdict' => TeleStaffMailClassification::MATCH, 'reasons' => ['operator_attested']],
+                    'classification' => (new TeleStaffMailClassification(
+                        TeleStaffMailClassification::MATCH,
+                        [RosterImportOperations::ATTESTED],
+                        TeleStaffMailClassifier::evidenceSummary($email),
+                    ))->toLedger(),
                 ]);
                 $recorder->appendEvent($import, RosterStateRecorder::ACTION_ATTESTED_IMPORT, to: RosterImport::STATE_CLASSIFIED, reason: 'operator_attested');
 
@@ -106,20 +119,20 @@ final class DailyRosterImportInbound extends Command
             return 'subject_mismatch';
         }
 
-        $attachments = is_array($email->attachment_metadata) ? array_values($email->attachment_metadata) : [];
+        $attachments = $email->attachment_metadata ?? [];
         if (count($attachments) !== 1) {
             return 'attachment_count_not_one';
         }
 
         $attachment = $attachments[0];
-        if (($attachment['filename'] ?? null) !== (string) config('daily_roster.classifier.filename')) {
+        if ($attachment['filename'] !== (string) config('daily_roster.classifier.filename')) {
             return 'filename_mismatch';
         }
-        if (strtolower((string) ($attachment['mime_type'] ?? '')) !== self::SPREADSHEET_MIME) {
+        if (strtolower($attachment['mime_type']) !== self::SPREADSHEET_MIME) {
             return 'attachment_mime_mismatch';
         }
 
-        return $this->storedFileProblem((string) ($attachment['disk'] ?? ''), (string) ($attachment['path'] ?? ''));
+        return $this->storedFileProblem($attachment['disk'], $attachment['path']);
     }
 
     private function storedFileProblem(string $disk, string $path): ?string

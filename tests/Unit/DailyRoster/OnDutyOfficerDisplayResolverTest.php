@@ -8,11 +8,16 @@ use App\Models\Captain5\Captain5ActingRequest;
 use App\Models\DailyRoster\RosterActiveVersion;
 use App\Models\DailyRoster\RosterAssignment;
 use App\Models\DailyRoster\RosterImport;
+use App\Models\DailyRoster\RosterSection;
 use App\Models\User;
 use App\Services\Captain5\Captain5DutyRoster;
 use App\Services\Captain5\OnDutyCaptain5;
+use App\Services\DailyRoster\CurrentRosterReader;
 use App\Services\DailyRoster\OnDutyOfficerDisplay;
 use App\Services\DailyRoster\OnDutyOfficerDisplayResolver;
+use App\Services\DailyRoster\RosterFreshness;
+use App\Services\DailyRoster\RosterFreshnessResolver;
+use App\Services\DailyRoster\RosterPipelineException;
 use App\Services\Security\Command300Access;
 use App\Support\Captain5\DutyCalendar;
 use Carbon\CarbonImmutable;
@@ -249,6 +254,18 @@ final class OnDutyOfficerDisplayResolverTest extends TestCase
         $this->assertShowsBidSeat($this->resolve(), OnDutyOfficerDisplay::FRESHNESS_DELAYED);
     }
 
+    public function test_a_held_export_with_nothing_published_reads_awaiting_until_the_cutoff(): void
+    {
+        RosterImport::query()->create([
+            'correlation_id' => (string) Str::uuid(), 'state' => RosterImport::STATE_NEEDS_REVIEW, 'state_changed_at' => now(),
+            'message_id_sha256' => hash('sha256', 'held'), 'sender' => 'sender@example.test', 'received_at' => CarbonImmutable::parse('2026-10-20 08:20', 'America/New_York'), 'duty_date' => self::DUTY_DATE,
+        ]);
+
+        $this->assertShowsBidSeat($this->resolve('2026-10-20 08:30'), OnDutyOfficerDisplay::FRESHNESS_AWAITING);
+        $this->assertShowsBidSeat($this->resolve('2026-10-20 09:59'), OnDutyOfficerDisplay::FRESHNESS_AWAITING);
+        $this->assertShowsBidSeat($this->resolve('2026-10-20 10:00'), OnDutyOfficerDisplay::FRESHNESS_DELAYED);
+    }
+
     public function test_a_held_later_export_does_not_hide_the_good_one_already_showing(): void
     {
         $this->publishCaptain5([$this->working($this->rosterCaptain)]);
@@ -260,11 +277,12 @@ final class OnDutyOfficerDisplayResolverTest extends TestCase
         self::assertSame('Roster Officer', $this->resolve()->name);
     }
 
-    public function test_a_stale_snapshot_on_the_wrong_shift_is_ignored(): void
+    public function test_a_snapshot_on_the_wrong_shift_is_not_trusted_but_has_arrived_as_the_page_says(): void
     {
         $this->publishCaptain5([$this->working($this->rosterCaptain)], ['shift' => 'B']);
 
-        $this->assertShowsBidSeat($this->resolve(), OnDutyOfficerDisplay::FRESHNESS_DELAYED);
+        $this->assertShowsBidSeat($this->resolve(), OnDutyOfficerDisplay::FRESHNESS_CURRENT, OnDutyOfficerDisplay::REASON_NEEDS_REVIEW);
+        self::assertSame(RosterFreshness::CURRENT, app(RosterFreshnessResolver::class)->status(CarbonImmutable::parse('2026-10-20 10:30', 'America/New_York'))->state);
     }
 
     public function test_a_pointer_at_another_days_snapshot_is_ignored(): void
@@ -294,6 +312,8 @@ final class OnDutyOfficerDisplayResolverTest extends TestCase
         self::assertSame(OnDutyCaptain5::SOURCE_UNKNOWN, $payload['source']);
         self::assertNull($payload['name']);
         self::assertNull($payload['shift']);
+        self::assertSame(OnDutyOfficerDisplay::FRESHNESS_CURRENT, $payload['freshness'], 'The roster arrived, as the page says; it just cannot name anyone.');
+        self::assertSame(OnDutyOfficerDisplay::REASON_NEEDS_REVIEW, $payload['reason']);
     }
 
     // ------------------------------------------------------------- who the section names
@@ -321,6 +341,33 @@ final class OnDutyOfficerDisplayResolverTest extends TestCase
         $this->publishCaptain5([$this->working($this->rosterCaptain), $this->working($this->rosterRelief, ['seat' => 1])]);
 
         $this->assertUnknown($this->resolve(), OnDutyOfficerDisplay::REASON_CONFLICT);
+    }
+
+    public function test_two_sections_carrying_the_same_role_are_a_conflict_even_when_only_one_names_anyone(): void
+    {
+        DailyRosterSnapshotFactory::publish(self::DUTY_DATE, [
+            self::CAPTAIN_5_SECTION => [$this->working($this->rosterCaptain)],
+            'Station 9 / Captain 5' => [['kind' => RosterAssignment::KIND_VACANCY_OPEN, 'name' => '?,?', 'code' => null, 'rank' => 'Capt']],
+        ]);
+        $this->forgetCaptain5Memo();
+
+        $this->assertUnknown($this->resolve(), OnDutyOfficerDisplay::REASON_CONFLICT);
+    }
+
+    public function test_the_reader_returns_every_section_of_a_role_in_sheet_order(): void
+    {
+        DailyRosterSnapshotFactory::publish(self::DUTY_DATE, [
+            'Station 1 / Engine 1' => [$this->working($this->rosterRelief, ['rank' => 'Lt'])],
+            self::CAPTAIN_5_SECTION => [$this->working($this->rosterCaptain), $this->working($this->rosterCaptain, ['code' => '+OT', 'seat' => 1])],
+            'Station 9 / Captain 5' => [$this->working($this->rosterRelief)],
+        ]);
+
+        $at = CarbonImmutable::parse('2026-10-20 10:30', 'America/New_York');
+        $sections = app(CurrentRosterReader::class)->sectionsForRole($at, RosterSection::ROLE_CAPTAIN_5);
+
+        self::assertSame([self::CAPTAIN_5_SECTION, 'Station 9 / Captain 5'], array_map(static fn ($view): string => $view->section->raw_title, $sections));
+        self::assertSame([2, 1], array_map(static fn ($view): int => count($view->assignments), $sections));
+        self::assertSame([], app(CurrentRosterReader::class)->sectionsForRole(CarbonImmutable::parse('2026-10-25 10:30', 'America/New_York'), RosterSection::ROLE_CAPTAIN_5));
     }
 
     public function test_the_same_person_on_two_working_rows_is_unique(): void
@@ -501,7 +548,7 @@ final class OnDutyOfficerDisplayResolverTest extends TestCase
 
     // ------------------------------------------------------------- identity
 
-    public function test_an_id_no_hub_member_holds_shows_the_source_name_and_seat_rank_as_unlinked(): void
+    public function test_an_id_no_hub_member_holds_shows_the_source_name_without_a_rank_as_unlinked(): void
     {
         $this->publishCaptain5([['employee_id' => '99999', 'name' => 'OUTSIDE, MEMBER', 'rank' => 'Capt 5', 'code' => 'SP']]);
 
@@ -509,7 +556,7 @@ final class OnDutyOfficerDisplayResolverTest extends TestCase
 
         self::assertSame(OnDutyOfficerDisplay::SOURCE_TELESTAFF, $payload['source']);
         self::assertSame('OUTSIDE, MEMBER', $payload['name']);
-        self::assertSame('Capt 5', $payload['rank']);
+        self::assertNull($payload['rank'], 'A backfill may hold a different rank than the seat');
         self::assertSame(OnDutyOfficerDisplay::IDENTITY_UNLINKED, $payload['identity']);
         self::assertNotSame('Bid Seat Captain', $payload['name']);
     }
@@ -647,6 +694,7 @@ final class OnDutyOfficerDisplayResolverTest extends TestCase
         Exceptions::fake();
 
         self::assertSame($seat, $this->resolve()->toArray());
-        Exceptions::assertReported(QueryException::class);
+        Exceptions::assertNotReported(QueryException::class);
+        Exceptions::assertReported(static fn (RosterPipelineException $exception): bool => $exception->getMessage() === 'display_failed_QueryException');
     }
 }

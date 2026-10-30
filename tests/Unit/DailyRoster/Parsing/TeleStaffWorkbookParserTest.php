@@ -216,6 +216,40 @@ final class TeleStaffWorkbookParserTest extends TestCase
         $this->assertNotSame($first->normalizedSha256(), $second->normalizedSha256());
     }
 
+    public function test_the_layout_fingerprint_is_exactly_the_observed_labels_and_their_gaps(): void
+    {
+        $report = $this->parse(Factory::build(['rowOffset' => 3, 'columnOffset' => 2]));
+
+        // Nothing but labels and gaps goes in, so a parser version bump cannot look like a layout change.
+        $this->assertSame(
+            hash('sha256', (string) json_encode([['Rank', 0], ['ID', 1], ['Name', 2], ['From', 5], ['Through', 6]], JSON_THROW_ON_ERROR)),
+            $report->layoutFingerprint,
+        );
+    }
+
+    public function test_the_layout_fingerprint_ignores_the_division_and_sheet_names(): void
+    {
+        $baseline = $this->parse(Factory::build());
+
+        config(['daily_roster.workbook.division' => 'Renamed Division', 'daily_roster.workbook.sheet' => 'Renamed Sheet']);
+        $renamed = $this->parse(Factory::build(['division' => 'Renamed Division']));
+
+        $this->assertSame('Renamed Sheet', $renamed->sheetName);
+        $this->assertSame($baseline->layoutFingerprint, $renamed->layoutFingerprint);
+    }
+
+    public function test_the_layout_fingerprint_changes_when_the_gap_between_columns_changes(): void
+    {
+        $baseline = $this->parse(Factory::build());
+        $widened = $this->parse(Factory::build(['customize' => static function (Spreadsheet $book, Worksheet $sheet): void {
+            // One more blank column between Name and the code; the roster itself reads the same.
+            $sheet->insertNewColumnBefore('E');
+        }]));
+
+        $this->assertNotSame($baseline->layoutFingerprint, $widened->layoutFingerprint);
+        $this->assertSame($baseline->normalizedSha256(), $widened->normalizedSha256());
+    }
+
     public function test_section_order_and_source_rows_are_preserved(): void
     {
         $report = $this->parse(Factory::build(['rowOffset' => 2, 'spacers' => 2]));

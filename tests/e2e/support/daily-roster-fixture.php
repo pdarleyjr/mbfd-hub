@@ -6,7 +6,10 @@ declare(strict_types=1);
 // browser suite only; every name, ID and certification below is made up.
 //   php daily-roster-fixture.php seed
 //   php daily-roster-fixture.php publish "EXTRA, MEMBER"
+//   php daily-roster-fixture.php publish-section "NEW, MEMBER"
+//   php daily-roster-fixture.php age-pointer
 
+use App\Models\DailyRoster\RosterActiveVersion;
 use App\Models\DailyRoster\RosterAssignment;
 use App\Support\Captain5\DutyCalendar;
 use Carbon\CarbonImmutable;
@@ -69,15 +72,29 @@ $calendar = app(DutyCalendar::class);
 $dutyDate = $calendar->dutyDate(CarbonImmutable::now());
 $command = $argv[1] ?? 'seed';
 
+// The publisher stores the rank on the seat only for a continuation row; the rows here say the same.
+$blankContinuationRanks = static fn () => RosterAssignment::query()->where('is_continuation', true)->update(['rank_label' => null]);
+
 if ($command === 'seed') {
     DailyRosterSnapshotFactory::publish($dutyDate->subDay()->format('Y-m-d'), [
         'Station 2 / Engine 2' => [['employee_id' => '90015', 'name' => 'YESTERDAY, NOA', 'rank' => 'Firefighter', 'code' => 'SP', 'category' => 'Scheduled']],
     ]);
     DailyRosterSnapshotFactory::publish($dutyDate->format('Y-m-d'), $roster());
+    $blankContinuationRanks();
 } elseif ($command === 'publish' && isset($argv[2])) {
     DailyRosterSnapshotFactory::publish($dutyDate->format('Y-m-d'), $roster([
         ['employee_id' => '90016', 'name' => $argv[2], 'rank' => 'Firefighter', 'code' => 'SP', 'category' => 'Scheduled'],
     ]), ['generated_at' => CarbonImmutable::now()]);
+    $blankContinuationRanks();
+} elseif ($command === 'publish-section' && isset($argv[2])) {
+    DailyRosterSnapshotFactory::publish($dutyDate->format('Y-m-d'), $roster() + [
+        'Station 6 / Engine 6' => [['employee_id' => '90017', 'name' => $argv[2], 'rank' => 'Firefighter', 'code' => 'SP', 'category' => 'Scheduled']],
+    ], ['generated_at' => CarbonImmutable::now()]);
+    $blankContinuationRanks();
+} elseif ($command === 'age-pointer') {
+    // So a later publish changes "Last updated" even when it lands in the same minute as the one before it.
+    RosterActiveVersion::query()->whereDate('duty_date', $dutyDate->format('Y-m-d'))->toBase()
+        ->update(['updated_at' => CarbonImmutable::now()->subHours(3)->format('Y-m-d H:i:s')]);
 } else {
-    throw new InvalidArgumentException('Usage: daily-roster-fixture.php seed | publish "NAME"');
+    throw new InvalidArgumentException('Usage: daily-roster-fixture.php seed | publish "NAME" | publish-section "NAME" | age-pointer');
 }

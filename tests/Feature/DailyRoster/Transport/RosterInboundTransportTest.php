@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Mockery;
+use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -110,6 +111,8 @@ final class RosterInboundTransportTest extends TestCase
         self::assertSame('local', $import->attachment_disk);
         self::assertSame($email->attachment_metadata[0]['path'], $import->attachment_path);
         self::assertSame('match', $import->classification['verdict']);
+        self::assertSame(self::PASSING_RESULTS, $import->classification['evidence']['authentication_results']);
+        self::assertSame('donotreply@miamibeachfl.gov', $import->classification['evidence']['envelope_from']);
         self::assertNotNull($import->last_dispatched_at);
         self::assertTrue(RosterEvent::query()->where('roster_import_id', $import->id)->where('action', 'registered')->exists());
         Queue::assertPushed(ProcessRosterImport::class, 1);
@@ -213,8 +216,54 @@ final class RosterInboundTransportTest extends TestCase
         self::assertSame(RosterImport::STATE_REJECTED, $import->state);
         self::assertSame('rejected', $import->classification['verdict']);
         self::assertContains('evidence_dmarc_fail', $import->classification['reasons']);
+        self::assertSame('attacker@example.test', $import->classification['evidence']['envelope_from']);
+        self::assertStringContainsString('dmarc=fail', $import->classification['evidence']['authentication_results']);
         self::assertNotNull($this->inboundFor($mail['message_id']));
         Queue::assertNothingPushed();
+    }
+
+    public function test_a_passing_claim_from_a_worker_without_the_counts_is_held(): void
+    {
+        $mail = $this->rosterMail(['authentication_evidence' => ['authentication_results' => self::PASSING_RESULTS]]);
+
+        $this->deliverMail($mail)->assertCreated();
+
+        $import = $this->ledgerFor($mail['message_id']);
+        self::assertSame(RosterImport::STATE_NEEDS_REVIEW, $import->state);
+        self::assertSame(['cloudflare_claims_missing'], $import->classification['reasons']);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_a_second_claim_the_worker_counted_holds_the_message(): void
+    {
+        $mail = $this->rosterMail(['authentication_evidence' => [
+            'authentication_results' => self::PASSING_RESULTS,
+            'cloudflare_claims' => ['authentication_results' => 2, 'arc_authentication_results' => 0],
+        ]]);
+
+        $this->deliverMail($mail)->assertCreated();
+
+        $import = $this->ledgerFor($mail['message_id']);
+        self::assertSame(RosterImport::STATE_NEEDS_REVIEW, $import->state);
+        self::assertSame(['authentication_results_multiple_claims'], $import->classification['reasons']);
+        self::assertSame(['authentication_results' => 2, 'arc_authentication_results' => 0], $import->classification['evidence']['cloudflare_claims']);
+        Queue::assertNothingPushed();
+    }
+
+    public function test_a_truncated_header_from_the_worker_holds_the_message(): void
+    {
+        $mail = $this->rosterMail(['authentication_evidence' => [
+            'authentication_results' => null,
+            'cloudflare_claims' => ['authentication_results' => 1, 'arc_authentication_results' => 0],
+            'truncated' => true,
+        ]]);
+
+        $this->deliverMail($mail)->assertCreated();
+
+        $import = $this->ledgerFor($mail['message_id']);
+        self::assertSame(RosterImport::STATE_NEEDS_REVIEW, $import->state);
+        self::assertContains('evidence_truncated', $import->classification['reasons']);
+        self::assertTrue($this->inboundFor($mail['message_id'])->transport_evidence['truncated']);
     }
 
     public function test_missing_evidence_is_held_for_review(): void
@@ -234,14 +283,18 @@ final class RosterInboundTransportTest extends TestCase
     public function test_malformed_evidence_is_held_for_review(): void
     {
         $mail = $this->rosterMail([
-            'authentication_evidence' => ['authentication_results' => 'mx.cloudflare.net; dmarc=pass (unbalanced', 'arc_authentication_results' => ['not', 'a', 'string']],
+            'authentication_evidence' => [
+                'authentication_results' => 'mx.cloudflare.net; dmarc=pass (unbalanced',
+                'arc_authentication_results' => ['not', 'a', 'string'],
+                'cloudflare_claims' => ['authentication_results' => 1, 'arc_authentication_results' => 0],
+            ],
         ]);
 
         $this->deliverMail($mail)->assertCreated();
 
         $import = $this->ledgerFor($mail['message_id']);
         self::assertSame(RosterImport::STATE_NEEDS_REVIEW, $import->state);
-        self::assertSame(['authentication_results_unparseable', 'arc_authentication_results_missing'], $import->classification['reasons']);
+        self::assertSame(['authentication_results_unparseable'], $import->classification['reasons']);
         Queue::assertNothingPushed();
     }
 
@@ -250,8 +303,9 @@ final class RosterInboundTransportTest extends TestCase
         $mail = $this->rosterMail([
             'authentication_evidence' => [
                 'authentication_results' => self::PASSING_RESULTS,
-                'arc_authentication_results' => str_repeat('x', 2049),
+                'arc_authentication_results' => str_repeat('x', 4097),
                 'received_spf' => "pass\u{0007} (mx.cloudflare.net)",
+                'cloudflare_claims' => ['authentication_results' => 1, 'arc_authentication_results' => 0],
             ],
         ]);
 
@@ -262,7 +316,46 @@ final class RosterInboundTransportTest extends TestCase
             'authentication_results' => self::PASSING_RESULTS,
             'arc_authentication_results' => null,
             'received_spf' => 'pass  (mx.cloudflare.net)',
+            'cloudflare_claims' => ['authentication_results' => 1, 'arc_authentication_results' => 0],
+            'truncated' => true,
         ], $this->inboundFor($mail['message_id'])->transport_evidence);
+        self::assertSame(['evidence_truncated'], $this->ledgerFor($mail['message_id'])->classification['reasons']);
+    }
+
+    public function test_a_header_up_to_the_cap_is_stored_whole(): void
+    {
+        $results = self::PASSING_RESULTS.str_repeat(' ', 4096 - strlen(self::PASSING_RESULTS) - 1).'x';
+        $mail = $this->rosterMail(['authentication_evidence' => [
+            'authentication_results' => $results,
+            'cloudflare_claims' => ['authentication_results' => 1, 'arc_authentication_results' => 0],
+        ]]);
+
+        $this->deliverMail($mail)->assertCreated();
+
+        self::assertSame($results, $this->inboundFor($mail['message_id'])->transport_evidence['authentication_results']);
+        self::assertFalse($this->inboundFor($mail['message_id'])->transport_evidence['truncated']);
+    }
+
+    /** @return array<string, array{mixed}> */
+    public static function unreadableCounts(): array
+    {
+        return [
+            'not an array' => ['2'],
+            'one kind missing' => [['authentication_results' => 1]],
+            'a string count' => [['authentication_results' => '1', 'arc_authentication_results' => 0]],
+            'a negative count' => [['authentication_results' => -1, 'arc_authentication_results' => 0]],
+        ];
+    }
+
+    #[DataProvider('unreadableCounts')]
+    public function test_counts_that_cannot_be_read_are_stored_as_null_and_hold_the_message(mixed $counts): void
+    {
+        $mail = $this->rosterMail(['authentication_evidence' => ['authentication_results' => self::PASSING_RESULTS, 'cloudflare_claims' => $counts]]);
+
+        $this->deliverMail($mail)->assertCreated();
+
+        self::assertNull($this->inboundFor($mail['message_id'])->transport_evidence['cloudflare_claims']);
+        self::assertSame(RosterImport::STATE_NEEDS_REVIEW, $this->ledgerFor($mail['message_id'])->state);
     }
 
     public function test_a_redelivery_after_cleanup_is_acknowledged_and_stores_nothing(): void

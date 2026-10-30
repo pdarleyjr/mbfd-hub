@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\Storage;
 use RuntimeException;
 use Tests\Feature\DailyRoster\Pipeline\Support\InteractsWithRosterPipeline;
 use Tests\Feature\DailyRoster\Pipeline\Support\RosterPipelineFixtures;
+use Tests\Support\DailyRosterSnapshotFactory;
 use Tests\TestCase;
 
 final class RosterPublisherTest extends TestCase
@@ -38,6 +39,18 @@ final class RosterPublisherTest extends TestCase
     {
         parent::setUp();
         $this->preparePipeline();
+    }
+
+    public function test_the_read_side_factory_writes_continuation_rows_as_the_publisher_does(): void
+    {
+        DailyRosterSnapshotFactory::publish(self::DATE, ['Station 1 / Engine 1' => [
+            ['employee_id' => '90001', 'name' => 'TESTPERSON, ALPHA', 'rank' => 'Lieutenant', 'seat' => 0],
+            ['employee_id' => '90002', 'name' => 'TESTPERSON, BRAVO', 'rank' => 'Lieutenant', 'seat' => 0, 'continuation' => true],
+        ]]);
+
+        $rows = RosterAssignment::query()->orderBy('position')->get();
+        self::assertSame(['Lieutenant', null], $rows->pluck('rank_label')->all());
+        self::assertSame(['Lieutenant', 'Lieutenant'], $rows->pluck('seat_rank')->all());
     }
 
     public function test_it_writes_the_whole_snapshot_with_seats_filled_down(): void

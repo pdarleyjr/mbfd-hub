@@ -55,7 +55,7 @@ final class RosterImportRegistrar
             'attachment_disk' => $attachment['disk'],
             'attachment_path' => $attachment['path'],
             'received_at' => $email->received_at,
-            'classification' => json_encode(['verdict' => $classification->verdict, 'reasons' => $classification->reasons], JSON_THROW_ON_ERROR),
+            'classification' => json_encode($classification->toLedger(), JSON_THROW_ON_ERROR),
             'created_at' => $now,
             'updated_at' => $now,
         ]);
@@ -145,10 +145,10 @@ final class RosterImportRegistrar
     /** @return array<string, mixed>|null The attachment carrying the configured name, else the first. */
     private function primaryAttachment(InboundEmail $email): ?array
     {
-        $attachments = array_values(array_filter((array) $email->attachment_metadata, is_array(...)));
+        $attachments = $email->attachment_metadata ?? [];
         $expected = mb_strtolower((string) config('daily_roster.classifier.filename'));
         foreach ($attachments as $attachment) {
-            if (mb_strtolower((string) ($attachment['filename'] ?? '')) === $expected) {
+            if (mb_strtolower($attachment['filename']) === $expected) {
                 return $attachment;
             }
         }

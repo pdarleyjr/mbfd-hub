@@ -199,7 +199,8 @@ final class DailyRosterPagePresenter
         return [
             'isFirstInSeat' => $isFirstInSeat,
             'isVacant' => $isVacant,
-            'rank' => (string) $assignment->rank_label,
+            // TeleStaff leaves the rank blank on a continuation row; the rank belongs to the seat.
+            'rank' => (string) ($assignment->rank_label ?: $assignment->seat_rank),
             'employeeId' => (string) $assignment->employee_id,
             'name' => $name,
             'sourceMarker' => $isVacant ? trim((string) $assignment->raw_name) : '',

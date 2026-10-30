@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Services\Security;
 
+use App\Models\DailyRoster\RosterActiveVersion;
 use App\Models\User;
 
 /**
@@ -28,5 +29,17 @@ final class DailyRosterAccess
         return $user->isAuthenticationAllowed()
             && ! $user->must_change_password
             && $user->hasCurrentAdminPanelEntitlement();
+    }
+
+    /**
+     * Whether Home links to the roster. During shadow rollout nothing has been published, so the link would
+     * lead to an empty page; the route itself stays open and shows its empty state. At most one exists query,
+     * and none once publishing is on.
+     */
+    public function canSeeHomeEntry(?User $user): bool
+    {
+        return $this->canView($user)
+            && (config('daily_roster.mode') === 'publish'
+                || RosterActiveVersion::query()->whereNotNull('roster_snapshot_id')->exists());
     }
 }

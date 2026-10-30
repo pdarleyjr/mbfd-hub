@@ -326,6 +326,33 @@ final class TeleStaffWorkbookPreflightTest extends TestCase
         $this->assertFails('zip_limit_exceeded', $path);
     }
 
+    public function test_it_rejects_too_many_cells(): void
+    {
+        $path = Factory::build();
+        config(['daily_roster.workbook.max_cells' => 10]);
+
+        $this->assertFails('zip_limit_exceeded', $path);
+    }
+
+    public function test_it_counts_cells_rather_than_rows_or_file_size(): void
+    {
+        // Few rows and a tiny compressed size, but a grid no real export has.
+        $path = Factory::build();
+        Factory::editEntry($path, 'xl/worksheets/sheet1.xml', static function (string $xml): string {
+            $cells = str_repeat('<c r="Z9000"/>', 20001);
+
+            return (string) preg_replace('#</row>#', $cells.'</row>', $xml, 1);
+        });
+
+        $this->assertFails('zip_limit_exceeded', $path);
+    }
+
+    public function test_the_default_cell_limit_leaves_room_for_the_real_export(): void
+    {
+        $this->assertGreaterThanOrEqual(3200 * 2, (int) config('daily_roster.workbook.max_cells'));
+        $this->assertSame('xl/worksheets/sheet1.xml', (new TeleStaffWorkbookPreflight)->inspect(Factory::build())['sheetPart']);
+    }
+
     public function test_it_fails_a_malformed_sheet_as_a_read_failure(): void
     {
         $path = Factory::build();

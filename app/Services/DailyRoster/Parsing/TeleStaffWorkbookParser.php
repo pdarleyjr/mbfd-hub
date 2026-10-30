@@ -76,7 +76,7 @@ final class TeleStaffWorkbookParser
             generatedAt: $generatedAt,
             divisionTitle: $primary['title'],
             titleRow: $primary['titleRow'],
-            layoutFingerprint: $this->layoutFingerprint($sheetName, $primary['division']),
+            layoutFingerprint: $this->layoutFingerprint($parsed['headerCells']),
             sections: $parsed['sections'],
             otherBlocks: $this->summarizeOtherBlocks($blocks, $primary['titleRow']),
             warnings: [...$warnings, ...$parsed['warnings']],
@@ -276,11 +276,12 @@ final class TeleStaffWorkbookParser
 
     /**
      * @param  array<string, mixed>  $primary
-     * @return array{sections: list<TeleStaffRosterSection>, warnings: list<string>}
+     * @return array{sections: list<TeleStaffRosterSection>, warnings: list<string>, headerCells: array<int, string|int|float|bool>}
      */
     private function parsePrimaryBlock(array $primary, string $dutyDate, CarbonImmutable $windowStart, CarbonImmutable $windowEnd): array
     {
         $columns = null;
+        $headerCells = [];
         $expectSection = false;
         $lastHeaderRow = $primary['titleRow'];
         $sections = [];
@@ -294,7 +295,7 @@ final class TeleStaffWorkbookParser
                 if ($expectSection || ($columns !== null && $found !== $columns)) {
                     throw new TeleStaffWorkbookException($expectSection ? 'row_unrecognized' : 'header_unrecognized', $rowNumber);
                 }
-                [$columns, $expectSection, $lastHeaderRow] = [$found, true, $rowNumber];
+                [$columns, $headerCells, $expectSection, $lastHeaderRow] = [$found, $cells, true, $rowNumber];
 
                 continue;
             }
@@ -325,7 +326,7 @@ final class TeleStaffWorkbookParser
             throw new TeleStaffWorkbookException('row_unrecognized', $lastHeaderRow);
         }
 
-        return $this->buildSections($sections, $warnings);
+        return [...$this->buildSections($sections, $warnings), 'headerCells' => $headerCells];
     }
 
     /** @param  array<int, string|int|float|bool>  $cells */
@@ -426,7 +427,7 @@ final class TeleStaffWorkbookParser
         return ['rank' => $rank, 'entry' => $entry];
     }
 
-    /** @param  array<string, mixed>  $interval */
+    /** @param  array{rawFrom: string, rawThrough: string, reportedHours: float, startAt: ?string, endAt: ?string}  $interval */
     private function vacancyEntry(int $rowNumber, string $rank, string $name, mixed $id, string $code, array $interval): TeleStaffRosterEntry
     {
         if ($id !== null) {
@@ -437,7 +438,6 @@ final class TeleStaffWorkbookParser
         }
 
         return new TeleStaffRosterEntry(
-            ...$interval,
             sourceRow: $rowNumber,
             isContinuation: $rank === '',
             kind: self::VACANCY_KINDS[$name],
@@ -451,11 +451,16 @@ final class TeleStaffWorkbookParser
             availability: 'vacant',
             category: null,
             displayLabel: null,
+            rawFrom: $interval['rawFrom'],
+            rawThrough: $interval['rawThrough'],
+            reportedHours: $interval['reportedHours'],
+            startAt: $interval['startAt'],
+            endAt: $interval['endAt'],
             reviewReasons: [],
         );
     }
 
-    /** @param  array<string, mixed>  $interval */
+    /** @param  array{rawFrom: string, rawThrough: string, reportedHours: float, startAt: ?string, endAt: ?string}  $interval */
     private function employeeEntry(int $rowNumber, string $rank, string $name, mixed $id, string $code, array $interval): TeleStaffRosterEntry
     {
         $employeeId = $this->employeeId($rowNumber, $id);
@@ -467,7 +472,6 @@ final class TeleStaffWorkbookParser
         $classification = TeleStaffCodebook::classify($code);
 
         return new TeleStaffRosterEntry(
-            ...$interval,
             sourceRow: $rowNumber,
             isContinuation: $rank === '',
             kind: 'employee',
@@ -481,6 +485,11 @@ final class TeleStaffWorkbookParser
             availability: $classification->availability,
             category: $classification->category,
             displayLabel: $classification->displayLabel,
+            rawFrom: $interval['rawFrom'],
+            rawThrough: $interval['rawThrough'],
+            reportedHours: $interval['reportedHours'],
+            startAt: $interval['startAt'],
+            endAt: $interval['endAt'],
             reviewReasons: $classification->availability === 'unknown' ? ['unknown_code'] : [],
         );
     }
@@ -656,17 +665,21 @@ final class TeleStaffWorkbookParser
         }
     }
 
-    private function layoutFingerprint(string $sheetName, string $division): string
+    /**
+     * The observed table structure: each header label in order, with its column gap from the first. A
+     * whole-table shift, renamed sections or divisions and a new parser version are not layout changes.
+     *
+     * @param  array<int, string|int|float|bool>  $headerCells  Non-blank cells by column index, in order
+     */
+    private function layoutFingerprint(array $headerCells): string
     {
-        $labels = self::COLUMN_LABELS;
-        sort($labels);
+        $firstColumn = (int) array_key_first($headerCells);
+        $structure = [];
+        foreach ($headerCells as $column => $label) {
+            $structure[] = [(string) $label, $column - $firstColumn];
+        }
 
-        return hash('sha256', json_encode([
-            self::PARSER_VERSION,
-            $sheetName,
-            $labels,
-            self::TITLE_ORGANIZATION." / {$division} / [ABC] Shift",
-        ], JSON_THROW_ON_ERROR));
+        return hash('sha256', json_encode($structure, JSON_THROW_ON_ERROR));
     }
 
     /**

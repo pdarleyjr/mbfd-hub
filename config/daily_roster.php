@@ -31,6 +31,8 @@ return [
         'max_entry_uncompressed_bytes' => 8 * 1024 * 1024,
         'max_entry_ratio' => 200,
         'max_rows' => 5000,
+        // Cell elements in the sheet. The real export has about 3,200.
+        'max_cells' => 20000,
     ],
 
     // TeleStaff unit labels that carry command display, matched exactly after trimming.

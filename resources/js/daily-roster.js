@@ -6,6 +6,8 @@
 const POLL_INTERVAL_MS = 60_000;
 const COUNT_DELAY_MS = 250;
 const WIDE_LEGEND_QUERY = '(min-width: 640px)';
+/** A timer asking is not a member using the Hub: the idle clock stays put, so a shared screen still signs out. */
+const BACKGROUND_REFRESH = { 'X-Hub-Background-Refresh': '1' };
 
 const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
 
@@ -16,15 +18,17 @@ function initDailyRoster(page) {
     const loginUrl = page.dataset.loginUrl;
 
     const body = () => page.querySelector('[data-roster-body]');
-    const part = (selector) => body().querySelector(selector);
-    const sections = () => [...body().querySelectorAll('[data-roster-section]')];
+    const part = (selector) => body()?.querySelector(selector) ?? null;
+    const sections = () => [...(body()?.querySelectorAll('[data-roster-section]') ?? [])];
 
     let version = body().dataset.version;
     let checking = false;
     let manualQueued = false;
-    let openBeforeFilter = null;
+    let closedBeforeFilter = null;
     let countTimer = null;
+    let pollTimer = null;
     let statusMessage = '';
+    let ended = false;
 
     function showStatus(message) {
         statusMessage = message;
@@ -35,12 +39,13 @@ function initDailyRoster(page) {
         }
     }
 
-    function openSectionKeys() {
-        return new Set(sections().filter((section) => section.open).map((section) => section.dataset.sectionKey));
+    // Closed keys, not open ones: a section this page has not seen yet renders open.
+    function closedSectionKeys() {
+        return new Set(sections().filter((section) => !section.open).map((section) => section.dataset.sectionKey));
     }
 
-    function restoreOpenSections(keys) {
-        sections().forEach((section) => { section.open = keys.has(section.dataset.sectionKey); });
+    function restoreClosedSections(keys) {
+        sections().forEach((section) => { section.open = !keys.has(section.dataset.sectionKey); });
     }
 
     function applyFilter() {
@@ -52,8 +57,8 @@ function initDailyRoster(page) {
         const status = part('[data-roster-status]').value;
         const filtering = query !== '' || status !== '';
 
-        if (filtering && openBeforeFilter === null) {
-            openBeforeFilter = openSectionKeys();
+        if (filtering && closedBeforeFilter === null) {
+            closedBeforeFilter = closedSectionKeys();
         }
 
         let shownRows = 0;
@@ -70,6 +75,8 @@ function initDailyRoster(page) {
                     const matches = (query === '' || unitMatches || row.dataset.search.includes(query))
                         && (status === '' || row.dataset.status === status);
                     row.hidden = !matches;
+                    // The first row still showing carries the seat's rank; the rest stay grouped under it.
+                    row.classList.toggle('roster-row--seat-lead', matches && seatRows === 0);
                     seatRows += matches ? 1 : 0;
                 });
                 seat.hidden = seatRows === 0;
@@ -83,12 +90,11 @@ function initDailyRoster(page) {
             shownSections += sectionRows > 0 ? 1 : 0;
         });
 
-        if (!filtering && openBeforeFilter !== null) {
-            restoreOpenSections(openBeforeFilter);
-            openBeforeFilter = null;
+        if (!filtering && closedBeforeFilter !== null) {
+            restoreClosedSections(closedBeforeFilter);
+            closedBeforeFilter = null;
         }
 
-        body().classList.toggle('is-filtering', filtering);
         part('[data-roster-clear]').hidden = !filtering;
         part('[data-roster-no-match]').hidden = shownRows > 0;
 
@@ -105,7 +111,7 @@ function initDailyRoster(page) {
     }
 
     function setAllSections(open) {
-        openBeforeFilter = null;
+        closedBeforeFilter = null;
         sections().forEach((section) => { section.open = open; });
     }
 
@@ -127,8 +133,8 @@ function initDailyRoster(page) {
         return {
             search: part('[data-roster-search]')?.value ?? '',
             status: part('[data-roster-status]')?.value ?? '',
-            open: openBeforeFilter ?? openSectionKeys(),
-            filtering: openBeforeFilter !== null,
+            closed: closedBeforeFilter ?? closedSectionKeys(),
+            filtering: closedBeforeFilter !== null,
             legendOpen: part('[data-roster-legend]')?.open ?? null,
             scrollY: window.scrollY,
             focusId: active?.id && body().contains(active) ? active.id : null,
@@ -145,8 +151,8 @@ function initDailyRoster(page) {
             search.value = view.search;
             status.value = [...status.options].some((option) => option.value === view.status) ? view.status : '';
         }
-        restoreOpenSections(view.open);
-        openBeforeFilter = view.filtering ? view.open : null;
+        restoreClosedSections(view.closed);
+        closedBeforeFilter = view.filtering ? view.closed : null;
         applyFilter();
 
         const legend = part('[data-roster-legend]');
@@ -177,22 +183,46 @@ function initDailyRoster(page) {
         restoreView(view);
     }
 
+    /** Takes the roster off the screen for good: personnel data does not outlive the member's access. */
+    function endRoster(title, detail) {
+        ended = true;
+        window.clearInterval(pollTimer);
+        window.clearTimeout(countTimer);
+        const view = page.querySelector('[data-roster-ended-template]').content.cloneNode(true);
+        view.querySelector('[data-roster-ended-title]').textContent = title;
+        view.querySelector('[data-roster-ended-detail]').textContent = detail;
+        body().replaceWith(view);
+        announce.textContent = title;
+        window.scrollTo({ top: 0, behavior: 'instant' });
+        page.querySelector('[data-roster-ended] h1').focus({ preventScroll: true });
+    }
+
     function goToLogin() {
+        endRoster('Your session has ended', 'Taking you to the sign-in page.');
         window.location.assign(loginUrl);
     }
 
-    /** Resolves to true when a newer roster is now on screen. Any failure keeps what is showing. */
-    async function refreshIfChanged() {
+    function showAccessRemoved() {
+        endRoster('You no longer have access to the Daily Roster', 'If you think this is a mistake, ask an administrator.');
+    }
+
+    /** Resolves to true when a newer roster is now on screen. Any failure other than a refusal keeps what is showing. */
+    async function refreshIfChanged(manual) {
+        const background = manual ? {} : BACKGROUND_REFRESH;
         const response = await fetch(versionUrl, {
             cache: 'no-store',
             credentials: 'same-origin',
-            headers: { Accept: 'application/json', 'If-None-Match': `"${version}"` },
+            headers: { Accept: 'application/json', 'If-None-Match': `"${version}"`, ...background },
         });
         if (response.status === 304) {
             return false;
         }
         if (response.status === 401) {
             goToLogin();
+            return false;
+        }
+        if (response.status === 403) {
+            showAccessRemoved();
             return false;
         }
         if (!response.ok) {
@@ -208,10 +238,14 @@ function initDailyRoster(page) {
             cache: 'no-store',
             credentials: 'same-origin',
             redirect: 'manual',
-            headers: { Accept: 'text/html' },
+            headers: { Accept: 'text/html', ...background },
         });
         if (fragment.type === 'opaqueredirect' || fragment.status === 401) {
             goToLogin();
+            return false;
+        }
+        if (fragment.status === 403) {
+            showAccessRemoved();
             return false;
         }
         if (!fragment.ok) {
@@ -222,6 +256,9 @@ function initDailyRoster(page) {
     }
 
     async function check({ manual = false } = {}) {
+        if (ended) {
+            return;
+        }
         if (checking) {
             // A tap during a background check still gets its own answer.
             manualQueued = manualQueued || manual;
@@ -238,7 +275,7 @@ function initDailyRoster(page) {
             showStatus('Checking for updates');
         }
         try {
-            const changed = await refreshIfChanged();
+            const changed = await refreshIfChanged(manual);
             if (changed) {
                 announce.textContent = 'Roster updated.';
                 showStatus(manual ? 'Roster updated' : '');
@@ -287,7 +324,7 @@ function initDailyRoster(page) {
         }
     });
 
-    window.setInterval(() => {
+    pollTimer = window.setInterval(() => {
         if (document.visibilityState === 'visible') {
             check();
         }

@@ -124,6 +124,70 @@ final class DailyRosterImportInboundCommandTest extends TestCase
         Bus::assertDispatchedTimes(ProcessRosterImport::class, 1);
     }
 
+    /** @return array<string, array{string, array<string, mixed>}> */
+    public static function heldByTheMailCheck(): array
+    {
+        return [
+            'rejected' => [RosterImport::STATE_REJECTED, ['verdict' => 'rejected', 'reasons' => ['evidence_dmarc_fail'], 'evidence' => ['envelope_from' => 'a@miamibeachfl.gov']]],
+            'needs review' => [RosterImport::STATE_NEEDS_REVIEW, ['verdict' => 'needs_review', 'reasons' => ['dkim_not_aligned'], 'evidence' => ['envelope_from' => 'a@miamibeachfl.gov']]],
+        ];
+    }
+
+    /** @param array<string, mixed> $classification */
+    #[DataProvider('heldByTheMailCheck')]
+    public function test_an_already_registered_rejected_or_held_row_is_attested_and_queued(string $state, array $classification): void
+    {
+        $email = $this->storedEmail();
+        $import = $this->registeredRow($email, $state, $classification);
+
+        $exit = $this->run_('--operator-attested', $email->id, $output);
+
+        self::assertSame(0, $exit);
+        self::assertStringContainsString('attested import='.$import->id, $output);
+        self::assertStringNotContainsString('already_registered', $output);
+        $import = $import->fresh();
+        self::assertSame(RosterImport::STATE_QUEUED, $import->state);
+        self::assertSame('match', $import->classification['verdict']);
+        self::assertSame($classification['verdict'], $import->classification['original_verdict']);
+        self::assertContains('operator_attested', $import->classification['reasons']);
+        self::assertSame($classification['evidence'], $import->classification['evidence']);
+        Bus::assertDispatched(ProcessRosterImport::class, static fn (ProcessRosterImport $job): bool => $job->importId === (int) $import->id);
+    }
+
+    public function test_an_attested_row_must_still_match_exactly(): void
+    {
+        $email = $this->storedEmail(['subject' => 'Roster Report Fwd']);
+        $import = $this->registeredRow($email, RosterImport::STATE_REJECTED, ['verdict' => 'rejected', 'reasons' => ['near_miss']]);
+
+        $exit = $this->run_('--operator-attested', $email->id, $output);
+
+        self::assertSame(1, $exit);
+        self::assertStringContainsString('refused:subject_mismatch', $output);
+        self::assertSame(RosterImport::STATE_REJECTED, $import->fresh()->state);
+    }
+
+    public function test_a_row_held_after_the_mail_check_passed_stays_as_it_is(): void
+    {
+        $email = $this->storedEmail();
+        $import = $this->registeredRow($email, RosterImport::STATE_NEEDS_REVIEW, ['verdict' => 'match', 'reasons' => []]);
+
+        $this->run_('--operator-attested', $email->id, $output);
+
+        self::assertStringContainsString('already_registered', $output);
+        self::assertSame(RosterImport::STATE_NEEDS_REVIEW, $import->fresh()->state);
+        Bus::assertNotDispatched(ProcessRosterImport::class);
+    }
+
+    public function test_a_new_registration_keeps_whatever_evidence_the_email_has(): void
+    {
+        $email = $this->storedEmail();
+        $email->forceFill(['transport_evidence' => ['envelope_from' => 'a@miamibeachfl.gov', 'authentication_results' => 'mx.cloudflare.net; dmarc=none']])->save();
+
+        $this->run_('--operator-attested', $email->id, $output);
+
+        self::assertSame('mx.cloudflare.net; dmarc=none', RosterImport::query()->sole()->classification['evidence']['authentication_results']);
+    }
+
     public function test_the_output_never_names_anyone(): void
     {
         $email = $this->storedEmail(['from_name' => 'TESTPERSON, ALPHA']);
@@ -143,6 +207,26 @@ final class DailyRosterImportInboundCommandTest extends TestCase
         $output = Artisan::output();
 
         return $exit;
+    }
+
+    /** @param array<string, mixed> $classification */
+    private function registeredRow(InboundEmail $email, string $state, array $classification): RosterImport
+    {
+        return RosterImport::query()->create([
+            'correlation_id' => (string) Str::uuid(),
+            'state' => $state,
+            'state_changed_at' => now(),
+            'message_id_sha256' => hash('sha256', (string) $email->provider_message_id),
+            'inbound_email_id' => $email->id,
+            'sender' => (string) $email->from_address,
+            'subject' => $email->subject,
+            'filename' => 'Dailyroster.xlsx',
+            'attachment_disk' => 'local',
+            'attachment_path' => $email->attachment_metadata[0]['path'],
+            'attachment_sha256' => hash('sha256', (string) Storage::disk('local')->get($email->attachment_metadata[0]['path'])),
+            'received_at' => now(),
+            'classification' => $classification,
+        ]);
     }
 
     /** @param array<string, mixed> $shape */

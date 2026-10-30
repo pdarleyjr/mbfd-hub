@@ -10,6 +10,7 @@ use App\Models\DailyRoster\RosterImport;
 use App\Models\DailyRoster\RosterSnapshot;
 use App\Models\InboundEmail;
 use App\Services\DailyRoster\RosterImportCleanup;
+use App\Services\DailyRoster\RosterImportOperations;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
@@ -301,8 +302,9 @@ final class RosterImportCleanupTest extends TestCase
 
     public function test_a_superseded_import_needs_its_snapshot_row(): void
     {
+        $winner = $this->verifiedImport();
         $import = $this->verifiedImport();
-        $import->forceFill(['state' => RosterImport::STATE_SUPERSEDED, 'outcome' => RosterImport::OUTCOME_SUPERSEDED])->save();
+        $import->forceFill(['state' => RosterImport::STATE_SUPERSEDED, 'outcome' => RosterImport::OUTCOME_SUPERSEDED, 'duplicate_of_import_id' => $winner->id])->save();
 
         $this->cleanup($import);
         $this->assertUntouched($import);
@@ -313,6 +315,194 @@ final class RosterImportCleanupTest extends TestCase
 
         $this->cleanup($import);
         self::assertSame(RosterImport::STATE_CLEANED, $import->refresh()->state);
+    }
+
+    public function test_a_superseded_import_needs_a_winner_that_was_verified(): void
+    {
+        $snapshot = DailyRosterSnapshotFactory::publish('2026-10-21', [], ['activate' => false]);
+        $import = $this->verifiedImport();
+        $import->forceFill(['state' => RosterImport::STATE_SUPERSEDED, 'outcome' => RosterImport::OUTCOME_SUPERSEDED, 'roster_snapshot_id' => $snapshot->id])->save();
+
+        $this->cleanup($import);
+        $this->assertUntouched($import);
+
+        $winner = $this->verifiedImport();
+        $winner->forceFill(['state' => RosterImport::STATE_PUBLISHED])->save();
+        $import->forceFill(['duplicate_of_import_id' => $winner->id])->save();
+
+        $this->cleanup($import);
+        $this->assertUntouched($import);
+
+        $winner->forceFill(['state' => RosterImport::STATE_VERIFIED])->save();
+        $this->cleanup($import);
+        self::assertSame(RosterImport::STATE_CLEANED, $import->refresh()->state);
+    }
+
+    /** @return array<string, array{string}> */
+    public static function nonRootStates(): array
+    {
+        return ['superseded' => [RosterImport::STATE_SUPERSEDED], 'duplicate' => [RosterImport::STATE_DUPLICATE]];
+    }
+
+    #[DataProvider('nonRootStates')]
+    public function test_a_duplicate_of_a_non_root_row_is_cleaned_by_walking_to_the_root(string $middleState): void
+    {
+        $root = $this->verifiedImport();
+        $middle = $this->verifiedImport();
+        $middle->forceFill(['state' => $middleState, 'duplicate_of_import_id' => $root->id])->save();
+        $import = $this->verifiedImport();
+        $import->forceFill(['state' => RosterImport::STATE_DUPLICATE, 'outcome' => RosterImport::OUTCOME_DUPLICATE, 'duplicate_of_import_id' => $middle->id])->save();
+
+        $this->cleanup($import);
+
+        self::assertSame(RosterImport::STATE_CLEANED, $import->refresh()->state);
+    }
+
+    public function test_a_duplicate_of_a_confirmed_duplicate_walks_through_the_pointer(): void
+    {
+        $dutyDate = '2026-10-20';
+        DailyRosterSnapshotFactory::publish($dutyDate, []);
+        $confirmed = $this->verifiedImport();
+        $confirmed->forceFill(['state' => RosterImport::STATE_DUPLICATE, 'outcome' => RosterImport::OUTCOME_CONFIRMED, 'duty_date' => $dutyDate])->save();
+        $import = $this->verifiedImport();
+        $import->forceFill(['state' => RosterImport::STATE_DUPLICATE, 'outcome' => RosterImport::OUTCOME_DUPLICATE, 'duplicate_of_import_id' => $confirmed->id])->save();
+
+        $this->cleanup($import);
+
+        self::assertSame(RosterImport::STATE_CLEANED, $import->refresh()->state);
+    }
+
+    public function test_a_chain_ending_in_a_held_row_keeps_the_email(): void
+    {
+        $root = $this->verifiedImport();
+        $root->forceFill(['state' => RosterImport::STATE_NEEDS_REVIEW])->save();
+        $middle = $this->verifiedImport();
+        $middle->forceFill(['state' => RosterImport::STATE_SUPERSEDED, 'duplicate_of_import_id' => $root->id])->save();
+        $import = $this->verifiedImport();
+        $import->forceFill(['state' => RosterImport::STATE_DUPLICATE, 'duplicate_of_import_id' => $middle->id])->save();
+
+        $this->cleanup($import);
+
+        $this->assertUntouched($import);
+    }
+
+    public function test_a_chain_that_loops_keeps_the_email_and_finishes(): void
+    {
+        $first = $this->verifiedImport();
+        $second = $this->verifiedImport();
+        $first->forceFill(['state' => RosterImport::STATE_DUPLICATE, 'duplicate_of_import_id' => $second->id])->save();
+        $second->forceFill(['state' => RosterImport::STATE_DUPLICATE, 'duplicate_of_import_id' => $first->id])->save();
+
+        $this->cleanup($first);
+
+        $this->assertUntouched($first);
+    }
+
+    public function test_a_concurrent_run_that_already_deleted_the_row_is_continued_from_there(): void
+    {
+        $import = $this->verifiedImport();
+        $emailId = $import->inbound_email_id;
+        $raced = false;
+        // Between this run reading the row and moving it to pending, another run deletes the email.
+        RosterImport::updated(static function () use ($import, $emailId, &$raced): void {
+            if ($raced) {
+                return;
+            }
+            $raced = true;
+            InboundEmail::query()->whereKey($emailId)->delete();
+            DB::table('roster_imports')->where('id', $import->id)->update(['cleanup_state' => RosterImport::CLEANUP_ROW_DELETED, 'inbound_email_id' => null]);
+        });
+
+        $this->cleanup($import);
+
+        $import->refresh();
+        self::assertTrue($raced);
+        self::assertSame(RosterImport::STATE_CLEANED, $import->state);
+        self::assertSame(RosterImport::CLEANUP_DONE, $import->cleanup_state);
+        Storage::disk('local')->assertMissing($import->attachment_path);
+    }
+
+    public function test_a_concurrent_run_that_finished_the_row_is_not_counted_as_a_failure(): void
+    {
+        config()->set('daily_roster.processing.max_cleanup_attempts', 1);
+        $import = $this->verifiedImport();
+        $raced = false;
+        RosterImport::updated(static function () use ($import, &$raced): void {
+            if ($raced) {
+                return;
+            }
+            $raced = true;
+            DB::table('roster_imports')->where('id', $import->id)->update(['cleanup_state' => RosterImport::CLEANUP_DONE, 'state' => RosterImport::STATE_CLEANED]);
+        });
+
+        $this->cleanup($import);
+
+        self::assertSame(RosterImport::CLEANUP_DONE, $import->refresh()->cleanup_state);
+        Exceptions::assertNothingReported();
+    }
+
+    public function test_a_run_that_loses_the_final_step_to_another_run_is_not_a_failure(): void
+    {
+        config()->set('daily_roster.processing.max_cleanup_attempts', 1);
+        $import = $this->verifiedImport();
+        InboundEmail::query()->whereKey($import->inbound_email_id)->delete();
+        $import->refresh()->forceFill(['cleanup_state' => RosterImport::CLEANUP_ROW_DELETED, 'inbound_email_id' => null])->save();
+        $raced = false;
+        RosterImport::updated(static function () use ($import, &$raced): void {
+            if (! $raced) {
+                $raced = true;
+                DB::table('roster_imports')->where('id', $import->id)->update(['cleanup_state' => RosterImport::CLEANUP_DONE, 'state' => RosterImport::STATE_CLEANED]);
+            }
+        });
+
+        $this->cleanup($import);
+
+        self::assertTrue($raced);
+        self::assertSame(RosterImport::CLEANUP_DONE, $import->refresh()->cleanup_state);
+        Exceptions::assertNothingReported();
+    }
+
+    public function test_an_attested_import_is_cleaned_and_the_ledger_keeps_the_evidence(): void
+    {
+        $mail = $this->rosterMail(['authentication_evidence' => [
+            'authentication_results' => 'mx.cloudflare.net; dkim=none; dmarc=none',
+            'cloudflare_claims' => ['authentication_results' => 1, 'arc_authentication_results' => 0],
+        ]]);
+        $this->deliverMail($mail)->assertCreated();
+        $import = $this->ledgerFor($mail['message_id']);
+        self::assertSame(RosterImport::STATE_NEEDS_REVIEW, $import->state);
+
+        app(RosterImportOperations::class)->retryAttested($import, null);
+        DB::table('roster_imports')->where('id', $import->id)->update(['state' => RosterImport::STATE_VERIFIED]);
+
+        $this->cleanup($import->refresh());
+
+        $import->refresh();
+        self::assertSame(RosterImport::STATE_CLEANED, $import->state);
+        $this->assertDatabaseCount('inbound_emails', 0);
+        self::assertContains('operator_attested', $import->classification['reasons']);
+        self::assertSame('donotreply@miamibeachfl.gov', $import->classification['evidence']['envelope_from']);
+        self::assertSame('mx.cloudflare.net; dkim=none; dmarc=none', $import->classification['evidence']['authentication_results']);
+    }
+
+    public function test_a_failed_cleanup_retried_after_the_cause_is_fixed_finishes_the_job(): void
+    {
+        config()->set('daily_roster.processing.max_cleanup_attempts', 1);
+        $import = $this->verifiedImport();
+        $hash = $import->attachment_sha256;
+        $import->forceFill(['attachment_sha256' => str_repeat('c', 64)])->save();
+
+        $this->cleanup($import);
+        self::assertSame(RosterImport::CLEANUP_FAILED, $import->refresh()->cleanup_state);
+        $this->cleanup($import);
+        self::assertSame(1, $import->refresh()->cleanup_attempts, 'A failed cleanup stays failed until someone retries it.');
+
+        $import->forceFill(['attachment_sha256' => $hash])->save();
+        app(RosterImportOperations::class)->retryCleanup($import, null);
+        $this->cleanup($import->refresh());
+
+        self::assertSame(RosterImport::STATE_CLEANED, $import->refresh()->state);
+        $this->assertDatabaseCount('inbound_emails', 0);
     }
 
     public function test_cleaned_mail_redelivered_end_to_end_is_acknowledged_and_not_stored(): void
