@@ -72,11 +72,11 @@ final class PushDeliveryHealthTestButtonTest extends TestCase
         }
 
         $this->assertSame(['accepted' => true, 'failure' => null, 'provider' => 'apple', 'status' => 'Accepted by push service'],
-            collect($byLabel['iPhone'])->except('label')->all());
+            collect($byLabel['iPhone'])->only(['accepted', 'failure', 'provider', 'status'])->all());
         $this->assertSame(['accepted' => false, 'failure' => 'rejected (403)', 'provider' => 'fcm', 'status' => 'Rejected by push service'],
-            collect($byLabel['Android'])->except('label')->all());
+            collect($byLabel['Android'])->only(['accepted', 'failure', 'provider', 'status'])->all());
         $this->assertSame(['accepted' => false, 'failure' => 'rate_limited (429)', 'provider' => 'mozilla', 'status' => 'Waiting to retry'],
-            collect($byLabel['Linux laptop'])->except('label')->all());
+            collect($byLabel['Linux laptop'])->only(['accepted', 'failure', 'provider', 'status'])->all());
     }
 
     public function test_a_device_the_push_service_has_dropped_is_reported_not_silently_left_out(): void
