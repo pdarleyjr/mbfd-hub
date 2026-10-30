@@ -9,14 +9,15 @@ use App\Models\Captain5\Captain5ActingRequest;
 use App\Models\User;
 use App\Services\Captain5\Captain5ActingService;
 use App\Services\Captain5\Captain5DutyRoster;
+use App\Services\DailyRoster\OnDutyOfficerDisplayResolver;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
  * The shift's 300 (Division Chief) on the 300 page and the 300 card: who is shown now (approved
- * acting 300, otherwise the 300 bid holder for the shift on duty) and "Acting as 300 today?".
- * Display only. The route group needs `access-command-300`; the acting service re-checks who may
+ * acting 300, otherwise today's accepted roster, otherwise the 300 bid holder for the shift on duty)
+ * and "Acting as 300 today?". Display only. The route group needs `access-command-300`; the acting service re-checks who may
  * ask and who may approve, and these routes only ever decide 300 requests.
  */
 final class Command300ShiftController extends Controller
@@ -61,11 +62,10 @@ final class Command300ShiftController extends Controller
     /** @return array{on_duty: array<string, mixed>, acting: array<string, mixed>} */
     private function state(User $user): array
     {
-        $roster = app(Captain5DutyRoster::class);
-        $roster->flush();
+        app(Captain5DutyRoster::class)->flush();
 
         return [
-            'on_duty' => $roster->command300OnDuty()->toArray(),
+            'on_duty' => app(OnDutyOfficerDisplayResolver::class)->resolve(self::ROLE)->toArray(),
             'acting' => app(Captain5ActingService::class)->state($user, self::ROLE),
         ];
     }

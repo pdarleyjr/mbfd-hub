@@ -5,17 +5,29 @@
 
 export type ShiftLetter = 'A' | 'B' | 'C';
 
+export type DutyFreshness = 'current' | 'awaiting' | 'delayed' | 'not_applicable';
+
+export type DutyReason = 'conflict' | 'needs_review' | 'no_working_row' | 'section_missing';
+
 export interface OnDuty {
   duty_date: string;
   shift: ShiftLetter | null;
-  /** 'acting' is an approved acting member; 'bid_holder' is the shift's bid holder. */
-  source: 'acting' | 'bid_holder' | 'unknown';
+  /** 'acting' is an approved acting member; 'telestaff' is today's roster; 'bid_holder' is the shift's bid holder. */
+  source: 'acting' | 'bid_holder' | 'telestaff' | 'unknown';
   resolved: boolean;
   name: string | null;
   rank: string | null;
   /** ISO time an approved acting member stops being shown. */
   acting_until: string | null;
   acting_request_id: number | null;
+  // The next four are absent from a server that does not read the roster, and then no note is shown.
+  /** ISO time of the roster behind this answer. */
+  as_of?: string | null;
+  freshness?: DutyFreshness;
+  /** Whether the roster's person matched a Hub member. */
+  identity?: 'linked' | 'unlinked' | null;
+  /** Why the roster did not name one person, or why the seat is shown from a valid roster. */
+  reason?: DutyReason | null;
 }
 
 export type ActingDuration = '12h' | '24h' | 'custom';

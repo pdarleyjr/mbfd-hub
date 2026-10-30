@@ -8,6 +8,9 @@ import test from 'node:test';
  */
 const normalisedViews = [
   'resources/views/welcome.blade.php',
+  'resources/views/daily-roster/show.blade.php',
+  'resources/views/daily-roster/_body.blade.php',
+  'resources/views/daily-roster/_section.blade.php',
   'resources/views/errors/hub.blade.php',
   'resources/views/auth/partials/city-email-style.blade.php',
   'resources/views/employee/personnel-request-detail.blade.php',
@@ -113,6 +116,7 @@ const normalisedStylesheets = [
   'resources/css/filament/admin/pages/personnel-uniforms.css',
   'resources/css/filament/hub-portals-v2.css',
   'resources/css/report-deck.css',
+  'resources/css/daily-roster.css',
   'resources/css/reports/evaluation-report.css',
   'resources/css/reports/final-recommendations.css',
   'resources/css/reports/workgroup-summary.css',

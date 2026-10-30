@@ -142,9 +142,14 @@
                             <h3 class="text-sm font-semibold text-gray-950 dark:text-white">Shown as {{ $shown['label'] }} now, {{ $shown['date'] }}@if ($shown['shift']) ({{ $shown['shift'] }} shift)@endif</h3>
                             @if ($shown['name'] !== null)
                                 <p class="text-sm text-gray-700 dark:text-gray-300">
-                                    {{ $shown['name'] }}@if ($shown['rank'] !== ''), {{ $shown['rank'] }}@endif.
+                                    Shown on cards: {{ $shown['name'] }}@if ($shown['rank'] !== ''), {{ $shown['rank'] }}@endif.
                                     Source: {{ $shown['source'] }}.
                                     @if ($shown['until'])Acting until {{ $shown['until'] }}.@endif
+                                    @if ($shown['note']){{ $shown['note'] }}@endif
+                                </p>
+                            @elseif ($shown['note'])
+                                <p class="text-sm text-gray-700 dark:text-gray-300">
+                                    No one is shown as {{ $shown['label'] }} right now. {{ $shown['note'] }}
                                 </p>
                             @elseif ($shown['role'] === 'command_300')
                                 <p class="text-sm text-gray-700 dark:text-gray-300">
@@ -154,6 +159,9 @@
                                 <p class="text-sm text-gray-700 dark:text-gray-300">
                                     No one is shown as Captain 5 right now. Source: {{ $shown['source'] }}. New findings go to every Captain 5 seat holder until the shift's bid holder is known or an acting request is approved.
                                 </p>
+                            @endif
+                            @if ($shown['notifications_to'])
+                                <p class="text-sm text-gray-700 dark:text-gray-300" data-testid="captain5-notifications-to">Notifications go to: {{ $shown['notifications_to'] }}.</p>
                             @endif
                         </div>
                     @endforeach
