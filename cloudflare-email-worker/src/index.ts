@@ -95,7 +95,7 @@ export function claimsCloudflare(value: string, isArc: boolean): boolean {
   const clean = cleanHeaderValue(value);
   const text = stripComments(clean);
   if (text === null) {
-    return clean.toLowerCase().split(/[^a-z0-9.-]+/).includes(CLOUDFLARE_AUTHSERV_ID);
+    return clean.toLowerCase().split(/[^a-z0-9.-]+/).some((token) => token === CLOUDFLARE_AUTHSERV_ID);
   }
   const body = isArc ? text.replace(/^[ \t]*i[ \t]*=[ \t]*\d+[ \t]*;/i, "") : text;
   const authservId = /^[ \t]*([^ \t;]+)/.exec(body)?.[1] ?? "";
