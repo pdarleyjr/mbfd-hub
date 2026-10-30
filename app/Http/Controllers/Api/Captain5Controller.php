@@ -16,6 +16,7 @@ use App\Services\Captain5\Captain5IssueActions;
 use App\Services\Captain5\Captain5IssuePresenter;
 use App\Services\Captain5\Captain5IssueScope;
 use App\Services\Captain5\Captain5Workspace;
+use App\Services\DailyRoster\OnDutyOfficerDisplayResolver;
 use App\Services\Defects\StaleDefectStateException;
 use App\Services\Fleet\VehicleIdentificationPlanner;
 use App\Services\Inspections\IssueMessageService;
@@ -64,7 +65,7 @@ final class Captain5Controller extends Controller
 
         return $this->json([
             'access' => $decision->toClientArray(),
-            'on_duty' => $decision->onDuty->toArray(),
+            'on_duty' => $this->cardDuty(),
             'open_issues' => $this->workspace()->openIssues()->count(),
         ]);
     }
@@ -247,7 +248,17 @@ final class Captain5Controller extends Controller
         $this->access()->flush();
         $decision = $this->access()->decide($user);
 
-        return ['on_duty' => $decision->onDuty->toArray(), 'acting' => $this->workspace()->acting($user, $decision)];
+        return ['on_duty' => $this->cardDuty(), 'acting' => $this->workspace()->acting($user, $decision)];
+    }
+
+    /**
+     * Who the card shows. Display only: `access` stays on the seat decision.
+     *
+     * @return array<string, mixed>
+     */
+    private function cardDuty(): array
+    {
+        return app(OnDutyOfficerDisplayResolver::class)->resolve(Captain5ActingRequest::ROLE_CAPTAIN_5)->toArray();
     }
 
     private function inScope(int $defectId): ApparatusDefect

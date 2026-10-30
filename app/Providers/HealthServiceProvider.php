@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Health\RosterImportCheck;
 use Illuminate\Support\ServiceProvider;
 use Spatie\Health\Checks\Checks\CacheCheck;
 use Spatie\Health\Checks\Checks\DatabaseCheck;
@@ -26,6 +27,7 @@ class HealthServiceProvider extends ServiceProvider
             CacheCheck::new(),
             EnvironmentCheck::new()
                 ->expectEnvironment('production'),
+            RosterImportCheck::new(),
         ]);
     }
 }

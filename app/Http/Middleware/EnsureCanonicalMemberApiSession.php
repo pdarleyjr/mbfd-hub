@@ -16,6 +16,18 @@ use Symfony\Component\HttpFoundation\Response;
 
 final readonly class EnsureCanonicalMemberApiSession
 {
+    /**
+     * Sent by timers on pages left open (Daily Roster poll, station-list cards), never by a member's own action.
+     * Every other check still runs; the request only leaves the idle clock where it is, so an unattended shared
+     * screen still signs out. Spoofing it can only shorten the sender's own session, so it is not signed.
+     */
+    public const BACKGROUND_REFRESH_HEADER = 'X-Hub-Background-Refresh';
+
+    public static function isBackgroundRefresh(Request $request): bool
+    {
+        return $request->headers->get(self::BACKGROUND_REFRESH_HEADER) === '1';
+    }
+
     public function __construct(private SessionRegistry $sessions) {}
 
     public function handle(Request $request, Closure $next): Response
@@ -44,7 +56,9 @@ final readonly class EnsureCanonicalMemberApiSession
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
-        $this->sessions->recordActivity($registered, CarbonImmutable::now());
+        if (! self::isBackgroundRefresh($request)) {
+            $this->sessions->recordActivity($registered, CarbonImmutable::now());
+        }
 
         if ($user->must_change_password) {
             throw new PasswordChangeRequired;

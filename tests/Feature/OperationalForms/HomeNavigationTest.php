@@ -7,10 +7,13 @@ namespace Tests\Feature\OperationalForms;
 use App\Enums\AccountStatus;
 use App\Models\DepartmentUpdate;
 use App\Models\User;
+use App\Services\Security\DailyRosterAccess;
 use App\Support\HubShellNavigation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
+use Tests\Support\DailyRosterSnapshotFactory;
 use Tests\TestCase;
 
 class HomeNavigationTest extends TestCase
@@ -255,7 +258,7 @@ class HomeNavigationTest extends TestCase
             Permission::findOrCreate('admin.access', 'web'),
             Permission::findOrCreate('admin.fleet.manage', 'web'),
         ]);
-        config(['services.media_control.authorization.service_token' => 'test-media-control-token']);
+        config(['services.media_control.authorization.service_token' => 'test-media-control-token', 'daily_roster.mode' => 'publish']);
 
         $xpath = $this->xpath($this->get('/')->assertOk()->getContent());
 
@@ -292,10 +295,69 @@ class HomeNavigationTest extends TestCase
 
         // The six are not repeated as standalone cards.
         $standalone = $xpath->query('//a[@data-quick-access-card]');
-        self::assertSame(['Station / Vehicles / Equipment', 'Employee Portal'], array_map(
+        self::assertSame(['Station / Vehicles / Equipment', 'Daily Roster', 'Employee Portal'], array_map(
             fn (\DOMNode $node): string => trim($xpath->query('.//*[contains(@class,"hub-tile__title")]', $node)->item(0)->textContent),
             iterator_to_array($standalone),
         ));
+    }
+
+    public function test_during_shadow_rollout_home_does_not_send_members_to_an_empty_roster(): void
+    {
+        $this->withoutVite();
+        config(['daily_roster.mode' => 'shadow']);
+        $this->actingAsCanonicalFixture();
+
+        $this->assertSame(['Station / Vehicles / Equipment', 'Employee Portal'], $this->quickAccessTitles());
+
+        // The route stays open: an old bookmark gets the safe empty state, not an error.
+        $this->get(route('daily-roster.show'))->assertOk()
+            ->assertSee('data-roster-empty', false)
+            ->assertSee('No roster has been published yet');
+    }
+
+    public function test_home_shows_the_roster_as_soon_as_one_is_published_in_any_mode(): void
+    {
+        $this->withoutVite();
+        config(['daily_roster.mode' => 'shadow']);
+        $this->actingAsCanonicalFixture();
+        DailyRosterSnapshotFactory::publish(now()->format('Y-m-d'), [
+            'Station 1 / Engine 1' => [['employee_id' => '40001', 'name' => 'ALPHA, MEMBER']],
+        ]);
+
+        $this->assertSame(['Station / Vehicles / Equipment', 'Daily Roster', 'Employee Portal'], $this->quickAccessTitles());
+    }
+
+    public function test_home_shows_the_roster_in_publish_mode_without_looking_for_a_pointer(): void
+    {
+        $this->withoutVite();
+        config(['daily_roster.mode' => 'publish']);
+        $this->actingAsCanonicalFixture();
+
+        DB::enableQueryLog();
+        $titles = $this->quickAccessTitles();
+
+        $this->assertSame(['Station / Vehicles / Equipment', 'Daily Roster', 'Employee Portal'], $titles);
+        $this->assertSame(0, $this->pointerQueries());
+    }
+
+    public function test_the_home_entry_costs_one_exists_query_at_most_and_none_for_a_guest(): void
+    {
+        config(['daily_roster.mode' => 'shadow']);
+        $access = app(DailyRosterAccess::class);
+
+        DB::enableQueryLog();
+        $this->assertFalse($access->canSeeHomeEntry(null));
+        $this->assertSame([], DB::getQueryLog());
+
+        $member = $this->actingAsCanonicalFixture();
+        DB::flushQueryLog();
+        $this->assertFalse($access->canSeeHomeEntry($member));
+        $this->assertSame(1, $this->pointerQueries());
+
+        config(['daily_roster.mode' => 'publish']);
+        DB::flushQueryLog();
+        $this->assertTrue($access->canSeeHomeEntry($member));
+        $this->assertSame(0, $this->pointerQueries());
     }
 
     public function test_additional_links_hides_unentitled_items_from_the_markup(): void
@@ -355,6 +417,25 @@ class HomeNavigationTest extends TestCase
     public function test_anonymous_home_requires_canonical_login(): void
     {
         $this->get('/')->assertRedirect('/login');
+    }
+
+    /** @return list<string> */
+    private function quickAccessTitles(): array
+    {
+        $xpath = $this->xpath($this->get('/')->assertOk()->getContent());
+
+        return array_map(
+            fn (\DOMNode $node): string => trim($xpath->query('.//*[contains(@class,"hub-tile__title")]', $node)->item(0)->textContent),
+            iterator_to_array($xpath->query('//a[@data-quick-access-card]')),
+        );
+    }
+
+    private function pointerQueries(): int
+    {
+        return count(array_filter(
+            DB::getQueryLog(),
+            static fn (array $entry): bool => str_contains((string) $entry['query'], 'roster_active_versions'),
+        ));
     }
 
     private function xpath(string $html): \DOMXPath

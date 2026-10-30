@@ -12,9 +12,10 @@ use App\Models\User;
 use App\Services\Captain5\Captain5AccessExplainer;
 use App\Services\Captain5\Captain5ActingService;
 use App\Services\Captain5\Captain5AdministrationService;
-use App\Services\Captain5\Captain5DutyRoster;
 use App\Services\Captain5\MedicalScopeReview;
 use App\Services\Captain5\OnDutyCaptain5;
+use App\Services\DailyRoster\OnDutyOfficerDisplay;
+use App\Services\DailyRoster\OnDutyOfficerDisplayResolver;
 use App\Services\Security\Captain5Access;
 use Carbon\CarbonImmutable;
 use Closure;
@@ -478,12 +479,12 @@ final class Captain5Operations extends Page
                 'note' => (string) $row->decision_note,
             ])->values()->all();
 
-        $roster = app(Captain5DutyRoster::class);
+        $display = app(OnDutyOfficerDisplayResolver::class);
 
         return [
             'shown' => [
-                $this->shownBlock(Captain5ActingRequest::ROLE_CAPTAIN_5, $roster->onDuty(), $timezone),
-                $this->shownBlock(Captain5ActingRequest::ROLE_COMMAND_300, $roster->command300OnDuty(), $timezone),
+                $this->shownBlock(Captain5ActingRequest::ROLE_CAPTAIN_5, $display->resolve(Captain5ActingRequest::ROLE_CAPTAIN_5), $timezone),
+                $this->shownBlock(Captain5ActingRequest::ROLE_COMMAND_300, $display->resolve(Captain5ActingRequest::ROLE_COMMAND_300), $timezone),
             ],
             'pending' => $pending,
             'decided' => $decided,
@@ -491,28 +492,51 @@ final class Captain5Operations extends Page
     }
 
     /**
-     * One "Shown now" block for a shift role.
+     * One "Shown now" block for a shift role: who the cards show, and, for Captain 5, who notifications
+     * go to when that is not the same person. Only Captain 5 has shift notifications.
      *
      * @return array<string, mixed>
      */
-    private function shownBlock(string $role, OnDutyCaptain5 $onDuty, string $timezone): array
+    private function shownBlock(string $role, OnDutyOfficerDisplay $shown, string $timezone): array
     {
         $label = Captain5ActingRequest::roleLabel($role);
+        $onDuty = $shown->seat;
 
         return [
             'role' => $role,
             'label' => $label,
             'date' => $onDuty->dutyDate->format('l, M j'),
             'shift' => $onDuty->shiftLetter,
-            'name' => $onDuty->employee !== null ? $this->memberName($onDuty->employee) : null,
-            'rank' => (string) ($onDuty->employee->rank ?? ''),
-            'source' => match ($onDuty->source) {
+            'name' => $shown->name,
+            'rank' => (string) $shown->rank,
+            'source' => match ($shown->source) {
                 OnDutyCaptain5::SOURCE_ACTING => "Acting {$label} (approved request)",
                 OnDutyCaptain5::SOURCE_BID => "{$label} bid seat",
+                OnDutyOfficerDisplay::SOURCE_TELESTAFF => $shown->identity === OnDutyOfficerDisplay::IDENTITY_UNLINKED
+                    ? 'TeleStaff roster, not matched to a Hub member'
+                    : 'TeleStaff roster',
                 default => 'Not set',
             },
+            'note' => $this->shownNote($shown, $label),
             'until' => $onDuty->source === OnDutyCaptain5::SOURCE_ACTING ? $this->format($onDuty->actingRequest?->ends_at, $timezone) : null,
+            'notifications_to' => $role === Captain5ActingRequest::ROLE_CAPTAIN_5 && $shown->differsFromSeat()
+                ? ($onDuty->employee !== null ? $this->memberName($onDuty->employee) : 'every Captain 5 seat holder')
+                : null,
         ];
+    }
+
+    /** Why the roster is not behind the name, or why no name is shown. Null when there is nothing to explain. */
+    private function shownNote(OnDutyOfficerDisplay $shown, string $label): ?string
+    {
+        return match (true) {
+            $shown->reason === OnDutyOfficerDisplay::REASON_CONFLICT => "Today's roster lists more than one person working the {$label} seat right now. Check Roster Imports.",
+            $shown->reason === OnDutyOfficerDisplay::REASON_NEEDS_REVIEW => "Today's roster needs review for the {$label} seat. Check Roster Imports.",
+            $shown->reason === OnDutyOfficerDisplay::REASON_NO_WORKING_ROW => "Today's roster lists nobody working the {$label} seat right now. Check Roster Imports.",
+            $shown->reason === OnDutyOfficerDisplay::REASON_SECTION_MISSING => "Today's roster has no {$label} section.",
+            $shown->freshness === OnDutyOfficerDisplay::FRESHNESS_AWAITING => "Today's roster has not arrived.",
+            $shown->freshness === OnDutyOfficerDisplay::FRESHNESS_DELAYED => "Today's roster is late.",
+            default => null,
+        };
     }
 
     /** @return array<string, mixed> */

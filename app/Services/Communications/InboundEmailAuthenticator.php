@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Communications;
 
 use App\Models\InboundEmail;
+use App\Services\DailyRoster\RosterImportRegistrar;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,7 +21,10 @@ use Throwable;
 
 final class InboundEmailAuthenticator
 {
-    public function persist(Request $request): InboundEmail
+    private const EVIDENCE_HEADER_MAX_LENGTH = 4096;
+
+    /** @return InboundEmail|null Null only when a cleaned roster email is redelivered: acknowledged, not stored. */
+    public function persist(Request $request): ?InboundEmail
     {
         $raw = $request->getContent();
         if (strlen($raw) > (int) config('communications.inbound.max_bytes', 5000000)) {
@@ -63,7 +67,7 @@ final class InboundEmailAuthenticator
         $storedPaths = [];
 
         try {
-            return DB::transaction(function () use ($nonce, $payload, $attachments, &$storedPaths): InboundEmail {
+            return DB::transaction(function () use ($nonce, $payload, $attachments, &$storedPaths): ?InboundEmail {
                 DB::table('inbound_email_nonces')->where('expires_at', '<=', now())->delete();
                 $inserted = DB::table('inbound_email_nonces')->insertOrIgnore([
                     'nonce' => $nonce,
@@ -73,6 +77,11 @@ final class InboundEmailAuthenticator
                 ]);
                 if (! $inserted) {
                     throw new ConflictHttpException('Inbound email replay rejected.');
+                }
+
+                $registrar = app(RosterImportRegistrar::class);
+                if ($registrar->isCleanedRedelivery($payload['message_id'])) {
+                    return null;
                 }
 
                 $html = is_string($payload['html'] ?? null) ? $payload['html'] : null;
@@ -90,11 +99,12 @@ final class InboundEmailAuthenticator
                     'in_reply_to' => app(EmailConversation::class)->messageId($payload['in_reply_to'] ?? null),
                     'references' => app(EmailConversation::class)->references($payload['references'] ?? []),
                     'processing_status' => 'received',
+                    'transport_evidence' => $this->transportEvidence($payload),
                 ]);
                 if ($email->wasRecentlyCreated) {
                     app(EmailConversation::class)->associateInbound($email);
                 }
-                if (! $email->wasRecentlyCreated || $attachments === []) {
+                if (! $email->wasRecentlyCreated) {
                     return $email;
                 }
 
@@ -114,7 +124,10 @@ final class InboundEmailAuthenticator
                         'path' => $path,
                     ];
                 }
-                $email->forceFill(['attachment_metadata' => $metadata])->save();
+                if ($metadata !== []) {
+                    $email->forceFill(['attachment_metadata' => $metadata])->save();
+                }
+                $registrar->register($email);
 
                 return $email;
             });
@@ -125,6 +138,55 @@ final class InboundEmailAuthenticator
 
             throw $exception;
         }
+    }
+
+    /**
+     * What the Worker saw on the wire. A field that is absent, the wrong type or over its cap stays
+     * null, so the classifier treats it as missing rather than reading a damaged value. A header over
+     * its cap also sets `truncated`, whichever side noticed.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array{envelope_from: ?string, authentication_results: ?string, arc_authentication_results: ?string, received_spf: ?string, cloudflare_claims: array{authentication_results: int, arc_authentication_results: int}|null, truncated: bool}|null
+     */
+    private function transportEvidence(array $payload): ?array
+    {
+        $headers = is_array($payload['authentication_evidence'] ?? null) ? $payload['authentication_evidence'] : [];
+        $strings = ['envelope_from' => $this->evidenceValue($payload['envelope_from'] ?? null, 320)];
+        $truncated = ($headers['truncated'] ?? false) === true;
+        foreach (['authentication_results', 'arc_authentication_results', 'received_spf'] as $field) {
+            $value = $headers[$field] ?? null;
+            $strings[$field] = $this->evidenceValue($value, self::EVIDENCE_HEADER_MAX_LENGTH);
+            $truncated = $truncated || (is_string($value) && mb_strlen($value) > self::EVIDENCE_HEADER_MAX_LENGTH);
+        }
+        $claims = $this->claimCounts($headers['cloudflare_claims'] ?? null);
+
+        if (array_filter($strings) === [] && $claims === null && ! $truncated) {
+            return null;
+        }
+
+        return [...$strings, 'cloudflare_claims' => $claims, 'truncated' => $truncated];
+    }
+
+    /** @return array{authentication_results: int, arc_authentication_results: int}|null Null unless both counts are readable */
+    private function claimCounts(mixed $claims): ?array
+    {
+        $results = is_array($claims) ? ($claims['authentication_results'] ?? null) : null;
+        $arcResults = is_array($claims) ? ($claims['arc_authentication_results'] ?? null) : null;
+        if (! is_int($results) || ! is_int($arcResults) || $results < 0 || $arcResults < 0) {
+            return null;
+        }
+
+        return ['authentication_results' => $results, 'arc_authentication_results' => $arcResults];
+    }
+
+    private function evidenceValue(mixed $value, int $maximumLength): ?string
+    {
+        if (! is_string($value) || mb_strlen($value) > $maximumLength) {
+            return null;
+        }
+        $clean = trim((string) preg_replace('/[\x00-\x1F\x7F]+/', ' ', $value));
+
+        return $clean === '' ? null : $clean;
     }
 
     private function safeHeaders(mixed $headers): array

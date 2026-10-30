@@ -10,6 +10,7 @@ use App\Models\ApparatusInspection;
 use App\Models\Captain5\Captain5ActingRequest;
 use App\Models\Captain5\Captain5HandoffNote;
 use App\Models\User;
+use App\Services\DailyRoster\OnDutyOfficerDisplayResolver;
 use App\Services\Security\Captain5AccessDecision;
 use App\Support\Captain5\DutyCalendar;
 use App\Support\Fleet\DefectActionStatus;
@@ -34,6 +35,7 @@ final class Captain5Workspace
         private readonly Captain5IssueScope $scope,
         private readonly Captain5IssuePresenter $presenter,
         private readonly DutyCalendar $calendar,
+        private readonly OnDutyOfficerDisplayResolver $display,
     ) {}
 
     /** @return array<string, mixed> */
@@ -45,7 +47,7 @@ final class Captain5Workspace
 
         return [
             'access' => $decision->toClientArray(),
-            'on_duty' => $decision->onDuty->toArray(),
+            'on_duty' => $this->display->resolve(Captain5ActingRequest::ROLE_CAPTAIN_5)->toArray(),
             'duty_date' => $dutyDate,
             'counts' => $this->counts($summaries),
             'rescue_dailies' => $this->rescueDailies(),

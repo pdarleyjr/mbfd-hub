@@ -8,7 +8,10 @@ use App\Models\Captain5\Captain5ActingRequest;
 use App\Models\Employee;
 use Carbon\CarbonImmutable;
 
-/** Who is shown as the shift's Captain 5 for a duty day, and why. Display and routing only. */
+/**
+ * The Shift Captain 5 or Shift 300 for a duty day by seat or approved acting request, and why. Feeds
+ * narcotics review, the audit capacity and notification routing, so TeleStaff never reaches it.
+ */
 final readonly class OnDutyCaptain5
 {
     public const SOURCE_ACTING = 'acting';
