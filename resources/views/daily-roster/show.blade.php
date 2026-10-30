@@ -15,6 +15,7 @@
         data-roster-page
         data-version-url="{{ url('/api/daily-roster/version') }}"
         data-sections-url="{{ route('daily-roster.sections', array_filter(['date' => $roster['requestedDate']])) }}"
+        data-changes-url="{{ route('daily-roster.changes') }}"
         data-login-url="{{ url('/login') }}"
     >
         {{-- Stays in place across a swap so "Roster updated" is announced. --}}

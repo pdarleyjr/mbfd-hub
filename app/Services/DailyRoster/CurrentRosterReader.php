@@ -96,6 +96,12 @@ final class CurrentRosterReader
             ->all();
     }
 
+    /** One stored version, whether or not it is showing: what an open page has, to compare with what is current. */
+    public function forSnapshot(RosterSnapshot $snapshot): RosterView
+    {
+        return new RosterView($snapshot, $this->sections($snapshot), null);
+    }
+
     private function view(RosterActiveVersion $pointer): ?RosterView
     {
         $snapshot = RosterSnapshot::query()->find($pointer->roster_snapshot_id);
@@ -103,6 +109,18 @@ final class CurrentRosterReader
             return null;
         }
 
+        return new RosterView(
+            $snapshot,
+            $this->sections($snapshot),
+            $pointer->last_confirmed_at,
+            $pointer->updated_at?->toImmutable(),
+            $pointer->content_changed_at,
+        );
+    }
+
+    /** @return list<RosterSectionView> */
+    private function sections(RosterSnapshot $snapshot): array
+    {
         $assignments = RosterAssignment::query()
             ->where('roster_snapshot_id', $snapshot->id)
             ->orderBy('position')
@@ -113,6 +131,6 @@ final class CurrentRosterReader
             $sections[] = new RosterSectionView($section, array_values($assignments->get($section->id)?->all() ?? []));
         }
 
-        return new RosterView($snapshot, $sections, $pointer->last_confirmed_at, $pointer->updated_at?->toImmutable());
+        return $sections;
     }
 }

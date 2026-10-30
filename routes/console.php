@@ -165,6 +165,12 @@ Schedule::command('daily-roster:reconcile')
     ->withoutOverlapping(5)
     ->onOneServer();
 
+Schedule::command('daily-roster:prune')
+    ->dailyAt('03:37')
+    ->timezone('America/New_York')
+    ->withoutOverlapping(60)
+    ->onOneServer();
+
 Schedule::command('inspections:retry-notifications')
     ->everyTenMinutes()
     ->withoutOverlapping()

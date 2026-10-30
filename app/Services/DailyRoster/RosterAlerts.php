@@ -20,6 +20,7 @@ final class RosterAlerts
 {
     private const MESSAGES = [
         'delayed' => 'Today\'s TeleStaff roster has not arrived. Members still see the last roster, marked as delayed.',
+        'stale' => 'TeleStaff has stopped sending roster updates. Members still see the last roster, marked as delayed.',
         'needs_review' => 'A TeleStaff roster was held for review. Members still see the last good roster.',
         'failed' => 'A TeleStaff roster email could not be processed. Members still see the last good roster.',
         'rejected' => 'An email that looks like the TeleStaff roster failed the mail check and was not used. Members still see the last good roster.',
@@ -27,14 +28,15 @@ final class RosterAlerts
 
     public function __construct(private readonly NotificationRecipientEvaluator $recipients) {}
 
-    public function send(string $kind, string $dutyDate): void
+    /** @param  string|null  $incident  Names one occurrence, when a kind can happen more than once in a duty date. */
+    public function send(string $kind, string $dutyDate, ?string $incident = null): void
     {
         $message = self::MESSAGES[$kind] ?? null;
         if ($message === null) {
             return;
         }
 
-        $key = "daily_roster_alert:{$kind}:{$dutyDate}";
+        $key = "daily_roster_alert:{$kind}:{$dutyDate}".($incident === null ? '' : ":{$incident}");
 
         try {
             if (! Cache::add($key, true, now()->addDays(2))) {

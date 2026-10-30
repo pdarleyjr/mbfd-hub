@@ -48,6 +48,7 @@
 }
 
 [data-hub-ui="2"] .roster-facts > div { display: flex; flex-wrap: wrap; gap: 0 6px; min-width: 0; }
+[data-hub-ui="2"] .roster-facts > div[hidden] { display: none; }
 [data-hub-ui="2"] .roster-facts dt { color: rgb(var(--hub2-n-600)); }
 [data-hub-ui="2"] .roster-facts dd { margin: 0; color: rgb(var(--hub2-n-900)); font-weight: 600; font-variant-numeric: tabular-nums; }
 
@@ -205,16 +206,18 @@
 [data-hub-ui="2"] .roster-legend__list li { display: flex; align-items: center; gap: 6px; min-width: 0; }
 [data-hub-ui="2"] .roster-legend__meaning { color: rgb(var(--hub2-n-600)); font-size: 13px; line-height: 18px; }
 
-/* Status pills: the text is the signal, the colour only helps scanning. */
+/* Status pills: the colors TeleStaff shows, so a member reads the same code the same way in both. */
 
-[data-hub-ui="2"] .roster-pill--sp { border-color: currentColor; background: rgb(var(--hub-roster-sp-bg)); color: rgb(var(--hub-roster-sp-ink)); }
-[data-hub-ui="2"] .roster-pill--ot { border-color: currentColor; background: rgb(var(--hub-roster-ot-bg)); color: rgb(var(--hub-roster-ot-ink)); }
-[data-hub-ui="2"] .roster-pill--aday { border-color: currentColor; background: rgb(var(--hub-roster-aday-bg)); color: rgb(var(--hub-roster-aday-ink)); }
-[data-hub-ui="2"] .roster-pill--vaca { border-color: currentColor; background: rgb(var(--hub-roster-vaca-bg)); color: rgb(var(--hub-roster-vaca-ink)); }
-[data-hub-ui="2"] .roster-pill--evac { border-color: currentColor; background: rgb(var(--hub-roster-evac-bg)); color: rgb(var(--hub-roster-evac-ink)); }
-[data-hub-ui="2"] .roster-pill--milnp { border-color: currentColor; background: rgb(var(--hub-roster-milnp-bg)); color: rgb(var(--hub-roster-milnp-ink)); }
-[data-hub-ui="2"] .roster-pill--2wxon { border-color: currentColor; background: rgb(var(--hub-roster-2wxon-bg)); color: rgb(var(--hub-roster-2wxon-ink)); }
-[data-hub-ui="2"] .roster-pill--2wxeon { border-color: currentColor; background: rgb(var(--hub-roster-2wxeon-bg)); color: rgb(var(--hub-roster-2wxeon-ink)); }
+[data-hub-ui="2"] .roster-pill { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+[data-hub-ui="2"] .roster-pill--sp { border-color: rgb(var(--hub2-n-200)); background: rgb(var(--hub-roster-sp-bg)); color: rgb(var(--hub-roster-sp-ink)); }
+[data-hub-ui="2"] .roster-pill--ot { border-color: transparent; background: rgb(var(--hub-roster-ot-bg)); color: rgb(var(--hub-roster-ot-ink)); }
+[data-hub-ui="2"] .roster-pill--aday { border-color: transparent; background: rgb(var(--hub-roster-aday-bg)); color: rgb(var(--hub-roster-aday-ink)); }
+[data-hub-ui="2"] .roster-pill--vaca { border-color: transparent; background: rgb(var(--hub-roster-vaca-bg)); color: rgb(var(--hub-roster-vaca-ink)); }
+[data-hub-ui="2"] .roster-pill--leave { border-color: transparent; background: rgb(var(--hub-roster-leave-bg)); color: rgb(var(--hub-roster-leave-ink)); }
+[data-hub-ui="2"] .roster-pill--sick { border-color: transparent; background: rgb(var(--hub-roster-sick-bg)); color: rgb(var(--hub-roster-sick-ink)); }
+[data-hub-ui="2"] .roster-pill--exchange { border-color: transparent; background: rgb(var(--hub-roster-exchange-bg)); color: rgb(var(--hub-roster-exchange-ink)); }
+[data-hub-ui="2"] .roster-pill--ooc { border-color: transparent; background: rgb(var(--hub-roster-ooc-bg)); color: rgb(var(--hub-roster-ooc-ink)); }
+[data-hub-ui="2"] .roster-pill--pms { border-color: transparent; background: rgb(var(--hub-roster-pms-bg)); color: rgb(var(--hub-roster-pms-ink)); }
 [data-hub-ui="2"] .roster-pill--other { border-color: rgb(var(--hub-roster-other-ink) / 0.4); background: rgb(var(--hub-roster-other-bg)); color: rgb(var(--hub-roster-other-ink)); }
 [data-hub-ui="2"] .roster-pill--unknown,
 [data-hub-ui="2"] .roster-pill--vacant { border: 1px dashed rgb(var(--hub-roster-unknown-border)); background: rgb(var(--hub-roster-unknown-bg)); color: rgb(var(--hub-roster-unknown-ink)); }
@@ -383,6 +386,10 @@
 [data-hub-ui="2"] .roster-cell--time { font-variant-numeric: tabular-nums; }
 
 [data-hub-ui="2"] .roster-seat { border-top: 1px solid rgb(var(--hub2-n-200)); }
+/* A spot that just changed fades back to normal, so a member's eye can find it. No motion to reduce: it is colour only. */
+@keyframes roster-updated { from { background-color: rgb(var(--hub2-warning-100, 254 243 199)); } to { background-color: transparent; } }
+[data-hub-ui="2"] .roster-seat.roster-updated { animation: roster-updated 6s ease-out; }
+@media (prefers-reduced-motion: reduce) { [data-hub-ui="2"] .roster-seat.roster-updated { animation-duration: 1ms; } }
 [data-hub-ui="2"] .roster-row + .roster-row { border-top: 1px dashed rgb(var(--hub2-n-200)); }
 
 [data-hub-ui="2"] .roster-member__name {
@@ -519,6 +526,7 @@
     [data-hub-ui="2"] .roster-toolbar,
     [data-hub-ui="2"] .roster-dates,
     [data-hub-ui="2"] .roster-header__actions button,
+    [data-hub-ui="2"] .roster-header__actions a,
     [data-hub-ui="2"] .roster-connection { display: none !important; }
     [data-hub-ui="2"] .roster-section { break-inside: auto; box-shadow: none; }
     [data-hub-ui="2"] .roster-seat { break-inside: avoid; }

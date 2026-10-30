@@ -108,8 +108,8 @@ final class DailyRosterPageTest extends TestCase
             ->assertSee('Report generated')
             ->assertSee('Last updated')
             ->assertSee('data-hub-shell', false)
+            ->assertSee('Export PDF')
             ->assertDontSee('Personnel')
-            ->assertDontSee('Export')
             ->assertDontSee('Print');
     }
 
@@ -129,9 +129,9 @@ final class DailyRosterPageTest extends TestCase
         $this->actingAsCanonicalFixture();
 
         $first = $this->getJson(self::VERSION)->assertOk();
-        $version = (string) $first->json('version');
+        $version = (string) $first->json('etag');
         self::assertSame($first->headers->get('ETag'), '"'.$version.'"');
-        self::assertSame(app(RosterFreshnessResolver::class)->status()->version, $version);
+        self::assertSame(app(RosterFreshnessResolver::class)->status()->version, (string) $first->json('version'));
         self::assertSame('current', $first->json('state'));
         self::assertSame(self::TODAY, $first->json('duty_date'));
         $this->assertNoStore($first);
@@ -166,7 +166,7 @@ final class DailyRosterPageTest extends TestCase
     {
         $this->publishRoster();
         $this->actingAsCanonicalFixture();
-        $version = (string) $this->getJson(self::VERSION)->json('version');
+        $version = (string) $this->getJson(self::VERSION)->json('etag');
 
         DailyRosterSnapshotFactory::publish(self::TODAY, [
             'Station 1 / Engine 1' => [['employee_id' => '50001', 'name' => 'NEWLY, PUBLISHED']],
@@ -386,7 +386,7 @@ final class DailyRosterPageTest extends TestCase
             ->assertSee('COWD/')
             ->assertSee('FBOQ');
         // The legend lists what is on this roster, nothing else.
-        $response->assertDontSee('roster-pill--milnp', false);
+        $response->assertDontSee('roster-pill--leave', false);
     }
 
     public function test_the_home_tile_follows_access(): void

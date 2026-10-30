@@ -18,3 +18,11 @@ Route::get('/daily-roster', [DailyRosterController::class, 'show'])
 Route::get('/daily-roster/sections', [DailyRosterController::class, 'sections'])
     ->middleware(['auth:web', 'throttle:60,1'])
     ->name('daily-roster.sections');
+
+Route::get('/daily-roster/changes', [DailyRosterController::class, 'changes'])
+    ->middleware(['auth:web', 'throttle:60,1'])
+    ->name('daily-roster.changes');
+
+Route::get('/daily-roster/pdf', [DailyRosterController::class, 'pdf'])
+    ->middleware(['auth:web', 'throttle:daily-roster-pdf'])
+    ->name('daily-roster.pdf');

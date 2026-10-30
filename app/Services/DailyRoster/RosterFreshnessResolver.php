@@ -35,31 +35,90 @@ final class RosterFreshnessResolver
 
         $state = match (true) {
             $held => RosterFreshness::NEEDS_REVIEW,
+            $published && $this->isStale($pointer, $moment) => RosterFreshness::DELAYED,
             $published => RosterFreshness::CURRENT,
             ! RosterActiveVersion::query()->whereNotNull('roster_snapshot_id')->exists() => RosterFreshness::NONE,
             $this->isPastCutoff($moment) => RosterFreshness::DELAYED,
             default => RosterFreshness::AWAITING,
         };
 
-        $version = hash('sha256', implode('|', [
-            $dutyDate, $state, (string) ($pointer->roster_snapshot_id ?? ''),
+        // Only what a member would see. An export with no changes must not make every open page refetch.
+        // A delayed notice names the last time heard, so a second outage is something new to show.
+        $version = substr(hash('sha256', implode('|', [
+            $dutyDate,
+            $state,
+            (string) ($pointer->roster_snapshot_id ?? ''),
+            $state === RosterFreshness::DELAYED ? (string) $pointer?->last_confirmed_at?->getTimestamp() : '',
+        ])), 0, 32);
+        $etag = substr(hash('sha256', implode('|', [
+            $version,
             (string) $pointer?->last_confirmed_at?->getTimestamp(),
             (string) $pointer?->updated_at?->getTimestamp(),
-        ]));
+        ])), 0, 32);
 
-        return new RosterFreshness($state, $dutyDate, $pointer?->last_confirmed_at, substr($version, 0, 32));
+        return new RosterFreshness(
+            $state,
+            $dutyDate,
+            $pointer?->last_confirmed_at,
+            $version,
+            $etag,
+            $published ? (int) $pointer->roster_snapshot_id : null,
+            $pointer?->updated_at?->toImmutable(),
+            $pointer?->content_changed_at,
+        );
     }
 
     /** Whether the current duty day's export should have arrived by now. */
     public function isPastCutoff(CarbonInterface $at): bool
     {
         $moment = CarbonImmutable::instance($at);
-        $local = $moment->setTimezone($this->calendar->timezone());
-        [$hour, $minute] = array_map('intval', explode(':', (string) config('daily_roster.delayed_after_local', '10:00')) + [1 => 0]);
 
         // The hours before the duty day starts belong to the previous duty day, already past its cutoff.
-        return $local->format('Y-m-d') !== $this->calendar->dutyDate($moment)->format('Y-m-d')
-            || $local->greaterThanOrEqualTo($local->setTime($hour, $minute));
+        return $moment->greaterThanOrEqualTo($this->lateFrom($this->calendar->dutyDate($moment)->format('Y-m-d')));
+    }
+
+    /** When a duty date with no roster yet starts counting as late. */
+    public function lateFrom(string $dutyDate): CarbonImmutable
+    {
+        $staleAfter = $this->staleAfterMinutes();
+        if ($staleAfter !== null) {
+            return CarbonImmutable::instance($this->calendar->window($dutyDate)[0])->addMinutes($staleAfter);
+        }
+
+        [$hour, $minute] = array_map('intval', explode(':', (string) config('daily_roster.delayed_after_local', '10:00')) + [1 => 0]);
+
+        return CarbonImmutable::createFromFormat('!Y-m-d', $dutyDate, $this->calendar->timezone())->setTime($hour, $minute);
+    }
+
+    /**
+     * Whether TeleStaff has gone quiet while a roster is showing. Only with a cadence set, since a daily
+     * export is quiet all day. A pin is an administrator's choice, and exports still arriving but held are
+     * trouble with the export, which needs_review already reports, so neither counts as silence.
+     */
+    public function isStale(?RosterActiveVersion $pointer, CarbonInterface $at): bool
+    {
+        $staleAfter = $this->staleAfterMinutes();
+        if ($staleAfter === null || $pointer === null || $pointer->roster_snapshot_id === null || $pointer->pinned_at !== null) {
+            return false;
+        }
+
+        $limit = CarbonImmutable::instance($at)->subMinutes($staleAfter);
+        $lastHeard = $pointer->last_confirmed_at ?? $pointer->updated_at;
+        if ($lastHeard !== null && $lastHeard->greaterThanOrEqualTo($limit)) {
+            return false;
+        }
+
+        return ! RosterImport::query()
+            ->where('received_at', '>=', $limit)
+            ->where('state', '!=', RosterImport::STATE_REJECTED)
+            ->exists();
+    }
+
+    private function staleAfterMinutes(): ?int
+    {
+        $interval = (int) config('daily_roster.cadence.expected_interval_minutes');
+
+        return $interval > 0 ? $interval * max(1, (int) config('daily_roster.cadence.stale_after_missed', 3)) : null;
     }
 
     /** Trouble older than the roster now showing has been overtaken by a good export, so it no longer counts. */

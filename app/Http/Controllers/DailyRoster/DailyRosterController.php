@@ -6,8 +6,10 @@ namespace App\Http\Controllers\DailyRoster;
 
 use App\Http\Controllers\Controller;
 use App\Services\DailyRoster\DailyRosterPagePresenter;
+use App\Services\DailyRoster\RosterChangeBuilder;
 use App\Services\DailyRoster\RosterFreshnessResolver;
 use App\Services\Security\DailyRosterAccess;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
@@ -22,6 +24,7 @@ final class DailyRosterController extends Controller
         private readonly DailyRosterAccess $access,
         private readonly DailyRosterPagePresenter $page,
         private readonly RosterFreshnessResolver $freshness,
+        private readonly RosterChangeBuilder $changeBuilder,
     ) {}
 
     public function show(Request $request): Response
@@ -39,7 +42,7 @@ final class DailyRosterController extends Controller
         $this->authorizeViewer($request);
 
         $date = $this->requestedDate($request);
-        $etag = sha1($this->freshness->status()->version.'|'.$date);
+        $etag = sha1($this->freshness->status()->etag.'|'.$date);
         if ($this->matchesEtag($request, $etag)) {
             return $this->notModified($etag);
         }
@@ -49,21 +52,56 @@ final class DailyRosterController extends Controller
         ], 200, self::NO_STORE + ['ETag' => '"'.$etag.'"']);
     }
 
+    /** Only the seats that changed since the snapshot a page is showing, or `full` when it must take the whole roster. */
+    public function changes(Request $request): JsonResponse
+    {
+        $this->authorizeViewer($request);
+
+        $from = $request->query('from');
+        $state = $request->query('state');
+        $changes = is_string($from) && preg_match('/\A[1-9]\d{0,18}\z/', $from) === 1
+            ? $this->changeBuilder->since((int) $from, is_string($state) ? $state : null)
+            : null;
+
+        return response()->json($changes ?? ['mode' => 'full'], 200, self::NO_STORE);
+    }
+
+    /** The entire roster for the date on screen, whatever the member has filtered or collapsed there. */
+    public function pdf(Request $request): SymfonyResponse
+    {
+        $this->authorizeViewer($request);
+
+        $data = $this->page->pdfData($this->requestedDate($request));
+        abort_if($data['roster']['isEmpty'], 404, 'No roster has been published yet.', self::NO_STORE);
+
+        $response = Pdf::loadView('daily-roster.pdf', $data)
+            ->setPaper('letter', 'landscape')
+            // Embeds only the glyphs used: about a tenth of the size, for a member on a phone connection.
+            ->setOption('isFontSubsettingEnabled', true)
+            ->download('MBFD-Daily-Roster-'.$data['roster']['displayedDate'].'.pdf');
+        $response->headers->set('Cache-Control', self::NO_STORE['Cache-Control']);
+        $response->headers->set('X-Content-Type-Options', 'nosniff');
+
+        return $response;
+    }
+
     public function version(Request $request): SymfonyResponse|JsonResponse
     {
         $this->authorizeViewer($request);
 
         $status = $this->freshness->status();
-        if ($this->matchesEtag($request, $status->version)) {
-            return $this->notModified($status->version);
+        if ($this->matchesEtag($request, $status->etag)) {
+            return $this->notModified($status->etag);
         }
 
         return response()->json([
             'version' => $status->version,
+            'etag' => $status->etag,
             'state' => $status->state,
             'duty_date' => $status->dutyDate,
             'as_of' => $status->asOf?->toIso8601String(),
-        ], 200, self::NO_STORE + ['ETag' => '"'.$status->version.'"']);
+            'facts' => $this->page->liveFacts($status),
+        ], 200, self::NO_STORE + ['ETag' => '"'.$status->etag.'"']);
     }
 
     private function authorizeViewer(Request $request): void

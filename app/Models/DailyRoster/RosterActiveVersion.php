@@ -22,6 +22,7 @@ final class RosterActiveVersion extends Model
         'effective_generated_at' => 'immutable_datetime',
         'last_confirmed_at' => 'immutable_datetime',
         'pinned_at' => 'immutable_datetime',
+        'content_changed_at' => 'immutable_datetime',
         'updated_at' => 'immutable_datetime',
     ];
 
