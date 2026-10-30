@@ -146,7 +146,8 @@ class TrainingAssignmentProvider
             'generated_at' => ['required', 'date'],
             'source_updated_at' => ['present', 'nullable', 'integer'],
             'term_label' => ['present', 'nullable', 'string', 'max:32'],
-            'members' => ['present', 'array', 'max:2000'],
+            // An empty list is not evidence that nobody is eligible; it is a bridge fault. Fail closed.
+            'members' => ['required', 'array', 'min:1', 'max:2000'],
             'members.*.employee_id' => ['required', 'string', 'max:64', 'distinct:strict'],
             'members.*.first_name' => ['present', 'nullable', 'string', 'max:100'],
             'members.*.last_name' => ['present', 'nullable', 'string', 'max:100'],

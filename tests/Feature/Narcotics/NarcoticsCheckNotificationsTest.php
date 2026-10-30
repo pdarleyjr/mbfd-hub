@@ -109,6 +109,22 @@ final class NarcoticsCheckNotificationsTest extends TestCase
         }
     }
 
+    public function test_the_email_is_as_generic_as_the_lock_screen(): void
+    {
+        $check = $this->submitOk($this->member, ['note' => 'Box 1 seal broken']);
+        $this->approve($this->captain5, $check)->assertOk();
+
+        foreach ([[$this->captain5, NarcoticsNotifier::KIND_SUBMITTED], [$this->member, NarcoticsNotifier::KIND_DECISION]] as [$user, $kind]) {
+            $email = $this->notificationFor($user, $kind)->toBudgetedEmail($user);
+            $this->assertSame('MBFD Hub update', $email['subject']);
+            foreach (['text', 'html'] as $part) {
+                $this->assertStringNotContainsString('Pat Member', $email[$part]);
+                $this->assertStringNotContainsString('Box 1', $email[$part]);
+            }
+            $this->assertStringStartsWith('Open MBFD Hub for details.', $email['text']);
+        }
+    }
+
     public function test_the_links_open_the_right_place_for_each_audience_and_carry_only_the_check_id(): void
     {
         $check = $this->submitOk($this->member);

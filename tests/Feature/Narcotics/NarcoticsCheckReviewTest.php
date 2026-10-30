@@ -69,6 +69,17 @@ final class NarcoticsCheckReviewTest extends TestCase
 
     // -------------------------------------------------------------- approve
 
+    public function test_a_reviewer_cannot_decide_their_own_check_but_another_reviewer_can(): void
+    {
+        $own = $this->submitOk($this->captain5);
+
+        $this->approve($this->captain5, $own)->assertForbidden();
+        $this->reject($this->captain5, $own, 'self')->assertForbidden();
+        $this->assertSame(NarcoticsCheck::PENDING, $own->fresh()->status);
+
+        $this->approve($this->secondCaptain5, $own)->assertOk()->assertJsonPath('data.status', 'approved');
+    }
+
     public function test_one_approval_archives_the_check_records_who_and_when_and_tells_the_member(): void
     {
         $check = $this->submitOk($this->member);

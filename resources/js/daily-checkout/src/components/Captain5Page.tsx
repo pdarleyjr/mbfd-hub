@@ -238,7 +238,7 @@ export default function Captain5Page() {
 
       {narcotics.status === 'ready' && narcotics.pending > 0 && active !== 'narcotics' && (
         <section className="hub-callout flex flex-wrap items-center justify-between gap-3 p-4" aria-label="Narcotics checks waiting" data-testid="narcotics-attention">
-          <p className="text-sm font-semibold text-hub-ink">{narcotics.pending === 1 ? '1 narcotics check is waiting for your review.' : ` narcotics checks are waiting for your review.`}</p>
+          <p className="text-sm font-semibold text-hub-ink">{narcotics.pending === 1 ? '1 narcotics check is waiting for your review.' : `${narcotics.pending} narcotics checks are waiting for your review.`}</p>
           <button type="button" className="hub-btn hub-btn--primary !min-h-11" onClick={() => update({ tab: 'narcotics', filter: null, kind: null, request: null, check: null, view: null, section: null })}>Review now</button>
         </section>
       )}

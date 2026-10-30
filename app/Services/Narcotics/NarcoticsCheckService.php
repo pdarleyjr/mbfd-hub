@@ -189,6 +189,13 @@ final class NarcoticsCheckService
             if ($check->status !== NarcoticsCheck::PENDING) {
                 return $this->alreadyDecided($check, $outcome);
             }
+            // A Captain 5 holder files checks like any member but never decides their own: another
+            // reviewer (or an administrator) does, so the record stays independent of the submitter.
+            if ($check->submitted_by_user_id !== null
+                && (int) $check->submitted_by_user_id === (int) $actor->getKey()
+                && ! $actor->hasRole('super_admin')) {
+                throw EmsException::forbidden('Another Captain 5 reviewer needs to review your own narcotics check.');
+            }
 
             $who = EmsActor::forUser($actor, NarcoticsCheckEvent::CONTEXT_CAPTAIN5);
             $at = now();

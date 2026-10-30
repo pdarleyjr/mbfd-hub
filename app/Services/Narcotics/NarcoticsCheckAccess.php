@@ -65,13 +65,14 @@ final class NarcoticsCheckAccess
         if (! $user instanceof User || ! $this->enabled()) {
             return false;
         }
-        if ($this->canReview($user)) {
+        // The owner check is cheap; the reviewer check walks the Captain 5 roster, so it goes second.
+        if ($this->usable($user)
+            && $check->submitted_by_user_id !== null
+            && (int) $check->submitted_by_user_id === (int) $user->getKey()) {
             return true;
         }
 
-        return $this->usable($user)
-            && $check->submitted_by_user_id !== null
-            && (int) $check->submitted_by_user_id === (int) $user->getKey();
+        return $this->canReview($user);
     }
 
     /** @return array{submit: bool, review: bool} */

@@ -27,8 +27,12 @@ final class NarcoticsImageProcessor
     /** @var list<string> */
     private const HEIC_BRANDS = ['heic', 'heix', 'hevc', 'hevx', 'heim', 'heis', 'mif1', 'msf1'];
 
-    /** Bytes that never occur in a camera photo but do in a polyglot. */
-    private const SCRIPT_MARKERS = ['<?php', '<script', '<%@', '<!doctype html', '<html'];
+    /**
+     * Long enough that they do not occur by chance in a multi-megabyte photo (a 3-byte marker such as
+     * "<%@" appears in about 1 in 8 random 2 MB files). The re-encode from decoded pixels is what
+     * actually removes any appended bytes; this only refuses the obvious polyglot early.
+     */
+    private const SCRIPT_MARKERS = ['<?php', '<script'];
 
     public function process(string $path): ProcessedImage
     {

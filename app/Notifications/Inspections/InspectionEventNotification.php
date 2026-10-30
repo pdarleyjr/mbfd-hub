@@ -156,6 +156,17 @@ final class InspectionEventNotification extends Notification implements ShouldQu
     {
         $url = url($this->url);
 
+        // Email leaves the Hub and sits in inboxes: a narcotics check is never named there either.
+        if (in_array($this->kind, [NarcoticsNotifier::KIND_SUBMITTED, NarcoticsNotifier::KIND_DECISION], true)) {
+            $generic = $this->pushText();
+
+            return [
+                'subject' => $generic['title'],
+                'text' => $generic['body']."\n\nView in MBFD Hub: {$url}",
+                'html' => '<h1>'.e($generic['title']).'</h1><p>'.e($generic['body']).'</p><p><a href="'.e($url).'">View in MBFD Hub</a></p>',
+            ];
+        }
+
         return [
             'subject' => $this->title,
             'text' => $this->body."\n\nView in MBFD Hub: {$url}",

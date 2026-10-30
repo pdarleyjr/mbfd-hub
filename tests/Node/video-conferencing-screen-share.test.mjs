@@ -21,7 +21,7 @@ test('a screen-share track ending outside our button resets the Share screen con
 
 test('cancelling the screen picker shows no error, a real failure still does', () => {
   const toggle = app.slice(app.indexOf('const toggleScreenShare'), app.indexOf('const stationMicrophone'));
-  assert.match(toggle, /enabled && shareError instanceof DOMException && \(shareError\.name === 'NotAllowedError' \|\| shareError\.name === 'AbortError'\)\) return;/);
+  assert.match(toggle, /enabled && shareError instanceof DOMException && \(shareError\.name === 'AbortError' \|\| \(shareError\.name === 'NotAllowedError' && !\/by system\/i\.test\(shareError\.message\)\)\)\) return;/);
   assert.match(toggle, /setError\(shareError instanceof Error \? shareError\.message : 'Screen sharing could not be started\.'\)/);
   assert.ok(
     toggle.indexOf("'NotAllowedError'") < toggle.indexOf('setError('),

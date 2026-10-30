@@ -1134,7 +1134,8 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
             setScreenShareEnabled(enabled);
         } catch (shareError) {
             // Closing the browser's screen picker is a choice, not a failure.
-            if (enabled && shareError instanceof DOMException && (shareError.name === 'NotAllowedError' || shareError.name === 'AbortError')) return;
+            // Chrome reports "Permission denied by system" when the OS blocks capture; that one is worth telling the member about.
+            if (enabled && shareError instanceof DOMException && (shareError.name === 'AbortError' || (shareError.name === 'NotAllowedError' && !/by system/i.test(shareError.message)))) return;
             setError(shareError instanceof Error ? shareError.message : 'Screen sharing could not be started.');
         }
     };
