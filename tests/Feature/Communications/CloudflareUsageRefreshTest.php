@@ -4,15 +4,22 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Communications;
 
+use App\Exceptions\CloudflareUsageRefreshFailed;
 use App\Exceptions\EmailBudgetExhausted;
 use App\Models\CloudflareUsageBudget;
 use App\Models\OutboundEmail;
 use App\Services\Communications\CloudflareCostGuard;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Factory;
+use Illuminate\Log\Events\MessageLogged;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use PHPUnit\Framework\Attributes\DataProvider;
+use RuntimeException;
 use Tests\TestCase;
 
 final class CloudflareUsageRefreshTest extends TestCase
@@ -97,6 +104,120 @@ final class CloudflareUsageRefreshTest extends TestCase
         Http::fake(['*' => Http::response(['success' => false, 'errors' => [['message' => 'isolated-secret']]], 403)]);
         $this->artisan('mbfd:cloudflare-usage-refresh')->doesntExpectOutputToContain('isolated-secret')->assertFailed();
         self::assertNull(CloudflareUsageBudget::query()->sole()->reconciled_at);
+    }
+
+    #[DataProvider('providerCalls')]
+    public function test_a_rejected_provider_call_is_logged_by_name_and_status_without_secrets(string $call): void
+    {
+        $logged = $this->captureLog();
+        $this->fakeProvider(overrides: ['*/'.$call => Http::response(
+            ['success' => false, 'errors' => [['message' => 'isolated-secret provider-body-marker']]], 403,
+        )]);
+
+        $this->artisan('mbfd:cloudflare-usage-refresh')->assertFailed();
+
+        $entry = $logged->firstWhere('message', 'cloudflare_usage_refresh_failed');
+        self::assertSame('warning', $entry->level);
+        self::assertSame($call, $entry->context['provider_call']);
+        self::assertSame(403, $entry->context['http_status']);
+        self::assertSame(CloudflareUsageRefreshFailed::class, $entry->context['exception_class']);
+        $this->assertLogHoldsNoSecrets($logged);
+    }
+
+    public static function providerCalls(): array
+    {
+        return [['subscriptions'], ['billable-usage'], ['email/sending/limits']];
+    }
+
+    public function test_a_request_that_never_completes_is_logged_by_its_exception_class_without_secrets(): void
+    {
+        $logged = $this->captureLog();
+        $this->fakeProvider(overrides: ['*/billable-usage' => static function (): never {
+            throw new ConnectionException('cURL error for https://api.cloudflare.com/client/v4/accounts/'.self::ACCOUNT.'/billable-usage Bearer isolated-secret');
+        }]);
+
+        $this->artisan('mbfd:cloudflare-usage-refresh')->assertFailed();
+
+        $entry = $logged->firstWhere('message', 'cloudflare_usage_refresh_failed');
+        self::assertSame('billable-usage', $entry->context['provider_call']);
+        self::assertNull($entry->context['http_status']);
+        self::assertSame(ConnectionException::class, $entry->context['exception_class']);
+        $this->assertLogHoldsNoSecrets($logged);
+    }
+
+    public function test_a_report_that_answers_but_fails_checks_logs_the_reason_with_its_status(): void
+    {
+        $logged = $this->captureLog();
+        $this->fakeProvider(overrides: ['*/subscriptions' => Http::response(
+            ['success' => true, 'errors' => [], 'result' => [], 'result_info' => ['total_pages' => 2]],
+        )]);
+
+        $this->artisan('mbfd:cloudflare-usage-refresh')->assertFailed();
+
+        $entry = $logged->firstWhere('message', 'cloudflare_usage_refresh_failed');
+        self::assertSame('subscriptions', $entry->context['provider_call']);
+        self::assertSame(200, $entry->context['http_status']);
+        self::assertSame('Cloudflare returned only part of the report.', $entry->context['reason']);
+    }
+
+    public function test_a_report_rejected_after_all_three_calls_logs_a_fixed_reason(): void
+    {
+        $logged = $this->captureLog();
+        $rows = $this->rows();
+        $rows[0]['BillingAccountId'] = str_repeat('b', 32);
+        $this->fakeProvider($rows);
+
+        $this->artisan('mbfd:cloudflare-usage-refresh')->assertFailed();
+
+        $entry = $logged->firstWhere('message', 'cloudflare_usage_refresh_failed');
+        self::assertNull($entry->context['provider_call']);
+        self::assertNull($entry->context['http_status']);
+        self::assertSame('Billing report account mismatch.', $entry->context['reason']);
+    }
+
+    public function test_an_unexpected_exception_logs_only_its_class_because_its_message_is_not_ours(): void
+    {
+        $logged = $this->captureLog();
+        $this->fakeProvider();
+        Event::listen('eloquent.creating: '.CloudflareUsageBudget::class, static function (): never {
+            throw new RuntimeException('Query failed for isolated-secret on https://api.cloudflare.com provider-body-marker');
+        });
+
+        $this->artisan('mbfd:cloudflare-usage-refresh')->assertFailed();
+
+        $entry = $logged->firstWhere('message', 'cloudflare_usage_refresh_failed');
+        self::assertSame(RuntimeException::class, $entry->context['exception_class']);
+        self::assertNull($entry->context['reason']);
+        $this->assertLogHoldsNoSecrets($logged);
+    }
+
+    public function test_an_overlapping_refresh_logs_its_reason_and_leaves_sending_open(): void
+    {
+        $this->fakeProvider();
+        $this->artisan('mbfd:cloudflare-usage-refresh')->assertSuccessful();
+        $logged = $this->captureLog();
+        Cache::lock('cloudflare-usage-refresh', 120)->get();
+
+        $this->artisan('mbfd:cloudflare-usage-refresh')->assertFailed();
+
+        $entry = $logged->firstWhere('message', 'cloudflare_usage_refresh_failed');
+        self::assertSame('A Cloudflare usage refresh is already in progress.', $entry->context['reason']);
+        self::assertNotNull(CloudflareUsageBudget::query()->sole()->reconciled_at);
+    }
+
+    public function test_logging_a_failure_still_closes_sending(): void
+    {
+        $this->fakeProvider();
+        $this->artisan('mbfd:cloudflare-usage-refresh')->assertSuccessful();
+        $logged = $this->captureLog();
+        $this->fakeProvider(overrides: ['*/email/sending/limits' => Http::response([], 500)]);
+
+        $this->artisan('mbfd:cloudflare-usage-refresh')->assertFailed();
+
+        $budget = CloudflareUsageBudget::query()->sole();
+        self::assertNull($budget->reconciled_at);
+        self::assertNull($budget->provider_daily_reconciled_at);
+        self::assertSame(500, $logged->firstWhere('message', 'cloudflare_usage_refresh_failed')->context['http_status']);
     }
 
     public function test_a_delayed_lower_report_cannot_reduce_current_cycle_baseline(): void
@@ -245,6 +366,27 @@ final class CloudflareUsageRefreshTest extends TestCase
     public static function invalidEnvelopes(): array
     {
         return array_map(fn (string $case): array => [$case], ['ambiguous subscriptions', 'unpaid', 'no paid cycle', 'missing success', 'provider error', 'pagination', 'missing rows', 'daily quota unit', 'daily unknown']);
+    }
+
+    /** @return Collection<int,MessageLogged> */
+    private function captureLog(): Collection
+    {
+        $logged = new Collection;
+        Event::listen(MessageLogged::class, static function (MessageLogged $entry) use ($logged): void {
+            $logged->push($entry);
+        });
+
+        return $logged;
+    }
+
+    /** @param Collection<int,MessageLogged> $logged */
+    private function assertLogHoldsNoSecrets(Collection $logged): void
+    {
+        $text = (string) json_encode($logged->map(static fn (MessageLogged $entry): array => [$entry->message, $entry->context])->all(), JSON_THROW_ON_ERROR);
+        self::assertStringContainsString('cloudflare_usage_refresh_failed', $text);
+        foreach (['isolated-secret', self::ACCOUNT, 'api.cloudflare.com', 'provider-body-marker', 'Bearer'] as $secret) {
+            self::assertStringNotContainsString($secret, $text);
+        }
     }
 
     private function fakeProvider(?array $rows = null, string $start = '2026-09-04T00:00:00Z', string $end = '2026-10-04T00:00:00Z', int $sent = 0, array $overrides = []): void
