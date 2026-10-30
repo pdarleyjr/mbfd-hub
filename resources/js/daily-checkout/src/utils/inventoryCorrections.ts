@@ -138,7 +138,8 @@ export function correctionErrorMessage(error: unknown): string {
   const detail = match[2].trim();
   if (status === 401 || status === 419) return 'Your sign-in expired. What you typed is still here. Sign in again, then send it.';
   const reason = detail !== '' && !/^(unprocessable|bad request|conflict|forbidden|not found)/i.test(detail) ? ` ${detail.replace(/\.?$/, '.')}` : '';
-  return `Logistics could not accept this report.${reason} What you typed is still here, so you can change it and try again.`;
+  // A refused send is not a decision: Logistics never saw it, so say so instead of sounding like a rejection.
+  return `Your report was not sent.${reason} Nothing was rejected: Logistics has not seen it. What you typed is still here, so you can change it and try again.`;
 }
 
 /** A report that is waiting on Logistics, for the marker on its item or compartment. */

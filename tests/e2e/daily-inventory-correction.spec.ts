@@ -297,7 +297,7 @@ test('a report saved on the device keeps its marker after the page is reloaded',
   await expect(page.getByText('1 unlisted item reported here, pending review.')).toBeVisible();
 });
 
-test('a rejected report explains why and keeps everything that was typed', async ({ page }) => {
+test('a refused report says it was not sent, is not a rejection, and keeps everything that was typed', async ({ page }) => {
   const api = await mockApi(page);
   api.respondWith = { status: 422, message: 'That item is not on this checklist.' };
   await openInspection(page);
@@ -307,7 +307,7 @@ test('a rejected report explains why and keeps everything that was typed', async
   await item.getByLabel('Note (required)').fill('It is a different light.');
   await item.getByRole('button', { name: 'Send to Logistics' }).click();
 
-  await expect(item.getByRole('alert')).toContainText('Logistics could not accept this report. That item is not on this checklist.');
+  await expect(item.getByRole('alert')).toContainText('Your report was not sent. That item is not on this checklist. Nothing was rejected: Logistics has not seen it.');
   await expect(item.getByLabel('Note (required)')).toHaveValue('It is a different light.');
   await expect(item.getByRole('button', { name: 'Send to Logistics' })).toBeEnabled();
   expect(await queuedCorrections(page)).toHaveLength(0);

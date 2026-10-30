@@ -69,10 +69,10 @@ final class ApparatusInventoryCorrection extends Model
     public static function statusLabels(): array
     {
         return [
-            self::STATUS_SUBMITTED => 'Awaiting review',
+            self::STATUS_SUBMITTED => 'Pending approval',
             self::STATUS_CLARIFICATION => 'Question for the member',
-            self::STATUS_APPLIED => 'Approved and applied',
-            self::STATUS_REJECTED => 'Not approved',
+            self::STATUS_APPLIED => 'Approved',
+            self::STATUS_REJECTED => 'Rejected',
             self::STATUS_REVERSED => 'Reversed',
         ];
     }

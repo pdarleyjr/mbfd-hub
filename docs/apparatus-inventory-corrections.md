@@ -208,3 +208,29 @@ item_id, reason, reason_label, status, reported_at, mine }]`. Items may carry `m
 All migrations are additive. Rollback = redeploy the previous image. Old code ignores the new
 tables, so every unit falls back to its baseline template (approved changes stop showing until
 re-deployed; nothing is lost). `down()` drops only the new tables.
+
+## 7. Equipment Change Requests (admin home card and decision flow, 2026-10-30)
+
+"Equipment change request" is the administrator's name for an inventory correction; there is one
+record and one set of tables. Nothing new is stored and no migration is involved.
+
+- **Member side.** The Daily Checkout "Report inventory correction" form is the entry point. A report
+  is `submitted` (shown as **Pending approval**) and never changes the checklist. It records the
+  apparatus (`apparatus_id`), the equipment (`item_key`, `equipment_key`), the old value
+  (`target_snapshot`, now including the destination compartment's name for a move), the proposed value
+  (`proposal`), the submitter and the optional note. Final states are shown as **Approved** and **Rejected**.
+- **Nothing is dropped.** A repeat of the same report (same item, reason, proposal and note) still merges into
+  the open one. A report that proposes something different is a new request, so Logistics always reviews what the
+  member last asked for.
+- **No automatic decisions.** Only `InventoryCorrectionService::reject()` / `approve()` set a final status, and both
+  require a reviewer (`InventoryCorrectionAccess::canReview`). A refused send (HTTP 4xx) is not a decision; the
+  Daily Checkout says "Your report was not sent ... Nothing was rejected: Logistics has not seen it".
+- **Admin home card.** `EquipmentChangeRequestsWidget` (Logistics Dashboard, not on the wall display): the pending
+  count, the newest five with before -> after, the reporter, and a link to the exact request. It only reads;
+  decisions are made on the request page (`InventoryCorrectionResource` view), which opens with a
+  "What would change" before/after table, the apparatus ID and equipment ID.
+- **Decisions.** Approve = one transaction (section 2.5) that adds an overlay change for the selected apparatus only,
+  re-resolves and verifies the next checklist, and snapshots the replaced one. Reject = status change only; the
+  message to the member is optional (a bare rejection still notifies "The checklist was not changed"). Both require the
+  `lock_version` the reviewer saw, are idempotent per key, and a second administrator is told it was already decided.
+- **Notifications** reuse `inventory_correction_submitted` (reviewers) and `inventory_correction_update` (member).
