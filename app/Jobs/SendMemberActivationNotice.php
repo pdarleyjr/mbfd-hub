@@ -11,9 +11,7 @@ use App\Services\Communications\CloudflareEmailDispatcher;
 use App\Support\HubTimezone;
 use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Log;
@@ -25,17 +23,16 @@ use Throwable;
  * slow the activation. The address is the one held at activation: whoever claimed
  * the account must not be able to redirect the notice by changing it afterwards.
  */
-final class SendMemberActivationNotice implements ShouldBeUnique, ShouldQueue
+final class SendMemberActivationNotice implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable;
 
     /** Outlasts about 6 hours of the 5-minute pause after a failed usage poll. */
     public int $tries = 72;
 
-    public int $timeout = 60;
+    public int $backoff = 60;
 
-    /** Longer than every try spent waiting out the hourly daily-quota block. */
-    public int $uniqueFor = 345600;
+    public int $timeout = 60;
 
     private readonly int $lastOutboundEmailIdAtDispatch;
 
@@ -45,20 +42,13 @@ final class SendMemberActivationNotice implements ShouldBeUnique, ShouldQueue
         public readonly CarbonImmutable $activatedAt,
     ) {
         $this->onQueue('notifications');
-        $this->lastOutboundEmailIdAtDispatch = (int) $this->deliveries()->max('id');
-    }
-
-    public function uniqueId(): string
-    {
-        return (string) $this->userId;
+        $this->lastOutboundEmailIdAtDispatch = (int) OutboundEmail::query()->where('source_type', 'member_self_service_activation')
+            ->where('source_id', (string) $userId)->max('id');
     }
 
     public function handle(CloudflareEmailDispatcher $email): void
     {
-        // Every status except this one may have reached the provider, including a
-        // lost response. Only a refusal before submission can safely be sent again.
-        if ($this->deliveries()->where('id', '>', $this->lastOutboundEmailIdAtDispatch)
-            ->where('status', '!=', 'failed_pre_acceptance')->exists()) {
+        if ($this->mayHaveReachedProvider()) {
             return;
         }
         $when = $this->activatedAt->setTimezone(HubTimezone::NAME)->format('F j, Y \a\t g:i A T');
@@ -89,6 +79,12 @@ final class SendMemberActivationNotice implements ShouldBeUnique, ShouldQueue
                 'user_id' => $this->userId,
                 'exception_class' => $exception::class,
             ]);
+            if ($this->mayHaveReachedProvider()) {
+                $this->fail('The activation notice may be undelivered and cannot safely be sent again.');
+
+                return;
+            }
+            $this->release($this->backoff);
         }
     }
 
@@ -100,9 +96,16 @@ final class SendMemberActivationNotice implements ShouldBeUnique, ShouldQueue
         ]);
     }
 
-    /** @return Builder<OutboundEmail> */
-    private function deliveries(): Builder
+    /**
+     * Every status except this one may have reached the provider, including a lost
+     * response. Only a refusal before submission can safely be sent again.
+     *
+     * @phpstan-impure
+     */
+    private function mayHaveReachedProvider(): bool
     {
-        return OutboundEmail::query()->where('source_type', 'member_self_service_activation')->where('source_id', (string) $this->userId);
+        return OutboundEmail::query()->where('source_type', 'member_self_service_activation')->where('source_id', (string) $this->userId)
+            ->where('id', '>', $this->lastOutboundEmailIdAtDispatch)
+            ->where('status', '!=', 'failed_pre_acceptance')->exists();
     }
 }

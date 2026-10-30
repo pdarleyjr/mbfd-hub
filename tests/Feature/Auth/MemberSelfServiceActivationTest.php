@@ -26,6 +26,7 @@ use App\Services\Identity\MemberSelfServiceActivation;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Factory;
 use Illuminate\Http\Client\Request;
 use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Collection;
@@ -278,17 +279,92 @@ final class MemberSelfServiceActivationTest extends TestCase
         self::assertSame(1, $submissions);
         self::assertSame('acceptance_unknown', OutboundEmail::query()->sole()->status);
         $job->assertNotReleased();
+        $job->assertFailed();
     }
 
-    public function test_activating_twice_cannot_queue_a_second_notice(): void
+    public function test_a_provider_429_is_not_resent_and_is_recorded_as_failed(): void
     {
         config()->set('queue.default', 'database');
-        $member = $this->pending('SELF-UNIQUE');
+        $logged = $this->captureLog();
+        $submissions = 0;
+        Http::swap(new Factory);
+        Http::fake(function () use (&$submissions) {
+            $submissions++;
 
-        SendMemberActivationNotice::dispatch($member->id, 'self-unique@miamibeachfl.gov', CarbonImmutable::now());
-        SendMemberActivationNotice::dispatch($member->id, 'self-unique@miamibeachfl.gov', CarbonImmutable::now());
+            return Http::response(['success' => false], 429, ['Retry-After' => '60']);
+        });
+        $this->pending('SELF-429');
 
+        $this->post('/activate', $this->form('SELF-429'))->assertRedirect('/');
+        $this->workNotificationQueue();
+
+        self::assertSame(1, $submissions);
+        self::assertDatabaseCount('jobs', 0);
+        self::assertDatabaseCount('failed_jobs', 1);
+        self::assertContains('member_self_service_activation_notice_abandoned', $logged->pluck('message')->all());
+    }
+
+    public function test_a_failure_before_submission_is_retried_and_then_delivered(): void
+    {
+        config()->set('queue.default', 'database');
+        config()->set('communications.cloudflare.api_token', '');
+        $this->pending('SELF-TRANSIENT');
+
+        $this->post('/activate', $this->form('SELF-TRANSIENT'))->assertRedirect('/');
+        $this->workNotificationQueue();
+
+        Http::assertNothingSent();
         self::assertDatabaseCount('jobs', 1);
+        self::assertDatabaseCount('failed_jobs', 0);
+
+        config()->set('communications.cloudflare.api_token', 'member-activation-test-token');
+        $this->travel(61)->seconds();
+        $this->openEmailBudget();
+        $this->workNotificationQueue();
+
+        Http::assertSentCount(1);
+        self::assertDatabaseCount('jobs', 0);
+    }
+
+    public function test_the_job_keeps_retrying_past_the_workers_default_of_three_tries(): void
+    {
+        config()->set('queue.default', 'database');
+        $this->closeEmailBudget();
+        $this->pending('SELF-PATIENT');
+        $this->post('/activate', $this->form('SELF-PATIENT'))->assertRedirect('/');
+
+        DB::table('jobs')->update(['attempts' => 10]);
+        $this->workNotificationQueue();
+
+        self::assertDatabaseCount('failed_jobs', 0);
+        self::assertSame(11, DB::table('jobs')->value('attempts'));
+    }
+
+    public function test_a_job_queued_twice_for_one_activation_sends_one_notice(): void
+    {
+        config()->set('queue.default', 'database');
+        $member = $this->pending('SELF-TWICE');
+
+        SendMemberActivationNotice::dispatch($member->id, 'self-twice@miamibeachfl.gov', CarbonImmutable::now());
+        SendMemberActivationNotice::dispatch($member->id, 'self-twice@miamibeachfl.gov', CarbonImmutable::now());
+        $this->workNotificationQueue();
+        $this->workNotificationQueue();
+
+        Http::assertSentCount(1);
+        self::assertDatabaseCount('jobs', 0);
+    }
+
+    public function test_a_second_activation_still_gets_its_own_notice_while_the_first_is_waiting(): void
+    {
+        config()->set('queue.default', 'database');
+        $this->closeEmailBudget();
+        $member = $this->pending('SELF-WAITING');
+
+        SendMemberActivationNotice::dispatch($member->id, 'self-waiting@miamibeachfl.gov', CarbonImmutable::now());
+        $this->workNotificationQueue();
+        SendMemberActivationNotice::dispatch($member->id, 'self-waiting@miamibeachfl.gov', CarbonImmutable::now());
+
+        self::assertDatabaseCount('jobs', 2);
     }
 
     public function test_a_notice_from_an_earlier_activation_does_not_silence_a_new_one(): void
