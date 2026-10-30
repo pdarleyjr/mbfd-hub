@@ -7,12 +7,16 @@ namespace App\Jobs;
 use App\Exceptions\EmailBudgetExhausted;
 use App\Models\OutboundEmail;
 use App\Models\User;
+use App\Notifications\Channels\BudgetedMailChannel;
 use App\Services\Communications\CloudflareEmailDispatcher;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Bus\Dispatchable;
+use Illuminate\Notifications\Notification;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\RateLimited;
+use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
@@ -27,7 +31,10 @@ use Throwable;
  */
 final class SendBudgetedEmail implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable;
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    /** A recipient deleted while the email waited has nobody left to tell. */
+    public bool $deleteWhenMissingModels = true;
 
     /** Outlasts about 6 hours of the 5-minute pause after failed usage polls. */
     public int $tries = 72;
@@ -38,7 +45,12 @@ final class SendBudgetedEmail implements ShouldQueue
 
     private readonly int $lastOutboundEmailIdAtDispatch;
 
-    /** @param list<string> $to */
+    /**
+     * A notification's recipient is checked again when the email is due: a preference
+     * switched off or a role revoked while it waited stops it.
+     *
+     * @param  list<string>  $to
+     */
     public function __construct(
         public readonly array $to,
         public readonly string $subject,
@@ -47,6 +59,8 @@ final class SendBudgetedEmail implements ShouldQueue
         public readonly string $sourceType,
         public readonly string $sourceId,
         public readonly ?int $actorId = null,
+        public readonly ?Notification $notification = null,
+        public readonly ?Model $notifiable = null,
     ) {
         $this->onQueue('notifications');
         $this->lastOutboundEmailIdAtDispatch = (int) OutboundEmail::query()->where('source_type', $sourceType)->where('source_id', $sourceId)->max('id');
@@ -60,7 +74,7 @@ final class SendBudgetedEmail implements ShouldQueue
 
     public function handle(CloudflareEmailDispatcher $email): void
     {
-        if ($this->mayHaveReachedProvider()) {
+        if ($this->mayHaveReachedProvider() || ! $this->stillWanted()) {
             return;
         }
         try {
@@ -98,6 +112,13 @@ final class SendBudgetedEmail implements ShouldQueue
         Log::error('budgeted_email_abandoned', $this->logContext() + [
             'exception_class' => $exception === null ? null : $exception::class,
         ]);
+    }
+
+    private function stillWanted(): bool
+    {
+        return $this->notification === null || $this->notifiable === null
+            || ! method_exists($this->notification, 'shouldSend')
+            || $this->notification->shouldSend($this->notifiable, BudgetedMailChannel::class);
     }
 
     /**

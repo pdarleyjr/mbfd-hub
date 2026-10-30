@@ -6,7 +6,9 @@ namespace Tests\Feature\Communications;
 
 use App\Jobs\SendBudgetedEmail;
 use App\Models\CloudflareUsageBudget;
+use App\Models\Employee;
 use App\Models\OutboundEmail;
+use App\Models\User;
 use App\Notifications\Channels\BudgetedMailChannel;
 use App\Notifications\EquipmentDefectNotification;
 use Carbon\CarbonImmutable;
@@ -135,18 +137,104 @@ final class BudgetedEmailRetryTest extends TestCase
         self::assertDatabaseCount('jobs', 0);
     }
 
-    public function test_a_block_that_waiting_will_not_clear_is_not_retried_forever(): void
+    public function test_a_block_that_waiting_will_not_clear_is_logged_once_and_not_retried(): void
     {
         config()->set('communications.cloudflare.safe_email_ceiling', 0);
+        $logged = collect();
+        Event::listen(MessageLogged::class, static function (MessageLogged $entry) use ($logged): void {
+            $logged->push($entry);
+        });
 
         Notification::route('mail', 'member@miamibeachfl.gov')->notify(new QueuedTestEmail);
-        $this->work();
-        $this->work();
         $this->work();
 
         Http::assertNothingSent();
         self::assertDatabaseCount('jobs', 0);
-        self::assertDatabaseCount('failed_jobs', 1);
+        self::assertSame('failed_pre_acceptance', OutboundEmail::query()->sole()->status);
+        self::assertSame('warning', $logged->firstWhere('message', 'budgeted_email_not_sent')->level);
+    }
+
+    public function test_one_refusal_sends_exactly_one_email_end_to_end(): void
+    {
+        $attempts = 0;
+        Http::swap(new Factory);
+        Http::fake(function (Request $request) use (&$attempts) {
+            $attempts++;
+
+            return $attempts === 1
+                ? Http::response(['success' => false], 429, ['Retry-After' => '60'])
+                : Http::response(['success' => true, 'result' => ['message_id' => 'after-refusal', 'delivered' => $request['to'], 'queued' => [], 'permanent_bounces' => []]]);
+        });
+        $member = $this->member('one-refusal@miamibeachfl.gov');
+
+        $member->notify(new QueuedTestEmail);
+        $this->work();
+        self::assertSame(1, $attempts);
+        self::assertSame('failed_pre_acceptance', OutboundEmail::query()->sole()->status);
+        self::assertDatabaseCount('jobs', 1);
+
+        // Due now, and again if a worker dies after sending and the queue redelivers.
+        $this->travel(61)->seconds();
+        $this->work();
+        $this->work();
+
+        self::assertSame(2, $attempts, 'One refused request and one accepted request: never a third.');
+        self::assertSame(1, OutboundEmail::query()->whereNotNull('accepted_at')->count());
+        self::assertSame(['one-refusal@miamibeachfl.gov'], OutboundEmail::query()->whereNotNull('accepted_at')->sole()->to_recipients);
+        self::assertDatabaseCount('jobs', 0);
+        self::assertDatabaseCount('failed_jobs', 0);
+    }
+
+    public function test_a_waiting_email_is_stopped_if_the_member_no_longer_wants_it(): void
+    {
+        $this->closeBudget();
+        $member = $this->member('stopped@miamibeachfl.gov');
+
+        $member->notify(new QueuedTestEmail);
+        $this->work();
+        self::assertDatabaseCount('jobs', 1);
+
+        config()->set('test.email_still_wanted', false);
+        $this->travel(301)->seconds();
+        $this->openBudget();
+        $this->work();
+
+        Http::assertNothingSent();
+        self::assertDatabaseCount('jobs', 0);
+        self::assertDatabaseCount('failed_jobs', 0);
+    }
+
+    public function test_a_waiting_email_is_dropped_if_the_member_was_deleted(): void
+    {
+        $this->closeBudget();
+        $member = $this->member('deleted@miamibeachfl.gov');
+
+        $member->notify(new QueuedTestEmail);
+        $this->work();
+        self::assertDatabaseCount('jobs', 1);
+
+        // The app refuses to delete accounts, so this stands in for a row removed some other way.
+        User::withoutEvents(fn () => $member->forceDelete());
+        $this->travel(301)->seconds();
+        $this->openBudget();
+        $this->work();
+
+        Http::assertNothingSent();
+        self::assertDatabaseCount('jobs', 0);
+        self::assertDatabaseCount('failed_jobs', 0);
+    }
+
+    public function test_a_member_without_a_city_email_is_skipped_without_any_retry(): void
+    {
+        $this->closeBudget();
+        $member = User::factory()->create(['employee_profile_id' => null]);
+
+        $member->notify(new QueuedTestEmail);
+        $this->work();
+
+        self::assertDatabaseCount('outbound_emails', 0);
+        self::assertDatabaseCount('jobs', 0);
+        self::assertDatabaseCount('failed_jobs', 0);
     }
 
     public function test_queued_jobs_over_the_send_rate_wait_without_adding_failed_rows_to_the_sent_list(): void
@@ -183,6 +271,20 @@ final class BudgetedEmailRetryTest extends TestCase
         }
     }
 
+    private function member(string $cityEmail): User
+    {
+        $employeeId = 'RETRY-'.bin2hex(random_bytes(4));
+        $employee = Employee::query()->create([
+            'employee_id' => $employeeId,
+            'name' => 'Retry Test Member',
+            'roster_status' => 'active',
+            'city_email' => $cityEmail,
+            'password' => 'not-used-in-this-test',
+        ]);
+
+        return User::factory()->create(['employee_profile_id' => $employee->id, 'employee_id' => $employeeId, 'email' => $cityEmail]);
+    }
+
     private function closeBudget(): void
     {
         CloudflareUsageBudget::query()->update(['reconciled_at' => null, 'provider_daily_reconciled_at' => null]);
@@ -214,6 +316,11 @@ final class QueuedTestEmail extends BaseNotification implements ShouldQueue
     public function via(object $notifiable): array
     {
         return [BudgetedMailChannel::class];
+    }
+
+    public function shouldSend(object $notifiable, string $channel): bool
+    {
+        return (bool) config('test.email_still_wanted', true);
     }
 
     /** @return array{subject:string,text:string} */
