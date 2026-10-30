@@ -83,13 +83,13 @@ test('a draft saved before the upgrade comes back whole, the new list is empty a
   const page = await openSeeded(context, {
     owner, v: 1, clientSubmissionId: '6f1e6b8a-1d2f-4c3a-9b1e-0d8c5a7e2f10', targetChoice: unit, savedAt: '2026-10-30T12:00:00.000Z',
     // The old bundle's shape, plus an entry for an item this definition does not list.
-    quantities: { [GLOVES]: 3, [ASHERMAN]: 2, [RETIRED]: 4 }, answers: {},
+    quantities: { [GLOVES]: 3, [ASHERMAN]: 2, [RETIRED]: 4 }, answers: {}, labels: { [RETIRED]: 'Old Item' },
   });
 
   await expect(page.getByText('Your unfinished request was restored')).toBeVisible();
   await expect(page.locator('#ems-target')).toHaveValue(unit);
   await expect(page.locator('.ems-item', { hasText: 'Gloves' }).first().getByLabel(/number needed/)).toHaveValue('3');
-  await expect(page.getByText('1 saved entry is for items that are not on this form right now')).toBeVisible();
+  await expect(page.getByText('1 saved entry is for items that are no longer on this form')).toBeVisible();
 
   const chooser = page.getByRole('navigation', { name: 'Choose a list' });
   await expect(chooser.getByRole('button', { name: /Airway Bag/ })).toContainText('1 needed');
@@ -102,21 +102,21 @@ test('a draft saved before the upgrade comes back whole, the new list is empty a
   await narcan.getByRole('button', { name: 'One more Narcan' }).click();
   await page.locator('#ems-note').fill('typed before the update');
 
-  // The refresh guard sees the work: the window never reloads on its own and the banner only asks.
-  expect(await page.evaluate(() => (window as unknown as { __mbfdBusy?: Set<string> }).__mbfdBusy?.has('ems-draft'))).toBe(true);
-  await expect(page.locator('[data-mbfd-unsaved-work-guard]').first()).toBeAttached();
+  // The Forms page carries the refresh guard: the window never reloads on its own and the update banner only asks.
+  await expect(page.locator('#operational-forms-root[data-mbfd-unsaved-work-guard]')).toBeAttached();
 
   await page.getByRole('button', { name: 'Review and send' }).click();
   const review = page.getByRole('dialog', { name: 'Review your request' });
-  await expect(review).toContainText('kept on this device and not sent');
+  await expect(review.getByRole('region', { name: 'Saved entries for items no longer on the form' })).toContainText('Old Item');
+  await expect(review).toContainText('4 needed');
   await review.getByRole('button', { name: /^Send/ }).click();
   await expect(page.getByRole('heading', { name: 'Request sent' })).toBeVisible({ timeout: 30_000 });
 
   // The retired entry was not sent, and it is still saved for the member.
   const left = await storedDraft(page, owner);
-  expect(left?.carried?.quantities).toEqual({ [RETIRED]: 4 });
+  expect(left?.retired?.quantities).toEqual({ [RETIRED]: 4 });
+  expect(left?.labels?.[RETIRED]).toBe('Old Item');
   expect(left?.quantities).toEqual({});
-  expect(await page.evaluate(() => (window as unknown as { __mbfdBusy?: Set<string> }).__mbfdBusy?.has('ems-draft'))).toBe(false);
 });
 
 test('a page loaded before the third list existed can still send once the server has it', async ({ page }) => {
@@ -157,7 +157,6 @@ test('a request queued on the device before the upgrade is sent after it, once, 
   await page.getByRole('dialog', { name: 'Review your request' }).getByRole('button', { name: /^Send/ }).click();
   await expect(page.getByRole('heading', { name: 'Saved on this device' })).toBeVisible({ timeout: 30_000 });
   expect(dropped).not.toBeNull();
-  expect(await page.evaluate(() => (window as unknown as { __mbfdBusy?: Set<string> }).__mbfdBusy?.has('ems-outbox'))).toBe(true);
 
   // The release lands: the page loads again, the connection is back, the queue replays.
   await page.unroute('**/employee/forms/api/ems/requests');

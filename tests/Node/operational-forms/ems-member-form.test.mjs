@@ -349,50 +349,55 @@ test('the transport vehicle sheet reads par and refill level, and is searchable 
 const keyOf = (form, itemKey) => lineKey(form, itemKey);
 
 test('a stored draft keeps entries for items the form no longer lists, writes them back, and never sends them', async () => {
-  const { carriedCount, discardCarried, hasUnsavedWork } = await import('../../../resources/js/operational-forms/ems/emsLogic.js');
+  const { retiredCount, discardRetired, hasUnsavedWork, retiredEntries } = await import('../../../resources/js/operational-forms/ems/emsLogic.js');
   const gone = keyOf('als-transport-vehicle', 'tv.drugs.narcan');
   const goneAnswer = keyOf('als-med-bag', 'als.rescue.old-box');
   const stored = {
     v: 1, clientSubmissionId: '6f1e6b8a-1d2f-4c3a-9b1e-0d8c5a7e2f10', targetChoice: 'unit:7', savedAt: '2026-10-30T12:00:00.000Z',
     quantities: { [GAUZE]: 5, [gone]: 3, [keyOf('airway-bag', 'x')]: 0 }, answers: { [NARCS]: true, [goneAnswer]: false },
+    labels: { [gone]: 'Narcan', [goneAnswer]: 'Old Narcs Box', [GAUZE]: 'Gauze' },
   };
 
   const restored = restoreDraft(stored, definition);
   assert.equal(restored.quantities[GAUZE], 5);
-  assert.deepEqual(restored.carried, { quantities: { [gone]: 3 }, answers: { [goneAnswer]: false } });
-  assert.equal(carriedCount(restored), 2);
+  assert.deepEqual(restored.retired, { quantities: { [gone]: 3 }, answers: { [goneAnswer]: false } });
+  assert.equal(retiredCount(restored), 2);
+  assert.deepEqual(retiredEntries(restored).map((entry) => `${entry.label}:${entry.detail}`), ['Narcan:3 needed', 'Old Narcs Box:No'], 'listed by the name saved with the draft');
   assert.equal(hasUnsavedWork(restored), true);
 
   // Saved again unchanged: nothing is lost on the next persist.
-  const again = serializeDraft(restored);
-  assert.deepEqual(again.carried, restored.carried);
+  const again = serializeDraft(restored, undefined, definition);
+  assert.deepEqual(again.retired, restored.retired);
+  assert.equal(again.labels[gone], 'Narcan');
+  assert.equal(again.labels[GAUZE], 'Gauze', 'names for live items come from the form');
   assert.equal(again.v, 1, 'additive field: the stored version does not change');
-  assert.deepEqual(restoreDraft(again, definition).carried, restored.carried);
+  assert.deepEqual(restoreDraft(again, definition).retired, restored.retired);
 
   // Never sent.
   const payload = buildPayload({ ...restored, targetChoice: 'unit:7' }, definition);
   assert.ok(payload.lines.every((line) => keyOf(line.form, line.item_key) !== gone && keyOf(line.form, line.item_key) !== goneAnswer));
   assert.equal(JSON.stringify(payload).includes('narcan'), false);
 
-  // When the item comes back (a rollback forward), the carried value returns to the form.
+  // When the item comes back (a rollback forward), the retired value returns to the form.
   const vehicle = { key: 'als-transport-vehicle', title: 'T', version_label: null, printed_note: null, sections: [{ key: 's', label: 'S', parent_key: null, items: [item('tv.drugs.narcan', 'Narcan')] }] };
   const back = restoreDraft(again, { ...definition, forms: [...definition.forms, vehicle] });
   assert.equal(back.quantities[gone], 3);
-  assert.equal(carriedCount(back), 1, 'only the entry whose item is still missing stays carried');
+  assert.equal(retiredCount(back), 1, 'only the entry whose item is still missing stays retired');
 
   // Discard removes them and nothing else.
-  const cleared = discardCarried(restored);
-  assert.equal(carriedCount(cleared), 0);
+  const cleared = discardRetired(restored);
+  assert.equal(retiredCount(cleared), 0);
   assert.equal(cleared.quantities[GAUZE], 5);
-  assert.equal(serializeDraft(cleared).carried, undefined);
+  assert.equal(serializeDraft(cleared).retired, undefined);
+  assert.equal(serializeDraft(cleared, undefined, definition).labels[gone], undefined, 'a discarded entry takes its name with it');
 });
 
-test('a draft that holds only carried entries is still saved, and junk is not carried', () => {
+test('a draft that holds only retired entries is still saved, and junk is not retired', () => {
   const key = keyOf('retired-form', 'old.item');
   const only = restoreDraft({ v: 1, clientSubmissionId: '6f1e6b8a-1d2f-4c3a-9b1e-0d8c5a7e2f10', targetChoice: '', quantities: { [key]: 2, [keyOf('retired-form', 'bad')]: 'abc' }, answers: {} }, definition);
-  assert.deepEqual(only.carried, { quantities: { [key]: 2 }, answers: {} });
-  assert.notEqual(serializeDraft(only), null, 'carried entries alone are worth keeping');
-  assert.equal(serializeDraft({ ...only, carried: undefined }), null);
+  assert.deepEqual(only.retired, { quantities: { [key]: 2 }, answers: {} });
+  assert.notEqual(serializeDraft(only), null, 'retired entries alone are worth keeping');
+  assert.equal(serializeDraft({ ...only, retired: undefined }), null);
 });
 
 test('editing a rejected request again keeps lines for items that left the form', () => {
@@ -400,5 +405,5 @@ test('editing a rejected request again keeps lines for items that left the form'
     { form: 'als-med-bag', item_key: 'als.trauma.gauze', quantity: 4 }, { form: 'als-transport-vehicle', item_key: 'tv.gone', quantity: 2 },
   ] };
   const draft = draftFromPayload(payload, definition);
-  assert.deepEqual(draft.carried?.quantities, { [keyOf('als-transport-vehicle', 'tv.gone')]: 2 });
+  assert.deepEqual(draft.retired?.quantities, { [keyOf('als-transport-vehicle', 'tv.gone')]: 2 });
 });

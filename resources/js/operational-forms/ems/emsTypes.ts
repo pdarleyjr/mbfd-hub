@@ -68,10 +68,12 @@ export interface EmsDraft {
     quantities: Record<string, number>;
     answers: Record<string, boolean>;
     /** Entries for items the form does not list right now. Saved with the draft, never sent. */
-    carried?: EmsCarried;
+    retired?: EmsRetired;
+    /** Item names for the retired entries, so they can be listed by name. */
+    labels?: Record<string, string>;
 }
 
-export interface EmsCarried {
+export interface EmsRetired {
     quantities: Record<string, number>;
     answers: Record<string, boolean>;
 }
@@ -83,7 +85,9 @@ export interface StoredDraft {
     targetChoice: string;
     quantities: Record<string, number>;
     answers: Record<string, boolean>;
-    carried?: EmsCarried;
+    retired?: EmsRetired;
+    /** Item name per key that has an entry (optional, additive). */
+    labels?: Record<string, string>;
     savedAt: string;
 }
 
