@@ -4,10 +4,12 @@ import { countRequested, itemsLabel, reviewGroups } from './emsLogic.js';
 import type { EmsDraft, EmsFormDefinition } from './emsTypes';
 
 /** Everything that will be sent, listed once more before the final Send. Opens as a bottom sheet on phones. */
-export function ReviewSheet({ open, definition, draft, unitLabel, sending, error, onBack, onSend }: {
+export function ReviewSheet({ open, definition, draft, carried, unitLabel, sending, error, onBack, onSend }: {
     open: boolean;
     definition: EmsFormDefinition;
     draft: EmsDraft;
+    /** Entries kept for items that are not on the form right now; they are not sent. */
+    carried: number;
     unitLabel: string;
     sending: boolean;
     error: string;
@@ -37,6 +39,7 @@ export function ReviewSheet({ open, definition, draft, unitLabel, sending, error
                                 {group.rows.map((row) => <li key={row.itemKey}><span>{row.label}</span><strong>{row.answered ? row.detail : `${row.detail} needed`}</strong></li>)}
                             </ul>
                         </section>)}
+                        {carried > 0 && <p className="ems-hint" id="ems-review-carried">{carried === 1 ? '1 saved entry is' : `${carried} saved entries are`} for items that are not on this form right now. {carried === 1 ? 'It is' : 'They are'} kept on this device and not sent.</p>}
                         {note && <section aria-label="Your note"><h3>Your note</h3><p className="ems-review-note">{note}</p></section>}
                     </div>
                     {error && <MessageBar intent="error" role="alert"><MessageBarBody>{error}</MessageBarBody></MessageBar>}

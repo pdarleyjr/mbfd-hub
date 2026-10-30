@@ -67,6 +67,13 @@ export interface EmsDraft {
     note: string;
     quantities: Record<string, number>;
     answers: Record<string, boolean>;
+    /** Entries for items the form does not list right now. Saved with the draft, never sent. */
+    carried?: EmsCarried;
+}
+
+export interface EmsCarried {
+    quantities: Record<string, number>;
+    answers: Record<string, boolean>;
 }
 
 /** What is stored on the device for an unfinished draft: quantities, the unit choice and the submission id only. */
@@ -76,6 +83,7 @@ export interface StoredDraft {
     targetChoice: string;
     quantities: Record<string, number>;
     answers: Record<string, boolean>;
+    carried?: EmsCarried;
     savedAt: string;
 }
 

@@ -19,6 +19,9 @@
 export const FORM_KEY = 'medical-inventory-request';
 export const DEFAULT_MAX_QUANTITY = 999;
 export const STORED_DRAFT_VERSION = 1;
+
+/** Upper bound on carried entries read back from a stored draft (a corrupt row cannot grow without limit). */
+const CARRIED_LIMIT = 600;
 export const TIME_ZONE = 'America/New_York';
 
 /** Record types that are a read-only PDF copy in the member's Forms records. */
@@ -120,6 +123,26 @@ export function hasContent(draft) {
     return countRequested(draft) > 0
         || Object.keys(draft.answers).length > 0
         || draft.note.trim() !== '';
+}
+
+/**
+ * Entries kept for items the form does not list right now (retired, renamed, or a list not yet imported).
+ * They are saved with the draft and never sent. @param {EmsDraft} draft
+ */
+export function carriedCount(draft) {
+    return Object.keys(draft.carried?.quantities ?? {}).length + Object.keys(draft.carried?.answers ?? {}).length;
+}
+
+/** @param {EmsDraft} draft @returns {EmsDraft} */
+export function discardCarried(draft) {
+    const { carried, ...rest } = draft;
+    void carried;
+    return rest;
+}
+
+/** Anything the member would have to redo if the page went away: entries, unit, note, event text, carried entries. @param {EmsDraft} draft */
+export function hasUnsavedWork(draft) {
+    return hasContent(draft) || draft.targetChoice !== '' || draft.eventAssignment.trim() !== '' || carriedCount(draft) > 0;
 }
 
 /** Requested items in a list of sections. @param {EmsDraft} draft @param {string} formKey @param {EmsFormSection[]} sections */
@@ -231,12 +254,18 @@ export function payloadItemCount(payload) {
 export function draftFromPayload(payload, definition) {
     const keys = validKeys(definition);
     let draft = blankDraft(payload.client_submission_id);
+    const carried = { quantities: /** @type {Record<string, number>} */ ({}), answers: /** @type {Record<string, boolean>} */ ({}) };
     for (const line of payload.lines) {
         const key = lineKey(line.form, line.item_key);
-        if (!keys.has(key)) continue;
-        if (typeof line.flag === 'boolean') draft = setAnswer(draft, key, line.flag);
-        else if (line.quantity !== undefined) draft = setQuantity(draft, key, line.quantity, definition.limits.max_quantity);
+        if (typeof line.flag === 'boolean') {
+            if (keys.has(key)) draft = setAnswer(draft, key, line.flag);
+            else carried.answers[key] = line.flag;
+        } else if (line.quantity !== undefined) {
+            if (keys.has(key)) draft = setQuantity(draft, key, line.quantity, definition.limits.max_quantity);
+            else if (normalizeQuantity(line.quantity, definition.limits.max_quantity) !== null) carried.quantities[key] = /** @type {number} */ (normalizeQuantity(line.quantity, definition.limits.max_quantity));
+        }
     }
+    if (Object.keys(carried.quantities).length + Object.keys(carried.answers).length > 0) draft = { ...draft, carried };
     const unit = payload.target.kind === 'detail_event'
         ? definition.units.find((candidate) => candidate.kind === 'detail_event')
         : definition.units.find((candidate) => candidate.id === payload.target.apparatus_id);
@@ -257,7 +286,7 @@ export function draftFromPayload(payload, definition) {
  * @param {EmsDraft} draft @param {string} [savedAt] @returns {StoredDraft | null}
  */
 export function serializeDraft(draft, savedAt = new Date().toISOString()) {
-    const hasEntries = Object.keys(draft.quantities).length > 0 || Object.keys(draft.answers).length > 0;
+    const hasEntries = Object.keys(draft.quantities).length > 0 || Object.keys(draft.answers).length > 0 || carriedCount(draft) > 0;
     if (!hasEntries && draft.targetChoice === '') return null;
     return {
         v: STORED_DRAFT_VERSION,
@@ -265,6 +294,8 @@ export function serializeDraft(draft, savedAt = new Date().toISOString()) {
         targetChoice: draft.targetChoice,
         quantities: { ...draft.quantities },
         answers: { ...draft.answers },
+        // Additive and optional, so the stored version stays 1: older code ignores it.
+        ...(carriedCount(draft) > 0 ? { carried: { quantities: { ...draft.carried?.quantities }, answers: { ...draft.carried?.answers } } } : {}),
         savedAt,
     };
 }
@@ -281,14 +312,33 @@ export function restoreDraft(stored, definition) {
     const max = definition.limits.max_quantity;
 
     let draft = blankDraft(data.clientSubmissionId);
-    for (const [key, value] of Object.entries(data.quantities ?? {})) {
-        if (keys.has(key)) draft = setQuantity(draft, key, value, max);
-    }
-    for (const [key, value] of Object.entries(data.answers ?? {})) {
-        if (keys.has(key) && typeof value === 'boolean') draft = setAnswer(draft, key, value);
-    }
+    // Merge by key: what the form lists goes back into it; what it does not list is carried, never dropped.
+    const carried = { quantities: /** @type {Record<string, number>} */ ({}), answers: /** @type {Record<string, boolean>} */ ({}) };
+    const place = (/** @type {'quantities' | 'answers'} */ kind, /** @type {unknown} */ entries) => {
+        if (!entries || typeof entries !== 'object') return;
+        for (const [key, value] of Object.entries(/** @type {Record<string, unknown>} */ (entries)).slice(0, CARRIED_LIMIT)) {
+            if (key.length > 240) continue;
+            if (kind === 'quantities') {
+                const quantity = normalizeQuantity(value, max);
+                if (quantity === null) continue;
+                if (keys.has(key)) draft = setQuantity(draft, key, quantity, max);
+                else carried.quantities[key] = quantity;
+            } else if (typeof value === 'boolean') {
+                if (keys.has(key)) draft = setAnswer(draft, key, value);
+                else carried.answers[key] = value;
+            }
+        }
+    };
+    // Carried entries first, so a value the member set on the live form wins over an older carried one.
+    place('quantities', data.carried?.quantities);
+    place('answers', data.carried?.answers);
+    place('quantities', data.quantities);
+    place('answers', data.answers);
+    for (const key of Object.keys(draft.quantities)) delete carried.quantities[key];
+    for (const key of Object.keys(draft.answers)) delete carried.answers[key];
     const choice = typeof data.targetChoice === 'string' && unitForChoice(data.targetChoice, definition.units) ? data.targetChoice : '';
-    return { ...draft, targetChoice: choice };
+    const restored = { ...draft, targetChoice: choice };
+    return Object.keys(carried.quantities).length + Object.keys(carried.answers).length > 0 ? { ...restored, carried } : restored;
 }
 
 // ---------------------------------------------------------------- search and grouping

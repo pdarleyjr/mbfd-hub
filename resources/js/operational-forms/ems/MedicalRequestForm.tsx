@@ -3,8 +3,8 @@ import { Button, MessageBar, MessageBarBody } from '@fluentui/react-components';
 import { AlertTriangle, ArrowLeft, Check, ClipboardList, ListChecks, Search, WifiOff, X } from 'lucide-react';
 import { EmsApiError, type EmsApi } from './emsApi';
 import {
-    blankDraft, buildPayload, bumpQuantity, classifyFailure, countRequested, fieldForError, filterForms, formName, groupSections,
-    hasContent, itemsLabel, lineKey, newSubmissionId, payloadItemCount, readiness, requestedInSections, restoreDraft, serializeDraft,
+    blankDraft, buildPayload, bumpQuantity, carriedCount, classifyFailure, countRequested, discardCarried, fieldForError, filterForms, formName, groupSections,
+    hasUnsavedWork, itemsLabel, lineKey, newSubmissionId, payloadItemCount, readiness, requestedInSections, restoreDraft, serializeDraft,
     setAnswer, setQuantity, unitForChoice, variantCaption,
 } from './emsLogic.js';
 import { emsDrafts } from './emsStore';
@@ -12,6 +12,7 @@ import type { EmsDraft, EmsFormDefinition, EmsOutboxEntry, EmsRequestDetail, Ems
 import { CategoryPanel, ItemRow } from './FormParts';
 import { PendingRequests } from './PendingRequests';
 import { ReviewSheet } from './ReviewSheet';
+import { useEmsDraftBusy } from './useEmsBusy';
 import type { EmsOutbox } from './useEmsOutbox';
 
 type Result =
@@ -58,6 +59,7 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
     const [errors, setErrors] = useState<FieldErrors>({});
     const [result, setResult] = useState<Result | null>(null);
     const sendingRef = useRef(false);
+    const carriedAfterSend = useRef<EmsDraft['carried'] | null>(null);
     const latestDraft = useRef<EmsDraft | null>(null);
     const targetRef = useRef<HTMLSelectElement | null>(null);
     const searchRef = useRef<HTMLInputElement | null>(null);
@@ -78,7 +80,7 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
             const saved = restoreDraft(await emsDrafts.get(owner), definition);
             if (!active) return;
             setDraft(saved ?? blankDraft());
-            setRestored(saved !== null && (countRequested(saved) > 0 || saved.targetChoice !== ''));
+            setRestored(saved !== null && (countRequested(saved) > 0 || saved.targetChoice !== '' || carriedCount(saved) > 0));
         };
         void begin();
         return () => { active = false; };
@@ -162,7 +164,7 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
     };
 
     const startNew = () => {
-        setResult(null); setDraft(blankDraft()); setRestored(false); setQuery(''); setOpenPanels({}); setActiveBag(''); setErrors({}); setReviewError('');
+        setResult(null); setDraft(carriedAfterSend.current ? { ...blankDraft(), carried: carriedAfterSend.current } : blankDraft()); setRestored(false); setQuery(''); setOpenPanels({}); setActiveBag(''); setErrors({}); setReviewError('');
         window.scrollTo({ top: 0, behavior: reducedMotion() ? 'auto' : 'smooth' });
     };
 
@@ -173,6 +175,12 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
     };
 
     const ready = draft ? readiness(draft) : null;
+    const carried = draft ? carriedCount(draft) : 0;
+    useEmsDraftBusy({
+        unsaved: draft !== null && result === null && hasUnsavedWork(draft),
+        sending,
+        textAtRisk: draft !== null && result === null && (draft.note.trim() !== '' || draft.eventAssignment.trim() !== ''),
+    });
 
     const openReview = () => {
         if (!draft || !ready) return;
@@ -197,6 +205,9 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
         try {
             const outcome = await api.submit(payload);
             await emsDrafts.remove(owner);
+            // Entries kept for items that are not on the form right now are not part of what was sent; they stay saved.
+            carriedAfterSend.current = draft.carried ?? null;
+            if (draft.carried) await emsDrafts.put(owner, { v: 1, clientSubmissionId: newSubmissionId(), targetChoice: '', quantities: {}, answers: {}, carried: draft.carried, savedAt: new Date().toISOString() });
             await outbox.discard(payload.client_submission_id);
             setResult({ kind: 'sent', request: outcome.request });
             setReviewOpen(false);
@@ -264,7 +275,7 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
     const isDetail = draft.targetChoice === 'detail';
     const unit = unitForChoice(draft.targetChoice, definition.units);
 
-    return <div className="ems-app has-bar" ref={topRef}>
+    return <div className="ems-app has-bar" ref={topRef} {...(hasUnsavedWork(draft) ? { 'data-mbfd-unsaved-work-guard': '' } : {})}>
         <div className="ems-topline">
             <Button appearance="subtle" icon={<ArrowLeft size={17} />} onClick={goForms}>Forms library</Button>
             <Button appearance="subtle" icon={<ListChecks size={17} />} onClick={goMine}>My medical requests</Button>
@@ -278,6 +289,11 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
         <PendingRequests outbox={outbox} openRequest={goDetail} editEntry={editEntry} />
 
         {restored && <MessageBar intent="info"><MessageBarBody>Your unfinished request was restored from this device. Notes and event text are not kept when you leave, so add yours again if you had one.</MessageBarBody></MessageBar>}
+
+        {carried > 0 && <MessageBar intent="warning" className="ems-carried"><MessageBarBody>
+            {carried === 1 ? '1 saved entry is' : `${carried} saved entries are`} for items that are not on this form right now. {carried === 1 ? 'It is' : 'They are'} kept on this device and not sent.
+            {' '}<Button appearance="transparent" onClick={() => setDraft((d) => (d ? discardCarried(d) : d))}>Discard {carried === 1 ? 'it' : 'them'}</Button>
+        </MessageBarBody></MessageBar>}
 
         <section className="ems-card" aria-labelledby="ems-target-label">
             <label id="ems-target-label" htmlFor="ems-target" className="ems-label">Completing this form for:</label>
@@ -370,7 +386,7 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
             {(draft.note.length > definition.limits.note_max * 0.8) && <p className="ems-hint">{draft.note.length} of {definition.limits.note_max} characters</p>}
         </section>
 
-        {(hasContent(draft) || draft.targetChoice !== '') && <div className="ems-clear"><Button appearance="subtle" onClick={clearForm}>Clear form</Button></div>}
+        {hasUnsavedWork(draft) && <div className="ems-clear"><Button appearance="subtle" onClick={clearForm}>Clear form</Button></div>}
 
         <div className="ems-bar" role="region" aria-label="Request summary">
             <div className="ems-bar-summary">
@@ -381,7 +397,7 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
         </div>
 
         <ReviewSheet
-            open={reviewOpen} definition={definition} draft={draft} unitLabel={unit?.label ?? ''} sending={sending} error={reviewError}
+            open={reviewOpen} definition={definition} draft={draft} carried={carried} unitLabel={unit?.label ?? ''} sending={sending} error={reviewError}
             onBack={() => { if (!sending) { setReviewOpen(false); window.setTimeout(() => reviewButtonRef.current?.focus(), 0); } }} onSend={() => void send()}
         />
     </div>;

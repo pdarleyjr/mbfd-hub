@@ -17,6 +17,7 @@ import { EmsApp } from './ems/EmsApp';
 import { isDocumentRecordType, recordTypeLabel, searchForView, viewFromDeepLink, viewFromSearch } from './ems/emsLogic.js';
 import type { EmsOutboxEntry, EmsView } from './ems/emsTypes';
 import { PendingRequests } from './ems/PendingRequests';
+import { useEmsOutboxBusy } from './ems/useEmsBusy';
 import { useEmsOutbox, type EmsOutbox } from './ems/useEmsOutbox';
 import { createNarcoticsApi } from './narcotics/narcoticsApi';
 import { BUSY_REASON as NARCOTICS_BUSY, FORM_KEY as NARCOTICS_FORM_KEY, searchForView as narcoticsSearchForView, viewFromDeepLink as narcoticsViewFromDeepLink, viewFromSearch as narcoticsViewFromSearch } from './narcotics/narcoticsImage.js';
@@ -117,6 +118,7 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
         try { setRecords(await api.records()); } catch { /* the list refreshes on the next visit */ }
     }, [api]);
     const emsOutbox = useEmsOutbox(emsApi, String(bootstrap.employee.id), refreshRecordsQuietly);
+    useEmsOutboxBusy(emsOutbox.entries.filter((entry) => entry.state === 'pending').length);
 
     const goEms = useCallback((view: EmsView | null) => {
         setEmsView(view);

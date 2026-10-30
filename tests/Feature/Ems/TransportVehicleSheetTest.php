@@ -379,4 +379,59 @@ SHEET;
         $this->assertSame(['5', '1 box'], $lines->pluck('min_text')->all());
         $this->assertSame([3, 1], $lines->pluck('requested_qty')->all());
     }
+
+    public function test_a_payload_built_from_the_old_two_list_form_is_still_accepted_once_the_third_list_is_active(): void
+    {
+        $this->actingAs($this->emsMember('Paramedic', 'Old Page'));
+        $airway = SourceForm::query()->where('key', SourceForm::AIRWAY)->where('active', true)->sole()->items()->limit(2)->get();
+        $als = SourceForm::query()->where('key', SourceForm::ALS)->where('active', true)->sole();
+        $quantity = $als->items()->where('response_type', 'quantity')->firstOrFail();
+        $yesNo = $als->items()->where('response_type', 'yes_no')->firstOrFail();
+
+        // Exactly what a page loaded before the third list existed would send: two form keys only.
+        $lines = [
+            ['form' => 'airway-bag', 'item_key' => $airway[0]->item_key, 'quantity' => 2],
+            ['form' => 'airway-bag', 'item_key' => $airway[1]->item_key, 'quantity' => 1],
+            ['form' => 'als-med-bag', 'item_key' => $quantity->item_key, 'quantity' => 4],
+            ['form' => 'als-med-bag', 'item_key' => $yesNo->item_key, 'flag' => true],
+        ];
+        $id = (string) Str::uuid();
+        $body = ['client_submission_id' => $id, 'target' => ['kind' => 'rescue_unit', 'apparatus_id' => $this->rescue2->id], 'lines' => $lines, 'member_note' => 'typed before the upgrade'];
+
+        $this->postJson('/employee/forms/api/ems/requests', $body)->assertSuccessful();
+        $request = InventoryRequest::query()->latest('id')->firstOrFail();
+        $this->assertSame(4, $request->lines()->count());
+        $this->assertSame('typed before the upgrade', $request->member_note);
+
+        // A retry of the same payload after the restart is idempotent: still one request.
+        $this->postJson('/employee/forms/api/ems/requests', $body)->assertSuccessful();
+        $this->assertSame(1, InventoryRequest::query()->where('client_submission_id', $id)->count());
+    }
+
+    public function test_an_item_that_is_not_on_the_form_is_refused_with_unknown_item_and_stores_nothing(): void
+    {
+        $this->actingAs($this->emsMember('Paramedic', 'Stale Page'));
+        $good = $this->transportForm()->items()->where('source_label', 'Narcan')->sole();
+
+        $response = $this->postJson('/employee/forms/api/ems/requests', [
+            'client_submission_id' => (string) Str::uuid(),
+            'target' => ['kind' => 'rescue_unit', 'apparatus_id' => $this->rescue2->id],
+            'lines' => [
+                ['form' => 'als-transport-vehicle', 'item_key' => $good->item_key, 'quantity' => 1],
+                ['form' => 'als-transport-vehicle', 'item_key' => 'tv.retired.item', 'quantity' => 1],
+            ],
+            'member_note' => 'must not be lost client side',
+        ]);
+
+        $response->assertStatus(422)->assertJsonPath('error.code', 'unknown_item');
+        $this->assertSame(0, InventoryRequest::query()->count(), 'nothing is stored, not even the valid line');
+    }
+
+    public function test_the_line_cap_covers_every_item_on_the_three_lists(): void
+    {
+        $this->assertGreaterThanOrEqual(
+            SourceFormItem::query()->whereIn('source_form_id', SourceForm::query()->whereIn('key', RequestFormDefinition::BAGS)->where('active', true)->pluck('id'))->count(),
+            RequestFormDefinition::MAX_LINES,
+        );
+    }
 }

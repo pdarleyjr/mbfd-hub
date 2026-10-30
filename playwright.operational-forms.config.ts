@@ -29,7 +29,7 @@ const webServerEnvironment = sanitizedTestEnvironment({
 
 export default defineConfig({
   testDir: './tests/e2e',
-  testMatch: /(?:operational-forms(?:-controls)?|ems-medical-request)\.spec\.ts/,
+  testMatch: /(?:operational-forms(?:-controls)?|ems-medical-request|ems-draft-continuity)\.spec\.ts/,
   globalSetup: './tests/e2e/operational-forms.setup.ts',
   timeout: 90_000,
   retries: process.env.CI ? 1 : 0,
