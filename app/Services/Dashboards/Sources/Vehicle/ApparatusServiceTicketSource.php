@@ -245,8 +245,9 @@ final class ApparatusServiceTicketSource extends VehicleIssueSource
                 Status::InProgress => new IssueAction($key, 'Start work', 'secondary', [$assign, ...$notes]),
                 Status::WaitingForParts => new IssueAction($key, 'Waiting for parts', 'secondary', $notes),
                 Status::Completed => new IssueAction($key, 'Complete', 'primary', [self::textarea('resolution_summary', 'Resolution summary', true, 10000), ...$notes]),
-                // The last entry of TRANSITIONS: every other target has its own arm above.
-                default => new IssueAction($key, 'Cancel ticket', 'danger', $notes, 'Cancel this service ticket? It cannot be reopened.'),
+                // No default arm on purpose: a transition added to TRANSITIONS without its own arm is reported by
+                // PHPStan (match.unhandled) and fails loudly at runtime, instead of rendering as the wrong button.
+                Status::Cancelled => new IssueAction($key, 'Cancel ticket', 'danger', $notes, 'Cancel this service ticket? It cannot be reopened.'),
             };
         }
         $actions[] = new IssueAction('add_note', 'Add note', 'secondary', $notes);
