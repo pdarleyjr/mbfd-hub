@@ -7,7 +7,7 @@ const logic = await import('../../resources/js/daily-checkout/src/components/cap
 const check = (overrides = {}) => ({
   id: '3f2b8c1e-5a47-4d0e-9b6f-0c1d2e3f4a5b', status: 'pending', status_label: 'Pending review', archived: false, archived_at: null,
   submitted_at: '2026-10-30T13:00:00+00:00', decided_at: null, submitter_name: 'Pat Member', submitter_rank: 'Firefighter',
-  has_note: false, member_note: null, decision_note: null, decided_by_name: null, decided_by_rank: null,
+  has_note: false, member_note: null, rescue_unit: 'R22', seal_number: 'ZX-4471', decision_note: null, decided_by_name: null, decided_by_rank: null,
   resubmission_of: null, resubmitted_as: null, image: { available: true }, ...overrides,
 });
 
@@ -56,6 +56,29 @@ test('pending is never worded like a decision', () => {
   const rejected = logic.decisionText(check({ status: 'rejected', decided_at: '2026-10-30T15:00:00+00:00', decided_by_name: 'Cap Five' }));
   assert.match(rejected, /^Rejected and archived by Cap Five on /);
   assert.equal(logic.deciderText({ decided_by_name: null, decided_by_rank: null }), 'Captain 5');
+});
+
+test('the rescue unit reads "Rescue unit: R22", the typed text for Other, and "Not recorded" for old checks', () => {
+  assert.equal(logic.rescueUnitText(check()), 'R22');
+  assert.equal(logic.rescueUnitLine(check()), 'Rescue unit: R22');
+  assert.equal(logic.rescueUnitText(check({ rescue_unit: 'Rescue 9' })), 'Rescue 9');
+  assert.equal(logic.rescueUnitLine(check({ rescue_unit: 'Rescue 9' })), 'Rescue unit: Rescue 9');
+  // A check sent before units were asked for: the sheet says so, the list row stays quiet.
+  assert.equal(logic.rescueUnitText(check({ rescue_unit: null })), 'Not recorded');
+  assert.equal(logic.rescueUnitText(check({ rescue_unit: '  ' })), 'Not recorded');
+  assert.equal(logic.rescueUnitLine(check({ rescue_unit: null })), null);
+  assert.equal(logic.rescueUnitLine(check({ rescue_unit: '' })), null);
+});
+
+test('the seal number reads "Seal number: ZX-4471", and "Not recorded" for old checks', () => {
+  assert.equal(logic.sealNumberText(check()), 'ZX-4471');
+  assert.equal(logic.sealNumberLine(check()), 'Seal number: ZX-4471');
+  assert.equal(logic.sealNumberText(check({ seal_number: ' 00481726 ' })), '00481726');
+  assert.equal(logic.sealNumberText(check({ seal_number: null })), 'Not recorded');
+  assert.equal(logic.sealNumberText(check({ seal_number: '  ' })), 'Not recorded');
+  // The list row stays quiet on a check sent before seal numbers were asked for; the sheet says so.
+  assert.equal(logic.sealNumberLine(check({ seal_number: null })), null);
+  assert.equal(logic.sealNumberLine(check({ seal_number: '' })), null);
 });
 
 test('times are shown in Eastern time', () => {

@@ -53,6 +53,13 @@ final class NarcoticsCheckPresenter
             'submitter_rank' => $check->submitter_rank,
             'has_note' => trim((string) $check->member_note) !== '',
             'member_note' => $check->member_note,
+            // What people read ("R22", or the typed text for Other); null on checks sent before units existed.
+            'rescue_unit' => $check->rescueUnitLabel(),
+            // The two stored values, so a rejected check can prefill the form that answers it.
+            'rescue_unit_choice' => $check->rescue_unit,
+            'rescue_unit_other' => $check->rescue_unit_other,
+            // As typed (trimmed); null on checks sent before seal numbers were asked for. Also prefills a resubmission.
+            'seal_number' => $check->seal_number,
             'decision_note' => $check->decision_note,
             'decided_by_name' => $check->decided_by_name,
             'decided_by_rank' => $check->decided_by_rank,

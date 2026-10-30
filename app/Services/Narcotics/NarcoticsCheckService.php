@@ -11,6 +11,8 @@ use App\Models\User;
 use App\Services\Ems\EmsActor;
 use App\Services\Ems\EmsException;
 use App\Services\Ems\EmsValidator;
+use App\Support\Narcotics\RescueUnits;
+use App\Support\Narcotics\SealNumber;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -40,21 +42,25 @@ final class NarcoticsCheckService
     // ------------------------------------------------------------------ member
 
     /**
-     * @param  array<string, mixed>  $input  {client_submission_id, note?, resubmission_of?}
+     * @param  array<string, mixed>  $input  {client_submission_id, rescue_unit, rescue_unit_other?, seal_number, note?, resubmission_of?}
      * @return array{check: NarcoticsCheck, replayed: bool}
      */
     public function submit(User $user, Employee $employee, UploadedFile $photo, array $input): array
     {
         $note = config('narcotics_checks.note_max_length');
+        // The unit is required on every new submission and checked against the server's list, never the browser's.
+        // The seal number is required too: free text, trimmed, one line.
+        $input = SealNumber::prepare(RescueUnits::prepare($input));
         $data = EmsValidator::validate($input, [
             'client_submission_id' => ['required', 'uuid'],
             'note' => ['nullable', 'string', 'max:'.$note],
             'resubmission_of' => ['nullable', 'uuid'],
-        ], [
+        ] + RescueUnits::rules($input['rescue_unit'] ?? null) + SealNumber::rules(), [
             'client_submission_id.required' => 'Reload the page and try again.',
             'client_submission_id.uuid' => 'Reload the page and try again.',
             'note.max' => "The note can be at most {$note} characters.",
-        ]);
+        ] + RescueUnits::messages() + SealNumber::messages());
+        $unit = RescueUnits::resolve($data);
         $clientId = Str::lower((string) $data['client_submission_id']);
 
         $existing = NarcoticsCheck::query()->where('client_submission_id', $clientId)->first();
@@ -69,7 +75,7 @@ final class NarcoticsCheckService
         $stored = $this->store->put($processed);
 
         try {
-            $check = DB::transaction(function () use ($user, $employee, $data, $clientId, $previous, $processed, $stored): NarcoticsCheck {
+            $check = DB::transaction(function () use ($user, $employee, $data, $unit, $clientId, $previous, $processed, $stored): NarcoticsCheck {
                 $actor = EmsActor::member($user);
                 $check = NarcoticsCheck::query()->create([
                     'uuid' => (string) Str::uuid(),
@@ -80,6 +86,9 @@ final class NarcoticsCheckService
                     'submitter_rank' => $actor->rank,
                     'submitted_at' => now(),
                     'member_note' => $this->clean($data['note'] ?? null),
+                    'rescue_unit' => $unit['rescue_unit'],
+                    'rescue_unit_other' => $unit['rescue_unit_other'],
+                    'seal_number' => (string) $data['seal_number'],
                     'client_submission_id' => $clientId,
                     'resubmission_of_id' => $previous?->getKey(),
                     'image_disk' => $stored['disk'],
@@ -94,6 +103,8 @@ final class NarcoticsCheckService
                 ]);
                 $this->event($check, $actor, NarcoticsCheckEvent::SUBMITTED, null, NarcoticsCheck::PENDING, [
                     'resubmission_of' => $previous?->uuid,
+                    'rescue_unit' => ['choice' => $check->rescue_unit, 'other' => $check->rescue_unit_other, 'label' => $check->rescueUnitLabel()],
+                    'seal_number' => $check->seal_number,
                     'image' => ['mime' => $processed->mime, 'width' => $processed->width, 'height' => $processed->height, 'bytes' => $processed->bytes(), 'sha256' => $processed->sha256()],
                 ]);
                 $this->notifier->checkSubmitted($check);

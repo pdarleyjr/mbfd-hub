@@ -4,6 +4,8 @@ import { ArrowLeft, CheckCircle2, Clock3, Plus, RefreshCw, XCircle, ZoomIn } fro
 import { HUB_TIMEZONE } from '../../shared/timezone.ts';
 import { NarcoticsApiError, type NarcoticsApi } from './narcoticsApi';
 import type { CheckStatus, NarcoticsCheckDetail, NarcoticsCheckSummary } from './narcoticsTypes';
+import { sealText } from './narcoticsSeal.js';
+import { unitText } from './narcoticsUnit.js';
 import { PhotoViewer } from './PhotoViewer';
 
 const when = (value: string | null | undefined) => (
@@ -86,7 +88,8 @@ export function MyChecksList({ api, goForm, goForms, goDetail, refreshKey }: Lis
                                     : <span className="nc-thumb nc-thumb--gone" aria-hidden="true">Photo removed</span>}
                                 <span className="nc-row-text">
                                     <span className="nc-row-top"><StatusBadge status={check.status} label={check.status_label} /></span>
-                                    <span className="nc-row-date">Sent {when(check.submitted_at)}</span>
+                                    <span className="nc-row-date">Sent {when(check.submitted_at)}{check.rescue_unit ? ` · Rescue unit: ${check.rescue_unit}` : ''}</span>
+                                    {check.seal_number && <span className="nc-row-date">Seal number: {check.seal_number}</span>}
                                     {check.status === 'rejected' && <span className="nc-row-note">{check.decision_note ? `Reason: ${check.decision_note}` : 'No reason was given.'}</span>}
                                     {check.status === 'approved' && <span className="nc-row-note">Approved {when(check.decided_at)}</span>}
                                     {check.status === 'pending' && check.has_note && <span className="nc-row-note">Your note: {check.member_note}</span>}
@@ -114,7 +117,7 @@ interface DetailProps {
     goMine: () => void;
     goForms: () => void;
     goDetail: (id: string) => void;
-    resubmit: (id: string) => void;
+    resubmit: (check: NarcoticsCheckDetail) => void;
 }
 
 const ACTION_TEXT: Record<string, string> = { submitted: 'Sent to Captain 5', approved: 'Approved', rejected: 'Rejected' };
@@ -177,7 +180,7 @@ export function CheckDetail({ api, id, goMine, goForms, goDetail, resubmit }: De
             </div>
 
             {check.status === 'rejected' && check.can_resubmit && (
-                <div className="nc-actions"><Button appearance="primary" size="large" onClick={() => resubmit(check.id)} data-testid="narcotics-resubmit">Send a new photo</Button></div>
+                <div className="nc-actions"><Button appearance="primary" size="large" onClick={() => resubmit(check)} data-testid="narcotics-resubmit">Send a new photo</Button></div>
             )}
             {check.status === 'rejected' && check.resubmitted_as && (
                 <div className="nc-actions"><Button size="large" onClick={() => goDetail(check.resubmitted_as as string)}>See the new check</Button></div>
@@ -191,6 +194,8 @@ export function CheckDetail({ api, id, goMine, goForms, goDetail, resubmit }: De
                         <span className="nc-zoom-hint"><ZoomIn size={16} aria-hidden="true" /> Tap to zoom</span>
                     </button>
                 ) : <p className="nc-hint">The photo file was removed under the retention policy. The record and the decision are kept.</p>}
+                <p className="nc-note" data-testid="narcotics-detail-unit"><strong>Rescue unit:</strong> {unitText(check)}</p>
+                <p className="nc-note" data-testid="narcotics-detail-seal"><strong>Seal number:</strong> {sealText(check)}</p>
                 {check.member_note && <p className="nc-note"><strong>Your note:</strong> {check.member_note}</p>}
             </section>
 

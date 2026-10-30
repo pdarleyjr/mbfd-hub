@@ -5,7 +5,7 @@ import { EmptyState, LoadError, SkeletonRows } from '../../ui/StateViews';
 import Tag from '../../ui/Tag';
 import { ChoiceChips, FIELD, HINT, LABEL, LiveNote, Pager, useEmsLoad } from '../ems/shared';
 import CheckSheet from './CheckSheet';
-import { EMPTY_FILTERS, STATUS_TONE, checksQuery, dateRangeError, etDateTime, memberText, rowNote } from './logic';
+import { EMPTY_FILTERS, STATUS_TONE, checksQuery, dateRangeError, etDateTime, memberText, rescueUnitLine, rowNote, sealNumberLine } from './logic';
 import type { NarcoticsCheck, NarcoticsFilters, NarcoticsOutcome, NarcoticsScope } from './types';
 
 interface Props {
@@ -23,6 +23,8 @@ const DEBOUNCE_MS = 300;
 
 function CheckRow({ check, onOpen }: { check: NarcoticsCheck; onOpen: (uuid: string) => void }) {
   const note = rowNote(check);
+  const unit = rescueUnitLine(check);
+  const seal = sealNumberLine(check);
   return (
     <li>
       <button
@@ -41,6 +43,8 @@ function CheckRow({ check, onOpen }: { check: NarcoticsCheck; onOpen: (uuid: str
             {check.resubmission_of && <Tag tone="warning">Sent again</Tag>}
           </span>
           <span className={HINT}>Sent {etDateTime(check.submitted_at)}</span>
+          {unit && <span className="break-words text-sm font-semibold text-hub-ink" data-testid="narcotics-row-unit">{unit}</span>}
+          {seal && <span className="break-words text-sm font-semibold text-hub-ink" data-testid="narcotics-row-seal">{seal}</span>}
           {note && <span className="line-clamp-2 break-words text-sm text-hub-ink">{note}</span>}
         </span>
         <ChevronRight className="h-5 w-5 flex-none text-hub-n-500" aria-hidden="true" />
@@ -76,7 +80,7 @@ function CheckList({ tick, onOpen, onForbidden }: { tick: number; onOpen: (uuid:
         options={[{ id: 'inbox', label: `Inbox${pending > 0 ? ` (${pending})` : ''}` }, { id: 'archive', label: 'Archive' }]}
         onChange={(scope) => change({ scope, outcome: 'all' })}
       />
-      <p className={HINT}>{archive ? 'Decided checks are kept here with who decided and when. Search by member, note or date.' : 'Checks waiting for you, oldest first. Open one to look at the photo and decide.'}</p>
+      <p className={HINT}>{archive ? 'Decided checks are kept here with who decided and when. Search by member, rescue unit, seal number, note or date.' : 'Checks waiting for you, oldest first. Open one to look at the photo and decide.'}</p>
 
       {archive && (
         <>
@@ -90,7 +94,7 @@ function CheckList({ tick, onOpen, onForbidden }: { tick: number; onOpen: (uuid:
           <div className="grid gap-3 sm:grid-cols-3">
             <div>
               <label className={LABEL} htmlFor="narcotics-filter-search">Search</label>
-              <input id="narcotics-filter-search" type="search" className={FIELD} value={search} placeholder="Member or note" autoComplete="off" maxLength={100} onChange={(event) => setSearch(event.target.value)} />
+              <input id="narcotics-filter-search" type="search" className={FIELD} value={search} placeholder="Member, unit, seal or note" autoComplete="off" maxLength={100} onChange={(event) => setSearch(event.target.value)} />
             </div>
             <div>
               <label className={LABEL} htmlFor="narcotics-filter-from">From date</label>

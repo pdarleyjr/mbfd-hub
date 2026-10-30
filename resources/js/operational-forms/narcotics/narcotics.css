@@ -39,6 +39,13 @@
 .nc-hint.is-error { color: var(--nc-danger); font-weight: 600; }
 .nc-note { font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
 
+/* Rescue unit: a native picker on phones. Inputs are 16px so iOS does not zoom the page when one is focused. */
+.nc-unit { gap: 14px; }
+.nc .fui-Select__select, .nc .fui-Input__input, .nc .fui-Textarea__textarea { font-size: 16px; }
+.nc .fui-Select, .nc .fui-Select__select { min-height: 44px; }
+.nc .fui-Input { min-height: 44px; }
+.nc .fui-Field__validationMessage { font-size: 13.5px; }
+
 .nc-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .nc-actions > button, .nc-actions > a { flex: 1 1 200px; min-height: 48px; }
 .nc-send { display: grid; gap: 6px; }

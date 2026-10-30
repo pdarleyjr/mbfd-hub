@@ -23,6 +23,24 @@ export function etDateTime(iso: string | null | undefined): string {
 
 export const memberText = (check: Pick<NarcoticsCheck, 'submitter_name' | 'submitter_rank'>): string => [check.submitter_rank, check.submitter_name].filter(Boolean).join(' ');
 
+/** The rescue unit the member named; old checks, sent before units were asked for, say so plainly. */
+export const rescueUnitText = (check: Pick<NarcoticsCheck, 'rescue_unit'>): string => {
+  const unit = (check.rescue_unit ?? '').trim();
+  return unit === '' ? 'Not recorded' : unit;
+};
+
+/** "Rescue unit: R22" for a list row, or null when the check predates units (rows stay uncluttered). */
+export const rescueUnitLine = (check: Pick<NarcoticsCheck, 'rescue_unit'>): string | null => ((check.rescue_unit ?? '').trim() === '' ? null : `Rescue unit: ${rescueUnitText(check)}`);
+
+/** The seal number the member typed; old checks say so plainly. */
+export const sealNumberText = (check: Pick<NarcoticsCheck, 'seal_number'>): string => {
+  const seal = (check.seal_number ?? '').trim();
+  return seal === '' ? 'Not recorded' : seal;
+};
+
+/** "Seal number: ZX-4471" for a list row, or null when the check predates seal numbers. */
+export const sealNumberLine = (check: Pick<NarcoticsCheck, 'seal_number'>): string | null => ((check.seal_number ?? '').trim() === '' ? null : `Seal number: ${sealNumberText(check)}`);
+
 export const deciderText = (check: Pick<NarcoticsCheck, 'decided_by_name' | 'decided_by_rank'>): string => [check.decided_by_rank, check.decided_by_name].filter(Boolean).join(' ') || 'Captain 5';
 
 export const dateRangeError = (from: string, to: string): string | null => (from !== '' && to !== '' && to < from ? 'The end date cannot be before the start date.' : null);
