@@ -14,6 +14,7 @@
 @import '../workgroup-pages.css';
 @import '../employee-messages.css';
 @import '../push-enrollment.css';
+@import './dashboards.css';
 /**
  * MBFD Hub — Unified Impeccable Enterprise Theme
  * Applied to ALL panels (Admin, Employee, Workgroup, Training) via ->viteTheme()

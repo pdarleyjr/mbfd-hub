@@ -98,6 +98,9 @@ class AdminPanelProvider extends PanelProvider
                 // Dashboard discovered from app/Filament/Pages and made /admin
                 // ambiguous at runtime.
                 Dashboard::class,
+                \App\Filament\Pages\VehicleCheckoutDashboard::class,
+                \App\Filament\Pages\StationOperationsDashboard::class,
+                \App\Filament\Pages\LogisticsBoard::class,
                 Captain5Operations::class,
                 \App\Filament\Admin\Pages\MedicalSupplyRoom::class,
                 \App\Filament\Admin\Pages\MedicalDataStatistics::class,

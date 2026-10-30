@@ -237,9 +237,11 @@ final class SupportServicesMessagingTest extends TestCase
 
         $this->actingAs($this->unrelatedAdmin());
         $this->assertFalse(EmployeeMessagesWidget::canView());
-        $html = $this->get('/admin')->assertOk()->getContent();
-        $this->assertStringNotContainsString('Support Services Messages', $html);
-        $this->assertStringNotContainsString('Gia Gear', $html);
+        foreach (['/admin', '/admin/logistics-board'] as $path) {
+            $html = $this->get($path)->assertOk()->getContent();
+            $this->assertStringNotContainsString('Support Services Messages', $html);
+            $this->assertStringNotContainsString('Gia Gear', $html);
+        }
         $this->get('/admin/employee-messages?thread='.$sent->thread_id)->assertForbidden();
     }
 
