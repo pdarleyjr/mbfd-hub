@@ -1,0 +1,37 @@
+/*
+ * "This device" push enrollment block on the Notification settings page.
+ *
+ * The Filament panels load only the panel theme, which never compiled the Hub
+ * utility `bg-hub-blue`: the "Turn on alerts for this device" button rendered
+ * as white text on white (invisible on every iPhone), and Tailwind's
+ * `inline-flex` overrode the `hidden` attribute, so "Send a test" and "Turn off"
+ * showed on devices that had never been enrolled (2026-10-30 incident).
+ * These rules are scoped to the block and use the theme's own tokens.
+ */
+[data-push-enrollment] [hidden] {
+    display: none !important;
+}
+
+[data-push-enrollment] [data-role='enable'],
+[data-push-enrollment] [data-role='test'],
+[data-push-enrollment] [data-role='disable'] {
+    min-height: 44px;
+}
+
+[data-push-enrollment] [data-role='enable'] {
+    background-color: rgb(var(--hub-blue));
+    border: 1px solid rgb(var(--hub-blue));
+    color: #fff;
+}
+
+[data-push-enrollment] [data-role='enable']:hover {
+    background-color: rgb(var(--hub-blue-strong));
+    border-color: rgb(var(--hub-blue-strong));
+}
+
+[data-push-enrollment] [data-role='enable']:disabled,
+[data-push-enrollment] [data-role='test']:disabled,
+[data-push-enrollment] [data-role='disable']:disabled {
+    cursor: progress;
+    opacity: 0.7;
+}
