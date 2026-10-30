@@ -56,6 +56,14 @@ final class DailyShellReleaseMetaTest extends TestCase
         $this->getJson('/app-release')->assertExactJson(['release' => 'abcdef012345']);
     }
 
+    public function test_the_shell_advertises_the_member_alert_feed_so_only_the_real_app_polls_it(): void
+    {
+        $this->actingAsCanonicalFixture('E-DAILY-FEED', 'Feed Member', 'Firefighter');
+
+        $this->get('/daily/stations')->assertOk()
+            ->assertSee('<meta name="mbfd-alerts-feed" content="/api/me/alerts">', false);
+    }
+
     public function test_an_unknown_release_is_published_as_such_not_as_a_commit(): void
     {
         $this->actingAsCanonicalFixture('E-DAILY-UNK', 'Unknown Member', 'Firefighter');

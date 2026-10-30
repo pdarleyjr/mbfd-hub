@@ -155,7 +155,8 @@ final class VehicleIssueBackNavigationTest extends TestCase
 
     public function test_dashboard_board_links_to_vehicles_and_checkouts_carry_the_admin_return_target(): void
     {
-        $html = $this->get('/admin')->assertOk()->getContent();
+        // The Station Operations board widget now lives on the Logistics Board; its links still return to /admin.
+        $html = $this->get('/admin/logistics-board')->assertOk()->getContent();
 
         $this->assertStringContainsString($this->inspectionPath().'?return_to=%2Fadmin', html_entity_decode($html));
         $this->assertStringContainsString('/admin/apparatuses/'.$this->apparatus->getRouteKey().'?return_to=%2Fadmin', html_entity_decode($html));

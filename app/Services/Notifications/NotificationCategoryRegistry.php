@@ -125,7 +125,6 @@ final class NotificationCategoryRegistry
         $push = NotificationCategory::CHANNEL_WEBPUSH;
         $mail = NotificationCategory::CHANNEL_EMAIL;
         $all = [$db, $push, $mail];
-        $inAppOnly = ['database' => true, 'webpush' => false, 'email' => false];
         // Cheap prefilter per category: only accounts that hold a role or permission which could make the
         // category's rule true (directly or through a role), plus super_admin. It must stay a SUPERSET of the
         // eligible people; the rule itself is still asked of each one, live, so nothing is granted by it.
@@ -148,7 +147,6 @@ final class NotificationCategoryRegistry
                 group: self::GROUP_OWN,
                 channels: $all,
                 locked: [$db],
-                defaults: $inAppOnly,
                 significance: 'important',
                 eligibility: static fn (EligibilityContext $c): ?string => $c->isActive() ? 'active_member' : null,
             ),
@@ -159,7 +157,6 @@ final class NotificationCategoryRegistry
                 group: self::GROUP_DEPARTMENT,
                 channels: [$db, $push],
                 locked: [],
-                defaults: ['database' => true, 'webpush' => true, 'email' => false],
                 significance: 'important',
                 eligibility: static fn (EligibilityContext $c): ?string => $c->isActive() ? 'active_member' : null,
             ),
@@ -170,23 +167,22 @@ final class NotificationCategoryRegistry
                 group: self::GROUP_FLEET,
                 channels: $all,
                 locked: [$db],
-                defaults: $inAppOnly,
                 significance: 'routine',
                 eligibility: static fn (EligibilityContext $c): ?string => InspectionReviewers::canReview($c->user)
                     ? 'inspection_reviewer' : null,
                 candidates: $fleetReviewers,
             ),
-            // Opt-in only: restores the old "tell me when a vehicle inspection is submitted" choice for the
-            // reviewers who made it. Nobody receives it by default, and a saved choice never grants access:
-            // a person who stops being a reviewer stops receiving it at once.
+            // Restores the old "tell me when a vehicle inspection is submitted" choice. The bell is on by default;
+            // phone alerts stay off (one per apparatus checkout a day would bury real alerts, see
+            // NotificationPresetPolicy). A saved choice never grants access: a person who stops being a
+            // reviewer stops receiving it at once.
             new NotificationCategory(
                 key: User::NOTIFICATION_PREFERENCE_DAILY_CHECKOUT_EVERY_SUBMISSION,
                 label: "Every Daily Checkout as it's submitted",
-                description: 'A message each time a crew submits a Daily Checkout, even when nothing is wrong. This is off until you turn it on.',
+                description: 'A message each time a crew submits a Daily Checkout, even when nothing is wrong. It shows in the bell; phone alerts for it are off unless you turn them on.',
                 group: self::GROUP_FLEET,
                 channels: $all,
                 locked: [],
-                defaults: ['database' => false, 'webpush' => false, 'email' => false],
                 significance: 'routine',
                 eligibility: static fn (EligibilityContext $c): ?string => InspectionReviewers::canReview($c->user)
                     ? 'inspection_reviewer' : null,
@@ -199,7 +195,6 @@ final class NotificationCategoryRegistry
                 group: self::GROUP_FLEET,
                 channels: $all,
                 locked: [],
-                defaults: ['database' => true, 'webpush' => false, 'email' => true],
                 significance: 'important',
                 eligibility: static fn (EligibilityContext $c): ?string => $c->user->canManageFleetSwaps()
                     ? 'fleet_swap_manager' : null,
@@ -212,7 +207,6 @@ final class NotificationCategoryRegistry
                 group: self::GROUP_FLEET,
                 channels: $all,
                 locked: [],
-                defaults: ['database' => true, 'webpush' => false, 'email' => true],
                 significance: 'important',
                 eligibility: static fn (EligibilityContext $c): ?string => $c->user->canManageFleetSwaps()
                     ? 'fleet_swap_manager' : null,
@@ -225,7 +219,6 @@ final class NotificationCategoryRegistry
                 group: self::GROUP_FLEET,
                 channels: $all,
                 locked: [],
-                defaults: $inAppOnly,
                 significance: 'routine',
                 eligibility: static fn (EligibilityContext $c): ?string => $c->can('viewAny', ApparatusServiceTicket::class)
                     ? 'can_view_service_tickets' : null,
@@ -238,7 +231,6 @@ final class NotificationCategoryRegistry
                 group: self::GROUP_FLEET,
                 channels: [$db],
                 locked: [],
-                defaults: $inAppOnly,
                 significance: 'important',
                 eligibility: static fn (EligibilityContext $c): ?string => InspectionReviewers::canReview($c->user)
                     ? 'inspection_reviewer' : null,
@@ -251,7 +243,6 @@ final class NotificationCategoryRegistry
                 group: self::GROUP_STATIONS,
                 channels: $all,
                 locked: [],
-                defaults: $inAppOnly,
                 significance: 'routine',
                 eligibility: static fn (EligibilityContext $c): ?string => $c->can('viewAny', StationInspection::class)
                     ? 'can_view_station_inspections' : null,
@@ -264,7 +255,6 @@ final class NotificationCategoryRegistry
                 group: self::GROUP_STATIONS,
                 channels: $all,
                 locked: [],
-                defaults: $inAppOnly,
                 significance: 'routine',
                 eligibility: static fn (EligibilityContext $c): ?string => $c->can('admin.stations.view')
                     ? 'permission:admin.stations.view' : null,
@@ -277,7 +267,6 @@ final class NotificationCategoryRegistry
                 group: self::GROUP_STATIONS,
                 channels: $all,
                 locked: [],
-                defaults: $inAppOnly,
                 significance: 'routine',
                 eligibility: static fn (EligibilityContext $c): ?string => $c->can('viewAny', Station::class)
                     ? 'can_view_stations' : null,
@@ -290,7 +279,6 @@ final class NotificationCategoryRegistry
                 group: self::GROUP_SUPPORT_SERVICES,
                 channels: $all,
                 locked: [],
-                defaults: $inAppOnly,
                 significance: 'routine',
                 eligibility: static fn (EligibilityContext $c): ?string => $c->can('viewAny', PersonnelRequest::class)
                     ? 'can_review_personnel_requests' : null,
@@ -303,7 +291,6 @@ final class NotificationCategoryRegistry
                 group: self::GROUP_SUPPORT_SERVICES,
                 channels: $all,
                 locked: [],
-                defaults: $inAppOnly,
                 significance: 'routine',
                 eligibility: static fn (EligibilityContext $c): ?string => $c->can('viewAny', PersonnelRequest::class)
                     ? 'can_review_personnel_requests' : null,
@@ -316,7 +303,6 @@ final class NotificationCategoryRegistry
                 group: self::GROUP_TRAINING,
                 channels: $all,
                 locked: [],
-                defaults: $inAppOnly,
                 significance: 'routine',
                 eligibility: static fn (EligibilityContext $c): ?string => $c->can('viewAny', EvaluationSubmission::class)
                     ? 'can_view_evaluations' : null,
@@ -329,7 +315,6 @@ final class NotificationCategoryRegistry
                 group: self::GROUP_TRAINING,
                 channels: [$db, $push],
                 locked: [],
-                defaults: ['database' => true, 'webpush' => true, 'email' => false],
                 significance: 'important',
                 eligibility: static fn (EligibilityContext $c): ?string => self::canEnterTrainingPanel($c)
                     ? 'training_panel_access' : null,
@@ -338,11 +323,10 @@ final class NotificationCategoryRegistry
             new NotificationCategory(
                 key: User::NOTIFICATION_PREFERENCE_HUB_SUPPORT_TICKETS,
                 label: 'Website and app problem reports',
-                description: 'Members reported a problem with MBFD Hub. This is off until you turn it on.',
+                description: 'Members reported a problem with MBFD Hub.',
                 group: self::GROUP_ADMIN,
                 channels: $all,
                 locked: [],
-                defaults: ['database' => false, 'webpush' => false, 'email' => false],
                 significance: 'routine',
                 eligibility: static fn (EligibilityContext $c): ?string => $c->user->hasCurrentAdminPanelEntitlement()
                     && $c->can('viewAny', HubSupportTicket::class)
@@ -356,7 +340,6 @@ final class NotificationCategoryRegistry
                 group: self::GROUP_ADMIN,
                 channels: [$db, $push],
                 locked: [$db],
-                defaults: ['database' => true, 'webpush' => true, 'email' => false],
                 significance: 'critical',
                 eligibility: static function (EligibilityContext $c): ?string {
                     if ($c->hasAnyRole('super_admin')) {
@@ -378,7 +361,6 @@ final class NotificationCategoryRegistry
                 group: self::GROUP_ADMIN,
                 channels: [$db],
                 locked: [],
-                defaults: $inAppOnly,
                 significance: 'routine',
                 eligibility: static fn (EligibilityContext $c): ?string => $c->hasAnyRole('super_admin', 'admin', 'project-manager')
                     && $c->can('viewAny', CapitalProject::class)
@@ -394,7 +376,6 @@ final class NotificationCategoryRegistry
                 group: self::GROUP_SUPPORT_SERVICES,
                 channels: $all,
                 locked: [$db],
-                defaults: $inAppOnly,
                 significance: 'routine',
                 eligibility: static fn (EligibilityContext $c): ?string => app(EmployeeLogisticsMessagingAccess::class)->canViewLogisticsInbox($c->user)
                     ? 'support_services_inbox' : null,
@@ -407,7 +388,6 @@ final class NotificationCategoryRegistry
                 group: self::GROUP_SUPPORT_SERVICES,
                 channels: [$db],
                 locked: [],
-                defaults: $inAppOnly,
                 significance: 'routine',
                 eligibility: static fn (EligibilityContext $c): ?string => $c->can('viewAny', AssignedEquipment::class)
                     ? 'can_view_assigned_equipment' : null,
@@ -420,7 +400,6 @@ final class NotificationCategoryRegistry
                 group: self::GROUP_ADMIN,
                 channels: [$db],
                 locked: [],
-                defaults: $inAppOnly,
                 significance: 'routine',
                 eligibility: static fn (EligibilityContext $c): ?string => $c->user->hasCurrentAdminPanelEntitlement()
                     && $c->can('viewAny', Todo::class)
@@ -436,7 +415,6 @@ final class NotificationCategoryRegistry
                 group: self::GROUP_COMMAND,
                 channels: $all,
                 locked: [$db],
-                defaults: ['database' => true, 'webpush' => true, 'email' => false],
                 significance: 'important',
                 eligibility: static fn (EligibilityContext $c): ?string => self::captain5Allows($c->user)
                     ? 'captain5_duty_access' : null,
@@ -449,7 +427,6 @@ final class NotificationCategoryRegistry
                 group: self::GROUP_COMMAND,
                 channels: $all,
                 locked: [$db],
-                defaults: ['database' => true, 'webpush' => true, 'email' => false],
                 significance: 'important',
                 eligibility: static fn (EligibilityContext $c): ?string => self::captain5ManagesAssignments($c->user)
                     ? 'captain5_assignment_manager' : null,
@@ -461,7 +438,6 @@ final class NotificationCategoryRegistry
                 group: self::GROUP_COMMAND,
                 channels: $all,
                 locked: [],
-                defaults: ['database' => true, 'webpush' => true, 'email' => false],
                 significance: 'important',
                 eligibility: static fn (EligibilityContext $c): ?string => app(Command300Access::class)->allows($c->user)
                     ? 'command_300_access' : null,

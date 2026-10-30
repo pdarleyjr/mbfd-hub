@@ -184,7 +184,7 @@ final class NotificationSettingsPageTest extends TestCase
 
         Livewire::test(NotificationSettings::class)
             ->assertFormSet([
-                'member_request_updates' => ['database' => true, 'webpush' => false, 'email' => false],
+                'member_request_updates' => ['database' => true, 'webpush' => true, 'email' => true],
                 'department_updates' => ['database' => true, 'webpush' => true],
             ])
             ->fillForm([

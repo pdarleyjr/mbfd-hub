@@ -157,7 +157,7 @@ test.describe.serial('Support Services conversation', () => {
   test('responder: the admin home card follows the Station Operations board, shows the unread row, expands and replies inline', async ({ browser }, info) => {
     const state = run(info);
     await as(browser, info, 'responder', async ({ page }) => {
-      await page.goto('/admin');
+      await page.goto('/admin/logistics-board');
       const stations = page.locator('#mbfd-stations-heading');
       const card = page.locator('#emsg-widget-title');
       await expect(stations).toBeVisible();
@@ -321,7 +321,7 @@ test.describe.serial('Support Services conversation', () => {
       await expect(page.locator('[data-employee-message-composer]')).toHaveCount(0);
       await expect(page.getByRole('button', { name: 'Send reply' })).toHaveCount(0);
 
-      await page.goto('/admin');
+      await page.goto('/admin/logistics-board');
       await expect(page.locator('#emsg-widget-title')).toBeVisible();
       await page.locator('button[data-emsg-row]', { hasText: state.logisticsInboxReply }).click();
       await expect(page.getByText(/can read Support Services messages but not reply/i)).toBeVisible();
@@ -329,7 +329,7 @@ test.describe.serial('Support Services conversation', () => {
     });
 
     await as(browser, info, 'unrelated', async ({ page }) => {
-      await page.goto('/admin');
+      await page.goto('/admin/logistics-board');
       await expect(page.locator('.fi-sidebar, .fi-topbar').first()).toBeVisible();
       await expect(page.locator('#emsg-widget-title')).toHaveCount(0);
       expect(await page.content()).not.toContain(state.firstBody);
@@ -562,7 +562,7 @@ test.describe.serial('Bunker gear cleaning request', () => {
     });
 
     await as(browser, info, 'responder', async ({ page }) => {
-      await page.goto('/admin');
+      await page.goto('/admin/logistics-board');
       const card = page.locator('#emsg-widget-title');
       await expect(card).toHaveText('Support Services Messages');
       const row = page.locator('button[data-emsg-row]', { hasText: body });

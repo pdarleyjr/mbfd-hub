@@ -20,3 +20,4 @@
 </script>
 {{-- Release the page was rendered by. resources/js/pwa/update-registrar.ts compares it with /app-release. --}}
 <meta name="mbfd-release" content="{{ app(\App\Support\Release\DeployedRelease::class)->short() }}">
+<x-hub.alerts-feed-meta />

@@ -13,6 +13,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
 
 /**
+ * @property \Illuminate\Support\Carbon|null $scheduled_for
+ * @property \Illuminate\Support\Carbon|null $expected_return_at
  * @property \Illuminate\Support\Carbon|null $archived_at
  * @property int|null $archived_by
  * @property string|null $archive_reason

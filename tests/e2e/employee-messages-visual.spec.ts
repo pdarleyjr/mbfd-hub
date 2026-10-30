@@ -133,10 +133,10 @@ test.describe.serial('Support Services visual QA', () => {
     });
   });
 
-  test('admin home: Support Services Messages and Equipment Change Requests cards; the reply is sent', async ({ browser }, info) => {
+  test('logistics board: Support Services Messages and Equipment Change Requests cards; the reply is sent', async ({ browser }, info) => {
     state.reply = `Pads are on the shelf ${token()}`;
     await as(browser, info, 'responder', async ({ page }) => {
-      await page.goto('/admin');
+      await page.goto('/admin/logistics-board'); // the former /admin widgets
       const messages = page.locator('#emsg-widget-title');
       const equipment = page.getByRole('heading', { name: /Equipment Change Requests/ });
       await expect(messages).toBeVisible();
@@ -203,7 +203,7 @@ test.describe.serial('Support Services visual QA', () => {
 
   test('equipment change request: the review page shows before and after', async ({ browser }, info) => {
     await as(browser, info, 'responder', async ({ page }) => {
-      await page.goto('/admin');
+      await page.goto('/admin/logistics-board');
       const link = page.locator('a[href*="inventory-corrections"]').first();
       await expect(link).toBeVisible();
       await link.click();

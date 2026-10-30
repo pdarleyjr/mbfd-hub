@@ -350,7 +350,7 @@ final class EquipmentChangeRequestsTest extends TestCase
 
         // The card is on the admin home page and the panel, and never on the wall display.
         $this->assertContains(EquipmentChangeRequestsWidget::class, Filament::getPanel('admin')->getWidgets());
-        $this->assertContains(EquipmentChangeRequestsWidget::class, app(Dashboard::class)->getWidgets());
+        $this->assertContains(EquipmentChangeRequestsWidget::class, app(\App\Filament\Pages\LogisticsBoard::class)->getWidgets());
         request()->merge(['display' => 1]);
         $this->assertNotContains(EquipmentChangeRequestsWidget::class, app(Dashboard::class)->getWidgets());
         $this->assertFalse(EquipmentChangeRequestsWidget::canView());
