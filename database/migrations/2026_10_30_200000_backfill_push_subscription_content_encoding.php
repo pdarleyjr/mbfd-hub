@@ -14,7 +14,9 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::table(config('webpush.table_name', 'push_subscriptions'))
+        // Same connection and table as the package migration that created the table.
+        DB::connection(config('webpush.database_connection'))
+            ->table(config('webpush.table_name'))
             ->whereNull('content_encoding')
             ->update(['content_encoding' => 'aes128gcm']);
     }
