@@ -14,5 +14,9 @@ return [
     ],
 
     'station_sources' => [
+        App\Services\Dashboards\Sources\Station\StationRequestSource::class,
+        App\Services\Dashboards\Sources\Station\StationInspectionSource::class,
+        App\Services\Dashboards\Sources\Station\HubSupportTicketSource::class,
+        App\Services\Dashboards\Sources\Station\SupportMessageSource::class,
     ],
 ];
