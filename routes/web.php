@@ -465,7 +465,7 @@ Route::get('/daily/{path?}', function (?string $path = null) {
     // The release this shell was rendered by. The page-side update registrar (resources/js/pwa)
     // compares it with /app-release, so a shell restored from the offline cache after days is
     // recognised as old instead of being mistaken for the current release.
-    $releaseMeta = '<meta name="mbfd-release" content="'.e(app(\App\Support\Release\DeployedRelease::class)->short()).'">';
+    $releaseMeta = '<meta name="mbfd-release" content="'.e(app(\App\Support\Release\DeployedRelease::class)->short()).'"><meta name="mbfd-authenticated" content="true">';
     $runtimeConfig = $releaseMeta.'<script>window.__MBFD_CANONICAL_ORIGIN__ = '.json_encode(
         $canonicalOrigin,
         JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT,

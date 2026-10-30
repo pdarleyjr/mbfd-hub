@@ -5,6 +5,7 @@ import App from './App.tsx'
 import { QueryProvider } from './providers/QueryProvider'
 import './index.css'
 import { startHubIssueDiagnosticsCollector } from '../../hub-support/diagnostics.js'
+import { startPushSync } from '../../pwa/push-sync'
 import { startUpdateRegistrar } from '../../pwa/update-registrar'
 import { startForegroundAlerts } from '../../pwa/foreground-alerts'
 
@@ -29,6 +30,7 @@ if ('serviceWorker' in navigator) {
 // deep links (MBFD_NAVIGATE). No scriptUrl: the registration above stays the only one.
 // It never reloads while a draft or a queued submission is busy (see src/pwa).
 startUpdateRegistrar({ scope: '/daily/' })
+startPushSync()
 
 // New in-app alerts pop up while Daily Checkout is open (one shared, visibility-aware poller per device,
 // at most once a minute; it stops by itself when the member is signed out or the feed is unavailable).

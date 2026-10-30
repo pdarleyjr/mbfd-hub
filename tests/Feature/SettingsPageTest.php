@@ -44,14 +44,11 @@ class SettingsPageTest extends TestCase
     {
         $this->actingAs($this->admin);
 
-        try {
-            Livewire::test(Settings::class)
-                ->assertSee('Push Notifications')
-                ->assertSee('Enable Push');
-        } catch (\Exception $e) {
-            // Skip if Livewire/Filament fails to boot in test environment
-            $this->markTestSkipped('Livewire test skipped: '.$e->getMessage());
-        }
+        Livewire::test(Settings::class)
+            ->assertSee('Push Notifications')
+            ->assertSee('Open Notification settings')
+            // The old block said "Enabled" without checking the server; it must not come back.
+            ->assertDontSee('push-notification-manager', false);
     }
 
     public function test_settings_page_contains_user_management_section(): void

@@ -336,7 +336,7 @@ test('a test result never claims delivery', () => {
   for (const sample of [accepted, two, describeTestResult(200, {}), describeTestResult(500, null)]) {
     assert.doesNotMatch(sample, /deliver|sent to your phone|should appear/i);
   }
-  for (const file of ['resources/js/pwa/push-enrollment.ts', 'resources/js/push-notification-widget.js', 'app/Http/Controllers/Api/TestNotificationController.php']) {
+  for (const file of ['resources/js/pwa/push-enrollment.ts', 'app/Http/Controllers/Api/TestNotificationController.php']) {
     assert.doesNotMatch(read(file), /Test sent\. It should appear|Check your device for the notification|delivered to your phone/i, file);
   }
 });

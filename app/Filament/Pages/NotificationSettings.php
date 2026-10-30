@@ -8,6 +8,7 @@ use App\Models\UserNotificationSubscription;
 use App\Services\Notifications\NotificationCategory;
 use App\Services\Notifications\NotificationCategoryRegistry;
 use App\Services\Notifications\NotificationRecipientEvaluator;
+use App\Services\Notifications\PushDeviceRemovals;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Fieldset;
 use Filament\Forms\Components\Placeholder;
@@ -260,7 +261,11 @@ class NotificationSettings extends Page implements HasForms
         $user = Auth::user();
         abort_unless($user instanceof User && $user->canManageNotificationSettings(), 403);
 
-        $user->pushSubscriptions()->whereKey($deviceId)->delete();
+        $device = $user->pushSubscriptions()->whereKey($deviceId)->first();
+        if ($device !== null) {
+            app(PushDeviceRemovals::class)->remember((string) $device->endpoint);
+            $device->delete();
+        }
         $this->deviceCache = null;
         Notification::make()->success()->title('Device removed')->send();
     }

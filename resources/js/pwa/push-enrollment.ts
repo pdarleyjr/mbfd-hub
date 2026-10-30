@@ -13,7 +13,8 @@
  *    every subscription on the device.
  *  - iPhone and iPad can only receive push from a Home Screen app, so a Safari tab is shown
  *    plain guidance instead of a button.
- *  - On every load the browser's own subscription is compared with the server's list and repaired.
+ *  - On every load the browser's own subscription is compared with the server's list and repaired. push-sync.ts
+ *    does the same on every signed-in page, so a member never has to come here for it.
  *  - In-app alerts are the fallback and always arrive; push is an extra.
  *
  * The pure helpers are exported for tests; the DOM wiring only runs where the block exists.
@@ -349,6 +350,21 @@ async function api(method: 'POST' | 'DELETE', url: string, body: unknown): Promi
     });
 }
 
+/** Remembered so the Hub never sets alerts up again on its own for someone who chose to turn them off here. */
+export const TURNED_OFF_KEY = 'mbfd.push.turned-off';
+
+function rememberTurnedOff(off: boolean): void {
+    try {
+        if (off) {
+            window.localStorage.setItem(TURNED_OFF_KEY, '1');
+        } else {
+            window.localStorage.removeItem(TURNED_OFF_KEY);
+        }
+    } catch {
+        // Blocked storage only means the offer may appear again.
+    }
+}
+
 function notifyPage(): void {
     const livewire = (window as unknown as { Livewire?: { dispatch?: (name: string) => void } }).Livewire;
     livewire?.dispatch?.('push-devices-changed');
@@ -417,7 +433,7 @@ class EnrollmentBlock {
                 // A subscription found on any registration is the device's enrollment: sync it, never create another.
                 for (const subscription of usable) {
                     const hash = await sha256Hex(subscription.endpoint);
-                    if (!this.serverHashes.has(hash) && (await this.register(subscription))) {
+                    if (!this.serverHashes.has(hash) && (await this.register(subscription, true))) {
                         this.serverHashes.add(hash);
                         notifyPage();
                     }
@@ -557,6 +573,7 @@ class EnrollmentBlock {
 
                 return;
             }
+            rememberTurnedOff(false);
             this.say('Alerts are on for this device. Use "Send a test" to check.');
             notifyPage();
         } catch (error) {
@@ -577,6 +594,7 @@ class EnrollmentBlock {
             for (const subscription of await this.allSubscriptions(environment)) {
                 await this.forget(subscription);
             }
+            rememberTurnedOff(true);
             this.say('Alerts are off on this device. In-app alerts still arrive in the bell.');
             notifyPage();
         } catch {
@@ -593,7 +611,14 @@ class EnrollmentBlock {
         try {
             const subscriptions = await this.allSubscriptions(readEnvironment(window));
             const subscription = classifySubscriptions(subscriptions, this.serverKey()).usable[0] ?? subscriptions[0] ?? null;
-            const response = await api('POST', '/api/push/test', subscription === null ? {} : { endpoint: subscription.endpoint });
+            if (subscription === null) {
+                // A test with no device named would go to the account's old rows, and a push service still accepts
+                // those: it would report success about a phone other than this one.
+                this.say(MESSAGES.ready);
+
+                return;
+            }
+            const response = await api('POST', '/api/push/test', { endpoint: subscription.endpoint });
             // What the push service said, per device; never "delivered" (see ./test-push-result.ts).
             this.say(describeTestResult(response.status, response.ok ? await response.json().catch(() => null) : null));
             if (response.ok) notifyPage();
@@ -604,7 +629,7 @@ class EnrollmentBlock {
         }
     }
 
-    private async register(subscription: PushSubscription): Promise<boolean> {
+    private async register(subscription: PushSubscription, sync = false): Promise<boolean> {
         const p256dh = arrayBufferToBase64Url(subscription.getKey('p256dh'));
         const auth = arrayBufferToBase64Url(subscription.getKey('auth'));
         if (p256dh === '' || auth === '') {
@@ -615,6 +640,7 @@ class EnrollmentBlock {
                 endpoint: subscription.endpoint,
                 keys: { p256dh, auth },
                 content_encoding: preferredContentEncoding((window.PushManager as { supportedContentEncodings?: readonly string[] } | undefined)?.supportedContentEncodings),
+                ...(sync ? { sync: true } : {}),
             });
 
             return response.ok;
@@ -647,9 +673,11 @@ export function parseHashes(raw: string | undefined): string[] {
 
 export function mountPushEnrollment(root: ParentNode = document): EnrollmentBlock | null {
     const element = root.querySelector<HTMLElement>('[data-push-enrollment]');
-    if (element === null) {
+    // Other bundles import the helpers above, so this can run more than once on a page: one block, one set of handlers.
+    if (element === null || element.dataset.pushMounted === 'true') {
         return null;
     }
+    element.dataset.pushMounted = 'true';
     const block = new EnrollmentBlock(element);
     block.start();
 
