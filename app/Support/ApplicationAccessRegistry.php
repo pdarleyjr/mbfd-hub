@@ -75,8 +75,8 @@ final class ApplicationAccessRegistry
             }
         }
         $options['admin.communications.send'] = 'Communications — send email';
-        $options['admin.employee_messages.view'] = 'Employee messages — view the Logistics inbox';
-        $options['admin.employee_messages.reply'] = 'Employee messages — view and reply as Logistics';
+        $options['admin.employee_messages.view'] = 'Support Services messages — view the inbox';
+        $options['admin.employee_messages.reply'] = 'Support Services messages — view and reply';
         $options['admin.fleet.documents.sensitive'] = 'Fleet — access restricted vehicle documents';
         $options['admin.fleet.documents.export'] = 'Fleet — export vehicle profiles and permitted documents';
         $options['files.manage'] = 'Policy library — manage';

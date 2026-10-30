@@ -15,7 +15,7 @@ use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Url;
 
 /**
- * My Messages: a member's private conversations with the Logistics team
+ * My Messages: a member's private conversations with Support Services (formerly Logistics)
  * (docs/employee-logistics-messaging.md). All reads and writes go through
  * EmployeeLogisticsMessagingService with the signed-in member, re-authorized on every request.
  */
@@ -72,7 +72,7 @@ class MyMessages extends Page
 
     public static function getNavigationBadgeTooltip(): ?string
     {
-        return 'New replies from Logistics';
+        return 'New replies from Support Services';
     }
 
     public function mount(): void
@@ -118,10 +118,10 @@ class MyMessages extends Page
     public function poll(): void {}
 
     /** @return array{ok: bool, message?: string} */
-    public function startThread(string $body, string $subject, string $requestId): array
+    public function startThread(string $body, string $subject, string $requestId, ?string $reason = null): array
     {
-        return $this->attempt(function (User $member, EmployeeLogisticsMessagingService $messages) use ($body, $subject, $requestId): void {
-            $message = $messages->startThread($member, $body, $subject, $requestId);
+        return $this->attempt(function (User $member, EmployeeLogisticsMessagingService $messages) use ($body, $subject, $requestId, $reason): void {
+            $message = $messages->startThread($member, $body, $subject, $requestId, $reason);
             $this->threadId = $message->thread_id;
             $this->composing = false;
             $this->markDisplayedRead = true;
@@ -197,7 +197,7 @@ class MyMessages extends Page
         } catch (ModelNotFoundException) {
             return ['ok' => false, 'message' => 'This conversation is no longer available. Your message is still here.'];
         } catch (AuthorizationException) {
-            return ['ok' => false, 'message' => 'Your account can no longer send messages here. Sign in again or contact Logistics.'];
+            return ['ok' => false, 'message' => 'Your account can no longer send messages here. Sign in again or contact Support Services.'];
         }
     }
 

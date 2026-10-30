@@ -43,6 +43,32 @@ final class HubNavigation
         return $path.(isset($parts['query']) ? '?'.$parts['query'] : '').(isset($parts['fragment']) ? '#'.$parts['fragment'] : '');
     }
 
+    /**
+     * Adds a validated `return_to` to a same-app link so the page it opens can send the member
+     * back to where they came from (the admin dashboard, a filtered list) even after a refresh or
+     * a direct link, without depending on browser history. The query goes before any #fragment,
+     * an existing `return_to` is kept, and an unsafe target leaves the link unchanged.
+     */
+    public static function withReturnTo(string $url, string $returnTo): string
+    {
+        $safe = self::safePath($returnTo);
+        if ($safe === null) {
+            return $url;
+        }
+
+        $fragment = '';
+        $hash = strpos($url, '#');
+        if ($hash !== false) {
+            $fragment = substr($url, $hash);
+            $url = substr($url, 0, $hash);
+        }
+        if (preg_match('/[?&]return_to=/', $url) === 1) {
+            return $url.$fragment;
+        }
+
+        return $url.(str_contains($url, '?') ? '&' : '?').'return_to='.rawurlencode($safe).$fragment;
+    }
+
     public static function backUrl(?string $parent = null): string
     {
         $current = request()->fullUrl();

@@ -43,7 +43,7 @@ final class EmployeeLogisticsAdminInboxTest extends TestCase
         $this->assertTrue(EmployeeMessages::canAccess());
         $this->assertSame('2', EmployeeMessages::getNavigationBadge());
         $this->assertSame('info', EmployeeMessages::getNavigationBadgeColor());
-        $this->assertSame('Unread employee messages', EmployeeMessages::getNavigationBadgeTooltip());
+        $this->assertSame('Unread Support Services messages', EmployeeMessages::getNavigationBadgeTooltip());
 
         Livewire::test(EmployeeMessages::class)
             ->assertSee('Ann Jones')
@@ -224,7 +224,7 @@ final class EmployeeLogisticsAdminInboxTest extends TestCase
         $page = Livewire::test(EmployeeMessages::class)
             ->call('openThread', $message->thread_id)
             ->assertSee('Boots arrived damaged')
-            ->assertSee('You can read employee messages but not reply.')
+            ->assertSee('You can read Support Services messages but not reply.')
             ->assertDontSee('Send reply');
 
         $page->call('sendReply', 'Sneaky reply', $this->rid())
@@ -286,7 +286,7 @@ final class EmployeeLogisticsAdminInboxTest extends TestCase
         $this->assertTrue(EmployeeMessagesWidget::canView());
 
         $card = Livewire::test(EmployeeMessagesWidget::class)
-            ->assertSee('Employee Messages')
+            ->assertSee('Support Services Messages')
             ->assertSee('Bo Smith')
             ->assertSee('View all messages')
             ->assertDontSee('Reply to Bo Smith')
@@ -322,7 +322,7 @@ final class EmployeeLogisticsAdminInboxTest extends TestCase
 
         $card = Livewire::test(EmployeeMessagesWidget::class)
             ->call('toggleThread', $message->thread_id)
-            ->assertSee('You can read employee messages but not reply.')
+            ->assertSee('You can read Support Services messages but not reply.')
             ->assertDontSee('Send reply');
         $card->call('sendReply', 'Nope', $this->rid())
             ->assertReturned(['ok' => false, 'message' => 'You no longer have permission to reply.']);
@@ -333,7 +333,7 @@ final class EmployeeLogisticsAdminInboxTest extends TestCase
         $this->actingAs($this->logisticsResponder());
 
         Livewire::test(EmployeeMessagesWidget::class)
-            ->assertSee('No employee messages yet. Messages members send from the Employee Portal appear here.');
+            ->assertSee('No Support Services messages yet.');
     }
 
     public function test_the_card_is_on_the_dashboard_but_not_in_display_mode(): void
@@ -349,7 +349,7 @@ final class EmployeeLogisticsAdminInboxTest extends TestCase
         $display = $this->get('/admin?display=1')->assertOk()->getContent();
         $this->assertStringNotContainsString('emsg-widget-title', $display);
         $this->assertStringNotContainsString('View all messages', $display);
-        $this->assertStringNotContainsString('Latest employee conversations', $display);
+        $this->assertStringNotContainsString('Latest Support Services conversations', $display);
         $this->assertStringNotContainsString('Need a size swap please', $display);
     }
 
@@ -389,7 +389,7 @@ final class EmployeeLogisticsAdminInboxTest extends TestCase
             ->get('/admin/employee-messages?thread='.$message->thread_id)
             ->assertOk()
             ->assertSee('Cy Doe')
-            ->assertSee('You can read employee messages but not reply.');
+            ->assertSee('You can read Support Services messages but not reply.');
     }
 
     public function test_the_email_resources_still_load_for_a_super_administrator(): void

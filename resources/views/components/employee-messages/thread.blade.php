@@ -16,7 +16,7 @@
         @php
             $fromLogistics = $message->isFromLogistics();
             $mine = ($viewerSide === \App\Models\EmployeeMessaging\EmployeeLogisticsMessage::SIDE_LOGISTICS) === $fromLogistics;
-            $sideLabel = $fromLogistics ? 'Logistics' : 'Member';
+            $sideLabel = $fromLogistics ? 'Support Services' : 'Member';
             $local = $message->created_at?->copy()->timezone($zone);
         @endphp
         <li wire:key="emsg-message-{{ $message->id }}" @class(['emsg-bubble', 'emsg-bubble--mine' => $mine, 'emsg-bubble--theirs' => ! $mine, 'emsg-bubble--logistics' => $fromLogistics])>
