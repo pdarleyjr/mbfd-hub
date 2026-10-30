@@ -286,6 +286,12 @@ Route::post('/v2/media-control/auth/revalidate', \App\Http\Controllers\Api\Media
 Route::post('/v2/media-control/auth/cloud-access', \App\Http\Controllers\Api\MediaControl\CloudAccessController::class)
     ->middleware(['throttle:6000,1,media-identity:', 'verify.media-control.token', \App\Http\Middleware\ThrottleMediaControlIdentity::class])->name('api.v2.media-control.auth.cloud-access');
 
+// Command Board crew editor: read-only personnel lookup. Service bearer token (the Command PIN
+// channel token), constant-time compare; the throttle runs first so bad tokens are counted too.
+Route::get('/internal/command/personnel', \App\Http\Controllers\Api\Command\CommandPersonnelSearchController::class)
+    ->middleware(['throttle:60,1,command-personnel:', \App\Http\Middleware\VerifyCommandBoardServiceToken::class])
+    ->name('api.internal.command.personnel');
+
 Route::prefix('v2')->middleware(['auth:sanctum', 'canonical.api', 'throttle:60,1'])->group(function () {
     Route::name('api.v2.station-inventory.')->group(function () {
         // Inventory list
