@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace Tests\Feature\Narcotics;
 
 use App\Models\Narcotics\NarcoticsCheck;
+use App\Models\User;
 use App\Notifications\Inspections\InspectionEventNotification;
 use App\Notifications\Inspections\InspectionNotificationKind;
 use App\Services\Narcotics\NarcoticsNotifier;
 use App\Services\Notifications\NotificationCategoryRegistry;
-use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;

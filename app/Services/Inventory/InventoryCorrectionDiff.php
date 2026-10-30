@@ -18,7 +18,7 @@ final class InventoryCorrectionDiff
 
     /**
      * @param  array<string, string>  $compartmentNames  compartment id => name, only needed for reports recorded before the
-     *                                                    destination name was stored with them
+     *                                                   destination name was stored with them
      * @return list<array{label: string, before: string, after: string}>
      */
     public static function rows(ApparatusInventoryCorrection $correction, array $compartmentNames = []): array

@@ -8,9 +8,9 @@ use App\Models\Narcotics\NarcoticsCheck;
 use App\Models\Narcotics\NarcoticsCheckEvent;
 use App\Services\Narcotics\NarcoticsImageStore;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Carbon;
 use Tests\Feature\Narcotics\Concerns\BuildsNarcoticsWorld;
 use Tests\TestCase;
 
