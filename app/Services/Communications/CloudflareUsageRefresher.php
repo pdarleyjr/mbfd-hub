@@ -7,6 +7,8 @@ namespace App\Services\Communications;
 use App\Exceptions\CloudflareUsageRefreshFailed;
 use App\Models\CloudflareUsageBudget;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -24,7 +26,8 @@ final class CloudflareUsageRefresher
 
     public function refresh(): CloudflareUsageBudget
     {
-        $lock = Cache::lock('cloudflare-usage-refresh', 120);
+        // Long enough for all three calls to use their one retry at the full timeout.
+        $lock = Cache::lock('cloudflare-usage-refresh', 150);
         if (! $lock->get()) {
             $busy = new CloudflareUsageRefreshFailed('A Cloudflare usage refresh is already in progress.');
             $this->logFailure($busy);
@@ -33,18 +36,30 @@ final class CloudflareUsageRefresher
         try {
             return $this->fetchAndPersist();
         } catch (Throwable $exception) {
-            // A failed poll must not leave an earlier, lower snapshot open.
+            $this->logFailure($exception);
+            // Never expose token-bearing HTTP exceptions or raw provider bodies.
+            if ($this->providerGaveNoUsableAnswer($exception)) {
+                // Nothing suggests usage changed, and the Hub's own sends are counted
+                // locally. CloudflareCostGuard closes sending once the last good
+                // report passes max_reconciliation_age_seconds.
+                throw new RuntimeException('Cloudflare usage could not be verified. Sending closes if no refresh succeeds within the reconciliation limit.');
+            }
+            // A report that fails its checks is a warning sign, and an unexpected error
+            // proves nothing: neither may leave an earlier, lower snapshot open.
             DB::transaction(function (): void {
                 foreach (CloudflareUsageBudget::query()->where('cycle_end', '>', now())->lockForUpdate()->get() as $budget) {
                     $budget->forceFill(['reconciled_at' => null, 'provider_daily_reconciled_at' => null])->save();
                 }
             });
-            $this->logFailure($exception);
-            // Never expose token-bearing HTTP exceptions or raw provider bodies.
             throw new RuntimeException('Cloudflare usage could not be verified. Sending is closed until a complete refresh succeeds.');
         } finally {
             $lock->release();
         }
+    }
+
+    private function providerGaveNoUsableAnswer(Throwable $exception): bool
+    {
+        return $exception instanceof CloudflareUsageRefreshFailed && $exception->providerCall !== null;
     }
 
     /** Only fields known to be safe: any other exception's message may quote a URL, query or body. */
@@ -190,7 +205,10 @@ final class CloudflareUsageRefresher
     private function get(string $account, string $token, string $path): array
     {
         try {
+            // These reads change nothing, so a passing fault gets one quick retry.
             $response = Http::withToken($token)->acceptJson()->connectTimeout(5)->timeout(20)
+                ->retry(2, 500, static fn (Throwable $exception): bool => $exception instanceof ConnectionException
+                    || ($exception instanceof RequestException && $exception->response->serverError()), throw: false)
                 ->get('https://api.cloudflare.com/client/v4/accounts/'.$account.'/'.$path);
         } catch (Throwable $exception) {
             throw new CloudflareUsageRefreshFailed('The Cloudflare request did not complete.', $path, null, $exception::class);

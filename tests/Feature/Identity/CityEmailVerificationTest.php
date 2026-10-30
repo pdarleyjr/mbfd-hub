@@ -244,6 +244,34 @@ final class CityEmailVerificationTest extends TestCase
         Http::assertSent(fn ($request) => $request['subject'] === 'Your MBFD Hub city email changed' && $request['to'] === ['old@miamibeachfl.gov']);
     }
 
+    public function test_the_change_notice_reaches_the_old_address_after_a_temporary_email_block(): void
+    {
+        [, $user] = $this->identity();
+        $service = app(CityEmailVerificationService::class);
+        $service->acknowledge($user, 'old@miamibeachfl.gov');
+        $service->issue($user);
+        self::assertTrue($service->verify($user, $this->tokens[0]));
+        $service->acknowledge($user, 'new@miamibeachfl.gov');
+        $service->issue($user);
+
+        config()->set('queue.default', 'database');
+        CloudflareUsageBudget::query()->update(['reconciled_at' => null, 'provider_daily_reconciled_at' => null]);
+        self::assertTrue($service->verify($user, $this->tokens[1]), 'A blocked notice must not undo the verified change.');
+        $work = ['connection' => 'database', '--once' => true, '--queue' => 'notifications', '--tries' => 3, '--sleep' => 0];
+        $this->artisan('queue:work', $work)->assertSuccessful();
+
+        Http::assertNotSent(fn ($request) => $request['subject'] === 'Your MBFD Hub city email changed');
+        self::assertDatabaseCount('jobs', 1);
+
+        $this->travel(301)->seconds();
+        CloudflareUsageBudget::query()->update(['reconciled_at' => now(), 'provider_daily_reconciled_at' => now()]);
+        $this->artisan('queue:work', $work)->assertSuccessful();
+
+        Http::assertSent(fn ($request) => $request['subject'] === 'Your MBFD Hub city email changed' && $request['to'] === ['old@miamibeachfl.gov']);
+        self::assertDatabaseCount('jobs', 0);
+        self::assertDatabaseCount('failed_jobs', 0);
+    }
+
     public function test_budget_failure_does_not_consume_acknowledgement_or_send(): void
     {
         [, $user] = $this->identity();

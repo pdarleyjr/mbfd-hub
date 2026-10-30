@@ -7,7 +7,7 @@ namespace Tests\Feature\Auth;
 use App\Enums\AccountStatus;
 use App\Exceptions\MemberBootstrapStateChanged;
 use App\Jobs\IssueMemberOnboardingInvitation;
-use App\Jobs\SendMemberActivationNotice;
+use App\Jobs\SendBudgetedEmail;
 use App\Models\CloudflareUsageBudget;
 use App\Models\Employee;
 use App\Models\EmployeeBidAssignment;
@@ -23,6 +23,7 @@ use App\Services\Identity\CityEmailVerificationService;
 use App\Services\Identity\EstablishedAccountIntegritySnapshot;
 use App\Services\Identity\MemberAccessEmail;
 use App\Services\Identity\MemberSelfServiceActivation;
+use App\Support\HubTimezone;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
@@ -180,24 +181,25 @@ final class MemberSelfServiceActivationTest extends TestCase
 
     public function test_a_late_notice_states_when_the_account_was_activated(): void
     {
-        $this->travelTo(CarbonImmutable::parse('2026-10-30T20:29:31Z'));
+        config()->set('queue.default', 'database');
         $this->closeEmailBudget();
-        $job = (new SendMemberActivationNotice($this->pending('SELF-WHEN')->id, 'self-when@miamibeachfl.gov', CarbonImmutable::now()))
-            ->withFakeQueueInteractions();
+        $this->pending('SELF-WHEN');
+        $when = HubTimezone::dateTime(CarbonImmutable::now());
 
-        $job->handle(app(CloudflareEmailDispatcher::class));
-        $this->travel(5)->hours();
+        $this->post('/activate', $this->form('SELF-WHEN'))->assertRedirect('/');
+        $this->workNotificationQueue();
+        $this->travel(6)->minutes();
         $this->openEmailBudget();
-        $job->handle(app(CloudflareEmailDispatcher::class));
+        $this->workNotificationQueue();
 
-        Http::assertSent(fn (Request $request): bool => str_contains((string) $request['text'], 'October 30, 2026 at 4:29 PM EDT')
+        Http::assertSent(fn (Request $request): bool => str_contains((string) $request['text'], "password was set on {$when}.")
             && ! str_contains((string) $request['text'], 'just activated'));
     }
 
     public function test_a_block_is_retried_after_the_delay_it_asks_for(): void
     {
         $member = $this->pending('SELF-RETRY-AFTER');
-        $job = fn (): SendMemberActivationNotice => (new SendMemberActivationNotice($member->id, 'self-retry-after@miamibeachfl.gov', CarbonImmutable::now()))
+        $job = fn (): SendBudgetedEmail => $this->noticeJob($member, 'self-retry-after@miamibeachfl.gov')
             ->withFakeQueueInteractions();
 
         config()->set('communications.cloudflare.max_recipient_units_per_minute', 0);
@@ -226,7 +228,7 @@ final class MemberSelfServiceActivationTest extends TestCase
         self::assertDatabaseCount('jobs', 0);
         self::assertDatabaseCount('failed_jobs', 1);
         Http::assertNothingSent();
-        self::assertContains('member_self_service_activation_notice_abandoned', $logged->pluck('message')->all());
+        self::assertContains('budgeted_email_abandoned', $logged->pluck('message')->all());
     }
 
     public function test_retries_are_bounded_and_the_last_failure_is_logged(): void
@@ -247,13 +249,13 @@ final class MemberSelfServiceActivationTest extends TestCase
         self::assertDatabaseCount('jobs', 0);
         self::assertDatabaseCount('failed_jobs', 1);
         self::assertDatabaseCount('outbound_emails', 0);
-        self::assertContains('member_self_service_activation_notice_abandoned', $logged->pluck('message')->all());
+        self::assertContains('budgeted_email_abandoned', $logged->pluck('message')->all());
     }
 
     public function test_a_member_gets_one_notice_when_the_job_runs_again(): void
     {
         $member = $this->pending('SELF-ONE');
-        $job = (new SendMemberActivationNotice($member->id, 'self-one@miamibeachfl.gov', CarbonImmutable::now()))->withFakeQueueInteractions();
+        $job = $this->noticeJob($member, 'self-one@miamibeachfl.gov')->withFakeQueueInteractions();
 
         $job->handle(app(CloudflareEmailDispatcher::class));
         $job->handle(app(CloudflareEmailDispatcher::class));
@@ -271,7 +273,7 @@ final class MemberSelfServiceActivationTest extends TestCase
             throw new ConnectionException('Provider response was lost.');
         });
         $member = $this->pending('SELF-UNKNOWN');
-        $job = (new SendMemberActivationNotice($member->id, 'self-unknown@miamibeachfl.gov', CarbonImmutable::now()))->withFakeQueueInteractions();
+        $job = $this->noticeJob($member, 'self-unknown@miamibeachfl.gov')->withFakeQueueInteractions();
 
         $job->handle(app(CloudflareEmailDispatcher::class));
         $job->handle(app(CloudflareEmailDispatcher::class));
@@ -282,16 +284,17 @@ final class MemberSelfServiceActivationTest extends TestCase
         $job->assertFailed();
     }
 
-    public function test_a_provider_429_is_not_resent_and_is_recorded_as_failed(): void
+    public function test_a_provider_429_waits_out_the_pause_and_then_delivers_one_notice(): void
     {
         config()->set('queue.default', 'database');
-        $logged = $this->captureLog();
         $submissions = 0;
         Http::swap(new Factory);
-        Http::fake(function () use (&$submissions) {
+        Http::fake(function (Request $request) use (&$submissions) {
             $submissions++;
 
-            return Http::response(['success' => false], 429, ['Retry-After' => '60']);
+            return $submissions === 1
+                ? Http::response(['success' => false], 429, ['Retry-After' => '60'])
+                : Http::response(['success' => true, 'result' => ['message_id' => 'after-429', 'delivered' => $request['to'], 'queued' => [], 'permanent_bounces' => []]]);
         });
         $this->pending('SELF-429');
 
@@ -299,9 +302,16 @@ final class MemberSelfServiceActivationTest extends TestCase
         $this->workNotificationQueue();
 
         self::assertSame(1, $submissions);
+        self::assertSame('failed_pre_acceptance', OutboundEmail::query()->sole()->status);
+        self::assertDatabaseCount('jobs', 1);
+
+        $this->travel(61)->seconds();
+        $this->workNotificationQueue();
+
+        self::assertSame(2, $submissions);
         self::assertDatabaseCount('jobs', 0);
-        self::assertDatabaseCount('failed_jobs', 1);
-        self::assertContains('member_self_service_activation_notice_abandoned', $logged->pluck('message')->all());
+        self::assertDatabaseCount('failed_jobs', 0);
+        self::assertNotNull(OutboundEmail::query()->latest('id')->first()->accepted_at);
     }
 
     public function test_a_failure_before_submission_is_retried_and_then_delivered(): void
@@ -345,8 +355,8 @@ final class MemberSelfServiceActivationTest extends TestCase
         config()->set('queue.default', 'database');
         $member = $this->pending('SELF-TWICE');
 
-        SendMemberActivationNotice::dispatch($member->id, 'self-twice@miamibeachfl.gov', CarbonImmutable::now());
-        SendMemberActivationNotice::dispatch($member->id, 'self-twice@miamibeachfl.gov', CarbonImmutable::now());
+        dispatch($this->noticeJob($member, 'self-twice@miamibeachfl.gov'));
+        dispatch($this->noticeJob($member, 'self-twice@miamibeachfl.gov'));
         $this->workNotificationQueue();
         $this->workNotificationQueue();
 
@@ -360,9 +370,9 @@ final class MemberSelfServiceActivationTest extends TestCase
         $this->closeEmailBudget();
         $member = $this->pending('SELF-WAITING');
 
-        SendMemberActivationNotice::dispatch($member->id, 'self-waiting@miamibeachfl.gov', CarbonImmutable::now());
+        dispatch($this->noticeJob($member, 'self-waiting@miamibeachfl.gov'));
         $this->workNotificationQueue();
-        SendMemberActivationNotice::dispatch($member->id, 'self-waiting@miamibeachfl.gov', CarbonImmutable::now());
+        dispatch($this->noticeJob($member, 'self-waiting@miamibeachfl.gov'));
 
         self::assertDatabaseCount('jobs', 2);
     }
@@ -370,10 +380,10 @@ final class MemberSelfServiceActivationTest extends TestCase
     public function test_a_notice_from_an_earlier_activation_does_not_silence_a_new_one(): void
     {
         $member = $this->pending('SELF-AGAIN');
-        (new SendMemberActivationNotice($member->id, 'self-again@miamibeachfl.gov', CarbonImmutable::now()))
+        $this->noticeJob($member, 'self-again@miamibeachfl.gov')
             ->withFakeQueueInteractions()->handle(app(CloudflareEmailDispatcher::class));
 
-        (new SendMemberActivationNotice($member->id, 'self-again@miamibeachfl.gov', CarbonImmutable::now()))
+        $this->noticeJob($member, 'self-again@miamibeachfl.gov')
             ->withFakeQueueInteractions()->handle(app(CloudflareEmailDispatcher::class));
 
         Http::assertSentCount(2);
@@ -828,7 +838,12 @@ final class MemberSelfServiceActivationTest extends TestCase
         $this->get('/activate/email')->assertRedirect('/');
     }
 
-    /** The state one failed usage poll leaves behind. */
+    private function noticeJob(User $member, string $address): SendBudgetedEmail
+    {
+        return new SendBudgetedEmail([$address], 'Your MBFD Hub account was activated', 'Activation notice', null, 'member_self_service_activation', (string) $member->id, $member->id);
+    }
+
+    /** The state a rejected usage report leaves behind. */
     private function closeEmailBudget(): void
     {
         CloudflareUsageBudget::query()->update(['reconciled_at' => null, 'provider_daily_reconciled_at' => null]);

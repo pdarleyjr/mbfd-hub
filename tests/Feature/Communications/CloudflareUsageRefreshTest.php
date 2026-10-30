@@ -96,14 +96,16 @@ final class CloudflareUsageRefreshTest extends TestCase
         return array_map(fn (string $case): array => [$case], ['missing email', 'wrong account', 'negative', 'fraction', 'string', 'unknown email meter', 'wrong unit', 'duplicate', 'future', 'stale report']);
     }
 
-    public function test_provider_failure_does_not_leave_an_old_allowing_snapshot_fresh(): void
+    public function test_provider_failure_never_prints_provider_text_and_keeps_the_last_good_time(): void
     {
         $this->fakeProvider();
         $this->artisan('mbfd:cloudflare-usage-refresh')->assertSuccessful();
+        $goodAt = CloudflareUsageBudget::query()->sole()->reconciled_at;
         Http::swap(new Factory);
         Http::fake(['*' => Http::response(['success' => false, 'errors' => [['message' => 'isolated-secret']]], 403)]);
+        $this->travel(5)->minutes();
         $this->artisan('mbfd:cloudflare-usage-refresh')->doesntExpectOutputToContain('isolated-secret')->assertFailed();
-        self::assertNull(CloudflareUsageBudget::query()->sole()->reconciled_at);
+        self::assertTrue(CloudflareUsageBudget::query()->sole()->reconciled_at->equalTo($goodAt), 'A failed poll must never look like a fresh one.');
     }
 
     #[DataProvider('providerCalls')]
@@ -205,19 +207,100 @@ final class CloudflareUsageRefreshTest extends TestCase
         self::assertNotNull(CloudflareUsageBudget::query()->sole()->reconciled_at);
     }
 
-    public function test_logging_a_failure_still_closes_sending(): void
+    public function test_a_rejected_report_still_closes_sending_at_once(): void
     {
         $this->fakeProvider();
         $this->artisan('mbfd:cloudflare-usage-refresh')->assertSuccessful();
         $logged = $this->captureLog();
-        $this->fakeProvider(overrides: ['*/email/sending/limits' => Http::response([], 500)]);
+        $rows = $this->rows();
+        $rows[0]['BillingAccountId'] = str_repeat('b', 32);
+        $this->fakeProvider($rows);
 
         $this->artisan('mbfd:cloudflare-usage-refresh')->assertFailed();
 
         $budget = CloudflareUsageBudget::query()->sole();
         self::assertNull($budget->reconciled_at);
         self::assertNull($budget->provider_daily_reconciled_at);
-        self::assertSame(500, $logged->firstWhere('message', 'cloudflare_usage_refresh_failed')->context['http_status']);
+        self::assertSame('Billing report account mismatch.', $logged->firstWhere('message', 'cloudflare_usage_refresh_failed')->context['reason']);
+    }
+
+    public function test_an_unexpected_exception_still_closes_sending_at_once(): void
+    {
+        $this->fakeProvider();
+        $this->artisan('mbfd:cloudflare-usage-refresh')->assertSuccessful();
+        $budget = CloudflareUsageBudget::query()->sole();
+        $failed = false;
+        Event::listen('eloquent.saving: '.CloudflareUsageBudget::class, static function () use (&$failed): void {
+            if (! $failed) {
+                $failed = true;
+                throw new RuntimeException('Unexpected database failure');
+            }
+        });
+
+        $this->artisan('mbfd:cloudflare-usage-refresh')->assertFailed();
+
+        self::assertNull($budget->fresh()->reconciled_at);
+    }
+
+    #[DataProvider('unusableAnswers')]
+    public function test_a_provider_that_gives_no_usable_answer_leaves_sending_to_the_age_limit(int $status): void
+    {
+        $this->fakeProvider();
+        $this->artisan('mbfd:cloudflare-usage-refresh')->assertSuccessful();
+        $this->fakeProvider(overrides: ['*/email/sending/limits' => Http::response([], $status)]);
+        $this->travel(5)->minutes();
+
+        $this->artisan('mbfd:cloudflare-usage-refresh')->assertFailed();
+
+        $budget = CloudflareUsageBudget::query()->sole();
+        self::assertNotNull($budget->reconciled_at);
+        self::assertNotNull($budget->provider_daily_reconciled_at);
+        $email = OutboundEmail::query()->create(['provider' => 'cloudflare', 'source_type' => 'test', 'from_address' => 'info@mbfdhub.com',
+            'to_recipients' => ['one@example.test'], 'subject' => 'Age limit test', 'recipient_count' => 1, 'chargeable_budget_units' => 1, 'status' => 'pending']);
+        $guard = app(CloudflareCostGuard::class);
+        self::assertSame('reserved', $guard->reserve($email, now())->status, 'One failed poll must not stop email.');
+
+        $this->travel(601)->seconds();
+        $this->expectException(EmailBudgetExhausted::class);
+        $guard->reserve(OutboundEmail::query()->create(['provider' => 'cloudflare', 'source_type' => 'test', 'from_address' => 'info@mbfdhub.com',
+            'to_recipients' => ['two@example.test'], 'subject' => 'Age limit test', 'recipient_count' => 1, 'chargeable_budget_units' => 1, 'status' => 'pending']), now());
+    }
+
+    public static function unusableAnswers(): array
+    {
+        return ['forbidden' => [403], 'rate limited' => [429], 'server error' => [500], 'unavailable' => [503]];
+    }
+
+    public function test_a_passing_provider_fault_is_retried_within_the_same_refresh(): void
+    {
+        $logged = $this->captureLog();
+        $calls = 0;
+        $this->fakeProvider(overrides: ['*/email/sending/limits' => function () use (&$calls) {
+            $calls++;
+
+            return $calls === 1 ? Http::response([], 503) : Http::response(['success' => true, 'errors' => [], 'result' => [
+                'quota' => ['value' => 1000, 'unit' => 'day'], 'usage' => ['sent' => 0, 'over_quota' => false, 'resets_at' => null],
+            ]]);
+        }]);
+
+        $this->artisan('mbfd:cloudflare-usage-refresh')->assertSuccessful();
+
+        self::assertSame(2, $calls);
+        self::assertNull($logged->firstWhere('message', 'cloudflare_usage_refresh_failed'));
+    }
+
+    public function test_a_refused_request_is_not_retried_within_the_same_refresh(): void
+    {
+        $calls = 0;
+        $this->fakeProvider(overrides: ['*/subscriptions' => function () use (&$calls) {
+            $calls++;
+
+            return Http::response([], 403);
+        }]);
+
+        $this->artisan('mbfd:cloudflare-usage-refresh')->assertFailed();
+
+        self::assertSame(1, $calls);
     }
 
     public function test_a_delayed_lower_report_cannot_reduce_current_cycle_baseline(): void

@@ -6,7 +6,7 @@ namespace App\Services\Identity;
 
 use App\Enums\AccountStatus;
 use App\Exceptions\MemberBootstrapStateChanged;
-use App\Jobs\SendMemberActivationNotice;
+use App\Jobs\SendBudgetedEmail;
 use App\Models\Employee;
 use App\Models\EmployeeBidAssignment;
 use App\Models\MemberActivationAttempt;
@@ -14,6 +14,7 @@ use App\Models\MemberOnboardingInvitation;
 use App\Models\MemberOnboardingRosterBinding;
 use App\Models\User;
 use App\Services\Security\SecurityAuditRecorder;
+use App\Support\HubTimezone;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -256,7 +257,16 @@ final class MemberSelfServiceActivation
             return;
         }
         try {
-            SendMemberActivationNotice::dispatch($user->id, $address, $at);
+            $when = HubTimezone::dateTime($at);
+            SendBudgetedEmail::dispatch(
+                [$address],
+                'Your MBFD Hub account was activated',
+                "Your MBFD Hub account was activated and a password was set on {$when}.\n\nIf this was you, no action is needed.\n\nIf this was NOT you, contact MBFD Hub support right away so the account can be secured.",
+                null,
+                'member_self_service_activation',
+                (string) $user->id,
+                $user->id,
+            );
         } catch (Throwable $exception) {
             Log::warning('member_self_service_activation_notice_failed', [
                 'user_id' => $user->id,

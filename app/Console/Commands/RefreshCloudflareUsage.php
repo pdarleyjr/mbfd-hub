@@ -22,7 +22,7 @@ final class RefreshCloudflareUsage extends Command
             $budget = $refresher->refresh();
         } catch (RuntimeException $exception) {
             $this->error($exception->getMessage());
-            Log::warning('Cloudflare email usage refresh failed; sending remains fail-closed.');
+            Log::warning('Cloudflare email usage refresh failed; sending closes if no refresh succeeds within the reconciliation limit.');
 
             return self::FAILURE;
         }

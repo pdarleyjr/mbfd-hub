@@ -109,9 +109,16 @@ final class CloudflareHardLimitTest extends TestCase
         try {
             $this->send();
             self::fail('Rate limiting must be surfaced.');
-        } catch (\Illuminate\Http\Client\RequestException) {
+        } catch (EmailBudgetExhausted $exception) {
             self::assertSame(1, $attempts);
+            self::assertSame(120, $exception->retryAfterSeconds);
         }
+        // Cloudflare refused the message, so it is not charged and can be sent again.
+        $refused = OutboundEmail::query()->sole();
+        self::assertSame('failed_pre_acceptance', $refused->status);
+        self::assertNull($refused->submitted_at);
+        self::assertNotNull($refused->budget_released_at);
+        self::assertSame(0, app(\App\Services\Communications\CloudflareCostGuard::class)->localReservedOrAcceptedUnits($this->now));
         try {
             $this->send();
             self::fail('The provider backoff must block a subsequent request.');
@@ -293,7 +300,7 @@ final class CloudflareHardLimitTest extends TestCase
     /** @return array<string, array{string}> */
     public static function uncertainResponses(): array
     {
-        return ['connection timeout' => ['timeout'], 'server failure' => ['503'], 'rate limited' => ['429'], 'missing message ID' => ['malformed']];
+        return ['connection timeout' => ['timeout'], 'server failure' => ['503'], 'missing message ID' => ['malformed']];
     }
 
     private function send(): OutboundEmail
