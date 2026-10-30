@@ -2,10 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { Button, MessageBar, MessageBarBody, Spinner } from '@fluentui/react-components';
 import './narcotics.css';
 import { NarcoticsApiError, type NarcoticsApi } from './narcoticsApi';
-import type { NarcoticsView } from './narcoticsTypes';
+import type { NarcoticsCheckDetail, NarcoticsFormDefinition, NarcoticsView } from './narcoticsTypes';
 import { CheckDetail, MyChecksList } from './MyChecks';
-import { NarcoticsForm } from './NarcoticsForm';
-import type { NarcoticsFormDefinition } from './narcoticsTypes';
+import { NarcoticsForm, type UnitSource } from './NarcoticsForm';
 
 export interface NarcoticsAppProps {
     api: NarcoticsApi;
@@ -20,6 +19,8 @@ export function NarcoticsApp({ api, view, navigate, goForms }: NarcoticsAppProps
     const [loadError, setLoadError] = useState('');
     const [loading, setLoading] = useState(false);
     const [resubmitOf, setResubmitOf] = useState<string | null>(null);
+    /** The rejected check's unit and seal number, so the answer starts with them (still editable). */
+    const [resubmitUnit, setResubmitUnit] = useState<UnitSource | null>(null);
     const [sentCount, setSentCount] = useState(0);
 
     const loadDefinition = useCallback(async () => {
@@ -33,10 +34,14 @@ export function NarcoticsApp({ api, view, navigate, goForms }: NarcoticsAppProps
 
     useEffect(() => { if (view.name === 'form' && !definition && !loading && !loadError) void loadDefinition(); }, [view.name, definition, loading, loadError, loadDefinition]);
 
-    const goForm = useCallback(() => { setResubmitOf(null); navigate({ name: 'form' }); }, [navigate]);
+    const goForm = useCallback(() => { setResubmitOf(null); setResubmitUnit(null); navigate({ name: 'form' }); }, [navigate]);
     const goMine = useCallback(() => navigate({ name: 'mine' }), [navigate]);
     const goDetail = useCallback((id: string) => navigate({ name: 'detail', id }), [navigate]);
-    const resubmit = useCallback((id: string) => { setResubmitOf(id); navigate({ name: 'form' }); }, [navigate]);
+    const resubmit = useCallback((check: NarcoticsCheckDetail) => {
+        setResubmitOf(check.id);
+        setResubmitUnit({ rescue_unit_choice: check.rescue_unit_choice, rescue_unit_other: check.rescue_unit_other, seal_number: check.seal_number });
+        navigate({ name: 'form' });
+    }, [navigate]);
 
     let content;
     if (view.name === 'mine') {
@@ -52,7 +57,7 @@ export function NarcoticsApp({ api, view, navigate, goForms }: NarcoticsAppProps
         content = <div className="nc nc-app"><div className="nc-loading"><Spinner label="Opening the narcotics check" /></div></div>;
     } else {
         content = <NarcoticsForm
-            key={resubmitOf ?? 'new'} api={api} definition={definition} resubmitOf={resubmitOf}
+            key={resubmitOf ?? 'new'} api={api} definition={definition} resubmitOf={resubmitOf} resubmitUnit={resubmitUnit}
             goForms={goForms} goMine={goMine} goDetail={goDetail} onSent={() => setSentCount((count) => count + 1)}
         />;
     }

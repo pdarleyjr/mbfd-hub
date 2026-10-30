@@ -108,12 +108,15 @@ trait BuildsNarcoticsWorld
     // ------------------------------------------------------------------ calls
 
     /**
+     * The rescue unit and the seal number are required on a new check, so a plain call sends R1 and SEAL-0001;
+     * pass `'rescue_unit' => null` or `'seal_number' => null` to leave one out.
+     *
      * @param  array<string, mixed>  $fields
      */
     protected function sendCheck(User $user, ?UploadedFile $photo = null, array $fields = [], bool $withPhoto = true): \Illuminate\Testing\TestResponse
     {
         $this->actingAs($user);
-        $payload = $fields + ['client_submission_id' => (string) Str::uuid()];
+        $payload = array_filter($fields + ['client_submission_id' => (string) Str::uuid(), 'rescue_unit' => 'R1', 'seal_number' => 'SEAL-0001'], fn (mixed $value): bool => $value !== null);
         if ($withPhoto) {
             $payload['photo'] = $photo ?? $this->upload($this->jpegBytes());
         }

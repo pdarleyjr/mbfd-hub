@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Services\Inventory;
 
+use App\Enums\DailyCheckoutChecklistTemplate;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusInventoryChange;
 use App\Models\ApparatusInventoryCorrection;
 use App\Services\DailyCheckoutChecklistResolver;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -25,8 +27,11 @@ final class InventoryChangePlanner
 
     public const SCOPE_EQUIPMENT = 'equipment';
 
+    /** The reporting apparatus plus every apparatus on the checkout lists Logistics picks. */
+    public const SCOPE_CHECKLISTS = 'checklists';
+
     /** @var list<string> */
-    public const SCOPES = [self::SCOPE_UNIT, self::SCOPE_FAMILY, self::SCOPE_EQUIPMENT];
+    public const SCOPES = [self::SCOPE_UNIT, self::SCOPE_FAMILY, self::SCOPE_EQUIPMENT, self::SCOPE_CHECKLISTS];
 
     public const ELIGIBLE = 'eligible';
 
@@ -61,15 +66,17 @@ final class InventoryChangePlanner
      *     item_key: string,
      *     equipment_key: string|null,
      *     source_apparatus_id: int,
+     *     checklist_types: list<string>,
      *     units: list<array<string, mixed>>,
      *     fingerprint: string
      * }
      */
-    public function plan(ApparatusInventoryCorrection $correction, array $operation, string $scope, bool $lock = false): array
+    public function plan(ApparatusInventoryCorrection $correction, array $operation, string $scope, bool $lock = false, array $checklistTypes = []): array
     {
         if (! in_array($scope, self::SCOPES, true)) {
             throw ValidationException::withMessages(['scope' => 'Choose which apparatus this decision applies to.']);
         }
+        $checklistTypes = $this->normalizeChecklistTypes($scope, $checklistTypes);
         $operation = $this->normalizeOperation($correction, $operation);
         if ($operation['op'] === ApparatusInventoryChange::OP_ADD && $scope === self::SCOPE_EQUIPMENT) {
             throw ValidationException::withMessages(['scope' => 'A newly listed item is not carried anywhere yet. Apply it to this apparatus or to its family.']);
@@ -79,7 +86,7 @@ final class InventoryChangePlanner
         $itemKey = $operation['op'] === ApparatusInventoryChange::OP_ADD
             ? EquipmentIdentity::addedItemKey((int) $correction->getKey())
             : (string) $correction->item_key;
-        $candidates = $this->candidates($sourceId, $scope, $lock);
+        $candidates = $this->candidates($sourceId, $scope, $lock, $checklistTypes);
         $source = $candidates->firstWhere('id', $sourceId);
         $sourceResolution = $source instanceof Apparatus ? $this->resolver->resolve($source) : null;
         $equipmentKey = $this->equipmentKey($correction, $operation, $itemKey, $sourceResolution);
@@ -101,6 +108,7 @@ final class InventoryChangePlanner
             'item_key' => $itemKey,
             'equipment_key' => $equipmentKey,
             'source_apparatus_id' => $sourceId,
+            'checklist_types' => $checklistTypes,
             'units' => $units,
         ];
         $plan['fingerprint'] = $this->fingerprint($plan);
@@ -166,17 +174,75 @@ final class InventoryChangePlanner
             $unit['apparatus_id'], $unit['checklist_version'], $unit['verdict'], $unit['target_item_key'], $unit['destination_compartment_id'],
         ], $plan['units']);
 
-        return hash('sha256', json_encode([$plan['scope'], $plan['operation'], $plan['item_key'], $plan['equipment_key'], $units], JSON_THROW_ON_ERROR));
+        return hash('sha256', json_encode([$plan['scope'], $plan['operation'], $plan['item_key'], $plan['equipment_key'], $plan['checklist_types'] ?? [], $units], JSON_THROW_ON_ERROR));
     }
 
-    /** @return Collection<int, Apparatus> */
-    private function candidates(int $sourceId, string $scope, bool $lock): Collection
+    /**
+     * Every checkout list that at least one apparatus uses today, with the apparatus on it, for the
+     * "selected checkout lists" choice. Lists with no usable mapping (pending, unmapped) are left out:
+     * nothing can be changed on them.
+     *
+     * @return list<array{type: string, label: string, units: list<array{id: int, label: string, daily_checkout: bool}>}>
+     */
+    public function checklistUsage(): array
+    {
+        $labels = DailyCheckoutChecklistTemplate::options();
+        $byType = [];
+        foreach (Apparatus::query()->orderBy('id')->get() as $apparatus) {
+            $type = $this->resolver->checklistTypeFor($apparatus);
+            if ($type === '' || in_array($type, ['unmapped', DailyCheckoutChecklistTemplate::Pending->value], true)) {
+                continue;
+            }
+            $byType[$type][] = ['id' => (int) $apparatus->getKey(), 'label' => $this->unitLabel($apparatus), 'daily_checkout' => $apparatus->isDailyCheckoutRequired()];
+        }
+        ksort($byType);
+
+        return array_map(
+            static fn (string $type, array $units): array => ['type' => $type, 'label' => $labels[$type] ?? Str::headline($type), 'units' => $units],
+            array_keys($byType),
+            $byType,
+        );
+    }
+
+    /**
+     * Only meaningful for the checkout-lists scope, where it must name at least one list that exists.
+     *
+     * @param  array<int|string, mixed>  $types
+     * @return list<string>
+     */
+    private function normalizeChecklistTypes(string $scope, array $types): array
+    {
+        if ($scope !== self::SCOPE_CHECKLISTS) {
+            return [];
+        }
+        $known = array_column($this->checklistUsage(), 'type');
+        $picked = array_values(array_unique(array_filter(array_map(static fn (mixed $type): string => is_string($type) ? $type : '', $types), static fn (string $type): bool => $type !== '')));
+        if ($picked === []) {
+            throw ValidationException::withMessages(['checklist_types' => 'Choose at least one checkout list.']);
+        }
+        if (array_diff($picked, $known) !== []) {
+            throw ValidationException::withMessages(['checklist_types' => 'One of the chosen checkout lists is not in use. Choose again.']);
+        }
+        sort($picked);
+
+        return $picked;
+    }
+
+    /**
+     * @param  list<string>  $checklistTypes
+     * @return Collection<int, Apparatus>
+     */
+    private function candidates(int $sourceId, string $scope, bool $lock, array $checklistTypes = []): Collection
     {
         $query = Apparatus::query()->orderBy('id');
         if ($scope === self::SCOPE_UNIT) {
             $query->whereKey($sourceId);
         }
         $all = $query->get();
+        if ($scope === self::SCOPE_CHECKLISTS) {
+            $all = $all->filter(fn (Apparatus $apparatus): bool => $apparatus->getKey() === $sourceId
+                || in_array($this->resolver->checklistTypeFor($apparatus), $checklistTypes, true))->values();
+        }
         if ($scope === self::SCOPE_FAMILY) {
             $source = $all->firstWhere('id', $sourceId);
             $family = $source instanceof Apparatus
@@ -251,7 +317,7 @@ final class InventoryChangePlanner
     ): array {
         $unit = [
             'apparatus_id' => (int) $apparatus->getKey(),
-            'label' => trim((string) ($apparatus->designation ?: $apparatus->name ?: $apparatus->getAttribute('unit_id'))) ?: 'Apparatus #'.$apparatus->getKey(),
+            'label' => $this->unitLabel($apparatus),
             'checklist_type' => $resolution['checklist_type'] ?? null,
             'daily_checkout' => $apparatus->isDailyCheckoutRequired(),
             'is_source' => $isSource,
@@ -273,6 +339,11 @@ final class InventoryChangePlanner
             'includable' => in_array($verdict, self::INCLUDABLE, true),
             'default_selected' => $verdict === self::ELIGIBLE,
         ];
+    }
+
+    private function unitLabel(Apparatus $apparatus): string
+    {
+        return trim((string) ($apparatus->designation ?: $apparatus->name ?: $apparatus->getAttribute('unit_id'))) ?: 'Apparatus #'.$apparatus->getKey();
     }
 
     /**

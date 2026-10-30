@@ -150,7 +150,7 @@ final class StaffCheckController extends Controller
         $like = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], Str::lower($term)).'%';
         $escape = " LIKE ? ESCAPE '\\'";
         $query->where(function (Builder $inner) use ($like, $escape): void {
-            foreach (['submitter_name', 'member_note', 'decision_note', 'decided_by_name'] as $index => $column) {
+            foreach (['submitter_name', 'rescue_unit', 'rescue_unit_other', 'seal_number', 'member_note', 'decision_note', 'decided_by_name'] as $index => $column) {
                 $inner->{$index === 0 ? 'whereRaw' : 'orWhereRaw'}("LOWER(COALESCE({$column}, ''))".$escape, [$like]);
             }
         });

@@ -234,7 +234,7 @@ export function photoFileName(type) {
 /**
  * The form's state, as far as the update banner is concerned:
  *  - empty   : nothing chosen or typed -> safe
- *  - dirty   : a photo or a note exists only in this tab -> NOT safe
+ *  - dirty   : a photo, a note, a seal number or a rescue unit the member picked exists only in this tab -> NOT safe
  *  - sending : the upload is in flight -> NOT safe
  *  - failed  : the server did not confirm -> NOT safe (the photo is still only here)
  *  - saved   : the server accepted it -> safe
@@ -242,14 +242,17 @@ export function photoFileName(type) {
  */
 
 /**
- * @param {{ hasPhoto: boolean, note: string, sending: boolean, failed: boolean, saved: boolean }} state
+ * `hasUnit` / `hasSeal` are true once the member has picked or typed a rescue unit / seal number themselves;
+ * a value that was only prefilled (answering a rejected check) is not work yet.
+ * @param {{ hasPhoto: boolean, note: string, hasUnit?: boolean, hasSeal?: boolean, sending: boolean, failed: boolean, saved: boolean }} state
  * @returns {FormPhase}
  */
 export function formPhase(state) {
     if (state.saved) return 'saved';
     if (state.sending) return 'sending';
-    if (state.failed && (state.hasPhoto || state.note.trim() !== '')) return 'failed';
-    if (state.hasPhoto || state.note.trim() !== '') return 'dirty';
+    const hasWork = state.hasPhoto || state.note.trim() !== '' || state.hasUnit === true || state.hasSeal === true;
+    if (state.failed && hasWork) return 'failed';
+    if (hasWork) return 'dirty';
     return 'empty';
 }
 

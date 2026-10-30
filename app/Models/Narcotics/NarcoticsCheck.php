@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models\Narcotics;
 
+use App\Support\Narcotics\RescueUnits;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -26,6 +27,9 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  * @property string|null $submitter_rank
  * @property \Illuminate\Support\Carbon $submitted_at
  * @property string|null $member_note
+ * @property string|null $rescue_unit the option chosen (R1 ... FB6 or "Other"); null on checks sent before units existed
+ * @property string|null $rescue_unit_other the typed text, only when $rescue_unit is "Other"
+ * @property string|null $seal_number as typed (trimmed); null on checks sent before seal numbers were asked for
  * @property string $client_submission_id
  * @property int|null $resubmission_of_id
  * @property string $image_disk
@@ -75,6 +79,12 @@ class NarcoticsCheck extends Model
     public function getRouteKeyName(): string
     {
         return 'uuid';
+    }
+
+    /** "R22", or the typed text for "Other"; null on a check sent before units existed. */
+    public function rescueUnitLabel(): ?string
+    {
+        return RescueUnits::label($this->rescue_unit, $this->rescue_unit_other);
     }
 
     public function isPending(): bool

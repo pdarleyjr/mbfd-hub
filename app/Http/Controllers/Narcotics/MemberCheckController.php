@@ -15,6 +15,8 @@ use App\Services\Narcotics\NarcoticsCheckAccess;
 use App\Services\Narcotics\NarcoticsCheckPresenter;
 use App\Services\Narcotics\NarcoticsCheckService;
 use App\Services\Narcotics\NarcoticsImageProcessor;
+use App\Support\Narcotics\RescueUnits;
+use App\Support\Narcotics\SealNumber;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -32,7 +34,7 @@ final class MemberCheckController extends Controller
         private readonly NarcoticsCheckAccess $access,
     ) {}
 
-    /** What the form needs to know: limits and the picture types this server accepts. */
+    /** What the form needs to know: limits, the rescue units to offer, the seal number length and the picture types this server accepts. */
     public function form(Request $request): JsonResponse
     {
         return $this->guarded(function () use ($request): JsonResponse {
@@ -41,6 +43,11 @@ final class MemberCheckController extends Controller
 
             return $this->ok([
                 'note_max_length' => (int) config('narcotics_checks.note_max_length'),
+                // Every option in display order, "Other" last; choosing "Other" asks for text of at most the length below.
+                'rescue_units' => RescueUnits::options(),
+                'rescue_unit_other_option' => RescueUnits::other(),
+                'rescue_unit_other_max_length' => RescueUnits::maxOtherLength(),
+                'seal_number_max_length' => SealNumber::maxLength(),
                 'accepted_mime_types' => NarcoticsImageProcessor::acceptedMimeTypes(),
                 'max_upload_bytes' => (int) $image['max_upload_kb'] * 1024,
                 'max_edge' => (int) $image['full_edge'],
@@ -62,7 +69,7 @@ final class MemberCheckController extends Controller
                 throw new EmsException('The photo did not finish uploading. Please try again.', 'photo_upload_failed', 422, ['photo' => ['The photo did not finish uploading. Please try again.']]);
             }
 
-            $outcome = $this->checks->submit($user, $employee, $photo, $request->only(['client_submission_id', 'note', 'resubmission_of']));
+            $outcome = $this->checks->submit($user, $employee, $photo, $request->only(['client_submission_id', 'rescue_unit', 'rescue_unit_other', 'seal_number', 'note', 'resubmission_of']));
 
             return $this->ok(
                 $this->presenter->detail($outcome['check']->fresh(['resubmission', 'resubmissionOf']), NarcoticsCheckPresenter::AUDIENCE_MEMBER),
