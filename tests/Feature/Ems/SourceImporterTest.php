@@ -53,6 +53,7 @@ final class SourceImporterTest extends TestCase
         $als = SourceForm::query()->where('key', 'als-med-bag')->where('active', true)->sole();
         $this->assertSame(90, $airway->items()->count());
         $this->assertSame(106, $als->items()->count());
+        $this->assertSame(222, SourceForm::query()->where('key', 'als-transport-vehicle')->where('active', true)->sole()->items()->count());
         $this->assertSame(295, SupplyItem::query()->count());
         $this->assertSame(64, strlen($airway->sha256));
 
@@ -89,7 +90,7 @@ final class SourceImporterTest extends TestCase
         $result = app(\App\Services\Ems\Import\SourceImporter::class)->import($this->realPath());
 
         $this->assertSame($counts, [SourceForm::query()->count(), SourceFormItem::query()->count(), SupplyItem::query()->count(), CatalogItem::query()->count()]);
-        $this->assertSame(['forms.airway-bag.unchanged', 'forms.als-med-bag.unchanged', 'supply_source.unchanged'], array_keys($result['counts']));
+        $this->assertSame(['forms.airway-bag.unchanged', 'forms.als-med-bag.unchanged', 'forms.als-transport-vehicle.unchanged', 'supply_source.unchanged'], array_keys($result['counts']));
     }
 
     public function test_dry_run_saves_nothing(): void

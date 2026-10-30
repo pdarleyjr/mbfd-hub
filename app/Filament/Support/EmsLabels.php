@@ -60,7 +60,7 @@ final class EmsLabels
         InventoryRequest::TARGET_DETAIL => 'Detail / Special Event',
     ];
 
-    public const BAG = ['airway-bag' => 'Airway Bag', 'als-med-bag' => 'ALS Med Bag or Box'];
+    public const BAG = ['airway-bag' => 'Airway Bag', 'als-med-bag' => 'ALS Med Bag or Box', 'als-transport-vehicle' => 'ALS Transport Vehicle'];
 
     public const WARNING = [
         'no_previous_count' => 'No earlier count',

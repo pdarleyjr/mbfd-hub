@@ -50,7 +50,7 @@ final class RequestSubmissionService
             'target.apparatus_id' => ['nullable', 'integer'],
             'target.event_assignment' => ['nullable', 'string', 'max:'.RequestFormDefinition::EVENT_MAX],
             'member_note' => ['nullable', 'string', 'max:'.RequestFormDefinition::NOTE_MAX],
-            'lines' => ['nullable', 'array', 'max:400'],
+            'lines' => ['nullable', 'array', 'max:'.RequestFormDefinition::MAX_LINES],
             'lines.*' => ['array'],
             'lines.*.form' => ['required', 'in:'.implode(',', RequestFormDefinition::BAGS)],
             'lines.*.item_key' => ['required', 'string', 'max:160'],

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Ems;
 
 use App\Models\Ems\InventoryRequest;
+use App\Models\Ems\SourceForm;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\CarbonImmutable;
 
@@ -67,7 +68,7 @@ final class RequestPdfRenderer
                 ];
             }
             if ($sections !== []) {
-                $bags[] = ['title' => (string) ($form['title'] ?? $key), 'version_label' => $form['version_label'] ?? null, 'sections' => $sections];
+                $bags[] = ['key' => (string) $key, 'min_heading' => $key === SourceForm::TRANSPORT ? 'Vehicle par' : 'Bag minimum', 'title' => (string) ($form['title'] ?? $key), 'version_label' => $form['version_label'] ?? null, 'sections' => $sections];
             }
         }
 

@@ -3,8 +3,8 @@ import { Button, MessageBar, MessageBarBody } from '@fluentui/react-components';
 import { AlertTriangle, ArrowLeft, Check, ClipboardList, ListChecks, Search, WifiOff, X } from 'lucide-react';
 import { EmsApiError, type EmsApi } from './emsApi';
 import {
-    blankDraft, buildPayload, bumpQuantity, classifyFailure, countRequested, fieldForError, filterForms, formName, groupSections,
-    hasContent, itemsLabel, lineKey, newSubmissionId, payloadItemCount, readiness, requestedInSections, restoreDraft, serializeDraft,
+    blankDraft, buildPayload, bumpQuantity, retiredCount, classifyFailure, countRequested, discardRetired, fieldForError, filterForms, formName, groupSections,
+    hasUnsavedWork, itemsLabel, lineKey, newSubmissionId, payloadItemCount, readiness, requestedInSections, restoreDraft, serializeDraft,
     setAnswer, setQuantity, unitForChoice, variantCaption,
 } from './emsLogic.js';
 import { emsDrafts } from './emsStore';
@@ -49,6 +49,7 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
     const [draft, setDraft] = useState<EmsDraft | null>(null);
     const [restored, setRestored] = useState(false);
     const [query, setQuery] = useState('');
+    const [activeBag, setActiveBag] = useState('');
     const deferredQuery = useDeferredValue(query);
     const [openPanels, setOpenPanels] = useState<Record<string, boolean>>({});
     const [reviewOpen, setReviewOpen] = useState(false);
@@ -57,6 +58,7 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
     const [errors, setErrors] = useState<FieldErrors>({});
     const [result, setResult] = useState<Result | null>(null);
     const sendingRef = useRef(false);
+    const retiredAfterSend = useRef<{ retired: NonNullable<EmsDraft['retired']>; labels?: EmsDraft['labels'] } | null>(null);
     const latestDraft = useRef<EmsDraft | null>(null);
     const targetRef = useRef<HTMLSelectElement | null>(null);
     const searchRef = useRef<HTMLInputElement | null>(null);
@@ -77,7 +79,7 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
             const saved = restoreDraft(await emsDrafts.get(owner), definition);
             if (!active) return;
             setDraft(saved ?? blankDraft());
-            setRestored(saved !== null && (countRequested(saved) > 0 || saved.targetChoice !== ''));
+            setRestored(saved !== null && (countRequested(saved) > 0 || saved.targetChoice !== '' || retiredCount(saved) > 0));
         };
         void begin();
         return () => { active = false; };
@@ -89,10 +91,10 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
     // Keep the unfinished request on this device: quantities, the unit choice and the submission id only.
     const persist = useCallback(async (value: EmsDraft | null) => {
         if (!value) return;
-        const stored = serializeDraft(value);
+        const stored = serializeDraft(value, undefined, definition);
         if (stored) await emsDrafts.put(owner, stored);
         else await emsDrafts.remove(owner);
-    }, [owner]);
+    }, [owner, definition]);
 
     useEffect(() => {
         if (!draft || result) return;
@@ -115,13 +117,27 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
 
     const searching = deferredQuery.trim() !== '';
     const filtered = useMemo(() => filterForms(definition.forms, deferredQuery), [definition.forms, deferredQuery]);
-    const firstPanel = definition.forms[0] ? groupSections(definition.forms[0].sections)[0]?.section.key : undefined;
+    // One list at a time (Airway Bag, ALS Med Bag/Box, ALS Transport Vehicle); a search looks through all of them.
+    const bagKey = definition.forms.some((form) => form.key === activeBag) ? activeBag : (definition.forms[0]?.key ?? '');
+    const firstPanelOf = (formKey: string) => {
+        const form = definition.forms.find((candidate) => candidate.key === formKey);
+        return form ? groupSections(form.sections)[0]?.section.key : undefined;
+    };
     const isOpen = (formKey: string, sectionKey: string) => {
-        const panelKey = `${formKey}:${sectionKey}`;
         if (searching) return true;
-        return openPanels[panelKey] ?? (formKey === definition.forms[0]?.key && sectionKey === firstPanel);
+        return openPanels[`${formKey}:${sectionKey}`] ?? sectionKey === firstPanelOf(formKey);
     };
     const togglePanel = (formKey: string, sectionKey: string) => setOpenPanels((state) => ({ ...state, [`${formKey}:${sectionKey}`]: !isOpen(formKey, sectionKey) }));
+    const setAllPanels = (form: EmsFormDefinition['forms'][number], open: boolean) => setOpenPanels((state) => {
+        const next = { ...state };
+        for (const { section } of groupSections(form.sections)) next[`${form.key}:${section.key}`] = open;
+        return next;
+    });
+    const chooseBag = (key: string) => {
+        setActiveBag(key);
+        window.requestAnimationFrame(() => document.getElementById('ems-bags')?.scrollIntoView({ block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth' }));
+    };
+    const shownForms = searching ? filtered.forms : filtered.forms.filter((form) => form.key === bagKey);
 
     const unitGroups = useMemo(() => {
         const groups: { label: string; units: EmsUnit[] }[] = [];
@@ -147,7 +163,7 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
     };
 
     const startNew = () => {
-        setResult(null); setDraft(blankDraft()); setRestored(false); setQuery(''); setOpenPanels({}); setErrors({}); setReviewError('');
+        setResult(null); setDraft(retiredAfterSend.current ? { ...blankDraft(), ...retiredAfterSend.current } : blankDraft()); setRestored(false); setQuery(''); setOpenPanels({}); setActiveBag(''); setErrors({}); setReviewError('');
         window.scrollTo({ top: 0, behavior: reducedMotion() ? 'auto' : 'smooth' });
     };
 
@@ -158,6 +174,7 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
     };
 
     const ready = draft ? readiness(draft) : null;
+    const retired = draft ? retiredCount(draft) : 0;
 
     const openReview = () => {
         if (!draft || !ready) return;
@@ -182,6 +199,10 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
         try {
             const outcome = await api.submit(payload);
             await emsDrafts.remove(owner);
+            // Entries kept for items that are not on the form right now are not part of what was sent; they stay saved.
+            retiredAfterSend.current = draft.retired ? { retired: draft.retired, labels: draft.labels } : null;
+            const leftover = draft.retired ? serializeDraft({ ...blankDraft(), retired: draft.retired, labels: draft.labels }, undefined, definition) : null;
+            if (leftover) await emsDrafts.put(owner, leftover);
             await outbox.discard(payload.client_submission_id);
             setResult({ kind: 'sent', request: outcome.request });
             setReviewOpen(false);
@@ -257,12 +278,16 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
         <header className="ems-head">
             <p className="of-eyebrow">Captain 5 EMS supply</p>
             <h1>Medical Inventory Request</h1>
-            <p>One request for your Airway Bag and your ALS Med Bag or Box. Pick the unit, then enter how many you need of each item and leave the rest blank. Every item and note is optional, and you can send a partial list.</p>
+            <p>Choose your unit, pick a list, and enter how many you need of each item. Leave the rest blank; a partial request is fine.</p>
         </header>
 
         <PendingRequests outbox={outbox} openRequest={goDetail} editEntry={editEntry} />
 
         {restored && <MessageBar intent="info"><MessageBarBody>Your unfinished request was restored from this device. Notes and event text are not kept when you leave, so add yours again if you had one.</MessageBarBody></MessageBar>}
+
+        {retired > 0 && <MessageBar intent="warning" className="ems-retired"><MessageBarBody>
+            {retired === 1 ? '1 saved entry is' : `${retired} saved entries are`} for items that are no longer on this form. {retired === 1 ? 'It is' : 'They are'} kept on this device and not sent; you can see {retired === 1 ? 'it' : 'them'} when you review.
+        </MessageBarBody></MessageBar>}
 
         <section className="ems-card" aria-labelledby="ems-target-label">
             <label id="ems-target-label" htmlFor="ems-target" className="ems-label">Completing this form for:</label>
@@ -288,10 +313,10 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
         </section>
 
         <section className="ems-card ems-searchbar" aria-label="Find an item">
-            <label htmlFor="ems-search" className="sr-only">Search items in both bags</label>
+            <label htmlFor="ems-search" className="sr-only">Search items in every list</label>
             <div className="ems-search">
                 <Search size={18} aria-hidden="true" />
-                <input id="ems-search" ref={searchRef} type="search" className="ems-search-input" autoComplete="off" placeholder="Search both bags, like gauze or suction" value={query} onChange={(event) => setQuery(event.target.value)} />
+                <input id="ems-search" ref={searchRef} type="search" className="ems-search-input" autoComplete="off" placeholder="Search all lists" value={query} onChange={(event) => setQuery(event.target.value)} />
                 {query && <button type="button" className="ems-search-clear" aria-label="Clear search" onClick={() => { setQuery(''); searchRef.current?.focus(); }}><X size={17} aria-hidden="true" /></button>}
             </div>
             <p className="ems-search-count" role="status" aria-live="polite">
@@ -300,11 +325,26 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
             {errors.items && <p className="ems-field-error" role="alert"><AlertTriangle size={15} aria-hidden="true" /> {errors.items}</p>}
         </section>
 
-        {filtered.forms.map((form) => <section key={form.key} className="ems-form" aria-labelledby={`ems-form-${form.key}`}>
+        {!searching && definition.forms.length > 1 && <nav id="ems-bags" className="ems-bags" aria-label="Choose a list">
+            {definition.forms.map((form) => {
+                const needed = requestedInSections(draft, form.key, form.sections);
+                const total = form.sections.reduce((sum, section) => sum + section.items.length, 0);
+                return <button key={form.key} type="button" className="ems-bag" aria-pressed={form.key === bagKey} onClick={() => chooseBag(form.key)}>
+                    <span className="ems-bag-name">{formName(form)}</span>
+                    <span className="ems-bag-meta">{itemsLabel(total)}{needed > 0 && <span className="ems-count-chip">{needed} needed</span>}</span>
+                </button>;
+            })}
+        </nav>}
+
+        {shownForms.map((form) => <section key={form.key} className="ems-form" aria-labelledby={`ems-form-${form.key}`}>
             <header className="ems-form-head">
                 <h2 id={`ems-form-${form.key}`}><ClipboardList size={18} aria-hidden="true" /> {formName(form)}</h2>
                 <p className="ems-form-source">Source form: {form.title}{form.version_label && form.version_label !== 'undated' ? `, ${form.version_label}` : ''}</p>
                 {form.printed_note && <p className="ems-printed-note">{form.printed_note}</p>}
+                {!searching && groupSections(form.sections).length > 1 && <div className="ems-form-tools">
+                    <Button appearance="subtle" onClick={() => setAllPanels(form, true)}>Open all sections</Button>
+                    <Button appearance="subtle" onClick={() => setAllPanels(form, false)}>Close all sections</Button>
+                </div>}
             </header>
             {groupSections(form.sections).map(({ section, children }) => {
                 const all = [section, ...children];
@@ -340,7 +380,7 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
             {(draft.note.length > definition.limits.note_max * 0.8) && <p className="ems-hint">{draft.note.length} of {definition.limits.note_max} characters</p>}
         </section>
 
-        {(hasContent(draft) || draft.targetChoice !== '') && <div className="ems-clear"><Button appearance="subtle" onClick={clearForm}>Clear form</Button></div>}
+        {hasUnsavedWork(draft) && <div className="ems-clear"><Button appearance="subtle" onClick={clearForm}>Clear form</Button></div>}
 
         <div className="ems-bar" role="region" aria-label="Request summary">
             <div className="ems-bar-summary">
@@ -351,7 +391,7 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
         </div>
 
         <ReviewSheet
-            open={reviewOpen} definition={definition} draft={draft} unitLabel={unit?.label ?? ''} sending={sending} error={reviewError}
+            open={reviewOpen} definition={definition} draft={draft} onDiscardRetired={() => setDraft((d) => (d ? discardRetired(d) : d))} unitLabel={unit?.label ?? ''} sending={sending} error={reviewError}
             onBack={() => { if (!sending) { setReviewOpen(false); window.setTimeout(() => reviewButtonRef.current?.focus(), 0); } }} onSend={() => void send()}
         />
     </div>;
