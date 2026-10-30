@@ -11,6 +11,7 @@ use Illuminate\Console\Command;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Tests\Support\MigratedSqliteTemplate;
 use Tests\TestCase;
 
 final class GenerateDailyCheckoutPreactivationManifestTest extends TestCase
@@ -46,10 +47,7 @@ final class GenerateDailyCheckoutPreactivationManifestTest extends TestCase
             'daily_checkout_preactivation_read_only' => true,
         ]);
         DB::purge(self::CONNECTION);
-        Artisan::call('migrate:fresh', [
-            '--database' => self::CONNECTION,
-            '--force' => true,
-        ]);
+        MigratedSqliteTemplate::populate(self::CONNECTION, $this->candidateDatabase);
     }
 
     protected function tearDown(): void
