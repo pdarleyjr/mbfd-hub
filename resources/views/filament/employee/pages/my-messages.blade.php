@@ -8,7 +8,7 @@
 
     <div class="emsg-layout" wire:poll.30s.visible="poll" data-employee-messages="member">
         {{-- Conversation list --}}
-        <section @class(['emsg-panel', 'max-lg:hidden' => $showConversationOnMobile]) aria-labelledby="emsg-member-list-heading">
+        <section @class(['emsg-panel', 'emsg-panel--phone-hidden' => $showConversationOnMobile]) aria-labelledby="emsg-member-list-heading">
             <div class="emsg-panel__header">
                 <h2 id="emsg-member-list-heading" class="emsg-panel__title">Conversations with Support Services</h2>
                 <button type="button" class="emsg-send" wire:click="startCompose" x-on:click.capture="window.mbfdEmployeeMessagesConfirmLeave($event)">
@@ -74,14 +74,14 @@
         </section>
 
         {{-- Conversation / composer --}}
-        <section @class(['emsg-panel', 'max-lg:hidden' => ! $showConversationOnMobile]) aria-labelledby="emsg-member-detail-heading" aria-live="off">
+        <section @class(['emsg-panel', 'emsg-panel--phone-hidden' => ! $showConversationOnMobile]) aria-labelledby="emsg-member-detail-heading" aria-live="off">
             @if ($composing)
                 <div class="emsg-panel__header">
                     <div>
                         <h2 id="emsg-member-detail-heading" class="emsg-panel__title">New message to Support Services</h2>
                         <p class="emsg-subtle">Only you and the Support Services team can see this conversation.</p>
                     </div>
-                    <button type="button" class="emsg-link-button lg:hidden" wire:click="backToList" x-on:click.capture="window.mbfdEmployeeMessagesConfirmLeave($event)">
+                    <button type="button" class="emsg-link-button emsg-phone-only" wire:click="backToList" x-on:click.capture="window.mbfdEmployeeMessagesConfirmLeave($event)">
                         <x-heroicon-o-arrow-left class="h-4 w-4" aria-hidden="true" /> All messages
                     </button>
                 </div>
@@ -100,7 +100,7 @@
             @elseif ($missingThread)
                 <div class="emsg-panel__header">
                     <h2 id="emsg-member-detail-heading" class="emsg-panel__title">Conversation not found</h2>
-                    <button type="button" class="emsg-link-button lg:hidden" wire:click="backToList">
+                    <button type="button" class="emsg-link-button emsg-phone-only" wire:click="backToList">
                         <x-heroicon-o-arrow-left class="h-4 w-4" aria-hidden="true" /> All messages
                     </button>
                 </div>
@@ -119,7 +119,7 @@
                             <p class="emsg-subtle"><span data-emsg-status>{{ $thread->memberStatus() }}</span></p>
                         @endif
                     </div>
-                    <button type="button" class="emsg-link-button lg:hidden" wire:click="backToList" x-on:click.capture="window.mbfdEmployeeMessagesConfirmLeave($event)">
+                    <button type="button" class="emsg-link-button emsg-phone-only" wire:click="backToList" x-on:click.capture="window.mbfdEmployeeMessagesConfirmLeave($event)">
                         <x-heroicon-o-arrow-left class="h-4 w-4" aria-hidden="true" /> All messages
                     </button>
                 </div>

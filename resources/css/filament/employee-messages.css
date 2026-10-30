@@ -664,3 +664,22 @@
 [data-hub-portal="employee"] .emsg-dashboard-card .emsg-unread-dot {
     margin-left: auto;
 }
+
+/*
+ * One pane at a time on a phone: the list while nothing is open, the conversation once one is. The blade used
+ * Tailwind's `max-lg:hidden` and `lg:hidden`, but this theme's utilities do not include `max-lg:` and the
+ * `lg:hidden` utility loses to .emsg-link-button's own display, so both panes showed at every width. These
+ * rules are last on purpose and plain CSS (no @apply).
+ */
+@media (max-width: 1023.98px) {
+    .emsg-panel.emsg-panel--phone-hidden {
+        display: none;
+    }
+}
+
+@media (min-width: 1024px) {
+    .emsg-phone-only.emsg-link-button,
+    .emsg-phone-only {
+        display: none;
+    }
+}

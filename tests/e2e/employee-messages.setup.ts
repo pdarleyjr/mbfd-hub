@@ -12,6 +12,7 @@ export const personas = {
   responder: '99303',
   viewer: '99304',
   unrelated: '99305',
+  superAdmin: '99306',
 } as const;
 
 export type PersonaName = keyof typeof personas;
@@ -24,6 +25,7 @@ export default async function setup() {
   const php = localPhpBinary('EMPLOYEE_MESSAGES_E2E_PHP');
   execFileSync(php, [...phpExtensionArguments, 'artisan', 'migrate:fresh', '--force', '--quiet'], options);
   execFileSync(php, [...phpExtensionArguments, 'artisan', 'db:seed', '--class=Database\\Seeders\\EmployeeMessagesE2ESeeder', '--force', '--quiet'], options);
+  execFileSync(php, [...phpExtensionArguments, 'artisan', 'db:seed', '--class=Database\\Seeders\\VisualQaE2ESeeder', '--force', '--quiet'], options);
   execFileSync(php, [...phpExtensionArguments, 'artisan', 'filament:assets', '--quiet'], options);
   mkdirSync(authDirectory, { recursive: true });
 
