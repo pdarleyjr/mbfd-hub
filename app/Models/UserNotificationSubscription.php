@@ -4,31 +4,13 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Services\Notifications\NotificationCategoryRegistry;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\DB;
 
 final class UserNotificationSubscription extends Model
 {
-    /** @var array{database_enabled: bool, webpush_enabled: bool, email_enabled: bool} */
-    public const DEPARTMENT_UPDATE_DEFAULTS = [
-        'database_enabled' => true,
-        'webpush_enabled' => true,
-        'email_enabled' => false,
-    ];
-
-    /**
-     * The admin queue is the page itself; the in-app inbox and the city email
-     * are on by default, web push is opt-in per device.
-     *
-     * @var array{database_enabled: bool, webpush_enabled: bool, email_enabled: bool}
-     */
-    public const VEHICLE_SWAP_DEFAULTS = [
-        'database_enabled' => true,
-        'webpush_enabled' => false,
-        'email_enabled' => true,
-    ];
-
     protected $fillable = [
         'user_id',
         'event_key',
@@ -51,12 +33,29 @@ final class UserNotificationSubscription extends Model
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * The row a member gets for a category before choosing anything: the category's own defaults
+     * (NotificationPresetPolicy), so a row created later never undoes the preset.
+     *
+     * @return array{database_enabled: bool, webpush_enabled: bool, email_enabled: bool}
+     */
+    public static function presetFor(string $eventKey): array
+    {
+        $category = app(NotificationCategoryRegistry::class)->get($eventKey);
+
+        return $category?->rowDefaults() ?? [
+            'database_enabled' => true,
+            'webpush_enabled' => false,
+            'email_enabled' => false,
+        ];
+    }
+
     public static function ensureDepartmentUpdatesForUser(int $userId): void
     {
         DB::table((new self)->getTable())->insertOrIgnore([
             'user_id' => $userId,
             'event_key' => User::NOTIFICATION_PREFERENCE_DEPARTMENT_UPDATES,
-            ...self::DEPARTMENT_UPDATE_DEFAULTS,
+            ...self::presetFor(User::NOTIFICATION_PREFERENCE_DEPARTMENT_UPDATES),
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -71,7 +70,7 @@ final class UserNotificationSubscription extends Model
         DB::table((new self)->getTable())->insertOrIgnore([
             'user_id' => $userId,
             'event_key' => User::NOTIFICATION_PREFERENCE_VEHICLE_SWAP_REPORTED,
-            ...self::VEHICLE_SWAP_DEFAULTS,
+            ...self::presetFor(User::NOTIFICATION_PREFERENCE_VEHICLE_SWAP_REPORTED),
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -88,9 +87,7 @@ final class UserNotificationSubscription extends Model
             DB::table((new self)->getTable())->insertOrIgnore([
                 'user_id' => $user->id,
                 'event_key' => $event,
-                'database_enabled' => true,
-                'webpush_enabled' => false,
-                'email_enabled' => false,
+                ...self::presetFor($event),
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);

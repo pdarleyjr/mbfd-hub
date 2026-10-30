@@ -13,7 +13,7 @@
                     Choose what you want to hear about.
                 </h2>
                 <p class="max-w-2xl text-sm leading-6 text-hub-muted sm:text-[0.95rem]">
-                    In-app alerts always arrive in the bell at the top of the page. Push alerts to your phone or computer, and city email, are extras you can turn on for each kind of alert. You only see the alerts you are allowed to receive, and this list changes by itself if your duties change.
+                    Most alerts come to the bell at the top of the page and to your phone, and the important ones also go to your city email. Turn off anything you don't need. You only see the alerts you are allowed to receive, and this list changes by itself if your duties change.
                 </p>
             </div>
         </section>

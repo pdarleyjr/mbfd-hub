@@ -46,13 +46,13 @@ final class NotificationSubscriptionTest extends TestCase
         return $user->fresh();
     }
 
-    public function test_each_channel_is_controlled_independently_and_only_in_app_is_on_by_default(): void
+    public function test_each_channel_is_controlled_independently_and_the_bell_and_phone_are_on_by_default(): void
     {
         $user = $this->stationReviewer();
         $notification = $this->stationRequestNotification();
 
-        // Never chosen anything: the category default is in-app only.
-        self::assertSame(['database'], $notification->via($user));
+        // Never chosen anything: the category default is the bell plus the phone (this member has a device).
+        self::assertSame(['database', WebPushChannel::class], $notification->via($user));
 
         UserNotificationSubscription::query()->create([
             'user_id' => $user->id,

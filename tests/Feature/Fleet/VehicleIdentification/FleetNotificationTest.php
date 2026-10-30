@@ -34,14 +34,14 @@ final class FleetNotificationTest extends IdentificationTestCase
         UnitMasterVehicle::query()->whereKey($masterId)->toBase()->update(['veh_number' => 'OLD-1']);
     }
 
-    public function test_the_category_is_a_fleet_alert_with_database_and_email_on_by_default(): void
+    public function test_the_category_is_a_fleet_alert_with_database_push_and_email_on_by_default(): void
     {
         $category = app(NotificationCategoryRegistry::class)->get(self::EVENT);
 
         $this->assertSame('vehicle_identification_reports', self::EVENT);
         $this->assertSame('Vehicle identification for Fleet', $category->label);
         $this->assertSame(NotificationCategoryRegistry::GROUP_FLEET, $category->group);
-        $this->assertSame(['database' => true, 'webpush' => false, 'email' => true], $category->defaults);
+        $this->assertSame(['database' => true, 'webpush' => true, 'email' => true], $category->defaults);
         $this->assertTrue($category->senderWired);
         $this->assertArrayHasKey(self::EVENT, User::notificationPreferenceDefinitions());
         $this->assertSame(self::EVENT, User::preferenceKeyForSubmissionType(VehicleIdentificationNotifier::SUBMISSION_TYPE));

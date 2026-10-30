@@ -108,23 +108,25 @@ final class PersonnelRequestNotificationIntegrationTest extends TestCase
         $this->assertSame(0, $other->notifications()->count());
         $subscription = $admin->notificationSubscriptions()->where('event_key', User::NOTIFICATION_PREFERENCE_UNIFORM_REQUESTS)->sole();
         $this->assertTrue($subscription->database_enabled);
-        $this->assertFalse($subscription->webpush_enabled);
-        $this->assertFalse($subscription->email_enabled);
+        $this->assertTrue($subscription->webpush_enabled, 'phone alerts are on by default (they still need an enrolled device)');
+        $this->assertFalse($subscription->email_enabled, 'routine: no email by default');
         $subscription->update(['database_enabled' => false]);
         $notifier->adminMessageReceived($request, 'My sizing has changed.');
         $this->assertSame(1, $admin->notifications()->count());
         $this->assertFalse($subscription->refresh()->database_enabled);
     }
 
-    public function test_member_essential_inbox_keeps_external_channels_opt_in_and_requires_a_live_device_subscription(): void
+    public function test_member_essential_inbox_defaults_to_phone_and_email_and_requires_a_live_device_subscription(): void
     {
         $employee = $this->employee('EXTERNAL-CHANNELS');
         $employee->update(['city_email' => 'member@miamibeachfl.gov']);
         $user = $this->account($employee);
         $notice = new NewSubmissionNotification('member_request_update', 'Order update', 'Items arrived.');
-        $this->assertSame(['database'], $notice->via($user));
+        // Phone and email are on by default, but no phone is enrolled yet: the bell and the verified city email only.
+        $this->assertSame(['database', BudgetedMailChannel::class], $notice->via($user));
         UserNotificationSubscription::ensurePersonnelRequestsForUser($user);
         $subscription = $user->notificationSubscriptions()->where('event_key', User::NOTIFICATION_PREFERENCE_MEMBER_REQUEST_UPDATES)->sole();
+        $this->assertTrue($subscription->database_enabled && $subscription->webpush_enabled && $subscription->email_enabled, 'the created row matches the category defaults');
         $subscription->update(['database_enabled' => false, 'webpush_enabled' => true, 'email_enabled' => true]);
         $this->assertSame(['database', BudgetedMailChannel::class], $notice->via($user));
         $user->updatePushSubscription('https://push.example.test/member', str_repeat('a', 88), str_repeat('b', 24));
