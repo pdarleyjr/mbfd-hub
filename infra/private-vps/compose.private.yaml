@@ -1,0 +1,209 @@
+# Synthetic, off-host rehearsal only. See the canonical 2026-10-29 plan/checklist.
+# Never overlay production Compose or supply production secrets/data here.
+name: mbfd-v2-synthetic
+x-private: &private
+  profiles: [private]
+  platform: linux/amd64
+  restart: "no"
+  networks: [isolated]
+  security_opt: [no-new-privileges:true]
+  logging:
+    driver: json-file
+    options: {max-size: 5m, max-file: "2"}
+services:
+  hub-db:
+    <<: *private
+    image: postgres:16.13-alpine@sha256:4e6e670bb069649261c9c18031f0aded7bb249a5b6664ddec29c013a89310d50
+    environment:
+      POSTGRES_DB: hub_synthetic
+      POSTGRES_USER: hub_synthetic
+      POSTGRES_PASSWORD_FILE: /run/secrets/hub_db
+    secrets: [hub_db]
+    volumes: [hub-db:/var/lib/postgresql/data]
+    mem_limit: 1g
+    healthcheck:
+      test: [CMD, pg_isready, -U, hub_synthetic, -d, hub_synthetic]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  redis:
+    <<: *private
+    image: redis:7.4-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
+    # Isolated synthetic cache only; no host port, no production session key.
+    command: [redis-server, --appendonly, "yes", --maxmemory, 256mb, --maxmemory-policy, noeviction]
+    volumes: [redis:/data]
+    mem_limit: 384m
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  hub:
+    <<: *private
+    image: ghcr.io/pdarleyjr/mbfd-hub@sha256:64a1a67dbea574c0a8118388d189355b0b596d75980d1a3968e74c04d0ab8cb5
+    entrypoint: [/bin/bash, /staging/hub-start.sh]
+    user: sail
+    environment:
+      APP_ENV: staging
+      APP_DEBUG: "false"
+      APP_URL: http://127.0.0.1:18081
+      DB_CONNECTION: pgsql
+      DB_HOST: hub-db
+      DB_PORT: "5432"
+      DB_DATABASE: hub_synthetic
+      DB_USERNAME: hub_synthetic
+      REDIS_HOST: redis
+      QUEUE_CONNECTION: database
+      MAIL_MAILER: log
+      LOG_CHANNEL: stderr
+      SESSION_DRIVER: database
+      SESSION_COOKIE: mbfd_v2_synthetic
+      CACHE_PREFIX: mbfd_v2_synthetic
+      AI_ANALYSIS_ENABLED: "false"
+      CLOUDFLARE_AI_ENABLED: "false"
+      AI_DRIVER: disabled
+      POLICY_LIBRARY_CLAMD_HOST: clamav
+      POLICY_LIBRARY_CLAMD_PORT: "3310"
+      REVERB_APP_ID: synthetic
+      REVERB_HOST: 127.0.0.1
+      REVERB_PORT: "18080"
+      REVERB_SCHEME: http
+      REVERB_ALLOWED_ORIGINS: http://127.0.0.1:18081
+    secrets: [hub_db, hub_key, reverb_key, reverb_secret]
+    volumes:
+      - hub-storage:/var/www/html/storage
+      - ./hub-start.sh:/staging/hub-start.sh:ro
+      - ./hub-supervisord.conf:/staging/supervisord.conf:ro
+    ports: [127.0.0.1:18081:8081, 127.0.0.1:18080:8080]
+    depends_on:
+      hub-db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    mem_limit: 2g
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, http://127.0.0.1:8081/up]
+      interval: 20s
+      timeout: 5s
+      retries: 6
+  identity-db:
+    <<: *private
+    image: postgres:16.10-alpine3.22@sha256:ab8380566c3ea09690a9ecaa85a59d82bfc6eb86744151a2a54335866c83a3e9
+    environment:
+      POSTGRES_DB: authentik_synthetic
+      POSTGRES_USER: authentik_synthetic
+      POSTGRES_PASSWORD_FILE: /run/secrets/identity_db
+    secrets: [identity_db]
+    volumes: [identity-db:/var/lib/postgresql/data]
+    mem_limit: 768m
+    healthcheck:
+      test: [CMD, pg_isready, -U, authentik_synthetic, -d, authentik_synthetic]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  identity-server:
+    <<: *private
+    image: ghcr.io/goauthentik/server:2026.8.2@sha256:c0ab98c3d26d4fe66a513b0ac96ab97abc47cec9d4255abb0ba61e7f2dba1ce0
+    entrypoint: [/bin/sh, /staging/identity-start.sh]
+    command: [server]
+    environment: &identity-env
+      AUTHENTIK_POSTGRESQL__HOST: identity-db
+      AUTHENTIK_POSTGRESQL__NAME: authentik_synthetic
+      AUTHENTIK_POSTGRESQL__USER: authentik_synthetic
+      AUTHENTIK_WEB__BASE_URL: http://127.0.0.1:19000
+      AUTHENTIK_EMAIL__HOST: 127.0.0.1
+      AUTHENTIK_EMAIL__PORT: "1"
+      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+      AUTHENTIK_DISABLE_UPDATE_CHECK: "true"
+    secrets: [identity_db, identity_key]
+    volumes:
+      - identity-data:/data
+      - ./identity-start.sh:/staging/identity-start.sh:ro
+    ports: [127.0.0.1:19000:9000]
+    depends_on:
+      identity-db: {condition: service_healthy}
+    mem_limit: 2g
+    healthcheck:
+      test: [CMD, ak, healthcheck]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+  identity-worker:
+    <<: *private
+    image: ghcr.io/goauthentik/server:2026.8.2@sha256:c0ab98c3d26d4fe66a513b0ac96ab97abc47cec9d4255abb0ba61e7f2dba1ce0
+    entrypoint: [/bin/sh, /staging/identity-start.sh]
+    command: [worker]
+    environment: *identity-env
+    secrets: [identity_db, identity_key]
+    volumes:
+      - identity-data:/data
+      - identity-certs:/certs
+      - ./identity-start.sh:/staging/identity-start.sh:ro
+    depends_on:
+      identity-db: {condition: service_healthy}
+    mem_limit: 1536m
+    healthcheck:
+      test: [CMD, ak, healthcheck]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+  command:
+    <<: *private
+    # This is a LOCAL image ID, not a registry manifest. Load a verified export first.
+    image: sha256:00890e1afed6b3b916232047ce7691f1d554742531321c535402afc448ad9817
+    pull_policy: never
+    environment:
+      CMD_STT_MODEL_PROVISION_ENABLED: "false"
+      CMD_WHISPER_URL: http://127.0.0.1:1
+      CMD_AI_GATEWAY_URL: http://127.0.0.1:1
+      CMD_AI_GATEWAY_CREDENTIAL_FILE: /run/absent-ai-credential
+      CMD_UVICORN_WORKERS: "1"
+      CMD_DB_PATH: /app/data/mbfd_command.sqlite
+      CMD_STATIC_DIR: /app/static
+      CMD_AUTH_MODE: hub
+      CMD_PUBLIC_ORIGIN: http://127.0.0.1:18200
+      CMD_OIDC_ISSUER: http://hub:8081
+      CMD_OIDC_CLIENT_ID: ""
+      CMD_OIDC_CLIENT_SECRET_FILE: /run/absent-oidc-secret
+      CMD_HUB_SERVICE_TOKEN_FILE: /run/absent-service-token
+      CMD_ALLOWED_ORIGINS: ""
+    volumes: [command-data:/app/data]
+    ports: [127.0.0.1:18200:8200]
+    mem_limit: 1g
+    # Keep image's baked healthcheck. Login intentionally remains unavailable
+    # until a synthetic Hub OIDC client is separately configured and tested.
+  clamav:
+    <<: *private
+    image: clamav/clamav@sha256:2c5497749b0c014e4c9ee7a3b07f8405931324d07e7a9e9533b901bbd3b2d83b
+    environment:
+      CLAMAV_NO_FRESHCLAMD: "true"
+    volumes: [clamav-data:/var/lib/clamav]
+    mem_limit: 2g
+    # Signature availability must pass before uploads; no fail-open override.
+  tunnel:
+    profiles: [connector-version-only]
+    platform: linux/amd64
+    image: cloudflare/cloudflared:2026.10.5@sha256:1b1d34d0a9c0bfca9de72db8460d328db3f19edd2b96169114e3e893a97bbe53
+    network_mode: none
+    command: [--version]
+    restart: "no"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 128m
+networks:
+  isolated: {internal: true}
+volumes:
+  hub-db: {}
+  redis: {}
+  hub-storage: {}
+  identity-db: {}
+  identity-data: {}
+  identity-certs: {}
+  command-data: {}
+  clamav-data: {}
+secrets:
+  hub_db: {file: "${STAGING_SECRET_DIR:?set an absolute synthetic-only secret directory}/hub_db"}
+  hub_key: {file: "${STAGING_SECRET_DIR:?set an absolute synthetic-only secret directory}/hub_key"}
+  reverb_key: {file: "${STAGING_SECRET_DIR:?set an absolute synthetic-only secret directory}/reverb_key"}
+  reverb_secret: {file: "${STAGING_SECRET_DIR:?set an absolute synthetic-only secret directory}/reverb_secret"}
+  identity_db: {file: "${STAGING_SECRET_DIR:?set an absolute synthetic-only secret directory}/identity_db"}
+  identity_key: {file: "${STAGING_SECRET_DIR:?set an absolute synthetic-only secret directory}/identity_key"}
