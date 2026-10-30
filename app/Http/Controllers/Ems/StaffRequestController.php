@@ -18,6 +18,7 @@ use App\Services\Ems\RequestWorkflowService;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Arr;
 
 /** Captain 5 / EMS Admin side: Rescue Inventory (requests). Reads need `view`, every write needs `act`. */
 final class StaffRequestController extends Controller
@@ -83,8 +84,11 @@ final class StaffRequestController extends Controller
             $text = trim((string) ($f['q'] ?? ''));
             if ($text !== '') {
                 $like = '%'.str_replace(['%', '_'], ['\\%', '\\_'], mb_strtolower($text)).'%';
+                // A unit typed exactly ("R2") means that unit, never every unit whose name merely contains it ("R22").
+                $unitIds = $this->unitIdsNamed($text);
                 $query->where(fn ($w) => $w->whereRaw('lower(number) like ?', [$like])->orWhereRaw('lower(submitter_name) like ?', [$like])
-                    ->orWhereRaw('lower(target_label) like ?', [$like])->orWhereRaw('lower(coalesce(event_assignment, \'\')) like ?', [$like]));
+                    ->when($unitIds === [], fn ($q) => $q->orWhereRaw('lower(target_label) like ?', [$like]), fn ($q) => $q->orWhereIn('apparatus_id', $unitIds))
+                    ->orWhereRaw('lower(coalesce(event_assignment, \'\')) like ?', [$like]));
             }
             $page = $query->orderByDesc('submitted_at')->orderByDesc('id')
                 ->paginate((int) ($f['per_page'] ?? 25), ['*'], 'page', (int) ($f['page'] ?? 1));
@@ -151,6 +155,30 @@ final class StaffRequestController extends Controller
         }
 
         return $user;
+    }
+
+    /**
+     * Apparatus ids a search term names exactly as a unit ("R2", "r 22", "E1"); empty when the text is anything else.
+     * A request is found by its unit's id, so "R2" never also returns "R22".
+     *
+     * @return list<int>
+     */
+    private function unitIdsNamed(string $text): array
+    {
+        $term = preg_replace('/\s+/u', '', mb_strtolower($text)) ?? '';
+        if (preg_match('/^[a-z]{1,3}\d{1,3}$/', $term) !== 1) {
+            return [];
+        }
+        $ids = [];
+        foreach ($this->units->options() as $unit) {
+            $designation = preg_replace('/\s+/u', '', mb_strtolower((string) ($unit['designation'] ?? ''))) ?? '';
+            $lastWord = preg_replace('/\s+/u', '', mb_strtolower((string) Arr::last(preg_split('/\s+/u', trim((string) $unit['label'])) ?: ['']))) ?? '';
+            if ($unit['id'] !== null && ($designation === $term || $lastWord === $term)) {
+                $ids[] = (int) $unit['id'];
+            }
+        }
+
+        return $ids;
     }
 
     private function find(string $uuid): InventoryRequest

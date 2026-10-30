@@ -31,6 +31,19 @@ final class RescueUnits
         return [...array_values(array_map('strval', (array) config('narcotics_checks.rescue_units'))), self::other()];
     }
 
+    /** The listed unit a search term names exactly ("r2" is R2), ignoring case and spaces; null for anything else, including "Other". */
+    public static function listedUnit(string $term): ?string
+    {
+        $wanted = mb_strtolower(preg_replace('/\s+/u', '', $term) ?? $term);
+        foreach (array_values(array_map('strval', (array) config('narcotics_checks.rescue_units'))) as $unit) {
+            if (mb_strtolower($unit) === $wanted) {
+                return $unit;
+            }
+        }
+
+        return null;
+    }
+
     public static function other(): string
     {
         return (string) config('narcotics_checks.rescue_unit_other_option');

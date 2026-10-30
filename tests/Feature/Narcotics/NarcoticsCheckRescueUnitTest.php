@@ -271,6 +271,26 @@ final class NarcoticsCheckRescueUnitTest extends TestCase
         $this->assertSame([$other->uuid], $found('spare rescue'));
     }
 
+    public function test_searching_for_r2_finds_r2_and_never_r22(): void
+    {
+        $r2 = $this->submitOk($this->member, ['rescue_unit' => 'R2']);
+        $r22 = $this->submitOk($this->member, ['rescue_unit' => 'R22']);
+        $r1 = $this->submitOk($this->member, ['rescue_unit' => 'R1']);
+        $r11 = $this->submitOk($this->member, ['rescue_unit' => 'R11']);
+        foreach ([$r2, $r22, $r1, $r11] as $check) {
+            $this->approve($this->captain5, $check)->assertOk();
+        }
+
+        $found = fn (string $term): array => collect($this->actingAs($this->captain5)->getJson('/api/narcotics-checks/staff/checks?scope=archive&q='.rawurlencode($term))->assertOk()->json('data.*.id'))->sort()->values()->all();
+        $this->assertSame([$r2->uuid], $found('R2'));
+        $this->assertSame([$r2->uuid], $found('r2'));
+        $this->assertSame([$r2->uuid], $found(' R 2 '), 'spaces and case do not change which unit is meant');
+        $this->assertSame([$r22->uuid], $found('R22'));
+        $this->assertSame([$r1->uuid], $found('R1'));
+        $this->assertSame([$r11->uuid], $found('R11'));
+        $this->assertSame(collect([$r1, $r11, $r2, $r22])->pluck('uuid')->sort()->values()->all(), $found('R'), 'a partial word still searches by text');
+    }
+
     public function test_the_in_app_notice_names_the_unit_but_the_lock_screen_and_email_do_not(): void
     {
         $this->submitOk($this->member, ['rescue_unit' => 'R22']);

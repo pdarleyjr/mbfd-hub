@@ -14,6 +14,7 @@ use App\Services\Narcotics\NarcoticsCheckAccess;
 use App\Services\Narcotics\NarcoticsCheckPresenter;
 use App\Services\Narcotics\NarcoticsCheckService;
 use App\Support\HubTimezone;
+use App\Support\Narcotics\RescueUnits;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -149,9 +150,17 @@ final class StaffCheckController extends Controller
         }
         $like = '%'.str_replace(['\\', '%', '_'], ['\\\\', '\\%', '\\_'], Str::lower($term)).'%';
         $escape = " LIKE ? ESCAPE '\\'";
-        $query->where(function (Builder $inner) use ($like, $escape): void {
+        // A unit typed exactly ("R2") means that unit, never every unit that merely contains it ("R22").
+        $unit = RescueUnits::listedUnit($term);
+        $query->where(function (Builder $inner) use ($like, $escape, $unit): void {
             foreach (['submitter_name', 'rescue_unit', 'rescue_unit_other', 'seal_number', 'member_note', 'decision_note', 'decided_by_name'] as $index => $column) {
-                $inner->{$index === 0 ? 'whereRaw' : 'orWhereRaw'}("LOWER(COALESCE({$column}, ''))".$escape, [$like]);
+                $method = $index === 0 ? 'whereRaw' : 'orWhereRaw';
+                if ($unit !== null && in_array($column, ['rescue_unit', 'rescue_unit_other'], true)) {
+                    $inner->{$method}("LOWER(COALESCE({$column}, '')) = ?", [Str::lower($unit)]);
+
+                    continue;
+                }
+                $inner->{$method}("LOWER(COALESCE({$column}, ''))".$escape, [$like]);
             }
         });
     }
