@@ -46,6 +46,7 @@ return [
         App\Models\ResourceDocument::class => 'admin.resources',
         App\Models\InboundEmail::class => 'admin.communications',
         App\Models\OutboundEmail::class => 'admin.communications',
+        App\Models\DailyRoster\RosterImport::class => 'admin.system',
         App\Models\DepartmentUpdate::class => [
             'view' => 'admin.department_updates.view',
             'manage' => 'admin.department_updates.manage',

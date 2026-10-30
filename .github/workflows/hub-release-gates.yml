@@ -307,7 +307,7 @@ jobs:
     needs: reuse-proof
     if: ${{ !cancelled() && needs.reuse-proof.outputs.verified != 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -408,6 +408,17 @@ jobs:
         with:
           name: training-crew-planner-browser-evidence
           path: test-results/training-crew-planner
+          retention-days: 7
+      - name: Verify member Daily Roster at every screen width
+        id: daily-roster
+        if: ${{ !cancelled() && steps.hub-assets.outcome == 'success' && steps.php-dependencies.outcome == 'success' }}
+        run: npx playwright test --config=playwright.daily-roster.config.ts
+      - name: Retain Daily Roster browser evidence
+        if: ${{ always() && steps.daily-roster.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: daily-roster-browser-evidence
+          path: test-results/daily-roster
           retention-days: 7
 
   daily-authenticated-shell:

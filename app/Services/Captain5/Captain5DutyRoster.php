@@ -15,8 +15,10 @@ use DateTimeInterface;
 use Illuminate\Support\Collection;
 
 /**
- * Resolves who is shown as the shift's Captain 5 or the shift's 300 (Division Chief): display and
- * notification routing only, never a permission:
+ * Resolves the Shift Captain 5 or Shift 300 (Division Chief) by seat or approved acting request. This
+ * is an authority and routing input, not only a display: it feeds narcotics review
+ * (NarcoticsCheckAccess), the Captain 5 audit capacity and notification routing. It never reads the
+ * TeleStaff roster, which only ever changes the name on the cards.
  *  1. an administrator-approved acting request of that role showing at the moment;
  *  2. otherwise the verified bid holder of that seat ("Captain 5" / "300") whose bid shift is the
  *     on-duty rotation shift;

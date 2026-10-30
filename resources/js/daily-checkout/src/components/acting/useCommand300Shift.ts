@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { isApiAuthenticationError, redirectToLoginAfterSessionExpiry } from '../../utils/api';
+import { asBackgroundRefresh } from '../../utils/captain5Api';
 import { fetchCommand300Shift } from '../../utils/command300ShiftApi';
 import type { ActingResult } from './types';
 
@@ -9,7 +10,7 @@ const POLL_MS = 60_000;
 interface Options {
   /** False until access is known, so a refused account never asks. */
   enabled?: boolean;
-  /** The 300 page keeps the line fresh; the station-list card loads it once. */
+  /** The 300 page keeps the line fresh; the station-list card refreshes slowly itself (useVisibleRefresh). */
   poll?: boolean;
 }
 
@@ -47,19 +48,23 @@ export function useCommand300Shift({ enabled = true, poll = true }: Options = {}
       setError(null);
     } catch (failure) {
       if (mine !== latest.current) return;
-      if (isApiAuthenticationError(failure)) { redirectToLoginAfterSessionExpiry(); return; }
+      if (isApiAuthenticationError(failure)) {
+        // A card's background refresh never takes the member off the page they are reading.
+        if (poll || mode !== 'silent') redirectToLoginAfterSessionExpiry();
+        return;
+      }
       const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
       if (mode !== 'silent' || !offline) setError(failure instanceof Error && failure.message ? failure.message : 'The shift 300 could not be loaded.');
     } finally {
       if (mine === latest.current) setLoading(false);
     }
-  }, []);
+  }, [poll]);
 
   useEffect(() => { if (enabled) void load('initial'); }, [enabled, load]);
 
   useEffect(() => {
     if (!enabled || !poll) return undefined;
-    const tick = () => { if (document.visibilityState === 'visible') void load('silent'); };
+    const tick = () => { if (document.visibilityState === 'visible') asBackgroundRefresh(() => { void load('silent'); }); };
     const timer = setInterval(tick, POLL_MS);
     document.addEventListener('visibilitychange', tick);
     return () => { clearInterval(timer); document.removeEventListener('visibilitychange', tick); };
