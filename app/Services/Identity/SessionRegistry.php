@@ -65,6 +65,44 @@ final class SessionRegistry
             && $absoluteExpiresAt->isAfter($at);
     }
 
+    /**
+     * Slides the idle deadline forward while the member is using the Hub. Call only after isCurrent()
+     * accepted the session: a session that is already past its idle or absolute time is never revived.
+     * The deadline never moves past the absolute expiry and never moves backwards, and the row is
+     * written at most once a minute, so a busy page does not turn into a stream of updates.
+     */
+    public function recordActivity(AuthenticationSession $session, CarbonInterface $at): void
+    {
+        $now = CarbonImmutable::instance($at);
+        $last = $this->timestamp($session, 'last_activity_at');
+        if ($last !== null && $last->greaterThan($now->subSeconds(60))) {
+            return; // already recorded within the last minute: no query at all on most requests
+        }
+        $window = max(60, (int) config('security.canonical_session.unmanaged_idle_seconds', 14400));
+        $deadline = $now->addSeconds($window);
+
+        $absolute = $this->timestamp($session, 'absolute_expires_at');
+        if ($absolute !== null && $deadline->greaterThan($absolute)) {
+            $deadline = $absolute;
+        }
+        $current = $this->timestamp($session, 'idle_expires_at');
+        if ($current !== null && $current->greaterThan($deadline)) {
+            $deadline = $current;
+        }
+
+        AuthenticationSession::query()
+            ->whereKey($session->getKey())
+            ->whereNull('revoked_at')
+            ->where(function ($query) use ($now): void {
+                $query->whereNull('last_activity_at')->orWhere('last_activity_at', '<=', $now->subSeconds(60));
+            })
+            ->update([
+                'last_activity_at' => $now,
+                'idle_expires_at' => $deadline,
+                'updated_at' => $now,
+            ]);
+    }
+
     public function revoke(
         User $user,
         string $registryId,

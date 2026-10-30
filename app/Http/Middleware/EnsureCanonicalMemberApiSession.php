@@ -44,6 +44,8 @@ final readonly class EnsureCanonicalMemberApiSession
             return response()->json(['message' => 'Unauthenticated.'], 401);
         }
 
+        $this->sessions->recordActivity($registered, CarbonImmutable::now());
+
         if ($user->must_change_password) {
             throw new PasswordChangeRequired;
         }
