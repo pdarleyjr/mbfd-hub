@@ -241,7 +241,7 @@ final class DailyInspectionSecurityTest extends TestCase
         // builder and postIssueMessage is denied to a non-reviewer by
         // CanonicalInspectionActionsTest::test_every_public_page_method_is_refused_to_a_viewer_who_cannot_review.
         $known = [
-            'mount', 'getTitle', 'getHeading',
+            'mount', 'getTitle', 'getHeading', 'getBreadcrumbs', 'getBreadcrumbs',
             'acknowledgeIssueAction', 'updateIssueAction', 'resolveIssueAction', 'dismissIssueAction', 'reopenIssueAction',
             'verifyCorrectionAction', 'classifyImpactAction', 'correctSeverityAction', 'linkServiceTicketAction',
             'acceptMeterReadingAction', 'enterVerifiedReadingAction', 'requestMeterClarificationAction', 'keepCurrentReadingAction',
