@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 /** Email handed to BudgetedMailChannel survives a block in the same way for every notification. */
@@ -135,6 +136,58 @@ final class BudgetedEmailRetryTest extends TestCase
         self::assertSame(1, $submissions);
         self::assertSame('acceptance_unknown', OutboundEmail::query()->sole()->status);
         self::assertDatabaseCount('jobs', 0);
+    }
+
+    #[DataProvider('temporaryBlocks')]
+    public function test_every_temporary_block_waits_its_own_time_at_first_send_and_on_retry_then_delivers_once(string $block, int $seconds): void
+    {
+        $this->applyBlock($block, true);
+
+        Notification::route('mail', 'member@miamibeachfl.gov')->notify(new QueuedTestEmail);
+        $this->work();
+
+        Http::assertNothingSent();
+        self::assertGreaterThanOrEqual(now()->addSeconds($seconds - 1)->getTimestamp(), (int) DB::table('jobs')->sole()->available_at);
+
+        // Still blocked when due: the job waits again for the time the block names.
+        $this->travel($seconds + 1)->seconds();
+        $this->applyBlock($block, true);
+        $this->work();
+
+        Http::assertNothingSent();
+        self::assertGreaterThanOrEqual(now()->addSeconds($seconds - 1)->getTimestamp(), (int) DB::table('jobs')->sole()->available_at);
+
+        $this->travel($seconds + 1)->seconds();
+        $this->applyBlock($block, false);
+        $this->work();
+
+        Http::assertSentCount(1);
+        self::assertDatabaseCount('jobs', 0);
+        self::assertDatabaseCount('failed_jobs', 0);
+    }
+
+    /** @return array<string, array{string, int}> */
+    public static function temporaryBlocks(): array
+    {
+        return [
+            'per-minute limit' => ['minute', 61],
+            'daily quota' => ['daily', 3600],
+            'unreconciled budget' => ['unreconciled', 300],
+            'provider backoff' => ['backoff', 601],
+        ];
+    }
+
+    private function applyBlock(string $block, bool $on): void
+    {
+        $this->openBudget();
+        config()->set('communications.cloudflare.max_recipient_units_per_minute', $block === 'minute' && $on ? 0 : 5);
+        CloudflareUsageBudget::query()->update([
+            'provider_daily_used' => $block === 'daily' && $on ? 1000 : 0,
+            'provider_backoff_until' => $block === 'backoff' && $on ? now()->addSeconds(600) : null,
+        ]);
+        if ($block === 'unreconciled' && $on) {
+            $this->closeBudget();
+        }
     }
 
     public function test_a_block_that_waiting_will_not_clear_is_logged_once_and_not_retried(): void
