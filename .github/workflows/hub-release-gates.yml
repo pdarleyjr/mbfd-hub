@@ -275,7 +275,10 @@ jobs:
           DAILY_CHECKOUT_OUT_DIR: ../../../public/daily
         run: npm run build
       - name: Run PHPUnit suite
-        run: php artisan test --exclude-group=postgres
+        # ParaTest workers each own an in-memory SQLite database (phpunit.xml and
+        # tests/bootstrap.php force it), so the default suite is isolated per process.
+        # The PostgreSQL group below stays sequential against the single service.
+        run: php artisan test --parallel --exclude-group=postgres
       - name: Test Policy Library navigation and source proof processing
         run: |
           npm --prefix modules/policy-library test
@@ -942,7 +945,8 @@ jobs:
           DAILY_CHECKOUT_OUT_DIR: ../../../public/daily
         run: npm run build
       - name: Run PHP 8.5 PHPUnit compatibility suite
-        run: php artisan test --exclude-group=postgres
+        # Same parallel, per-process in-memory SQLite execution as the PHP 8.4 lane.
+        run: php artisan test --parallel --exclude-group=postgres
       - name: Run PHP 8.5 PostgreSQL compatibility tests
         env:
           MBFD_ALLOW_DISPOSABLE_POSTGRES: "1"
