@@ -34,6 +34,8 @@ case "${1:-check}" in
   init)
     host_gate
     test ! -e "$STAGING_SECRET_DIR" || { echo 'Synthetic secret directory already exists; refusing overwrite.' >&2; exit 1; }
+    existing_volumes=$("${engine[@]}" volume ls --filter label=com.docker.compose.project=mbfd-v2-synthetic --format '{{.Name}}')
+    test -z "$existing_volumes" || { echo 'Synthetic volumes already exist. Recover their original keys; do not generate replacements.' >&2; exit 1; }
     umask 077
     mkdir -m 700 "$STAGING_SECRET_DIR"
     for name in hub_db reverb_key reverb_secret identity_db identity_key; do
