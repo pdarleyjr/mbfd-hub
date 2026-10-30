@@ -67,7 +67,9 @@ class ApparatusObserver
     private function dispatchSync(): void
     {
         if (config('google_sheets.apparatus_sync_enabled')) {
-            SyncApparatusToSheetJob::dispatch()->afterCommit();
+            // Not ->afterCommit(): the unique lock is taken at dispatch, and a rollback
+            // would then hold it with no job behind it, swallowing the next save's sync.
+            DB::afterCommit(static fn () => SyncApparatusToSheetJob::dispatch());
         }
     }
 }

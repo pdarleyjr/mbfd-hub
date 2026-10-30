@@ -26,7 +26,7 @@ class SyncApparatusToSheetJob implements ShouldBeUniqueUntilProcessing, ShouldQu
     /** @var list<int> Seconds between tries, past Google's per-minute write quota. */
     public array $backoff = [60, 120, 300, 600];
 
-    public int $uniqueFor = 900;
+    public int $uniqueFor = 120;
 
     public function handle(ApparatusSheetSyncService $service): void
     {

@@ -102,15 +102,20 @@ final class SendBudgetedEmail implements ShouldQueue
 
     /**
      * Every status except this one may have reached the provider, including a lost
-     * response. Only a refusal before acceptance can safely be sent again.
+     * response. Only a refusal before acceptance can safely be sent again. Compared
+     * per recipient: two changes of one member's address notify two different people.
      *
      * @phpstan-impure
      */
     private function mayHaveReachedProvider(): bool
     {
+        $wanted = array_map(static fn (string $address): string => strtolower(trim($address)), $this->to);
+
         return OutboundEmail::query()->where('source_type', $this->sourceType)->where('source_id', $this->sourceId)
             ->where('id', '>', $this->lastOutboundEmailIdAtDispatch)
-            ->where('status', '!=', 'failed_pre_acceptance')->exists();
+            ->where('status', '!=', 'failed_pre_acceptance')
+            ->get(['to_recipients'])
+            ->contains(static fn (OutboundEmail $delivery): bool => array_intersect($wanted, (array) $delivery->to_recipients) !== []);
     }
 
     /** @return array{source_type:string,source_id:string} */

@@ -364,17 +364,24 @@ final class MemberSelfServiceActivationTest extends TestCase
         self::assertDatabaseCount('jobs', 0);
     }
 
-    public function test_a_second_activation_still_gets_its_own_notice_while_the_first_is_waiting(): void
+    public function test_two_waiting_notices_to_one_address_send_once_but_to_two_addresses_send_both(): void
     {
         config()->set('queue.default', 'database');
         $this->closeEmailBudget();
         $member = $this->pending('SELF-WAITING');
 
         dispatch($this->noticeJob($member, 'self-waiting@miamibeachfl.gov'));
-        $this->workNotificationQueue();
         dispatch($this->noticeJob($member, 'self-waiting@miamibeachfl.gov'));
+        dispatch($this->noticeJob($member, 'other-mailbox@miamibeachfl.gov'));
+        $this->openEmailBudget();
+        foreach (range(1, 3) as $ignored) {
+            $this->workNotificationQueue();
+        }
 
-        self::assertDatabaseCount('jobs', 2);
+        Http::assertSentCount(2);
+        Http::assertSent(fn (Request $request): bool => $request['to'] === ['self-waiting@miamibeachfl.gov']);
+        Http::assertSent(fn (Request $request): bool => $request['to'] === ['other-mailbox@miamibeachfl.gov']);
+        self::assertDatabaseCount('jobs', 0);
     }
 
     public function test_a_notice_from_an_earlier_activation_does_not_silence_a_new_one(): void

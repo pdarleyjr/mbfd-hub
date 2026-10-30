@@ -58,7 +58,7 @@ final class BudgetedEmailRetryTest extends TestCase
         ]));
     }
 
-    public function test_a_queued_notification_email_outlasts_a_block_that_covers_all_the_workers_tries(): void
+    public function test_a_blocked_notification_email_leaves_the_workers_fast_retries_and_is_delivered_after_the_block(): void
     {
         $this->closeBudget();
 

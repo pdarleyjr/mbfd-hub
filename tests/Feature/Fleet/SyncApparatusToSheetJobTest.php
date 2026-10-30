@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Tests\Feature\Fleet;
 
 use App\Jobs\SyncApparatusToSheetJob;
+use App\Models\Apparatus;
+use App\Observers\ApparatusObserver;
 use App\Services\GoogleSheets\ApparatusSheetSyncService;
 use Google\Service\Exception as GoogleServiceException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -64,12 +66,33 @@ final class SyncApparatusToSheetJobTest extends TestCase
         $job->assertFailed();
     }
 
-    public function test_the_retry_schedule_outlasts_googles_per_minute_quota(): void
+    public function test_the_worker_waits_past_googles_per_minute_quota_before_trying_again(): void
     {
-        $job = new SyncApparatusToSheetJob;
+        config()->set('queue.default', 'database');
+        $this->serviceThrows(new GoogleServiceException('Quota exceeded', 429));
+        SyncApparatusToSheetJob::dispatch();
 
-        self::assertSame(5, $job->tries);
-        self::assertSame([60, 120, 300, 600], $job->backoff);
+        $this->artisan('queue:work', ['connection' => 'database', '--once' => true, '--tries' => 3, '--sleep' => 0])->assertSuccessful();
+
+        self::assertDatabaseCount('failed_jobs', 0);
+        $job = DB::table('jobs')->sole();
+        self::assertSame(1, (int) $job->attempts);
+        self::assertGreaterThanOrEqual(now()->addSeconds(59)->getTimestamp(), (int) $job->available_at);
+    }
+
+    public function test_a_save_rolled_back_with_its_transaction_does_not_hold_up_the_next_sync(): void
+    {
+        config()->set('queue.default', 'database');
+        $observer = new ApparatusObserver;
+
+        DB::beginTransaction();
+        $observer->deleted(new Apparatus);
+        DB::rollBack();
+        self::assertSame(0, DB::table('jobs')->count());
+
+        $observer->deleted(new Apparatus);
+
+        self::assertSame(1, DB::table('jobs')->count());
     }
 
     public function test_a_burst_of_saves_queues_one_sync_because_each_run_sends_every_apparatus(): void

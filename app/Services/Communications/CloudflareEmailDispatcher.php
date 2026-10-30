@@ -127,8 +127,8 @@ final class CloudflareEmailDispatcher
             'references' => isset($headers['References']) ? preg_split('/\s+/', trim($headers['References'])) : null,
         ]);
 
-        $this->deliveryLedger->initialize($email);
         try {
+            $this->deliveryLedger->initialize($email);
             if (! $sensitive && $attachmentPayload !== []) {
                 foreach ($attachmentPayload as $index => $attachment) {
                     $path = 'outbound-email-attachments/'.$email->id.'/'.Str::uuid();
