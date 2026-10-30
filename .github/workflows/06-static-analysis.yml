@@ -1,10 +1,23 @@
 name: Static Analysis
 
+# PHPStan and actionlint for pull requests and main run in the required
+# "PHPStan static analysis" and "GitHub Actions syntax and policy" jobs in
+# hub-release-gates.yml (same PHP version, extensions, phpstan.neon, action SHA
+# and fail-on-error). They are not repeated here for the same commit.
+#
+# This workflow keeps the checks the release gates do not run: every Node
+# contract test under tests/Node and the operations monitor Python tests under
+# tests/Python. PHPStan stays available here as an on-demand run only.
 on:
+  workflow_dispatch:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -12,13 +25,14 @@ permissions:
 jobs:
   phpstan:
     name: PHPStan
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: Setup PHP
-        uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2
+        uses: shivammathur/setup-php@accd6127cb78bee3e8082180cb391013d204ef9f # v2.37.0
         with:
           php-version: '8.4'
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, pdo_pgsql, bcmath, soap, intl, gd, exif, iconv, fileinfo
@@ -31,12 +45,12 @@ jobs:
       - name: Run PHPStan
         run: vendor/bin/phpstan analyse --memory-limit=1G --no-progress -c phpstan.neon
 
-  actionlint:
-    name: Action Lint
+  regression-tests:
+    name: Node contract and Python regression tests
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: CI configuration contract tests
         run: node --test tests/Node/*.test.mjs
@@ -47,8 +61,3 @@ jobs:
           "$RUNNER_TEMP/operations-python/bin/python" -m pip install --disable-pip-version-check -r scripts/operations/requirements-training-paper.txt
           source "$RUNNER_TEMP/operations-python/bin/activate"
           python3 -m unittest discover -s tests/Python -p 'test_*.py' -v
-
-      - name: Run actionlint
-        uses: raven-actions/actionlint@205b530c5d9fa8f44ae9ed59f341a0db994aa6f8 # v2.1.2
-        with:
-          fail-on-error: true

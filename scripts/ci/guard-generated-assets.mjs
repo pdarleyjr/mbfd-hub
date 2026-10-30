@@ -42,7 +42,7 @@ const releaseGateWorkflow = readFileSync(releaseGateWorkflowPath, "utf8");
 const missingReleaseCommands = [
   "run: composer install",
   "run: npm run build",
-  "run: php artisan test --exclude-group=postgres",
+  "run: php artisan test --parallel --exclude-group=postgres",
 ].filter((command) => !releaseGateWorkflow.includes(command));
 
 if (missingReleaseCommands.length > 0) {

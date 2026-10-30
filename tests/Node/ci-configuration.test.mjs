@@ -4,9 +4,11 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import {
+  browserViolations,
   declaredProjects,
   matrixLanes,
   partitionViolations,
+  webkitProjects,
 } from "../../scripts/ci/verify-daily-playwright-partition.mjs";
 import {
   AGGREGATE_CHECK_NAME,
@@ -727,7 +729,7 @@ test("the shared release gate has hard-failing quality, Daily, PostgreSQL, asset
   assert.match(postgresDailyAssets, /working-directory:\s*resources\/js\/daily-checkout/);
   assert.match(postgresDailyAssets, /DAILY_CHECKOUT_OUT_DIR:\s*\.\.\/\.\.\/\.\.\/public\/daily/);
   assert.match(postgresDailyAssets, /npm run build/);
-  assert.match(workflowStep(postgres, "Run PHPUnit suite"), /php artisan test --exclude-group=postgres/);
+  assert.match(workflowStep(postgres, "Run PHPUnit suite"), /php artisan test --parallel --exclude-group=postgres/);
   assert.match(
     workflowStep(postgres, "Run PostgreSQL concurrency and integrity tests"),
     /php artisan test --group=postgres/,
@@ -801,7 +803,7 @@ test("the shared release gate has hard-failing quality, Daily, PostgreSQL, asset
   assert.match(php85DailyAssets, /working-directory:\s*resources\/js\/daily-checkout/);
   assert.match(php85DailyAssets, /DAILY_CHECKOUT_OUT_DIR:\s*\.\.\/\.\.\/\.\.\/public\/daily/);
   assert.match(php85DailyAssets, /npm run build/);
-  assert.match(workflowStep(php85, "Run PHP 8.5 PHPUnit compatibility suite"), /php artisan test --exclude-group=postgres/);
+  assert.match(workflowStep(php85, "Run PHP 8.5 PHPUnit compatibility suite"), /php artisan test --parallel --exclude-group=postgres/);
   assert.match(workflowStep(php85, "Run PHP 8.5 PostgreSQL compatibility tests"), /php artisan test --group=postgres/);
 
   const aiGateway = workflowJob(gates, "ai-gateway-source");
@@ -859,7 +861,7 @@ test("CI runs a required PostgreSQL group against its dedicated disposable servi
   assert.match(workflow, /POSTGRES_DB:\s*mbfd_hub_test_ci/);
   assert.match(workflow, /POSTGRES_USER:\s*mbfd_test_ci/);
   assert.match(workflow, /POSTGRES_HOST_AUTH_METHOD:\s*trust/);
-  assert.match(defaultTestStep, /php artisan test --exclude-group=postgres/);
+  assert.match(defaultTestStep, /php artisan test --parallel --exclude-group=postgres/);
   assert.match(postgresTestStep, /MBFD_ALLOW_DISPOSABLE_POSTGRES:\s*["']1["']/);
   assert.match(postgresTestStep, /REQUIRE_POSTGRES_INTEGRATION:\s*["']true["']/);
   assert.match(postgresTestStep, /DISPOSABLE_POSTGRES_HOST:\s*127\.0\.0\.1/);
@@ -868,6 +870,30 @@ test("CI runs a required PostgreSQL group against its dedicated disposable servi
   assert.match(postgresTestStep, /DISPOSABLE_POSTGRES_PASSWORD:\s*["']{2}/);
   assert.match(postgresTestStep, /php artisan test --group=postgres/);
   assert.match(phpunit, /<directory>tests\/Integration<\/directory>/);
+});
+
+test("Parallel PHPUnit lanes keep per-process in-memory SQLite isolation and never parallelize the PostgreSQL group", () => {
+  const workflow = readFileSync(resolve(root, ".github/workflows/hub-release-gates.yml"), "utf8");
+  const bootstrap = readFileSync(resolve(root, "tests/bootstrap.php"), "utf8");
+  const phpunit = readFileSync(resolve(root, "phpunit.xml"), "utf8");
+  const composer = JSON.parse(readFileSync(resolve(root, "composer.json"), "utf8"));
+  const coordinator = readFileSync(resolve(root, "tests/CreatesApplication.php"), "utf8");
+
+  assert.ok(composer["require-dev"]["brianium/paratest"], "php artisan test --parallel needs ParaTest");
+  assert.match(phpunit, /<env name="DB_CONNECTION" value="sqlite" force="true"\/>/);
+  assert.match(phpunit, /<env name="DB_DATABASE" value=":memory:" force="true"\/>/);
+  assert.match(bootstrap, /'DB_DATABASE' => ':memory:'/);
+  // The ParaTest coordinator boots the app before tests/bootstrap.php, so it must use the same sentinel.
+  assert.match(coordinator, /define\('MBFD_PHPUNIT_BOOTSTRAP', true\)/);
+
+  for (const [job, step, postgresStep] of [
+    ["phpunit-postgres", "Run PHPUnit suite", "Run PostgreSQL concurrency and integrity tests"],
+    ["php-85-compatibility", "Run PHP 8.5 PHPUnit compatibility suite", "Run PHP 8.5 PostgreSQL compatibility tests"],
+  ]) {
+    const body = workflowJob(workflow, job);
+    assert.match(workflowStep(body, step), /php artisan test --parallel --exclude-group=postgres\s*$/m);
+    assert.doesNotMatch(workflowStep(body, postgresStep), /--parallel/, `${job} must keep the PostgreSQL group sequential`);
+  }
 });
 
 test("CI executes the deploy-free configuration regression suite", () => {
@@ -956,9 +982,12 @@ test("Daily Checkout browser acceptance uses a mocked isolated loopback build", 
   assert.match(config, /daily-checkout-service-worker\\\.spec\\\.ts/);
   assert.match(dailySpec, /page\.route\('\*\*\/api\/\*\*'/);
   assert.match(workflowStep(daily, "Install root browser test dependencies"), /npm ci --ignore-scripts --legacy-peer-deps/);
-  assert.match(workflowStep(daily, "Install Chromium and WebKit for Daily Checkout Playwright"), /npx playwright install --with-deps chromium webkit/);
+  const install = workflowStep(daily, "Install Playwright browsers for Daily Checkout (${{ matrix.browsers }})");
+  assert.match(install, /PLAYWRIGHT_BROWSERS:\s*\$\{\{\s*matrix\.browsers\s*\}\}/);
+  assert.match(install, /npx playwright install --with-deps "\$\{browsers\[@\]\}"/);
   const mocked = workflowStep(daily, "Run mocked Daily Checkout Playwright");
   assert.match(mocked, /DAILY_CHECKOUT_E2E_BASE_URL:\s*http:\/\/127\.0\.0\.1:4176/);
+  assert.match(mocked, /DAILY_PLAYWRIGHT_WORKERS:\s*\$\{\{\s*matrix\.workers\s*\}\}/);
   assert.match(mocked, /DAILY_PLAYWRIGHT_PROJECTS:\s*\$\{\{\s*matrix\.projects\s*\}\}/);
   assert.match(mocked, /set -euo pipefail/);
   assert.match(mocked, /test "\$\{#project_args\[@\]\}" -gt 0/);
@@ -973,6 +1002,27 @@ test("Daily Checkout browser acceptance uses a mocked isolated loopback build", 
   const projects = declaredProjects(config);
   assert.ok(projects.length >= 19, "the Daily Playwright config project list must resolve");
   assert.deepEqual(partitionViolations(lanes, projects), []);
+  // A lane installs exactly the browsers its projects need: never fewer, no unused WebKit.
+  const webkit = webkitProjects(config);
+  assert.deepEqual([...webkit].sort(), [
+    "daily-issue-report-webkit",
+    "daily-webkit-ipad",
+    "daily-webkit-iphone",
+    "daily-workspace-webkit-ipad",
+    "daily-workspace-webkit-iphone",
+  ]);
+  assert.deepEqual(browserViolations(lanes, projects, webkit), []);
+  assert.ok(
+    browserViolations([{ lane: "y", browsers: ["chromium", "webkit"], workers: 2, projects: ["daily-webkit-iphone"] }], projects, webkit)
+      .some((violation) => violation.includes("need one")),
+    "WebKit lanes running more than one worker must be detected",
+  );
+  assert.ok(lanes.every((lane) => lane.workers >= 1), "every lane declares its workers");
+  assert.ok(
+    browserViolations([{ lane: "x", browsers: ["chromium"], projects: ["daily-webkit-iphone"] }], projects, webkit)
+      .some((violation) => violation.includes("does not install webkit")),
+    "a WebKit project in a lane that did not install WebKit must be detected",
+  );
   assert.ok(
     partitionViolations(lanes.slice(1), projects).some((violation) => violation.includes("not assigned")),
     "dropping a lane must be detected",
@@ -995,6 +1045,25 @@ test("Daily Checkout authenticated browser lanes keep every suite, project, and 
   const sessionExpiry = workflowStep(core, "Verify shared panel session-expiry handling");
   assert.match(sessionExpiry, /node --test tests\/Node\/panel-session-expiry\.test\.mjs/);
   assert.match(sessionExpiry, /node --test tests\/Browser\/panel-session-expiry\.mjs/);
+
+  // The training kiosk, matrix and crew planner suites each run exactly once (in
+  // the contract job, which already has their Vite build, PHP and browsers) and
+  // keep their evidence uploads.
+  for (const [stepName, id, config, artifact, path] of [
+    ["Verify training roster kiosk browser contracts", "training-roster", "playwright.training-roster.config.ts", "training-roster-browser-evidence", "test-results/training-roster"],
+    ["Verify authenticated training matrix and workbook browsers", "training-matrix", "playwright.training-matrix.config.ts", "training-matrix-browser-evidence", "test-results/training-matrix"],
+    ["Verify isolated crew planner and standalone exports in browsers", "training-crew-planner", "playwright.training-crew-planner.config.ts", "training-crew-planner-browser-evidence", "test-results/training-crew-planner"],
+  ]) {
+    const step = workflowStep(core, stepName);
+    assert.match(step, new RegExp(`id: ${id}\\b`));
+    assert.match(step, new RegExp(`npx playwright test --config=${escapeRegExp(config)}\\r?$`, "m"));
+    assert.match(step, /if: \$\{\{ !cancelled\(\) && steps\.hub-assets\.outcome == 'success' && steps\.php-dependencies\.outcome == 'success' \}\}/);
+    assert.doesNotMatch(shell, new RegExp(escapeRegExp(config)), `${config} must not also run in the shell job`);
+    const upload = workflowStep(core, `Retain ${stepName.includes("roster") ? "training roster" : stepName.includes("matrix") ? "training matrix" : "crew planner"} browser evidence`);
+    assert.match(upload, new RegExp(`if: \\$\\{\\{ always\\(\\) && steps\\.${id}\\.outcome != 'skipped' \\}\\}`));
+    assert.match(upload, new RegExp(`name: ${artifact}\\r?$`, "m"));
+    assert.match(upload, new RegExp(`path: ${escapeRegExp(path)}\\r?$`, "m"));
+  }
 
   for (const job of [shell, lifecycles]) {
     assert.match(workflowStep(job, "Install root browser test dependencies"), /npm ci --ignore-scripts --legacy-peer-deps/);
