@@ -82,10 +82,9 @@ final class NarcoticsImageProcessor
     /** The MIME types the form tells the browser it may send (browser-side encoding is WebP or JPEG). */
     public static function acceptedMimeTypes(): array
     {
-        return array_values(array_filter([
-            'image/jpeg', 'image/png',
-            self::webpAvailable() ? 'image/webp' : null,
-        ]));
+        return self::webpAvailable()
+            ? ['image/jpeg', 'image/png', 'image/webp']
+            : ['image/jpeg', 'image/png'];
     }
 
     private function detectType(string $bytes): ?string

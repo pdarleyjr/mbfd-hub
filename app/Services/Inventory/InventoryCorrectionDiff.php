@@ -23,8 +23,8 @@ final class InventoryCorrectionDiff
      */
     public static function rows(ApparatusInventoryCorrection $correction, array $compartmentNames = []): array
     {
-        $snapshot = is_array($correction->target_snapshot) ? $correction->target_snapshot : [];
-        $proposal = is_array($correction->proposal) ? $correction->proposal : [];
+        $snapshot = $correction->target_snapshot ?: [];
+        $proposal = $correction->proposal ?: [];
         $before = static fn (string $key): string => self::text($snapshot[$key] ?? null);
         $note = self::text($correction->member_note, '');
 

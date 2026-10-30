@@ -96,7 +96,7 @@ final class NarcoticsNotifier
 
         try {
             $parts = explode(':', $eventKey);
-            if (($parts[0] ?? '') !== 'narcotics' || ($parts[1] ?? '') !== 'check') {
+            if ($parts[0] !== 'narcotics' || ($parts[1] ?? '') !== 'check') {
                 Log::warning('Narcotics notification retry: event cannot be rebuilt', ['event_key' => $eventKey]);
 
                 return false;

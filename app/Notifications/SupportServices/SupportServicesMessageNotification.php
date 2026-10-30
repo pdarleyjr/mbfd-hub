@@ -69,7 +69,7 @@ final class SupportServicesMessageNotification extends Notification implements S
         return $this->categoryKey();
     }
 
-    protected function deliveryEventKey(): ?string
+    protected function deliveryEventKey(): string
     {
         return self::eventKey($this->messageId);
     }

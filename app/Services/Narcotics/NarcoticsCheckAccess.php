@@ -62,12 +62,11 @@ final class NarcoticsCheckAccess
     /** A reviewer reads every check; a member reads only their own. */
     public function canView(?User $user, NarcoticsCheck $check): bool
     {
-        if (! $user instanceof User || ! $this->enabled()) {
+        if (! $this->enabled() || ! $this->usable($user)) {
             return false;
         }
         // The owner check is cheap; the reviewer check walks the Captain 5 roster, so it goes second.
-        if ($this->usable($user)
-            && $check->submitted_by_user_id !== null
+        if ($check->submitted_by_user_id !== null
             && (int) $check->submitted_by_user_id === (int) $user->getKey()) {
             return true;
         }

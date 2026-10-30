@@ -93,8 +93,8 @@ final class EquipmentChangeRequestsWidget extends Widget
      */
     private function compartmentNames(ApparatusInventoryCorrection $correction): array
     {
-        $snapshot = is_array($correction->target_snapshot) ? $correction->target_snapshot : [];
-        $destination = is_array($correction->proposal) ? ($correction->proposal['to_compartment_id'] ?? null) : null;
+        $snapshot = $correction->target_snapshot ?: [];
+        $destination = ($correction->proposal ?: [])['to_compartment_id'] ?? null;
         if ($correction->reason !== InventoryCorrectionReason::MOVED || $destination === null || isset($snapshot['to_compartment'])) {
             return [];
         }
