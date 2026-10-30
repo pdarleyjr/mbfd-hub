@@ -36,7 +36,8 @@ for (const menuName of ['Apps', 'More']) {
     await activate(admin, hasTouch);
     await expect(page).toHaveURL(/\/admin\/?$/, { timeout: 15_000 });
     await expect(page.locator('.fi-main')).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Logistics Dashboard', exact: true })).toBeVisible();
+    // /admin lands on the Admin Overview (view 1 of 3); the former widgets live on /admin/logistics-board.
+    await expect(page.getByRole('heading', { name: 'Admin Overview', exact: true })).toBeVisible();
     await expect(page.locator('[data-admin-status-bar]').first()).toBeAttached();
     expect(failedResponses).toEqual([]);
     expect(errors).toEqual([]);
