@@ -6,13 +6,13 @@ namespace App\Services\Identity;
 
 use App\Enums\AccountStatus;
 use App\Exceptions\MemberBootstrapStateChanged;
+use App\Jobs\SendMemberActivationNotice;
 use App\Models\Employee;
 use App\Models\EmployeeBidAssignment;
 use App\Models\MemberActivationAttempt;
 use App\Models\MemberOnboardingInvitation;
 use App\Models\MemberOnboardingRosterBinding;
 use App\Models\User;
-use App\Services\Communications\CloudflareEmailDispatcher;
 use App\Services\Security\SecurityAuditRecorder;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -32,7 +32,6 @@ final class MemberSelfServiceActivation
     public function __construct(
         private readonly AccountSecurityService $security,
         private readonly SecurityAuditRecorder $audit,
-        private readonly CloudflareEmailDispatcher $email,
     ) {}
 
     public function enabled(): bool
@@ -130,7 +129,7 @@ final class MemberSelfServiceActivation
         }, 3);
 
         if ($activated instanceof User) {
-            $this->notifyMember($activated);
+            $this->notifyMember($activated, $at);
         }
 
         return $activated;
@@ -249,23 +248,15 @@ final class MemberSelfServiceActivation
         );
     }
 
-    /** Tell the real owner right away, so a claim made by someone else is noticed. */
-    private function notifyMember(User $user): void
+    /** A notice that cannot even be queued must not undo or block the activation. */
+    private function notifyMember(User $user, CarbonImmutable $at): void
     {
         $address = strtolower(trim((string) $user->employeeProfile?->city_email));
         if ($address === '') {
             return;
         }
         try {
-            $this->email->send(
-                to: [$address],
-                subject: 'Your MBFD Hub account was activated',
-                text: "Your MBFD Hub account was just activated and a password was set.\n\nIf this was you, no action is needed.\n\nIf this was NOT you, contact MBFD Hub support right away so the account can be secured.",
-                html: null,
-                sourceType: 'member_self_service_activation',
-                sourceId: (string) $user->id,
-                actor: $user,
-            );
+            SendMemberActivationNotice::dispatch($user->id, $address, $at);
         } catch (Throwable $exception) {
             Log::warning('member_self_service_activation_notice_failed', [
                 'user_id' => $user->id,
