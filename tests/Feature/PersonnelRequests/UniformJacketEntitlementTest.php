@@ -29,6 +29,14 @@ final class UniformJacketEntitlementTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Keep UTC on the next day while operational dates are still Eastern.
+        $this->travelTo(Carbon::parse('2026-10-30 01:00:00', 'UTC'));
+    }
+
     #[DataProvider('parkaSizes')]
     public function test_each_parka_size_is_one_jacket_with_server_derived_name(string $size): void
     {
@@ -216,7 +224,7 @@ final class UniformJacketEntitlementTest extends TestCase
         $item->update(['fulfillment_status' => 'fulfilled', 'fulfilled_quantity' => 1]);
         $first->update(['status' => PersonnelRequestStatus::Completed]);
         AssignedEquipment::query()->create(['employee_portal_id' => $employee->id, 'category' => 'Uniform Inventory',
-            'item_description' => 'Issued jacket', 'quantity' => 1, 'issued_at' => today(), 'source_personnel_request_item_id' => $item->id]);
+            'item_description' => 'Issued jacket', 'quantity' => 1, 'issued_at' => HubTimezone::today(), 'source_personnel_request_item_id' => $item->id]);
         $retry = $service->submitUniform($employee, [], 'jacket-idempotent');
 
         $this->assertTrue($first->is($retry));
@@ -230,9 +238,9 @@ final class UniformJacketEntitlementTest extends TestCase
         $employee = $this->employee();
         $request = app(PersonnelRequestSubmissionService::class)->submitUniform($employee, [$this->jacket()], 'jacket-before-direct-issue');
         $stock = $this->jacketStock();
-        app(UniformInventoryService::class)->issue($stock, $employee, 1, today()->toDateString());
+        app(UniformInventoryService::class)->issue($stock, $employee, 1, HubTimezone::today()->toDateString());
         try {
-            app(PersonnelRequestFulfillmentService::class)->issueUniform($request->items->sole(), $stock, $this->issueAdmin(), today()->toDateString(), quantity: 1, idempotencyKey: 'jacket-after-direct-issue');
+            app(PersonnelRequestFulfillmentService::class)->issueUniform($request->items->sole(), $stock, $this->issueAdmin(), HubTimezone::today()->toDateString(), quantity: 1, idempotencyKey: 'jacket-after-direct-issue');
             $this->fail('A pending request bypassed the recorded jacket cycle.');
         } catch (ValidationException $exception) {
             $this->assertArrayHasKey('issued_at', $exception->errors());
@@ -252,13 +260,13 @@ final class UniformJacketEntitlementTest extends TestCase
         $admin = $this->issueAdmin();
         $service = app(PersonnelRequestFulfillmentService::class);
         try {
-            $service->issueUniform($item, $stock, $admin, today()->toDateString());
+            $service->issueUniform($item, $stock, $admin, HubTimezone::today()->toDateString());
             $this->fail('A historical quantity bypassed the one-jacket issue cap.');
         } catch (ValidationException $exception) {
             $this->assertArrayHasKey('quantity', $exception->errors());
         }
-        $first = $service->issueUniform($item, $stock, $admin, today()->toDateString(), quantity: 1, idempotencyKey: 'jacket-issue-once');
-        $retry = $service->issueUniform($item, $stock, $admin, today()->toDateString(), quantity: 1, idempotencyKey: 'jacket-issue-once');
+        $first = $service->issueUniform($item, $stock, $admin, HubTimezone::today()->toDateString(), quantity: 1, idempotencyKey: 'jacket-issue-once');
+        $retry = $service->issueUniform($item, $stock, $admin, HubTimezone::today()->toDateString(), quantity: 1, idempotencyKey: 'jacket-issue-once');
         $this->assertTrue($first->is($retry));
         $this->assertSame(4, $stock->refresh()->quantity_on_hand);
         $this->assertSame(1, $item->refresh()->fulfilled_quantity);
@@ -270,10 +278,10 @@ final class UniformJacketEntitlementTest extends TestCase
     {
         $employee = $this->employee();
         $stock = $this->jacketStock();
-        $assignment = app(UniformInventoryService::class)->issue($stock, $employee, 1, today()->subYear()->toDateString());
+        $assignment = app(UniformInventoryService::class)->issue($stock, $employee, 1, HubTimezone::today()->subYear()->toDateString());
         $assignment->update(['status' => $status]);
         try {
-            app(UniformInventoryService::class)->issue($stock, $employee, 1, today()->toDateString());
+            app(UniformInventoryService::class)->issue($stock, $employee, 1, HubTimezone::today()->toDateString());
             $this->fail('The recorded issue cycle was reset.');
         } catch (ValidationException $exception) {
             $this->assertArrayHasKey('issued_at', $exception->errors());
@@ -287,7 +295,7 @@ final class UniformJacketEntitlementTest extends TestCase
         $request = app(PersonnelRequestSubmissionService::class)->submitUniform($employee,
             [['item_code' => 't_shirt', 'quantity' => 1, 'metadata' => ['size' => 'L']]], 'jacket-inventory-exact');
         $stock = $this->jacketStock();
-        app(UniformInventoryService::class)->issue($stock, $employee, 1, today()->toDateString(), sourceItem: $request->items->sole());
+        app(UniformInventoryService::class)->issue($stock, $employee, 1, HubTimezone::today()->toDateString(), sourceItem: $request->items->sole());
         $this->assertFalse(app(UniformEntitlementService::class)->jacketEligibility($employee)['can_order']);
     }
 
@@ -295,9 +303,9 @@ final class UniformJacketEntitlementTest extends TestCase
     {
         $user = User::factory()->create(['employee_profile_id' => null]);
         AssignedEquipment::query()->create(['user_id' => $user->id, 'category' => 'Jacket', 'item_description' => 'Legacy jacket',
-            'quantity' => 1, 'issued_at' => today()->subYear(), 'status' => 'retired']);
+            'quantity' => 1, 'issued_at' => HubTimezone::today()->subYear(), 'status' => 'retired']);
         try {
-            DB::transaction(fn () => app(UniformEntitlementService::class)->assertJacketIssueAllowed($user, 1, today()->toDateString()));
+            DB::transaction(fn () => app(UniformEntitlementService::class)->assertJacketIssueAllowed($user, 1, HubTimezone::today()->toDateString()));
             $this->fail('User-only history was silently exempted from the cycle.');
         } catch (ValidationException $exception) {
             $this->assertArrayHasKey('issued_at', $exception->errors());

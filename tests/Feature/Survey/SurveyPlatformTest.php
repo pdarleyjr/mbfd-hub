@@ -21,6 +21,7 @@ use App\Support\Workgroups\WorkgroupAccess;
 use App\Support\Workgroups\WorkgroupContext;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use LogicException;
@@ -460,6 +461,8 @@ class SurveyPlatformTest extends TestCase
 
     public function test_pdf_export_is_delivered_through_livewire_as_a_download(): void
     {
+        // The download uses the Eastern date even after the UTC date changes.
+        $this->travelTo(Carbon::parse('2026-10-30 01:00:00', 'UTC'));
         [$user, $survey] = $this->makeSurvey();
         $this->actingAs($user);
         Filament::setCurrentPanel(Filament::getPanel('workgroups'));
@@ -468,7 +471,7 @@ class SurveyPlatformTest extends TestCase
             ->test(SurveyResultsPage::class)
             ->call('downloadPdf')
             ->assertFileDownloaded(
-                'workgroup-survey-'.$survey->id.'-'.now()->format('Y-m-d').'.pdf',
+                'workgroup-survey-'.$survey->id.'-2026-10-29.pdf',
                 null,
                 'application/pdf',
             );
