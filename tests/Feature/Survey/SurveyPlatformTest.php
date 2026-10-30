@@ -468,7 +468,7 @@ class SurveyPlatformTest extends TestCase
             ->test(SurveyResultsPage::class)
             ->call('downloadPdf')
             ->assertFileDownloaded(
-                'workgroup-survey-'.$survey->id.'-'.now()->format('Y-m-d').'.pdf',
+                'workgroup-survey-'.$survey->id.'-'.now((string) config('hub.timezone'))->format('Y-m-d').'.pdf',
                 null,
                 'application/pdf',
             );

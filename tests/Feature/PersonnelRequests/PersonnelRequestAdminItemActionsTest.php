@@ -15,6 +15,7 @@ use App\Models\User;
 use App\Services\PersonnelRequests\PersonnelRequestFulfillmentService;
 use App\Services\PersonnelRequests\PersonnelRequestSubmissionService;
 use App\Services\PersonnelRequests\PersonnelRequestWorkflowService;
+use App\Support\HubTimezone;
 use Filament\Facades\Filament;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -57,7 +58,7 @@ final class PersonnelRequestAdminItemActionsTest extends TestCase
         $item = $request->items->first();
         $stock = $this->stock('T-Shirt', 1);
         $page = $this->page($request)->mountAction('issue_uniform')
-            ->setActionData(['item_id' => $item->id, 'uniform_id' => $stock->id, 'quantity' => 2, 'issued_at' => today()->toDateString()]);
+            ->setActionData(['item_id' => $item->id, 'uniform_id' => $stock->id, 'quantity' => 2, 'issued_at' => HubTimezone::today()->toDateString()]);
         $key = $page->get('mountedActionsData.0.idempotency_key');
         $this->assertTrue(Str::isUuid($key));
         $page->callMountedAction()->assertHasActionErrors(['quantity'])
@@ -131,10 +132,10 @@ final class PersonnelRequestAdminItemActionsTest extends TestCase
             unset($line);
             $page->set('mountedActionsData.0.lines', $lines);
             app(PersonnelRequestFulfillmentService::class)->issueBatch($request,
-                [['item_id' => $item->id, 'quantity' => 3, 'uniform_id' => $stock->id]], auth()->user(), today()->toDateString(), $key);
+                [['item_id' => $item->id, 'quantity' => 3, 'uniform_id' => $stock->id]], auth()->user(), HubTimezone::today()->toDateString(), $key);
         } elseif ($action === 'issue_uniform') {
             $page->setActionData(['item_id' => $item->id, 'quantity' => 3, 'uniform_id' => $stock->id]);
-            app(PersonnelRequestFulfillmentService::class)->issueUniform($item, $stock, auth()->user(), today()->toDateString(), quantity: 3, idempotencyKey: $key);
+            app(PersonnelRequestFulfillmentService::class)->issueUniform($item, $stock, auth()->user(), HubTimezone::today()->toDateString(), quantity: 3, idempotencyKey: $key);
         } else {
             $page->setActionData(['item_id' => $item->id, 'quantity' => 3]);
             app(PersonnelRequestWorkflowService::class)->arriveItem($item, auth()->user(), 3, $key);
@@ -179,7 +180,7 @@ final class PersonnelRequestAdminItemActionsTest extends TestCase
         auth()->user()->givePermissionTo([
             Permission::findOrCreate('view_any_uniform', 'web'), Permission::findOrCreate('view_uniform', 'web'),
         ]);
-        $data = ['category' => 'Jacket', 'item_description' => 'Department jacket', 'quantity' => 1, 'issued_at' => today()->toDateString()];
+        $data = ['category' => 'Jacket', 'item_description' => 'Department jacket', 'quantity' => 1, 'issued_at' => HubTimezone::today()->toDateString()];
         Livewire::test(ViewPersonnelEmployee::class, ['record' => $employee->id])->callAction('assign_ppe', $data)->assertHasNoActionErrors();
         Livewire::test(ViewPersonnelEmployee::class, ['record' => $employee->id])->callAction('assign_ppe', $data)->assertHasActionErrors(['issued_at']);
         Livewire::test(ListUniforms::class)->callAction('assign_equipment', $data + ['employee_portal_id' => $employee->id])->assertHasActionErrors(['issued_at']);
