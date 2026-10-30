@@ -32,7 +32,10 @@ return [
     |
     */
 
-    'lifetime' => (int) env('SESSION_LIFETIME', 120),
+    // Four hours of no requests at all. The Hub's own idle window (config/security.php, canonical_session) is
+    // the same length and slides with use, so this is the ceiling for a session left alone, never a cap on a
+    // member who is working.
+    'lifetime' => (int) env('SESSION_LIFETIME', 240),
 
     'expire_on_close' => env('SESSION_EXPIRE_ON_CLOSE', false),
 

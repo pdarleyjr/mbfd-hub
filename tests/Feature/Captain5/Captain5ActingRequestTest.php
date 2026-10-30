@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Tests\Feature\Captain5\Concerns\BuildsCaptain5World;
+use Tests\Support\DailyRosterSnapshotFactory;
 use Tests\TestCase;
 
 final class Captain5ActingRequestTest extends TestCase
@@ -78,6 +79,69 @@ final class Captain5ActingRequestTest extends TestCase
         $this->actAs($lieutenant);
         $this->getJson('/api/captain5/summary')->assertOk()->assertJsonPath('on_duty.source', OnDutyCaptain5::SOURCE_BID)
             ->assertJsonPath('on_duty.name', 'Oscar Lima');
+    }
+
+    public function test_with_the_card_display_off_every_endpoint_answers_todays_shape_and_ignores_the_roster(): void
+    {
+        $rosterOfficer = $this->officer('Lieutenant', 'Roster Officer');
+        DailyRosterSnapshotFactory::publish('2026-10-20', ['Rescue Division / Captain 5' => [['employee_id' => $rosterOfficer->employee_id, 'rank' => 'Capt']]]);
+        config()->set('daily_roster.card_display_enabled', false);
+
+        $this->actAs($this->holder);
+        foreach (['/api/captain5/summary', '/api/captain5/workspace'] as $endpoint) {
+            $onDuty = $this->getJson($endpoint)->assertOk()->assertJsonPath('on_duty.name', 'Oscar Lima')->json('on_duty');
+            self::assertSame(['duty_date', 'shift', 'source', 'resolved', 'name', 'rank', 'acting_until', 'acting_request_id'], array_keys($onDuty));
+        }
+    }
+
+    public function test_the_card_shows_the_roster_acting_beats_it_and_the_display_returns_to_the_roster_when_acting_ends(): void
+    {
+        $rosterOfficer = $this->officer('Lieutenant', 'Roster Officer');
+        DailyRosterSnapshotFactory::publish('2026-10-20', ['Rescue Division / Captain 5' => [['employee_id' => $rosterOfficer->employee_id, 'rank' => 'Capt']]]);
+        config()->set('daily_roster.card_display_enabled', true);
+
+        $this->actAs($this->holder);
+        foreach (['/api/captain5/summary', '/api/captain5/workspace'] as $endpoint) {
+            $this->getJson($endpoint)->assertOk()
+                ->assertJsonPath('on_duty.source', 'telestaff')
+                ->assertJsonPath('on_duty.name', 'Roster Officer')
+                ->assertJsonPath('on_duty.rank', 'Lieutenant')
+                ->assertJsonPath('access.authority', 'shift_captain5');
+        }
+
+        $acting = $this->officer('Lieutenant', 'Rita Acting');
+        $this->actAs($acting);
+        $request = $this->postJson('/api/captain5/acting-requests', ['kind' => 'act', 'duration' => '12h', 'client_request_id' => (string) Str::uuid()])
+            ->assertCreated()->assertJsonPath('on_duty.source', 'telestaff')->json('acting.mine.id');
+
+        $this->actAs($this->admin);
+        $this->postJson('/api/captain5/acting-requests/'.$request.'/approve', [])->assertOk()
+            ->assertJsonPath('on_duty.source', OnDutyCaptain5::SOURCE_ACTING)
+            ->assertJsonPath('on_duty.name', 'Rita Acting')
+            ->assertJsonPath('on_duty.freshness', 'not_applicable')
+            ->assertJsonPath('on_duty.as_of', null)
+            ->assertJsonPath('on_duty.identity', null);
+
+        $this->travelTo(CarbonImmutable::parse('2026-10-20 20:00:01', 'America/New_York'));
+        $this->forgetCaptain5Memo();
+        $this->actAs($this->holder);
+        $this->getJson('/api/captain5/summary')->assertOk()
+            ->assertJsonPath('on_duty.source', 'telestaff')
+            ->assertJsonPath('on_duty.name', 'Roster Officer');
+    }
+
+    public function test_before_the_first_export_the_page_shows_the_seat_and_says_the_roster_has_not_arrived(): void
+    {
+        config()->set('daily_roster.card_display_enabled', true);
+
+        $this->actAs($this->holder);
+        $this->getJson('/api/captain5/summary')->assertOk()
+            ->assertJsonPath('on_duty.source', OnDutyCaptain5::SOURCE_BID)
+            ->assertJsonPath('on_duty.name', 'Oscar Lima')
+            ->assertJsonPath('on_duty.freshness', 'awaiting')
+            ->assertJsonPath('on_duty.as_of', null)
+            ->assertJsonPath('on_duty.identity', null)
+            ->assertJsonPath('on_duty.reason', null);
     }
 
     public function test_takeover_and_end_requests_need_approval_too(): void

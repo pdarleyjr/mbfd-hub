@@ -6,6 +6,7 @@ import { useOffline } from '../hooks/useOffline';
 import DailyPageNav from './DailyPageNav';
 import ActingApprovals from './acting/ActingApprovals';
 import ActingControl from './acting/ActingControl';
+import DutyNote from './acting/DutyNote';
 import { CAPTAIN_5_ACTING } from './captain5/actingRole';
 import Captain5Denied from './captain5/Captain5Denied';
 import Captain5Messages from './captain5/Captain5Messages';
@@ -215,6 +216,7 @@ export default function Captain5Page() {
             <p className="flex flex-wrap items-center gap-2 text-sm" data-testid="captain5-duty-line">
               <Tag tone={dutyTone(data.on_duty)} className="!text-sm !whitespace-normal !py-1 max-w-full break-words">{dutyLine(data.on_duty)}</Tag>
             </p>
+            <DutyNote onDuty={data.on_duty} testId="captain5-duty-note" linkToRoster />
             <ActingControl role={CAPTAIN_5_ACTING} onDuty={data.on_duty} acting={data.acting} onChange={actingChanged} />
             <p className="text-[13px] leading-5 text-hub-n-600" data-testid="captain5-authority">Your access: {access.authority_label || 'Captain 5'}</p>
           </div>

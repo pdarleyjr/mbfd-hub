@@ -55,7 +55,10 @@ return [
     'canonical_session' => [
         // Device posture is not inferred from request headers. D01 issues the
         // existing unmanaged-browser profile until an enrollment service is approved.
-        'unmanaged_idle_seconds' => 3600,
-        'unmanaged_absolute_seconds' => 86400,
+        // Idle slides: every request from a signed-in member pushes the deadline out by this long
+        // (SessionRegistry::recordActivity), always capped by the absolute limit below. It used to be fixed at
+        // sign-in time, so every session ended exactly one hour after login whatever the member was doing.
+        'unmanaged_idle_seconds' => (int) env('SECURITY_SESSION_IDLE_SECONDS', 14400),
+        'unmanaged_absolute_seconds' => (int) env('SECURITY_SESSION_ABSOLUTE_SECONDS', 86400),
     ],
 ];

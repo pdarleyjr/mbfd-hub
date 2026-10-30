@@ -1,6 +1,6 @@
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import {
-  SHIFT_BASE, UNSET_DUTY, UUID_PATTERN, actingChief, chiefOnDuty, handleShiftRoute, makeRequest300, newShiftServer, noActing300, ymd,
+  SHIFT_BASE, UNSET_DUTY, UUID_PATTERN, actingChief, chiefOnDuty, handleShiftRoute, makeRequest300, newShiftServer, noActing300, rosterChief, rosterUnknown, seatAwaiting, ymd,
   type ShiftServer,
 } from './support/command300-shift';
 
@@ -174,6 +174,117 @@ test.describe('the shift 300 on the stations-list card', () => {
     await expectNoHorizontalOverflow(page);
     await page.getByTestId('daily-command-card').click();
     await expect(page).toHaveURL(/\/daily\/command-300$/);
+  });
+});
+
+test.describe('where the 300 name comes from', () => {
+  const pageNote = (page: Page) => page.getByTestId('command-duty-note');
+  const cardNote = (page: Page) => page.getByTestId('daily-command-duty-note');
+  const cardDuty = (page: Page) => page.getByTestId('daily-command-duty');
+
+  test('an old answer with none of the new fields shows no note on the page or the card', async ({ page }) => {
+    await open(page, newShiftServer({ onDuty: chiefOnDuty('B') }));
+    await expect(line(page)).toHaveText('B Shift 300: Division Chief Jane Smith');
+    await expect(pageNote(page)).toHaveCount(0);
+
+    await page.goto('/daily/stations');
+    await expect(cardDuty(page)).toHaveText('B Shift 300: Division Chief Jane Smith');
+    await expect(cardNote(page)).toHaveCount(0);
+  });
+
+  test('an approved acting member shows no note', async ({ page }) => {
+    await open(page, newShiftServer({ onDuty: { ...actingChief('B', 'Pat Doe'), as_of: null, freshness: 'not_applicable', identity: null, reason: null } }));
+    await expect(line(page)).toHaveText(/^B Shift Acting 300: Battalion Chief Pat Doe until /);
+    await expect(pageNote(page)).toHaveCount(0);
+  });
+
+  test('the roster keeps the Tag as it is and adds when it was updated, in Miami Beach time', async ({ page }) => {
+    await open(page, newShiftServer({ onDuty: rosterChief('B') }));
+    await expect(line(page)).toHaveText('B Shift 300: Division Chief Jane Smith');
+    await expect(tag(page)).toHaveClass(/hub-tag--info/);
+    await expect(pageNote(page)).toHaveText('TeleStaff roster, updated 9:14 AM');
+
+    await page.goto('/daily/stations');
+    await expect(cardDuty(page)).toHaveText('B Shift 300: Division Chief Jane Smith');
+    await expect(cardNote(page)).toHaveText('TeleStaff roster, updated 9:14 AM');
+  });
+
+  test('a person not matched to a Hub member says so', async ({ page }) => {
+    await open(page, newShiftServer({ onDuty: rosterChief('B', 'SMITH, JANE', 'DC', 'unlinked') }));
+    await expect(line(page)).toHaveText('B Shift 300: DC SMITH, JANE');
+    await expect(pageNote(page)).toHaveText('TeleStaff roster. Not matched to a Hub member.');
+  });
+
+  test('before the roster arrives and once it is late the seat says so', async ({ page }) => {
+    await open(page, newShiftServer({ onDuty: seatAwaiting('awaiting') }));
+    await expect(line(page)).toHaveText('B Shift 300: Division Chief Jane Smith');
+    await expect(pageNote(page)).toHaveText("Bid seat. Today's roster has not arrived.");
+
+    const late = await page.context().newPage();
+    await open(late, newShiftServer({ onDuty: seatAwaiting('delayed') }));
+    await expect(pageNote(late)).toHaveText("Bid seat. Today's roster is late.");
+  });
+
+  for (const reason of ['conflict', 'needs_review'] as const) {
+    test(`${reason}: the Tag says the roster needs review and only the page links to the Daily Roster`, async ({ page }) => {
+      await open(page, newShiftServer({ onDuty: rosterUnknown(reason) }));
+      await expect(line(page)).toHaveText('B Shift 300: roster needs review');
+      await expect(tag(page)).toHaveClass(/hub-tag--warning/);
+      const link = pageNote(page).getByRole('link', { name: 'Check the Daily Roster.' });
+      await expect(link).toHaveAttribute('href', '/daily-roster');
+      expect((await link.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+
+      await page.goto('/daily/stations');
+      await expect(cardDuty(page)).toHaveText('B Shift 300: roster needs review');
+      await expect(cardNote(page)).toHaveText('Check the Daily Roster.');
+      // The card is one big link; a link inside it would be invalid and unsafe to tap.
+      await expect(page.getByTestId('daily-command-card').locator('a')).toHaveCount(0);
+    });
+  }
+
+  test('a seat with nobody working it reads not set and points at the Daily Roster', async ({ page }) => {
+    await open(page, newShiftServer({ onDuty: rosterUnknown('no_working_row') }));
+    await expect(line(page)).toHaveText('Shift 300 not set');
+    await expect(pageNote(page)).toHaveText('Check the Daily Roster.');
+  });
+
+  test('the note has no dash characters and fits a narrow card', async ({ page }) => {
+    await open(page, newShiftServer({ onDuty: rosterChief('C', LONG_NAME, 'Assistant Division Chief', 'unlinked') }), '/daily/stations');
+    await expect(cardNote(page)).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+    expect(await cardNote(page).innerText()).not.toMatch(DASHES);
+  });
+
+  test('the card updates when the page comes back into view, with no loading state', async ({ page }) => {
+    const server = newShiftServer({ onDuty: seatAwaiting('awaiting') });
+    await open(page, server, '/daily/stations');
+    await expect(cardNote(page)).toHaveText("Bid seat. Today's roster has not arrived.");
+
+    server.onDuty = rosterChief('B', 'Pat Doe', 'Battalion Chief');
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await expect(cardDuty(page)).toHaveText('B Shift 300: Battalion Chief Pat Doe');
+    await expect(cardNote(page)).toHaveText('TeleStaff roster, updated 9:14 AM');
+    await expect(page.getByTestId('daily-command-card').locator('.hub-skeleton')).toHaveCount(0);
+  });
+
+  test('the card refreshes every five minutes while visible, and a failed refresh keeps the name', async ({ page }) => {
+    await page.clock.install();
+    const server = newShiftServer({ onDuty: rosterChief('B') });
+    await open(page, server, '/daily/stations');
+    await expect(cardDuty(page)).toHaveText('B Shift 300: Division Chief Jane Smith');
+    const before = server.shiftCalls;
+
+    await page.clock.fastForward('04:59');
+    expect(server.shiftCalls).toBe(before);
+
+    server.onDuty = rosterChief('B', 'Pat Doe', 'Battalion Chief');
+    await page.clock.fastForward('00:02');
+    await expect(cardDuty(page)).toHaveText('B Shift 300: Battalion Chief Pat Doe');
+
+    server.status = 500;
+    await page.clock.fastForward('05:01');
+    await expect.poll(() => server.shiftCalls).toBeGreaterThan(before + 1);
+    await expect(cardDuty(page)).toHaveText('B Shift 300: Battalion Chief Pat Doe');
   });
 });
 

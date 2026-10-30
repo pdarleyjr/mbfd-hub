@@ -53,6 +53,23 @@ const FALLBACKS: Record<number, string> = {
 
 export type Requester = <T>(path: string, init?: RequestInit) => Promise<T>;
 
+/** See EnsureCanonicalMemberApiSession: the session is checked as usual but its idle clock does not move. */
+const BACKGROUND_REFRESH_HEADER = 'X-Hub-Background-Refresh';
+let inBackgroundRefresh = false;
+
+/**
+ * Runs `start` so any request it begins synchronously is marked as a timer's, not the member's. An unattended
+ * shared screen must still sign out. A member's own Refresh or action calls the same loaders directly.
+ */
+export function asBackgroundRefresh(start: () => void): void {
+  inBackgroundRefresh = true;
+  try {
+    start();
+  } finally {
+    inBackgroundRefresh = false;
+  }
+}
+
 /**
  * Binds the fetch, CSRF and error handling to one API base. The 300 shift API (command300ShiftApi) uses the
  * same handling with its own 403 wording, so both areas fail the same way. `status` 0 always means "no answer".
@@ -61,6 +78,7 @@ export function createRequester(base: string, forbiddenMessage: string = FALLBAC
   const fallbacks: Record<number, string> = { ...FALLBACKS, 403: forbiddenMessage };
   return async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     const method = (init.method ?? 'GET').toUpperCase();
+    const background: Record<string, string> = inBackgroundRefresh ? { [BACKGROUND_REFRESH_HEADER]: '1' } : {};
     if (method !== 'GET' && typeof navigator !== 'undefined' && navigator.onLine === false) {
       throw new Captain5ApiError(OFFLINE_MESSAGE, 0);
     }
@@ -70,7 +88,7 @@ export function createRequester(base: string, forbiddenMessage: string = FALLBAC
         credentials: 'same-origin',
         cache: 'no-store',
         ...init,
-        headers: method === 'GET' ? { Accept: 'application/json' } : mutationHeaders(),
+        headers: { ...(method === 'GET' ? { Accept: 'application/json' } : mutationHeaders()), ...background },
       });
     } catch {
       // A timeout, an abort and a dropped connection all leave the outcome unknown.
@@ -151,7 +169,7 @@ export function normalizeActing(raw: unknown): ActingState {
 
 export const normalizeOnDuty = (raw: unknown): OnDuty => {
   const duty = asRecord(raw) as unknown as OnDuty;
-  return { ...duty, acting_until: asIso(duty.acting_until), acting_request_id: typeof duty.acting_request_id === 'number' ? duty.acting_request_id : null };
+  return { ...duty, acting_until: asIso(duty.acting_until), acting_request_id: typeof duty.acting_request_id === 'number' ? duty.acting_request_id : null, as_of: asIso(duty.as_of) };
 };
 
 function normalizeWorkspace(raw: Record<string, unknown>): Workspace {

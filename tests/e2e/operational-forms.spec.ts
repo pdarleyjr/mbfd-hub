@@ -4,6 +4,8 @@ const employeeId = process.env.OPERATIONAL_FORMS_E2E_EMPLOYEE_ID ?? 'E214';
 const password = process.env.OPERATIONAL_FORMS_E2E_PASSWORD ?? 'OperationalForms!1';
 const adminEmployeeId = process.env.OPERATIONAL_FORMS_E2E_ADMIN_EMPLOYEE_ID ?? 'E215';
 const adminPassword = process.env.OPERATIONAL_FORMS_E2E_ADMIN_PASSWORD ?? 'OperationalFormsAdmin!1';
+// This suite seeds no roster, so the tile only appears when the server runs in publish mode.
+const rosterPublishing = process.env.DAILY_ROSTER_MODE === 'publish';
 
 async function login(page: import('@playwright/test').Page, id: string, secret: string) {
   await page.getByLabel('Employee ID').fill(id);
@@ -47,9 +49,9 @@ test('entitled home exposes the exact unified Quick Access destinations', async 
   await expect(page.getByRole('heading', { name: 'Quick Access' })).toBeVisible();
 
   const cards = page.locator('[data-quick-access-card]');
-  await expect(cards).toHaveCount(3);
   await expect(cards).toHaveText([
     /Station \/ Vehicles \/ Equipment/,
+    ...(rosterPublishing ? [/Daily Roster/] : []),
     /Employee Portal/,
     /Additional Links/,
   ]);
@@ -72,6 +74,17 @@ test('entitled home exposes the exact unified Quick Access destinations', async 
   await expect(page.getByRole('link', { name: /Media Control/i })).toHaveAttribute('href', 'https://media.mbfdhub.com/api/auth/hub/start');
   await expect(page.getByText('MBFD Support Assistant')).toHaveCount(0);
   await expect(page.locator('[data-home-column="incidents"]')).toHaveCount(0);
+});
+
+test('the roster route stays open with a safe empty state before anything is published', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'One desktop acceptance is sufficient.');
+
+  await page.goto('/');
+  await login(page, adminEmployeeId, adminPassword);
+  await page.goto('/daily-roster');
+  await expect(page.getByRole('heading', { level: 1, name: 'Daily Roster' })).toBeVisible();
+  await expect(page.getByText('No roster has been published yet')).toBeVisible();
+  await expect(page.locator('main').getByRole('link', { name: 'Hub Home' })).toHaveAttribute('href', /^http:\/\/[^/]+\/?$/);
 });
 
 test('authorized user enters Workgroups without a second login', async ({ page }, testInfo) => {

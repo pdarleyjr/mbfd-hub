@@ -1,26 +1,40 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { ChevronRight } from 'lucide-react';
 import { CAPTAIN_5_IMAGE, bundledImageSize } from '../types';
 import { dutyLine, dutyTone } from './captain5/format';
-import { fetchCaptain5Summary } from '../utils/captain5Api';
+import { fetchCaptain5Summary, isCaptain5Forbidden } from '../utils/captain5Api';
 import type { Captain5Summary } from './captain5/types';
+import DutyNote from './acting/DutyNote';
+import { useVisibleRefresh } from './acting/useVisibleRefresh';
 import StationCardMedia from './StationCardMedia';
 import Tag from './ui/Tag';
 
 /**
  * The server decides who sees Captain 5. The card appears only after /api/captain5/summary answers 200
  * with view access; a 403, an error or being offline leaves it out, and the station list never waits for it.
+ * Later refreshes keep the card on screen through a failed request; only a refusal removes it.
  */
 export function useCaptain5Summary(): Captain5Summary | null {
   const [summary, setSummary] = useState<Captain5Summary | null>(null);
-  useEffect(() => {
-    let active = true;
+  // Only the newest request may write state; a page that has gone away writes nothing.
+  const latest = useRef(0);
+
+  const load = useCallback((refreshing: boolean) => {
+    const mine = ++latest.current;
     fetchCaptain5Summary()
-      .then((loaded) => { if (active) setSummary(loaded.access?.view ? loaded : null); })
-      .catch(() => { if (active) setSummary(null); });
-    return () => { active = false; };
+      .then((loaded) => { if (mine === latest.current) setSummary(loaded.access?.view ? loaded : null); })
+      .catch((failure) => { if (mine === latest.current && (!refreshing || isCaptain5Forbidden(failure))) setSummary(null); });
   }, []);
+
+  useEffect(() => {
+    load(false);
+    return () => { latest.current += 1; };
+  }, [load]);
+
+  const refresh = useCallback(() => load(true), [load]);
+  useVisibleRefresh(refresh);
+
   return summary;
 }
 
@@ -45,6 +59,7 @@ export default function Captain5Card({ summary }: { summary: Captain5Summary }) 
         <p className="mb-2" data-testid="daily-captain5-duty">
           <Tag tone={dutyTone(summary.on_duty)} className="!whitespace-normal !py-1 max-w-full break-words">{dutyLine(summary.on_duty)}</Tag>
         </p>
+        <DutyNote onDuty={summary.on_duty} testId="daily-captain5-duty-note" className="mb-2" />
         <p className="text-sm text-hub-n-600">EMS Operations: Rescue and medical equipment issues, replacements, shift handoff and messages.</p>
         <p className="mt-3" data-testid="daily-captain5-open">
           <Tag tone={open > 0 ? 'warning' : 'success'}>{open > 0 ? `${open} open ${open === 1 ? 'issue' : 'issues'}` : 'No open issues'}</Tag>

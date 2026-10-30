@@ -123,7 +123,7 @@ final class Captain5OperationsPageTest extends TestCase
             ->call('chooseMember', (int) $seatHolder->employee_profile_id)
             ->assertSee('Holds the Captain 5 seat on A shift')
             ->assertSee('Can use the whole Captain 5 page')
-            ->assertSee('is shown as the shift')
+            ->assertSee('is the Shift Captain 5 by seat or approved acting request')
             ->assertSee('Act on issues')
             ->assertSee('No administrator choice is set');
 

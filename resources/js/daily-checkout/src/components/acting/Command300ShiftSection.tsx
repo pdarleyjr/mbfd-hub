@@ -2,6 +2,7 @@ import { BTN_SECONDARY } from '../captain5/ui';
 import Tag from '../ui/Tag';
 import ActingControl from './ActingControl';
 import { COMMAND_300_ACTING } from './command300Role';
+import DutyNote from './DutyNote';
 import { dutyLine, dutyTone } from './format';
 import type { Command300Shift } from './useCommand300Shift';
 
@@ -30,6 +31,7 @@ export default function Command300ShiftSection({ shift }: { shift: Command300Shi
       <p className="flex flex-wrap items-center gap-2 text-sm" data-testid="command-duty-line">
         <Tag tone={dutyTone(data.on_duty)} className="!text-sm !whitespace-normal !py-1 max-w-full break-words">{dutyLine(data.on_duty, COMMAND_300_ACTING)}</Tag>
       </p>
+      <DutyNote onDuty={data.on_duty} testId="command-duty-note" linkToRoster />
       {error && (
         <p className="text-[13px] leading-5 text-hub-n-600" role="status" data-testid="command-duty-stale">
           The shift 300 could not be refreshed: {error} The name above may be out of date.
