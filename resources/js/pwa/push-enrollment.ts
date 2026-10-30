@@ -145,7 +145,7 @@ export const MESSAGES: Record<DeviceView, string> = {
     'ios-install': 'Add MBFD Hub to your Home Screen to get alerts on this iPhone. Open the Share menu, choose "Add to Home Screen", then open MBFD Hub from the new icon and come back to this page.',
     unsupported: 'This browser cannot receive push alerts. In-app alerts still arrive in the bell, and you can turn on city email below if it is offered.',
     blocked: 'Alerts are blocked for this device. Allow notifications for MBFD Hub in your browser or phone settings, then reload this page.',
-    ready: 'Alerts are off on this device. In-app alerts still arrive in the bell.',
+    ready: 'Push alerts are not on for this device yet. Tap "Turn on alerts for this device" and allow notifications when asked. In-app alerts still arrive in the bell.',
     enabled: 'Alerts are on for this device.',
     'needs-repair': 'Alerts were turned on here but the Hub lost track of this device. Turn them on again to repair it.',
 };
