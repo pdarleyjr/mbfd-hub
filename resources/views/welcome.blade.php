@@ -56,6 +56,9 @@
                 'domain' => 'personnel',
             ],
         ];
+        // Rescue Forms shortcuts and the Command Board button: each is offered only to members the destination admits.
+        $rescueForms = \App\Support\Home\HomeQuickActions::rescueForms($currentUser);
+        $commandBoardUrl = \App\Support\Home\HomeQuickActions::commandBoardUrl($currentUser);
         // One expandable card holds the less-used destinations. Each keeps its own visibility rule.
         $additionalLinks = collect([
             [
@@ -124,8 +127,9 @@
                 <p class="hub-page-header__eyebrow"><time datetime="{{ $now->toDateString() }}">{{ $now->format('l, F j') }}</time></p>
                 <h1 id="home-greeting" class="hub-h1">{{ $greeting }}{{ $firstName !== '' ? ', '.$firstName : '' }}</h1>
             </div>
-            @if($showEmployeePortal)
+            @if($showEmployeePortal || $commandBoardUrl !== null)
                 <div class="hub-page-header__actions">
+                    @if($showEmployeePortal)
                     <a href="{{ url('/daily/vehicle-inspections') }}" data-important-target class="hub-btn hub-btn--primary hub-btn--field">
                         <x-heroicon-o-truck class="hub-btn__icon" aria-hidden="true" />
                         Vehicle Checkout
@@ -135,6 +139,14 @@
                         <a href="{{ url('/employee/messages?compose=1') }}" data-important-target data-home-message-logistics class="hub-btn hub-btn--secondary hub-btn--field">
                             <x-heroicon-o-chat-bubble-bottom-center-text class="hub-btn__icon" aria-hidden="true" />
                             Message Support Services
+                        </a>
+                    @endif
+                    @endif
+                    {{-- Only for members Command300Access admits. The board's own Hub sign-in checks the same rule again. --}}
+                    @if($commandBoardUrl !== null)
+                        <a href="{{ $commandBoardUrl }}" target="_blank" rel="noopener noreferrer" data-important-target data-home-command-board class="hub-btn hub-btn--secondary hub-btn--field">
+                            <x-heroicon-o-squares-2x2 class="hub-btn__icon" aria-hidden="true" />
+                            Command Board<span class="hub-visually-hidden"> (opens in a new tab)</span>
                         </a>
                     @endif
                 </div>
@@ -225,6 +237,32 @@
                                 @endif
                             </a>
                         @endforeach
+
+                        {{-- Rescue Forms: a gray native disclosure of direct links. Hidden entirely when the member may use none. --}}
+                        @if($rescueForms !== [])
+                            <details data-rescue-forms class="hub-tile hub-tile--neutral hub-additional bg-hub-surface">
+                                <summary class="hub-additional__summary">
+                                    <svg class="hub-tile__glyph" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-3-3v6m-9 1.5V8.25a2.25 2.25 0 0 1 2.25-2.25h3L9.75 4.5h4.5L15.75 6h3a2.25 2.25 0 0 1 2.25 2.25V16.5A2.25 2.25 0 0 1 18.75 18.75H5.25A2.25 2.25 0 0 1 3 16.5Z"></path></svg>
+                                    <span class="hub-tile__body">
+                                        <span class="hub-tile__title">Rescue Forms</span>
+                                        <span class="hub-tile__description">Medical inventory, narcotics check, vehicle inspection</span>
+                                    </span>
+                                    <svg class="hub-tile__affordance hub-additional__chevron" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
+                                </summary>
+                                <ul class="hub-additional__list" aria-label="Rescue Forms">
+                                    @foreach($rescueForms as $form)
+                                        <li>
+                                            <a href="{{ $form['href'] }}" data-rescue-form-link="{{ $form['key'] }}" data-important-target class="hub-additional__link hub-tile--neutral">
+                                                <span class="hub-tile__body">
+                                                    <span class="hub-tile__title">{{ $form['label'] }}</span>
+                                                </span>
+                                                <svg class="hub-tile__affordance" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
+                                            </a>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            </details>
+                        @endif
 
                         @if($additionalLinks->isNotEmpty())
                             <details data-quick-access-card data-additional-links class="hub-tile hub-tile--programs hub-additional bg-hub-surface">

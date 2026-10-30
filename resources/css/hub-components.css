@@ -671,6 +671,15 @@ body[data-hub-ui="2"] {
 [data-hub-ui="2"] .hub-additional__link:hover { background: rgb(var(--hub-well)); }
 [data-hub-ui="2"] .hub-additional__list li:last-child .hub-additional__link { border-radius: 0 0 var(--hub-radius-card) var(--hub-radius-card); }
 
+/* Neutral (gray) tile: Rescue Forms on the member Home. Gray surface and accent, same row geometry as the other tiles. */
+[data-hub-ui="2"] .hub-tile--neutral { --tile-accent: var(--hub2-n-500); }
+[data-hub-ui="2"] .hub-tile.hub-tile--neutral,
+[data-hub-ui="2"] .hub-tile.hub-tile--neutral:hover { background: rgb(var(--hub2-n-100)); }
+[data-hub-ui="2"] .hub-tile--neutral .hub-additional__summary:hover,
+[data-hub-ui="2"] .hub-tile--neutral .hub-additional__link:hover { background: rgb(var(--hub2-n-200)); }
+[data-hub-ui="2"] .hub-tile--neutral .hub-additional__list,
+[data-hub-ui="2"] .hub-tile--neutral .hub-additional__list li + li { border-color: rgb(var(--hub2-n-200)); }
+
 /* ------------------------------------------------------------------ */
 /* Motion preferences                                                  */
 /* ------------------------------------------------------------------ */

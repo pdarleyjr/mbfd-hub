@@ -42,7 +42,7 @@ final class CommandBoardLauncherTest extends TestCase
         self::assertNotContains('cmd', $this->keys($user, $allowed));
     }
 
-    public function test_home_and_shared_launcher_omit_command_board_for_every_account_type(): void
+    public function test_shared_launcher_omits_command_board_for_every_account_type_and_home_only_offers_it_with_300_command_access(): void
     {
         $this->withoutVite();
         $this->configureClient();
@@ -61,11 +61,19 @@ final class CommandBoardLauncherTest extends TestCase
         foreach ([$plain, $direct, $inherited, $superAdmin] as $user) {
             $this->actingAsCanonicalUser($user->fresh());
             self::assertNotContains('cmd', $this->keys($user->fresh()));
+        }
+        // Without 300 Command Access (the Command Board app grant alone is not it) Home offers no Command Board button.
+        foreach ([$plain, $direct, $inherited] as $user) {
+            $this->actingAsCanonicalUser($user->fresh());
             $this->get('/')->assertOk()
                 ->assertSee('Quick Access')
                 ->assertDontSee('Command Board')
                 ->assertDontSee('href="'.self::URL.'"', false);
         }
+        // An administrator holds 300 Command Access, so Home's quick-action row (not the shared launcher) offers the button.
+        $superAdmin->forceFill(['must_change_password' => false])->save();
+        $this->actingAsCanonicalUser($superAdmin->fresh());
+        $this->get('/')->assertOk()->assertSee('data-home-command-board', false);
     }
 
     public function test_configuring_the_cmd_client_does_not_add_a_home_link(): void
