@@ -43,6 +43,10 @@
 .nc-actions > button, .nc-actions > a { flex: 1 1 200px; min-height: 48px; }
 .nc-send { display: grid; gap: 6px; }
 .nc-send > button { min-height: 52px; font-size: 16px; }
+/* The Forms app sets `#operational-forms-root .fui-Button { min-height: 40px }`; an id beats the class rules above, so restate the 44px floor with an id. */
+#operational-forms-root .nc .fui-Button { min-height: 44px; }
+#operational-forms-root .nc .nc-actions > button, #operational-forms-root .nc .nc-actions > a { min-height: 48px; }
+#operational-forms-root .nc .nc-send > button { min-height: 52px; }
 .nc-preparing { display: grid; place-items: center; min-height: 120px; }
 
 /* The photo being sent, and a photo that was sent */

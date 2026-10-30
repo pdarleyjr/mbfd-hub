@@ -1,4 +1,4 @@
-import { expect, test, type Browser, type BrowserContext, type Page, type Route, type TestInfo } from '@playwright/test';
+import { expect, test, type Browser, type BrowserContext, type Locator, type Page, type Route, type TestInfo } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -93,6 +93,16 @@ async function as(browser: Browser, info: TestInfo, persona: PersonaName, scenar
 async function expectNoHorizontalOverflow(page: Page): Promise<void> {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow, 'the page must not scroll sideways').toBeLessThanOrEqual(1);
+}
+
+
+/** On a phone every control the work needs is at least 44 px tall. */
+async function expectTouchTargets(info: TestInfo, controls: Locator[]): Promise<void> {
+  if (!info.project.use.isMobile) return;
+  for (const control of controls) {
+    const box = await control.boundingBox();
+    expect(box?.height ?? 0, `touch target ${await control.textContent()}`).toBeGreaterThanOrEqual(44);
+  }
 }
 
 const screenshotDirectory = join(process.cwd(), 'test-results', 'visual');
@@ -342,6 +352,7 @@ test.describe.serial('Narcotics check', () => {
       await page.keyboard.press('Escape');
       await expect(viewer).toHaveCount(0);
 
+      await expectTouchTargets(info, [page.getByTestId('narcotics-take'), page.getByTestId('narcotics-upload'), sendButton(page)]);
       await page.getByTestId('narcotics-note').fill('A note that is optional');
       await expectNoHorizontalOverflow(page);
       await shot(page, info, '02-form-preview');
@@ -475,8 +486,12 @@ test.describe.serial('Narcotics check', () => {
       await row.click();
       await expect(sheet(page)).toBeVisible();
       await expect(page).toHaveURL(/check=/);
+      // Focus moves into the sheet (not left on the page's skip link behind it).
+      await expect.poll(() => page.evaluate(() => Boolean(document.activeElement?.closest('[role="dialog"]')))).toBe(true);
+      await expect(page.getByRole('link', { name: 'Skip to main content' })).not.toBeInViewport();
       const photo = page.getByTestId('narcotics-photo').locator('img');
       await imageIsSharp(page, photo, 1200);
+      await expectTouchTargets(info, [page.getByTestId('narcotics-approve'), page.getByTestId('narcotics-reject'), row]);
       await expect(sheet(page).getByTestId('narcotics-summary')).toContainText('Pat Member');
       await expect(sheet(page).getByTestId('narcotics-summary')).toContainText(state.approvedNote);
       await expectNoHorizontalOverflow(page);
