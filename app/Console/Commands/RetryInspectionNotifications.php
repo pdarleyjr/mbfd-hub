@@ -7,6 +7,7 @@ namespace App\Console\Commands;
 use App\Services\Captain5\Captain5Notifier;
 use App\Services\Ems\EmsNotifier;
 use App\Services\Inspections\InspectionNotificationDispatcher;
+use App\Services\Narcotics\NarcoticsNotifier;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -59,6 +60,7 @@ final class RetryInspectionNotifications extends Command
             try {
                 $delivered = match (true) {
                     str_starts_with((string) $row->event_key, 'captain5:') => app(Captain5Notifier::class)->redeliver((string) $row->event_key, (string) $row->notification_type, (int) $row->recipient_user_id),
+                    str_starts_with((string) $row->event_key, 'narcotics:') => app(NarcoticsNotifier::class)->redeliver((string) $row->event_key, (string) $row->notification_type, (int) $row->recipient_user_id),
                     str_starts_with((string) $row->event_key, 'ems:') => app(EmsNotifier::class)->redeliver((string) $row->event_key, (string) $row->notification_type, (int) $row->recipient_user_id),
                     default => $dispatcher->redeliver((string) $row->event_key, (string) $row->notification_type, (int) $row->recipient_user_id),
                 };

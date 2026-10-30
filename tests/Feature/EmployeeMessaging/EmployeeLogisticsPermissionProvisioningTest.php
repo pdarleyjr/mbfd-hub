@@ -64,8 +64,8 @@ final class EmployeeLogisticsPermissionProvisioningTest extends TestCase
     {
         $options = app(ApplicationAccessRegistry::class)->capabilityOptions();
 
-        $this->assertSame("Employee messages \u{2014} view the Logistics inbox", $options[Access::PERMISSION_VIEW]);
-        $this->assertSame("Employee messages \u{2014} view and reply as Logistics", $options[Access::PERMISSION_REPLY]);
+        $this->assertSame("Support Services messages \u{2014} view the inbox", $options[Access::PERMISSION_VIEW]);
+        $this->assertSame("Support Services messages \u{2014} view and reply", $options[Access::PERMISSION_REPLY]);
     }
 
     public function test_every_capability_option_has_a_permission_the_editor_can_grant(): void
@@ -207,6 +207,8 @@ final class EmployeeLogisticsPermissionProvisioningTest extends TestCase
     {
         $this->migration()->down();
         $this->migration()->up();
+        // The additive reason column (2026_10_30_100000) is a later migration: re-apply it too.
+        (require database_path('migrations/2026_10_30_100000_add_reason_to_employee_logistics_threads.php'))->up();
         app(PermissionRegistrar::class)->forgetCachedPermissions();
 
         $this->assertTrue(Schema::hasTable('employee_logistics_threads'));
@@ -221,7 +223,7 @@ final class EmployeeLogisticsPermissionProvisioningTest extends TestCase
     {
         $this->assertTrue(Schema::hasColumns('employee_logistics_threads', [
             'id', 'member_user_id', 'employee_profile_id', 'member_name', 'member_employee_number', 'member_rank',
-            'member_station', 'subject', 'last_message_preview', 'last_message_side', 'last_message_at',
+            'member_station', 'subject', 'reason', 'last_message_preview', 'last_message_side', 'last_message_at',
             'last_member_message_id', 'last_logistics_message_id', 'member_read_message_id',
             'logistics_read_message_id', 'logistics_read_by_user_id', 'logistics_read_at', 'message_count',
             'created_at', 'updated_at',

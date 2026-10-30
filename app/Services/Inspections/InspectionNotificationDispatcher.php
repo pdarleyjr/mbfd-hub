@@ -426,8 +426,9 @@ final class InspectionNotificationDispatcher
             $excerpt = $this->excerpt((string) $event->body);
             [$title, $body] = match ($event->event_type) {
                 ApparatusInventoryCorrectionEvent::CLARIFICATION_REQUESTED => ["{$unit}: question about your inventory correction", "Logistics asked about {$subject}: {$excerpt}"],
-                ApparatusInventoryCorrectionEvent::APPLIED => ["{$unit}: inventory correction approved", "Logistics approved your correction for {$subject}. The Daily Checkout checklist now reflects it."],
-                ApparatusInventoryCorrectionEvent::REJECTED => ["{$unit}: inventory correction not approved", "Logistics did not approve your correction for {$subject}: {$excerpt}"],
+                ApparatusInventoryCorrectionEvent::APPLIED => ["{$unit}: equipment change approved", "Logistics approved your correction for {$subject}. The Daily Checkout checklist now reflects it."],
+                // The message is optional: a bare rejection still says what happened.
+                ApparatusInventoryCorrectionEvent::REJECTED => ["{$unit}: equipment change rejected", "Logistics rejected your correction for {$subject}.".($excerpt !== '' ? " {$excerpt}" : ' The checklist was not changed.')],
                 ApparatusInventoryCorrectionEvent::REVERSED => ["{$unit}: inventory correction reversed", "Logistics reversed the change made for {$subject}: {$excerpt}"],
                 default => ["{$unit}: message about your inventory correction", "Logistics wrote about {$subject}: {$excerpt}"],
             };

@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { authDirectory, type PersonaName } from './employee-messages.setup';
 
 /*
- * Employee <-> Logistics messaging in real browsers (docs/employee-logistics-messaging.md).
+ * Support Services messaging in real browsers (formerly Employee <-> Logistics) (docs/employee-logistics-messaging.md).
  * Synthetic personas only; see database/seeders/EmployeeMessagesE2ESeeder.php.
  *
  * The conversation tests run in order inside one serial group per project: each builds on the
@@ -115,14 +115,14 @@ const pollComponent = (page: Page, fragment: string) =>
     await component.$wire.$call('poll');
   }, fragment);
 
-test.describe.serial('Employee <-> Logistics conversation', () => {
-  test('member A: Home offers Message Logistics beside Vehicle Checkout, and a first message is sent and persists', async ({ browser }, info) => {
+test.describe.serial('Support Services conversation', () => {
+  test('member A: Home offers Message Support Services beside Vehicle Checkout, and a first message is sent and persists', async ({ browser }, info) => {
     const state = run(info);
     await as(browser, info, 'memberA', async ({ page }) => {
       await page.goto('/');
       const actions = page.locator('.hub-page-header__actions');
       const checkout = actions.getByRole('link', { name: 'Vehicle Checkout', exact: true });
-      const message = actions.getByRole('link', { name: 'Message Logistics', exact: true });
+      const message = actions.getByRole('link', { name: 'Message Support Services', exact: true });
       await expect(checkout).toBeVisible();
       await expect(message).toBeVisible();
       await expect(message).toHaveAttribute('href', /\/employee\/messages\?compose=1$/);
@@ -140,7 +140,7 @@ test.describe.serial('Employee <-> Logistics conversation', () => {
 
       await page.locator('#emsg-member-new-subject').fill(state.subject);
       await body.fill(state.firstBody);
-      await page.getByRole('button', { name: 'Send to Logistics' }).click();
+      await page.getByRole('button', { name: 'Send to Support Services' }).click();
 
       await expect(bubble(page, state.firstBody)).toBeVisible();
       await expect(page.locator('.emsg-bubble--mine')).toHaveCount(1);
@@ -154,7 +154,7 @@ test.describe.serial('Employee <-> Logistics conversation', () => {
     });
   });
 
-  test('responder: the Dashboard card follows the Station Operations board, shows the unread row, expands and replies inline', async ({ browser }, info) => {
+  test('responder: the admin home card follows the Station Operations board, shows the unread row, expands and replies inline', async ({ browser }, info) => {
     const state = run(info);
     await as(browser, info, 'responder', async ({ page }) => {
       await page.goto('/admin');
@@ -168,7 +168,7 @@ test.describe.serial('Employee <-> Logistics conversation', () => {
 
         return Boolean(board && widget && (board.compareDocumentPosition(widget) & Node.DOCUMENT_POSITION_FOLLOWING));
       });
-      expect(cardFollowsBoard, 'Employee Messages comes after the Station Operations board').toBe(true);
+      expect(cardFollowsBoard, 'Support Services Messages comes after the Station Operations board').toBe(true);
 
       const row = page.locator('button[data-emsg-row]', { hasText: state.firstBody });
       await expect(row).toBeVisible();
@@ -219,7 +219,7 @@ test.describe.serial('Employee <-> Logistics conversation', () => {
 
       await expect(bubble(page, state.logisticsWidgetReply)).toBeVisible();
       await expect(page.locator('.emsg-bubble--logistics')).toHaveCount(1);
-      await page.getByLabel('Reply to Logistics').fill(state.memberFollowUp);
+      await page.getByLabel('Reply to Support Services').fill(state.memberFollowUp);
       await page.getByRole('button', { name: 'Send reply' }).click();
       await expect(bubble(page, state.memberFollowUp)).toBeVisible();
       await expect(page.locator('.emsg-bubble')).toHaveCount(3);
@@ -230,16 +230,16 @@ test.describe.serial('Employee <-> Logistics conversation', () => {
     const state = run(info);
     await as(browser, info, 'responder', async ({ page }) => {
       await page.goto('/admin');
-      await openCommunicationsLink(page, /^Employee Messages/);
+      await openCommunicationsLink(page, /^Support Services Messages/);
       await expect(page).toHaveURL(/\/admin\/employee-messages/);
-      await expect(page.getByRole('heading', { name: 'Employee Messages', level: 1 })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Support Services Messages', level: 1 })).toBeVisible();
 
       const row = page.locator('.emsg-row', { hasText: state.memberFollowUp });
       await expect(row).toBeVisible();
       await expect(row.locator('.emsg-unread-dot')).toHaveText('Unread');
       await expect(row).toContainText('Awaiting reply');
 
-      const search = page.getByRole('searchbox', { name: 'Search employee messages' });
+      const search = page.getByRole('searchbox', { name: 'Search Support Services messages' });
       await search.fill('Casey');
       await expect(row).toBeVisible();
       await search.fill('nobody-by-this-name');
@@ -295,8 +295,8 @@ test.describe.serial('Employee <-> Logistics conversation', () => {
 
     await as(browser, info, 'memberB', async ({ page }) => {
       await page.goto('/employee/messages');
-      await expect(page.getByText('No messages yet')).toBeVisible();
-      await expect(page.locator('.emsg-row')).toHaveCount(0);
+      // Member B may own conversations of their own (the bunker gear scenario sends one); none is member A's.
+      await expect(page.locator('.emsg-row').filter({ hasText: state.firstBody })).toHaveCount(0);
       await expect(page.getByText(state.firstBody)).toHaveCount(0);
 
       await page.goto(`/employee/messages?thread=${state.threadId}`);
@@ -317,14 +317,14 @@ test.describe.serial('Employee <-> Logistics conversation', () => {
       await expect(row).toBeVisible();
       await row.click();
       await expect(bubble(page, state.memberFollowUp)).toBeVisible();
-      await expect(page.getByText(/can read employee messages but not reply/i)).toBeVisible();
+      await expect(page.getByText(/can read Support Services messages but not reply/i)).toBeVisible();
       await expect(page.locator('[data-employee-message-composer]')).toHaveCount(0);
       await expect(page.getByRole('button', { name: 'Send reply' })).toHaveCount(0);
 
       await page.goto('/admin');
       await expect(page.locator('#emsg-widget-title')).toBeVisible();
       await page.locator('button[data-emsg-row]', { hasText: state.logisticsInboxReply }).click();
-      await expect(page.getByText(/can read employee messages but not reply/i)).toBeVisible();
+      await expect(page.getByText(/can read Support Services messages but not reply/i)).toBeVisible();
       await expect(page.locator('[data-employee-message-composer]')).toHaveCount(0);
     });
 
@@ -339,7 +339,7 @@ test.describe.serial('Employee <-> Logistics conversation', () => {
       if (await opener.isVisible().catch(() => false)) await opener.click();
       await sidebar.getByRole('button', { name: 'Communications' }).click();
       await expect(sidebar.getByRole('link', { name: /Inbound Email/ })).toBeVisible();
-      await expect(sidebar.getByRole('link', { name: /Employee Messages/ })).toHaveCount(0);
+      await expect(sidebar.getByRole('link', { name: /Support Services Messages/ })).toHaveCount(0);
 
       const response = await page.goto('/admin/employee-messages');
       expect(response?.status()).toBe(403);
@@ -435,7 +435,7 @@ test.describe('Drafts and PWA updates', () => {
       await page.goto('/employee/messages?compose=1');
       await exerciseDraftGuard(page, releases, {
         textarea: '#emsg-member-new-body',
-        send: 'button:has-text("Send to Logistics")',
+        send: 'button:has-text("Send to Support Services")',
         pollComponent: 'my-messages',
         sentText: sent,
         confirmed: async () => {
@@ -454,7 +454,7 @@ test.describe('Drafts and PWA updates', () => {
     await as(browser, info, 'viewer', async ({ page }) => {
       await page.goto('/employee/messages?compose=1');
       await page.locator('#emsg-member-new-body').fill(`Guard thread opener ${state.token}`);
-      await page.getByRole('button', { name: 'Send to Logistics' }).click();
+      await page.getByRole('button', { name: 'Send to Support Services' }).click();
       await expect(bubble(page, `Guard thread opener ${state.token}`)).toBeVisible();
       threadId = new URL(page.url()).searchParams.get('thread');
     });
@@ -485,14 +485,14 @@ test.describe('Drafts and PWA updates', () => {
       await textarea.fill(text);
 
       await context.setOffline(true);
-      await page.getByRole('button', { name: 'Send to Logistics' }).click();
+      await page.getByRole('button', { name: 'Send to Support Services' }).click();
       await expect(page.getByRole('alert').filter({ hasText: "You're offline" })).toBeVisible();
       await expect(textarea).toHaveValue(text);
       expect(await busyReasons(page), 'the unsent draft still holds the page').toHaveLength(1);
       await expect(bubble(page, text)).toHaveCount(0);
 
       await context.setOffline(false);
-      await page.getByRole('button', { name: 'Send to Logistics' }).click();
+      await page.getByRole('button', { name: 'Send to Support Services' }).click();
       await expect(bubble(page, text)).toHaveCount(1);
       await expect.poll(() => busyReasons(page)).toEqual([]);
 
@@ -526,12 +526,68 @@ test.describe('Composer accessibility', () => {
       await field.fill(text);
       await expect(field).toBeFocused();
       await page.keyboard.press('Tab');
-      await expect(page.getByRole('button', { name: 'Send to Logistics' })).toBeFocused();
+      await expect(page.getByRole('button', { name: 'Send to Support Services' })).toBeFocused();
 
       await field.focus();
       await page.keyboard.press('Control+Enter');
       await expect(bubble(page, text)).toBeVisible();
       await expect(bubble(page, text)).toHaveCount(1);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Bunker gear cleaning request: member -> admin home card -> exact conversation -> reply -> member
+// ---------------------------------------------------------------------------
+
+test.describe.serial('Bunker gear cleaning request', () => {
+  test('member B sends a bunker gear request; the admin home card shows it and Reply opens that exact conversation; member B sees the reply', async ({ browser }, info) => {
+    const token = run(info).token;
+    const body = `Please clean my turnout coat and pants ${token}`;
+    const reply = `Drop the gear at Station 1 Monday ${token}`;
+    let threadId: string | null = null;
+
+    await as(browser, info, 'memberB', async ({ page }) => {
+      await page.goto('/employee/messages?compose=1');
+      const reason = page.getByLabel('Reason');
+      await expect(reason).toBeVisible();
+      await reason.selectOption({ label: 'Bunker gear cleaning request' });
+      await page.locator('#emsg-member-new-body').fill(body);
+      await page.getByRole('button', { name: 'Send to Support Services' }).click();
+      await expect(bubble(page, body)).toBeVisible();
+      await expect(page.getByText('Reason: Bunker gear cleaning request')).toBeVisible();
+      await expect(page.locator('[data-emsg-status]').first()).toContainText('Sent, awaiting reply');
+      threadId = new URL(page.url()).searchParams.get('thread');
+      expect(threadId).toMatch(/^\d+$/);
+    });
+
+    await as(browser, info, 'responder', async ({ page }) => {
+      await page.goto('/admin');
+      const card = page.locator('#emsg-widget-title');
+      await expect(card).toHaveText('Support Services Messages');
+      const row = page.locator('button[data-emsg-row]', { hasText: body });
+      await expect(row).toBeVisible();
+      await expect(row.locator('.emsg-tag--reason')).toHaveText('Bunker gear cleaning request');
+      const open = page.locator(`a[data-emsg-open-link][href$="thread=${threadId}"]`);
+      await expect(open).toHaveText('Reply');
+      await expectNoHorizontalOverflow(page);
+      await open.click();
+      await expect(page).toHaveURL(new RegExp(`/admin/employee-messages\\?thread=${threadId}$`));
+      await expect(bubble(page, body)).toBeVisible();
+      await page.getByLabel('Reply to ', { exact: false }).first().fill(reply);
+      await page.getByRole('button', { name: 'Send reply' }).click();
+      await expect(bubble(page, reply)).toBeVisible();
+
+      // The deep link survives a refresh.
+      await page.reload();
+      await expect(bubble(page, body)).toBeVisible();
+      await expect(bubble(page, reply)).toBeVisible();
+    });
+
+    await as(browser, info, 'memberB', async ({ page }) => {
+      await page.goto(`/employee/messages?thread=${threadId}`);
+      await expect(bubble(page, reply)).toBeVisible();
+      await expect(page.locator('.emsg-bubble--logistics .emsg-bubble__side')).toHaveText('Support Services');
     });
   });
 });

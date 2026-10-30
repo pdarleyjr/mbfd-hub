@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Services\DailyCheckoutChecklistResolver;
 use App\Services\Inventory\InventoryChangePlanner;
 use App\Services\Inventory\InventoryCorrectionConflict;
+use App\Services\Inventory\InventoryCorrectionDiff;
 use App\Services\Inventory\InventoryCorrectionReason;
 use App\Services\Inventory\InventoryCorrectionService;
 use App\Services\Inventory\InventoryOperationException;
@@ -72,6 +73,7 @@ class ViewInventoryCorrection extends ViewRecord
             'reasonLabel' => InventoryCorrectionReason::label($correction->reason),
             'statusLabel' => ApparatusInventoryCorrection::statusLabel($correction->status),
             'current' => $current,
+            'diffRows' => InventoryCorrectionDiff::rows($correction),
             'suggestedAfter' => $sourceUnit['after'] ?? null,
             'suggestedVerdict' => $sourceUnit['verdict_label'] ?? null,
             'compartmentNames' => $this->compartmentOptions(),
@@ -127,22 +129,23 @@ class ViewInventoryCorrection extends ViewRecord
                     (int) $this->correction()->getKey(), $user, (string) $data['body'], (string) $data['visibility'], $data['key'] ?? null,
                 ), $data['visibility'] === Event::VISIBILITY_INTERNAL ? 'Internal note saved' : 'Message sent to the member')),
             Action::make('reject')
-                ->label('Do not approve')
+                ->label('Reject')
                 ->icon('heroicon-o-x-circle')
                 ->color('danger')
                 ->visible(fn (): bool => $this->correction()->isOpen() && $this->isReviewer())
-                ->modalHeading('Do not approve this correction')
-                ->modalDescription('The checklist stays as it is. The member sees the reason you give.')
+                ->modalHeading('Reject this request')
+                ->modalDescription('The checklist stays exactly as it is. The member is told it was rejected, with your message if you write one.')
+                ->modalSubmitActionLabel('Reject request')
                 ->fillForm(fn (): array => ['lock_version' => $this->correction()->lock_version, 'key' => (string) Str::uuid()])
                 ->form([
                     Forms\Components\Hidden::make('lock_version'),
                     Forms\Components\Hidden::make('key'),
-                    Forms\Components\Textarea::make('reason')->label('Reason shared with the member')->required()->rows(4)->maxLength(InventoryCorrectionService::MAX_MESSAGE),
-                    Forms\Components\Textarea::make('internal_note')->label('Internal note (Logistics only)')->rows(2)->maxLength(InventoryCorrectionService::MAX_MESSAGE),
+                    Forms\Components\Textarea::make('reason')->label('Message to the member (optional)')->rows(4)->maxLength(InventoryCorrectionService::MAX_MESSAGE),
+                    Forms\Components\Textarea::make('internal_note')->label('Internal note (Logistics only, optional)')->rows(2)->maxLength(InventoryCorrectionService::MAX_MESSAGE),
                 ])
                 ->action(fn (array $data) => $this->run(fn (User $user) => app(InventoryCorrectionService::class)->reject(
-                    (int) $this->correction()->getKey(), $user, (string) $data['reason'], $data['internal_note'] ?? null, (int) $data['lock_version'], $data['key'] ?? null,
-                ), 'Correction not approved; the member was told why')),
+                    (int) $this->correction()->getKey(), $user, $data['reason'] ?? null, $data['internal_note'] ?? null, (int) $data['lock_version'], $data['key'] ?? null,
+                ), 'Request rejected. The checklist was not changed and the member was told.')),
             Action::make('reverse')
                 ->label('Reverse change')
                 ->icon('heroicon-o-arrow-uturn-left')

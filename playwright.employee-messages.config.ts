@@ -46,7 +46,7 @@ export const phpExtensionArguments: string[] = process.platform === 'win32' ? ['
 
 export default defineConfig({
   testDir: './tests/e2e',
-  testMatch: /employee-messages\.spec\.ts/,
+  testMatch: /employee-messages(?:-visual)?\.spec\.ts/,
   globalSetup: './tests/e2e/employee-messages.setup.ts',
   timeout: 90_000,
   retries: 0,

@@ -446,7 +446,7 @@ final class TrainingRosterService
                 return $candidate;
             }
         }
-        $this->reject('employee_profile_id', 'This employee has no verified published bid selection. Ask the instructor for assistance.');
+        $this->reject('employee_profile_id', 'This employee is not on the current training roster. Ask the instructor for assistance.');
     }
 
     private function locked(TrainingSession $session): TrainingSession

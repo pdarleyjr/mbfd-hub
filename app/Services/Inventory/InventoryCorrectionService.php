@@ -225,9 +225,14 @@ final class InventoryCorrectionService
 
     // --------------------------------------------------------------- decisions
 
-    public function reject(int $correctionId, User $reviewer, string $reason, ?string $internalNote = null, ?int $expectedLock = null, ?string $idempotencyKey = null): ApparatusInventoryCorrection
+    /**
+     * Rejects the correction. The message to the member is optional; the checklist is never touched.
+     * A repeat with the same idempotency key returns the first result; a repeat without one on an
+     * already decided correction is refused, so a double click never rejects twice.
+     */
+    public function reject(int $correctionId, User $reviewer, ?string $reason = null, ?string $internalNote = null, ?int $expectedLock = null, ?string $idempotencyKey = null): ApparatusInventoryCorrection
     {
-        $reason = $this->messageBody($reason);
+        $reason = filled($reason) ? $this->messageBody((string) $reason) : null;
 
         return DB::transaction(function () use ($correctionId, $reviewer, $reason, $internalNote, $expectedLock, $idempotencyKey): ApparatusInventoryCorrection {
             $correction = $this->lock($correctionId);
@@ -614,14 +619,20 @@ final class InventoryCorrectionService
         }
         $proposal = is_array($data['proposal'] ?? null) ? $data['proposal'] : [];
         $destination = $proposal['to_compartment_id'] ?? null;
+        $destinationName = null;
         if (is_string($destination) && $destination !== '') {
-            $valid = collect($checklist['compartments'])->contains(static fn (array $entry): bool => (string) ($entry['id'] ?? '') === $destination);
-            if (! $valid || $destination === $compartmentId) {
+            $destinationEntry = collect($checklist['compartments'])->first(static fn (array $entry): bool => (string) ($entry['id'] ?? '') === $destination);
+            if (! is_array($destinationEntry) || $destination === $compartmentId) {
                 throw ValidationException::withMessages(['proposal.to_compartment_id' => 'Choose a different compartment on this apparatus, or describe where it is now.']);
             }
+            $destinationName = InventoryOverlay::compartmentName($destinationEntry);
         }
 
         $snapshot = ['compartment_id' => $compartmentId, 'compartment' => InventoryOverlay::compartmentName($compartment)];
+        if ($destinationName !== null) {
+            // What the reviewer reads in "after"; the id stays authoritative in the proposal.
+            $snapshot['to_compartment'] = $destinationName;
+        }
         if ($data['reason'] === InventoryCorrectionReason::NEW_ITEM) {
             return ['compartment_id' => $compartmentId, 'item_id' => null, 'equipment_key' => null, 'snapshot' => $snapshot];
         }
@@ -700,7 +711,10 @@ final class InventoryCorrectionService
     }
 
     /**
-     * An open report by this member about the same item (or unlisted item name) for the same reason.
+     * An open report by this member that says exactly the same thing: the same item (or unlisted item name),
+     * the same reason AND the same proposed value and note. A report that proposes something different
+     * (for example a different destination compartment) is a new request, never silently dropped in favour
+     * of the earlier one, so Logistics always reviews what the member last asked for.
      *
      * @param  array<string, mixed>  $data
      * @param  array{compartment_id: string, item_id: string|null, equipment_key: string|null, snapshot: array<string, mixed>}  $target
@@ -715,13 +729,28 @@ final class InventoryCorrectionService
             ->open()
             ->when($target['item_id'] !== null, fn ($query) => $query->where('item_key', $target['item_id']), fn ($query) => $query->whereNull('item_key'))
             ->orderBy('id')
-            ->get();
+            ->get()
+            ->filter(fn (ApparatusInventoryCorrection $open): bool => $this->sameContent($open, $data));
         if ($target['item_id'] !== null) {
             return $candidates->first();
         }
         $name = EquipmentIdentity::normalize((string) ($data['proposal']['name'] ?? ''));
 
         return $candidates->first(static fn (ApparatusInventoryCorrection $open): bool => EquipmentIdentity::normalize((string) ($open->proposal['name'] ?? '')) === $name);
+    }
+
+    /** Same proposed values and note (a new photo on a report that had none also counts as different). */
+    private function sameContent(ApparatusInventoryCorrection $open, array $data): bool
+    {
+        $canonical = static function (array $proposal): string {
+            ksort($proposal, SORT_STRING);
+
+            return json_encode($proposal, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        };
+
+        return $canonical($this->cleanProposal(is_array($data['proposal'] ?? null) ? $data['proposal'] : [])) === $canonical(is_array($open->proposal) ? $open->proposal : [])
+            && $this->optional($data['note'] ?? null) === $open->member_note
+            && (! filled($data['photo'] ?? null) || $open->photo_path !== null);
     }
 
     /** Keeps one member from flooding Logistics' queue or the checklist payload. */

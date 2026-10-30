@@ -6,7 +6,8 @@
     'withSubject' => false,
     'autofocus' => false,
     'idPrefix' => 'emsg',
-    'hint' => 'Text only. Logistics will reply here.',
+    'hint' => 'Text only. Support Services will reply here.',
+    'withReason' => false,
     'threadId' => null,
 ])
 @php
@@ -16,15 +17,32 @@
     $subjectId = $idPrefix.'-subject';
     $hintId = $idPrefix.'-hint';
     $feedbackId = $idPrefix.'-feedback';
+    $reasonId = $idPrefix.'-reason';
 @endphp
 <form
     wire:ignore
-    x-data="window.mbfdEmployeeMessageComposer({ method: @js($method), withSubject: @js((bool) $withSubject), autofocus: @js((bool) $autofocus), maxLength: {{ $max }}, threadId: @js($threadId === null ? null : (int) $threadId) })"
+    x-data="window.mbfdEmployeeMessageComposer({ method: @js($method), withSubject: @js((bool) $withSubject), withReason: @js((bool) $withReason), autofocus: @js((bool) $autofocus), maxLength: {{ $max }}, threadId: @js($threadId === null ? null : (int) $threadId) })"
     x-on:submit.prevent="send()"
     data-employee-message-composer
     {{ $attributes->class('emsg-composer') }}
     novalidate
 >
+    @if ($withReason)
+        <div class="emsg-field">
+            <label for="{{ $reasonId }}" class="emsg-label">Reason</label>
+            <select
+                id="{{ $reasonId }}"
+                x-model="reason"
+                class="emsg-input emsg-select"
+                x-bind:disabled="sending"
+            >
+                @foreach (\App\Services\EmployeeMessaging\EmployeeMessageReason::options() as $reasonKey => $reasonLabel)
+                    <option value="{{ $reasonKey }}">{{ $reasonLabel }}</option>
+                @endforeach
+            </select>
+        </div>
+    @endif
+
     @if ($withSubject)
         <div class="emsg-field">
             <label for="{{ $subjectId }}" class="emsg-label">Subject <span class="emsg-optional">(optional)</span></label>

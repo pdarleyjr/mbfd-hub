@@ -6,6 +6,7 @@ namespace App\Notifications\Inspections;
 
 use App\Models\User;
 use App\Services\Captain5\Captain5Notifier;
+use App\Services\Narcotics\NarcoticsNotifier;
 use App\Services\Notifications\NotificationCategoryRegistry;
 use Illuminate\Support\Facades\Log;
 
@@ -97,6 +98,9 @@ final class InspectionNotificationKind
             Captain5Notifier::KIND_MESSAGE => $captain5,
             Captain5Notifier::KIND_MEMBER_REPLY => $captain5,
             Captain5Notifier::KIND_COMMUNICATION => $captain5,
+            // Narcotics check (docs/narcotics-check.md): Captain 5 reviewers hear of a new check; the member hears the decision.
+            NarcoticsNotifier::KIND_SUBMITTED => $captain5,
+            NarcoticsNotifier::KIND_DECISION => $own,
             // Sent to whoever may approve acting Captain 5 assignments; they need not have workspace access.
             'captain5_acting_request' => NotificationCategoryRegistry::CAPTAIN5_ASSIGNMENT_REQUESTS,
             // Tells the requesting member about their own request.

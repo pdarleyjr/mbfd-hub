@@ -6,7 +6,7 @@ import {
 import {
     AlertTriangle, ArrowLeft, BookOpen, Check, ChevronRight, ClipboardList, Clock3, Cloud, Copy, Download,
     Bot, Eye, FileArchive, FileCheck2, FilePenLine, FilePlus2, FileUp, Home, Library, LoaderCircle, Plus, Printer, RefreshCw, Save,
-    ShieldCheck, Sparkles, Stethoscope, Trash2, Truck, UsersRound, WifiOff,
+    ShieldAlert, ShieldCheck, Sparkles, Stethoscope, Trash2, Truck, UsersRound, WifiOff,
 } from 'lucide-react';
 import { ApiError, createApi } from './api';
 import { HUB_TIMEZONE } from '../shared/timezone.ts';
@@ -18,6 +18,11 @@ import { isDocumentRecordType, recordTypeLabel, searchForView, viewFromDeepLink,
 import type { EmsOutboxEntry, EmsView } from './ems/emsTypes';
 import { PendingRequests } from './ems/PendingRequests';
 import { useEmsOutbox, type EmsOutbox } from './ems/useEmsOutbox';
+import { createNarcoticsApi } from './narcotics/narcoticsApi';
+import { BUSY_REASON as NARCOTICS_BUSY, FORM_KEY as NARCOTICS_FORM_KEY, searchForView as narcoticsSearchForView, viewFromDeepLink as narcoticsViewFromDeepLink, viewFromSearch as narcoticsViewFromSearch } from './narcotics/narcoticsImage.js';
+import { NarcoticsApp } from './narcotics/NarcoticsApp';
+import type { NarcoticsView } from './narcotics/narcoticsTypes';
+import { busyReasons } from '../pwa/busy';
 import type { BootstrapData, EditableFormType, EmployeeSuggestion, FormDefinition, FormDocument, FormRecord, FormType, FrocImportConfig, FrocImportSummary, LibraryLink } from './types';
 
 const PdfPreview = lazy(() => import('./PdfPreview').then((module) => ({ default: module.PdfPreview })));
@@ -88,6 +93,11 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
     const [emsView, setEmsView] = useState<EmsView | null>(() => (emsEndpoints ? viewFromDeepLink(bootstrap.deep_link) : null));
     const [emsEdit, setEmsEdit] = useState<EmsOutboxEntry | null>(null);
 
+    // Narcotics check: its own views inside this app, reachable by deep link (?form=narcotics-check[&view=mine|&check=...]).
+    const narcoticsEndpoints = bootstrap.endpoints.narcotics ?? null;
+    const narcoticsApi = useMemo(() => (narcoticsEndpoints ? createNarcoticsApi(narcoticsEndpoints, bootstrap.csrf_token) : null), [narcoticsEndpoints, bootstrap.csrf_token]);
+    const [narcoticsView, setNarcoticsView] = useState<NarcoticsView | null>(() => (narcoticsEndpoints ? (narcoticsViewFromDeepLink(bootstrap.narcotics_deep_link) as NarcoticsView | null) : null));
+
     useEffect(() => { currentRef.current = current; }, [current]);
 
     const refreshLibrary = useCallback(async () => {
@@ -123,6 +133,33 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
         return () => window.removeEventListener('popstate', onPop);
     }, [emsEndpoints]);
 
+    /** A photo that has not been sent exists only in this tab: leaving the form asks first. */
+    const confirmLeaveNarcotics = useCallback(() => (
+        !busyReasons().includes(NARCOTICS_BUSY)
+        || window.confirm('Your narcotics check photo has not been sent yet. If you leave now it will be lost. Leave anyway?')
+    ), []);
+
+    const goNarcotics = useCallback((view: NarcoticsView | null) => {
+        if (narcoticsView?.name === 'form' && view?.name !== 'form' && !confirmLeaveNarcotics()) return;
+        setNarcoticsView(view);
+        const url = `${window.location.pathname}${narcoticsSearchForView(view)}`;
+        if (`${window.location.pathname}${window.location.search}` !== url) window.history.pushState({}, '', url);
+        window.scrollTo({ top: 0 });
+    }, [narcoticsView, confirmLeaveNarcotics]);
+
+    useEffect(() => {
+        if (!narcoticsEndpoints) return undefined;
+        const onPop = () => {
+            const next = narcoticsViewFromSearch(window.location.search) as NarcoticsView | null;
+            if (narcoticsView?.name === 'form' && next?.name !== 'form' && !confirmLeaveNarcotics()) {
+                window.history.pushState({}, '', `${window.location.pathname}${narcoticsSearchForView(narcoticsView)}`);
+                return;
+            }
+            setNarcoticsView(next);
+        };
+        window.addEventListener('popstate', onPop);
+        return () => window.removeEventListener('popstate', onPop);
+    }, [narcoticsEndpoints, narcoticsView, confirmLeaveNarcotics]);
     const editQueuedRequest = useCallback((entry: EmsOutboxEntry) => { setEmsEdit(entry); goEms({ name: 'form' }); }, [goEms]);
     const openEmsPdf = useCallback((url: string, name: string) => setPreview({ preview_url: url, display_name: name } as FormDocument), []);
 
@@ -308,20 +345,23 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
                 </header>
                 <div className="of-layout">
                     <nav className="of-rail" aria-label="Forms navigation">
-                        <button className={!current && !emsView ? 'active' : ''} onClick={() => { setCurrent(null); if (emsView) goEms(null); }}><Library size={19} /><span>Library</span></button>
+                        <button className={!current && !emsView && !narcoticsView ? 'active' : ''} onClick={() => { setCurrent(null); if (emsView) goEms(null); if (narcoticsView) goNarcotics(null); }}><Library size={19} /><span>Library</span></button>
                         {current && <button className="active"><FilePenLine size={19} /><span>Editor</span></button>}
                         {emsView && emsApi && <button className="active" aria-current="page"><ClipboardList size={19} /><span>Medical</span></button>}
+                        {narcoticsView && narcoticsApi && <button className="active" aria-current="page"><ShieldAlert size={19} /><span>Narcotics</span></button>}
                         <a href="/employee/dashboard"><Home size={19} /><span>Portal</span></a>
                     </nav>
                     <main className="of-main">
                         {message && <MessageBar intent={message.intent}><MessageBarBody>{message.text}</MessageBarBody></MessageBar>}
-                        {emsView && emsApi && !current ? (
+                        {narcoticsView && narcoticsApi && !current ? (
+                            <NarcoticsApp api={narcoticsApi} view={narcoticsView} navigate={goNarcotics} goForms={() => goNarcotics(null)} />
+                        ) : emsView && emsApi && !current ? (
                             <EmsApp
                                 api={emsApi} owner={String(bootstrap.employee.id)} view={emsView} outbox={emsOutbox} edit={emsEdit} onEditConsumed={() => setEmsEdit(null)}
                                 navigate={goEms} goForms={() => goEms(null)} editEntry={editQueuedRequest} openPdf={openEmsPdf} onSubmitted={() => void refreshRecordsQuietly()}
                             />
                         ) : !current ? (
-                            <LibraryView definitions={definitions} records={records} busy={busy} createRecord={createRecord} uploadFile={uploadFile} openRecord={openRecord} refresh={refreshLibrary} openDocument={openDocument} guideUrl={bootstrap.endpoints.guide} libraryLinks={bootstrap.library_links ?? []} openEms={emsApi ? goEms : undefined} emsOutbox={emsApi ? emsOutbox : undefined} editQueuedRequest={editQueuedRequest} />
+                            <LibraryView definitions={definitions} records={records} busy={busy} createRecord={createRecord} uploadFile={uploadFile} openRecord={openRecord} refresh={refreshLibrary} openDocument={openDocument} guideUrl={bootstrap.endpoints.guide} libraryLinks={bootstrap.library_links ?? []} openEms={emsApi ? goEms : undefined} emsOutbox={emsApi ? emsOutbox : undefined} editQueuedRequest={editQueuedRequest} openNarcotics={narcoticsApi ? goNarcotics : undefined} />
                         ) : (
                             <EditorView
                                 record={current} definition={definitions.find((item) => item.form_type === current.form_type)}
@@ -351,32 +391,36 @@ function inAppClick(open: () => void) {
     };
 }
 
-function LibraryLinkCard({ entry, openEms }: { entry: LibraryLink; openEms?: (view: EmsView) => void }) {
-    const inApp = entry.in_app === true && openEms !== undefined;
+function LibraryLinkCard({ entry, openEms, openNarcotics }: { entry: LibraryLink; openEms?: (view: EmsView) => void; openNarcotics?: (view: NarcoticsView) => void }) {
+    const narcotics = entry.key === NARCOTICS_FORM_KEY;
+    const inApp = entry.in_app === true && (narcotics ? openNarcotics !== undefined : openEms !== undefined);
+    const openPrimary = () => (narcotics ? openNarcotics?.({ name: 'form' }) : openEms?.({ name: 'form' }));
+    const openSecondary = () => (narcotics ? openNarcotics?.({ name: 'mine' }) : openEms?.({ name: 'mine' }));
     return <article className="of-form-card" data-library-link={entry.key}>
-        <div className="of-form-card-icon">{entry.in_app ? <Stethoscope /> : <Truck />}</div>
+        <div className="of-form-card-icon">{narcotics ? <ShieldAlert /> : entry.in_app ? <Stethoscope /> : <Truck />}</div>
         <div><h3>{entry.title}</h3><p>{entry.description}</p></div>
         <div className="ems-card-actions">
-            <Button as="a" appearance="primary" href={entry.href} onClick={inApp ? inAppClick(() => openEms?.({ name: 'form' })) : undefined} icon={<ChevronRight size={17} />} iconPosition="after">{entry.action_label}</Button>
-            {entry.secondary && <Button as="a" href={entry.secondary.href} onClick={inApp ? inAppClick(() => openEms?.({ name: 'mine' })) : undefined}>{entry.secondary.label}</Button>}
+            <Button as="a" appearance="primary" href={entry.href} onClick={inApp ? inAppClick(openPrimary) : undefined} icon={<ChevronRight size={17} />} iconPosition="after">{entry.action_label}</Button>
+            {entry.secondary && <Button as="a" href={entry.secondary.href} onClick={inApp ? inAppClick(openSecondary) : undefined}>{entry.secondary.label}</Button>}
         </div>
     </article>;
 }
 
-function LibraryView({ definitions, records, busy, createRecord, uploadFile, openRecord, refresh, openDocument, guideUrl, libraryLinks, openEms, emsOutbox, editQueuedRequest }: {
+function LibraryView({ definitions, records, busy, createRecord, uploadFile, openRecord, refresh, openDocument, guideUrl, libraryLinks, openEms, emsOutbox, editQueuedRequest, openNarcotics }: {
     definitions: FormDefinition[]; records: FormRecord[]; busy: boolean;
     createRecord: (type: EditableFormType) => Promise<void>;
     uploadFile: (name: string, file: File) => Promise<void>;
     openRecord: (record: FormRecord) => void; refresh: () => void; openDocument: (doc: FormDocument) => void; guideUrl: string;
     libraryLinks: LibraryLink[];
     openEms?: (view: EmsView) => void; emsOutbox?: EmsOutbox; editQueuedRequest: (entry: EmsOutboxEntry) => void;
+    openNarcotics?: (view: NarcoticsView) => void;
 }) {
     return <div className="of-library">
         <div className="of-page-heading"><div><p className="of-eyebrow">Controlled records workspace</p><h1>Operational Forms</h1><p>Start, resume, generate, or submit incident and reimbursement records.</p></div><div className="of-heading-actions"><Button as="a" href={guideUrl} target="_blank" icon={<BookOpen size={16} />}>User guide</Button><Button icon={<RefreshCw size={16} />} onClick={refresh} disabled={busy}>Refresh</Button></div></div>
         {emsOutbox && openEms && <PendingRequests outbox={emsOutbox} openRequest={(id) => openEms({ name: 'detail', id })} editEntry={editQueuedRequest} />}
         <section aria-labelledby="start-form"><h2 id="start-form">Start a form</h2><div className="of-form-cards">
             {definitions.map((definition) => <article className="of-form-card" key={definition.form_type}><div className="of-form-card-icon">{definition.form_type === 'ics_214' ? <ClipboardList /> : <FileCheck2 />}</div><div><Badge appearance="outline">Version {definition.form_version}</Badge><h3>{definition.display_name}</h3><p>{definition.form_type === 'ics_214' ? 'Document unit resources and chronological incident activity.' : 'Capture firefighter labor, equipment, mileage, materials, and certification—with optional AI-assisted note import.'}</p></div><Button appearance="primary" icon={<FilePlus2 size={17} />} onClick={() => void createRecord(definition.form_type)}>Create form</Button></article>)}
-            {libraryLinks.map((entry) => <LibraryLinkCard key={entry.key} entry={entry} openEms={openEms} />)}
+            {libraryLinks.map((entry) => <LibraryLinkCard key={entry.key} entry={entry} openEms={openEms} openNarcotics={openNarcotics} />)}
         </div></section>
         <FileSubmissionCard upload={uploadFile} />
         <section aria-labelledby="recent-records"><div className="of-section-heading"><h2 id="recent-records">Recent records</h2><span>{records.length} record{records.length === 1 ? '' : 's'}</span></div>

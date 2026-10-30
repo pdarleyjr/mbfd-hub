@@ -16,7 +16,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 /**
- * Logistics Dashboard card for Employee <-> Logistics messaging (docs/employee-logistics-messaging.md).
+ * Admin home card for Support Services messaging (formerly Employee <-> Logistics messaging) (docs/employee-logistics-messaging.md).
  *
  * Shows the latest conversations from one list query (no message bodies for collapsed rows).
  * Expanding a row shows its last messages and, for responders, the reply box. Only expanding a
@@ -136,6 +136,7 @@ final class EmployeeMessagesWidget extends Widget
         $expanded = $this->expandedConversation($actor, $service);
         $threads = $service->logisticsThreads($actor, EmployeeLogisticsMessagingService::FILTER_ALL, null, self::PREVIEW_ROWS)['threads'];
         $unread = $service->logisticsUnreadCount($actor);
+        $awaiting = $service->logisticsAwaitingCount($actor);
 
         // A newer conversation can push the open one out of the top rows; keep it on screen so a
         // reply being typed is never torn down by a poll.
@@ -147,6 +148,7 @@ final class EmployeeMessagesWidget extends Widget
             'visible' => true,
             'threads' => $threads,
             'unread' => $unread,
+            'awaiting' => $awaiting,
             'expandedId' => $expanded['thread']?->id,
             'messages' => $expanded['messages'],
             'hasEarlier' => $expanded['hasEarlier'],
@@ -195,7 +197,7 @@ final class EmployeeMessagesWidget extends Widget
 
     protected function exportDataset(User $actor): ExportDataset
     {
-        abort(403, 'Employee messages are private and cannot be exported.');
+        abort(403, 'Support Services messages are private and cannot be exported.');
     }
 
     private function authorizedActor(): User

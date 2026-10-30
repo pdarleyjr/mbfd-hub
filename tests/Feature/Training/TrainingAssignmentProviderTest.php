@@ -163,6 +163,15 @@ final class TrainingAssignmentProviderTest extends TestCase
         app(TrainingAssignmentProvider::class)->candidates('2026-10-15');
     }
 
+    public function test_an_empty_member_list_from_the_bridge_is_a_fault_not_a_roster(): void
+    {
+        $payload = $this->payload();
+        $payload['members'] = [];
+        Http::fake(['*' => Http::response($payload)]);
+        $this->expectException(ValidationException::class);
+        app(TrainingAssignmentProvider::class)->candidates('2026-10-15');
+    }
+
     public function test_stale_response_is_rejected(): void
     {
         $payload = $this->payload();

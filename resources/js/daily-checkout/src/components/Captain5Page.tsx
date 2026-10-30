@@ -20,6 +20,8 @@ import VehicleIdentificationCard from './VehicleIdentificationCard';
 import RescueInventoryTab, { type RescueView } from './captain5/ems/RescueInventoryTab';
 import SupplyRoomTab, { isSupplyView, type SupplyView } from './captain5/ems/SupplyRoomTab';
 import { useEmsAccess, useOpenRequestCount } from './captain5/ems/useEmsAccess';
+import NarcoticsTab from './captain5/narcotics/NarcoticsTab';
+import { useNarcoticsInbox } from './captain5/narcotics/useNarcoticsInbox';
 import { isKindFilter, isQueueFilter, type KindFilter, type QueueFilter } from './captain5/filters';
 import { dutyLine, dutyTone, isReplacementTracked } from './captain5/format';
 import type { ActingResult, Workspace } from './captain5/types';
@@ -29,17 +31,18 @@ import Tabs, { type TabItem } from './ui/Tabs';
 import Tag from './ui/Tag';
 import { LoadError, SkeletonRows } from './ui/StateViews';
 
-type TabId = 'today' | 'issues' | 'replacements' | 'rescue' | 'supply' | 'messages' | 'updates' | 'history';
+type TabId = 'today' | 'issues' | 'replacements' | 'rescue' | 'supply' | 'narcotics' | 'messages' | 'updates' | 'history';
 
-const TAB_IDS: TabId[] = ['today', 'issues', 'replacements', 'rescue', 'supply', 'messages', 'updates', 'history'];
+const TAB_IDS: TabId[] = ['today', 'issues', 'replacements', 'rescue', 'supply', 'narcotics', 'messages', 'updates', 'history'];
 const isTab = (value: string | null): value is TabId => TAB_IDS.includes(value as TabId);
 const isEmsTab = (value: string | null): boolean => value === 'rescue' || value === 'supply';
 const positiveInt = (value: string | null): number | null => (value !== null && /^\d{1,12}$/.test(value) && Number(value) > 0 ? Number(value) : null);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 interface EmsTabs { show: boolean; openRequests: number }
+interface NarcoticsTabState { show: boolean; pending: number }
 
-function tabsFor(workspace: Workspace, unread: number, ems: EmsTabs): Array<TabItem<TabId>> {
+function tabsFor(workspace: Workspace, unread: number, ems: EmsTabs, narcotics: NarcoticsTabState): Array<TabItem<TabId>> {
   const tracked = workspace.issues.filter(isReplacementTracked).length;
   return [
     { id: 'today', label: 'Today' },
@@ -49,6 +52,7 @@ function tabsFor(workspace: Workspace, unread: number, ems: EmsTabs): Array<TabI
       { id: 'rescue' as const, label: 'Rescue Inventory', badge: ems.openRequests, badgeLabel: 'open requests' },
       { id: 'supply' as const, label: 'Supply Room' },
     ] : []),
+    ...(narcotics.show ? [{ id: 'narcotics' as const, label: 'Narcotics Checks', badge: narcotics.pending, badgeLabel: 'checks to review' }] : []),
     { id: 'messages', label: 'Messages', badge: unread, badgeLabel: 'unread messages' },
     { id: 'updates', label: 'Department Updates' },
     { id: 'history', label: 'History' },
@@ -76,13 +80,19 @@ export default function Captain5Page() {
   const [identificationSaved, setIdentificationSaved] = useState(false);
   const pushedIssue = useRef(false);
   const pushedRequest = useRef(false);
+  const pushedCheck = useRef(false);
   const ems = useEmsAccess();
+  const narcotics = useNarcoticsInbox();
 
   const requestedTab = searchParams.get('tab');
   const issueId = positiveInt(searchParams.get('issue'));
   // The EMS tabs exist only for people the EMS API admits. A deep link keeps its tab while that is being checked.
   const emsShown = ems.status === 'ready' || ((ems.status === 'loading' || ems.status === 'error') && isEmsTab(requestedTab));
   const openRequests = useOpenRequestCount(ems.status === 'ready');
+  // The Narcotics Checks tab exists only for the people the narcotics API admits (Captain 5). A deep link keeps its tab while that is checked.
+  const narcoticsShown = narcotics.status === 'ready' || ((narcotics.status === 'loading' || narcotics.status === 'error') && requestedTab === 'narcotics');
+  const checkParam = searchParams.get('check');
+  const checkId = checkParam !== null && UUID.test(checkParam) ? checkParam.toLowerCase() : null;
   const requestParam = searchParams.get('request');
   const requestId = requestParam !== null && UUID.test(requestParam) ? requestParam.toLowerCase() : null;
   const rescueView: RescueView = searchParams.get('view') === 'stats' ? 'stats' : 'requests';
@@ -111,6 +121,11 @@ export default function Captain5Page() {
   const closeRequest = useCallback(() => {
     if (pushedRequest.current) { pushedRequest.current = false; navigate(-1); } else update({ request: null });
   }, [navigate, update]);
+  useEffect(() => { if (checkId === null) pushedCheck.current = false; }, [checkId]);
+  const openCheck = useCallback((uuid: string) => { pushedCheck.current = true; update({ check: uuid }, true); }, [update]);
+  const closeCheck = useCallback(() => {
+    if (pushedCheck.current) { pushedCheck.current = false; navigate(-1); } else update({ check: null });
+  }, [navigate, update]);
   const changed = useCallback(() => { setVersion((n) => n + 1); void load('silent'); }, [load]);
   const identificationChanged = useCallback((next: VehicleIdentification | undefined) => {
     setIdentificationSaved(true);
@@ -131,7 +146,7 @@ export default function Captain5Page() {
   }
 
   const { access } = data;
-  const tabs = tabsFor(data, ws.unread, { show: emsShown, openRequests: openRequests.count });
+  const tabs = tabsFor(data, ws.unread, { show: emsShown, openRequests: openRequests.count }, { show: narcoticsShown, pending: narcotics.pending });
   const active: TabId = isTab(requestedTab) && tabs.some((tab) => tab.id === requestedTab) ? requestedTab : 'today';
   const refreshLabel = isOffline ? 'Refresh unavailable while offline' : ws.refreshing ? 'Refreshing Captain 5' : 'Refresh Captain 5';
 
@@ -167,6 +182,11 @@ export default function Captain5Page() {
       case 'rescue':
       case 'supply':
         return renderEms(id);
+      case 'narcotics':
+        if (narcotics.status === 'loading') return <SkeletonRows rows={3} />;
+        if (narcotics.status === 'error') return <LoadError title="Narcotics Checks could not be loaded" message={narcotics.error} onRetry={narcotics.reload} />;
+        if (narcotics.status !== 'ready') return null;
+        return <NarcoticsTab checkId={checkId} onOpenCheck={openCheck} onCloseCheck={closeCheck} tick={narcotics.tick} onChanged={narcotics.refresh} onForbidden={narcotics.deny} />;
       case 'messages':
         return <Captain5Messages onDenied={ws.markForbidden} onOpenUpdates={() => update({ tab: 'updates', filter: null, kind: null })} />;
       case 'updates':
@@ -216,6 +236,13 @@ export default function Captain5Page() {
 
       <ActingApprovals role={CAPTAIN_5_ACTING} acting={data.acting} onChange={actingChanged} />
 
+      {narcotics.status === 'ready' && narcotics.pending > 0 && active !== 'narcotics' && (
+        <section className="hub-callout flex flex-wrap items-center justify-between gap-3 p-4" aria-label="Narcotics checks waiting" data-testid="narcotics-attention">
+          <p className="text-sm font-semibold text-hub-ink">{narcotics.pending === 1 ? '1 narcotics check is waiting for your review.' : `${narcotics.pending} narcotics checks are waiting for your review.`}</p>
+          <button type="button" className="hub-btn hub-btn--primary !min-h-11" onClick={() => update({ tab: 'narcotics', filter: null, kind: null, request: null, check: null, view: null, section: null })}>Review now</button>
+        </section>
+      )}
+
       {data.vehicle_identification && !data.vehicle_identification.can_answer && (
         <VehicleIdentificationCard block={data.vehicle_identification} answers={{}} onChange={() => undefined} readOnly />
       )}
@@ -238,7 +265,7 @@ export default function Captain5Page() {
         <Tabs
           tabs={tabs}
           active={active}
-          onChange={(id) => update({ tab: id === 'today' ? null : id, filter: null, kind: null, request: null, view: null, section: null })}
+          onChange={(id) => update({ tab: id === 'today' ? null : id, filter: null, kind: null, request: null, check: null, view: null, section: null })}
           label="Captain 5 workspace"
           idPrefix="captain5"
           panelClassName="p-4 sm:p-5"

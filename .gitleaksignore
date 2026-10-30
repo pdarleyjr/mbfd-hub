@@ -1,0 +1,5 @@
+# Reviewed false positives only. One fingerprint per line; each needs a reason.
+#
+# E2E seed fixture: a synthetic bid-assignment idempotency label ('narcotics-e2e-key-<n>') in a seeder that only
+# runs under the Playwright narcotics-check config. It is not a credential.
+5ec9414367d6f7ada0cb156cfb397a068c0c1602:database/seeders/NarcoticsChecksE2ESeeder.php:generic-api-key:80

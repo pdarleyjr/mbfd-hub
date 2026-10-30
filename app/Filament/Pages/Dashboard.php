@@ -3,6 +3,7 @@
 namespace App\Filament\Pages;
 
 use App\Filament\Widgets\EmployeeMessagesWidget;
+use App\Filament\Widgets\EquipmentChangeRequestsWidget;
 use App\Filament\Widgets\StationOperationsHubWidget;
 use Filament\Actions\Action;
 use Filament\Pages\Dashboard as BaseDashboard;
@@ -45,6 +46,8 @@ class Dashboard extends BaseDashboard
         return [
             StationOperationsHubWidget::class,
             ...($display ? [] : [EmployeeMessagesWidget::class]),
+            // Names members and is decided by Fleet reviewers: never on the wall display.
+            ...($display ? [] : [EquipmentChangeRequestsWidget::class]),
         ];
     }
 

@@ -298,7 +298,11 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
         nextRoom.on(RoomEvent.TrackUnmuted, refresh);
         nextRoom.on(RoomEvent.ActiveSpeakersChanged, refresh);
         nextRoom.on(RoomEvent.LocalTrackPublished, refresh);
-        nextRoom.on(RoomEvent.LocalTrackUnpublished, refresh);
+        nextRoom.on(RoomEvent.LocalTrackUnpublished, (publication) => {
+            // The browser's own "Stop sharing" bar ends the track without going through our button.
+            if (publication.source === Track.Source.ScreenShare) setScreenShareEnabled(false);
+            refresh();
+        });
         nextRoom.on(RoomEvent.ConnectionQualityChanged, refresh);
         nextRoom.on(RoomEvent.MediaDevicesChanged, () => void refreshDevices(false));
         nextRoom.on(RoomEvent.MediaDevicesError, (deviceError) => setError(mediaErrorMessage(deviceError)));
@@ -1129,6 +1133,9 @@ export function ConferenceApp({ bootstrap, embedded = false }: ConferenceAppProp
             await room.localParticipant.setScreenShareEnabled(enabled);
             setScreenShareEnabled(enabled);
         } catch (shareError) {
+            // Closing the browser's screen picker is a choice, not a failure.
+            // Chrome reports "Permission denied by system" when the OS blocks capture; that one is worth telling the member about.
+            if (enabled && shareError instanceof DOMException && (shareError.name === 'AbortError' || (shareError.name === 'NotAllowedError' && !/by system/i.test(shareError.message)))) return;
             setError(shareError instanceof Error ? shareError.message : 'Screen sharing could not be started.');
         }
     };

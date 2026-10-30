@@ -7,6 +7,7 @@ namespace App\Filament\Admin\Pages;
 use App\Models\EmployeeMessaging\EmployeeLogisticsThread;
 use App\Models\User;
 use App\Services\EmployeeMessaging\EmployeeLogisticsMessagingService;
+use App\Services\EmployeeMessaging\EmployeeMessageReason;
 use App\Services\Security\EmployeeLogisticsMessagingAccess;
 use Filament\Pages\Page;
 use Filament\Support\Enums\MaxWidth;
@@ -16,7 +17,7 @@ use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Url;
 
 /**
- * Logistics inbox for Employee <-> Logistics messaging (docs/employee-logistics-messaging.md).
+ * Support Services inbox (formerly the Logistics inbox) for member messaging (docs/employee-logistics-messaging.md).
  *
  * A thin Livewire view over EmployeeLogisticsMessagingService: this class never queries threads or
  * messages itself, never accepts an owner, author or side from the browser, and re-checks
@@ -38,9 +39,9 @@ final class EmployeeMessages extends Page
 
     protected static ?string $navigationGroup = 'Communications';
 
-    protected static ?string $navigationLabel = 'Employee Messages';
+    protected static ?string $navigationLabel = 'Support Services Messages';
 
-    protected static ?string $title = 'Employee Messages';
+    protected static ?string $title = 'Support Services Messages';
 
     protected static ?string $slug = 'employee-messages';
 
@@ -58,6 +59,9 @@ final class EmployeeMessages extends Page
     public string $filter = EmployeeLogisticsMessagingService::FILTER_ALL;
 
     public string $search = '';
+
+    /** An EmployeeMessageReason key, or '' for every reason. */
+    public string $reasonFilter = '';
 
     /** How many conversations the list window shows ("Show more" raises it by one page). */
     public int $limit = EmployeeLogisticsMessagingService::THREAD_PAGE_SIZE;
@@ -97,12 +101,12 @@ final class EmployeeMessages extends Page
 
     public static function getNavigationBadgeTooltip(): string
     {
-        return 'Unread employee messages';
+        return 'Unread Support Services messages';
     }
 
     public function getSubheading(): string
     {
-        return 'Private messages from members to the Logistics team. Replies appear in the member\'s Employee Portal.';
+        return 'Private messages from members to Support Services. Replies appear in the member\'s Employee Portal.';
     }
 
     /** Set by the actions that open or answer a conversation; consumed by the next render only. */
@@ -147,6 +151,13 @@ final class EmployeeMessages extends Page
     {
         $this->authorizeAccess();
         $this->filter = $this->activeFilter();
+        $this->limit = EmployeeLogisticsMessagingService::THREAD_PAGE_SIZE;
+    }
+
+    public function updatedReasonFilter(): void
+    {
+        $this->authorizeAccess();
+        $this->reasonFilter = $this->activeReason() ?? '';
         $this->limit = EmployeeLogisticsMessagingService::THREAD_PAGE_SIZE;
     }
 
@@ -224,7 +235,7 @@ final class EmployeeMessages extends Page
         // The open conversation first: displaying it moves the read marker, and the list and the
         // unread count below must reflect that.
         $conversation = $this->conversation($actor, $service);
-        $list = $service->logisticsThreads($actor, $filter, $search === '' ? null : $search, $this->windowLimit());
+        $list = $service->logisticsThreads($actor, $filter, $search === '' ? null : $search, $this->windowLimit(), $this->activeReason());
 
         return [
             'threads' => $list['threads'],
@@ -236,7 +247,10 @@ final class EmployeeMessages extends Page
                 EmployeeLogisticsMessagingService::FILTER_UNREAD => 'Unread',
                 EmployeeLogisticsMessagingService::FILTER_AWAITING_REPLY => 'Awaiting reply',
             ],
-            'filtered' => $filter !== EmployeeLogisticsMessagingService::FILTER_ALL || $search !== '',
+            'filtered' => $filter !== EmployeeLogisticsMessagingService::FILTER_ALL || $search !== '' || $this->activeReason() !== null,
+            'reasons' => EmployeeMessageReason::options(),
+            'reasonFilter' => $this->activeReason() ?? '',
+            'awaitingTotal' => $service->logisticsAwaitingCount($actor),
             'selectedId' => $this->selectedThreadId(),
             'thread' => $conversation['thread'],
             'messages' => $conversation['messages'],
@@ -291,6 +305,11 @@ final class EmployeeMessages extends Page
             EmployeeLogisticsMessagingService::FILTER_UNREAD,
             EmployeeLogisticsMessagingService::FILTER_AWAITING_REPLY,
         ], true) ? $this->filter : EmployeeLogisticsMessagingService::FILTER_ALL;
+    }
+
+    private function activeReason(): ?string
+    {
+        return EmployeeMessageReason::isValid($this->reasonFilter) ? $this->reasonFilter : null;
     }
 
     private function windowLimit(): int

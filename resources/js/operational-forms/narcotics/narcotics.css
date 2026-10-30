@@ -1,0 +1,137 @@
+/*
+ * Narcotics check inside the Operational Forms app.
+ * Only Hub tokens (rgb(var(--hub-*))) are used, so the colors follow the shared theme. No hex colors.
+ * Mobile first: the base rules are the phone layout; wider screens only add room. Every control is at least 44px.
+ */
+.nc-root {
+    --nc-ink: rgb(var(--hub-ink));
+    --nc-muted: rgb(var(--hub-n-600));
+    --nc-surface: rgb(var(--hub-surface));
+    --nc-well: rgb(var(--hub-well));
+    --nc-line: rgb(var(--hub-border));
+    --nc-line-soft: rgb(var(--hub-border-soft));
+    --nc-edge: rgb(var(--hub-n-400));
+    --nc-accent: rgb(var(--hub-blue));
+    --nc-tint: rgb(var(--hub-blue-tint));
+    --nc-heading: rgb(var(--hub-header));
+    --nc-danger: rgb(var(--hub-danger));
+    color: var(--nc-ink);
+    font-family: var(--hub-font-sans);
+}
+
+.nc-app { display: flex; flex-direction: column; gap: 14px; max-width: 760px; margin: 0 auto; padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px)); }
+.nc-app :is(h1, h2, h3, p, ul, ol) { margin: 0; }
+.nc-app :is(ul, ol) { padding: 0; list-style: none; }
+.nc-file { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+.nc-topline { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px; }
+.nc-head { display: grid; gap: 6px; }
+.nc-head h1 { font-size: 24px; line-height: 1.2; font-weight: 650; letter-spacing: -0.01em; color: var(--nc-heading); }
+.nc-head p:not(.of-eyebrow) { color: var(--nc-muted); font-size: 14px; line-height: 1.5; }
+.nc-detail-title { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 20px !important; }
+.nc-loading, .nc-empty { padding: 28px 12px; text-align: center; color: var(--nc-muted); }
+.nc-empty { display: grid; gap: 8px; justify-items: center; background: var(--nc-surface); border: 1px solid var(--nc-line); border-radius: var(--hub-radius-card); }
+
+.nc-card { display: grid; gap: 10px; padding: 14px; background: var(--nc-surface); border: 1px solid var(--nc-line); border-radius: var(--hub-radius-card); }
+.nc-card h2 { font-size: 16px; font-weight: 650; color: var(--nc-heading); }
+.nc-optional { font-size: 12.5px; font-weight: 500; color: var(--nc-muted); }
+.nc-hint { font-size: 13px; line-height: 1.45; color: var(--nc-muted); }
+.nc-hint.is-error { color: var(--nc-danger); font-weight: 600; }
+.nc-note { font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+
+.nc-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.nc-actions > button, .nc-actions > a { flex: 1 1 200px; min-height: 48px; }
+.nc-send { display: grid; gap: 6px; }
+.nc-send > button { min-height: 52px; font-size: 16px; }
+/* The Forms app sets `#operational-forms-root .fui-Button { min-height: 40px }`; an id beats the class rules above, so restate the 44px floor with an id. */
+#operational-forms-root .nc .fui-Button { min-height: 44px; }
+#operational-forms-root .nc .nc-actions > button, #operational-forms-root .nc .nc-actions > a { min-height: 48px; }
+#operational-forms-root .nc .nc-send > button { min-height: 52px; }
+.nc-preparing { display: grid; place-items: center; min-height: 120px; }
+
+/* The photo being sent, and a photo that was sent */
+.nc-preview { display: grid; gap: 6px; }
+.nc-preview-frame {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 100%;
+    padding: 0;
+    overflow: hidden;
+    background: rgb(var(--hub-n-900, 15 23 42));
+    border: 1px solid var(--nc-edge);
+    border-radius: var(--hub-radius-control);
+    cursor: zoom-in;
+}
+.nc-preview-frame img { display: block; width: 100%; max-height: 62vh; object-fit: contain; }
+.nc-preview-frame:focus-visible { outline: 2px solid rgb(var(--hub-focus)); outline-offset: 2px; }
+.nc-zoom-hint {
+    position: absolute; right: 8px; bottom: 8px; display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 10px; font-size: 12.5px; font-weight: 600; color: var(--nc-ink);
+    background: var(--nc-surface); border: 1px solid var(--nc-line); border-radius: var(--hub-radius-pill);
+}
+
+/* In-page camera (computers and tablets with a camera) */
+.nc-camera { display: grid; gap: 10px; }
+.nc-camera-frame { position: relative; display: grid; place-items: center; min-height: 220px; background: rgb(var(--hub-n-900, 15 23 42)); border-radius: var(--hub-radius-control); overflow: hidden; }
+.nc-camera-frame video { display: block; width: 100%; max-height: 66vh; object-fit: contain; }
+.nc-camera-wait { position: absolute; margin: 0; padding: 8px 14px; color: var(--nc-ink); background: var(--nc-surface); border-radius: var(--hub-radius-pill); font-size: 14px; }
+
+.nc-progress { display: grid; gap: 4px; }
+
+/* "Sent" confirmation */
+.nc-sent { display: grid; justify-items: center; gap: 8px; padding: 26px 14px; text-align: center; color: rgb(var(--hub-success)); background: rgb(var(--hub-success-bg)); border: 1px solid rgb(var(--hub-success-border)); border-radius: var(--hub-radius-card); }
+.nc-sent h1 { font-size: 22px; line-height: 1.25; font-weight: 700; }
+.nc-sent p { color: var(--nc-ink); font-size: 14px; max-width: 46ch; }
+
+/* Status: text first, colour and icon reinforce it. Pending is never styled like approved. */
+.nc-status { display: inline-flex; align-items: center; gap: 5px; padding: 2px 10px; font-size: 12.5px; font-weight: 650; border: 1px solid; border-radius: var(--hub-radius-pill); white-space: nowrap; }
+.nc-status--pending { color: rgb(var(--hub-info)); background: rgb(var(--hub-info-bg)); border-color: rgb(var(--hub-info-border)); }
+.nc-status--approved { color: rgb(var(--hub-success)); background: rgb(var(--hub-success-bg)); border-color: rgb(var(--hub-success-border)); }
+.nc-status--rejected { color: rgb(var(--hub-danger)); background: rgb(var(--hub-danger-bg, var(--hub-n-50))); border-color: rgb(var(--hub-danger-border, var(--hub-danger))); }
+
+.nc-banner { padding: 12px 14px; font-size: 14px; line-height: 1.5; border: 1px solid; border-radius: var(--hub-radius-card); display: grid; gap: 4px; }
+.nc-banner--pending { background: rgb(var(--hub-info-bg)); border-color: rgb(var(--hub-info-border)); }
+.nc-banner--approved { background: rgb(var(--hub-success-bg)); border-color: rgb(var(--hub-success-border)); }
+.nc-banner--rejected { background: rgb(var(--hub-danger-bg, var(--hub-n-50))); border-color: rgb(var(--hub-danger-border, var(--hub-danger))); }
+
+/* My checks */
+.nc-list { display: grid; gap: 8px; }
+.nc-row {
+    display: grid; grid-template-columns: 72px minmax(0, 1fr); align-items: center; gap: 12px; width: 100%; min-height: 72px; padding: 8px 12px 8px 8px;
+    text-align: left; font: inherit; color: inherit; background: var(--nc-surface); border: 1px solid var(--nc-line); border-radius: var(--hub-radius-card); cursor: pointer;
+}
+.nc-row:hover { background: rgb(var(--hub-n-25)); }
+.nc-row:focus-visible { outline: 2px solid rgb(var(--hub-focus)); outline-offset: 2px; }
+.nc-thumb { width: 72px; height: 72px; object-fit: cover; background: rgb(var(--hub-n-100)); border-radius: var(--hub-radius-control); }
+.nc-thumb--gone { display: grid; place-items: center; font-size: 11px; text-align: center; color: var(--nc-muted); }
+.nc-row-text { display: grid; gap: 3px; min-width: 0; }
+.nc-row-date { font-size: 13px; color: var(--nc-muted); }
+.nc-row-note { font-size: 13.5px; overflow-wrap: anywhere; }
+.nc-history { display: grid; gap: 6px; }
+.nc-history li { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: baseline; padding: 6px 0; border-bottom: 1px solid var(--nc-line-soft); }
+.nc-history li:last-child { border-bottom: 0; }
+
+/* Photo viewer: full screen, zoom, drag */
+.nc-viewer { position: fixed; inset: 0; z-index: 2000; display: flex; flex-direction: column; background: rgb(var(--hub-n-900, 15 23 42) / 0.96); }
+.nc-viewer-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 8px calc(8px + env(safe-area-inset-right, 0px)) 8px calc(8px + env(safe-area-inset-left, 0px)); padding-top: calc(8px + env(safe-area-inset-top, 0px)); background: var(--nc-surface); border-bottom: 1px solid var(--nc-line); }
+.nc-viewer-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 44px; min-height: 44px; padding: 0 12px; font: inherit; font-weight: 600; color: var(--nc-ink); background: var(--nc-well); border: 1px solid var(--nc-edge); border-radius: var(--hub-radius-control); cursor: pointer; }
+.nc-viewer-btn:disabled { opacity: 0.45; cursor: default; }
+.nc-viewer-btn:focus-visible { outline: 2px solid rgb(var(--hub-focus)); outline-offset: 2px; }
+.nc-viewer-close { margin-left: auto; }
+.nc-viewer-zoom { min-width: 48px; text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; }
+.nc-viewer-stage { flex: 1; min-height: 0; display: grid; place-items: center; overflow: auto; touch-action: pan-x pan-y pinch-zoom; overscroll-behavior: contain; }
+.nc-viewer-stage.is-zoomed { display: block; cursor: grab; }
+.nc-viewer-img { display: block; max-width: 100%; max-height: 100%; margin: auto; object-fit: contain; user-select: none; -webkit-user-drag: none; }
+.nc-viewer-stage.is-zoomed .nc-viewer-img { margin: 0; object-fit: initial; }
+
+@media (min-width: 720px) {
+    .nc-actions > button, .nc-actions > a { flex: 0 1 auto; min-width: 180px; }
+    .nc-send > button { width: fit-content; min-width: 260px; }
+    .nc-row { grid-template-columns: 88px minmax(0, 1fr); }
+    .nc-thumb { width: 88px; height: 88px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .nc * { transition: none !important; animation: none !important; }
+}

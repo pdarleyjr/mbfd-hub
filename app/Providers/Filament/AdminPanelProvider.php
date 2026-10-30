@@ -21,6 +21,7 @@ use App\Filament\Pages\Settings;
 use App\Filament\Pages\WorkgroupAdministration;
 use App\Filament\Support\HubPalette;
 use App\Filament\Widgets\EmployeeMessagesWidget;
+use App\Filament\Widgets\EquipmentChangeRequestsWidget;
 use App\Filament\Widgets\FleetStatsWidget;
 use App\Filament\Widgets\InventoryOverviewWidget;
 use App\Filament\Widgets\StationOperationsHubWidget;
@@ -128,6 +129,7 @@ class AdminPanelProvider extends PanelProvider
                 InventoryOverviewWidget::class,
                 StationOperationsHubWidget::class,
                 EmployeeMessagesWidget::class,
+                EquipmentChangeRequestsWidget::class,
             ])
             ->navigationGroups([
                 NavigationGroup::make()->label('Operations')->icon('heroicon-o-clipboard-document-list')->collapsed(),

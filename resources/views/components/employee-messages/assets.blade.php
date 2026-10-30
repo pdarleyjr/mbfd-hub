@@ -1,5 +1,5 @@
 {{--
-    Employee <-> Logistics message composer behavior (docs/employee-logistics-messaging.md section 5).
+    Employee <-> Support Services message composer behavior (docs/employee-logistics-messaging.md section 5).
     Render once, unconditionally, on any page or widget that can show a composer: a composer that
     appears later through a Livewire update relies on this function already being defined.
     Inline on purpose: no lazily loaded chunk can go missing across a release.
@@ -19,6 +19,7 @@
         return {
             body: '',
             subject: '',
+            reason: 'general',
             sending: false,
             error: '',
             status: '',
@@ -81,7 +82,7 @@
 
                 // One request id per exact message: a retry of the same text can never post twice,
                 // and edited text after a failure is a new, deliberate message.
-                const key = this.subject + '\u0000' + body;
+                const key = this.reason + '\u0000' + this.subject + '\u0000' + body;
                 if (this.requestId === null || this.attemptedKey !== key) {
                     this.requestId = newRequestId();
                     this.attemptedKey = key;
@@ -94,7 +95,7 @@
                     const timeout = new Promise((resolve) => { timer = setTimeout(() => resolve({ ok: false, timedOut: true }), SEND_TIMEOUT_MS); });
                     // A reply names the conversation it was typed for, so the server can refuse a switch.
                     const call = config.withSubject
-                        ? this.$wire.call(config.method, body, this.subject, this.requestId)
+                        ? this.$wire.call(config.method, body, this.subject, this.requestId, config.withReason ? this.reason : null)
                         : (config.threadId === null || config.threadId === undefined
                             ? this.$wire.call(config.method, body, this.requestId)
                             : this.$wire.call(config.method, body, this.requestId, config.threadId));
@@ -103,6 +104,7 @@
                     if (result && result.ok === true) {
                         this.body = '';
                         this.subject = '';
+                        this.reason = 'general';
                         this.requestId = null;
                         this.attemptedKey = null;
                         this.status = 'Message sent.';

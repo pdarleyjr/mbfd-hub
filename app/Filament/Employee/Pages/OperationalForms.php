@@ -3,8 +3,10 @@
 namespace App\Filament\Employee\Pages;
 
 use App\Concerns\ResolvesCanonicalEmployee;
+use App\Services\Narcotics\NarcoticsCheckAccess;
 use App\Services\OperationalForms\FrocImportLimits;
 use App\Support\Ems\EmsLinks;
+use App\Support\Narcotics\NarcoticsLinks;
 use Filament\Pages\Page;
 use Illuminate\Support\Str;
 
@@ -46,8 +48,10 @@ class OperationalForms extends Page
                     'uploads' => route('employee.forms.api.uploads.store'),
                     'guide' => url('/documents/MBFD_Operational_Forms_User_Guide.pdf'),
                     'ems' => $this->emsEndpoints(),
+                    'narcotics' => $this->narcoticsEndpoints(),
                 ],
                 'deep_link' => $this->emsDeepLink(),
+                'narcotics_deep_link' => $this->narcoticsDeepLink(),
                 'library_links' => $this->libraryLinks(),
                 'csrf_token' => csrf_token(),
                 'build' => config('app.version', 'development'),
@@ -74,6 +78,47 @@ class OperationalForms extends Page
             'cancel' => route('employee.forms.api.ems.requests.cancel', ['uuid' => $placeholder]),
             'placeholder' => $placeholder,
         ];
+    }
+
+    /**
+     * The Narcotics check JSON API (routes/narcotics.php), or null when the check is switched off or this account cannot send one.
+     * The two per-check URLs carry the placeholder __UUID__, which the app replaces with the check id.
+     *
+     * @return array{form: string, mine: string, check: string, store: string, placeholder: string}|null
+     */
+    private function narcoticsEndpoints(): ?array
+    {
+        if (! app(NarcoticsCheckAccess::class)->canSubmit(auth('web')->user())) {
+            return null;
+        }
+        $placeholder = '__UUID__';
+
+        return [
+            'form' => route('narcotics.api.form'),
+            'mine' => route('narcotics.api.mine.index'),
+            'check' => route('narcotics.api.mine.show', ['uuid' => $placeholder]),
+            'store' => route('narcotics.api.store'),
+            'placeholder' => $placeholder,
+        ];
+    }
+
+    /**
+     * Which Narcotics check view the page opens first: ?form=narcotics-check (new check), &view=mine (own history),
+     * &check=<uuid> (one check). Anything else is ignored.
+     *
+     * @return array{view: string|null, check: string|null}
+     */
+    private function narcoticsDeepLink(): array
+    {
+        if (request()->query('form') !== NarcoticsLinks::FORM_KEY) {
+            return ['view' => null, 'check' => null];
+        }
+        $check = Str::lower(trim((string) request()->query('check', '')));
+        if (Str::isUuid($check)) {
+            return ['view' => 'detail', 'check' => $check];
+        }
+
+        return ['view' => request()->query('view') === 'mine' ? 'mine' : 'form', 'check' => null];
     }
 
     /**
@@ -105,6 +150,16 @@ class OperationalForms extends Page
      */
     private function libraryLinks(): array
     {
+        $narcotics = app(NarcoticsCheckAccess::class)->canSubmit(auth('web')->user()) ? [[
+            'key' => NarcoticsLinks::FORM_KEY,
+            'title' => 'Narcotics check',
+            'description' => 'Take or upload a photo of your narcotics check and send it to Captain 5. You see when it is approved.',
+            'href' => url(NarcoticsLinks::memberForm()),
+            'action_label' => 'Start a check',
+            'in_app' => true,
+            'secondary' => ['label' => 'My narcotics checks', 'href' => url(NarcoticsLinks::memberChecks())],
+        ]] : [];
+
         return [
             [
                 'key' => EmsLinks::MEMBER_FORM_KEY,
@@ -122,6 +177,7 @@ class OperationalForms extends Page
                 'href' => route('take-home-inspections.index'),
                 'action_label' => 'Open inspections',
             ],
+            ...$narcotics,
         ];
     }
 }

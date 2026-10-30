@@ -15,7 +15,7 @@
         'logistics_replied' => 'Logistics replied',
         'approved' => 'Approved',
         'applied' => 'Applied to the checklist',
-        'rejected' => 'Not approved',
+        'rejected' => 'Rejected',
         'reversed' => 'Change reversed',
     ];
 @endphp
@@ -34,7 +34,9 @@
             @elseif($detail['status'] === 'applied')
                 <p class="hub-insp-callout" role="status">The Daily Checkout checklist now reflects this correction{{ count($detail['applied_to']) > 0 ? ' on '.implode(', ', $detail['applied_to']) : '' }}.</p>
             @elseif($detail['status'] === 'submitted')
-                <p class="hub-insp-note">Logistics will review it. Keep recording what you see on each Daily Checkout until it is approved.</p>
+                <p class="hub-insp-note">Waiting for Logistics to approve or reject it. Keep recording what you see on each Daily Checkout until it is approved.</p>
+            @elseif($detail['status'] === 'rejected')
+                <p class="hub-insp-callout" role="status" data-rejected>Logistics rejected this request. The equipment list was not changed.{{ blank($detail['decision_reason']) ? ' They did not add a message.' : '' }} You can report it again from a Daily Checkout if something is still wrong.</p>
             @endif
             @if(filled($detail['decision_reason']))
                 <p class="hub-insp-item__sub">Logistics' note</p>

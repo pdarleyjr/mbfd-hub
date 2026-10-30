@@ -134,7 +134,7 @@
                     @if(app(\App\Services\Security\EmployeeLogisticsMessagingAccess::class)->canUseMemberInbox($currentUser))
                         <a href="{{ url('/employee/messages?compose=1') }}" data-important-target data-home-message-logistics class="hub-btn hub-btn--secondary hub-btn--field">
                             <x-heroicon-o-chat-bubble-bottom-center-text class="hub-btn__icon" aria-hidden="true" />
-                            Message Logistics
+                            Message Support Services
                         </a>
                     @endif
                 </div>

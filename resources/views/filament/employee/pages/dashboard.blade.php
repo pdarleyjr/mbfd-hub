@@ -75,12 +75,12 @@
                 <x-heroicon-o-chat-bubble-bottom-center-text class="w-5 h-5" aria-hidden="true" />
             </div>
             <div class="ep-action-body">
-                <span class="ep-action-title">Message Logistics</span>
+                <span class="ep-action-title">Message Support Services</span>
                 <span class="ep-action-desc">
                     @if ($messageUnread > 0)
                         {{ $messageUnread }} new {{ \Illuminate\Support\Str::plural('reply', $messageUnread) }} in My Messages
                     @else
-                        Ask about equipment, uniforms or supplies
+                        Ask about equipment, uniforms, supplies or bunker gear cleaning
                     @endif
                 </span>
             </div>

@@ -39,24 +39,38 @@
             <section @class(['emsg-panel', 'hidden lg:block' => $showConversation]) aria-labelledby="emsg-admin-list-title">
                 <header class="emsg-panel__header">
                     <h2 id="emsg-admin-list-title" class="emsg-panel__title">Conversations</h2>
-                    @if ($unreadTotal > 0)
-                        <span class="emsg-unread-dot">{{ $unreadTotal }} unread</span>
-                    @endif
+                    <div class="flex flex-wrap items-center gap-2">
+                        @if ($awaitingTotal > 0)
+                            <span class="emsg-status emsg-status--attention" data-emsg-awaiting>{{ $awaitingTotal }} awaiting reply</span>
+                        @endif
+                        @if ($unreadTotal > 0)
+                            <span class="emsg-unread-dot">{{ $unreadTotal }} unread</span>
+                        @endif
+                    </div>
                 </header>
 
                 <div class="emsg-toolbar">
                     <div role="search" class="w-full">
-                        <label for="emsg-admin-search" class="sr-only">Search employee messages</label>
+                        <label for="emsg-admin-search" class="sr-only">Search Support Services messages</label>
                         <input
                             id="emsg-admin-search"
                             type="search"
                             class="emsg-search w-full"
                             wire:model.live.debounce.400ms="search"
-                            placeholder="Search name, number, station or message"
+                            placeholder="Search name, number, station, reason or message"
                             autocomplete="off"
                             maxlength="100"
                             enterkeyhint="search"
                         >
+                    </div>
+                    <div class="w-full">
+                        <label for="emsg-admin-reason" class="sr-only">Filter by reason</label>
+                        <select id="emsg-admin-reason" class="emsg-search emsg-select w-full" wire:model.live="reasonFilter" data-emsg-reason-filter>
+                            <option value="">All reasons</option>
+                            @foreach ($reasons as $key => $label)
+                                <option value="{{ $key }}" @selected($reasonFilter === $key)>{{ $label }}</option>
+                            @endforeach
+                        </select>
                     </div>
                     <div class="emsg-filters" role="group" aria-label="Show conversations">
                         @foreach ($filters as $value => $label)
@@ -77,12 +91,12 @@
                             <p class="emsg-empty__title">No conversations match</p>
                             <p class="emsg-subtle">Try a different search or show all conversations.</p>
                         @else
-                            <p class="emsg-empty__title">No employee messages yet</p>
+                            <p class="emsg-empty__title">No Support Services messages yet</p>
                             <p class="emsg-subtle">Messages members send from the Employee Portal appear here.</p>
                         @endif
                     </div>
                 @else
-                    <ul class="emsg-list" aria-label="Employee conversations" x-data x-on:click.capture="window.mbfdEmployeeMessagesConfirmLeave($event)">
+                    <ul class="emsg-list" aria-label="Support Services conversations" x-data x-on:click.capture="window.mbfdEmployeeMessagesConfirmLeave($event)">
                         @foreach ($threads as $row)
                             @php
                                 $rowUnread = $row->isUnreadForLogistics();
@@ -96,27 +110,7 @@
                                     @class(['emsg-row', 'emsg-row--unread' => $rowUnread])
                                     aria-current="{{ $selectedId === $row->id ? 'true' : 'false' }}"
                                 >
-                                    <span class="emsg-avatar" aria-hidden="true">{{ $initials($row->member_name) }}</span>
-                                    <span class="emsg-row__main">
-                                        <span class="emsg-row__title">{{ $row->member_name }}</span>
-                                        @if ($rowDetails !== '')
-                                            <span class="emsg-row__sub">{{ $rowDetails }}</span>
-                                        @endif
-                                        @if (filled($row->last_message_preview))
-                                            <span class="emsg-row__preview">{{ $row->last_message_preview }}</span>
-                                        @endif
-                                        @if ($rowAwaiting)
-                                            <span class="emsg-tag mt-1">Awaiting reply</span>
-                                        @endif
-                                    </span>
-                                    <span class="emsg-row__aside">
-                                        @if ($row->last_message_at)
-                                            <time datetime="{{ $row->last_message_at->copy()->timezone($zone)->toIso8601String() }}" title="{{ $row->last_message_at->copy()->timezone($zone)->format('l, F j, Y g:i A') }}">{{ $when($row->last_message_at) }}</time>
-                                        @endif
-                                        @if ($rowUnread)
-                                            <span class="emsg-unread-dot">Unread</span>
-                                        @endif
-                                    </span>
+                                    <x-employee-messages.admin-row :row="$row" :initials="$initials($row->member_name)" :details="$rowDetails" :when="$when($row->last_message_at)" />
                                 </button>
                             </li>
                         @endforeach
@@ -141,7 +135,10 @@
                                 <p class="emsg-subtle">{{ $threadDetails }}</p>
                             @endif
                             @if (filled($thread->subject))
-                                <p class="emsg-subtle">Subject: {{ $thread->subject }}</p>
+                                <p class="emsg-subtle">Subject: <strong class="emsg-strong">{{ $thread->subject }}</strong></p>
+                            @endif
+                            @if ($thread->reasonTag() !== null)
+                                <p class="emsg-subtle">Reason: <strong class="emsg-strong">{{ $thread->reasonTag() }}</strong></p>
                             @endif
                         </div>
                         <div class="lg:hidden" x-data x-on:click.capture="window.mbfdEmployeeMessagesConfirmLeave($event)">
@@ -188,7 +185,7 @@
                         />
                     @else
                         <div class="emsg-composer">
-                            <p class="emsg-subtle">You can read employee messages but not reply.</p>
+                            <p class="emsg-subtle">You can read Support Services messages but not reply.</p>
                         </div>
                     @endif
                 @elseif ($threadMissing)
