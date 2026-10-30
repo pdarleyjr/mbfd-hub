@@ -1,4 +1,5 @@
 import type { EmsDeepLink, EmsEndpoints } from './ems/emsTypes';
+import type { NarcoticsDeepLink, NarcoticsEndpoints } from './narcotics/narcoticsTypes';
 
 export type EditableFormType = 'ics_214' | 'froc_log_001_ff';
 /** medical_inventory_request is the read-only PDF copy of a Medical Inventory Request, created by the server. */
@@ -134,9 +135,11 @@ export interface LibraryLink {
 
 export interface BootstrapData {
     employee: { id: number; employee_id: string; name: string; rank?: string | null };
-    endpoints: { form_types: string; records: string; uploads: string; guide: string; ems?: EmsEndpoints };
+    endpoints: { form_types: string; records: string; uploads: string; guide: string; ems?: EmsEndpoints; narcotics?: NarcoticsEndpoints | null };
     /** Which Medical Inventory Request view the page was opened on (from ?form= or ?ems_request=). */
     deep_link?: EmsDeepLink;
+    /** Which Narcotics check view the page was opened on (from ?form=narcotics-check). */
+    narcotics_deep_link?: NarcoticsDeepLink;
     library_links: LibraryLink[];
     csrf_token: string;
     build: string;

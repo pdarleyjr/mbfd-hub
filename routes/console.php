@@ -112,6 +112,14 @@ Schedule::command('ems:prune-idempotency')
     ->withoutOverlapping()
     ->onOneServer();
 
+// Narcotics check photo files past the department retention window (off until retention_days is set;
+// the record, decision and audit rows are never deleted).
+Schedule::command('narcotics-checks:prune-images --force')
+    ->dailyAt('04:00')
+    ->timezone((string) config('hub.timezone'))
+    ->when(fn (): bool => (int) config('narcotics_checks.retention_days') > 0)
+    ->withoutOverlapping()
+    ->onOneServer();
 Schedule::command('personnel-equipment:notify-expirations')
     ->dailyAt('06:30')
     ->timezone((string) config('hub.timezone'))
