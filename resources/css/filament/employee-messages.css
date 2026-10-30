@@ -512,6 +512,11 @@
 
 .emsg-select {
     cursor: pointer;
+    /* The framework's chevron is a background image; the field's own background shorthand reset it to tile. */
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 1.25rem 1.25rem;
+    padding-right: 2.5rem;
 }
 
 .emsg-textarea {

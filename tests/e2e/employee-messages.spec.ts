@@ -295,8 +295,8 @@ test.describe.serial('Support Services conversation', () => {
 
     await as(browser, info, 'memberB', async ({ page }) => {
       await page.goto('/employee/messages');
-      await expect(page.getByText('No messages yet')).toBeVisible();
-      await expect(page.locator('.emsg-row')).toHaveCount(0);
+      // Member B may own conversations of their own (the bunker gear scenario sends one); none is member A's.
+      await expect(page.locator('.emsg-row').filter({ hasText: state.firstBody })).toHaveCount(0);
       await expect(page.getByText(state.firstBody)).toHaveCount(0);
 
       await page.goto(`/employee/messages?thread=${state.threadId}`);

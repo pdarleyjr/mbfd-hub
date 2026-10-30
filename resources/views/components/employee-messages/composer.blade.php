@@ -36,8 +36,8 @@
                 class="emsg-input emsg-select"
                 x-bind:disabled="sending"
             >
-                @foreach (\App\Services\EmployeeMessaging\EmployeeMessageReason::options() as $key => $label)
-                    <option value="{{ $key }}">{{ $label }}</option>
+                @foreach (\App\Services\EmployeeMessaging\EmployeeMessageReason::options() as $reasonKey => $reasonLabel)
+                    <option value="{{ $reasonKey }}">{{ $reasonLabel }}</option>
                 @endforeach
             </select>
         </div>
