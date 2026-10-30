@@ -28,6 +28,7 @@ export function ReviewSheet({ open, definition, draft, onDiscardRetired, unitLab
                 <DialogTitle>Review your request</DialogTitle>
                 <DialogContent>
                     <div className="ems-review" id="ems-review-summary">
+                        <p className="ems-unit-banner">For <strong>{unitLabel || 'no unit chosen'}</strong></p>
                         <dl className="ems-review-facts">
                             <div><dt>For</dt><dd>{unitLabel}</dd></div>
                             {event && <div><dt>Event or assignment</dt><dd>{event}</dd></div>}

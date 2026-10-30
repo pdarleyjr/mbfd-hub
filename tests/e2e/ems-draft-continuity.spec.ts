@@ -61,9 +61,9 @@ async function prepareMember(context: BrowserContext): Promise<{ owner: string; 
   const first = await context.newPage();
   await signIn(first);
   const owner = await ownerOf(first);
-  const unit = await first.locator('#ems-target option', { hasText: 'Rescue 2' }).getAttribute('value');
+  const unit = await first.getByRole('radio', { name: 'RESCUE R2', exact: true }).getAttribute('data-choice');
   await first.close();
-  expect(unit, 'the seeded Rescue 2 unit is a choice').toBeTruthy();
+  expect(unit, 'the seeded RESCUE R2 unit is a choice').toBeTruthy();
   return { owner, unit: unit as string };
 }
 
@@ -87,7 +87,8 @@ test('a draft saved before the upgrade comes back whole, the new list is empty a
   });
 
   await expect(page.getByText('Your unfinished request was restored')).toBeVisible();
-  await expect(page.locator('#ems-target')).toHaveValue(unit);
+  await expect(page.getByRole('radio', { name: 'RESCUE R2', exact: true })).toBeChecked();
+  await expect(page.locator('#ems-target-confirm')).toContainText('For: RESCUE R2');
   await expect(page.locator('.ems-item', { hasText: 'Gloves' }).first().getByLabel(/number needed/)).toHaveValue('3');
   await expect(page.getByText('1 saved entry is for items that are no longer on this form')).toBeVisible();
 
@@ -132,7 +133,7 @@ test('a page loaded before the third list existed can still send once the server
   await page.unroute('**/employee/forms/api/ems/form'); // the server now has three lists; this page still has two
   const gloves = page.locator('.ems-item', { hasText: 'Gloves' }).first();
   await gloves.getByRole('button', { name: /One more/ }).click();
-  await page.locator('#ems-target').selectOption({ label: 'Rescue 2' });
+  await page.getByRole('radio', { name: 'RESCUE R2', exact: true }).click();
   await page.getByRole('button', { name: 'Review and send' }).click();
   await page.getByRole('dialog', { name: 'Review your request' }).getByRole('button', { name: /^Send/ }).click();
   await expect(page.getByRole('heading', { name: 'Request sent' })).toBeVisible({ timeout: 30_000 });
@@ -152,7 +153,7 @@ test('a request queued on the device before the upgrade is sent after it, once, 
     return route.abort('internetdisconnected');
   });
   await page.locator('.ems-item', { hasText: 'Gloves' }).first().getByRole('button', { name: /One more/ }).click();
-  await page.locator('#ems-target').selectOption({ label: 'Rescue 2' });
+  await page.getByRole('radio', { name: 'RESCUE R2', exact: true }).click();
   await page.getByRole('button', { name: 'Review and send' }).click();
   await page.getByRole('dialog', { name: 'Review your request' }).getByRole('button', { name: /^Send/ }).click();
   await expect(page.getByRole('heading', { name: 'Saved on this device' })).toBeVisible({ timeout: 30_000 });
@@ -175,7 +176,7 @@ test('a refused send (unknown item) keeps the quantities, the note and the saved
   });
   await page.locator('.ems-item', { hasText: 'Gloves' }).first().getByRole('button', { name: /One more/ }).click();
   await page.locator('#ems-note').fill('do not lose me');
-  await page.locator('#ems-target').selectOption({ label: 'Rescue 2' });
+  await page.getByRole('radio', { name: 'RESCUE R2', exact: true }).click();
   await page.getByRole('button', { name: 'Review and send' }).click();
   const review = page.getByRole('dialog', { name: 'Review your request' });
   await review.getByRole('button', { name: /^Send/ }).click();

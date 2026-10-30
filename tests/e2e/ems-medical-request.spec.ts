@@ -86,7 +86,7 @@ test('quantity controls are touch sized with 16px text, search crosses all lists
   await page.getByRole('button', { name: 'Clear search' }).click();
   await expect(page.getByRole('navigation', { name: 'Choose a list' }).getByRole('button', { name: /ALS Transport Vehicle/ })).toContainText('1 needed');
 
-  await page.locator('#ems-target').selectOption({ label: 'Rescue 2' });
+  await page.getByRole('radio', { name: 'RESCUE R2', exact: true }).click();
   await noSidewaysScroll(page);
   await page.getByRole('button', { name: 'Review and send' }).click();
   const review = page.getByRole('dialog', { name: 'Review your request' });

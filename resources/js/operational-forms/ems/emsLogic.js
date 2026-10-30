@@ -208,6 +208,40 @@ export function choiceForUnit(unit) {
     return unit.kind === 'detail_event' || unit.id === null ? 'detail' : `unit:${unit.id}`;
 }
 
+/**
+ * The unit choices as the picker shows them: Rescue units as buttons (server order), every other unit in a list,
+ * and Detail / Special Event.
+ * @param {EmsUnit[]} units
+ * @returns {{rescue: EmsUnit[], other: EmsUnit[], detail: EmsUnit | null}}
+ */
+export function unitChoices(units) {
+    return {
+        rescue: units.filter((unit) => unit.kind === 'rescue_unit'),
+        other: units.filter((unit) => unit.kind === 'other_unit'),
+        detail: units.find((unit) => unit.kind === 'detail_event') ?? null,
+    };
+}
+
+/** The unit's name in words for a stored choice, or '' when the choice is empty or no longer a unit (never another unit's name). @param {string} choice @param {EmsUnit[]} units */
+export function unitLine(choice, units) {
+    return unitForChoice(choice, units)?.label ?? '';
+}
+
+/**
+ * Arrow-key navigation of the radio buttons: where focus (and the choice) goes next, or null for other keys.
+ * @param {string[]} order choices in display order @param {string} current @param {string} key
+ * @returns {string | null}
+ */
+export function nextUnitChoice(order, current, key) {
+    if (order.length === 0) return null;
+    const index = order.indexOf(current);
+    if (key === 'Home') return order[0];
+    if (key === 'End') return order[order.length - 1];
+    if (key === 'ArrowRight' || key === 'ArrowDown') return index < 0 ? order[0] : order[(index + 1) % order.length];
+    if (key === 'ArrowLeft' || key === 'ArrowUp') return index < 0 ? order[order.length - 1] : order[(index - 1 + order.length) % order.length];
+    return null;
+}
+
 /** @param {EmsFormDefinition} definition @returns {Set<string>} every line key on the active forms */
 export function validKeys(definition) {
     const keys = new Set();
@@ -245,7 +279,8 @@ export function buildPayload(draft, definition) {
     }
 
     /** @type {EmsSubmitPayload['target']} */
-    const target = unit.kind === 'detail_event' ? { kind: 'detail_event' } : { kind: unit.kind, apparatus_id: /** @type {number} */ (unit.id) };
+    // label_seen is the name the member saw; the server refuses the request if it is not the name of that unit.
+    const target = unit.kind === 'detail_event' ? { kind: 'detail_event' } : { kind: unit.kind, apparatus_id: /** @type {number} */ (unit.id), label_seen: unit.label };
     const event = draft.eventAssignment.trim();
     if (unit.kind === 'detail_event' && event !== '') target.event_assignment = event;
 
@@ -619,7 +654,7 @@ export function classifyFailure(failure) {
  */
 export function fieldForError(code, fields) {
     const names = Object.keys(fields ?? {});
-    if (code === 'invalid_unit' || names.some((name) => name === 'target' || name === 'target.kind' || name === 'target.apparatus_id')) return 'target';
+    if (code === 'invalid_unit' || code === 'unit_mismatch' || names.some((name) => name === 'target' || name === 'target.kind' || name === 'target.apparatus_id')) return 'target';
     if (names.includes('target.event_assignment')) return 'event';
     if (names.includes('member_note')) return 'note';
     if (code === 'empty_request' || names.includes('lines') || ['unknown_item', 'invalid_quantity', 'invalid_answer', 'duplicate_item'].includes(code ?? '')) return 'items';

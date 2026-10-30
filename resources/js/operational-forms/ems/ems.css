@@ -346,3 +346,39 @@
     .ems-bag-meta { justify-content: flex-end; }
 }
 #ems-review-retired .fui-Button { min-height: 44px; }
+
+/* Unit picker: one tap per unit, the chosen unit named in words under it. Wraps; never scrolls sideways. */
+.ems-picker { display: grid; gap: 10px; }
+.ems-units { display: grid; gap: 6px; outline-offset: 4px; }
+.ems-unit-group { font-size: 13px; font-weight: 650; color: var(--ems-muted); }
+.ems-unit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 128px), 1fr)); gap: 8px; }
+.ems-unit {
+    box-sizing: border-box;
+    display: grid;
+    align-content: center;
+    gap: 2px;
+    min-height: 48px;
+    padding: 8px 10px;
+    font: inherit;
+    font-weight: 650;
+    text-align: center;
+    color: var(--ems-ink);
+    background: var(--ems-surface);
+    border: 1px solid var(--ems-edge);
+    border-radius: var(--hub-radius-control);
+    cursor: pointer;
+    overflow-wrap: anywhere;
+}
+.ems-unit:hover { background: rgb(var(--hub-n-25)); }
+.ems-unit.is-chosen { color: var(--ems-ink); background: var(--ems-tint); border-color: var(--ems-accent); box-shadow: inset 0 0 0 2px var(--ems-accent); }
+.ems-unit:focus-visible, .ems-other-toggle:focus-visible { outline: 3px solid rgb(var(--hub-focus, 29 78 216)); outline-offset: 2px; }
+.ems-unit-status { font-size: 12px; font-weight: 500; color: var(--ems-muted); }
+.ems-units[aria-invalid="true"] .ems-unit:not(.is-chosen) { border-color: var(--ems-danger); }
+.ems-other { display: grid; gap: 6px; }
+.ems-other-toggle { box-sizing: border-box; min-height: 44px; padding: 8px 12px; font: inherit; font-weight: 600; text-align: left; color: var(--ems-ink); background: transparent; border: 1px dashed var(--ems-edge); border-radius: var(--hub-radius-control); cursor: pointer; }
+.ems-unit-confirm { font-size: 16px; color: var(--ems-ink); }
+.ems-unit-confirm.is-empty { color: var(--ems-muted); font-size: 14px; }
+.ems-unit-banner { font-size: 18px; color: var(--ems-ink); }
+.ems-unit-banner strong { font-size: 22px; letter-spacing: 0.01em; color: var(--ems-heading); overflow-wrap: anywhere; }
+.ems-bar-unit { font-size: 13.5px; color: var(--ems-ink); }
+.ems-bar-unit strong { font-weight: 700; }

@@ -100,7 +100,7 @@ export interface EmsSubmitLine {
 
 export interface EmsSubmitPayload {
     client_submission_id: string;
-    target: { kind: EmsTargetKind; apparatus_id?: number; event_assignment?: string };
+    target: { kind: EmsTargetKind; apparatus_id?: number; event_assignment?: string; label_seen?: string };
     member_note?: string;
     lines: EmsSubmitLine[];
 }
