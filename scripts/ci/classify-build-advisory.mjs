@@ -29,7 +29,7 @@ const expires = Date.parse('2026-11-12T00:00:00Z');
 // test:pwa-worker-core also runs pwa-refresh-safety). No dependency, version or lock change.
 const inputs = {
     '.': {
-        'package.json': '7f0109fa7099540d9fc0b3c8994509c76aaa8b1e9124de5c7d18f20de8524d5e',
+        'package.json': '09b44cd9c3fbff0731c3493d213066655381f228392235600a29a1fa3f509777',
         'package-lock.json': 'd2716fe1c072e7aff6741ea5f738a3d2760a19e7230f94871e6a2312924a0010',
     },
     'resources/js/daily-checkout': {
