@@ -144,7 +144,7 @@ final class VehicleInventoryCorrectionSourceTest extends TestCase
         $query = $this->boardQuery('2026-11-01 08:00:00');
         $rows = $this->allRows($this->source, $reviewer, $query);
         $this->assertSame([(string) $open->id, (string) $decidedAt->id], array_map(static fn ($row): string => $row->id, $rows));
-        $this->assertSame($this->countsFromRows($rows, $tags), array_intersect_key($this->source->counts($reviewer, $query), array_flip(['open', 'awaiting_response', 'high', 'resolved_today', ...$tags])));
+        $this->assertSame($this->countsFromRows($rows, $tags), array_intersect_key($this->source->counts($reviewer, $query), array_flip(['open', 'awaiting_response', 'in_progress', 'high', 'resolved_today', ...$tags])));
         $this->assertSame(1, $this->source->counts($reviewer, $query)['resolved_today']);
 
         $earlier = array_map(static fn ($row): string => $row->id, $this->allRows($this->source, $reviewer, $this->boardQuery('2026-11-01 07:59:00')));

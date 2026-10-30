@@ -94,7 +94,7 @@ final class StationRequestSourceTest extends TestCase
         $stages = collect($rows)->countBy(fn (DashboardIssue $i): string => $i->stage);
 
         $this->assertCount(4, $rows);
-        $this->assertSame(['open' => 2, 'awaiting_response' => 1, 'high' => 1, 'resolved_today' => 2, 'facilities' => 2, 'supplies' => 2, 'access_it' => 0, 'other' => 0], $counts);
+        $this->assertSame(['open' => 2, 'awaiting_response' => 1, 'in_progress' => 1, 'high' => 1, 'resolved_today' => 2, 'facilities' => 2, 'supplies' => 2, 'access_it' => 0, 'other' => 0], $counts);
         $this->assertSame($counts['resolved_today'], $stages['resolved']);
         $this->assertSame($counts['open'], count($rows) - $stages['resolved']);
         $this->assertSame('high', $rows[0]->severity, 'Open, most severe first.');

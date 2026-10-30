@@ -178,7 +178,7 @@ final class VehicleInspectionExceptionSourceTest extends TestCase
         $query = $this->boardQuery('2026-11-01 08:00:00');
         $rows = $this->allRows($this->source, $admin, $query);
         $this->assertSame([(string) $significant->id, (string) $open->id, (string) $at->id], array_map(static fn ($row): string => $row->id, $rows));
-        $this->assertSame($this->countsFromRows($rows, $tags), array_intersect_key($this->source->counts($admin, $query), array_flip(['open', 'awaiting_response', 'high', 'resolved_today', ...$tags])));
+        $this->assertSame($this->countsFromRows($rows, $tags), array_intersect_key($this->source->counts($admin, $query), array_flip(['open', 'awaiting_response', 'in_progress', 'high', 'resolved_today', ...$tags])));
         $this->assertSame(['open' => 2, 'awaiting_response' => 2, 'high' => 1, 'resolved_today' => 1], array_intersect_key($this->source->counts($admin, $query), array_flip(['open', 'awaiting_response', 'high', 'resolved_today'])));
         $this->assertContains((string) $before->id, array_map(static fn ($row): string => $row->id, $this->allRows($this->source, $admin, $this->boardQuery('2026-11-01 07:59:00'))));
     }

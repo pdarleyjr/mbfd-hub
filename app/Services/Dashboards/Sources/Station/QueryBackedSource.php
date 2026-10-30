@@ -23,6 +23,7 @@ use Illuminate\Validation\ValidationException;
  * (OperationalDisplayWindow, 08:00 America/New_York). Count keys:
  * - open: in-scope rows whose stage is not "resolved".
  * - awaiting_response: rows in stage "awaiting_response" (nobody has acted yet).
+ * - in_progress: rows in stage "in_progress" (someone acted; not resolved).
  * - high: open rows with severity "high".
  * - resolved_today: rows in stage "resolved" (resolved inside the window).
  * - facilities / supplies / access_it / other: in-scope rows carrying that tag. These facet counts
@@ -69,7 +70,7 @@ abstract class QueryBackedSource implements IssueSource
 
     public function counts(User $user, DashboardQuery $query): array
     {
-        $keys = ['open', 'awaiting_response', 'high', 'resolved_today', ...self::TAGS];
+        $keys = ['open', 'awaiting_response', 'in_progress', 'high', 'resolved_today', ...self::TAGS];
         if (! $this->visibleTo($user, $query->displayMode)) {
             return array_fill_keys($keys, 0);
         }
@@ -80,6 +81,7 @@ abstract class QueryBackedSource implements IssueSource
         $counts = [
             'open' => $count($filtered, fn (Builder $q) => $this->whereOpen($q)),
             'awaiting_response' => $count($filtered, fn (Builder $q) => $this->whereStage($q, 'awaiting_response', $window)),
+            'in_progress' => $count($filtered, fn (Builder $q) => $this->whereStage($q, 'in_progress', $window)),
             'high' => $count($filtered, function (Builder $q): void {
                 $this->whereOpen($q);
                 $this->whereSeverity($q, 'high');

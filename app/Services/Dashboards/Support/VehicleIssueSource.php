@@ -42,6 +42,7 @@ use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
  * counts() keys, each over that same row set:
  *  - open:              rows whose stage is awaiting_response or in_progress;
  *  - awaiting_response: rows whose stage is awaiting_response;
+ *  - in_progress:       rows whose stage is in_progress;
  *  - high:              open rows whose severity is high;
  *  - resolved_today:    rows whose stage is resolved (only same-day closures are in the set);
  *  - <tag>:             open rows carrying that tag (every apparatus class tag and source tag).
@@ -120,7 +121,7 @@ abstract class VehicleIssueSource implements IssueSource
 
     public function counts(User $user, DashboardQuery $query): array
     {
-        $counts = ['open' => 0, 'awaiting_response' => 0, 'high' => 0, 'resolved_today' => 0];
+        $counts = ['open' => 0, 'awaiting_response' => 0, 'in_progress' => 0, 'high' => 0, 'resolved_today' => 0];
         foreach ([...ApparatusClass::TAGS, ...array_keys($this->sourceTagSql())] as $tag) {
             $counts[$tag] = 0;
         }
@@ -151,6 +152,7 @@ abstract class VehicleIssueSource implements IssueSource
             $open = in_array($group->dashboard_stage, self::OPEN_STAGES, true);
             $counts['open'] += $open ? $n : 0;
             $counts['awaiting_response'] += $group->dashboard_stage === 'awaiting_response' ? $n : 0;
+            $counts['in_progress'] += $group->dashboard_stage === 'in_progress' ? $n : 0;
             $counts['high'] += $open && $group->dashboard_severity === 'high' ? $n : 0;
             $counts['resolved_today'] += $group->dashboard_stage === 'resolved' ? $n : 0;
             if (! $open) {

@@ -122,7 +122,7 @@ final class VehicleServiceTicketSourceTest extends TestCase
         }
         $tags = ['rescue', 'engine_puc', 'ladder', 'marine', 'special', 'repair'];
         $counts = $this->source->counts($admin, $query);
-        $this->assertSame($this->countsFromRows($rows, $tags), array_intersect_key($counts, array_flip(['open', 'awaiting_response', 'high', 'resolved_today', ...$tags])));
+        $this->assertSame($this->countsFromRows($rows, $tags), array_intersect_key($counts, array_flip(['open', 'awaiting_response', 'in_progress', 'high', 'resolved_today', ...$tags])));
         $this->assertSame(['open' => 2, 'awaiting_response' => 1, 'high' => 1, 'resolved_today' => 1], array_intersect_key($counts, array_flip(['open', 'awaiting_response', 'high', 'resolved_today'])));
     }
 

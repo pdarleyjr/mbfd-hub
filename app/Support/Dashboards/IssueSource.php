@@ -41,7 +41,7 @@ interface IssueSource
     /**
      * Exact counts for the stat cards and filter chips, computed with the same filters as rows().
      *
-     * @return array<string, int> keys: "open", "awaiting_response", "high", "resolved_today", plus any tag key.
+     * @return array<string, int> keys: "open", "awaiting_response", "in_progress", "high", "resolved_today", plus any tag key.
      */
     public function counts(User $user, DashboardQuery $query): array;
 

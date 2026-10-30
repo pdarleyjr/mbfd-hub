@@ -91,6 +91,7 @@ trait VehicleDashboardFixtures
         $counts = [
             'open' => count($open),
             'awaiting_response' => count(array_filter($rows, static fn (DashboardIssue $row): bool => $row->stage === 'awaiting_response')),
+            'in_progress' => count(array_filter($rows, static fn (DashboardIssue $row): bool => $row->stage === 'in_progress')),
             'high' => count(array_filter($open, static fn (DashboardIssue $row): bool => $row->severity === 'high')),
             'resolved_today' => count(array_filter($rows, static fn (DashboardIssue $row): bool => $row->stage === 'resolved')),
         ];

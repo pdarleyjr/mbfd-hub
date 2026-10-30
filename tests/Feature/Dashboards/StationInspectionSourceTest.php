@@ -105,7 +105,7 @@ final class StationInspectionSourceTest extends TestCase
         $query = new DashboardQuery(OperationalDisplayWindow::forNow('2026-11-01 10:00:00'));
 
         $this->assertCount(1, $this->source()->rows($viewer, $query, 50));
-        $this->assertSame(['open' => 1, 'awaiting_response' => 1, 'high' => 0, 'resolved_today' => 0, 'facilities' => 1, 'supplies' => 0, 'access_it' => 0, 'other' => 0], $this->source()->counts($viewer, $query));
+        $this->assertSame(['open' => 1, 'awaiting_response' => 1, 'in_progress' => 0, 'high' => 0, 'resolved_today' => 0, 'facilities' => 1, 'supplies' => 0, 'access_it' => 0, 'other' => 0], $this->source()->counts($viewer, $query));
 
         DB::table('station_inspections')->where('id', $reviewed->id)->update(['reviewed_at' => '2026-11-01 13:00:00']);
         $this->assertCount(2, $this->source()->rows($viewer, $query, 50));

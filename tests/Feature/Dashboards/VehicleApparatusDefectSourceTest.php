@@ -133,12 +133,12 @@ final class VehicleApparatusDefectSourceTest extends TestCase
 
         $tags = ['rescue', 'engine_puc', 'ladder', 'marine', 'special', 'inventory'];
         $counts = $this->source->counts($admin, $query);
-        $this->assertSame($this->countsFromRows($rows, $tags), array_intersect_key($counts, array_flip(['open', 'awaiting_response', 'high', 'resolved_today', ...$tags])));
+        $this->assertSame($this->countsFromRows($rows, $tags), array_intersect_key($counts, array_flip(['open', 'awaiting_response', 'in_progress', 'high', 'resolved_today', ...$tags])));
         $this->assertSame(['open' => 4, 'awaiting_response' => 3, 'high' => 1, 'resolved_today' => 1], array_intersect_key($counts, array_flip(['open', 'awaiting_response', 'high', 'resolved_today'])));
         $this->assertSame(2, $counts['inventory']);
 
         foreach ([$this->boardQuery(tags: ['inventory']), $this->boardQuery(severity: 'high'), $this->boardQuery(stage: 'in_progress'), $this->boardQuery(tags: ['marine'])] as $filtered) {
-            $this->assertSame($this->countsFromRows($this->allRows($this->source, $admin, $filtered), $tags), array_intersect_key($this->source->counts($admin, $filtered), array_flip(['open', 'awaiting_response', 'high', 'resolved_today', ...$tags])));
+            $this->assertSame($this->countsFromRows($this->allRows($this->source, $admin, $filtered), $tags), array_intersect_key($this->source->counts($admin, $filtered), array_flip(['open', 'awaiting_response', 'in_progress', 'high', 'resolved_today', ...$tags])));
         }
         $this->assertSame([], $this->source->rows($admin, $this->boardQuery(tags: ['marine']), 10));
         $this->assertCount(2, $this->source->rows($admin, $this->boardQuery(), 2), 'the caller limit is honoured');
