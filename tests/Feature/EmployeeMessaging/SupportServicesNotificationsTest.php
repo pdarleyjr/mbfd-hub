@@ -87,7 +87,7 @@ final class SupportServicesNotificationsTest extends TestCase
         $this->assertSame(NotificationCategoryRegistry::GROUP_SUPPORT_SERVICES, $category->group);
         $this->assertSame(['database', 'webpush', 'email'], $category->channels);
         $this->assertTrue($category->isLocked('database'));
-        $this->assertSame(['database' => true, 'webpush' => false, 'email' => false], $category->defaults);
+        $this->assertSame(['database' => true, 'webpush' => true, 'email' => true], $category->defaults);
         $this->assertTrue($category->senderWired);
     }
 

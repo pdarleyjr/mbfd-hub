@@ -41,7 +41,6 @@ final class BudgetedMailChannel
         $subject = (string) $payload['subject'];
         $text = isset($payload['text']) ? (string) $payload['text'] : null;
         $html = isset($payload['html']) ? (string) $payload['html'] : null;
-
         $sourceId = (string) $notification->id;
 
         // A worker retry after a lost response must not send a second copy. The

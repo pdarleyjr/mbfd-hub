@@ -55,6 +55,9 @@ final class InspectionNotificationDispatcherTest extends TestCase
         $this->admin = $this->reviewer();
         $this->inspection = $this->inspectionBy($this->rig, $this->reporter);
         $this->defect = $this->openDefect($this->rig, $this->inspection, $this->reporter);
+        // Creating the fixture inspection told reviewers in the bell ("Every Daily Checkout" is on by default).
+        // These tests are about what the dispatcher sends next, so start from a clean fake.
+        Notification::fake();
     }
 
     protected function tearDown(): void

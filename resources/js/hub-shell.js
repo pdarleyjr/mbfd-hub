@@ -1,4 +1,6 @@
 import { startUpdateRegistrar } from './pwa/update-registrar';
+import { startForegroundAlerts } from './pwa/foreground-alerts';
+import { mountAlertSoundSettings } from './pwa/alert-sound';
 // The Home install card; install-ui mounts only where its markup is rendered.
 import './pwa/install-ui';
 
@@ -77,3 +79,9 @@ window.addEventListener('offline', updateConnection);
 // Hub page. Scope '/' only attaches to the root push worker if this device already has it; it never
 // registers a worker itself (the push settings page does that, at /sw.js).
 startUpdateRegistrar({ scope: '/' });
+
+// A short pop-up (and an optional chime) when a NEW in-app alert arrives while this page is open. Filament
+// panels read it from the bell's own poll; other signed-in pages from the member alert feed. Never marks read.
+startForegroundAlerts();
+// "Play a sound for new alerts" on the Notification settings page (a per-device choice).
+mountAlertSoundSettings();

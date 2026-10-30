@@ -231,7 +231,7 @@ async function closeInitialMobileSidebar(page: Page) {
 async function sidebar(page: Page, info: TestInfo) {
   const aside = page.locator('.fi-sidebar');
   if (!await aside.count()) return;
-  const expand = page.getByRole('button', { name: 'Expand sidebar', exact: true }).filter({ visible: true }).first();
+  const expand = page.getByRole('button', { name: /^(Expand sidebar|Open menu)$/ }).filter({ visible: true }).first();
   if (await expand.count()) await expand.click();
   await expect.poll(() => aside.evaluate(el => Math.round(el.getBoundingClientRect().left))).toBeGreaterThanOrEqual(0);
   const bounds = await aside.boundingBox();

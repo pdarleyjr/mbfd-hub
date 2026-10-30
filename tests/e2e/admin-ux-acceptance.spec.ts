@@ -104,7 +104,7 @@ test.describe('Admin UX acceptance', () => {
       if (response.status() >= 500) serverErrors.push(`${response.status()} ${response.url()}`);
     });
 
-    await page.goto('/admin');
+    await page.goto('/admin/logistics-board'); // the Station Operations widget moved here from /admin
     await expect(page.getByRole('heading', { name: 'Station Operations' })).toBeVisible();
     const selector = page.getByLabel('Workspace');
     await expect(selector).toBeVisible();
