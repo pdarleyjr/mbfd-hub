@@ -167,14 +167,13 @@ final class ForegroundAlertFeedTest extends TestCase
         $this->getJson('/api/me/alerts')->assertUnauthorized();
     }
 
-    public function test_signed_in_pages_advertise_the_feed_only_once_the_route_exists(): void
+    public function test_signed_in_pages_advertise_the_registered_feed_and_guests_never_do(): void
     {
         $member = $this->member();
 
         $this->actingAs($member);
-        $this->assertStringNotContainsString('mbfd-alerts-feed', Blade::render('<x-hub.head />'), 'no route yet: nothing polls a 404');
-
-        $this->registerFeedRoute();
+        // The route is registered in routes/api.php, so signed-in pages advertise the feed.
+        $this->assertTrue(\Illuminate\Support\Facades\Route::has('api.me.alerts'));
         $this->assertStringContainsString('<meta name="mbfd-alerts-feed" content="/api/me/alerts">', Blade::render('<x-hub.head />'));
 
         auth()->logout();

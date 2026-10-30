@@ -62,13 +62,13 @@ final class PushDeliveryHealthTestButtonTest extends TestCase
 
         $response = $this->actingAs($me)->postJson('/api/push/test')->assertOk()
             ->assertJsonPath('success', true)
-            ->assertJsonPath('message', 'Test notification sent.')
+            ->assertJsonPath('message', 'Test handed to the push service. Check each device to see whether it appeared.')
             ->assertJsonPath('note', 'Accepted means Apple/Google/Microsoft/Mozilla took the alert. Whether the phone displayed it is not observable by the server.')
             ->assertJsonCount(4, 'devices');
 
         $byLabel = collect($response->json('devices'))->keyBy('label');
         foreach ($byLabel as $device) {
-            $this->assertEqualsCanonicalizing(['label', 'accepted', 'failure', 'provider', 'status'], array_keys($device));
+            $this->assertEqualsCanonicalizing(['label', 'accepted', 'failure', 'outcome', 'service', 'summary', 'provider', 'status'], array_keys($device));
         }
 
         $this->assertSame(['accepted' => true, 'failure' => null, 'provider' => 'apple', 'status' => 'Accepted by push service'],

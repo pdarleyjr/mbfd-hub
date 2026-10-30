@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages;
 
+use App\Filament\Concerns\HasPageTableExportActions;
 use App\Models\HubPushSubscription;
 use App\Models\User;
+use App\Services\Exports\ExportableTable;
 use App\Services\Notifications\PushDeliveryTrace;
 use App\Services\Notifications\PushDeviceStatus;
 use App\Support\HubTimezone;
@@ -25,8 +27,9 @@ use Illuminate\Database\Eloquent\Builder;
  * key columns are never selected. Access: super administrators and the existing notifications
  * administrators (admin.notifications.manage).
  */
-final class PushDeliveryHealth extends Page implements HasTable
+final class PushDeliveryHealth extends Page implements ExportableTable, HasTable
 {
+    use HasPageTableExportActions;
     use InteractsWithTable;
 
     public const PERMISSION = 'admin.notifications.manage';
@@ -67,7 +70,7 @@ final class PushDeliveryHealth extends Page implements HasTable
 
     public function table(Table $table): Table
     {
-        return $table
+        return self::withExportActions($table
             ->query(fn (): Builder => $this->devices())
             ->columns([
                 TextColumn::make('member_name')
@@ -115,7 +118,7 @@ final class PushDeliveryHealth extends Page implements HasTable
             ->paginated([25, 50, 100])
             ->defaultPaginationPageOption(25)
             ->emptyStateHeading('No push devices yet')
-            ->emptyStateDescription('A device appears here once a member turns on alerts on it.');
+            ->emptyStateDescription('A device appears here once a member turns on alerts on it.'));
     }
 
     /** Only the columns the page shows: the public key and auth secret are never loaded. */
