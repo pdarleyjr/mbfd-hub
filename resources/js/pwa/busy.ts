@@ -246,18 +246,29 @@ interface LivewireCommit {
     calls?: Array<{ method?: unknown }>;
 }
 
-type LivewireHook = (name: 'commit', callback: (context: { commit?: LivewireCommit; succeed?: (callback: () => void) => void }) => void) => void;
+interface LivewireCommitContext {
+    commit?: LivewireCommit;
+    component?: { el?: Element };
+    succeed?: (callback: () => void) => void;
+}
 
-/** A successful Livewire action (a save, a create) means what the member typed reached the server. */
+type LivewireHook = (name: 'commit', callback: (context: LivewireCommitContext) => void) => void;
+
+/**
+ * A successful Livewire action (a save, a create) means what the member typed INSIDE THAT COMPONENT
+ * reached the server. Polls and refreshes ($refresh, $commit ...) and Livewire's own plumbing
+ * (__lazyLoad when a widget loads, __dispatch when an event reaches a component) are not saves, and a
+ * save in one component says nothing about text typed in another one on the same page.
+ */
 function watchLivewireSaves(): void {
     const register = (): void => {
         const hook = (window as unknown as { Livewire?: { hook?: LivewireHook } }).Livewire?.hook;
         if (typeof hook !== 'function') return;
         try {
-            hook('commit', ({ commit, succeed }) => {
-                // Polls and refreshes ($refresh, $commit ...) are not saves.
-                const saves = (commit?.calls ?? []).some((call) => typeof call.method === 'string' && !call.method.startsWith('$'));
-                if (saves && typeof succeed === 'function') succeed(() => clearFieldEdits());
+            hook('commit', ({ commit, component, succeed }) => {
+                const saves = (commit?.calls ?? []).some((call) => typeof call.method === 'string'
+                    && !call.method.startsWith('$') && !call.method.startsWith('__'));
+                if (saves && typeof succeed === 'function') succeed(() => clearFieldEdits(component?.el));
             });
         } catch {
             // An unfamiliar Livewire version: edits stay recorded, which only ever errs towards "busy".
