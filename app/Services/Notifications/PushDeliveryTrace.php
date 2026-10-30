@@ -168,7 +168,7 @@ final class PushDeliveryTrace
                 'correlation_id' => $correlationId,
                 'notification_class' => $notification::class,
                 'category_key' => self::categoryOf($notification),
-                'notification_id' => is_string($notification->id ?? null) ? $notification->id : null,
+                'notification_id' => $notification->id,
                 'user_id' => (int) $user->getKey(),
                 'device_id' => (int) $device->getKey(),
                 'endpoint_hash' => self::endpointHash($device->endpoint),

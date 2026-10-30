@@ -47,6 +47,8 @@ use Throwable;
  *
  * Version: "{status}:{last update id}". Every workflow write appends an update row, so the token
  * changes with every change of state or note; perform() compares it with the row locked.
+ *
+ * @extends VehicleIssueSource<ApparatusServiceTicket>
  */
 final class ApparatusServiceTicketSource extends VehicleIssueSource
 {
@@ -132,7 +134,6 @@ final class ApparatusServiceTicketSource extends VehicleIssueSource
 
     protected function toIssue(Model $record, bool $displayMode, array $projection): DashboardIssue
     {
-        assert($record instanceof ApparatusServiceTicket);
         $status = Status::tryFrom((string) $record->status);
 
         return new DashboardIssue(
@@ -244,13 +245,13 @@ final class ApparatusServiceTicketSource extends VehicleIssueSource
                 Status::InProgress => new IssueAction($key, 'Start work', 'secondary', [$assign, ...$notes]),
                 Status::WaitingForParts => new IssueAction($key, 'Waiting for parts', 'secondary', $notes),
                 Status::Completed => new IssueAction($key, 'Complete', 'primary', [self::textarea('resolution_summary', 'Resolution summary', true, 10000), ...$notes]),
-                Status::Cancelled => new IssueAction($key, 'Cancel ticket', 'danger', $notes, 'Cancel this service ticket? It cannot be reopened.'),
-                default => null,
+                // The last entry of TRANSITIONS: every other target has its own arm above.
+                default => new IssueAction($key, 'Cancel ticket', 'danger', $notes, 'Cancel this service ticket? It cannot be reopened.'),
             };
         }
         $actions[] = new IssueAction('add_note', 'Add note', 'secondary', $notes);
 
-        return array_values(array_filter($actions));
+        return $actions;
     }
 
     /** @return array<int, string> active accounts holding a ticket-managing role */

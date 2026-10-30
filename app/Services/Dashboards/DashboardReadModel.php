@@ -130,7 +130,7 @@ final class DashboardReadModel
                 $laneCounts[$lane][$countKey] = ($laneCounts[$lane][$countKey] ?? 0) + (int) $value;
             }
             foreach ($sourceRows as $row) {
-                if (! $row instanceof DashboardIssue || isset($laneOf[$row->ref()])) {
+                if (isset($laneOf[$row->ref()])) {
                     continue;
                 }
                 $laneOf[$row->ref()] = $lane;
@@ -139,8 +139,8 @@ final class DashboardReadModel
         }
 
         usort($rows, static function (DashboardIssue $a, DashboardIssue $b): int {
-            return [self::SEVERITY_ORDER[$a->severity] ?? 3, -$a->occurredAt->getTimestamp(), $a->ref()]
-                <=> [self::SEVERITY_ORDER[$b->severity] ?? 3, -$b->occurredAt->getTimestamp(), $b->ref()];
+            return [self::SEVERITY_ORDER[$a->severity], -$a->occurredAt->getTimestamp(), $a->ref()]
+                <=> [self::SEVERITY_ORDER[$b->severity], -$b->occurredAt->getTimestamp(), $b->ref()];
         });
 
         return new DashboardSnapshot(

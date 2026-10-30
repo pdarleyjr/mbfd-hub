@@ -28,6 +28,8 @@ use Illuminate\Validation\ValidationException;
  * - resolved_today: rows in stage "resolved" (resolved inside the window).
  * - facilities / supplies / access_it / other: in-scope rows carrying that tag. These facet counts
  *   apply the query's stage and severity filters but not its tag filter, so every chip keeps its number.
+ *
+ * @template TModel of Model
  */
 abstract class QueryBackedSource implements IssueSource
 {
@@ -36,22 +38,33 @@ abstract class QueryBackedSource implements IssueSource
     /** Filter chips every station adapter reports (zero where a source has no such rows). */
     public const TAGS = ['facilities', 'supplies', 'access_it', 'other'];
 
-    /** @return Builder<Model> records this source may show, before window and dashboard filters */
+    /** @return Builder<TModel> records this source may show, before window and dashboard filters */
     abstract protected function baseQuery(): Builder;
 
+    /** @param Builder<TModel> $query */
     abstract protected function whereOpen(Builder $query): void;
 
-    /** Narrow to one stage; "resolved" must be limited to resolutions inside $window. */
+    /**
+     * Narrow to one stage; "resolved" must be limited to resolutions inside $window.
+     *
+     * @param  Builder<TModel>  $query
+     */
     abstract protected function whereStage(Builder $query, string $stage, OperationalDisplayWindow $window): void;
 
+    /** @param Builder<TModel> $query */
     abstract protected function whereSeverity(Builder $query, string $severity): void;
 
-    /** @return array<string, Closure(Builder): void> tag => constraint */
+    /** @return array<string, Closure(Builder<TModel>): mixed> tag => constraint (its return value is ignored) */
     abstract protected function tagConstraints(): array;
 
-    /** Eager loads and ordering for list rows (no per-row queries in toIssue()). */
+    /**
+     * Eager loads and ordering for list rows (no per-row queries in toIssue()).
+     *
+     * @param  Builder<TModel>  $query
+     */
     abstract protected function prepareRows(Builder $query): void;
 
+    /** @param TModel $record */
     abstract protected function toIssue(Model $record, bool $displayMode): DashboardIssue;
 
     public function rows(User $user, DashboardQuery $query, int $limit): array
@@ -97,7 +110,7 @@ abstract class QueryBackedSource implements IssueSource
         return $counts;
     }
 
-    /** @return Builder<Model> */
+    /** @return Builder<TModel> */
     protected function filtered(DashboardQuery $query, bool $withTagFilter): Builder
     {
         $window = $query->window;
@@ -127,11 +140,13 @@ abstract class QueryBackedSource implements IssueSource
     }
 
     /** Column inside [window start, window end), compared in UTC like every stored timestamp. */
+    /** @param Builder<TModel> $query */
     protected static function whereInWindow(Builder $query, string $column, OperationalDisplayWindow $window): void
     {
         $query->where($column, '>=', $window->databaseStart())->where($column, '<', $window->databaseEnd());
     }
 
+    /** @param Builder<TModel> $query */
     protected static function nothing(Builder $query): void
     {
         $query->whereRaw('1 = 0');

@@ -51,6 +51,8 @@ use Illuminate\Validation\ValidationException;
  * Version: the service's own optimistic token "{action_status}:{last event id}"; perform()
  * hands it to DefectCorrectiveActionService::expectingState(), which compares it under the
  * service's row locks (apparatus -> defect, the global lock order) before writing anything.
+ *
+ * @extends VehicleIssueSource<ApparatusDefect>
  */
 final class ApparatusDefectSource extends VehicleIssueSource
 {
@@ -121,7 +123,6 @@ final class ApparatusDefectSource extends VehicleIssueSource
 
     protected function toIssue(Model $record, bool $displayMode, array $projection): DashboardIssue
     {
-        assert($record instanceof ApparatusDefect);
         $status = (string) ($record->action_status ?: DefectActionStatus::REPORTED);
         $problem = str((string) $record->issue_type)->replace('_', ' ')->headline()->toString();
         $notes = $displayMode ? null : (trim((string) $record->notes) ?: null);

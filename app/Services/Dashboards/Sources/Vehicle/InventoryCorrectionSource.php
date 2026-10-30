@@ -53,6 +53,8 @@ use Throwable;
  * "Apply to" choice, so a checklist that changed after the panel opened is a conflict, never a
  * silent different change. Anything else (editing the change, other apparatus) stays on the
  * full review page.
+ *
+ * @extends VehicleIssueSource<Correction>
  */
 final class InventoryCorrectionSource extends VehicleIssueSource
 {
@@ -133,7 +135,6 @@ final class InventoryCorrectionSource extends VehicleIssueSource
 
     protected function toIssue(Model $record, bool $displayMode, array $projection): DashboardIssue
     {
-        assert($record instanceof Correction);
 
         return new DashboardIssue(
             type: $this->type(),

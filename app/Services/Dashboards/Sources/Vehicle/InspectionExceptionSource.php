@@ -49,6 +49,8 @@ use Illuminate\Validation\ValidationException;
  * Version: "{status}:{updated_at epoch}:{authoritative meter}". The meter part is the
  * expected_current_value the service insists on, so a meter changed by another decision is a
  * conflict. perform() locks inspection -> apparatus -> exception (the service's lock order).
+ *
+ * @extends VehicleIssueSource<ApparatusInspectionException>
  */
 final class InspectionExceptionSource extends VehicleIssueSource
 {
@@ -117,7 +119,6 @@ final class InspectionExceptionSource extends VehicleIssueSource
 
     protected function toIssue(Model $record, bool $displayMode, array $projection): DashboardIssue
     {
-        assert($record instanceof ApparatusInspectionException);
         $field = (string) $record->field;
 
         return new DashboardIssue(

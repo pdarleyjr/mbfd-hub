@@ -46,6 +46,8 @@ use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
  *  - high:              open rows whose severity is high;
  *  - resolved_today:    rows whose stage is resolved (only same-day closures are in the set);
  *  - <tag>:             open rows carrying that tag (every apparatus class tag and source tag).
+ *
+ * @template TModel of Model
  */
 abstract class VehicleIssueSource implements IssueSource
 {
@@ -63,10 +65,10 @@ abstract class VehicleIssueSource implements IssueSource
         return [DashboardView::Overview, DashboardView::VehicleCheckout];
     }
 
-    /** @return Builder<Model> */
+    /** @return Builder<TModel> */
     abstract protected function newQuery(): Builder;
 
-    /** Open records, plus records closed inside the window. @param Builder<Model> $query */
+    /** Open records, plus records closed inside the window. @param Builder<TModel> $query */
     abstract protected function scopeToBoard(Builder $query, OperationalDisplayWindow $window): void;
 
     abstract protected function severitySql(): string;
@@ -91,6 +93,7 @@ abstract class VehicleIssueSource implements IssueSource
     }
 
     /**
+     * @param  TModel  $record
      * @param  array{severity: string, stage: string, occurredAt: CarbonImmutable, tags: list<string>, subject: string|null, imageKey: string|null}  $projection
      */
     abstract protected function toIssue(Model $record, bool $displayMode, array $projection): DashboardIssue;
@@ -179,7 +182,7 @@ abstract class VehicleIssueSource implements IssueSource
         return $record === null ? null : ['record' => $record, 'issue' => $this->project($record, $displayMode)];
     }
 
-    /** @return Builder<Model>|null null when the filters can match nothing */
+    /** @return Builder<TModel>|null null when the filters can match nothing */
     private function filtered(DashboardQuery $query, bool $forCount = false): ?Builder
     {
         $builder = $this->newQuery();
@@ -216,7 +219,7 @@ abstract class VehicleIssueSource implements IssueSource
         return $forCount ? $builder : $this->withRowColumns($builder);
     }
 
-    /** @param Builder<Model> $builder @return Builder<Model> */
+    /** @param Builder<TModel> $builder @return Builder<TModel> */
     private function withRowColumns(Builder $builder): Builder
     {
         return $builder

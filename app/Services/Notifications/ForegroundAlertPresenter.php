@@ -45,9 +45,7 @@ final class ForegroundAlertPresenter
             if (count($items) >= self::SNAPSHOT_SIZE) {
                 break;
             }
-            if ($notification instanceof DatabaseNotification) {
-                $items[] = $notification;
-            }
+            $items[] = $notification;
         }
 
         return $this->snapshot($items);
@@ -73,7 +71,7 @@ final class ForegroundAlertPresenter
      */
     public function present(DatabaseNotification $notification, ?NotificationCategoryRegistry $registry = null): array
     {
-        $data = is_array($notification->data) ? $notification->data : [];
+        $data = $notification->data;
         $title = self::plain($data['title'] ?? null, self::TITLE_LIMIT);
 
         return [

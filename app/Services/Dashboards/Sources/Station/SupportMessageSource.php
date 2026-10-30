@@ -38,6 +38,8 @@ use Illuminate\Validation\ValidationException;
  * Read markers: rows(), counts() and detail() never move the shared team marker. Only the explicit
  * "mark_read" action, or a reply (which, like the widget's sendReply, marks the conversation seen
  * up to the reply that was just sent), calls markReadByLogistics().
+ *
+ * @extends QueryBackedSource<EmployeeLogisticsThread>
  */
 final class SupportMessageSource extends QueryBackedSource
 {
