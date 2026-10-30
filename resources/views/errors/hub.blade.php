@@ -3,7 +3,8 @@
 <head>
     <meta charset="utf-8">
     <x-hub.head />
-    <title>{{ $code }} — {{ $title }} | MBFD Hub</title>
+    @isset($refreshSeconds)<meta http-equiv="refresh" content="{{ $refreshSeconds }}">@endisset
+    <title>{{ isset($eyebrow) ? '' : $code.' — ' }}{{ $title }} | MBFD Hub</title>
     <link rel="stylesheet" href="/css/hub-wallpaper-v1.css">
     {{-- Error pages must render even when the build is missing: a failed stylesheet lookup degrades to unstyled text. --}}
     @php
@@ -29,18 +30,20 @@
 <body class="hub-error">
     <main class="hub-panel hub-error__card">
         <div class="hub-error__identity"><img src="/images/mbfd_logo-256.png" alt="" width="48" height="48">MBFD Hub</div>
-        <p class="hub-error__code">ERROR {{ $code }}</p>
+        <p class="hub-error__code">{{ $eyebrow ?? 'ERROR '.$code }}</p>
         <h1>{{ $title }}</h1>
         <p class="hub-error__message">{{ $message }}</p>
         @if($code !== 404)
             <p class="hub-callout hub-callout--warning p-4">If this is an active incident, contact the duty officer directly.</p>
         @endif
-        <div class="hub-error__actions">
-            <a class="hub-btn hub-btn--primary" href="{{ url('/') }}">Return to Hub home</a>
-            @if($code !== 404)
-                <a class="hub-btn hub-btn--secondary" href="{{ url()->current() }}">Try again</a>
-            @endif
-        </div>
+        @unless(isset($eyebrow))
+            <div class="hub-error__actions">
+                <a class="hub-btn hub-btn--primary" href="{{ url('/') }}">Return to Hub home</a>
+                @if($code !== 404)
+                    <a class="hub-btn hub-btn--secondary" href="{{ url()->current() }}">Try again</a>
+                @endif
+            </div>
+        @endunless
         <div class="hub-error__footer">Miami Beach Fire Department · Support Services Division</div>
     </main>
 </body>
