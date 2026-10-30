@@ -358,7 +358,7 @@ final class EmployeeLogisticsAdminInboxTest extends TestCase
         $this->actingAs($this->logisticsResponder());
 
         $widgets = (new Dashboard)->getWidgets();
-        $this->assertSame([StationOperationsHubWidget::class, EmployeeMessagesWidget::class], $widgets);
+        $this->assertSame([StationOperationsHubWidget::class, EmployeeMessagesWidget::class, \App\Filament\Widgets\EquipmentChangeRequestsWidget::class], $widgets);
 
         $this->app['request']->merge(['display' => '1']);
         $this->assertSame([StationOperationsHubWidget::class], (new Dashboard)->getWidgets());

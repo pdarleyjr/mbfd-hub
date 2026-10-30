@@ -22,7 +22,7 @@
         'internal_note' => 'Internal note',
         'approved' => 'Approved',
         'applied' => 'Applied to the checklist',
-        'rejected' => 'Not approved',
+        'rejected' => 'Rejected',
         'reversed' => 'Change reversed',
         'linked_to_inspection' => 'Linked to the submitted inspection',
     ];
@@ -45,12 +45,30 @@
                 </dd></div>
                 <div><dt>Reported (Eastern)</dt><dd>{{ $correction->created_at?->timezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A T') }}</dd></div>
                 <div><dt>Member</dt><dd>{{ $reporterName }}@if($correction->reporterEmployee?->rank) · {{ $correction->reporterEmployee->rank }}@endif</dd></div>
+                <div><dt>Apparatus ID</dt><dd data-apparatus-id>{{ $correction->apparatus_id }}</dd></div>
+                <div><dt>Equipment ID</dt><dd data-equipment-id>{{ $correction->item_key ?? 'New item (not listed yet)' }}</dd></div>
                 <div><dt>Inspection</dt><dd>
                     @if($inspectionUrl)<a class="hub-insp-link" href="{{ $inspectionUrl }}">Open the inspection</a>@else Reported while the inspection was in progress @endif
                 </dd></div>
             </dl>
             <p class="hub-insp-note">An inventory correction is separate from the inspection's findings: it never marks equipment missing or damaged, never holds the inspection and never changes the unit's status.</p>
         </section>
+
+        @if($diffRows !== [])
+            <section class="hub-insp-card" aria-labelledby="inv-diff-title" data-section="diff">
+                <h2 class="hub-insp-card__title" id="inv-diff-title">{{ $correction->isOpen() ? 'What would change' : 'What the member asked for' }}</h2>
+                <div class="hub-insp-table-wrap">
+                    <table class="hub-insp-table">
+                        <thead><tr><th scope="col">Detail</th><th scope="col">Now on the checklist</th><th scope="col">Requested</th></tr></thead>
+                        <tbody>
+                            @foreach($diffRows as $row)
+                                <tr data-diff-row><th scope="row">{{ $row['label'] }}</th><td><s>{{ $row['before'] }}</s></td><td><strong>{{ $row['after'] }}</strong></td></tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        @endif
 
         <section class="hub-insp-section" aria-labelledby="inv-compare-title" data-section="compare">
             <div class="hub-insp-section__head">
