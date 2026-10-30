@@ -41,6 +41,12 @@ Route::get('/me/context', AuthenticatedMemberContextController::class)
     ->middleware(['auth:sanctum', 'canonical.api', 'throttle:120,1'])
     ->name('api.me.context');
 
+// Foreground alert feed for Hub pages without the Filament bell (Hub home, Daily Checkout). Read-only, no-store;
+// it never marks anything read.
+Route::get('/me/alerts', \App\Http\Controllers\Api\MemberAlertFeedController::class)
+    ->middleware(['auth:sanctum', 'canonical.api', 'throttle:120,1'])
+    ->name('api.me.alerts');
+
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware(['auth:sanctum', 'canonical.api']);
