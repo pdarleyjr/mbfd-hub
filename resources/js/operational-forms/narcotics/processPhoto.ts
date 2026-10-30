@@ -1,5 +1,5 @@
 import {
-    ORIENTATION_PROBE_JPEG_BASE64, browserAppliesExifOrientation, checkSelection, encodeWithPlan, encodingPlan, fitWithin,
+    ORIENTATION_PROBE_JPEG_BASE64, browserAppliesExifOrientation, browserDecodesNatively, checkSelection, encodeWithPlan, encodingPlan, fitWithin,
     orientationPlan, readJpegOrientation,
 } from './narcoticsImage.js';
 import type { PreparedPhoto } from './narcoticsTypes';
@@ -101,7 +101,13 @@ export async function preparePhoto(file: File, limits: PrepareLimits): Promise<P
 
     let source: Source | null = null;
     try {
-        source = await decode(file);
+        try {
+            source = await decode(file);
+        } catch {
+            // A JPEG, PNG or WebP every browser reads that this one cannot is damaged. HEIC and the like are the server's job.
+            if (browserDecodesNatively(file)) throw new PhotoProblem('That photo could not be read. Take it again or choose another.');
+            throw new Error('undecodable');
+        }
         const stored = sizeOf(source);
         if (stored.width < 1 || stored.height < 1) throw new Error('empty');
 

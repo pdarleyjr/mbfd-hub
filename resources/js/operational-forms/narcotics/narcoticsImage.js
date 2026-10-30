@@ -172,6 +172,17 @@ export function checkSelection(file, server = {}) {
     return { ok: true };
 }
 
+/**
+ * Whether every browser reads this kind of file itself. A file of such a type that the browser then
+ * cannot decode is damaged: say so now, instead of previewing a broken picture and failing at the server.
+ * HEIC and anything unfamiliar are left to the server, which re-encodes them.
+ * @param {{ type?: string, name?: string }} file
+ */
+export function browserDecodesNatively(file) {
+    const type = String(file?.type || '').toLowerCase();
+    return type === 'image/jpeg' || type === 'image/png' || type === 'image/webp' || type === 'image/gif';
+}
+
 // ------------------------------------------------------------------- encoding
 
 /**

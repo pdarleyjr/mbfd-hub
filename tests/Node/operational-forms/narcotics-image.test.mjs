@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   BUSY_REASON, FORM_KEY, MAX_SOURCE_BYTES, ORIENTATION_PROBE_JPEG_BASE64, SENT_MESSAGE, TARGET_BYTES,
-  browserAppliesExifOrientation, checkSelection, describeFailure, encodeWithPlan, encodingPlan, fitWithin, formPhase,
+  browserAppliesExifOrientation, browserDecodesNatively, checkSelection, describeFailure, encodeWithPlan, encodingPlan, fitWithin, formPhase,
   formatBytes, isUnsafeToRefresh, isUuid, newSubmissionId, orientationPlan, photoFileName, readJpegOrientation,
   searchForView, urlFor, viewFromDeepLink, viewFromSearch,
 } from '../../../resources/js/operational-forms/narcotics/narcoticsImage.js';
@@ -233,4 +233,11 @@ test('sizes read like a person would say them', () => {
   assert.equal(formatBytes(512), '1 KB');
   assert.equal(formatBytes(820 * 1024), '820 KB');
   assert.equal(formatBytes(1.4 * 1024 * 1024), '1.4 MB');
+});
+
+test('a JPEG, PNG or WebP that will not decode is damaged; HEIC and the unfamiliar are left to the server', () => {
+  for (const type of ['image/jpeg', 'IMAGE/PNG', 'image/webp', 'image/gif']) assert.equal(browserDecodesNatively({ type, name: 'x' }), true, type);
+  for (const file of [{ type: '', name: 'IMG_0001.HEIC' }, { type: 'image/heic', name: 'a.heic' }, { type: 'image/heif', name: 'a.heif' }, { type: '', name: 'photo' }, null]) {
+    assert.equal(browserDecodesNatively(file), false);
+  }
 });
