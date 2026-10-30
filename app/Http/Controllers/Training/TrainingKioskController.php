@@ -157,14 +157,18 @@ final class TrainingKioskController extends Controller
     {
         $kiosk->requireDevice($request, $session);
         abort_unless($session->status === 'open', 409, 'Sign-in is closed.');
-        $members = collect($provider->candidates(now(\App\Support\HubTimezone::NAME)->toDateString()))->map(fn (array $member): array => [
+        $candidates = collect($provider->candidates(now(\App\Support\HubTimezone::NAME)->toDateString()));
+        // Personnel whose positions do not bid carry no term. The screen reads one shared term for its
+        // heading, so they take the roster's term here; their stored attendance snapshot stays unlabeled.
+        $rosterTerm = $candidates->pluck('term_label')->filter()->countBy()->sortDesc()->keys()->first() ?? 'Current assignment';
+        $members = $candidates->map(fn (array $member): array => [
             'id' => $member['employee_profile_id'],
             'first_name' => $member['first_name'],
             'last_name' => $member['last_name'],
             'name' => $member['display_name'],
             'rank' => $member['rank'],
             'shift' => $member['shift'],
-            'term_label' => $member['term_label'],
+            'term_label' => $member['term_label'] ?? $rosterTerm,
             // Last four digits disambiguate names without exposing full City IDs.
             'identifier_hint' => substr((string) $member['employee_id'], -4),
         ])->sortBy([['last_name', 'asc'], ['first_name', 'asc']])->values();
