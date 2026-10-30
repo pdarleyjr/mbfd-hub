@@ -65,18 +65,18 @@ final class NotificationDispatchService
      * @param  list<int>|null  $candidateIds
      * @return Collection<int, User>
      */
-    public function sendToIds(string $categoryKey, Notification $notification, ?array $candidateIds, ?string $eventKey = null, ?int $exceptUserId = null): Collection
+    public function sendToIds(string $categoryKey, Notification $notification, ?array $candidateIds, ?string $eventKey = null, ?int $exceptUserId = null, ?string $correlationId = null): Collection
     {
         $candidates = $candidateIds === null ? null : User::query()->whereIn('id', $candidateIds)->get();
 
-        return $this->send($categoryKey, $notification, $candidates, $eventKey, $exceptUserId);
+        return $this->send($categoryKey, $notification, $candidates, $eventKey, $exceptUserId, $correlationId);
     }
 
     /**
      * @param  iterable<User>|null  $candidates  Who to evaluate; null evaluates the category's own audience.
      * @return Collection<int, User> The people the notification was handed to.
      */
-    public function send(string $categoryKey, Notification $notification, ?iterable $candidates = null, ?string $eventKey = null, ?int $exceptUserId = null): Collection
+    public function send(string $categoryKey, Notification $notification, ?iterable $candidates = null, ?string $eventKey = null, ?int $exceptUserId = null, ?string $correlationId = null): Collection
     {
         $recipients = $this->evaluator->recipients($categoryKey, $candidates)
             ->reject(fn (User $user): bool => $exceptUserId !== null && (int) $user->getKey() === $exceptUserId)
@@ -106,6 +106,10 @@ final class NotificationDispatchService
             return $recipients;
         }
 
+        // One id for this send, carried on the notification into every push attempt it causes (the queued fan-out
+        // job stamped it already; commands that call send() directly get a fresh one).
+        PushDeliveryTrace::stamp($notification, $correlationId);
+
         try {
             NotificationFacade::send($recipients, $notification);
         } catch (Throwable $exception) {
@@ -129,6 +133,7 @@ final class NotificationDispatchService
             return false;
         }
 
+        PushDeliveryTrace::stamp($notification);
         $user->notify($notification);
 
         return true;

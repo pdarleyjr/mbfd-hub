@@ -109,6 +109,7 @@ class AdminPanelProvider extends PanelProvider
                 MyProfile::class,
                 NotificationSettings::class,
                 PulseDashboard::class,
+                \App\Filament\Pages\PushDeliveryHealth::class,
                 SetPasswordPage::class,
                 Settings::class,
                 WorkgroupAdministration::class,

@@ -30,6 +30,25 @@ trait EvaluatesDelivery
         return null;
     }
 
+    /**
+     * One id per fan-out / send, stamped before the notification is queued so every push attempt it causes
+     * (including deferred retries) can be matched in the delivery log. Not a secret and not personal.
+     */
+    public ?string $deliveryCorrelationId = null;
+
+    public function withDeliveryCorrelation(string $correlationId): static
+    {
+        $this->deliveryCorrelationId ??= $correlationId;
+
+        return $this;
+    }
+
+    /** The registry category key, for the delivery log (null for an unknown/undeliverable kind). */
+    public function deliveryCategoryKey(): ?string
+    {
+        return $this->deliveryCategory();
+    }
+
     /** Idempotency key (category + subject + event) recorded as provenance. */
     protected function deliveryEventKey(): ?string
     {

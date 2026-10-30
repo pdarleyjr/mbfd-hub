@@ -6,6 +6,7 @@ namespace App\Jobs;
 
 use App\Models\User;
 use App\Notifications\Channels\HubWebPushChannel;
+use App\Services\Notifications\PushDeliveryTrace;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -33,6 +34,7 @@ final class DeliverDeferredPush implements ShouldQueue
         public readonly int $userId,
         public readonly int $subscriptionId,
         public readonly int $attempt = 1,
+        public readonly ?string $correlationId = null,
     ) {
         $this->onQueue('notifications');
     }
@@ -53,20 +55,26 @@ final class DeliverDeferredPush implements ShouldQueue
         // job correct even if something rebinds the package channel.
         $channel = HubWebPushChannel::decorate(app(WebPushChannel::class));
 
+        // The same id the original send logged, so one alert's whole story can be followed in the log.
+        $correlationId = $this->correlationId ?? PushDeliveryTrace::correlationIdFor($this->notification);
+        // Trace attempt numbers count send opportunities: 1 is the original send, this job is the next one.
+        $traceAttempt = $this->attempt + 1;
+
         if ($device->backoff_until?->isFuture() === true) {
+            PushDeliveryTrace::record($this->notification, $user, $device, $correlationId, $traceAttempt, null, 0);
             // The sync driver has no "later": the job ran at once, so waiting again would only recurse.
             if (! $this->job instanceof SyncJob) {
-                $channel->defer($user, $this->notification, $device, $this->attempt + 1);
+                $channel->defer($user, $this->notification, $device, $this->attempt + 1, $correlationId);
             }
 
             return;
         }
 
-        $channel->deliverTo($user, $this->notification, $user->pushSubscriptions()->whereKey($device->getKey())->get());
+        $channel->deliverTo($user, $this->notification, $user->pushSubscriptions()->whereKey($device->getKey())->get(), $traceAttempt, $correlationId);
 
         $device->refresh();
         if ($device->backoff_until?->isFuture() === true && ! $this->job instanceof SyncJob) {
-            $channel->defer($user, $this->notification, $device, $this->attempt + 1);
+            $channel->defer($user, $this->notification, $device, $this->attempt + 1, $correlationId);
         }
     }
 }

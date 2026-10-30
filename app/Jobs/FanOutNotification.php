@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Services\Notifications\NotificationDispatchService;
+use App\Services\Notifications\PushDeliveryTrace;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -27,6 +28,9 @@ final class FanOutNotification implements ShouldQueue
     /** @var list<int> */
     public array $backoff = [15, 60];
 
+    /** One id for everything this fan-out causes, carried on the notification into every push attempt and deferred retry. */
+    public readonly string $correlationId;
+
     /** @param  list<int>|null  $candidateIds  Who to evaluate; null evaluates the category's own audience. */
     public function __construct(
         public readonly string $categoryKey,
@@ -36,11 +40,12 @@ final class FanOutNotification implements ShouldQueue
         public readonly ?int $exceptUserId = null,
     ) {
         $this->onQueue('notifications');
+        $this->correlationId = PushDeliveryTrace::stamp($notification);
     }
 
     public function handle(NotificationDispatchService $dispatcher): void
     {
-        $dispatcher->sendToIds($this->categoryKey, $this->notification, $this->candidateIds, $this->eventKey, $this->exceptUserId);
+        $dispatcher->sendToIds($this->categoryKey, $this->notification, $this->candidateIds, $this->eventKey, $this->exceptUserId, $this->correlationId);
     }
 
     public function failed(Throwable $exception): void
@@ -49,6 +54,7 @@ final class FanOutNotification implements ShouldQueue
             'category' => $this->categoryKey,
             'notification' => $this->notification::class,
             'event_key' => $this->eventKey,
+            'correlation_id' => $this->correlationId,
             'exception' => $exception->getMessage(),
         ]);
     }

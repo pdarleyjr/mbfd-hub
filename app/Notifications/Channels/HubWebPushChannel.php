@@ -7,6 +7,7 @@ namespace App\Notifications\Channels;
 use App\Jobs\DeliverDeferredPush;
 use App\Models\HubPushSubscription;
 use App\Models\User;
+use App\Services\Notifications\PushDeliveryTrace;
 use App\Services\Notifications\PushDeviceHealth;
 use Closure;
 use Illuminate\Database\Eloquent\Collection;
@@ -27,7 +28,10 @@ use NotificationChannels\WebPush\WebPushMessage;
  * this very send is handled the same way.
  *
  * Notifications that choose their own devices (pushDevicesFor, the "send a test" button)
- * keep the package behaviour.
+ * keep the package behaviour: exactly those devices, back-off ignored, no re-sending.
+ *
+ * Every attempt (and every skip of a device that is waiting) writes one privacy-preserving log line
+ * (PushDeliveryTrace) with a correlation id that follows the alert into its deferred retries.
  */
 class HubWebPushChannel extends WebPushChannel
 {
@@ -48,8 +52,16 @@ class HubWebPushChannel extends WebPushChannel
 
     public function send(mixed $notifiable, Notification $notification): void
     {
-        if (! $notifiable instanceof User || method_exists($notification, 'pushDevicesFor')) {
+        if (! $notifiable instanceof User) {
             parent::send($notifiable, $notification);
+
+            return;
+        }
+
+        $correlationId = PushDeliveryTrace::correlationIdFor($notification);
+
+        if (method_exists($notification, 'pushDevicesFor')) {
+            $this->deliverTo($notifiable, $notification, $notifiable->routeNotificationFor('WebPush', $notification), 1, $correlationId);
 
             return;
         }
@@ -63,13 +75,16 @@ class HubWebPushChannel extends WebPushChannel
         $healthy = $devices->reject(fn (HubPushSubscription $device): bool => $device->backoff_until?->isFuture() === true);
 
         $retry = $waiting;
+        foreach ($waiting as $device) {
+            PushDeliveryTrace::record($notification, $notifiable, $device, $correlationId, 1, null, 0);
+        }
         if ($healthy->isNotEmpty()) {
-            $this->deliverTo($notifiable, $notification, $healthy->values());
+            $this->deliverTo($notifiable, $notification, $healthy->values(), 1, $correlationId);
             $retry = $retry->merge($this->refusedRetryably($healthy->modelKeys()));
         }
 
         foreach ($retry as $device) {
-            $this->defer($notifiable, $notification, $device, 1);
+            $this->defer($notifiable, $notification, $device, 1, $correlationId);
         }
     }
 
@@ -77,8 +92,9 @@ class HubWebPushChannel extends WebPushChannel
      * Send to exactly these devices now (no back-off handling).
      *
      * @param  Collection<int, HubPushSubscription>  $subscriptions
+     * @param  int  $attempt  1 at the original send; n + 1 for the nth deferred retry (trace only).
      */
-    public function deliverTo(mixed $notifiable, Notification $notification, Collection $subscriptions): void
+    public function deliverTo(mixed $notifiable, Notification $notification, Collection $subscriptions, int $attempt = 1, ?string $correlationId = null): void
     {
         if ($subscriptions->isEmpty()) {
             return;
@@ -95,6 +111,8 @@ class HubWebPushChannel extends WebPushChannel
 
         $payload = json_encode($message->toArray());
         $options = $message->getOptions();
+        $correlationId ??= PushDeliveryTrace::correlationIdFor($notification);
+        $startedAt = hrtime(true);
 
         foreach ($subscriptions as $subscription) {
             $this->webPush->queueNotification(new Subscription(
@@ -111,16 +129,24 @@ class HubWebPushChannel extends WebPushChannel
             $device = $subscriptions->first(fn (HubPushSubscription $candidate): bool => $candidate->endpoint === $report->getEndpoint());
 
             if ($device instanceof HubPushSubscription) {
+                // Traced before the report is handled: a 404/410 deletes the device, and nothing that
+                // goes wrong while recording may hide the attempt. Time is measured to this answer.
+                if ($notifiable instanceof User) {
+                    PushDeliveryTrace::record($notification, $notifiable, $device, $correlationId, $attempt, $report, (int) round((hrtime(true) - $startedAt) / 1_000_000));
+                }
                 $this->reportHandler->handleReport($report, $device, $message);
             }
         }
     }
 
     /** Re-send to one device when its back-off ends. */
-    public function defer(User $user, Notification $notification, HubPushSubscription $device, int $attempt): void
+    public function defer(User $user, Notification $notification, HubPushSubscription $device, int $attempt, ?string $correlationId = null): void
     {
+        $correlationId ??= PushDeliveryTrace::correlationIdFor($notification);
+
         if ($attempt > self::MAX_DEFERRALS) {
             Log::warning('Push alert given up after repeated retryable refusals', [
+                'correlation_id' => $correlationId,
                 'user_id' => $user->getKey(),
                 'subscription_id' => $device->getKey(),
                 'notification' => $notification::class,
@@ -129,7 +155,7 @@ class HubWebPushChannel extends WebPushChannel
             return;
         }
 
-        $job = DeliverDeferredPush::dispatch($notification, (int) $user->getKey(), (int) $device->getKey(), $attempt);
+        $job = DeliverDeferredPush::dispatch($notification, (int) $user->getKey(), (int) $device->getKey(), $attempt, $correlationId);
         if ($device->backoff_until !== null) {
             $job->delay($device->backoff_until);
         }

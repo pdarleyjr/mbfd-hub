@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\HubPushSubscription;
 use App\Models\User;
 use App\Notifications\TestPushNotification;
+use App\Services\Notifications\PushDeliveryTrace;
+use App\Services\Notifications\PushDeviceStatus;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -31,29 +33,52 @@ class TestNotificationController extends Controller
         $validated = $request->validate(['endpoint' => ['nullable', 'string', 'max:500']]);
         $endpoints = is_string($validated['endpoint'] ?? null) ? [$validated['endpoint']] : null;
 
-        $devices = $user->pushSubscriptions()
-            ->when($endpoints !== null, fn ($query) => $query->whereIn('endpoint', $endpoints))
-            ->count();
-        if ($devices === 0) {
+        $own = fn () => $user->pushSubscriptions()
+            ->when($endpoints !== null, fn ($query) => $query->whereIn('endpoint', $endpoints));
+
+        $targeted = $own()->get();
+        if ($targeted->isEmpty()) {
             return response()->json(['error' => 'No push devices found. Turn on alerts for this device first.'], 400);
         }
 
         $startedAt = now()->subSecond();
         $user->notifyNow(new TestPushNotification($endpoints));
 
+        // A push service that answers 404/410 gets the device removed, so it is looked up again by id:
+        // a device that is gone is reported as needing setup, never silently left out of the answer.
+        $after = $own()->get()->keyBy(fn (HubPushSubscription $device): int => (int) $device->getKey());
+
         return response()->json([
             'success' => true,
             'message' => 'Test notification sent.',
-            'devices' => $user->pushSubscriptions()
-                ->when($endpoints !== null, fn ($query) => $query->whereIn('endpoint', $endpoints))
-                ->get()
-                ->map(fn (HubPushSubscription $device): array => [
-                    'label' => $device->device_label ?? 'Unknown device',
-                    'accepted' => $device->last_success_at !== null && $device->last_success_at->greaterThan($startedAt),
-                    'failure' => $device->last_failure_at !== null && $device->last_failure_at->greaterThan($startedAt)
-                        ? $device->last_failure_reason
-                        : null,
-                ])
+            'note' => PushDeviceStatus::EXPLANATION,
+            'devices' => $targeted
+                ->map(function (HubPushSubscription $before) use ($after, $startedAt): array {
+                    $provider = PushDeliveryTrace::providerFamily($before->endpoint);
+                    $device = $after->get((int) $before->getKey());
+
+                    if ($device === null) {
+                        return [
+                            'label' => $before->device_label ?? 'Unknown device',
+                            'accepted' => false,
+                            'failure' => 'subscription_expired',
+                            'provider' => $provider,
+                            'status' => PushDeviceStatus::SETUP_NEEDED,
+                        ];
+                    }
+
+                    $accepted = $device->last_success_at !== null && $device->last_success_at->greaterThan($startedAt);
+
+                    return [
+                        'label' => $device->device_label ?? 'Unknown device',
+                        'accepted' => $accepted,
+                        'failure' => $device->last_failure_at !== null && $device->last_failure_at->greaterThan($startedAt)
+                            ? $device->last_failure_reason
+                            : null,
+                        'provider' => $provider,
+                        'status' => $accepted ? PushDeviceStatus::ACCEPTED : PushDeviceStatus::for($device),
+                    ];
+                })
                 ->values(),
         ]);
     }
