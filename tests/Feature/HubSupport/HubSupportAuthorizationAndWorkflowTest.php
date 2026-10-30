@@ -363,7 +363,7 @@ final class HubSupportAuthorizationAndWorkflowTest extends TestCase
             ->assertDontSee('resolution_summary', false);
     }
 
-    public function test_only_authorized_and_opted_in_admins_receive_submission_alerts(): void
+    public function test_only_authorized_admins_who_have_not_turned_it_off_receive_submission_alerts(): void
     {
         $reporter = User::factory()->create(['account_status' => AccountStatus::Active]);
         $subscribedUnauthorized = User::factory()->create(['account_status' => AccountStatus::Active]);
@@ -375,6 +375,11 @@ final class HubSupportAuthorizationAndWorkflowTest extends TestCase
                 'database_enabled' => true, 'webpush_enabled' => false, 'email_enabled' => false,
             ]);
         }
+        // On by default for the authorized, so "off" is a saved choice to turn every channel off.
+        UserNotificationSubscription::query()->create([
+            'user_id' => $authorizedOff->id, 'event_key' => User::NOTIFICATION_PREFERENCE_HUB_SUPPORT_TICKETS,
+            'database_enabled' => false, 'webpush_enabled' => false, 'email_enabled' => false,
+        ]);
         foreach ([$authorizedOff, $authorizedOn] as $user) {
             $user->givePermissionTo(Permission::findOrCreate('admin.access', 'web'));
             $user->givePermissionTo(Permission::findOrCreate('admin.support.view', 'web'));

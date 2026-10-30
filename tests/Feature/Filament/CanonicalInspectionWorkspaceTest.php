@@ -101,25 +101,25 @@ final class CanonicalInspectionWorkspaceTest extends TestCase
         $this->assertSame($canonical, $checkouts[0]['url']);
     }
 
-    public function test_a_new_checkout_sends_no_default_alert_and_reviewer_alerts_link_to_the_canonical_page(): void
+    public function test_a_new_checkout_alerts_only_reviewers_who_have_not_turned_it_off_and_reviewer_alerts_link_to_the_canonical_page(): void
     {
         Notification::fake();
-        // A current reviewer with an old `vehicle_inspections` row: neither the row nor the role triggers a per-checkout
-        // alert. The only per-checkout alert is the opt-in "daily_checkout_every_submission" category
-        // (tests/Feature/Notifications/EveryDailyCheckoutAlertTest.php), and it has its own row.
+        // A reviewer who turned "Every Daily Checkout" off keeps hearing nothing per checkout, whatever their old
+        // `vehicle_inspections` row says. The category is in-app on by default (tests/Feature/Notifications/EveryDailyCheckoutAlertTest.php).
         $recipient = $this->userWithRole('super_admin');
         UserNotificationSubscription::query()->create([
             'user_id' => $recipient->id,
             'event_key' => User::NOTIFICATION_PREFERENCE_VEHICLE_INSPECTIONS,
             'database_enabled' => true, 'webpush_enabled' => false, 'email_enabled' => false,
         ]);
-
-        $optedIn = $this->userWithRole('super_admin');
         UserNotificationSubscription::query()->create([
-            'user_id' => $optedIn->id,
+            'user_id' => $recipient->id,
             'event_key' => User::NOTIFICATION_PREFERENCE_DAILY_CHECKOUT_EVERY_SUBMISSION,
-            'database_enabled' => true, 'webpush_enabled' => false, 'email_enabled' => false,
+            'database_enabled' => false, 'webpush_enabled' => false, 'email_enabled' => false,
         ]);
+
+        // A reviewer who never chose anything gets the in-app default.
+        $optedIn = $this->userWithRole('super_admin');
 
         $inspection = $this->inspection();
 
