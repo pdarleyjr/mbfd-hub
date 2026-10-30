@@ -35,6 +35,8 @@ export default defineConfig({
                 'resources/js/training-roster/main.tsx',
                 'resources/css/take-home-inspection.css',
                 'resources/js/take-home-inspection.js',
+                'resources/css/daily-roster.css',
+                'resources/js/daily-roster.js',
             ],
             refresh: true,
         }),

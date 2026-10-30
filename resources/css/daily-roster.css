@@ -1,0 +1,525 @@
+/*
+ * Daily Roster page. Tokens only (mbfd-theme.css). One DOM: a real table from 1024px, seat cards
+ * below it (two columns from 640px, one column on phones). Glass panels hold white wells.
+ */
+
+[data-hub-ui="2"] .roster-main {
+    max-width: 1280px;
+    margin-inline: auto;
+    padding: 16px 16px 32px;
+}
+
+@media (min-width: 640px) {
+    [data-hub-ui="2"] .roster-main { padding: 24px 24px 48px; }
+}
+
+[data-hub-ui="2"] .roster-main .hub-btn { min-height: 44px; }
+
+[data-hub-ui="2"] .roster-main .hub-tag {
+    min-height: 24px;
+    padding: 2px 8px;
+    justify-content: center;
+    text-align: center;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+[data-hub-ui="2"] .roster-main [hidden] { display: none !important; }
+
+/* Header */
+
+[data-hub-ui="2"] .roster-header { align-items: flex-start; margin-bottom: 16px; }
+[data-hub-ui="2"] .roster-header__text { flex: 1 1 320px; min-width: 0; }
+
+[data-hub-ui="2"] .roster-header__division {
+    margin: 4px 0 0;
+    color: rgb(var(--hub2-n-600));
+    font-size: 14px;
+    line-height: 20px;
+}
+
+[data-hub-ui="2"] .roster-facts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 20px;
+    margin: 8px 0 0;
+    font-size: 13px;
+    line-height: 20px;
+}
+
+[data-hub-ui="2"] .roster-facts > div { display: flex; flex-wrap: wrap; gap: 0 6px; min-width: 0; }
+[data-hub-ui="2"] .roster-facts dt { color: rgb(var(--hub2-n-600)); }
+[data-hub-ui="2"] .roster-facts dd { margin: 0; color: rgb(var(--hub2-n-900)); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+[data-hub-ui="2"] .roster-header__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    min-width: 0;
+}
+
+[data-hub-ui="2"] .roster-connection {
+    flex-basis: 100%;
+    margin: 0;
+    color: rgb(var(--hub2-n-600));
+    font-size: 13px;
+    line-height: 20px;
+}
+
+@media (min-width: 640px) {
+    [data-hub-ui="2"] .roster-header__actions { justify-content: flex-end; max-width: 380px; }
+    [data-hub-ui="2"] .roster-connection { text-align: right; }
+}
+
+[data-hub-ui="2"] .roster-notice {
+    margin: 0 0 16px;
+    padding: 10px 12px;
+    font-size: 14px;
+    line-height: 20px;
+}
+
+[data-hub-ui="2"] .roster-empty__action { margin-top: 12px; }
+
+/* Summary cards */
+
+[data-hub-ui="2"] .roster-summary {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    margin: 0 0 12px;
+    padding: 0;
+    list-style: none;
+}
+
+@media (min-width: 1024px) {
+    [data-hub-ui="2"] .roster-summary { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+}
+
+[data-hub-ui="2"] .roster-summary__card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+}
+
+[data-hub-ui="2"] .roster-summary__card > div { min-width: 0; }
+
+[data-hub-ui="2"] .roster-summary__icon {
+    display: none;
+    flex: none;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    border-radius: var(--hub-radius-pill);
+    background: rgb(var(--hub2-action-tint));
+    color: rgb(var(--hub2-action));
+}
+
+[data-hub-ui="2"] .roster-summary__icon svg { width: 22px; height: 22px; }
+
+@media (min-width: 420px) {
+    [data-hub-ui="2"] .roster-summary__icon { display: grid; }
+}
+
+[data-hub-ui="2"] .roster-summary__label { margin: 0; color: rgb(var(--hub2-n-600)); font-size: 13px; line-height: 18px; }
+[data-hub-ui="2"] .roster-summary p { margin: 0; }
+
+[data-hub-ui="2"] .roster-summary__value {
+    color: rgb(var(--hub2-header));
+    font-size: 18px;
+    line-height: 24px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+[data-hub-ui="2"] .roster-summary__detail { color: rgb(var(--hub2-n-600)); font-size: 12px; line-height: 16px; }
+
+/* Dates */
+
+[data-hub-ui="2"] .roster-dates {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 4px;
+    margin: 0 0 8px;
+}
+
+[data-hub-ui="2"] .roster-dates__next { margin-left: auto; }
+
+/* Legend */
+
+[data-hub-ui="2"] .roster-legend { margin-bottom: 12px; }
+
+[data-hub-ui="2"] .roster-legend__summary,
+[data-hub-ui="2"] .roster-section__summary {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 44px;
+    list-style: none;
+    cursor: pointer;
+    border-radius: var(--hub-radius-card);
+}
+
+[data-hub-ui="2"] .roster-legend__summary::-webkit-details-marker,
+[data-hub-ui="2"] .roster-section__summary::-webkit-details-marker { display: none; }
+
+[data-hub-ui="2"] .roster-legend__summary:focus-visible,
+[data-hub-ui="2"] .roster-section__summary:focus-visible {
+    outline: 2px solid rgb(var(--hub2-focus));
+    outline-offset: 2px;
+}
+
+[data-hub-ui="2"] .roster-legend__summary {
+    justify-content: space-between;
+    padding: 4px 16px;
+    color: rgb(var(--hub2-header));
+    font-size: 14px;
+    font-weight: 700;
+}
+
+[data-hub-ui="2"] .roster-chevron {
+    width: 20px;
+    height: 20px;
+    flex: none;
+    color: rgb(var(--hub2-n-600));
+    transition: transform var(--hub2-duration-fast) var(--hub2-ease-enter);
+}
+
+[data-hub-ui="2"] details[open] > summary > .roster-chevron { transform: rotate(180deg); }
+
+@media (prefers-reduced-motion: reduce) {
+    [data-hub-ui="2"] .roster-chevron { transition: none; }
+}
+
+[data-hub-ui="2"] .roster-legend__list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 20px;
+    margin: 0;
+    padding: 4px 16px 12px;
+    list-style: none;
+}
+
+[data-hub-ui="2"] .roster-legend__list li { display: flex; align-items: center; gap: 6px; min-width: 0; }
+[data-hub-ui="2"] .roster-legend__meaning { color: rgb(var(--hub2-n-600)); font-size: 13px; line-height: 18px; }
+
+/* Status pills: the text is the signal, the colour only helps scanning. */
+
+[data-hub-ui="2"] .roster-pill--sp { border-color: currentColor; background: rgb(var(--hub-roster-sp-bg)); color: rgb(var(--hub-roster-sp-ink)); }
+[data-hub-ui="2"] .roster-pill--ot { border-color: currentColor; background: rgb(var(--hub-roster-ot-bg)); color: rgb(var(--hub-roster-ot-ink)); }
+[data-hub-ui="2"] .roster-pill--aday { border-color: currentColor; background: rgb(var(--hub-roster-aday-bg)); color: rgb(var(--hub-roster-aday-ink)); }
+[data-hub-ui="2"] .roster-pill--vaca { border-color: currentColor; background: rgb(var(--hub-roster-vaca-bg)); color: rgb(var(--hub-roster-vaca-ink)); }
+[data-hub-ui="2"] .roster-pill--evac { border-color: currentColor; background: rgb(var(--hub-roster-evac-bg)); color: rgb(var(--hub-roster-evac-ink)); }
+[data-hub-ui="2"] .roster-pill--milnp { border-color: currentColor; background: rgb(var(--hub-roster-milnp-bg)); color: rgb(var(--hub-roster-milnp-ink)); }
+[data-hub-ui="2"] .roster-pill--2wxon { border-color: currentColor; background: rgb(var(--hub-roster-2wxon-bg)); color: rgb(var(--hub-roster-2wxon-ink)); }
+[data-hub-ui="2"] .roster-pill--2wxeon { border-color: currentColor; background: rgb(var(--hub-roster-2wxeon-bg)); color: rgb(var(--hub-roster-2wxeon-ink)); }
+[data-hub-ui="2"] .roster-pill--other { border-color: rgb(var(--hub-roster-other-ink) / 0.4); background: rgb(var(--hub-roster-other-bg)); color: rgb(var(--hub-roster-other-ink)); }
+[data-hub-ui="2"] .roster-pill--unknown,
+[data-hub-ui="2"] .roster-pill--vacant { border: 1px dashed rgb(var(--hub-roster-unknown-border)); background: rgb(var(--hub-roster-unknown-bg)); color: rgb(var(--hub-roster-unknown-ink)); }
+
+/* Search and filter */
+
+[data-hub-ui="2"] .roster-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px 12px;
+    margin-bottom: 12px;
+    padding: 12px;
+}
+
+@media (min-width: 640px) {
+    [data-hub-ui="2"] .roster-toolbar { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+    [data-hub-ui="2"] .roster-toolbar__actions { grid-column: 1 / -1; }
+}
+
+@media (min-width: 1024px) {
+    [data-hub-ui="2"] .roster-toolbar { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; align-items: end; }
+    [data-hub-ui="2"] .roster-toolbar__actions { grid-column: auto; }
+    [data-hub-ui="2"] .roster-toolbar__count { grid-column: 1 / -1; }
+}
+
+[data-hub-ui="2"] .roster-field { display: grid; gap: 4px; min-width: 0; }
+[data-hub-ui="2"] .roster-field label { color: rgb(var(--hub2-n-900)); font-size: 13px; line-height: 18px; font-weight: 600; }
+
+[data-hub-ui="2"] .roster-field :is(input, select) {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    padding: 8px 12px;
+    border: 1px solid rgb(var(--hub2-n-400));
+    border-radius: var(--hub-radius-control);
+    background: rgb(var(--hub-well));
+    color: rgb(var(--hub2-n-900));
+    font-size: 16px;
+}
+
+[data-hub-ui="2"] .roster-field :is(input, select):focus-visible {
+    outline: 2px solid rgb(var(--hub2-focus));
+    outline-offset: 1px;
+}
+
+[data-hub-ui="2"] .roster-field input::placeholder { color: rgb(var(--hub2-n-500)); }
+
+[data-hub-ui="2"] .roster-toolbar__actions { display: flex; flex-wrap: wrap; gap: 4px; }
+
+[data-hub-ui="2"] .roster-toolbar__count {
+    margin: 0;
+    color: rgb(var(--hub2-n-600));
+    font-size: 13px;
+    line-height: 20px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Sections */
+
+[data-hub-ui="2"] .roster-sections { display: grid; gap: 12px; min-width: 0; }
+[data-hub-ui="2"] .roster-section { min-width: 0; overflow: hidden; }
+
+[data-hub-ui="2"] .roster-section__summary {
+    min-height: 56px;
+    padding: 8px 12px;
+}
+
+[data-hub-ui="2"] .roster-section__summary:hover { background: rgb(var(--hub-well) / 0.5); }
+[data-hub-ui="2"] .roster-section__summary:focus-visible { outline-offset: -2px; }
+
+[data-hub-ui="2"] .roster-section__text {
+    display: flex;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0 12px;
+    min-width: 0;
+}
+
+[data-hub-ui="2"] .roster-section__title {
+    margin: 0;
+    min-width: 0;
+    color: rgb(var(--hub2-header));
+    font-size: 15px;
+    line-height: 20px;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+@media (min-width: 640px) {
+    [data-hub-ui="2"] .roster-section__title { font-size: 16px; line-height: 22px; }
+}
+
+[data-hub-ui="2"] .roster-section__count {
+    flex: none;
+    color: rgb(var(--hub2-n-600));
+    font-size: 13px;
+    line-height: 20px;
+    font-variant-numeric: tabular-nums;
+}
+
+[data-hub-ui="2"] .roster-unit {
+    display: flex;
+    flex: none;
+    align-items: flex-end;
+    justify-content: center;
+    width: 68px;
+    height: 36px;
+}
+
+[data-hub-ui="2"] .roster-unit img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    object-position: center bottom;
+}
+
+/* Opaque photographs sit in a white well; only the transparent cutouts sit directly on the panel. */
+[data-hub-ui="2"] .roster-unit--photo {
+    overflow: hidden;
+    padding: 2px;
+    border: 1px solid rgb(var(--hub-glass-border));
+    border-radius: var(--hub-radius-control);
+    background: rgb(var(--hub-well));
+}
+
+[data-hub-ui="2"] .roster-unit--pictogram { align-items: center; color: rgb(var(--hub2-n-600)); }
+[data-hub-ui="2"] .roster-unit--pictogram svg { width: 28px; height: 28px; }
+
+/* Roster table: desktop default */
+
+[data-hub-ui="2"] .roster-section__body { position: relative; border-top: 1px solid rgb(var(--hub-glass-border)); }
+
+[data-hub-ui="2"] .roster-table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    background: rgb(var(--hub-well));
+    font-size: 14px;
+    line-height: 20px;
+}
+
+[data-hub-ui="2"] .roster-table th {
+    padding: 8px 12px;
+    background: rgb(var(--hub2-n-50));
+    color: rgb(var(--hub2-n-600));
+    font-size: 13px;
+    font-weight: 600;
+    text-align: left;
+}
+
+[data-hub-ui="2"] .roster-col--rank { width: 15%; }
+[data-hub-ui="2"] .roster-col--id { width: 8%; }
+[data-hub-ui="2"] .roster-col--status { width: 14%; }
+[data-hub-ui="2"] .roster-col--time { width: 8%; }
+
+[data-hub-ui="2"] .roster-cell {
+    padding: 8px 12px;
+    vertical-align: top;
+    overflow-wrap: anywhere;
+    color: rgb(var(--hub2-n-900));
+}
+
+[data-hub-ui="2"] .roster-cell--id,
+[data-hub-ui="2"] .roster-cell--time { font-variant-numeric: tabular-nums; }
+
+[data-hub-ui="2"] .roster-seat { border-top: 1px solid rgb(var(--hub2-n-200)); }
+[data-hub-ui="2"] .roster-row + .roster-row { border-top: 1px dashed rgb(var(--hub2-n-200)); }
+
+[data-hub-ui="2"] .roster-member__name {
+    display: block;
+    color: rgb(var(--hub2-n-900));
+    font-weight: 600;
+}
+
+[data-hub-ui="2"] .roster-row--vacant .roster-member__name { color: rgb(var(--hub2-n-600)); font-style: italic; }
+
+[data-hub-ui="2"] .roster-member__certifications,
+[data-hub-ui="2"] .roster-member__source {
+    display: block;
+    margin-top: 2px;
+    color: rgb(var(--hub2-n-600));
+    font-size: 13px;
+    line-height: 18px;
+    overflow-wrap: anywhere;
+}
+
+[data-hub-ui="2"] .roster-member__meta,
+[data-hub-ui="2"] .roster-cell__label { display: none; }
+
+/* A continuation row keeps its rank for screen readers; a filtered row shows it, since the first row may be hidden. */
+[data-hub-ui="2"] .roster-cell--rank .roster-rank-continued {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+[data-hub-ui="2"] .is-filtering .roster-cell--rank .roster-rank-continued {
+    position: static;
+    width: auto;
+    height: auto;
+    clip-path: none;
+    white-space: normal;
+}
+
+/* Cards below 1024px */
+
+@media (max-width: 1023.98px) {
+    [data-hub-ui="2"] .roster-table {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        padding: 8px;
+        background: transparent;
+    }
+
+    [data-hub-ui="2"] .roster-table thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+    }
+
+    [data-hub-ui="2"] .roster-seat {
+        display: block;
+        min-width: 0;
+        border: 1px solid rgb(var(--hub-glass-border));
+        border-radius: var(--hub-radius-control);
+        background: rgb(var(--hub-well));
+    }
+
+    [data-hub-ui="2"] .roster-row {
+        position: relative;
+        display: grid;
+        grid-template-columns: minmax(0, 1.5fr) repeat(3, minmax(0, 1fr));
+        gap: 8px 4px;
+        padding: 10px 12px;
+    }
+
+    [data-hub-ui="2"] .roster-cell { display: block; padding: 0; min-width: 0; }
+
+    [data-hub-ui="2"] .roster-cell--member { grid-column: 1 / -1; }
+
+    /* Rank and ID move into the name line; the cells stay for screen readers. */
+    [data-hub-ui="2"] .roster-cell--rank,
+    [data-hub-ui="2"] .roster-cell--id {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+    }
+
+    [data-hub-ui="2"] .roster-member__meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0 12px;
+        margin-top: 2px;
+        color: rgb(var(--hub2-n-800));
+        font-size: 13px;
+        line-height: 18px;
+    }
+
+    [data-hub-ui="2"] .roster-member__meta .roster-rank-continued { display: none; }
+    [data-hub-ui="2"] .is-filtering .roster-member__meta .roster-rank-continued { display: inline; }
+
+    [data-hub-ui="2"] .roster-cell__label {
+        display: block;
+        margin-bottom: 2px;
+        color: rgb(var(--hub2-n-600));
+        font-size: 12px;
+        line-height: 16px;
+    }
+
+    [data-hub-ui="2"] .roster-cell--status,
+    [data-hub-ui="2"] .roster-cell--time {
+        padding: 6px 4px;
+        border-radius: var(--hub-radius-tag);
+        background: rgb(var(--hub2-n-50));
+        text-align: center;
+    }
+
+    [data-hub-ui="2"] .roster-cell--time { font-weight: 600; }
+}
+
+@media (max-width: 639.98px) {
+    [data-hub-ui="2"] .roster-table { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 374.98px) {
+    [data-hub-ui="2"] .roster-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    [data-hub-ui="2"] .roster-cell--status { grid-column: 1 / -1; }
+}
+
+/* Browser print: the shell hides itself in hub-shell.css; the controls go too. */
+@media print {
+    [data-hub-ui="2"] .roster-toolbar,
+    [data-hub-ui="2"] .roster-dates,
+    [data-hub-ui="2"] .roster-header__actions button,
+    [data-hub-ui="2"] .roster-connection { display: none !important; }
+    [data-hub-ui="2"] .roster-section { break-inside: auto; box-shadow: none; }
+    [data-hub-ui="2"] .roster-seat { break-inside: avoid; }
+}

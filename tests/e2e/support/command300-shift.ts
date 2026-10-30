@@ -29,6 +29,16 @@ export const actingChief = (shift: OnDuty['shift'], name: string, rank: string |
 );
 export const UNSET_DUTY: Duty = { shift: null, source: 'unknown', resolved: false, name: null, rank: null, acting_until: null, acting_request_id: null };
 
+/** 09:14 ET on a fixed day, so the note's clock text is the same wherever the test runs. */
+export const ROSTER_AS_OF = '2026-10-30T13:14:15+00:00';
+export const rosterChief = (shift: OnDuty['shift'] = 'B', name = 'Jane Smith', rank: string | null = 'Division Chief', identity: 'linked' | 'unlinked' = 'linked'): Duty => (
+  { ...chiefOnDuty(shift, name, rank), source: 'telestaff', as_of: ROSTER_AS_OF, freshness: 'current', identity, reason: null }
+);
+export const seatAwaiting = (freshness: 'awaiting' | 'delayed'): Duty => ({ ...chiefOnDuty('B'), as_of: null, freshness, identity: null, reason: null });
+export const rosterUnknown = (reason: 'conflict' | 'needs_review' | 'no_working_row'): Duty => (
+  { shift: 'B', source: 'unknown', resolved: false, name: null, rank: null, acting_until: null, acting_request_id: null, as_of: ROSTER_AS_OF, freshness: 'current', identity: null, reason }
+);
+
 export const noActing300 = (overrides: Partial<ActingState> = {}): ActingState => ({
   role: 'command_300', can_request: true, can_approve: false, mine: null, pending: [],
   choices: { '12h': inHours(12), '24h': inHours(24) }, ...overrides,

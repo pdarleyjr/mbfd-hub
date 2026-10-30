@@ -47,9 +47,10 @@ test('entitled home exposes the exact unified Quick Access destinations', async 
   await expect(page.getByRole('heading', { name: 'Quick Access' })).toBeVisible();
 
   const cards = page.locator('[data-quick-access-card]');
-  await expect(cards).toHaveCount(3);
+  await expect(cards).toHaveCount(4);
   await expect(cards).toHaveText([
     /Station \/ Vehicles \/ Equipment/,
+    /Daily Roster/,
     /Employee Portal/,
     /Additional Links/,
   ]);

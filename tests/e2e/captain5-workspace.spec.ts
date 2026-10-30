@@ -30,6 +30,11 @@ type Duty = Omit<OnDuty, 'duty_date'>;
 const bidHolder = (shift: OnDuty['shift'] = 'B', name = 'Alex Rivera'): Duty => ({ shift, source: 'bid_holder', resolved: true, name, rank: 'Capt.', acting_until: null, acting_request_id: null });
 const acting = (shift: OnDuty['shift'], name: string, until = inHours(10)): Duty => ({ shift, source: 'acting', resolved: true, name, rank: 'Lt.', acting_until: until, acting_request_id: 8 });
 const UNSET: Duty = { shift: null, source: 'unknown', resolved: false, name: null, rank: null, acting_until: null, acting_request_id: null };
+/** 09:14 ET on a fixed day, so the note's clock text is the same wherever the test runs. */
+const ROSTER_AS_OF = '2026-10-30T13:14:15+00:00';
+const rosterOfficer = (name = 'Jordan Lee', identity: 'linked' | 'unlinked' = 'linked'): Duty => ({ ...bidHolder('B', name), source: 'telestaff', as_of: ROSTER_AS_OF, freshness: 'current', identity, reason: null });
+const seatAwaiting = (freshness: 'awaiting' | 'delayed'): Duty => ({ ...bidHolder('B'), as_of: null, freshness, identity: null, reason: null });
+const rosterUnknown = (reason: 'conflict' | 'needs_review' | 'no_working_row'): Duty => ({ ...UNSET, shift: 'B', as_of: ROSTER_AS_OF, freshness: 'current', identity: null, reason });
 
 const noActing = (overrides: Partial<ActingState> = {}): ActingState => ({
   can_approve: false, mine: null, pending: [], choices: { '12h': inHours(12), '24h': inHours(24) }, ...overrides,
@@ -373,6 +378,88 @@ test.describe('station list card', () => {
     await offline.goto('/daily/stations');
     await expect(offline.getByTestId('daily-station-grid')).toBeVisible();
     await expect(offline.getByTestId('daily-captain5-card')).toHaveCount(0);
+  });
+});
+
+test.describe('where the Captain 5 name comes from', () => {
+  const cardDuty = (page: Page) => page.getByTestId('daily-captain5-duty');
+  const cardNote = (page: Page) => page.getByTestId('daily-captain5-duty-note');
+  const pageLine = (page: Page) => page.getByTestId('captain5-duty-line');
+  const pageNote = (page: Page) => page.getByTestId('captain5-duty-note');
+
+  test('an old answer with none of the new fields shows no note on the card or the page', async ({ page }) => {
+    await open(page, newServer(), '/daily/stations');
+    await expect(cardDuty(page)).toHaveText('B Shift Captain 5: Alex Rivera');
+    await expect(cardNote(page)).toHaveCount(0);
+
+    await page.goto('/daily/captain-5');
+    await expect(pageLine(page)).toHaveText('B Shift Captain 5: Alex Rivera');
+    await expect(pageNote(page)).toHaveCount(0);
+  });
+
+  test('an approved acting member shows no note', async ({ page }) => {
+    await open(page, newServer({ onDuty: { ...acting('C', 'Jordan Lee'), as_of: null, freshness: 'not_applicable', identity: null, reason: null } }));
+    await expect(pageLine(page)).toHaveText(/^C Shift Acting Captain 5: Jordan Lee until /);
+    await expect(pageNote(page)).toHaveCount(0);
+  });
+
+  test('the roster keeps the Tag and "Your access" as they are and adds when it was updated', async ({ page }) => {
+    await open(page, newServer({ onDuty: rosterOfficer() }));
+    await expect(pageLine(page)).toHaveText('B Shift Captain 5: Jordan Lee');
+    await expect(pageLine(page).locator('.hub-tag')).toHaveClass(/hub-tag--info/);
+    await expect(pageNote(page)).toHaveText('TeleStaff roster, updated 9:14 AM');
+    await expect(page.getByTestId('captain5-authority')).toHaveText('Your access: Captain 5 (on duty)');
+
+    await page.goto('/daily/stations');
+    await expect(cardDuty(page)).toHaveText('B Shift Captain 5: Jordan Lee');
+    await expect(cardNote(page)).toHaveText('TeleStaff roster, updated 9:14 AM');
+  });
+
+  test('a person not matched to a Hub member says so', async ({ page }) => {
+    await open(page, newServer({ onDuty: rosterOfficer('LEE, JORDAN', 'unlinked') }));
+    await expect(pageNote(page)).toHaveText('TeleStaff roster. Not matched to a Hub member.');
+  });
+
+  test('before the roster arrives and once it is late the seat says so', async ({ page }) => {
+    await open(page, newServer({ onDuty: seatAwaiting('awaiting') }));
+    await expect(pageLine(page)).toHaveText('B Shift Captain 5: Alex Rivera');
+    await expect(pageNote(page)).toHaveText("Bid seat. Today's roster has not arrived.");
+
+    const late = await page.context().newPage();
+    await open(late, newServer({ onDuty: seatAwaiting('delayed') }));
+    await expect(pageNote(late)).toHaveText("Bid seat. Today's roster is late.");
+  });
+
+  test('a conflict: the Tag says the roster needs review and only the page links to the Daily Roster', async ({ page }) => {
+    await open(page, newServer({ onDuty: rosterUnknown('conflict') }));
+    await expect(pageLine(page)).toHaveText('B Shift Captain 5: roster needs review');
+    await expect(pageLine(page).locator('.hub-tag')).toHaveClass(/hub-tag--warning/);
+    await expect(pageNote(page).getByRole('link', { name: 'Check the Daily Roster.' })).toHaveAttribute('href', '/daily-roster');
+
+    await page.goto('/daily/stations');
+    await expect(cardDuty(page)).toHaveText('B Shift Captain 5: roster needs review');
+    await expect(cardNote(page)).toHaveText('Check the Daily Roster.');
+    await expect(page.getByTestId('daily-captain5-card').locator('a')).toHaveCount(0);
+  });
+
+  test('the card updates when the page comes back into view and survives a failed refresh', async ({ page }) => {
+    const server = newServer({ onDuty: seatAwaiting('awaiting') });
+    await open(page, server, '/daily/stations');
+    await expect(cardNote(page)).toHaveText("Bid seat. Today's roster has not arrived.");
+
+    server.onDuty = rosterOfficer();
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await expect(cardDuty(page)).toHaveText('B Shift Captain 5: Jordan Lee');
+    await expect(cardNote(page)).toHaveText('TeleStaff roster, updated 9:14 AM');
+
+    server.summaryStatus = 500;
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await expect(cardDuty(page)).toHaveText('B Shift Captain 5: Jordan Lee');
+
+    // A refusal is different: the server has said this member may not see Captain 5 any more.
+    server.summaryStatus = 403;
+    await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+    await expect(page.getByTestId('daily-captain5-card')).toHaveCount(0);
   });
 });
 

@@ -19,6 +19,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Spatie\Permission\Models\Permission;
 use Tests\Feature\Captain5\Concerns\BuildsCaptain5World;
+use Tests\Support\DailyRosterSnapshotFactory;
 use Tests\TestCase;
 
 /**
@@ -78,6 +79,73 @@ final class Command300ShiftTest extends TestCase
         $this->getJson(self::SHIFT)->assertOk()->assertJsonPath('on_duty.shift', 'C')
             ->assertJsonPath('on_duty.resolved', false)->assertJsonPath('on_duty.name', null)
             ->assertJsonPath('on_duty.source', OnDutyCaptain5::SOURCE_UNKNOWN);
+    }
+
+    public function test_with_the_card_display_off_the_answer_has_exactly_todays_shape_and_ignores_the_roster(): void
+    {
+        $rosterChief = $this->officer('Division Chief', 'Roster Chief');
+        DailyRosterSnapshotFactory::publish('2026-10-20', ['Suppression / Division Chief 300' => [['employee_id' => $rosterChief->employee_id, 'rank' => 'DC']]]);
+        config()->set('daily_roster.card_display_enabled', false);
+
+        $this->actAs($this->officer('Captain', 'Viewing Captain'));
+        $onDuty = $this->getJson(self::SHIFT)->assertOk()->assertJsonPath('on_duty.name', 'Alpha Chief')->json('on_duty');
+
+        self::assertSame(['duty_date', 'shift', 'source', 'resolved', 'name', 'rank', 'acting_until', 'acting_request_id'], array_keys($onDuty));
+    }
+
+    public function test_the_card_shows_the_roster_acting_beats_it_and_the_display_returns_to_the_roster_when_acting_ends(): void
+    {
+        $rosterChief = $this->officer('Division Chief', 'Roster Chief');
+        DailyRosterSnapshotFactory::publish('2026-10-20', ['Suppression / Division Chief 300' => [['employee_id' => $rosterChief->employee_id, 'rank' => 'DC']]]);
+        config()->set('daily_roster.card_display_enabled', true);
+
+        $captain = $this->officer('Captain', 'Charlie Captain');
+        $this->actAs($captain);
+        $this->getJson(self::SHIFT)->assertOk()
+            ->assertJsonPath('on_duty.source', 'telestaff')
+            ->assertJsonPath('on_duty.name', 'Roster Chief')
+            ->assertJsonPath('on_duty.rank', 'Division Chief')
+            ->assertJsonPath('on_duty.freshness', 'current')
+            ->assertJsonPath('on_duty.identity', 'linked')
+            ->assertJsonPath('on_duty.reason', null);
+
+        // Asking changes nothing; approval does.
+        $request = app(Captain5ActingService::class)->request($captain, ['role' => 'command_300', 'kind' => 'act', 'duration' => '12h']);
+        $this->actAs($this->admin);
+        $this->postJson(self::ACTING.'/'.$request->id.'/approve', [])->assertOk()
+            ->assertJsonPath('on_duty.source', OnDutyCaptain5::SOURCE_ACTING)
+            ->assertJsonPath('on_duty.name', 'Charlie Captain')
+            ->assertJsonPath('on_duty.freshness', 'not_applicable')
+            ->assertJsonPath('on_duty.as_of', null);
+
+        $this->travelTo(CarbonImmutable::parse('2026-10-20 20:00:01', 'America/New_York'));
+        $this->forgetCaptain5Memo();
+        $this->actAs($captain);
+        $this->getJson(self::SHIFT)->assertOk()
+            ->assertJsonPath('on_duty.source', 'telestaff')
+            ->assertJsonPath('on_duty.name', 'Roster Chief');
+
+        // Whoever the card shows, 300 access still follows rank, seat and grants only.
+        self::assertSame(OnDutyCaptain5::SOURCE_BID, app(Captain5DutyRoster::class)->command300OnDuty()->source);
+    }
+
+    public function test_a_conflict_shows_nobody_and_the_seat_answer_is_untouched(): void
+    {
+        DailyRosterSnapshotFactory::publish('2026-10-20', ['Suppression / Division Chief 300' => [
+            ['employee_id' => '70001', 'rank' => 'DC'],
+            ['employee_id' => '70002', 'rank' => 'DC', 'seat' => 1],
+        ]]);
+        config()->set('daily_roster.card_display_enabled', true);
+
+        $this->actAs($this->officer('Captain', 'Viewing Captain'));
+        $this->getJson(self::SHIFT)->assertOk()
+            ->assertJsonPath('on_duty.source', OnDutyCaptain5::SOURCE_UNKNOWN)
+            ->assertJsonPath('on_duty.resolved', false)
+            ->assertJsonPath('on_duty.name', null)
+            ->assertJsonPath('on_duty.reason', 'conflict')
+            ->assertJsonPath('on_duty.shift', 'A');
+
+        self::assertSame('Alpha Chief', app(Captain5DutyRoster::class)->command300OnDuty()->toArray()['name']);
     }
 
     public function test_a_captain_asks_an_administrator_approves_and_the_display_ends_on_its_own(): void

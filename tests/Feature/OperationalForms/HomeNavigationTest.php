@@ -292,7 +292,7 @@ class HomeNavigationTest extends TestCase
 
         // The six are not repeated as standalone cards.
         $standalone = $xpath->query('//a[@data-quick-access-card]');
-        self::assertSame(['Station / Vehicles / Equipment', 'Employee Portal'], array_map(
+        self::assertSame(['Station / Vehicles / Equipment', 'Daily Roster', 'Employee Portal'], array_map(
             fn (\DOMNode $node): string => trim($xpath->query('.//*[contains(@class,"hub-tile__title")]', $node)->item(0)->textContent),
             iterator_to_array($standalone),
         ));

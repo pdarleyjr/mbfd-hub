@@ -341,6 +341,11 @@ Route::prefix('command-communications/department-updates')
         Route::post('/{update}/take-down', 'takeDown')->defaults('origin', 'command_300')->whereNumber('update')->name('take-down');
     });
 
+// Daily Roster change check. The controller applies DailyRosterAccess.
+Route::get('daily-roster/version', [\App\Http\Controllers\DailyRoster\DailyRosterController::class, 'version'])
+    ->middleware(['auth:sanctum', 'canonical.api', 'throttle:120,1'])
+    ->name('api.daily-roster.version');
+
 // The shift's 300 (Division Chief) shown on the 300 page and card, and "Acting as 300 today?".
 // Display only; the acting service re-checks who may ask and who may approve.
 Route::prefix('command-300')

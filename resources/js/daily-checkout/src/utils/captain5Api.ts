@@ -151,7 +151,7 @@ export function normalizeActing(raw: unknown): ActingState {
 
 export const normalizeOnDuty = (raw: unknown): OnDuty => {
   const duty = asRecord(raw) as unknown as OnDuty;
-  return { ...duty, acting_until: asIso(duty.acting_until), acting_request_id: typeof duty.acting_request_id === 'number' ? duty.acting_request_id : null };
+  return { ...duty, acting_until: asIso(duty.acting_until), acting_request_id: typeof duty.acting_request_id === 'number' ? duty.acting_request_id : null, as_of: asIso(duty.as_of) };
 };
 
 function normalizeWorkspace(raw: Record<string, unknown>): Workspace {

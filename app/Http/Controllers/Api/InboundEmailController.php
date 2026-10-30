@@ -15,6 +15,7 @@ final class InboundEmailController extends Controller
     {
         $email = $authenticator->persist($request);
 
-        return response()->json(['id' => $email->getKey()], 201);
+        // Null id: a redelivery of a roster email already processed and cleaned. Acknowledged, not stored.
+        return response()->json(['id' => $email?->getKey()], 201);
     }
 }

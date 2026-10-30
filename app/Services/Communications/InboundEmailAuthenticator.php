@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Communications;
 
 use App\Models\InboundEmail;
+use App\Services\DailyRoster\RosterImportRegistrar;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,7 +21,8 @@ use Throwable;
 
 final class InboundEmailAuthenticator
 {
-    public function persist(Request $request): InboundEmail
+    /** @return InboundEmail|null Null only when a cleaned roster email is redelivered: acknowledged, not stored. */
+    public function persist(Request $request): ?InboundEmail
     {
         $raw = $request->getContent();
         if (strlen($raw) > (int) config('communications.inbound.max_bytes', 5000000)) {
@@ -63,7 +65,7 @@ final class InboundEmailAuthenticator
         $storedPaths = [];
 
         try {
-            return DB::transaction(function () use ($nonce, $payload, $attachments, &$storedPaths): InboundEmail {
+            return DB::transaction(function () use ($nonce, $payload, $attachments, &$storedPaths): ?InboundEmail {
                 DB::table('inbound_email_nonces')->where('expires_at', '<=', now())->delete();
                 $inserted = DB::table('inbound_email_nonces')->insertOrIgnore([
                     'nonce' => $nonce,
@@ -73,6 +75,11 @@ final class InboundEmailAuthenticator
                 ]);
                 if (! $inserted) {
                     throw new ConflictHttpException('Inbound email replay rejected.');
+                }
+
+                $registrar = app(RosterImportRegistrar::class);
+                if ($registrar->isCleanedRedelivery($payload['message_id'])) {
+                    return null;
                 }
 
                 $html = is_string($payload['html'] ?? null) ? $payload['html'] : null;
@@ -90,11 +97,12 @@ final class InboundEmailAuthenticator
                     'in_reply_to' => app(EmailConversation::class)->messageId($payload['in_reply_to'] ?? null),
                     'references' => app(EmailConversation::class)->references($payload['references'] ?? []),
                     'processing_status' => 'received',
+                    'transport_evidence' => $this->transportEvidence($payload),
                 ]);
                 if ($email->wasRecentlyCreated) {
                     app(EmailConversation::class)->associateInbound($email);
                 }
-                if (! $email->wasRecentlyCreated || $attachments === []) {
+                if (! $email->wasRecentlyCreated) {
                     return $email;
                 }
 
@@ -114,7 +122,10 @@ final class InboundEmailAuthenticator
                         'path' => $path,
                     ];
                 }
-                $email->forceFill(['attachment_metadata' => $metadata])->save();
+                if ($metadata !== []) {
+                    $email->forceFill(['attachment_metadata' => $metadata])->save();
+                }
+                $registrar->register($email);
 
                 return $email;
             });
@@ -125,6 +136,36 @@ final class InboundEmailAuthenticator
 
             throw $exception;
         }
+    }
+
+    /**
+     * What the Worker saw on the wire. A field that is absent, the wrong type or over its cap stays
+     * null, so the classifier treats it as missing rather than reading a damaged value.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array{envelope_from: ?string, authentication_results: ?string, arc_authentication_results: ?string, received_spf: ?string}|null
+     */
+    private function transportEvidence(array $payload): ?array
+    {
+        $headers = is_array($payload['authentication_evidence'] ?? null) ? $payload['authentication_evidence'] : [];
+        $evidence = [
+            'envelope_from' => $this->evidenceValue($payload['envelope_from'] ?? null, 320),
+            'authentication_results' => $this->evidenceValue($headers['authentication_results'] ?? null, 2048),
+            'arc_authentication_results' => $this->evidenceValue($headers['arc_authentication_results'] ?? null, 2048),
+            'received_spf' => $this->evidenceValue($headers['received_spf'] ?? null, 2048),
+        ];
+
+        return array_filter($evidence, static fn (?string $value): bool => $value !== null) === [] ? null : $evidence;
+    }
+
+    private function evidenceValue(mixed $value, int $maximumLength): ?string
+    {
+        if (! is_string($value) || mb_strlen($value) > $maximumLength) {
+            return null;
+        }
+        $clean = trim((string) preg_replace('/[\x00-\x1F\x7F]+/', ' ', $value));
+
+        return $clean === '' ? null : $clean;
     }
 
     private function safeHeaders(mixed $headers): array

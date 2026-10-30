@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import worker from "../src/index";
+import worker, { firstHeaderValue } from "../src/index";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -90,6 +90,78 @@ it("rejects attachments over 2 MB even when the raw message fits", async () => {
 
   expect(await deliver(raw)).toHaveBeenCalledWith("Attachments exceed the 2 MB total limit");
   expect(fetcher).not.toHaveBeenCalled();
+});
+
+function transportMessage(headers: string[]): string {
+  return [
+    ...headers,
+    "From: Sender <header-from@example.test>",
+    "To: info@mbfdhub.com",
+    "Message-ID: <transport@example.test>",
+    "Subject: Transport evidence",
+    "", "Body.",
+  ].join("\r\n");
+}
+
+async function forwardedBody(raw: string) {
+  const fetcher = vi.fn().mockResolvedValue(new Response("{}", { status: 201 }));
+  vi.stubGlobal("fetch", fetcher);
+  expect(await deliver(raw)).not.toHaveBeenCalled();
+
+  return JSON.parse(fetcher.mock.calls[0][1].body);
+}
+
+it("forwards the envelope sender separately from the header From", async () => {
+  const body = await forwardedBody(transportMessage([]));
+
+  expect(body.envelope_from).toBe("sender@example.test");
+  expect(body.from).toBe("header-from@example.test");
+});
+
+it("forwards only the topmost occurrence of each authentication header", async () => {
+  const body = await forwardedBody(transportMessage([
+    "Authentication-Results: mx.cloudflare.net; dmarc=pass header.from=example.test",
+    "ARC-Authentication-Results: i=2; mx.cloudflare.net; dkim=pass header.d=example.test",
+    "Received-SPF: pass (mx.cloudflare.net: domain designates sender) client-ip=192.0.2.1;",
+    "Authentication-Results: forged.example; dmarc=fail",
+    "ARC-Authentication-Results: i=1; forged.example; dkim=fail",
+    "Received-SPF: fail (forged.example)",
+  ]));
+
+  expect(body.authentication_evidence).toEqual({
+    authentication_results: "mx.cloudflare.net; dmarc=pass header.from=example.test",
+    arc_authentication_results: "i=2; mx.cloudflare.net; dkim=pass header.d=example.test",
+    received_spf: "pass (mx.cloudflare.net: domain designates sender) client-ip=192.0.2.1;",
+  });
+});
+
+it("forwards null for authentication headers the message does not have", async () => {
+  const body = await forwardedBody(transportMessage([]));
+
+  expect(body.authentication_evidence).toEqual({
+    authentication_results: null,
+    arc_authentication_results: null,
+    received_spf: null,
+  });
+});
+
+it("unfolds, strips control characters from, and caps authentication headers", async () => {
+  const folded = await forwardedBody(transportMessage([
+    "Authentication-Results: mx.cloudflare.net;\r\n\tdkim=pass\r\n header.d=example.test\u0007",
+    `Received-SPF: ${"x".repeat(3000)}`,
+  ]));
+
+  expect(folded.authentication_evidence.authentication_results).toBe("mx.cloudflare.net; dkim=pass header.d=example.test");
+  expect(folded.authentication_evidence.received_spf).toHaveLength(2048);
+});
+
+it("takes the first occurrence and treats an empty value as absent", () => {
+  expect(firstHeaderValue([
+    { key: "authentication-results", value: "first" },
+    { key: "authentication-results", value: "second" },
+  ], "authentication-results")).toBe("first");
+  expect(firstHeaderValue([], "authentication-results")).toBeNull();
+  expect(firstHeaderValue([{ key: "received-spf", value: "\u0001" }], "received-spf")).toBeNull();
 });
 
 it("rejects raw messages over 3 MB even if the reported size is inaccurate", async () => {

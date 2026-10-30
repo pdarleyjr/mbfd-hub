@@ -71,6 +71,7 @@ require __DIR__.'/training-roster.php';
 require __DIR__.'/training-paper.php';
 require __DIR__.'/training-crew-planner.php';
 require __DIR__.'/take-home-inspections.php';
+require __DIR__.'/daily-roster.php';
 require __DIR__.'/vehicle-documents.php';
 
 Route::get('/', HomeController::class)->middleware('auth:web');

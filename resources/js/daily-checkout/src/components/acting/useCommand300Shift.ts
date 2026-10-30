@@ -9,7 +9,7 @@ const POLL_MS = 60_000;
 interface Options {
   /** False until access is known, so a refused account never asks. */
   enabled?: boolean;
-  /** The 300 page keeps the line fresh; the station-list card loads it once. */
+  /** The 300 page keeps the line fresh; the station-list card refreshes slowly itself (useVisibleRefresh). */
   poll?: boolean;
 }
 
@@ -47,13 +47,17 @@ export function useCommand300Shift({ enabled = true, poll = true }: Options = {}
       setError(null);
     } catch (failure) {
       if (mine !== latest.current) return;
-      if (isApiAuthenticationError(failure)) { redirectToLoginAfterSessionExpiry(); return; }
+      if (isApiAuthenticationError(failure)) {
+        // A card's background refresh never takes the member off the page they are reading.
+        if (poll || mode !== 'silent') redirectToLoginAfterSessionExpiry();
+        return;
+      }
       const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
       if (mode !== 'silent' || !offline) setError(failure instanceof Error && failure.message ? failure.message : 'The shift 300 could not be loaded.');
     } finally {
       if (mine === latest.current) setLoading(false);
     }
-  }, []);
+  }, [poll]);
 
   useEffect(() => { if (enabled) void load('initial'); }, [enabled, load]);
 

@@ -34,6 +34,21 @@ export function encodeBase64(content: string | ArrayBuffer | Uint8Array): string
   return btoa(binary);
 }
 
+const EVIDENCE_MAX_LENGTH = 2048;
+
+// Email Routing prepends its own results, so only the first occurrence in raw header order is
+// Cloudflare's; later ones may have been written by the sender. message.headers merges duplicates
+// and cannot identify it, but postal-mime's parsed.headers keeps the raw top-to-bottom order.
+export function firstHeaderValue(headers: readonly { key: string; value: string }[], name: string): string | null {
+  const value = headers.find((header) => header.key === name)?.value;
+  if (value === undefined) {
+    return null;
+  }
+  const clean = value.replace(/[\u0000-\u001f\u007f-\u009f]/g, "").slice(0, EVIDENCE_MAX_LENGTH);
+
+  return clean === "" ? null : clean;
+}
+
 export default {
   async email(message: ForwardableEmailMessage, env: Env): Promise<void> {
     if (!env.HUB_INBOUND_SECRET || !env.HUB_INBOUND_URL.startsWith("https://")) {
@@ -70,6 +85,12 @@ export default {
       message_id: parsed.messageId || crypto.randomUUID(),
       from: parsed.from?.address || message.from,
       from_name: parsed.from?.name || null,
+      envelope_from: message.from,
+      authentication_evidence: {
+        authentication_results: firstHeaderValue(parsed.headers, "authentication-results"),
+        arc_authentication_results: firstHeaderValue(parsed.headers, "arc-authentication-results"),
+        received_spf: firstHeaderValue(parsed.headers, "received-spf"),
+      },
       to: message.to,
       subject: parsed.subject || null,
       text: parsed.text || null,
