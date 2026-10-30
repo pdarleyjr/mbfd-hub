@@ -6,7 +6,7 @@ on:
     paths:
       - .github/workflows/zz-b-pwa-flake-probe.yml
       - playwright.tmp-sw.config.ts
-      - tests/e2e/tmp-sw-probe.spec.ts
+      - tests/e2e/pwa-sw-upgrade.spec.ts
 
 permissions:
   contents: read
@@ -19,7 +19,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        mode: [plain, passive]
+        mode: [fixed]
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -33,8 +33,6 @@ jobs:
           bash scripts/ci/prepare-ubuntu-apt-mirror.sh
           npx playwright install --with-deps chromium
       - name: Repeat the SW upgrade spec
-        env:
-          PROBE_PASSIVE: ${{ matrix.mode == 'passive' }}
         run: npx playwright test --config=playwright.tmp-sw.config.ts --repeat-each=60 --workers=1
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: ${{ failure() }}

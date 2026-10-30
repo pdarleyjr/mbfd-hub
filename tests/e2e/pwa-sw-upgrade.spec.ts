@@ -167,6 +167,15 @@ async function updateInPlace(page: Page, scope: string, expectedBuild: string) {
           worker.postMessage({ type: 'GET_VERSION' }, [channel.port2]);
         });
 
+      // Let the new worker finish installing and activate BEFORE asking anyone for a version. Posting
+      // messages to the still-active old worker while the new one is installed is what intermittently left
+      // the new worker unactivated for 26+ s in CI (about 5% of runs; 9 of 180 with the old loop, 0 of 300
+      // when waiting passively). The wait is bounded and the build is still required below.
+      for (let attempt = 0; attempt < 300 && (registration.installing || registration.waiting); attempt += 1) {
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      note(`settled; installing=${registration.installing?.state ?? 'none'} waiting=${registration.waiting?.state ?? 'none'} active=${registration.active?.state ?? 'none'}`);
+
       let build: string | null = null;
       for (let attempt = 0; attempt < 40 && build !== expectedBuild; attempt += 1) {
         build = await askVersion(registration.active);
