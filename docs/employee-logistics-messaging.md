@@ -118,4 +118,15 @@ The stylesheet is `resources/css/filament/employee-messages.css`. Hub colour tok
 
 ## 10. Notifications
 
-This module sends no push, email or database notification of its own. Its in-app signals are the member's *My Messages* badge and dashboard card, and the administrators' navigation badge, admin-home card counts and per-row *Unread* / *Awaiting reply* status. Adding push is a separate change that must go through the existing notification category registry (and the Notification Settings page), not a new path.
+Alerts use the existing pipeline only (category registry, recipient evaluator, `NotificationDispatchService`); there is no separate push path.
+
+| Event | Who | Category | Click-through |
+|---|---|---|---|
+| A member starts a conversation or replies | The Support Services inbox audience, minus the sender | `support_services_messages` (group *Support Services*; in-app locked on; default in-app only; push and email optional) | `/admin/employee-messages?thread={id}` |
+| Support Services replies | The member who owns the conversation, minus the replier | `member_request_updates` | `/employee/messages?thread={id}` |
+
+* Eligibility for `support_services_messages` is `EmployeeLogisticsMessagingAccess::canViewLogisticsInbox` (never a Gate ability), asked when the fan-out runs and again for every channel at delivery, so a role revoked in between receives nothing. The registry prefilter is a superset (`super_admin`, `logistics_admin`, the two `admin.employee_messages.*` permissions).
+* `SupportServicesMessageNotification` is dispatched from the service after the write commits, on the `notifications` queue, keyed `support-msg:{messageId}`. A retried or replayed send (same `client_request_id`) never reaches the append, and the event key collapses any double delivery, so each person is told once.
+* The in-app copy shows sender, reason and a preview. Push and email never carry a name, subject, reason or message text (`PushPrivacy::messageBody`); they only say there is a new message.
+* Click-through URLs are resolved per recipient (`NotificationLink`), so someone without access lands on their own page rather than a 403.
+* The unread badges and card counts described above remain as the always-visible signal.

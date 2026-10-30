@@ -8,6 +8,8 @@ use App\Models\Employee;
 use App\Models\EmployeeMessaging\EmployeeLogisticsMessage;
 use App\Models\EmployeeMessaging\EmployeeLogisticsThread;
 use App\Models\User;
+use App\Notifications\SupportServices\SupportServicesMessageNotification;
+use App\Services\Notifications\NotificationDispatchService;
 use App\Services\Security\EmployeeLogisticsMessagingAccess;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\Eloquent\Builder;
@@ -323,8 +325,49 @@ final class EmployeeLogisticsMessagingService
             $side === EmployeeLogisticsMessage::SIDE_MEMBER ? 'last_member_message_id' : 'last_logistics_message_id' => $id,
         ])->save();
         $message->setRelation('thread', $thread);
+        $this->announce($thread, $message, $author, $side);
 
         return $message;
+    }
+
+    /**
+     * Tell the other side through the existing notification pipeline (docs section 10): a member's new
+     * message or reply alerts the Support Services audience; a Support Services reply alerts the member.
+     * Queued after the surrounding transaction commits and deduplicated per message, so a retried or
+     * replayed send (which never reaches append()) cannot alert twice, and a notification problem can
+     * never fail the write. Eligibility is decided again by the evaluator for each recipient.
+     */
+    private function announce(EmployeeLogisticsThread $thread, EmployeeLogisticsMessage $message, User $author, string $side): void
+    {
+        try {
+            $fromMember = $side === EmployeeLogisticsMessage::SIDE_MEMBER;
+            $notification = new SupportServicesMessageNotification(
+                $fromMember ? SupportServicesMessageNotification::AUDIENCE_SUPPORT : SupportServicesMessageNotification::AUDIENCE_MEMBER,
+                (int) $thread->getKey(),
+                (int) $message->getKey(),
+                (string) $thread->member_name,
+                EmployeeMessageReason::label($thread->reason),
+                (string) $thread->last_message_preview,
+            );
+            $candidates = null;
+            if (! $fromMember) {
+                $member = User::query()->find($thread->member_user_id);
+                if (! $member instanceof User) {
+                    return;
+                }
+                $candidates = [$member];
+            }
+
+            app(NotificationDispatchService::class)->dispatch(
+                $notification->categoryKey(),
+                $notification,
+                $candidates,
+                SupportServicesMessageNotification::eventKey((int) $message->getKey()),
+                (int) $author->getKey(),
+            );
+        } catch (\Throwable $exception) {
+            report($exception);
+        }
     }
 
     private function existing(User $author, string $clientRequestId): ?EmployeeLogisticsMessage

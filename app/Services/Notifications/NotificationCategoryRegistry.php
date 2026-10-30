@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Services\Captain5\ActingApprovers;
 use App\Services\Security\Captain5Access;
 use App\Services\Security\Command300Access;
+use App\Services\Security\EmployeeLogisticsMessagingAccess;
 use App\Support\Fleet\InspectionReviewers;
 use Closure;
 use Filament\Facades\Filament;
@@ -61,6 +62,8 @@ final class NotificationCategoryRegistry
     public const EQUIPMENT_EXPIRATIONS = 'equipment_expirations';
 
     public const TODO_ASSIGNMENTS = 'todo_assignments';
+
+    public const SUPPORT_SERVICES_MESSAGES = 'support_services_messages';
 
     /** @var array<string, NotificationCategory>|null */
     private ?array $categories = null;
@@ -381,6 +384,21 @@ final class NotificationCategoryRegistry
                     && $c->can('viewAny', CapitalProject::class)
                     ? 'project_manager' : null,
                 candidates: $audience(['super_admin', 'admin', 'project-manager'], []),
+            ),
+            // Whoever the messaging access class lets into the Support Services inbox (never a Gate ability: the global
+            // Gate::before would answer true for every super_admin). The prefilter is a superset; the rule is asked live.
+            new NotificationCategory(
+                key: self::SUPPORT_SERVICES_MESSAGES,
+                label: 'Support Services messages',
+                description: 'A member started a conversation with Support Services or replied to one. Push and email only say there is a new message; the text stays in the Hub. In-app alerts for these are always on.',
+                group: self::GROUP_SUPPORT_SERVICES,
+                channels: $all,
+                locked: [$db],
+                defaults: $inAppOnly,
+                significance: 'routine',
+                eligibility: static fn (EligibilityContext $c): ?string => app(EmployeeLogisticsMessagingAccess::class)->canViewLogisticsInbox($c->user)
+                    ? 'support_services_inbox' : null,
+                candidates: $audience(['super_admin', EmployeeLogisticsMessagingAccess::LOGISTICS_ROLE], [EmployeeLogisticsMessagingAccess::PERMISSION_VIEW, EmployeeLogisticsMessagingAccess::PERMISSION_REPLY]),
             ),
             new NotificationCategory(
                 key: self::EQUIPMENT_EXPIRATIONS,
