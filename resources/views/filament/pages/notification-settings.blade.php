@@ -1,4 +1,5 @@
 <x-filament-panels::page>
+<div data-notification-settings>
     @vite('resources/js/pwa/push-enrollment.ts')
 
     @php
@@ -128,4 +129,5 @@
     </div>
 
     <x-filament-actions::modals />
+</div>
 </x-filament-panels::page>

@@ -80,7 +80,7 @@ test('pager links are real links with explicit labels and disabled ends', async 
 
 test('filter chips narrow the list with exact counts', async ({ page }) => {
   await openView(page, '/admin/dashboards/vehicle-checkout');
-  const marine = page.getByRole('button', { name: /^Marine \(\d+\)$/ });
+  const marine = page.getByRole('button', { name: /^Marine · \d+ open$/ });
   await marine.click();
   await expect(marine).toHaveAttribute('aria-pressed', 'true');
   await expect(page).toHaveURL(/filter=marine/);

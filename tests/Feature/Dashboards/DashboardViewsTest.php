@@ -188,7 +188,7 @@ final class DashboardViewsTest extends TestCase
 
         $vehicle = Livewire::test(DashboardBoard::class, ['dashboard' => 'vehicle-checkout']);
         $html = $vehicle->html();
-        $this->assertMatchesRegularExpression('#aria-pressed="true".*?All</span>\s*<span class="mbfd-dash-chip__count">\(7\)#s', $html);
+        $this->assertMatchesRegularExpression('#aria-pressed="true".*?All</span>\s*<span class="mbfd-dash-chip__count">· 7 open#s', $html);
         $this->assertStringContainsString('Rescue</span>', $html);
         $this->assertStringContainsString('Ladder</span>', $html);
         $this->assertStringContainsString('Special units</span>', $html);

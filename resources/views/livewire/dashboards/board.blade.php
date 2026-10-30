@@ -80,7 +80,8 @@
                     aria-pressed="{{ $snapshot->filter === $chip['key'] ? 'true' : 'false' }}">
                     <x-filament::icon :icon="$chip['icon']" class="mbfd-dash-chip__icon" />
                     <span>{{ $chip['label'] }}</span>
-                    <span class="mbfd-dash-chip__count">({{ number_format($chip['count']) }})</span>
+                    {{-- Counts are OPEN items; the list below also keeps items closed earlier this operational day. --}}
+                    <span class="mbfd-dash-chip__count">· {{ number_format($chip['count']) }} open</span>
                 </button>
             @endforeach
         </div>
