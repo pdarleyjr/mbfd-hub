@@ -48,6 +48,7 @@ final class RequestSubmissionService
             'target' => ['required', 'array'],
             'target.kind' => ['required', 'in:'.implode(',', InventoryRequest::TARGET_KINDS)],
             'target.apparatus_id' => ['nullable', 'integer'],
+            'target.label_seen' => ['nullable', 'string', 'max:160'],
             'target.event_assignment' => ['nullable', 'string', 'max:'.RequestFormDefinition::EVENT_MAX],
             'member_note' => ['nullable', 'string', 'max:'.RequestFormDefinition::NOTE_MAX],
             'lines' => ['nullable', 'array', 'max:'.RequestFormDefinition::MAX_LINES],
@@ -129,6 +130,13 @@ final class RequestSubmissionService
         $unit = $this->units->find(isset($target['apparatus_id']) ? (int) $target['apparatus_id'] : null);
         if ($unit === null) {
             throw new EmsException('Pick a unit from the list, or choose Detail / Special Event.', 'invalid_unit', 422, ['target.apparatus_id' => ['Pick a unit from the list, or choose Detail / Special Event.']]);
+        }
+
+        // The page also says which unit name it showed. A page that sends none (an older page, a queued request) is trusted as before;
+        // one that sends a name which is not this unit's was out of date or wrong, so nothing is saved.
+        $seen = trim((string) ($target['label_seen'] ?? ''));
+        if ($seen !== '' && mb_strtolower($seen) !== mb_strtolower(trim((string) $unit['label']))) {
+            throw new EmsException('The unit you picked does not match what was sent. Please choose the unit again and send the request again.', 'unit_mismatch', 422, ['target.apparatus_id' => ['Choose the unit again.']]);
         }
 
         return ['kind' => $unit['kind'], 'apparatus_id' => $unit['id'], 'label' => $unit['label'], 'event_assignment' => $event !== '' ? $event : null];

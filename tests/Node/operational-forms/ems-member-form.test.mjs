@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
-  blankDraft, buildPayload, bumpQuantity, choiceForUnit, classifyFailure, countRequested, draftFromPayload,
+  blankDraft, buildPayload, bumpQuantity, choiceForUnit, unitForChoice, classifyFailure, countRequested, draftFromPayload,
   eventDetail, fieldForError, filterForms, flagTags, formatEastern, groupSections, hasContent, isDocumentRecordType,
   isUuid, itemsLabel, lineKey, minLabel, newSubmissionId, normalizeQuantity, payloadItemCount, readiness,
   recordTypeLabel, requestedInSections, restoreDraft, reviewGroups, formName, searchForView, serializeDraft, setAnswer, setQuantity,
@@ -122,7 +122,7 @@ test('the payload lists only touched items, never a 0, and never identity or tim
   const payload = buildPayload(draft, definition);
   assert.deepEqual(payload, {
     client_submission_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-    target: { kind: 'rescue_unit', apparatus_id: 7 },
+    target: { kind: 'rescue_unit', apparatus_id: 7, label_seen: 'Rescue 2' },
     lines: [
       { form: 'airway-bag', item_key: 'airway.top.gloves', quantity: 2 },
       { form: 'als-med-bag', item_key: 'als.rescue.narcs-box', flag: true },
@@ -142,7 +142,7 @@ test('a Detail / Special Event payload carries the optional event text only when
   assert.deepEqual(buildPayload({ ...draft, eventAssignment: '   ' }, definition).target, { kind: 'detail_event' });
   assert.deepEqual(buildPayload({ ...draft, eventAssignment: ' Air show, medic 4 ' }, definition).target, { kind: 'detail_event', event_assignment: 'Air show, medic 4' });
   // Event text typed before switching back to a unit is not sent.
-  assert.deepEqual(buildPayload({ ...draft, targetChoice: 'unit:9', eventAssignment: 'Air show' }, definition).target, { kind: 'other_unit', apparatus_id: 9 });
+  assert.deepEqual(buildPayload({ ...draft, targetChoice: 'unit:9', eventAssignment: 'Air show' }, definition).target, { kind: 'other_unit', apparatus_id: 9, label_seen: 'Engine 1' });
 });
 
 test('a note-only request is a valid payload and a No answer is sent as a flag of false', () => {
@@ -406,4 +406,74 @@ test('editing a rejected request again keeps lines for items that left the form'
   ] };
   const draft = draftFromPayload(payload, definition);
   assert.deepEqual(draft.retired?.quantities, { [keyOf('als-transport-vehicle', 'tv.gone')]: 2 });
+});
+
+// ---- the unit picker: one tap yields exactly that unit, and the unit is always named in words
+
+const RESCUES = [['RESCUE R1', 41], ['RESCUE R11', 42], ['RESCUE R2', 45], ['RESCUE R22', 46], ['RESCUE R3', 47], ['RESCUE R4', 51], ['RESCUE R44', 52]];
+const pickerUnits = [
+  ...RESCUES.map(([label, id]) => ({ id, kind: 'rescue_unit', label, designation: label.replace('RESCUE ', 'R '), status: 'In Service', group: 'Rescue units' })),
+  { id: 60, kind: 'other_unit', label: 'ENGINE 1', designation: 'E 1', status: 'In Service', group: 'Other units' },
+  { id: 61, kind: 'other_unit', label: 'LADDER 2', designation: 'L 2', status: 'Out of Service', group: 'Other units' },
+  { id: null, kind: 'detail_event', label: 'Detail / Special Event', designation: null, status: null, group: 'Details' },
+];
+const pickerDefinition = { ...definition, units: pickerUnits };
+
+test('each tap on a rescue unit yields exactly its own id and name, never a longer neighbour', async () => {
+  const { unitChoices, unitLine } = await import('../../../resources/js/operational-forms/ems/emsLogic.js');
+  const { rescue } = unitChoices(pickerUnits);
+  assert.deepEqual(rescue.map((unit) => unit.label), RESCUES.map(([label]) => label), 'server order is kept');
+  for (const [label, id] of RESCUES) {
+    const tapped = rescue.find((unit) => unit.label === label);
+    const choice = choiceForUnit(tapped);
+    assert.equal(choice, `unit:${id}`);
+    assert.equal(unitForChoice(choice, pickerUnits).id, id);
+    assert.equal(unitForChoice(choice, pickerUnits).label, label);
+    assert.equal(unitLine(choice, pickerUnits), label);
+  }
+  assert.notEqual(choiceForUnit(rescue[2]), choiceForUnit(rescue[3]), 'R2 and R22 are different choices');
+  assert.notEqual(choiceForUnit(rescue[5]), choiceForUnit(rescue[6]), 'R4 and R44 are different choices');
+});
+
+test('units split into rescue buttons, an other-units list and the detail choice; unknown choices say nothing', async () => {
+  const { unitChoices, unitLine } = await import('../../../resources/js/operational-forms/ems/emsLogic.js');
+  const groups = unitChoices(pickerUnits);
+  assert.deepEqual(groups.other.map((unit) => unit.label), ['ENGINE 1', 'LADDER 2']);
+  assert.equal(groups.detail?.label, 'Detail / Special Event');
+  assert.equal(unitLine('detail', pickerUnits), 'Detail / Special Event');
+  assert.equal(unitLine('', pickerUnits), '');
+  assert.equal(unitLine('unit:999', pickerUnits), '', 'a stale choice is never shown as some other unit');
+});
+
+test('arrow keys move through the rescue units and Detail, one at a time, wrapping at the ends', async () => {
+  const { nextUnitChoice } = await import('../../../resources/js/operational-forms/ems/emsLogic.js');
+  const order = ['unit:41', 'unit:42', 'unit:45', 'unit:46', 'detail'];
+  assert.equal(nextUnitChoice(order, 'unit:45', 'ArrowRight'), 'unit:46');
+  assert.equal(nextUnitChoice(order, 'unit:45', 'ArrowDown'), 'unit:46');
+  assert.equal(nextUnitChoice(order, 'unit:45', 'ArrowLeft'), 'unit:42');
+  assert.equal(nextUnitChoice(order, 'unit:45', 'ArrowUp'), 'unit:42');
+  assert.equal(nextUnitChoice(order, 'detail', 'ArrowRight'), 'unit:41', 'wraps');
+  assert.equal(nextUnitChoice(order, 'unit:41', 'ArrowLeft'), 'detail', 'wraps');
+  assert.equal(nextUnitChoice(order, 'unit:45', 'Home'), 'unit:41');
+  assert.equal(nextUnitChoice(order, 'unit:45', 'End'), 'detail');
+  assert.equal(nextUnitChoice(order, '', 'ArrowRight'), 'unit:41', 'nothing chosen yet: start at the first');
+  assert.equal(nextUnitChoice(order, '', 'ArrowLeft'), 'detail');
+  assert.equal(nextUnitChoice(order, 'unit:45', 'a'), null, 'other keys do nothing');
+});
+
+test('the request carries the label the member saw, and drafts still store unit:ID and detail', () => {
+  let draft = { ...blankDraft(), targetChoice: 'unit:45' };
+  draft = setQuantity(draft, GLOVES, 2);
+  const payload = buildPayload(draft, pickerDefinition);
+  assert.deepEqual(payload.target, { kind: 'rescue_unit', apparatus_id: 45, label_seen: 'RESCUE R2' });
+  assert.equal(buildPayload({ ...draft, targetChoice: 'unit:46' }, pickerDefinition).target.label_seen, 'RESCUE R22');
+  assert.deepEqual(buildPayload({ ...draft, targetChoice: 'detail' }, pickerDefinition).target, { kind: 'detail_event' }, 'Detail has no unit label to confirm');
+
+  const stored = serializeDraft(draft);
+  assert.equal(stored.targetChoice, 'unit:45');
+  assert.equal(restoreDraft(stored, pickerDefinition).targetChoice, 'unit:45');
+  assert.equal(restoreDraft({ ...stored, targetChoice: 'detail' }, pickerDefinition).targetChoice, 'detail');
+  // A queued request edited again keeps its unit, found by id.
+  assert.equal(draftFromPayload(payload, pickerDefinition).targetChoice, 'unit:45');
+  assert.equal(draftFromPayload({ ...payload, target: { kind: 'rescue_unit', apparatus_id: 52 } }, pickerDefinition).targetChoice, 'unit:52');
 });

@@ -8,9 +8,10 @@ import {
     setAnswer, setQuantity, unitForChoice, variantCaption,
 } from './emsLogic.js';
 import { emsDrafts } from './emsStore';
-import type { EmsDraft, EmsFormDefinition, EmsOutboxEntry, EmsRequestDetail, EmsUnit } from './emsTypes';
+import type { EmsDraft, EmsFormDefinition, EmsOutboxEntry, EmsRequestDetail } from './emsTypes';
 import { CategoryPanel, ItemRow } from './FormParts';
 import { PendingRequests } from './PendingRequests';
+import { UnitPicker } from './UnitPicker';
 import { ReviewSheet } from './ReviewSheet';
 import type { EmsOutbox } from './useEmsOutbox';
 
@@ -24,10 +25,6 @@ const PERSIST_DELAY_MS = 400;
 
 function reducedMotion() {
     return typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-}
-
-function unitOptionLabel(unit: EmsUnit) {
-    return unit.status && unit.status !== 'In Service' ? `${unit.label} (${unit.status})` : unit.label;
 }
 
 export interface MedicalRequestFormProps {
@@ -60,7 +57,7 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
     const sendingRef = useRef(false);
     const retiredAfterSend = useRef<{ retired: NonNullable<EmsDraft['retired']>; labels?: EmsDraft['labels'] } | null>(null);
     const latestDraft = useRef<EmsDraft | null>(null);
-    const targetRef = useRef<HTMLSelectElement | null>(null);
+    const targetRef = useRef<HTMLDivElement | null>(null);
     const searchRef = useRef<HTMLInputElement | null>(null);
     const topRef = useRef<HTMLDivElement | null>(null);
     const reviewButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -139,18 +136,6 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
     };
     const shownForms = searching ? filtered.forms : filtered.forms.filter((form) => form.key === bagKey);
 
-    const unitGroups = useMemo(() => {
-        const groups: { label: string; units: EmsUnit[] }[] = [];
-        for (const unit of definition.units) {
-            if (unit.kind === 'detail_event') continue;
-            const last = groups[groups.length - 1];
-            if (last && last.label === unit.group) last.units.push(unit);
-            else groups.push({ label: unit.group, units: [unit] });
-        }
-        return groups;
-    }, [definition.units]);
-    const detailUnit = definition.units.find((unit) => unit.kind === 'detail_event');
-
     const focusWithScroll = (element: HTMLElement | null) => {
         if (!element) return;
         element.scrollIntoView({ block: 'center', behavior: reducedMotion() ? 'auto' : 'smooth' });
@@ -225,6 +210,8 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
             const field = fieldForError(error.code, error.fields);
             if (error.code === 'duplicate_submission') patch({ clientSubmissionId: newSubmissionId() });
             if (field === 'target' || field === 'event' || field === 'note') {
+                // A refused unit is never kept: the member picks it again.
+                if (error.code === 'unit_mismatch') patch({ targetChoice: '' });
                 setReviewOpen(false);
                 setErrors({ [field]: error.message });
                 window.setTimeout(() => focusWithScroll(field === 'target' ? targetRef.current : document.getElementById(field === 'event' ? 'ems-event' : 'ems-note')), 50);
@@ -290,18 +277,12 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
         </MessageBarBody></MessageBar>}
 
         <section className="ems-card" aria-labelledby="ems-target-label">
-            <label id="ems-target-label" htmlFor="ems-target" className="ems-label">Completing this form for:</label>
-            <select
-                id="ems-target" ref={targetRef} className="ems-select" value={draft.targetChoice} onChange={(event) => chooseUnit(event.target.value)}
-                aria-describedby={`ems-target-hint${errors.target ? ' ems-target-error' : ''}`} aria-invalid={Boolean(errors.target)}
-            >
-                <option value="">Choose a unit</option>
-                {unitGroups.map((group) => <optgroup key={group.label} label={group.label}>
-                    {group.units.map((candidate) => <option key={candidate.id ?? candidate.label} value={`unit:${candidate.id}`}>{unitOptionLabel(candidate)}</option>)}
-                </optgroup>)}
-                {detailUnit && <option value="detail">{detailUnit.label}</option>}
-            </select>
-            <p id="ems-target-hint" className="ems-hint">Rescue units are listed first. Captain 5 uses this to know where the supplies go.</p>
+            <p id="ems-target-label" className="ems-label">Completing this form for:</p>
+            <UnitPicker
+                ref={targetRef} units={definition.units} value={draft.targetChoice} onChange={chooseUnit}
+                describedBy={`ems-target-hint${errors.target ? ' ems-target-error' : ''}`} invalid={Boolean(errors.target)}
+            />
+            <p id="ems-target-hint" className="ems-hint">Tap your unit. Captain 5 uses this to know where the supplies go.</p>
             {errors.target && <p id="ems-target-error" className="ems-field-error" role="alert"><AlertTriangle size={15} aria-hidden="true" /> {errors.target}</p>}
             {isDetail && <div className="ems-event">
                 <label htmlFor="ems-event" className="ems-label">Unit, assignment, or position for this event <span className="ems-optional">optional</span></label>
@@ -385,6 +366,7 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
         <div className="ems-bar" role="region" aria-label="Request summary">
             <div className="ems-bar-summary">
                 <strong className="ems-bar-count" role="status" aria-live="polite" aria-atomic="true">{itemsLabel(requestedCount)}</strong>
+                {unit && <span className="ems-bar-unit">For <strong>{unit.label}</strong></span>}
                 <span className={`ems-bar-hint${ready.ready ? '' : ' is-pending'}`}>{ready.message}</span>
             </div>
             <Button ref={reviewButtonRef} appearance="primary" size="large" className="ems-bar-action" onClick={openReview}>Review and send</Button>
@@ -407,6 +389,7 @@ function SentConfirmation({ request, onView, onNew, onBack, onMine }: {
         <div className="ems-result-icon is-success"><Check size={28} aria-hidden="true" /></div>
         <h1 id="ems-sent-title" tabIndex={-1} ref={headingRef}>Request sent</h1>
         <p className="ems-result-number" role="status">{request.number}</p>
+        <p className="ems-unit-banner">Sent for <strong>{request.target_label}</strong></p>
         <dl className="ems-review-facts">
             <div><dt>For</dt><dd>{request.target_label}{request.event_assignment ? `, ${request.event_assignment}` : ''}</dd></div>
             <div><dt>Items</dt><dd>{itemsLabel(items)}</dd></div>

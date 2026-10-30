@@ -136,9 +136,11 @@ class OperationalFormsE2ESeeder extends Seeder
     {
         app(SourceImporter::class)->import(base_path('database/data/ems'));
         $station = Station::query()->firstOrCreate(['station_number' => 2], ['name' => 'Station 2', 'address' => '1 Test St', 'is_active' => true]);
-        foreach ([['R2', 'Rescue 2', 'Rescue', 'rescue'], ['E1', 'Engine 1', 'Engine', 'engine']] as [$unit, $name, $type, $template]) {
+        // Named the way production names them: R2 and R22, R4 and R44 differ by one character, which the unit picker must never confuse.
+        $units = [['R1', 'RESCUE R1', 'R 1'], ['R11', 'RESCUE R11', 'R 11'], ['R2', 'RESCUE R2', 'R 2'], ['R22', 'RESCUE R22', 'R 22'], ['R3', 'RESCUE R3', 'R 3'], ['R4', 'RESCUE R4', 'R 4'], ['R44', 'RESCUE R44', 'R 44']];
+        foreach ([...array_map(static fn (array $row): array => [...$row, 'Rescue', 'rescue'], $units), ['E1', 'ENGINE 1', 'E 1', 'Engine', 'engine']] as [$unit, $name, $designation, $type, $template]) {
             Apparatus::query()->firstOrCreate(['unit_id' => $unit], [
-                'station_id' => $station->id, 'vin' => 'VIN-'.$unit, 'assignment' => 'Station 2', 'designation' => $unit, 'name' => $name, 'type' => $type,
+                'station_id' => $station->id, 'vin' => 'VIN-'.$unit, 'assignment' => 'Station 2', 'designation' => $designation, 'name' => $name, 'type' => $type,
                 'vehicle_number' => 'V-'.$unit, 'status' => 'In Service', 'daily_checkout_requirement' => 'required', 'daily_checkout_template' => $template,
             ]);
         }
