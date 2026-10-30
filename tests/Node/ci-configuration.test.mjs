@@ -729,7 +729,7 @@ test("the shared release gate has hard-failing quality, Daily, PostgreSQL, asset
   assert.match(postgresDailyAssets, /working-directory:\s*resources\/js\/daily-checkout/);
   assert.match(postgresDailyAssets, /DAILY_CHECKOUT_OUT_DIR:\s*\.\.\/\.\.\/\.\.\/public\/daily/);
   assert.match(postgresDailyAssets, /npm run build/);
-  assert.match(workflowStep(postgres, "Run PHPUnit suite"), /php artisan test --exclude-group=postgres/);
+  assert.match(workflowStep(postgres, "Run PHPUnit suite"), /php artisan test --parallel --exclude-group=postgres/);
   assert.match(
     workflowStep(postgres, "Run PostgreSQL concurrency and integrity tests"),
     /php artisan test --group=postgres/,
@@ -803,7 +803,7 @@ test("the shared release gate has hard-failing quality, Daily, PostgreSQL, asset
   assert.match(php85DailyAssets, /working-directory:\s*resources\/js\/daily-checkout/);
   assert.match(php85DailyAssets, /DAILY_CHECKOUT_OUT_DIR:\s*\.\.\/\.\.\/\.\.\/public\/daily/);
   assert.match(php85DailyAssets, /npm run build/);
-  assert.match(workflowStep(php85, "Run PHP 8.5 PHPUnit compatibility suite"), /php artisan test --exclude-group=postgres/);
+  assert.match(workflowStep(php85, "Run PHP 8.5 PHPUnit compatibility suite"), /php artisan test --parallel --exclude-group=postgres/);
   assert.match(workflowStep(php85, "Run PHP 8.5 PostgreSQL compatibility tests"), /php artisan test --group=postgres/);
 
   const aiGateway = workflowJob(gates, "ai-gateway-source");
@@ -861,7 +861,7 @@ test("CI runs a required PostgreSQL group against its dedicated disposable servi
   assert.match(workflow, /POSTGRES_DB:\s*mbfd_hub_test_ci/);
   assert.match(workflow, /POSTGRES_USER:\s*mbfd_test_ci/);
   assert.match(workflow, /POSTGRES_HOST_AUTH_METHOD:\s*trust/);
-  assert.match(defaultTestStep, /php artisan test --exclude-group=postgres/);
+  assert.match(defaultTestStep, /php artisan test --parallel --exclude-group=postgres/);
   assert.match(postgresTestStep, /MBFD_ALLOW_DISPOSABLE_POSTGRES:\s*["']1["']/);
   assert.match(postgresTestStep, /REQUIRE_POSTGRES_INTEGRATION:\s*["']true["']/);
   assert.match(postgresTestStep, /DISPOSABLE_POSTGRES_HOST:\s*127\.0\.0\.1/);
@@ -870,6 +870,30 @@ test("CI runs a required PostgreSQL group against its dedicated disposable servi
   assert.match(postgresTestStep, /DISPOSABLE_POSTGRES_PASSWORD:\s*["']{2}/);
   assert.match(postgresTestStep, /php artisan test --group=postgres/);
   assert.match(phpunit, /<directory>tests\/Integration<\/directory>/);
+});
+
+test("Parallel PHPUnit lanes keep per-process in-memory SQLite isolation and never parallelize the PostgreSQL group", () => {
+  const workflow = readFileSync(resolve(root, ".github/workflows/hub-release-gates.yml"), "utf8");
+  const bootstrap = readFileSync(resolve(root, "tests/bootstrap.php"), "utf8");
+  const phpunit = readFileSync(resolve(root, "phpunit.xml"), "utf8");
+  const composer = JSON.parse(readFileSync(resolve(root, "composer.json"), "utf8"));
+  const coordinator = readFileSync(resolve(root, "tests/CreatesApplication.php"), "utf8");
+
+  assert.ok(composer["require-dev"]["brianium/paratest"], "php artisan test --parallel needs ParaTest");
+  assert.match(phpunit, /<env name="DB_CONNECTION" value="sqlite" force="true"\/>/);
+  assert.match(phpunit, /<env name="DB_DATABASE" value=":memory:" force="true"\/>/);
+  assert.match(bootstrap, /'DB_DATABASE' => ':memory:'/);
+  // The ParaTest coordinator boots the app before tests/bootstrap.php, so it must use the same sentinel.
+  assert.match(coordinator, /define\('MBFD_PHPUNIT_BOOTSTRAP', true\)/);
+
+  for (const [job, step, postgresStep] of [
+    ["phpunit-postgres", "Run PHPUnit suite", "Run PostgreSQL concurrency and integrity tests"],
+    ["php-85-compatibility", "Run PHP 8.5 PHPUnit compatibility suite", "Run PHP 8.5 PostgreSQL compatibility tests"],
+  ]) {
+    const body = workflowJob(workflow, job);
+    assert.match(workflowStep(body, step), /php artisan test --parallel --exclude-group=postgres\s*$/m);
+    assert.doesNotMatch(workflowStep(body, postgresStep), /--parallel/, `${job} must keep the PostgreSQL group sequential`);
+  }
 });
 
 test("CI executes the deploy-free configuration regression suite", () => {
