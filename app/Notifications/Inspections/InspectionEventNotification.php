@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Notifications\Channels\BudgetedMailChannel;
 use App\Notifications\Concerns\EvaluatesDelivery;
 use App\Services\Captain5\Captain5Notifier;
+use App\Services\Narcotics\NarcoticsNotifier;
 use App\Services\Notifications\NotificationDecision;
 use App\Services\Notifications\NotificationRecipientEvaluator;
 use App\Services\Notifications\PushPrivacy;
@@ -195,6 +196,11 @@ final class InspectionEventNotification extends Notification implements ShouldQu
      */
     public function pushText(): array
     {
+        // A narcotics check is never named on a lock screen: not the kind, not the member, not the outcome.
+        if (in_array($this->kind, [NarcoticsNotifier::KIND_SUBMITTED, NarcoticsNotifier::KIND_DECISION], true)) {
+            return ['title' => 'MBFD Hub update', 'body' => PushPrivacy::detailBody()];
+        }
+
         $unit = $this->kind === Captain5Notifier::KIND_COMMUNICATION ? null : PushPrivacy::subjectFromTitle($this->title);
 
         if (in_array($this->kind, self::messageBearingKinds(), true)) {
