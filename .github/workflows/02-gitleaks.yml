@@ -1,28 +1,30 @@
 name: Gitleaks Secret Scan
 
+# Pull-request and push-to-main secret scanning is performed by the required
+# "Hub secret scan" job in hub-release-gates.yml (same gitleaks-action SHA,
+# same fetch-depth 0), so this standalone workflow no longer repeats it for the
+# same commit. It remains as a weekly and on-demand full-history scan: the
+# action scans the entire history for any event that is not a push or a pull
+# request.
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 5 * * 1'  # Weekly Monday 5am UTC
 
 permissions:
   contents: read
-  # gitleaks-action needs to read PR commit list on pull_request events;
-  # without this, runs on Dependabot PRs fail with a 403 from /repos/.../pulls/N/commits.
-  pull-requests: read
 
 jobs:
   gitleaks:
     name: Gitleaks
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           fetch-depth: 0
 
       - name: Run Gitleaks
-        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.8
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
