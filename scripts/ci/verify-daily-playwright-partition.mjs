@@ -44,8 +44,60 @@ export function matrixLanes(workflow) {
     .slice(1)
     .map((entry) => ({
       lane: entry.match(/^lane:\s*([A-Za-z0-9_-]+)/m)?.[1] ?? "",
+      browsers: (entry.match(/^ {12}browsers:[ \t]*(.+?)\r?$/m)?.[1] ?? "").split(/\s+/).filter(Boolean),
+      workers: Number(entry.match(/^ {12}workers:[ \t]*(\d+)/m)?.[1] ?? 0),
       projects: [...entry.matchAll(/--project=([A-Za-z0-9_.-]+)/g)].map((match) => match[1]),
     }));
+}
+
+/** Names of the literal Daily Playwright projects that run in WebKit. */
+export function webkitProjects(config) {
+  const projectsBlock = config.match(/^  projects: \[(?<body>[\s\S]*?)^  \],/m)?.groups?.body ?? "";
+  const starts = [...projectsBlock.matchAll(/name:\s*(?:'(?<literal>[^']+)'|`)/g)];
+
+  return starts
+    .map((start, index) => ({
+      name: start.groups.literal,
+      body: projectsBlock.slice(start.index, starts[index + 1]?.index ?? projectsBlock.length),
+    }))
+    .filter(({ name, body }) => name !== undefined && /browserName:\s*'webkit'/.test(body))
+    .map(({ name }) => name);
+}
+
+/**
+ * Returns violations when a lane installs browsers it does not need to, or,
+ * more importantly, runs a project in a browser it did not install.
+ */
+export function browserViolations(lanes, projects, webkit) {
+  const violations = [];
+  const webkitNames = new Set(webkit);
+  const allowed = new Set(["chromium", "webkit"]);
+
+  for (const { lane, browsers = [], workers, projects: laneProjects } of lanes) {
+    for (const browser of browsers) {
+      if (!allowed.has(browser)) violations.push(`lane ${lane} installs unknown browser ${browser}`);
+    }
+    if (workers !== undefined && !(workers >= 1 && workers <= 4)) {
+      violations.push(`lane ${lane} must declare 1-4 Playwright workers`);
+    }
+    if (workers !== undefined && workers > 1 && laneProjects.some((project) => webkitNames.has(project))) {
+      violations.push(`lane ${lane} runs WebKit projects with ${workers} workers; the long WebKit tests need one`);
+    }
+    if (browsers.length === 0) violations.push(`lane ${lane} must declare the browsers it installs`);
+    const needsWebkit = laneProjects.some((project) => webkitNames.has(project));
+    const needsChromium = laneProjects.some((project) => projects.includes(project) && !webkitNames.has(project));
+    if (needsWebkit && !browsers.includes("webkit")) {
+      violations.push(`lane ${lane} runs a WebKit project but does not install webkit`);
+    }
+    if (needsChromium && !browsers.includes("chromium")) {
+      violations.push(`lane ${lane} runs a Chromium project but does not install chromium`);
+    }
+    if (!needsWebkit && browsers.includes("webkit")) {
+      violations.push(`lane ${lane} installs webkit but runs no WebKit project`);
+    }
+  }
+
+  return violations;
 }
 
 /** Project names declared in the Daily Playwright config, expanded statically. */
@@ -120,6 +172,9 @@ function main() {
   const lanes = matrixLanes(workflow);
   const full = listTests([]);
   const violations = partitionViolations(lanes, full.projects);
+  violations.push(
+    ...browserViolations(lanes, full.projects, webkitProjects(readFileSync(resolve(root, CONFIG_PATH), "utf8"))),
+  );
 
   const covered = new Map();
   for (const { lane, projects } of lanes) {
