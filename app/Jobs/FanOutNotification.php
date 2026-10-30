@@ -28,8 +28,12 @@ final class FanOutNotification implements ShouldQueue
     /** @var list<int> */
     public array $backoff = [15, 60];
 
-    /** One id for everything this fan-out causes, carried on the notification into every push attempt and deferred retry. */
-    public readonly string $correlationId;
+    /**
+     * One id for everything this fan-out causes, carried on the notification into every push attempt and deferred retry.
+     * Not readonly and defaulted: a job queued by the previous release has no such property in its payload, and an
+     * uninitialized typed property would make it throw after the deploy (null: the dispatcher stamps a fresh id).
+     */
+    public ?string $correlationId = null;
 
     /** @param  list<int>|null  $candidateIds  Who to evaluate; null evaluates the category's own audience. */
     public function __construct(

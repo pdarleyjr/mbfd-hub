@@ -288,6 +288,34 @@ final class PushDeliveryTraceTest extends TestCase
         Queue::assertPushed(DeliverDeferredPush::class, fn (DeliverDeferredPush $job): bool => $job->attempt === 2 && $job->correlationId === $id);
     }
 
+    /**
+     * A fan-out job queued by the release before this one has no correlationId in its payload. After the deploy
+     * restarts the workers it must still deliver (with a fresh id), and failed() must still log.
+     */
+    public function test_a_fan_out_queued_before_correlation_ids_existed_still_delivers_after_the_deploy(): void
+    {
+        $this->pushService();
+        $user = $this->reviewer();
+        $this->device($user, self::PHONE);
+
+        $payload = serialize(new FanOutNotification('station_requests', $this->alert(), [$user->id]));
+        $legacy = (string) preg_replace('/s:13:"correlationId";s:\d+:"[^"]*";/', '', $payload, 1, $removed);
+        $this->assertSame(1, $removed);
+        $legacy = (string) preg_replace_callback('/^O:(\d+):"App\\\\Jobs\\\\FanOutNotification":(\d+):/', static fn (array $m): string => 'O:'.$m[1].':"App\\Jobs\\FanOutNotification":'.((int) $m[2] - 1).':', $legacy);
+
+        /** @var FanOutNotification $job */
+        $job = unserialize($legacy);
+        $job->handle(app(NotificationDispatchService::class));
+
+        $lines = $this->attemptLines();
+        $this->assertCount(1, $lines, 'the in-flight alert is still delivered');
+        $this->assertSame('accepted', $lines[0]['outcome']);
+        $this->assertNotSame('', (string) $lines[0]['correlation_id']);
+
+        $job->failed(new \RuntimeException('boom'));
+        $this->assertStringContainsString('Notification fan-out failed', $this->everythingLogged());
+    }
+
     public function test_each_fan_out_gets_its_own_correlation_id(): void
     {
         $this->assertNotSame(
