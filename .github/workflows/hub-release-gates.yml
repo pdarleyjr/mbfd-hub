@@ -369,6 +369,43 @@ jobs:
           tests/Feature/Console/AuditDailyCheckoutPreactivationTest.php
           tests/Unit/Services/DailyCheckoutComplianceServiceTest.php
           tests/Feature/Api/PublicStationDailyCheckoutContractTest.php
+      # The training kiosk, matrix and crew planner suites need only the root
+      # Vite build, PHP dependencies and Chromium/WebKit that this job already
+      # prepares. They run here, not in the authenticated shell job, so that
+      # job and this one finish together instead of one carrying all of them.
+      - name: Verify training roster kiosk browser contracts
+        id: training-roster
+        if: ${{ !cancelled() && steps.hub-assets.outcome == 'success' && steps.php-dependencies.outcome == 'success' }}
+        run: npx playwright test --config=playwright.training-roster.config.ts
+      - name: Retain training roster browser evidence
+        if: ${{ always() && steps.training-roster.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: training-roster-browser-evidence
+          path: test-results/training-roster
+          retention-days: 7
+      - name: Verify authenticated training matrix and workbook browsers
+        id: training-matrix
+        if: ${{ !cancelled() && steps.hub-assets.outcome == 'success' && steps.php-dependencies.outcome == 'success' }}
+        run: npx playwright test --config=playwright.training-matrix.config.ts
+      - name: Retain training matrix browser evidence
+        if: ${{ always() && steps.training-matrix.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: training-matrix-browser-evidence
+          path: test-results/training-matrix
+          retention-days: 7
+      - name: Verify isolated crew planner and standalone exports in browsers
+        id: training-crew-planner
+        if: ${{ !cancelled() && steps.hub-assets.outcome == 'success' && steps.php-dependencies.outcome == 'success' }}
+        run: npx playwright test --config=playwright.training-crew-planner.config.ts
+      - name: Retain crew planner browser evidence
+        if: ${{ always() && steps.training-crew-planner.outcome != 'skipped' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: training-crew-planner-browser-evidence
+          path: test-results/training-crew-planner
+          retention-days: 7
 
   daily-authenticated-shell:
     name: Daily Checkout authenticated shell and Bid browsers
@@ -417,36 +454,6 @@ jobs:
         run: npx vite build
       - name: Publish Filament assets for authenticated browser workflows
         run: php artisan filament:assets
-      - name: Verify training roster kiosk browser contracts
-        id: training-roster
-        run: npx playwright test --config=playwright.training-roster.config.ts
-      - name: Retain training roster browser evidence
-        if: ${{ always() && steps.training-roster.outcome != 'skipped' }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: training-roster-browser-evidence
-          path: test-results/training-roster
-          retention-days: 7
-      - name: Verify authenticated training matrix and workbook browsers
-        id: training-matrix
-        run: npx playwright test --config=playwright.training-matrix.config.ts
-      - name: Retain training matrix browser evidence
-        if: ${{ always() && steps.training-matrix.outcome != 'skipped' }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: training-matrix-browser-evidence
-          path: test-results/training-matrix
-          retention-days: 7
-      - name: Verify isolated crew planner and standalone exports in browsers
-        id: training-crew-planner
-        run: npx playwright test --config=playwright.training-crew-planner.config.ts
-      - name: Retain crew planner browser evidence
-        if: ${{ always() && steps.training-crew-planner.outcome != 'skipped' }}
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: training-crew-planner-browser-evidence
-          path: test-results/training-crew-planner
-          retention-days: 7
       - name: Verify Home and Daily member shell in Chromium and true iPhone WebKit
         id: mobile-shell
         env:
@@ -588,13 +595,28 @@ jobs:
         id: employee-messages
         if: ${{ !cancelled() && steps.member-requests.outcome != 'skipped' }}
         run: npm run test:employee-messages-e2e
+      - name: Retain PWA and messaging failure evidence
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pwa-messaging-failure-evidence
+          path: test-results
+          if-no-files-found: ignore
+          retention-days: 3
 
   # Mocked Daily Checkout Playwright is partitioned by Playwright project, so
-  # every project runs exactly as it did serially (same files, grep, retries
-  # and ordering inside the project). The partition must cover every project
-  # in playwright.daily-checkout.config.ts exactly once; this is enforced by
+  # every project keeps its files, grep and retries. Tests are API-mocked and
+  # isolated per browser context, so lanes of light Chromium tests run 2-3
+  # workers (the runner is two physical cores; more adds nothing) while lanes
+  # holding the long WebKit workspace tests stay at one worker, because those
+  # tests take 60-80 s against a 90 s timeout and fail under CPU contention
+  # (see matrix.workers and playwright.daily-checkout.config.ts). The partition must cover every
+  # project in that config exactly once; this is enforced by
   # tests/Node/ci-configuration.test.mjs and, against the resolved Playwright
-  # project list, by scripts/ci/verify-daily-playwright-partition.mjs.
+  # project list, by scripts/ci/verify-daily-playwright-partition.mjs. Each
+  # lane installs only the browsers its projects use (WebKit pulls in roughly
+  # 180 extra system packages); the same test asserts that every lane running
+  # a WebKit project installs WebKit.
   daily-checkout-browser:
     name: Daily Checkout mocked Playwright (${{ matrix.lane }})
     needs: reuse-proof
@@ -606,37 +628,47 @@ jobs:
       matrix:
         include:
           - lane: workspace-webkit-iphone
+            browsers: chromium webkit
+            workers: 1
             projects: >-
               --project=daily-workspace-webkit-iphone
-              --project=captain5-chromium
-              --project=captain5-chromium-phone
-              --project=captain5-ems-chromium
-          - lane: webkit-ipad-and-issue-report
+          - lane: webkit-ipad-and-small-webkit
+            browsers: chromium webkit
+            workers: 1
             projects: >-
               --project=daily-workspace-webkit-ipad
               --project=daily-webkit-iphone
               --project=daily-webkit-ipad
-              --project=daily-issue-report-chromium
               --project=daily-issue-report-webkit
-          - lane: chromium-pwa-and-displays
+          - lane: responsive-phones-and-wide
+            browsers: chromium
+            workers: 3
+            projects: >-
+              --project=daily-responsive-phone-320
+              --project=daily-responsive-phone-360
+              --project=daily-responsive-phone-390
+              --project=daily-responsive-phone-430
+              --project=daily-responsive-wide-1920
+              --project=daily-issue-report-chromium
+          - lane: responsive-tablets-and-desktops
+            browsers: chromium
+            workers: 3
+            projects: >-
+              --project=daily-responsive-tablet-768
+              --project=daily-responsive-tablet-landscape-1024
+              --project=daily-responsive-desktop-1280
+              --project=daily-responsive-wide-1440
+          - lane: checkout-captain-and-displays
+            browsers: chromium
+            workers: 2
             projects: >-
               --project=daily-checkout-chromium
               --project=daily-pwa-chromium
-              --project=daily-responsive-display-3840
+              --project=captain5-chromium
+              --project=captain5-chromium-phone
+              --project=captain5-ems-chromium
               --project=daily-responsive-display-2560
-          - lane: responsive-mid
-            projects: >-
-              --project=daily-responsive-wide-1440
-              --project=daily-responsive-tablet-768
-              --project=daily-responsive-phone-390
-              --project=daily-responsive-tablet-landscape-1024
-          - lane: responsive-edge
-            projects: >-
-              --project=daily-responsive-phone-430
-              --project=daily-responsive-wide-1920
-              --project=daily-responsive-desktop-1280
-              --project=daily-responsive-phone-320
-              --project=daily-responsive-phone-360
+              --project=daily-responsive-display-3840
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -650,15 +682,19 @@ jobs:
       - name: Install Daily Checkout dependencies
         working-directory: resources/js/daily-checkout
         run: npm ci --ignore-scripts --legacy-peer-deps
-      - name: Install Chromium and WebKit for Daily Checkout Playwright
+      - name: Install Playwright browsers for Daily Checkout (${{ matrix.browsers }})
+        env:
+          PLAYWRIGHT_BROWSERS: ${{ matrix.browsers }}
         run: |
           bash scripts/ci/prepare-ubuntu-apt-mirror.sh
-          npx playwright install --with-deps chromium webkit
+          read -r -a browsers <<< "$PLAYWRIGHT_BROWSERS"
+          test "${#browsers[@]}" -gt 0
+          npx playwright install --with-deps "${browsers[@]}"
       - name: Verify individual Morning Lineup lobby
-        if: ${{ matrix.lane == 'chromium-pwa-and-displays' }}
+        if: ${{ matrix.lane == 'checkout-captain-and-displays' }}
         run: npx playwright test --config=playwright.member-lineup.config.ts
       - name: Retain Morning Lineup browser evidence
-        if: ${{ always() && matrix.lane == 'chromium-pwa-and-displays' }}
+        if: ${{ always() && matrix.lane == 'checkout-captain-and-displays' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: member-lineup-browser-evidence
@@ -668,11 +704,22 @@ jobs:
         env:
           DAILY_CHECKOUT_E2E_BASE_URL: http://127.0.0.1:4176
           DAILY_PLAYWRIGHT_PROJECTS: ${{ matrix.projects }}
+          DAILY_PLAYWRIGHT_WORKERS: ${{ matrix.workers }}
         run: |
           set -euo pipefail
           read -r -a project_args <<< "$DAILY_PLAYWRIGHT_PROJECTS"
           test "${#project_args[@]}" -gt 0
           npm run test:daily-checkout-e2e -- "${project_args[@]}"
+      - name: Retain Daily Playwright failure evidence
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: daily-playwright-failure-evidence-${{ matrix.lane }}
+          path: |
+            test-results
+            !test-results/daily-checkout-e2e-build
+          if-no-files-found: ignore
+          retention-days: 3
 
   generated-assets:
     name: Generated deployment assets
