@@ -49,6 +49,7 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
     const [draft, setDraft] = useState<EmsDraft | null>(null);
     const [restored, setRestored] = useState(false);
     const [query, setQuery] = useState('');
+    const [activeBag, setActiveBag] = useState('');
     const deferredQuery = useDeferredValue(query);
     const [openPanels, setOpenPanels] = useState<Record<string, boolean>>({});
     const [reviewOpen, setReviewOpen] = useState(false);
@@ -115,13 +116,27 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
 
     const searching = deferredQuery.trim() !== '';
     const filtered = useMemo(() => filterForms(definition.forms, deferredQuery), [definition.forms, deferredQuery]);
-    const firstPanel = definition.forms[0] ? groupSections(definition.forms[0].sections)[0]?.section.key : undefined;
+    // One list at a time (Airway Bag, ALS Med Bag/Box, ALS Transport Vehicle); a search looks through all of them.
+    const bagKey = definition.forms.some((form) => form.key === activeBag) ? activeBag : (definition.forms[0]?.key ?? '');
+    const firstPanelOf = (formKey: string) => {
+        const form = definition.forms.find((candidate) => candidate.key === formKey);
+        return form ? groupSections(form.sections)[0]?.section.key : undefined;
+    };
     const isOpen = (formKey: string, sectionKey: string) => {
-        const panelKey = `${formKey}:${sectionKey}`;
         if (searching) return true;
-        return openPanels[panelKey] ?? (formKey === definition.forms[0]?.key && sectionKey === firstPanel);
+        return openPanels[`${formKey}:${sectionKey}`] ?? sectionKey === firstPanelOf(formKey);
     };
     const togglePanel = (formKey: string, sectionKey: string) => setOpenPanels((state) => ({ ...state, [`${formKey}:${sectionKey}`]: !isOpen(formKey, sectionKey) }));
+    const setAllPanels = (form: EmsFormDefinition['forms'][number], open: boolean) => setOpenPanels((state) => {
+        const next = { ...state };
+        for (const { section } of groupSections(form.sections)) next[`${form.key}:${section.key}`] = open;
+        return next;
+    });
+    const chooseBag = (key: string) => {
+        setActiveBag(key);
+        window.requestAnimationFrame(() => document.getElementById('ems-bags')?.scrollIntoView({ block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth' }));
+    };
+    const shownForms = searching ? filtered.forms : filtered.forms.filter((form) => form.key === bagKey);
 
     const unitGroups = useMemo(() => {
         const groups: { label: string; units: EmsUnit[] }[] = [];
@@ -147,7 +162,7 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
     };
 
     const startNew = () => {
-        setResult(null); setDraft(blankDraft()); setRestored(false); setQuery(''); setOpenPanels({}); setErrors({}); setReviewError('');
+        setResult(null); setDraft(blankDraft()); setRestored(false); setQuery(''); setOpenPanels({}); setActiveBag(''); setErrors({}); setReviewError('');
         window.scrollTo({ top: 0, behavior: reducedMotion() ? 'auto' : 'smooth' });
     };
 
@@ -257,7 +272,7 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
         <header className="ems-head">
             <p className="of-eyebrow">Captain 5 EMS supply</p>
             <h1>Medical Inventory Request</h1>
-            <p>One request for your Airway Bag and your ALS Med Bag or Box. Pick the unit, then enter how many you need of each item and leave the rest blank. Every item and note is optional, and you can send a partial list.</p>
+            <p>Choose your unit, pick a list, and enter how many you need of each item. Leave the rest blank; a partial request is fine.</p>
         </header>
 
         <PendingRequests outbox={outbox} openRequest={goDetail} editEntry={editEntry} />
@@ -288,10 +303,10 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
         </section>
 
         <section className="ems-card ems-searchbar" aria-label="Find an item">
-            <label htmlFor="ems-search" className="sr-only">Search items in both bags</label>
+            <label htmlFor="ems-search" className="sr-only">Search items in every list</label>
             <div className="ems-search">
                 <Search size={18} aria-hidden="true" />
-                <input id="ems-search" ref={searchRef} type="search" className="ems-search-input" autoComplete="off" placeholder="Search both bags, like gauze or suction" value={query} onChange={(event) => setQuery(event.target.value)} />
+                <input id="ems-search" ref={searchRef} type="search" className="ems-search-input" autoComplete="off" placeholder="Search all lists" value={query} onChange={(event) => setQuery(event.target.value)} />
                 {query && <button type="button" className="ems-search-clear" aria-label="Clear search" onClick={() => { setQuery(''); searchRef.current?.focus(); }}><X size={17} aria-hidden="true" /></button>}
             </div>
             <p className="ems-search-count" role="status" aria-live="polite">
@@ -300,11 +315,26 @@ export function MedicalRequestForm({ api, owner, definition, outbox, startFrom, 
             {errors.items && <p className="ems-field-error" role="alert"><AlertTriangle size={15} aria-hidden="true" /> {errors.items}</p>}
         </section>
 
-        {filtered.forms.map((form) => <section key={form.key} className="ems-form" aria-labelledby={`ems-form-${form.key}`}>
+        {!searching && definition.forms.length > 1 && <nav id="ems-bags" className="ems-bags" aria-label="Choose a list">
+            {definition.forms.map((form) => {
+                const needed = requestedInSections(draft, form.key, form.sections);
+                const total = form.sections.reduce((sum, section) => sum + section.items.length, 0);
+                return <button key={form.key} type="button" className="ems-bag" aria-pressed={form.key === bagKey} onClick={() => chooseBag(form.key)}>
+                    <span className="ems-bag-name">{formName(form)}</span>
+                    <span className="ems-bag-meta">{itemsLabel(total)}{needed > 0 && <span className="ems-count-chip">{needed} needed</span>}</span>
+                </button>;
+            })}
+        </nav>}
+
+        {shownForms.map((form) => <section key={form.key} className="ems-form" aria-labelledby={`ems-form-${form.key}`}>
             <header className="ems-form-head">
                 <h2 id={`ems-form-${form.key}`}><ClipboardList size={18} aria-hidden="true" /> {formName(form)}</h2>
                 <p className="ems-form-source">Source form: {form.title}{form.version_label && form.version_label !== 'undated' ? `, ${form.version_label}` : ''}</p>
                 {form.printed_note && <p className="ems-printed-note">{form.printed_note}</p>}
+                {!searching && groupSections(form.sections).length > 1 && <div className="ems-form-tools">
+                    <Button appearance="subtle" onClick={() => setAllPanels(form, true)}>Open all sections</Button>
+                    <Button appearance="subtle" onClick={() => setAllPanels(form, false)}>Close all sections</Button>
+                </div>}
             </header>
             {groupSections(form.sections).map(({ section, children }) => {
                 const all = [section, ...children];

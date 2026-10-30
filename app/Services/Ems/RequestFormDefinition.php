@@ -8,12 +8,15 @@ use App\Models\Ems\SourceForm;
 use App\Models\Ems\SourceFormItem;
 use Illuminate\Support\Collection;
 
-/** What the Medical Inventory Request form shows: the active airway and ALS bag forms plus the unit choices. */
+/** What the Medical Inventory Request form shows: the active airway bag, ALS bag and ALS transport vehicle forms plus the unit choices. */
 final class RequestFormDefinition
 {
-    public const BAGS = [SourceForm::AIRWAY, SourceForm::ALS];
+    public const BAGS = [SourceForm::AIRWAY, SourceForm::ALS, SourceForm::TRANSPORT];
 
     public const MAX_QUANTITY = 999;
+
+    /** Three forms list about 420 items; a request never needs more lines than that. */
+    public const MAX_LINES = 500;
 
     public const NOTE_MAX = 2000;
 

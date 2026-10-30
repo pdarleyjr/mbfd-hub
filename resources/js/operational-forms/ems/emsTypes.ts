@@ -1,6 +1,6 @@
 /** Shapes of the Medical Inventory Request JSON API (routes/ems.php, docs/ems/ems-inventory-contract.md section 9). */
 
-export type EmsBagKey = 'airway-bag' | 'als-med-bag' | string;
+export type EmsBagKey = 'airway-bag' | 'als-med-bag' | 'als-transport-vehicle' | string;
 export type EmsResponseType = 'quantity' | 'yes_no';
 export type EmsTargetKind = 'rescue_unit' | 'other_unit' | 'detail_event';
 
@@ -9,6 +9,9 @@ export interface EmsFlags {
     rescue_only?: boolean;
     refrigerated?: boolean;
     controlled_substance?: boolean;
+    /** The transport vehicle sheet's "Fill if <" level, as printed. min_text is its AMOUNT (par). */
+    fill_if_text?: string;
+    fill_if_qty?: number | null;
 }
 
 export interface EmsFormItem {

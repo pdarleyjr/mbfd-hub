@@ -305,7 +305,7 @@ function haystack(item, section, form) {
 }
 
 /**
- * Items that match every word of the query, across both forms. A match on a section name keeps its items.
+ * Items that match every word of the query, across every form. A match on a section name keeps its items.
  * @param {EmsForm[]} forms @param {string} query
  * @returns {{forms: EmsForm[], matches: number}}
  */
@@ -351,7 +351,7 @@ export function groupSections(sections) {
         .map((section) => ({ section, children: children.get(section.key) ?? [] }));
 }
 
-const FORM_NAMES = { 'airway-bag': 'Airway Bag', 'als-med-bag': 'ALS Med Bag/Box' };
+const FORM_NAMES = { 'airway-bag': 'Airway Bag', 'als-med-bag': 'ALS Med Bag/Box', 'als-transport-vehicle': 'ALS Transport Vehicle' };
 
 /** A short name for a bag form. @param {EmsForm} form */
 export function formName(form) {
@@ -382,11 +382,15 @@ export function reviewGroups(draft, definition) {
     return groups;
 }
 
-/** "Min 2 each", exactly as the paper form gives it. Yes/No items have no minimum. @param {EmsFormItem} item */
+/**
+ * "Min 2 each", exactly as the paper form gives it; the transport vehicle sheet reads "Par 4, refill under 2".
+ * Yes/No items have no minimum. @param {EmsFormItem} item
+ */
 export function minLabel(item) {
     const text = (item.min_text ?? '').trim();
     if (item.response_type === 'yes_no' || text === '') return '';
-    return `Min ${text}`;
+    const fillIf = String(item.flags?.fill_if_text ?? '').trim();
+    return fillIf === '' ? `Min ${text}` : `Par ${text}, refill under ${fillIf}`;
 }
 
 const FLAG_LABELS = /** @type {const} */ ([

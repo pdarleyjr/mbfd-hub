@@ -316,3 +316,30 @@ test('Medical Inventory Request records get a proper label and open as a read-on
   assert.equal(isDocumentRecordType('ics_214'), false);
   assert.equal(isDocumentRecordType('froc_log_001_ff'), false);
 });
+
+test('the transport vehicle sheet reads par and refill level, and is searchable with the bags', () => {
+  const vehicle = {
+    key: 'als-transport-vehicle', title: 'M.B.F.D. A.L.S. TRANSPORT VEHICLE WEEKLY INVENTORY', version_label: 'Revised April 2021', printed_note: null,
+    sections: [{
+      key: 'tv-drugs', label: 'Drugs', parent_key: null, items: [
+        item('tv.drugs.narcan', 'Narcan', { min_text: '5', min_qty: 5, flags: { fill_if_text: '3', fill_if_qty: 3 } }),
+        item('tv.lifepack.ekg-paper', 'EKG Paper, LifePak 15', { min_text: '1 pack', min_qty: 1, min_unit: 'pack', flags: { fill_if_text: '1 Roll', fill_if_qty: 1 } }),
+      ],
+    }],
+  };
+  const forms = [...definition.forms, vehicle];
+
+  assert.equal(minLabel(vehicle.sections[0].items[0]), 'Par 5, refill under 3');
+  assert.equal(minLabel(vehicle.sections[0].items[1]), 'Par 1 pack, refill under 1 Roll', 'units are kept as printed');
+  assert.equal(minLabel(definition.forms[0].sections[0].items[0]), 'Min 3 SETS', 'bag forms keep the plain minimum');
+  assert.equal(formName(vehicle), 'ALS Transport Vehicle');
+  assert.deepEqual(filterForms(forms, 'narcan').forms.map((f) => f.key), ['als-transport-vehicle']);
+  assert.equal(filterForms(forms, 'lifepak').matches, 1);
+
+  const key = lineKey('als-transport-vehicle', 'tv.drugs.narcan');
+  const draft = setQuantity({ ...blankDraft(), targetChoice: 'unit:7' }, key, 3);
+  assert.equal(requestedInSections(draft, 'als-transport-vehicle', vehicle.sections), 1);
+  assert.equal(requestedInSections(draft, 'airway-bag', definition.forms[0].sections), 0);
+  assert.deepEqual(reviewGroups(draft, { ...definition, forms }).map((g) => [g.name, g.rows.map((r) => `${r.label}:${r.detail}`)]), [['ALS Transport Vehicle', ['Narcan:3']]]);
+  assert.equal(buildPayload(draft, { ...definition, forms }).lines[0].form, 'als-transport-vehicle');
+});

@@ -2,12 +2,15 @@
 
 namespace Database\Seeders;
 
+use App\Models\Apparatus;
 use App\Models\DepartmentUpdate;
 use App\Models\Employee;
 use App\Models\OperationalFormRecord;
+use App\Models\Station;
 use App\Models\User;
 use App\Models\Workgroup;
 use App\Models\WorkgroupMember;
+use App\Services\Ems\Import\SourceImporter;
 use App\Services\OperationalForms\PdfGenerationService;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Database\Seeder;
@@ -125,6 +128,20 @@ class OperationalFormsE2ESeeder extends Seeder
         );
 
         $this->seedControlledSamples($employee);
+        $this->seedMedicalInventoryRequest();
+    }
+
+    /** The tracked EMS source forms (Airway Bag, ALS Med Bag, ALS Transport Vehicle) and two units for the Medical Inventory Request. */
+    private function seedMedicalInventoryRequest(): void
+    {
+        app(SourceImporter::class)->import(base_path('database/data/ems'));
+        $station = Station::query()->firstOrCreate(['station_number' => 2], ['name' => 'Station 2', 'address' => '1 Test St', 'is_active' => true]);
+        foreach ([['R2', 'Rescue 2', 'Rescue', 'rescue'], ['E1', 'Engine 1', 'Engine', 'engine']] as [$unit, $name, $type, $template]) {
+            Apparatus::query()->firstOrCreate(['unit_id' => $unit], [
+                'station_id' => $station->id, 'vin' => 'VIN-'.$unit, 'assignment' => 'Station 2', 'designation' => $unit, 'name' => $name, 'type' => $type,
+                'vehicle_number' => 'V-'.$unit, 'status' => 'In Service', 'daily_checkout_requirement' => 'required', 'daily_checkout_template' => $template,
+            ]);
+        }
     }
 
     private function ensurePermissionTables(): void

@@ -5,7 +5,7 @@ Owner: EMS / Captain 5. This file is the source of truth for the data model and 
 
 ## 1. What this adds
 
-1. **Medical Inventory Request** (member form, Employee Portal → Forms). One combined Airway Bag + ALS Med Bag/Box request.
+1. **Medical Inventory Request** (member form, Employee Portal → Forms). One combined Airway Bag + ALS Med Bag/Box + ALS Transport Vehicle request.
    A member taps the quantities a bag needs and submits once. Nothing typed is mandatory, there are no submission windows or
    quotas, and a partial request is valid. Blank stays blank (never stored as 0).
 2. **Rescue Inventory** (Captain 5 tab and Admin → EMS). Every request is one durable record that Captain 5 and EMS Admin work
@@ -23,9 +23,11 @@ Tracked extractions live in `database/data/ems/` (see `EXTRACTION_VALIDATION.md`
 |---|---|---|
 | `airway_bag_inventory.json` | `Airway_bag_inventory.pdf` | `mbfd.ems.source_form.v1` |
 | `als_med_bag_inventory.json` | `ALS_Med_bag_inventory.pdf` (3/2023, "Totals can include amounts in Bobo Bag.") | `mbfd.ems.source_form.v1` |
+| `als_transport_vehicle_inventory.json` | Photo of the paper "M.B.F.D. A.L.S. TRANSPORT VEHICLE WEEKLY INVENTORY" (Revised April 2021, 222 lines) | `mbfd.ems.source_form.v1` |
 | `captain5_supply_room_inventory.json` | `captain_5_supply_room_inventory.pdf` (Revised 11/2021, 5 pages) | `mbfd.ems.supply_room_source.v1` |
 
 Rules:
+- The transport vehicle sheet prints two numbers per item: **AMOUNT** (the par the vehicle carries; stored as `min_text` / `min_qty` / `min_unit`) and **Fill if <** (the level under which it is refilled; stored in `flags.fill_if_text` / `flags.fill_if_qty`). Values keep the printed units ("1 box", "3 pair", "4 bags", "1 pack" against "1 Roll"). Its two "Cont." headings are merged into the section they continue, in sheet reading order. `tests/Feature/Ems/TransportVehicleSheetTest.php` holds the sheet line by line.
 - Every imported row keeps its verbatim source text (`source_label`, `min_text`, `order_level_text`, supplier cells, ...) and a
   `source_ref` (page/column/row). Normalized numbers are separate columns and may be null.
 - Each source file's `sha256` is stored with the imported form version. Re-importing the same sha256 is a no-op.

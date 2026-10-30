@@ -46,7 +46,7 @@ function LineCard({ line, canMark, onNotIssued }: { line: RequestLine; canMark: 
         <div><dt className={HINT}>Prepared</dt><dd className="font-semibold tabular-nums text-hub-ink">{line.prepared_qty ?? 'Not set'}</dd></div>
         <div><dt className={HINT}>Issued</dt><dd className="font-semibold tabular-nums text-hub-ink">{line.issued_qty}</dd></div>
       </dl>
-      {line.min_text && <p className={HINT}>Bag minimum: {line.min_text}</p>}
+      {line.min_text && <p className={HINT}>{line.bag_key === 'als-transport-vehicle' ? 'Vehicle par' : 'Bag minimum'}: {line.min_text}</p>}
       {line.controlled_substance && <p className={HINT}>Narcotics are restocked through the department controlled-substance procedure. This is recorded on the request only.</p>}
       {line.not_issued_reason && <p className="text-sm text-hub-ink">Not issued: {line.not_issued_reason}</p>}
       {canMark && (
