@@ -46,6 +46,9 @@ class ViewInventoryCorrection extends ViewRecord
     /** @var array<string, array<string, mixed>> plans computed during this request, by form state */
     private array $plans = [];
 
+    /** @var list<array{type: string, label: string, units: list<array{id: int, label: string, daily_checkout: bool}>}>|null */
+    private ?array $checklistUsage = null;
+
     public function getTitle(): string|Htmlable
     {
         return 'Inventory correction '.$this->correction()->reference();
@@ -171,7 +174,7 @@ class ViewInventoryCorrection extends ViewRecord
         $correction = fn (): ApparatusInventoryCorrection => $this->correction();
         $isNew = fn (): bool => $correction()->item_key === null;
         $refresh = function (Get $get, Set $set): void {
-            $plan = $this->safePlan($this->operationFromState($get), (string) ($get('scope') ?: InventoryChangePlanner::SCOPE_UNIT));
+            $plan = $this->safePlan($this->operationFromState($get), (string) ($get('scope') ?: InventoryChangePlanner::SCOPE_UNIT), $this->checklistTypesFrom($get));
             $set('preview_fingerprint', $plan['fingerprint'] ?? '');
             $set('apparatus_ids', collect($plan['units'] ?? [])->where('default_selected', true)->pluck('apparatus_id')->map(fn ($id): string => (string) $id)->values()->all());
         };
@@ -192,6 +195,7 @@ class ViewInventoryCorrection extends ViewRecord
                 return [
                     ...$state,
                     'scope' => InventoryChangePlanner::SCOPE_UNIT,
+                    'checklist_types' => [],
                     'preview_fingerprint' => $plan['fingerprint'] ?? '',
                     'apparatus_ids' => collect($plan['units'] ?? [])->where('default_selected', true)->pluck('apparatus_id')->map(fn ($id): string => (string) $id)->values()->all(),
                     'lock_version' => $correction()->lock_version,
@@ -246,6 +250,16 @@ class ViewInventoryCorrection extends ViewRecord
                             ->live()
                             ->afterStateUpdated($refresh)
                             ->helperText(fn (): ?string => InventoryCorrectionAccess::canPropagate(auth()->user()) ? null : 'Changing more than one apparatus requires a Logistics or administrator role.'),
+                        Forms\Components\CheckboxList::make('checklist_types')
+                            ->label('Also apply to these checkout lists')
+                            ->helperText(fn (): string => 'This apparatus ('.InventoryCorrectionResource::unitLabel($this->correction()).') is always included. Every apparatus listed under a checked checkout list is checked one by one below.')
+                            ->options(fn (): array => $this->checklistOptions())
+                            ->descriptions(fn (): array => $this->checklistDescriptions())
+                            ->visible(fn (Get $get): bool => $get('scope') === InventoryChangePlanner::SCOPE_CHECKLISTS)
+                            ->required(fn (Get $get): bool => $get('scope') === InventoryChangePlanner::SCOPE_CHECKLISTS)
+                            ->live()
+                            ->afterStateUpdated($refresh)
+                            ->columns(1),
                         Forms\Components\Placeholder::make('impact')
                             ->label('Impact')
                             ->content(fn (Get $get): HtmlString => $this->impactHtml($get)),
@@ -275,6 +289,7 @@ class ViewInventoryCorrection extends ViewRecord
                     (string) $data['key'],
                     $data['member_message'] ?? null,
                     $data['internal_note'] ?? null,
+                    $data['scope'] === InventoryChangePlanner::SCOPE_CHECKLISTS ? array_values((array) ($data['checklist_types'] ?? [])) : [],
                 ), 'Approved. The next checklist for the selected apparatus includes this change.');
             });
     }
@@ -365,15 +380,63 @@ class ViewInventoryCorrection extends ViewRecord
             if ($op !== ApparatusInventoryChange::OP_ADD) {
                 $options[InventoryChangePlanner::SCOPE_EQUIPMENT] = 'Every apparatus carrying this exact item';
             }
+            $options[InventoryChangePlanner::SCOPE_CHECKLISTS] = 'This apparatus and the checkout lists I choose';
         }
 
         return $options;
     }
 
+    /** @return list<string> the checkout lists ticked in the form; only read while that scope is chosen */
+    private function checklistTypesFrom(Get $get): array
+    {
+        if ($get('scope') !== InventoryChangePlanner::SCOPE_CHECKLISTS) {
+            return [];
+        }
+
+        return array_values(array_filter((array) $get('checklist_types'), 'is_string'));
+    }
+
+    /** @return array<string, string> checkout list => name, with a marker on the reporting apparatus's own list */
+    private function checklistOptions(): array
+    {
+        $own = $this->ownChecklistType();
+
+        return collect($this->checklistUsage())
+            ->mapWithKeys(fn (array $list): array => [$list['type'] => $list['label'].($list['type'] === $own ? ' (this apparatus\'s list)' : '')])
+            ->all();
+    }
+
+    /** @return array<string, string> checkout list => "Used by: E1, E3, E21 (reserve)" */
+    private function checklistDescriptions(): array
+    {
+        return collect($this->checklistUsage())
+            ->mapWithKeys(fn (array $list): array => [$list['type'] => 'Used by: '.collect($list['units'])
+                ->map(static fn (array $unit): string => $unit['label'].($unit['daily_checkout'] ? '' : ' (not on Daily Checkout)'))
+                ->implode(', ')])
+            ->all();
+    }
+
+    /** @return list<array{type: string, label: string, units: list<array{id: int, label: string, daily_checkout: bool}>}> */
+    private function checklistUsage(): array
+    {
+        return $this->checklistUsage ??= $this->planner()->checklistUsage();
+    }
+
+    private function ownChecklistType(): ?string
+    {
+        foreach ($this->checklistUsage() as $list) {
+            if (collect($list['units'])->contains('id', (int) $this->correction()->apparatus_id)) {
+                return $list['type'];
+            }
+        }
+
+        return null;
+    }
+
     /** @return array<string, string> */
     private function unitOptions(Get $get): array
     {
-        $plan = $this->safePlan($this->operationFromState($get), (string) ($get('scope') ?: InventoryChangePlanner::SCOPE_UNIT));
+        $plan = $this->safePlan($this->operationFromState($get), (string) ($get('scope') ?: InventoryChangePlanner::SCOPE_UNIT), $this->checklistTypesFrom($get));
 
         return collect($plan['units'] ?? [])->where('includable', true)
             ->mapWithKeys(fn (array $unit): array => [(string) $unit['apparatus_id'] => $unit['label'].($unit['is_source'] ? ' (reported here)' : '')])
@@ -383,7 +446,7 @@ class ViewInventoryCorrection extends ViewRecord
     /** @return array<string, string> */
     private function unitDescriptions(Get $get): array
     {
-        $plan = $this->safePlan($this->operationFromState($get), (string) ($get('scope') ?: InventoryChangePlanner::SCOPE_UNIT));
+        $plan = $this->safePlan($this->operationFromState($get), (string) ($get('scope') ?: InventoryChangePlanner::SCOPE_UNIT), $this->checklistTypesFrom($get));
 
         return collect($plan['units'] ?? [])->where('includable', true)
             ->mapWithKeys(fn (array $unit): array => [(string) $unit['apparatus_id'] => $this->unitSummary($unit)])
@@ -393,7 +456,7 @@ class ViewInventoryCorrection extends ViewRecord
     private function impactHtml(Get $get): HtmlString
     {
         try {
-            $plan = $this->planner()->plan($this->correction(), $this->operationFromState($get), (string) ($get('scope') ?: InventoryChangePlanner::SCOPE_UNIT));
+            $plan = $this->planner()->plan($this->correction(), $this->operationFromState($get), (string) ($get('scope') ?: InventoryChangePlanner::SCOPE_UNIT), checklistTypes: $this->checklistTypesFrom($get));
         } catch (ValidationException $exception) {
             return new HtmlString('<p class="hub-insp-muted">'.e((string) collect($exception->errors())->flatten()->first()).'</p>');
         }
@@ -442,16 +505,17 @@ class ViewInventoryCorrection extends ViewRecord
 
     /**
      * @param  array{op: string, fields: array<string, mixed>}  $operation
+     * @param  list<string>  $checklistTypes
      * @return array<string, mixed>|null
      */
-    private function safePlan(array $operation, string $scope): ?array
+    private function safePlan(array $operation, string $scope, array $checklistTypes = []): ?array
     {
-        $key = md5(json_encode([$operation, $scope]) ?: '');
+        $key = md5(json_encode([$operation, $scope, $checklistTypes]) ?: '');
         if (array_key_exists($key, $this->plans)) {
             return $this->plans[$key];
         }
         try {
-            $plan = $this->planner()->plan($this->correction(), $operation, $scope);
+            $plan = $this->planner()->plan($this->correction(), $operation, $scope, checklistTypes: $checklistTypes);
         } catch (ValidationException) {
             $plan = null;
         }

@@ -88,6 +88,7 @@ defect continuity survives chained moves and renames (later change still wins pe
 | `unit` (default) | the reporting apparatus | it | reviewer |
 | `family` | every usable apparatus of the same family (`engine*`, `ladder*`, `rescue`, `fireboat*`) | Daily Checkout units that are eligible | propagation authority |
 | `equipment` | every usable apparatus whose effective checklist carries the same `equipment_key` | eligible Daily Checkout units | propagation authority |
+| `checklists` | the reporting apparatus plus every apparatus on the checkout lists (`checklist_type`) the reviewer ticks; the form lists each checkout list with the apparatus using it | eligible Daily Checkout units | propagation authority |
 
 Per-unit matching: on the same template, same `item_key` with same `equipment_key`; otherwise only
 the single item with the same `equipment_key` (variant template ids are positional). Destination
@@ -97,7 +98,10 @@ same normalized name (Ladder 1 and Ladder 3 reuse `b_comp_N` for different posit
 `item_not_found`, `ambiguous_item`, `destination_missing`, `invalid_result` (name clash),
 `no_change` (already as requested), `unit_override` (another unit-scoped active change on this
 item; excluded by default, may be included), `not_daily_checkout` (reserve; may be included),
-`checklist_unavailable`. `add` cannot use `equipment` scope.
+`checklist_unavailable`. `add` cannot use `equipment` scope. The `checklists` scope needs at least one
+known checkout list (`InventoryChangePlanner::checklistUsage()`); the chosen lists are part of the preview
+fingerprint, stored on the decision and the applied event as `checklist_types`, and a unit on a chosen list
+that does not carry the item is listed as excluded (`item_not_found`) exactly as under `family`.
 
 Reviewer authority = `InspectionReviewers::canReview`. Propagation authority (multi-unit) =
 reviewer AND role `super_admin`, `admin` or `logistics_admin` (Fleet-only reviewers apply to
