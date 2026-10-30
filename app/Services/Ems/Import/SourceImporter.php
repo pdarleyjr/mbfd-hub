@@ -30,10 +30,11 @@ final class SourceImporter
     public const FILES = [
         'airway_bag_inventory.json' => 'mbfd.ems.source_form.v1',
         'als_med_bag_inventory.json' => 'mbfd.ems.source_form.v1',
+        'als_transport_vehicle_inventory.json' => 'mbfd.ems.source_form.v1',
         'captain5_supply_room_inventory.json' => 'mbfd.ems.supply_room_source.v1',
     ];
 
-    private const FORM_KEYS = [SourceForm::AIRWAY, SourceForm::ALS];
+    private const FORM_KEYS = [SourceForm::AIRWAY, SourceForm::ALS, SourceForm::TRANSPORT];
 
     /** Supply fields an authorized person may edit; once edited, a re-import leaves them alone. */
     private const EDITABLE = [
@@ -193,6 +194,11 @@ final class SourceImporter
             'refrigerated' => (bool) ($flags['refrigerated'] ?? false),
             'controlled_substance' => (bool) ($flags['controlled_substance'] ?? false),
         ];
+        // The transport vehicle sheet also prints a "Fill if <" level next to the AMOUNT; the bag forms do not.
+        if (isset($flags['fill_if_text']) && trim((string) $flags['fill_if_text']) !== '') {
+            $normalizedFlags['fill_if_text'] = trim((string) $flags['fill_if_text']);
+            $normalizedFlags['fill_if_qty'] = isset($flags['fill_if_qty']) ? (int) $flags['fill_if_qty'] : null;
+        }
         $catalogRef = self::reference($item, 'catalog');
         $catalog = $catalogRef !== null
             ? $this->catalogItem($catalogRef, (string) $item['label'], (string) ($section['label'] ?? ''), $normalizedFlags, null)

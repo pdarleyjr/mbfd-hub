@@ -5,7 +5,7 @@ Owner: EMS / Captain 5. This file is the source of truth for the data model and 
 
 ## 1. What this adds
 
-1. **Medical Inventory Request** (member form, Employee Portal → Forms). One combined Airway Bag + ALS Med Bag/Box request.
+1. **Medical Inventory Request** (member form, Employee Portal → Forms). One combined Airway Bag + ALS Med Bag/Box + ALS Transport Vehicle request.
    A member taps the quantities a bag needs and submits once. Nothing typed is mandatory, there are no submission windows or
    quotas, and a partial request is valid. Blank stays blank (never stored as 0).
 2. **Rescue Inventory** (Captain 5 tab and Admin → EMS). Every request is one durable record that Captain 5 and EMS Admin work
@@ -23,9 +23,11 @@ Tracked extractions live in `database/data/ems/` (see `EXTRACTION_VALIDATION.md`
 |---|---|---|
 | `airway_bag_inventory.json` | `Airway_bag_inventory.pdf` | `mbfd.ems.source_form.v1` |
 | `als_med_bag_inventory.json` | `ALS_Med_bag_inventory.pdf` (3/2023, "Totals can include amounts in Bobo Bag.") | `mbfd.ems.source_form.v1` |
+| `als_transport_vehicle_inventory.json` | Photo of the paper "M.B.F.D. A.L.S. TRANSPORT VEHICLE WEEKLY INVENTORY" (Revised April 2021, 222 lines) | `mbfd.ems.source_form.v1` |
 | `captain5_supply_room_inventory.json` | `captain_5_supply_room_inventory.pdf` (Revised 11/2021, 5 pages) | `mbfd.ems.supply_room_source.v1` |
 
 Rules:
+- The transport vehicle sheet prints two numbers per item: **AMOUNT** (the par the vehicle carries; stored as `min_text` / `min_qty` / `min_unit`) and **Fill if <** (the level under which it is refilled; stored in `flags.fill_if_text` / `flags.fill_if_qty`). Values keep the printed units ("1 box", "3 pair", "4 bags", "1 pack" against "1 Roll"). Its two "Cont." headings are merged into the section they continue, in sheet reading order. `tests/Feature/Ems/TransportVehicleSheetTest.php` holds the sheet line by line.
 - Every imported row keeps its verbatim source text (`source_label`, `min_text`, `order_level_text`, supplier cells, ...) and a
   `source_ref` (page/column/row). Normalized numbers are separate columns and may be null.
 - Each source file's `sha256` is stored with the imported form version. Re-importing the same sha256 is a no-op.
@@ -337,3 +339,18 @@ The Daily Checkout app's Captain 5 page (`/daily/captain-5`) gains two tabs buil
 - **Corrections** start from the quantity an issuance stands at now, found by replaying `issue_corrected` events (`payload.corrects_event_id`, `new_quantity`) over the original `issued` event.
 - **Downloads.** Snapshots download through the two export routes in section 9.3. They are plain links, outside the Daily service worker's `/daily/` scope, and the worker never stores `/ems/api/` responses.
 - **Tests.** `tests/Node/ems-captain5-logic.test.mjs` (pure helpers), `tests/e2e/captain5-ems.spec.ts` (mocked API, project `captain5-ems-chromium`), `tests/Feature/Ems/EmsSnapshotExportApiTest.php` and `EmsRetryNotificationsTest.php`.
+
+## Draft continuity and release order
+
+A member can be partway through a request when a release ships. Nothing they entered may be lost or redone.
+
+- **Where work lives.** The unfinished request is kept on the device only (IndexedDB `mbfd-ems-requests`, table `drafts`, one row per employee id): `{v: 1, clientSubmissionId, targetChoice, quantities, answers, savedAt}`, keyed by `<form key>|<item_key>`, plus two optional fields: `labels` (item name per key that has an entry) and `retired` (`{quantities, answers}` for keys the current form does not list). The note and event text are not stored (privacy decision); the Forms page's unsaved-work guard and the typed-field refresh predicate protect them while the page is open. A request that could not be sent waits in the `outbox` table with its `client_submission_id`; the server dedupes on that id, so a retry after a restart creates exactly one request.
+- **The stored version stays 1.** `restoreDraft` discards a draft whose `v` differs, so a version bump would make a rolled-back build throw a newer draft away whole. New data is added only as optional fields that older builds ignore.
+- **Draft keys are a public contract.** Never rename or reuse an `item_key` or a form key. Retire an item by deactivating the form version or letting the importer flag it absent; never delete rows.
+- **Expand, then contract.** A release adds forms and items (new keys, blank for everyone) and accepts old payloads: the server's allowed form keys are a superset and unchanged item keys keep validating. Only a later release may stop offering something, once no resident page or queued request can still carry it.
+- **Merge by key on load.** An entry for an item the form lists goes back into the form. An entry for an item it does not list is *retired*: saved with the draft on every write, never sent (the server rejects unknown items), counted in the restore notice ("N saved entries are for items that are no longer on this form"), listed by name on the review screen with a Discard button, and returned to the form automatically if the item reappears in a later definition.
+- **No forced reload.** `#operational-forms-root` carries `data-mbfd-unsaved-work-guard`, so the window never reloads on its own and the update banner only asks.
+- **Release order.** (1) Deploy the image; pages keep working and the form still shows the lists it had. (2) `php artisan ems:import-sources --dry-run`: the existing lists must report `unchanged`, only a new list adds rows; then run it for real. (3) Smoke with a synthetic identity. Pages already open keep their loaded definition until they reload, and a page with the old definition can still submit.
+- **Rollback is the previous image only.** Never reverse migrations or delete imported rows; deactivate the new form version if it must be hidden. Caveat: a build from before the `retired` merge drops unknown keys when it saves, so entries typed on a newly added list are protected only by builds that have it.
+
+Covered by `tests/Node/operational-forms/ems-member-form.test.mjs`, `tests/Feature/Ems/TransportVehicleSheetTest.php` and `tests/e2e/ems-draft-continuity.spec.ts`.

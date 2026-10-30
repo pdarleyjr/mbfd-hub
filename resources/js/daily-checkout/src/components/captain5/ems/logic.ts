@@ -56,7 +56,7 @@ export function monthLabel(month: string): string {
 
 // -------------------------------------------------------------- request list
 
-export const BAG_LABELS: Record<string, string> = { 'airway-bag': 'Airway Bag', 'als-med-bag': 'ALS Med Bag or Box' };
+export const BAG_LABELS: Record<string, string> = { 'airway-bag': 'Airway Bag', 'als-med-bag': 'ALS Med Bag or Box', 'als-transport-vehicle': 'ALS Transport Vehicle' };
 
 /** Open on the Captain 5 tab means work is left to do: the request is not yet fully issued or closed. */
 export const OPEN_STATUSES = ['submitted', 'reviewed', 'prepared', 'partially_issued'] as const;

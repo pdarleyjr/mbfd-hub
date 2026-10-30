@@ -315,3 +315,34 @@
 
 .ems-search-input::-webkit-search-cancel-button { display: none; }
 .ems-search-count:empty { min-height: 0; margin-top: -8px; } /* stays in the page so the live region announces the first result */
+
+/* Choosing a list: Airway Bag, ALS Med Bag/Box, ALS Transport Vehicle. Wraps on a phone, never scrolls sideways. */
+.ems-bags { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 8px; scroll-margin-top: 12px; }
+.ems-bag {
+    box-sizing: border-box;
+    display: grid;
+    align-content: center;
+    gap: 2px;
+    min-height: 56px;
+    padding: 8px 12px;
+    font: inherit;
+    text-align: left;
+    color: var(--ems-ink);
+    background: var(--ems-surface);
+    border: 1px solid var(--ems-edge);
+    border-radius: var(--hub-radius-control);
+    cursor: pointer;
+}
+.ems-bag:hover { background: rgb(var(--hub-n-25)); }
+.ems-bag[aria-pressed="true"] { background: var(--ems-tint); border-color: var(--ems-accent); box-shadow: inset 0 0 0 1px var(--ems-accent); }
+.ems-bag-name { font-size: 15px; font-weight: 650; line-height: 1.25; }
+.ems-bag-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 12.5px; color: var(--ems-muted); }
+.ems-form-tools { display: flex; flex-wrap: wrap; gap: 4px; }
+.ems-form-tools .fui-Button { min-height: 44px; }
+/* Phones: one list per row, name left and counts right, so all three show without scrolling past a wrapped grid. */
+@media (max-width: 520px) {
+    .ems-bags { grid-template-columns: 1fr; gap: 6px; }
+    .ems-bag { grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 12px; min-height: 48px; }
+    .ems-bag-meta { justify-content: flex-end; }
+}
+#ems-review-retired .fui-Button { min-height: 44px; }

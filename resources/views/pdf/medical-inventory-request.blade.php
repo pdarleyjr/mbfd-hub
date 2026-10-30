@@ -76,7 +76,7 @@
 @forelse($bags as $bag)
     <h2>{{ $bag['title'] }}@if(filled($bag['version_label'])) <span class="muted">({{ $bag['version_label'] }})</span>@endif</h2>
     <table class="grid">
-        <thead><tr><th>Item</th><th style="width: 90px">Bag minimum</th><th style="width: 70px; text-align: right">Requested</th></tr></thead>
+        <thead><tr><th>Item</th><th style="width: 90px">{{ $bag['min_heading'] ?? 'Bag minimum' }}</th><th style="width: 70px; text-align: right">Requested</th></tr></thead>
         <tbody>
         @foreach($bag['sections'] as $section)
             <tr class="avoid-break"><td colspan="3"><strong>{{ $section['label'] }}</strong></td></tr>

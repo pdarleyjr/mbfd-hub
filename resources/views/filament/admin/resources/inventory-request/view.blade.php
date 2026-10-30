@@ -64,7 +64,7 @@
                                         {{ $line['label'] }}@if (filled($line['variant_label'])) <span class="font-normal text-gray-600 dark:text-gray-400">({{ $line['variant_label'] }})</span>@endif
                                     </p>
                                     <p class="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-gray-600 dark:text-gray-400">
-                                        @if (filled($line['min_text']))<span>Bag minimum: {{ $line['min_text'] }}</span>@endif
+                                        @if (filled($line['min_text']))<span>{{ ($line['bag_key'] ?? '') === 'als-transport-vehicle' ? 'Vehicle par' : 'Bag minimum' }}: {{ $line['min_text'] }}</span>@endif
                                         @if ($line['refrigerated'])<x-filament::badge size="sm" color="info">Refrigerated</x-filament::badge>@endif
                                         @if ($line['controlled_substance'])<x-filament::badge size="sm" color="warning">Controlled: recorded only</x-filament::badge>@endif
                                     </p>

@@ -164,7 +164,7 @@ class OperationalForms extends Page
             [
                 'key' => EmsLinks::MEMBER_FORM_KEY,
                 'title' => 'Medical Inventory Request',
-                'description' => 'Tell Captain 5 what your Airway Bag and ALS Med Bag or Box need. Fill in only what you need and send it when you are ready.',
+                'description' => 'Tell Captain 5 what your Airway Bag, ALS Med Bag or Box, and ALS Transport Vehicle need. Fill in only what you need and send it when you are ready.',
                 'href' => url(EmsLinks::memberForm()),
                 'action_label' => 'Start a request',
                 'in_app' => true,

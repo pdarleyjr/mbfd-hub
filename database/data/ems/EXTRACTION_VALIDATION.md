@@ -368,3 +368,14 @@ Interpreter: `C:\Users\Peter Darley\AppData\Local\Programs\Python\Python313\pyth
 
 Row numbering: bag forms `source_ref.row` = table row with the yellow title banner as row 1 and the header row as row 2. Supply-room `row` = 1-based data row on the page, band rows excluded; `row_key` = `sr.p{page}.r{nn}`.
 
+
+## 7. ALS Transport Vehicle Weekly Inventory (added 2026-10-30)
+
+Source: a phone photo of the paper "M.B.F.D. A.L.S. TRANSPORT VEHICLE WEEKLY INVENTORY, Revised April 2021" (`als_transport_vehicle_inventory.json`, `source.sha256` is the sha256 of that photo). Transcribed by reading the photo and zoomed crops (DRUGS, INTUBATION/SUCTION, LifePack 15 and MISCELLANEOUS crops at 2x), 222 lines in 8 sections: Drugs 27, I.V. / Needles 33, Airways / Oxygen 31, Intubation / Suction 46, Trauma Supplies 35, PPE / Decon 24, LifePack 15 Supplies 7, Miscellaneous 19.
+
+- Each line carries AMOUNT (par, `min_text`) and "Fill if <" (`flags.fill_if_text`), exactly as printed; the blank NEED column is what the member fills in.
+- The sheet has two continuation headings ("AIRWAYS/OXYGEN Cont.", "TRAUMA SUPPLIES Cont."). They are merged into the section they continue; `source_label` on the section keeps the printed headings.
+- There is no ET Tube 7.0 line: the sheet goes 6.0, 6.5, 7.5, 8.0, 8.5, 9.0.
+- Printed oddities kept as they are: EKG paper "1 pack" with fill-if "1 Roll"; disposable razors "1 pack" with fill-if "2 Razors"; Steri pads 2x2" fill-if printed "1box"; "Ascherman", "Stabilzer" spellings are corrected in `label` and kept in `source_label`.
+- Catalog identity is shared with the bag forms only for exact same items (for example Narcan, Epi 1:10,000, i-gel 3/4/5, OPA/NPA sizes); near matches such as "Baby Aspirin" vs "Aspirin", "Ocular Patch" vs "Eye Cover" or "Cold packs" vs "Ice Packs" keep their own catalog item (`tv-...`). Nothing is matched by name similarity at runtime.
+- Not done: no OCR and no second independent transcription; every number was read by eye from the photo. A re-read against the paper sheet is the check that would catch a misread digit.

@@ -1,13 +1,15 @@
 import { Button, Dialog, DialogActions, DialogBody, DialogContent, DialogSurface, DialogTitle, MessageBar, MessageBarBody } from '@fluentui/react-components';
 import { LoaderCircle, Send } from 'lucide-react';
-import { countRequested, itemsLabel, reviewGroups } from './emsLogic.js';
+import { countRequested, itemsLabel, retiredEntries, reviewGroups } from './emsLogic.js';
 import type { EmsDraft, EmsFormDefinition } from './emsTypes';
 
 /** Everything that will be sent, listed once more before the final Send. Opens as a bottom sheet on phones. */
-export function ReviewSheet({ open, definition, draft, unitLabel, sending, error, onBack, onSend }: {
+export function ReviewSheet({ open, definition, draft, onDiscardRetired, unitLabel, sending, error, onBack, onSend }: {
     open: boolean;
     definition: EmsFormDefinition;
     draft: EmsDraft;
+    /** Entries kept for items that are no longer on the form. They are listed here by name, never sent, and can be discarded. */
+    onDiscardRetired: () => void;
     unitLabel: string;
     sending: boolean;
     error: string;
@@ -15,6 +17,7 @@ export function ReviewSheet({ open, definition, draft, unitLabel, sending, error
     onSend: () => void;
 }) {
     const groups = reviewGroups(draft, definition);
+    const leftBehind = retiredEntries(draft);
     const requested = countRequested(draft);
     const note = draft.note.trim();
     const event = draft.targetChoice === 'detail' ? draft.eventAssignment.trim() : '';
@@ -37,6 +40,14 @@ export function ReviewSheet({ open, definition, draft, unitLabel, sending, error
                                 {group.rows.map((row) => <li key={row.itemKey}><span>{row.label}</span><strong>{row.answered ? row.detail : `${row.detail} needed`}</strong></li>)}
                             </ul>
                         </section>)}
+                        {leftBehind.length > 0 && <section aria-label="Saved entries for items no longer on the form" id="ems-review-retired">
+                            <h3>Not sent: no longer on the form</h3>
+                            <p className="ems-hint">These stay saved on this device. They are not part of this request.</p>
+                            <ul className="ems-review-list">
+                                {leftBehind.map((entry) => <li key={entry.key}><span>{entry.label}</span><strong>{entry.detail}</strong></li>)}
+                            </ul>
+                            <Button appearance="subtle" onClick={onDiscardRetired} disabled={sending}>Discard saved entries</Button>
+                        </section>}
                         {note && <section aria-label="Your note"><h3>Your note</h3><p className="ems-review-note">{note}</p></section>}
                     </div>
                     {error && <MessageBar intent="error" role="alert"><MessageBarBody>{error}</MessageBarBody></MessageBar>}

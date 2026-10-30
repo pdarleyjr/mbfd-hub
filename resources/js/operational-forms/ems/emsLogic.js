@@ -19,6 +19,9 @@
 export const FORM_KEY = 'medical-inventory-request';
 export const DEFAULT_MAX_QUANTITY = 999;
 export const STORED_DRAFT_VERSION = 1;
+
+/** Upper bound on retired entries read back from a stored draft (a corrupt row cannot grow without limit). */
+const RETIRED_LIMIT = 600;
 export const TIME_ZONE = 'America/New_York';
 
 /** Record types that are a read-only PDF copy in the member's Forms records. */
@@ -120,6 +123,40 @@ export function hasContent(draft) {
     return countRequested(draft) > 0
         || Object.keys(draft.answers).length > 0
         || draft.note.trim() !== '';
+}
+
+/**
+ * Entries kept for items the form does not list right now (retired, renamed, or a list not yet imported).
+ * They are saved with the draft and never sent. @param {EmsDraft} draft
+ */
+export function retiredCount(draft) {
+    return Object.keys(draft.retired?.quantities ?? {}).length + Object.keys(draft.retired?.answers ?? {}).length;
+}
+
+/** @param {EmsDraft} draft @returns {EmsDraft} */
+export function discardRetired(draft) {
+    const { retired, labels, ...rest } = draft;
+    void retired;
+    void labels;
+    return rest;
+}
+
+/**
+ * The retired entries by name, for the review screen. A name comes from the draft (saved with it) or, failing that, the last part of the key.
+ * @param {EmsDraft} draft @returns {{key: string, label: string, detail: string}[]}
+ */
+export function retiredEntries(draft) {
+    /** @param {string} key */
+    const name = (key) => draft.labels?.[key] || key.split('|').slice(1).join('|') || key;
+    return [
+        ...Object.entries(draft.retired?.quantities ?? {}).map(([key, value]) => ({ key, label: name(key), detail: `${value} needed` })),
+        ...Object.entries(draft.retired?.answers ?? {}).map(([key, value]) => ({ key, label: name(key), detail: value ? 'Yes' : 'No' })),
+    ];
+}
+
+/** Anything the member would have to redo if the page went away: entries, unit, note, event text, retired entries. @param {EmsDraft} draft */
+export function hasUnsavedWork(draft) {
+    return hasContent(draft) || draft.targetChoice !== '' || draft.eventAssignment.trim() !== '' || retiredCount(draft) > 0;
 }
 
 /** Requested items in a list of sections. @param {EmsDraft} draft @param {string} formKey @param {EmsFormSection[]} sections */
@@ -231,12 +268,18 @@ export function payloadItemCount(payload) {
 export function draftFromPayload(payload, definition) {
     const keys = validKeys(definition);
     let draft = blankDraft(payload.client_submission_id);
+    const retired = { quantities: /** @type {Record<string, number>} */ ({}), answers: /** @type {Record<string, boolean>} */ ({}) };
     for (const line of payload.lines) {
         const key = lineKey(line.form, line.item_key);
-        if (!keys.has(key)) continue;
-        if (typeof line.flag === 'boolean') draft = setAnswer(draft, key, line.flag);
-        else if (line.quantity !== undefined) draft = setQuantity(draft, key, line.quantity, definition.limits.max_quantity);
+        if (typeof line.flag === 'boolean') {
+            if (keys.has(key)) draft = setAnswer(draft, key, line.flag);
+            else retired.answers[key] = line.flag;
+        } else if (line.quantity !== undefined) {
+            if (keys.has(key)) draft = setQuantity(draft, key, line.quantity, definition.limits.max_quantity);
+            else if (normalizeQuantity(line.quantity, definition.limits.max_quantity) !== null) retired.quantities[key] = /** @type {number} */ (normalizeQuantity(line.quantity, definition.limits.max_quantity));
+        }
     }
+    if (Object.keys(retired.quantities).length + Object.keys(retired.answers).length > 0) draft = { ...draft, retired };
     const unit = payload.target.kind === 'detail_event'
         ? definition.units.find((candidate) => candidate.kind === 'detail_event')
         : definition.units.find((candidate) => candidate.id === payload.target.apparatus_id);
@@ -251,13 +294,32 @@ export function draftFromPayload(payload, definition) {
 // ---------------------------------------------------------------- what is stored on the device
 
 /**
+ * Names for every key that has an entry: from the form when it lists the item, else the name saved with the draft.
+ * @param {EmsDraft} draft @param {EmsFormDefinition | undefined} definition @returns {Record<string, string> | null}
+ */
+function entryLabels(draft, definition) {
+    /** @type {Record<string, string>} */
+    const labels = {};
+    const live = new Map();
+    for (const form of definition?.forms ?? []) {
+        for (const section of form.sections) for (const item of section.items) live.set(lineKey(form.key, item.item_key), item.label);
+    }
+    for (const key of [...Object.keys(draft.quantities), ...Object.keys(draft.answers), ...Object.keys(draft.retired?.quantities ?? {}), ...Object.keys(draft.retired?.answers ?? {})]) {
+        const label = live.get(key) ?? draft.labels?.[key];
+        if (label) labels[key] = label;
+    }
+    return Object.keys(labels).length > 0 ? labels : null;
+}
+
+/**
  * The unfinished draft for IndexedDB: quantities, answers, the unit choice and the submission id. Nothing else.
  * No names, no personnel data, and not the free-text note or event text.
  * Returns null when there is nothing worth keeping.
- * @param {EmsDraft} draft @param {string} [savedAt] @returns {StoredDraft | null}
+ * Item names are saved next to the entries (`labels`) so an entry for an item that later leaves the form can still be named.
+ * @param {EmsDraft} draft @param {string} [savedAt] @param {EmsFormDefinition} [definition] @returns {StoredDraft | null}
  */
-export function serializeDraft(draft, savedAt = new Date().toISOString()) {
-    const hasEntries = Object.keys(draft.quantities).length > 0 || Object.keys(draft.answers).length > 0;
+export function serializeDraft(draft, savedAt = new Date().toISOString(), definition = undefined) {
+    const hasEntries = Object.keys(draft.quantities).length > 0 || Object.keys(draft.answers).length > 0 || retiredCount(draft) > 0;
     if (!hasEntries && draft.targetChoice === '') return null;
     return {
         v: STORED_DRAFT_VERSION,
@@ -265,6 +327,9 @@ export function serializeDraft(draft, savedAt = new Date().toISOString()) {
         targetChoice: draft.targetChoice,
         quantities: { ...draft.quantities },
         answers: { ...draft.answers },
+        // Additive and optional, so the stored version stays 1 and a build that does not know them ignores them.
+        ...(retiredCount(draft) > 0 ? { retired: { quantities: { ...draft.retired?.quantities }, answers: { ...draft.retired?.answers } } } : {}),
+        ...(entryLabels(draft, definition) ? { labels: entryLabels(draft, definition) } : {}),
         savedAt,
     };
 }
@@ -281,14 +346,40 @@ export function restoreDraft(stored, definition) {
     const max = definition.limits.max_quantity;
 
     let draft = blankDraft(data.clientSubmissionId);
-    for (const [key, value] of Object.entries(data.quantities ?? {})) {
-        if (keys.has(key)) draft = setQuantity(draft, key, value, max);
-    }
-    for (const [key, value] of Object.entries(data.answers ?? {})) {
-        if (keys.has(key) && typeof value === 'boolean') draft = setAnswer(draft, key, value);
-    }
+    // Merge by key: what the form lists goes back into it; what it does not list is retired, never dropped.
+    const retired = { quantities: /** @type {Record<string, number>} */ ({}), answers: /** @type {Record<string, boolean>} */ ({}) };
+    const place = (/** @type {'quantities' | 'answers'} */ kind, /** @type {unknown} */ entries) => {
+        if (!entries || typeof entries !== 'object') return;
+        for (const [key, value] of Object.entries(/** @type {Record<string, unknown>} */ (entries)).slice(0, RETIRED_LIMIT)) {
+            if (key.length > 240) continue;
+            if (kind === 'quantities') {
+                const quantity = normalizeQuantity(value, max);
+                if (quantity === null) continue;
+                if (keys.has(key)) draft = setQuantity(draft, key, quantity, max);
+                else retired.quantities[key] = quantity;
+            } else if (typeof value === 'boolean') {
+                if (keys.has(key)) draft = setAnswer(draft, key, value);
+                else retired.answers[key] = value;
+            }
+        }
+    };
+    // Retired entries first, so a value the member set on the live form wins over an older retired one.
+    place('quantities', data.retired?.quantities);
+    place('answers', data.retired?.answers);
+    place('quantities', data.quantities);
+    place('answers', data.answers);
+    for (const key of Object.keys(draft.quantities)) delete retired.quantities[key];
+    for (const key of Object.keys(draft.answers)) delete retired.answers[key];
     const choice = typeof data.targetChoice === 'string' && unitForChoice(data.targetChoice, definition.units) ? data.targetChoice : '';
-    return { ...draft, targetChoice: choice };
+    const restored = { ...draft, targetChoice: choice };
+    if (Object.keys(retired.quantities).length + Object.keys(retired.answers).length === 0) return restored;
+    /** @type {Record<string, string>} */
+    const labels = {};
+    for (const key of [...Object.keys(retired.quantities), ...Object.keys(retired.answers)]) {
+        const label = data.labels?.[key];
+        if (typeof label === 'string' && label.trim() !== '') labels[key] = label.trim().slice(0, 160);
+    }
+    return { ...restored, retired, labels };
 }
 
 // ---------------------------------------------------------------- search and grouping
@@ -305,7 +396,7 @@ function haystack(item, section, form) {
 }
 
 /**
- * Items that match every word of the query, across both forms. A match on a section name keeps its items.
+ * Items that match every word of the query, across every form. A match on a section name keeps its items.
  * @param {EmsForm[]} forms @param {string} query
  * @returns {{forms: EmsForm[], matches: number}}
  */
@@ -351,7 +442,7 @@ export function groupSections(sections) {
         .map((section) => ({ section, children: children.get(section.key) ?? [] }));
 }
 
-const FORM_NAMES = { 'airway-bag': 'Airway Bag', 'als-med-bag': 'ALS Med Bag/Box' };
+const FORM_NAMES = { 'airway-bag': 'Airway Bag', 'als-med-bag': 'ALS Med Bag/Box', 'als-transport-vehicle': 'ALS Transport Vehicle' };
 
 /** A short name for a bag form. @param {EmsForm} form */
 export function formName(form) {
@@ -382,11 +473,15 @@ export function reviewGroups(draft, definition) {
     return groups;
 }
 
-/** "Min 2 each", exactly as the paper form gives it. Yes/No items have no minimum. @param {EmsFormItem} item */
+/**
+ * "Min 2 each", exactly as the paper form gives it; the transport vehicle sheet reads "Par 4, refill under 2".
+ * Yes/No items have no minimum. @param {EmsFormItem} item
+ */
 export function minLabel(item) {
     const text = (item.min_text ?? '').trim();
     if (item.response_type === 'yes_no' || text === '') return '';
-    return `Min ${text}`;
+    const fillIf = String(item.flags?.fill_if_text ?? '').trim();
+    return fillIf === '' ? `Min ${text}` : `Par ${text}, refill under ${fillIf}`;
 }
 
 const FLAG_LABELS = /** @type {const} */ ([

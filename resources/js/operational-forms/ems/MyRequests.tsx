@@ -11,7 +11,7 @@ import type { EmsOutboxEntry, EmsRequestDetail, EmsRequestLine, EmsRequestSummar
 import { PendingRequests } from './PendingRequests';
 import type { EmsOutbox } from './useEmsOutbox';
 
-const BAG_NAMES: Record<string, string> = { 'airway-bag': 'Airway Bag', 'als-med-bag': 'ALS Med Bag/Box' };
+const BAG_NAMES: Record<string, string> = { 'airway-bag': 'Airway Bag', 'als-med-bag': 'ALS Med Bag/Box', 'als-transport-vehicle': 'ALS Transport Vehicle' };
 const MESSAGE_MAX = 2000;
 const CANCEL_REASON_MAX = 255;
 

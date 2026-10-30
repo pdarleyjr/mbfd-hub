@@ -1,6 +1,6 @@
 /** Shapes of the Medical Inventory Request JSON API (routes/ems.php, docs/ems/ems-inventory-contract.md section 9). */
 
-export type EmsBagKey = 'airway-bag' | 'als-med-bag' | string;
+export type EmsBagKey = 'airway-bag' | 'als-med-bag' | 'als-transport-vehicle' | string;
 export type EmsResponseType = 'quantity' | 'yes_no';
 export type EmsTargetKind = 'rescue_unit' | 'other_unit' | 'detail_event';
 
@@ -9,6 +9,9 @@ export interface EmsFlags {
     rescue_only?: boolean;
     refrigerated?: boolean;
     controlled_substance?: boolean;
+    /** The transport vehicle sheet's "Fill if <" level, as printed. min_text is its AMOUNT (par). */
+    fill_if_text?: string;
+    fill_if_qty?: number | null;
 }
 
 export interface EmsFormItem {
@@ -64,6 +67,15 @@ export interface EmsDraft {
     note: string;
     quantities: Record<string, number>;
     answers: Record<string, boolean>;
+    /** Entries for items the form does not list right now. Saved with the draft, never sent. */
+    retired?: EmsRetired;
+    /** Item names for the retired entries, so they can be listed by name. */
+    labels?: Record<string, string>;
+}
+
+export interface EmsRetired {
+    quantities: Record<string, number>;
+    answers: Record<string, boolean>;
 }
 
 /** What is stored on the device for an unfinished draft: quantities, the unit choice and the submission id only. */
@@ -73,6 +85,9 @@ export interface StoredDraft {
     targetChoice: string;
     quantities: Record<string, number>;
     answers: Record<string, boolean>;
+    retired?: EmsRetired;
+    /** Item name per key that has an entry (optional, additive). */
+    labels?: Record<string, string>;
     savedAt: string;
 }
 
