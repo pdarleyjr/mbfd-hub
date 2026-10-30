@@ -74,8 +74,9 @@ final class RosterSpecialEventExtractor
      */
     private function sections(array $rows): array
     {
-        $read = array_map(static fn (mixed $row): array => RosterRowReader::read(is_array($row) ? $row : []), array_values($rows));
+        $read = array_map(static fn (array $row): array => RosterRowReader::read($row), $rows);
         $sections = [];
+        /** @var array<string, mixed>|null $current */
         $current = null;
         $blockKnown = false;
         $blockType = null;
