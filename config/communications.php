@@ -16,6 +16,9 @@ return [
         // this Hub ledger. Never infer absent billing rows mean zero usage.
         'sole_sender' => (bool) env('CLOUDFLARE_EMAIL_HUB_SOLE_SENDER', false),
         'from_address' => env('CLOUDFLARE_EMAIL_FROM', 'info@mbfdhub.com'),
+        // Shown beside the address in the recipient's mail client and used in message sign-offs.
+        // The stored from_address stays the bare address; blank sends the bare address only.
+        'from_name' => env('CLOUDFLARE_EMAIL_FROM_NAME', 'Miami Beach Fire Department'),
         'safe_email_ceiling' => (int) env('CLOUDFLARE_EMAIL_SAFE_CEILING', 2850),
         // Internal anti-burst limit, independent of Cloudflare's daily quota.
         'max_recipient_units_per_minute' => (int) env('CLOUDFLARE_EMAIL_MAX_RECIPIENT_UNITS_PER_MINUTE', 5),
@@ -26,6 +29,10 @@ return [
         'worker_request_threshold' => (int) env('CLOUDFLARE_WORKER_REQUEST_THRESHOLD', 9000000),
         'worker_cpu_ms_threshold' => (int) env('CLOUDFLARE_WORKER_CPU_MS_THRESHOLD', 27000000),
         'max_reconciliation_age_seconds' => (int) env('CLOUDFLARE_USAGE_MAX_AGE', 900),
+    ],
+    'health' => [
+        // Cloudflare signs Email Sending mail with this selector (d=<sending domain>). Presence of any listed selector counts.
+        'dkim_selectors' => ['cf-bounce', 'cf2024-1'],
     ],
     'inbound' => [
         'address' => env('MBFD_INBOUND_EMAIL_ADDRESS', 'info@mbfdhub.com'),

@@ -271,10 +271,10 @@ test.describe.serial('Support Services conversation', () => {
       await expect(page.locator('.emsg-row', { hasText: state.logisticsInboxReply })).toHaveCount(0);
       await expectNoHorizontalOverflow(page);
 
-      // The email inbox is its own page and nav item.
-      await openCommunicationsLink(page, /^Inbound Email/);
-      await expect(page).toHaveURL(/inbound-email/);
-      await expect(page.getByRole('heading', { name: /Inbound Email/ }).first()).toBeVisible();
+      // Email is its own page and nav item (it replaced Inbound Email, Outbound Email and Compose Email).
+      await openCommunicationsLink(page, /^Email/);
+      await expect(page).toHaveURL(/\/admin\/email/);
+      await expect(page.getByRole('heading', { name: 'Email', exact: true }).first()).toBeVisible();
       await expect(page.locator('.emsg-layout')).toHaveCount(0);
     });
   });
@@ -339,7 +339,7 @@ test.describe.serial('Support Services conversation', () => {
       const opener = page.locator('.fi-topbar-open-sidebar-btn');
       if (await opener.isVisible().catch(() => false)) await opener.click();
       await sidebar.getByRole('button', { name: 'Communications' }).click();
-      await expect(sidebar.getByRole('link', { name: /Inbound Email/ })).toBeVisible();
+      await expect(sidebar.getByRole('link', { name: /^Email/ })).toBeVisible();
       await expect(sidebar.getByRole('link', { name: /Support Services Messages/ })).toHaveCount(0);
 
       const response = await page.goto('/admin/employee-messages');

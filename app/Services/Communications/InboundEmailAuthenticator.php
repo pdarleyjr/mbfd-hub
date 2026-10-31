@@ -63,11 +63,11 @@ final class InboundEmailAuthenticator
             throw new HttpException(422, 'Inbound email recipient is not configured.');
         }
 
-        $attachments = $this->validateAttachments($payload['attachments'] ?? []);
+        [$attachments, $skipped] = $this->validateAttachments($payload['attachments'] ?? []);
         $storedPaths = [];
 
         try {
-            return DB::transaction(function () use ($nonce, $payload, $attachments, &$storedPaths): ?InboundEmail {
+            return DB::transaction(function () use ($nonce, $payload, $attachments, $skipped, &$storedPaths): ?InboundEmail {
                 DB::table('inbound_email_nonces')->where('expires_at', '<=', now())->delete();
                 $inserted = DB::table('inbound_email_nonces')->insertOrIgnore([
                     'nonce' => $nonce,
@@ -124,8 +124,15 @@ final class InboundEmailAuthenticator
                         'path' => $path,
                     ];
                 }
-                if ($metadata !== []) {
-                    $email->forceFill(['attachment_metadata' => $metadata])->save();
+                $changes = $metadata === [] ? [] : ['attachment_metadata' => $metadata];
+                if ($skipped !== []) {
+                    // Parts that were not kept live in their own column; attachment_metadata keeps its exact
+                    // shape because TeleStaff cleanup requires one entry there for a roster mail. The model's
+                    // array cast encodes it once; a pre-encoded string here would be encoded a second time.
+                    $changes['skipped_attachments'] = $skipped;
+                }
+                if ($changes !== []) {
+                    $email->forceFill($changes)->save();
                 }
                 $registrar->register($email);
 
@@ -212,7 +219,12 @@ final class InboundEmailAuthenticator
     }
 
     /**
-     * @return list<array{filename: string, mime_type: string, extension: string, content: string}>
+     * Parts the Hub can keep are returned with their bytes. A part with an unsupported type or an unusable
+     * filename (an inline logo with no name, a calendar invite, a path in the name) is recorded and left out
+     * instead of bouncing the whole message, which the sender would never be able to resend. The count and
+     * total-size limits still reject the message, and a part that is not valid base64 still does too.
+     *
+     * @return array{0: list<array{filename: string, mime_type: string, extension: string, content: string}>, 1: list<array{filename: ?string, mime_type: ?string, size: int, reason: string}>}
      */
     private function validateAttachments(mixed $attachments): array
     {
@@ -237,6 +249,7 @@ final class InboundEmailAuthenticator
         $maximumBytes = (int) config('communications.inbound.max_attachment_bytes', 3500000);
         $totalBytes = 0;
         $validated = [];
+        $skipped = [];
 
         foreach ($attachments as $attachment) {
             if (! is_array($attachment)) {
@@ -247,15 +260,27 @@ final class InboundEmailAuthenticator
             $encoded = is_string($attachment['content'] ?? null) ? $attachment['content'] : '';
             $safeFilename = basename(str_replace('\\', '/', $filename));
             $content = base64_decode($encoded, true);
-            if ($safeFilename === '' || in_array($safeFilename, ['.', '..'], true)
-                || $safeFilename !== $filename || ! in_array($mimeType, $allowedTypes, true)
-                || ! isset($extensions[$mimeType]) || $content === false) {
+            if ($content === false) {
                 throw new HttpException(422, 'An inbound attachment is invalid or unsafe.');
             }
 
+            // Every part counts toward the limit, kept or not: the cap protects the request, not just the disk.
             $totalBytes += strlen($content);
             if ($totalBytes > $maximumBytes) {
                 throw new HttpException(413, 'The inbound attachment limit was exceeded.');
+            }
+
+            $usableName = $safeFilename !== '' && ! in_array($safeFilename, ['.', '..'], true) && $safeFilename === $filename;
+            $supportedType = in_array($mimeType, $allowedTypes, true) && isset($extensions[$mimeType]);
+            if (! $usableName || ! $supportedType) {
+                $skipped[] = [
+                    'filename' => $this->displayValue($filename === '' ? null : basename(str_replace('\\', '/', $filename)), 255),
+                    'mime_type' => preg_match('/^[a-z0-9][a-z0-9.+\-]*\/[a-z0-9][a-z0-9.+\-]*$/D', $mimeType) === 1 ? substr($mimeType, 0, 127) : null,
+                    'size' => strlen($content),
+                    'reason' => $supportedType ? 'unusable_filename' : 'unsupported_type',
+                ];
+
+                continue;
             }
             $validated[] = [
                 'filename' => $safeFilename,
@@ -265,6 +290,13 @@ final class InboundEmailAuthenticator
             ];
         }
 
-        return $validated;
+        return [$validated, $skipped];
+    }
+
+    private function displayValue(?string $value, int $limit): ?string
+    {
+        $clean = trim((string) preg_replace('/[\x00-\x1F\x7F]+/u', ' ', (string) $value));
+
+        return $clean === '' ? null : mb_substr($clean, 0, $limit);
     }
 }

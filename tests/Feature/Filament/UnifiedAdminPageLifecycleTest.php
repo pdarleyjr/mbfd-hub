@@ -6,6 +6,7 @@ namespace Tests\Feature\Filament;
 
 use App\Enums\AccountStatus;
 use App\Filament\Admin\Pages\BidAccessPin;
+use App\Filament\Admin\Pages\EmailCenter;
 use App\Filament\Pages\ComposeEmail;
 use App\Filament\Pages\WorkgroupAdministration;
 use App\Models\User;
@@ -30,15 +31,19 @@ final class UnifiedAdminPageLifecycleTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
     }
 
-    public function test_compose_email_page_initializes_its_form_during_mount(): void
+    // Changed: Compose Email no longer has a form of its own. Its mount hands the visit to the Email Center, which needs the
+    // panel entitlement every administrator already has on top of the (still honoured) admin.communications.send.
+    public function test_compose_email_page_mounts_and_hands_the_visit_to_the_email_center(): void
     {
         $user = User::factory()->create(['account_status' => AccountStatus::Active]);
+        $user->givePermissionTo(Permission::findOrCreate('admin.access', 'web'));
+        $user->givePermissionTo(Permission::findOrCreate('admin.communications.view', 'web')); // sending includes reading
         $user->givePermissionTo(Permission::findOrCreate('admin.communications.send', 'web'));
 
         $this->actingAs($user);
 
         Livewire::test(ComposeEmail::class)
-            ->assertSuccessful();
+            ->assertRedirect(EmailCenter::getUrl());
     }
 
     public function test_workgroup_administration_page_mounts_without_calling_a_missing_parent_hook(): void

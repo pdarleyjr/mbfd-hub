@@ -94,7 +94,7 @@ final class BudgetedEmailRetryTest extends TestCase
         $this->openBudget();
         $this->work();
 
-        Http::assertSent(fn (Request $request): bool => $request['to'] === ['admin@miamibeachfl.gov'] && str_contains((string) $request['subject'], 'Equipment DAMAGED'));
+        Http::assertSent(fn (Request $request): bool => $request['to'] === ['admin@miamibeachfl.gov'] && str_contains((string) $request['subject'], 'Equipment damaged'));
     }
 
     public function test_a_burst_above_the_hub_rate_limit_delivers_every_email(): void

@@ -5,6 +5,7 @@ namespace App\Providers\Filament;
 use App\Filament\Admin\Pages\BidAccessPin;
 use App\Filament\Admin\Pages\Captain5Operations;
 use App\Filament\Admin\Pages\CommandCommunications;
+use App\Filament\Admin\Pages\EmailCenter;
 use App\Filament\Admin\Pages\EmployeeMessages;
 use App\Filament\Admin\Pages\EquipmentIntake;
 use App\Filament\Admin\Pages\KnowledgeBase;
@@ -30,6 +31,7 @@ use App\Http\Middleware\AuthenticateCanonicalPanelUser;
 use App\Http\Middleware\EnsureCanonicalSessionIsCurrent;
 use App\Http\Middleware\ForceFilamentPasswordChange;
 use App\Http\Middleware\RedirectTrainingUsers;
+use App\Services\Mail\MailAccess;
 use BezhanSalleh\FilamentShield\FilamentShieldPlugin;
 use Filament\FontProviders\LocalFontProvider;
 use Filament\Http\Middleware\AuthenticateSession;
@@ -105,6 +107,7 @@ class AdminPanelProvider extends PanelProvider
                 \App\Filament\Admin\Pages\MedicalSupplyRoom::class,
                 \App\Filament\Admin\Pages\MedicalDataStatistics::class,
                 CommandCommunications::class,
+                EmailCenter::class,
                 EmployeeMessages::class,
                 CommunicationsUsage::class,
                 ComposeEmail::class,
@@ -223,6 +226,14 @@ class AdminPanelProvider extends PanelProvider
                 fn (): string => self::safeRender('filament.admin.partials.keyboard-shortcuts')
                     .self::safeRender('filament.admin.partials.status-bar')
                     .self::safeRender('filament.admin.partials.context-menu')
+            )
+            // The envelope sits directly left of the notification bell, inside the same persisted flex group, so the
+            // phone rule that keeps the bar on one row applies to it unchanged. Only people who may read mail get it.
+            ->renderHook(
+                PanelsRenderHook::GLOBAL_SEARCH_AFTER,
+                fn (): string => filament()->getCurrentPanel()?->getId() === 'admin' && app(MailAccess::class)->canView(auth()->user())
+                    ? self::safeRender('filament.admin.partials.mailbox-badge')
+                    : ''
             )
             // The shared install card, inline above the dashboard content only (never over a form).
             ->renderHook(

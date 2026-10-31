@@ -609,6 +609,10 @@ jobs:
         id: employee-messages
         if: ${{ !cancelled() && steps.member-requests.outcome != 'skipped' }}
         run: npm run test:employee-messages-e2e
+      - name: Verify the Email Center in Chromium
+        id: email-center
+        if: ${{ !cancelled() && steps.member-requests.outcome != 'skipped' }}
+        run: npm run test:email-center-e2e
       - name: Retain PWA and messaging failure evidence
         if: ${{ failure() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

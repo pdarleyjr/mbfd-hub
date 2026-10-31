@@ -175,7 +175,7 @@ final class CloudflareCostGuardTest extends TestCase
         self::assertStringNotContainsString('test-token-not-persisted', json_encode($email->toArray(), JSON_THROW_ON_ERROR));
         self::assertStringNotContainsString(base64_encode('safe attachment'), json_encode($email->toArray(), JSON_THROW_ON_ERROR));
         Http::assertSent(fn ($request): bool => $request->hasHeader('Authorization', 'Bearer test-token-not-persisted')
-            && $request['from'] === 'info@mbfdhub.com'
+            && $request['from'] === ['address' => 'info@mbfdhub.com', 'name' => 'Miami Beach Fire Department']
             && $request['attachments'][0]['disposition'] === 'attachment'
             && $request['attachments'][0]['content'] === base64_encode('safe attachment'));
         CarbonImmutable::setTestNow();

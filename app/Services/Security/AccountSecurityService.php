@@ -16,6 +16,7 @@ use App\Services\Communications\CloudflareEmailDispatcher;
 use App\Services\Identity\AccountSecurityService as IdentityAccountSecurityService;
 use App\Services\Identity\CityEmailVerificationService;
 use App\Services\Identity\IdentityProviderService;
+use App\Support\Mail\TransactionalMessageFormatter;
 use Carbon\CarbonInterface;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Contracts\Session\Session;
@@ -108,7 +109,7 @@ final class AccountSecurityService
             $this->emailDispatcher->send(
                 to: [$recipient],
                 subject: 'MBFD Identity account recovery',
-                text: "An MBFD administrator sent an individual account activation or recovery link.\n\nContinue securely: {$url}\n\nThis one-time link expires shortly. If you did not expect it, ignore this message and contact an administrator.",
+                text: app(TransactionalMessageFormatter::class)->signOffText("An MBFD administrator sent an individual account activation or recovery link.\n\nContinue securely: {$url}\n\nThis one-time link expires shortly. If you did not expect it, ignore this message and contact an administrator."),
                 html: null,
                 sourceType: 'identity_administrative_recovery',
                 sourceId: (string) $currentTarget->getKey(),

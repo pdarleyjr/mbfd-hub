@@ -4,6 +4,14 @@
   "source": "Reconciled source/runtime route inventory; record destinations use isolated fixture mappings or rendered local links",
   "pages": [
     {
+      "route": "/admin/email",
+      "name": "EmailCenter",
+      "panel": "admin",
+      "scope": "IN SCOPE",
+      "parent": "/admin",
+      "route_name": "filament.admin.pages.email"
+    },
+    {
       "route": "/admin/employees/accounts",
       "name": "ListAccountProfiles",
       "panel": "admin",

@@ -10,6 +10,7 @@ use App\Models\Employee;
 use App\Models\OutboundEmail;
 use App\Models\User;
 use App\Services\Communications\CloudflareEmailDispatcher;
+use App\Support\Mail\TransactionalMessageFormatter;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Log;
@@ -17,7 +18,13 @@ use LogicException;
 
 final class BudgetedMailChannel
 {
-    public function __construct(private readonly CloudflareEmailDispatcher $dispatcher) {}
+    /** Used only when a notification supplies no usable subject: the message is still sent. */
+    private const FALLBACK_SUBJECT = 'MBFD Hub notification';
+
+    public function __construct(
+        private readonly CloudflareEmailDispatcher $dispatcher,
+        private readonly TransactionalMessageFormatter $formatter,
+    ) {}
 
     public function send(object $notifiable, Notification $notification): void
     {
@@ -38,9 +45,15 @@ final class BudgetedMailChannel
         if (! is_string($cityEmail) || $cityEmail === '') {
             return;
         }
-        $subject = (string) $payload['subject'];
-        $text = isset($payload['text']) ? (string) $payload['text'] : null;
-        $html = isset($payload['html']) ? (string) $payload['html'] : null;
+        $subject = trim((string) ($payload['subject'] ?? '')) === '' ? self::FALLBACK_SUBJECT : (string) $payload['subject'];
+        // Sign-off and document wrapper are added once, here, so a retry through SendBudgetedEmail carries the finished message.
+        $message = $this->formatter->notification([
+            'subject' => $subject,
+            'text' => isset($payload['text']) ? (string) $payload['text'] : null,
+            'html' => isset($payload['html']) ? (string) $payload['html'] : null,
+        ]);
+        $text = $message['text'] ?? null;
+        $html = $message['html'] ?? null;
         $sourceId = (string) $notification->id;
 
         // A worker retry after a lost response must not send a second copy. The

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources\InboundEmailResource\Pages;
 
+use App\Filament\Concerns\RedirectsToMailThread;
 use App\Filament\Pages\ComposeEmail;
 use App\Filament\Resources\InboundEmailResource;
 use Filament\Actions\Action;
@@ -11,9 +12,17 @@ use Filament\Resources\Pages\ViewRecord;
 
 final class ViewInboundEmail extends ViewRecord
 {
+    use RedirectsToMailThread;
+
     protected static string $resource = InboundEmailResource::class;
 
     protected static string $view = 'filament.communications.view-email';
+
+    public function mount(int|string $record): void
+    {
+        parent::mount($record);
+        $this->redirectToIndexedThread('inbound', $this->getRecord()->getKey());
+    }
 
     public function getRecord(): \App\Models\InboundEmail
     {
@@ -27,7 +36,7 @@ final class ViewInboundEmail extends ViewRecord
 
     public function downloadAttachment(int $index): \Symfony\Component\HttpFoundation\StreamedResponse
     {
-        abort_unless(auth()->user()?->can('admin.communications.view'), 403);
+        abort_unless(InboundEmailResource::canViewAny(), 403);
         $service = app(\App\Services\Communications\EmailConversation::class);
         abort_unless($service->canRespond($this->getRecord()), 403);
         $file = $service->attachments($this->getRecord(), [$index])[0];

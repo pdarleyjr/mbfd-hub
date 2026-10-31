@@ -15,6 +15,7 @@ use App\Models\MemberOnboardingRosterBinding;
 use App\Models\User;
 use App\Services\Security\SecurityAuditRecorder;
 use App\Support\HubTimezone;
+use App\Support\Mail\TransactionalMessageFormatter;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -261,7 +262,7 @@ final class MemberSelfServiceActivation
             SendBudgetedEmail::dispatch(
                 [$address],
                 'Your MBFD Hub account was activated',
-                "Your MBFD Hub account was activated and a password was set on {$when}.\n\nIf this was you, no action is needed.\n\nIf this was NOT you, contact MBFD Hub support right away so the account can be secured.",
+                app(TransactionalMessageFormatter::class)->signOffText("Your MBFD Hub account was activated and a password was set on {$when}.\n\nIf this was you, no action is needed.\n\nIf this was NOT you, contact MBFD Hub support right away so the account can be secured."),
                 null,
                 'member_self_service_activation',
                 (string) $user->id,
