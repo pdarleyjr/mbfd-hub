@@ -22,6 +22,8 @@ const StationRequestWizard = lazy(() => import('./components/forms/StationReques
 const LegacyStationRequestRedirect = lazy(() => import('./components/LegacyStationRequestRedirect'));
 const StationInspectionWizard = lazy(() => import('./components/forms/StationInspectionWizard'));
 const TrtInventoryWizard = lazy(() => import('./components/TrtInventoryWizard'));
+const ChangeoutWizard = lazy(() => import('./components/changeout/ChangeoutWizard'));
+const ChangeoutReceipt = lazy(() => import('./components/changeout/ChangeoutReceipt'));
 
 const PageLoading = () => (
   <div className="flex min-h-48 items-center justify-center" role="status" aria-live="polite">
@@ -39,7 +41,8 @@ function isActiveInspectionPath(pathname: string) {
 
 function ContextualIssueWidget() {
   const { pathname } = useLocation();
-  return isActiveInspectionPath(pathname)
+  // The changeout wizard's sticky action bar sits where the floating report button would.
+  return isActiveInspectionPath(pathname) || pathname.startsWith('/changeouts/new/')
     ? null
     : <HubIssueWidget />;
 }
@@ -73,6 +76,9 @@ function DailyShell() {
             {/* Captain 5 EMS Operations is a workspace route, never a station id. */}
             <Route path="/captain-5" element={<Captain5Page />} />
             <Route path="/stations/:stationId/rooms/:roomId" element={<RoomAssetTracker />} />
+            {/* Moving a unit to another truck (docs/apparatus-changeouts.md). */}
+            <Route path="/changeouts/new/:apparatusId" element={<ChangeoutWizard />} />
+            <Route path="/changeouts/:id" element={<ChangeoutReceipt />} />
             {/* Forms Hub Routes */}
             <Route path="/forms-hub" element={<FormsHub />} />
             <Route path="/forms-hub/station-request" element={<StationRequestWizard />} />

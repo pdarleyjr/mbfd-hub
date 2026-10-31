@@ -9,6 +9,7 @@
         \App\Models\UnitMasterVehicleChange::SOURCE_APPARATUS_PAGE => 'Apparatus page',
         \App\Models\UnitMasterVehicleChange::SOURCE_MASTER_INVENTORY => 'Master Vehicle Inventory',
         \App\Models\UnitMasterVehicleChange::SOURCE_DAILY_CHECKOUT => 'Daily Checkout',
+        \App\Services\Fleet\FleetStatusReportReconciler::SOURCE => 'Fleet status report',
     ];
     $statusColors = ['applied' => 'info', 'accepted' => 'success', 'rejected' => 'gray'];
 @endphp

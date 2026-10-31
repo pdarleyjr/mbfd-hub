@@ -7,17 +7,23 @@ namespace App\Filament\Resources\ApparatusResource;
 use App\Enums\ApparatusPmServiceType;
 use App\Enums\ApparatusServiceTicketCategory;
 use App\Enums\ApparatusServiceTicketPriority;
+use App\Filament\Resources\ApparatusOperationalAlertResource;
 use App\Filament\Resources\UnitMasterVehicleResource;
 use App\Models\Apparatus;
+use App\Models\ApparatusOperationalAlert;
 use App\Models\UnitMasterVehicle;
 use App\Models\User;
 use App\Services\ApparatusServiceTicketWorkflowService;
 use App\Services\Fleet\ApparatusMasterVehicleLink;
+use App\Services\Fleet\ApparatusOperationalAlertService;
+use App\Support\HubTimezone;
 use Filament\Actions\MountableAction;
 use Filament\Forms;
 use Filament\Notifications\Notification;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 /**
  * The Fleet manager's and mechanics' everyday actions on one apparatus. The
@@ -317,6 +323,172 @@ final class ApparatusWorkflowActions
                     ->body($changes === [] ? 'The records already matched.' : count($changes).' '.(count($changes) === 1 ? 'field was' : 'fields were').' aligned and recorded in the vehicle history.')
                     ->send();
             });
+    }
+
+    /**
+     * Plans a changeout: one upcoming_swap alert. Nothing about the truck changes until a changeout commits. Row
+     * visibility only reads what the table already loaded, so the Apparatus list gains no query per row.
+     *
+     * @template T of MountableAction
+     *
+     * @param  T  $action
+     * @return T
+     */
+    public static function scheduleChangeout(MountableAction $action): MountableAction
+    {
+        return $action
+            ->label('Schedule changeout')
+            ->icon('heroicon-o-arrows-right-left')
+            ->color('gray')
+            ->authorize(fn (): bool => self::canManageChangeouts())
+            ->visible(fn (Apparatus $record): bool => filled($record->slug))
+            ->modalHeading(fn (Apparatus $record): string => 'Schedule changeout · '.self::unitLabel($record))
+            ->modalDescription('Crews see this on the station page. Nothing about the truck changes until the changeout is done.')
+            ->modalSubmitActionLabel('Schedule changeout')
+            ->form([
+                Forms\Components\Hidden::make('dedupe_key')->default(fn (): string => 'schedule-changeout:'.Str::uuid()),
+                Forms\Components\TextInput::make('title')
+                    ->label('Title')
+                    ->default(fn (Apparatus $record): string => ApparatusOperationalAlertResource::defaultTitle($record, ApparatusOperationalAlert::CATEGORY_UPCOMING_SWAP))
+                    ->required()
+                    ->maxLength(180),
+                Forms\Components\TextInput::make('reason')->label('Reason')->required()->maxLength(180),
+                Forms\Components\Grid::make(2)->schema([
+                    Forms\Components\DatePicker::make('scheduled_date')
+                        ->label('Date')
+                        ->minDate(fn (): string => HubTimezone::today()->format('Y-m-d'))
+                        ->required(),
+                    ApparatusOperationalAlertResource::windowField(),
+                ]),
+                Forms\Components\Select::make('planned_replacement_apparatus_id')
+                    ->label('Planned replacement truck (optional)')
+                    ->helperText('If you name a truck, a crew choosing a different one needs a Fleet decision.')
+                    ->options(fn (Apparatus $record): array => self::truckOptions((int) $record->getKey()))
+                    ->searchable(),
+                ApparatusOperationalAlertResource::oldTruckStatusField(),
+                Forms\Components\Textarea::make('message')
+                    ->label('Message')
+                    ->default(fn (Apparatus $record): string => self::unitLabel($record).' is scheduled to move to a different truck. Keep using truck '.($record->vehicle_number ?: 'as assigned').' until the changeout is done.')
+                    ->required()
+                    ->rows(3)
+                    ->maxLength(1000),
+                Forms\Components\Textarea::make('instructions')->label('Instructions for the crew (optional)')->rows(2)->maxLength(1000),
+                Forms\Components\Toggle::make('send_notification')->label('Notify members')->helperText('Sends once, in the members\' alert bell.'),
+            ])
+            ->action(function (Apparatus $record, array $data): void {
+                $saved = self::saveAlert($record, [...$data, 'category' => ApparatusOperationalAlert::CATEGORY_UPCOMING_SWAP]);
+                if ($saved instanceof ApparatusOperationalAlert) {
+                    Notification::make()->success()
+                        ->title('Changeout scheduled')
+                        ->body(self::unitLabel($record).': '.$saved->scheduleLabel())
+                        ->send();
+                }
+            });
+    }
+
+    /**
+     * @template T of MountableAction
+     *
+     * @param  T  $action
+     * @return T
+     */
+    public static function addOperationalAlert(MountableAction $action): MountableAction
+    {
+        return $action
+            ->label('Add operational alert')
+            ->icon('heroicon-o-megaphone')
+            ->color('gray')
+            ->authorize(fn (): bool => self::canManageChangeouts())
+            ->visible(fn (Apparatus $record): bool => filled($record->slug))
+            ->modalHeading(fn (Apparatus $record): string => 'Add operational alert · '.self::unitLabel($record))
+            ->modalDescription('Crews see this on the station page until it ends or Fleet closes it.')
+            ->modalSubmitActionLabel('Add alert')
+            ->form([
+                Forms\Components\Hidden::make('dedupe_key')->default(fn (): string => 'add-alert:'.Str::uuid()),
+                Forms\Components\Select::make('category')
+                    ->label('Kind of alert')
+                    ->options(collect(ApparatusOperationalAlert::CATEGORIES)->except(ApparatusOperationalAlert::CATEGORY_UPCOMING_SWAP)->all())
+                    ->default(ApparatusOperationalAlert::CATEGORY_GENERAL)
+                    ->native(false)
+                    ->required(),
+                Forms\Components\TextInput::make('title')
+                    ->label('Title')
+                    ->default(fn (Apparatus $record): string => ApparatusOperationalAlertResource::defaultTitle($record, ApparatusOperationalAlert::CATEGORY_GENERAL))
+                    ->required()
+                    ->maxLength(180),
+                Forms\Components\Textarea::make('message')->label('Message')->required()->rows(3)->maxLength(1000),
+                Forms\Components\TextInput::make('reason')->label('Reason (optional)')->maxLength(180),
+                Forms\Components\Textarea::make('instructions')->label('Instructions for the crew (optional)')->rows(2)->maxLength(1000),
+                Forms\Components\Grid::make(3)->schema([
+                    Forms\Components\DatePicker::make('scheduled_date')->label('Date (optional)'),
+                    ApparatusOperationalAlertResource::windowField(),
+                    Forms\Components\DatePicker::make('ends_on')->label('Stop showing after (optional)'),
+                ]),
+                Forms\Components\Select::make('apparatus_service_ticket_id')
+                    ->label('Service ticket (optional)')
+                    ->options(fn (Apparatus $record): array => ApparatusOperationalAlertResource::ticketOptions((int) $record->getKey()))
+                    ->searchable(),
+                Forms\Components\Toggle::make('send_notification')->label('Notify members')->helperText('Sends once, in the members\' alert bell.'),
+            ])
+            ->action(function (Apparatus $record, array $data): void {
+                if (self::saveAlert($record, $data) instanceof ApparatusOperationalAlert) {
+                    Notification::make()->success()->title('Alert added')->body(self::unitLabel($record))->send();
+                }
+            });
+    }
+
+    /** @param array<string, mixed> $data */
+    private static function saveAlert(Apparatus $record, array $data): ?ApparatusOperationalAlert
+    {
+        try {
+            return app(ApparatusOperationalAlertService::class)->create([...$data, 'apparatus_id' => $record->getKey()], self::actor());
+        } catch (ValidationException $exception) {
+            Notification::make()->danger()->title('The alert was not saved')
+                ->body((string) (collect($exception->errors())->flatten()->first() ?? 'Check the form and try again.'))->persistent()->send();
+        } catch (AuthorizationException) {
+            Notification::make()->danger()->title('You do not have permission to do this.')->send();
+        }
+
+        return null;
+    }
+
+    /**
+     * Trucks with a vehicle number, for a truck choice in a form. Called only when a modal opens.
+     *
+     * @return array<int, string>
+     */
+    public static function truckOptions(?int $excludeId = null, bool $sameType = true): array
+    {
+        $type = $excludeId !== null && $sameType ? Apparatus::query()->whereKey($excludeId)->value('type') : null;
+
+        return Apparatus::query()
+            ->when($excludeId !== null, fn ($query) => $query->whereKeyNot($excludeId))
+            ->when(filled($type), fn ($query) => $query->where('type', $type))
+            ->whereNotNull('vehicle_number')
+            ->orderBy('vehicle_number')
+            ->limit(300)
+            ->get(['id', 'vehicle_number', 'designation', 'name', 'unit_id', 'status'])
+            ->mapWithKeys(fn (Apparatus $truck): array => [$truck->getKey() => trim($truck->vehicle_number.' · '.self::unitLabel($truck).' ('.($truck->getAttribute('status') ?: 'no status').')')])
+            ->all();
+    }
+
+    /**
+     * One answer per HTTP request: canManageFleetSwaps() runs permission queries, and the Apparatus list evaluates
+     * this for every action on every row.
+     */
+    private static function canManageChangeouts(): bool
+    {
+        $user = auth()->user();
+        if (! $user instanceof User) {
+            return false;
+        }
+        $key = 'fleet.can-manage-changeouts.'.$user->getKey();
+        $attributes = request()->attributes;
+        if (! $attributes->has($key)) {
+            $attributes->set($key, $user->canManageFleetSwaps());
+        }
+
+        return (bool) $attributes->get($key);
     }
 
     /** @return array<int, string> master vehicles not linked to another apparatus, matching the search */

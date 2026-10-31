@@ -1,3 +1,4 @@
+import type { ChangeoutHandoff } from './components/changeout/types';
 export type ApparatusType = 'engine' | 'ladder1' | 'ladder3' | 'rescue' | 'rope' | 'fireboat' | 'fire boat';
 export type DailyCheckoutRequirement = 'required' | 'exempt' | 'reserve' | 'administrative' | 'inactive' | 'unknown';
 export type DailyCheckoutState = 'checked' | 'attention' | 'review_pending' | 'not_checked' | 'out_of_service' | 'exempt' | 'classification_required';
@@ -292,6 +293,8 @@ export interface ChecklistData {
   pending_corrections?: PendingInventoryCorrection[];
   /** Open one-time vehicle information questions. Absent when nothing is open. */
   vehicle_identification?: VehicleIdentification;
+  /** Equipment the last changeout left on the old truck. Absent on older cached responses. */
+  changeout_handoff?: ChangeoutHandoff;
   checklist_version: string;
   checklist_type?: string;
   schema_version: 1 | 2;

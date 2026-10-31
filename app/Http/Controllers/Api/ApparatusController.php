@@ -9,6 +9,7 @@ use App\Exceptions\DailyCheckoutInspectionSessionException;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Public\PublicApparatusResource;
 use App\Models\Apparatus;
+use App\Models\ApparatusChangeout;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusVehicleSwapRequest;
 use App\Models\DailyCheckoutInspectionSession;
@@ -19,6 +20,7 @@ use App\Services\ApparatusInspectionProcessingService;
 use App\Services\DailyCheckoutChecklistResolver;
 use App\Services\DailyCheckoutInspectionSessionService;
 use App\Services\Display\DisplaySnapshotService;
+use App\Services\Fleet\ApparatusChangeoutPlanner;
 use App\Services\Fleet\VehicleIdentificationPlanner;
 use App\Services\Fleet\VehicleIdentificationService;
 use App\Services\Fleet\VehicleIdentificationSubmission;
@@ -119,7 +121,24 @@ class ApparatusController extends Controller
             'pending_corrections' => $this->pendingCorrections($apparatus, $request),
             // Outside the hashed checklist on purpose: answering a question never changes checklist_version.
             'vehicle_identification' => app(VehicleIdentificationPlanner::class)->block($apparatus),
+            // Outside the hashed checklist too: what stayed on the truck this crew just left.
+            'changeout_handoff' => app(ApparatusChangeoutPlanner::class)->handoffNotice($apparatus),
         ]);
+    }
+
+    /**
+     * A checkout queued on a phone still posts to the truck it was performed on. When the unit moved off this truck
+     * after that, the row is no longer a Daily Checkout unit, but the findings are real and belong to this truck, so
+     * a stored submission must not be stranded. Same grace window as a retired checklist.
+     */
+    private function justChangedOutFrom(Apparatus $apparatus): ?ApparatusChangeout
+    {
+        return ApparatusChangeout::query()
+            ->where('from_apparatus_id', $apparatus->getKey())
+            ->where('status', ApparatusChangeout::STATUS_COMPLETED)
+            ->where('effective_at', '>=', now()->subHours((int) config('daily_checkout.inventory_revision_grace_hours', 168)))
+            ->orderByDesc('id')
+            ->first();
     }
 
     /** Open inventory corrections on this apparatus (member-safe markers, no reporter identity). */
@@ -445,7 +464,7 @@ class ApparatusController extends Controller
         }
 
         $apparatus = Apparatus::findOrFail($id);
-        if (! $apparatus->isDailyCheckoutRequired()) {
+        if (! $apparatus->isDailyCheckoutRequired() && $this->justChangedOutFrom($apparatus) === null) {
             return response()->json([
                 'message' => 'This apparatus is not configured for Daily Checkout.',
             ], 409);
@@ -478,7 +497,10 @@ class ApparatusController extends Controller
             $expectedChecklistVersion = $inspectionSession->checklist_hash;
         } else {
             $resolution = $checklistResolver->resolve($apparatus);
-            if (! $resolution['usable']) {
+            $replaced = ! $resolution['usable'] || ! hash_equals((string) $resolution['checklist_version'], $validated['checklist_version'])
+                ? $this->recentlyReplacedChecklist($apparatus, $validated['checklist_version'])
+                : null;
+            if (! $resolution['usable'] && $replaced === null) {
                 Log::warning('Daily Checkout checklist resolution failed during submission.', [
                     'apparatus_id' => $apparatus->id,
                     'checklist_type' => $resolution['checklist_type'],
@@ -493,11 +515,10 @@ class ApparatusController extends Controller
 
             $checklist = $resolution['checklist'];
             $expectedChecklistVersion = (string) $resolution['checklist_version'];
-            if ($this->isV2Checklist($checklist)) {
+            if ($resolution['usable'] && $this->isV2Checklist($checklist)) {
                 return $this->inspectionSessionRequiredResponse();
             }
-            if (! hash_equals($expectedChecklistVersion, $validated['checklist_version'])
-                && ($replaced = $this->recentlyReplacedChecklist($apparatus, $validated['checklist_version'])) !== null) {
+            if ($replaced !== null) {
                 $checklist = $replaced;
                 $expectedChecklistVersion = $validated['checklist_version'];
             }
@@ -528,7 +549,8 @@ class ApparatusController extends Controller
                 if ($committedWhileWaiting !== null) {
                     return ['inspection' => $committedWhileWaiting, 'created' => false];
                 }
-                if (! $lockedApparatus->isDailyCheckoutRequired()) {
+                $changedOut = $lockedApparatus->isDailyCheckoutRequired() ? null : $this->justChangedOutFrom($lockedApparatus);
+                if (! $lockedApparatus->isDailyCheckoutRequired() && $changedOut === null) {
                     abort(409, 'This apparatus is not configured for Daily Checkout.');
                 }
 
@@ -548,7 +570,10 @@ class ApparatusController extends Controller
                     $lockedChecklistVersion = $lockedInspectionSession->checklist_hash;
                 } else {
                     $lockedResolution = $checklistResolver->resolve($lockedApparatus);
-                    if (! $lockedResolution['usable']) {
+                    $lockedReplacement = ! $lockedResolution['usable'] || ! hash_equals((string) $lockedResolution['checklist_version'], (string) $prepared['checklist_version'])
+                        ? $this->recentlyReplacedChecklist($lockedApparatus, (string) $prepared['checklist_version'])
+                        : null;
+                    if (! $lockedResolution['usable'] && $lockedReplacement === null) {
                         Log::warning('Daily Checkout checklist resolution failed after apparatus lock.', [
                             'apparatus_id' => $lockedApparatus->id,
                             'checklist_type' => $lockedResolution['checklist_type'],
@@ -560,10 +585,8 @@ class ApparatusController extends Controller
 
                     $lockedChecklist = $lockedResolution['checklist'];
                     $lockedChecklistVersion = $lockedResolution['checklist_version'];
-                    if (is_string($lockedChecklistVersion)
-                        && ! hash_equals($lockedChecklistVersion, (string) $prepared['checklist_version'])
-                        && ($replaced = $this->recentlyReplacedChecklist($lockedApparatus, (string) $prepared['checklist_version'])) !== null) {
-                        $lockedChecklist = $replaced;
+                    if ($lockedReplacement !== null) {
+                        $lockedChecklist = $lockedReplacement;
                         $lockedChecklistVersion = (string) $prepared['checklist_version'];
                     }
                 }
@@ -603,7 +626,7 @@ class ApparatusController extends Controller
                 // The client may display a unit number, but the persisted identity must
                 // always come from the apparatus selected by its unique route ID.
                 $today = now((string) config('hub.timezone'))->format('Y-m-d');
-                $designation = $lockedApparatus->designation ?? $lockedApparatus->name ?? 'UNK';
+                $designation = $changedOut->unit_designation ?? $lockedApparatus->designation ?? $lockedApparatus->name ?? 'UNK';
                 $designationTag = preg_replace('/[^A-Z0-9]/i', '', $designation) ?: 'UNK';
                 $hasCriticalDefects = false;
                 foreach ($prepared['defects'] ?? [] as $defectData) {
@@ -639,7 +662,8 @@ class ApparatusController extends Controller
                     'engine_hours' => $prepared['engine_hours'] ?? null,
                     'miles' => $prepared['miles'] ?? null,
                     'vehicle_number' => $lockedApparatus->vehicle_number,
-                    'designation_at_time' => $lockedApparatus->designation,
+                    // The checkout was done as the unit that was on this truck, not the identity the truck took after.
+                    'designation_at_time' => $changedOut->unit_designation ?? $lockedApparatus->designation,
                     'processing_status' => $swapAssessment !== null ? VehicleSwapService::HELD_PROCESSING_STATUS : null,
                     'results' => $prepared['compartments'] ?? null,
                     'checklist_evidence' => ($prepared['processing_version'] ?? null) === 1

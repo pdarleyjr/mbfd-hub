@@ -44,6 +44,8 @@ class ViewApparatus extends ViewRecord
             ApparatusWorkflowActions::logPm(Actions\Action::make('logPmService')),
             ApparatusWorkflowActions::changeStatus(Actions\Action::make('updateStatus')),
             Actions\ActionGroup::make([
+                ApparatusWorkflowActions::scheduleChangeout(Actions\Action::make('scheduleChangeout')),
+                ApparatusWorkflowActions::addOperationalAlert(Actions\Action::make('addOperationalAlert')),
                 ApparatusWorkflowActions::dailyCheckout(Actions\Action::make('daily_checkout')),
                 ApparatusWorkflowActions::masterRecord(Actions\Action::make('vehicle_record')),
                 ApparatusWorkflowActions::linkVehicleRecord(Actions\Action::make('linkVehicleRecord')),

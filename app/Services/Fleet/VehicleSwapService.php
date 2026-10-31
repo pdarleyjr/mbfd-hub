@@ -51,6 +51,10 @@ final class VehicleSwapService
 
     public const DEMOTE_OUT_OF_SERVICE = 'Out of Service';
 
+    private const STATUS_IN_SERVICE = 'In Service';
+
+    private const STATUS_AVAILABLE = 'Available';
+
     /** What makes a row the unit: its identity, station and frontline role. Never the truck's own attributes. */
     private const IDENTITY_FIELDS = ['unit_id', 'designation', 'name', 'slug', 'station_id', 'assignment', 'daily_checkout_requirement', 'daily_checkout_template'];
 
@@ -324,6 +328,81 @@ final class VehicleSwapService
             'daily_checkout_requirement' => 'reserve',
             'status' => $demoteTo,
         ])->save();
+    }
+
+    /**
+     * Move a unit to another truck for a changeout. The caller holds the transaction and has locked both rows
+     * in id order. The new truck takes the unit's identity and location; the old truck takes the new truck's previous
+     * identity, and stays where the swap happened until Fleet moves it. A number-derived reserve identity (R-1033,
+     * RESCUE 1033, r1033, reserve-<id>) is rewritten for the truck that now carries it, so a label never names another
+     * truck. vehicle_number, VIN, meters, defects, inspections and tickets never move.
+     *
+     * A status describes a truck, so a failure never travels. The new truck keeps Maintenance or Out of Service if it
+     * has one; otherwise it runs as the unit does, and a unit moving off a failed truck is In Service. The old truck
+     * takes $oldTruckStatus, else the status the new truck vacated, and a vacated failure reads Available.
+     *
+     * @return array{before: array{from: array<string, mixed>, to: array<string, mixed>}, after: array{from: array<string, mixed>, to: array<string, mixed>}}
+     */
+    public function moveUnitForChangeout(Apparatus $from, Apparatus $to, ?string $oldTruckStatus = null): array
+    {
+        $before = ['from' => $this->snapshot($from), 'to' => $this->snapshot($to)];
+        $identity = static fn (Apparatus $row): array => collect(self::IDENTITY_FIELDS)
+            ->mapWithKeys(static fn (string $field): array => [$field => $row->getRawOriginal($field)])->all();
+        $unitIdentity = $identity($from);
+        $vacated = $identity($to);
+        $unitStatus = $from->getAttribute('status');
+        $vacatedStatus = $to->getAttribute('status');
+        $swapLocation = $from->getAttribute('current_location');
+        $swapStation = $from->station_id;
+
+        foreach (['unit_id', 'designation', 'name', 'slug'] as $field) {
+            $vacated[$field] = $this->rewrittenForTruck($vacated[$field], $field, $to, $from);
+        }
+        $newStatus = match (true) {
+            self::isFailureStatus($vacatedStatus) => $vacatedStatus,
+            self::isFailureStatus($unitStatus) => self::STATUS_IN_SERVICE,
+            default => $unitStatus,
+        };
+        $oldStatus = $oldTruckStatus ?? (self::isFailureStatus($vacatedStatus) ? self::STATUS_AVAILABLE : $vacatedStatus);
+
+        $from->forceFill(['unit_id' => 'swap-hold-'.$from->getKey(), 'slug' => 'swap-hold-'.$from->getKey()])->save();
+        $to->forceFill([...$unitIdentity, 'status' => $newStatus, 'current_location' => $swapLocation])->save();
+        $from->forceFill([
+            ...$vacated,
+            'status' => $oldStatus,
+            'station_id' => $swapStation,
+            'current_location' => $swapLocation,
+        ])->save();
+
+        return ['before' => $before, 'after' => ['from' => $this->snapshot($from->refresh()), 'to' => $this->snapshot($to->refresh())]];
+    }
+
+    /**
+     * A label that names the truck it was on names the truck that now carries it. Whole numbers only: 1033 is not
+     * inside R-11033. A decide() reserve identity is named by row id, so it follows the row the same way.
+     */
+    private function rewrittenForTruck(mixed $value, string $field, Apparatus $previous, Apparatus $next): mixed
+    {
+        if (! is_string($value)) {
+            return $value;
+        }
+        if (in_array($field, ['unit_id', 'slug'], true) && $value === 'reserve-'.$previous->getKey()) {
+            return 'reserve-'.$next->getKey();
+        }
+        if (blank($previous->vehicle_number) || blank($next->vehicle_number)) {
+            return $value;
+        }
+
+        return (string) preg_replace_callback(
+            '/(?<![0-9])'.preg_quote((string) $previous->vehicle_number, '/').'(?![0-9])/iu',
+            static fn (): string => (string) $next->vehicle_number,
+            $value,
+        );
+    }
+
+    private static function isFailureStatus(mixed $status): bool
+    {
+        return is_string($status) && FleetVehicleCatalog::roleFor($status) === FleetVehicleCatalog::ROLE_OUT_OF_SERVICE;
     }
 
     /**

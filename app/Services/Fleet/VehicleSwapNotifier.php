@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services\Fleet;
 
+use App\Models\ApparatusChangeout;
 use App\Models\ApparatusVehicleSwapRequest;
 use App\Models\User;
 use App\Notifications\NewSubmissionNotification;
+use App\Services\Notifications\NotificationDispatchService;
 use App\Services\Notifications\NotificationRecipientEvaluator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
@@ -61,6 +63,30 @@ class VehicleSwapNotifier
                     'exception' => $exception->getMessage(),
                 ]);
             }
+        }
+    }
+
+    /**
+     * A changeout is waiting on Fleet's decision: same category and pipeline as a swap report, told once. Best effort: the
+     * send happens after commit, and nothing here can fail the submission.
+     */
+    public function changeoutWaiting(ApparatusChangeout $changeout): void
+    {
+        try {
+            $category = User::NOTIFICATION_PREFERENCE_VEHICLE_SWAP_REPORTED;
+            $eventKey = NotificationDispatchService::eventKey($category, 'apparatus_changeout', (int) $changeout->getKey(), 'pending_fleet');
+            $from = $changeout->from_vehicle_number ?: 'no vehicle recorded';
+
+            app(NotificationDispatchService::class)->dispatch($category, new NewSubmissionNotification(
+                submissionType: self::SUBMISSION_TYPE,
+                title: "Vehicle change needs a decision on {$changeout->unit_designation}",
+                body: "{$changeout->submitted_by_name} is moving {$changeout->unit_designation} from truck {$from} to truck {$changeout->to_vehicle_number}. The equipment choices are saved. No truck has changed until you decide.",
+                actionUrl: '/admin/apparatus-changeouts/'.$changeout->getKey(),
+                icon: 'heroicon-o-arrows-right-left',
+                eventKey: $eventKey,
+            ), eventKey: $eventKey);
+        } catch (Throwable $exception) {
+            report($exception);
         }
     }
 

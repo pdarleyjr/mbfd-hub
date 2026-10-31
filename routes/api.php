@@ -75,6 +75,12 @@ Route::prefix('public')->middleware(['auth:sanctum', 'canonical.api', 'throttle:
     Route::get('apparatuses/{apparatus}/service-notices', [PublicApparatusServiceTicketController::class, 'apparatusNotices']);
     Route::post('apparatuses/{apparatus}/inspections', [ApparatusController::class, 'storeInspection']);
     Route::post('apparatuses/{apparatus}/inventory-corrections', [\App\Http\Controllers\Api\InventoryCorrectionController::class, 'store'])->middleware(['throttle:30,1']);
+    // Vehicle changeouts and operational alerts (docs/apparatus-changeouts.md). Network only, never offline-cached.
+    Route::get('apparatuses/{apparatus}/changeout-context', [\App\Http\Controllers\Api\ApparatusChangeoutController::class, 'context'])->whereNumber('apparatus');
+    Route::post('apparatuses/{apparatus}/changeouts', [\App\Http\Controllers\Api\ApparatusChangeoutController::class, 'store'])->whereNumber('apparatus')->middleware(['throttle:30,1']);
+    Route::get('changeouts/{changeout}', [\App\Http\Controllers\Api\ApparatusChangeoutController::class, 'show'])->whereNumber('changeout');
+    Route::post('changeouts/{changeout}/lines/{line}/verify', [\App\Http\Controllers\Api\ApparatusChangeoutController::class, 'verify'])->whereNumber(['changeout', 'line'])->middleware(['throttle:30,1']);
+    Route::get('stations/{station}/operational-alerts', [\App\Http\Controllers\Api\OperationalAlertController::class, 'station'])->whereNumber('station');
     // One-time vehicle questions outside a checkout (Captain 5 page); the unit is authorized per request.
     Route::get('apparatuses/{apparatus}/vehicle-identification', [\App\Http\Controllers\Api\VehicleIdentificationController::class, 'show'])->whereNumber('apparatus');
     Route::post('apparatuses/{apparatus}/vehicle-identification', [\App\Http\Controllers\Api\VehicleIdentificationController::class, 'store'])->whereNumber('apparatus')->middleware(['throttle:30,1']);

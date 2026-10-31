@@ -13,13 +13,14 @@ namespace App\Services\Notifications;
  * never enrolls a phone (the device still has to tap "Turn on alerts") and never reaches a member with no city
  * email on file (the roster-sourced city email is the only address these alerts use).
  *
- * One exception: "Every Daily Checkout as it's submitted" would send one phone alert per apparatus checkout
- * every day and bury the real alerts, so its phone alerts stay off (the bell is on).
+ * Two exceptions: "Every Daily Checkout as it's submitted" would send one phone alert per apparatus checkout
+ * every day and bury the real alerts, and "Fleet operational alerts" reach every active member about units they
+ * may not ride, so their phone alerts stay off (the bell is on).
  */
 final class NotificationPresetPolicy
 {
     /** Categories whose phone alerts stay off by default. */
-    public const PUSH_OFF_BY_DEFAULT = ['daily_checkout_every_submission'];
+    public const PUSH_OFF_BY_DEFAULT = ['daily_checkout_every_submission', 'fleet_operational_alerts'];
 
     /** Routine categories whose email is still on by default (members should get replies by email). */
     public const EMAIL_ON_BY_DEFAULT = ['support_services_messages'];

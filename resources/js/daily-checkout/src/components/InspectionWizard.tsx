@@ -30,6 +30,7 @@ import OfficerStep from './OfficerStep';
 import ChecklistFieldsStep from './ChecklistFieldsStep';
 import MeterStep from './MeterStep';
 import CompartmentStep from './CompartmentStep';
+import ChangeoutHandoffNote from './changeout/ChangeoutHandoffNote';
 import SubmitStep from './SubmitStep';
 import PreviousPageButton from './PreviousPageButton';
 import { inspectionProgress, inspectionReadiness } from '../utils/inspectionProgress';
@@ -529,7 +530,11 @@ export default function InspectionWizard() {
             setCurrentStep('compartments');
             setHasLoadedAutosave(true);
           };
-          if (canRestoreSavedProgress) {
+          // Drafts follow the unit's address, but readings and answers belong to the truck they were taken on.
+          const truckChanged = saved.apparatusSnapshot?.id !== undefined && saved.apparatusSnapshot.id !== foundApparatus.id;
+          if (truckChanged) {
+            setAutosaveReviewMessage(`This unit moved to truck ${foundApparatus.vehicle_number ?? 'a different truck'} after this inspection was saved. Those answers were for the earlier truck, so this is a new checkout.`);
+          } else if (canRestoreSavedProgress) {
             applySavedProgress(saved.compartments);
           } else if (saved.actorUserId !== identity.userId || saved.actorSecurityVersion !== identity.securityVersion) {
             setAutosaveReviewMessage('A saved inspection belongs to a different or unverified sign-in. Its answers were not loaded.');
@@ -1168,6 +1173,7 @@ export default function InspectionWizard() {
         />
       )}
 
+      {currentStep === 'compartments' && <ChangeoutHandoffNote handoff={checklist.changeout_handoff} />}
       {currentStep === 'compartments' && (
         <CompartmentStep
           actionLabel={readiness.label}

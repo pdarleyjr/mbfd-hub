@@ -1,0 +1,32 @@
+{
+    "report": "Apparatus Status Report",
+    "report_date": "2026-10-30",
+    "partial": true,
+    "rows": [
+        { "vehicle_number": "002-16", "designation": "E 21", "assignment": "Reserve", "location": "Station 2", "status": "Available", "note": null },
+        { "vehicle_number": "002-18", "designation": "E 11", "assignment": "Reserve", "location": "Station 2", "status": "Available", "note": null },
+        { "vehicle_number": "002-14", "designation": "E 31", "assignment": "Reserve", "location": "Station 2", "status": "Available", "note": null },
+        { "vehicle_number": "1033", "designation": null, "assignment": "Reserve", "location": "Station 2", "status": "Available", "note": null },
+        { "vehicle_number": "1034", "designation": null, "assignment": "Reserve", "location": "Station 2", "status": "In Service", "note": "Detail" },
+        { "vehicle_number": "1035", "designation": null, "assignment": "Reserve", "location": "Station 3", "status": "Available", "note": null },
+        { "vehicle_number": "1036", "designation": null, "assignment": "Reserve", "location": "Station 2", "status": "Available", "note": null },
+        { "vehicle_number": "14500", "designation": null, "assignment": "Reserve", "location": "Station 2", "status": "Available", "note": null },
+        { "vehicle_number": "002-6", "designation": "L 11", "assignment": "Reserve", "location": "Station 2", "status": "Available", "note": null },
+        { "vehicle_number": "14501", "designation": null, "assignment": "Reserve", "location": "Station 2", "status": "Available", "note": null },
+        { "vehicle_number": "20503", "designation": "E 1", "assignment": "Station 1", "location": "Station 1", "status": "In Service", "note": null },
+        { "vehicle_number": "002-12", "designation": "L 1", "assignment": "Station 1", "location": "Station 1", "status": "In Service", "note": null },
+        { "vehicle_number": "16508", "designation": "R 1", "assignment": "Station 1", "location": "Station 1", "status": "In Service", "note": null },
+        { "vehicle_number": "19502", "designation": "R 11", "assignment": "Station 1", "location": "Station 1", "status": "In Service", "note": null },
+        { "vehicle_number": "002-20", "designation": "A 1", "assignment": "Station 2", "location": "Station 2", "status": "In Service", "note": null },
+        { "vehicle_number": "18500", "designation": "A 2", "assignment": "Station 2", "location": "Station 2", "status": "In Service", "note": null },
+        { "vehicle_number": "24509", "designation": "E 2", "assignment": "Station 2", "location": "Station 2", "status": "In Service", "note": null },
+        { "vehicle_number": "16507", "designation": "R 2", "assignment": "Station 2", "location": "Station 2", "status": "In Service", "note": null },
+        { "vehicle_number": "19503", "designation": "R 22", "assignment": "Station 2", "location": "Station 2", "status": "In Service", "note": null },
+        { "vehicle_number": "002-22", "designation": "E 3", "assignment": "Station 3", "location": "Station 3", "status": "In Service", "note": null },
+        { "vehicle_number": "17505", "designation": "L 3", "assignment": "Station 3", "location": "Station 3", "status": "In Service", "note": null },
+        { "vehicle_number": "17501", "designation": "R 3", "assignment": "Station 3", "location": "Station 3", "status": "In Service", "note": null },
+        { "vehicle_number": "17503", "designation": "R 44", "assignment": "Station 4", "location": "Station 4", "status": "In Service", "note": null },
+        { "vehicle_number": "20504", "designation": "E 4", "assignment": "Station 4", "location": "Station 4", "status": "In Service", "note": null },
+        { "vehicle_number": "17502", "designation": "R 4", "assignment": "Station 4", "location": "Station 4", "status": "In Service", "note": null }
+    ]
+}

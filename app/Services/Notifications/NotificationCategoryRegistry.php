@@ -212,6 +212,17 @@ final class NotificationCategoryRegistry
                     ? 'fleet_swap_manager' : null,
                 candidates: $audience(['super_admin'], ['admin.fleet.manage']),
             ),
+            // An alert only goes out when Fleet turns on its send_notification, and at most once per alert.
+            new NotificationCategory(
+                key: User::NOTIFICATION_PREFERENCE_FLEET_OPERATIONAL_ALERTS,
+                label: 'Fleet operational alerts',
+                description: 'Fleet announced something about a unit, such as an upcoming vehicle change. It shows in the bell; phone alerts for it are off unless you turn them on.',
+                group: self::GROUP_FLEET,
+                channels: [$db, $push],
+                locked: [],
+                significance: 'routine',
+                eligibility: static fn (EligibilityContext $c): ?string => $c->isActive() ? 'active_member' : null,
+            ),
             new NotificationCategory(
                 key: User::NOTIFICATION_PREFERENCE_APPARATUS_SERVICE_TICKETS,
                 label: 'Apparatus service tickets',

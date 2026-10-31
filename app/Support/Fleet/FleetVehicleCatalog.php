@@ -55,8 +55,10 @@ final class FleetVehicleCatalog
     public static function roleFor(?string $status): string
     {
         return match (str_replace([' ', '-'], '_', strtolower(trim((string) $status)))) {
-            'reserve' => self::ROLE_RESERVE,
-            'out_of_service', 'in_repair' => self::ROLE_OUT_OF_SERVICE,
+            // Reserve trucks on the fleet report read "Available"; a frontline unit reads "In Service".
+            'reserve', 'available' => self::ROLE_RESERVE,
+            // A truck in the shop has no role to trade: a swap never hands its status to a good truck.
+            'out_of_service', 'in_repair', 'maintenance' => self::ROLE_OUT_OF_SERVICE,
             default => self::ROLE_FRONTLINE,
         };
     }

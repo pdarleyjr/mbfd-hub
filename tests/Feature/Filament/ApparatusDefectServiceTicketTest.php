@@ -6,10 +6,12 @@ namespace Tests\Feature\Filament;
 
 use App\Filament\Resources\ApparatusResource;
 use App\Filament\Resources\ApparatusResource\Pages\ViewApparatus;
+use App\Filament\Resources\ApparatusResource\RelationManagers\ChangeoutsRelationManager;
 use App\Filament\Resources\ApparatusResource\RelationManagers\DefectsRelationManager;
 use App\Filament\Resources\ApparatusResource\RelationManagers\IdentificationQuestionsRelationManager;
 use App\Filament\Resources\ApparatusResource\RelationManagers\InspectionsRelationManager;
 use App\Filament\Resources\ApparatusResource\RelationManagers\InventoryCorrectionsRelationManager;
+use App\Filament\Resources\ApparatusResource\RelationManagers\OperationalAlertsRelationManager;
 use App\Filament\Resources\ApparatusResource\RelationManagers\ServiceTicketsRelationManager;
 use App\Filament\Resources\ApparatusResource\RelationManagers\VehicleSwapReportsRelationManager;
 use App\Filament\Resources\ApparatusServiceTicketResource;
@@ -487,10 +489,12 @@ final class ApparatusDefectServiceTicketTest extends TestCase
             InspectionsRelationManager::class,
             ServiceTicketsRelationManager::class,
             VehicleSwapReportsRelationManager::class,
+            OperationalAlertsRelationManager::class,
+            ChangeoutsRelationManager::class,
             DefectsRelationManager::class,
             InventoryCorrectionsRelationManager::class,
             IdentificationQuestionsRelationManager::class,
-        ], array_values(ApparatusResource::getRelations()), 'Vehicle swaps is the fourth tab, shown only to Fleet staff who can view swap reports; inventory corrections follow for reviewers; Identification is a rare Fleet task, last, and only shown once a question exists.');
+        ], array_values(ApparatusResource::getRelations()), 'Vehicle swaps, operational alerts and vehicle changeouts follow service tickets, shown only to Fleet staff who can view them; inventory corrections follow for reviewers; Identification is a rare Fleet task, last, and only shown once a question exists.');
         $this->assertFalse(
             IdentificationQuestionsRelationManager::canViewForRecord($this->apparatus, ViewApparatus::class),
             'No question has been asked for this unit, so there is no Identification tab.',

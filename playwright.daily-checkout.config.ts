@@ -47,7 +47,7 @@ const responsiveViewports = [
  */
 export default defineConfig({
   testDir: './tests/e2e',
-  testMatch: /(canonical-login-responsive|command-communications|command-300-shift|daily-checkout-(inspection|responsive|service-worker|workspace|mobile|vehicle-confirmation)|daily-issue-report|daily-inventory-correction|daily-(?:station-)?vehicle-identification|daily-station-overview|captain5-workspace|captain5-ems)\.spec\.ts/,
+  testMatch: /(canonical-login-responsive|command-communications|command-300-shift|daily-checkout-(inspection|responsive|service-worker|workspace|mobile|vehicle-confirmation)|daily-issue-report|daily-inventory-correction|daily-(?:station-)?vehicle-identification|daily-station-overview|daily-changeout|captain5-workspace|captain5-ems)\.spec\.ts/,
   timeout: 45_000,
   retries: process.env.CI ? 1 : 0,
   // Every spec here mocks the API per test in a fresh browser context and writes only to its own
@@ -91,8 +91,13 @@ export default defineConfig({
       use: { ...devices['iPhone 13'], browserName: 'webkit' },
     },
     {
+      name: 'daily-changeout-webkit-iphone',
+      testMatch: /daily-changeout\.spec\.ts/,
+      use: { ...devices['iPhone 13'], browserName: 'webkit' },
+    },
+    {
       name: 'daily-checkout-chromium',
-      testMatch: /(daily-checkout-(inspection|workspace|vehicle-confirmation)|daily-inventory-correction|daily-(?:station-)?vehicle-identification|daily-station-overview)\.spec\.ts/,
+      testMatch: /(daily-checkout-(inspection|workspace|vehicle-confirmation)|daily-inventory-correction|daily-(?:station-)?vehicle-identification|daily-station-overview|daily-changeout)\.spec\.ts/,
       use: {
         browserName: 'chromium',
         viewport: { width: 1280, height: 800 },
