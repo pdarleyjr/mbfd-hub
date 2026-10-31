@@ -54,12 +54,13 @@ function verifyInputs(files) {
     for (const [file, sha256] of Object.entries(files)) assert.equal(createHash('sha256').update(readFileSync(resolve(root, file))).digest('hex'), sha256, `Unreviewed input: ${file}`);
 }
 
-function validateCounts(findings, counts, withTotal) {
+function validateCounts(findings, counts, withTotal, occurrences = () => 1) {
     const severities = ['info', 'low', 'moderate', 'high', 'critical'];
     assert.ok(findings.every((finding) => severities.includes(finding.severity)), 'Unknown severity');
     for (const severity of severities) {
         assert.ok(Number.isInteger(counts?.[severity]) && counts[severity] >= 0, `Invalid ${severity} count`);
-        assert.equal(counts[severity], findings.filter((finding) => finding.severity === severity).length, `Incomplete ${severity} findings`);
+        const expected = findings.filter((finding) => finding.severity === severity).reduce((sum, finding) => sum + occurrences(finding), 0);
+        assert.equal(counts[severity], expected, `Incomplete ${severity} findings`);
     }
     if (withTotal) assert.equal(counts.total, findings.length, 'Invalid total count');
 }
@@ -75,7 +76,8 @@ export function classifyVacationBuildAdvisory(report, auditExit, now = Date.now(
             && Number.isInteger(resolved.id) && typeof resolved.path === 'string', 'Invalid pnpm resolve schema');
     }
     const findings = Object.values(report.advisories);
-    validateCounts(findings, report.metadata?.vulnerabilities, false);
+    // pnpm counts an advisory once per affected version (GHSA-g3hv-75wg-m249 has three minimatch versions).
+    validateCounts(findings, report.metadata?.vulnerabilities, false, (finding) => finding.findings?.length || 1);
     for (const [id, finding] of Object.entries(report.advisories)) assert.ok(Number.isInteger(finding.id) && String(finding.id) === id, 'Invalid pnpm advisory ID');
     const blocking = findings.filter((finding) => ['high', 'critical'].includes(finding.severity));
     // Pinned pnpm 9.12.0 JSON mode exits 1 for any severity, before audit-level
