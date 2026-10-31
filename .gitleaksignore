@@ -3,3 +3,9 @@
 # E2E seed fixture: a synthetic bid-assignment idempotency label ('narcotics-e2e-key-<n>') in a seeder that only
 # runs under the Playwright narcotics-check config. It is not a credential.
 5ec9414367d6f7ada0cb156cfb397a068c0c1602:database/seeders/NarcoticsChecksE2ESeeder.php:generic-api-key:80
+#
+# Checklist item ids such as 'front_cab-item-3' in a design document's API samples and a browser test. "item_key" reads
+# like a credential name to the rule; the values are positional checklist labels.
+0ead490970e06c12972fde6c42f92ead28a8a6d5:docs/apparatus-changeouts.md:generic-api-key:213
+0ead490970e06c12972fde6c42f92ead28a8a6d5:docs/apparatus-changeouts.md:generic-api-key:233
+0ead490970e06c12972fde6c42f92ead28a8a6d5:tests/e2e/daily-changeout.spec.ts:generic-api-key:347
