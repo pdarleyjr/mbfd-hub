@@ -104,18 +104,25 @@ final class EmailCenter extends Page
         if (! $user instanceof User || ! self::canAccess()) {
             return null;
         }
-        // Filament draws the navigation more than once per page; count once per HTTP request.
+        $unread = self::unreadThisRequest($user);
+
+        return $unread > 0 ? (string) $unread : null;
+    }
+
+    /** The sidebar and the header envelope draw the same number, and the sidebar draws more than once: one count per HTTP request. */
+    public static function unreadThisRequest(User $user): int
+    {
         $attributes = request()->attributes;
         if (! $attributes->has(self::BADGE_REQUEST_KEY)) {
             try {
                 $attributes->set(self::BADGE_REQUEST_KEY, app(MailboxQuery::class)->unreadCount($user));
-            } catch (Throwable) {
+            } catch (Throwable $exception) {
+                report($exception);
                 $attributes->set(self::BADGE_REQUEST_KEY, 0);
             }
         }
-        $unread = (int) $attributes->get(self::BADGE_REQUEST_KEY);
 
-        return $unread > 0 ? (string) $unread : null;
+        return (int) $attributes->get(self::BADGE_REQUEST_KEY);
     }
 
     public static function getNavigationBadgeColor(): string

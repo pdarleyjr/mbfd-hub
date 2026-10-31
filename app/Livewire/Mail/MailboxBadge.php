@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace App\Livewire\Mail;
 
+use App\Filament\Admin\Pages\EmailCenter;
 use App\Models\User;
 use App\Services\Mail\MailAccess;
-use App\Services\Mail\MailboxQuery;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\On;
 use Livewire\Component;
-use Throwable;
 
 /**
  * The envelope in the admin header: a link to the Email Center with the member's unread count. It counts for
@@ -35,20 +34,13 @@ final class MailboxBadge extends Component
     public function render(): View
     {
         $user = auth()->user();
-        $count = 0;
         $allowed = $user instanceof User && $this->allowed();
-        if ($allowed) {
-            try {
-                $count = app(MailboxQuery::class)->unreadCount($user);
-            } catch (Throwable $exception) {
-                report($exception);
-            }
-        }
+        $count = $allowed ? EmailCenter::unreadThisRequest($user) : 0;
 
         return view('livewire.mail.mailbox-badge', [
             'allowed' => $allowed,
             'count' => $count,
-            'url' => \App\Filament\Admin\Pages\EmailCenter::getUrl(),
+            'url' => EmailCenter::getUrl(),
             'label' => $count > 0 ? 'Email, '.$count.' unread' : 'Email',
         ]);
     }

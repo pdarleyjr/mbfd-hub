@@ -120,8 +120,10 @@ final class GoLiveCapacityProbeTest extends TestCase
         self::assertCount(300, $assessments);
         self::assertLessThanOrEqual(20, $previewQueries);
         // 30 + 1: the Employee Messages unread badge (one count per admin page view, memoized per
-        // request; docs/employee-logistics-messaging.md). Any further growth needs its own reason.
-        self::assertLessThanOrEqual(31, $adminQueries);
+        // request; docs/employee-logistics-messaging.md). + 1: the Email unread count the header and sidebar
+        // share (one indexed count, memoized per request; docs/email-center-architecture.md).
+        // Any further growth needs its own reason.
+        self::assertLessThanOrEqual(32, $adminQueries);
         self::assertLessThanOrEqual(40, $searchQueries);
         self::assertLessThanOrEqual(40, $filterQueries);
     }
