@@ -124,6 +124,7 @@ final class StationInspectionSource extends QueryBackedSource
             occurredAt: CarbonImmutable::instance($record->created_at),
             version: self::stamp($record->updated_at).'#'.$record->review_status,
             sourceUrl: StationInspectionResource::getUrl('view', ['record' => $record->getKey()], panel: 'admin'),
+            groupKey: 'station:'.(int) $record->station_id,
         );
     }
 

@@ -35,8 +35,6 @@ final class DashboardBoard extends Component
     #[Url(as: 'filter', except: 'all', history: true)]
     public string $filter = DashboardFilters::ALL;
 
-    public int $rowsPerSource = DashboardReadModel::ROWS_PER_SOURCE;
-
     private bool $fresh = false;
 
     public function mount(string $dashboard): void
@@ -62,12 +60,6 @@ final class DashboardBoard extends Component
         }
     }
 
-    /** Reaches the rows past the first page, so every open item can be acted on from the board. */
-    public function showMore(): void
-    {
-        $this->rowsPerSource = min($this->rowsPerSource + DashboardReadModel::ROWS_PER_SOURCE, DashboardReadModel::MAX_ROWS_PER_SOURCE);
-    }
-
     /** The Refresh button: a real reload from the sources, bypassing the short cache. */
     public function refresh(): void
     {
@@ -87,7 +79,7 @@ final class DashboardBoard extends Component
         /** @var User $user */
         $user = auth()->user();
 
-        $snapshot = app(DashboardReadModel::class)->load($user, $view, $this->filter, $this->fresh, $this->rowsPerSource);
+        $snapshot = app(DashboardReadModel::class)->load($user, $view, $this->filter, $this->fresh);
         $this->fresh = false;
 
         return view('livewire.dashboards.board', [
@@ -108,12 +100,16 @@ final class DashboardBoard extends Component
         abort_unless(DashboardAccess::canView(auth()->user(), $this->view()), 403);
     }
 
-    /** @return list<array{key: string, label: string, countKey: string, kind: string, optional: bool, icon: string, count: int}> */
+    /** @return list<array{key: string, label: string, countKey: string, kind: string, optional: bool, icon: string, lane?: string, count: int}> */
     private function visibleChips(DashboardView $view, DashboardSnapshot $snapshot): array
     {
         $chips = [];
         foreach (DashboardFilters::chips($view) as $chip) {
-            $count = $snapshot->count($chip['countKey']);
+            $lane = $chip['lane'] ?? null;
+            if ($lane !== null && ! $snapshot->hasLane($lane)) {
+                continue;
+            }
+            $count = $snapshot->count($chip['countKey'], $lane);
             if ($chip['optional'] && $count === 0 && $this->filter !== $chip['key']) {
                 continue;
             }

@@ -225,10 +225,10 @@ final class ApparatusDefectSource extends VehicleIssueSource
 
         return array_values(array_filter([
             $status === DefectActionStatus::REPORTED
-                ? new IssueAction('acknowledge', 'Acknowledge', 'primary', $messages)
-                : new IssueAction('add_note', 'Add note or message', 'secondary', $messages),
-            new IssueAction('set_progress', 'Update progress', 'secondary', [self::select('action_status', 'Progress', $progress), ...$messages]),
-            $staff === [] ? null : new IssueAction('assign', 'Assign', 'secondary', [self::select('assignee_id', 'Assign to', $staff), ...$messages]),
+                ? new IssueAction('acknowledge', 'Acknowledge', 'primary', $messages, bulk: IssueAction::BULK_DIRECT)
+                : new IssueAction('add_note', 'Add note or message', 'secondary', $messages, bulk: IssueAction::BULK_FORM),
+            new IssueAction('set_progress', 'Update progress', 'secondary', [self::select('action_status', 'Progress', $progress), ...$messages], bulk: IssueAction::BULK_FORM),
+            $staff === [] ? null : new IssueAction('assign', 'Assign', 'secondary', [self::select('assignee_id', 'Assign to', $staff), ...$messages], bulk: IssueAction::BULK_FORM),
             $defect->latestObservation?->observation === 'appears_corrected'
                 ? new IssueAction('verify', 'Verify correction', 'primary', [self::textarea('notes', 'Notes (optional)', max: 5000), ...$messages])
                 : null,
@@ -237,12 +237,12 @@ final class ApparatusDefectSource extends VehicleIssueSource
                 self::select('resolution_type', 'How was it resolved?', DefectCorrectiveActions::RESOLUTION_OPTIONS),
                 self::textarea('resolution_notes', 'Resolution notes', true, 5000),
                 ...$messages,
-            ]),
+            ], bulk: IssueAction::BULK_FORM),
             DefectCorrectiveActions::closeBlockedReason($defect) === null
                 ? new IssueAction('close_no_action', DefectNoActionClosure::ACTION_LABEL, 'danger', [
                     self::textarea('reason', DefectNoActionClosure::REASON_LABEL, true, 5000),
                     ...$messages,
-                ], DefectNoActionClosure::DIALOG_TEXT)
+                ], DefectNoActionClosure::DIALOG_TEXT, IssueAction::BULK_FORM)
                 : null,
         ]));
     }

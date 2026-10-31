@@ -61,7 +61,7 @@ abstract class FixtureIssueSource implements IssueSource
 
         $actions = match ($issue->stage) {
             'awaiting_response' => [
-                new IssueAction('acknowledge', 'Acknowledge', 'primary'),
+                new IssueAction('acknowledge', 'Acknowledge', 'primary', bulk: IssueAction::BULK_DIRECT),
                 new IssueAction('reply', 'Send reply', 'secondary', [
                     ['name' => 'message', 'label' => 'Reply', 'type' => 'textarea', 'required' => true, 'max' => 500],
                 ]),
@@ -70,7 +70,7 @@ abstract class FixtureIssueSource implements IssueSource
                 new IssueAction('resolve', 'Mark completed', 'primary', [
                     ['name' => 'note', 'label' => 'What was done', 'type' => 'textarea', 'required' => true, 'max' => 500],
                     ['name' => 'completed_on', 'label' => 'Completed on', 'type' => 'date', 'required' => false],
-                ]),
+                ], bulk: IssueAction::BULK_FORM),
             ],
             default => [],
         };
@@ -161,10 +161,17 @@ abstract class FixtureIssueSource implements IssueSource
                 categoryLabel: $item['category'],
                 occurredAt: $now->subMinutes($item['minutesAgo']),
                 version: 'v'.$state['revision'],
+                groupKey: $this->groupKey(),
             );
         }
 
         return $rows;
+    }
+
+    /** Set by a fixture whose items all belong to one unit. */
+    protected function groupKey(): ?string
+    {
+        return null;
     }
 
     private function currentStage(string $id): ?string

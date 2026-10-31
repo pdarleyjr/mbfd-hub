@@ -87,6 +87,99 @@ test('filter chips narrow the list with exact counts', async ({ page }) => {
   await expect(page.locator('[data-card="priority-apparatus"] [data-issue-ref]')).toHaveCount(1);
 });
 
+test('the Overview shows apparatus, stations and personnel separately or together', async ({ page }) => {
+  await openView(page, '/admin');
+  const lanes = ['lane-vehicle', 'lane-station', 'lane-messages'];
+  for (const lane of lanes) await expect(page.locator(`[data-card="${lane}"]`)).toBeVisible();
+
+  for (const [name, lane, query] of [['Apparatus', 'lane-vehicle', 'apparatus'], ['Stations', 'lane-station', 'stations'], ['Personnel', 'lane-messages', 'personnel']] as const) {
+    const chip = page.getByRole('button', { name: new RegExp(`^${name} · \\d+`) });
+    await chip.click();
+    await expect(chip).toHaveAttribute('aria-pressed', 'true');
+    await expect(page).toHaveURL(new RegExp(`filter=${query}`));
+    await expect(page.locator(`[data-card="${lane}"]`)).toBeVisible();
+    for (const other of lanes.filter(item => item !== lane)) await expect(page.locator(`[data-card="${other}"]`)).toHaveCount(0);
+    const metrics = await overflow(page);
+    expect(metrics.scrollWidth).toBeLessThanOrEqual(metrics.innerWidth);
+  }
+
+  await page.getByRole('button', { name: /^All · \d+/ }).click();
+  for (const lane of lanes) await expect(page.locator(`[data-card="${lane}"]`)).toBeVisible();
+});
+
+test('one unit is one row on the dashboard, and its page fits the window', async ({ page }, testInfo) => {
+  const { width, height } = page.viewportSize()!;
+  await openView(page, '/admin');
+  const unit = page.locator('[data-card="lane-vehicle"] [data-group-key="apparatus:2"]');
+  await expect(unit).toHaveCount(1);
+  await expect(unit).toContainText('E 2');
+  await expect(unit).toContainText(/\d+ open issues/);
+  await expect(page.locator('[data-card="lane-vehicle"]')).not.toContainText('Missing: Gated Wye');
+
+  if (width < 1024) {
+    // A stacked Overview holds five rows per list; the rest are one tap away.
+    await expect(page.locator('[data-card="lane-vehicle"] .mbfd-dash-row:visible')).toHaveCount(5);
+    if (width < 640) {
+      // A row stays short enough that a phone screen shows a real list, not one blown-up item.
+      const tallest = await page.locator('.mbfd-dash-row:visible').evaluateAll(rows => Math.max(...rows.map(row => row.getBoundingClientRect().height)));
+      expect(tallest).toBeLessThanOrEqual(110);
+    }
+    await page.locator('[data-card="lane-vehicle"] .mbfd-dash-card__more').click();
+    await expect(page).toHaveURL(/filter=apparatus/);
+    await expect(page.locator('[data-card="lane-station"]')).toHaveCount(0);
+    expect(await page.locator('[data-card="lane-vehicle"] .mbfd-dash-row:visible').count()).toBeGreaterThan(5);
+    await page.goBack();
+    await expect(unit).toBeVisible();
+  }
+
+  if (screenshotSizes.has(testInfo.project.name)) {
+    mkdirSync(screensDir, { recursive: true });
+    await page.screenshot({ path: join(screensDir, `overview-grouped-${width}x${height}.png`), fullPage: width < 1024 });
+  }
+
+  await unit.click();
+  await expect(page).toHaveURL(/dashboards\/item\?group=apparatus%3A2/);
+  await expect(page.getByRole('heading', { level: 1, name: 'E 2' })).toBeVisible();
+  await expect(page.locator('[data-issue-group] .mbfd-dash-group__row')).toHaveCount(8);
+
+  const metrics = await overflow(page);
+  expect(metrics.scrollWidth, 'no horizontal page overflow').toBeLessThanOrEqual(metrics.innerWidth);
+  if (width >= 1366) expect(metrics.scrollHeight, 'desktop page fits the viewport').toBeLessThanOrEqual(metrics.innerHeight + 1);
+  if (width < 1024) {
+    const small = await page.locator('.mbfd-dash :is(button, a[href], label)').evaluateAll(nodes => nodes
+      .filter(node => (node as HTMLElement).offsetParent !== null)
+      .map(node => node.getBoundingClientRect())
+      .filter(rect => rect.height < 43.5).length);
+    expect(small).toBe(0);
+  }
+  if (screenshotSizes.has(testInfo.project.name)) {
+    await page.screenshot({ path: join(screensDir, `item-page-${width}x${height}.png`), fullPage: width < 1024 });
+  }
+
+  // Any one issue still opens its own panel from here.
+  await page.locator('[data-issue-group] [data-issue-ref="fixture_engine:203"]').click();
+  await expect(page.locator('[data-issue-panel]')).toBeVisible();
+  await expect(page.locator('[data-issue-panel]').getByRole('heading', { level: 2 })).toContainText('Gated Wye');
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-issue-panel]')).toBeHidden();
+});
+
+test('one action reaches every selected issue on a unit', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== '1440x900', 'Mutating flow runs once.');
+  await page.goto('/admin/dashboards/item?group=apparatus%3A2');
+  const section = page.locator('[data-group-section="fixture_engine"]');
+  await expect(section.getByRole('button', { name: 'Acknowledge 8' })).toBeVisible();
+
+  await section.getByRole('checkbox', { name: 'Select Missing: Hydrant Wrench' }).uncheck();
+  await section.getByRole('button', { name: 'Acknowledge 7' }).click();
+  await expect(page.locator('[data-group-notice]')).toContainText('7 issues updated');
+  await expect(section.locator('.mbfd-dash-group__row', { hasText: 'Gated Wye' })).toContainText('In progress');
+  await expect(section.locator('.mbfd-dash-group__row', { hasText: 'Hydrant Wrench' })).toContainText('New');
+
+  await openView(page, '/admin');
+  await expect(page.locator('[data-group-key="apparatus:2"]')).toContainText('8 open issues');
+});
+
 test('freshness says Offline without a network and never fakes Live', async ({ page, context }) => {
   await openView(page, '/admin');
   await context.setOffline(true);

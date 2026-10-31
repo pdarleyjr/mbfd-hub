@@ -72,8 +72,15 @@
         </p>
     @endif
 
+    @if ($snapshot->moreAvailable)
+        <p class="mbfd-dash-notice" role="status">
+            There are more items than this list can hold, so the oldest may not be shown. Clear some, then refresh.
+        </p>
+    @endif
+
     @if ($chips !== [])
-        <div class="mbfd-dash-chips" role="group" aria-label="Filter {{ strtolower($view->label()) }} items">
+        <div class="mbfd-dash-chips" role="group" aria-label="Filter {{ strtolower($view->label()) }} items"
+            @if ($view === \App\Support\Dashboards\DashboardView::Overview) data-segmented @endif>
             @foreach ($chips as $chip)
                 <button type="button" class="mbfd-dash-chip" wire:key="chip-{{ $chip['key'] }}"
                     wire:click="setFilter('{{ $chip['key'] }}')"
@@ -81,26 +88,30 @@
                     <x-filament::icon :icon="$chip['icon']" class="mbfd-dash-chip__icon" />
                     <span>{{ $chip['label'] }}</span>
                     {{-- Counts are OPEN items; the list below also keeps items closed earlier this operational day. --}}
-                    <span class="mbfd-dash-chip__count">· {{ number_format($chip['count']) }} open</span>
+                    <span class="mbfd-dash-chip__count">· {{ number_format($chip['count']) }}<span class="mbfd-dash-chip__unit"> open</span></span>
                 </button>
             @endforeach
         </div>
     @endif
 
-    <div class="mbfd-dash-stats">
-        @foreach ($layout['stats'] as $stat)
-            @include('filament.dashboards.partials.stat', $stat)
-        @endforeach
-    </div>
+    @if ($layout['stats'] !== [])
+        <div class="mbfd-dash-stats">
+            @foreach ($layout['stats'] as $stat)
+                @include('filament.dashboards.partials.stat', $stat)
+            @endforeach
+        </div>
+    @endif
 
-    <div @class(['mbfd-dash-body', 'mbfd-dash-body--lanes' => $layout['side'] === [], 'mbfd-dash-body--split' => $layout['side'] !== []])>
+    <div @class([
+        'mbfd-dash-body',
+        'mbfd-dash-body--lanes' => $layout['side'] === [] && count($layout['main']) > 1,
+        'mbfd-dash-body--single' => $layout['side'] === [] && count($layout['main']) === 1,
+        'mbfd-dash-body--split' => $layout['side'] !== [],
+    ])>
         <div class="mbfd-dash-main">
             @foreach ($layout['main'] as $card)
                 @include('filament.dashboards.partials.list-card', $card)
             @endforeach
-            @if ($snapshot->moreAvailable)
-                <button type="button" class="mbfd-dash-more" wire:click="showMore" wire:loading.attr="disabled" wire:target="showMore">Show more issues</button>
-            @endif
         </div>
         @if ($layout['side'] !== [])
             <div class="mbfd-dash-side">

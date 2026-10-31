@@ -49,6 +49,59 @@ final class IssuePresenter
         ];
     }
 
+    /**
+     * One dashboard row for a whole group. A single issue stays an ordinary row that opens the
+     * action panel; several become one row that links to the page for all of them ($href).
+     *
+     * @param  array{key: string, issues: list<DashboardIssue>}  $group
+     * @return array<string, mixed>
+     */
+    public static function groupRow(array $group, string $lane, string $href): array
+    {
+        $issues = $group['issues'];
+        $count = count($issues);
+        if ($count === 1) {
+            return [...self::row($issues[0], $lane), 'count' => 1, 'href' => null];
+        }
+
+        $relevant = IssueGroups::openFirst($issues);
+        $lead = $relevant[0];
+        $open = count(array_filter($issues, static fn (DashboardIssue $issue): bool => $issue->isOpen()));
+        $severity = IssueGroups::worstSeverity($issues);
+        $newest = max(array_map(static fn (DashboardIssue $issue): int => $issue->occurredAt->getTimestamp(), $issues));
+        $stage = match (true) {
+            array_filter($issues, static fn (DashboardIssue $issue): bool => $issue->stage === 'awaiting_response') !== [] => 'awaiting_response',
+            $open > 0 => 'in_progress',
+            default => 'resolved',
+        };
+        $reporters = array_values(array_unique(array_filter(array_map(static fn (DashboardIssue $issue): ?string => $issue->actorLabel, $issues))));
+        $noun = match ($lane) {
+            DashboardSnapshot::LANE_VEHICLE => 'issue',
+            DashboardSnapshot::LANE_STATION => 'request',
+            default => 'item',
+        };
+        $shown = $open > 0 ? $open : $count;
+
+        return [
+            ...self::row($lead, $lane),
+            'ref' => $group['key'],
+            'subject' => $lead->subject ?? $lead->actorLabel,
+            'title' => $shown.' '.($open > 0 ? 'open ' : 'completed ').$noun.($shown === 1 ? '' : 's'),
+            'summary' => $lead->title.' + '.($count - 1).' more',
+            'severity' => $severity,
+            'severityLabel' => self::severityLabel($severity),
+            'stage' => $stage,
+            'statusLabel' => $open > 0 ? $lead->statusLabel : 'Completed today',
+            'time' => self::time(CarbonImmutable::createFromTimestamp($newest)),
+            'timeIso' => CarbonImmutable::createFromTimestamp($newest)->toIso8601String(),
+            'actor' => count($reporters) === 1 && $lead->subject !== null ? $reporters[0] : null,
+            'initials' => self::initials($lead->actorLabel),
+            'cta' => $stage === 'resolved' ? 'View all' : self::cta($stage).' all',
+            'count' => $count,
+            'href' => $href,
+        ];
+    }
+
     public static function severityLabel(string $severity): string
     {
         return match ($severity) {

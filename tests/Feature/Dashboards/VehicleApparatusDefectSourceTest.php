@@ -5,17 +5,21 @@ declare(strict_types=1);
 namespace Tests\Feature\Dashboards;
 
 use App\Filament\Resources\DefectResource\Pages\ListDefects;
+use App\Filament\Support\DefectCorrectiveActions;
+use App\Livewire\Dashboards\IssueGroupBoard;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusDefectEvent;
 use App\Models\ApparatusInspection;
 use App\Models\User;
+use App\Notifications\Inspections\InspectionEventNotification;
 use App\Services\Dashboards\Sources\Vehicle\ApparatusDefectSource;
 use App\Support\Dashboards\DashboardView;
 use App\Support\Dashboards\IssueSourceRegistry;
 use App\Support\Fleet\DefectActionStatus;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
 use Tests\Feature\Defects\Concerns\BuildsContinuityFixtures;
@@ -60,6 +64,44 @@ final class VehicleApparatusDefectSourceTest extends TestCase
     private function versionOf(ApparatusDefect $defect): string
     {
         return $this->source->detail($this->personas()['super admin'], (string) $defect->id)->issue->version;
+    }
+
+    public function test_acting_on_all_of_a_units_issues_tells_the_reporter_once(): void
+    {
+        CarbonImmutable::setTestNow(CarbonImmutable::parse('2026-10-30 14:00:00', 'America/New_York'));
+        try {
+            $defects = [$this->defect('Fog Nozzle'), $this->defect('Gated Wye'), $this->defect('Siamese')];
+            $this->actingAs($this->personas()['super admin']);
+            Notification::fake();
+            $board = Livewire::test(IssueGroupBoard::class, ['group' => 'apparatus:'.$this->rig->id]);
+            $this->assertCount(3, $board->get('selected'));
+
+            $board->call('apply', 'apparatus_defect', 'acknowledge', $board->get('token'));
+            $this->assertSame('success', $board->get('notice')['tone']);
+            foreach ($defects as $defect) {
+                $this->assertSame(DefectActionStatus::ACKNOWLEDGED, $defect->refresh()->action_status);
+            }
+            Notification::assertNotSentTo($this->reporter, InspectionEventNotification::class);
+
+            $board->set('input.apparatus_defect.resolve.resolution_type', array_key_first(DefectCorrectiveActions::RESOLUTION_OPTIONS))
+                ->set('input.apparatus_defect.resolve.resolution_notes', 'Replaced from the shop')
+                ->set('input.apparatus_defect.resolve.internal_note', 'Staff only text');
+            $board->call('apply', 'apparatus_defect', 'resolve', $board->get('token'));
+            $this->assertSame('success', $board->get('notice')['tone'], (string) $board->get('notice')['text']);
+            foreach ($defects as $defect) {
+                $this->assertSame(DefectActionStatus::RESOLVED, $defect->refresh()->action_status);
+            }
+
+            Notification::assertSentToTimes($this->reporter, InspectionEventNotification::class, 1);
+            Notification::assertSentTo($this->reporter, InspectionEventNotification::class, function (InspectionEventNotification $notification): bool {
+                $text = $notification->title.' '.$notification->body;
+
+                return str_contains($text, '3 reported issues') && ! str_contains($text, 'Staff only text');
+            });
+            $this->assertSame(3, DB::table('inspection_notification_deliveries')->where('recipient_user_id', $this->reporter->id)->where('status', 'dispatched')->count());
+        } finally {
+            CarbonImmutable::setTestNow();
+        }
     }
 
     public function test_it_is_registered_for_the_overview_and_vehicle_checkout_dashboards(): void

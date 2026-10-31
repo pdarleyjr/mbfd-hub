@@ -1,6 +1,7 @@
 {{--
     A titled card holding a bounded, internally scrolling list of rows.
-    Expects: $id, $title, $note, $icon, $tone, $rows (IssuePresenter rows), $empty, optional $href / $hrefLabel, $compact.
+    Expects: $id, $title, $note, $icon, $tone, $rows (IssuePresenter rows), $empty, optional $href / $hrefLabel, $compact,
+    $filterKey (the Overview filter that shows this list alone; on small screens the list stops at five rows and offers it).
 --}}
 <section class="mbfd-dash-card" aria-labelledby="{{ $id }}-title" data-card="{{ $id }}">
     <header class="mbfd-dash-card__head">
@@ -24,5 +25,8 @@
                 @include('filament.dashboards.partials.row', ['row' => $row, 'compact' => $compact ?? false, 'scope' => $id])
             @endforeach
         </ul>
+        @if (filled($filterKey ?? null) && count($rows) > 5)
+            <button type="button" class="mbfd-dash-card__more" wire:click="setFilter('{{ $filterKey }}')">See all {{ count($rows) }} in {{ $title }}</button>
+        @endif
     @endif
 </section>

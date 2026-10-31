@@ -15,7 +15,7 @@ if (! is_string($path) || ! str_ends_with($path, 'admin-dashboards-config.php') 
 }
 
 $config = require $path;
-$config['dashboards']['vehicle_sources'] = ['Tests\\Support\\Dashboards\\FixtureVehicleSource'];
+$config['dashboards']['vehicle_sources'] = ['Tests\\Support\\Dashboards\\FixtureVehicleSource', 'Tests\\Support\\Dashboards\\FixtureGroupedEngineSource'];
 $config['dashboards']['station_sources'] = ['Tests\\Support\\Dashboards\\FixtureStationSource', 'Tests\\Support\\Dashboards\\FixtureMessageSource'];
 
 file_put_contents($path, '<?php return '.var_export($config, true).';'.PHP_EOL);

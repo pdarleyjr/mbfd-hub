@@ -1,14 +1,18 @@
 {{--
-    One issue row. The whole row is a single <button> that opens the action panel (the contextual
-    "Review / Update / View" label inside it is part of that button, so there is one tab stop per row).
-    $row comes from IssuePresenter::row(); every value is escaped. $compact drops the thumbnail detail line.
+    One dashboard row. The whole row is a single control, so there is one tab stop per row: a <button>
+    that opens the action panel for one issue, or a link to the page for all of one item's issues
+    ($row['href'], from IssuePresenter::groupRow()). Every value is escaped. $compact drops the detail line.
 --}}
 @php($compact = $compact ?? false)
 <li class="mbfd-dash-row" wire:key="row-{{ $scope ?? 'list' }}-{{ $row['ref'] }}">
-    <button type="button" class="mbfd-dash-row__button @if ($compact) is-compact @endif"
-        data-issue-ref="{{ $row['ref'] }}"
-        aria-haspopup="dialog"
-        x-on:click="$dispatch('dashboard-issue-open', { ref: $el.dataset.issueRef })">
+    @if (filled($row['href'] ?? null))
+        <a href="{{ $row['href'] }}" class="mbfd-dash-row__button @if ($compact) is-compact @endif" data-group-key="{{ $row['ref'] }}">
+    @else
+        <button type="button" class="mbfd-dash-row__button @if ($compact) is-compact @endif"
+            data-issue-ref="{{ $row['ref'] }}"
+            aria-haspopup="dialog"
+            x-on:click="$dispatch('dashboard-issue-open', { ref: $el.dataset.issueRef })">
+    @endif
         @if ($row['lane'] === 'messages' && $row['image'] === null && $row['initials'] !== null)
             <span class="mbfd-dash-thumb mbfd-dash-thumb--avatar" aria-hidden="true">{{ $row['initials'] }}</span>
         @elseif ($row['image'] !== null)
@@ -49,5 +53,9 @@
         </span>
 
         <span class="mbfd-dash-row__cta" data-stage="{{ $row['stage'] }}">{{ $row['cta'] }}</span>
-    </button>
+    @if (filled($row['href'] ?? null))
+        </a>
+    @else
+        </button>
+    @endif
 </li>

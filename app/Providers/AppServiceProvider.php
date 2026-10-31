@@ -53,6 +53,9 @@ class AppServiceProvider extends ServiceProvider
         );
         $this->app->bind(ConferenceProvider::class, \App\Services\VideoConferencing\LiveKitConferenceProvider::class);
 
+        // Holds notifications only while one bulk dashboard action runs, never across requests or jobs.
+        $this->app->scoped(\App\Services\Inspections\InspectionNotificationBatch::class);
+
         // Captain 5 decisions are memoized per request (scoped), never across requests or jobs.
         $this->app->scoped(\App\Services\Captain5\VerifiedBidSeats::class);
         $this->app->scoped(\App\Services\Captain5\Captain5DutyRoster::class);
