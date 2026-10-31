@@ -678,6 +678,7 @@ function DailyCheckoutPanel({ dailyCheckout }: { dailyCheckout: DailyCheckoutSum
           ) : (
             <p className="mt-1 text-sm text-hub-n-600">No required apparatus — completion unavailable</p>
           )}
+          <p className="mt-1 text-xs text-hub-n-600">Counted from 7 AM to 7 AM</p>
         </div>
         <span className="w-fit text-2xl font-bold tabular-nums text-hub-blue">{completionLabel}</span>
       </div>

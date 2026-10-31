@@ -279,6 +279,100 @@ class DailyCheckoutComplianceServiceTest extends TestCase
         $this->assertSame(2, $summary['not_checked_count']);
     }
 
+    public function test_the_station_shift_summary_counts_from_7_am_while_the_compliance_day_still_counts_from_midnight(): void
+    {
+        $this->activateBaseCutover();
+        $station = $this->shiftStation(21);
+        $beforeSeven = $this->makeApparatus($station, 'E71', 'required', 'In Service');
+        $atSeven = $this->makeApparatus($station, 'E72', 'required', 'In Service');
+        $this->recordInspection($beforeSeven, $this->eastern('2026-10-30 06:59:59')->utc());
+        $this->recordInspection($atSeven, $this->eastern('2026-10-30 07:00:00')->utc());
+        $service = app(DailyCheckoutComplianceService::class);
+        $now = $this->eastern('2026-10-30 09:00:00');
+
+        $shift = collect($service->summaryForStationShift($station->apparatuses()->get(), $now)['matrix'])->keyBy('apparatus_id');
+        $this->assertSame('not_checked', $shift[$beforeSeven->id]['state']);
+        $this->assertSame('checked', $shift[$atSeven->id]['state']);
+
+        $day = collect($service->summaryForApparatuses($station->apparatuses()->get(), $now)['matrix'])->keyBy('apparatus_id');
+        $this->assertSame('checked', $day[$beforeSeven->id]['state']);
+        $this->assertSame('checked', $day[$atSeven->id]['state']);
+    }
+
+    public function test_a_late_night_checkout_stays_counted_for_the_station_shift_until_7_am(): void
+    {
+        $this->activateBaseCutover();
+        $station = $this->shiftStation(22);
+        $apparatus = $this->makeApparatus($station, 'E73', 'required', 'In Service');
+        $this->recordInspection($apparatus, $this->eastern('2026-10-30 21:30:00')->utc());
+        $service = app(DailyCheckoutComplianceService::class);
+
+        foreach ([['2026-10-31 03:00:00', 'checked'], ['2026-10-31 06:59:59', 'checked'], ['2026-10-31 07:00:00', 'not_checked']] as [$moment, $state]) {
+            $summary = $service->summaryForStationShift($station->apparatuses()->get(), $this->eastern($moment));
+            $this->assertSame($state, $summary['matrix'][0]['state'], $moment);
+        }
+    }
+
+    public function test_a_pending_submission_shows_as_submitted_on_the_station_shift(): void
+    {
+        $this->activateBaseCutover();
+        $station = $this->shiftStation(23);
+        $apparatus = $this->makeApparatus($station, 'E74', 'required', 'In Service');
+        $this->recordInspection($apparatus, $this->eastern('2026-10-30 22:00:00')->utc(), 'pending_review');
+
+        $summary = app(DailyCheckoutComplianceService::class)
+            ->summaryForStationShift($station->apparatuses()->get(), $this->eastern('2026-10-31 02:00:00'));
+
+        $this->assertSame('review_pending', $summary['matrix'][0]['state']);
+    }
+
+    public function test_the_station_shift_needs_a_checkout_after_a_return_to_service_in_the_same_window(): void
+    {
+        $this->activateBaseCutover();
+        $station = $this->shiftStation(24);
+        $apparatus = $this->makeApparatus($station, 'E75', 'required', 'In Service');
+        $service = app(DailyCheckoutComplianceService::class);
+
+        // A return before 7 AM belongs to the previous window, so it asks nothing of this one.
+        $this->transitionStatusAt($apparatus, 'Out of Service', $this->eastern('2026-10-30 05:00:00')->utc());
+        $this->transitionStatusAt($apparatus, 'In Service', $this->eastern('2026-10-30 06:30:00')->utc());
+        $this->recordInspection($apparatus, $this->eastern('2026-10-30 07:15:00')->utc());
+        $row = $service->summaryForStationShift($station->apparatuses()->get(), $this->eastern('2026-10-30 08:00:00'))['matrix'][0];
+        $this->assertSame('checked', $row['state']);
+        $this->assertFalse($row['return_checkout_required']);
+
+        // A return after that checkout, in the same window, needs a new one, and still does after midnight.
+        $this->transitionStatusAt($apparatus, 'Out of Service', $this->eastern('2026-10-30 20:00:00')->utc());
+        $this->transitionStatusAt($apparatus, 'In Service', $this->eastern('2026-10-30 23:00:00')->utc());
+        $row = $service->summaryForStationShift($station->apparatuses()->get(), $this->eastern('2026-10-31 02:00:00'))['matrix'][0];
+        $this->assertSame('not_checked', $row['state']);
+        $this->assertTrue($row['return_checkout_required']);
+
+        $this->recordInspection($apparatus, $this->eastern('2026-10-30 23:30:00')->utc());
+        $row = $service->summaryForStationShift($station->apparatuses()->get(), $this->eastern('2026-10-31 02:00:00'))['matrix'][0];
+        $this->assertSame('checked', $row['state']);
+        $this->assertTrue($row['return_checkout_verified']);
+    }
+
+    public function test_the_station_shift_follows_7_am_across_both_clock_changes(): void
+    {
+        $this->activateBaseCutover();
+        $station = $this->shiftStation(25);
+        $apparatus = $this->makeApparatus($station, 'E76', 'required', 'In Service');
+        $service = app(DailyCheckoutComplianceService::class);
+
+        // 2026-11-01 falls back to Standard Time, so 7 AM is 12:00 UTC, not 11:00 UTC.
+        $this->recordInspection($apparatus, CarbonImmutable::parse('2026-11-01 11:30:00', 'UTC'));
+        $this->assertSame('not_checked', $service->summaryForStationShift($station->apparatuses()->get(), $this->eastern('2026-11-01 08:00:00'))['matrix'][0]['state']);
+        $this->recordInspection($apparatus, CarbonImmutable::parse('2026-11-01 12:00:00', 'UTC'));
+        $this->assertSame('checked', $service->summaryForStationShift($station->apparatuses()->get(), $this->eastern('2026-11-01 08:00:00'))['matrix'][0]['state']);
+
+        // 2026-03-08 springs forward, so 7 AM is 11:00 UTC, not 12:00 UTC.
+        $spring = $this->makeApparatus($this->shiftStation(26), 'E77', 'required', 'In Service');
+        $this->recordInspection($spring, CarbonImmutable::parse('2026-03-08 11:00:00', 'UTC'));
+        $this->assertSame('checked', $service->summaryForStationShift(collect([$spring->fresh()]), $this->eastern('2026-03-08 08:00:00'))['matrix'][0]['state']);
+    }
+
     public function test_pre_cutover_inspections_without_the_canonical_submission_identifier_do_not_satisfy_daily_compliance(): void
     {
         $this->activateBaseCutover();
@@ -594,6 +688,21 @@ class DailyCheckoutComplianceServiceTest extends TestCase
             'status' => $status,
             'daily_checkout_requirement' => $requirement,
         ]);
+    }
+
+    private function shiftStation(int $number): Station
+    {
+        return Station::query()->create([
+            'station_number' => $number,
+            'name' => "Station {$number}",
+            'address' => "{$number} Test Street",
+            'is_active' => true,
+        ]);
+    }
+
+    private function eastern(string $moment): CarbonImmutable
+    {
+        return CarbonImmutable::parse($moment, DailyCheckoutComplianceService::TIMEZONE);
     }
 
     private function recordInspection(
