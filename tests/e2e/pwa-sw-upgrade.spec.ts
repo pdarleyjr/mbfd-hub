@@ -1,5 +1,5 @@
 import { generateKeyPairSync } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { createServer, type Server } from 'node:http';
 import { stripTypeScriptTypes } from 'node:module';
 import type { AddressInfo } from 'node:net';
@@ -63,6 +63,11 @@ async function startOrigin(): Promise<FixtureOrigin> {
       // The real module, types stripped, exactly as the Hub bundle would run it.
       return send(stripTypeScriptTypes(readFileSync(resolve(root, 'resources/js/pwa/push-enrollment.ts'), 'utf8')), 'text/javascript; charset=utf-8');
     }
+    // Sibling modules the enrollment module imports (e.g. './test-push-result.ts'), served the same way.
+    const sibling = /^\/([a-z][a-z0-9-]*)\.ts$/.exec(path);
+    if (sibling && existsSync(resolve(root, `resources/js/pwa/${sibling[1]}.ts`))) {
+      return send(stripTypeScriptTypes(readFileSync(resolve(root, `resources/js/pwa/${sibling[1]}.ts`), 'utf8')), 'text/javascript; charset=utf-8');
+    }
     if (path === '/sw.js') return send(scripts.root, 'text/javascript; charset=utf-8');
     if (path === '/admin/service-worker.js') {
       return send(scripts.admin, 'application/javascript; charset=utf-8', { 'service-worker-allowed': '/admin/' });
@@ -103,7 +108,7 @@ interface Probe {
   subscribeError: string | null;
 }
 
-/** Register exactly as production code does (see push-notification-widget.js and admin-pwa/main.ts). */
+/** Register exactly as production code does (see push-enrollment.ts and admin-pwa/main.ts). */
 async function registerLikeProduction(page: Page, script: string, scope: string, key: string): Promise<Probe> {
   return page.evaluate(
     async ({ script, scope, key }) => {

@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\InventoryChatController;
 use App\Http\Controllers\Api\MediaControl\AuthorizationCodeExchangeController as MediaControlAuthorizationCodeExchangeController;
 use App\Http\Controllers\Api\PublicApparatusServiceTicketController;
 use App\Http\Controllers\Api\PublicStationRequestController;
+use App\Http\Controllers\Api\PushDeviceStateController;
 use App\Http\Controllers\Api\PushSubscriptionController;
 use App\Http\Controllers\Api\SmartUpdatesController;
 use App\Http\Controllers\Api\StationContextController;
@@ -40,6 +41,12 @@ Route::post('/v2/email/inbound', \App\Http\Controllers\Api\InboundEmailControlle
 Route::get('/me/context', AuthenticatedMemberContextController::class)
     ->middleware(['auth:sanctum', 'canonical.api', 'throttle:120,1'])
     ->name('api.me.context');
+
+// Foreground alert feed for Hub pages without the Filament bell (Hub home, Daily Checkout). Read-only, no-store;
+// it never marks anything read.
+Route::get('/me/alerts', \App\Http\Controllers\Api\MemberAlertFeedController::class)
+    ->middleware(['auth:sanctum', 'canonical.api', 'throttle:120,1'])
+    ->name('api.me.alerts');
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -164,6 +171,11 @@ Route::middleware(['web', AuthenticateSession::class, 'auth', 'throttle:10,1'])
         Route::post('push/test', [TestNotificationController::class, 'sendTestNotification'])
             ->middleware('throttle:3,1,push-test');
     });
+
+// Every signed-in page may ask this about its own device, so it is apart from the budget for turning alerts on or off.
+Route::middleware(['web', AuthenticateSession::class, 'auth', 'throttle:30,1,push-read'])
+    ->withoutMiddleware(EnsureFrontendRequestsAreStateful::class)
+    ->get('push/device-state', PushDeviceStateController::class);
 
 // Admin lookup endpoints — powers the desktop-PWA Dexie prefetch + future typeahead.
 // Uses the Filament admin cookie session (web + auth) so the installed PWA

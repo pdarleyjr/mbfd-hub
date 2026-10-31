@@ -14,7 +14,6 @@ export default defineConfig({
                 'resources/js/hub-shell.js',
                 'resources/js/hub-support/blade.js',
                 'resources/js/pump-simulator/main.tsx',
-                'resources/js/push-notification-widget.js',
                 // "This device" block of Notification settings (loaded only on that page).
                 'resources/js/pwa/push-enrollment.ts',
                 'resources/js/pwa/install-ui.ts',

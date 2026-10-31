@@ -149,9 +149,10 @@ final class StationOperationsCommandBoardTest extends TestCase
         Carbon::setTestNow(Carbon::parse('2026-09-23 12:00:00', 'America/New_York'));
         $this->station(1);
 
-        $this->get(Dashboard::getUrl())
+        // The logistics widget board moved from /admin to the Logistics Board page; /admin is the Admin Overview.
+        $this->get(\App\Filament\Pages\LogisticsBoard::getUrl())
             ->assertOk()
-            ->assertSee('Logistics Dashboard')
+            ->assertSee('Logistics Board')
             ->assertDontSee('Station Operations Command Board')
             ->assertSee('Today’s Truck Checkouts')
             ->assertSee('New / Needs Attention');

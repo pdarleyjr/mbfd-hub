@@ -6,6 +6,7 @@ return [
     App\Providers\HealthServiceProvider::class,
     App\Providers\ConferenceRateLimitServiceProvider::class,
     App\Providers\NotificationServiceProvider::class,
+    App\Providers\DashboardServiceProvider::class,
     App\Providers\ResponsiveTablesServiceProvider::class,
     App\Providers\Filament\AdminPanelProvider::class,
     App\Providers\Filament\TrainingPanelProvider::class,

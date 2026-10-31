@@ -35,3 +35,18 @@
     cursor: progress;
     opacity: 0.7;
 }
+
+/*
+ * The rest of the Notification settings page uses Hub utilities that the panel theme never compiled
+ * (text-hub-ink, text-hub-muted, border-hub-border, ...). Defined here from the same theme tokens,
+ * scoped to this page so no other panel view changes.
+ */
+[data-notification-settings] .text-hub-ink { color: rgb(var(--hub-ink)); }
+[data-notification-settings] .text-hub-muted { color: rgb(var(--hub-muted)); }
+[data-notification-settings] .text-hub-blue { color: rgb(var(--hub-blue)); }
+[data-notification-settings] .border-hub-border { border-color: rgb(var(--hub-border)); }
+[data-notification-settings] .border-hub-border-strong { border-color: rgb(var(--hub-border-strong)); }
+[data-notification-settings] .divide-hub-border > :not([hidden]) ~ :not([hidden]) { border-color: rgb(var(--hub-border)); }
+[data-notification-settings] .bg-hub-blue { background-color: rgb(var(--hub-blue)); }
+[data-notification-settings] .hover\:bg-hub-blue-strong:hover { background-color: rgb(var(--hub-blue-strong)); }
+[data-notification-settings] .hover\:bg-hub-surface-muted:hover { background-color: rgb(var(--hub-surface-muted, 241 245 249)); }

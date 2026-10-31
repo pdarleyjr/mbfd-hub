@@ -84,7 +84,8 @@ final class PushDeliveryOutcomeRecorder
             Log::error('Push service refused the Hub request; not a device fault', [
                 'subscription_id' => $subscription->getKey(),
                 'status' => $status,
-                'reason' => $report->getReason(),
+                // Never $report->getReason(): the HTTP client's message quotes the full push endpoint.
+                'provider_reason' => PushDeliveryTrace::providerReason($report),
             ]);
         }
 

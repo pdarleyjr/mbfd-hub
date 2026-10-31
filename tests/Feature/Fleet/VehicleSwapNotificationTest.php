@@ -112,7 +112,7 @@ final class VehicleSwapNotificationTest extends TestCase
             ->assertFormFieldExists(self::EVENT.'.database')
             ->assertFormFieldExists(self::EVENT.'.webpush')
             ->assertFormFieldExists(self::EVENT.'.email')
-            ->assertFormSet([self::EVENT => ['database' => true, 'webpush' => false, 'email' => true]])
+            ->assertFormSet([self::EVENT => ['database' => true, 'webpush' => true, 'email' => true]])
             ->fillForm([self::EVENT => ['database' => false, 'webpush' => false, 'email' => false]])
             ->call('save')
             ->assertHasNoFormErrors();

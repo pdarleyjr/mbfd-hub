@@ -91,6 +91,60 @@
     transform: none;
 }
 
+/*
+ * Employee "Menu" button (resources/views/vendor/filament-panels/components/topbar/index.blade.php).
+ * On phones and tablets the Employee drawer opens from this control, so it must read as a button on the navy
+ * bar: a subtle filled surface with a 1px light border (about 3:1 against the bar), white bars thicker than
+ * Filament's hairline icon, a 44px touch target and a visible "Menu" label when the bar has room.
+ * Scoped to the Employee panel; other panels keep Filament's own icon button. Below 1024px only: from 1024px
+ * the sidebar is a permanent rail and the vendor "lg:hidden" utility hides this button.
+ */
+@media (max-width: 1023.98px) {
+    .fi-panel-employee .fi-topbar > nav .hub-menu-btn {
+        display: inline-flex;
+        flex: none;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        box-sizing: border-box;
+        min-width: 44px;
+        min-height: 44px;
+        padding: 0 12px 0 10px;
+        border: 1px solid rgb(255 255 255 / .35);
+        border-radius: 10px;
+        background: rgb(255 255 255 / .12);
+        color: rgb(255 255 255);
+        font-size: 14px;
+        font-weight: 600;
+        line-height: 20px;
+        cursor: pointer;
+    }
+
+    .fi-panel-employee .fi-topbar > nav .hub-menu-btn:hover { background: rgb(255 255 255 / .2); }
+    .fi-panel-employee .fi-topbar > nav .hub-menu-btn:active { background: rgb(255 255 255 / .28); }
+
+    .fi-panel-employee .fi-topbar > nav .hub-menu-btn:focus-visible {
+        outline: 2px solid rgb(255 255 255);
+        outline-offset: 2px;
+    }
+
+    .fi-panel-employee .fi-topbar > nav .hub-menu-btn__icon {
+        width: 24px;
+        height: 24px;
+        flex: none;
+        color: rgb(255 255 255);
+        stroke-width: 2.25;
+    }
+
+    .fi-panel-employee .fi-topbar > nav .hub-menu-btn__label { white-space: nowrap; }
+}
+
+/* Under 360px the label would crowd the switcher and the bell: the button keeps its surface and size, icon only. */
+@media (max-width: 359.98px) {
+    .fi-panel-employee .fi-topbar > nav .hub-menu-btn { padding: 0; }
+    .fi-panel-employee .fi-topbar > nav .hub-menu-btn__label { display: none; }
+}
+
 /* ---------- Sidebar: a glass rail ---------- */
 
 :is(.fi-panel-admin, .fi-panel-employee, .fi-panel-workgroups, .fi-panel-training) .fi-sidebar {

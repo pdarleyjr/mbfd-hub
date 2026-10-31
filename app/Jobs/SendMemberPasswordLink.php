@@ -131,6 +131,8 @@ final class SendMemberPasswordLink implements ShouldBeUnique, ShouldQueue
             // Start the token's lifetime again only when sending can resume.
             if ($this->discardChallenge($challenge) && $exception->retryAfterSeconds !== null) {
                 $this->release($exception->retryAfterSeconds);
+            } elseif ($exception->retryAfterSeconds === null) {
+                Log::error('member_password_link_blocked', ['user_id' => $this->userId]);
             }
         } catch (Throwable $exception) {
             $delivery = $this->deliveries()->where('id', '>', $this->lastOutboundEmailIdAtDispatch)->orderByDesc('id')->first();

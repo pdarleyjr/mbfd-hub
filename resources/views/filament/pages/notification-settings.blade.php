@@ -1,4 +1,5 @@
 <x-filament-panels::page>
+<div data-notification-settings>
     @vite('resources/js/pwa/push-enrollment.ts')
 
     @php
@@ -12,7 +13,7 @@
                     Choose what you want to hear about.
                 </h2>
                 <p class="max-w-2xl text-sm leading-6 text-hub-muted sm:text-[0.95rem]">
-                    In-app alerts always arrive in the bell at the top of the page. Push alerts to your phone or computer, and city email, are extras you can turn on for each kind of alert. You only see the alerts you are allowed to receive, and this list changes by itself if your duties change.
+                    Most alerts come to the bell at the top of the page and to your phone, and the important ones also go to your city email. Turn off anything you don't need. You only see the alerts you are allowed to receive, and this list changes by itself if your duties change.
                 </p>
             </div>
         </section>
@@ -44,6 +45,37 @@
                 </div>
 
                 <p data-role="message" role="status" aria-live="polite" class="min-h-5 text-sm text-hub-muted"></p>
+            </div>
+
+            {{-- A device preference kept in this browser (localStorage), mounted by resources/js/pwa/alert-sound.ts. --}}
+            <div wire:ignore data-alert-sound-settings class="mt-6 space-y-3 border-t border-hub-border pt-5">
+                <h4 class="text-base font-semibold text-hub-ink">While the Hub is open</h4>
+                <p class="text-sm leading-6 text-hub-muted">
+                    A new alert pops up for a few seconds on the screen you are using. It stays in the bell until you read it.
+                </p>
+
+                <label class="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-semibold text-hub-ink">
+                    <input
+                        type="checkbox"
+                        role="switch"
+                        data-role="sound-toggle"
+                        class="h-5 w-5 rounded border-hub-border-strong text-hub-blue focus:ring-2 focus:ring-hub-focus"
+                    >
+                    <span>Play a sound for new alerts while the Hub is open</span>
+                </label>
+                <p class="text-sm text-hub-muted">This device only. Off unless you turn it on.</p>
+
+                <button
+                    type="button"
+                    data-role="sound-test"
+                    class="inline-flex min-h-11 items-center rounded-lg border border-hub-border-strong px-4 py-2 text-sm font-bold hover:bg-hub-surface-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-hub-focus"
+                >Play test sound</button>
+
+                <p data-role="sound-message" role="status" aria-live="polite" class="min-h-5 text-sm text-hub-muted"></p>
+
+                <p class="text-sm text-hub-muted">
+                    Alerts on your lock screen use your phone's own notification sound and Focus settings; the Hub can't change those.
+                </p>
             </div>
         </section>
 
@@ -97,4 +129,5 @@
     </div>
 
     <x-filament-actions::modals />
+</div>
 </x-filament-panels::page>

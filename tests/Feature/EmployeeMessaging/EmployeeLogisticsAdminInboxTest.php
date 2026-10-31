@@ -256,10 +256,12 @@ final class EmployeeLogisticsAdminInboxTest extends TestCase
     public function test_the_dashboard_has_no_messages_card_for_an_unrelated_administrator(): void
     {
         $this->memberSends($this->messagingMember('Ann Jones'), 'Boots arrived damaged');
-        $html = $this->actingAs($this->unrelatedAdmin())->get('/admin')->assertOk()->getContent();
+        foreach (['/admin', '/admin/logistics-board'] as $path) {
+            $html = $this->actingAs($this->unrelatedAdmin())->get($path)->assertOk()->getContent();
 
-        $this->assertStringNotContainsString('emsg-widget-title', $html);
-        $this->assertStringNotContainsString('Boots arrived damaged', $html);
+            $this->assertStringNotContainsString('emsg-widget-title', $html);
+            $this->assertStringNotContainsString('Boots arrived damaged', $html);
+        }
     }
 
     public function test_a_role_revoked_between_requests_is_refused_on_the_next_poll(): void
@@ -341,7 +343,8 @@ final class EmployeeLogisticsAdminInboxTest extends TestCase
         $this->memberSends($this->messagingMember('Bo Smith'), 'Need a size swap please');
         $this->actingAs($this->logisticsResponder());
 
-        $normal = $this->get('/admin')->assertOk()->getContent();
+        // The messages card lives on the Logistics Board (the old /admin widget page).
+        $normal = $this->get('/admin/logistics-board')->assertOk()->getContent();
         $this->assertStringContainsString('emsg-widget-title', $normal);
         $this->assertStringContainsString('View all messages', $normal);
         $this->assertStringContainsString('Need a size swap please', $normal);
@@ -357,7 +360,7 @@ final class EmployeeLogisticsAdminInboxTest extends TestCase
     {
         $this->actingAs($this->logisticsResponder());
 
-        $widgets = (new Dashboard)->getWidgets();
+        $widgets = (new \App\Filament\Pages\LogisticsBoard)->getWidgets();
         $this->assertSame([StationOperationsHubWidget::class, EmployeeMessagesWidget::class, \App\Filament\Widgets\EquipmentChangeRequestsWidget::class], $widgets);
 
         $this->app['request']->merge(['display' => '1']);

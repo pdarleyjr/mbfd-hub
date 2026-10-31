@@ -36,13 +36,13 @@ final class EveryDailyCheckoutAlertTest extends TestCase
         return $this->inspectionBy($this->rig(), $by ?? $this->member('Riley Reporter'));
     }
 
-    public function test_the_category_is_opt_in_with_every_channel_off_and_reviewers_only(): void
+    public function test_the_category_shows_in_the_bell_by_default_keeps_phone_and_email_off_and_is_for_reviewers_only(): void
     {
         $category = app(NotificationCategoryRegistry::class)->get(self::KEY);
 
         $this->assertNotNull($category);
         $this->assertSame("Every Daily Checkout as it's submitted", $category->label);
-        $this->assertSame(['database' => false, 'webpush' => false, 'email' => false], $category->defaults);
+        $this->assertSame(['database' => true, 'webpush' => false, 'email' => false], $category->defaults, 'bell on, phone off so one alert per checkout does not bury real alerts');
         $this->assertSame([], $category->locked, 'nothing is forced on');
         $this->assertSame('routine', $category->significance);
         $this->assertSame(['database', 'webpush', 'email'], $category->channels);
@@ -68,20 +68,20 @@ final class EveryDailyCheckoutAlertTest extends TestCase
         $this->assertGreaterThan(0, $inspection->id);
     }
 
-    public function test_an_eligible_reviewer_who_did_not_opt_in_is_not_told(): void
+    public function test_an_eligible_reviewer_is_told_in_the_bell_unless_they_turned_it_off(): void
     {
         $noRow = $this->reviewer();
         $allOff = $this->reviewer();
         $this->optIn($allOff, false, false, false);
-        // The OLD category's saved choice no longer means "every checkout"; only the new category does.
+        // The OLD category's saved choice has no say here; only a saved choice about THIS category counts.
         $oldChoiceOnly = $this->reviewer();
-        $this->optIn($oldChoiceOnly, true, true, true, 'vehicle_inspections');
+        $this->optIn($oldChoiceOnly, false, false, false, 'vehicle_inspections');
 
         $this->submit();
 
-        foreach ([$noRow, $allOff, $oldChoiceOnly] as $person) {
-            $this->assertSame(0, $person->notifications()->count());
-        }
+        $this->assertSame(1, $noRow->notifications()->count(), 'the bell is on by default');
+        $this->assertSame(1, $oldChoiceOnly->notifications()->count(), 'the old category choice does not turn this one off');
+        $this->assertSame(0, $allOff->notifications()->count(), 'a saved all-off choice is respected');
     }
 
     public function test_an_opted_in_person_who_is_no_longer_a_reviewer_is_not_told(): void
@@ -161,7 +161,7 @@ final class EveryDailyCheckoutAlertTest extends TestCase
 
         $this->assertTrue($decision->eligible);
         $this->assertSame(['database'], $decision->channels, 'push needs a healthy device and email needs a city address');
-        $this->assertSame([], $evaluator->decide($this->reviewer(), self::KEY)->channels, 'no row means nothing is on');
+        $this->assertSame(['database'], $evaluator->decide($this->reviewer(), self::KEY)->channels, 'no row means the bell only');
     }
 
     // ------------------------------------------------------------------ data migration

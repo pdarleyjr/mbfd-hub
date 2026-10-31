@@ -70,17 +70,17 @@ final class NotificationRecipientEvaluatorTest extends TestCase
         }
     }
 
-    public function test_routine_high_volume_categories_default_to_in_app_only(): void
+    public function test_routine_categories_default_to_the_bell_and_phone_without_email(): void
     {
         $registry = app(NotificationCategoryRegistry::class);
 
-        foreach (['vehicle_inspections', 'station_inspections', 'station_requests', 'apparatus_service_tickets', 'station_inventory_alerts', 'workgroup_evaluations'] as $key) {
-            $this->assertSame(['database' => true, 'webpush' => false, 'email' => false], $registry->get($key)->defaults, $key);
+        foreach (['vehicle_inspections', 'station_inspections', 'station_requests', 'apparatus_service_tickets', 'station_inventory_alerts', 'workgroup_evaluations', 'hub_support_tickets'] as $key) {
+            $this->assertSame(['database' => true, 'webpush' => true, 'email' => false], $registry->get($key)->defaults, $key);
         }
         $this->assertTrue($registry->get('department_updates')->defaults['webpush'], 'department notices keep their existing push default');
-        $this->assertSame(['database' => true, 'webpush' => false, 'email' => true], $registry->get('vehicle_swap_reports')->defaults);
-        $this->assertSame(['database' => true, 'webpush' => false, 'email' => true], $registry->get('vehicle_identification_reports')->defaults);
-        $this->assertSame(['database' => false, 'webpush' => false, 'email' => false], $registry->get('hub_support_tickets')->defaults, 'opt-in only');
+        $this->assertSame(['database' => true, 'webpush' => true, 'email' => true], $registry->get('vehicle_swap_reports')->defaults);
+        $this->assertSame(['database' => true, 'webpush' => true, 'email' => true], $registry->get('vehicle_identification_reports')->defaults);
+        $this->assertSame(['database' => true, 'webpush' => false, 'email' => false], $registry->get('daily_checkout_every_submission')->defaults, 'the bell only: one phone alert per checkout would bury real alerts');
     }
 
     public function test_an_unknown_category_and_an_inactive_account_get_a_machine_reason(): void
@@ -187,7 +187,8 @@ final class NotificationRecipientEvaluatorTest extends TestCase
 
         $this->assertSame(['database'], $this->evaluator->decide($reviewer, 'station_requests')->channels);
         $this->assertSame([], $this->evaluator->decide($outsider, 'station_requests')->channels);
-        $this->assertSame([], $this->evaluator->decide($this->withPermissions($this->member(), 'admin.access', 'admin.support.view'), 'hub_support_tickets')->channels, 'opt-in categories send nothing until chosen');
+        $this->assertSame(['database'], $this->evaluator->decide($this->withPermissions($this->member(), 'admin.access', 'admin.support.view'), 'hub_support_tickets')->channels, 'on by default for the eligible; phone needs a device');
+        $this->assertSame([], $this->evaluator->decide($outsider, 'hub_support_tickets')->channels, 'on by default never makes a member eligible');
     }
 
     public function test_recipients_are_exactly_the_eligible_active_members(): void

@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace App\Services\Communications;
 
+use App\Exceptions\CloudflareUsageRefreshFailed;
 use App\Models\CloudflareUsageBudget;
 use Carbon\CarbonImmutable;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 use Throwable;
 
@@ -22,24 +26,52 @@ final class CloudflareUsageRefresher
 
     public function refresh(): CloudflareUsageBudget
     {
-        $lock = Cache::lock('cloudflare-usage-refresh', 120);
+        // Long enough for all three calls to use their one retry at the full timeout.
+        $lock = Cache::lock('cloudflare-usage-refresh', 150);
         if (! $lock->get()) {
-            throw new RuntimeException('A Cloudflare usage refresh is already in progress.');
+            $busy = new CloudflareUsageRefreshFailed('A Cloudflare usage refresh is already in progress.');
+            $this->logFailure($busy);
+            throw $busy;
         }
         try {
             return $this->fetchAndPersist();
-        } catch (Throwable) {
-            // A failed poll must not leave an earlier, lower snapshot open.
+        } catch (Throwable $exception) {
+            $this->logFailure($exception);
+            // Never expose token-bearing HTTP exceptions or raw provider bodies.
+            if ($this->providerGaveNoUsableAnswer($exception)) {
+                // Nothing suggests usage changed, and the Hub's own sends are counted
+                // locally. CloudflareCostGuard closes sending once the last good
+                // report passes max_reconciliation_age_seconds.
+                throw new RuntimeException('Cloudflare usage could not be verified. Sending closes if no refresh succeeds within the reconciliation limit.');
+            }
+            // A report that fails its checks is a warning sign, and an unexpected error
+            // proves nothing: neither may leave an earlier, lower snapshot open.
             DB::transaction(function (): void {
                 foreach (CloudflareUsageBudget::query()->where('cycle_end', '>', now())->lockForUpdate()->get() as $budget) {
                     $budget->forceFill(['reconciled_at' => null, 'provider_daily_reconciled_at' => null])->save();
                 }
             });
-            // Never expose token-bearing HTTP exceptions or raw provider bodies.
             throw new RuntimeException('Cloudflare usage could not be verified. Sending is closed until a complete refresh succeeds.');
         } finally {
             $lock->release();
         }
+    }
+
+    private function providerGaveNoUsableAnswer(Throwable $exception): bool
+    {
+        return $exception instanceof CloudflareUsageRefreshFailed && $exception->providerCall !== null;
+    }
+
+    /** Only fields known to be safe: any other exception's message may quote a URL, query or body. */
+    private function logFailure(Throwable $exception): void
+    {
+        $known = $exception instanceof CloudflareUsageRefreshFailed ? $exception : null;
+        Log::warning('cloudflare_usage_refresh_failed', [
+            'exception_class' => $known->causeClass ?? $exception::class,
+            'provider_call' => $known?->providerCall,
+            'http_status' => $known?->httpStatus,
+            'reason' => $known?->getMessage(),
+        ]);
     }
 
     private function fetchAndPersist(): CloudflareUsageBudget
@@ -47,7 +79,7 @@ final class CloudflareUsageRefresher
         $account = (string) config('communications.cloudflare.account_id');
         $token = (string) config('communications.cloudflare.api_token');
         if (preg_match('/\A[a-f0-9]{32}\z/i', $account) !== 1 || $token === '') {
-            throw new RuntimeException('Cloudflare usage credentials are not configured.');
+            throw new CloudflareUsageRefreshFailed('Cloudflare usage credentials are not configured.');
         }
         $subscriptions = $this->get($account, $token, 'subscriptions');
         $rows = $this->get($account, $token, 'billable-usage');
@@ -67,25 +99,25 @@ final class CloudflareUsageRefresher
             }
         }
         if (count($active) !== 1) {
-            throw new RuntimeException('The active paid billing cycle is ambiguous.');
+            throw new CloudflareUsageRefreshFailed('The active paid billing cycle is ambiguous.');
         }
         [$start, $end] = $active[0];
         if (! array_is_list($rows) || ! array_is_list($subscriptions)) {
-            throw new RuntimeException('Incomplete Cloudflare report.');
+            throw new CloudflareUsageRefreshFailed('Incomplete Cloudflare report.');
         }
         $quota = $this->count(data_get($limits, 'quota.value'));
         $dailyUsed = $this->count(data_get($limits, 'usage.sent'));
         if (data_get($limits, 'quota.unit') !== 'day' || $quota < 1
             || ! is_bool(data_get($limits, 'usage.over_quota'))
             || data_get($limits, 'usage.over_quota') !== ($dailyUsed >= $quota)) {
-            throw new RuntimeException('The daily quota response is inconsistent.');
+            throw new CloudflareUsageRefreshFailed('The daily quota response is inconsistent.');
         }
         $totals = [];
         $seen = [];
         $measured = null;
         foreach ($rows as $row) {
             if (! is_array($row) || ($row['BillingAccountId'] ?? null) !== $account) {
-                throw new RuntimeException('Billing report account mismatch.');
+                throw new CloudflareUsageRefreshFailed('Billing report account mismatch.');
             }
             if (! $this->date($row['BillingPeriodStart'] ?? null)->equalTo($start)) {
                 continue;
@@ -93,13 +125,13 @@ final class CloudflareUsageRefresher
             $periodStart = $this->date($row['ChargePeriodStart'] ?? null);
             $periodEnd = $this->date($row['ChargePeriodEnd'] ?? null);
             if ($periodStart->lt($start) || $periodStart->gte($periodEnd) || $periodEnd->gt($at) || $periodEnd->gt($end)) {
-                throw new RuntimeException('Invalid billing measurement period.');
+                throw new CloudflareUsageRefreshFailed('Invalid billing measurement period.');
             }
             $measured = $measured === null || $periodEnd->gt($measured) ? $periodEnd : $measured;
             $metric = self::METRICS[$row['ServiceName'] ?? ''] ?? null;
             if ($metric === null) {
                 if (($row['ServiceFamilyName'] ?? null) === 'Email') {
-                    throw new RuntimeException('An unrecognized Email billing metric requires review.');
+                    throw new CloudflareUsageRefreshFailed('An unrecognized Email billing metric requires review.');
                 }
 
                 continue;
@@ -109,17 +141,17 @@ final class CloudflareUsageRefresher
             if (($row['ServiceFamilyName'] ?? null) !== $metric[0] || ($row['ConsumedUnit'] ?? null) !== ''
                 || ($row['ChargeCategory'] ?? null) !== 'Usage' || ! is_string($row['SubscriptionId'] ?? null)
                 || $row['SubscriptionId'] === '') {
-                throw new RuntimeException('Unexpected billing metric schema.');
+                throw new CloudflareUsageRefreshFailed('Unexpected billing metric schema.');
             }
             $key = $metric[1].'|'.$row['SubscriptionId'].'|'.$periodStart->toIso8601String().'|'.$periodEnd->toIso8601String();
             if (isset($seen[$key])) {
-                throw new RuntimeException('Duplicate billing metric.');
+                throw new CloudflareUsageRefreshFailed('Duplicate billing metric.');
             }
             $seen[$key] = true;
             $quantity = $this->count($row['ConsumedQuantity'] ?? null);
             $prior = $totals[$metric[1]] ?? 0;
             if ($quantity > PHP_INT_MAX - $prior) {
-                throw new RuntimeException('Billing count overflow.');
+                throw new CloudflareUsageRefreshFailed('Billing count overflow.');
             }
             $totals[$metric[1]] = $prior + $quantity;
         }
@@ -141,13 +173,13 @@ final class CloudflareUsageRefresher
                 $source = 'retained_authoritative_baseline';
             }
             if ($baseline === null) {
-                throw new RuntimeException('No authoritative current-cycle email baseline is available.');
+                throw new CloudflareUsageRefreshFailed('No authoritative current-cycle email baseline is available.');
             }
             if (! $soleSender && ($measured === null || $measured->lt($at->subHours(48)))) {
-                throw new RuntimeException('The billing report is stale.');
+                throw new CloudflareUsageRefreshFailed('The billing report is stale.');
             }
             if ($budget !== null && $budget->provider_account_id !== null && $budget->provider_account_id !== $account) {
-                throw new RuntimeException('The existing budget belongs to a different account.');
+                throw new CloudflareUsageRefreshFailed('The existing budget belongs to a different account.');
             }
             $budget ??= new CloudflareUsageBudget(['cycle_start' => $start, 'cycle_end' => $end]);
             $budget->fill([
@@ -172,14 +204,27 @@ final class CloudflareUsageRefresher
     /** @return array<mixed> */
     private function get(string $account, string $token, string $path): array
     {
-        $response = Http::withToken($token)->acceptJson()->connectTimeout(5)->timeout(20)
-            ->get('https://api.cloudflare.com/client/v4/accounts/'.$account.'/'.$path);
+        try {
+            // These reads change nothing, so a passing fault gets one quick retry.
+            $response = Http::withToken($token)->acceptJson()->connectTimeout(5)->timeout(20)
+                ->retry(2, 500, static fn (Throwable $exception): bool => $exception instanceof ConnectionException
+                    || ($exception instanceof RequestException && $exception->response->serverError()), throw: false)
+                ->get('https://api.cloudflare.com/client/v4/accounts/'.$account.'/'.$path);
+        } catch (Throwable $exception) {
+            throw new CloudflareUsageRefreshFailed('The Cloudflare request did not complete.', $path, null, $exception::class);
+        }
         $body = $response->json();
-        if (! $response->successful() || ! is_array($body) || ($body['success'] ?? null) !== true
-            || ($body['errors'] ?? null) !== [] || ! is_array($body['result'] ?? null)
-            || (int) data_get($body, 'result_info.total_pages', 1) > 1
-            || (isset($body['result_info']['total_count']) && $body['result_info']['total_count'] !== count($body['result']))) {
-            throw new RuntimeException('Incomplete Cloudflare response.');
+        $problem = match (true) {
+            ! $response->successful() => 'Cloudflare answered with an error status.',
+            ! is_array($body) => 'Cloudflare answered with an unreadable body.',
+            ($body['success'] ?? null) !== true || ($body['errors'] ?? null) !== [] => 'Cloudflare reported that the request failed.',
+            ! is_array($body['result'] ?? null) => 'Cloudflare answered without a result.',
+            (int) data_get($body, 'result_info.total_pages', 1) > 1,
+            isset($body['result_info']['total_count']) && $body['result_info']['total_count'] !== count($body['result']) => 'Cloudflare returned only part of the report.',
+            default => null,
+        };
+        if ($problem !== null) {
+            throw new CloudflareUsageRefreshFailed($problem, $path, $response->status());
         }
 
         return $body['result'];
@@ -188,7 +233,7 @@ final class CloudflareUsageRefresher
     private function count(mixed $value): int
     {
         if (! is_int($value) || $value < 0) {
-            throw new RuntimeException('Provider usage must be an exact non-negative integer.');
+            throw new CloudflareUsageRefreshFailed('Provider usage must be an exact non-negative integer.');
         }
 
         return $value;
@@ -197,11 +242,11 @@ final class CloudflareUsageRefresher
     private function date(mixed $value): CarbonImmutable
     {
         if (! is_string($value) || preg_match('/\A\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z\z/', $value) !== 1) {
-            throw new RuntimeException('A provider UTC timestamp is missing.');
+            throw new CloudflareUsageRefreshFailed('A provider UTC timestamp is missing.');
         }
         $date = CarbonImmutable::parse($value);
         if ($date->format('Y-m-d\TH:i:s\Z') !== $value) {
-            throw new RuntimeException('A provider UTC timestamp is invalid.');
+            throw new CloudflareUsageRefreshFailed('A provider UTC timestamp is invalid.');
         }
 
         return $date;

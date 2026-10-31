@@ -165,12 +165,10 @@ test('exactly one registration per scope, with plain worker URLs, across Admin a
   await login(page);
   await page.goto('/admin/settings');
 
+  // The root worker is registered only when a device turns on alerts (see the M6 tests in pwa-sw-upgrade.spec.ts).
   await expect
     .poll(() => registrations(page), { timeout: 30_000 })
-    .toEqual([
-      { scope: '/', script: '/sw.js' },
-      { scope: '/admin/', script: '/admin/service-worker.js' },
-    ]);
+    .toEqual([{ scope: '/admin/', script: '/admin/service-worker.js' }]);
 
   // Visiting more Admin and Hub pages must neither add nor duplicate registrations.
   for (const path of ['/', '/admin', '/admin/settings', '/']) {
@@ -178,7 +176,6 @@ test('exactly one registration per scope, with plain worker URLs, across Admin a
     await page.waitForLoadState('load');
     await page.waitForTimeout(500);
     expect(await registrations(page), `registrations after visiting ${path}`).toEqual([
-      { scope: '/', script: '/sw.js' },
       { scope: '/admin/', script: '/admin/service-worker.js' },
     ]);
   }

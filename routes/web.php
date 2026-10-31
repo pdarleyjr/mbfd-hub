@@ -466,7 +466,11 @@ Route::get('/daily/{path?}', function (?string $path = null) {
     // compares it with /app-release, so a shell restored from the offline cache after days is
     // recognised as old instead of being mistaken for the current release.
     $releaseMeta = '<meta name="mbfd-release" content="'.e(app(\App\Support\Release\DeployedRelease::class)->short()).'">';
-    $runtimeConfig = $releaseMeta.'<script>window.__MBFD_CANONICAL_ORIGIN__ = '.json_encode(
+    // New in-app alerts for the signed-in member (resources/js/pwa/foreground-alerts.ts reads this meta).
+    $alertsFeedMeta = \Illuminate\Support\Facades\Route::has('api.me.alerts')
+        ? '<meta name="mbfd-alerts-feed" content="'.e(route('api.me.alerts', absolute: false)).'">'
+        : '';
+    $runtimeConfig = $releaseMeta.$alertsFeedMeta.'<script>window.__MBFD_CANONICAL_ORIGIN__ = '.json_encode(
         $canonicalOrigin,
         JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT,
     ).';window.__MBFD_HUB_NAVIGATION__ = '.json_encode(

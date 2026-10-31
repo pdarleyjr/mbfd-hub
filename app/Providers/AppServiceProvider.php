@@ -25,15 +25,12 @@ use App\Observers\UpstreamIdentityObserver;
 use App\Observers\WorkgroupSharedUploadObserver;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Infolists\Components\TextEntry;
-use Filament\Support\Assets\Js;
-use Filament\Support\Facades\FilamentAsset;
 use Filament\Tables\Columns\TextColumn;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
-use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Pulse\Facades\Pulse;
 
@@ -101,6 +98,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(\App\Models\Training\TrainingSession::class, \App\Policies\TrainingRosterPolicy::class);
 
         RateLimiter::for('member-onboarding-invitations', static fn () => Limit::perMinute(4)->by('member-onboarding-global'));
+        // Matches the Hub's hard email cap in CloudflareCostGuard.
+        RateLimiter::for('budgeted-email', static fn () => Limit::perMinute(5)->by('budgeted-email-global'));
 
         // Its own counter: a plain throttle:10,1 shares one per user with every other plain throttle in the Hub.
         RateLimiter::for('daily-roster-pdf', static fn (Request $request) => Limit::perMinute(10)->by('daily-roster-pdf:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
@@ -213,8 +212,6 @@ class AppServiceProvider extends ServiceProvider
             }
         });
 
-        $this->registerPushNotificationWidgetAssets();
-
         \Filament\Support\Facades\FilamentView::registerRenderHook(
             \Filament\View\PanelsRenderHook::TOPBAR_START,
             fn (): \Illuminate\Contracts\View\View => view('filament.partials.hub-shell'),
@@ -320,8 +317,8 @@ class AppServiceProvider extends ServiceProvider
         // Daily Checkouts have no default fan-out. Reviewers are told by InspectionNotificationDispatcher
         // (review required, significant damage, member replies) and a routine accepted checkout notifies
         // nobody (docs/daily-inspection-continuity.md section 4.5). The ONE exception is the opt-in
-        // category "Every Daily Checkout as it's submitted": it defaults to all channels off, goes only to
-        // reviewers who turned it on, and skips excluded tests and the submitter.
+        // category "Every Daily Checkout as it's submitted": it shows in the bell by default (phone alerts
+        // off), goes only to eligible reviewers, and skips excluded tests and the submitter.
         ApparatusInspection::created(fn (ApparatusInspection $inspection) => $this->guardNotificationHook(function () use ($inspection): void {
             if ($inspection->test_excluded_at !== null) {
                 return;
@@ -360,22 +357,6 @@ class AppServiceProvider extends ServiceProvider
                 $submission->id,
             );
         }));
-    }
-
-    /**
-     * Register browser-only assets without making Artisan commands depend on a
-     * generated Vite manifest. Deployment separately proves and atomically
-     * activates that manifest before serving web traffic.
-     */
-    protected function registerPushNotificationWidgetAssets(): void
-    {
-        if ($this->app->runningInConsole()) {
-            return;
-        }
-
-        FilamentAsset::register([
-            Js::make('push-notification-widget', Vite::asset('resources/js/push-notification-widget.js')),
-        ]);
     }
 
     /**
