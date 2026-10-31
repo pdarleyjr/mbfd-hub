@@ -19,6 +19,8 @@ use Throwable;
  */
 final class RosterImportRegistrar
 {
+    private const SUPERSEDE_LIMIT = 50;
+
     public function __construct(private readonly TeleStaffMailClassifier $classifier) {}
 
     public function register(InboundEmail $email): ?RosterImport
@@ -72,9 +74,49 @@ final class RosterImportRegistrar
 
         if ($classification->isMatch()) {
             $this->queueAfterCommit((int) $import->getKey());
+        } elseif ($state === RosterImport::STATE_NEEDS_REVIEW) {
+            $this->supersedeOlderMailHolds($import);
         }
 
         return $import;
+    }
+
+    /**
+     * Mail the check could not vouch for was never read, so it has no export time to compare; arrival
+     * order decides, and only copies of the same problem collapse. A different reason is a different
+     * thing for a person to look at, so it stays open. A failure here must not lose the email now being
+     * stored: the older holds just stay.
+     */
+    private function supersedeOlderMailHolds(RosterImport $newest): void
+    {
+        try {
+            $reasons = (array) ($newest->classification['reasons'] ?? []);
+            $older = RosterImport::query()
+                ->where('state', RosterImport::STATE_NEEDS_REVIEW)
+                ->whereNull('duty_date')
+                ->where('received_at', '<', $newest->received_at)
+                ->whereKeyNot($newest->getKey())
+                ->orderBy('id')
+                ->limit(self::SUPERSEDE_LIMIT)
+                ->get()
+                ->filter(static fn (RosterImport $import): bool => (array) ($import->classification['reasons'] ?? []) === $reasons);
+
+            $recorder = app(RosterStateRecorder::class);
+            foreach ($older as $import) {
+                try {
+                    $recorder->transition($import, RosterImport::STATE_SUPERSEDED, [
+                        'outcome' => RosterImport::OUTCOME_SUPERSEDED,
+                        'duplicate_of_import_id' => $newest->getKey(),
+                    ], 'newer_export_held');
+                } catch (RosterPipelineException $exception) {
+                    if (! $exception->isConflict()) {
+                        throw $exception;
+                    }
+                }
+            }
+        } catch (Throwable $exception) {
+            report($exception);
+        }
     }
 
     /** True once the email is gone, so a redelivery must not bring it back. */

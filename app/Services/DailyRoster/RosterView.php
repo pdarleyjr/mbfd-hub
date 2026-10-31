@@ -15,5 +15,6 @@ final readonly class RosterView
         public array $sections,
         public ?CarbonImmutable $asOf,
         public ?CarbonImmutable $updatedAt = null,
+        public ?CarbonImmutable $changedAt = null,
     ) {}
 }
