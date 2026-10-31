@@ -11,6 +11,7 @@ use App\Models\ApparatusInspectionException;
 use App\Models\ApparatusOperationalStatusEvent;
 use App\Models\DailyCheckoutLedgerCutover;
 use App\Models\Station;
+use App\Support\StationShiftWindow;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Support\Collection;
@@ -37,6 +38,36 @@ final class DailyCheckoutComplianceService
         bool $requireSubmissionPayloadHash = false,
     ): array {
         [$startOfDay, $startOfNextDay] = $this->localDayWindow($now);
+
+        return $this->summaryForWindow($apparatuses, $startOfDay, $startOfNextDay, $connection, $evidenceAsOf, $requireSubmissionPayloadHash);
+    }
+
+    /**
+     * The same summary, counted over the station page's 7-to-7 window instead of the midnight day.
+     * Only the station page uses this; every department-wide readiness view keeps the midnight day.
+     *
+     * @param  Collection<int, Apparatus>  $apparatuses
+     * @return array<string, mixed>
+     */
+    public function summaryForStationShift(Collection $apparatuses, ?CarbonImmutable $now = null): array
+    {
+        $window = StationShiftWindow::containing($now ?? CarbonImmutable::now(self::TIMEZONE));
+
+        return $this->summaryForWindow($apparatuses, $window->start->utc(), $window->end->utc());
+    }
+
+    /**
+     * @param  Collection<int, Apparatus>  $apparatuses
+     * @return array<string, mixed>
+     */
+    private function summaryForWindow(
+        Collection $apparatuses,
+        CarbonImmutable $startOfDay,
+        CarbonImmutable $startOfNextDay,
+        ?string $connection = null,
+        ?CarbonImmutable $evidenceAsOf = null,
+        bool $requireSubmissionPayloadHash = false,
+    ): array {
         $evidenceAsOf = $evidenceAsOf?->utc();
         $cutoverSignal = $this->cutoverSignal($connection);
 
