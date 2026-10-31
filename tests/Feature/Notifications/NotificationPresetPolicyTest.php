@@ -36,6 +36,7 @@ final class NotificationPresetPolicyTest extends TestCase
         'daily_checkout_every_submission' => [true, false, false],
         'vehicle_swap_reports' => [true, true, true],
         'vehicle_identification_reports' => [true, true, true],
+        'fleet_operational_alerts' => [true, false, false],
         'apparatus_service_tickets' => [true, true, false],
         'vehicle_maintenance_alerts' => [true, false, false],
         'station_inspections' => [true, true, false],
@@ -130,7 +131,7 @@ final class NotificationPresetPolicyTest extends TestCase
     {
         foreach (app(NotificationCategoryRegistry::class)->all() as $category) {
             if ($category->supports('webpush')) {
-                $this->assertSame($category->key !== 'daily_checkout_every_submission', $category->defaults['webpush'], $category->key);
+                $this->assertSame(! in_array($category->key, ['daily_checkout_every_submission', 'fleet_operational_alerts'], true), $category->defaults['webpush'], $category->key);
             }
             if ($category->supports('email')) {
                 $expected = in_array($category->significance, ['important', 'critical'], true) || $category->key === 'support_services_messages';
@@ -183,6 +184,11 @@ final class NotificationPresetPolicyTest extends TestCase
         foreach (app(NotificationCategoryRegistry::class)->all() as $category) {
             if ($category->key === 'daily_checkout_every_submission') {
                 $this->assertSame([false, false, false], $this->stored($user, $category->key), 'these rows were copied from members\' own choices');
+
+                continue;
+            }
+            if ($category->key === 'fleet_operational_alerts') {
+                $this->assertSame([false, false, false], $this->stored($user, $category->key), 'newer than this migration, whose list is frozen');
 
                 continue;
             }
@@ -298,12 +304,12 @@ final class NotificationPresetPolicyTest extends TestCase
             $this->assertSame([], $decision->channels, $key);
         }
         foreach ($registry->all() as $category) {
-            if (in_array($category->key, ['member_request_updates', 'department_updates'], true)) {
-                continue; // every active member is eligible for these two, by design
+            if (in_array($category->key, ['member_request_updates', 'department_updates', 'fleet_operational_alerts'], true)) {
+                continue; // every active member is eligible for these, by design
             }
             $this->assertFalse($evaluator->recipients($category->key)->contains('id', $outsider->id), $category->key.' recipients exclude an ineligible member');
         }
-        $this->assertSame([], $registry->forUser($outsider)->keys()->diff(['member_request_updates', 'department_updates'])->all(), 'an ordinary member sees only the member categories');
+        $this->assertSame([], $registry->forUser($outsider)->keys()->diff(['member_request_updates', 'department_updates', 'fleet_operational_alerts'])->all(), 'an ordinary member sees only the member categories');
     }
 
     public function test_an_inactive_account_still_receives_nothing_even_with_everything_on(): void

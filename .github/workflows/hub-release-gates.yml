@@ -658,6 +658,7 @@ jobs:
               --project=daily-webkit-iphone
               --project=daily-webkit-ipad
               --project=daily-issue-report-webkit
+              --project=daily-changeout-webkit-iphone
           - lane: responsive-phones-and-wide
             browsers: chromium
             workers: 3

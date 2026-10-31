@@ -16,6 +16,7 @@ export async function mobileInspectionFixture(
   model: typeof mobileApparatus[number],
   options: {
     fleetVehicles?: Array<{ vehicle_number: string; designation: string | null; role: string }>;
+    changeoutHandoff?: unknown;
     /** The server's `vehicle_identification` block, sent next to the checklist; absent when not given. */
     vehicleIdentification?: unknown;
   } = {},
@@ -40,6 +41,7 @@ export async function mobileInspectionFixture(
     const contract = {
       inspection_date: inspectionDate, checklist_version: version, checklist_type: model.checklistType, checklist, due_tasks: [], open_findings: [],
       ...(options.vehicleIdentification !== undefined ? { vehicle_identification: options.vehicleIdentification } : {}),
+      ...(options.changeoutHandoff !== undefined ? { changeout_handoff: options.changeoutHandoff } : {}),
     };
     if (path.endsWith('/checklist')) return route.fulfill({ json: contract });
     if (path.endsWith('/inspection-sessions')) return route.fulfill({ status: 201, json: { ...contract, inspection_session: {

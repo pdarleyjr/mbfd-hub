@@ -415,6 +415,8 @@ class ApparatusResource extends Resource
                     ApparatusWorkflowActions::changeStatus(Tables\Actions\Action::make('updateStatus')),
                     ApparatusWorkflowActions::scheduleService(Tables\Actions\Action::make('scheduleService')),
                     ApparatusWorkflowActions::logPm(Tables\Actions\Action::make('logPmService')),
+                    ApparatusWorkflowActions::scheduleChangeout(Tables\Actions\Action::make('scheduleChangeout')),
+                    ApparatusWorkflowActions::addOperationalAlert(Tables\Actions\Action::make('addOperationalAlert')),
                     ApparatusWorkflowActions::dailyCheckout(Tables\Actions\Action::make('daily_checkout')),
                     ApparatusWorkflowActions::masterRecord(Tables\Actions\Action::make('vehicle_record')),
                     Tables\Actions\EditAction::make(),
@@ -544,6 +546,8 @@ class ApparatusResource extends Resource
             RelationManagers\InspectionsRelationManager::class,
             RelationManagers\ServiceTicketsRelationManager::class,
             RelationManagers\VehicleSwapReportsRelationManager::class,
+            RelationManagers\OperationalAlertsRelationManager::class,
+            RelationManagers\ChangeoutsRelationManager::class,
             RelationManagers\DefectsRelationManager::class,
             RelationManagers\InventoryCorrectionsRelationManager::class,
             // A rare Fleet task, so it follows the everyday tabs.

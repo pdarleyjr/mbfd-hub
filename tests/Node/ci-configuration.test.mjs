@@ -1005,6 +1005,7 @@ test("Daily Checkout browser acceptance uses a mocked isolated loopback build", 
   // A lane installs exactly the browsers its projects need: never fewer, no unused WebKit.
   const webkit = webkitProjects(config);
   assert.deepEqual([...webkit].sort(), [
+    "daily-changeout-webkit-iphone",
     "daily-issue-report-webkit",
     "daily-webkit-ipad",
     "daily-webkit-iphone",

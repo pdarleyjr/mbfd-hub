@@ -80,6 +80,31 @@ class ApparatusServiceTicketWorkflowService
         ], changedByUser: $actor);
     }
 
+    /**
+     * A notice Fleet gave outside the Hub, recorded from the console: there is no acting user and nobody is alerted.
+     * Idempotent by client_submission_id.
+     *
+     * @param  array<string, mixed>  $data  The creation fields plus requester_name_snapshot, who gave the notice.
+     */
+    public function recordFleetNotice(Apparatus $apparatus, array $data): ApparatusServiceTicketSubmissionResult
+    {
+        $validated = Validator::make($data, array_merge($this->creationRules(), [
+            'requester_name_snapshot' => ['required', 'string', 'max:255'],
+        ]))->validate();
+        $requester = trim((string) $validated['requester_name_snapshot']);
+
+        return $this->createIdempotently($apparatus, [
+            ...$validated,
+            'public_note' => 'Recorded from a Fleet notice.',
+            'internal_note' => "Recorded from the console. Source: {$requester}.",
+        ], [
+            'created_by_user_id' => null,
+            'requester_name_snapshot' => $requester,
+            'origin' => 'fleet',
+            'status' => ApparatusServiceTicketStatus::Submitted->value,
+        ], fleetNoticeSource: $requester);
+    }
+
     /** @param array<string, mixed> $data */
     public function transition(
         ApparatusServiceTicket $ticket,
@@ -367,6 +392,7 @@ class ApparatusServiceTicketWorkflowService
         array $identity,
         ?User $changedByUser = null,
         ?Employee $changedByEmployee = null,
+        ?string $fleetNoticeSource = null,
     ): ApparatusServiceTicketSubmissionResult {
         $clientId = (string) $validated['client_submission_id'];
         $existing = $this->existing($clientId);
@@ -375,7 +401,7 @@ class ApparatusServiceTicketWorkflowService
         }
 
         try {
-            return DB::transaction(function () use ($apparatus, $validated, $identity, $changedByUser, $changedByEmployee, $clientId): ApparatusServiceTicketSubmissionResult {
+            return DB::transaction(function () use ($apparatus, $validated, $identity, $changedByUser, $changedByEmployee, $clientId, $fleetNoticeSource): ApparatusServiceTicketSubmissionResult {
                 $existing = $this->existing($clientId, true);
                 if ($existing !== null) {
                     return new ApparatusServiceTicketSubmissionResult($this->load($existing), false);
@@ -403,7 +429,9 @@ class ApparatusServiceTicketWorkflowService
                     'started_at' => $status === ApparatusServiceTicketStatus::InProgress->value ? now() : null,
                     'opened_engine_hours' => $lockedApparatus->current_engine_hours,
                     'opened_miles' => $lockedApparatus->current_miles,
-                    'metadata' => ['source' => $identity['origin'].'_service_ticket'],
+                    'metadata' => $fleetNoticeSource === null
+                        ? ['source' => $identity['origin'].'_service_ticket']
+                        : ['source' => 'fleet_notice', 'notice_source' => $fleetNoticeSource],
                 ]));
                 $ticket->updates()->create([
                     'status' => $status,
@@ -412,9 +440,14 @@ class ApparatusServiceTicketWorkflowService
                     'scheduled_for' => $validated['scheduled_for'] ?? null,
                     'changed_by_user_id' => $changedByUser?->id,
                     'changed_by_employee_id' => $changedByEmployee?->id,
-                    'metadata' => ['event' => 'submitted'],
+                    'metadata' => $fleetNoticeSource === null
+                        ? ['event' => 'submitted']
+                        : ['event' => 'submitted', 'source' => 'fleet_notice', 'notice_source' => $fleetNoticeSource],
                 ]);
-                DB::afterCommit(fn () => $this->sideEffects->ticketCreated($ticket));
+                // A Fleet notice clears the read models but alerts nobody; ticketChanged with no requester does exactly that.
+                DB::afterCommit(fn () => $fleetNoticeSource === null
+                    ? $this->sideEffects->ticketCreated($ticket)
+                    : $this->sideEffects->ticketChanged($ticket, false));
 
                 return new ApparatusServiceTicketSubmissionResult($this->load($ticket), true);
             }, 3);

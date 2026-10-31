@@ -71,6 +71,8 @@ class User extends Authenticatable implements FilamentUser
 
     public const NOTIFICATION_PREFERENCE_VEHICLE_IDENTIFICATION = 'vehicle_identification_reports';
 
+    public const NOTIFICATION_PREFERENCE_FLEET_OPERATIONAL_ALERTS = 'fleet_operational_alerts';
+
     /**
      * The current roles that grant access to the Filament admin panel.
      *
@@ -116,6 +118,7 @@ class User extends Authenticatable implements FilamentUser
         self::NOTIFICATION_PREFERENCE_MEMBER_REQUEST_UPDATES => true,
         self::NOTIFICATION_PREFERENCE_VEHICLE_SWAP_REPORTED => true,
         self::NOTIFICATION_PREFERENCE_VEHICLE_IDENTIFICATION => true,
+        self::NOTIFICATION_PREFERENCE_FLEET_OPERATIONAL_ALERTS => true,
     ];
 
     /**
@@ -410,6 +413,7 @@ class User extends Authenticatable implements FilamentUser
             'member_request_update' => self::NOTIFICATION_PREFERENCE_MEMBER_REQUEST_UPDATES,
             'vehicle_swap_reported' => self::NOTIFICATION_PREFERENCE_VEHICLE_SWAP_REPORTED,
             'vehicle_identification_reported' => self::NOTIFICATION_PREFERENCE_VEHICLE_IDENTIFICATION,
+            'fleet_operational_alert' => self::NOTIFICATION_PREFERENCE_FLEET_OPERATIONAL_ALERTS,
             default => null,
         };
     }

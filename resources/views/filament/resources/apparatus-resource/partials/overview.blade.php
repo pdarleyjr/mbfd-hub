@@ -39,6 +39,10 @@
         </div>
     @endif
 
+    @can('viewAny', \App\Models\ApparatusChangeout::class)
+        @include('filament.resources.apparatus-resource.partials.current-assignment', ['assignment' => \App\Support\Fleet\ApparatusCurrentAssignment::for($apparatus)])
+    @endcan
+
     <dl class="hub-insp-facts hub-insp-facts--plain">
         <div>
             <dt>Vehicle #</dt>

@@ -1,0 +1,51 @@
+{
+  "source": "Fleet email dated October 30, 2026",
+  "alerts": [
+    {
+      "dedupe_key": "fleet-email-2026-10-30-r44",
+      "vehicle_number": "17503",
+      "expected_unit": "R 44",
+      "category": "upcoming_swap",
+      "title": "Upcoming Apparatus Changeout: Rescue 44",
+      "message": "R44 is scheduled to change vehicles Sunday afternoon, November 1, so Fleet can repair the current apparatus exhaust on Monday morning, November 2.",
+      "reason": "Exhaust repair",
+      "scheduled_date": "2026-11-01",
+      "scheduled_window": "afternoon",
+      "scheduled_at": null,
+      "old_truck_status_after": "Maintenance",
+      "source": "Fleet email dated October 30, 2026",
+      "send_notification": false,
+      "ticket": {
+        "client_submission_id": "68346820-fe62-5cc1-ba86-a1eac09b3823",
+        "category": "repair_mechanical",
+        "title": "Exhaust repair",
+        "description": "Fleet advised on October 30, 2026 that the exhaust on this apparatus will be repaired first thing Monday morning, November 2, 2026.",
+        "priority": "routine",
+        "requester_name_snapshot": "Fleet (email dated October 30, 2026)"
+      }
+    },
+    {
+      "dedupe_key": "fleet-email-2026-10-30-e1",
+      "vehicle_number": "20503",
+      "expected_unit": "E 1",
+      "category": "upcoming_swap",
+      "title": "Upcoming Apparatus Changeout: Engine 1",
+      "message": "E1 is scheduled to change vehicles Monday, November 2, to address a communications issue involving the shift pad.",
+      "reason": "Shift pad communications issue",
+      "scheduled_date": "2026-11-02",
+      "scheduled_window": null,
+      "scheduled_at": null,
+      "old_truck_status_after": "Maintenance",
+      "source": "Fleet email dated October 30, 2026",
+      "send_notification": false,
+      "ticket": {
+        "client_submission_id": "5e5e5a93-d7c7-517c-b8e6-acf64d7430c6",
+        "category": "electrical",
+        "title": "Shift pad communications issue",
+        "description": "Fleet advised on October 30, 2026 that this apparatus will change vehicles on Monday, November 2, 2026 to address a communications issue involving the shift pad.",
+        "priority": "routine",
+        "requester_name_snapshot": "Fleet (email dated October 30, 2026)"
+      }
+    }
+  ]
+}

@@ -29,11 +29,13 @@ const expires = Date.parse('2026-11-12T00:00:00Z');
 // test:pwa-worker-core also runs pwa-refresh-safety). No dependency, version or lock change.
 // 2026-10-31: root package.json re-pinned for one added npm script (test:email-center-e2e). No dependency, version or lock change;
 // package-lock.json is byte-identical.
+// 2026-10-31: root package.json re-pinned for one added npm script (test:fleet-changeout-e2e). No dependency, version or lock change;
+// package-lock.json is byte-identical.
 // 2026-10-30: root lock re-pinned for follow-redirects 1.16.1 -> 1.16.2 (HIGH GHSA-mrwp-f3q8-3g9p;
 // dev tooling only). Only that entry moved; the Tailwind 3 / braces graph is unchanged.
 const inputs = {
     '.': {
-        'package.json': '9f9370f11682a32df6dbc202db27f4ad8e600d9b1e0874e652ef93daa1a5de86',
+        'package.json': 'd1355b8966a598e1018a2c0c196ca5339f31a4138654cc1946407ed0c9928f34',
         'package-lock.json': '4c2e8aa7d638cdbc299b2f280a2cdc5ce2025113f3fb85acf904c6bba85088d9',
     },
     'resources/js/daily-checkout': {

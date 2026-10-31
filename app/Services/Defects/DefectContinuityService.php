@@ -11,12 +11,14 @@ use App\Models\ApparatusDefectObservation;
 use App\Models\ApparatusDefectParticipant;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusIssueMessage;
+use App\Models\User;
 use App\Services\InspectionPaperFields;
 use App\Support\Fleet\DefectActionStatus;
 use App\Support\HubTimezone;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use InvalidArgumentException;
 
 /**
  * One persistent issue history per physical vehicle item
@@ -163,6 +165,50 @@ final class DefectContinuityService
         [$defect] = $this->createOrFind($apparatus, $inspection, $entry, $prior !== null ? (int) $prior : null);
         $this->event($defect, $inspection, 'reported', ['to_status' => DefectActionStatus::REPORTED, 'details' => $this->details($entry)]);
         $this->enrollParticipants($inspection, [(int) $defect->id => 'reported']);
+
+        return $defect;
+    }
+
+    /**
+     * A named person found an item missing or damaged during a vehicle changeout (docs/apparatus-changeouts.md).
+     * No inspection is involved, so the actor is carried directly. Called inside the changeout transaction, which
+     * holds the truck row. Joins the open defect for this item on this truck when there is one, and never closes
+     * or rewrites it. $status is missing or damaged.
+     */
+    public function recordHandoffFinding(
+        Apparatus $truck,
+        string $compartment,
+        string $item,
+        string $status,
+        ?string $note,
+        ?User $actor,
+        ?string $compartmentKey = null,
+        ?string $itemKey = null,
+    ): ApparatusDefect {
+        if (! in_array($status, ['missing', 'damaged'], true)) {
+            throw new InvalidArgumentException('A handoff finding is either missing or damaged.');
+        }
+        $entry = ['compartment' => $compartment, 'item' => $item, 'status' => ucfirst($status), 'notes' => $note, 'photo_path' => null,
+            'significant' => false, 'compartment_id' => $compartmentKey, 'item_id' => $itemKey];
+        $details = [...$this->details($entry), 'source' => 'apparatus_changeout'];
+
+        $existing = ApparatusDefect::query()
+            ->where('apparatus_id', $truck->id)->where('compartment', $compartment)->where('item', $item)
+            ->unresolved()->lockForUpdate()->first();
+        if ($existing !== null) {
+            $existing->forceFill(['issue_type' => $status, 'last_observed_at' => now()])->save();
+            $this->event($existing, null, 'observed_again', ['details' => $details], $actor);
+
+            return $existing;
+        }
+
+        $prior = ApparatusDefect::query()->where('apparatus_id', $truck->id)->where('compartment', $compartment)
+            ->where('item', $item)->where('resolved', true)->orderByDesc('id')->value('id');
+        [$defect, $created] = $this->createOrFind($truck, null, $entry, $prior !== null ? (int) $prior : null, $actor);
+        $this->event($defect, null, $created ? 'reported' : 'observed_again', [
+            'to_status' => $created ? DefectActionStatus::REPORTED : null,
+            'details' => $details,
+        ], $actor);
 
         return $defect;
     }
@@ -438,7 +484,7 @@ final class DefectContinuityService
      * @param  array<string, mixed>  $entry
      * @return array{0: ApparatusDefect, 1: bool}
      */
-    private function createOrFind(Apparatus $apparatus, ?ApparatusInspection $inspection, array $entry, ?int $recurrenceOf): array
+    private function createOrFind(Apparatus $apparatus, ?ApparatusInspection $inspection, array $entry, ?int $recurrenceOf, ?User $actor = null): array
     {
         $significant = $entry['significant'] && $entry['status'] === 'Damaged';
         $attributes = [
@@ -456,7 +502,7 @@ final class DefectContinuityService
             'item_key' => $entry['item_id'],
             'severity' => $significant ? 'significant' : 'routine',
             'first_reported_inspection_id' => $inspection?->id,
-            'first_reported_by_user_id' => $inspection?->actor_user_id,
+            'first_reported_by_user_id' => $inspection->actor_user_id ?? $actor?->getKey(),
             'first_reported_at' => now(),
             'last_observed_inspection_id' => $inspection?->id,
             'last_observed_at' => now(),
@@ -510,12 +556,12 @@ final class DefectContinuityService
     }
 
     /** @param array<string, mixed> $attributes */
-    private function event(ApparatusDefect $defect, ?ApparatusInspection $inspection, string $type, array $attributes): void
+    private function event(ApparatusDefect $defect, ?ApparatusInspection $inspection, string $type, array $attributes, ?User $actor = null): void
     {
         ApparatusDefectEvent::query()->create([
             'apparatus_defect_id' => $defect->id,
             'apparatus_inspection_id' => $inspection?->id,
-            'actor_user_id' => $inspection?->actor_user_id,
+            'actor_user_id' => $inspection->actor_user_id ?? $actor?->getKey(),
             'event_type' => $type,
             'from_status' => $attributes['from_status'] ?? null,
             'to_status' => $attributes['to_status'] ?? null,

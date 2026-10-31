@@ -164,6 +164,10 @@ async function mockDailySelectorApi(page: Page): Promise<void> {
       return route.fulfill({ json: emptyStationOverview });
     }
 
+    if (path.endsWith('/operational-alerts')) {
+      return route.fulfill({ json: { alerts: [] } });
+    }
+
     return route.fulfill({ status: 404, json: { message: `Unmocked Daily API route: ${path}` } });
   });
 }
