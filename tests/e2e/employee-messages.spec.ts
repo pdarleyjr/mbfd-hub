@@ -133,7 +133,8 @@ test.describe.serial('Support Services conversation', () => {
       await expectNoHorizontalOverflow(page);
 
       await message.click();
-      await expect(page).toHaveURL(/\/employee\/messages\?compose=1/);
+      // Livewire may rewrite the boolean to compose=true as soon as it boots, so a slower check sees either.
+      await expect(page).toHaveURL(/\/employee\/messages\?compose=(1|true)/);
       const body = page.locator('#emsg-member-new-body');
       await expect(body).toBeFocused();
       await expectNoHorizontalOverflow(page);

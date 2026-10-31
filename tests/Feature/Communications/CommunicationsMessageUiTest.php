@@ -118,6 +118,18 @@ final class CommunicationsMessageUiTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_compose_says_plainly_when_sending_is_paused_and_nothing_was_sent(): void
+    {
+        $this->configureSending();
+        \App\Models\CloudflareUsageBudget::query()->update(['reconciled_at' => null, 'provider_daily_reconciled_at' => null]);
+        Http::fake();
+
+        Livewire::test(ComposeEmail::class)->fillForm(['to' => ['public@example.test'], 'subject' => 'Operations', 'text' => 'Body'])
+            ->call('send')->assertHasNoFormErrors()->assertNotified('Email sending is paused');
+
+        Http::assertNothingSent();
+    }
+
     public function test_reply_send_preserves_provider_headers_parent_and_private_recipient_classes(): void
     {
         $this->configureSending();

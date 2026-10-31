@@ -129,6 +129,13 @@ test('pnpm 9 JSON exit status counts lower severities while the gate remains HIG
     assert.match(classifyVacationBuildAdvisory(clean, 0, now), /No HIGH or CRITICAL findings/);
     assert.throws(() => classifyVacationBuildAdvisory(clean, 1, now), /Audit exit contradicts/);
 });
+test('pnpm counts an advisory once per affected version, and a wrong total is still refused', () => {
+    const value = structuredClone(pnpmLowerSeverityReport);
+    value.advisories['1130709'].findings = [{ version: '9.0.9' }, { version: '5.1.9' }, { version: '3.1.5' }];
+    assert.throws(() => classifyVacationBuildAdvisory(value, 1, now), /Incomplete moderate findings/);
+    value.metadata.vulnerabilities.moderate = 3;
+    assert.match(classifyVacationBuildAdvisory(value, 1, now), /No HIGH or CRITICAL findings/);
+});
 test('lower pnpm findings cannot hide an unclassified HIGH or CRITICAL finding', () => {
     for (const severity of ['high', 'critical']) {
         for (const includeReviewed of [false, true]) {

@@ -12,6 +12,12 @@ final class HubTimezone
 {
     public const NAME = 'America/New_York';
 
+    /** A moment in the words a member reads, for messages that may arrive after it happened. */
+    public static function dateTime(DateTimeInterface $value): string
+    {
+        return CarbonImmutable::instance($value)->setTimezone(self::NAME)->format('F j, Y \a\t g:i A T');
+    }
+
     /** The Eastern calendar date at UTC midnight, matching Eloquent date-cast comparisons. */
     public static function today(): CarbonImmutable
     {

@@ -7,6 +7,7 @@ namespace Tests\Feature\Auth;
 use App\Enums\AccountStatus;
 use App\Exceptions\MemberBootstrapStateChanged;
 use App\Jobs\IssueMemberOnboardingInvitation;
+use App\Jobs\SendBudgetedEmail;
 use App\Models\CloudflareUsageBudget;
 use App\Models\Employee;
 use App\Models\EmployeeBidAssignment;
@@ -16,14 +17,22 @@ use App\Models\MemberOnboardingRosterBinding;
 use App\Models\OutboundEmail;
 use App\Models\SecurityActionEvent;
 use App\Models\User;
+use App\Services\Communications\CloudflareEmailDispatcher;
 use App\Services\Identity\AccountSecurityService;
 use App\Services\Identity\CityEmailVerificationService;
 use App\Services\Identity\EstablishedAccountIntegritySnapshot;
 use App\Services\Identity\MemberAccessEmail;
 use App\Services\Identity\MemberSelfServiceActivation;
+use App\Support\HubTimezone;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\Factory;
 use Illuminate\Http\Client\Request;
+use Illuminate\Log\Events\MessageLogged;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
@@ -128,6 +137,293 @@ final class MemberSelfServiceActivationTest extends TestCase
         $this->post('/activate', $this->form('SELF-NOTICE-DOWN'))->assertRedirect('/');
 
         self::assertSame(AccountStatus::Active, $member->fresh()->account_status);
+    }
+
+    public function test_the_notice_arrives_after_a_temporary_email_block_and_activation_does_not_wait_for_it(): void
+    {
+        config()->set('queue.default', 'database');
+        $this->closeEmailBudget();
+        $member = $this->pending('SELF-BLOCKED');
+
+        $this->post('/activate', $this->form('SELF-BLOCKED'))->assertRedirect('/');
+
+        self::assertSame(AccountStatus::Active, $member->fresh()->account_status);
+        self::assertDatabaseCount('outbound_emails', 0);
+        self::assertDatabaseHas('jobs', ['queue' => 'notifications']);
+
+        $this->workNotificationQueue();
+
+        self::assertSame('failed_pre_acceptance', OutboundEmail::query()->sole()->status);
+        self::assertDatabaseCount('jobs', 1);
+        Http::assertNothingSent();
+
+        // The retry waits for the 300 seconds the block asked for.
+        $this->travel(299)->seconds();
+        $this->openEmailBudget();
+        $this->workNotificationQueue();
+        self::assertDatabaseCount('outbound_emails', 1);
+        Http::assertNothingSent();
+
+        $this->travel(2)->seconds();
+        $this->openEmailBudget();
+        $this->workNotificationQueue();
+
+        Http::assertSentCount(1);
+        self::assertDatabaseCount('jobs', 0);
+        self::assertDatabaseCount('failed_jobs', 0);
+        $notice = OutboundEmail::query()->where('status', '!=', 'failed_pre_acceptance')->sole();
+        self::assertNotNull($notice->accepted_at);
+        self::assertSame(['self-blocked@miamibeachfl.gov'], $notice->to_recipients);
+        self::assertSame('Your MBFD Hub account was activated', $notice->subject);
+        self::assertSame((string) $member->id, $notice->source_id);
+        self::assertSame($member->id, $notice->initiated_by_user_id);
+    }
+
+    public function test_a_late_notice_states_when_the_account_was_activated(): void
+    {
+        config()->set('queue.default', 'database');
+        $this->closeEmailBudget();
+        $this->pending('SELF-WHEN');
+        $when = HubTimezone::dateTime(CarbonImmutable::now());
+
+        $this->post('/activate', $this->form('SELF-WHEN'))->assertRedirect('/');
+        $this->workNotificationQueue();
+        $this->travel(6)->minutes();
+        $this->openEmailBudget();
+        $this->workNotificationQueue();
+
+        Http::assertSent(fn (Request $request): bool => str_contains((string) $request['text'], "password was set on {$when}.")
+            && ! str_contains((string) $request['text'], 'just activated'));
+    }
+
+    public function test_a_block_is_retried_after_the_delay_it_asks_for(): void
+    {
+        $member = $this->pending('SELF-RETRY-AFTER');
+        $job = fn (): SendBudgetedEmail => $this->noticeJob($member, 'self-retry-after@miamibeachfl.gov')
+            ->withFakeQueueInteractions();
+
+        config()->set('communications.cloudflare.max_recipient_units_per_minute', 0);
+        $rateLimited = $job();
+        $rateLimited->handle(app(CloudflareEmailDispatcher::class));
+        $rateLimited->assertReleased(61);
+        config()->set('communications.cloudflare.max_recipient_units_per_minute', 5);
+
+        $this->closeEmailBudget();
+        $unreconciled = $job();
+        $unreconciled->handle(app(CloudflareEmailDispatcher::class));
+        $unreconciled->assertReleased(300);
+        Http::assertNothingSent();
+    }
+
+    public function test_a_block_with_no_retry_time_ends_the_job_visibly_instead_of_retrying(): void
+    {
+        config()->set('queue.default', 'database');
+        config()->set('communications.cloudflare.safe_email_ceiling', 0);
+        $logged = $this->captureLog();
+        $this->pending('SELF-CEILING');
+
+        $this->post('/activate', $this->form('SELF-CEILING'))->assertRedirect('/');
+        $this->workNotificationQueue();
+
+        self::assertDatabaseCount('jobs', 0);
+        self::assertDatabaseCount('failed_jobs', 1);
+        Http::assertNothingSent();
+        self::assertContains('budgeted_email_abandoned', $logged->pluck('message')->all());
+    }
+
+    public function test_retries_are_bounded_and_the_last_failure_is_logged(): void
+    {
+        config()->set('queue.default', 'database');
+        $logged = $this->captureLog();
+        $this->closeEmailBudget();
+        $this->pending('SELF-BOUNDED');
+
+        $this->post('/activate', $this->form('SELF-BOUNDED'))->assertRedirect('/');
+
+        $payload = json_decode((string) DB::table('jobs')->value('payload'), true, flags: JSON_THROW_ON_ERROR);
+        self::assertSame(72, $payload['maxTries']);
+
+        DB::table('jobs')->update(['attempts' => 72]);
+        $this->workNotificationQueue();
+
+        self::assertDatabaseCount('jobs', 0);
+        self::assertDatabaseCount('failed_jobs', 1);
+        self::assertDatabaseCount('outbound_emails', 0);
+        self::assertContains('budgeted_email_abandoned', $logged->pluck('message')->all());
+    }
+
+    public function test_a_member_gets_one_notice_when_the_job_runs_again(): void
+    {
+        $member = $this->pending('SELF-ONE');
+        $job = $this->noticeJob($member, 'self-one@miamibeachfl.gov')->withFakeQueueInteractions();
+
+        $job->handle(app(CloudflareEmailDispatcher::class));
+        $job->handle(app(CloudflareEmailDispatcher::class));
+
+        Http::assertSentCount(1);
+        self::assertDatabaseCount('outbound_emails', 1);
+        $job->assertNotReleased();
+    }
+
+    public function test_a_lost_provider_response_is_never_resent(): void
+    {
+        $submissions = 0;
+        Http::fake(function () use (&$submissions) {
+            $submissions++;
+            throw new ConnectionException('Provider response was lost.');
+        });
+        $member = $this->pending('SELF-UNKNOWN');
+        $job = $this->noticeJob($member, 'self-unknown@miamibeachfl.gov')->withFakeQueueInteractions();
+
+        $job->handle(app(CloudflareEmailDispatcher::class));
+        $job->handle(app(CloudflareEmailDispatcher::class));
+
+        self::assertSame(1, $submissions);
+        self::assertSame('acceptance_unknown', OutboundEmail::query()->sole()->status);
+        $job->assertNotReleased();
+        $job->assertFailed();
+    }
+
+    public function test_a_provider_429_waits_out_the_pause_and_then_delivers_one_notice(): void
+    {
+        config()->set('queue.default', 'database');
+        $submissions = 0;
+        Http::swap(new Factory);
+        Http::fake(function (Request $request) use (&$submissions) {
+            $submissions++;
+
+            return $submissions === 1
+                ? Http::response(['success' => false], 429, ['Retry-After' => '60'])
+                : Http::response(['success' => true, 'result' => ['message_id' => 'after-429', 'delivered' => $request['to'], 'queued' => [], 'permanent_bounces' => []]]);
+        });
+        $this->pending('SELF-429');
+
+        $this->post('/activate', $this->form('SELF-429'))->assertRedirect('/');
+        $this->workNotificationQueue();
+
+        self::assertSame(1, $submissions);
+        self::assertSame('failed_pre_acceptance', OutboundEmail::query()->sole()->status);
+        self::assertDatabaseCount('jobs', 1);
+
+        $this->travel(61)->seconds();
+        $this->workNotificationQueue();
+
+        self::assertSame(2, $submissions);
+        self::assertDatabaseCount('jobs', 0);
+        self::assertDatabaseCount('failed_jobs', 0);
+        self::assertNotNull(OutboundEmail::query()->latest('id')->first()->accepted_at);
+    }
+
+    public function test_a_failure_before_submission_is_retried_and_then_delivered(): void
+    {
+        config()->set('queue.default', 'database');
+        config()->set('communications.cloudflare.api_token', '');
+        $this->pending('SELF-TRANSIENT');
+
+        $this->post('/activate', $this->form('SELF-TRANSIENT'))->assertRedirect('/');
+        $this->workNotificationQueue();
+
+        Http::assertNothingSent();
+        self::assertDatabaseCount('jobs', 1);
+        self::assertDatabaseCount('failed_jobs', 0);
+
+        config()->set('communications.cloudflare.api_token', 'member-activation-test-token');
+        $this->travel(61)->seconds();
+        $this->openEmailBudget();
+        $this->workNotificationQueue();
+
+        Http::assertSentCount(1);
+        self::assertDatabaseCount('jobs', 0);
+    }
+
+    public function test_the_job_keeps_retrying_past_the_workers_default_of_three_tries(): void
+    {
+        config()->set('queue.default', 'database');
+        $this->closeEmailBudget();
+        $this->pending('SELF-PATIENT');
+        $this->post('/activate', $this->form('SELF-PATIENT'))->assertRedirect('/');
+
+        DB::table('jobs')->update(['attempts' => 10]);
+        $this->workNotificationQueue();
+
+        self::assertDatabaseCount('failed_jobs', 0);
+        self::assertSame(11, DB::table('jobs')->value('attempts'));
+    }
+
+    public function test_a_job_queued_twice_for_one_activation_sends_one_notice(): void
+    {
+        config()->set('queue.default', 'database');
+        $member = $this->pending('SELF-TWICE');
+
+        dispatch($this->noticeJob($member, 'self-twice@miamibeachfl.gov'));
+        dispatch($this->noticeJob($member, 'self-twice@miamibeachfl.gov'));
+        $this->workNotificationQueue();
+        $this->workNotificationQueue();
+
+        Http::assertSentCount(1);
+        self::assertDatabaseCount('jobs', 0);
+    }
+
+    public function test_two_waiting_notices_to_one_address_send_once_but_to_two_addresses_send_both(): void
+    {
+        config()->set('queue.default', 'database');
+        $this->closeEmailBudget();
+        $member = $this->pending('SELF-WAITING');
+
+        dispatch($this->noticeJob($member, 'self-waiting@miamibeachfl.gov'));
+        dispatch($this->noticeJob($member, 'self-waiting@miamibeachfl.gov'));
+        dispatch($this->noticeJob($member, 'other-mailbox@miamibeachfl.gov'));
+        $this->openEmailBudget();
+        foreach (range(1, 3) as $ignored) {
+            $this->workNotificationQueue();
+        }
+
+        Http::assertSentCount(2);
+        Http::assertSent(fn (Request $request): bool => $request['to'] === ['self-waiting@miamibeachfl.gov']);
+        Http::assertSent(fn (Request $request): bool => $request['to'] === ['other-mailbox@miamibeachfl.gov']);
+        self::assertDatabaseCount('jobs', 0);
+    }
+
+    public function test_a_notice_from_an_earlier_activation_does_not_silence_a_new_one(): void
+    {
+        $member = $this->pending('SELF-AGAIN');
+        $this->noticeJob($member, 'self-again@miamibeachfl.gov')
+            ->withFakeQueueInteractions()->handle(app(CloudflareEmailDispatcher::class));
+
+        $this->noticeJob($member, 'self-again@miamibeachfl.gov')
+            ->withFakeQueueInteractions()->handle(app(CloudflareEmailDispatcher::class));
+
+        Http::assertSentCount(2);
+    }
+
+    public function test_the_notice_goes_to_the_address_held_at_activation_even_if_it_changes_later(): void
+    {
+        config()->set('queue.default', 'database');
+        $this->closeEmailBudget();
+        $member = $this->pending('SELF-REDIRECT');
+        $this->post('/activate', $this->form('SELF-REDIRECT'))->assertRedirect('/');
+        $this->workNotificationQueue();
+
+        $member->employeeProfile->forceFill(['city_email' => 'someone.else@miamibeachfl.gov'])->save();
+        $this->travel(301)->seconds();
+        $this->openEmailBudget();
+        $this->workNotificationQueue();
+
+        Http::assertSentCount(1);
+        Http::assertSent(fn (Request $request): bool => $request['to'] === ['self-redirect@miamibeachfl.gov']);
+    }
+
+    public function test_activation_succeeds_when_the_notice_cannot_even_be_queued(): void
+    {
+        config()->set('queue.default', 'unavailable-queue-connection');
+        $logged = $this->captureLog();
+        $member = $this->pending('SELF-NOQUEUE');
+
+        $this->post('/activate', $this->form('SELF-NOQUEUE'))->assertRedirect('/');
+
+        self::assertSame(AccountStatus::Active, $member->fresh()->account_status);
+        $this->assertAuthenticatedAs($member->fresh(), 'web');
+        self::assertContains('member_self_service_activation_notice_failed', $logged->pluck('message')->all());
     }
 
     public function test_every_refusal_returns_the_same_response(): void
@@ -547,6 +843,40 @@ final class MemberSelfServiceActivationTest extends TestCase
 
         $this->get('/activate')->assertRedirect('/');
         $this->get('/activate/email')->assertRedirect('/');
+    }
+
+    private function noticeJob(User $member, string $address): SendBudgetedEmail
+    {
+        return new SendBudgetedEmail([$address], 'Your MBFD Hub account was activated', 'Activation notice', null, 'member_self_service_activation', (string) $member->id, $member->id);
+    }
+
+    /** The state a rejected usage report leaves behind. */
+    private function closeEmailBudget(): void
+    {
+        CloudflareUsageBudget::query()->update(['reconciled_at' => null, 'provider_daily_reconciled_at' => null]);
+    }
+
+    private function openEmailBudget(): void
+    {
+        CloudflareUsageBudget::query()->update(['reconciled_at' => now(), 'provider_daily_reconciled_at' => now()]);
+    }
+
+    /** Run one job the way the production worker does, with its --tries=3 default. */
+    private function workNotificationQueue(): void
+    {
+        $this->artisan('queue:work', ['connection' => 'database', '--once' => true, '--queue' => 'notifications', '--tries' => 3, '--sleep' => 0])
+            ->assertSuccessful();
+    }
+
+    /** @return Collection<int,MessageLogged> */
+    private function captureLog(): Collection
+    {
+        $logged = new Collection;
+        Event::listen(MessageLogged::class, static function (MessageLogged $entry) use ($logged): void {
+            $logged->push($entry);
+        });
+
+        return $logged;
     }
 
     /**

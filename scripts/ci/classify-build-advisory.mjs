@@ -27,10 +27,12 @@ const expires = Date.parse('2026-11-12T00:00:00Z');
 // miniflare>undici 7.30.1; dev tooling only). Tailwind 3 / braces graph unchanged.
 // 2026-10-29: root package.json re-pinned for two npm script changes (test:employee-messages-e2e added;
 // test:pwa-worker-core also runs pwa-refresh-safety). No dependency, version or lock change.
+// 2026-10-30: root lock re-pinned for follow-redirects 1.16.1 -> 1.16.2 (HIGH GHSA-mrwp-f3q8-3g9p;
+// dev tooling only). Only that entry moved; the Tailwind 3 / braces graph is unchanged.
 const inputs = {
     '.': {
         'package.json': '09b44cd9c3fbff0731c3493d213066655381f228392235600a29a1fa3f509777',
-        'package-lock.json': 'd2716fe1c072e7aff6741ea5f738a3d2760a19e7230f94871e6a2312924a0010',
+        'package-lock.json': '4c2e8aa7d638cdbc299b2f280a2cdc5ce2025113f3fb85acf904c6bba85088d9',
     },
     'resources/js/daily-checkout': {
         'resources/js/daily-checkout/package.json': 'dd808f286eff6301a2e51dd39dc08739868eac9d473c08ea818776c5ebbcfb81',
@@ -52,12 +54,13 @@ function verifyInputs(files) {
     for (const [file, sha256] of Object.entries(files)) assert.equal(createHash('sha256').update(readFileSync(resolve(root, file))).digest('hex'), sha256, `Unreviewed input: ${file}`);
 }
 
-function validateCounts(findings, counts, withTotal) {
+function validateCounts(findings, counts, withTotal, occurrences = () => 1) {
     const severities = ['info', 'low', 'moderate', 'high', 'critical'];
     assert.ok(findings.every((finding) => severities.includes(finding.severity)), 'Unknown severity');
     for (const severity of severities) {
         assert.ok(Number.isInteger(counts?.[severity]) && counts[severity] >= 0, `Invalid ${severity} count`);
-        assert.equal(counts[severity], findings.filter((finding) => finding.severity === severity).length, `Incomplete ${severity} findings`);
+        const expected = findings.filter((finding) => finding.severity === severity).reduce((sum, finding) => sum + occurrences(finding), 0);
+        assert.equal(counts[severity], expected, `Incomplete ${severity} findings`);
     }
     if (withTotal) assert.equal(counts.total, findings.length, 'Invalid total count');
 }
@@ -73,7 +76,8 @@ export function classifyVacationBuildAdvisory(report, auditExit, now = Date.now(
             && Number.isInteger(resolved.id) && typeof resolved.path === 'string', 'Invalid pnpm resolve schema');
     }
     const findings = Object.values(report.advisories);
-    validateCounts(findings, report.metadata?.vulnerabilities, false);
+    // pnpm counts an advisory once per affected version (GHSA-g3hv-75wg-m249 has three minimatch versions).
+    validateCounts(findings, report.metadata?.vulnerabilities, false, (finding) => finding.findings?.length || 1);
     for (const [id, finding] of Object.entries(report.advisories)) assert.ok(Number.isInteger(finding.id) && String(finding.id) === id, 'Invalid pnpm advisory ID');
     const blocking = findings.filter((finding) => ['high', 'critical'].includes(finding.severity));
     // Pinned pnpm 9.12.0 JSON mode exits 1 for any severity, before audit-level

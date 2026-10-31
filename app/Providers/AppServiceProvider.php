@@ -98,6 +98,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::policy(\App\Models\Training\TrainingSession::class, \App\Policies\TrainingRosterPolicy::class);
 
         RateLimiter::for('member-onboarding-invitations', static fn () => Limit::perMinute(4)->by('member-onboarding-global'));
+        // Matches the Hub's hard email cap in CloudflareCostGuard.
+        RateLimiter::for('budgeted-email', static fn () => Limit::perMinute(5)->by('budgeted-email-global'));
 
         // Pulse defaults to Gravatar URLs built from hashed member emails; keep
         // dashboard user cards local instead of disclosing them to a third party.

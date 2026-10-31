@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Services\Identity;
 
 use App\Enums\AccountStatus;
+use App\Jobs\SendBudgetedEmail;
 use App\Models\CityEmailVerification;
 use App\Models\Employee;
 use App\Models\MemberOnboardingRosterBinding;
 use App\Models\User;
 use App\Services\Communications\CloudflareEmailDispatcher;
+use App\Support\HubTimezone;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -243,9 +245,10 @@ final class CityEmailVerificationService
         }
         if ($verified && $oldVerifiedEmail !== null) {
             try {
-                $this->email->send([$oldVerifiedEmail], 'Your MBFD Hub city email changed', 'Your MBFD Hub city email was changed after mailbox verification. If you did not make this change, contact your MBFD Hub administrator.', null, 'city_email_changed', (string) $user->getKey(), $user);
-            } catch (Throwable) {
-                Log::notice('city_email_change_notice_failed', ['user_id' => $user->getKey()]);
+                $when = HubTimezone::dateTime(now());
+                SendBudgetedEmail::dispatch([$oldVerifiedEmail], 'Your MBFD Hub city email changed', "Your MBFD Hub city email was changed on {$when} after mailbox verification. If you did not make this change, contact your MBFD Hub administrator.", null, 'city_email_changed', (string) $user->getKey(), (int) $user->getKey());
+            } catch (Throwable $exception) {
+                Log::warning('city_email_change_notice_failed', ['user_id' => $user->getKey(), 'exception_class' => $exception::class]);
             }
         }
 
