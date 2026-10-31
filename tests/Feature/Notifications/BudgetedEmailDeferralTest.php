@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Notifications;
 
-use App\Jobs\DeliverDeferredEmail;
+use App\Jobs\SendBudgetedEmail;
 use App\Models\OutboundEmail;
 use App\Models\User;
 use App\Notifications\Channels\BudgetedMailChannel;
+use App\Services\Communications\CloudflareEmailDispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Notifications\Notification;
 use Illuminate\Support\Facades\Http;
@@ -19,7 +20,8 @@ use Tests\TestCase;
 /**
  * More alerts per minute than the email budget allows used to throw out of the queued notification job,
  * which the worker retried three times at once and then dropped. A refusal with a retry window now
- * defers the email (bounded); a refusal without one (the cycle ceiling) is logged and nothing retries.
+ * hands the email to SendBudgetedEmail, whose tries are bounded; a refusal without one (the cycle
+ * ceiling) is logged and nothing retries.
  */
 final class BudgetedEmailDeferralTest extends TestCase
 {
@@ -64,27 +66,30 @@ final class BudgetedEmailDeferralTest extends TestCase
     public function test_a_refusal_with_a_retry_window_defers_the_email_instead_of_dropping_it(): void
     {
         Queue::fake();
+        $member = $this->recipient();
 
-        app(BudgetedMailChannel::class)->send($this->recipient(), $this->alert());
+        app(BudgetedMailChannel::class)->send($member, $this->alert());
 
-        Queue::assertPushed(DeliverDeferredEmail::class, fn (DeliverDeferredEmail $job): bool => $job->attempt === 2
+        Queue::assertPushed(SendBudgetedEmail::class, fn (SendBudgetedEmail $job): bool => $job->to === ['member@miamibeachfl.gov']
+            && $job->notifiable?->is($member) === true
             && $job->queue === 'notifications'
-            && $job->delay !== null);
+            && $job->delay === 300);
         // Nothing was submitted: the dispatcher recorded the refusal before the provider.
         $this->assertNull(OutboundEmail::query()->whereNotNull('submitted_at')->first());
     }
 
-    public function test_the_deferred_job_tries_again_and_stops_after_the_bounded_number_of_attempts(): void
+    public function test_the_waiting_email_tries_again_while_refused_and_its_tries_are_bounded(): void
     {
         Queue::fake();
         $member = $this->recipient();
+        $alert = $this->alert();
 
-        (new DeliverDeferredEmail($this->alert(), $member, BudgetedMailChannel::MAX_DEFERRALS - 1))->handle(app(BudgetedMailChannel::class));
-        Queue::assertPushed(DeliverDeferredEmail::class, fn (DeliverDeferredEmail $job): bool => $job->attempt === BudgetedMailChannel::MAX_DEFERRALS);
+        $job = (new SendBudgetedEmail(['member@miamibeachfl.gov'], 'Rescue 2 defect', 'Missing airway bag item', null, $alert::class, (string) $alert->id, null, $alert, $member))
+            ->withFakeQueueInteractions();
+        $job->handle(app(CloudflareEmailDispatcher::class));
 
-        Queue::fake();
-        (new DeliverDeferredEmail($this->alert(), $member, BudgetedMailChannel::MAX_DEFERRALS))->handle(app(BudgetedMailChannel::class));
-        Queue::assertNothingPushed();
+        $job->assertReleased(300);
+        $this->assertSame(72, $job->tries);
     }
 
     public function test_a_member_without_a_city_email_is_skipped_without_any_retry(): void

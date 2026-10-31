@@ -205,7 +205,7 @@ Schedule::command('video-conferencing:expire-lineup')
 
 Schedule::command('mbfd:cloudflare-usage-refresh')
     ->everyFiveMinutes()
-    ->withoutOverlapping(2)
+    ->withoutOverlapping(3)
     ->onOneServer();
 
 Schedule::command('health:check')

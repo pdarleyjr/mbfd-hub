@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages;
 
+use App\Exceptions\EmailBudgetExhausted;
 use App\Models\InboundEmail;
 use App\Models\OutboundEmail;
 use App\Models\User;
@@ -134,6 +135,14 @@ final class ComposeEmail extends Page implements HasForms
             );
         } catch (ValidationException $exception) {
             throw $exception;
+        } catch (EmailBudgetExhausted $exception) {
+            // The dispatcher proves nothing reached the provider, and an admin message is not retried unattended.
+            Notification::make()->warning()->title('Email sending is paused')
+                ->body($exception->retryAfterSeconds === null
+                    ? 'This message was not sent. The email safety limit has been reached; check Communications Usage.'
+                    : 'This message was not sent. Your text is still here; try again in about '.max(1, (int) ceil($exception->retryAfterSeconds / 60)).' minute(s).')->send();
+
+            return;
         } catch (Throwable) {
             Notification::make()->danger()->title('Delivery could not be confirmed')
                 ->body('Check Sent and Communications Usage before trying again; the provider may have accepted this message.')->send();

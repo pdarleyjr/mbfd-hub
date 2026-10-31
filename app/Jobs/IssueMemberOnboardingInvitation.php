@@ -18,6 +18,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\Middleware\RateLimited;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
 final class IssueMemberOnboardingInvitation implements ShouldBeUnique, ShouldQueue
 {
@@ -100,6 +101,8 @@ final class IssueMemberOnboardingInvitation implements ShouldBeUnique, ShouldQue
         } catch (EmailBudgetExhausted $exception) {
             if ($exception->retryAfterSeconds !== null) {
                 $this->release($exception->retryAfterSeconds);
+            } else {
+                Log::error('member_onboarding_invitation_blocked', ['user_id' => $this->userId]);
             }
         }
     }

@@ -127,8 +127,8 @@ final class CloudflareEmailDispatcher
             'references' => isset($headers['References']) ? preg_split('/\s+/', trim($headers['References'])) : null,
         ]);
 
-        $this->deliveryLedger->initialize($email);
         try {
+            $this->deliveryLedger->initialize($email);
             if (! $sensitive && $attachmentPayload !== []) {
                 foreach ($attachmentPayload as $index => $attachment) {
                     $path = 'outbound-email-attachments/'.$email->id.'/'.Str::uuid();
@@ -172,47 +172,68 @@ final class CloudflareEmailDispatcher
             $email = $this->deliveryLedger->initialResponse($email, (array) $response->json('result'), CarbonImmutable::now());
 
             return $email;
+        } catch (RequestException $exception) {
+            if ($exception->response->status() !== 429) {
+                $this->recordUncertainFailure($email, $exception, $recipients);
+                throw $exception;
+            }
+            // Cloudflare rejects over-limit requests at its rate-limit check, before
+            // the message is processed, so this one is safe to send again later.
+            $now = CarbonImmutable::now();
+            $until = $this->backoffUntil($exception->response->header('Retry-After'), $now);
+            $this->costGuard->deferUntil($until);
+            $this->costGuard->releaseAfterRefusal($email, 'Cloudflare rate limited this message before accepting it.', $now);
+            $email->recipients()->update(['status' => 'failed', 'is_terminal' => true, 'failed_at' => $now]);
+            throw new EmailBudgetExhausted('Cloudflare requested a sending pause. Try again after the provider backoff.', max(1, $until->getTimestamp() - $now->getTimestamp()));
         } catch (Throwable $exception) {
-            // A lost response (or a failed local save) is not evidence that the
-            // provider rejected the message. Keep its budget and never retry here.
-            $this->costGuard->markUncertain($email, CarbonImmutable::now());
-            if ($email->fresh()->accepted_at === null) {
-                $email->recipients()->where('is_terminal', false)->update(['status' => 'unknown']);
-                $rejection = null;
-                if ($exception instanceof RequestException) {
-                    $statusCode = $exception->response->status();
-                    if (in_array($statusCode, [401, 403], true)) {
-                        $rejection = ['failed', 'HTTP_'.$statusCode, 'Provider denied authentication or sending permission.'];
-                    } elseif (in_array($statusCode, [400, 422], true)) {
-                        $errors = collect((array) $exception->response->json('errors'));
-                        if ($errors->contains(fn (mixed $error): bool => is_array($error)
-                            && in_array('E_RECIPIENT_SUPPRESSED', [$error['code'] ?? null, $error['message'] ?? null], true))) {
-                            $rejection = ['rejected', 'E_RECIPIENT_SUPPRESSED', 'Provider rejected the request because a recipient is suppressed.'];
-                        } elseif ($errors->contains(fn (mixed $error): bool => is_array($error)
-                            && ($error['message'] ?? null) === 'email.sending.error.invalid_request_schema')) {
-                            $rejection = ['rejected', 'INVALID_REQUEST_SCHEMA', 'Provider rejected the request schema.'];
-                        }
-                    }
-                }
-                if ($rejection !== null) {
-                    foreach ($recipients as $address) {
-                        $this->deliveryLedger->record($email, $address, $rejection[0], 'send_response.rejected', CarbonImmutable::now(),
-                            $rejection[1], $rejection[2]);
-                    }
-                }
-            }
-            if ($exception instanceof RequestException && $exception->response->status() === 429) {
-                $retryAfter = $exception->response->header('Retry-After');
-                $now = CarbonImmutable::now();
-                $seconds = filter_var($retryAfter, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
-                $date = \DateTimeImmutable::createFromFormat(DATE_RFC7231, $retryAfter);
-                $until = $seconds !== false
-                    ? $now->addSeconds(max(1, $seconds))
-                    : ($date !== false ? CarbonImmutable::instance($date) : $now->addMinute());
-                $this->costGuard->deferUntil($until->isFuture() ? $until : $now->addMinute());
-            }
+            $this->recordUncertainFailure($email, $exception, $recipients);
             throw $exception;
         }
+    }
+
+    /** @param list<string> $recipients */
+    private function recordUncertainFailure(OutboundEmail $email, Throwable $exception, array $recipients): void
+    {
+        // A lost response (or a failed local save) is not evidence that the
+        // provider rejected the message. Keep its budget and never retry here.
+        $this->costGuard->markUncertain($email, CarbonImmutable::now());
+        if ($email->fresh()->accepted_at !== null) {
+            return;
+        }
+        $email->recipients()->where('is_terminal', false)->update(['status' => 'unknown']);
+        $rejection = null;
+        if ($exception instanceof RequestException) {
+            $statusCode = $exception->response->status();
+            if (in_array($statusCode, [401, 403], true)) {
+                $rejection = ['failed', 'HTTP_'.$statusCode, 'Provider denied authentication or sending permission.'];
+            } elseif (in_array($statusCode, [400, 422], true)) {
+                $errors = collect((array) $exception->response->json('errors'));
+                if ($errors->contains(fn (mixed $error): bool => is_array($error)
+                    && in_array('E_RECIPIENT_SUPPRESSED', [$error['code'] ?? null, $error['message'] ?? null], true))) {
+                    $rejection = ['rejected', 'E_RECIPIENT_SUPPRESSED', 'Provider rejected the request because a recipient is suppressed.'];
+                } elseif ($errors->contains(fn (mixed $error): bool => is_array($error)
+                    && ($error['message'] ?? null) === 'email.sending.error.invalid_request_schema')) {
+                    $rejection = ['rejected', 'INVALID_REQUEST_SCHEMA', 'Provider rejected the request schema.'];
+                }
+            }
+        }
+        if ($rejection !== null) {
+            foreach ($recipients as $address) {
+                $this->deliveryLedger->record($email, $address, $rejection[0], 'send_response.rejected', CarbonImmutable::now(),
+                    $rejection[1], $rejection[2]);
+            }
+        }
+    }
+
+    private function backoffUntil(string $retryAfter, CarbonImmutable $now): CarbonImmutable
+    {
+        $seconds = filter_var($retryAfter, FILTER_VALIDATE_INT, ['options' => ['min_range' => 0]]);
+        $date = \DateTimeImmutable::createFromFormat(DATE_RFC7231, $retryAfter);
+        $until = $seconds !== false
+            ? $now->addSeconds(max(1, $seconds))
+            : ($date !== false ? CarbonImmutable::instance($date) : $now->addMinute());
+
+        return $until->isFuture() ? $until : $now->addMinute();
     }
 
     /** @param list<string> $addresses @return list<string> */

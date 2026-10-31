@@ -115,6 +115,27 @@ final class CloudflareCostGuard
         });
     }
 
+    /** The provider answered that it did not take this message, so it costs nothing and never went out. */
+    public function releaseAfterRefusal(OutboundEmail $email, string $reason, CarbonInterface $at): OutboundEmail
+    {
+        return DB::transaction(function () use ($email, $reason, $at): OutboundEmail {
+            $email = OutboundEmail::query()->lockForUpdate()->findOrFail($email->getKey());
+            if ($email->accepted_at !== null) {
+                return $email;
+            }
+
+            $email->forceFill([
+                'status' => 'failed_pre_acceptance',
+                'submitted_at' => null,
+                'budget_released_at' => $at,
+                'failed_at' => $at,
+                'failure_reason' => $reason,
+            ])->save();
+
+            return $email;
+        });
+    }
+
     public function markUncertain(OutboundEmail $email, CarbonInterface $at): OutboundEmail
     {
         return DB::transaction(function () use ($email, $at): OutboundEmail {
