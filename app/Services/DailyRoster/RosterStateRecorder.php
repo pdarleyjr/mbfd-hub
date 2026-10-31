@@ -27,6 +27,8 @@ final class RosterStateRecorder
 
     public const ACTION_DELAYED = 'roster_delayed';
 
+    public const ACTION_STALE = 'roster_stale';
+
     public const ACTION_ATTESTED_IMPORT = 'operator_attested_import';
 
     /**
@@ -55,7 +57,7 @@ final class RosterStateRecorder
         RosterImport::STATE_SUPERSEDED => [RosterImport::STATE_CLEANED],
         RosterImport::STATE_SHADOWED => [RosterImport::STATE_QUEUED],
         RosterImport::STATE_REJECTED => [RosterImport::STATE_QUEUED],
-        RosterImport::STATE_PERMANENT_FAILED => [RosterImport::STATE_QUEUED],
+        RosterImport::STATE_PERMANENT_FAILED => [RosterImport::STATE_QUEUED, RosterImport::STATE_SUPERSEDED],
         RosterImport::STATE_NEEDS_REVIEW => [
             RosterImport::STATE_QUEUED, RosterImport::STATE_SUPERSEDED, RosterImport::STATE_PUBLISHED,
         ],
@@ -63,6 +65,8 @@ final class RosterStateRecorder
 
     /** States that keep a lease: a crash while in one of them is found when the lease expires. */
     private const LEASED_STATES = [RosterImport::STATE_PARSING, RosterImport::STATE_VALIDATED];
+
+    private const SUPERSEDE_LIMIT = 50;
 
     public static function isDefined(string $from, string $to): bool
     {
@@ -151,18 +155,48 @@ final class RosterStateRecorder
         $context = [...$context, 'attempt' => $attempts];
 
         if ($attempts >= max(1, (int) config('daily_roster.processing.max_attempts', 5))) {
-            report(new RosterPipelineException($errorCode));
+            app(RosterIncidents::class)->report($errorCode, $import->received_at->format('Y-m-d'));
 
-            return $this->transition($import, RosterImport::STATE_PERMANENT_FAILED, [
+            $failed = $this->transition($import, RosterImport::STATE_PERMANENT_FAILED, [
                 'error_code' => $errorCode,
                 'next_attempt_at' => null,
             ], 'max_attempts_reached', $context);
+            $this->supersedeOlderFailures($failed);
+
+            return $failed;
         }
 
         return $this->transition($import, RosterImport::STATE_RETRYABLE_FAILED, [
             'error_code' => $errorCode,
             'next_attempt_at' => self::nextAttemptAt($attempts),
         ], 'retry_scheduled', $context);
+    }
+
+    /** Only the newest failure of a kind stays open: exports every few minutes would otherwise bury it in copies. */
+    public function supersedeOlderFailures(RosterImport $newest): void
+    {
+        $older = RosterImport::query()
+            ->where('state', RosterImport::STATE_PERMANENT_FAILED)
+            ->where('error_code', $newest->error_code)
+            ->where('received_at', '<', $newest->received_at)
+            ->whereKeyNot($newest->getKey())
+            ->orderBy('id')
+            ->limit(self::SUPERSEDE_LIMIT)
+            ->get();
+
+        foreach ($older as $import) {
+            try {
+                $this->transition($import, RosterImport::STATE_SUPERSEDED, [
+                    'outcome' => RosterImport::OUTCOME_SUPERSEDED,
+                    'duplicate_of_import_id' => $newest->getKey(),
+                ], 'newer_export_failed');
+            } catch (RosterPipelineException $exception) {
+                // An administrator or another job moved this row first. That must not undo this failure.
+                if (! $exception->isConflict()) {
+                    throw $exception;
+                }
+            }
+        }
     }
 
     /** The configured wait for this attempt, within 20 percent either way so retries do not bunch. */

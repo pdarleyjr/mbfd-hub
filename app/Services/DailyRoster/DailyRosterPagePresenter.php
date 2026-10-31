@@ -24,6 +24,8 @@ final class DailyRosterPagePresenter
 
     private const MODE_EMPTY = 'empty';
 
+    private const PDF_LOGO = 'images/mbfd_logo-256.png';
+
     public function __construct(
         private readonly CurrentRosterReader $reader,
         private readonly RosterFreshnessResolver $freshness,
@@ -48,10 +50,15 @@ final class DailyRosterPagePresenter
         }
 
         $displayedDate = $view?->snapshot->duty_date->format('Y-m-d') ?? $freshness->dutyDate;
-        $sections = $view === null ? [] : $this->sections($view);
+        $content = $view === null ? ['sections' => [], 'summary' => null, 'legend' => [], 'filters' => []] : $this->present($view);
 
         return [
             'version' => $freshness->version,
+            'etag' => $freshness->etag,
+            'state' => $freshness->state,
+            'snapshotId' => $view === null ? null : (int) $view->snapshot->getKey(),
+            // Only the current roster moves on its own; an earlier one on screen is a settled record.
+            'isLive' => $mode === self::MODE_CURRENT,
             'mode' => $mode,
             'isEmpty' => $mode === self::MODE_EMPTY,
             'requestedDate' => $date,
@@ -60,12 +67,59 @@ final class DailyRosterPagePresenter
             'tag' => $this->tag($mode, $freshness, $displayedDate),
             'notice' => $this->notice($mode, $freshness, $displayedDate),
             'facts' => $view === null ? null : $this->facts($view),
-            'summary' => $view === null ? null : $this->summary($view->snapshot, $sections),
+            'summary' => $content['summary'],
             'previousDate' => $this->neighbour($available, $displayedDate, 1, $freshness->dutyDate),
             'nextDate' => $this->neighbour($available, $displayedDate, -1, $freshness->dutyDate),
+            'sections' => $content['sections'],
+            'legend' => $content['legend'],
+            'filters' => $content['filters'],
+        ];
+    }
+
+    /**
+     * The same roster the page shows, so the export can never disagree with it.
+     *
+     * @return array{roster: array<string, mixed>, logo: ?string, exportedAt: string}
+     */
+    public function pdfData(?string $requestedDate): array
+    {
+        $logo = public_path(self::PDF_LOGO);
+
+        return [
+            'roster' => $this->build($requestedDate),
+            'logo' => is_file($logo) ? 'data:image/png;base64,'.base64_encode((string) file_get_contents($logo)) : null,
+            'exportedAt' => $this->localTime(CarbonImmutable::now()),
+        ];
+    }
+
+    /**
+     * What one roster renders as, so the page and a spot update can never disagree.
+     *
+     * @return array{sections: list<array<string, mixed>>, summary: array<string, int|string>, legend: list<RosterStatusPill>, filters: list<string>}
+     */
+    public function present(RosterView $view): array
+    {
+        $sections = $this->sections($view);
+
+        return [
             'sections' => $sections,
+            'summary' => $this->summary($view->snapshot, $sections),
             'legend' => $this->legend($sections),
             'filters' => $this->filters($sections),
+        ];
+    }
+
+    /**
+     * The times a page moves in place when an export changes nothing. Cheap: no roster is read.
+     *
+     * @return array{generated: ?string, updated: ?string, changed: ?string}
+     */
+    public function liveFacts(RosterFreshness $freshness): array
+    {
+        return [
+            'generated' => $freshness->asOf === null ? null : $this->localTime($freshness->asOf),
+            'updated' => $freshness->checkedAt === null ? null : $this->localTime($freshness->checkedAt),
+            'changed' => $freshness->changedAt === null ? null : $this->localTime($freshness->changedAt),
         ];
     }
 
@@ -95,21 +149,31 @@ final class DailyRosterPagePresenter
             $mode === self::MODE_STALE && $freshness->state === RosterFreshness::DELAYED => "Today's roster has not arrived and is late. This is the last published roster, from {$shown}.",
             $mode === self::MODE_STALE => "Today's roster has not arrived yet. This is the last published roster, from {$shown}.",
             $mode === self::MODE_CURRENT && $freshness->state === RosterFreshness::NEEDS_REVIEW => 'A newer TeleStaff export is being reviewed. This is the last accepted roster for today.',
+            $mode === self::MODE_CURRENT && $freshness->state === RosterFreshness::DELAYED => 'TeleStaff has stopped sending updates'.($freshness->asOf === null ? '' : ' since '.$this->localTime($freshness->asOf)).'. This roster may be out of date.',
             default => null,
         };
     }
 
-    /** @return array{division: list<string>, window: string, generated: string, updated: string} */
+    /** @return array{division: list<string>, window: string, generated: string, updated: string, changed: string, changedHidden: bool} */
     private function facts(RosterView $view): array
     {
         $snapshot = $view->snapshot;
-        $generated = $snapshot->source_generated_at;
+        // The newest export that confirmed this roster, not the first one that carried it.
+        $generated = $view->asOf ?? $snapshot->source_generated_at;
+        $updated = $view->updatedAt ?? $generated;
+        $changed = $view->changedAt ?? $snapshot->created_at;
+
+        $updatedLabel = $updated === null ? 'Not recorded' : $this->localTime($updated);
+        $changedLabel = $changed === null ? 'Not recorded' : $this->localTime($changed);
 
         return [
             'division' => array_values(array_filter(array_map('trim', explode(' / ', (string) $snapshot->division)))),
             'window' => $this->moment($snapshot->starts_at).' to '.$this->moment($snapshot->ends_at).' ET',
             'generated' => $generated === null ? 'Not recorded' : $this->localTime($generated),
-            'updated' => ($view->updatedAt ?? $view->asOf ?? $generated) === null ? 'Not recorded' : $this->localTime($view->updatedAt ?? $view->asOf ?? $generated),
+            'updated' => $updatedLabel,
+            'changed' => $changedLabel,
+            // Two identical times say nothing: it only earns a line once the roster has been re-confirmed.
+            'changedHidden' => $changedLabel === $updatedLabel,
         ];
     }
 

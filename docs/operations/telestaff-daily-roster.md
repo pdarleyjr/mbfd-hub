@@ -179,11 +179,59 @@ Enabling cleanup also sweeps earlier rows. `daily-roster:reconcile` picks up eve
 
 The Worker is separate: `cloudflare-email-worker` needs its own `wrangler deploy`. It only adds fields the Hub ignores until this release is live, so deploy it first. Until it is live, genuine TeleStaff mail lands in **Needs review** because the transport evidence is missing, and is never published.
 
+### Code colors and PDF export
+
+Code colors match the TeleStaff online roster, read on 2026-10-30. They are defined once in `RosterStatusPresenter::TONE_COLORS` and mirrored in the `--hub-roster-*` tokens, and a test keeps the two equal. TeleStaff's red and pink are darkened about 10 percent, because white text on the originals misses WCAG AA. Color is display only and never decides who counts as working. `.PMS` and `HOOT` keep TeleStaff's color but still read **Not recognized**, because the Hub does not classify them.
+
+**Export PDF** on the roster page downloads the entire roster for the date on screen as landscape Letter, ignoring any search or collapsed sections, with its date, shift, times and any warning. It holds what the Hub publishes, the Suppression/Rescue block, not TeleStaff's other divisions. Access is the same as the page, it is never cached, and each member is limited to 10 exports a minute.
+
+### Sending more often
+
+The pipeline is built for exports every few minutes. When TeleStaff's schedule changes, add this to `/opt/mbfd/mbfd-hub/.env`, then rebuild the config cache and restart the workers:
+
+```bash
+DAILY_ROSTER_EXPECTED_INTERVAL_MINUTES=5
+```
+
+Nothing else changes, and sending more often works without it. The setting only tells the Hub what silence means: after 3 missed exports (`DAILY_ROSTER_STALE_AFTER_MISSED`) members see **Update delayed** with the last time heard, and administrators get one alert per outage. It recovers by itself on the next export. Without it, nothing is ever called stale and the 10:00 ET rule decides lateness.
+
+What each export costs, at any frequency:
+
+| The export | What happens |
+|---|---|
+| Changes nothing (almost all of them) | Parsed once, compared by hash, recorded, email removed. No new roster is stored. Open pages move **Last updated** in place and download no roster. |
+| Changes one seat | One new immutable snapshot. Open pages replace that seat only. Scroll, search and open sections stay, and the spot fades from yellow so it can be found. |
+| Adds or moves a section, or changes over half the seats | Open pages take the whole roster, in place, without reloading. |
+| Held or failed | The newest copy stays open for review and older copies are marked superseded. One alert and one error report per kind per day, however many arrive. |
+
+Open pages ask every 60 seconds whether anything changed, and only while visible. That question does not grow with the roster.
+
+Reading the page: **Last updated** is the last export the Hub accepted, **Report generated** is when TeleStaff made it, and **Roster last changed** is when the people on it last changed. The last line appears only when it differs from **Last updated**.
+
+Under **System > Roster Imports**, exports that changed nothing are hidden by default. Clear **Hide exports that changed nothing** to see them.
+
+### What gets removed, and when
+
+`daily-roster:prune` runs daily at 03:37 ET, in batches. `--dry-run` counts without changing anything.
+
+| What | After | Setting |
+|---|---|---|
+| Finished exports that changed nothing, with their history | 30 days | `DAILY_ROSTER_UNCHANGED_EXPORT_DAYS` |
+| Roster versions that were replaced. This is the rollback window. | 30 days | `DAILY_ROSTER_REPLACED_SNAPSHOT_DAYS` |
+| Held or failed emails that a later verified export overtook | 14 days | `DAILY_ROSTER_OVERTAKEN_EMAIL_DAYS` |
+
+An email counts as overtaken only once a later export was accepted: a newer one for the same duty date, or any later one for mail that was never read. A held copy that merely finished does not count. Copies of a mail check hold collapse only when the reason is identical, so a different problem stays open for a person.
+
+These always stay: the roster that was showing for each date, the ledger row for every published change, anything still held and never overtaken, and rejected mail.
+
+The ledger row is also what recognises a redelivered message. Cloudflare's retries arrive within hours, far inside the 30 days. If one somehow arrived later it would be processed again and end as a duplicate, with no effect on the roster.
+
 ### When something is wrong
 
 | You see | Means | Do |
 |---|---|---|
 | **Update delayed** on the page, alert at 10:00 ET | No export for this duty day | Check TeleStaff's scheduled report. Members still see the last good roster, marked. Nothing to repair in the Hub. Until a first roster has ever been published, the page reads as awaiting and no alert goes. |
+| **Update delayed** while a roster is showing (only with a cadence set) | TeleStaff has stopped sending. One alert per outage. | Check TeleStaff's scheduled report. It clears by itself on the next export. |
 | System Health shows **cleanup failed** | An email could not be removed after 5 attempts. It is still in the inbox. | Fix the cause the import's reason names, then use **Retry email cleanup**. The count clears once that row is no longer failed. |
 | **Needs review** with "TeleStaff changed the report layout" | The table's column labels or spacing differ from the last accepted export | Open the import and read the findings. If TeleStaff really changed the report and the roster parsed correctly, use **Confirm genuine and retry**: the new layout becomes the one later exports are compared with. If the parser misread it, update the parser first. |
 | **Needs review**, mail check reasons | Cloudflare's result was missing, unreadable, ambiguous, or did not prove the sender | Open **Mail check evidence**. Confirm with the source, then use **Confirm genuine and retry**. **Retry** is refused here. |
@@ -210,7 +258,7 @@ docker exec mbfd-hub-laravel php artisan daily-roster:import-inbound <inbound_em
 
 ### Answering "what happened to this email?"
 
-The ledger outlives the email. Find it by `attachment_sha256`, `correlation_id` or received time in `roster_imports`, with history in `roster_events`. Neither holds member names; those live in the snapshot tables, which stay after the email is gone, so a past roster can always be shown again.
+The ledger outlives the email, for the windows above. Find it by `attachment_sha256`, `correlation_id` or received time in `roster_imports`, with history in `roster_events`. Neither holds member names; those live in the snapshot tables, which stay after the email is gone, so the roster shown for a past date can always be shown again.
 
 ### Idle sign-out
 
@@ -220,7 +268,7 @@ Automatic refreshes on the roster page and the 300 and Captain 5 cards send `X-H
 
 - Cleanup removes the `inbound_emails` row and its stored attachment from the live system. Backups keep their own copies until the backup rotation expires them (14 daily, 8 weekly, 12 monthly), so "removed" means removed from the live Hub.
 - There is no upstream mailbox. Cloudflare Email Routing only passes the message through. The City's sent copy is out of reach.
-- The repository holds no retention rule or legal hold for inbound email. If one is adopted, turn `DAILY_ROSTER_CLEANUP_ENABLED` off until cleanup honours it.
+- The department confirmed on 2026-10-30 that no retention rule applies to these emails. If one is adopted, turn `DAILY_ROSTER_CLEANUP_ENABLED` off until cleanup honours it.
 
 ### Backing out a release
 

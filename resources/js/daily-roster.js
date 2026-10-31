@@ -15,6 +15,7 @@ function initDailyRoster(page) {
     const announce = page.querySelector('[data-roster-announce]');
     const versionUrl = page.dataset.versionUrl;
     const sectionsUrl = page.dataset.sectionsUrl;
+    const changesUrl = page.dataset.changesUrl;
     const loginUrl = page.dataset.loginUrl;
 
     const body = () => page.querySelector('[data-roster-body]');
@@ -22,6 +23,7 @@ function initDailyRoster(page) {
     const sections = () => [...(body()?.querySelectorAll('[data-roster-section]') ?? [])];
 
     let version = body().dataset.version;
+    let etag = body().dataset.etag;
     let checking = false;
     let manualQueued = false;
     let closedBeforeFilter = null;
@@ -180,7 +182,130 @@ function initDailyRoster(page) {
         const view = captureView();
         body().replaceWith(document.adoptNode(next));
         version = next.dataset.version;
+        etag = next.dataset.etag;
         restoreView(view);
+    }
+
+    /** The times a member reads, moved in place. An export that changed nothing touches nothing else. */
+    function applyFacts(facts) {
+        if (!facts || body().dataset.live !== '1') {
+            return;
+        }
+        Object.entries(facts).forEach(([name, label]) => {
+            const fact = part(`[data-roster-fact="${name}"]`);
+            if (fact && label) {
+                fact.textContent = label;
+            }
+        });
+        const changedRow = part('[data-roster-fact-row="changed"]');
+        if (changedRow && facts.changed) {
+            changedRow.hidden = facts.changed === part('[data-roster-fact="updated"]')?.textContent;
+        }
+    }
+
+    function fragment(html, selector) {
+        // A seat is a table body, which only parses inside a table.
+        const source = selector === '[data-roster-seat]' ? `<table>${html}</table>` : html;
+        return new DOMParser().parseFromString(source, 'text/html').querySelector(selector);
+    }
+
+    function setFilterOptions(filters) {
+        const status = part('[data-roster-status]');
+        const selected = status.value;
+        const options = [status.options[0], ...filters.map((filter) => new Option(filter, filter))];
+        status.replaceChildren(...options);
+        status.value = filters.includes(selected) ? selected : '';
+    }
+
+    /**
+     * Replaces only the seats that changed, leaving scroll, focus, search and open sections alone. Every
+     * target is found before anything moves, so a page that does not match what the server expects is
+     * left untouched and returns false, and takes the whole roster instead.
+     */
+    function applyChanges(changes) {
+        const sectionsByKey = new Map(sections().map((section) => [section.dataset.sectionKey, section]));
+        const swaps = [];
+
+        for (const change of changes.seats) {
+            const current = sectionsByKey.get(change.section)?.querySelector(`[data-roster-seat][data-seat-index="${Number(change.seat)}"]`);
+            const next = fragment(change.html, '[data-roster-seat]');
+            if (!current || !next) {
+                return false;
+            }
+            swaps.push([current, next]);
+        }
+        for (const change of changes.sections) {
+            const current = sectionsByKey.get(change.section);
+            const next = fragment(change.html, '[data-roster-section]');
+            if (!current || !next) {
+                return false;
+            }
+            next.open = current.open;
+            swaps.push([current, next]);
+        }
+
+        const summary = part('[data-roster-summary]');
+        const legend = part('[data-roster-legend-items]');
+        const nextSummary = fragment(changes.summary, '[data-roster-summary]');
+        const nextLegend = fragment(changes.legend, '[data-roster-legend-items]');
+        if (!summary || !legend || !nextSummary || !nextLegend || !part('[data-roster-status]')) {
+            return false;
+        }
+
+        swaps.forEach(([current, next]) => {
+            current.replaceWith(document.adoptNode(next));
+            next.classList.add('roster-updated');
+        });
+        changes.counts.forEach((count) => {
+            const label = sectionsByKey.get(count.section)?.querySelector('[data-roster-section-count]');
+            if (label) {
+                label.textContent = count.label;
+            }
+        });
+        summary.replaceWith(document.adoptNode(nextSummary));
+        legend.replaceWith(document.adoptNode(nextLegend));
+        setFilterOptions(changes.filters);
+
+        version = changes.version;
+        etag = changes.etag;
+        const element = body();
+        element.dataset.version = changes.version;
+        element.dataset.etag = changes.etag;
+        element.dataset.snapshot = String(changes.snapshot);
+        applyFacts(changes.facts);
+        applyFilter();
+        return true;
+    }
+
+    /**
+     * Resolves to the number of spots now changed on screen, which can be 0 when TeleStaff re-exported
+     * something no member can see, or to null when the page must take the whole roster.
+     */
+    async function applySpotUpdate(background) {
+        const element = body();
+        if (element.dataset.live !== '1' || !element.dataset.snapshot) {
+            return null;
+        }
+        const url = new URL(changesUrl, window.location.origin);
+        url.searchParams.set('from', element.dataset.snapshot);
+        url.searchParams.set('state', element.dataset.state);
+        let changes;
+        try {
+            const response = await fetch(url, {
+                cache: 'no-store',
+                credentials: 'same-origin',
+                redirect: 'manual',
+                headers: { Accept: 'application/json', ...background },
+            });
+            if (!response.ok) {
+                return null; // Includes a redirect or a refusal: the full request below answers those properly.
+            }
+            changes = await response.json();
+        } catch (error) {
+            console.warn('Daily Roster spot update failed', error);
+            return null;
+        }
+        return changes.mode === 'changes' && applyChanges(changes) ? changes.changed : null;
     }
 
     /** Takes the roster off the screen for good: personnel data does not outlive the member's access. */
@@ -212,7 +337,7 @@ function initDailyRoster(page) {
         const response = await fetch(versionUrl, {
             cache: 'no-store',
             credentials: 'same-origin',
-            headers: { Accept: 'application/json', 'If-None-Match': `"${version}"`, ...background },
+            headers: { Accept: 'application/json', 'If-None-Match': `"${etag}"`, ...background },
         });
         if (response.status === 304) {
             return false;
@@ -230,28 +355,36 @@ function initDailyRoster(page) {
         }
         const latest = await response.json();
         if (latest.version === version) {
+            // The same roster again: only its times moved.
+            etag = latest.etag ?? etag;
+            applyFacts(latest.facts);
             return false;
         }
 
+        const spots = await applySpotUpdate(background);
+        if (spots !== null) {
+            return spots > 0;
+        }
+
         // A redirect here means the session ended; do not follow it into the login page's HTML.
-        const fragment = await fetch(sectionsUrl, {
+        const whole = await fetch(sectionsUrl, {
             cache: 'no-store',
             credentials: 'same-origin',
             redirect: 'manual',
             headers: { Accept: 'text/html', ...background },
         });
-        if (fragment.type === 'opaqueredirect' || fragment.status === 401) {
+        if (whole.type === 'opaqueredirect' || whole.status === 401) {
             goToLogin();
             return false;
         }
-        if (fragment.status === 403) {
+        if (whole.status === 403) {
             showAccessRemoved();
             return false;
         }
-        if (!fragment.ok) {
-            throw new Error(`Roster request returned ${fragment.status}.`);
+        if (!whole.ok) {
+            throw new Error(`Roster request returned ${whole.status}.`);
         }
-        swapBody(await fragment.text());
+        swapBody(await whole.text());
         return true;
     }
 

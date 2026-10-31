@@ -35,6 +35,11 @@ final class RosterRollbackService
         }
 
         DB::transaction(function () use ($actor, $dutyDate, $snapshot, $reason): void {
+            // Holds the version in place against retention, which removes replaced ones past their window.
+            if (! RosterSnapshot::query()->whereKey($snapshot->getKey())->lockForUpdate()->exists()) {
+                throw new RosterPipelineException('rollback_snapshot_not_for_date');
+            }
+
             $now = CarbonImmutable::now('UTC');
             RosterActiveVersion::query()->insertOrIgnore(['duty_date' => $dutyDate, 'created_at' => $now, 'updated_at' => $now]);
             $pointer = RosterActiveVersion::query()->whereDate('duty_date', $dutyDate)->lockForUpdate()->firstOrFail();
@@ -42,6 +47,7 @@ final class RosterRollbackService
 
             $pointer->forceFill([
                 'roster_snapshot_id' => $snapshot->getKey(),
+                'content_changed_at' => $now,
                 'pinned_at' => $now,
                 'pinned_by_user_id' => $actor->getKey(),
             ])->save();

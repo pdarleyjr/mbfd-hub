@@ -101,6 +101,9 @@ class AppServiceProvider extends ServiceProvider
         // Matches the Hub's hard email cap in CloudflareCostGuard.
         RateLimiter::for('budgeted-email', static fn () => Limit::perMinute(5)->by('budgeted-email-global'));
 
+        // Its own counter: a plain throttle:10,1 shares one per user with every other plain throttle in the Hub.
+        RateLimiter::for('daily-roster-pdf', static fn (Request $request) => Limit::perMinute(10)->by('daily-roster-pdf:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
+
         // Pulse defaults to Gravatar URLs built from hashed member emails; keep
         // dashboard user cards local instead of disclosing them to a third party.
         Pulse::user(static fn (User $user): array => ['name' => $user->name, 'extra' => (string) $user->email]);

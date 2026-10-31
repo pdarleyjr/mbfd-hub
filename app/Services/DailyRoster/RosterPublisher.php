@@ -40,7 +40,7 @@ final class RosterPublisher
 
         // A pin is an administrator's own decision, so the exports it holds are not an alert.
         if ($holdCode !== null && $holdCode !== self::HOLD_PINNED) {
-            report(new RosterPipelineException($holdCode));
+            app(RosterIncidents::class)->report($holdCode, $report->dutyDate);
         }
     }
 
@@ -115,6 +115,9 @@ final class RosterPublisher
     private function hold(RosterImport $import, string $code): string
     {
         $this->recorder->transition($import, RosterImport::STATE_NEEDS_REVIEW, ['error_code' => $code], 'publish_held', ['reasons' => [$code]]);
+        if ($import->source_generated_at !== null) {
+            $this->supersedeOlderHeld($import, CarbonImmutable::instance($import->source_generated_at), 'newer_export_held');
+        }
 
         return $code;
     }
@@ -150,6 +153,7 @@ final class RosterPublisher
             'roster_snapshot_id' => $snapshot->getKey(),
             'effective_generated_at' => $generatedAt,
             'last_confirmed_at' => $generatedAt,
+            'content_changed_at' => CarbonImmutable::now('UTC'),
         ])->save();
 
         $this->recorder->transition($import, RosterImport::STATE_PUBLISHED, [
@@ -182,8 +186,12 @@ final class RosterPublisher
         ], 'older_than_effective');
     }
 
-    /** Held exports older than one that just passed are moot. Their raw files stay until cleanup rules allow. */
-    private function supersedeOlderHeld(RosterImport $winner, CarbonImmutable $generatedAt): void
+    /**
+     * Held exports older than this one are moot, whether it just passed or was held in turn: at a few
+     * minutes between exports, review would otherwise fill with copies of the same problem and only the
+     * newest can matter. Their raw files stay until cleanup rules allow.
+     */
+    public function supersedeOlderHeld(RosterImport $winner, CarbonImmutable $generatedAt, string $reason = 'newer_export_passed'): void
     {
         $held = RosterImport::query()
             ->where('state', RosterImport::STATE_NEEDS_REVIEW)
@@ -196,10 +204,17 @@ final class RosterPublisher
             ->get();
 
         foreach ($held as $import) {
-            $this->recorder->transition($import, RosterImport::STATE_SUPERSEDED, [
-                'outcome' => RosterImport::OUTCOME_SUPERSEDED,
-                'duplicate_of_import_id' => $winner->getKey(),
-            ], 'newer_export_passed');
+            try {
+                $this->recorder->transition($import, RosterImport::STATE_SUPERSEDED, [
+                    'outcome' => RosterImport::OUTCOME_SUPERSEDED,
+                    'duplicate_of_import_id' => $winner->getKey(),
+                ], $reason);
+            } catch (RosterPipelineException $exception) {
+                // An administrator or another job moved this row first. That must not undo this export.
+                if (! $exception->isConflict()) {
+                    throw $exception;
+                }
+            }
         }
     }
 

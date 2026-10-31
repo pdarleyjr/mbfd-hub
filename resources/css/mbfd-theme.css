@@ -136,22 +136,24 @@ body:has(.identity-strip, .fi-simple-layout) {
 
 /* Daily Roster status pills, one ink and one fill per TeleStaff status. Contrast is checked by tests/Node/daily-roster-assets.test.mjs. */
 :root {
-    --hub-roster-sp-ink: 4 120 87;
-    --hub-roster-sp-bg: 236 253 245;
-    --hub-roster-ot-ink: 146 64 14;
-    --hub-roster-ot-bg: 255 237 213;
-    --hub-roster-aday-ink: 30 78 140;
-    --hub-roster-aday-bg: 238 243 250;
-    --hub-roster-vaca-ink: 91 63 184;
-    --hub-roster-vaca-bg: 243 240 253;
-    --hub-roster-evac-ink: 185 28 28;
-    --hub-roster-evac-bg: 254 242 242;
-    --hub-roster-milnp-ink: 113 63 18;
-    --hub-roster-milnp-bg: 254 249 195;
-    --hub-roster-2wxon-ink: 51 65 85;
-    --hub-roster-2wxon-bg: 226 232 240;
-    --hub-roster-2wxeon-ink: 91 33 182;
-    --hub-roster-2wxeon-bg: 237 233 254;
+    --hub-roster-sp-ink: 0 0 0;
+    --hub-roster-sp-bg: 255 255 255;
+    --hub-roster-ot-ink: 0 0 0;
+    --hub-roster-ot-bg: 0 255 0;
+    --hub-roster-aday-ink: 0 0 0;
+    --hub-roster-aday-bg: 0 142 229;
+    --hub-roster-vaca-ink: 255 255 255;
+    --hub-roster-vaca-bg: 230 0 111;
+    --hub-roster-leave-ink: 255 255 255;
+    --hub-roster-leave-bg: 230 0 0;
+    --hub-roster-sick-ink: 255 255 255;
+    --hub-roster-sick-bg: 170 0 0;
+    --hub-roster-exchange-ink: 0 0 0;
+    --hub-roster-exchange-bg: 255 170 86;
+    --hub-roster-ooc-ink: 0 0 0;
+    --hub-roster-ooc-bg: 0 191 191;
+    --hub-roster-pms-ink: 0 0 0;
+    --hub-roster-pms-bg: 255 0 255;
     --hub-roster-other-ink: 71 85 105;
     --hub-roster-other-bg: 241 245 249;
     --hub-roster-unknown-ink: 15 23 42;

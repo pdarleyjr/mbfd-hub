@@ -11,6 +11,8 @@ use App\Models\DailyRoster\RosterActiveVersion;
 use App\Models\DailyRoster\RosterEvent;
 use App\Models\DailyRoster\RosterImport;
 use App\Services\DailyRoster\RosterAlerts;
+use App\Services\DailyRoster\RosterFreshnessResolver;
+use App\Services\DailyRoster\RosterImportCleanup;
 use App\Services\DailyRoster\RosterImportOperations;
 use App\Services\DailyRoster\RosterPipelineException;
 use App\Services\DailyRoster\RosterStateRecorder;
@@ -37,7 +39,7 @@ final class ReconcileRosterImports extends Command
 
     private const PENDING_CLEANUP = [RosterImport::CLEANUP_NONE, RosterImport::CLEANUP_PENDING, RosterImport::CLEANUP_ROW_DELETED];
 
-    public function handle(RosterStateRecorder $recorder, RosterImportOperations $operations, DutyCalendar $calendar, RosterAlerts $alerts): int
+    public function handle(RosterStateRecorder $recorder, RosterImportOperations $operations, DutyCalendar $calendar, RosterAlerts $alerts, RosterFreshnessResolver $freshness): int
     {
         if (config('daily_roster.mode') === 'off') {
             return self::SUCCESS;
@@ -52,7 +54,8 @@ final class ReconcileRosterImports extends Command
             'due_retries' => $this->redispatchDueRetries($now, $cutoff),
             'unverified' => $this->verifyUnverified($now, $cutoff),
             'pending_cleanups' => $this->cleanupPending($now, $cutoff),
-            'late_rosters' => $this->flagLateRoster($recorder, $alerts, $calendar, $now),
+            'late_rosters' => $this->flagLateRoster($recorder, $alerts, $calendar, $freshness, $now),
+            'stale_rosters' => $this->flagStaleRoster($recorder, $alerts, $calendar, $freshness, $now),
             'held_alerts' => $this->alertHeldImports($alerts, $calendar, $now),
         ];
 
@@ -129,10 +132,12 @@ final class ReconcileRosterImports extends Command
             ->whereIn('cleanup_state', self::PENDING_CLEANUP)
             ->where(static fn (Builder $states) => $states
                 ->whereIn('state', [RosterImport::STATE_VERIFIED, RosterImport::STATE_DUPLICATE])
-                // A held export that was superseded has no snapshot, so its raw file is the only copy.
+                // A held export that was superseded has no snapshot, so its raw file is the only copy...
                 ->orWhere(static fn (Builder $superseded) => $superseded
                     ->where('state', RosterImport::STATE_SUPERSEDED)
-                    ->whereNotNull('roster_snapshot_id')));
+                    ->whereNotNull('roster_snapshot_id'))
+                // ...until a good export has overtaken it and the grace period has passed.
+                ->orWhere(static fn (Builder $held) => RosterImportCleanup::whereOvertaken($held)));
 
         return $this->eachThrottled($query, $now, $cutoff, static function (RosterImport $import): void {
             CleanupRosterImport::dispatch((int) $import->getKey())->afterCommit();
@@ -144,17 +149,15 @@ final class ReconcileRosterImports extends Command
      * every late tick, deduplicated by RosterAlerts, so one that failed to send is tried again; the event
      * is written once. Before anything has ever been published no roster is late, as on the page.
      */
-    private function flagLateRoster(RosterStateRecorder $recorder, RosterAlerts $alerts, DutyCalendar $calendar, CarbonImmutable $now): int
+    private function flagLateRoster(RosterStateRecorder $recorder, RosterAlerts $alerts, DutyCalendar $calendar, RosterFreshnessResolver $freshness, CarbonImmutable $now): int
     {
         if (config('daily_roster.mode') !== 'publish') {
             return 0;
         }
 
         $dutyDate = $calendar->dutyDate($now)->format('Y-m-d');
-        [$hour, $minute] = array_map('intval', explode(':', (string) config('daily_roster.delayed_after_local', '10:00')) + [1 => 0]);
-        $lateFrom = CarbonImmutable::createFromFormat('!Y-m-d', $dutyDate, $calendar->timezone())->setTime($hour, $minute);
 
-        if ($now->lessThan($lateFrom)
+        if ($now->lessThan($freshness->lateFrom($dutyDate))
             || RosterActiveVersion::query()->whereDate('duty_date', $dutyDate)->whereNotNull('roster_snapshot_id')->exists()
             || ! RosterActiveVersion::query()->whereNotNull('roster_snapshot_id')->exists()) {
             return 0;
@@ -172,7 +175,41 @@ final class ReconcileRosterImports extends Command
         return 1;
     }
 
-    /** Tells administrators about imports that need a person. Sending is once per kind per duty date. */
+    /**
+     * TeleStaff went quiet while a roster is showing: alerted once per outage, because each outage is
+     * named by the last export heard, so a second one later the same day raises its own. A roster that
+     * recovers stops being stale by itself.
+     */
+    private function flagStaleRoster(RosterStateRecorder $recorder, RosterAlerts $alerts, DutyCalendar $calendar, RosterFreshnessResolver $freshness, CarbonImmutable $now): int
+    {
+        if (config('daily_roster.mode') !== 'publish') {
+            return 0;
+        }
+
+        $dutyDate = $calendar->dutyDate($now)->format('Y-m-d');
+        $pointer = RosterActiveVersion::query()->whereDate('duty_date', $dutyDate)->first();
+        if (! $freshness->isStale($pointer, $now)) {
+            return 0;
+        }
+
+        $outage = (string) ($pointer->last_confirmed_at ?? $pointer->updated_at)?->getTimestamp();
+        $alerts->send('stale', $dutyDate, $outage);
+
+        if (RosterEvent::query()->whereDate('duty_date', $dutyDate)->where('action', RosterStateRecorder::ACTION_STALE)->where('reason', $outage)->exists()) {
+            return 0;
+        }
+
+        $recorder->appendEvent(null, RosterStateRecorder::ACTION_STALE, reason: $outage, dutyDate: $dutyDate);
+        report(new RosterPipelineException(RosterStateRecorder::ACTION_STALE));
+
+        return 1;
+    }
+
+    /**
+     * Tells administrators about imports that need a person. Sending is once per kind per duty date, so
+     * this asks for each kind and date once, however many rows share them: a batch of rows of one kind
+     * must not hide a different kind behind it.
+     */
     private function alertHeldImports(RosterAlerts $alerts, DutyCalendar $calendar, CarbonImmutable $now): int
     {
         if (config('daily_roster.mode') !== 'publish') {
@@ -183,9 +220,10 @@ final class ReconcileRosterImports extends Command
             ->whereIn('state', [RosterImport::STATE_NEEDS_REVIEW, RosterImport::STATE_REJECTED, RosterImport::STATE_PERMANENT_FAILED])
             ->where('state_changed_at', '>=', $now->subDay())
             ->where(static fn (Builder $code) => $code->whereNull('error_code')->orWhere('error_code', '!=', 'pinned'))
-            ->orderBy('id')
-            ->limit(self::BATCH)
-            ->get(['id', 'state', 'duty_date', 'received_at']);
+            ->select('state', 'duty_date')
+            ->selectRaw('MAX(received_at) as newest_received_at')
+            ->groupBy('state', 'duty_date')
+            ->get();
 
         foreach ($held as $import) {
             $alerts->send(
@@ -194,7 +232,7 @@ final class ReconcileRosterImports extends Command
                     RosterImport::STATE_REJECTED => 'rejected',
                     default => 'needs_review',
                 },
-                $import->duty_date?->format('Y-m-d') ?? $calendar->dutyDate($import->received_at)->format('Y-m-d'),
+                $import->duty_date?->format('Y-m-d') ?? $calendar->dutyDate(CarbonImmutable::parse((string) $import->getAttribute('newest_received_at')))->format('Y-m-d'),
             );
         }
 

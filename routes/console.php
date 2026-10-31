@@ -172,6 +172,12 @@ Schedule::command('mail:index-sweep')
     ->withoutOverlapping(10)
     ->onOneServer();
 
+Schedule::command('daily-roster:prune')
+    ->dailyAt('03:37')
+    ->timezone('America/New_York')
+    ->withoutOverlapping(60)
+    ->onOneServer();
+
 Schedule::command('inspections:retry-notifications')
     ->everyTenMinutes()
     ->withoutOverlapping()

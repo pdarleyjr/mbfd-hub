@@ -63,5 +63,30 @@ return [
     ],
 
     // Local wall clock after which a missing roster for the current duty day counts as late.
+    // Used only when no cadence is set below.
     'delayed_after_local' => env('DAILY_ROSTER_DELAYED_AFTER', '10:00'),
+
+    'cadence' => [
+        // Minutes between TeleStaff exports. Empty means once a day: nothing is ever called stale, and
+        // delayed_after_local decides lateness. Set it when TeleStaff starts sending more often.
+        'expected_interval_minutes' => env('DAILY_ROSTER_EXPECTED_INTERVAL_MINUTES') ?: null,
+        // How many exports may go missing before members are told and administrators alerted.
+        'stale_after_missed' => (int) env('DAILY_ROSTER_STALE_AFTER_MISSED', 3),
+    ],
+
+    'live_updates' => [
+        // Above this share of seats changed, an open page takes the whole roster instead of spot updates.
+        'max_changed_seat_percent' => 50,
+    ],
+
+    'retention' => [
+        // Finished exports that changed nothing. The record of every real change stays.
+        'unchanged_export_days' => (int) env('DAILY_ROSTER_UNCHANGED_EXPORT_DAYS', 30),
+        // Versions of a roster that were replaced: the rollback window. What was shown for a date stays.
+        'replaced_snapshot_days' => (int) env('DAILY_ROSTER_REPLACED_SNAPSHOT_DAYS', 30),
+        // Held or failed mail that a later verified export overtook. Rejected mail is never removed by age.
+        'overtaken_email_days' => (int) env('DAILY_ROSTER_OVERTAKEN_EMAIL_DAYS', 14),
+        'batch' => 500,
+        'max_batches' => 20,
+    ],
 ];

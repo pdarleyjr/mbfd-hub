@@ -9,6 +9,7 @@ use App\Models\DailyRoster\RosterImport;
 use App\Models\DailyRoster\RosterSnapshot;
 use App\Models\InboundEmail;
 use App\Models\OutboundEmail;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use RuntimeException;
@@ -73,19 +74,55 @@ final class RosterImportCleanup
 
     /**
      * Rejected, held and failed mail is never eligible. A superseded export needs its own snapshot,
-     * because a held one has none and its raw file is then the only copy.
+     * because a held one has none and its raw file is then the only copy, until it has been overtaken.
      */
     private function isEligible(RosterImport $import): bool
     {
         return match ($import->state) {
             RosterImport::STATE_VERIFIED => true,
             RosterImport::STATE_DUPLICATE => $this->leadsToVerified($import),
-            RosterImport::STATE_SUPERSEDED => $import->roster_snapshot_id !== null
+            RosterImport::STATE_SUPERSEDED => $this->isOvertaken($import) || ($import->roster_snapshot_id !== null
                 && RosterSnapshot::query()->whereKey($import->roster_snapshot_id)->exists()
                 && $import->duplicateOf !== null
-                && $this->leadsToVerified($import->duplicateOf),
+                && $this->leadsToVerified($import->duplicateOf)),
             default => false,
         };
+    }
+
+    private function isOvertaken(RosterImport $import): bool
+    {
+        return self::whereOvertaken(RosterImport::query()->whereKey($import->getKey()))->exists();
+    }
+
+    /**
+     * Held or failed email that a later export replaced, once TeleStaff's later word on it has actually
+     * been accepted and the grace period for reading it has passed: a newer export of the same duty date
+     * for one that was read, or any later accepted export for one that never could be. A later row that
+     * merely finished, like another held copy or a late older export, proves nothing. Exports every few
+     * minutes would otherwise keep every copy of an old problem in the inbox for good.
+     *
+     * @param  Builder<RosterImport>  $query
+     * @return Builder<RosterImport>
+     */
+    public static function whereOvertaken(Builder $query): Builder
+    {
+        $days = max(1, (int) config('daily_roster.retention.overtaken_email_days', 14));
+
+        return $query
+            ->where('roster_imports.state', RosterImport::STATE_SUPERSEDED)
+            ->whereNull('roster_imports.roster_snapshot_id')
+            ->where('roster_imports.state_changed_at', '<=', now()->subDays($days))
+            ->whereExists(static fn ($accepted) => $accepted
+                ->from('roster_imports as accepted')
+                ->whereIn('accepted.outcome', [RosterImport::OUTCOME_PUBLISHED, RosterImport::OUTCOME_CONFIRMED])
+                ->whereIn('accepted.state', [RosterImport::STATE_VERIFIED, RosterImport::STATE_DUPLICATE, RosterImport::STATE_CLEANED])
+                ->where(static fn ($later) => $later
+                    ->where(static fn ($read) => $read
+                        ->whereColumn('accepted.duty_date', 'roster_imports.duty_date')
+                        ->whereColumn('accepted.source_generated_at', '>', 'roster_imports.source_generated_at'))
+                    ->orWhere(static fn ($unread) => $unread
+                        ->whereNull('roster_imports.source_generated_at')
+                        ->whereColumn('accepted.received_at', '>', 'roster_imports.received_at'))));
     }
 
     /** Walks duplicates and superseded rows back to the import that took effect. Bounded, so a loop cannot hang a worker. */

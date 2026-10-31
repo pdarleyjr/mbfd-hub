@@ -10,6 +10,7 @@ use App\Services\DailyRoster\Parsing\TeleStaffRosterReport;
 use App\Services\DailyRoster\Parsing\TeleStaffWorkbookException;
 use App\Services\DailyRoster\Parsing\TeleStaffWorkbookParser;
 use App\Services\DailyRoster\RosterAnomalyGuard;
+use App\Services\DailyRoster\RosterIncidents;
 use App\Services\DailyRoster\RosterPipelineException;
 use App\Services\DailyRoster\RosterPublisher;
 use App\Services\DailyRoster\RosterStateRecorder;
@@ -156,7 +157,8 @@ final class ProcessRosterImport implements ShouldQueue
     private function failPermanently(RosterImport $import, string $code, RosterStateRecorder $recorder, array $context = []): null
     {
         $recorder->transition($import, RosterImport::STATE_PERMANENT_FAILED, ['error_code' => $code], 'workbook_failed_closed', $context);
-        report(new RosterPipelineException($code));
+        $recorder->supersedeOlderFailures($import);
+        app(RosterIncidents::class)->report($code, $import->received_at->format('Y-m-d'));
 
         return null;
     }
@@ -178,7 +180,10 @@ final class ProcessRosterImport implements ShouldQueue
                 'error_code' => $reasons[0],
                 'warnings' => self::warningsWithHolds($report, $reasons),
             ], 'anomaly_hold', ['reasons' => $reasons]);
-            report(new RosterPipelineException($reasons[0]));
+            if ($report->generatedAt !== null) {
+                $publisher->supersedeOlderHeld($import, CarbonImmutable::parse($report->generatedAt)->utc(), 'newer_export_held');
+            }
+            app(RosterIncidents::class)->report($reasons[0], $report->dutyDate);
 
             return;
         }

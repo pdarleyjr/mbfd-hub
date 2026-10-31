@@ -198,7 +198,7 @@ test('a new roster swaps in without a page reload and keeps the member where the
   const scrollBefore = await page.evaluate(() => window.scrollY);
 
   publishRoster(name);
-  const manualFragment = page.waitForRequest(pathIs('/daily-roster/sections'));
+  const manualFragment = page.waitForRequest(request => pathIs('/daily-roster/sections')(request) || pathIs('/daily-roster/changes')(request));
   await page.getByRole('button', { name: 'Refresh' }).click();
   expect((await manualFragment).headers()[BACKGROUND_HEADER]).toBeUndefined();
 
@@ -218,12 +218,102 @@ test('a new roster swaps in without a page reload and keeps the member where the
   const second = `${name} AGAIN`;
   publishRoster(second);
   const backgroundVersion = page.waitForRequest(pathIs('/api/daily-roster/version'));
-  const backgroundFragment = page.waitForRequest(pathIs('/daily-roster/sections'));
+  const backgroundFragment = page.waitForRequest(request => pathIs('/daily-roster/sections')(request) || pathIs('/daily-roster/changes')(request));
   await backgroundCheck(page);
   expect((await backgroundVersion).headers()[BACKGROUND_HEADER]).toBe('1');
   expect((await backgroundFragment).headers()[BACKGROUND_HEADER]).toBe('1');
   await expect(page.getByText(second)).toHaveCount(1, { timeout: 30_000 });
   expect(navigations).toBe(0);
+});
+
+test('one changed seat replaces only that spot and never downloads the whole roster', async ({ page }, testInfo) => {
+  test.skip(![390, 1440].includes(viewportWidth(testInfo)), 'Phone and desktop cover the spot update.');
+  // Earlier tests publish into the same database, so this one starts from a roster it knows.
+  rosterFixture('publish-seat', `BASELINE ${viewportWidth(testInfo)}, MEMBER`);
+  await openRoster(page);
+  const whole: string[] = [];
+  page.on('request', request => { if (pathIs('/daily-roster/sections')(request)) whole.push(request.url()); });
+
+  // Member state, and a marker on a seat that must survive because it is never touched.
+  await page.locator('[data-roster-section]', { hasText: 'Station 1 / Rescue 1' }).locator('summary').click();
+  const kept = page.locator('[data-roster-section]', { hasText: 'Station 1 / Engine 1' }).locator('[data-roster-seat]').first();
+  await kept.evaluate((seat: HTMLElement) => { seat.dataset.marker = 'kept'; });
+  await page.evaluate(() => window.scrollTo(0, 200));
+  const scrollBefore = await page.evaluate(() => window.scrollY);
+
+  const name = `SPOT ${viewportWidth(testInfo)}, MEMBER`;
+  rosterFixture('publish-seat', name);
+  // The timer's path, because clicking Refresh would scroll the button back into view on its own.
+  const changes = page.waitForResponse(response => pathIs('/daily-roster/changes')(response.request()));
+  await backgroundCheck(page);
+  const payload = await (await changes).json();
+
+  expect(payload.mode).toBe('changes');
+  expect(payload.changed).toBe(1);
+  await expect(page.getByText(name)).toHaveCount(1, { timeout: 30_000 });
+  await expect(page.locator('[data-roster-section]', { hasText: 'Float / Rescue Float' }).locator('[data-roster-seat].roster-updated')).toHaveCount(1);
+  await expect(page.locator('[data-marker="kept"]')).toHaveCount(1);
+  await expect(page.locator('[data-roster-section]', { hasText: 'Station 1 / Rescue 1' })).toHaveJSProperty('open', false);
+  await expect(page.locator('[data-roster-announce]')).toHaveText('Roster updated.');
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scrollBefore);
+  await expectNoHorizontalOverflow(page);
+  expect(whole).toEqual([]);
+
+  // The next export changes nothing: only the times move, and no roster travels at all.
+  rosterFixture('age-pointer');
+  await page.reload();
+  await page.waitForLoadState('networkidle');
+  const updatedBefore = await lastUpdated(page).textContent();
+  const asked: string[] = [];
+  page.on('request', request => {
+    if (pathIs('/daily-roster/sections')(request) || pathIs('/daily-roster/changes')(request)) asked.push(request.url());
+  });
+  rosterFixture('confirm');
+  const version = page.waitForResponse(response => pathIs('/api/daily-roster/version')(response.request()));
+  await page.getByRole('button', { name: 'Refresh' }).click();
+  expect((await version).status()).toBe(200);
+  await expect(lastUpdated(page)).not.toHaveText(updatedBefore!);
+  await expect(page.locator('[data-roster-connection]')).toHaveText('Roster is up to date');
+  expect(asked).toEqual([]);
+});
+
+test('the entire roster exports as a PDF and codes wear their TeleStaff colors', async ({ page }, testInfo) => {
+  test.skip(![320, 390, 1440].includes(viewportWidth(testInfo)), 'Narrow phone, phone and desktop cover the button.');
+  await openRoster(page);
+
+  const overtime = page.locator('.roster-pill--ot').first();
+  await expect(overtime).toHaveCSS('background-color', 'rgb(0, 255, 0)');
+  await expect(overtime).toHaveCSS('color', 'rgb(0, 0, 0)');
+  await expect(page.locator('.roster-pill--aday').first()).toHaveCSS('background-color', 'rgb(0, 142, 229)');
+  await expect(page.locator('.roster-pill--exchange').first()).toHaveCSS('background-color', 'rgb(255, 170, 86)');
+  await expect(page.locator('.roster-pill--leave').first()).toHaveCSS('background-color', 'rgb(230, 0, 0)');
+
+  const exportLink = page.getByRole('link', { name: 'Export PDF' });
+  await expect(exportLink).toBeVisible();
+  await expectNoHorizontalOverflow(page);
+  await expectAccessible(page);
+
+  const download = page.waitForEvent('download');
+  await exportLink.click();
+  const file = await download;
+  expect(file.suggestedFilename()).toMatch(/^MBFD-Daily-Roster-\d{4}-\d{2}-\d{2}\.pdf$/);
+  await expect(page.getByRole('heading', { level: 1, name: 'Daily Roster' })).toBeVisible();
+});
+
+test('a page that does not match what the server expects takes the whole roster instead', async ({ page }, testInfo) => {
+  test.skip(![390, 1440].includes(viewportWidth(testInfo)), 'Phone and desktop cover the fallback.');
+  await openRoster(page);
+  // A seat this page cannot find, so the spot update must leave everything alone and fall back.
+  await page.locator('[data-roster-section]', { hasText: 'Float / Rescue Float' }).locator('[data-roster-seat]').evaluate((seat: HTMLElement) => seat.remove());
+
+  const name = `FALLBACK ${viewportWidth(testInfo)}, MEMBER`;
+  rosterFixture('publish-seat', name);
+  const full = page.waitForRequest(pathIs('/daily-roster/sections'));
+  await page.getByRole('button', { name: 'Refresh' }).click();
+  await full;
+
+  await expect(page.getByText(name)).toHaveCount(1, { timeout: 30_000 });
+  await expect(page.locator('[data-roster-connection]')).toHaveText('Roster updated');
 });
 
 test('a section this page has not seen renders open and the one the member closed stays closed', async ({ page }, testInfo) => {

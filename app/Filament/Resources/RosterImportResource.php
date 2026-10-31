@@ -14,6 +14,7 @@ use Filament\Infolists\Infolist;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Exception-only view of TeleStaff roster imports. Imports run on their own; an administrator only
@@ -58,6 +59,14 @@ final class RosterImportResource extends Resource
             ->defaultSort('received_at', 'desc')
             ->filters([
                 Tables\Filters\SelectFilter::make('state')->label('Status')->options(self::stateOptions()),
+                // Exports that confirmed what was already showing outnumber everything else at a few
+                // minutes between them, and they need nobody. Off by a click when one has to be found.
+                Tables\Filters\Filter::make('took_effect')
+                    ->label('Hide exports that changed nothing')
+                    ->default()
+                    ->query(static fn (Builder $query): Builder => $query->where(static fn (Builder $outcome): Builder => $outcome
+                        ->whereNull('outcome')
+                        ->orWhereNotIn('outcome', [RosterImport::OUTCOME_CONFIRMED, RosterImport::OUTCOME_DUPLICATE, RosterImport::OUTCOME_SUPERSEDED]))),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
