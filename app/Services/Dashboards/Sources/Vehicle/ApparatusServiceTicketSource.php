@@ -289,7 +289,10 @@ final class ApparatusServiceTicketSource extends VehicleIssueSource
                 $locked = ApparatusServiceTicket::query()->lockForUpdate()->findOrFail($ticketId);
                 $target = self::TRANSITIONS[$action] ?? null;
                 if ($target !== null && $locked->status === $target->value) {
-                    return ActionResult::done('Already '.mb_strtolower($target->label()).'.');
+                    // A repeat tap changes nothing, but what an admin typed must not vanish behind "already".
+                    return array_filter($data, static fn (mixed $value): bool => $value !== null) === []
+                        ? ActionResult::done('Already '.mb_strtolower($target->label()).'.')
+                        : ActionResult::conflict();
                 }
                 $lastUpdate = (int) ApparatusServiceTicketUpdate::query()->where('apparatus_service_ticket_id', $locked->getKey())->max('id');
                 if (! hash_equals($locked->status.':'.$lastUpdate, $expectedVersion)) {

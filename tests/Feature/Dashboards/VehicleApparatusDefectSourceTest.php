@@ -255,6 +255,19 @@ final class VehicleApparatusDefectSourceTest extends TestCase
         $this->assertSame(DefectActionStatus::RESOLVED, $defect->fresh()->action_status);
     }
 
+    public function test_a_stale_resolution_with_different_notes_is_refused_and_the_first_notes_stand(): void
+    {
+        $defect = $this->defect();
+        $admin = $this->personas()['admin'];
+        $version = $this->versionOf($defect);
+
+        $this->assertSame('done', $this->source->perform($admin, (string) $defect->id, 'resolve', ['resolution_type' => 'spare_issued', 'resolution_notes' => 'Spare issued from stock.'], $version)->outcome);
+        $second = $this->source->perform($admin, (string) $defect->id, 'resolve', ['resolution_type' => 'spare_issued', 'resolution_notes' => 'Vendor repaired it.'], $version);
+
+        $this->assertSame('conflict', $second->outcome);
+        $this->assertSame('Spare issued from stock.', $defect->fresh()->resolution_notes);
+    }
+
     public function test_invalid_input_and_unknown_actions_write_nothing(): void
     {
         $defect = $this->defect();

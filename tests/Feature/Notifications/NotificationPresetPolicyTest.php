@@ -17,7 +17,7 @@ use Tests\Feature\Notifications\Concerns\BuildsNotificationPersonas;
 use Tests\TestCase;
 
 /**
- * Owner-directed preset: the bell is on for every category, phone alerts are on wherever a category can
+ * The preset: the bell is on for every category, phone alerts are on wherever a category can
  * send them (except one-per-checkout), and the city email is on for important/critical categories plus
  * Support Services messages. Presets change which channels are PREFERRED, never who is eligible.
  */
@@ -62,17 +62,33 @@ final class NotificationPresetPolicyTest extends TestCase
         $this->resetPermissionCache();
     }
 
+    private bool $bulkSeeded = false;
+
+    /** Rows sharing a minute with this batch look like the bulk seeds that created almost every stored row. */
+    private function bulkSeed(): void
+    {
+        if ($this->bulkSeeded) {
+            return;
+        }
+        $this->bulkSeeded = true;
+        $filler = $this->member();
+        foreach (range(1, 5) as $n) {
+            $this->save($filler, 'retired_category_'.$n, false, false, false);
+        }
+    }
+
     private function runMigration(): void
     {
+        $this->bulkSeed();
         (require base_path(self::MIGRATION))->up();
     }
 
-    private function save(User $user, string $key, bool $database, bool $push, bool $email): void
+    private function save(User $user, string $key, bool $database, bool $push, bool $email, string $createdAt = '2026-10-01 00:00:00', ?string $updatedAt = null): void
     {
         DB::table('user_notification_subscriptions')->insert([
             'user_id' => $user->id, 'event_key' => $key,
             'database_enabled' => $database, 'webpush_enabled' => $push, 'email_enabled' => $email,
-            'created_at' => '2026-10-01 00:00:00', 'updated_at' => '2026-10-01 00:00:00',
+            'created_at' => $createdAt, 'updated_at' => $updatedAt ?? $createdAt,
         ]);
     }
 
@@ -155,7 +171,7 @@ final class NotificationPresetPolicyTest extends TestCase
         $this->assertSame([true, false, false], $this->stored($other, 'vehicle_swap_reports'), 'a saved choice is never overwritten');
     }
 
-    public function test_the_migration_turns_on_exactly_the_policy_channels_in_saved_rows(): void
+    public function test_the_migration_turns_on_exactly_the_policy_channels_in_seeded_rows(): void
     {
         $user = $this->member();
         foreach (array_keys(self::TABLE) as $key) {
@@ -165,6 +181,11 @@ final class NotificationPresetPolicyTest extends TestCase
         $this->runMigration();
 
         foreach (app(NotificationCategoryRegistry::class)->all() as $category) {
+            if ($category->key === 'daily_checkout_every_submission') {
+                $this->assertSame([false, false, false], $this->stored($user, $category->key), 'these rows were copied from members\' own choices');
+
+                continue;
+            }
             $this->assertSame(
                 [$category->defaults['database'], $category->defaults['webpush'], $category->defaults['email']],
                 $this->stored($user, $category->key),
@@ -176,15 +197,15 @@ final class NotificationPresetPolicyTest extends TestCase
     public function test_the_migration_never_turns_anything_off_and_never_enables_an_unsupported_channel(): void
     {
         $user = $this->member();
-        // Everything on, including the phone for the one category whose default is off.
+        // Everything on, including channels the defaults leave off.
         $this->save($user, 'daily_checkout_every_submission', true, true, true);
         $this->save($user, 'hub_support_tickets', true, true, true);
-        // A member who chose only email stays that way for that channel; the bell and phone come on.
+        // A seeded row with only email on keeps it; the bell and phone come on.
         $this->save($user, 'member_request_updates', false, false, true);
         // Categories that cannot send the phone or email keep those channels off.
         $this->save($user, 'vehicle_maintenance_alerts', false, false, false);
         $this->save($user, 'department_updates', false, false, false);
-        // Members' own opt-out of email on a routine category is untouched.
+        // Email the defaults leave off on a routine category stays off.
         $this->save($user, 'station_requests', true, false, false);
 
         $this->runMigration();
@@ -202,6 +223,7 @@ final class NotificationPresetPolicyTest extends TestCase
         $withoutRow = $this->member();
         $inactive = $this->member(['account_status' => AccountStatus::Disabled]);
         $active = $this->member();
+        $this->bulkSeed();
         $this->save($inactive, 'station_requests', false, false, false);
         $this->save($active, 'some_retired_category', false, false, false);
         $before = DB::table('user_notification_subscriptions')->count();
@@ -226,6 +248,34 @@ final class NotificationPresetPolicyTest extends TestCase
 
         $this->assertEquals($once, DB::table('user_notification_subscriptions')->get()->toArray());
         $this->assertSame([true, true, true], $this->stored($user, 'support_services_messages'));
+    }
+
+    public function test_a_member_who_edited_any_row_keeps_every_row_exactly_as_it_is(): void
+    {
+        $chose = $this->member();
+        $this->save($chose, 'station_requests', true, false, false, '2026-10-01 00:00:00', '2026-10-12 09:30:00');
+        $this->save($chose, 'member_request_updates', false, false, false);
+        $seeded = $this->member();
+        $this->save($seeded, 'member_request_updates', false, false, false);
+
+        $this->runMigration();
+
+        $this->assertSame([true, false, false], $this->stored($chose, 'station_requests'), 'an edited row is a choice');
+        $this->assertSame([false, false, false], $this->stored($chose, 'member_request_updates'), 'so is the rest of what that member left alone');
+        $this->assertSame([true, true, true], $this->stored($seeded, 'member_request_updates'));
+    }
+
+    public function test_a_row_the_settings_page_created_is_a_choice_and_leaves_that_member_alone(): void
+    {
+        // The settings page creates a row only when it differs from the default, so it arrives alone, not in a bulk seed.
+        $chose = $this->member();
+        $this->save($chose, 'support_services_messages', true, false, false, '2026-10-22 14:53:10');
+        $this->save($chose, 'department_updates', true, false, false);
+
+        $this->runMigration();
+
+        $this->assertSame([true, false, false], $this->stored($chose, 'support_services_messages'));
+        $this->assertSame([true, false, false], $this->stored($chose, 'department_updates'));
     }
 
     public function test_presets_never_change_who_is_eligible(): void

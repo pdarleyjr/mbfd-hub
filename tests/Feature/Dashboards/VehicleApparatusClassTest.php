@@ -24,8 +24,8 @@ final class VehicleApparatusClassTest extends TestCase
         yield 'rescue template' => [['designation' => 'R4', 'type' => 'Rescue', 'daily_checkout_template' => 'rescue'], 'rescue', 'rescue'];
         yield 'fire boat template' => [['unit_id' => 'FB6', 'designation' => 'Fire Boat 6', 'type' => 'Other', 'daily_checkout_template' => 'fireboat6'], 'marine', 'fireboat'];
         yield 'rescue by family, no template' => [['designation' => 'R9', 'type' => 'Rescue'], 'rescue', 'rescue'];
-        yield 'marine by type' => [['designation' => 'Marine 1', 'type' => 'Marine'], 'marine', 'fireboat'];
-        yield 'fire boat by class' => [['designation' => 'Marine 2', 'type' => 'Other', 'class_description' => 'Fire Boats'], 'marine', 'fireboat'];
+        yield 'marine by type has no approved photo' => [['designation' => 'Marine 1', 'type' => 'Marine'], 'marine', null];
+        yield 'fire boat by class has no approved photo' => [['designation' => 'Marine 2', 'type' => 'Other', 'class_description' => 'Fire Boats'], 'marine', null];
         yield 'ladder on the default checklist' => [['designation' => 'Ladder 4', 'type' => 'Ladder', 'daily_checkout_template' => 'default'], 'ladder', 'ladder-1'];
         yield 'command vehicle' => [['designation' => 'Battalion Chief 1', 'type' => 'Command'], 'special', null];
         yield 'name alone never classifies' => [['designation' => 'Utility 1', 'name' => 'Rescue support pickup', 'type' => 'Pickup'], 'special', null];

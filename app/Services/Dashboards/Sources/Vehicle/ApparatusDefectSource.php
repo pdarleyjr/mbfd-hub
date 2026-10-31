@@ -310,6 +310,11 @@ final class ApparatusDefectSource extends VehicleIssueSource
     {
         $status = (string) ($defect->action_status ?: DefectActionStatus::REPORTED);
         $details = is_array($defect->action_details) ? $defect->action_details : [];
+        // A closing or reopening action with different typed text goes on to the version check, so it is never lost.
+        $stored = $defect->resolution_notes;
+        $nothingNew = $quiet
+            && in_array(self::text($input, 'resolution_notes'), [null, $stored], true)
+            && in_array(self::text($input, 'reason'), [null, $stored], true);
 
         return match (true) {
             $action === 'acknowledge' && $quiet && $status !== DefectActionStatus::REPORTED && ! DefectActionStatus::isClosed($status) => 'Already acknowledged.',
@@ -318,9 +323,9 @@ final class ApparatusDefectSource extends VehicleIssueSource
                 && is_int($details['assigned_to'] ?? null) && (string) $details['assigned_to'] === (string) ($input['assignee_id'] ?? '') => 'Already assigned to that person.',
             $action === 'classify_impact' && $quiet && ($input['operational_impact'] ?? null) !== 'out_of_service'
                 && $defect->operational_impact === ($input['operational_impact'] ?? null) && ! DefectActionStatus::isClosed($status) => 'Impact is already classified that way.',
-            in_array($action, ['resolve', 'verify'], true) && $status === DefectActionStatus::RESOLVED => 'Already resolved.',
-            $action === 'close_no_action' && $status === DefectActionStatus::DISMISSED => 'Already closed with no action required.',
-            $action === 'reopen' && ! DefectActionStatus::isClosed($status) => 'Already open.',
+            in_array($action, ['resolve', 'verify'], true) && $nothingNew && $status === DefectActionStatus::RESOLVED => 'Already resolved.',
+            $action === 'close_no_action' && $nothingNew && $status === DefectActionStatus::DISMISSED => 'Already closed with no action required.',
+            $action === 'reopen' && $nothingNew && ! DefectActionStatus::isClosed($status) => 'Already open.',
             default => null,
         };
     }

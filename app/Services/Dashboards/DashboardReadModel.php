@@ -31,6 +31,9 @@ final class DashboardReadModel
 {
     public const ROWS_PER_SOURCE = 25;
 
+    /** How far "Show more" can go: the most any source will return. */
+    public const MAX_ROWS_PER_SOURCE = 200;
+
     public const CACHE_SECONDS = 10;
 
     /** Source types whose rows are conversations rather than apparatus or station records. */
@@ -43,14 +46,15 @@ final class DashboardReadModel
         private readonly Cache $cache,
     ) {}
 
-    public function load(User $user, DashboardView $view, string $filter = DashboardFilters::ALL, bool $fresh = false): DashboardSnapshot
+    public function load(User $user, DashboardView $view, string $filter = DashboardFilters::ALL, bool $fresh = false, int $rowsPerSource = self::ROWS_PER_SOURCE): DashboardSnapshot
     {
         if (! DashboardFilters::isValid($view, $filter)) {
             $filter = DashboardFilters::ALL;
         }
 
         $window = OperationalDisplayWindow::forNow();
-        $key = self::cacheKey($user, $view, $filter, $window);
+        $rowsPerSource = max(self::ROWS_PER_SOURCE, min($rowsPerSource, self::MAX_ROWS_PER_SOURCE));
+        $key = self::cacheKey($user, $view, $filter, $window, $rowsPerSource);
 
         if (! $fresh) {
             $cached = $this->cache->get($key);
@@ -59,7 +63,7 @@ final class DashboardReadModel
             }
         }
 
-        $snapshot = $this->compute($user, $view, $filter, $window);
+        $snapshot = $this->compute($user, $view, $filter, $window, $rowsPerSource);
         if ($snapshot->failedSources === []) {
             $this->cache->put($key, $snapshot, self::CACHE_SECONDS);
         }
@@ -96,7 +100,7 @@ final class DashboardReadModel
         return DashboardSnapshot::LANE_MESSAGES;
     }
 
-    private function compute(User $user, DashboardView $view, string $filter, OperationalDisplayWindow $window): DashboardSnapshot
+    private function compute(User $user, DashboardView $view, string $filter, OperationalDisplayWindow $window, int $rowsPerSource): DashboardSnapshot
     {
         $base = new DashboardQuery($window);
         $filtered = DashboardFilters::query($view, $filter, $window);
@@ -107,6 +111,7 @@ final class DashboardReadModel
         $laneCounts = [];
         $lanes = [];
         $failed = [];
+        $moreAvailable = false;
 
         foreach ($this->registry->forView($view) as $source) {
             try {
@@ -116,7 +121,7 @@ final class DashboardReadModel
 
                 $lane = self::laneOf($source);
                 $sourceCounts = $source->counts($user, $base);
-                $sourceRows = array_slice($source->rows($user, $filtered, self::ROWS_PER_SOURCE), 0, self::ROWS_PER_SOURCE);
+                $sourceRows = array_slice($source->rows($user, $filtered, $rowsPerSource), 0, $rowsPerSource);
             } catch (Throwable $exception) {
                 report($exception);
                 $failed[] = $source->type();
@@ -125,6 +130,7 @@ final class DashboardReadModel
             }
 
             $lanes[$lane] = true;
+            $moreAvailable = $moreAvailable || (count($sourceRows) >= $rowsPerSource && $rowsPerSource < self::MAX_ROWS_PER_SOURCE);
             foreach ($sourceCounts as $countKey => $value) {
                 $counts[$countKey] = ($counts[$countKey] ?? 0) + (int) $value;
                 $laneCounts[$lane][$countKey] = ($laneCounts[$lane][$countKey] ?? 0) + (int) $value;
@@ -153,12 +159,13 @@ final class DashboardReadModel
             lanes: array_keys($lanes),
             failedSources: $failed,
             window: $window,
+            moreAvailable: $moreAvailable,
             loadedAt: CarbonImmutable::now(OperationalDisplayWindow::TIMEZONE),
         );
     }
 
-    private static function cacheKey(User $user, DashboardView $view, string $filter, OperationalDisplayWindow $window): string
+    private static function cacheKey(User $user, DashboardView $view, string $filter, OperationalDisplayWindow $window, int $rowsPerSource = self::ROWS_PER_SOURCE): string
     {
-        return 'admin-dashboards:v1:'.$user->getKey().':'.$view->value.':'.$filter.':'.$window->start->getTimestamp();
+        return 'admin-dashboards:v1:'.$user->getKey().':'.$view->value.':'.$filter.':'.$window->start->getTimestamp().':'.$rowsPerSource;
     }
 }

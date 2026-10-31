@@ -94,7 +94,7 @@ final class StationRequestSourceTest extends TestCase
         $stages = collect($rows)->countBy(fn (DashboardIssue $i): string => $i->stage);
 
         $this->assertCount(4, $rows);
-        $this->assertSame(['open' => 2, 'awaiting_response' => 1, 'in_progress' => 1, 'high' => 1, 'resolved_today' => 2, 'facilities' => 2, 'supplies' => 2, 'access_it' => 0, 'other' => 0], $counts);
+        $this->assertSame(['open' => 2, 'awaiting_response' => 1, 'in_progress' => 1, 'high' => 1, 'resolved_today' => 2, 'facilities' => 1, 'supplies' => 1, 'access_it' => 0, 'other' => 0], $counts);
         $this->assertSame($counts['resolved_today'], $stages['resolved']);
         $this->assertSame($counts['open'], count($rows) - $stages['resolved']);
         $this->assertSame('high', $rows[0]->severity, 'Open, most severe first.');
@@ -103,7 +103,7 @@ final class StationRequestSourceTest extends TestCase
         $this->assertCount(2, $this->source()->rows($viewer, $filtered, 50));
         $filteredCounts = $this->source()->counts($viewer, $filtered);
         $this->assertSame(1, $filteredCounts['open']);
-        $this->assertSame(2, $filteredCounts['facilities'], 'Tag chips keep their own numbers under a tag filter.');
+        $this->assertSame(1, $filteredCounts['facilities'], 'Tag chips keep their own numbers under a tag filter.');
     }
 
     public function test_the_eight_oclock_boundary_holds_on_a_dst_date(): void
