@@ -9,6 +9,9 @@ use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
 use App\Models\DailyCheckoutLedgerCutover;
 use App\Models\Station;
+use App\Support\HubTimezone;
+use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
 use Tests\TestCase;
@@ -22,6 +25,13 @@ final class PublicStationDailyCheckoutContractTest extends TestCase
         parent::setUp();
 
         $this->actingAsCanonicalFixture();
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        CarbonImmutable::setTestNow();
+        parent::tearDown();
     }
 
     public function test_station_show_exposes_the_canonical_daily_checkout_summary_and_matrix(): void
@@ -117,6 +127,53 @@ final class PublicStationDailyCheckoutContractTest extends TestCase
         $this->assertFalse($matrix[$exempt->id]['included_in_required_total']);
     }
 
+    public function test_the_station_apparatus_status_agrees_with_the_overview_on_the_7_am_to_7_am_window(): void
+    {
+        $station = Station::query()->create([
+            'station_number' => 29,
+            'name' => 'Station 29',
+            'address' => '29 Test Street',
+            'is_active' => true,
+        ]);
+        $this->at('2026-10-30 06:00:00');
+        $early = $this->apparatus($station, 'E29A');
+        $night = $this->apparatus($station, 'E29B');
+        $this->activateCutover([$early, $night]);
+        $this->inspection($early, 'approved', '2026-10-30 06:30:00');
+        $moments = [
+            // Before 7 AM the early checkout still belongs to the window that started the day before.
+            ['2026-10-30 06:45:00', 'checked', 'not_checked'],
+            ['2026-10-30 09:00:00', 'not_checked', 'not_checked'],
+            ['2026-10-30 22:00:00', 'not_checked', 'checked'],
+            // After midnight: the compliance day would have started over here.
+            ['2026-10-31 03:00:00', 'not_checked', 'checked'],
+            ['2026-10-31 07:00:00', 'not_checked', 'not_checked'],
+        ];
+
+        foreach ($moments as [$moment, $earlyState, $nightState]) {
+            $this->at($moment);
+            if ($moment === '2026-10-30 22:00:00') {
+                $this->inspection($night, 'approved', '2026-10-30 21:30:00');
+            }
+            $matrix = collect($this->getJson("/api/public/stations/{$station->id}")->assertOk()->json('daily_checkout.matrix'))->keyBy('apparatus_id');
+            $overview = collect($this->getJson("/api/public/stations/{$station->id}/overview")->assertOk()->json('units'))->keyBy('apparatus_id');
+
+            $this->assertSame($earlyState, $matrix[$early->id]['state'], $moment);
+            $this->assertSame($nightState, $matrix[$night->id]['state'], $moment);
+            $this->assertSame($earlyState === 'checked' ? 'submitted' : 'not_submitted', $overview[$early->id]['state'], $moment);
+            $this->assertSame($nightState === 'checked' ? 'submitted' : 'not_submitted', $overview[$night->id]['state'], $moment);
+        }
+    }
+
+    private function at(string $eastern): void
+    {
+        $now = CarbonImmutable::parse($eastern, HubTimezone::NAME);
+        Carbon::setTestNow($now);
+        CarbonImmutable::setTestNow($now);
+        // The member session's idle clock follows the test clock, so sign in again at each moment.
+        $this->actingAsCanonicalFixture('E-'.Str::upper(Str::random(8)));
+    }
+
     private function apparatus(
         Station $station,
         string $unit,
@@ -135,7 +192,7 @@ final class PublicStationDailyCheckoutContractTest extends TestCase
         ]);
     }
 
-    private function inspection(Apparatus $apparatus, string $reviewStatus): void
+    private function inspection(Apparatus $apparatus, string $reviewStatus, ?string $completedEastern = null): void
     {
         ApparatusInspection::query()->create([
             'apparatus_id' => $apparatus->id,
@@ -145,7 +202,7 @@ final class PublicStationDailyCheckoutContractTest extends TestCase
             'shift' => 'A-Day',
             'unit_number' => $apparatus->unit_id,
             'review_status' => $reviewStatus,
-            'completed_at' => now(),
+            'completed_at' => $completedEastern === null ? now() : CarbonImmutable::parse($completedEastern, HubTimezone::NAME)->utc(),
         ]);
     }
 

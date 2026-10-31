@@ -8,8 +8,8 @@ use Carbon\CarbonImmutable;
 
 /**
  * The 24 hours a station page counts vehicle inspections against: 7:00 AM to 7:00 AM Eastern. This starts before the
- * actual shift change because some members complete their checkouts early. It is separate from the midnight-based
- * compliance day in DailyCheckoutComplianceService.
+ * actual shift change because some members complete their checkouts early. Both the Overview and the Apparatus tab
+ * count against it; department-wide readiness views keep the midnight-based day in DailyCheckoutComplianceService.
  */
 final readonly class StationShiftWindow
 {

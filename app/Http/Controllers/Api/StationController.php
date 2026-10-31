@@ -121,7 +121,7 @@ class StationController extends Controller
         /** @var Collection<int, Apparatus> $stationApparatuses */
         $stationApparatuses = $station->apparatuses;
         $dailyCheckout = app(DailyCheckoutComplianceService::class)
-            ->summaryForApparatuses($stationApparatuses);
+            ->summaryForStationShift($stationApparatuses);
         $dormBedsCount = $staffing['dorm_beds_count'];
         $personnelCount = $staffing['assigned_personnel_count'];
 

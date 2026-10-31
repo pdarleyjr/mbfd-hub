@@ -829,6 +829,7 @@ test('station Daily Checkout renders the canonical server result without estimat
   await page.getByRole('tab', { name: 'Apparatus', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Daily Checkout' })).toBeVisible();
   await expect(page.getByText('2 / 4 required inspections completed', { exact: true })).toBeVisible();
+  await expect(page.getByText('Counted from 7 AM to 7 AM', { exact: true })).toBeVisible();
   await expect(page.getByText('50%', { exact: true })).toBeVisible();
   await expect(page.getByText('Submitted', { exact: true }).first()).toBeVisible();
   await expect(page.getByText('Out of service', { exact: true }).first()).toBeVisible();
