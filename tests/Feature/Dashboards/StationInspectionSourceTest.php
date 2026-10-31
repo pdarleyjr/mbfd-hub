@@ -78,7 +78,7 @@ final class StationInspectionSourceTest extends TestCase
         $counts = $this->source()->counts($manager, DashboardQuery::now());
         $this->assertSame(0, $counts['open']);
         $this->assertSame(1, $counts['resolved_today']);
-        $this->assertSame(1, $counts['facilities']);
+        $this->assertSame(0, $counts['facilities'], 'chips count open items');
 
         $this->actingAs($manager);
         Livewire::test(ViewStationInspection::class, ['record' => $inspection->id])->assertActionHidden('acknowledgeInspection');

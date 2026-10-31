@@ -658,7 +658,8 @@ class FeedPoller {
             const response = await (this.deps.fetchImpl ?? fetch)(this.deps.url, {
                 credentials: 'same-origin',
                 cache: 'no-store',
-                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                // A timer, not the member: an unattended screen must still reach the idle sign-out.
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest', 'X-Hub-Background-Refresh': '1' },
             });
             const outcome = classifyFeedResponse(response.status);
             if (outcome === 'stop') {

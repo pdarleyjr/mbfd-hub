@@ -65,7 +65,7 @@ final class StationHubSupportSourceTest extends TestCase
         $counts = $this->source()->counts($viewer, DashboardQuery::now());
 
         $this->assertCount(3, $rows);
-        $this->assertSame(['open' => 2, 'awaiting_response' => 1, 'in_progress' => 1, 'high' => 1, 'resolved_today' => 1, 'facilities' => 0, 'supplies' => 0, 'access_it' => 3, 'other' => 0], $counts);
+        $this->assertSame(['open' => 2, 'awaiting_response' => 1, 'in_progress' => 1, 'high' => 1, 'resolved_today' => 1, 'facilities' => 0, 'supplies' => 0, 'access_it' => 2, 'other' => 0], $counts);
         $this->assertSame([], $this->source()->rows($viewer, new DashboardQuery(OperationalDisplayWindow::forNow(), tags: ['facilities']), 50));
     }
 

@@ -104,7 +104,11 @@ abstract class QueryBackedSource implements IssueSource
         $faceted = $this->filtered($query, false);
         $tags = $this->tagConstraints();
         foreach (self::TAGS as $tag) {
-            $counts[$tag] = isset($tags[$tag]) ? $count($faceted, $tags[$tag]) : 0;
+            $counts[$tag] = isset($tags[$tag])
+                ? $count($faceted, function (Builder $q) use ($tags, $tag): void {
+                    $q->where(fn (Builder $open) => $this->whereOpen($open))->where($tags[$tag]);
+                })
+                : 0;
         }
 
         return $counts;
