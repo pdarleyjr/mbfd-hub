@@ -38,6 +38,15 @@ const unknownApparatus = {
   daily_checkout_requirement: 'unknown',
 };
 
+const emptyStationOverview = {
+  shift_window: { starts_at: '2026-10-31T11:00:00+00:00', ends_at: '2026-11-01T12:00:00+00:00', alert_from: '2026-10-31T16:00:00+00:00' },
+  units: [],
+  checkouts: [],
+  requests: [],
+  requests_total: 0,
+  alert: { active: false, units: [] },
+};
+
 async function mockDailySelectorApi(page: Page): Promise<void> {
   await page.route('**/images/**', (route) => {
     const path = new URL(route.request().url()).pathname;
@@ -149,6 +158,10 @@ async function mockDailySelectorApi(page: Page): Promise<void> {
 
     if (path.endsWith('/requests') || path.endsWith('/service-tickets')) {
       return route.fulfill({ json: { data: [], meta: { total: 0 } } });
+    }
+
+    if (path.endsWith('/overview')) {
+      return route.fulfill({ json: emptyStationOverview });
     }
 
     return route.fulfill({ status: 404, json: { message: `Unmocked Daily API route: ${path}` } });
@@ -549,6 +562,7 @@ test('station profile stays contained at 320px with 44px controls, keyboard tabs
     if (path === '/api/public/stations/31/gas-meters') return route.fulfill({ json: { gas_meters: [] } });
     if (path === '/api/public/stations/31/inspections') return route.fulfill({ json: { inspections: [] } });
     if (path === '/api/public/stations/31/activity') return route.fulfill({ json: { activity: [] } });
+    if (path === '/api/public/stations/31/overview') return route.fulfill({ json: emptyStationOverview });
     return route.fulfill({ json: { data: [], meta: { total: 0 } } });
   });
   const quality = captureBrowserQuality(page);

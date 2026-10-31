@@ -1,7 +1,7 @@
 import { useState, useEffect, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router';
 import {
-  Activity, ChevronRight, ClipboardCheck, ClipboardList, DoorOpen, Gauge, House, Phone, ShieldCheck, Truck, Video, Wrench,
+  Activity, ChevronRight, ClipboardCheck, ClipboardList, DoorOpen, Gauge, ShieldCheck, Truck, Video, Wrench,
 } from 'lucide-react';
 import {
   StationDetail,
@@ -15,7 +15,6 @@ import {
   SingleGasMeterSummary,
   VehicleIdentification,
   VehicleIdentificationUnit,
-  stationImageUrl,
 } from '../types';
 import { ApiClient, isApiAuthenticationError, redirectToLoginAfterSessionExpiry } from '../utils/api';
 import { parseVehicleIdentificationUnits } from '../utils/vehicleIdentification';
@@ -25,7 +24,11 @@ import DailyPageNav from './DailyPageNav';
 import { identityForQueueCapture } from '../lib/offlineIdentity';
 import { groupRoomsByArea, stationComplement } from '../utils/stationRoomBlueprint';
 import Tabs, { type TabItem } from './ui/Tabs';
-import QuickLink, { type QuickLinkProps } from './ui/QuickLink';
+import type { QuickLinkProps } from './ui/QuickLink';
+import StationHeader from './station/StationHeader';
+import StationOverviewPanel from './station/StationOverviewPanel';
+import StationShiftAlert from './station/StationShiftAlert';
+import { useStationOverview } from './station/useStationOverview';
 import Tag, { StatusTag } from './ui/Tag';
 import { EmptyState, LoadError, SkeletonRows } from './ui/StateViews';
 import { humanize, type Tone } from './ui/status';
@@ -51,6 +54,7 @@ export default function StationDetailPage() {
   // Units at this station with open one-time vehicle questions; answered ones leave this list.
   const [identificationUnits, setIdentificationUnits] = useState<VehicleIdentificationUnit[]>([]);
   const [activeTab, setActiveTab] = useState<TabId>('overview');
+  const stationOverview = useStationOverview(Number(id));
 
   // Tab data (lazy loaded)
   const [stationInspections, setStationInspections] = useState<StationInspectionSummary[]>([]);
@@ -272,29 +276,14 @@ export default function StationDetailPage() {
     switch (tab) {
       case 'overview':
         return (
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <section aria-labelledby="station-information-heading">
-              <h3 id="station-information-heading" className="mb-3 text-lg font-semibold text-hub-ink font-heading">Station Information</h3>
-              <dl className="hub-well divide-y divide-hub-n-100">
-                <DetailRow label="Station Number" value={station.station_number} numeric />
-                <DetailRow label="Assigned Apparatus" value={assignedApparatusCount ?? 'Unknown'} numeric />
-                <DetailRow label="Assigned Personnel" value={assignedPersonnelCount ?? 'Unknown'} numeric />
-                <DetailRow label="Dorm Beds" value={dormBedsCount ?? 'Unknown'} numeric />
-                <DetailRow label="Assigned Units" value={assignedUnits.length ? assignedUnits.join(' · ') : 'Unknown'} stacked />
-                {station.fax && <DetailRow label="Fax" value={station.fax} numeric />}
-              </dl>
-            </section>
-            <section aria-labelledby="station-location-heading">
-              <h3 id="station-location-heading" className="mb-3 text-lg font-semibold text-hub-ink font-heading">Location</h3>
-              <dl className="hub-well divide-y divide-hub-n-100">
-                <DetailRow label="Address" value={station.address} />
-                <DetailRow label="City" value={station.city} />
-                <DetailRow label="State" value={station.state} />
-                <DetailRow label="ZIP Code" value={station.zip_code} numeric />
-                {station.latitude && station.longitude && <DetailRow label="Coordinates" value={`${station.latitude}, ${station.longitude}`} numeric />}
-              </dl>
-            </section>
-          </div>
+          <StationOverviewPanel
+            stationId={station.id}
+            overview={stationOverview.overview}
+            loading={stationOverview.loading}
+            error={stationOverview.error}
+            onRetry={stationOverview.retry}
+            onViewAllRequests={() => { setRequestScope('all'); setActiveTab('requests'); }}
+          />
         );
       case 'rooms':
         return station.rooms && station.rooms.length > 0 ? (
@@ -463,31 +452,16 @@ export default function StationDetailPage() {
         <Tag tone={station.is_active ? 'success' : 'neutral'}>{station.is_active ? 'Active' : 'Inactive'}</Tag>
       </div>
 
-      {/* Station identity and quick links */}
-      <section className="hub-panel p-4 sm:p-6" aria-labelledby="station-heading">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-          <StationPhoto station={station} />
-          <div className="min-w-0">
-            <h1 id="station-heading" className="text-2xl font-bold text-hub-ink font-heading sm:text-3xl">
-              Station {station.station_number}
-            </h1>
-            <p className="mt-1 text-hub-n-600">
-              {station.address}, {station.city}, {station.state} {station.zip_code}
-            </p>
-            {station.phone && (
-              <p className="mt-1 flex items-center gap-2 tabular-nums text-hub-n-600">
-                <Phone className="h-4 w-4" aria-hidden="true" />
-                {station.phone}
-              </p>
-            )}
-          </div>
-        </div>
-        <nav aria-label="Station actions" className="mt-5">
-          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-            {quickLinks.map((link) => <li key={link.label}><QuickLink {...link} /></li>)}
-          </ul>
-        </nav>
-      </section>
+      <StationHeader
+        station={station}
+        assignedApparatusCount={assignedApparatusCount}
+        assignedPersonnelCount={assignedPersonnelCount}
+        dormBedsCount={dormBedsCount}
+        assignedUnits={assignedUnits}
+        quickLinks={quickLinks}
+      />
+
+      <StationShiftAlert overview={stationOverview.overview} stationId={station.id} />
 
       {/* One-time vehicle questions for units without a Daily Checkout or Captain 5 page */}
       <StationVehicleIdentification units={identificationUnits} onUnitSaved={identificationSaved} />
@@ -501,35 +475,6 @@ export default function StationDetailPage() {
 }
 
 // ===== Helper Components =====
-
-/** Recorded station photo (or bundled artwork); a branded placeholder when neither exists or the image fails. */
-function StationPhoto({ station }: { station: StationDetail }) {
-  const imageUrl = stationImageUrl(station);
-  const [failedUrl, setFailedUrl] = useState<string | null>(null);
-  const showImage = imageUrl !== null && failedUrl !== imageUrl;
-
-  return (
-    <div data-testid="station-profile-photo" className="relative h-40 w-full shrink-0 overflow-hidden rounded-hub-control border border-hub-glass-border bg-hub-n-100 sm:h-32 sm:w-48 lg:h-36 lg:w-56">
-      {showImage ? (
-        <img src={imageUrl} alt={`Station ${station.station_number} exterior`} className="h-full w-full object-cover" onError={() => setFailedUrl(imageUrl)} />
-      ) : (
-        <div className="flex h-full flex-col items-center justify-center gap-2 text-hub-n-600" role="img" aria-label={`No photo recorded for Station ${station.station_number}`}>
-          <House className="h-10 w-10 text-hub-n-400" strokeWidth={1.5} aria-hidden="true" />
-          <span className="rounded-hub-tag bg-hub-header px-2.5 py-1 text-[13px] font-bold leading-5 text-white">Station {station.station_number}</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function DetailRow({ label, value, numeric = false, stacked = false }: { label: string; value: ReactNode; numeric?: boolean; stacked?: boolean }) {
-  return (
-    <div className={stacked ? 'grid gap-1 px-4 py-3' : 'flex justify-between gap-4 px-4 py-3'}>
-      <dt className="text-hub-n-600">{label}</dt>
-      <dd className={`font-medium text-hub-ink ${stacked ? '' : 'text-right'} ${numeric ? 'tabular-nums' : ''}`}>{value}</dd>
-    </div>
-  );
-}
 
 function PanelHeading({ title, description, filter }: { title: string; description: string; filter: ReactNode }) {
   return (

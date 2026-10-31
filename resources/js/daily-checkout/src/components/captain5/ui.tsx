@@ -34,6 +34,8 @@ interface SheetProps {
   testId: string;
   /** Stacking layer: 0 for the issue sheet, 1 for the inspection view opened over it. */
   layer?: 0 | 1;
+  /** The control to focus when the sheet closes, for sheets opened from a list that may not hold focus itself. */
+  returnFocusTo?: () => HTMLElement | null;
   children: ReactNode;
 }
 
@@ -41,7 +43,7 @@ interface SheetProps {
  * Overlay panel (level 3): a bottom-anchored full-height sheet on phones, a right-hand panel from sm up.
  * Radix supplies the focus trap, Escape, scroll lock and focus return; nothing here is hover-only.
  */
-export function Sheet({ open, onClose, title, description, testId, layer = 0, children }: SheetProps) {
+export function Sheet({ open, onClose, title, description, testId, layer = 0, returnFocusTo, children }: SheetProps) {
   return (
     <Dialog.Root open={open} onOpenChange={(next) => { if (!next) onClose(); }}>
       <Dialog.Portal>
@@ -49,6 +51,13 @@ export function Sheet({ open, onClose, title, description, testId, layer = 0, ch
         <Dialog.Content
           data-hub-ui="2"
           data-testid={testId}
+          onCloseAutoFocus={returnFocusTo ? (event) => {
+            const target = returnFocusTo();
+            if (target?.isConnected) {
+              event.preventDefault();
+              target.focus();
+            }
+          } : undefined}
           className={`fixed inset-y-0 right-0 flex w-full flex-col bg-hub-n-0 font-hub shadow-[var(--hub-elevation-3)] sm:max-w-2xl sm:border-l sm:border-hub-glass-border ${layer === 0 ? 'z-[71]' : 'z-[81]'}`}
         >
           <header className="flex items-start gap-3 border-b border-hub-glass-border px-4 py-3 sm:px-5">

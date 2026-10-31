@@ -93,6 +93,8 @@ Route::prefix('public')->middleware(['auth:sanctum', 'canonical.api', 'throttle:
     Route::get('stations/{station}/requests', [PublicStationRequestController::class, 'index']);
     Route::get('stations/{station}/service-tickets', [PublicApparatusServiceTicketController::class, 'stationIndex']);
     Route::get('stations/{station}/activity', [StationContextController::class, 'activity']);
+    Route::get('stations/{station}/overview', [\App\Http\Controllers\Api\StationOverviewController::class, 'show'])->whereNumber('station');
+    Route::get('stations/{station}/checkouts/{inspection}', [\App\Http\Controllers\Api\StationOverviewController::class, 'checkout'])->whereNumber(['station', 'inspection']);
     Route::get('stations/{station}/rooms/{room}/profile', [StationContextController::class, 'roomProfile']);
     Route::get('station-requests/{stationRequest}', [PublicStationRequestController::class, 'show']);
     Route::get('stations/{station}/gas-meters', [\App\Http\Controllers\Api\StationController::class, 'gasMeters']);

@@ -795,7 +795,7 @@ final class DailyCheckoutComplianceService
             : 'unknown';
     }
 
-    private function isOutOfService(string $status): bool
+    public function isOutOfService(string $status): bool
     {
         $normalized = $this->normalizedStatus($status);
 

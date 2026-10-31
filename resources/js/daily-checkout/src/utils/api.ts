@@ -10,6 +10,8 @@ import {
 import { purgeOnSessionEnd } from '../pwa/userCaches.ts';
 import { parseVehicleIdentification, parseVehicleIdentificationResponse } from './vehicleIdentification';
 
+import type { StationCheckoutDetail, StationOverview } from '../types';
+
 const API_BASE = '/api';
 
 declare global {
@@ -946,6 +948,37 @@ export class ApiClient {
     }
     const payload = await response.json();
     return payload.activity || [];
+  }
+
+  /** `background` refreshes leave the idle clock alone, so an unattended shared screen still signs out. */
+  static async getStationOverview(stationId: number, background = false): Promise<StationOverview> {
+    const response = await fetchWithTimeout(`${API_BASE}/public/stations/${stationId}/overview`, {
+      headers: { ...DEFAULT_HEADERS, ...(background ? { 'X-Hub-Background-Refresh': '1' } : {}) },
+      cache: 'no-store',
+    });
+    if (!response.ok) {
+      throw new ApiRequestError(await responseMessage(response, 'The station overview could not be loaded'), response.status);
+    }
+    const payload = await response.json() as Partial<StationOverview>;
+    if (!Array.isArray(payload.units) || !Array.isArray(payload.checkouts) || !Array.isArray(payload.requests) || !payload.shift_window || !payload.alert) {
+      throw new Error('The station overview could not be loaded');
+    }
+    return payload as StationOverview;
+  }
+
+  static async getStationCheckout(stationId: number, checkoutId: number): Promise<StationCheckoutDetail> {
+    const response = await fetchWithTimeout(`${API_BASE}/public/stations/${stationId}/checkouts/${checkoutId}`, {
+      headers: { ...DEFAULT_HEADERS },
+      cache: 'no-store',
+    });
+    if (!response.ok) {
+      throw new ApiRequestError(await responseMessage(response, 'The checkout could not be loaded.'), response.status);
+    }
+    const payload = await response.json() as { checkout?: StationCheckoutDetail };
+    if (!Array.isArray(payload.checkout?.compartments)) {
+      throw new Error('The checkout could not be loaded.');
+    }
+    return payload.checkout;
   }
 
   static async getRoomProfile(stationId: number, roomId: number): Promise<RoomProfile> {
