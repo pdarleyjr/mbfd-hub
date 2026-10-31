@@ -147,6 +147,7 @@ final class HubSupportTicketSource extends QueryBackedSource
             occurredAt: CarbonImmutable::instance($record->created_at),
             version: self::stamp($record->updated_at).'#'.(int) $record->getAttribute('updates_max_id'),
             sourceUrl: HubSupportTicketResource::getUrl('view', ['record' => $record->getKey()], panel: 'admin'),
+            groupKey: 'member:'.(int) $record->reported_by_user_id,
         );
     }
 
@@ -259,7 +260,7 @@ final class HubSupportTicketSource extends QueryBackedSource
                 continue;
             }
             $actions[] = match ($target) {
-                Status::Acknowledged => new IssueAction($key, 'Acknowledge', 'primary', [$reply(false), $internal]),
+                Status::Acknowledged => new IssueAction($key, 'Acknowledge', 'primary', [$reply(false), $internal], bulk: IssueAction::BULK_DIRECT),
                 Status::InProgress => new IssueAction($key, in_array($ticket->status, [Status::Resolved, Status::Closed], true) ? 'Reopen' : 'Start work', 'secondary', [$reply(false), $internal]),
                 Status::WaitingForReporter => new IssueAction($key, 'Ask the member for details', 'secondary', [$reply(true), $internal]),
                 Status::Resolved => new IssueAction($key, 'Resolve', 'primary', [
@@ -272,7 +273,7 @@ final class HubSupportTicketSource extends QueryBackedSource
         $actions[] = new IssueAction('assign', 'Assign', 'secondary', [[
             'name' => 'assigned_to_user_id', 'label' => 'Assign to', 'type' => 'select', 'required' => true,
             'options' => $this->assignees($ticket), 'value' => $ticket->assigned_to_user_id,
-        ]]);
+        ]], bulk: IssueAction::BULK_FORM);
 
         return $actions;
     }

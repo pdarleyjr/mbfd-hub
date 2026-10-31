@@ -262,7 +262,7 @@ final class IssueActionPanel extends Component
                 'actor' => $entry['actor'],
                 'text' => $entry['text'],
             ], $detail->timeline),
-            'actions' => $this->presentActions($detail->actions),
+            'actions' => self::presentActions($detail->actions),
             'readOnlyReason' => $detail->readOnlyReason,
             'sourceUrl' => HubNavigation::safePath($issue->sourceUrl),
             'gone' => false,
@@ -273,7 +273,7 @@ final class IssueActionPanel extends Component
      * @param  list<IssueAction>  $actions
      * @return list<array<string, mixed>>
      */
-    private function presentActions(array $actions): array
+    public static function presentActions(array $actions): array
     {
         $presented = [];
         foreach ($actions as $action) {
@@ -307,6 +307,7 @@ final class IssueActionPanel extends Component
                 'label' => $action->label,
                 'tone' => $action->tone,
                 'confirm' => $action->confirm,
+                'bulk' => $action->bulk,
                 'fields' => $fields,
             ];
         }
@@ -322,9 +323,18 @@ final class IssueActionPanel extends Component
      */
     private function validated(array $spec): array
     {
+        return self::validateFields($spec, is_array($this->input[$spec['key']] ?? null) ? $this->input[$spec['key']] : []);
+    }
+
+    /**
+     * @param  array<string, mixed>  $spec  one action from presentActions()
+     * @param  array<mixed>  $typed  field name => typed value, not yet trusted
+     * @return array{0: array<string, string>, 1: array<string, string>}
+     */
+    public static function validateFields(array $spec, array $typed): array
+    {
         $values = [];
         $errors = [];
-        $typed = is_array($this->input[$spec['key']] ?? null) ? $this->input[$spec['key']] : [];
 
         foreach ($spec['fields'] as $field) {
             $raw = $typed[$field['name']] ?? '';
@@ -344,7 +354,7 @@ final class IssueActionPanel extends Component
                 $errors[$errorKey] = $field['label'].' must be '.$field['max'].' characters or fewer.';
             } elseif ($field['type'] === 'select' && ! in_array($value, array_column($field['options'], 'value'), true)) {
                 $errors[$errorKey] = 'Choose one of the listed options for '.$field['label'].'.';
-            } elseif ($field['type'] === 'date' && ! $this->isDate($value)) {
+            } elseif ($field['type'] === 'date' && ! self::isDate($value)) {
                 $errors[$errorKey] = $field['label'].' must be a valid date.';
             }
 
@@ -354,7 +364,7 @@ final class IssueActionPanel extends Component
         return [$values, $errors];
     }
 
-    private function isDate(string $value): bool
+    private static function isDate(string $value): bool
     {
         $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
 

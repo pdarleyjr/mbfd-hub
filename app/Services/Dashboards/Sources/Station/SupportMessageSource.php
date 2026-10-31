@@ -125,6 +125,7 @@ final class SupportMessageSource extends QueryBackedSource
             occurredAt: CarbonImmutable::instance($record->last_message_at ?? $record->created_at),
             version: self::versionOf($record),
             sourceUrl: EmployeeMessages::getUrl(['thread' => $record->getKey()], panel: 'admin'),
+            groupKey: $record->member_user_id === null ? null : 'member:'.(int) $record->member_user_id,
         );
     }
 
@@ -166,7 +167,7 @@ final class SupportMessageSource extends QueryBackedSource
             ]]);
         }
         if ($thread->isUnreadForLogistics()) {
-            $actions[] = new IssueAction('mark_read', 'Mark as read', 'secondary');
+            $actions[] = new IssueAction('mark_read', 'Mark as read', 'secondary', bulk: IssueAction::BULK_DIRECT);
         }
         $reason = $actions === [] ? 'You can read Support Services messages but not reply to them.' : null;
 

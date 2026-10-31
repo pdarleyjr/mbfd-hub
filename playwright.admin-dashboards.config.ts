@@ -1,7 +1,6 @@
 import { defineConfig } from '@playwright/test';
 import { randomBytes } from 'node:crypto';
 import { existsSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { disposableTestAppKey, isolatedSqliteDatabasePath, localPhpBinary, sanitizedTestEnvironment } from './tests/e2e/support/test-environment';
 
 /*
@@ -19,7 +18,8 @@ const database = isolatedSqliteDatabasePath('ADMIN_DASHBOARDS_E2E_DATABASE', 'ad
 const port = '8133';
 export const adminDashboardsEnvironment = sanitizedTestEnvironment({
   APP_ENV: 'testing', APP_KEY: disposableTestAppKey, APP_URL: `http://127.0.0.1:${port}`,
-  APP_CONFIG_CACHE: resolve('bootstrap/cache/admin-dashboards-config.php'),
+  // Relative: Laravel reads a Windows drive path as relative and doubles it.
+  APP_CONFIG_CACHE: 'bootstrap/cache/admin-dashboards-config.php',
   DB_CONNECTION: 'sqlite', DB_DATABASE: database, CACHE_STORE: 'file',
   BROADCAST_DRIVER: 'log', BROADCAST_CONNECTION: 'log', MAIL_MAILER: 'array',
   FILESYSTEM_DISK: 'local', PRIVATE_FILESYSTEM_DISK: 'local', QUEUE_CONNECTION: 'sync',

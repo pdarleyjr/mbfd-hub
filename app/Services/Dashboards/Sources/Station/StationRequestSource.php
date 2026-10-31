@@ -139,6 +139,7 @@ final class StationRequestSource extends QueryBackedSource
             occurredAt: CarbonImmutable::instance($record->created_at),
             version: self::versionOf($record, (int) $record->getAttribute('updates_max_id')),
             sourceUrl: StationRequestResource::getUrl('view', ['record' => $record->getKey()], panel: 'admin'),
+            groupKey: 'station:'.(int) $record->station_id,
         );
     }
 
@@ -253,7 +254,7 @@ final class StationRequestSource extends QueryBackedSource
         $actions = [];
 
         if ($status === Status::Pending) {
-            $actions[] = new IssueAction('acknowledge', 'Acknowledge', 'primary', [$note('Update to station (optional)')]);
+            $actions[] = new IssueAction('acknowledge', 'Acknowledge', 'primary', [$note('Update to station (optional)')], bulk: IssueAction::BULK_DIRECT);
         }
         if (in_array($status, [Status::Pending, Status::Acknowledged, Status::UnderReview], true)) {
             $actions[] = new IssueAction('approve', 'Approve', $status === Status::Pending ? 'secondary' : 'primary', [$note('Update to station (optional)')]);
@@ -261,7 +262,7 @@ final class StationRequestSource extends QueryBackedSource
         $actions[] = new IssueAction('assign', 'Assign', 'secondary', [[
             'name' => 'assigned_to_user_id', 'label' => 'Assign to', 'type' => 'select', 'required' => true,
             'options' => $this->assignees(), 'value' => $request->assigned_to_user_id,
-        ]]);
+        ]], bulk: IssueAction::BULK_FORM);
         $actions[] = new IssueAction('set_status', 'Set progress', 'secondary', [
             ['name' => 'status', 'label' => 'Status', 'type' => 'select', 'required' => true, 'options' => collect(Status::openValues())
                 ->reject(fn (string $value): bool => $value === $status->value)
@@ -269,9 +270,9 @@ final class StationRequestSource extends QueryBackedSource
             $note('Update to station (optional)'),
             $internal,
         ]);
-        $actions[] = new IssueAction('post_update', 'Send update to station', 'secondary', [$note('Update to station', true), $internal]);
+        $actions[] = new IssueAction('post_update', 'Send update to station', 'secondary', [$note('Update to station', true), $internal], bulk: IssueAction::BULK_FORM);
         $actions[] = new IssueAction('complete', 'Mark completed', 'primary', [$note('Update to station (optional)'), $internal],
-            'Mark this request completed? Recording room assets is done from the full record.');
+            'Mark this request completed? Recording room assets is done from the full record.', IssueAction::BULK_FORM);
         $actions[] = new IssueAction('deny', 'Deny', 'danger', [$note('Reason (shown to the station)', true, DecisionReason::MAX_LENGTH), $internal],
             'Deny this request? The station sees your reason.');
 

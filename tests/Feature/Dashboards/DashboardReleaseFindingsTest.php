@@ -138,7 +138,7 @@ final class DashboardReleaseFindingsTest extends TestCase
         $this->assertSame(0, $counts['facilities']);
     }
 
-    public function test_show_more_reaches_every_open_item_on_the_board(): void
+    public function test_every_open_item_on_a_station_is_reached_from_one_row(): void
     {
         Filament::setCurrentPanel(Filament::getPanel('admin'));
         $this->actingAs($this->persona('super_admin', []));
@@ -147,18 +147,10 @@ final class DashboardReleaseFindingsTest extends TestCase
         }
 
         $board = Livewire::test(DashboardBoard::class, ['dashboard' => 'station-operations']);
-        $listed = static function (string $html): int {
-            preg_match_all('/data-issue-ref="(station_request:\d+)"/', $html, $refs);
+        $main = (string) preg_replace('/data-card="station-queue".*/s', '', $board->html());
 
-            return count(array_unique($refs[1]));
-        };
-
-        $board->assertSee('Show more issues');
-        $this->assertSame(25, $listed($board->html()));
-
-        $board->call('showMore');
-        $board->assertDontSee('Show more issues');
-        $this->assertSame(30, $listed($board->html()));
+        $this->assertSame(1, substr_count($main, 'data-group-key="station:'));
+        $this->assertStringContainsString('30 open requests', $main);
     }
 
     public function test_only_fire_boat_6_uses_the_fire_boat_art(): void

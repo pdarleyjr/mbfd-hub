@@ -164,11 +164,43 @@ final class DashboardViewsTest extends TestCase
         $this->get('/admin')->assertOk()
             ->assertSee('No open vehicle issues for this operational day.')
             ->assertSee('No open station requests for this operational day.')
-            ->assertSee('No open Support Services messages for this operational day.')
+            ->assertSee('No open personnel items for this operational day.')
             ->assertDontSee('data-issue-ref="', false);
 
         $this->get('/admin/dashboards/vehicle-checkout')->assertOk()->assertSee('No open vehicle issues for this operational day.');
         $this->get('/admin/dashboards/station-operations')->assertOk()->assertSee('No open station requests for this operational day.');
+    }
+
+    public function test_the_overview_filter_shows_apparatus_stations_or_personnel_separately_or_together(): void
+    {
+        $this->useFixtures();
+        $board = Livewire::test(DashboardBoard::class, ['dashboard' => 'overview']);
+
+        foreach (['lane-vehicle', 'lane-station', 'lane-messages'] as $card) {
+            $this->assertStringContainsString('data-card="'.$card.'"', $board->html());
+        }
+
+        foreach (['apparatus' => 'lane-vehicle', 'stations' => 'lane-station', 'personnel' => 'lane-messages'] as $filter => $card) {
+            $html = $board->call('setFilter', $filter)->assertSet('filter', $filter)->html();
+            $this->assertStringContainsString('data-card="'.$card.'"', $html);
+            foreach (array_diff(['lane-vehicle', 'lane-station', 'lane-messages'], [$card]) as $other) {
+                $this->assertStringNotContainsString('data-card="'.$other.'"', $html);
+            }
+        }
+
+        $this->assertStringContainsString('data-card="lane-station"', $board->call('setFilter', 'all')->html());
+        $this->assertSame('all', $board->call('setFilter', 'nonsense')->get('filter'));
+    }
+
+    public function test_a_lane_this_admin_cannot_see_has_no_filter(): void
+    {
+        $this->app->instance(IssueSourceRegistry::class, new IssueSourceRegistry([new FixtureVehicleSource]));
+
+        $html = Livewire::test(DashboardBoard::class, ['dashboard' => 'overview'])->html();
+
+        $this->assertStringContainsString('Apparatus</span>', $html);
+        $this->assertStringNotContainsString('Personnel</span>', $html);
+        $this->assertStringNotContainsString('Stations</span>', $html);
     }
 
     public function test_fixture_rows_counts_and_chips_render_on_each_view(): void
@@ -180,15 +212,17 @@ final class DashboardViewsTest extends TestCase
         $this->assertStringContainsString('Bay door opener not closing fully', $overview);
         $this->assertStringContainsString('Boot size exchange', $overview);
         // Open items: vehicle 7 + station 5 + messages 2 (everything not completed); exact, no trend arrows.
-        $this->assertMatchesRegularExpression('#data-stat="open".*?mbfd-dash-stat__value">14<#s', $overview);
-        $this->assertMatchesRegularExpression('#data-stat="vehicle_open".*?mbfd-dash-stat__value">7<#s', $overview);
-        $this->assertMatchesRegularExpression('#data-stat="station_open".*?mbfd-dash-stat__value">5<#s', $overview);
-        $this->assertMatchesRegularExpression('#data-stat="messages_awaiting".*?mbfd-dash-stat__value">1<#s', $overview);
+        $chip = static fn (string $label, int $count): string => '#'.$label.'</span>\s*<span class="mbfd-dash-chip__count">· '.$count.'<#s';
+        $this->assertMatchesRegularExpression($chip('All', 14), $overview);
+        $this->assertMatchesRegularExpression($chip('Apparatus', 7), $overview);
+        $this->assertMatchesRegularExpression($chip('Stations', 5), $overview);
+        $this->assertMatchesRegularExpression($chip('Personnel', 2), $overview);
+        $this->assertStringNotContainsString('data-stat=', $overview);
         $this->assertStringNotContainsString('↑', $overview);
 
         $vehicle = Livewire::test(DashboardBoard::class, ['dashboard' => 'vehicle-checkout']);
         $html = $vehicle->html();
-        $this->assertMatchesRegularExpression('#aria-pressed="true".*?All</span>\s*<span class="mbfd-dash-chip__count">· 7 open#s', $html);
+        $this->assertMatchesRegularExpression('#aria-pressed="true".*?All</span>\s*<span class="mbfd-dash-chip__count">· 7<span class="mbfd-dash-chip__unit"> open#s', $html);
         $this->assertStringContainsString('Rescue</span>', $html);
         $this->assertStringContainsString('Ladder</span>', $html);
         $this->assertStringContainsString('Special units</span>', $html);

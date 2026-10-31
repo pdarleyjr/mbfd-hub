@@ -233,7 +233,7 @@ final class ApparatusServiceTicketSource extends VehicleIssueSource
                 continue;
             }
             $actions[] = match ($target) {
-                Status::Acknowledged => new IssueAction($key, 'Acknowledge', 'primary', [$assign, ...$notes]),
+                Status::Acknowledged => new IssueAction($key, 'Acknowledge', 'primary', [$assign, ...$notes], bulk: IssueAction::BULK_DIRECT),
                 Status::Scheduled => new IssueAction($key, 'Schedule', 'secondary', [
                     ['name' => 'scheduled_for', 'label' => 'Scheduled for (Eastern time)', 'type' => 'date', 'required' => true],
                     ['name' => 'service_type', 'label' => 'Service type', 'type' => 'text', 'required' => true, 'max' => 255],
@@ -250,7 +250,7 @@ final class ApparatusServiceTicketSource extends VehicleIssueSource
                 Status::Cancelled => new IssueAction($key, 'Cancel ticket', 'danger', $notes, 'Cancel this service ticket? It cannot be reopened.'),
             };
         }
-        $actions[] = new IssueAction('add_note', 'Add note', 'secondary', $notes);
+        $actions[] = new IssueAction('add_note', 'Add note', 'secondary', $notes, bulk: IssueAction::BULK_FORM);
 
         return $actions;
     }

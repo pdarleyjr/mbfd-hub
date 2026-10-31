@@ -28,7 +28,7 @@ final readonly class DashboardSnapshot
      * @param  array<string, array<string, int>>  $laneCounts  lane => summed counts
      * @param  list<string>  $lanes  lanes that have at least one visible source
      * @param  list<string>  $failedSources  source types that could not be read this time
-     * @param  bool  $moreAvailable  a source filled the row limit, so "Show more" may reach further rows
+     * @param  bool  $moreAvailable  a source filled the row limit, so the lists may be missing older rows
      */
     public function __construct(
         public DashboardView $view,

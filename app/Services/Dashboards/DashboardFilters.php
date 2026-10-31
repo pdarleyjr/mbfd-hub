@@ -10,14 +10,15 @@ use App\Support\OperationalDisplayWindow;
 
 /**
  * Filter chips per dashboard. Every chip maps onto a DashboardQuery field the sources already
- * honour (tag, severity or stage) and shows the exact count the sources return for its key.
+ * honour (tag, severity or stage), or on the Overview onto one lane (apparatus, stations or
+ * personnel), and shows the exact count the sources return for its key.
  */
 final class DashboardFilters
 {
     public const ALL = 'all';
 
     /**
-     * @return list<array{key: string, label: string, countKey: string, kind: string, optional: bool, icon: string}>
+     * @return list<array{key: string, label: string, countKey: string, kind: string, optional: bool, icon: string, lane?: string}>
      */
     public static function chips(DashboardView $view): array
     {
@@ -26,7 +27,12 @@ final class DashboardFilters
         $awaiting = ['key' => 'awaiting_response', 'label' => 'Awaiting response', 'countKey' => 'awaiting_response', 'kind' => 'stage', 'optional' => false, 'icon' => 'heroicon-m-clock'];
 
         return match ($view) {
-            DashboardView::Overview => [],
+            DashboardView::Overview => [
+                $all,
+                self::lane('apparatus', 'Apparatus', 'heroicon-m-truck', DashboardSnapshot::LANE_VEHICLE),
+                self::lane('stations', 'Stations', 'heroicon-m-building-office', DashboardSnapshot::LANE_STATION),
+                self::lane('personnel', 'Personnel', 'heroicon-m-users', DashboardSnapshot::LANE_MESSAGES),
+            ],
             DashboardView::VehicleCheckout => [
                 $all,
                 self::tag('rescue', 'Rescue', 'heroicon-m-truck'),
@@ -79,6 +85,24 @@ final class DashboardFilters
         }
 
         return new DashboardQuery($window);
+    }
+
+    /** The lane an Overview filter shows alone; null for "All" and on the other dashboards. */
+    public static function laneOf(DashboardView $view, string $key): ?string
+    {
+        foreach (self::chips($view) as $chip) {
+            if ($chip['key'] === $key) {
+                return $chip['lane'] ?? null;
+            }
+        }
+
+        return null;
+    }
+
+    /** @return array{key: string, label: string, countKey: string, kind: string, optional: bool, icon: string, lane: string} */
+    private static function lane(string $key, string $label, string $icon, string $lane): array
+    {
+        return ['key' => $key, 'label' => $label, 'countKey' => 'open', 'kind' => 'lane', 'optional' => false, 'icon' => $icon, 'lane' => $lane];
     }
 
     /** @return array{key: string, label: string, countKey: string, kind: string, optional: bool, icon: string} */

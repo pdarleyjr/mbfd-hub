@@ -260,7 +260,7 @@ abstract class VehicleIssueSource implements IssueSource
         }
         $occurred = $record->getAttribute('dashboard_occurred_at');
 
-        return $this->toIssue($record, $displayMode, [
+        $issue = $this->toIssue($record, $displayMode, [
             'severity' => (string) $record->getAttribute('dashboard_severity'),
             'stage' => (string) $record->getAttribute('dashboard_stage'),
             'occurredAt' => $occurred === null ? CarbonImmutable::now('UTC') : CarbonImmutable::parse((string) $occurred, 'UTC'),
@@ -268,6 +268,9 @@ abstract class VehicleIssueSource implements IssueSource
             'subject' => ApparatusClass::label($apparatus),
             'imageKey' => $class['imageKey'],
         ]);
+        $apparatusId = $record->getAttribute('apparatus_id');
+
+        return $apparatusId === null ? $issue : $issue->inGroup('apparatus:'.(int) $apparatusId);
     }
 
     // ---------------------------------------------------------------- actions

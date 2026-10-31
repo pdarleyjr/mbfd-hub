@@ -560,9 +560,15 @@ final class InspectionNotificationDispatcher
         }
 
         DB::afterCommit(function () use ($fresh, $eventKey, $kind, $content): void {
+            $batch = app(InspectionNotificationBatch::class);
             foreach ($fresh as $recipient) {
                 try {
                     $payload = $content($recipient);
+                    if ($batch->isHolding()) {
+                        $batch->hold($recipient, $kind, $payload, $eventKey, fn (string $status) => $this->markDelivery($eventKey, $recipient, $status));
+
+                        continue;
+                    }
                     $recipient->notify(new InspectionEventNotification(
                         $kind,
                         $payload['title'],

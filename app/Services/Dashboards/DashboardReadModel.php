@@ -29,15 +29,16 @@ use Throwable;
  */
 final class DashboardReadModel
 {
-    public const ROWS_PER_SOURCE = 25;
-
-    /** How far "Show more" can go: the most any source will return. */
-    public const MAX_ROWS_PER_SOURCE = 200;
+    /** Every row a source will return: rows are combined per unit, so a partial list would misstate how many a unit has. */
+    public const ROWS_PER_SOURCE = 200;
 
     public const CACHE_SECONDS = 10;
 
     /** Source types whose rows are conversations rather than apparatus or station records. */
     private const MESSAGE_TYPES = ['support_message'];
+
+    /** Source types the Overview files under Personnel: a member's own report, tied to no station. */
+    private const OVERVIEW_PERSONNEL_TYPES = ['hub_support_ticket'];
 
     private const SEVERITY_ORDER = ['high' => 0, 'medium' => 1, 'low' => 2];
 
@@ -46,15 +47,14 @@ final class DashboardReadModel
         private readonly Cache $cache,
     ) {}
 
-    public function load(User $user, DashboardView $view, string $filter = DashboardFilters::ALL, bool $fresh = false, int $rowsPerSource = self::ROWS_PER_SOURCE): DashboardSnapshot
+    public function load(User $user, DashboardView $view, string $filter = DashboardFilters::ALL, bool $fresh = false): DashboardSnapshot
     {
         if (! DashboardFilters::isValid($view, $filter)) {
             $filter = DashboardFilters::ALL;
         }
 
         $window = OperationalDisplayWindow::forNow();
-        $rowsPerSource = max(self::ROWS_PER_SOURCE, min($rowsPerSource, self::MAX_ROWS_PER_SOURCE));
-        $key = self::cacheKey($user, $view, $filter, $window, $rowsPerSource);
+        $key = self::cacheKey($user, $view, $filter, $window);
 
         if (! $fresh) {
             $cached = $this->cache->get($key);
@@ -63,7 +63,7 @@ final class DashboardReadModel
             }
         }
 
-        $snapshot = $this->compute($user, $view, $filter, $window, $rowsPerSource);
+        $snapshot = $this->compute($user, $view, $filter, $window);
         if ($snapshot->failedSources === []) {
             $this->cache->put($key, $snapshot, self::CACHE_SECONDS);
         }
@@ -83,9 +83,12 @@ final class DashboardReadModel
     }
 
     /** Lane a source's rows belong to on the overview and in the side panels. */
-    public static function laneOf(IssueSource $source): string
+    public static function laneOf(IssueSource $source, ?DashboardView $on = null): string
     {
         if (in_array($source->type(), self::MESSAGE_TYPES, true)) {
+            return DashboardSnapshot::LANE_MESSAGES;
+        }
+        if ($on === DashboardView::Overview && in_array($source->type(), self::OVERVIEW_PERSONNEL_TYPES, true)) {
             return DashboardSnapshot::LANE_MESSAGES;
         }
 
@@ -100,7 +103,7 @@ final class DashboardReadModel
         return DashboardSnapshot::LANE_MESSAGES;
     }
 
-    private function compute(User $user, DashboardView $view, string $filter, OperationalDisplayWindow $window, int $rowsPerSource): DashboardSnapshot
+    private function compute(User $user, DashboardView $view, string $filter, OperationalDisplayWindow $window): DashboardSnapshot
     {
         $base = new DashboardQuery($window);
         $filtered = DashboardFilters::query($view, $filter, $window);
@@ -119,9 +122,9 @@ final class DashboardReadModel
                     continue;
                 }
 
-                $lane = self::laneOf($source);
+                $lane = self::laneOf($source, $view);
                 $sourceCounts = $source->counts($user, $base);
-                $sourceRows = array_slice($source->rows($user, $filtered, $rowsPerSource), 0, $rowsPerSource);
+                $sourceRows = array_slice($source->rows($user, $filtered, self::ROWS_PER_SOURCE), 0, self::ROWS_PER_SOURCE);
             } catch (Throwable $exception) {
                 report($exception);
                 $failed[] = $source->type();
@@ -130,7 +133,7 @@ final class DashboardReadModel
             }
 
             $lanes[$lane] = true;
-            $moreAvailable = $moreAvailable || (count($sourceRows) >= $rowsPerSource && $rowsPerSource < self::MAX_ROWS_PER_SOURCE);
+            $moreAvailable = $moreAvailable || count($sourceRows) >= self::ROWS_PER_SOURCE;
             foreach ($sourceCounts as $countKey => $value) {
                 $counts[$countKey] = ($counts[$countKey] ?? 0) + (int) $value;
                 $laneCounts[$lane][$countKey] = ($laneCounts[$lane][$countKey] ?? 0) + (int) $value;
@@ -164,8 +167,9 @@ final class DashboardReadModel
         );
     }
 
-    private static function cacheKey(User $user, DashboardView $view, string $filter, OperationalDisplayWindow $window, int $rowsPerSource = self::ROWS_PER_SOURCE): string
+    private static function cacheKey(User $user, DashboardView $view, string $filter, OperationalDisplayWindow $window): string
     {
-        return 'admin-dashboards:v1:'.$user->getKey().':'.$view->value.':'.$filter.':'.$window->start->getTimestamp().':'.$rowsPerSource;
+        // v2: rows carry a group key. A v1 entry cached across a release would combine nothing.
+        return 'admin-dashboards:v2:'.$user->getKey().':'.$view->value.':'.$filter.':'.$window->start->getTimestamp();
     }
 }

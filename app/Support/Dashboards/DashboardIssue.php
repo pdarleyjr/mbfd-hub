@@ -28,6 +28,7 @@ final readonly class DashboardIssue
      * @param  string|null  $actorLabel  reporter/requester display name, or null where privacy/display mode forbids it.
      * @param  string  $version  optimistic-concurrency token of the source record (e.g. updated_at ISO-8601 or a revision column).
      * @param  string|null  $sourceUrl  optional "Open full record" link (secondary only).
+     * @param  string|null  $groupKey  the thing this row is about, "apparatus:<id>", "station:<id>" or "member:<id>", so a dashboard can show one row per thing. Null: the row stands alone.
      */
     public function __construct(
         public string $type,
@@ -46,7 +47,22 @@ final readonly class DashboardIssue
         public CarbonImmutable $occurredAt,
         public string $version,
         public ?string $sourceUrl = null,
+        public ?string $groupKey = null,
     ) {}
+
+    public function inGroup(string $groupKey): self
+    {
+        return new self(
+            $this->type, $this->id, $this->title, $this->summary, $this->severity, $this->status, $this->statusLabel, $this->stage,
+            $this->tags, $this->subject, $this->imageKey, $this->actorLabel, $this->categoryLabel, $this->occurredAt, $this->version,
+            $this->sourceUrl, $groupKey,
+        );
+    }
+
+    public function isOpen(): bool
+    {
+        return in_array($this->stage, ['awaiting_response', 'in_progress'], true);
+    }
 
     /** Stable identity used in URLs, wire:key and dedupe: "<type>:<id>". */
     public function ref(): string

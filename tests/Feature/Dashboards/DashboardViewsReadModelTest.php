@@ -93,15 +93,16 @@ final class DashboardViewsReadModelTest extends TestCase
 
     public function test_each_source_is_capped_and_asked_once_per_load(): void
     {
-        $big = new FakeIssueSource('big', [DashboardView::VehicleCheckout], $this->many('big', 60));
+        $big = new FakeIssueSource('big', [DashboardView::VehicleCheckout], $this->many('big', 210));
         $this->bind($big);
 
         $snapshot = app(DashboardReadModel::class)->load($this->admin, DashboardView::VehicleCheckout);
 
         $this->assertCount(DashboardReadModel::ROWS_PER_SOURCE, $snapshot->rows);
+        $this->assertTrue($snapshot->moreAvailable);
         $this->assertSame(1, $big->rowsCalls);
         $this->assertSame(1, $big->countsCalls);
-        $this->assertSame(60, $snapshot->count('open'));
+        $this->assertSame(210, $snapshot->count('open'));
     }
 
     public function test_loads_are_cached_briefly_per_user_and_refresh_bypasses_the_cache(): void
