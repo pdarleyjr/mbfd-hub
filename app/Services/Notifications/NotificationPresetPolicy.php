@@ -10,8 +10,8 @@ namespace App\Services\Notifications;
  * addition for the important and critical categories plus Support Services messages.
  *
  * This only sets which channels are PREFERRED. It never decides who may receive a category (eligibility),
- * never enrolls a phone (the device still has to tap "Turn on alerts") and never reaches an unverified email
- * (the existing city-email rule still applies at send time).
+ * never enrolls a phone (the device still has to tap "Turn on alerts") and never reaches a member with no city
+ * email on file (the roster-sourced city email is the only address these alerts use).
  *
  * One exception: "Every Daily Checkout as it's submitted" would send one phone alert per apparatus checkout
  * every day and bury the real alerts, so its phone alerts stay off (the bell is on).

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Notifications;
 
 use App\Notifications\Concerns\EvaluatesDelivery;
+use App\Services\Notifications\NotificationCategory;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Notification;
@@ -13,7 +14,7 @@ use Illuminate\Notifications\Notification;
  * An in-app operational alert (a project that is overdue, equipment about to expire, a to-do assigned to you)
  * for a registry category. Who may receive it is the evaluator's answer for that category now, both when it
  * is queued and when the worker delivers it, and the delivery records why ("provenance") like every other
- * alert. In-app only: these categories offer no push or email.
+ * alert. In-app only.
  */
 final class OperationalAlertNotification extends Notification implements ShouldQueue
 {
@@ -42,6 +43,17 @@ final class OperationalAlertNotification extends Notification implements ShouldQ
     protected function deliveryEventKey(): ?string
     {
         return $this->eventKey;
+    }
+
+    /**
+     * In-app only, whatever the category offers: this alert has no push or email form, and its categories may
+     * default those channels on for the other alerts they carry.
+     *
+     * @return list<string>
+     */
+    protected function deliveryChannelMask(): array
+    {
+        return [NotificationCategory::CHANNEL_DATABASE];
     }
 
     /** @return list<string> */

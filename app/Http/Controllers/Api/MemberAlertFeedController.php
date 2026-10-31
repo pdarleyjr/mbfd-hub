@@ -26,6 +26,11 @@ final class MemberAlertFeedController extends Controller
             return response()->json(['error' => 'Unauthorized'], 401);
         }
 
+        // A poll landing between a redirecting POST and its page must not use up that page's flash message.
+        if ($request->hasSession()) {
+            $request->session()->reflash();
+        }
+
         // Same query the bell uses (Filament's format only), newest first.
         $alerts = $user->notifications()
             ->where('data->format', 'filament')

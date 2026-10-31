@@ -284,7 +284,7 @@ final class InspectionExceptionSource extends VehicleIssueSource
                 $apparatus = Apparatus::query()->lockForUpdate()->findOrFail($reference->apparatus_id);
                 $locked = ApparatusInspectionException::query()->lockForUpdate()->findOrFail($reference->getKey());
                 if (in_array($locked->status, self::CLOSED, true)) {
-                    return ActionResult::done('This hold was already decided.');
+                    return ActionResult::conflict('This hold was already decided. The latest version has been loaded.');
                 }
                 if ($decision === 'request_revision' && $locked->status === 'revision_requested') {
                     return ActionResult::done('The member has already been asked to clarify.');

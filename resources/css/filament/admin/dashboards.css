@@ -250,6 +250,19 @@ a.mbfd-dash-stat:hover { border-color: rgb(var(--hub-border-strong)); }
 .mbfd-dash-body { display: grid; gap: var(--dash-gap); min-width: 0; }
 .mbfd-dash-main, .mbfd-dash-side { display: grid; gap: var(--dash-gap); min-width: 0; align-content: start; }
 
+.mbfd-dash-more {
+    justify-self: center;
+    min-height: 2.75rem;
+    padding-inline: 1rem;
+    border: 1px solid rgb(0 0 0 / .2);
+    border-radius: .5rem;
+    font-weight: 600;
+}
+.mbfd-dash-more:hover { background: rgb(0 0 0 / .05); }
+.mbfd-dash-more:disabled { opacity: .7; cursor: progress; }
+.dark .mbfd-dash-more { border-color: rgb(255 255 255 / .3); }
+.dark .mbfd-dash-more:hover { background: rgb(255 255 255 / .08); }
+
 /* Cards */
 .mbfd-dash-card {
     position: relative;
@@ -356,6 +369,7 @@ a.mbfd-dash-stat:hover { border-color: rgb(var(--hub-border-strong)); }
 .mbfd-dash-stat:focus-visible,
 .mbfd-dash-card__link:focus-visible,
 .mbfd-dash-refresh:focus-visible,
+.mbfd-dash-more:focus-visible,
 .mbfd-dash-pager__step:focus-visible,
 .mbfd-dash-panel__close:focus-visible,
 .mbfd-dash-action__submit:focus-visible {

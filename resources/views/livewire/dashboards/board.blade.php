@@ -98,6 +98,9 @@
             @foreach ($layout['main'] as $card)
                 @include('filament.dashboards.partials.list-card', $card)
             @endforeach
+            @if ($snapshot->moreAvailable)
+                <button type="button" class="mbfd-dash-more" wire:click="showMore" wire:loading.attr="disabled" wire:target="showMore">Show more issues</button>
+            @endif
         </div>
         @if ($layout['side'] !== [])
             <div class="mbfd-dash-side">

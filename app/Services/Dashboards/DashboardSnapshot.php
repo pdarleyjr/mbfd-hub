@@ -28,6 +28,7 @@ final readonly class DashboardSnapshot
      * @param  array<string, array<string, int>>  $laneCounts  lane => summed counts
      * @param  list<string>  $lanes  lanes that have at least one visible source
      * @param  list<string>  $failedSources  source types that could not be read this time
+     * @param  bool  $moreAvailable  a source filled the row limit, so "Show more" may reach further rows
      */
     public function __construct(
         public DashboardView $view,
@@ -40,6 +41,7 @@ final readonly class DashboardSnapshot
         public array $failedSources,
         public OperationalDisplayWindow $window,
         public CarbonImmutable $loadedAt,
+        public bool $moreAvailable = false,
     ) {}
 
     public function count(string $key, ?string $lane = null): int
