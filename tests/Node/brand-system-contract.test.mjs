@@ -101,6 +101,7 @@ test("six non-inspection Daily surfaces scope Plus Jakarta and avoid decorative 
 
 test("Station Detail quick actions share one ordinary hub-blue QuickLink treatment", () => {
   const source = read("resources/js/daily-checkout/src/components/StationDetailPage.tsx");
+  const header = read("resources/js/daily-checkout/src/components/station/StationHeader.tsx");
   const quickLink = read("resources/js/daily-checkout/src/components/ui/QuickLink.tsx");
   const labels = [
     "Personnel Equipment Request",
@@ -111,7 +112,7 @@ test("Station Detail quick actions share one ordinary hub-blue QuickLink treatme
   ];
 
   // Every quick action is data rendered through the single QuickLink component.
-  assert.match(source, /quickLinks\.map\(\(link\) => <li key=\{link\.label\}><QuickLink \{\.\.\.link\} \/><\/li>\)/);
+  assert.match(header, /quickLinks\.map\(\(link, index\) => <li key=\{link\.label\}[^>]*><QuickLink \{\.\.\.link\} \/><\/li>\)/);
   for (const label of labels) {
     assert.match(source, new RegExp(`label: '${label}'`), `Station Detail must retain the ${label} quick action`);
   }
