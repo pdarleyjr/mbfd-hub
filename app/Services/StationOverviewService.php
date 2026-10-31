@@ -83,13 +83,13 @@ final class StationOverviewService
             ->whereKey($inspectionId)
             // The previous window too: a row stays on screen until the page next refreshes.
             ->where('completed_at', '>=', $window->start->subDay()->utc())
-            ->with('apparatus:id,designation,name,unit_id,vehicle_number,type')
             ->first();
         if (! $inspection instanceof ApparatusInspection) {
             return null;
         }
+        $apparatus = Apparatus::query()->find($inspection->apparatus_id, ['id', 'designation', 'name', 'unit_id', 'vehicle_number', 'type']);
 
-        return $this->checkoutRow($inspection, $inspection->apparatus) + [
+        return $this->checkoutRow($inspection, $apparatus instanceof Apparatus ? $apparatus : null) + [
             'engine_hours' => $inspection->engine_hours,
             'miles' => $inspection->miles,
             'compartments' => $this->compartments($inspection),
