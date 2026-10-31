@@ -108,7 +108,7 @@ interface Probe {
   subscribeError: string | null;
 }
 
-/** Register exactly as production code does (see push-notification-widget.js and admin-pwa/main.ts). */
+/** Register exactly as production code does (see push-enrollment.ts and admin-pwa/main.ts). */
 async function registerLikeProduction(page: Page, script: string, scope: string, key: string): Promise<Probe> {
   return page.evaluate(
     async ({ script, scope, key }) => {

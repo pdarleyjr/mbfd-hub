@@ -25,15 +25,12 @@ use App\Observers\UpstreamIdentityObserver;
 use App\Observers\WorkgroupSharedUploadObserver;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Infolists\Components\TextEntry;
-use Filament\Support\Assets\Js;
-use Filament\Support\Facades\FilamentAsset;
 use Filament\Tables\Columns\TextColumn;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
-use Illuminate\Support\Facades\Vite;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Pulse\Facades\Pulse;
 
@@ -212,8 +209,6 @@ class AppServiceProvider extends ServiceProvider
             }
         });
 
-        $this->registerPushNotificationWidgetAssets();
-
         \Filament\Support\Facades\FilamentView::registerRenderHook(
             \Filament\View\PanelsRenderHook::TOPBAR_START,
             fn (): \Illuminate\Contracts\View\View => view('filament.partials.hub-shell'),
@@ -359,22 +354,6 @@ class AppServiceProvider extends ServiceProvider
                 $submission->id,
             );
         }));
-    }
-
-    /**
-     * Register browser-only assets without making Artisan commands depend on a
-     * generated Vite manifest. Deployment separately proves and atomically
-     * activates that manifest before serving web traffic.
-     */
-    protected function registerPushNotificationWidgetAssets(): void
-    {
-        if ($this->app->runningInConsole()) {
-            return;
-        }
-
-        FilamentAsset::register([
-            Js::make('push-notification-widget', Vite::asset('resources/js/push-notification-widget.js')),
-        ]);
     }
 
     /**

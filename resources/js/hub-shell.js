@@ -1,3 +1,4 @@
+import { startPushSync } from './pwa/push-sync';
 import { startUpdateRegistrar } from './pwa/update-registrar';
 import { startForegroundAlerts } from './pwa/foreground-alerts';
 import { mountAlertSoundSettings } from './pwa/alert-sound';
@@ -79,6 +80,9 @@ window.addEventListener('offline', updateConnection);
 // Hub page. Scope '/' only attaches to the root push worker if this device already has it; it never
 // registers a worker itself (the push settings page does that, at /sw.js).
 startUpdateRegistrar({ scope: '/' });
+
+// Keeps this device receiving alerts with as little as the platform allows. Signed-in pages only.
+startPushSync();
 
 // A short pop-up (and an optional chime) when a NEW in-app alert arrives while this page is open. Filament
 // panels read it from the bell's own poll; other signed-in pages from the member alert feed. Never marks read.

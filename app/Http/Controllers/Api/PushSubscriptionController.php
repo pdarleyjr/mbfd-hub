@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Services\Notifications\PushDeviceLabel;
+use App\Services\Notifications\PushDeviceRemovals;
 use App\Services\Notifications\PushSessionBinding;
 use Closure;
 use Illuminate\Database\QueryException;
@@ -40,6 +41,8 @@ class PushSubscriptionController extends Controller
                 },
             ],
             'label' => ['nullable', 'string', 'max:80'],
+            // An automatic repair rather than a tap: it may not undo a member's "Remove" (see PushDeviceRemovals).
+            'sync' => ['nullable', 'boolean'],
             // RFC 8291 aes128gcm is what Apple requires and every current browser supports.
             'content_encoding' => ['nullable', 'string', 'in:aes128gcm,aesgcm'],
             'keys.p256dh' => [
@@ -80,6 +83,14 @@ class PushSubscriptionController extends Controller
             'user_agent' => $request->userAgent(),
             'ip' => $request->ip(),
         ]);
+
+        $removals = app(PushDeviceRemovals::class);
+        if ($request->boolean('sync') && $removals->wasRemoved($this->endpointHash($validated['endpoint']))) {
+            return response()->json(['success' => false, 'removed' => true, 'message' => 'This device was removed from the list.'], 409);
+        }
+        if (! $request->boolean('sync')) {
+            $removals->forget($validated['endpoint']);
+        }
 
         try {
             $subscription = $this->saveSubscription(

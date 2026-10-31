@@ -13,6 +13,7 @@
  */
 
 import { prefetchAdminLookups } from './prefetch';
+import { startPushSync } from '../pwa/push-sync';
 import { startUpdateRegistrar } from '../pwa/update-registrar';
 import { getInstallController } from '../pwa/install-controller';
 import { mountInstallCards } from '../pwa/install-ui';
@@ -54,6 +55,7 @@ function bootstrap(): void {
     // Release checks, the update banner (all platforms, never while busy) and chunk-load
     // recovery. No scriptUrl: the registration above stays the only one for this worker.
     startUpdateRegistrar({ scope: '/admin/' });
+    startPushSync();
     mountInstallCards();
     // Login and password-recovery pages share this bundle but must not call
     // protected lookup APIs before the web guard has authenticated a user.

@@ -1,3 +1,5 @@
+> **Historical.** This describes an earlier state, and the widget and URLs named below no longer exist. Current code: `resources/js/pwa/push-enrollment.ts`, `resources/js/pwa/push-sync.ts`, `app/Services/Notifications/PushDeliveryTrace.php`.
+
 # Push Notification Diagnostic Guide
 
 ## ✅ COMPLETE SERVER-SIDE VERIFICATION (All Working)
