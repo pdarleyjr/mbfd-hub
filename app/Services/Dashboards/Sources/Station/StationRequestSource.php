@@ -34,6 +34,8 @@ use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
  * in_progress; completed/denied/cancelled → resolved (in the window by completed_at/denied_at/
  * cancelled_at). Archived requests are out of scope. Every action goes through
  * StationRequestWorkflowService::transition(), exactly like the resource's "Update Status" action.
+ *
+ * @extends QueryBackedSource<StationRequest>
  */
 final class StationRequestSource extends QueryBackedSource
 {
@@ -156,7 +158,7 @@ final class StationRequestSource extends QueryBackedSource
         $status = Status::from($request->status);
         $timeline = $request->updates->map(fn (StationRequestUpdate $update): array => [
             'at' => CarbonImmutable::instance($update->created_at),
-            'actor' => $update->changedBy?->name ?? 'System',
+            'actor' => $update->changedBy->name ?? 'System',
             'text' => collect([
                 'Status: '.(Status::tryFrom((string) $update->status)?->label() ?? (string) $update->status),
                 filled($update->public_note) ? 'Update to station: '.$update->public_note : null,

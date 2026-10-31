@@ -34,7 +34,8 @@ startPushSync()
 
 // New in-app alerts pop up while Daily Checkout is open (one shared, visibility-aware poller per device,
 // at most once a minute; it stops by itself when the member is signed out or the feed is unavailable).
-startForegroundAlerts({ feedUrl: '/api/me/alerts' })
+// The Laravel-rendered shell advertises the feed (<meta name="mbfd-alerts-feed">); a static preview has none, so nothing polls.
+startForegroundAlerts()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

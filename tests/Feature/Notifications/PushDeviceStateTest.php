@@ -127,6 +127,6 @@ final class PushDeviceStateTest extends TestCase
     {
         $this->withoutVite();
 
-        $this->get('/login')->assertDontSee('mbfd-authenticated', false);
+        $this->get('/login')->assertDontSee('mbfd-alerts-feed', false);
     }
 }

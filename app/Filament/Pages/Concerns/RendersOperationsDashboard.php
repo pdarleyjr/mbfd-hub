@@ -26,7 +26,7 @@ trait RendersOperationsDashboard
     protected function dashboardHeader(): View
     {
         $now = CarbonImmutable::now(OperationalDisplayWindow::TIMEZONE);
-        $first = trim((string) strtok((string) (auth()->user()?->name ?? ''), ' '));
+        $first = trim((string) strtok((string) (auth()->user()->name ?? ''), ' '));
 
         return view('filament.dashboards.header', [
             'heading' => $this->getHeading(),

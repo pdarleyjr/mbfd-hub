@@ -47,6 +47,8 @@ use Throwable;
  *
  * Version: "{status}:{last update id}". Every workflow write appends an update row, so the token
  * changes with every change of state or note; perform() compares it with the row locked.
+ *
+ * @extends VehicleIssueSource<ApparatusServiceTicket>
  */
 final class ApparatusServiceTicketSource extends VehicleIssueSource
 {
@@ -132,7 +134,6 @@ final class ApparatusServiceTicketSource extends VehicleIssueSource
 
     protected function toIssue(Model $record, bool $displayMode, array $projection): DashboardIssue
     {
-        assert($record instanceof ApparatusServiceTicket);
         $status = Status::tryFrom((string) $record->status);
 
         return new DashboardIssue(
@@ -244,13 +245,14 @@ final class ApparatusServiceTicketSource extends VehicleIssueSource
                 Status::InProgress => new IssueAction($key, 'Start work', 'secondary', [$assign, ...$notes]),
                 Status::WaitingForParts => new IssueAction($key, 'Waiting for parts', 'secondary', $notes),
                 Status::Completed => new IssueAction($key, 'Complete', 'primary', [self::textarea('resolution_summary', 'Resolution summary', true, 10000), ...$notes]),
+                // No default arm on purpose: a transition added to TRANSITIONS without its own arm is reported by
+                // PHPStan (match.unhandled) and fails loudly at runtime, instead of rendering as the wrong button.
                 Status::Cancelled => new IssueAction($key, 'Cancel ticket', 'danger', $notes, 'Cancel this service ticket? It cannot be reopened.'),
-                default => null,
             };
         }
         $actions[] = new IssueAction('add_note', 'Add note', 'secondary', $notes);
 
-        return array_values(array_filter($actions));
+        return $actions;
     }
 
     /** @return array<int, string> active accounts holding a ticket-managing role */
@@ -287,7 +289,10 @@ final class ApparatusServiceTicketSource extends VehicleIssueSource
                 $locked = ApparatusServiceTicket::query()->lockForUpdate()->findOrFail($ticketId);
                 $target = self::TRANSITIONS[$action] ?? null;
                 if ($target !== null && $locked->status === $target->value) {
-                    return ActionResult::done('Already '.mb_strtolower($target->label()).'.');
+                    // A repeat tap changes nothing, but what an admin typed must not vanish behind "already".
+                    return array_filter($data, static fn (mixed $value): bool => $value !== null) === []
+                        ? ActionResult::done('Already '.mb_strtolower($target->label()).'.')
+                        : ActionResult::conflict();
                 }
                 $lastUpdate = (int) ApparatusServiceTicketUpdate::query()->where('apparatus_service_ticket_id', $locked->getKey())->max('id');
                 if (! hash_equals($locked->status.':'.$lastUpdate, $expectedVersion)) {

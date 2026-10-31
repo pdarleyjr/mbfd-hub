@@ -30,6 +30,8 @@ use InvalidArgumentException;
  * Tag: "facilities". Severity from overall_status: fail → high, needs_attention → medium,
  * pass → low. Visibility: the admin capability gate for StationInspection (admin.stations.view);
  * reviewing needs update (admin.stations.manage), as in the resource.
+ *
+ * @extends QueryBackedSource<StationInspection>
  */
 final class StationInspectionSource extends QueryBackedSource
 {
@@ -99,7 +101,7 @@ final class StationInspectionSource extends QueryBackedSource
     /** @param StationInspection $record */
     protected function toIssue(Model $record, bool $displayMode): DashboardIssue
     {
-        $station = $record->station;
+        $station = $record->getRelationValue('station');
 
         return new DashboardIssue(
             type: $this->type(),
@@ -117,7 +119,7 @@ final class StationInspectionSource extends QueryBackedSource
             tags: ['facilities'],
             subject: StationImageKey::label($station),
             imageKey: StationImageKey::for($station),
-            actorLabel: $displayMode ? null : ($record->inspector?->name ?: null),
+            actorLabel: $displayMode ? null : ($record->getRelationValue('inspector')?->name ?: null),
             categoryLabel: 'Inspection: '.ucfirst(str_replace('_', ' ', (string) $record->overall_status)),
             occurredAt: CarbonImmutable::instance($record->created_at),
             version: self::stamp($record->updated_at).'#'.$record->review_status,
@@ -134,23 +136,23 @@ final class StationInspectionSource extends QueryBackedSource
 
         $timeline = [[
             'at' => CarbonImmutable::instance($inspection->created_at),
-            'actor' => $inspection->inspector?->name,
+            'actor' => $inspection->getRelationValue('inspector')?->name,
             'text' => 'Inspection submitted: '.ucfirst(str_replace('_', ' ', (string) $inspection->overall_status)),
         ]];
         if ($inspection->reviewed_at !== null) {
             $timeline[] = [
                 'at' => CarbonImmutable::instance($inspection->reviewed_at),
-                'actor' => $inspection->reviewer?->name,
+                'actor' => $inspection->getRelationValue('reviewer')?->name,
                 'text' => self::reviewLabel((string) $inspection->review_status).(filled($inspection->review_note) ? ': '.$inspection->review_note : ''),
             ];
         }
         $facts = [
-            ['label' => 'Station', 'value' => StationImageKey::label($inspection->station) ?? 'Unknown'],
-            ['label' => 'Inspection date', 'value' => $inspection->inspection_date?->format('M j, Y') ?? ''],
+            ['label' => 'Station', 'value' => StationImageKey::label($inspection->getRelationValue('station')) ?? 'Unknown'],
+            ['label' => 'Inspection date', 'value' => $inspection->inspection_date->format('M j, Y')],
             ['label' => 'Type', 'value' => ucfirst(str_replace('_', ' ', (string) $inspection->inspection_type))],
             ['label' => 'Result', 'value' => ucfirst(str_replace('_', ' ', (string) $inspection->overall_status))],
             ['label' => 'Review', 'value' => self::reviewLabel((string) $inspection->review_status)],
-            ['label' => 'Inspector', 'value' => (string) ($inspection->inspector?->name ?? 'Unknown')],
+            ['label' => 'Inspector', 'value' => (string) ($inspection->getRelationValue('inspector')->name ?? 'Unknown')],
         ];
 
         $reason = match (true) {

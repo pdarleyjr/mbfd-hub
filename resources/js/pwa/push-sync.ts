@@ -335,7 +335,7 @@ function showOffer(registration: ServiceWorkerRegistration, publicKey: string): 
 export function startPushSync(): void {
     const target = window as Window & { __mbfdPushSyncStarted?: boolean };
     if (target.__mbfdPushSyncStarted === true
-        || document.querySelector('meta[name="mbfd-authenticated"]') === null
+        || document.querySelector('meta[name="mbfd-alerts-feed"]') === null
         || !('serviceWorker' in navigator)
         // The settings page has its own button, and shared screens get nothing personal.
         || document.querySelector('[data-push-enrollment]') !== null

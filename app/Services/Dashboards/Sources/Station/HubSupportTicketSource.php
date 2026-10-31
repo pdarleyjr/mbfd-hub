@@ -36,6 +36,8 @@ use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
  * resolved/closed → resolved (in the window by resolved_at/closed_at). Every action goes through
  * HubSupportTicketWorkflowService::transition() with a deterministic client_action_id, so an
  * identical repeat is replayed by the domain itself.
+ *
+ * @extends QueryBackedSource<HubSupportTicket>
  */
 final class HubSupportTicketSource extends QueryBackedSource
 {
@@ -157,7 +159,7 @@ final class HubSupportTicketSource extends QueryBackedSource
 
         $timeline = $ticket->updates->map(fn (HubSupportTicketUpdate $update): array => [
             'at' => CarbonImmutable::instance($update->created_at),
-            'actor' => $update->changedBy?->name ?? 'System',
+            'actor' => $update->changedBy->name ?? 'System',
             'text' => collect([
                 'Status: '.self::statusLabel($update->status),
                 filled($update->public_response) ? 'Reply to member: '.$update->public_response : null,
@@ -171,7 +173,7 @@ final class HubSupportTicketSource extends QueryBackedSource
             ['label' => 'Impact', 'value' => $ticket->impact->label()],
             ['label' => 'Status', 'value' => self::statusLabel($ticket->status)],
             ['label' => 'Reported by', 'value' => (string) $ticket->reporter_name_snapshot],
-            ['label' => 'Assigned to', 'value' => $ticket->assignedTo?->name ?? 'Unassigned'],
+            ['label' => 'Assigned to', 'value' => $ticket->assignedTo->name ?? 'Unassigned'],
             ['label' => 'Page', 'value' => (string) ($ticket->page_path ?: '—')],
         ];
 

@@ -15,7 +15,6 @@ use App\Support\Dashboards\IssueDetail;
 use App\Support\Dashboards\IssueSource;
 use App\Support\Dashboards\IssueSourceRegistry;
 use App\Support\HubNavigation;
-use Carbon\CarbonImmutable;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -70,7 +69,7 @@ final class IssueActionPanel extends Component
     #[Locked]
     public array $fieldErrors = [];
 
-    /** @var array<string, array<string, string>> action key => field name => typed value */
+    /** @var array<string, mixed> action key => field name => typed value; client-writable, so never trusted until validated() */
     public array $input = [];
 
     #[On(self::OPEN_EVENT)]
@@ -253,20 +252,16 @@ final class IssueActionPanel extends Component
             'imageKind' => $image === null ? null : DashboardImages::kind($issue->imageKey),
             'icon' => str_starts_with((string) $issue->imageKey, 'station:') ? 'heroicon-o-building-office' : (str_starts_with((string) $issue->imageKey, 'apparatus:') ? 'heroicon-o-truck' : 'heroicon-o-document-text'),
             'body' => $detail->body,
-            'facts' => array_values(array_map(static fn (array $fact): array => [
-                'label' => (string) ($fact['label'] ?? ''),
-                'value' => (string) ($fact['value'] ?? ''),
-            ], $detail->facts)),
-            'timeline' => array_values(array_map(static function (array $entry): array {
-                $at = $entry['at'] ?? null;
-
-                return [
-                    'at' => $at instanceof CarbonImmutable ? IssuePresenter::time($at) : '',
-                    'atIso' => $at instanceof CarbonImmutable ? $at->toIso8601String() : '',
-                    'actor' => isset($entry['actor']) ? (string) $entry['actor'] : null,
-                    'text' => (string) ($entry['text'] ?? ''),
-                ];
-            }, $detail->timeline)),
+            'facts' => array_map(static fn (array $fact): array => [
+                'label' => $fact['label'],
+                'value' => $fact['value'],
+            ], $detail->facts),
+            'timeline' => array_map(static fn (array $entry): array => [
+                'at' => IssuePresenter::time($entry['at']),
+                'atIso' => $entry['at']->toIso8601String(),
+                'actor' => $entry['actor'],
+                'text' => $entry['text'],
+            ], $detail->timeline),
             'actions' => $this->presentActions($detail->actions),
             'readOnlyReason' => $detail->readOnlyReason,
             'sourceUrl' => HubNavigation::safePath($issue->sourceUrl),
@@ -282,7 +277,7 @@ final class IssueActionPanel extends Component
     {
         $presented = [];
         foreach ($actions as $action) {
-            if (! $action instanceof IssueAction || preg_match(self::KEY_PATTERN, $action->key) !== 1) {
+            if (preg_match(self::KEY_PATTERN, $action->key) !== 1) {
                 continue;
             }
 
@@ -310,7 +305,7 @@ final class IssueActionPanel extends Component
             $presented[] = [
                 'key' => $action->key,
                 'label' => $action->label,
-                'tone' => in_array($action->tone, ['primary', 'secondary', 'danger'], true) ? $action->tone : 'secondary',
+                'tone' => $action->tone,
                 'confirm' => $action->confirm,
                 'fields' => $fields,
             ];
