@@ -165,6 +165,13 @@ Schedule::command('daily-roster:reconcile')
     ->withoutOverlapping(5)
     ->onOneServer();
 
+// Email Center: indexes any mail the after-commit hooks missed, merges late-arriving parents, tidies threads
+// whose roster mail TeleStaff cleanup deleted. Idempotent; see App\Services\Mail\MailIndexSweeper.
+Schedule::command('mail:index-sweep')
+    ->everyFiveMinutes()
+    ->withoutOverlapping(10)
+    ->onOneServer();
+
 Schedule::command('daily-roster:prune')
     ->dailyAt('03:37')
     ->timezone('America/New_York')

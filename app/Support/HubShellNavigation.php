@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support;
 
 use App\Models\User;
+use App\Services\Mail\MailAccess;
 use Filament\Facades\Filament;
 
 final class HubShellNavigation
@@ -34,6 +35,12 @@ final class HubShellNavigation
         ] as $key => $application) {
             if (self::launchable($key, $states)) {
                 $navigation['applications'][] = ['key' => $key, ...$application];
+                // Email is part of the admin panel, so it needs the same entitlement as Admin and its own read
+                // level on top: a link that would answer 403 is never offered. It rides this one builder, so the
+                // Home menu, the phone More sheet and the React shell all show it.
+                if ($key === 'admin' && app(MailAccess::class)->canView($user)) {
+                    $navigation['applications'][] = ['key' => 'email', 'label' => 'Email', 'href' => '/admin/email'];
+                }
             }
         }
         $canAccessEmployeePanel = false;

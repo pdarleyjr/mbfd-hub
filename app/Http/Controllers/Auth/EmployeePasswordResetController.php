@@ -15,6 +15,7 @@ use App\Services\Identity\CityEmailVerificationService;
 use App\Services\Identity\EmployeeIdentifier;
 use App\Services\Identity\IdentityProviderService;
 use App\Services\Identity\MemberAccessEmail;
+use App\Support\Mail\TransactionalMessageFormatter;
 use Illuminate\Auth\Passwords\PasswordBroker;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -93,7 +94,7 @@ final class EmployeePasswordResetController extends Controller
                     $dispatcher->send(
                         to: [$recipient],
                         subject: 'MBFD Identity account recovery',
-                        text: "Account recovery was requested for your MBFD Identity account.\n\nContinue securely: {$url}\n\nThis one-time link expires shortly. If you did not request it, ignore this message and contact an administrator.",
+                        text: app(TransactionalMessageFormatter::class)->signOffText("Account recovery was requested for your MBFD Identity account.\n\nContinue securely: {$url}\n\nThis one-time link expires shortly. If you did not request it, ignore this message and contact an administrator."),
                         html: null,
                         sourceType: 'identity_recovery',
                         sourceId: (string) $user->getKey(),
@@ -121,7 +122,7 @@ final class EmployeePasswordResetController extends Controller
                 $dispatcher->send(
                     to: [$challenge['recipient']],
                     subject: 'MBFD Hub password reset',
-                    text: "A password reset was requested for your MBFD Hub account.\n\nReset your password: {$url}\n\nIf you did not request this, ignore this message.",
+                    text: app(TransactionalMessageFormatter::class)->signOffText("A password reset was requested for your MBFD Hub account.\n\nReset your password: {$url}\n\nIf you did not request this, ignore this message."),
                     html: null,
                     sourceType: 'password_reset',
                     sourceId: (string) $user->getKey(),

@@ -12,6 +12,7 @@ use App\Models\MemberOnboardingRosterBinding;
 use App\Models\User;
 use App\Services\Communications\CloudflareEmailDispatcher;
 use App\Support\HubTimezone;
+use App\Support\Mail\TransactionalMessageFormatter;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -185,7 +186,7 @@ final class CityEmailVerificationService
             $delivery = $this->email->send(
                 to: [$row->email],
                 subject: 'Confirm your MBFD Hub city email',
-                text: "Sign in to your MBFD Hub account and confirm this email address using the link below. The link expires in 30 minutes.\n\n{$link}\n\nIf you did not request this message, you can ignore it.",
+                text: app(TransactionalMessageFormatter::class)->signOffText("Sign in to your MBFD Hub account and confirm this email address using the link below. The link expires in 30 minutes.\n\n{$link}\n\nIf you did not request this message, you can ignore it."),
                 html: null,
                 sourceType: 'city_email_verification',
                 sourceId: (string) $row->getKey(),
@@ -246,7 +247,8 @@ final class CityEmailVerificationService
         if ($verified && $oldVerifiedEmail !== null) {
             try {
                 $when = HubTimezone::dateTime(now());
-                SendBudgetedEmail::dispatch([$oldVerifiedEmail], 'Your MBFD Hub city email changed', "Your MBFD Hub city email was changed on {$when} after mailbox verification. If you did not make this change, contact your MBFD Hub administrator.", null, 'city_email_changed', (string) $user->getKey(), (int) $user->getKey());
+                $notice = app(TransactionalMessageFormatter::class)->signOffText("Your MBFD Hub city email was changed on {$when} after mailbox verification. If you did not make this change, contact your MBFD Hub administrator.");
+                SendBudgetedEmail::dispatch([$oldVerifiedEmail], 'Your MBFD Hub city email changed', $notice, null, 'city_email_changed', (string) $user->getKey(), (int) $user->getKey());
             } catch (Throwable $exception) {
                 Log::warning('city_email_change_notice_failed', ['user_id' => $user->getKey(), 'exception_class' => $exception::class]);
             }

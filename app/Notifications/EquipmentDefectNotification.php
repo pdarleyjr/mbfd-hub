@@ -30,15 +30,12 @@ class EquipmentDefectNotification extends Notification
     /** @return array{subject: string, text: string} */
     public function toBudgetedEmail(object $notifiable): array
     {
-        $subject = $this->type === 'damaged'
-            ? "Equipment DAMAGED: {$this->assetName} ({$this->assetTag}) on {$this->apparatusName}"
-            : "Equipment MISSING: {$this->assetName} ({$this->assetTag}) on {$this->apparatusName}";
+        $statusLabel = $this->type === 'damaged' ? 'damaged' : 'missing';
+        $subject = "Equipment {$statusLabel}: {$this->assetName} ({$this->assetTag}) on {$this->apparatusName}";
 
-        $statusLabel = $this->type === 'damaged' ? 'DAMAGED' : 'MISSING';
-
-        $snipeitUrl = rtrim(config('snipeit.url', 'https://inventory.mbfdhub.com'), '/api/v1');
+        $snipeitUrl = $this->snipeItBaseUrl();
         $lines = [
-            "Equipment Defect Alert — {$statusLabel}",
+            "Equipment defect alert: {$statusLabel}",
             "Equipment: {$this->assetName} (Tag: {$this->assetTag})",
             "Apparatus: {$this->apparatusName}",
             "Reported by: {$this->operatorName}",
@@ -55,5 +52,13 @@ class EquipmentDefectNotification extends Notification
         }
 
         return ['subject' => $subject, 'text' => implode("\n", $lines)];
+    }
+
+    /** The Snipe-IT address people open, from the API address in configuration (which ends in /api/v1). */
+    private function snipeItBaseUrl(): string
+    {
+        $url = rtrim(trim((string) config('snipeit.url', 'https://inventory.mbfdhub.com')), '/');
+
+        return rtrim(preg_replace('#/api/v1$#i', '', $url) ?? $url, '/');
     }
 }

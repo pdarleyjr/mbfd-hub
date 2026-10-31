@@ -47,9 +47,24 @@ final class InboundEmailResource extends Resource
         ];
     }
 
+    /** Email has one entry in the sidebar (Communications > Email); the old address keeps working. */
+    public static function shouldRegisterNavigation(): bool
+    {
+        return false;
+    }
+
+    /** The Email Center's read level, which still honours the older admin.communications.view. */
     public static function canViewAny(): bool
     {
-        return auth()->user()?->can('admin.communications.view') ?? false;
+        $user = auth()->user();
+
+        return $user instanceof \App\Models\User && app(\App\Services\Mail\MailAccess::class)->canView($user);
+    }
+
+    /** The capability gate maps this model to admin.communications only; the Email Center's read level is the rule here. */
+    public static function canView(\Illuminate\Database\Eloquent\Model $record): bool
+    {
+        return self::canViewAny();
     }
 
     public static function canCreate(): bool

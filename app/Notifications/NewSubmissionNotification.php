@@ -67,10 +67,22 @@ class NewSubmissionNotification extends Notification implements ShouldQueue
         $url = url($this->deliveryUrl($notifiable, $this->actionUrl));
 
         return [
-            'subject' => $this->title,
+            'subject' => $this->subject(),
             'text' => $this->body."\n\nView in MBFD Hub: {$url}",
-            'html' => "<h1>{$safeTitle}</h1><p>{$safeBody}</p><p><a href=\"".e($url).'\">View in MBFD Hub</a></p>',
+            // The closing quote used to be written as \" inside single quotes, which left a stray backslash on the end of the link.
+            'html' => "<h1>{$safeTitle}</h1><p>{$safeBody}</p><p><a href=\"".e($url).'">View in MBFD Hub</a></p>',
         ];
+    }
+
+    /**
+     * The title, plus the unit or request number when the title does not already carry it. That label is the
+     * same one the lock screen shows, so it is safe in a subject; it tells repeated alerts apart.
+     */
+    private function subject(): string
+    {
+        $label = PushPrivacy::cleanSubject($this->pushSubject);
+
+        return $label === null || str_contains($this->title, $label) ? $this->title : "{$this->title} ({$label})";
     }
 
     /**

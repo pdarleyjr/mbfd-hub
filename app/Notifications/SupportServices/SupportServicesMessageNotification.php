@@ -140,8 +140,9 @@ final class SupportServicesMessageNotification extends Notification implements S
         $push = $this->pushText();
         $url = url($this->deliveryUrl($notifiable, $this->path()));
 
+        // The conversation number is an opaque id: it tells two alerts apart and reveals nothing about them.
         return [
-            'subject' => $push['title'],
+            'subject' => $push['title'].' (conversation #'.$this->threadId.')',
             'text' => $push['body']."\n\nOpen in MBFD Hub: {$url}",
             'html' => '<h1>'.e($push['title']).'</h1><p>'.e($push['body']).'</p><p><a href="'.e($url).'">Open in MBFD Hub</a></p>',
         ];

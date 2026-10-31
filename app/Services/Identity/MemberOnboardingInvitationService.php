@@ -13,6 +13,7 @@ use App\Models\OutboundEmail;
 use App\Models\User;
 use App\Services\Communications\CloudflareEmailDispatcher;
 use App\Services\Security\SecurityAuditRecorder;
+use App\Support\Mail\TransactionalMessageFormatter;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -180,7 +181,7 @@ final class MemberOnboardingInvitationService
             $delivery = $this->email->send(
                 to: [$invitation->email],
                 subject: 'Set up your MBFD Hub account',
-                text: "Use this private MBFD Hub link to create your password. It expires in 30 minutes and can be used once.\n\n".url('/member-onboarding/invite#'.$token)."\n\nIf you did not expect this email, ignore it and contact MBFD Hub support.",
+                text: app(TransactionalMessageFormatter::class)->signOffText("Use this private MBFD Hub link to create your password. It expires in 30 minutes and can be used once.\n\n".url('/member-onboarding/invite#'.$token)."\n\nIf you did not expect this email, ignore it and contact MBFD Hub support."),
                 html: null,
                 sourceType: 'member_onboarding_invitation',
                 sourceId: (string) $invitation->id,

@@ -395,11 +395,13 @@ final class EmployeeLogisticsAdminInboxTest extends TestCase
             ->assertSee('You can read Support Services messages but not reply.');
     }
 
+    // Changed: the old Inbound and Outbound lists now lead into the Email Center, which loads for the same administrator.
     public function test_the_email_resources_still_load_for_a_super_administrator(): void
     {
         $this->actingAs($this->messagingAdmin(['super_admin'], ['admin.access']));
 
-        $this->get('/admin/inbound-emails')->assertOk();
-        $this->get('/admin/outbound-emails')->assertOk();
+        $this->get('/admin/inbound-emails')->assertRedirect(\App\Filament\Admin\Pages\EmailCenter::getUrl());
+        $this->get('/admin/outbound-emails')->assertRedirect(\App\Filament\Admin\Pages\EmailCenter::getUrl(['folder' => 'sent']));
+        $this->get('/admin/email')->assertOk();
     }
 }

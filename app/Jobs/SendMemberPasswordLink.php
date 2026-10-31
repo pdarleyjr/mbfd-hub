@@ -9,6 +9,7 @@ use App\Models\OutboundEmail;
 use App\Models\User;
 use App\Services\Communications\CloudflareEmailDispatcher;
 use App\Services\Identity\CityEmailVerificationService;
+use App\Support\Mail\TransactionalMessageFormatter;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
 use Illuminate\Auth\Passwords\PasswordBroker;
@@ -118,7 +119,7 @@ final class SendMemberPasswordLink implements ShouldBeUnique, ShouldQueue
             $delivery = $dispatcher->send(
                 to: [$challenge['recipient']],
                 subject: $subject,
-                text: "{$intro}\n\nChoose your password: {$url}\n\nThis link works once and expires in {$minutes} minutes. Your Employee ID is your username.\n\nIf you did not ask for this, ignore this message; your account has not changed.",
+                text: app(TransactionalMessageFormatter::class)->signOffText("{$intro}\n\nChoose your password: {$url}\n\nThis link works once and expires in {$minutes} minutes. Your Employee ID is your username.\n\nIf you did not ask for this, ignore this message; your account has not changed."),
                 html: null,
                 sourceType: 'password_reset',
                 sourceId: (string) $this->userId,

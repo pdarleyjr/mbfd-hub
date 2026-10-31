@@ -1,7 +1,5 @@
 <x-filament-panels::page>
-    <form wire:submit="send" class="space-y-6">
-        {{ $this->form }}
-        <p class="text-sm text-gray-600 dark:text-gray-400">{{ $this->recipientCount() }} unique recipients. Provider acceptance is separate from confirmed delivery.</p>
-        <x-filament::button type="submit" wire:loading.attr="disabled" wire:target="send">Send email</x-filament::button>
-    </form>
+    {{-- Compose Email moved into the Email Center. mount() redirects; this shows only if the redirect is blocked. --}}
+    <p>Writing email now happens in the Email Center.</p>
+    <p><a class="underline" href="{{ \App\Filament\Admin\Pages\EmailCenter::getUrl() }}">Open the Email Center</a></p>
 </x-filament-panels::page>

@@ -78,7 +78,7 @@ final class CloudflareCostGuard
             if ((int) $budget->provider_daily_used + $reservedSinceDailyReconciliation + (int) $email->chargeable_budget_units > (int) $budget->provider_daily_quota) {
                 throw new EmailBudgetExhausted('The reconciled Cloudflare daily quota would be exceeded.', 3600);
             }
-            $minuteLimit = min(5, (int) config('communications.cloudflare.max_recipient_units_per_minute', 5));
+            $minuteLimit = $this->minuteLimit();
             $minuteUnits = $this->localReservedOrAcceptedUnits($at, true, $at->copy()->subMinute());
             if ($minuteUnits + (int) $email->chargeable_budget_units > $minuteLimit) {
                 throw new EmailBudgetExhausted('The Hub email rate limit has been reached. Try again later.', 61);
@@ -94,6 +94,83 @@ final class CloudflareCostGuard
 
             return $email;
         });
+    }
+
+    /**
+     * The most recipients one message can have and still pass every guard: the smaller of the per-message
+     * cap and the per-minute cap (each recipient is one unit). A larger message would be refused by
+     * reserve() on every attempt, so callers can say so up front. This never raises either cap.
+     */
+    public function effectiveRecipientLimit(): int
+    {
+        return max(0, min(
+            (int) config('communications.cloudflare.max_recipients_per_message', 10),
+            $this->minuteLimit(),
+        ));
+    }
+
+    /**
+     * Read-only view of the same gates reserve() applies, for the health report. Takes no locks and changes nothing.
+     *
+     * @return array{state: string, summary: string, used: int, ceiling: int, remaining: int, daily_used: ?int, daily_quota: ?int, backoff_until: ?CarbonImmutable, reconciled_at: ?CarbonImmutable, recipient_limit: int, minute_limit: int}
+     */
+    public function snapshot(?CarbonInterface $at = null): array
+    {
+        $at = CarbonImmutable::instance($at ?? CarbonImmutable::now());
+        $ceiling = min(2850, (int) config('communications.cloudflare.safe_email_ceiling', 2850));
+        $base = [
+            'used' => 0, 'ceiling' => $ceiling, 'remaining' => $ceiling, 'daily_used' => null, 'daily_quota' => null,
+            'backoff_until' => null, 'reconciled_at' => null,
+            'recipient_limit' => $this->effectiveRecipientLimit(), 'minute_limit' => $this->minuteLimit(),
+        ];
+
+        $budgets = CloudflareUsageBudget::query()->where('cycle_start', '<=', $at)->where('cycle_end', '>', $at)->get();
+        $budget = $budgets->count() === 1 ? $budgets->first() : null;
+        $maxAge = (int) config('communications.cloudflare.max_reconciliation_age_seconds', 900);
+        $reconciledAt = $budget?->reconciled_at === null ? null : CarbonImmutable::parse($budget->reconciled_at);
+        $dailyAt = $budget?->provider_daily_reconciled_at === null ? null : CarbonImmutable::parse($budget->provider_daily_reconciled_at);
+        $accountId = (string) config('communications.cloudflare.account_id');
+        $backoffUntil = CloudflareUsageBudget::query()->where('provider_backoff_until', '>', $at)->max('provider_backoff_until');
+        $base['backoff_until'] = $backoffUntil === null ? null : CarbonImmutable::parse($backoffUntil);
+
+        if ($budget === null
+            || preg_match('/\A[a-f0-9]{32}\z/i', $accountId) !== 1
+            || $budget->provider_account_id !== $accountId
+            || $reconciledAt === null || $dailyAt === null
+            || $budget->provider_daily_quota === null || $budget->provider_daily_used === null
+            || ! $this->hasValidCounters($budget) || (int) $budget->provider_daily_quota < 1
+            || $reconciledAt->gt($at) || $dailyAt->gt($at)
+            || $reconciledAt->lt($at->subSeconds($maxAge)) || $dailyAt->lt($at->subSeconds($maxAge))) {
+            return [
+                'state' => 'not_reconciled',
+                'summary' => 'Cloudflare usage has not been reconciled recently, so sending is closed until it is.',
+                'reconciled_at' => $reconciledAt,
+            ] + $base;
+        }
+
+        $ceiling = min(2850, (int) $budget->hub_safe_ceiling, $ceiling);
+        $used = (int) $budget->provider_chargeable_used
+            + $this->localReservedOrAcceptedUnits($at, false, CarbonImmutable::parse($budget->cycle_start), true);
+        $dailyUsed = (int) $budget->provider_daily_used
+            + $this->localReservedOrAcceptedUnits($at, false, $at->utc()->startOfDay(), true);
+        $base = [
+            'used' => $used, 'ceiling' => $ceiling, 'remaining' => max(0, $ceiling - $used),
+            'daily_used' => $dailyUsed, 'daily_quota' => (int) $budget->provider_daily_quota, 'reconciled_at' => $reconciledAt,
+        ] + $base;
+
+        [$state, $summary] = match (true) {
+            $base['backoff_until'] !== null => ['paused', 'Cloudflare asked the Hub to pause sending; it resumes on its own after the pause.'],
+            $used >= $ceiling => ['ceiling_reached', 'The monthly safety ceiling has been reached; sending stays closed until the next billing cycle.'],
+            $dailyUsed >= (int) $budget->provider_daily_quota => ['daily_quota_reached', 'The provider daily quota has been reached; sending resumes when it resets.'],
+            default => ['open', 'Sending is open.'],
+        };
+
+        return ['state' => $state, 'summary' => $summary] + $base;
+    }
+
+    private function minuteLimit(): int
+    {
+        return min(5, (int) config('communications.cloudflare.max_recipient_units_per_minute', 5));
     }
 
     public function releaseBeforeAcceptance(OutboundEmail $email, string $reason, CarbonInterface $at): OutboundEmail

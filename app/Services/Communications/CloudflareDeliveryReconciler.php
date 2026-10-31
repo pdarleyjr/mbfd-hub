@@ -76,7 +76,7 @@ final class CloudflareDeliveryReconciler
 query DeliveryEvents($zoneTag: string!, $start: Time!, $end: Time!) {
   viewer { zones(filter: {zoneTag: $zoneTag}) {
     emailSendingAdaptive(limit: 1000, orderBy: [datetime_ASC], filter: {datetime_geq: $start, datetime_leq: $end}) {
-      messageId envelopeTo status eventType errorCause errorDetail datetime sendingDomain
+      messageId envelopeTo status eventType errorCause errorDetail datetime sendingDomain isLastEvent
     }
   } }
 }
@@ -122,6 +122,10 @@ GRAPHQL;
                 continue;
             }
             $status = $this->status($event['status'], $event['eventType']);
+            // A failed attempt Cloudflare is still retrying is not a bounce; only its last event can be.
+            if ($status === 'bounced' && strtolower($event['status']) === 'deliveryfailed' && in_array($event['isLastEvent'] ?? null, [0, false], true)) {
+                $status = 'deferred';
+            }
             $count += (int) $this->ledger->record($email, $event['envelopeTo'], $status, $event['eventType'], $at,
                 is_string($event['errorCause'] ?? null) ? $event['errorCause'] : null,
                 is_string($event['errorDetail'] ?? null) ? $event['errorDetail'] : null);
