@@ -109,7 +109,8 @@ class ApparatusInspection extends Model
         };
     }
 
-    public function apparatus()
+    /** @return BelongsTo<Apparatus, $this> */
+    public function apparatus(): BelongsTo
     {
         return $this->belongsTo(Apparatus::class);
     }

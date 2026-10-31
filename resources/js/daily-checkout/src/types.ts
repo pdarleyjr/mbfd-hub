@@ -620,6 +620,52 @@ export interface StationRequestSummary {
   updates?: StationRequestUpdate[];
 }
 
+/** A unit on a station's Overview for the current 7 AM to 7 AM window. Frontline units owe a daily inspection. */
+export interface StationOverviewUnit {
+  apparatus_id: number;
+  designation: string;
+  vehicle_number?: string | null;
+  type?: string | null;
+  slug?: string | null;
+  frontline: boolean;
+  state: 'submitted' | 'not_submitted' | 'out_of_service';
+  inspection_id?: number | null;
+  submitted_at?: string | null;
+}
+
+export interface StationCheckoutRow {
+  id: number;
+  apparatus_id: number;
+  designation: string;
+  vehicle_number?: string | null;
+  type?: string | null;
+  submitted_by?: string | null;
+  shift?: string | null;
+  submitted_at?: string | null;
+  status: string;
+  needs_attention: boolean;
+}
+
+export interface StationCheckoutDetail extends StationCheckoutRow {
+  engine_hours?: string | null;
+  miles?: number | null;
+  compartments: Array<{
+    name: string;
+    items: Array<{ name: string; status: string; value?: string | null; notes?: string | null; has_photo: boolean }>;
+  }>;
+}
+
+export interface StationOverview {
+  station_id: number;
+  as_of: string;
+  shift_window: { starts_at: string; ends_at: string; alert_from: string };
+  units: StationOverviewUnit[];
+  checkouts: StationCheckoutRow[];
+  requests: StationRequestSummary[];
+  requests_total: number;
+  alert: { active: boolean; units: StationOverviewUnit[] };
+}
+
 export type ApparatusServiceTicketStatus = 'submitted' | 'acknowledged' | 'scheduled' | 'in_progress' | 'waiting_for_parts' | 'completed' | 'cancelled';
 
 export interface ApparatusServiceTicketUpdate {
