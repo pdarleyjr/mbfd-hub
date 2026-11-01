@@ -11,7 +11,7 @@
         $sessionsOpen = $slotCount > 0 || collect($slotEdits)->contains(fn ($row) => collect(['label', 'start', 'end', 'location_choice', 'venue'])->contains(fn ($field) => ($row[$field] ?? '') !== ''));
         $latestPublished = $publications->first()?->fingerprint;
         $latest = $publications->where('fingerprint', $latestPublished);
-        $hasFailed = $latest->contains(fn ($row) => $row->status === 'failed');
+        $hasFailed = $latest->contains(fn ($row) => $row->needsRetry());
         $destinationLabels = collect($targets)->pluck('label', 'id');
         $failureText = ['not_permitted' => 'Your account cannot post there.', 'rejected' => 'It was not accepted.', 'send_failed' => 'It could not be sent.'];
     @endphp
@@ -307,11 +307,11 @@
                             <li class="flex flex-wrap items-center justify-between gap-2 py-2 text-sm" wire:key="publication-{{ $publication->id }}">
                                 <span class="min-w-0">
                                     {{ $destinationLabels[$publication->destination] ?? $publication->destination }}
-                                    <span class="block">{{ $publication->member_count }} members{{ $publication->fingerprint === $latestPublished ? '' : ' · earlier version' }}{{ $publication->sent_at ? ' · '.$publication->sent_at->setTimezone($tz)->format('M j g:i A') : '' }}@if ($publication->status === 'failed') · {{ $failureText[$publication->error_code] ?? 'It could not be sent.' }}@endif</span>
+                                    <span class="block">{{ $publication->member_count }} members{{ $publication->fingerprint === $latestPublished ? '' : ' · earlier version' }}{{ $publication->sent_at ? ' · '.$publication->sent_at->setTimezone($tz)->format('M j g:i A') : '' }}@if ($publication->needsRetry()) · {{ $failureText[$publication->error_code] ?? 'It could not be confirmed as sent.' }}@endif</span>
                                 </span>
                                 <span class="flex items-center gap-2">
                                     @if ($publication->department_update_id)<a class="hub-link" href="{{ route('updates.show', $publication->department_update_id) }}">View</a>@endif
-                                    <x-filament::badge :color="match ($publication->status) { 'sent' => 'success', 'failed' => 'danger', default => 'gray' }">{{ match ($publication->status) { 'sent' => 'Sent', 'failed' => 'Failed', default => 'Sending' } }}</x-filament::badge>
+                                    <x-filament::badge :color="$publication->status === 'sent' ? 'success' : ($publication->needsRetry() ? 'danger' : 'gray')">{{ $publication->status === 'sent' ? 'Sent' : ($publication->needsRetry() ? 'Failed' : 'Sending') }}</x-filament::badge>
                                 </span>
                             </li>
                         @endforeach

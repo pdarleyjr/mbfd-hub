@@ -59,6 +59,17 @@ final class TrainingCrewPlannerDraftStoreTest extends TestCase
         self::assertNull($store->latest($this->actor()));
     }
 
+    public function test_an_unreadable_proposal_is_removed_so_its_owner_can_start_again(): void
+    {
+        $store = app(TrainingCrewPlannerDraftStore::class);
+        $owner = $this->actor();
+        $draft = $store->create($owner);
+        TrainingCrewPlanDraft::query()->whereKey($draft['id'])->update(['payload' => 'not-readable']);
+        self::assertNull($store->latest($owner));
+        self::assertSame(0, TrainingCrewPlanDraft::query()->count());
+        self::assertNotSame($draft['id'], $store->create($owner)['id']);
+    }
+
     public function test_stale_tab_cannot_overwrite_saved_selections(): void
     {
         $store = app(TrainingCrewPlannerDraftStore::class);

@@ -6,9 +6,12 @@ namespace App\Services\Training\CrewPlanner;
 
 use App\Models\Training\TrainingCrewPlanDraft;
 use App\Models\User;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use JsonException;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
@@ -43,8 +46,14 @@ final class TrainingCrewPlannerDraftStore
     {
         $row = TrainingCrewPlanDraft::query()->where('user_id', $actor->getKey())->where('expires_at', '>', now())
             ->orderByDesc('updated_at')->first();
-
-        return $row === null ? null : $this->open($row);
+        if ($row === null) {
+            return null;
+        }
+        try {
+            return $this->open($row);
+        } catch (HttpException) {
+            return null; // Unreadable, and now removed: the member simply starts a new plan.
+        }
     }
 
     public function get(User $actor, string $id): array
@@ -90,9 +99,16 @@ final class TrainingCrewPlannerDraftStore
         return $row;
     }
 
+    /** A proposal that can no longer be read (a rotated app key, a damaged row) must not lock its owner out of the page. */
     private function open(TrainingCrewPlanDraft $row): array
     {
-        return json_decode(Crypt::decryptString((string) $row->payload), true, flags: JSON_THROW_ON_ERROR);
+        try {
+            return json_decode(Crypt::decryptString((string) $row->payload), true, flags: JSON_THROW_ON_ERROR);
+        } catch (DecryptException|JsonException $failure) {
+            Log::warning('training_crew_plan.draft_unreadable', ['draft_id' => $row->getKey(), 'exception' => $failure::class]);
+            $row->delete();
+            abort(410, 'This proposal could not be read. Start a new one; nothing was sent or recorded.');
+        }
     }
 
     private function seal(array $draft): string

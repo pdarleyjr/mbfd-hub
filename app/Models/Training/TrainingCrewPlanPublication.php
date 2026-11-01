@@ -22,6 +22,9 @@ final class TrainingCrewPlanPublication extends Model
 
     public const STATUS_FAILED = 'failed';
 
+    /** Longer than the publish lock, so a live send is never offered for retry. */
+    private const SENDING_GIVES_UP_MINUTES = 5;
+
     protected $table = 'training_crew_plan_publications';
 
     protected $guarded = ['id'];
@@ -31,6 +34,13 @@ final class TrainingCrewPlanPublication extends Model
     protected static function booted(): void
     {
         self::deleting(static fn (): never => throw new LogicException('Crew plan publications are permanent.'));
+    }
+
+    /** It failed, or a send stopped partway and never came back. Sending again cannot duplicate it. */
+    public function needsRetry(): bool
+    {
+        return $this->status === self::STATUS_FAILED
+            || ($this->status === self::STATUS_SENDING && $this->updated_at !== null && $this->updated_at->lt(now()->subMinutes(self::SENDING_GIVES_UP_MINUTES)));
     }
 
     /** @return BelongsTo<User, $this> */

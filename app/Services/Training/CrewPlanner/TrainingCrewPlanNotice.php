@@ -18,9 +18,21 @@ final class TrainingCrewPlanNotice
 
     private const MAX_BODY = 9500;
 
-    /** @return array{subject: string, body: string} */
-    public function compose(array $report, bool $updated = false): array
+    /**
+     * @param  bool  $departmentWide  everyone reads it, so someone whose place is unconfirmed is counted, never named
+     * @return array{subject: string, body: string}
+     */
+    public function compose(array $report, bool $updated = false, bool $departmentWide = false): array
     {
+        if ($departmentWide) {
+            $held = 0;
+            foreach ($report['groups'] as $group) {
+                $held += $group['kind'] === 'review' ? count($group['rows']) : 0;
+            }
+            $report['groups'] = array_values(array_filter($report['groups'], static fn (array $group): bool => $group['kind'] !== 'review'));
+            $report['total'] -= $held;
+            $report['held'] = $held;
+        }
         $date = CarbonImmutable::parse($report['schedule_date'], self::TZ);
         $class = trim($report['course_name'].($report['module_name'] !== '' ? ' · '.$report['module_name'] : ''));
         $subject = mb_substr(($updated ? 'Updated training roster: ' : 'Training roster: ').$class.' · '.$date->format('M j'), 0, 150);
@@ -32,6 +44,10 @@ final class TrainingCrewPlanNotice
             foreach ($section['names'] as $name) {
                 $lines[] = '- '.$name;
             }
+        }
+        if (($report['held'] ?? 0) > 0) {
+            $lines[] = '';
+            $lines[] = 'Training is confirming '.$report['held'].' more.';
         }
         $body = implode("\n", $lines);
 

@@ -111,12 +111,13 @@ final class TrainingCrewPlanPublisher
             $this->sendCommand($actor, $projection, $notice, $fingerprint, $command, $pending);
         }
         if (isset($pending[self::DEPARTMENT])) {
-            $this->attempt($pending[self::DEPARTMENT], function () use ($actor, $projection, $notice, $fingerprint, $pending): void {
+            $public = $this->notice->compose($report, $updated, true);
+            $this->attempt($pending[self::DEPARTMENT], function () use ($actor, $projection, $public, $fingerprint, $pending): void {
                 if (! $this->departmentUpdates->canPost($actor)) {
                     throw new AuthorizationException;
                 }
                 $update = $this->departmentUpdates->publish($actor, CommandDepartmentUpdatePublisher::ORIGIN_TRAINING, [
-                    'title' => $notice['subject'], 'body' => $notice['body'], 'category' => 'training',
+                    'title' => $public['subject'], 'body' => $public['body'], 'category' => 'training',
                     'expires_at' => $this->expiry($projection['schedule_date']),
                     'client_request_id' => 'crewplan-'.substr($fingerprint, 0, 40),
                 ]);
@@ -215,16 +216,22 @@ final class TrainingCrewPlanPublisher
         }
     }
 
-    /** A class notice leaves the home page the day after the class. */
-    private function expiry(string $date): ?string
+    /**
+     * A class notice leaves the home page the day after the class. A date already past still goes after a
+     * day, and a far-off one stops at the longest expiry updates allow, so no notice stays up forever.
+     */
+    private function expiry(string $date): string
     {
-        $expires = CarbonImmutable::parse($date, \App\Support\HubTimezone::NAME)->addDay()->endOfDay();
+        $zone = \App\Support\HubTimezone::NAME;
+        $expires = CarbonImmutable::parse($date, $zone)->addDay()->endOfDay();
+        $earliest = CarbonImmutable::now($zone)->addDay();
+        $latest = CarbonImmutable::now($zone)->addDays(119);
 
-        return $expires->isFuture() && $expires->lt(now()->addDays(119)) ? $expires->format('Y-m-d H:i:s') : null;
+        return ($expires->lt($earliest) ? $earliest : ($expires->gt($latest) ? $latest : $expires))->format('Y-m-d H:i:s');
     }
 
     /** Identifies this exact plan. Any change to the class, date, roster version, sessions or members makes a new version. */
-    private function fingerprint(array $draft, array $projection): string
+    public function fingerprint(array $draft, array $projection): string
     {
         $stable = array_diff_key($projection, array_flip(['generated_at', 'roster_as_of']));
         ksort($stable['rows']);

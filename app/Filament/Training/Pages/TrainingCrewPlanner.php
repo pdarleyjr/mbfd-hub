@@ -451,14 +451,26 @@ final class TrainingCrewPlanner extends Page
     {
         $actor = $this->actor();
         $draft = $this->draft();
-        $publisher = app(TrainingCrewPlanPublisher::class);
-        $latest = $publisher->history($actor, $draft['id'])->first()?->fingerprint;
-        $failed = $publisher->history($actor, $draft['id'])
-            ->filter(static fn (TrainingCrewPlanPublication $row): bool => $row->fingerprint === $latest && $row->status === TrainingCrewPlanPublication::STATUS_FAILED)
-            ->pluck('destination')->values()->all();
-        if ($failed !== []) {
-            $this->send($actor, $draft, $failed);
+        if ($draft['version'] !== $this->version) {
+            $this->addError('proposal', 'This proposal changed in another tab. Reload it before sending.');
+
+            return;
         }
+        $publisher = app(TrainingCrewPlanPublisher::class);
+        $history = $publisher->history($actor, $draft['id']);
+        $latest = $history->first()?->fingerprint;
+        $failed = $history->filter(static fn (TrainingCrewPlanPublication $row): bool => $row->fingerprint === $latest && $row->needsRetry())
+            ->pluck('destination')->values()->all();
+        if ($failed === []) {
+            return;
+        }
+        // A retry repeats what failed, word for word. A plan edited since then is a new send, chosen on purpose.
+        if ($publisher->fingerprint($draft, $this->composer()->projection($actor, $draft, $this->confirmReview)) !== $latest) {
+            $this->addError('publishTargets', 'This plan changed after that send. Choose where to send the new version.');
+
+            return;
+        }
+        $this->send($actor, $draft, $failed);
     }
 
     protected function getViewData(): array

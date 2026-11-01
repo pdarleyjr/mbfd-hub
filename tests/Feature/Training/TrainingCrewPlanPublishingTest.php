@@ -274,6 +274,90 @@ final class TrainingCrewPlanPublishingTest extends TestCase
         self::assertStringNotContainsString('SIC', $body, 'A leave code never goes out.');
     }
 
+    public function test_retry_from_a_stale_tab_or_after_an_edit_is_refused_and_sends_nothing(): void
+    {
+        $admin = $this->superAdmin();
+        $component = $this->plan($admin);
+        $outage = true;
+        DepartmentUpdate::creating(static function () use (&$outage): void {
+            if ($outage) {
+                throw new RuntimeException('Synthetic outage');
+            }
+        });
+        $this->send($component, [TrainingCrewPlanPublisher::DEPARTMENT])->assertHasNoErrors();
+        $outage = false;
+
+        // Another tab edited the plan: this tab is stale.
+        $store = app(TrainingCrewPlannerDraftStore::class);
+        $id = $this->employees['90003']->id;
+        $store->update($admin, $component->get('draftId'), $component->get('version'), static function (array $draft) use ($id): array {
+            $draft['selections'][$id] = ['slot_id' => null];
+
+            return $draft;
+        });
+        $component->call('retryFailed')->assertHasErrors('proposal');
+        self::assertSame(0, DepartmentUpdate::query()->count());
+
+        // Reloaded, the plan is no longer what failed, so a retry would send something else.
+        $component->call('reloadProposal')->call('retryFailed')->assertHasErrors('publishTargets');
+        self::assertSame(0, DepartmentUpdate::query()->count());
+    }
+
+    public function test_a_send_that_died_partway_can_be_retried_without_duplicating(): void
+    {
+        $admin = $this->superAdmin();
+        $component = $this->plan($admin);
+        $this->send($component, [TrainingCrewPlanPublisher::COMMAND_300])->assertHasNoErrors();
+        $row = TrainingCrewPlanPublication::query()->sole();
+        // The post went out but the process died before recording it.
+        $row->forceFill(['status' => TrainingCrewPlanPublication::STATUS_SENDING, 'sent_at' => null])->save();
+        self::assertFalse($row->refresh()->needsRetry(), 'A send in progress is not offered for retry.');
+        $component->call('reloadProposal')->assertDontSee('Retry what failed');
+
+        $this->travel(6)->minutes();
+        \Illuminate\Support\Carbon::setTestNow(now());
+        self::assertTrue($row->refresh()->needsRetry());
+        $component->call('reloadProposal')->assertSee('Retry what failed')->call('retryFailed')->assertHasNoErrors();
+        self::assertSame(1, CommandCommunicationPost::query()->count(), 'The earlier post is found by its key, not repeated.');
+        self::assertSame('sent', $row->refresh()->status);
+    }
+
+    public function test_a_department_update_counts_unconfirmed_members_and_does_not_name_them(): void
+    {
+        $admin = $this->superAdmin();
+        $component = $this->plan($admin);
+        DailyRosterSnapshotFactory::publish(self::DATE, ['Station 9 / Engine 9' => [
+            ['employee_id' => '90001', 'name' => 'Synthetic 90001', 'code' => 'SIC', 'availability' => RosterAssignment::AVAILABILITY_NOT_WORKING],
+            ['employee_id' => '90002', 'name' => 'Synthetic 90002', 'code' => 'SP', 'availability' => RosterAssignment::AVAILABILITY_WORKING],
+        ]], ['shift' => 'B']);
+        $component->call('acknowledgeRoster')->set('confirmReview', true);
+        $this->send($component, [TrainingCrewPlanPublisher::COMMAND_300, TrainingCrewPlanPublisher::DEPARTMENT])->assertHasNoErrors();
+
+        $public = (string) DepartmentUpdate::query()->sole()->body;
+        self::assertStringNotContainsString('Synthetic 90001', $public);
+        self::assertStringContainsString('Synthetic 90002', $public);
+        self::assertStringContainsString('Training is confirming 1 more.', $public);
+        self::assertStringContainsString('Members listed: 1', $public);
+        self::assertStringContainsString('Synthetic 90001', CommandCommunicationPost::query()->sole()->body, 'Command staff see who needs confirming.');
+    }
+
+    public function test_every_department_notice_expires_even_for_a_past_or_far_off_date(): void
+    {
+        $admin = $this->superAdmin();
+        DailyRosterSnapshotFactory::publish('2026-10-10', ['Station 9 / Engine 9' => [
+            ['employee_id' => '90001', 'name' => 'Synthetic 90001', 'code' => 'SP', 'availability' => RosterAssignment::AVAILABILITY_WORKING],
+        ]], ['shift' => 'B']);
+        $this->actingAs($admin);
+        $component = Livewire::test(TrainingCrewPlanner::class)->set('classTitle', 'Synthetic past class')->set('scheduleDate', '2026-10-10');
+        $component->call('toggleMember', $this->employees['90001']->id);
+        $this->send($component, [TrainingCrewPlanPublisher::DEPARTMENT])->assertHasNoErrors();
+        self::assertTrue(DepartmentUpdate::query()->sole()->expires_at->between(now(), now()->addDays(2)));
+
+        $component->set('scheduleDate', '2027-09-01')->set('confirmReview', true);
+        $this->send($component, [TrainingCrewPlanPublisher::DEPARTMENT])->assertHasNoErrors();
+        self::assertTrue(DepartmentUpdate::query()->latest('id')->first()->expires_at->lt(now()->addDays(120)));
+    }
+
     public function test_publishing_creates_no_training_session_or_attendance(): void
     {
         $admin = $this->superAdmin();
