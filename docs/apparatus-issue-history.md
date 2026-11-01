@@ -132,6 +132,6 @@ An open session belongs to its member and device. It never blocks anyone else, a
 
 The template (`storage/checklists/fireboat6_checklist.json`, version 2026-11) groups its daily readings under headings that stay on screen. Existing field ids never change. Sessions issued earlier stay on the snapshot they were issued with, so they show the older form until they expire.
 
-Open question for the owner: the temperature unit. No FB6 inspection convention records one, so the fields hold the number shown on the gauge and claim no unit. Adding `"unit"` to those two fields is enough once it is known. Readings refuse only what cannot be a reading (below zero, fuel above 100%). No operating limits are configured because none are established.
+Engine temperatures are in Fahrenheit (owner, 2026-11-01). The unit is in the field name, so it shows everywhere the reading does: entry, review, member history and the admin record. Readings refuse only what cannot be a reading (below zero, fuel above 100%). No operating limits are configured because none are established.
 
 SCUBA is diving equipment and airpacks (SCBA) are breathing apparatus, so they are separate fields. The count of SCUBA sets aboard is not established, so `fb6-scuba-ids` is one list rather than a fixed number of boxes. Radio numbers and the last four of the Motorola serial are kept as separate identifiers.
