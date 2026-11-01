@@ -419,7 +419,12 @@ class ApparatusController extends Controller
             'concerns.*.location' => ['nullable', 'string', 'max:255'],
             'concerns.*.photo' => ['nullable', 'string', 'max:7000000'],
             'concerns.*.existing_issue_id' => ['nullable', 'integer', 'min:1'],
-            // SCBA and radio numbers the checklist has no entry for. The key being sent, even empty, says this app showed the member the numbers.
+            // The SCBA and radio numbers the app showed the member, so only what they changed is applied. Sent, even empty, by an app that shows them.
+            'equipment_numbers_seen' => ['sometimes', 'array', 'max:200', 'prohibited_unless:processing_version,1'],
+            'equipment_numbers_seen.*' => ['required', 'array'],
+            'equipment_numbers_seen.*.slot' => ['required', 'string', 'max:255'],
+            'equipment_numbers_seen.*.number' => ['required', 'string', 'max:255'],
+            // SCBA and radio numbers the checklist has no entry for.
             'extra_equipment_numbers' => ['sometimes', 'array', 'max:'.CrewEquipmentNumbers::MAX_EXTRAS, 'prohibited_unless:processing_version,1'],
             'extra_equipment_numbers.*' => ['required', 'array'],
             'extra_equipment_numbers.*.client_id' => ['required', 'uuid', 'distinct:ignore_case'],
@@ -657,8 +662,10 @@ class ApparatusController extends Controller
                 if (($prepared['concerns'] ?? []) !== []) {
                     $pendingEffects['concerns'] = $prepared['concerns'];
                 }
-                if (array_key_exists('extra_equipment_numbers', $prepared)) {
-                    $pendingEffects['extra_equipment_numbers'] = $prepared['extra_equipment_numbers'];
+                foreach (['equipment_numbers_seen', 'extra_equipment_numbers'] as $numbersKey) {
+                    if (array_key_exists($numbersKey, $prepared)) {
+                        $pendingEffects[$numbersKey] = $prepared[$numbersKey];
+                    }
                 }
                 if ($this->isV2Checklist($lockedChecklist)) {
                     $pendingEffects['checklist_v2'] = $this->snapshotV2ChecklistEvidence(

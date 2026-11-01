@@ -5,6 +5,7 @@ import type {
   EquipmentKind,
   EquipmentNumbers,
   EquipmentSlot,
+  SeenNumber,
 } from '../types';
 
 const text = (value: unknown): string => (typeof value === 'string' ? value : typeof value === 'number' ? String(value) : '');
@@ -91,6 +92,33 @@ export function prefillCompartments(compartments: Compartment[], block: Equipmen
     }),
   }));
 }
+
+const isBlank = (value: unknown): boolean => value === null || value === undefined || value === '';
+
+/** A draft from before numbers carried over was never shown them, so its blanks are not a member clearing anything. */
+export const prefillBlankFieldValues = <T extends { id: string; value: ChecklistFieldValue }>(fields: T[], block: EquipmentNumbers | undefined): T[] => {
+  const filled = prefillFieldValues(fields, block);
+
+  return fields.map((field, index) => (isBlank(field.value) ? filled[index] : field));
+};
+
+export function prefillBlankCompartments(compartments: Compartment[], block: EquipmentNumbers | undefined): Compartment[] {
+  const filled = prefillCompartments(compartments, block);
+
+  return compartments.map((compartment, position) => ({
+    ...compartment,
+    items: compartment.items.map((item, index) => (isBlank(item.value) ? filled[position].items[index] : item)),
+  }));
+}
+
+/**
+ * The numbers this member was shown, in the form the answers go back in. Sent with the inspection, so only what they
+ * changed is applied and a change someone else made in the meantime stands.
+ */
+export const seenNumbers = (block: EquipmentNumbers | undefined): SeenNumber[] => (block ? [
+  ...block.slots.filter(slot => slot.number !== '').map(slot => ({ slot: slot.slot, number: prefillValue(slot) })),
+  ...block.extras.filter(extra => extra.number !== '').map(extra => ({ slot: `extra:${extra.client_id}`, number: extra.number })),
+] : []);
 
 /** Fields shown on the numbers card instead of on the details step. */
 export const equipmentFieldIds = (block: EquipmentNumbers | undefined): Set<string> => (

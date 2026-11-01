@@ -1,7 +1,7 @@
 import { HUB_TIMEZONE } from '../../../shared/timezone.ts';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router';
-import { Apparatus, ApparatusServiceTicketSummary, EquipmentExtra, FleetVehicle, OfficerInfo, ChecklistData, ChecklistFieldValue, Compartment, Defect, InspectionData, MeterData, InspectionSubmission, ReviewFlagDraft, ScheduledChecklistTaskResult, VehicleIdentificationAnswers } from '../types';
+import { Apparatus, ApparatusServiceTicketSummary, EquipmentExtra, FleetVehicle, OfficerInfo, ChecklistData, ChecklistFieldValue, Compartment, Defect, InspectionData, MeterData, InspectionSubmission, ReviewFlagDraft, ScheduledChecklistTaskResult, SeenNumber, VehicleIdentificationAnswers } from '../types';
 import { ApiClient, READ_TIMEOUT_MS } from '../utils/api';
 import {
   DAILY_CHECKOUT_QUEUE_SYNC_EVENT,
@@ -41,7 +41,7 @@ import { inspectionProgress, inspectionReadiness } from '../utils/inspectionProg
 import { identityForQueueCapture, type OfflineIdentity } from '../lib/offlineIdentity';
 import { EMPTY_REVIEW_FLAG, buildReviewFlag, normalizeReviewFlagDraft, reviewFlagExplanationMissing } from '../utils/reviewFlag';
 import { normalizeTaskStatus } from '../utils/checklistFields.ts';
-import { prefillCompartments, prefillFieldValues, toExtraSubmissions } from '../utils/equipmentNumbers.ts';
+import { prefillBlankCompartments, prefillBlankFieldValues, prefillCompartments, prefillFieldValues, seenNumbers, toExtraSubmissions } from '../utils/equipmentNumbers.ts';
 import { checklistUsesVehicleId, defaultVehicleConfirmation, paperVehicleValue, reconcileVehicleConfirmation, toPhysicalVehicleReport } from '../utils/vehicleConfirmation';
 import { activeVehicleIdentification, optionalIdentification, toVehicleIdentificationSubmission } from '../utils/vehicleIdentification';
 import { ClipboardList, Gauge, Truck, Users } from 'lucide-react';
@@ -157,6 +157,7 @@ export default function InspectionWizard() {
   const [concerns, setConcerns] = useState<ConcernDraft[]>([]);
   // SCBA and radio numbers added beyond the checklist's own entries. Part of the draft.
   const [equipmentExtras, setEquipmentExtras] = useState<EquipmentExtra[]>([]);
+  const [equipmentSeen, setEquipmentSeen] = useState<SeenNumber[]>([]);
   // Created once per draft; links inventory corrections reported meanwhile to the inspection.
   const [draftId, setDraftId] = useState<string | null>(null);
   const [checklist, setChecklist] = useState<ChecklistData | null>(null);
@@ -496,6 +497,7 @@ export default function InspectionWizard() {
         setReviewFlag(EMPTY_REVIEW_FLAG);
         setConcerns([]);
         setEquipmentExtras(checklistData.equipment_numbers?.extras ?? []);
+        setEquipmentSeen(seenNumbers(checklistData.equipment_numbers));
         setDraftId(createClientSubmissionId());
         setCurrentStep('compartments');
         // The last member's SCBA and radio numbers carry over, so this member only changes what changed.
@@ -528,10 +530,14 @@ export default function InspectionWizard() {
           // The normal restore and the inventory-overlay migration differ only in which answers are loaded.
           const personnel = identity.personnel;
           const applySavedProgress = (restoredCompartments: Compartment[]) => {
+            // A draft from before numbers carried over was never shown them, so it picks them up now.
+            const numbers = checklistData.equipment_numbers;
+            const neverShownNumbers = saved.equipmentSeen === undefined;
             setSignature(saved.signature ?? null);
             setReviewFlag(normalizeReviewFlagDraft(saved.reviewFlag));
             setConcerns(restoreConcernDrafts(saved.concerns));
-            setEquipmentExtras(saved.equipmentExtras ?? checklistData.equipment_numbers?.extras ?? []);
+            setEquipmentExtras(saved.equipmentExtras ?? numbers?.extras ?? []);
+            setEquipmentSeen(saved.equipmentSeen ?? seenNumbers(numbers));
             setDraftId(saved.draftId ?? createClientSubmissionId());
             // Keep the issued baseline with the observation, even after a newer
             // checkout changed the live fleet meters while this draft was offline.
@@ -543,10 +549,11 @@ export default function InspectionWizard() {
               setMeterData(saved.meter);
             }
             setVehicleIdentification(saved.vehicleIdentification ?? {});
-            setCompartments(restoredCompartments);
+            setCompartments(neverShownNumbers ? prefillBlankCompartments(restoredCompartments, numbers) : restoredCompartments);
             {
               if (saved.fieldValues) {
-                setFieldValues(saved.fieldValues.map(field => field.id === 'vehicle_num' ? { ...field, value: paperVehicleValue(restoredVehicle) } : field));
+                const restoredFields = saved.fieldValues.map(field => field.id === 'vehicle_num' ? { ...field, value: paperVehicleValue(restoredVehicle) } : field);
+                setFieldValues(neverShownNumbers ? prefillBlankFieldValues(restoredFields, numbers) : restoredFields);
               }
               if (saved.scheduledTasks) {
                 setScheduledTasks(saved.scheduledTasks.map(task => ({ ...task, status: normalizeTaskStatus(task.status) })));
@@ -623,7 +630,7 @@ export default function InspectionWizard() {
         ...(draftId ? { draftId } : {}),
         ...(Object.keys(vehicleIdentification).length > 0 ? { vehicleIdentification } : {}),
         ...(concerns.length > 0 ? { concerns } : {}),
-        ...(checklist.equipment_numbers ? { equipmentExtras } : {}),
+        ...(checklist.equipment_numbers ? { equipmentExtras, equipmentSeen } : {}),
         meter: meterData,
         compartments,
         fieldValues,
@@ -633,7 +640,7 @@ export default function InspectionWizard() {
       },
       clearSessionStartKeyFor: checklist.schema_version === 2 && checklist.inspection_session ? checklist.checklist_version : undefined,
     }, stepChanged);
-  }, [officerInfo, meterData, compartments, fieldValues, scheduledTasks, currentStep, slug, apparatus, checklist, memberIdentity, loading, signature, reviewFlag, concerns, equipmentExtras, draftId, vehicleIdentification, submitting, queuedSubmissionBlocker, autosaver]);
+  }, [officerInfo, meterData, compartments, fieldValues, scheduledTasks, currentStep, slug, apparatus, checklist, memberIdentity, loading, signature, reviewFlag, concerns, equipmentExtras, equipmentSeen, draftId, vehicleIdentification, submitting, queuedSubmissionBlocker, autosaver]);
 
   useEffect(() => {
     if (readiness.ready) setShowNotReady(false);
@@ -726,6 +733,7 @@ export default function InspectionWizard() {
       setReviewFlag(EMPTY_REVIEW_FLAG);
       setConcerns([]);
       setEquipmentExtras(todayChecklist.equipment_numbers?.extras ?? []);
+      setEquipmentSeen(seenNumbers(todayChecklist.equipment_numbers));
       setDraftId(createClientSubmissionId());
       setCompartments(prefillCompartments(todayChecklist.compartments, todayChecklist.equipment_numbers));
       setFieldValues(prefillFieldValues(todayChecklist.fields.map((field) => ({
@@ -851,7 +859,7 @@ export default function InspectionWizard() {
         ...(draftId ? { inventory_draft_id: draftId } : {}),
         ...(identificationReport && (usesVehicleId || identificationReport.answers.length > 0) ? { vehicle_identification: identificationReport } : {}),
         ...(concernReport.length > 0 ? { concerns: concernReport } : {}),
-        ...(checklist.equipment_numbers ? { extra_equipment_numbers: toExtraSubmissions(equipmentExtras) } : {}),
+        ...(checklist.equipment_numbers ? { extra_equipment_numbers: toExtraSubmissions(equipmentExtras), equipment_numbers_seen: equipmentSeen } : {}),
       };
       clientSubmissionIdRef.current = submission.client_submission_id;
       const queueId = await queueSubmission(apparatus.id, submission, currentIdentity, checklist.checklist_base_version);

@@ -7,6 +7,7 @@ namespace App\Services\Fleet;
 use App\Models\Apparatus;
 use App\Models\ApparatusEquipmentNumber;
 use App\Models\ApparatusInspection;
+use Illuminate\Database\Eloquent\Collection;
 
 /**
  * The SCBA and radio numbers that carry from one Daily Checkout to the next on every apparatus, so a member only changes
@@ -41,7 +42,7 @@ final class CrewEquipmentNumbers
         $slots = $this->slots($checklist);
         // Until a unit's first checkout under this feature, its numbers are whatever its latest inspection recorded.
         if ($numbers === []) {
-            $numbers = $this->fromLatestInspection($apparatus, $slots);
+            $numbers = $this->numbersFrom($this->latestInspection($apparatus), $slots);
         }
 
         return [
@@ -58,40 +59,53 @@ final class CrewEquipmentNumbers
     }
 
     /**
-     * Update the current numbers from an accepted checkout, on the physical apparatus it settled on. A blank entry clears
-     * the number only when the app showed the member that number to change. A phone on an older app never saw it, so its
-     * blank says nothing and the number stays.
+     * Update the current numbers from an accepted checkout, on the physical apparatus it settled on. The app reports the
+     * numbers it showed the member, so only what they changed is applied: a draft or queued submission that sat for hours
+     * cannot undo a change someone made in the meantime. A phone on an older app reports nothing, so its blank says nothing
+     * and the number stays.
      *
      * @param  array<string, mixed>  $checklist
      * @param  array<string, mixed>  $evidence  the inspection's pending effects
      */
     public function record(ApparatusInspection $inspection, Apparatus $apparatus, array $checklist, array $evidence): void
     {
-        $sawNumbers = array_key_exists('extra_equipment_numbers', $evidence);
+        $sawNumbers = array_key_exists('equipment_numbers_seen', $evidence);
+        $seen = [];
+        foreach ($evidence['equipment_numbers_seen'] ?? [] as $shown) {
+            $seen[(string) $shown['slot']] = $this->text($shown['number'] ?? null) ?? '';
+        }
+        $slots = $this->slots($checklist);
         $existing = ApparatusEquipmentNumber::query()->where('apparatus_id', $apparatus->id)->get()->keyBy('slot');
+        if ($existing->isEmpty()) {
+            $existing = $this->startFromLatestInspection($inspection, $apparatus, $slots);
+        }
         $values = $this->enteredValues($inspection);
 
-        foreach ($this->slots($checklist) as $slot) {
+        foreach ($slots as $slot) {
             $number = $values[$slot['slot']] ?? '';
-            if ($number !== '') {
+            if ($sawNumbers && $number === ($seen[$slot['slot']] ?? '')) {
+                continue;
+            }
+            if ($this->hasDigit($number)) {
                 $this->put($inspection, $apparatus, $existing->get($slot['slot']), $slot['slot'], $slot['kind'], $slot['label'], $number);
-            } elseif ($sawNumbers) {
+            } elseif ($sawNumbers && $number === '') {
                 $existing->get($slot['slot'])?->delete();
             }
         }
 
-        if (! $sawNumbers) {
-            return;
-        }
-        $kept = [];
-        foreach ($evidence['extra_equipment_numbers'] as $extra) {
+        $sent = [];
+        foreach ($evidence['extra_equipment_numbers'] ?? [] as $extra) {
             $slot = self::EXTRA_PREFIX.strtolower((string) $extra['client_id']);
-            $kept[] = $slot;
-            $this->put($inspection, $apparatus, $existing->get($slot), $slot, (string) $extra['kind'], $this->text($extra['label'] ?? null), $this->text($extra['number'] ?? null) ?? '');
+            $sent[] = $slot;
+            $number = $this->text($extra['number'] ?? null) ?? '';
+            if (($seen[$slot] ?? null) !== $number) {
+                $this->put($inspection, $apparatus, $existing->get($slot), $slot, (string) $extra['kind'], $this->text($extra['label'] ?? null), $number);
+            }
         }
-        foreach ($existing as $slot => $row) {
-            if (str_starts_with((string) $slot, self::EXTRA_PREFIX) && ! in_array($slot, $kept, true)) {
-                $row->delete();
+        // Removed means shown and not sent back. One added since this member looked is not theirs to remove.
+        foreach (array_keys($seen) as $slot) {
+            if (str_starts_with($slot, self::EXTRA_PREFIX) && ! in_array($slot, $sent, true)) {
+                $existing->get($slot)?->delete();
             }
         }
     }
@@ -182,35 +196,65 @@ final class CrewEquipmentNumbers
     }
 
     /**
+     * The numbers a unit had before its first checkout under this feature become rows first, so one phone filling a single
+     * box cannot lose the rest.
+     *
+     * @param  list<array<string, mixed>>  $slots
+     * @return Collection<string, ApparatusEquipmentNumber>
+     */
+    private function startFromLatestInspection(ApparatusInspection $inspection, Apparatus $apparatus, array $slots): Collection
+    {
+        $latest = $this->latestInspection($apparatus, (int) $inspection->id);
+        $numbers = $this->numbersFrom($latest, $slots);
+        if ($latest === null || $numbers === []) {
+            return new Collection;
+        }
+        foreach ($slots as $slot) {
+            if (isset($numbers[$slot['slot']])) {
+                $this->put($latest, $apparatus, null, $slot['slot'], $slot['kind'], $slot['label'], $numbers[$slot['slot']]);
+            }
+        }
+
+        return ApparatusEquipmentNumber::query()->where('apparatus_id', $apparatus->id)->get()->keyBy('slot');
+    }
+
+    private function latestInspection(Apparatus $apparatus, ?int $except = null): ?ApparatusInspection
+    {
+        return ApparatusInspection::query()->operational()
+            ->where(static fn ($query) => $query->where('processed_apparatus_id', $apparatus->id)
+                ->orWhere(static fn ($legacy) => $legacy->whereNull('processed_apparatus_id')->where('apparatus_id', $apparatus->id)))
+            ->whereNotNull('completed_at')
+            ->when($except !== null, static fn ($query) => $query->whereKeyNot($except))
+            ->orderByDesc('completed_at')->orderByDesc('id')
+            ->first(['id', 'results', 'checklist_evidence', 'actor_user_id']);
+    }
+
+    /**
      * Older inspections hold words like "OK" or "Inspected" in these boxes, so only an entry with a digit carries forward.
      *
      * @param  list<array<string, mixed>>  $slots
      * @return array<string, string>
      */
-    private function fromLatestInspection(Apparatus $apparatus, array $slots): array
+    private function numbersFrom(?ApparatusInspection $inspection, array $slots): array
     {
-        if ($slots === []) {
+        if ($inspection === null) {
             return [];
         }
-        $latest = ApparatusInspection::query()->operational()
-            ->where(static fn ($query) => $query->where('processed_apparatus_id', $apparatus->id)
-                ->orWhere(static fn ($legacy) => $legacy->whereNull('processed_apparatus_id')->where('apparatus_id', $apparatus->id)))
-            ->whereNotNull('completed_at')
-            ->orderByDesc('completed_at')->orderByDesc('id')
-            ->first(['id', 'results', 'checklist_evidence']);
-        if (! $latest instanceof ApparatusInspection) {
-            return [];
-        }
-        $entered = $this->enteredValues($latest);
+        $entered = $this->enteredValues($inspection);
         $numbers = [];
         foreach ($slots as $slot) {
             $value = $entered[$slot['slot']] ?? '';
-            if (preg_match('/\d/', $value) === 1) {
+            if ($this->hasDigit($value)) {
                 $numbers[$slot['slot']] = $value;
             }
         }
 
         return $numbers;
+    }
+
+    private function hasDigit(string $value): bool
+    {
+        return preg_match('/\d/', $value) === 1;
     }
 
     private function put(ApparatusInspection $inspection, Apparatus $apparatus, ?ApparatusEquipmentNumber $row, string $slot, string $kind, ?string $label, string $number): void

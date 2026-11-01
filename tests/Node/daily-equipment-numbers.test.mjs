@@ -5,8 +5,11 @@ import {
   equipmentFieldIds,
   joinNumbers,
   parseEquipmentNumbers,
+  prefillBlankCompartments,
+  prefillBlankFieldValues,
   prefillCompartments,
   prefillFieldValues,
+  seenNumbers,
   slotsOnChecklist,
   splitNumbers,
   toExtraSubmissions,
@@ -66,6 +69,31 @@ test('an added number left blank is not sent, which removes it', () => {
     { client_id: 'a', kind: 'radio', label: null, number: ' 1741 ' },
     { client_id: 'b', kind: 'scba', label: null, number: '   ' },
   ]), [{ client_id: 'a', kind: 'radio', label: null, number: '1741' }]);
+});
+
+test('what the member was shown is recorded in the same form the answers are sent', () => {
+  const block = { slots: [fieldSlot, itemSlot, { ...fieldSlot, slot: 'field:empty', field_id: 'empty', number: '' }], extras: [{ client_id: 'a', kind: 'radio', label: null, number: '1800' }] };
+  assert.deepEqual(seenNumbers(block), [
+    { slot: 'field:scba_1', number: '2103' },
+    { slot: itemSlot.slot, number: '2103, 2161, 2189' },
+    { slot: 'extra:a', number: '1800' },
+  ]);
+  assert.deepEqual(seenNumbers(undefined), []);
+});
+
+test('a draft from before the numbers carried gets them in its blanks and keeps what the member typed', () => {
+  const block = { slots: [fieldSlot, { ...fieldSlot, slot: 'field:scba_2', field_id: 'scba_2', number: '2161' }, itemSlot], extras: [] };
+  assert.deepEqual(prefillBlankFieldValues([{ id: 'scba_1', value: '' }, { id: 'scba_2', value: '9999' }, { id: 'tide', value: null }], block), [
+    { id: 'scba_1', value: '2103' },
+    { id: 'scba_2', value: '9999' },
+    { id: 'tide', value: null },
+  ]);
+
+  const typed = [{ ...compartments[0], items: [{ ...compartments[0].items[0], value: '1, 2, 3', status: 'Present', observed: true }, compartments[0].items[1]] }];
+  assert.equal(prefillBlankCompartments(typed, block)[0].items[0].value, '1, 2, 3');
+  const blank = prefillBlankCompartments([{ ...compartments[0], items: [{ ...compartments[0].items[0], value: '' }] }], block);
+  assert.equal(blank[0].items[0].value, '2103, 2161, 2189');
+  assert.equal(blank[0].items[0].observed, undefined);
 });
 
 test('a bad row from the server is dropped and the rest still work', () => {

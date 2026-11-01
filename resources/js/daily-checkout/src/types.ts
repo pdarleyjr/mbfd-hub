@@ -218,6 +218,11 @@ export interface EquipmentExtra {
   number: string;
 }
 
+export interface SeenNumber {
+  slot: string;
+  number: string;
+}
+
 /** The SCBA and radio numbers carried from the last inspection; outside the hashed checklist. */
 export interface EquipmentNumbers {
   slots: EquipmentSlot[];
@@ -419,8 +424,10 @@ export interface InspectionSubmission {
   inventory_draft_id?: string;
   /** Concerns, damage and notes the member added (max 20). Omitted when there are none. */
   concerns?: ConcernSubmission[];
-  /** Sent, even empty, when the member was shown the numbers, so a blank entry means the number was cleared. */
+  /** Numbers the member added or kept beyond the checklist's own entries. */
   extra_equipment_numbers?: EquipmentExtra[];
+  /** Sent, even empty, when the member was shown the numbers, so the server applies only what they changed. */
+  equipment_numbers_seen?: SeenNumber[];
 }
 
 export interface MeterData {
@@ -446,6 +453,8 @@ export interface InspectionData {
   concerns?: ConcernDraft[];
   /** SCBA and radio numbers added on this checkout; absent on a draft from before they could be added. */
   equipmentExtras?: EquipmentExtra[];
+  /** The numbers this draft was filled in from; absent on a draft from before they carried over. */
+  equipmentSeen?: SeenNumber[];
   actorUserId?: number;
   actorSecurityVersion?: number;
   checklist_version: string;

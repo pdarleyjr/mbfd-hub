@@ -1117,6 +1117,55 @@ test('SCBA and radio numbers come filled in, one box each, and only a change or 
   expect(submitted.field_values.find((field) => field.id === 'radio_de')?.value).toBe('1741');
   expect(submitted.compartments[0].items.find((item) => item.id === 'fb6-cubby-scbas')?.value).toBe('2103, 2999, 2189');
   expect(submitted.extra_equipment_numbers.map((extra) => [extra.kind, extra.number])).toEqual([['radio', '1800'], ['scba', '2200']]);
+  // What the member was shown, in the form the answers are sent, so the server applies only their changes.
+  expect((api.submissions[0] as { equipment_numbers_seen: unknown }).equipment_numbers_seen).toEqual([
+    { slot: 'item:fb6-cubby/fb6-cubby-scbas', number: '2103, 2161, 2189' },
+    { slot: 'field:radio_de', number: '1741' },
+    { slot: 'extra:77777777-7777-4777-8777-777777777777', number: '1800' },
+  ]);
+});
+
+test('a draft saved before numbers carried over picks them up instead of clearing them', async ({ page }) => {
+  const api = await mockFireBoatInspectionApi(page, { equipmentNumbers: true });
+
+  await page.goto('/daily/apparatus/fire-boat-6');
+  await page.getByRole('button', { name: 'Checklist details', exact: true }).click();
+  await page.locator('#fb6-shift').selectOption('A');
+  await page.getByLabel('High Low Tide').fill('High');
+  await page.getByRole('button', { name: 'Mark all duties completed' }).click();
+  await page.getByLabel('Port Engine Hours').fill('45.5');
+  const autosaveKey = `mbfd_autosave_inspection_fire-boat-6_${fireBoatChecklist.checklist_version}_actor_101_1`;
+  await expect.poll(async () => JSON.stringify((await readDrafts(page)).find(draft => draft.key === autosaveKey)?.data.fieldValues ?? [])).toContain('45.5');
+
+  // Exactly what the released app left on a phone: blank boxes and no record of the numbers.
+  await replaceDrafts(page, (await readDrafts(page)).map((draft) => {
+    if (draft.key !== autosaveKey) return draft;
+    const { equipmentExtras: _extras, equipmentSeen: _seen, ...data } = draft.data as unknown as Record<string, unknown> & { fieldValues: Array<{ id: string }>; compartments: Array<{ items: Array<{ id: string }> }> };
+
+    return {
+      ...draft,
+      data: {
+        ...data,
+        fieldValues: data.fieldValues.map(field => field.id === 'radio_de' ? { ...field, value: '' } : field),
+        compartments: data.compartments.map(compartment => ({ ...compartment, items: compartment.items.map(item => item.id === 'fb6-cubby-scbas' ? { ...item, value: '' } : item) })),
+      },
+    } as unknown as typeof draft;
+  }));
+
+  await page.reload();
+  await expect(page.getByText(/Restored from autosave/)).toBeVisible();
+  await page.getByRole('button', { name: 'Confirm all present' }).click();
+  await page.getByRole('button', { name: 'Review & Sign', exact: true }).click();
+  await expect(page.getByLabel('Radio # - DE')).toHaveValue('1741');
+  await expect(page.getByLabel('SCBAs 2')).toHaveValue('2161');
+  await expect(page.getByLabel('Additional radio')).toHaveValue('1800');
+  await drawInspectionSignature(page);
+  await page.getByRole('button', { name: 'Submit Inspection' }).click();
+  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
+
+  const submitted = api.submissions[0] as { field_values: Array<{ id: string; value: unknown }>; equipment_numbers_seen: Array<{ slot: string; number: string }> };
+  expect(submitted.field_values.find((field) => field.id === 'radio_de')?.value).toBe('1741');
+  expect(submitted.equipment_numbers_seen).toContainEqual({ slot: 'field:radio_de', number: '1741' });
 });
 
 test('Fire Boat blocks an unbound offline checkout before inspection entry', async ({ page }) => {

@@ -19,6 +19,7 @@ use App\Services\Fleet\CrewEquipmentNumbers;
 use App\Services\Inspections\InspectionHold;
 use App\Services\Inspections\InspectionNotificationDispatcher;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 /**
  * Applies one submitted inspection to its physical apparatus
@@ -71,7 +72,7 @@ final class ApparatusInspectionProcessingService
         $batch = $concerns->begin($inspection, $apparatus, $evidence['concerns'] ?? []);
         $findings = app(DefectContinuityService::class)->recordFindings($inspection, $apparatus, [...$observations, ...$batch->compartments], $definitions, $evidence);
         $findings = $concerns->finish($batch, $inspection, $apparatus, $findings);
-        app(CrewEquipmentNumbers::class)->record($inspection, $apparatus, $checklist, $evidence);
+        $this->carryEquipmentNumbers($inspection, $apparatus, $checklist, $evidence);
 
         $this->recordNonMeterHolds($inspection, $apparatus, $findings);
         $this->settle($inspection, $apparatus, $evidence, $meterOutcomes);
@@ -85,6 +86,22 @@ final class ApparatusInspectionProcessingService
                 AuditEquipmentAfterInspection::dispatch((int) $inspection->id, (int) $apparatus->id)->delay(now()->addSeconds(5));
             }
         });
+    }
+
+    /**
+     * The inspection already holds these numbers, so a problem keeping the current copy must not cost the member their
+     * checkout. The savepoint leaves the surrounding PostgreSQL transaction usable.
+     *
+     * @param  array<string, mixed>  $checklist
+     * @param  array<string, mixed>  $evidence
+     */
+    private function carryEquipmentNumbers(ApparatusInspection $inspection, Apparatus $apparatus, array $checklist, array $evidence): void
+    {
+        try {
+            DB::transaction(static fn () => app(CrewEquipmentNumbers::class)->record($inspection, $apparatus, $checklist, $evidence));
+        } catch (Throwable $exception) {
+            report($exception);
+        }
     }
 
     /** Reviewers hear about a held inspection and about new significant damage; routine acceptance is silent. */

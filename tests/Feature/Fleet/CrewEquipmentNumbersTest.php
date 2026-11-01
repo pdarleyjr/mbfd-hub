@@ -11,6 +11,7 @@ use App\Models\Station;
 use App\Services\DailyCheckoutChecklistResolver;
 use App\Services\Fleet\CrewEquipmentNumbers;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -21,6 +22,9 @@ class CrewEquipmentNumbersTest extends TestCase
     use RefreshDatabase;
 
     private const SIGNATURE = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+
+    /** @var list<array{slot: string, number: string}>|null */
+    private ?array $shown = null;
 
     protected function setUp(): void
     {
@@ -145,6 +149,110 @@ class CrewEquipmentNumbersTest extends TestCase
         $this->assertSame('', $slots['item:radio_numbers/radio_numbers-item-1']['number'], 'a word is not a number');
     }
 
+    public function test_one_older_phone_filling_one_box_does_not_lose_the_units_other_numbers(): void
+    {
+        $unit = $this->unit('engine');
+        $this->submit($unit, ['field:scba_1' => '2103', 'field:scba_2' => '2161'], null);
+        ApparatusEquipmentNumber::query()->delete();
+
+        $this->submit($unit, ['field:scba_1' => '2200'], null);
+
+        $slots = collect($this->getJson("/api/public/apparatuses/{$unit->id}/checklist")->json('equipment_numbers.slots'))->keyBy('slot');
+        $this->assertSame('2200', $slots['field:scba_1']['number']);
+        $this->assertSame('2161', $slots['field:scba_2']['number']);
+    }
+
+    public function test_a_word_never_replaces_a_number(): void
+    {
+        $unit = $this->unit('engine');
+        $this->submit($unit, ['field:scba_1' => '2103'], []);
+
+        $this->submit($unit, ['field:scba_1' => 'OK'], null);
+        $this->assertDatabaseHas('apparatus_equipment_numbers', ['slot' => 'field:scba_1', 'number' => '2103']);
+
+        $this->submit($unit, ['field:scba_1' => 'Inspected'], []);
+        $this->assertDatabaseHas('apparatus_equipment_numbers', ['slot' => 'field:scba_1', 'number' => '2103']);
+    }
+
+    public function test_a_member_who_left_a_number_alone_does_not_undo_a_newer_change(): void
+    {
+        $unit = $this->unit('engine');
+        $this->submit($unit, ['field:scba_1' => '2103', 'field:scba_2' => '2161'], []);
+        // This member opened the checkout now and is slow to submit, or their phone is offline.
+        $shown = $this->seen($unit);
+
+        $this->submit($unit, ['field:scba_1' => '2200', 'field:scba_2' => '2161'], []);
+
+        // They change only the second box. The first still holds what they were shown.
+        $this->submit($unit, ['field:scba_1' => '2103', 'field:scba_2' => '2999'], [], $shown);
+
+        $this->assertDatabaseHas('apparatus_equipment_numbers', ['slot' => 'field:scba_1', 'number' => '2200']);
+        $this->assertDatabaseHas('apparatus_equipment_numbers', ['slot' => 'field:scba_2', 'number' => '2999']);
+    }
+
+    public function test_a_replayed_stale_submission_does_not_bring_back_a_cleared_number(): void
+    {
+        $unit = $this->unit('engine');
+        $this->submit($unit, ['field:scba_1' => '2103', 'field:scba_2' => '2161'], []);
+        $shown = $this->seen($unit);
+
+        $this->submit($unit, ['field:scba_2' => '2161'], []);
+        $this->assertDatabaseMissing('apparatus_equipment_numbers', ['slot' => 'field:scba_1']);
+
+        $this->submit($unit, ['field:scba_1' => '2103', 'field:scba_2' => '2161'], [], $shown);
+        $this->assertDatabaseMissing('apparatus_equipment_numbers', ['slot' => 'field:scba_1']);
+    }
+
+    public function test_an_extra_added_by_someone_else_survives_a_member_who_was_never_shown_it(): void
+    {
+        $unit = $this->unit('rescue');
+        $mine = (string) Str::uuid();
+        $this->submit($unit, [], [['client_id' => $mine, 'kind' => 'radio', 'label' => null, 'number' => '1800']]);
+        $shown = $this->seen($unit);
+
+        $theirs = (string) Str::uuid();
+        $this->submit($unit, [], [
+            ['client_id' => $mine, 'kind' => 'radio', 'label' => null, 'number' => '1801'],
+            ['client_id' => $theirs, 'kind' => 'scba', 'label' => null, 'number' => '2200'],
+        ]);
+
+        // Stale list: they saw 1800, kept it, and know nothing of the new one.
+        $this->submit($unit, [], [['client_id' => $mine, 'kind' => 'radio', 'label' => null, 'number' => '1800']], $shown);
+
+        $extras = $this->getJson("/api/public/apparatuses/{$unit->id}/checklist")->json('equipment_numbers.extras');
+        $this->assertEqualsCanonicalizing(['1801', '2200'], array_column($extras, 'number'));
+    }
+
+    public function test_a_stale_member_can_still_remove_the_extra_they_were_shown(): void
+    {
+        $unit = $this->unit('rescue');
+        $mine = (string) Str::uuid();
+        $this->submit($unit, [], [['client_id' => $mine, 'kind' => 'radio', 'label' => null, 'number' => '1800']]);
+        $shown = $this->seen($unit);
+
+        $theirs = (string) Str::uuid();
+        $this->submit($unit, [], [
+            ['client_id' => $mine, 'kind' => 'radio', 'label' => null, 'number' => '1800'],
+            ['client_id' => $theirs, 'kind' => 'scba', 'label' => null, 'number' => '2200'],
+        ]);
+
+        $this->submit($unit, [], [], $shown);
+
+        $extras = $this->getJson("/api/public/apparatuses/{$unit->id}/checklist")->json('equipment_numbers.extras');
+        $this->assertSame(['2200'], array_column($extras, 'number'));
+    }
+
+    public function test_a_problem_saving_the_numbers_never_costs_the_member_their_checkout(): void
+    {
+        $unit = $this->unit('engine');
+        Schema::drop('apparatus_equipment_numbers');
+
+        $this->submit($unit, ['field:scba_1' => '2103'], null);
+
+        $inspection = ApparatusInspection::query()->sole();
+        $this->assertNotNull($inspection->processing_status);
+    }
+
     public function test_numbers_stay_on_their_own_apparatus(): void
     {
         $one = $this->unit('engine');
@@ -181,11 +289,13 @@ class CrewEquipmentNumbersTest extends TestCase
 
     /**
      * @param  array<string, string>  $numbers  slot => number
-     * @param  list<array<string, mixed>>|null  $extras  null is an older app, which does not send the key
+     * @param  list<array<string, mixed>>|null  $extras  null is an older app, which sends neither key
+     * @param  list<array{slot: string, number: string}>|null  $shown  what the member saw; by default what is current
      */
-    private function submit(Apparatus $unit, array $numbers, ?array $extras = []): void
+    private function submit(Apparatus $unit, array $numbers, ?array $extras = [], ?array $shown = null): void
     {
         $unit->refresh();
+        $this->shown = $extras === null ? null : ($shown ?? $this->seen($unit));
         if ($unit->daily_checkout_template?->value === 'fireboat6') {
             $start = $this->postJson("/api/public/apparatuses/{$unit->id}/inspection-sessions", ['inspection_session_start_key' => (string) Str::uuid()])->assertSuccessful();
             $cookie = collect($start->headers->getCookies())->first(fn ($c): bool => $c->getName() === 'daily_checkout_inspection_browser');
@@ -261,7 +371,22 @@ class CrewEquipmentNumbersTest extends TestCase
             ], $checklist['fields'] ?? $checklist['officerChecklist'] ?? []),
             'scheduled_tasks' => array_map(static fn (array $task): array => ['id' => $task['id'], 'status' => 'Completed', 'notes' => null, 'observed' => true], $dueTasks),
             'officer_signature' => self::SIGNATURE,
-            ...($extras === null ? [] : ['extra_equipment_numbers' => $extras]),
+            ...($extras === null ? [] : ['extra_equipment_numbers' => $extras, 'equipment_numbers_seen' => $this->shown ?? []]),
+        ];
+    }
+
+    /**
+     * What the app reports having shown the member, from the block it was given.
+     *
+     * @return list<array{slot: string, number: string}>
+     */
+    private function seen(Apparatus $unit): array
+    {
+        $block = app(CrewEquipmentNumbers::class)->block($unit, $this->checklist($unit));
+
+        return [
+            ...collect($block['slots'])->where('number', '!=', '')->map(static fn (array $slot): array => ['slot' => $slot['slot'], 'number' => $slot['number']])->values()->all(),
+            ...array_map(static fn (array $extra): array => ['slot' => 'extra:'.$extra['client_id'], 'number' => $extra['number']], $block['extras']),
         ];
     }
 
