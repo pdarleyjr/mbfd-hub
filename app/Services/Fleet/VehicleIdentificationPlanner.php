@@ -219,7 +219,8 @@ final class VehicleIdentificationPlanner
                 continue;
             }
             // Once a unit is linked, the link defines its vehicle number: the crew is never asked for it.
-            if ($master !== null && $field === Fields::VEHICLE_NUMBER) {
+            // A boat has no fleet number at all.
+            if (($master !== null || $kind === Fields::KIND_BOAT) && $field === Fields::VEHICLE_NUMBER) {
                 continue;
             }
             $masterValue = $master === null ? null : $master->getAttribute(Fields::masterColumn($field));
@@ -256,6 +257,9 @@ final class VehicleIdentificationPlanner
     {
         if (! $this->isEligible($apparatus)) {
             return 'This unit is not asked identification questions.';
+        }
+        if ($field === Fields::VEHICLE_NUMBER && ! Fields::usesFleetNumber($apparatus)) {
+            return 'A boat has no fleet vehicle number.';
         }
         $question = ApparatusIdentificationQuestion::query()
             ->where('apparatus_id', $apparatus->getKey())->where('field', $field)->first();

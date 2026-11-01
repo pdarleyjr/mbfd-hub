@@ -446,6 +446,7 @@ export class ApiClient {
       ...(checklistBaseVersion ? { checklist_base_version: checklistBaseVersion } : {}),
       pending_corrections: parsePendingCorrections(payload?.pending_corrections),
       ...(vehicleIdentification ? { vehicle_identification: vehicleIdentification } : {}),
+      ...(payload?.vehicle_id_required === false ? { vehicle_id_required: false } : {}),
       ...(changeoutHandoff ? { changeout_handoff: changeoutHandoff } : {}),
       checklist_version: checklistVersion.toLowerCase(),
       checklist_type: typeof payload?.checklist_type === 'string' ? payload.checklist_type : undefined,

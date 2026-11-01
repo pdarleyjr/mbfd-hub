@@ -3,7 +3,7 @@ import SignatureCanvas from 'react-signature-canvas';
 import type { OfficerInfo, Compartment, ChecklistData, ChecklistFieldValue, MeterData, ReviewFlagDraft, ScheduledChecklistTaskResult } from '../types';
 import { ArrowLeft, Send, TriangleAlert, Undo2 } from 'lucide-react';
 import { inspectionProgress } from '../utils/inspectionProgress';
-import { reportedVehicle } from '../utils/vehicleConfirmation';
+import { checklistUsesVehicleId, reportedVehicle } from '../utils/vehicleConfirmation';
 import { currentObservationText, previousIssueHeadline, previousIssueStatusLine, resolveFindingTargets, unlocatedFindings } from '../utils/previousFindings';
 import { reviewFlagExplanationMissing } from '../utils/reviewFlag';
 import ReviewFlagControl from './ReviewFlagControl';
@@ -119,10 +119,10 @@ export default function SubmitStep({
             <p className="text-sm text-hub-n-600">{officerInfo.rank}</p>
             <p className="text-sm">Shift {officerInfo.shift}</p>
           </div>
-          <div>
+          {checklistUsesVehicleId(checklist) && <div>
             <p className={LABEL}>Physical vehicle</p>
             <p className="font-medium tabular-nums">{vehicle ? reportedVehicle(vehicle) || officerInfo.unitNumber : officerInfo.unitNumber}</p>
-          </div>
+          </div>}
         </div>
 
         <div className="grid grid-cols-2 gap-4">

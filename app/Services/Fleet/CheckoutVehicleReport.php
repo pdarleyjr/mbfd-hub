@@ -12,6 +12,7 @@ use App\Models\User;
 use App\Services\ApparatusInspectionProcessingService;
 use App\Services\InspectionMeterBaseline;
 use App\Support\Fleet\FleetVehicleCatalog;
+use App\Support\Fleet\VehicleIdentificationFields;
 use App\Support\Fleet\VehicleNumber;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -60,6 +61,10 @@ final class CheckoutVehicleReport
     /** @return Assessment */
     public function assess(Apparatus $row, mixed $report): array
     {
+        // A boat has no fleet number and no truck to change to. An older phone may still send one; it means nothing here.
+        if (! VehicleIdentificationFields::usesFleetNumber($row)) {
+            return $this->assessment(self::SAME);
+        }
         $number = is_array($report) ? VehicleNumber::normalize($report['vehicle_number'] ?? null) : null;
         if ($number === null) {
             return $this->assessment(self::SAME);

@@ -67,9 +67,9 @@ final class VehicleIdentificationPlannerTest extends IdentificationTestCase
         $block = $this->block($boat);
 
         $this->assertSame('boat', $block['kind']);
-        $this->assertSame(['vehicle_number', 'vin', 'plate', 'year', 'make', 'model'], array_column($block['questions'], 'field'));
+        $this->assertSame(['vin', 'plate', 'year', 'make', 'model'], array_column($block['questions'], 'field'), 'a boat has no fleet number to ask for');
         $byField = array_column($block['questions'], null, 'field');
-        $this->assertSame('Fleet vessel number', $byField['vehicle_number']['label']);
+        $this->assertSame('A boat has no fleet vehicle number.', app(VehicleIdentificationPlanner::class)->whyNotAsked($boat, 'vehicle_number'));
         $this->assertStringStartsWith('Hull ID (HIN', $byField['vin']['label']);
         $this->assertStringStartsWith('Registration number (FL number', $byField['plate']['label']);
         $this->assertSame('Builder / make', $byField['make']['label']);
