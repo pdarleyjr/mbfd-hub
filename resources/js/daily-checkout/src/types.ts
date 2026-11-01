@@ -48,6 +48,8 @@ export interface Apparatus {
   unit_id?: string;
   type: ApparatusType;
   vehicle_number: string | null;
+  /** False for a unit with no fleet vehicle ID at all (Fire Boat 6). Missing means true. */
+  vehicle_id_required?: boolean;
   designation?: string;
   slug: string;
   status?: string;
@@ -287,6 +289,8 @@ export interface ChecklistData {
   pending_corrections?: PendingInventoryCorrection[];
   /** Open one-time vehicle information questions. Absent when nothing is open. */
   vehicle_identification?: VehicleIdentification;
+  /** False for a unit with no fleet vehicle ID at all (Fire Boat 6). Missing means true. */
+  vehicle_id_required?: boolean;
   /** Equipment the last changeout left on the old truck. Absent on older cached responses. */
   changeout_handoff?: ChangeoutHandoff;
   checklist_version: string;

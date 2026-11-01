@@ -47,7 +47,7 @@ export const phpArguments: string[] = ['-d', 'memory_limit=768M', ...(process.pl
 
 export default defineConfig({
   testDir: './tests/e2e',
-  testMatch: /fleet-changeout-real\.spec\.ts/,
+  testMatch: /(fleet-changeout|fb6-inspection)-real\.spec\.ts/,
   globalSetup: './tests/e2e/fleet-changeout.setup.ts',
   timeout: 180_000,
   retries: 0,

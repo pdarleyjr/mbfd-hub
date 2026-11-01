@@ -12,6 +12,7 @@ use App\Services\Fleet\ApparatusChangeoutPlanner;
 use App\Services\Fleet\ApparatusChangeoutService;
 use App\Services\Fleet\ChangeoutConflictException;
 use App\Services\Identity\AuthenticatedMemberContextResolver;
+use App\Support\Fleet\VehicleIdentificationFields;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -31,6 +32,7 @@ final class ApparatusChangeoutController extends Controller
     {
         $unit = Apparatus::query()->findOrFail($apparatus);
         $this->authorizeMember($request);
+        $this->refuseUnitWithoutFleetNumber($unit);
         $validated = $request->validate(['alert_id' => ['nullable', 'integer']]);
 
         return response()->json($this->planner->context($unit, isset($validated['alert_id']) ? (int) $validated['alert_id'] : null));
@@ -41,6 +43,7 @@ final class ApparatusChangeoutController extends Controller
     {
         $unit = Apparatus::query()->findOrFail($apparatus);
         $user = $this->authorizeMember($request);
+        $this->refuseUnitWithoutFleetNumber($unit);
         // A truck keeps its number after a move, so the unit is what proves nothing moved under this screen.
         $validated = $request->validate(ApparatusChangeoutService::rules());
 
@@ -65,6 +68,12 @@ final class ApparatusChangeoutController extends Controller
         abort_unless($this->canView($request, $user, $record), 404);
 
         return response()->json(['changeout' => $this->service->summary($record, true)]);
+    }
+
+    /** A boat has no fleet vehicle to change to; its screens never offer this, so only an old link lands here. */
+    private function refuseUnitWithoutFleetNumber(Apparatus $unit): void
+    {
+        abort_unless(VehicleIdentificationFields::usesFleetNumber($unit), 409, "{$unit->name} does not use vehicle changes.");
     }
 
     /** Fleet managers, and any active member with an employee profile, for any unit on any day. */
