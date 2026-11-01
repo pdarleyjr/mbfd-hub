@@ -15,14 +15,11 @@ use DateTimeInterface;
 use Illuminate\Support\Collection;
 
 /**
- * Resolves the Shift Captain 5 or Shift 300 (Division Chief) by seat or approved acting request. This
- * is an authority and routing input, not only a display: it feeds narcotics review
- * (NarcoticsCheckAccess), the Captain 5 audit capacity and notification routing. It never reads the
- * TeleStaff roster, which only ever changes the name on the cards.
- *  1. an administrator-approved acting request of that role showing at the moment;
- *  2. otherwise the verified bid holder of that seat ("Captain 5" / "300") whose bid shift is the
- *     on-duty rotation shift;
- *  3. otherwise unknown (shown as "not set"). Never inferred from rank.
+ * Resolves the Shift Captain 5 or Shift 300 (Division Chief) by bid seat: the verified bid holder of that
+ * seat ("Captain 5" / "300") whose bid shift is the on-duty rotation shift, otherwise unknown (shown as
+ * "not set"). Never inferred from rank. It feeds narcotics review (NarcoticsCheckAccess) and the Captain 5
+ * audit capacity, and it is what the cards fall back on when no roster names anyone. It does not read the
+ * TeleStaff roster.
  */
 final class Captain5DutyRoster
 {
@@ -46,15 +43,10 @@ final class Captain5DutyRoster
         return $this->memo[$role.'@'.$moment->format('Y-m-d H:i')] ??= $this->resolve($moment, $role);
     }
 
-    /** The shift's 300 (Division Chief): the approved acting 300 when showing, otherwise the 300 bid holder. */
+    /** The shift's 300 (Division Chief) by bid seat. */
     public function command300OnDuty(?DateTimeInterface $moment = null): OnDutyCaptain5
     {
         return $this->onDuty($moment, Captain5ActingRequest::ROLE_COMMAND_300);
-    }
-
-    public function actingAt(DateTimeInterface $moment, string $role = Captain5ActingRequest::ROLE_CAPTAIN_5): ?Captain5ActingRequest
-    {
-        return Captain5ActingRequest::query()->showingAt($moment, $role)->with('employee')->orderByDesc('starts_at')->orderByDesc('id')->first();
     }
 
     /** @return Collection<int, EmployeeBidAssignment> keyed by employee_profile_id */
@@ -131,20 +123,15 @@ final class Captain5DutyRoster
         $dutyDate = $this->calendar->dutyDate($moment);
         $shift = $this->calendar->shiftFor($dutyDate);
 
-        $acting = $this->actingAt($moment, $role);
-        if ($acting !== null && $acting->employee instanceof Employee) {
-            return new OnDutyCaptain5($dutyDate, $shift ?? $acting->shift_letter, OnDutyCaptain5::SOURCE_ACTING, $acting->employee, $acting);
-        }
-
         if ($shift !== null) {
             $seat = $this->seatsFor($role)
                 ->first(fn (EmployeeBidAssignment $row): bool => DutyCalendar::letterFromBidShift($row->shift_label) === $shift);
             $employee = $seat !== null ? Employee::query()->find($seat->employee_profile_id) : null;
             if ($employee instanceof Employee && $employee->roster_status !== 'departed') {
-                return new OnDutyCaptain5($dutyDate, $shift, OnDutyCaptain5::SOURCE_BID, $employee, null);
+                return new OnDutyCaptain5($dutyDate, $shift, OnDutyCaptain5::SOURCE_BID, $employee);
             }
         }
 
-        return new OnDutyCaptain5($dutyDate, $shift, OnDutyCaptain5::SOURCE_UNKNOWN, null, null);
+        return new OnDutyCaptain5($dutyDate, $shift, OnDutyCaptain5::SOURCE_UNKNOWN, null);
     }
 }

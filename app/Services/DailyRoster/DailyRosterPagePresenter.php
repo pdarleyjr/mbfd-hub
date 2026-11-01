@@ -6,6 +6,7 @@ namespace App\Services\DailyRoster;
 
 use App\Models\DailyRoster\RosterAssignment;
 use App\Models\DailyRoster\RosterSnapshot;
+use App\Support\Captain5\DutyCalendar;
 use App\Support\HubTimezone;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -17,6 +18,9 @@ use Carbon\CarbonInterface;
 final class DailyRosterPagePresenter
 {
     private const MODE_CURRENT = 'current';
+
+    /** TeleStaff has posted the next shift before it starts. Shown by default; the shift on duty is a link away. */
+    private const MODE_NEXT = 'next';
 
     private const MODE_STALE = 'stale';
 
@@ -31,18 +35,24 @@ final class DailyRosterPagePresenter
         private readonly RosterFreshnessResolver $freshness,
         private readonly RosterUnitPresenter $units,
         private readonly RosterStatusPresenter $statuses,
+        private readonly DutyCalendar $calendar,
     ) {}
 
     /** @return array<string, mixed> */
     public function build(?string $requestedDate): array
     {
         $now = CarbonImmutable::now();
-        $freshness = $this->freshness->status($now);
+        $freshness = $this->freshness->pageStatus($now);
+        $onDutyDate = $this->calendar->dutyDate($now)->format('Y-m-d');
         $available = $this->reader->availableDutyDates();
         $date = in_array($requestedDate, $available, true) && $requestedDate !== $freshness->dutyDate ? $requestedDate : null;
 
-        $view = $date !== null ? $this->reader->forDutyDate($date) : $this->reader->current($now);
-        $mode = $date !== null ? self::MODE_DATED : self::MODE_CURRENT;
+        $view = $this->reader->forDutyDate($date ?? $freshness->dutyDate);
+        $mode = match (true) {
+            $date !== null => self::MODE_DATED,
+            $freshness->dutyDate !== $onDutyDate => self::MODE_NEXT,
+            default => self::MODE_CURRENT,
+        };
         if ($view === null) {
             $date = null;
             $view = $this->reader->latestBefore($now);
@@ -57,15 +67,19 @@ final class DailyRosterPagePresenter
             'etag' => $freshness->etag,
             'state' => $freshness->state,
             'snapshotId' => $view === null ? null : (int) $view->snapshot->getKey(),
-            // Only the current roster moves on its own; an earlier one on screen is a settled record.
-            'isLive' => $mode === self::MODE_CURRENT,
+            // Only the roster TeleStaff is sending moves on its own; an earlier one on screen is a settled record.
+            'isLive' => $mode === self::MODE_CURRENT || $mode === self::MODE_NEXT,
             'mode' => $mode,
             'isEmpty' => $mode === self::MODE_EMPTY,
             'requestedDate' => $date,
             'displayedDate' => $displayedDate,
             'displayedDateLabel' => $this->dateLabel($displayedDate, 'l, F j'),
-            'tag' => $this->tag($mode, $freshness, $displayedDate),
+            'tag' => $this->tag($mode, $freshness, $displayedDate, $onDutyDate),
             'notice' => $this->notice($mode, $freshness, $displayedDate),
+            // Null when the shift on duty has no roster, so nothing links to a page that cannot show it.
+            'onDutyDate' => in_array($onDutyDate, $available, true) ? $onDutyDate : null,
+            'nextShiftNote' => $mode === self::MODE_NEXT ? $this->nextShiftNote($view, $onDutyDate) : null,
+            'currentLinkLabel' => $freshness->dutyDate !== $onDutyDate ? "Go to the next shift's roster" : 'Go to the current roster',
             'facts' => $view === null ? null : $this->facts($view),
             'summary' => $content['summary'],
             'previousDate' => $this->neighbour($available, $displayedDate, 1, $freshness->dutyDate),
@@ -124,16 +138,20 @@ final class DailyRosterPagePresenter
     }
 
     /** @return array{label: string, class: string} */
-    private function tag(string $mode, RosterFreshness $freshness, string $displayedDate): array
+    private function tag(string $mode, RosterFreshness $freshness, string $displayedDate, string $onDutyDate): array
     {
         if ($mode === self::MODE_DATED) {
-            return $displayedDate < $freshness->dutyDate
-                ? ['label' => 'Earlier roster', 'class' => '']
-                : ['label' => 'Upcoming roster', 'class' => 'hub-tag--info'];
+            return match (true) {
+                $displayedDate === $onDutyDate => ['label' => 'On duty now', 'class' => 'hub-tag--success'],
+                $displayedDate < $freshness->dutyDate => ['label' => 'Earlier roster', 'class' => ''],
+                default => ['label' => 'Upcoming roster', 'class' => 'hub-tag--info'],
+            };
         }
 
         return match ($freshness->state) {
-            RosterFreshness::CURRENT => ['label' => 'Data current', 'class' => 'hub-tag--success'],
+            RosterFreshness::CURRENT => $mode === self::MODE_NEXT
+                ? ['label' => 'Next shift', 'class' => 'hub-tag--info']
+                : ['label' => 'Data current', 'class' => 'hub-tag--success'],
             RosterFreshness::DELAYED => ['label' => 'Update delayed', 'class' => 'hub-tag--warning'],
             RosterFreshness::NEEDS_REVIEW => ['label' => 'Needs review', 'class' => 'hub-tag--warning'],
             default => ['label' => "Awaiting today's roster", 'class' => 'hub-tag--info'],
@@ -149,9 +167,23 @@ final class DailyRosterPagePresenter
             $mode === self::MODE_STALE && $freshness->state === RosterFreshness::DELAYED => "Today's roster has not arrived and is late. This is the last published roster, from {$shown}.",
             $mode === self::MODE_STALE => "Today's roster has not arrived yet. This is the last published roster, from {$shown}.",
             $mode === self::MODE_CURRENT && $freshness->state === RosterFreshness::NEEDS_REVIEW => 'A newer TeleStaff export is being reviewed. This is the last accepted roster for today.',
-            $mode === self::MODE_CURRENT && $freshness->state === RosterFreshness::DELAYED => 'TeleStaff has stopped sending updates'.($freshness->asOf === null ? '' : ' since '.$this->localTime($freshness->asOf)).'. This roster may be out of date.',
+            $mode === self::MODE_NEXT && $freshness->state === RosterFreshness::NEEDS_REVIEW => 'A newer TeleStaff export is being reviewed. This is the last accepted roster for the next shift.',
+            in_array($mode, [self::MODE_CURRENT, self::MODE_NEXT], true) && $freshness->state === RosterFreshness::DELAYED => 'TeleStaff has stopped sending updates'.($freshness->asOf === null ? '' : ' since '.$this->localTime($freshness->asOf)).'. This roster may be out of date.',
             default => null,
         };
+    }
+
+    /** Says plainly that the people on screen are not on duty yet, and who is. */
+    private function nextShiftNote(?RosterView $view, string $onDutyDate): ?string
+    {
+        if ($view === null) {
+            return null;
+        }
+        $starts = $view->snapshot->starts_at->copy()->setTimezone(HubTimezone::NAME);
+        $onDutyShift = $this->calendar->shiftFor($onDutyDate);
+
+        return 'This is the next shift. It starts '.$starts->format('l, F j \a\t g:i A').'. '
+            .($onDutyShift === null ? 'The current shift' : "{$onDutyShift} Shift").' stays on duty until then.';
     }
 
     /** @return array{division: list<string>, window: string, generated: string, updated: string, changed: string, changedHidden: bool} */

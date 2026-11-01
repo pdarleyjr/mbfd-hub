@@ -2,7 +2,7 @@
 <x-filament-panels::page>
     <div class="mx-auto w-full max-w-5xl space-y-6" data-testid="captain5-operations">
         <p class="text-sm text-gray-600 dark:text-gray-400">
-            Control who can use Captain 5, approve acting Captain 5 and 300 requests, and decide which Engine and Ladder items count as medical.
+            Control who can use Captain 5, see who the shift's cards show, and decide which Engine and Ladder items count as medical.
             Every change is saved with your reason and stays in the history.
         </p>
 
@@ -133,18 +133,17 @@
             @endif
         </x-filament::section>
 
-        {{-- Acting Captain 5 and 300 requests --}}
-        <x-filament::section heading="Acting Captain 5 and 300 requests" description="Members ask to be shown as the shift's Captain 5 or the shift's 300. Approving changes only the name shown for that role. For Captain 5 it also changes who gets the shift's Captain 5 notifications. It never changes who can use any page.">
+        {{-- Who the shift's Captain 5 and 300 cards show --}}
+        <x-filament::section heading="Shift Captain 5 and 300" description="These follow the TeleStaff roster on their own, changing at the times the roster says. With no roster for today, the bid seat holder is shown. Shift Captain 5 alerts go to the person shown.">
             <div class="space-y-6">
                 <div class="grid gap-4 sm:grid-cols-2">
-                    @foreach ($acting['shown'] as $shown)
+                    @foreach ($shownNow as $shown)
                         <div class="space-y-1 rounded-lg border border-gray-200 p-4 dark:border-white/10" data-testid="captain5-on-duty-{{ $shown['role'] }}">
                             <h3 class="text-sm font-semibold text-gray-950 dark:text-white">Shown as {{ $shown['label'] }} now, {{ $shown['date'] }}@if ($shown['shift']) ({{ $shown['shift'] }} shift)@endif</h3>
                             @if ($shown['name'] !== null)
                                 <p class="text-sm text-gray-700 dark:text-gray-300">
                                     Shown on cards: {{ $shown['name'] }}@if ($shown['rank'] !== ''), {{ $shown['rank'] }}@endif.
                                     Source: {{ $shown['source'] }}.
-                                    @if ($shown['until'])Acting until {{ $shown['until'] }}.@endif
                                     @if ($shown['note']){{ $shown['note'] }}@endif
                                 </p>
                             @elseif ($shown['note'])
@@ -153,11 +152,11 @@
                                 </p>
                             @elseif ($shown['role'] === 'command_300')
                                 <p class="text-sm text-gray-700 dark:text-gray-300">
-                                    No one is shown as 300 right now. Source: {{ $shown['source'] }}. The name appears once the shift's 300 bid seat holder is known or an acting request is approved.
+                                    No one is shown as 300 right now. Source: {{ $shown['source'] }}. The name appears once today's roster or the shift's 300 bid seat holder is known.
                                 </p>
                             @else
                                 <p class="text-sm text-gray-700 dark:text-gray-300">
-                                    No one is shown as Captain 5 right now. Source: {{ $shown['source'] }}. New findings go to every Captain 5 seat holder until the shift's bid holder is known or an acting request is approved.
+                                    No one is shown as Captain 5 right now. Source: {{ $shown['source'] }}. New findings go to every Captain 5 seat holder until today's roster or the shift's bid holder is known.
                                 </p>
                             @endif
                             @if ($shown['notifications_to'])
@@ -167,82 +166,6 @@
                     @endforeach
                 </div>
 
-                <div>
-                    <h3 class="text-sm font-semibold text-gray-950 dark:text-white">Waiting for a decision</h3>
-                    @if ($acting['pending'] === [])
-                        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400" data-testid="captain5-acting-pending-empty">No requests are waiting.</p>
-                    @else
-                        <ul class="mt-1 divide-y divide-gray-200 dark:divide-white/10" data-testid="captain5-acting-pending">
-                            @foreach ($acting['pending'] as $row)
-                                <li class="flex flex-wrap items-start justify-between gap-3 py-3" wire:key="captain5-acting-pending-{{ $row['id'] }}" data-role="{{ $row['role'] }}">
-                                    <div class="min-w-0 space-y-1">
-                                        <p class="flex flex-wrap items-center gap-2 text-sm font-semibold text-gray-950 dark:text-white">
-                                            <x-filament::badge :color="$row['role'] === 'command_300' ? 'info' : 'gray'" size="sm" data-testid="captain5-acting-role-badge">{{ $row['role_label'] }}</x-filament::badge>
-                                            <span>
-                                                @if ($row['kind'] === 'end')
-                                                    {{ $row['requester'] }} asks to end the acting display
-                                                @else
-                                                    {{ $row['member'] }}@if ($row['rank'] !== '')<span class="font-normal text-gray-600 dark:text-gray-400"> · {{ $row['rank'] }}</span>@endif
-                                                    asks to be shown as acting {{ $row['role_label'] }}
-                                                @endif
-                                            </span>
-                                        </p>
-                                        @if ($row['kind'] === 'act')
-                                            <p class="text-sm text-gray-700 dark:text-gray-300">
-                                                {{ $row['duration'] }}, ends {{ $row['ends_at'] }}@if ($row['shift']) · {{ $row['shift'] }} shift @endif
-                                                @if ($row['passed'])<x-filament::badge color="warning" size="sm" class="ml-1 inline-flex">Past its end time</x-filament::badge>@endif
-                                            </p>
-                                        @endif
-                                        <p class="text-xs text-gray-600 dark:text-gray-400">Asked by {{ $row['requester'] }}, {{ $row['requested_at'] }}</p>
-                                    </div>
-                                    @if ($row['own'])
-                                        <p class="text-sm text-gray-600 dark:text-gray-400">Another administrator approves your own request.</p>
-                                    @else
-                                        <div class="flex items-center gap-2">
-                                            {{ ($this->approveActingAction)(['request' => $row['id']]) }}
-                                            {{ ($this->rejectActingAction)(['request' => $row['id']]) }}
-                                        </div>
-                                    @endif
-                                </li>
-                            @endforeach
-                        </ul>
-                    @endif
-                </div>
-
-                <details class="rounded-lg border border-gray-200 dark:border-white/10" data-testid="captain5-acting-decided">
-                    <summary class="flex min-h-[44px] cursor-pointer items-center justify-between gap-2 px-4 py-2 text-sm font-semibold text-gray-950 dark:text-white">
-                        <span>Recent decisions</span>
-                        <span class="font-normal text-gray-600 dark:text-gray-400">{{ count($acting['decided']) }}</span>
-                    </summary>
-                    @if ($acting['decided'] === [])
-                        <p class="border-t border-gray-200 px-4 py-3 text-sm text-gray-600 dark:border-white/10 dark:text-gray-400">No request has been decided yet.</p>
-                    @else
-                        <ul class="divide-y divide-gray-200 border-t border-gray-200 dark:divide-white/10 dark:border-white/10">
-                            @foreach ($acting['decided'] as $row)
-                                <li class="space-y-1 px-4 py-3" wire:key="captain5-acting-decided-{{ $row['id'] }}" data-role="{{ $row['role'] }}">
-                                    <p class="flex flex-wrap items-center gap-2 text-sm font-semibold text-gray-950 dark:text-white">
-                                        <x-filament::badge :color="$row['approved'] ? 'success' : 'danger'" size="sm">{{ $row['status'] }}</x-filament::badge>
-                                        <x-filament::badge :color="$row['role'] === 'command_300' ? 'info' : 'gray'" size="sm" data-testid="captain5-acting-role-badge">{{ $row['role_label'] }}</x-filament::badge>
-                                        <span>
-                                            @if ($row['kind'] === 'end')
-                                                {{ $row['requester'] }}: end the acting display
-                                            @else
-                                                {{ $row['member'] }}: acting {{ $row['role_label'] }} until {{ $row['ends_at'] }}
-                                            @endif
-                                        </span>
-                                    </p>
-                                    @if ($row['state'] !== '')
-                                        <p class="text-sm text-gray-700 dark:text-gray-300">{{ $row['state'] }}.</p>
-                                    @endif
-                                    @if ($row['note'] !== '')
-                                        <p class="text-sm text-gray-700 dark:text-gray-300">{{ $row['note'] }}</p>
-                                    @endif
-                                    <p class="text-xs text-gray-600 dark:text-gray-400">Asked by {{ $row['requester'] }}, {{ $row['requested_at'] }}. Decided by {{ $row['decided_by'] }}, {{ $row['decided_at'] }}.</p>
-                                </li>
-                            @endforeach
-                        </ul>
-                    @endif
-                </details>
             </div>
         </x-filament::section>
 

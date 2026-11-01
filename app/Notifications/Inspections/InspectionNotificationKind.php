@@ -101,10 +101,6 @@ final class InspectionNotificationKind
             // Narcotics check (docs/narcotics-check.md): Captain 5 reviewers hear of a new check; the member hears the decision.
             NarcoticsNotifier::KIND_SUBMITTED => $captain5,
             NarcoticsNotifier::KIND_DECISION => $own,
-            // Sent to whoever may approve acting Captain 5 assignments; they need not have workspace access.
-            'captain5_acting_request' => NotificationCategoryRegistry::CAPTAIN5_ASSIGNMENT_REQUESTS,
-            // Tells the requesting member about their own request.
-            'captain5_acting_decision' => $own,
         ];
     }
 

@@ -63,26 +63,6 @@ final class DutyCalendar
         return $order[$index];
     }
 
-    /**
-     * When an acting Captain 5 display ends (America/New_York wall clock):
-     *  - `12h`: the next 08:00 or 20:00 after now;
-     *  - `24h`: 08:00 on the next calendar day.
-     */
-    public function actingEnd(string $duration, ?DateTimeInterface $moment = null): CarbonImmutable
-    {
-        $local = CarbonImmutable::instance($moment ?? now())->setTimezone($this->timezone());
-
-        if ($duration === '12h') {
-            foreach ([$local->setTime(8, 0), $local->setTime(20, 0), $local->addDay()->setTime(8, 0)] as $boundary) {
-                if ($boundary->greaterThan($local)) {
-                    return $boundary->utc();
-                }
-            }
-        }
-
-        return $local->addDay()->setTime(8, 0)->utc();
-    }
-
     /** "A Shift" / "B Shift" ... from a bid shift label; null for D Shift, Days or unknown. */
     public static function letterFromBidShift(?string $label): ?string
     {
