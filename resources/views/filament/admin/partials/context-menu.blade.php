@@ -78,7 +78,9 @@
                 if (view) items.push({ label: 'Open', icon: '↗', node: view });
 
                 const popout = row.querySelector('a[href]');
-                if (popout) items.push({ label: 'Open in new window', icon: '⧉', popout: popout.getAttribute('href') });
+                // A new window escapes an installed app into the browser, so it is offered only in ordinary tabs.
+                const installed = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+                if (popout && !installed) items.push({ label: 'Open in new window', icon: '⧉', popout: popout.getAttribute('href') });
 
                 const allButtons = row.querySelectorAll('.fi-ta-actions button, .fi-ta-actions a');
                 allButtons.forEach((btn) => {

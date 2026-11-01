@@ -157,6 +157,8 @@
                             <x-heroicon-o-squares-2x2 class="hub-btn__icon" aria-hidden="true" />
                             Command Board<span class="hub-visually-hidden"> (opens in a new tab)</span>
                         </a>
+                        {{-- Shown only in the installed app, where nothing else says this leaves the Hub (hub-shell.css). --}}
+                        <p class="hub-installed-hint">Opens outside the Hub. Tap Done or Close to come back.</p>
                     @endif
                 </div>
             @endif
@@ -311,6 +313,11 @@
                             </details>
                         @endif
                     </div>
+
+                    {{-- Visit counters, and for administrators the list of recent sign-ins. Not drawn if the counts cannot be read. --}}
+                    @if($homeActivity ?? null)
+                        <x-hub.home-activity :summary="$homeActivity" :signed-in="$homeSignedIn ?? null" />
+                    @endif
                 </section>
             </aside>
         </div>

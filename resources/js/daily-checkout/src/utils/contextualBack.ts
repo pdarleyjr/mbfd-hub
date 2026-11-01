@@ -1,5 +1,5 @@
-const DAILY_PATH = /^\/(?:stations|command-300|forms-hub|vehicle-inspections|apparatuses|apparatus|success)(?:\/|$)/;
-const HUB_PATH = /^\/(?:$|(?:admin|employee|training|workgroups|daily|updates|account|security-standards)(?:\/|$)|support\/issues(?:\/|$))/;
+const DAILY_PATH = /^\/(?:stations|command-300|captain-5|changeouts|forms-hub|vehicle-inspections|apparatuses|apparatus|success)(?:\/|$)/;
+const HUB_PATH = /^\/(?:$|(?:admin|employee|training|workgroups|daily|daily-roster|updates|account|security-standards|take-home-vehicle-inspections|video-conferencing|install)(?:\/|$)|support\/issues(?:\/|$))/;
 
 export function safeContextualPath(candidate: string | null, origin: string): string | null {
   if (!candidate || /[\x00-\x20\x7f\\]/.test(candidate) || candidate.startsWith('//')) return null;
@@ -41,5 +41,7 @@ export function contextualBackLabel(path: string): string {
   if (pathname.startsWith('/support/issues')) return 'Back to reports';
   if (pathname.startsWith('/updates')) return 'Back to updates';
   if (pathname.startsWith('/account')) return 'Back to account';
+  if (pathname.startsWith('/take-home-vehicle-inspections')) return 'Back to Take Home Inspections';
+  if (pathname.startsWith('/daily-roster')) return 'Back to Daily Roster';
   return 'Back to previous page';
 }

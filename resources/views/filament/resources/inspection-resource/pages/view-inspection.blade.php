@@ -355,7 +355,7 @@
                             @endif
                             @if($defect['photo_key'])
                                 <div class="hub-insp-photos">
-                                    <a href="{{ $imageUrl($defect['photo_key']) }}" target="_blank" rel="noopener" class="hub-insp-photo" aria-label="Open photo of {{ $defect['item'] }} in a new tab">
+                                    <a href="{{ $imageUrl($defect['photo_key']) }}" target="_blank" rel="noopener" data-hub-viewer="image" data-hub-viewer-title="Photo of {{ $defect['item'] }}" class="hub-insp-photo" aria-label="Open photo of {{ $defect['item'] }}">
                                         <img src="{{ $imageUrl($defect['photo_key']) }}" alt="Photo of {{ $defect['item'] }}" loading="lazy">
                                     </a>
                                 </div>
@@ -546,7 +546,7 @@
                                             <td class="is-muted">
                                                 {{ $item['notes'] ?? 'No notes' }}
                                                 @if($item['photo_key'])
-                                                    <a href="{{ $imageUrl($item['photo_key']) }}" target="_blank" rel="noopener" class="hub-insp-table-link">View photo</a>
+                                                    <a href="{{ $imageUrl($item['photo_key']) }}" target="_blank" rel="noopener" data-hub-viewer="image" data-hub-viewer-title="Inspection photo" class="hub-insp-table-link">View photo</a>
                                                 @endif
                                             </td>
                                         </tr>
@@ -564,7 +564,7 @@
                 @if($checklist['signature_key'])
                     <div class="hub-insp-card">
                         <h3 class="hub-insp-card__title">Officer signature</h3>
-                        <a href="{{ $imageUrl($checklist['signature_key']) }}" target="_blank" rel="noopener" class="hub-insp-signature" aria-label="Open officer signature in a new tab">
+                        <a href="{{ $imageUrl($checklist['signature_key']) }}" target="_blank" rel="noopener" data-hub-viewer="image" data-hub-viewer-title="Officer signature" class="hub-insp-signature" aria-label="Open officer signature">
                             <img src="{{ $imageUrl($checklist['signature_key']) }}" alt="Officer signature" loading="lazy">
                         </a>
                     </div>

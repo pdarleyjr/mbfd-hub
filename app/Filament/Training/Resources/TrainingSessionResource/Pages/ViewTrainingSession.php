@@ -91,7 +91,7 @@ class ViewTrainingSession extends ViewRecord implements ExportableTable, HasTabl
                 }),
             Action::make('launch')->label('Classroom links')->icon('heroicon-o-computer-desktop')
                 ->visible(fn (): bool => Gate::allows('manageKiosk', $this->getRecord()))
-                ->url(fn (): string => route('training.rosters.launch', ['session' => $this->getRecord()]))->openUrlInNewTab(),
+                ->url(fn (): string => route('training.rosters.launch', ['session' => $this->getRecord()], false)),
             Action::make('editSession')->label('Edit session')->color('gray')
                 ->visible(fn (): bool => Gate::allows('update', $this->getRecord()))
                 ->fillForm(fn (): array => $this->getRecord()->only(['course_name', 'held_on', 'starts_at', 'location', 'oic_employee_profile_id', 'classifications']) + ['expected_revision' => $this->getRecord()->revision])

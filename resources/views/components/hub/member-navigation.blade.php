@@ -24,11 +24,13 @@
             <x-heroicon-o-ellipsis-horizontal class="hub-shell-icon" aria-hidden="true" /><span>More</span>
         </summary>
         <div id="{{ $id }}" class="hub-shell-popover" role="menu" aria-label="More Hub destinations">
-            @foreach($navigation['applications'] as $application)
-                <a role="menuitem" href="{{ $application['href'] }}" class="hub-shell-menuitem" @if(str_starts_with($application['href'], 'https://')) target="_blank" rel="noopener" @endif>{{ $application['label'] }}@if(str_starts_with($application['href'], 'https://'))<span class="sr-only"> (opens in a new tab)</span>@endif</a>
+            {{-- Home and Daily Checkout are already tabs on this bar, so the sheet leaves them out. --}}
+            @foreach(collect($navigation['applications'])->reject(fn ($application) => in_array($application['key'], ['home', 'daily'], true)) as $application)
+                <x-hub.menu-item :href="$application['href']" :label="$application['label']" />
             @endforeach
-            <a role="menuitem" href="{{ route('updates.index') }}" class="hub-shell-menuitem">Department Updates</a>
-            <a role="menuitem" href="{{ route('hub-support.index') }}" class="hub-shell-menuitem">Support</a>
+            @foreach($navigation['moreNavigation'] ?? [] as $destination)
+                <x-hub.menu-item :href="$destination['href']" :label="$destination['label']" />
+            @endforeach
             <a role="menuitem" href="{{ route('account.show') }}" class="hub-shell-menuitem">My account</a>
             <a role="menuitem" href="{{ route('install') }}" class="hub-shell-menuitem">Install MBFD Hub</a>
         </div>

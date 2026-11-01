@@ -64,6 +64,16 @@ final class DailyShellReleaseMetaTest extends TestCase
             ->assertSee('<meta name="mbfd-alerts-feed" content="/api/me/alerts">', false);
     }
 
+    public function test_the_shell_carries_the_session_csrf_token_for_the_account_menus_sign_out_form(): void
+    {
+        $this->actingAsCanonicalFixture('E-DAILY-CSRF', 'Csrf Member', 'Firefighter');
+
+        $response = $this->get('/daily/stations')->assertOk();
+
+        $response->assertSee('<meta name="csrf-token" content="'.csrf_token().'">', false);
+        self::assertSame(1, substr_count($response->getContent(), 'name="csrf-token"'));
+    }
+
     public function test_an_unknown_release_is_published_as_such_not_as_a_commit(): void
     {
         $this->actingAsCanonicalFixture('E-DAILY-UNK', 'Unknown Member', 'Firefighter');

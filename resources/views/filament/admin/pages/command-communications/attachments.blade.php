@@ -5,7 +5,7 @@
             @php $url = route('command-communications.attachment', ['public_id' => $attachment->public_id], false); @endphp
             <li>
                 @if ($attachment->isImage())
-                    <a href="{{ $url }}?inline=1" target="_blank" rel="noopener noreferrer" class="block min-h-[44px] min-w-[44px] overflow-hidden rounded-lg border border-gray-200" aria-label="Open image {{ $attachment->original_filename }}">
+                    <a href="{{ $url }}?inline=1" target="_blank" rel="noopener noreferrer" data-hub-viewer="image" data-hub-viewer-title="{{ $attachment->original_filename }}" data-hub-viewer-download="{{ $url }}" class="block min-h-[44px] min-w-[44px] overflow-hidden rounded-lg border border-gray-200" aria-label="Open image {{ $attachment->original_filename }}">
                         <img src="{{ $url }}?inline=1" alt="{{ $attachment->original_filename }}" loading="lazy" class="h-24 w-24 object-cover">
                     </a>
                 @else

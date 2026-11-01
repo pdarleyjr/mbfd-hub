@@ -23,6 +23,7 @@ import { BUSY_REASON as NARCOTICS_BUSY, FORM_KEY as NARCOTICS_FORM_KEY, searchFo
 import { NarcoticsApp } from './narcotics/NarcoticsApp';
 import type { NarcoticsView } from './narcotics/narcoticsTypes';
 import { busyReasons } from '../pwa/busy';
+import { openInDocumentViewer } from '../pwa/document-viewer';
 import type { BootstrapData, EditableFormType, EmployeeSuggestion, FormDefinition, FormDocument, FormRecord, FormType, FrocImportConfig, FrocImportSummary, LibraryLink } from './types';
 
 const PdfPreview = lazy(() => import('./PdfPreview').then((module) => ({ default: module.PdfPreview })));
@@ -198,7 +199,17 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
             return;
         }
 
-        window.open(document.preview_url, '_blank', 'noopener,noreferrer');
+        // Images open in the page-wide document viewer; anything else downloads in place. Neither leaves
+        // this page, which would lose the open form (and, in an installed app, escape into the browser).
+        const isImage = document.mime_type.startsWith('image/') && document.mime_type !== 'image/svg+xml';
+        if (isImage && openInDocumentViewer(document.preview_url, { kind: 'image', title: document.display_name, downloadUrl: document.download_url })) return;
+
+        const link = window.document.createElement('a');
+        link.href = document.download_url;
+        link.download = document.display_name;
+        window.document.body.append(link);
+        link.click();
+        link.remove();
     };
 
     const applyFrocImport = async (payload: FormData): Promise<FrocImportSummary> => {
@@ -361,7 +372,7 @@ export function OperationalFormsApp({ bootstrap }: { bootstrap: BootstrapData })
                                 navigate={goEms} goForms={() => goEms(null)} editEntry={editQueuedRequest} openPdf={openEmsPdf} onSubmitted={() => void refreshRecordsQuietly()}
                             />
                         ) : !current ? (
-                            <LibraryView definitions={definitions} records={records} busy={busy} createRecord={createRecord} uploadFile={uploadFile} openRecord={openRecord} refresh={refreshLibrary} openDocument={openDocument} guideUrl={bootstrap.endpoints.guide} libraryLinks={bootstrap.library_links ?? []} openEms={emsApi ? goEms : undefined} emsOutbox={emsApi ? emsOutbox : undefined} editQueuedRequest={editQueuedRequest} openNarcotics={narcoticsApi ? goNarcotics : undefined} />
+                            <LibraryView definitions={definitions} records={records} busy={busy} createRecord={createRecord} uploadFile={uploadFile} openRecord={openRecord} refresh={refreshLibrary} openDocument={openDocument} openGuide={() => openEmsPdf(bootstrap.endpoints.guide, 'Operational Forms user guide')} libraryLinks={bootstrap.library_links ?? []} openEms={emsApi ? goEms : undefined} emsOutbox={emsApi ? emsOutbox : undefined} editQueuedRequest={editQueuedRequest} openNarcotics={narcoticsApi ? goNarcotics : undefined} />
                         ) : (
                             <EditorView
                                 record={current} definition={definitions.find((item) => item.form_type === current.form_type)}
@@ -406,17 +417,17 @@ function LibraryLinkCard({ entry, openEms, openNarcotics }: { entry: LibraryLink
     </article>;
 }
 
-function LibraryView({ definitions, records, busy, createRecord, uploadFile, openRecord, refresh, openDocument, guideUrl, libraryLinks, openEms, emsOutbox, editQueuedRequest, openNarcotics }: {
+function LibraryView({ definitions, records, busy, createRecord, uploadFile, openRecord, refresh, openDocument, openGuide, libraryLinks, openEms, emsOutbox, editQueuedRequest, openNarcotics }: {
     definitions: FormDefinition[]; records: FormRecord[]; busy: boolean;
     createRecord: (type: EditableFormType) => Promise<void>;
     uploadFile: (name: string, file: File) => Promise<void>;
-    openRecord: (record: FormRecord) => void; refresh: () => void; openDocument: (doc: FormDocument) => void; guideUrl: string;
+    openRecord: (record: FormRecord) => void; refresh: () => void; openDocument: (doc: FormDocument) => void; openGuide: () => void;
     libraryLinks: LibraryLink[];
     openEms?: (view: EmsView) => void; emsOutbox?: EmsOutbox; editQueuedRequest: (entry: EmsOutboxEntry) => void;
     openNarcotics?: (view: NarcoticsView) => void;
 }) {
     return <div className="of-library">
-        <div className="of-page-heading"><div><p className="of-eyebrow">Controlled records workspace</p><h1>Operational Forms</h1><p>Start, resume, generate, or submit incident and reimbursement records.</p></div><div className="of-heading-actions"><Button as="a" href={guideUrl} target="_blank" icon={<BookOpen size={16} />}>User guide</Button><Button icon={<RefreshCw size={16} />} onClick={refresh} disabled={busy}>Refresh</Button></div></div>
+        <div className="of-page-heading"><div><p className="of-eyebrow">Controlled records workspace</p><h1>Operational Forms</h1><p>Start, resume, generate, or submit incident and reimbursement records.</p></div><div className="of-heading-actions"><Button icon={<BookOpen size={16} />} onClick={openGuide}>User guide</Button><Button icon={<RefreshCw size={16} />} onClick={refresh} disabled={busy}>Refresh</Button></div></div>
         {emsOutbox && openEms && <PendingRequests outbox={emsOutbox} openRequest={(id) => openEms({ name: 'detail', id })} editEntry={editQueuedRequest} />}
         <section aria-labelledby="start-form"><h2 id="start-form">Start a form</h2><div className="of-form-cards">
             {definitions.map((definition) => <article className="of-form-card" key={definition.form_type}><div className="of-form-card-icon">{definition.form_type === 'ics_214' ? <ClipboardList /> : <FileCheck2 />}</div><div><Badge appearance="outline">Version {definition.form_version}</Badge><h3>{definition.display_name}</h3><p>{definition.form_type === 'ics_214' ? 'Document unit resources and chronological incident activity.' : 'Capture firefighter labor, equipment, mileage, materials, and certification—with optional AI-assisted note import.'}</p></div><Button appearance="primary" icon={<FilePlus2 size={17} />} onClick={() => void createRecord(definition.form_type)}>Create form</Button></article>)}

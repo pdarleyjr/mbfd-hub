@@ -275,7 +275,6 @@ class ViewInspection extends ViewRecord
                 ->icon('heroicon-o-arrow-down-tray')
                 ->color('gray')
                 ->url(fn (): string => route('employee.vehicle-inspections.pdf', $this->inspection()))
-                ->openUrlInNewTab()
                 ->visible(fn (): bool => (bool) auth()->user()?->can('view', $this->inspection())),
         ];
     }

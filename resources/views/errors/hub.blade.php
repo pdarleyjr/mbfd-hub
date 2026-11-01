@@ -39,9 +39,10 @@
         @unless(isset($eyebrow))
             <div class="hub-error__actions">
                 <a class="hub-btn hub-btn--primary" href="{{ url('/') }}">Return to Hub home</a>
-                @if($code !== 404)
+                {{-- Repeating the same request cannot fix a missing page, a refusal or a wrong method. --}}
+                @unless(in_array($code, [401, 403, 404, 405], true))
                     <a class="hub-btn hub-btn--secondary" href="{{ url()->current() }}">Try again</a>
-                @endif
+                @endunless
             </div>
         @endunless
         <div class="hub-error__footer">Miami Beach Fire Department · Support Services Division</div>

@@ -176,7 +176,7 @@
                             @endif
                             @if(! empty($finding['photo_key']))
                                 <div class="hub-insp-photos">
-                                    <a href="{{ $imageUrl($finding['photo_key']) }}" target="_blank" rel="noopener" class="hub-insp-photo" aria-label="Open photo of {{ $finding['name'] }} in a new tab">
+                                    <a href="{{ $imageUrl($finding['photo_key']) }}" target="_blank" rel="noopener" data-hub-viewer="image" data-hub-viewer-title="Photo of {{ $finding['name'] }}" class="hub-insp-photo" aria-label="Open photo of {{ $finding['name'] }}">
                                         <img src="{{ $imageUrl($finding['photo_key']) }}" alt="Photo of {{ $finding['name'] }}" loading="lazy">
                                     </a>
                                 </div>
@@ -237,7 +237,7 @@
                                 <td class="is-muted">
                                     {{ $item['notes'] ?? '—' }}
                                     @if($item['photo_key'])
-                                        <a href="{{ $imageUrl($item['photo_key']) }}" target="_blank" rel="noopener" class="hub-insp-table-link">View photo</a>
+                                        <a href="{{ $imageUrl($item['photo_key']) }}" target="_blank" rel="noopener" data-hub-viewer="image" data-hub-viewer-title="Inspection photo" class="hub-insp-table-link">View photo</a>
                                     @endif
                                 </td>
                             </tr>
@@ -254,7 +254,7 @@
 
     @if($detail['signature_key'])
         <x-filament::section heading="Inspector signature">
-            <a href="{{ $imageUrl($detail['signature_key']) }}" target="_blank" rel="noopener" class="hub-insp-signature" aria-label="Open inspector signature in a new tab">
+            <a href="{{ $imageUrl($detail['signature_key']) }}" target="_blank" rel="noopener" data-hub-viewer="image" data-hub-viewer-title="Inspector signature" class="hub-insp-signature" aria-label="Open inspector signature">
                 <img src="{{ $imageUrl($detail['signature_key']) }}" alt="Inspector signature" loading="lazy">
             </a>
         </x-filament::section>

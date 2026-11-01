@@ -196,8 +196,7 @@ class MyVehicleInspections extends Page implements HasTable
                     ->label('PDF')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->color('gray')
-                    ->url(fn (ApparatusInspection $record): string => route('employee.vehicle-inspections.pdf', ['inspection' => $record->getKey()]))
-                    ->openUrlInNewTab(),
+                    ->url(fn (ApparatusInspection $record): string => route('employee.vehicle-inspections.pdf', ['inspection' => $record->getKey()])),
             ])
             ->recordUrl(fn (ApparatusInspection $record): string => $this->detailUrl($record))
             ->defaultSort(fn (Builder $query): Builder => $query

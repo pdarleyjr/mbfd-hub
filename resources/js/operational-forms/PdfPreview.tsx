@@ -36,9 +36,26 @@ export function PdfPreview({ url, name, onClose }: { url: string; name: string; 
         return () => { cancelled = true; };
     }, [document, page, scale]);
 
+    // A same-origin hidden frame prints without opening a window (a new window escapes an installed app, and
+    // window.open with noopener returns null, so the old call never printed). The frame is removed afterward.
     const print = () => {
-        const frame = window.open(url, '_blank', 'noopener,noreferrer');
-        frame?.addEventListener('load', () => frame.print(), { once: true });
+        const frame = window.document.createElement('iframe');
+        frame.setAttribute('aria-hidden', 'true');
+        frame.tabIndex = -1;
+        frame.style.cssText = 'position:fixed;width:0;height:0;border:0;opacity:0;pointer-events:none';
+        const remove = () => frame.remove();
+        frame.addEventListener('load', () => {
+            const view = frame.contentWindow;
+            if (!view) { remove(); return; }
+            view.addEventListener('afterprint', remove, { once: true });
+            view.focus();
+            view.print();
+            // Browsers that never fire afterprint still get the frame cleaned up.
+            window.setTimeout(remove, 60_000);
+        }, { once: true });
+        frame.addEventListener('error', remove, { once: true });
+        frame.src = url;
+        window.document.body.append(frame);
     };
 
     return (
