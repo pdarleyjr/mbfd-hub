@@ -420,6 +420,7 @@ async function mockFireBoatInspectionApi(
     readonly abortFirstSessionStart?: boolean;
     readonly recoverPriorDayContract?: boolean;
     readonly nullFleetMetadata?: boolean;
+    readonly equipmentNumbers?: boolean;
   } = {},
 ): Promise<InspectionApiMock> {
   const submissions: Array<Record<string, unknown>> = [];
@@ -445,6 +446,26 @@ async function mockFireBoatInspectionApi(
         snipeit_asset_id: null,
       }
     : fireBoatApparatus;
+  const presentedChecklist = options.equipmentNumbers
+    ? {
+        ...fireBoatChecklist,
+        checklist: {
+          ...fireBoatChecklist.checklist,
+          fields: [...fireBoatChecklist.checklist.fields, { id: 'radio_de', name: 'Radio # - DE', inputType: 'text', required: false }],
+          compartments: fireBoatChecklist.checklist.compartments.map((compartment) => ({
+            ...compartment,
+            items: [...compartment.items, { id: 'fb6-cubby-scbas', name: 'SCBAs', inputType: 'text', expectedQuantity: 3 }],
+          })),
+        },
+        equipment_numbers: {
+          slots: [
+            { slot: 'item:fb6-cubby/fb6-cubby-scbas', kind: 'scba', label: 'SCBAs', field_id: null, compartment_id: 'fb6-cubby', item_id: 'fb6-cubby-scbas', boxes: 3, number: '2103 - 2161 - 2189' },
+            { slot: 'field:radio_de', kind: 'radio', label: 'Radio # - DE', field_id: 'radio_de', compartment_id: null, item_id: null, boxes: 1, number: '1741' },
+          ],
+          extras: [{ client_id: '77777777-7777-4777-8777-777777777777', kind: 'radio', label: null, number: '1800' }],
+        },
+      }
+    : fireBoatChecklist;
 
   await page.route('**/images/mbfd_logo-256.png', (route) => route.fulfill({ path: 'public/images/mbfd_logo-256.png' }));
   await page.route('**/api/**', async (route) => {
@@ -523,7 +544,7 @@ async function mockFireBoatInspectionApi(
     }
 
     if (path === `/api/public/apparatuses/${fireBoatApparatus.id}/checklist`) {
-      return route.fulfill({ json: fireBoatChecklist });
+      return route.fulfill({ json: presentedChecklist });
     }
 
     if (path === `/api/public/apparatuses/${fireBoatApparatus.id}/inspection-sessions/${fireBoatPriorDayInspectionSession.id}/abandon` && request.method() === 'POST') {
@@ -561,7 +582,7 @@ async function mockFireBoatInspectionApi(
       return route.fulfill({
         status: recoversPriorDayContract ? 200 : 201,
         json: {
-          ...(recoversPriorDayContract ? fireBoatPriorDayChecklist : fireBoatChecklist),
+          ...(recoversPriorDayContract ? fireBoatPriorDayChecklist : presentedChecklist),
           inspection_session: recoversPriorDayContract ? fireBoatPriorDayInspectionSession : fireBoatInspectionSession,
         },
       });
@@ -1058,6 +1079,93 @@ test('FB6 null fleet metadata remains selectable and completes the Daily browser
   await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
   expect(api.submissions).toHaveLength(1);
   expect(pageErrors).toEqual([]);
+});
+
+test('SCBA and radio numbers come filled in, one box each, and only a change or an addition differs from last time', async ({ page }) => {
+  const api = await mockFireBoatInspectionApi(page, { equipmentNumbers: true });
+
+  await page.goto('/daily/apparatus/fire-boat-6');
+  await page.getByRole('button', { name: 'Checklist details', exact: true }).click();
+  await page.locator('#fb6-shift').selectOption('A');
+  await page.getByLabel('High Low Tide').fill('High');
+  await page.getByLabel('Port Engine Hours').fill('45.5');
+  // They live on the review card, so they are not asked here as well.
+  await expect(page.getByLabel('Radio # - DE')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Mark all duties completed' }).click();
+  await page.getByRole('button', { name: 'Continue: Apparatus' }).click();
+  // The write-in item has its numbers already, so confirming the area is enough.
+  await page.getByRole('button', { name: 'Confirm all present' }).click();
+  await page.getByRole('button', { name: 'Review & Sign', exact: true }).click();
+
+  const card = page.locator('[data-equipment-numbers]');
+  await expect(card.getByRole('heading', { name: 'SCBA & Radio Numbers' })).toBeVisible();
+  await expect(page.getByLabel('SCBAs 1')).toHaveValue('2103');
+  await expect(page.getByLabel('SCBAs 2')).toHaveValue('2161');
+  await expect(page.getByLabel('SCBAs 3')).toHaveValue('2189');
+  await expect(page.getByLabel('Radio # - DE')).toHaveValue('1741');
+  await expect(page.getByLabel('Additional radio')).toHaveValue('1800');
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+
+  await page.getByLabel('SCBAs 2').fill('2999');
+  await page.getByRole('button', { name: 'Add another SCBA' }).click();
+  await page.getByLabel('Additional SCBA').fill('2200');
+  await drawInspectionSignature(page);
+  await page.getByRole('button', { name: 'Submit Inspection' }).click();
+  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
+
+  const submitted = api.submissions[0] as { field_values: Array<{ id: string; value: unknown }>; compartments: Array<{ items: Array<{ id: string; value?: unknown }> }>; extra_equipment_numbers: Array<Record<string, unknown>> };
+  expect(submitted.field_values.find((field) => field.id === 'radio_de')?.value).toBe('1741');
+  expect(submitted.compartments[0].items.find((item) => item.id === 'fb6-cubby-scbas')?.value).toBe('2103, 2999, 2189');
+  expect(submitted.extra_equipment_numbers.map((extra) => [extra.kind, extra.number])).toEqual([['radio', '1800'], ['scba', '2200']]);
+  // What the member was shown, in the form the answers are sent, so the server applies only their changes.
+  expect((api.submissions[0] as { equipment_numbers_seen: unknown }).equipment_numbers_seen).toEqual([
+    { slot: 'item:fb6-cubby/fb6-cubby-scbas', number: '2103, 2161, 2189' },
+    { slot: 'field:radio_de', number: '1741' },
+    { slot: 'extra:77777777-7777-4777-8777-777777777777', number: '1800' },
+  ]);
+});
+
+test('a draft saved before numbers carried over picks them up instead of clearing them', async ({ page }) => {
+  const api = await mockFireBoatInspectionApi(page, { equipmentNumbers: true });
+
+  await page.goto('/daily/apparatus/fire-boat-6');
+  await page.getByRole('button', { name: 'Checklist details', exact: true }).click();
+  await page.locator('#fb6-shift').selectOption('A');
+  await page.getByLabel('High Low Tide').fill('High');
+  await page.getByRole('button', { name: 'Mark all duties completed' }).click();
+  await page.getByLabel('Port Engine Hours').fill('45.5');
+  const autosaveKey = `mbfd_autosave_inspection_fire-boat-6_${fireBoatChecklist.checklist_version}_actor_101_1`;
+  await expect.poll(async () => JSON.stringify((await readDrafts(page)).find(draft => draft.key === autosaveKey)?.data.fieldValues ?? [])).toContain('45.5');
+
+  // Exactly what the released app left on a phone: blank boxes and no record of the numbers.
+  await replaceDrafts(page, (await readDrafts(page)).map((draft) => {
+    if (draft.key !== autosaveKey) return draft;
+    const { equipmentExtras: _extras, equipmentSeen: _seen, ...data } = draft.data as unknown as Record<string, unknown> & { fieldValues: Array<{ id: string }>; compartments: Array<{ items: Array<{ id: string }> }> };
+
+    return {
+      ...draft,
+      data: {
+        ...data,
+        fieldValues: data.fieldValues.map(field => field.id === 'radio_de' ? { ...field, value: '' } : field),
+        compartments: data.compartments.map(compartment => ({ ...compartment, items: compartment.items.map(item => item.id === 'fb6-cubby-scbas' ? { ...item, value: '' } : item) })),
+      },
+    } as unknown as typeof draft;
+  }));
+
+  await page.reload();
+  await expect(page.getByText(/Restored from autosave/)).toBeVisible();
+  await page.getByRole('button', { name: 'Confirm all present' }).click();
+  await page.getByRole('button', { name: 'Review & Sign', exact: true }).click();
+  await expect(page.getByLabel('Radio # - DE')).toHaveValue('1741');
+  await expect(page.getByLabel('SCBAs 2')).toHaveValue('2161');
+  await expect(page.getByLabel('Additional radio')).toHaveValue('1800');
+  await drawInspectionSignature(page);
+  await page.getByRole('button', { name: 'Submit Inspection' }).click();
+  await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
+
+  const submitted = api.submissions[0] as { field_values: Array<{ id: string; value: unknown }>; equipment_numbers_seen: Array<{ slot: string; number: string }> };
+  expect(submitted.field_values.find((field) => field.id === 'radio_de')?.value).toBe('1741');
+  expect(submitted.equipment_numbers_seen).toContainEqual({ slot: 'field:radio_de', number: '1741' });
 });
 
 test('Fire Boat blocks an unbound offline checkout before inspection entry', async ({ page }) => {

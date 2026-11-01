@@ -115,12 +115,9 @@ test('Station 6 opens the boat, the daily readings are on screen, and they are s
   await page.getByRole('button', { name: 'Checklist details', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Engine & Generator' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Fuel & Operating Readings' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Crew Equipment & Radios' })).toBeVisible();
   await page.getByLabel('Port engine hours (hours)').fill('1204.5');
   await page.getByLabel('Starboard engine running voltage (volts)').fill('13.8');
   await page.getByLabel('Current fuel level').fill('75');
-  await page.getByLabel('SCUBA equipment ID numbers').fill('T-1, T-2');
-  await page.getByLabel('Deckhand radio number').fill('6104');
   await page.locator('#fb6-shift').selectOption('B');
   const allDuties = page.getByRole('button', { name: 'Mark all duties completed' });
   if (await allDuties.count() > 0) await allDuties.click();
@@ -134,6 +131,8 @@ test('Station 6 opens the boat, the daily readings are on screen, and they are s
   }
   await page.locator('.inspection-action-bar .inspection-review-button').click();
   await expect(page.getByRole('heading', { name: 'Review & Sign Inspection' })).toBeVisible();
+  await page.getByLabel('SCUBA equipment ID numbers').fill('T-1, T-2');
+  await page.getByLabel('Deckhand radio number').fill('6104');
   const canvas = page.locator('canvas');
   await canvas.scrollIntoViewIfNeeded();
   const box = await canvas.boundingBox();
@@ -163,6 +162,44 @@ test('Station 6 opens the boat, the daily readings are on screen, and they are s
   await expect(page.getByRole('article', { name: 'FB6' }).getByText('Counts as completed')).toBeVisible({ timeout: 60_000 });
 });
 
+test('SCBA and radio numbers carry to the next member, who only changes what changed and can add more', async ({ browser }, info) => {
+  const first = await member(browser, info, 'second');
+  await completeTheBoat(first.page);
+  const card = (page: Page) => page.locator('[data-equipment-numbers]');
+  await expect(card(first.page).getByRole('group', { name: 'SCBA' }).getByRole('textbox')).toHaveCount(5);
+  await first.page.getByLabel('Airpack (SCBA) ID 1').fill('2103');
+  await first.page.getByLabel('Airpack (SCBA) ID 4').fill('2189');
+  await first.page.getByLabel('Driver radio number').fill('6101');
+  await first.page.getByRole('button', { name: 'Add another SCBA' }).click();
+  await first.page.getByLabel('Additional SCBA').fill('2200');
+  await first.page.getByRole('button', { name: 'Add another radio' }).click();
+  await first.page.getByLabel('Additional radio').fill('6199');
+  await first.page.getByRole('button', { name: 'Submit Inspection' }).click();
+  await expect(first.page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible({ timeout: 60_000 });
+  expect(first.problems).toEqual([]);
+
+  const next = await member(browser, info, 'fleet');
+  await completeTheBoat(next.page);
+  await expect(next.page.getByLabel('Airpack (SCBA) ID 1')).toHaveValue('2103');
+  await expect(next.page.getByLabel('Airpack (SCBA) ID 4')).toHaveValue('2189');
+  await expect(next.page.getByLabel('Driver radio number')).toHaveValue('6101');
+  await expect(next.page.getByLabel('Additional SCBA')).toHaveValue('2200');
+  await expect(next.page.getByLabel('Additional radio')).toHaveValue('6199');
+  // One radio was swapped and one extra SCBA left the boat. Everything else is left alone.
+  await next.page.getByLabel('Driver radio number').fill('6150');
+  await next.page.getByRole('button', { name: 'Remove additional scba' }).click();
+  await next.page.getByRole('button', { name: 'Submit Inspection' }).click();
+  await expect(next.page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible({ timeout: 60_000 });
+  expect(next.problems).toEqual([]);
+
+  const third = await member(browser, info, 'member');
+  await completeTheBoat(third.page);
+  await expect(third.page.getByLabel('Airpack (SCBA) ID 1')).toHaveValue('2103');
+  await expect(third.page.getByLabel('Driver radio number')).toHaveValue('6150');
+  await expect(third.page.getByLabel('Additional SCBA')).toHaveCount(0);
+  await expect(third.page.getByLabel('Additional radio')).toHaveValue('6199');
+});
+
 test('a concern is reported, the next member sees it live with its history, and answers survive the refresh', async ({ browser }, info) => {
   const reporter = await member(browser, info, 'member');
 
@@ -171,7 +208,7 @@ test('a concern is reported, the next member sees it live with its history, and 
   await reporter.page.getByLabel('What did you notice?').fill('Port foam line coupling is leaking');
   await reporter.page.getByLabel('Where is it? (optional)').fill('Port Side Deck Upper Storage');
   await reporter.page.getByRole('radio', { name: 'Problem that needs attention' }).check();
-  await reporter.page.getByRole('button', { name: 'Add another' }).click();
+  await reporter.page.getByRole('button', { name: 'Add another', exact: true }).click();
   await reporter.page.getByLabel('What did you notice?').last().fill('Tide was unusually low at the lift this morning');
   await reporter.page.getByRole('radio', { name: 'Note for the record: no action needed' }).last().check();
   await reporter.page.getByRole('button', { name: 'Submit Inspection' }).click();

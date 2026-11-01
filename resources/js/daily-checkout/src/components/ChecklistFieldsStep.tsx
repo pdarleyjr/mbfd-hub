@@ -6,6 +6,7 @@ import type {
   ScheduledTaskStatus,
 } from '../types';
 import { fieldGroups, taskIsCompleted } from '../utils/checklistFields.ts';
+import { equipmentFieldIds } from '../utils/equipmentNumbers.ts';
 
 interface ChecklistFieldsStepProps {
   checklist: ChecklistData;
@@ -94,9 +95,12 @@ export default function ChecklistFieldsStep({
   const editableFields = checklist.fields.filter(field => !knownFields.includes(field));
   // Shift is separately required by the processing contract, even on Fire Boat.
   const requiredFields = editableFields.filter(field => field.required || field.id === 'fb6-shift');
+  // SCBA and radio numbers are on the review step's card, the one place every member passes. A required one stays here.
+  const onCard = equipmentFieldIds(checklist.equipment_numbers);
+  const shownFields = editableFields.filter(field => !requiredFields.includes(field) && !onCard.has(field.id));
   // Fields with a heading are everyday readings, so they stay on screen. Only the rest are tucked away.
-  const groups = fieldGroups(editableFields.filter(field => !requiredFields.includes(field)));
-  const optionalFields = editableFields.filter(field => !requiredFields.includes(field) && !field.group);
+  const groups = fieldGroups(shownFields);
+  const optionalFields = shownFields.filter(field => !field.group);
 
   const renderField = (field: ChecklistData['fields'][number]) => {
     const value = fieldValues.find((fieldValue) => fieldValue.id === field.id)?.value ?? null;
