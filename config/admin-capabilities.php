@@ -11,7 +11,6 @@ return [
         App\Models\ApparatusInspection::class => 'admin.fleet',
         App\Models\ApparatusInspectionException::class => 'admin.fleet',
         App\Models\ApparatusServiceTicket::class => 'admin.fleet',
-        App\Models\ApparatusVehicleSwapRequest::class => 'admin.fleet',
         App\Models\ApparatusOperationalAlert::class => 'admin.fleet',
         App\Models\ApparatusChangeout::class => 'admin.fleet',
         App\Models\HubSupportTicket::class => 'admin.support',

@@ -29,7 +29,7 @@ final class DailyCheckoutNotesFeed
 
     private const TIMEZONE = 'America/New_York';
 
-    private const OPEN_INSPECTION_STATES = ['held_for_review', 'pending_vehicle_swap'];
+    private const OPEN_INSPECTION_STATES = ['held_for_review'];
 
     /** @return array{count: int, rows: list<array<string, mixed>>} */
     public static function build(): array

@@ -15,7 +15,7 @@ use App\Services\Notifications\NotificationCategoryRegistry;
 use Illuminate\Support\Facades\Notification;
 use RuntimeException;
 
-/** "Vehicle identification for Fleet": mirrors "Vehicle swap reported". */
+/** "Vehicle identification for Fleet": mirrors "Truck changed". */
 final class FleetNotificationTest extends IdentificationTestCase
 {
     private const EVENT = User::NOTIFICATION_PREFERENCE_VEHICLE_IDENTIFICATION;

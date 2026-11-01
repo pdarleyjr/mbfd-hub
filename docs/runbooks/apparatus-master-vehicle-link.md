@@ -8,7 +8,7 @@ for the Fleet manager and mechanics: status, open work, PM, Daily Checkout and s
 
 `apparatuses.unit_master_vehicle_id` ties the two (unique: one apparatus per vehicle).
 `master_link_status` is `linked` or `needs_review`; `master_link_note` says why a unit
-needs review. Vehicle swaps move a unit's identity (designation, station) between truck
+needs review. Vehicle changeouts move a unit's identity (designation, station) between truck
 rows and never move the vehicle number, so links stay with the physical trucks.
 
 ## Who owns which field

@@ -545,7 +545,6 @@ class ApparatusResource extends Resource
         return [
             RelationManagers\InspectionsRelationManager::class,
             RelationManagers\ServiceTicketsRelationManager::class,
-            RelationManagers\VehicleSwapReportsRelationManager::class,
             RelationManagers\OperationalAlertsRelationManager::class,
             RelationManagers\ChangeoutsRelationManager::class,
             RelationManagers\DefectsRelationManager::class,

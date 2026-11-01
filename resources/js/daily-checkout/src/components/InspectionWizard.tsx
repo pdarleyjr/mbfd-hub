@@ -1141,7 +1141,7 @@ export default function InspectionWizard() {
           identificationAnswers={vehicleIdentification}
           onIdentificationChange={setVehicleIdentification}
           showIdentificationErrors={showNotReady}
-          changeoutPath={truck => `/changeouts/new/${apparatus.id}?truck=${encodeURIComponent(truck)}&return_to=${encodeURIComponent(location.pathname)}`}
+          changeoutPath={truck => `/changeouts/new/${apparatus.id}?${truck ? `truck=${encodeURIComponent(truck)}&` : ''}return_to=${encodeURIComponent(location.pathname)}`}
         />
       )}
 

@@ -99,12 +99,6 @@
                                 <p class="hub-insp-queue__empty">{{ $group['empty'] }}</p>
                             @endforelse
                         </div>
-                        @if($group['key'] === 'approvals' && ($queue['swapHeld'] ?? 0) > 0)
-                            <p class="hub-insp-queue__foot">
-                                {{ $queue['swapHeld'] }} more {{ $queue['swapHeld'] === 1 ? 'is' : 'are' }} held for a vehicle swap:
-                                <a href="{{ $queues['swapUrl'] }}">Pending vehicle swaps</a>
-                            </p>
-                        @endif
                     </article>
                 @endforeach
             </div>

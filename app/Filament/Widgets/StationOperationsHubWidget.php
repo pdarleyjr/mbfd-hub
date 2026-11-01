@@ -13,7 +13,6 @@ use App\Filament\Resources\InspectionResource;
 use App\Filament\Resources\StationInspectionResource;
 use App\Filament\Resources\StationRequestResource;
 use App\Filament\Resources\StationResource;
-use App\Filament\Resources\VehicleSwapRequestResource;
 use App\Filament\Support\InspectionWorkspace;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
@@ -405,9 +404,8 @@ final class StationOperationsHubWidget extends Widget
     private function inspectionQueues(array $apparatusIds, Collection $apparatusById): array
     {
         $empty = ['count' => 0, 'rows' => []];
-        $swapUrl = VehicleSwapRequestResource::getUrl('index');
         if ($apparatusIds === []) {
-            return ['approvals' => $empty + ['swapHeld' => 0], 'issues' => $empty, 'actions' => $empty, 'recent' => $empty, 'swapUrl' => $swapUrl];
+            return ['approvals' => $empty, 'issues' => $empty, 'actions' => $empty, 'recent' => $empty];
         }
 
         $inspectionColumns = ['id', 'apparatus_id', 'processed_apparatus_id', 'designation_at_time', 'unit_number', 'operator_name', 'processing_status', 'review_status', 'completed_at', 'created_at'];
@@ -419,7 +417,7 @@ final class StationOperationsHubWidget extends Widget
         };
         $moment = static fn (ApparatusInspection $record): mixed => $record->completed_at ?: $record->created_at;
 
-        // Query 1: everything that is waiting on a person, including checkouts held for a vehicle swap.
+        // Query 1: everything that is waiting on a person.
         $waiting = $this->onPhysicalVehicles(ApparatusInspection::query()->operational()->select($inspectionColumns)->addSelect([
             'open_holds' => DB::table('apparatus_inspection_exceptions as e')->selectRaw('count(*)')
                 ->whereColumn('e.apparatus_inspection_id', 'apparatus_inspections.id')
@@ -427,12 +425,11 @@ final class StationOperationsHubWidget extends Widget
                 ->whereNotIn('e.status', ['resolved', 'dismissed']),
         ]), $apparatusIds)
             ->where(function (Builder $scope): void {
-                $scope->whereIn('processing_status', ['held_for_review', 'pending_vehicle_swap'])
+                $scope->where('processing_status', 'held_for_review')
                     ->orWhere(fn (Builder $legacy) => $legacy->whereNull('processing_status')->where('review_status', 'pending_review'));
             })
             ->orderByRaw('COALESCE(completed_at, created_at) DESC')->orderByDesc('id')->get();
-        $swapHeld = $waiting->where('processing_status', 'pending_vehicle_swap')->count();
-        $approvals = $waiting->reject(fn (ApparatusInspection $record): bool => $record->processing_status === 'pending_vehicle_swap')
+        $approvals = $waiting
             ->map(function (ApparatusInspection $record) use ($inspectionLabel, $moment): array {
                 $holds = (int) $record->getAttribute('open_holds');
 
@@ -500,11 +497,10 @@ final class StationOperationsHubWidget extends Widget
         ))->values();
 
         return [
-            'approvals' => ['count' => $approvals->count(), 'rows' => $approvals->all(), 'swapHeld' => $swapHeld],
+            'approvals' => ['count' => $approvals->count(), 'rows' => $approvals->all()],
             'issues' => ['count' => $issues->count(), 'rows' => $issues->all()],
             'actions' => ['count' => $actions->count(), 'rows' => $actions->all()],
             'recent' => ['count' => $completed->count(), 'rows' => $recent->all()],
-            'swapUrl' => $swapUrl,
         ];
     }
 

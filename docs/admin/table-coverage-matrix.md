@@ -2,7 +2,7 @@
 
 Audit of every Filament table surface in the Hub (Admin, Employee, Training and Workgroups panels) as of 2026-10-23, branch `feat/ems-table-audit`. It records what each table can do today, what this release changed, and why the rest was left alone.
 
-- **Resources:** 51 Filament resource classes (`PersonnelUniformResource` and `TrainingTodoAdminResource` are subclasses and inherit their parent's table).
+- **Resources:** 50 Filament resource classes, after `VehicleSwapRequestResource` was removed on 2026-11-01 along with the old Daily Checkout swap report (`PersonnelUniformResource` and `TrainingTodoAdminResource` are subclasses and inherit their parent's table).
 - **Other surfaces:** 31 custom pages, tables inside resource pages, and hand-built Blade tables. Relation managers are not listed separately; they follow their parent resource.
 - Facts come from reading the source, not from running the app. Where a cell says "none" it means none was found in the resource or its pages.
 
@@ -22,9 +22,9 @@ A surface can carry more than one decision, so the counts below add up to more t
 
 | Decision | Resources | Other surfaces | Total |
 | --- | ---: | ---: | ---: |
-| Exports added | 31 | 0 | 31 |
+| Exports added | 30 | 0 | 30 |
 | Editing added | 5 | 0 | 5 |
-| Read-only by design | 16 | 16 | 32 |
+| Read-only by design | 15 | 16 | 31 |
 | Deferred (other workstream) | 4 | 7 | 11 |
 | Skipped | 16 | 16 | 32 |
 
@@ -79,7 +79,6 @@ Filament's own queued exporters (`app/Filament/Exports`, `app/Filament/Workgroup
 | `StationInspectionResource` | admin | Operations | StationInspection | deactivate/archive | yes | 3 | inspection_date desc | Export selected | none → shared XLSX/PDF + export selected | Exports added + Read-only by design - Station inspections are immutable submissions; review goes through actions. |
 | `StationRequestResource` | admin | Operations | StationRequest | deactivate/archive | yes | 7 | created_at desc | Export selected | none → shared XLSX/PDF + export selected | Exports added - Requests move through the view page; export lists the table columns. |
 | `StationResource` | admin | Operations | Station | create, edit, delete | yes | 1 | none | Export selected | none (inventory PDF on a relation manager) → shared XLSX/PDF + export selected | Exports added + Editing added - Already editable. Added a station-number sort so stations open in order. |
-| `VehicleSwapRequestResource` | admin | Operations | ApparatusVehicleSwapRequest | view only | yes | 1 | created_at desc | Export selected | none → shared XLSX/PDF + export selected | Exports added + Read-only by design - Swap decisions go through the decision action; requests are not edited. |
 | `AccountProfileResource` | admin | Personnel | User | edit | yes | 0 | none | none | none → none | Skipped - Account identity data (email, account status; phone on the edit form). Left to the access-administration workstream. |
 | `EmployeeEquipmentRequestResource` | admin | Personnel | EmployeeEquipmentRequest | deactivate/archive | yes | 2 | created_at desc | Export selected | none → shared XLSX/PDF + export selected | Exports added + Read-only by design - Requests are processed from the view page. |
 | `EmployeeResource` | admin | Personnel | Employee | create, edit, deactivate/archive | yes | 1 | name asc | Send onboarding invitations, Export selected | none → shared XLSX/PDF + export selected | Exports added - Already editable. Export carries the columns this viewer already sees (name, rank, station, roster and account status). |

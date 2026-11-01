@@ -9,7 +9,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Validation\ValidationException;
 use LogicException;
 
@@ -97,7 +96,6 @@ class ApparatusInspection extends Model
         return match ($this->processing_status) {
             'accepted' => 'Accepted',
             'accepted_with_exception' => 'Follow-up needed',
-            'pending_vehicle_swap' => 'Held: vehicle swap',
             'held_for_review' => 'Needs approval',
             'rejected' => 'Rejected',
             default => match ($this->review_status) {
@@ -114,7 +112,7 @@ class ApparatusInspection extends Model
         return $this->belongsTo(Apparatus::class);
     }
 
-    /** The physical truck this inspection's findings were applied to (differs from apparatus_id after a decided swap). */
+    /** The physical truck this inspection's findings were applied to (differs from apparatus_id when the crew reported another truck). */
     public function processedApparatus(): BelongsTo
     {
         return $this->belongsTo(Apparatus::class, 'processed_apparatus_id');
@@ -135,17 +133,6 @@ class ApparatusInspection extends Model
     public function actorUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'actor_user_id');
-    }
-
-    /** @return HasOne<ApparatusVehicleSwapRequest, $this> */
-    public function vehicleSwapRequest(): HasOne
-    {
-        return $this->hasOne(ApparatusVehicleSwapRequest::class);
-    }
-
-    public function isHeldForVehicleSwap(): bool
-    {
-        return $this->processing_status === 'pending_vehicle_swap';
     }
 
     public function defects(): HasMany

@@ -7,8 +7,6 @@ namespace App\Services\Captain5;
 use App\Models\Apparatus;
 use App\Models\ApparatusChangeout;
 use App\Models\ApparatusChangeoutItem;
-use App\Models\ApparatusVehicleSwapRequest;
-use App\Models\User;
 use App\Services\Fleet\ApparatusChangeoutPlanner;
 use App\Support\Fleet\FleetVehicleCatalog;
 use Carbon\CarbonInterface;
@@ -16,8 +14,7 @@ use Illuminate\Database\Eloquent\Builder;
 
 /**
  * The Truck Changes tab: which Rescue unit is on which vehicle number, and what changed lately. Read only.
- * A change is a completed changeout or a swap Fleet decided from a Daily Checkout report; either way the truck
- * it started from is a Rescue-type truck, so an Engine or Ladder change never appears here.
+ * A change is a completed changeout involving a Rescue-type truck, so an Engine or Ladder change never appears here.
  */
 final class Captain5RescueTrucks
 {
@@ -76,15 +73,7 @@ final class Captain5RescueTrucks
     private function changes(): array
     {
         $since = now()->subDays(self::CHANGE_WINDOW_DAYS);
-        $rows = [...$this->changeouts($since), ...$this->fleetDecisions($since)];
-        usort($rows, static fn (array $a, array $b): int => strcmp((string) $b['at'], (string) $a['at']));
 
-        return array_slice($rows, 0, self::MAX_CHANGES);
-    }
-
-    /** @return list<array<string, mixed>> */
-    private function changeouts(CarbonInterface $since): array
-    {
         return ApparatusChangeout::query()
             ->with(['items' => static fn ($items) => $items->where('custody_status', ApparatusChangeoutItem::CUSTODY_LEFT_BEHIND)->orderBy('id')])
             ->where('status', ApparatusChangeout::STATUS_COMPLETED)
@@ -95,7 +84,6 @@ final class Captain5RescueTrucks
             ->limit(self::MAX_CHANGES)->get()
             ->map(fn (ApparatusChangeout $changeout): array => $this->change(
                 'changeout:'.$changeout->getKey(),
-                'changeout',
                 $changeout->unit_designation,
                 $changeout->from_vehicle_number,
                 $changeout->to_vehicle_number,
@@ -109,43 +97,14 @@ final class Captain5RescueTrucks
             ))->values()->all();
     }
 
-    /** @return list<array<string, mixed>> */
-    private function fleetDecisions(CarbonInterface $since): array
-    {
-        return ApparatusVehicleSwapRequest::query()
-            ->with('decidedBy:id,name,display_name')
-            ->whereIn('status', [ApparatusVehicleSwapRequest::STATUS_APPROVED_SWAP, ApparatusVehicleSwapRequest::STATUS_APPROVED_REPLACE])
-            ->where('decided_at', '>=', $since)
-            ->whereIn('apparatus_id', $this->rescueTrucks()->select('id'))
-            ->orderByDesc('decided_at')->orderByDesc('id')
-            ->limit(self::MAX_CHANGES)->get()
-            ->map(function (ApparatusVehicleSwapRequest $swap): array {
-                $decider = $swap->getRelationValue('decidedBy');
-                $moment = $swap->getAttribute('decided_at');
-
-                return $this->change(
-                    'fleet_decision:'.$swap->getKey(),
-                    'fleet_decision',
-                    (string) ($swap->unit_designation ?: 'Rescue'),
-                    $swap->assigned_vehicle_number,
-                    $swap->reported_vehicle_number,
-                    $moment instanceof CarbonInterface ? $moment : null,
-                    $decider instanceof User ? $this->presenter->name($decider) : 'Fleet',
-                    null,
-                    [],
-                );
-            })->values()->all();
-    }
-
     /**
      * @param  list<array{name: string, note: string|null}>  $leftBehind
      * @return array<string, mixed>
      */
-    private function change(string $id, string $source, string $unit, ?string $from, ?string $to, ?CarbonInterface $at, string $by, ?string $note, array $leftBehind): array
+    private function change(string $id, string $unit, ?string $from, ?string $to, ?CarbonInterface $at, string $by, ?string $note, array $leftBehind): array
     {
         return [
             'id' => $id,
-            'source' => $source,
             'unit' => $unit,
             'from_vehicle_number' => $from,
             'to_vehicle_number' => $to,

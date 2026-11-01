@@ -103,8 +103,7 @@ Any truck is allowed. The context lists same-type trucks with a number: `candida
 
 ### 4.2 What a commit writes, in one transaction
 
-1. Lock the alert, then both truck rows in ascending id (the order `VehicleSwapService` uses). A retry that waited on these locks
-   returns the first result.
+1. Lock the alert, then both truck rows in ascending id. A retry that waited on these locks returns the first result.
 2. Refuse if `expected_vehicle_number` or `expected_unit_slug` no longer holds the unit. A truck keeps its number after a move, so
    the slug is what proves the unit is still there.
 3. Save the changeout and its lines, from the truck the unit is on.
@@ -122,9 +121,9 @@ An active `upcoming_swap` alert for this unit raised from this truck is complete
 they chose. A changeout for a different unit never closes it, and neither does a move from another truck. An alert id that is stale,
 closed, of another kind or about another unit is ignored.
 
-If an older Daily Checkout decision (`VehicleSwapService::decide`, unchanged) already moved the unit, its alert offers the `handoff`
-action: `handoff_only` mode records what the crew took and left against the existing pair, moves nothing, changes no status, and
-completes the alert. `old_truck_status` in that summary is the status that truck has.
+If an admin already moved the unit by editing the apparatus rows, so the alert's truck no longer holds it, its alert offers the
+`handoff` action: `handoff_only` mode records what the crew took and left against the existing pair, moves no identity, marks the
+truck they left Out of Service, and completes the alert.
 
 ### 4.4 Conflicts
 
@@ -133,6 +132,34 @@ completes the alert. `old_truck_status` in that summary is the status that truck
 | Same `client_submission_id`, same payload | 200 with the first result, `replayed: true` |
 | Same `client_submission_id`, different payload | 409 `CHANGEOUT_REPLAY_CONFLICT` |
 | Unit no longer on `expected_vehicle_number` or `expected_unit_slug` | 409 `CHANGEOUT_STALE` with `current_vehicle_number`, `current_apparatus_id`, `unit_designation`. Nothing written. |
+
+### 4.5 At Daily Checkout
+
+The checkout's vehicle step has the assigned truck preset. Choosing another truck, or "Not listed", shows only **Record this vehicle
+change**, which opens the wizard with that truck chosen, and the checkout cannot continue until the change is recorded. After the
+change the checkout comes back on the new truck. New submissions always send the assigned truck in `physical_vehicle`. A unit with no
+vehicle number on file has nothing to differ from: its crew names the vehicle and carries on, and nothing moves.
+
+A phone still on the old app can have a queued checkout whose `physical_vehicle` names another truck, with or without `swap_answer`
+and `note`. It is never stranded and never waits for anyone. `App\Services\Fleet\CheckoutVehicleReport` decides, against the locked row,
+inside the checkout's own transaction:
+
+| The checkout names | What happens |
+|---|---|
+| The row's own truck, including a row that just changed out | Nothing moves. Processed on that row. |
+| Another truck | `ApparatusChangeoutService::recordFromCheckout`: a swap through the same commit path as a submit, with no equipment lines and the note "Reported at Daily Checkout by NAME. No equipment list was recorded." plus the member's note. New truck In Service, old truck Out of Service, trade and new-record rules, alert completion, review notes and the one notification (after commit), all as usual. Findings and meters go on the reported truck, judged against a meter baseline issued for it. |
+| The truck the row's unit already moved to in the grace window | Nothing moves again. Findings and meters go on that truck. |
+| A third truck, from a row whose unit has moved away and which is no longer a checkout unit | Nothing moves, because that row holds no unit the crew was checking. Findings go on the reported truck, or on the row with a flagged note if that number has no record. |
+| An ill-formed number | Processed on the assigned truck, with a flagged note on its review history (`vehicle_flagged`). |
+
+The changeout's `client_submission_id` is a uuid5 of the checkout's, and a replay of the checkout returns at its own idempotency check,
+so a replay creates nothing. If anything fails, the checkout and the swap roll back together. The ordinary holds (meter rollback, member
+flag, new significant damage) still apply to the checkout itself and are decided by a reviewer as usual. Inspection `apparatus_id`
+stays the route row and `processed_apparatus_id` is the truck the findings went on. The move appears on the inspection's timeline as
+`vehicle_changed`.
+
+The old report is gone: no hold, no `pending_vehicle_swap`, no decision page. The table `apparatus_vehicle_swap_requests` stays in the
+schema, retired and unused. Production had 0 rows and 0 held inspections when it was retired.
 
 ## 5. Going back
 
@@ -197,7 +224,7 @@ safe, and what to do next.
 
 On every committed changeout, including `handoff_only`:
 
-- **Notification.** One, through `NotificationDispatchService`, category `vehicle_swap_reports`, event key
+- **Notification.** One, through `NotificationDispatchService`, category `vehicle_swap_reports` (shown as "Truck changed"; the stored key does not change), event key
   `apparatus_changeout:<id>:committed`, deep link `/admin/apparatus-changeouts/<id>`, after commit and best effort. A failure never
   fails the swap. There is no new preference store.
 - **Admin dashboard.** `App\Services\Dashboards\Sources\Vehicle\VehicleChangeoutSource`, type `vehicle_changeout`, vehicle lane, grouped under
@@ -231,6 +258,7 @@ context(Apparatus $unit, ?int $alertId = null): array                           
 submit(Apparatus $unit, User $actor, array $payload): array                            // ['changeout' => ApparatusChangeout, 'created' => bool, 'replayed' => bool]
 acknowledge(int $changeoutId, User $actor): ApparatusChangeout                         // Fleet managers, idempotent
 summary(ApparatusChangeout $changeout, bool $withLines = false): array                 // section 6 shape
+recordFromCheckout(Apparatus $unit, User $actor, string $inspectionSubmissionId, string $reportedNumber, string $reporterName, ?string $memberNote): array  // section 4.5, caller holds the transaction
 // Refusals throw App\Services\Fleet\ChangeoutConflictException(code, message, array $context); the controller maps it to 409.
 
 // App\Services\Fleet\VehicleSwapService

@@ -108,8 +108,8 @@ export function parseVehicleIdentificationUnits(raw: unknown): VehicleIdentifica
 
 /**
  * The block that applies to this checkout, or undefined. It does not apply when the server says the crew
- * cannot answer, or while the crew reports a different physical vehicle than the one assigned (the server
- * ignores identification answers for another vehicle, so nothing is asked, required or sent).
+ * cannot answer, or while the crew says they are at a different physical vehicle than the one assigned (the
+ * questions are about the assigned one, so nothing is asked, required or sent until they go back to it).
  */
 export function activeVehicleIdentification(
   block: VehicleIdentification | null | undefined,
@@ -117,10 +117,8 @@ export function activeVehicleIdentification(
 ): VehicleIdentification | undefined {
   if (!block || !block.can_answer) return undefined;
   const confirmation = officer.vehicleConfirmation;
-  // With no vehicle number on record there is nothing for another vehicle to differ from.
-  const differentVehicle = confirmation !== undefined && confirmation.assignedVehicle !== '' && isVehicleMismatch(confirmation);
 
-  return differentVehicle ? undefined : block;
+  return confirmation !== undefined && isVehicleMismatch(confirmation) ? undefined : block;
 }
 
 const EMPTY_ANSWER: VehicleIdentificationAnswer = { mode: '', value: '', reason: '', note: '' };

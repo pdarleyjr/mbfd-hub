@@ -57,7 +57,8 @@ final class AdminVehicleChangesTest extends AdminChangeoutTestCase
         $category = app(NotificationCategoryRegistry::class)->all()[User::NOTIFICATION_PREFERENCE_VEHICLE_SWAP_REPORTED] ?? null;
 
         $this->assertNotNull($category);
-        $this->assertSame('A crew changed trucks, or reported a different truck than the one assigned.', $category->description);
+        $this->assertSame('Truck changed', $category->label);
+        $this->assertSame('A crew changed trucks.', $category->description);
     }
 
     public function test_the_list_banner_shows_what_is_not_acknowledged_with_acknowledge_and_view(): void

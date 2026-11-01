@@ -109,7 +109,7 @@ final class ApparatusChangeoutPlanner
         return $unitSlug === null ? null : Apparatus::query()->where('slug', $unitSlug)->first();
     }
 
-    /** The unit is already off the truck the alert was raised on: an older Daily Checkout decision moved it. */
+    /** The unit is already off the truck the alert was raised on: an admin moved it by hand. */
     public function isHandoffOnly(ApparatusOperationalAlert $alert, Apparatus $unit): bool
     {
         return $alert->isActive() && $alert->isUpcomingSwap() && $alert->unit_slug === $unit->slug
@@ -135,6 +135,20 @@ final class ApparatusChangeoutPlanner
         return $previous !== null && $to !== null
             && (int) $previous->from_apparatus_id === (int) $to->getKey()
             && (int) $previous->to_apparatus_id === (int) $unit->getKey();
+    }
+
+    /**
+     * The newest move off this truck, inside the window a queued checkout can still post to it (the same as a retired
+     * checklist). A checkout queued on a phone still posts to the truck it was performed on.
+     */
+    public function changedOutFrom(Apparatus $truck): ?ApparatusChangeout
+    {
+        return ApparatusChangeout::query()
+            ->where('from_apparatus_id', $truck->getKey())
+            ->where('status', ApparatusChangeout::STATUS_COMPLETED)
+            ->where('effective_at', '>=', now()->subHours((int) config('daily_checkout.inventory_revision_grace_hours', 168)))
+            ->orderByDesc('id')
+            ->first();
     }
 
     public function previousChangeout(string $unitSlug): ?ApparatusChangeout
