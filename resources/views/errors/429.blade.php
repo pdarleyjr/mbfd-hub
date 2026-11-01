@@ -1,0 +1,1 @@
+@include('errors.hub', ['code' => 429, 'title' => 'Too many requests', 'message' => 'There were a lot of requests in a short time, so the Hub paused this one. Anything you already saved is safe. Wait a minute, then try again.'])

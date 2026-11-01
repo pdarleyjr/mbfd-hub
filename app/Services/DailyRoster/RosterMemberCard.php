@@ -7,7 +7,6 @@ namespace App\Services\DailyRoster;
 use App\Models\DailyRoster\RosterAssignment;
 use App\Models\Employee;
 use App\Services\Personnel\PersonnelSource;
-use App\Support\Captain5\DutyCalendar;
 use App\Support\HubTimezone;
 use Carbon\CarbonImmutable;
 
@@ -20,7 +19,7 @@ final class RosterMemberCard
 {
     public function __construct(
         private readonly CurrentRosterReader $reader,
-        private readonly DutyCalendar $calendar,
+        private readonly RosterFreshnessResolver $freshness,
         private readonly RosterStatusPresenter $statuses,
         private readonly PersonnelSource $personnel,
     ) {}
@@ -79,12 +78,12 @@ final class RosterMemberCard
     private function rosterFor(?string $requestedDate): ?RosterView
     {
         $now = CarbonImmutable::now();
-        if ($requestedDate !== null && in_array($requestedDate, $this->reader->availableDutyDates(), true)
-            && $requestedDate !== $this->calendar->dutyDate($now)->format('Y-m-d')) {
+        $shown = $this->freshness->pageStatus($now)->dutyDate;
+        if ($requestedDate !== null && $requestedDate !== $shown && in_array($requestedDate, $this->reader->availableDutyDates(), true)) {
             return $this->reader->forDutyDate($requestedDate);
         }
 
-        return $this->reader->current($now) ?? $this->reader->latestBefore($now);
+        return $this->reader->forDutyDate($shown) ?? $this->reader->latestBefore($now);
     }
 
     /** @return array<string, string> Label => value, only what the current term holds */

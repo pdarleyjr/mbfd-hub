@@ -83,6 +83,10 @@ final class VehicleIdentificationSubmission
         if (isset($seen[$field])) {
             return [null, 'This question was answered twice.'];
         }
+        // A draft from before boats stopped being asked can still carry this answer. It never becomes a fleet record.
+        if ($field === Fields::VEHICLE_NUMBER && $kind === Fields::KIND_BOAT) {
+            return [null, 'A boat has no fleet vehicle number.'];
+        }
 
         if (is_string($item['value'] ?? null) || is_int($item['value'] ?? null)) {
             $value = Fields::clean($field, $kind, $item['value']);

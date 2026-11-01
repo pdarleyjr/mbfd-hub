@@ -33,11 +33,14 @@ New `processing_status` value: `held_for_review`.
 | Accepted | approved | accepted | normal |
 | Accepted, follow-up | approved | accepted_with_exception | non-blocking open exception remains (legacy rows only after this change) |
 | Needs approval | pending_review | held_for_review | at least one open blocking hold |
-| Vehicle swap hold | pending_review | pending_vehicle_swap | unchanged contract |
 | Legacy pending | pending_review | NULL | pre-processing payloads; legacy approve/reject path |
 | Rejected | rejected | rejected | reviewer rejected; evidence retained |
 
 `ApparatusInspection::displayStatus()` adds: `held_for_review` => "Needs approval", `rejected` => "Rejected".
+
+A truck swap never holds a checkout. The member records the change first; a queued checkout from an old phone that names another truck
+commits the swap in its own transaction and is processed on the reported truck (`docs/apparatus-changeouts.md` section 4.5). The
+`pending_vehicle_swap` state was removed on 2026-11-01. The ordinary holds in this table still apply to that checkout.
 
 ### 2.1 Holds = blocking rows in `apparatus_inspection_exceptions`
 

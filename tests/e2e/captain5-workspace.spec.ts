@@ -1,20 +1,19 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 import type {
-  ActingRequest, ActingState, Captain5Access, HandoffNote, InspectionView, IssueDetail, OnDuty, RescueDaily, RescueTruck, RescueTruckChange,
+  Captain5Access, HandoffNote, InspectionView, IssueDetail, OnDuty, RescueDaily, RescueTruck, RescueTruckChange,
 } from '../../resources/js/daily-checkout/src/components/captain5/types';
 import type { PostedUpdate } from '../../resources/js/daily-checkout/src/components/department-updates/types';
 
 /**
  * Captain 5 EMS Operations Center (member page), every API response mocked.
  * Server contract: /api/captain5/* (summary, workspace, issues, issues/{id}, issues/{id}/actions,
- * issues/{id}/messages, inspections/{id}, handoff, acting-requests*, department-updates*) and
+ * issues/{id}/messages, inspections/{id}, handoff, department-updates*) and
  * /api/captain5/communications/* for the Messages tab.
  */
 
 const KEY_PATTERN = /^[A-Za-z0-9-]{8,48}$/;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const minutesAgo = (minutes: number): string => new Date(Date.now() - minutes * 60_000).toISOString();
-const inHours = (hours: number): string => new Date(Date.now() + hours * 3_600_000).toISOString();
 const ymd = (offsetDays: number): string => {
   const date = new Date(Date.now() + offsetDays * 86_400_000);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
@@ -24,24 +23,15 @@ const ymd = (offsetDays: number): string => {
 const ACCESS_ACT: Captain5Access = {
   view: true, act: true, configure: false, acts_as: 'captain5', authority: 'on_duty_captain5', authority_label: 'Captain 5 (on duty)',
 };
-const ACCESS_ADMIN: Captain5Access = { ...ACCESS_ACT, configure: true, authority: 'administrator', authority_label: 'Administrator' };
 
 type Duty = Omit<OnDuty, 'duty_date'>;
-const bidHolder = (shift: OnDuty['shift'] = 'B', name = 'Alex Rivera'): Duty => ({ shift, source: 'bid_holder', resolved: true, name, rank: 'Capt.', acting_until: null, acting_request_id: null });
-const acting = (shift: OnDuty['shift'], name: string, until = inHours(10)): Duty => ({ shift, source: 'acting', resolved: true, name, rank: 'Lt.', acting_until: until, acting_request_id: 8 });
-const UNSET: Duty = { shift: null, source: 'unknown', resolved: false, name: null, rank: null, acting_until: null, acting_request_id: null };
+const bidHolder = (shift: OnDuty['shift'] = 'B', name = 'Alex Rivera'): Duty => ({ shift, source: 'bid_holder', resolved: true, name, rank: 'Capt.' });
+const UNSET: Duty = { shift: null, source: 'unknown', resolved: false, name: null, rank: null };
 /** 09:14 ET on a fixed day, so the note's clock text is the same wherever the test runs. */
 const ROSTER_AS_OF = '2026-10-30T13:14:15+00:00';
 const rosterOfficer = (name = 'Jordan Lee', identity: 'linked' | 'unlinked' = 'linked'): Duty => ({ ...bidHolder('B', name), source: 'telestaff', as_of: ROSTER_AS_OF, freshness: 'current', identity, reason: null });
 const seatAwaiting = (freshness: 'awaiting' | 'delayed'): Duty => ({ ...bidHolder('B'), as_of: null, freshness, identity: null, reason: null });
 const rosterUnknown = (reason: 'conflict' | 'needs_review' | 'no_working_row'): Duty => ({ ...UNSET, shift: 'B', as_of: ROSTER_AS_OF, freshness: 'current', identity: null, reason });
-
-const noActing = (overrides: Partial<ActingState> = {}): ActingState => ({
-  can_approve: false, mine: null, pending: [], choices: { '12h': inHours(12), '24h': inHours(24) }, ...overrides,
-});
-const makeActing = (id: number, overrides: Partial<ActingRequest> = {}): ActingRequest => ({
-  id, kind: 'act', requested_by: 'Jordan Lee', name: 'Jordan Lee', rank: 'Lt.', duration: '12h', shift: 'C', ends_at: inHours(12), requested_at: minutesAgo(5), own: false, ...overrides,
-});
 
 const makeUpdate = (id: number, overrides: Partial<PostedUpdate> = {}): PostedUpdate => ({
   id, title: `Update ${id}`, excerpt: 'Body text', status: 'published', posted_at: minutesAgo(30), expires_at: null,
@@ -94,7 +84,6 @@ interface Server {
   workspaceStatus: number;
   access: Captain5Access;
   onDuty: Duty;
-  acting: ActingState;
   issues: IssueDetail[];
   closed: IssueDetail[];
   /** Left out of the workspace answer when undefined, like a response sent before they existed. */
@@ -106,9 +95,6 @@ interface Server {
   actionBodies: Array<Record<string, unknown>>;
   messageBodies: Array<Record<string, unknown>>;
   handoffBodies: Array<Record<string, unknown>>;
-  actingBodies: Array<Record<string, unknown>>;
-  /** 'approve:7', 'reject:7', 'withdraw:7' with the body of each decision. */
-  actingDecisions: Array<{ call: string; body: Record<string, unknown> }>;
   updateForms: Array<{ fields: Record<string, string>; files: Record<string, string> }>;
   takeDowns: number[];
   clarifications: Array<Record<string, unknown>>;
@@ -116,17 +102,16 @@ interface Server {
   requests: string[];
   /** Return true after fulfilling to take over an action request. */
   onAction?: (route: Route, body: Record<string, unknown>, server: Server) => Promise<boolean>;
-  onActing?: (route: Route, body: Record<string, unknown>, server: Server) => Promise<boolean>;
   onUpdatePost?: (route: Route, server: Server) => Promise<boolean>;
 }
 
 function newServer(overrides: Partial<Server> = {}): Server {
   return {
     summaryStatus: 200, workspaceStatus: 200, access: ACCESS_ACT,
-    onDuty: bidHolder(), acting: noActing(),
+    onDuty: bidHolder(),
     issues: [makeIssue(1), makeIssue(2, { kind: 'medical', unit: 'Engine 1', item: 'Epinephrine', severity: 'significant' })],
     closed: [], detailStatus: 200, notes: [handoffNote], updates: [],
-    actionBodies: [], messageBodies: [], handoffBodies: [], actingBodies: [], actingDecisions: [], updateForms: [], takeDowns: [],
+    actionBodies: [], messageBodies: [], handoffBodies: [], updateForms: [], takeDowns: [],
     clarifications: [], historyQueries: [], requests: [],
     ...overrides,
   };
@@ -202,41 +187,6 @@ async function handleIssueAction(route: Route, server: Server, id: number): Prom
   await route.fulfill({ json: { issue: updated } });
 }
 
-const actingPayload = (server: Server) => ({ on_duty: { duty_date: ymd(0), ...server.onDuty }, acting: server.acting });
-
-async function handleActing(route: Route, server: Server, pathname: string): Promise<void> {
-  if (pathname === '/api/captain5/acting-requests') {
-    const body = await readBody(route);
-    server.actingBodies.push(body);
-    if (server.onActing && await server.onActing(route, body, server)) return;
-    const kind = body.kind === 'end' ? 'end' : 'act';
-    const hours = body.duration === '24h' ? 24 : 12;
-    const request = makeActing(100 + server.actingBodies.length, {
-      kind, requested_by: 'Alex Rivera', name: kind === 'act' ? 'Alex Rivera' : null, rank: kind === 'act' ? 'Capt.' : null,
-      duration: kind === 'act' ? (body.duration as ActingRequest['duration']) : null, shift: 'B',
-      ends_at: kind === 'act' ? (typeof body.ends_at === 'string' ? new Date(body.ends_at).toISOString() : inHours(hours)) : null, own: true,
-    });
-    server.acting = { ...server.acting, mine: request };
-    return route.fulfill({ status: 201, json: actingPayload(server) });
-  }
-  const decision = /^\/api\/captain5\/acting-requests\/(\d+)\/(approve|reject|withdraw)$/.exec(pathname);
-  if (!decision) return route.fulfill({ status: 404, json: { message: `Unmocked route ${pathname}` } });
-  const id = Number(decision[1]);
-  const body = await readBody(route);
-  server.actingDecisions.push({ call: `${decision[2]}:${id}`, body });
-  if (decision[2] === 'reject' && String(body.note ?? '').trim() === '') {
-    return route.fulfill({ status: 422, json: { message: 'The note field is required.', errors: { note: ['The note field is required.'] } } });
-  }
-  const found = [...server.acting.pending, ...(server.acting.mine ? [server.acting.mine] : [])].find((request) => request.id === id);
-  if (decision[2] === 'approve' && found) {
-    server.onDuty = found.kind === 'act'
-      ? { shift: 'B', source: 'acting', resolved: true, name: found.name, rank: found.rank, acting_until: found.ends_at, acting_request_id: found.id }
-      : bidHolder();
-  }
-  server.acting = { ...server.acting, pending: server.acting.pending.filter((request) => request.id !== id), mine: server.acting.mine?.id === id ? null : server.acting.mine };
-  return route.fulfill({ json: actingPayload(server) });
-}
-
 async function handleUpdates(route: Route, server: Server, pathname: string): Promise<void> {
   const method = route.request().method();
   const base = '/api/captain5/department-updates';
@@ -279,7 +229,7 @@ async function handleCaptain5(route: Route, server: Server, pathname: string, se
         cleared_issues: server.issues.filter((i) => i.open && i.captain5_cleared_at),
         ...(server.trucks ? { rescue_trucks: server.trucks } : {}),
         ...(server.truckChanges ? { rescue_truck_changes: server.truckChanges } : {}),
-        acting: server.acting, generated_at: new Date().toISOString(),
+        generated_at: new Date().toISOString(),
       },
     });
   }
@@ -323,7 +273,6 @@ async function handleCaptain5(route: Route, server: Server, pathname: string, se
     server.notes = server.notes.map((note) => (note.id === Number(ack[1]) ? { ...note, acknowledged_by: 'Capt. Alex Rivera', acknowledged_at: new Date().toISOString() } : note));
     return route.fulfill({ json: { handoff: { duty_date: ymd(0), notes: server.notes } } });
   }
-  if (pathname.startsWith('/api/captain5/acting-requests')) return handleActing(route, server, pathname);
   if (pathname.startsWith('/api/captain5/department-updates')) return handleUpdates(route, server, pathname);
   if (pathname === '/api/captain5/communications/summary') return route.fulfill({ json: { unread_count: 3, latest_activity_at: null } });
   if (pathname === '/api/captain5/communications/posts') return route.fulfill({ json: { data: [], pinned: [], next_before: null, unread_count: 3 } });
@@ -431,12 +380,6 @@ test.describe('where the Captain 5 name comes from', () => {
     await expect(pageNote(page)).toHaveCount(0);
   });
 
-  test('an approved acting member shows no note', async ({ page }) => {
-    await open(page, newServer({ onDuty: { ...acting('C', 'Jordan Lee'), as_of: null, freshness: 'not_applicable', identity: null, reason: null } }));
-    await expect(pageLine(page)).toHaveText(/^C Shift Acting Captain 5: Jordan Lee until /);
-    await expect(pageNote(page)).toHaveCount(0);
-  });
-
   test('the roster keeps the Tag and "Your access" as they are and adds when it was updated', async ({ page }) => {
     await open(page, newServer({ onDuty: rosterOfficer() }));
     await expect(pageLine(page)).toHaveText('B Shift Captain 5: Jordan Lee');
@@ -498,10 +441,11 @@ test.describe('where the Captain 5 name comes from', () => {
 });
 
 test.describe('workspace shell', () => {
-  test('shows the shift line, authority and the tabs, with no Duty tab and no view-only mode', async ({ page }) => {
+  test('shows the shift line, authority and the tabs, with no Duty tab, no view-only mode and no control to change the name', async ({ page }) => {
     await open(page, newServer());
     await expect(page.getByRole('heading', { name: 'Captain 5 · EMS Operations', level: 1 })).toBeVisible();
     await expect(page.getByTestId('captain5-duty-line')).toHaveText('B Shift Captain 5: Alex Rivera');
+    await expect(page.getByTestId('captain5-acting-open')).toHaveCount(0);
     await expect(page.getByTestId('captain5-authority')).toContainText('Captain 5 (on duty)');
     const tabs = page.getByRole('tablist', { name: 'Captain 5 workspace' });
     await expect(tabs.getByRole('tab')).toHaveText([/Today/, /Issues\s*2/, /Replacements/, /Truck Changes/, /Messages\s*3/, /Department Updates/, /History/]);
@@ -518,15 +462,9 @@ test.describe('workspace shell', () => {
     });
   }
 
-  test('an approved acting member reads "Acting Captain 5 ... until <time>" in the shift colour; unresolved is neutral', async ({ page }) => {
-    await open(page, newServer({ onDuty: acting('C', 'Jordan Lee') }));
-    const line = page.getByTestId('captain5-duty-line');
-    await expect(line).toHaveText(/^C Shift Acting Captain 5: Jordan Lee until \S+/);
-    await expect(line.locator('.hub-tag')).toHaveClass(/hub-tag--danger/);
-
-    const unresolved = await page.context().newPage();
-    await open(unresolved, newServer({ onDuty: UNSET }));
-    const none = unresolved.getByTestId('captain5-duty-line');
+  test('an unresolved shift reads not set in a neutral tone', async ({ page }) => {
+    await open(page, newServer({ onDuty: UNSET }));
+    const none = page.getByTestId('captain5-duty-line');
     await expect(none).toHaveText('Shift Captain 5 not set');
     await expect(none.locator('.hub-tag')).not.toHaveClass(/hub-tag--(success|info|danger|warning)/);
   });
@@ -1060,8 +998,8 @@ test.describe('Truck Changes', () => {
     { apparatus_id: 5, unit: 'R 44', vehicle_number: '1033', station: 'Station 4', status: 'Out of Service', changed_at: minutesAgo(90), changed_recently: true },
   ];
   const changes: RescueTruckChange[] = [
-    { id: 'changeout:1', source: 'changeout', unit: 'R 44', from_vehicle_number: '17503', to_vehicle_number: '1033', at: minutesAgo(90), by: 'Lt. Alvarez', recent: true, note: 'Moved after the morning call.', left_behind: [{ name: 'Airway Bag', note: 'Stays on the old truck.' }, { name: 'LifePak 15', note: null }] },
-    { id: 'fleet_decision:2', source: 'fleet_decision', unit: 'R 1', from_vehicle_number: '2200', to_vehicle_number: '2201', at: minutesAgo(60 * 24 * 5), by: 'Sam Fleet', recent: false, note: null, left_behind: [] },
+    { id: 'changeout:1', unit: 'R 44', from_vehicle_number: '17503', to_vehicle_number: '1033', at: minutesAgo(90), by: 'Lt. Alvarez', recent: true, note: 'Moved after the morning call.', left_behind: [{ name: 'Airway Bag', note: 'Stays on the old truck.' }, { name: 'LifePak 15', note: null }] },
+    { id: 'changeout:2', unit: 'R 1', from_vehicle_number: '2200', to_vehicle_number: '2201', at: minutesAgo(60 * 24 * 5), by: 'Sam Fleet', recent: false, note: null, left_behind: [] },
   ];
 
   test('the tab sits after Replacements, shows who is on what truck and what changed, and its badge is the last 24 hours', async ({ page }) => {
@@ -1091,7 +1029,8 @@ test.describe('Truck Changes', () => {
     await entries.nth(0).locator('summary').click();
     await expect(entries.nth(0).getByText('Airway Bag: Stays on the old truck.')).toBeVisible();
     await expect(entries.nth(0).getByText('Moved after the morning call.')).toBeVisible();
-    await expect(entries.nth(1)).toContainText('Fleet decision by Sam Fleet');
+    await expect(entries.nth(1)).toContainText('Sam Fleet');
+    await expect(entries.nth(1)).not.toContainText('Fleet decision');
     await expect(entries.nth(1).locator('summary')).toHaveCount(0);
     await expectNoHorizontalOverflow(page);
     await shot(page, `trucks-${page.viewportSize()?.width}`);
@@ -1174,7 +1113,6 @@ test.describe('everyone with access can do everything', () => {
     await expect(page.getByTestId('captain5-authority')).toContainText('Officer');
     await expect(page.getByLabel('Handoff note for the next Captain 5')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Acknowledge handoff' })).toBeVisible();
-    await expect(page.getByTestId('captain5-acting-open')).toBeVisible();
 
     await page.goto('/daily/captain-5?tab=issues&issue=1');
     await expect(sheet(page).getByRole('heading', { name: 'Rescue 1: Pulse oximeter' })).toBeVisible();
@@ -1185,181 +1123,6 @@ test.describe('everyone with access can do everything', () => {
     await page.goto('/daily/captain-5');
     await page.getByTestId('captain5-rescue-row').first().click();
     await expect(page.getByTestId('captain5-clarification')).toBeVisible();
-  });
-});
-
-test.describe('acting as Captain 5', () => {
-  const open_ = (page: Page) => page.getByTestId('captain5-acting-open');
-  const acts = (page: Page) => page.getByTestId('captain5-acting-sheet');
-
-  test('the control sits under the shift line and opens a card with the plain explanation and three choices', async ({ page }) => {
-    await open(page, newServer());
-    await expect(open_(page)).toHaveText('Acting as Captain 5 today? Click here.');
-    await open_(page).click();
-    await expect(acts(page)).toBeVisible();
-    await expect(acts(page)).toContainText('An administrator approves this. It only changes the name shown at the top; your work on this page is always recorded under your own name, whether or not you use this.');
-    await expect(acts(page).getByRole('radio', { name: /^12 hours\s+ends / })).toBeChecked();
-    await expect(acts(page).getByRole('radio', { name: /^24 hours\s+ends / })).not.toBeChecked();
-    await expect(acts(page).getByRole('radio', { name: /^Custom end time/ })).not.toBeChecked();
-    await expect(acts(page).getByRole('button', { name: 'End the current acting Captain 5' })).toHaveCount(0);
-    await page.keyboard.press('Escape');
-    await expect(acts(page)).toHaveCount(0);
-  });
-
-  test('12 hours: posts kind act with a request id, closes, shows the pending request, and Withdraw takes it back', async ({ page }) => {
-    const server = newServer();
-    await open(page, server);
-    await open_(page).click();
-    await acts(page).getByRole('button', { name: 'Request to act as Captain 5' }).click();
-    await expect(acts(page)).toHaveCount(0);
-    expect(server.actingBodies).toHaveLength(1);
-    expect(server.actingBodies[0]).toMatchObject({ kind: 'act', duration: '12h' });
-    expect(server.actingBodies[0]).not.toHaveProperty('ends_at');
-    expect(String(server.actingBodies[0].client_request_id)).toMatch(UUID_PATTERN);
-    const mine = page.getByTestId('captain5-acting-mine');
-    await expect(mine).toContainText('Your request to act as Captain 5 until');
-    await expect(mine).toContainText('is waiting for approval');
-    // Acting is display only: the shown name has not changed.
-    await expect(page.getByTestId('captain5-duty-line')).toHaveText('B Shift Captain 5: Alex Rivera');
-
-    await mine.getByRole('button', { name: 'Withdraw' }).click();
-    await expect(page.getByTestId('captain5-acting-mine')).toHaveCount(0);
-    expect(server.actingDecisions[0].call).toMatch(/^withdraw:\d+$/);
-  });
-
-  test('24 hours posts duration 24h; a custom end time posts the local datetime and needs a time first', async ({ page }) => {
-    const server = newServer();
-    await open(page, server);
-    await open_(page).click();
-    await acts(page).getByRole('radio', { name: /^24 hours/ }).check();
-    await acts(page).getByRole('button', { name: 'Request to act as Captain 5' }).click();
-    await expect(acts(page)).toHaveCount(0);
-    expect(server.actingBodies[0]).toMatchObject({ kind: 'act', duration: '24h' });
-    expect(server.actingBodies[0]).not.toHaveProperty('ends_at');
-    await page.getByTestId('captain5-acting-mine').getByRole('button', { name: 'Withdraw' }).click();
-
-    await open_(page).click();
-    await acts(page).getByRole('radio', { name: /^Custom end time/ }).check();
-    await acts(page).getByRole('button', { name: 'Request to act as Captain 5' }).click();
-    await expect(acts(page).getByTestId('captain5-acting-error')).toHaveText('Choose when you stop acting as Captain 5.');
-    expect(server.actingBodies).toHaveLength(1);
-    const end = `${ymd(1)}T09:30`;
-    await acts(page).getByLabel('Stop acting at').fill(end);
-    await acts(page).getByRole('button', { name: /Request to act as Captain 5|Try again/ }).click();
-    await expect(acts(page)).toHaveCount(0);
-    expect(server.actingBodies).toHaveLength(2);
-    expect(server.actingBodies[1]).toMatchObject({ kind: 'act', duration: 'custom', ends_at: end });
-  });
-
-  test('while someone is shown as acting, the card explains the takeover and can end the current acting Captain 5', async ({ page }) => {
-    const server = newServer({ onDuty: acting('B', 'Jordan Lee') });
-    await open(page, server);
-    await open_(page).click();
-    await expect(page.getByTestId('captain5-acting-takeover')).toContainText('Jordan Lee is shown as acting Captain 5 until');
-    await expect(page.getByTestId('captain5-acting-takeover')).toContainText('your name replaces theirs');
-    await acts(page).getByRole('button', { name: 'End the current acting Captain 5' }).click();
-    await expect(acts(page)).toHaveCount(0);
-    expect(server.actingBodies[0]).toMatchObject({ kind: 'end' });
-    expect(server.actingBodies[0]).not.toHaveProperty('duration');
-    expect(String(server.actingBodies[0].client_request_id)).toMatch(UUID_PATTERN);
-    await expect(page.getByTestId('captain5-acting-mine')).toContainText('Your request to end the current acting Captain 5 is waiting for approval.');
-
-    // Asking to act while someone else is shown is the same act request (a takeover).
-    await open_(page).click();
-    await acts(page).getByRole('button', { name: 'Request to act as Captain 5' }).click();
-    await expect(acts(page)).toHaveCount(0);
-    expect(server.actingBodies[1]).toMatchObject({ kind: 'act', duration: '12h' });
-    expect(server.actingBodies[1].client_request_id).not.toBe(server.actingBodies[0].client_request_id);
-  });
-
-  test('a dropped connection keeps the card open and the retry reuses the SAME client_request_id', async ({ page }) => {
-    const server = newServer();
-    const keys: string[] = [];
-    let drop = true;
-    server.onActing = async (route, body) => {
-      keys.push(String(body.client_request_id));
-      if (!drop) return false;
-      drop = false;
-      await route.abort('failed');
-      return true;
-    };
-    await open(page, server);
-    await open_(page).click();
-    await acts(page).getByRole('button', { name: 'Request to act as Captain 5' }).click();
-    await expect(acts(page).getByTestId('captain5-acting-error')).toContainText('nothing is confirmed');
-    await acts(page).getByRole('button', { name: 'Try again' }).click();
-    await expect(acts(page)).toHaveCount(0);
-    expect(keys).toHaveLength(2);
-    expect(keys[1]).toBe(keys[0]);
-  });
-
-  test('a refused request shows the server reason and the next try is a new request', async ({ page }) => {
-    const server = newServer();
-    const keys: string[] = [];
-    let refuse = true;
-    server.onActing = async (route, body) => {
-      keys.push(String(body.client_request_id));
-      if (!refuse) return false;
-      refuse = false;
-      await route.fulfill({ status: 422, json: { message: 'Invalid.', errors: { ends_at: ['Choose an end time between 15 minutes and 72 hours from now.'] } } });
-      return true;
-    };
-    await open(page, server);
-    await open_(page).click();
-    await acts(page).getByRole('button', { name: 'Request to act as Captain 5' }).click();
-    await expect(acts(page).getByTestId('captain5-acting-error')).toHaveText('Choose an end time between 15 minutes and 72 hours from now.');
-    await acts(page).getByRole('button', { name: 'Try again' }).click();
-    await expect(acts(page)).toHaveCount(0);
-    expect(keys[1]).not.toBe(keys[0]);
-  });
-
-  test('offline: nothing is sent and the card says so', async ({ page, context }) => {
-    const server = newServer();
-    await open(page, server);
-    await open_(page).click();
-    await context.setOffline(true);
-    await acts(page).getByRole('button', { name: 'Request to act as Captain 5' }).click();
-    await expect(acts(page).getByTestId('captain5-acting-error')).toHaveText("You're offline. Nothing was sent. Reconnect, then try again.");
-    expect(server.actingBodies).toHaveLength(0);
-    await context.setOffline(false);
-    await acts(page).getByRole('button', { name: 'Try again' }).click();
-    await expect(acts(page)).toHaveCount(0);
-    expect(server.actingBodies).toHaveLength(1);
-  });
-
-  test('members who cannot approve see no approval list', async ({ page }) => {
-    await open(page, newServer({ acting: noActing({ pending: [makeActing(7)] }) }));
-    await expect(page.getByTestId('captain5-acting-approvals')).toHaveCount(0);
-    await expect(page.getByText('Waiting for approval')).toHaveCount(0);
-  });
-
-  test('an administrator approves a request: the new name shows at the top', async ({ page }) => {
-    const server = newServer({ access: ACCESS_ADMIN, acting: noActing({ can_approve: true, pending: [makeActing(7), makeActing(8, { kind: 'end', name: null, rank: null, duration: null, ends_at: null, requested_by: 'Sam Ortiz' })] }) });
-    await open(page, server);
-    const list = page.getByTestId('captain5-acting-approvals');
-    await expect(list.getByRole('heading', { name: 'Waiting for approval' })).toBeVisible();
-    const rows = list.getByTestId('captain5-acting-pending');
-    await expect(rows).toHaveCount(2);
-    await expect(rows.first()).toContainText('Lt. Jordan Lee to act as Captain 5 until');
-    await expect(rows.nth(1)).toContainText('End the current acting Captain 5');
-    await rows.first().getByRole('button', { name: /^Approve/ }).click();
-    await expect(rows).toHaveCount(1);
-    expect(server.actingDecisions[0]).toEqual({ call: 'approve:7', body: {} });
-    await expect(page.getByTestId('captain5-duty-line')).toHaveText(/^B Shift Acting Captain 5: Jordan Lee until /);
-  });
-
-  test('"Not approved" needs a note, then sends it', async ({ page }) => {
-    const server = newServer({ access: ACCESS_ADMIN, acting: noActing({ can_approve: true, pending: [makeActing(7)] }) });
-    await open(page, server);
-    const row = page.getByTestId('captain5-acting-pending');
-    await row.getByRole('button', { name: /^Not approved/ }).click();
-    await row.getByRole('button', { name: 'Send decision' }).click();
-    await expect(row.getByText('Write a short note so the member knows why.')).toBeVisible();
-    expect(server.actingDecisions).toHaveLength(0);
-    await row.getByLabel('Why is this not approved?').fill('Captain 5 is on duty tonight');
-    await row.getByRole('button', { name: 'Send decision' }).click();
-    await expect(page.getByTestId('captain5-acting-approvals')).toHaveCount(0);
-    expect(server.actingDecisions[0]).toEqual({ call: 'reject:7', body: { note: 'Captain 5 is on duty tonight' } });
   });
 });
 
@@ -1563,26 +1326,16 @@ test.describe('responsive', () => {
       await expect(page.getByTestId('captain5-issue-sheet')).toBeInViewport();
     });
 
-    test(`${name} ${width}px: the shift line, the acting card and Department Updates fit with 44px targets`, async ({ page }) => {
+    test(`${name} ${width}px: the shift line and Department Updates fit with 44px targets`, async ({ page }) => {
       await page.setViewportSize({ width, height });
       const server = newServer({
-        onDuty: acting('C', 'A Surprisingly Long Name For A Narrow Phone Screen', inHours(30)),
+        onDuty: bidHolder('C', 'A Surprisingly Long Name For A Narrow Phone Screen'),
         updates: [makeUpdate(3, { title: 'A long update title that has to wrap instead of overflowing the row on a phone', excerpt: 'word '.repeat(60) })],
       });
       await open(page, server);
       await expect(page.getByTestId('captain5-duty-line')).toBeVisible();
       await expectNoHorizontalOverflow(page);
       await shot(page, `${name}-duty`);
-
-      await page.getByTestId('captain5-acting-open').click();
-      await page.getByRole('radio', { name: /^Custom end time/ }).check();
-      await expect(page.getByTestId('captain5-acting-sheet')).toBeVisible();
-      await expectNoHorizontalOverflow(page);
-      await shot(page, `${name}-acting`);
-      const sheetBox = await page.getByTestId('captain5-acting-sheet').evaluate((el) => ({ client: el.clientWidth, scroll: el.scrollWidth, buttons: [...el.querySelectorAll<HTMLElement>('button, label:has(input), input:not([type="radio"])')].map((b) => Math.round(b.getBoundingClientRect().height)) }));
-      expect(sheetBox.scroll).toBeLessThanOrEqual(sheetBox.client);
-      expect(Math.min(...sheetBox.buttons)).toBeGreaterThanOrEqual(44);
-      await page.keyboard.press('Escape');
 
       await page.getByRole('tab', { name: 'Department Updates' }).click();
       await expect(page.getByTestId('department-update-row')).toHaveCount(1);

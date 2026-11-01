@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Notifications;
 
 use App\Models\User;
+use App\Support\Host\HubHosts;
 use Filament\Facades\Filament;
 use Throwable;
 
@@ -25,7 +26,9 @@ final class NotificationLink
 
     /**
      * @param  string  $url  A site-relative path, or an absolute URL on this site.
-     * @return string The original URL when it is same-origin and enterable, otherwise the landing path.
+     * @return string The site-relative path when it is enterable, otherwise the landing path. Never absolute:
+     *                the worker that shows a push treats any other host as off-site, and a device installed on
+     *                the apex must open the deep link on its own host. Email callers wrap this in url().
      */
     public static function resolve(User $recipient, string $url): string
     {
@@ -41,7 +44,7 @@ final class NotificationLink
             return self::landing($recipient);
         }
 
-        return $url;
+        return $path;
     }
 
     /** The relative path (with query and fragment) when the URL stays on this site, else null. */
@@ -59,15 +62,20 @@ final class NotificationLink
         }
 
         $parts = parse_url($url);
-        $appHost = parse_url((string) config('app.url'), PHP_URL_HOST);
         if ($parts === false || ! isset($parts['scheme'], $parts['host'])
             || ! in_array(strtolower($parts['scheme']), ['http', 'https'], true)
-            || ! is_string($appHost) || strtolower($parts['host']) !== strtolower($appHost)
+            || ! HubHosts::isHubHost($parts['host'])
             || isset($parts['user']) || isset($parts['pass'])) {
             return null;
         }
 
-        return ($parts['path'] ?? '/')
+        $path = $parts['path'] ?? '/';
+        // "https://hub//other.example/x" keeps a path that would mean another site once it stands alone.
+        if (str_starts_with($path, '//')) {
+            return null;
+        }
+
+        return $path
             .(isset($parts['query']) ? '?'.$parts['query'] : '')
             .(isset($parts['fragment']) ? '#'.$parts['fragment'] : '');
     }

@@ -47,14 +47,13 @@ final class ApparatusMasterVehicleLinkSwapTest extends TestCase
         }
     }
 
-    public function test_approved_swap_leaves_every_link_on_its_physical_truck(): void
+    public function test_a_swap_leaves_every_link_on_its_physical_truck(): void
     {
-        $swap = $this->heldRequest();
         $links = $this->links();
         $masters = UnitMasterVehicle::query()->count();
         $history = UnitMasterVehicleChange::query()->count();
 
-        $this->app->make(VehicleSwapService::class)->decide($swap->id, $this->fleetOperationsManager(), VehicleSwapService::DECISION_APPROVE_SWAP);
+        $this->app->make(VehicleSwapService::class)->moveUnitForChangeout($this->unit->fresh(), $this->frontline->fresh());
 
         $this->assertSame('E3', $this->unit->fresh()->designation, 'the unit really did move');
         $this->assertSame($links, $this->links());
@@ -62,14 +61,13 @@ final class ApparatusMasterVehicleLinkSwapTest extends TestCase
         $this->assertSame($history, UnitMasterVehicleChange::query()->count(), 'a swap writes no master history');
     }
 
-    public function test_approved_replace_keeps_links_and_the_reserve_status_is_accepted(): void
+    public function test_a_queued_checkout_that_names_another_truck_keeps_links_on_their_trucks(): void
     {
-        $swap = $this->heldRequest();
         $links = $this->links();
 
-        $this->app->make(VehicleSwapService::class)->decide($swap->id, $this->fleetOperationsManager(), VehicleSwapService::DECISION_APPROVE_REPLACE, null, VehicleSwapService::DEMOTE_RESERVE);
+        $this->postJson($this->submissionUrl(), $this->payload(['vehicle_number' => 'V-303', 'swap_answer' => 'swap_completed']))->assertCreated();
 
-        $this->assertSame('Reserve', $this->unit->fresh()->status);
+        $this->assertSame('E2', $this->frontline->fresh()->designation);
         $this->assertSame($links, $this->links());
     }
 }

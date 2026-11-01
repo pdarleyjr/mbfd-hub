@@ -16,6 +16,7 @@ use App\Models\User;
 use App\Services\ApparatusServiceTicketWorkflowService;
 use App\Services\Fleet\ApparatusMasterVehicleLink;
 use App\Services\Fleet\ApparatusOperationalAlertService;
+use App\Support\HubNavigation;
 use App\Support\HubTimezone;
 use Filament\Actions\MountableAction;
 use Filament\Forms;
@@ -24,6 +25,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Livewire\Livewire;
 
 /**
  * The Fleet manager's and mechanics' everyday actions on one apparatus. The
@@ -233,8 +235,11 @@ final class ApparatusWorkflowActions
             ->icon('heroicon-o-clipboard-document-check')
             ->color('gray')
             ->visible(fn (Apparatus $record): bool => $record->isDailyCheckoutRequired() && filled($record->slug))
-            ->url(fn (Apparatus $record): string => url("/daily/vehicle-inspections/{$record->slug}"))
-            ->openUrlInNewTab();
+            // Same window: a new tab escapes an installed app. Daily's Back returns to this admin page.
+            ->url(fn (Apparatus $record): string => HubNavigation::withReturnTo(
+                "/daily/vehicle-inspections/{$record->slug}",
+                Livewire::isLivewireRequest() ? Livewire::originalUrl() : request()->fullUrl(),
+            ));
     }
 
     /**

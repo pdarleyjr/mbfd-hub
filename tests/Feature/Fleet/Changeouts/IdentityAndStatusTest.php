@@ -12,7 +12,7 @@ use Filament\Facades\Filament;
 use PHPUnit\Framework\Attributes\DataProvider;
 
 /**
- * A status describes a truck and a label names one. Neither is handed to the wrong truck, by a changeout or a decision.
+ * A status describes a truck and a label names one. Neither is handed to the wrong truck by a changeout.
  */
 final class IdentityAndStatusTest extends ChangeoutTestCase
 {
@@ -99,30 +99,6 @@ final class IdentityAndStatusTest extends ChangeoutTestCase
         $this->assertSame(FleetVehicleCatalog::ROLE_RESERVE, FleetVehicleCatalog::roleFor('Available'));
     }
 
-    public function test_a_decision_never_trades_a_shop_truck_status_onto_a_good_one(): void
-    {
-        $this->unit->forceFill(['status' => 'Maintenance'])->save();
-        $this->reserve->forceFill(['status' => 'Available'])->save();
-        $swap = $this->heldRequest('V-909', withFinding: false);
-
-        app(VehicleSwapService::class)->decide($swap->id, $this->fleetOperationsManager(), VehicleSwapService::DECISION_APPROVE_SWAP);
-
-        $this->assertSame('E2', $this->reserve->fresh()->designation);
-        $this->assertSame('Maintenance', $this->unit->fresh()->getAttribute('status'));
-        $this->assertSame('Available', $this->reserve->fresh()->getAttribute('status'));
-    }
-
-    public function test_a_decision_still_trades_in_service_with_available(): void
-    {
-        $this->reserve->forceFill(['status' => 'Available'])->save();
-        $swap = $this->heldRequest('V-909', withFinding: false);
-
-        app(VehicleSwapService::class)->decide($swap->id, $this->fleetOperationsManager(), VehicleSwapService::DECISION_APPROVE_SWAP);
-
-        $this->assertSame('In Service', $this->reserve->fresh()->getAttribute('status'));
-        $this->assertSame('Available', $this->unit->fresh()->getAttribute('status'));
-    }
-
     public function test_a_number_is_only_rewritten_where_it_stands_alone(): void
     {
         $to = $this->reserveEngine('1033', ['unit_id' => 'R-11033', 'designation' => 'R-1033', 'name' => 'RESCUE 1033 (was 21033)', 'slug' => 'r1033']);
@@ -144,36 +120,19 @@ final class IdentityAndStatusTest extends ChangeoutTestCase
         $this->assertSame(['R-$1-2', 'R-VX909', 'Reserve $1-2'], [$from->fresh()->unit_id, $from->fresh()->designation, $from->fresh()->name]);
     }
 
-    public function test_a_reserve_identity_from_a_decision_follows_its_row_so_a_later_decision_does_not_collide(): void
+    public function test_an_older_row_named_reserve_id_follows_its_row(): void
     {
-        // decide() "replace" leaves the old truck as reserve-<its id>.
-        $swap = $this->heldRequest('V-909', withFinding: false);
-        $manager = $this->fleetOperationsManager();
-        app(VehicleSwapService::class)->decide($swap->id, $manager, VehicleSwapService::DECISION_APPROVE_REPLACE, null, VehicleSwapService::DEMOTE_RESERVE);
-        $replaced = $this->unit->fresh();
-        $this->assertSame('reserve-'.$replaced->id, $replaced->slug);
+        // Older swaps left trucks named by row id, and some rows may still carry it.
+        $this->reserve->forceFill(['unit_id' => 'reserve-'.$this->reserve->id, 'slug' => 'reserve-'.$this->reserve->id, 'designation' => 'Reserve V-909'])->save();
 
         // E3 moves onto that truck, so the truck it left carries the reserve identity, renamed for the row.
-        $this->actingAsCanonicalUser($manager);
-        $this->postChangeout($this->frontline, ['to_apparatus_id' => $replaced->id])->assertCreated()->assertJsonPath('changeout.status', 'completed');
+        $this->actingAsCanonicalUser($this->fleetOperationsManager());
+        $this->postChangeout($this->frontline, ['to_apparatus_id' => $this->reserve->id])->assertCreated()->assertJsonPath('changeout.status', 'completed');
+
         $left = $this->frontline->fresh();
         $this->assertSame(['reserve-'.$left->id, 'reserve-'.$left->id], [$left->slug, $left->unit_id]);
         $this->assertSame('Reserve V-303', $left->designation);
-        $this->assertSame('E3', $this->unit->fresh()->designation);
-
-        // That truck can be demoted by a decision again: reserve-<its id> is free, because nobody kept it.
-        $this->actingAsCanonicalUser($this->member);
-        $unitNow = $this->unit->fresh();
-        $this->unit = $unitNow;
-        $this->assertNotNull($unitNow->slug);
-        $target = $this->reserveEngine('V-940', ['status' => 'Reserve']);
-        $next = $this->heldRequest('V-940', withFinding: false);
-
-        app(VehicleSwapService::class)->decide($next->id, $manager, VehicleSwapService::DECISION_APPROVE_REPLACE, null, VehicleSwapService::DEMOTE_RESERVE);
-
-        $this->assertSame('E3', $target->fresh()->designation);
-        $this->assertSame('reserve-'.$unitNow->id, $unitNow->fresh()->slug);
-        $this->assertSame(1, Apparatus::query()->where('slug', 'reserve-'.$unitNow->id)->count());
-        $this->assertSame('reserve-'.$left->id, $left->fresh()->slug);
+        $this->assertSame('E3', $this->reserve->fresh()->designation);
+        $this->assertSame(0, Apparatus::query()->where('slug', 'reserve-'.$this->reserve->id)->count());
     }
 }

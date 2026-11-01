@@ -31,7 +31,11 @@ final readonly class TeleStaffRosterReport
         public array $warnings,
     ) {}
 
-    /** Hash of the roster content. Excludes export time and file bytes, so a re-export of the same roster matches. */
+    /**
+     * Hash of the roster content. Excludes export time and file bytes, so a re-export of the same roster
+     * matches. Includes each row's availability, so a code the Hub has just learned reaches today's roster
+     * on the next export instead of waiting for TeleStaff to change something.
+     */
     public function normalizedSha256(): string
     {
         $sections = [];
@@ -42,7 +46,7 @@ final readonly class TeleStaffRosterReport
                 foreach ($seat->entries as $entry) {
                     $entries[] = [
                         $entry->kind, $entry->employeeId, $entry->rawName, $entry->rawCode,
-                        $entry->rawFrom, $entry->rawThrough, $entry->reportedHours,
+                        $entry->rawFrom, $entry->rawThrough, $entry->reportedHours, $entry->availability,
                     ];
                 }
                 $seats[] = [$seat->rawRank, $entries];

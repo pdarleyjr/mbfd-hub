@@ -18,7 +18,6 @@ use App\Models\ApparatusInspection;
 use App\Models\ApparatusInspectionException;
 use App\Models\ApparatusInspectionReviewEvent;
 use App\Models\ApparatusIssueMessage;
-use App\Models\ApparatusVehicleSwapRequest;
 use App\Models\User;
 use App\Notifications\Inspections\InspectionEventNotification;
 use App\Services\ApparatusInspectionApprovalService;
@@ -26,7 +25,6 @@ use App\Services\ApparatusInspectionExceptionService;
 use App\Services\ApparatusInspectionProcessingService;
 use App\Services\DailyCheckoutChecklistResolver;
 use App\Services\Defects\DefectCorrectiveActionService;
-use App\Services\Fleet\VehicleSwapService;
 use App\Services\Inspections\EmployeeInspectionHistoryService;
 use App\Services\Inspections\InspectionReviewService;
 use App\Services\Inspections\IssueMessageService;
@@ -39,7 +37,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use PHPUnit\Framework\Attributes\DataProvider;
-use Spatie\Permission\Models\Role;
 use Tests\Feature\Inspections\Concerns\BuildsDailyScenarioWorld;
 use Tests\TestCase;
 
@@ -591,39 +588,26 @@ final class DailyInspectionAcceptanceScenariosTest extends TestCase
 
     // ---------------------------------------------------- vehicle swap + holds
 
-    public function test_a_swap_hold_with_a_meter_rollback_and_a_member_flag_stays_pending_until_every_hold_is_decided(): void
+    public function test_a_queued_checkout_on_another_truck_with_a_meter_rollback_and_a_member_flag_stays_pending_until_every_hold_is_decided(): void
     {
-        $fleet = $this->newReviewer('Fleet Super');
-        $fleet->assignRole(Role::findOrCreate('super_admin', 'web'));
         $this->actAs($this->alpha);
         $payload = $this->payload();
         $payload['physical_vehicle'] = ['vehicle_number' => 'V-303', 'swap_answer' => 'swap_completed', 'note' => 'E3 is in the shop.'];
         $this->setField($payload, 'vehicle_num', 'V-303');
         $payload['review_flag'] = ['explanation' => 'Different truck than usual.', 'items' => []];
 
+        // The swap needs nobody. The ordinary holds on the checkout itself are still decided by a reviewer.
         $inspection = ApparatusInspection::query()->findOrFail(
-            $this->submit($payload)->assertCreated()->assertJsonPath('processing_status', 'pending_vehicle_swap')->json('id'),
+            $this->submit($payload)->assertCreated()->assertJsonPath('processing_status', 'held_for_review')->json('id'),
         );
-        // Nothing is applied while Fleet decides.
-        $this->assertSame(0, ApparatusInspectionException::query()->count());
+        $this->assertSame('E2', $this->frontline->fresh()->designation, 'The swap has already happened.');
         $this->assertSame(1000, $this->unit->fresh()->current_miles);
         $this->assertSame(5000, $this->frontline->fresh()->current_miles);
-
-        // Approving the ordinary way is refused while the swap is undecided.
-        try {
-            app(InspectionReviewService::class)->approve($inspection->id, $this->reviewer);
-            $this->fail('A swap-held checkout must not be approved through the ordinary path.');
-        } catch (\Throwable $exception) {
-            $this->assertStringContainsString('vehicle swap', strtolower($exception->getMessage()));
-        }
-
-        $request = ApparatusVehicleSwapRequest::query()->sole();
-        app(VehicleSwapService::class)->decide($request->id, $fleet, VehicleSwapService::DECISION_APPROVE_SWAP);
 
         $inspection->refresh();
         $this->assertSame('held_for_review', $inspection->processing_status);
         $this->assertSame('pending_review', $inspection->review_status);
-        $this->assertSame($this->frontline->id, $inspection->processed_apparatus_id, 'Findings apply to the confirmed truck.');
+        $this->assertSame($this->frontline->id, $inspection->processed_apparatus_id, 'Findings apply to the reported truck.');
         $holds = ApparatusInspectionException::query()->where('apparatus_inspection_id', $inspection->id)->orderBy('id')->get();
         $this->assertEqualsCanonicalizing(['engine_hours', 'member_review_flag', 'miles'], $holds->pluck('field')->all());
 
@@ -645,25 +629,22 @@ final class DailyInspectionAcceptanceScenariosTest extends TestCase
         $this->assertSame(0, ApparatusInspectionException::query()->where('apparatus_inspection_id', $inspection->id)->whereNotIn('status', ['resolved', 'dismissed'])->count());
     }
 
-    public function test_a_checkout_held_for_a_vehicle_swap_renders_for_the_member_the_reviewer_and_the_pdf(): void
+    public function test_a_queued_checkout_on_another_truck_renders_for_the_member_the_reviewer_and_the_pdf(): void
     {
         $this->actAs($this->alpha);
         $payload = $this->payload();
         $payload['physical_vehicle'] = ['vehicle_number' => 'V-303', 'swap_answer' => 'swap_completed', 'note' => 'E3 is in the shop.'];
         $this->setField($payload, 'vehicle_num', 'V-303');
-        $inspection = ApparatusInspection::query()->findOrFail(
-            $this->submit($payload)->assertCreated()->assertJsonPath('processing_status', 'pending_vehicle_swap')->json('id'),
-        );
+        $inspection = ApparatusInspection::query()->findOrFail($this->submit($payload)->assertCreated()->json('id'));
 
-        $html = $this->get('/employee/my-vehicle-inspections/'.$inspection->id)->assertOk()->getContent();
-        $this->assertStringContainsString('Waiting for Logistics review', $html);
-        $this->assertStringContainsString('Fleet is confirming which vehicle you inspected', $html);
+        $this->get('/employee/my-vehicle-inspections/'.$inspection->id)->assertOk();
         $this->get(route('employee.vehicle-inspections.pdf', $inspection))->assertOk();
 
         $workspace = app(InspectionWorkspace::class)->build($inspection, $this->reviewer);
-        $this->assertSame('Held: vehicle swap', $workspace['status']['label']);
+        $this->assertSame('V-303', $workspace['header']['vehicle_number']);
+        $this->assertContains('Truck changed at checkout: V-303', array_column($workspace['timeline'], 'title'));
         $this->actAs($this->reviewer);
-        $this->get('/admin/inspections/'.$inspection->id)->assertOk();
+        $this->get('/admin/inspections/'.$inspection->id)->assertOk()->assertSee('Truck changed at checkout: V-303');
     }
 
     /**
@@ -740,7 +721,6 @@ final class DailyInspectionAcceptanceScenariosTest extends TestCase
             ]]],
             'legacy pending with no pending effects' => ['pending_review', null, ['unprocessed' => true, 'with_defect' => false]],
             'legacy approved' => ['approved', null, ['unprocessed' => true, 'with_defect' => false]],
-            'held for a vehicle swap' => ['pending_review', 'pending_vehicle_swap', ['unprocessed' => true]],
             'processed against a different truck' => ['approved', 'accepted', ['other_truck' => true]],
             'no stored results' => ['approved', 'accepted', ['results' => [], 'with_defect' => false]],
             'partly malformed stored results' => ['approved', 'accepted', ['results' => ['not an array', ['items' => [['name' => 'No status'], 'nor this']]], 'with_defect' => false]],

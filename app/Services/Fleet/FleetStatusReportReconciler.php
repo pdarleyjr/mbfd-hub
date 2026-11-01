@@ -9,7 +9,6 @@ use App\Enums\DailyCheckoutRequirement;
 use App\Models\Apparatus;
 use App\Models\ApparatusChangeout;
 use App\Models\ApparatusOperationalStatusEvent;
-use App\Models\ApparatusVehicleSwapRequest;
 use App\Models\Station;
 use App\Models\UnitMasterVehicle;
 use App\Services\Display\DisplaySnapshotService;
@@ -517,7 +516,6 @@ final class FleetStatusReportReconciler
     private function newerEvidence(int $apparatusId, string $since): ?string
     {
         return $this->newerStatusEvent($apparatusId, $since)
-            ?? $this->newerSwapDecision($apparatusId, $since)
             ?? $this->newerChangeoutDecision($apparatusId, $since);
     }
 
@@ -534,24 +532,6 @@ final class FleetStatusReportReconciler
             ->first();
 
         return $event === null ? null : sprintf('Newer data: status changed to %s at %s UTC, on or after the report date.', self::display($event->status), $event->getRawOriginal('changed_at'));
-    }
-
-    private function newerSwapDecision(int $apparatusId, string $since): ?string
-    {
-        if (! Schema::hasTable('apparatus_vehicle_swap_requests')) {
-            return null;
-        }
-        $swap = ApparatusVehicleSwapRequest::query()
-            ->where(static function ($query) use ($apparatusId): void {
-                $query->where('apparatus_id', $apparatusId)
-                    ->orWhere('reported_apparatus_id', $apparatusId)
-                    ->orWhere('confirmed_apparatus_id', $apparatusId);
-            })
-            ->where('decided_at', '>=', $since)
-            ->orderByDesc('decided_at')
-            ->first();
-
-        return $swap === null ? null : sprintf('Newer data: vehicle swap report %d was decided at %s UTC, on or after the report date.', $swap->getKey(), $swap->getRawOriginal('decided_at'));
     }
 
     private function newerChangeoutDecision(int $apparatusId, string $since): ?string

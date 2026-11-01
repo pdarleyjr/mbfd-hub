@@ -12,7 +12,7 @@ const engine2 = mobileApparatus[0];
 
 const navigation = (page: Page) => page.getByRole('navigation', { name: 'Inspection workspace' });
 const vehicleSelect = (page: Page) => page.getByRole('combobox', { name: 'Physical vehicle', exact: true });
-const swapPrompt = (page: Page) => page.getByRole('group', { name: 'Was a truck swap completed?' });
+const recordChange = (page: Page) => page.getByRole('link', { name: 'Record this vehicle change' });
 
 async function openMemberStep(page: Page) {
   await navigation(page).getByRole('button', { name: 'Member / Vehicle Info', exact: true }).click();
@@ -35,7 +35,8 @@ test.describe('confirm the physical vehicle', () => {
       'RES-901 · R9 (Reserve)',
       'Not listed',
     ]);
-    await expect(swapPrompt(page)).toHaveCount(0);
+    await expect(recordChange(page)).toHaveCount(0);
+    await expect(page.locator('.inspection-review-button')).toBeVisible();
     await expect(page.getByLabel('Member', { exact: true })).toHaveAttribute('readonly', '');
   });
 
@@ -51,70 +52,51 @@ test.describe('confirm the physical vehicle', () => {
     ]);
   });
 
-  test('another vehicle asks whether a swap was completed, and I picked wrong goes back', async ({ page }) => {
+  test('a different vehicle shows only Record this vehicle change, and choosing the assigned one goes back', async ({ page }) => {
     await mobileInspectionFixture(page, engine2, { fleetVehicles });
     await openMemberStep(page);
 
+    await expect(recordChange(page)).toHaveCount(0);
     await vehicleSelect(page).selectOption('TEST-205');
-    await expect(swapPrompt(page)).toBeVisible();
-    await expect(swapPrompt(page).getByRole('radio', { name: 'Yes, swap completed' })).toBeVisible();
-    await expect(swapPrompt(page).getByRole('radio', { name: 'Unknown, not sure why' })).toBeVisible();
-    await expect(swapPrompt(page)).toContainText('You can still submit this checkout');
-    await swapPrompt(page).getByLabel('Note (optional)').fill('Engine 5 was in the shop.');
-
-    await page.getByRole('button', { name: 'I picked wrong', exact: true }).click();
-    await expect(vehicleSelect(page)).toHaveValue('TEST-102');
-    await expect(swapPrompt(page)).toHaveCount(0);
-
-    await vehicleSelect(page).selectOption('TEST-205');
-    await expect(swapPrompt(page).getByLabel('Note (optional)')).toHaveValue('');
-  });
-
-  test('a different vehicle offers Record this vehicle change, with the report to Fleet still below it', async ({ page }) => {
-    await mobileInspectionFixture(page, engine2, { fleetVehicles });
-    await openMemberStep(page);
-
-    const record = page.getByRole('link', { name: 'Record this vehicle change' });
-    await expect(record).toHaveCount(0);
-    await vehicleSelect(page).selectOption('TEST-205');
-    await expect(record).toBeVisible();
-    await expect(record).toHaveClass(/hub-btn--primary/);
-    const href = new URL((await record.getAttribute('href')) ?? '', 'http://localhost');
+    await expect(recordChange(page)).toBeVisible();
+    await expect(recordChange(page)).toHaveClass(/hub-btn--primary/);
+    const href = new URL((await recordChange(page).getAttribute('href')) ?? '', 'http://localhost');
     expect(href.pathname).toMatch(/^\/daily\/changeouts\/new\/\d+$/);
     expect(href.searchParams.get('truck')).toBe('TEST-205');
     expect(href.searchParams.get('return_to')).toBe(`/vehicle-inspections/${engine2.slug}`);
 
-    const recordBox = await record.boundingBox();
-    const reportBox = await swapPrompt(page).boundingBox();
-    expect(recordBox && reportBox && recordBox.y < reportBox.y).toBe(true);
-    await expect(swapPrompt(page).getByRole('radio', { name: 'Yes, swap completed' })).toBeVisible();
+    await expect(page.locator('[data-vehicle-change-link]')).toContainText("You can't continue on a different truck until the change is recorded");
+    await expect(page.getByRole('radio')).toHaveCount(0);
+    await expect(page.getByLabel('Note (optional)')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'I picked wrong' })).toHaveCount(0);
 
-    await page.getByRole('button', { name: 'I picked wrong', exact: true }).click();
-    await expect(record).toHaveCount(0);
+    await vehicleSelect(page).selectOption('TEST-102');
+    await expect(recordChange(page)).toHaveCount(0);
+    await expect(page.locator('.inspection-review-button')).toBeVisible();
   });
 
-  test('Not listed accepts a typed vehicle ID and rejects characters a vehicle ID cannot have', async ({ page }) => {
+  test('Not listed asks for no number and links to the change with no truck chosen', async ({ page }) => {
     await mobileInspectionFixture(page, engine2, { fleetVehicles });
     await openMemberStep(page);
 
     await vehicleSelect(page).selectOption('__not_listed__');
-    const typed = page.getByLabel('Vehicle ID on the truck');
-    await typed.fill('<b>9');
-    expect(await typed.evaluate((input: HTMLInputElement) => input.validity.patternMismatch)).toBe(true);
-    await typed.fill('X-77');
-    expect(await typed.evaluate((input: HTMLInputElement) => input.validity.valid)).toBe(true);
-    await expect(swapPrompt(page)).toBeVisible();
+    await expect(page.getByLabel('Vehicle ID on the truck')).toHaveCount(0);
+    await expect(recordChange(page)).toBeVisible();
+    const href = new URL((await recordChange(page).getAttribute('href')) ?? '', 'http://localhost');
+    expect(href.searchParams.has('truck')).toBe(false);
+    expect(href.searchParams.get('return_to')).toBe(`/vehicle-inspections/${engine2.slug}`);
   });
 
-  test('a different vehicle cannot continue until the swap question is answered', async ({ page }) => {
+  test('a different vehicle cannot continue the checkout', async ({ page }) => {
     const api = await mobileInspectionFixture(page, engine2, { fleetVehicles });
     await openMemberStep(page);
     await vehicleSelect(page).selectOption('TEST-205');
     await page.getByRole('combobox', { name: 'Shift', exact: true }).selectOption('A');
-    await page.locator('.inspection-review-button').click();
 
-    expect(await swapPrompt(page).getByRole('radio', { name: 'Yes, swap completed' }).evaluate((radio: HTMLInputElement) => radio.validity.valueMissing)).toBe(true);
+    await expect(page.locator('.inspection-review-button')).toHaveCount(0);
+    await page.getByRole('combobox', { name: 'Shift', exact: true }).press('Enter');
     await expect(vehicleSelect(page)).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Review & Sign Inspection' })).toHaveCount(0);
     expect(api.submissions).toEqual([]);
   });
 
@@ -126,7 +108,6 @@ test.describe('confirm the physical vehicle', () => {
     await page.getByRole('combobox', { name: 'Shift', exact: true }).selectOption('A');
     await page.getByRole('button', { name: 'Review & Sign', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Review & Sign Inspection' })).toBeVisible();
-    await expect(page.locator('[data-vehicle-swap-summary]')).toHaveCount(0);
     await sign(page);
     await page.getByRole('button', { name: 'Submit Inspection', exact: true }).click();
 
@@ -135,19 +116,14 @@ test.describe('confirm the physical vehicle', () => {
     expect(api.submissions[0].field_values).toContainEqual({ id: 'vehicle_num', value: 'TEST-102' });
   });
 
-  test('a different vehicle is still submittable and the report is queued offline then replayed', async ({ page, context }) => {
+  test('a confirmed vehicle is queued offline then replayed unchanged', async ({ page, context }) => {
     test.setTimeout(120_000);
     const api = await mobileInspectionFixture(page, engine2, { fleetVehicles });
     await completeChecklist(page, api.checklist);
     await openMemberStep(page);
-    await vehicleSelect(page).selectOption('TEST-205');
-    await swapPrompt(page).getByRole('radio', { name: 'Yes, swap completed' }).check();
-    await swapPrompt(page).getByLabel('Note (optional)').fill('Engine 5 was in the shop.');
     await page.getByRole('combobox', { name: 'Shift', exact: true }).selectOption('A');
     await page.getByRole('button', { name: 'Review & Sign', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Review & Sign Inspection' })).toBeVisible();
-    await expect(page.locator('[data-vehicle-swap-summary]')).toContainText('Fleet reviews this possible swap');
-    await expect(page.getByText('TEST-205', { exact: true }).first()).toBeVisible();
     await sign(page);
 
     await context.setOffline(true);
@@ -158,8 +134,8 @@ test.describe('confirm the physical vehicle', () => {
     const rows = await queued(page);
     expect(rows).toHaveLength(1);
     const queuedReport = rows[0].data.physical_vehicle;
-    expect(queuedReport).toEqual({ vehicle_number: 'TEST-205', swap_answer: 'swap_completed', note: 'Engine 5 was in the shop.' });
-    expect(rows[0].data.field_values).toContainEqual({ id: 'vehicle_num', value: 'TEST-205' });
+    expect(queuedReport).toEqual({ vehicle_number: 'TEST-102' });
+    expect(rows[0].data.field_values).toContainEqual({ id: 'vehicle_num', value: 'TEST-102' });
     expect(api.submissions).toHaveLength(0);
 
     await context.setOffline(false);

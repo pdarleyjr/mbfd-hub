@@ -8,6 +8,7 @@ use App\Enums\DepartmentUpdateAudience;
 use App\Enums\DepartmentUpdateCategory;
 use App\Enums\DepartmentUpdatePriority;
 use App\Enums\DepartmentUpdateStatus;
+use App\Support\Host\HubHosts;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -277,7 +278,14 @@ class DepartmentUpdate extends Model
 
     public function hasExternalCta(): bool
     {
-        return $this->safeCtaUrl() !== null && preg_match('/^https?:\/\//i', $this->cta_url) === 1;
+        if ($this->safeCtaUrl() === null || preg_match('/^https?:\/\//i', $this->cta_url) !== 1) {
+            return false;
+        }
+
+        // A link to the Hub itself (either host) stays in the app; only other sites open apart.
+        $host = parse_url($this->cta_url, PHP_URL_HOST);
+
+        return ! (is_string($host) && HubHosts::isHubHost($host));
     }
 
     public function safeCtaUrl(): ?string

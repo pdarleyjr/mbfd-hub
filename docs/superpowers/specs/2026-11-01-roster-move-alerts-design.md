@@ -77,6 +77,20 @@ Owner request while this was being built: remove the legend, the search and filt
 - Search, the status filter, and Expand all and Collapse all are gone, with their code.
 - **Builder's call:** date links, Refresh, Export PDF, the legend, the summary and the other times move under the roster rather than being deleted, because members still need to reach earlier rosters and read a status color.
 
+## Part 4: Getting alerts to phones
+
+Owner request on release: turn push on for members with the installed app, and have future members start with it on.
+
+- **What a site cannot do:** iPhones and Android require the person holding the phone to tap Allow once. No server setting can enroll a device.
+- **What was already there:** the installed app shows a one-tap card on every signed-in page (`push-sync.ts`), and turns alerts on by itself when permission was already given.
+- **Changed:** "Not now" brings the card back after a day instead of two weeks.
+- **Changed:** seeded settings rows nobody chose no longer leave a member with push off. The earlier migration only covered accounts active that day, so people who activated later kept rows with push off.
+- **Builder's call:** no prompt on the first tap anywhere. A reflex "Don't Allow" on the system dialog is permanent on an iPhone unless the member finds the setting, so the card, whose "Not now" costs nothing, stays in front of it.
+
+## Part 5: A queue outage
+
+The queue is Redis, so it can be down while the database is up. Alerts the queue refuses are kept in `notification_dispatch_retries` and offered again every minute. Roster move alerts are written there inside the baseline's own transaction, because nothing else would ever raise them again.
+
 ## Limits to know
 
 - A push needs a phone that turned on alerts. On 2026-11-01 there were 14 enrolled devices across the Hub and 36 of the 81 people on the sampled roster had an active account. Everyone else gets nothing until they activate and enroll; those with an account still get the in-app copy.

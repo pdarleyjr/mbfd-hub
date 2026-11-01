@@ -34,6 +34,50 @@ import {
   saveChangeoutDraft,
   saveContextSnapshot,
 } from '../../resources/js/daily-checkout/src/components/changeout/changeoutDraft.ts';
+import {
+  NOT_LISTED,
+  defaultVehicleConfirmation,
+  isVehicleMismatch,
+  paperVehicleValue,
+  reconcileVehicleConfirmation,
+  toPhysicalVehicleReport,
+  vehicleConfirmationComplete,
+} from '../../resources/js/daily-checkout/src/utils/vehicleConfirmation.ts';
+
+test('a draft from the old app with a swap answer loads safely and asks for the change to be recorded', () => {
+  const saved = { assignedVehicle: '17503', choice: '1033', typedVehicle: '', swapAnswer: 'swap_completed', note: 'In the shop.', confirmed: true };
+
+  const restored = reconcileVehicleConfirmation(saved, '17503');
+
+  assert.deepEqual(restored, { assignedVehicle: '17503', choice: '1033', typedVehicle: '', confirmed: false });
+  assert.equal(isVehicleMismatch(restored), true);
+  assert.equal(vehicleConfirmationComplete(restored), false);
+
+  const typed = reconcileVehicleConfirmation({ ...saved, choice: NOT_LISTED, typedVehicle: 'X-77' }, '17503');
+  assert.equal(typed.typedVehicle, 'X-77');
+  assert.equal(vehicleConfirmationComplete(typed), false);
+});
+
+test('a confirmed draft on the assigned truck stays confirmed, and one for another assignment starts over', () => {
+  const saved = { assignedVehicle: '17503', choice: '17503', typedVehicle: '', swapAnswer: '', note: '', confirmed: true };
+
+  assert.equal(vehicleConfirmationComplete(reconcileVehicleConfirmation(saved, '17503')), true);
+  assert.deepEqual(reconcileVehicleConfirmation(saved, '1033'), defaultVehicleConfirmation('1033'));
+  assert.deepEqual(reconcileVehicleConfirmation(undefined, '1033'), defaultVehicleConfirmation('1033'));
+});
+
+test('a checkout only ever sends the assigned truck, and a unit with no number names its own', () => {
+  const assigned = { ...defaultVehicleConfirmation('17503'), confirmed: true };
+  assert.deepEqual(toPhysicalVehicleReport(assigned), { vehicle_number: '17503' });
+  assert.equal(paperVehicleValue(assigned), '17503');
+  assert.equal(isVehicleMismatch({ ...assigned, choice: NOT_LISTED }), true);
+  assert.equal(isVehicleMismatch({ ...assigned, choice: '' }), false);
+
+  const named = { assignedVehicle: '', choice: NOT_LISTED, typedVehicle: 'FB6-1', confirmed: true };
+  assert.equal(isVehicleMismatch(named), false);
+  assert.equal(vehicleConfirmationComplete(named), true);
+  assert.deepEqual(toPhysicalVehicleReport(named), { vehicle_number: 'FB6-1' });
+});
 
 /**
  * The rules behind the Daily changeout wizard: what is sent, what a truck choice means and what stays on the phone.

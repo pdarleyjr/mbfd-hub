@@ -63,10 +63,13 @@
                                         href="{{ route('employee.resources.preview', ['document' => $document->uuid]) }}"
                                         target="_blank"
                                         rel="noopener"
+                                        data-hub-viewer="pdf"
+                                        data-hub-viewer-title="{{ $document->title }}"
+                                        data-hub-viewer-download="{{ route('employee.resources.download', ['document' => $document->uuid]) }}"
                                         class="rl-btn rl-btn--primary"
                                     >
                                         <svg aria-hidden="true" class="rl-btn__icon" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25"/></svg>
-                                        <span>Open<span class="hub-visually-hidden"> {{ $document->title }} (opens in a new tab)</span></span>
+                                        <span>Open<span class="hub-visually-hidden"> {{ $document->title }}</span></span>
                                     </a>
                                 @endif
                                 <a

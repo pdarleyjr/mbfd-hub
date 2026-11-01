@@ -411,7 +411,6 @@ final class InspectionAcceptanceTest extends TestCase
     {
         $this->assertSame('Needs approval', (new ApparatusInspection(['processing_status' => 'held_for_review', 'review_status' => 'pending_review']))->displayStatus());
         $this->assertSame('Rejected', (new ApparatusInspection(['processing_status' => 'rejected', 'review_status' => 'rejected']))->displayStatus());
-        $this->assertSame('Held: vehicle swap', (new ApparatusInspection(['processing_status' => 'pending_vehicle_swap', 'review_status' => 'pending_review']))->displayStatus());
     }
 
     private function heldFixtureInspection(): ApparatusInspection

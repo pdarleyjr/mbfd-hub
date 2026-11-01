@@ -565,7 +565,7 @@ function ApparatusCard({ apparatus, checkoutRow, stationId, hubStationReturn }: 
         <a href={`/employee/apparatus-service-request?station_id=${stationId}&apparatus_id=${apparatus.id}&return_to=${hubStationReturn}`} className="hub-link hub-link--standalone">
           Report Service Need
         </a>
-        {apparatus.daily_checkout_requirement === 'required' && (
+        {apparatus.daily_checkout_requirement === 'required' && apparatus.vehicle_id_required !== false && (
           <Link to={`/changeouts/new/${apparatus.id}?return_to=${encodeURIComponent(`/stations/${stationId}`)}`} className="hub-link hub-link--standalone">
             Change vehicle
           </Link>

@@ -12,6 +12,7 @@ use App\Models\DailyRoster\RosterImport;
 use App\Models\DailyRoster\RosterMoveBaseline;
 use App\Models\DailyRoster\RosterSnapshot;
 use App\Models\Employee;
+use App\Models\NotificationDispatchRetry;
 use App\Models\User;
 use App\Models\UserNotificationSubscription;
 use App\Notifications\CriticalAlertNotification;
@@ -25,6 +26,7 @@ use App\Services\Notifications\NotificationCategoryRegistry;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Notification;
 use NotificationChannels\WebPush\WebPushChannel;
 use Spatie\Permission\Models\Role;
@@ -427,6 +429,39 @@ final class RosterMoveAlertsTest extends TestCase
         Notification::assertNotSentTo($first, RosterMoveNotification::class);
         Notification::assertNotSentTo($second, RosterMoveNotification::class);
         Notification::assertSentTo($admin, CriticalAlertNotification::class);
+    }
+
+    public function test_the_administrator_alert_is_tried_again_if_it_did_not_go_out(): void
+    {
+        config(['daily_roster.move_alerts.max_members' => 1]);
+        $admin = User::factory()->create(['account_status' => AccountStatus::Active]);
+        $admin->assignRole(Role::findOrCreate('super_admin', 'web'));
+        $admin->pushSubscriptions()->create(['endpoint' => 'https://push.example.test/admin', 'public_key' => 'key', 'auth_token' => 'token']);
+        $this->baseline([self::ENGINE => [$this->row('90001'), $this->row('90002')]]);
+        $this->publish([self::RESCUE => [$this->row('90001'), $this->row('90002')]]);
+        $this->detect();
+        Notification::assertSentToTimes($admin, CriticalAlertNotification::class, 1);
+
+        // Repeated checks do not repeat it.
+        $this->detect();
+        Notification::assertSentToTimes($admin, CriticalAlertNotification::class, 1);
+
+        // A failed send clears its own marker (RosterAlerts), and then the next check sends it.
+        Cache::forget('daily_roster_alert:move_alerts_held:'.self::TODAY);
+        $this->detect();
+        Notification::assertSentToTimes($admin, CriticalAlertNotification::class, 2);
+    }
+
+    public function test_an_alert_is_recorded_before_the_roster_baseline_commits_and_cleared_after(): void
+    {
+        $member = $this->member('90001');
+        $this->baseline([self::ENGINE => [$this->row('90001')]]);
+        $this->publish([self::RESCUE => [$this->row('90001')]]);
+
+        $this->detect();
+
+        Notification::assertSentTo($member, RosterMoveNotification::class);
+        $this->assertSame(0, NotificationDispatchRetry::query()->count());
     }
 
     public function test_the_kill_switch_sends_nothing_and_keeps_the_baseline_current(): void

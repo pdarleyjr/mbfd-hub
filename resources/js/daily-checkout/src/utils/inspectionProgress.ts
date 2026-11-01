@@ -1,7 +1,7 @@
 import type { ChecklistData, ChecklistFieldValue, ChecklistItem, Compartment, MeterData, OfficerInfo, ScheduledChecklistTaskResult, VehicleIdentificationAnswers } from '../types';
-import { resolveFindingTargets } from './previousFindings';
-import { vehicleConfirmationComplete } from './vehicleConfirmation';
-import { activeVehicleIdentification, vehicleIdentificationComplete } from './vehicleIdentification';
+import { resolveFindingTargets } from './previousFindings.ts';
+import { checklistUsesVehicleId, vehicleConfirmationComplete } from './vehicleConfirmation.ts';
+import { activeVehicleIdentification, vehicleIdentificationComplete } from './vehicleIdentification.ts';
 
 export function itemIsComplete(item: ChecklistItem) {
   if (item.observed !== true) return false;
@@ -32,11 +32,12 @@ export function inspectionReadiness(checklist: ChecklistData | null, compartment
   }) ?? [];
   const missingDuties = checklist?.due_tasks.filter(task => !scheduledTasks.find(answer => answer.id === task.id)?.observed) ?? [];
   const missingShift = !['A', 'B', 'C'].includes(officer.shift);
-  // The physical vehicle must be confirmed (and any different vehicle explained) before submitting.
-  const missingVehicle = !vehicleConfirmationComplete(officer.vehicleConfirmation);
+  const usesVehicleId = checklistUsesVehicleId(checklist);
+  // The physical vehicle must be confirmed before submitting, and a different vehicle has to be recorded first.
+  const missingVehicle = usesVehicleId && !vehicleConfirmationComplete(officer.vehicleConfirmation);
   // Each open one-time vehicle question needs an answer, or "not available" with its reason. No questions, no gate.
-  // Not asked while the crew reports a different vehicle: the server ignores those answers.
-  const missingIdentification = !vehicleIdentificationComplete(activeVehicleIdentification(checklist?.vehicle_identification, officer), identification);
+  // Not asked while the crew says they are at a different vehicle. On a unit with no vehicle ID they are optional.
+  const missingIdentification = usesVehicleId && !vehicleIdentificationComplete(activeVehicleIdentification(checklist?.vehicle_identification, officer), identification);
   const maxMiles = checklist?.fields.some(field => field.id === 'mileage') ? 999999999 : 2147483647;
   const invalidMeters = (meters.engine_hours !== null && (!Number.isFinite(meters.engine_hours) || meters.engine_hours < 0 || meters.engine_hours > 9999999.9 || !/^\d+(\.\d)?$/.test(String(meters.engine_hours))))
     || (meters.miles !== null && (!Number.isInteger(meters.miles) || meters.miles < 0 || meters.miles > maxMiles));

@@ -433,18 +433,15 @@ final class CanonicalInspectionWorkspaceTest extends TestCase
 
     /* ------------------------------------------------------------ actions */
 
-    public function test_approve_and_reject_are_hidden_for_accepted_inspections_and_swap_holds(): void
+    public function test_approve_and_reject_are_hidden_for_accepted_inspections(): void
     {
         $accepted = $this->inspection();
-        $swapHeld = $this->inspection(['processing_status' => 'pending_vehicle_swap', 'review_status' => 'pending_review']);
         $held = $this->inspection(['processing_status' => 'held_for_review', 'review_status' => 'pending_review']);
         $this->actAs($this->reviewer());
 
         Livewire::test(ViewInspection::class, ['record' => $accepted->getRouteKey()])
             ->assertActionHidden('approveInspection')->assertActionHidden('rejectInspection')
             ->assertActionVisible('print')->assertActionVisible('downloadPdf');
-        Livewire::test(ViewInspection::class, ['record' => $swapHeld->getRouteKey()])
-            ->assertActionHidden('approveInspection')->assertActionHidden('rejectInspection');
         Livewire::test(ViewInspection::class, ['record' => $held->getRouteKey()])
             ->assertActionVisible('approveInspection')->assertActionVisible('rejectInspection');
     }
@@ -457,7 +454,6 @@ final class CanonicalInspectionWorkspaceTest extends TestCase
         $this->exception($held, ['field' => 'miles', 'reason' => 'rollback', 'blocks_acceptance' => true]);
         $this->exception($held, ['field' => 'member_review_flag', 'reason' => 'member_flagged', 'blocks_acceptance' => true]);
         $legacy = $this->inspection(['processing_status' => null, 'review_status' => 'pending_review']);
-        $this->inspection(['processing_status' => 'pending_vehicle_swap', 'review_status' => 'pending_review']);
         $accepted = $this->inspection(['completed_at' => '2026-10-20 12:00:00']);
         $old = $this->inspection(['completed_at' => '2026-09-01 12:00:00']);
 
@@ -477,7 +473,6 @@ final class CanonicalInspectionWorkspaceTest extends TestCase
 
         $this->assertSame(2, $queues['approvals']['count']);
         $this->assertEqualsCanonicalizing([$held->id, $legacy->id], collect($queues['approvals']['rows'])->pluck('id')->all());
-        $this->assertSame(1, $queues['approvals']['swapHeld']);
         $heldRow = collect($queues['approvals']['rows'])->firstWhere('id', $held->id);
         $this->assertStringContainsString('Needs approval · 2 holds', $heldRow['status']);
         $this->assertStringEndsWith('#approval', $heldRow['url']);

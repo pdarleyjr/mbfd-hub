@@ -95,17 +95,6 @@ final class NotificationSettingsPageTest extends TestCase
         $this->assertNotContains('captain5_ems', $this->visibleKeys($member->fresh()));
     }
 
-    public function test_only_people_who_configure_captain_5_see_acting_requests(): void
-    {
-        foreach (['admin.access', \App\Services\Security\Captain5Access::PERMISSION_ADMIN] as $permission) {
-            \Spatie\Permission\Models\Permission::findOrCreate($permission, 'web');
-        }
-        $this->assertNotContains('captain5_assignment_requests', $this->visibleKeys($this->rosterMember('Captain')));
-        $this->assertNotContains('captain5_assignment_requests', $this->visibleKeys($this->rosterMember('Division Chief')), 'rank alone does not approve');
-        $approver = $this->withPermissions($this->rosterMember('Division Chief'), 'admin.access', \App\Services\Security\Captain5Access::PERMISSION_ADMIN);
-        $this->assertContains('captain5_assignment_requests', $this->visibleKeys($approver));
-    }
-
     public function test_a_fleet_reviewer_sees_checkout_and_swap_alerts_but_not_unrelated_admin_alerts(): void
     {
         $reviewer = $this->withPermissions($this->rosterMember('Captain'), 'admin.access', 'admin.fleet.manage');

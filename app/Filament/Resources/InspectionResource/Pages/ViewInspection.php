@@ -275,7 +275,6 @@ class ViewInspection extends ViewRecord
                 ->icon('heroicon-o-arrow-down-tray')
                 ->color('gray')
                 ->url(fn (): string => route('employee.vehicle-inspections.pdf', $this->inspection()))
-                ->openUrlInNewTab()
                 ->visible(fn (): bool => (bool) auth()->user()?->can('view', $this->inspection())),
         ];
     }
@@ -431,12 +430,10 @@ class ViewInspection extends ViewRecord
         $this->record = $this->inspection()->refresh();
     }
 
-    /** Waiting on a person: not yet decided and not held for a vehicle swap decision. */
+    /** Waiting on a person: not yet decided. */
     private function isAwaitingDecision(): bool
     {
-        $inspection = $this->inspection();
-
-        return $inspection->review_status === 'pending_review' && ! $inspection->isHeldForVehicleSwap();
+        return $this->inspection()->review_status === 'pending_review';
     }
 
     /** True while a meter rollback hold is undecided; approval must wait for that decision. */

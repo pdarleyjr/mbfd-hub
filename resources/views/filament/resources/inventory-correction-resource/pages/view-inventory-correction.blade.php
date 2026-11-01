@@ -104,7 +104,7 @@
                         <p class="hub-insp-item__text">{{ $correction->member_note }}</p>
                     @endif
                     @if($photoUrl)
-                        <a class="hub-insp-table-link" href="{{ $photoUrl }}" target="_blank" rel="noopener">View the member's photo</a>
+                        <a class="hub-insp-table-link" href="{{ $photoUrl }}" target="_blank" rel="noopener" data-hub-viewer="image" data-hub-viewer-title="Member's photo">View the member's photo</a>
                     @endif
                 </div>
             </div>

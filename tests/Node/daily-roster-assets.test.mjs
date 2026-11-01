@@ -70,7 +70,7 @@ test('every status pill meets WCAG AA for its text', () => {
     assert.ok(match, `--hub-roster-${name} is declared`);
     return match.slice(1).map(Number);
   };
-  for (const tone of ['sp', 'ot', 'aday', 'vaca', 'leave', 'sick', 'exchange', 'ooc', 'pms', 'other', 'unknown']) {
+  for (const tone of ['sp', 'ot', 'aday', 'vaca', 'holiday', 'leave', 'sick', 'exchange', 'ooc', 'pms', 'other', 'unknown']) {
     const ratio = contrast(channels(`${tone}-ink`), channels(`${tone}-bg`));
     assert.ok(ratio >= 4.5, `${tone} contrast is ${ratio.toFixed(2)}`);
   }

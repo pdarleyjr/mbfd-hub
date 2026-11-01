@@ -25,7 +25,7 @@
         'dismissIssue' => \App\Support\Fleet\DefectNoActionClosure::ACTION_LABEL,
         'reopenIssue' => 'Reopen',
     ];
-    $hasIssues = $workspace['legacy_pending'] || $workspace['swap'] || count($workspace['holds']) > 0
+    $hasIssues = $workspace['legacy_pending'] || count($workspace['holds']) > 0
         || $workspace['member_flag'] || count($workspace['damage_holds']) > 0 || count($workspace['defects']) > 0;
 @endphp
 <x-filament-panels::page data-hub-ui="2" data-inspection-workspace>
@@ -122,7 +122,7 @@
         <section id="approval" class="hub-insp-section hub-insp-anchor" aria-labelledby="insp-issues-title" data-section="issues">
             <div class="hub-insp-section__head">
                 <h2 class="hub-insp-section__title" id="insp-issues-title">Issues requiring attention</h2>
-                @if($workspace['can_review'] && $inspection->review_status === 'pending_review' && ! $inspection->isHeldForVehicleSwap())
+                @if($workspace['can_review'] && $inspection->review_status === 'pending_review')
                     <p class="hub-insp-note">
                         @if($workspace['meter_hold_open'])
                             Decide the meter reading first. Approve inspection is unavailable until you do.
@@ -169,28 +169,6 @@
                         @else
                             <p class="hub-insp-card__lead">No defects were reported with this pending submission.</p>
                         @endif
-                    </div>
-                @endif
-
-                @if($workspace['swap'])
-                    @php
-                        $swap = $workspace['swap'];
-                    @endphp
-                    <div class="hub-insp-card {{ $swap['pending'] ? 'hub-insp-card--warning' : '' }}" data-vehicle-swap-report>
-                        <h3 class="hub-insp-card__title">Physical vehicle reported: {{ $swap['reported_vehicle'] }}</h3>
-                        <p class="hub-insp-card__lead">
-                            @if($swap['pending'])
-                                The member reported a different vehicle than the one assigned to this unit ({{ $swap['assigned_vehicle'] }}). The findings are on hold until Fleet decides it from
-                                <a class="hub-insp-link" href="{{ $workspace['swaps_url'] }}">Pending vehicle swaps</a>.
-                            @else
-                                {{ $swap['status_label'] }} by {{ $swap['decided_by'] }}{{ $swap['decided_at'] ? ' on '.$swap['decided_at'] : '' }}.
-                                The vehicle ID recorded at checkout was {{ $swap['assigned_vehicle'] }}.
-                            @endif
-                        </p>
-                        <dl class="hub-insp-fields">
-                            <div><dt>Was a truck swap completed?</dt><dd>{{ $swap['answer'] }}</dd></div>
-                            <div><dt>Note from the member</dt><dd class="is-prose">{{ $swap['note'] ?: 'No note' }}</dd></div>
-                        </dl>
                     </div>
                 @endif
 
@@ -355,7 +333,7 @@
                             @endif
                             @if($defect['photo_key'])
                                 <div class="hub-insp-photos">
-                                    <a href="{{ $imageUrl($defect['photo_key']) }}" target="_blank" rel="noopener" class="hub-insp-photo" aria-label="Open photo of {{ $defect['item'] }} in a new tab">
+                                    <a href="{{ $imageUrl($defect['photo_key']) }}" target="_blank" rel="noopener" data-hub-viewer="image" data-hub-viewer-title="Photo of {{ $defect['item'] }}" class="hub-insp-photo" aria-label="Open photo of {{ $defect['item'] }}">
                                         <img src="{{ $imageUrl($defect['photo_key']) }}" alt="Photo of {{ $defect['item'] }}" loading="lazy">
                                     </a>
                                 </div>
@@ -546,7 +524,7 @@
                                             <td class="is-muted">
                                                 {{ $item['notes'] ?? 'No notes' }}
                                                 @if($item['photo_key'])
-                                                    <a href="{{ $imageUrl($item['photo_key']) }}" target="_blank" rel="noopener" class="hub-insp-table-link">View photo</a>
+                                                    <a href="{{ $imageUrl($item['photo_key']) }}" target="_blank" rel="noopener" data-hub-viewer="image" data-hub-viewer-title="Inspection photo" class="hub-insp-table-link">View photo</a>
                                                 @endif
                                             </td>
                                         </tr>
@@ -564,7 +542,7 @@
                 @if($checklist['signature_key'])
                     <div class="hub-insp-card">
                         <h3 class="hub-insp-card__title">Officer signature</h3>
-                        <a href="{{ $imageUrl($checklist['signature_key']) }}" target="_blank" rel="noopener" class="hub-insp-signature" aria-label="Open officer signature in a new tab">
+                        <a href="{{ $imageUrl($checklist['signature_key']) }}" target="_blank" rel="noopener" data-hub-viewer="image" data-hub-viewer-title="Officer signature" class="hub-insp-signature" aria-label="Open officer signature">
                             <img src="{{ $imageUrl($checklist['signature_key']) }}" alt="Officer signature" loading="lazy">
                         </a>
                     </div>

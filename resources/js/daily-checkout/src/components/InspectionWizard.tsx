@@ -36,8 +36,8 @@ import PreviousPageButton from './PreviousPageButton';
 import { inspectionProgress, inspectionReadiness } from '../utils/inspectionProgress';
 import { identityForQueueCapture, type OfflineIdentity } from '../lib/offlineIdentity';
 import { EMPTY_REVIEW_FLAG, buildReviewFlag, normalizeReviewFlagDraft, reviewFlagExplanationMissing } from '../utils/reviewFlag';
-import { defaultVehicleConfirmation, paperVehicleValue, reconcileVehicleConfirmation, toPhysicalVehicleReport } from '../utils/vehicleConfirmation';
-import { activeVehicleIdentification, toVehicleIdentificationSubmission } from '../utils/vehicleIdentification';
+import { checklistUsesVehicleId, defaultVehicleConfirmation, paperVehicleValue, reconcileVehicleConfirmation, toPhysicalVehicleReport } from '../utils/vehicleConfirmation';
+import { activeVehicleIdentification, optionalIdentification, toVehicleIdentificationSubmission } from '../utils/vehicleIdentification';
 import { ClipboardList, Gauge, Truck, Users } from 'lucide-react';
 
 type Step = 'officer' | 'meter' | 'details' | 'compartments' | 'submit';
@@ -777,8 +777,9 @@ export default function InspectionWizard() {
       });
 
       const flag = buildReviewFlag(reviewFlag, compartments);
+      const usesVehicleId = checklistUsesVehicleId(checklist);
       // Omitted when no question is open, so a checkout without questions is byte for byte what it was.
-      const identificationReport = toVehicleIdentificationSubmission(activeVehicleIdentification(checklist.vehicle_identification, officerInfo), vehicleIdentification);
+      const identificationReport = toVehicleIdentificationSubmission(usesVehicleId ? activeVehicleIdentification(checklist.vehicle_identification, officerInfo) : optionalIdentification(checklist.vehicle_identification), vehicleIdentification);
       const submission: InspectionSubmission = {
         processing_version: 1,
         meter_baseline_token: apparatus.meter_baseline_token,
@@ -789,7 +790,7 @@ export default function InspectionWizard() {
         shift: officerInfo.shift,
         unit_number: officerInfo.unitNumber,
         employee_id: officerInfo.employeeId,
-        ...(officerInfo.vehicleConfirmation ? { physical_vehicle: toPhysicalVehicleReport(officerInfo.vehicleConfirmation) } : {}),
+        ...(usesVehicleId && officerInfo.vehicleConfirmation ? { physical_vehicle: toPhysicalVehicleReport(officerInfo.vehicleConfirmation) } : {}),
         engine_hours: meterData.engine_hours,
         miles: meterData.miles,
         compartments: compartments.map(c => ({
@@ -817,7 +818,7 @@ export default function InspectionWizard() {
         officer_signature: signature,
         ...(flag ? { review_flag: flag } : {}),
         ...(draftId ? { inventory_draft_id: draftId } : {}),
-        ...(identificationReport ? { vehicle_identification: identificationReport } : {}),
+        ...(identificationReport && (usesVehicleId || identificationReport.answers.length > 0) ? { vehicle_identification: identificationReport } : {}),
       };
       clientSubmissionIdRef.current = submission.client_submission_id;
       const queueId = await queueSubmission(apparatus.id, submission, currentIdentity, checklist.checklist_base_version);
@@ -1012,6 +1013,8 @@ export default function InspectionWizard() {
   }
 
   const isV2Checklist = checklist.schema_version === 2;
+  const usesVehicleId = checklistUsesVehicleId(checklist);
+  const memberStepLabel = usesVehicleId ? 'Member / Vehicle Info' : 'Member Info';
   const priorDayInspectionSession = isV2Checklist
     && checklist.inspection_session !== undefined
     && !inspectionSessionIsExpired(checklist.inspection_session)
@@ -1031,7 +1034,7 @@ export default function InspectionWizard() {
     <div className="apparatus-inspection">
       <header className="inspection-authority">
         <div><p className="inspection-eyebrow">Daily Checkout</p><div className="inspection-unit-title"><h1>{apparatus.name}</h1><span className={isOutOfService ? 'inspection-status is-oos' : 'inspection-status'}>{apparatus.status ?? 'Status unavailable'}</span></div>
-          <div className="inspection-identity"><span>Vehicle {apparatus.vehicle_number ?? 'Not recorded'}</span><span>{officerInfo.name} · {officerInfo.shift ? 'Shift ' + officerInfo.shift : 'Shift not selected'}</span></div>
+          <div className="inspection-identity">{usesVehicleId && <span>Vehicle {apparatus.vehicle_number ?? 'Not recorded'}</span>}<span>{officerInfo.name} · {officerInfo.shift ? 'Shift ' + officerInfo.shift : 'Shift not selected'}</span></div>
         </div>
         <div className="inspection-save" data-save-state={autosaveState === 'idle' ? 'saving' : autosaveState}><div><strong>{isOffline ? 'Offline · On this device' : 'Online'}</strong>{/* Announced politely and only when a write finishes or fails, not on every edit. */}<small role="status" aria-live="polite">{saveStatusText}</small></div><div className="inspection-progress"><small>{progress.completed} / {progress.total} inspected</small><progress value={progress.completed} max={progress.total || 1} aria-label="Inspection progress" /></div></div>
       </header>
@@ -1124,7 +1127,7 @@ export default function InspectionWizard() {
 
       <nav className="mb-4 flex flex-wrap gap-2 text-sm" aria-label="Inspection workspace">
         <button type="button" className="px-3 font-semibold" aria-current={currentStep === 'compartments' ? 'page' : undefined} onClick={() => changeStep('compartments')}><Truck size={20} aria-hidden="true" />Apparatus</button>
-        <button type="button" className="px-3" aria-label="Member / Vehicle Info" aria-current={currentStep === 'officer' ? 'page' : undefined} onClick={() => changeStep('officer')}><Users size={20} aria-hidden="true" />Member</button>
+        <button type="button" className="px-3" aria-label={memberStepLabel} aria-current={currentStep === 'officer' ? 'page' : undefined} onClick={() => changeStep('officer')}><Users size={20} aria-hidden="true" />Member</button>
         <button type="button" className="px-3" aria-label={isV2Checklist ? 'Checklist details' : 'Readings · Optional'} aria-current={currentStep === (isV2Checklist ? 'details' : 'meter') ? 'page' : undefined} onClick={() => changeStep(isV2Checklist ? 'details' : 'meter')}><Gauge size={20} aria-hidden="true" /><span>{isV2Checklist ? 'Details' : <>Readings <small>Optional</small></>}</span></button>
         {!isV2Checklist && checklist.fields.length > 0 && <button type="button" className="px-3" aria-label="Checklist details" aria-current={currentStep === 'details' ? 'page' : undefined} onClick={() => changeStep('details')}><ClipboardList size={20} aria-hidden="true" />Details</button>}
       </nav>
@@ -1137,11 +1140,12 @@ export default function InspectionWizard() {
           onChange={handleOfficerChange}
           fleetVehicles={fleetVehicles}
           assignedDesignation={apparatus.designation ?? apparatus.name}
+          usesVehicleId={usesVehicleId}
           identification={checklist.vehicle_identification}
           identificationAnswers={vehicleIdentification}
           onIdentificationChange={setVehicleIdentification}
           showIdentificationErrors={showNotReady}
-          changeoutPath={truck => `/changeouts/new/${apparatus.id}?truck=${encodeURIComponent(truck)}&return_to=${encodeURIComponent(location.pathname)}`}
+          changeoutPath={truck => `/changeouts/new/${apparatus.id}?${truck ? `truck=${encodeURIComponent(truck)}&` : ''}return_to=${encodeURIComponent(location.pathname)}`}
         />
       )}
 
@@ -1184,7 +1188,7 @@ export default function InspectionWizard() {
           onChange={setCompartments}
           onSubmit={handleCompartmentsSubmit}
           onBack={() => setCurrentStep('officer')}
-          backLabel="Member / Vehicle Info"
+          backLabel={memberStepLabel}
           inventory={checklist.schema_version === 2 ? undefined : { apparatusId: apparatus.id, checklistVersion: checklist.checklist_version, draftId, markers: inventoryMarkers.markers, onRecorded: inventoryMarkers.record }}
         />
       )}

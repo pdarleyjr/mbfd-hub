@@ -6,6 +6,7 @@ namespace App\Support;
 
 use App\Models\User;
 use App\Services\Mail\MailAccess;
+use App\Services\Security\DailyRosterAccess;
 use Filament\Facades\Filament;
 
 final class HubShellNavigation
@@ -57,11 +58,26 @@ final class HubShellNavigation
                 }
             }
         }
+        // Home and Daily Checkout open the app switcher in every shell (Blade, Filament, React), so the list is
+        // built once here. Daily Checkout follows the same Employee panel rule as the Checkout tab and Home button.
+        $leading = [['key' => 'home', 'label' => 'Home', 'href' => '/']];
+        if ($canAccessEmployeePanel) {
+            $leading[] = ['key' => 'daily', 'label' => 'Daily Checkout', 'href' => '/daily/stations'];
+        }
+        $navigation['applications'] = [...$leading, ...$navigation['applications']];
         $navigation['account'] = ['name' => (string) ($user->display_name ?: $user->name), 'href' => route('account.show', absolute: false)];
         $navigation['moreNavigation'] = [
-            ['key' => 'updates', 'label' => 'Updates', 'href' => route('updates.index', absolute: false)],
+            ['key' => 'updates', 'label' => 'Department Updates', 'href' => route('updates.index', absolute: false)],
             ['key' => 'support', 'label' => 'Support', 'href' => route('hub-support.index', absolute: false)],
         ];
+        // Never offered where it would answer 403 or lead to an empty page. Home keeps its own entry.
+        if (app(DailyRosterAccess::class)->canSeeMenuEntry($user)) {
+            $navigation['moreNavigation'][] = [
+                'key' => 'daily-roster',
+                'label' => 'Daily Roster',
+                'href' => route('daily-roster.show', absolute: false),
+            ];
+        }
         // Members with an employee profile reach the inspection through Employee > Forms.
         // Accounts without a profile cannot open that panel, so they keep a direct entry here.
         if (! $canAccessEmployeePanel) {

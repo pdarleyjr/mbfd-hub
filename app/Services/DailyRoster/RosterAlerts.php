@@ -6,6 +6,7 @@ namespace App\Services\DailyRoster;
 
 use App\Notifications\CriticalAlertNotification;
 use App\Services\Notifications\NotificationRecipientEvaluator;
+use Carbon\CarbonImmutable;
 use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Notification;
@@ -37,8 +38,35 @@ final class RosterAlerts
             return;
         }
 
-        $key = "daily_roster_alert:{$kind}:{$dutyDate}".($incident === null ? '' : ":{$incident}");
+        $this->deliver("daily_roster_alert:{$kind}:{$dutyDate}".($incident === null ? '' : ":{$incident}"), $message, '/admin/roster-imports');
+    }
 
+    /** The person TeleStaff has on a command seat cannot open the page until their account is set up. Once per person, seat and duty date. */
+    public function seatAccountNotReady(string $name, string $seat, string $dutyDate, int $employeeProfileId): void
+    {
+        $date = CarbonImmutable::createFromFormat('!Y-m-d', $dutyDate)->format('D, M j');
+
+        $this->deliver(
+            "daily_roster_alert:seat_account:{$dutyDate}:{$seat}:{$employeeProfileId}",
+            "{$name} is on the {$seat} seat on the TeleStaff roster for {$date} but has not finished setting up a Hub account, so they cannot open the {$seat} page. Send an invitation from Personnel > Employees.",
+            '/admin/employees',
+        );
+    }
+
+    /** Usually a normal overtime or out-of-class ride, but a bad export could name anyone. Once per person, seat and duty date. */
+    public function seatOnlyByRoster(string $name, string $seat, string $dutyDate, int $employeeProfileId): void
+    {
+        $date = CarbonImmutable::createFromFormat('!Y-m-d', $dutyDate)->format('D, M j');
+
+        $this->deliver(
+            "daily_roster_alert:seat_only_roster:{$dutyDate}:{$seat}:{$employeeProfileId}",
+            "{$name} can open the {$seat} page on {$date} only because the TeleStaff roster has them on that seat. If that looks wrong, check Roster Imports.",
+            '/admin/roster-imports',
+        );
+    }
+
+    private function deliver(string $key, string $message, string $path): void
+    {
         try {
             if (! Cache::add($key, true, now()->addDays(2))) {
                 return;
@@ -48,7 +76,7 @@ final class RosterAlerts
             foreach ($recipients as $recipient) {
                 FilamentNotification::make()->warning()->title('Daily Roster')->body($message)->sendToDatabase($recipient);
             }
-            Notification::send($recipients, new CriticalAlertNotification('Daily Roster', $message, 'daily_roster', url: url('/admin/roster-imports')));
+            Notification::send($recipients, new CriticalAlertNotification('Daily Roster', $message, 'daily_roster', url: url($path)));
         } catch (Throwable $exception) {
             $this->forget($key);
             report($exception);

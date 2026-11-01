@@ -10,10 +10,12 @@ use App\Notifications\Inspections\InspectionEventNotification;
 use App\Notifications\Inspections\InspectionNotificationKind;
 use App\Services\Narcotics\NarcoticsNotifier;
 use App\Services\Notifications\NotificationCategoryRegistry;
+use App\Support\Captain5\DutyCalendar;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
 use Tests\Feature\Narcotics\Concerns\BuildsNarcoticsWorld;
+use Tests\Support\DailyRosterSnapshotFactory;
 use Tests\TestCase;
 
 final class NarcoticsCheckNotificationsTest extends TestCase
@@ -62,6 +64,36 @@ final class NarcoticsCheckNotificationsTest extends TestCase
         $this->submitOk($this->member);
 
         $this->assertSame(0, $this->sentTimes($this->captain5, NarcoticsNotifier::KIND_SUBMITTED));
+    }
+
+    public function test_with_seat_access_on_a_new_check_goes_to_whoever_the_roster_has_working_the_seat(): void
+    {
+        config()->set('daily_roster.card_display_enabled', true);
+        config()->set('daily_roster.seat_access_enabled', true);
+        $rider = $this->emsMember('Firefighter', 'Rider Five');
+        DailyRosterSnapshotFactory::publish(app(DutyCalendar::class)->dutyDate()->format('Y-m-d'), ['Rescue Division / Captain 5' => [
+            ['employee_id' => $rider->employee_id, 'name' => 'FIVE, RIDER', 'rank' => 'FF', 'code' => '+OT', 'category' => 'Overtime'],
+        ]]);
+        $this->forgetEmsMemo();
+
+        $this->submitOk($this->member);
+
+        $this->assertSame(1, $this->sentTimes($rider, NarcoticsNotifier::KIND_SUBMITTED));
+        $this->assertSame(0, $this->sentTimes($this->captain5, NarcoticsNotifier::KIND_SUBMITTED));
+    }
+
+    public function test_with_seat_access_on_a_check_still_reaches_a_seat_holder_when_nobody_on_the_roster_can_review(): void
+    {
+        config()->set('daily_roster.card_display_enabled', true);
+        config()->set('daily_roster.seat_access_enabled', true);
+        DailyRosterSnapshotFactory::publish(app(DutyCalendar::class)->dutyDate()->format('Y-m-d'), ['Rescue Division / Captain 5' => [
+            ['kind' => 'vacancy_open', 'rank' => 'Capt'],
+        ]]);
+        $this->forgetEmsMemo();
+
+        $this->submitOk($this->member);
+
+        $this->assertSame(1, $this->sentTimes($this->captain5, NarcoticsNotifier::KIND_SUBMITTED));
     }
 
     public function test_the_member_hears_the_decision_and_only_the_member(): void

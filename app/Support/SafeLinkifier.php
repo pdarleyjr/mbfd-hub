@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace App\Support;
 
+use App\Support\Host\HubHosts;
 use Illuminate\Support\HtmlString;
 
 /**
  * Renders untrusted plain text as safe HTML: everything is escaped, line
  * breaks are preserved, and only http:// and https:// URLs become links
- * (opened in a new tab with noopener noreferrer nofollow). The server never
- * fetches a linked URL.
+ * (other sites open in a new tab with noopener noreferrer nofollow; a link
+ * to the Hub itself stays in the same window). The server never fetches a
+ * linked URL.
  */
 final class SafeLinkifier
 {
@@ -69,6 +71,10 @@ final class SafeLinkifier
     {
         $label = mb_strlen($url) > self::DISPLAY_LIMIT ? mb_substr($url, 0, self::DISPLAY_LIMIT - 1).'…' : $url;
 
-        return '<a href="'.e($url).'" target="_blank" rel="noopener noreferrer nofollow" class="underline break-all">'.e($label).'</a>';
+        // A link to the Hub itself opens in the same window; any other site opens apart.
+        $host = parse_url($url, PHP_URL_HOST);
+        $attributes = is_string($host) && HubHosts::isHubHost($host) ? '' : ' target="_blank" rel="noopener noreferrer nofollow"';
+
+        return '<a href="'.e($url).'"'.$attributes.' class="underline break-all">'.e($label).'</a>';
     }
 }

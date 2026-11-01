@@ -121,6 +121,17 @@ final class RosterMemberCardTest extends TestCase
         $this->get($this->card('90009').'?date=2026-10-29')->assertOk()->assertSee('Rescue 3')->assertSee('EARLIER, NINE');
     }
 
+    public function test_it_follows_the_page_when_the_next_shift_is_already_posted(): void
+    {
+        $this->travelTo(CarbonImmutable::parse('2026-10-31 07:30:00', 'America/New_York'));
+        DailyRosterSnapshotFactory::publish('2026-10-31', ['Station 3 / Rescue 3' => [['employee_id' => '90009', 'name' => 'NEXT, NINE', 'code' => 'SP', 'category' => 'Scheduled']]]);
+        $this->actingAs($this->viewer());
+
+        $this->get('/daily-roster')->assertOk()->assertSee('NEXT, NINE');
+        $this->get($this->card('90009'))->assertOk()->assertSee('Rescue 3');
+        $this->get($this->card('90001').'?date='.self::TODAY)->assertOk()->assertSee('Engine 1');
+    }
+
     public function test_a_member_with_no_hub_profile_shows_telestaff_data_only(): void
     {
         $this->actingAs($this->viewer());

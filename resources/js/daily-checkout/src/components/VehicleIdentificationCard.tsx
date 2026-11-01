@@ -18,6 +18,8 @@ interface Props {
   disabled?: boolean;
   /** Show the open questions without controls (the person may read them but not answer). */
   readOnly?: boolean;
+  /** The questions are optional details here, so the card says nothing about one-time requirements. */
+  bare?: boolean;
 }
 
 const CONTROL = 'mt-1 block min-h-11 w-full rounded-hub-control border border-hub-control-border bg-hub-well px-3 py-2.5 font-normal text-hub-ink';
@@ -147,7 +149,7 @@ function Question({ block, question, answers, onChange, showErrors, disabled, pr
  * The one-time vehicle information card. The same component is used in the Daily Checkout (Member / Vehicle
  * Info step) and on the Captain 5 page. It renders nothing when the server has no open question.
  */
-export default function VehicleIdentificationCard({ block, answers, onChange, showErrors = false, disabled = false, readOnly = false }: Props) {
+export default function VehicleIdentificationCard({ block, answers, onChange, showErrors = false, disabled = false, readOnly = false, bare = false }: Props) {
   const prefix = useId();
   if (block.questions.length === 0) return null;
 
@@ -165,10 +167,10 @@ export default function VehicleIdentificationCard({ block, answers, onChange, sh
     </section>;
   }
 
-  return <section data-vehicle-identification aria-labelledby={`${prefix}-title`} className="rounded-xl border border-hub-glass-border bg-hub-n-50 p-4">
-    <h3 id={`${prefix}-title`} className="text-base font-semibold text-hub-ink">One-time vehicle information</h3>
-    {block.note && <p className="mt-1 text-sm text-hub-n-600">{block.note}</p>}
-    <div className="mt-4 grid gap-5">
+  return <section data-vehicle-identification aria-labelledby={bare ? undefined : `${prefix}-title`} className={bare ? '' : 'rounded-xl border border-hub-glass-border bg-hub-n-50 p-4'}>
+    {!bare && <h3 id={`${prefix}-title`} className="text-base font-semibold text-hub-ink">One-time vehicle information</h3>}
+    {!bare && block.note && <p className="mt-1 text-sm text-hub-n-600">{block.note}</p>}
+    <div className={bare ? 'grid gap-5' : 'mt-4 grid gap-5'}>
       {block.questions.map((question) => <Question
         key={question.field}
         block={block}

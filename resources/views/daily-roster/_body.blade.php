@@ -11,10 +11,19 @@
         <p class="hub-callout hub-callout--warning roster-notice" data-roster-notice>{{ $roster['notice'] }}</p>
     @endif
 
+    @if($roster['nextShiftNote'] !== null)
+        <p class="hub-callout roster-notice" data-roster-next>
+            {{ $roster['nextShiftNote'] }}
+            @if($roster['onDutyDate'] !== null)
+                <a class="hub-link" href="{{ route('daily-roster.show', ['date' => $roster['onDutyDate']]) }}">See the shift on duty now</a>
+            @endif
+        </p>
+    @endif
+
     @if($roster['mode'] === 'dated')
         <p class="hub-callout roster-notice" data-roster-dated>
             You are viewing the roster for {{ $roster['displayedDateLabel'] }}.
-            <a class="hub-link" href="{{ route('daily-roster.show') }}">Go to the current roster</a>
+            <a class="hub-link" href="{{ route('daily-roster.show') }}">{{ $roster['currentLinkLabel'] }}</a>
         </p>
     @endif
 

@@ -7,9 +7,7 @@ import { ApiClient, isApiAuthenticationError, redirectToLoginAfterSessionExpiry 
 import { isForbiddenError } from '../utils/commandCommunicationsApi';
 import { useOffline } from '../hooks/useOffline';
 import DailyPageNav from './DailyPageNav';
-import ActingApprovals from './acting/ActingApprovals';
 import Command300ShiftSection from './acting/Command300ShiftSection';
-import { COMMAND_300_ACTING } from './acting/command300Role';
 import { useCommand300Shift } from './acting/useCommand300Shift';
 import AccessDenied from './command-communications/AccessDenied';
 import CommunicationsPanel from './command-communications/CommunicationsPanel';
@@ -279,12 +277,12 @@ export default function Command300Page() {
                 <ExternalLink size={20} aria-hidden="true" />
                 <span className="min-w-0">Open Command Board<span className="sr-only"> (opens in a new tab)</span></span>
               </a>
+              {/* Shown only in the installed app, where nothing else says this leaves the Hub (hub-shell.css). */}
+              <p className="hub-installed-hint col-span-full">Opens outside the Hub. Tap Done or Close to come back.</p>
             </nav>
           </div>
         </div>
       </section>
-
-      {shift.data && <ActingApprovals role={COMMAND_300_ACTING} acting={shift.data.acting} onChange={shift.apply} />}
 
       <section aria-labelledby="command-overview-heading" className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">

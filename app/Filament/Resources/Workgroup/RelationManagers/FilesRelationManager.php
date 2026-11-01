@@ -74,8 +74,7 @@ class FilesRelationManager extends RelationManager implements ExportableTable
                 Tables\Actions\Action::make('download')
                     ->label('Download')
                     ->icon('heroicon-o-arrow-down-tray')
-                    ->url(fn ($record) => route('workgroup.file.download', ['file' => $record->id]))
-                    ->openUrlInNewTab(),
+                    ->url(fn ($record) => route('workgroup.file.download', ['file' => $record->id])),
                 Tables\Actions\EditAction::make()
                     ->mutateFormDataUsing(fn (array $data): array => $this->validateSessionAssociation($data)),
                 Tables\Actions\DeleteAction::make(),

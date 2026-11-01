@@ -7,7 +7,6 @@ namespace Tests\Feature\Fleet;
 use App\Models\Apparatus;
 use App\Models\ApparatusChangeout;
 use App\Models\ApparatusOperationalStatusEvent;
-use App\Models\ApparatusVehicleSwapRequest;
 use App\Models\Station;
 use App\Models\UnitMasterVehicle;
 use App\Models\UnitMasterVehicleChange;
@@ -462,25 +461,6 @@ final class FleetStatusReportTest extends TestCase
         $this->assertSame('In Service', $this->row('1036')->status);
     }
 
-    public function test_a_swap_decision_on_the_report_day_is_listed_and_not_overwritten(): void
-    {
-        $truck = $this->row('14500');
-        $inspection = DB::table('apparatus_inspections')->insertGetId([
-            'apparatus_id' => $truck->id, 'operator_name' => 'Test Member', 'rank' => 'Firefighter',
-            'created_at' => '2026-10-30 18:00:00', 'updated_at' => '2026-10-30 18:00:00',
-        ]);
-        ApparatusVehicleSwapRequest::query()->create([
-            'apparatus_inspection_id' => $inspection, 'apparatus_id' => $truck->id, 'reporter_name' => 'Test Member',
-            'reported_vehicle_number' => '1036', 'answer' => ApparatusVehicleSwapRequest::ANSWER_UNKNOWN,
-            'status' => ApparatusVehicleSwapRequest::STATUS_REJECTED, 'decided_at' => '2026-10-30 18:30:00',
-        ]);
-
-        $row = $this->planRow($this->shippedPlan(), '14500');
-
-        $this->assertSame(FleetStatusReportReconciler::OUTCOME_DISCREPANCY, $row['outcome']);
-        $this->assertStringContainsString('vehicle swap report', $row['discrepancies'][0]);
-    }
-
     public function test_a_row_matching_the_report_stays_no_change_despite_a_report_day_event(): void
     {
         $this->statusEvent('1033', '2026-10-30 15:00:00');
@@ -505,7 +485,7 @@ final class FleetStatusReportTest extends TestCase
         $this->assertStringNotContainsString(FleetStatusReportReconciler::SOURCE, $html);
     }
 
-    public function test_a_newer_changeout_and_swap_decision_leave_the_row_alone(): void
+    public function test_a_newer_changeout_leaves_the_row_alone(): void
     {
         ApparatusChangeout::query()->create([
             'client_submission_id' => (string) Str::uuid(), 'payload_hash' => str_repeat('a', 64),
@@ -514,23 +494,11 @@ final class FleetStatusReportTest extends TestCase
             'handoff_status' => ApparatusChangeout::HANDOFF_COMPLETE, 'submitted_by_name' => 'Test Member',
             'effective_at' => '2026-10-31 12:00:00',
         ]);
-        $truck = $this->row('14500');
-        $inspection = DB::table('apparatus_inspections')->insertGetId([
-            'apparatus_id' => $truck->id, 'operator_name' => 'Test Member', 'rank' => 'Firefighter',
-            'created_at' => '2026-10-31 12:00:00', 'updated_at' => '2026-10-31 12:00:00',
-        ]);
-        ApparatusVehicleSwapRequest::query()->create([
-            'apparatus_inspection_id' => $inspection, 'apparatus_id' => $truck->id, 'reporter_name' => 'Test Member',
-            'reported_vehicle_number' => '1036', 'answer' => ApparatusVehicleSwapRequest::ANSWER_UNKNOWN,
-            'status' => ApparatusVehicleSwapRequest::STATUS_REJECTED, 'decided_at' => '2026-10-31 13:00:00',
-        ]);
 
         $plan = $this->shippedPlan();
 
         $this->assertStringContainsString('changeout', $this->planRow($plan, '1035')['discrepancies'][0]);
         $this->assertSame([], $this->planRow($plan, '1035')['changes']);
-        $this->assertStringContainsString('vehicle swap report', $this->planRow($plan, '14500')['discrepancies'][0]);
-        $this->assertSame([], $this->planRow($plan, '14500')['changes']);
     }
 
     public function test_a_meter_update_is_not_evidence(): void

@@ -1,4 +1,4 @@
-import type { ActingState, OnDuty } from '../acting/types';
+import type { OnDuty } from '../acting/types';
 
 /** Shapes of /api/captain5/* (docs/captain5-ems-operations-center.md). Only what the page reads. */
 
@@ -24,8 +24,8 @@ export interface Captain5Access {
   authority_label: string;
 }
 
-// The shift line and acting request shapes are shared with the 300 page, so they live in ../acting/types.
-export type { ActingDuration, ActingRequest, ActingResult, ActingState, OnDuty, ShiftLetter } from '../acting/types';
+// The shift line shape is shared with the 300 page, so it lives in ../acting/types.
+export type { OnDuty, ShiftLetter } from '../acting/types';
 
 export interface IssueDetails {
   parts_ordered?: string;
@@ -155,10 +155,9 @@ export interface RescueTruckLeftBehind {
   note: string | null;
 }
 
-/** A completed changeout, or a swap Fleet decided from a Daily Checkout report. */
+/** A completed changeout. */
 export interface RescueTruckChange {
   id: string;
-  source: 'changeout' | 'fleet_decision';
   unit: string;
   from_vehicle_number: string | null;
   to_vehicle_number: string | null;
@@ -206,7 +205,6 @@ export interface Workspace {
   rescue_trucks: RescueTruck[];
   rescue_truck_changes: RescueTruckChange[];
   handoff: Handoff;
-  acting: ActingState;
   generated_at: string;
 }
 

@@ -54,7 +54,6 @@ final class NotificationPresetPolicyTest extends TestCase
         'equipment_expirations' => [true, false, false],
         'todo_assignments' => [true, false, false],
         'captain5_ems' => [true, true, true],
-        'captain5_assignment_requests' => [true, true, true],
         'command_communications' => [true, true, true],
     ];
 

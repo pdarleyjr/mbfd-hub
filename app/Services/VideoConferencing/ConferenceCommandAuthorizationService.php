@@ -14,7 +14,7 @@ use Illuminate\Http\Request;
  */
 class ConferenceCommandAuthorizationService
 {
-    public const DENIED_MESSAGE = '300 Command video controls are available to Captains, Division Chiefs, the 300 command officer, administrators, and members granted 300 Command Access.';
+    public const DENIED_MESSAGE = '300 Command video controls are available to Captains, Chiefs, the 300 command officer, whoever TeleStaff has working the 300 seat today, administrators, and members granted 300 Command Access.';
 
     public function __construct(private readonly Command300Access $access) {}
 

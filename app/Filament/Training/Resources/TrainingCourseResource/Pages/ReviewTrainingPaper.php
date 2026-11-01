@@ -78,7 +78,10 @@ class ReviewTrainingPaper extends Page implements ExportableTable, HasTable
                 Tables\Filters\SelectFilter::make('review_status')->label('Review state')->options(['pending' => 'Pending review', 'approved' => 'Verified paper', 'excluded' => 'Excluded', 'voided' => 'Voided']),
             ])->actions([
                 Tables\Actions\Action::make('source')->label('Original paper')->icon('heroicon-o-document')
-                    ->url(fn (TrainingPaperAttendance $record): string => route('training.paper.source', ['import' => $record->training_paper_roster_import_id]).'#page='.$record->source_page)->openUrlInNewTab(),
+                    ->url(fn (TrainingPaperAttendance $record): string => route('training.paper.source', ['import' => $record->training_paper_roster_import_id]).'#page='.$record->source_page)
+                    // The viewer scrolls to the page in #page=N; the new tab is only the no-script fallback.
+                    ->extraAttributes(['data-hub-viewer' => 'pdf', 'data-hub-viewer-title' => 'Original paper'])
+                    ->openUrlInNewTab(),
                 Tables\Actions\Action::make('review')->label('Review entry')->visible(fn (): bool => Gate::allows('update', $this->course))
                     ->fillForm(fn (TrainingPaperAttendance $record): array => ['expected_version' => $record->review_version])
                     ->modalDescription('Inspect the original page and verify the member against canonical personnel records. A paper review does not create an electronic signature or retrospective officer certification.')

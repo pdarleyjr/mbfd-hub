@@ -92,7 +92,14 @@ final class ReviewVehicleDocuments extends Page implements ExportableTable, HasT
             ->actions([
                 Tables\Actions\Action::make('preview')->label('Preview')->icon('heroicon-o-eye')->color('gray')
                     ->visible(fn (VehicleDocument $record): bool => $record->canPreview())
-                    ->url(fn (VehicleDocument $record): string => route('vehicle-documents.review-preview', $record))->openUrlInNewTab(),
+                    ->url(fn (VehicleDocument $record): string => route('vehicle-documents.review-preview', $record))
+                    // The viewer shows it on this page; the new tab is only the no-script fallback.
+                    ->extraAttributes(fn (VehicleDocument $record): array => [
+                        'data-hub-viewer' => 'auto',
+                        'data-hub-viewer-title' => $record->original_filename ?: 'Vehicle document',
+                        'data-hub-viewer-download' => route('vehicle-documents.review-download', $record),
+                    ])
+                    ->openUrlInNewTab(),
                 Tables\Actions\Action::make('download')->label('Download')->color('gray')->icon('heroicon-o-arrow-down-tray')
                     ->url(fn (VehicleDocument $record): string => route('vehicle-documents.review-download', $record)),
                 Tables\Actions\Action::make('assignVehicle')->label('Review / assign vehicle')->icon('heroicon-o-link')

@@ -80,6 +80,109 @@ class DailyCheckoutInspectionSessionContractTest extends TestCase
         )->assertCreated();
     }
 
+    public function test_the_payload_the_app_really_sends_for_fb6_is_accepted_with_no_vehicle_id(): void
+    {
+        $apparatus = $this->makeFireBoat6();
+        $this->setTestTime('2026-08-31 09:00:00');
+        $checklist = $this->getJson("/api/public/apparatuses/{$apparatus->id}/checklist")
+            ->assertOk()
+            ->assertJsonPath('vehicle_id_required', false)
+            ->assertJsonPath('apparatus.vehicle_id_required', false)
+            ->assertJsonPath('apparatus.vehicle_number', null);
+        $this->assertNotContains('vehicle_number', array_column($checklist->json('vehicle_identification.questions'), 'field'));
+
+        $contract = $this->startInspectionSession($apparatus);
+        $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", $this->appSubmission($apparatus, $contract, '20202020-2020-4020-8020-202020202020'))
+            ->assertCreated();
+
+        $apparatus->refresh();
+        $this->assertNull($apparatus->vehicle_number);
+        $this->assertNull($apparatus->unit_master_vehicle_id);
+        $this->assertDatabaseHas('apparatus_inspections', [
+            'apparatus_id' => $apparatus->id,
+            'vehicle_number' => null,
+            'unit_number' => null,
+            'designation_at_time' => $apparatus->designation,
+            'processing_status' => 'accepted',
+            'review_status' => 'approved',
+        ]);
+        $this->assertDatabaseCount('apparatus_inspection_review_events', 1);
+        $this->assertNotNull(DailyCheckoutInspectionSession::sole()->submitted_inspection_id);
+    }
+
+    public function test_a_retry_of_the_same_fb6_submission_records_one_inspection(): void
+    {
+        $apparatus = $this->makeFireBoat6();
+        $this->setTestTime('2026-08-31 09:00:00');
+        $contract = $this->startInspectionSession($apparatus);
+        $payload = $this->appSubmission($apparatus, $contract, '21212121-2121-4121-8121-212121212121');
+
+        $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", $payload)->assertCreated();
+        $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", $payload)->assertOk();
+
+        $this->assertDatabaseCount('apparatus_inspections', 1);
+    }
+
+    public function test_an_older_phone_naming_a_vehicle_on_fb6_records_nothing_about_a_vehicle(): void
+    {
+        $apparatus = $this->makeFireBoat6();
+        $this->setTestTime('2026-08-31 09:00:00');
+        $contract = $this->startInspectionSession($apparatus);
+        $payload = $this->appSubmission($apparatus, $contract, '22222222-2222-4222-8222-222222222223');
+        $payload['physical_vehicle'] = ['vehicle_number' => 'FB6-1'];
+
+        $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", $payload)->assertCreated();
+
+        $this->assertNull($apparatus->fresh()->vehicle_number);
+        $this->assertDatabaseCount('apparatus_changeouts', 0);
+        $this->assertDatabaseMissing('apparatus_inspection_review_events', ['status' => 'vehicle_named']);
+    }
+
+    public function test_a_second_member_is_not_locked_out_while_another_members_fb6_inspection_is_open(): void
+    {
+        $apparatus = $this->makeFireBoat6();
+        $this->setTestTime('2026-08-31 09:00:00');
+        $this->startInspectionSession($apparatus);
+
+        $second = $this->actingAsCanonicalFixture('E01-SECOND-MEMBER');
+        $this->flushBrowserBinding();
+        $contract = $this->startInspectionSession($apparatus);
+
+        $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", $this->appSubmission($apparatus, $contract, '23232323-2323-4323-8323-232323232323'))
+            ->assertCreated();
+        $this->assertDatabaseCount('daily_checkout_inspection_sessions', 2);
+        $this->assertDatabaseHas('apparatus_inspections', ['apparatus_id' => $apparatus->id, 'actor_user_id' => $second->id]);
+    }
+
+    public function test_the_same_member_on_another_device_the_same_day_gets_their_own_contract(): void
+    {
+        $apparatus = $this->makeFireBoat6();
+        $this->setTestTime('2026-08-31 09:00:00');
+        $this->startInspectionSession($apparatus);
+
+        $this->flushBrowserBinding();
+        $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspection-sessions", ['inspection_session_start_key' => '24242424-2424-4424-8424-242424242424'])
+            ->assertCreated();
+
+        $this->assertDatabaseCount('daily_checkout_inspection_sessions', 2);
+    }
+
+    public function test_a_boat_has_no_vehicle_change_but_a_truck_still_does(): void
+    {
+        $boat = $this->makeFireBoat6();
+
+        $this->getJson("/api/public/apparatuses/{$boat->id}/changeout-context")
+            ->assertStatus(409)
+            ->assertJsonPath('message', 'Fire Boat 6 does not use vehicle changes.');
+
+        $truck = Apparatus::query()->create([
+            'station_id' => $boat->station_id, 'unit_id' => 'E6', 'name' => 'Engine 6', 'designation' => 'E6', 'type' => 'Engine',
+            'slug' => 'e6', 'vehicle_number' => '20503', 'daily_checkout_requirement' => 'required', 'daily_checkout_template' => 'engine',
+        ]);
+        $this->getJson("/api/public/apparatuses/{$truck->id}/changeout-context")->assertOk();
+        $this->getJson("/api/public/apparatuses/{$truck->id}/checklist")->assertOk()->assertJsonPath('vehicle_id_required', true);
+    }
+
     public function test_normal_same_day_online_fire_boat_inspection_uses_a_persisted_server_contract(): void
     {
         $apparatus = $this->makeFireBoat6();
@@ -735,6 +838,62 @@ class DailyCheckoutInspectionSessionContractTest extends TestCase
         return $payload;
     }
 
+    /** A new device: no inspection browser cookie yet. */
+    private function flushBrowserBinding(): void
+    {
+        unset($this->defaultCookies['daily_checkout_inspection_browser'], $this->unencryptedCookies['daily_checkout_inspection_browser']);
+    }
+
+    /**
+     * What InspectionWizard.handleSubmit really posts for a member who filled in only what is required:
+     * processing_version 1, explicit observations, a signature, untouched fields as their empty values and no vehicle.
+     *
+     * @param  array<string, mixed>  $contract
+     * @return array<string, mixed>
+     */
+    private function appSubmission(Apparatus $apparatus, array $contract, string $clientSubmissionId): array
+    {
+        $resolution = app(DailyCheckoutChecklistResolver::class)->resolve($apparatus);
+        $this->assertIsArray($resolution['checklist']);
+        $signature = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+
+        return [
+            'processing_version' => 1,
+            'meter_baseline_token' => $this->getJson('/api/public/apparatuses')->json('0.meter_baseline_token'),
+            'client_submission_id' => $clientSubmissionId,
+            'checklist_version' => $contract['checklist_hash'],
+            'operator_name' => 'Firefighter Example',
+            'rank' => 'Firefighter',
+            'shift' => 'A',
+            'unit_number' => 'FB6',
+            'engine_hours' => null,
+            'miles' => null,
+            'compartments' => array_map(static fn (array $compartment): array => [
+                'id' => $compartment['id'],
+                'name' => $compartment['name'],
+                'items' => array_map(static fn (array $item): array => [
+                    'id' => $item['id'], 'name' => $item['name'], 'status' => 'Present', 'observed' => true, 'notes' => null,
+                ], $compartment['items']),
+            ], $resolution['checklist']['compartments']),
+            'defects' => [],
+            'field_values' => array_map(static fn (array $field): array => [
+                'id' => $field['id'],
+                'value' => match (true) {
+                    $field['inputType'] === 'date' => $contract['duty_date'],
+                    $field['id'] === 'fb6-shift' => 'A',
+                    $field['inputType'] === 'checkbox' => false,
+                    $field['inputType'] === 'number', $field['inputType'] === 'percentage' => null,
+                    default => '',
+                },
+            ], $resolution['checklist']['fields']),
+            'scheduled_tasks' => array_map(static fn (array $task): array => ['id' => $task['id'], 'status' => 'Present', 'notes' => null, 'observed' => true], $contract['due_tasks']),
+            'inspection_session_id' => $contract['id'],
+            'inspection_session_token' => $contract['token'],
+            'inspection_session_replay_key' => $contract['replay_key'],
+            'officer_signature' => $signature,
+        ];
+    }
+
     /** @return array<string, string> */
     private function abandonmentPayload(array $contract, string $transitionKey): array
     {
@@ -817,7 +976,7 @@ class DailyCheckoutInspectionSessionContractTest extends TestCase
             'name' => 'Fire Boat 6',
             'type' => 'Fire Boat',
             'class_description' => 'Marine',
-            'vehicle_number' => 'FB6',
+            'vehicle_number' => null,
             'designation' => 'FB6',
             'slug' => 'fire-boat-6',
             'make' => 'Metal Shark',

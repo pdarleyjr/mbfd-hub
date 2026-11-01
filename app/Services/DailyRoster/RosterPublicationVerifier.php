@@ -180,7 +180,7 @@ final class RosterPublicationVerifier
                 }
                 $seats[array_key_last($seats)][1][] = [
                     $row->kind, $row->employee_id, $row->raw_name, $row->raw_code,
-                    $row->raw_from, $row->raw_through, (float) $row->reported_hours,
+                    $row->raw_from, $row->raw_through, (float) $row->reported_hours, $row->availability,
                 ];
             }
             $canonical[] = [$view->section->raw_title, $seats];

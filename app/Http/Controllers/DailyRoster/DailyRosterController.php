@@ -44,7 +44,7 @@ final class DailyRosterController extends Controller
         $this->authorizeViewer($request);
 
         $date = $this->requestedDate($request);
-        $etag = sha1($this->freshness->status()->etag.'|'.$date);
+        $etag = sha1($this->freshness->pageStatus()->etag.'|'.$date);
         if ($this->matchesEtag($request, $etag)) {
             return $this->notModified($etag);
         }
@@ -102,7 +102,7 @@ final class DailyRosterController extends Controller
     {
         $this->authorizeViewer($request);
 
-        $status = $this->freshness->status();
+        $status = $this->freshness->pageStatus();
         if ($this->matchesEtag($request, $status->etag)) {
             return $this->notModified($status->etag);
         }

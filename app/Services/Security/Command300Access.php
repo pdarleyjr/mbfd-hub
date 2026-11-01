@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Services\Security;
 
+use App\Models\DailyRoster\RosterSection;
 use App\Models\Employee;
 use App\Models\EmployeeBidAssignment;
 use App\Models\User;
+use App\Services\DailyRoster\RosterSeatAccess;
 
 /**
  * The single 300 Command authorization decision. The 300 profile, its
@@ -15,8 +17,10 @@ use App\Models\User;
  *
  * Eligible = an active account with no pending password setup, and ANY of:
  * administrator (super_admin or current Admin Panel entitlement), the
- * authoritative personnel rank Captain or Division Chief, a verified current
- * 300 bid assignment, or a direct `command.300.access` grant.
+ * authoritative personnel rank Captain, Division Chief, Deputy Fire Chief or
+ * Fire Chief, a verified current 300 bid assignment, working the 300 seat on
+ * the accepted TeleStaff roster for the duty day on the clock, or a direct
+ * `command.300.access` grant.
  */
 final class Command300Access
 {
@@ -35,7 +39,13 @@ final class Command300Access
 
     public const SOURCE_DIVISION_CHIEF = 'division_chief';
 
+    public const SOURCE_DEPUTY_FIRE_CHIEF = 'deputy_fire_chief';
+
+    public const SOURCE_FIRE_CHIEF = 'fire_chief';
+
     public const SOURCE_ASSIGNMENT = 'assignment_300';
+
+    public const SOURCE_ROSTER = 'roster_300';
 
     public const SOURCE_GRANT = 'explicit_grant';
 
@@ -45,15 +55,22 @@ final class Command300Access
     private const COMMAND_RANKS = [
         'captain' => self::SOURCE_CAPTAIN,
         'division chief' => self::SOURCE_DIVISION_CHIEF,
+        'deputy fire chief' => self::SOURCE_DEPUTY_FIRE_CHIEF,
+        'fire chief' => self::SOURCE_FIRE_CHIEF,
     ];
 
     private const SOURCE_LABELS = [
         self::SOURCE_ADMINISTRATOR => 'Automatic — Administrator',
         self::SOURCE_CAPTAIN => 'Automatic — Captain',
         self::SOURCE_DIVISION_CHIEF => 'Automatic — Division Chief',
+        self::SOURCE_DEPUTY_FIRE_CHIEF => 'Automatic — Deputy Fire Chief',
+        self::SOURCE_FIRE_CHIEF => 'Automatic — Fire Chief',
         self::SOURCE_ASSIGNMENT => 'Automatic — 300 assignment',
+        self::SOURCE_ROSTER => "Automatic — On today's TeleStaff roster",
         self::SOURCE_GRANT => 'Explicit access grant',
     ];
+
+    public function __construct(private readonly RosterSeatAccess $rosterSeats) {}
 
     public function allows(?User $user): bool
     {
@@ -81,6 +98,15 @@ final class Command300Access
         return $this->automaticSourceFrom($user, $this->directGrants($user));
     }
 
+    /** Whether this member would have access if the roster did not list them. */
+    public function qualifiesBesidesRoster(User $user): bool
+    {
+        $source = $this->source($user);
+
+        return $source !== null
+            && ($source !== self::SOURCE_ROSTER || in_array(self::PERMISSION, $this->directGrants($user), true));
+    }
+
     /** @param list<string> $direct */
     private function automaticSourceFrom(User $user, array $direct): ?string
     {
@@ -94,9 +120,9 @@ final class Command300Access
             return null;
         }
 
-        return self::COMMAND_RANKS[self::normalizeRank($employee->rank)] ?? (
-            $this->hasVerifiedCurrentAssignment($employee) ? self::SOURCE_ASSIGNMENT : null
-        );
+        return self::COMMAND_RANKS[self::normalizeRank($employee->rank)]
+            ?? ($this->hasVerifiedCurrentAssignment($employee) ? self::SOURCE_ASSIGNMENT : null)
+            ?? ($this->rosterSeats->holdsSeat($employee, RosterSection::ROLE_COMMAND_300) ? self::SOURCE_ROSTER : null);
     }
 
     /** @return list<string> Direct (never role-inherited) web grants this policy reads. */

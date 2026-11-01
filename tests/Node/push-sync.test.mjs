@@ -156,12 +156,13 @@ test('a member who turned alerts off here stays off, on both paths', () => {
   assert.equal(alertSetupFor(device('granted'), 'no-subscription', off, NOW), 'none');
 });
 
-test('"Not now" is respected for two weeks, then the card comes back', () => {
+test('"Not now" is respected for a day, then the card comes back', () => {
   const storage = memoryStorage();
   snoozeOffer(storage, NOW);
 
   assert.equal(alertSetupFor(device('default'), 'unavailable', storage, NOW + 60_000), 'none');
-  assert.equal(alertSetupFor(device('default'), 'unavailable', storage, NOW + 15 * 24 * 60 * 60_000), 'offer');
+  assert.equal(alertSetupFor(device('default'), 'unavailable', storage, NOW + 23 * 60 * 60_000), 'none');
+  assert.equal(alertSetupFor(device('default'), 'unavailable', storage, NOW + 25 * 60 * 60_000), 'offer');
 });
 
 test('blocked storage fails toward doing nothing', () => {

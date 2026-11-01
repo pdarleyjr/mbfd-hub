@@ -583,32 +583,19 @@ final class OnDutyOfficerDisplayResolverTest extends TestCase
         self::assertSame('PADDED, NOT', $payload['name']);
     }
 
-    // ------------------------------------------------------------- acting
+    // ------------------------------------------------------------- retired acting requests
 
-    public function test_an_approved_acting_member_beats_the_roster_and_the_payload_carries_no_roster_label(): void
+    public function test_an_old_approved_acting_request_never_beats_the_roster(): void
     {
         $this->publishCaptain5([$this->working($this->rosterCaptain)]);
-        $acting = $this->actingAssignment($this->rosterRelief, $this->captain5Administrator());
+        $this->actingAssignment($this->rosterRelief, $this->captain5Administrator());
 
         $payload = $this->resolve()->toArray();
 
-        self::assertSame(OnDutyCaptain5::SOURCE_ACTING, $payload['source']);
-        self::assertSame('Relief Officer', $payload['name']);
-        self::assertSame($acting->getKey(), $payload['acting_request_id']);
-        self::assertNotNull($payload['acting_until']);
-        self::assertNull($payload['as_of']);
-        self::assertSame(OnDutyOfficerDisplay::FRESHNESS_NOT_APPLICABLE, $payload['freshness']);
-        self::assertNull($payload['identity']);
-        self::assertNull($payload['reason']);
-    }
-
-    public function test_when_an_acting_display_ends_the_card_returns_to_the_roster(): void
-    {
-        $this->publishCaptain5([$this->working($this->rosterCaptain)]);
-        $this->actingAssignment($this->rosterRelief, $this->captain5Administrator(), CarbonImmutable::parse('2026-10-20 12:00', 'America/New_York')->utc());
-
-        self::assertSame('Relief Officer', $this->resolve('2026-10-20 11:59')->name);
-        self::assertSame('Roster Officer', $this->resolve('2026-10-20 12:00')->name);
+        self::assertSame('Roster Officer', $payload['name']);
+        self::assertSame(OnDutyOfficerDisplay::SOURCE_TELESTAFF, $payload['source']);
+        self::assertNull($payload['acting_request_id']);
+        self::assertNull($payload['acting_until']);
     }
 
     // ------------------------------------------------------------- corrections

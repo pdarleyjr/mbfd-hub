@@ -19,7 +19,9 @@ use NotificationChannels\WebPush\WebPushMessage;
  */
 final class RosterMoveNotification extends Notification implements ShouldQueue
 {
-    use EvaluatesDelivery;
+    use EvaluatesDelivery {
+        shouldSend as private evaluatedShouldSend;
+    }
     use Queueable;
 
     private const URL = '/daily-roster';
@@ -47,7 +49,18 @@ final class RosterMoveNotification extends Notification implements ShouldQueue
     /** @return list<string> */
     public function via(object $notifiable): array
     {
-        return $this->evaluatedChannels($notifiable);
+        return $this->shiftIsOver() ? [] : $this->evaluatedChannels($notifiable);
+    }
+
+    /** A queue outage can delay this. Telling someone after the shift where they should have ridden helps nobody. */
+    public function shouldSend(object $notifiable, string $channel): bool
+    {
+        return ! $this->shiftIsOver() && $this->evaluatedShouldSend($notifiable, $channel);
+    }
+
+    private function shiftIsOver(): bool
+    {
+        return $this->shiftEndsAt !== null && now()->getTimestamp() >= $this->shiftEndsAt;
     }
 
     /** @return array<string, mixed> Filament-compatible database notification. */

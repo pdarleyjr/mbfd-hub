@@ -10,7 +10,6 @@ use App\Filament\Resources\ApparatusServiceTicketResource;
 use App\Filament\Resources\EmployeeResource;
 use App\Filament\Resources\InspectionResource;
 use App\Filament\Resources\InventoryCorrectionResource;
-use App\Filament\Resources\VehicleSwapRequestResource;
 use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusDefectEvent;
@@ -20,7 +19,6 @@ use App\Models\ApparatusInspectionException;
 use App\Models\ApparatusInventoryCorrection;
 use App\Models\ApparatusIssueMessage;
 use App\Models\ApparatusServiceTicket;
-use App\Models\ApparatusVehicleSwapRequest;
 use App\Models\Station;
 use App\Models\User;
 use App\Services\Inspections\EmployeeInspectionHistoryService;
@@ -79,7 +77,6 @@ final class InspectionWorkspace
 
         return match (true) {
             $processing === 'held_for_review' => ['label' => 'Needs approval', 'tone' => 'warning'],
-            $processing === 'pending_vehicle_swap' => ['label' => 'Held: vehicle swap', 'tone' => 'warning'],
             $processing === 'rejected', $review === 'rejected' => ['label' => 'Rejected', 'tone' => 'danger'],
             $processing === 'accepted' => ['label' => 'Accepted', 'tone' => 'success'],
             $processing === 'accepted_with_exception' => ['label' => 'Follow-up needed', 'tone' => 'warning'],
@@ -113,7 +110,6 @@ final class InspectionWorkspace
     {
         $inspection->loadMissing([
             'apparatus.station', 'processedApparatus', 'employee', 'reviewEvents.changedByUser',
-            'vehicleSwapRequest.decidedBy',
         ]);
 
         $physicalId = (int) ($inspection->processed_apparatus_id ?? $inspection->apparatus_id);
@@ -147,7 +143,6 @@ final class InspectionWorkspace
             'header' => $this->header($inspection, $physical, $detail, $viewer, $openHolds, $openIssues),
             'legacy_pending' => $inspection->processing_status === null && $inspection->review_status === 'pending_review',
             'pending_effects' => $this->pendingEffects($inspection),
-            'swap' => $this->swapCard($inspection),
             'holds' => $holdCards['cards'],
             'member_flag' => $this->memberFlag($inspection, $exceptions),
             'damage_holds' => $holdCards['damage'],
@@ -159,7 +154,6 @@ final class InspectionWorkspace
                 ? ApparatusResource::getUrl('view', ['record' => $physical], panel: 'admin')
                 : null,
             'exceptions_url' => ApparatusInspectionExceptionResource::getUrl('index', panel: 'admin'),
-            'swaps_url' => VehicleSwapRequestResource::getUrl('index', panel: 'admin'),
         ];
     }
 
@@ -503,28 +497,8 @@ final class InspectionWorkspace
         ];
     }
 
-    /** @return array<string, mixed>|null */
-    private function swapCard(ApparatusInspection $inspection): ?array
-    {
-        $swap = $inspection->vehicleSwapRequest;
-        if (! $swap instanceof ApparatusVehicleSwapRequest) {
-            return null;
-        }
-
-        return [
-            'reported_vehicle' => $swap->reported_vehicle_number,
-            'assigned_vehicle' => $swap->assigned_vehicle_number ?: 'none recorded',
-            'pending' => $swap->isPending(),
-            'status_label' => ApparatusVehicleSwapRequest::statusLabel($swap->status),
-            'decided_by' => data_get($swap, 'decidedBy.name') ?? 'Fleet',
-            'decided_at' => $swap->decided_at ? $this->eastern($swap->decided_at)?->format('M j, Y g:i A') : null,
-            'answer' => ApparatusVehicleSwapRequest::answerLabel($swap->answer),
-            'note' => $swap->note,
-        ];
-    }
-
     /**
-     * Review events, defect events, messages and swap decisions in one chronological list.
+     * Review events, defect events and messages in one chronological list.
      *
      * @param  list<int>  $defectIds
      * @return list<array<string, mixed>>
@@ -542,22 +516,13 @@ final class InspectionWorkspace
             'actor' => trim($inspection->rank.' '.$inspection->operator_name) ?: null,
         ]);
 
-        $swap = $inspection->vehicleSwapRequest;
-        if ($swap instanceof ApparatusVehicleSwapRequest) {
-            $push($swap->created_at, 'swap', 'Vehicle reported: '.$swap->reported_vehicle_number, ['actor' => $swap->reporter_name, 'body' => $swap->note]);
-            if (! $swap->isPending()) {
-                $push($swap->decided_at ?? $swap->updated_at, 'swap', 'Vehicle swap decision: '.ApparatusVehicleSwapRequest::statusLabel($swap->status), [
-                    'actor' => data_get($swap, 'decidedBy.name') ?? 'Fleet', 'body' => $swap->decision_note, 'internal' => filled($swap->decision_note),
-                ]);
-            }
-        }
-
         foreach ($inspection->reviewEvents as $event) {
             $meta = is_array($event->metadata) ? $event->metadata : [];
             $previous = str((string) $event->previous_status)->replace('_', ' ')->headline()->toString();
             $status = str((string) $event->status)->replace('_', ' ')->headline()->toString();
             $evidence = data_get($meta, 'submitted_effects.checklist_v2');
-            $push($event->created_at, 'review', isset($meta['exception_id']) ? 'Meter reading decision: '.$status : 'Review: '.$previous.' to '.$status, [
+            $title = is_string($meta['title'] ?? null) ? $meta['title'] : (isset($meta['exception_id']) ? 'Meter reading decision: '.$status : 'Review: '.$previous.' to '.$status);
+            $push($event->created_at, 'review', $title, [
                 'actor' => (string) (data_get($event, 'changedByUser.name') ?? $meta['actor_name'] ?? $meta['reviewer_name'] ?? 'User no longer active'),
                 'body' => $event->internal_note,
                 'internal' => filled($event->internal_note),

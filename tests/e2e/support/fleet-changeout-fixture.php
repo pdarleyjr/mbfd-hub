@@ -9,6 +9,8 @@ declare(strict_types=1);
  *   php fleet-changeout-fixture.php reset [alert-date]   rebuild the fleet rows (see FleetChangeoutE2ESeeder::world)
  *   php fleet-changeout-fixture.php state                every fleet row the suite asserts on
  *   php fleet-changeout-fixture.php clear-alert <slug>   removes the planned changeout alert for a unit
+ *   php fleet-changeout-fixture.php fb6                  creates Fire Boat 6 as it is in production
+ *   php fleet-changeout-fixture.php fb6-state            the Fire Boat 6 rows tests/e2e/fb6-inspection-real.spec.ts asserts on
  *
  * It refuses to run anywhere except the disposable database named in FleetChangeoutE2ESeeder::DATABASE_FILE.
  */
@@ -52,6 +54,25 @@ switch ($command) {
     case 'clear-alert':
         DB::table('apparatus_operational_alerts')->where('unit_slug', $argument)->delete();
         $result = ['cleared' => $argument];
+        break;
+    case 'fb6':
+        // Fire Boat 6 as it is in production: no vehicle number, no master vehicle, no status.
+        $station = App\Models\Station::query()->firstOrCreate(['station_number' => 6], ['name' => 'Station 6', 'address' => '2300 Pine Tree Drive', 'is_active' => true]);
+        $boat = App\Models\Apparatus::query()->firstOrCreate(['slug' => 'fb6'], [
+            'station_id' => $station->id, 'unit_id' => 'FB6', 'name' => 'Fire Boat 6', 'designation' => 'FB6', 'type' => 'Fire Boat',
+            'daily_checkout_requirement' => 'required', 'daily_checkout_template' => 'fireboat6',
+        ]);
+        $result = ['id' => $boat->id, 'station_number' => 6];
+        break;
+    case 'fb6-state':
+        $boatId = DB::table('apparatuses')->where('slug', 'fb6')->value('id');
+        $rows = static fn (string $sql) => array_map(static fn (object $row): array => (array) $row, DB::select($sql, [$boatId]));
+        $result = [
+            'boat' => $rows('select vehicle_number, unit_master_vehicle_id from apparatuses where id = ?')[0] ?? null,
+            'inspections' => $rows('select actor_user_id, vehicle_number, unit_number, processing_status, review_status, designation_at_time, inspection_reference from apparatus_inspections where apparatus_id = ? order by id'),
+            'sessions' => $rows('select actor_user_id, submitted_inspection_id from daily_checkout_inspection_sessions where apparatus_id = ? order by id'),
+            'changeouts' => $rows('select id from apparatus_changeouts where from_apparatus_id = ?'),
+        ];
         break;
     default:
         fwrite(STDERR, "Unknown command {$command}\n");

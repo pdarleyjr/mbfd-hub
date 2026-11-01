@@ -13,6 +13,9 @@ return [
     'cleanup_enabled' => (bool) env('DAILY_ROSTER_CLEANUP_ENABLED', false),
     // The 300 and Captain 5 cards read the published roster for display only.
     'card_display_enabled' => (bool) env('DAILY_ROSTER_CARD_DISPLAY_ENABLED', false),
+    // Whoever the accepted roster has working the 300 or Captain 5 seat may use that page for the duty day.
+    // Turning this off ends that route at once and touches nothing else.
+    'seat_access_enabled' => (bool) env('DAILY_ROSTER_SEAT_ACCESS_ENABLED', false),
 
     'classifier' => [
         'sender' => env('DAILY_ROSTER_SENDER', 'donotreply@miamibeachfl.gov'),

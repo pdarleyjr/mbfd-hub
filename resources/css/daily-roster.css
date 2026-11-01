@@ -218,6 +218,7 @@
 [data-hub-ui="2"] .roster-pill--ot { border-color: transparent; background: rgb(var(--hub-roster-ot-bg)); color: rgb(var(--hub-roster-ot-ink)); }
 [data-hub-ui="2"] .roster-pill--aday { border-color: transparent; background: rgb(var(--hub-roster-aday-bg)); color: rgb(var(--hub-roster-aday-ink)); }
 [data-hub-ui="2"] .roster-pill--vaca { border-color: transparent; background: rgb(var(--hub-roster-vaca-bg)); color: rgb(var(--hub-roster-vaca-ink)); }
+[data-hub-ui="2"] .roster-pill--holiday { border-color: transparent; background: rgb(var(--hub-roster-holiday-bg)); color: rgb(var(--hub-roster-holiday-ink)); }
 [data-hub-ui="2"] .roster-pill--leave { border-color: transparent; background: rgb(var(--hub-roster-leave-bg)); color: rgb(var(--hub-roster-leave-ink)); }
 [data-hub-ui="2"] .roster-pill--sick { border-color: transparent; background: rgb(var(--hub-roster-sick-bg)); color: rgb(var(--hub-roster-sick-ink)); }
 [data-hub-ui="2"] .roster-pill--exchange { border-color: transparent; background: rgb(var(--hub-roster-exchange-bg)); color: rgb(var(--hub-roster-exchange-ink)); }
@@ -382,7 +383,7 @@
     color: rgb(var(--hub2-n-900));
     overflow-y: auto;
 }
-[data-hub-ui="2"] .roster-card-dialog::backdrop { background: rgb(17 28 44 / 0.55); }
+[data-hub-ui="2"] .roster-card-dialog::backdrop { background: rgb(var(--hub2-n-900) / 0.55); }
 [data-hub-ui="2"] .roster-card-dialog__inner { padding: 16px; }
 [data-hub-ui="2"] .roster-card-dialog__bar { display: flex; justify-content: flex-end; margin-bottom: 8px; }
 [data-hub-ui="2"] .roster-card__message { margin: 8px 0 16px; color: rgb(var(--hub2-n-600)); }

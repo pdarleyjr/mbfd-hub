@@ -66,7 +66,7 @@ No Gate ability (Gate::before passes any super_admin). One class decides:
 | Action | Who |
 |---|---|
 | submit / list own / read own photo | active account, not forced to change password, with an employee profile |
-| review (inbox, archive, approve, reject, read any photo) | **Captain 5 only**: a Captain 5 bid seat holder (any shift), the EMS Captain seat holder, the person currently shown as Captain 5 (admin-approved acting request), a person an administrator allowed in Captain 5 Operations ("allow" override), or super_admin |
+| review (inbox, archive, approve, reject, read any photo) | **Captain 5 only**: a Captain 5 bid seat holder (any shift), the EMS Captain seat holder, whoever the TeleStaff roster has working the Captain 5 seat at this moment (not the rest of that duty day), a person an administrator allowed in Captain 5 Operations ("allow" override), or super_admin |
 
 Officers by rank, Fleet reviewers and Admin Panel administrators can open the Captain 5 page but are
 **not** reviewers here. A Captain 5 "deny" override removes review (not for super_admin). No person

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\DailyRoster;
 
 use App\Models\DailyRoster\RosterActiveVersion;
+use App\Models\DailyRoster\RosterEvent;
 use App\Models\DailyRoster\RosterImport;
 use App\Models\DailyRoster\RosterMoveBaseline;
 use App\Models\DailyRoster\RosterSnapshot;
@@ -51,10 +52,17 @@ final class RosterMoveDetector
         $now = CarbonImmutable::now('UTC');
         $dutyDate = $this->calendar->dutyDate($now)->format('Y-m-d');
         $pointer = RosterActiveVersion::query()->whereDate('duty_date', $dutyDate)->first();
+        if ($pointer?->roster_snapshot_id === null) {
+            return 0;
+        }
 
-        // Runs every minute, so the usual answer has to be two small queries.
-        if ($pointer?->roster_snapshot_id === null
-            || (int) RosterMoveBaseline::query()->whereDate('duty_date', $dutyDate)->value('roster_snapshot_id') === (int) $pointer->roster_snapshot_id
+        // Asked again every minute, deduplicated by RosterAlerts: the baseline has moved, so nothing else would raise it.
+        if (RosterEvent::query()->whereDate('duty_date', $dutyDate)->where('action', RosterStateRecorder::ACTION_MOVE_ALERTS_HELD)->exists()) {
+            $this->alerts->send('move_alerts_held', $dutyDate);
+        }
+
+        // Runs every minute, so the usual answer has to be a few small queries.
+        if ((int) RosterMoveBaseline::query()->whereDate('duty_date', $dutyDate)->value('roster_snapshot_id') === (int) $pointer->roster_snapshot_id
             || ! $this->hasBeenReadBack($pointer)) {
             return 0;
         }
@@ -124,7 +132,7 @@ final class RosterMoveDetector
                 continue;
             }
             $eventKey = NotificationDispatchService::eventKey(NotificationCategoryRegistry::ROSTER_MOVES, 'duty_date', $dutyDate, "{$user->employee_id}:{$fromId}:{$toId}:{$changedAt}");
-            $this->notifications->dispatch(NotificationCategoryRegistry::ROSTER_MOVES, new RosterMoveNotification($move->title(), $move->body(), $eventKey, $shiftEndsAt), [$user], $eventKey);
+            $this->notifications->dispatch(NotificationCategoryRegistry::ROSTER_MOVES, new RosterMoveNotification($move->title(), $move->body(), $eventKey, $shiftEndsAt), [$user], $eventKey, writeAhead: true);
             $alerted++;
         }
 
