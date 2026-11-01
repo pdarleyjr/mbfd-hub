@@ -51,7 +51,8 @@ final class HandoffOnlyTest extends ChangeoutTestCase
     public function test_the_handoff_records_the_existing_pair_with_no_move(): void
     {
         $statusEvents = ApparatusOperationalStatusEvent::query()->count();
-        $identity = static fn (array $row): array => array_diff_key($row, array_flip(['status', 'updated_at']));
+        // ApparatusObserver stamps reported_at on every save: bookkeeping like updated_at, not the unit's identity.
+        $identity = static fn (array $row): array => array_diff_key($row, array_flip(['status', 'updated_at', 'reported_at']));
         $before = [$identity($this->unit->fresh()->getAttributes()), $identity($this->frontline->fresh()->getAttributes())];
 
         $response = $this->postChangeout($this->frontline, ['alert_id' => $this->alert->id]);
