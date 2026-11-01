@@ -40,8 +40,8 @@ interface BatchUndo {
 const needsValue = (item: ChecklistItem) => Boolean(item.inputType && item.inputType !== 'checkbox');
 const isNumeric = (item: ChecklistItem) => item.inputType === 'number' || item.inputType === 'percentage';
 const percentageOutOfRange = (item: ChecklistItem) => item.inputType === 'percentage' && typeof item.value === 'number' && (item.value < 0 || item.value > 100);
-/** The batch only marks plain present/absent items that have not been reported or still need a typed value. */
-const batchEligible = (item: ChecklistItem) => !((item.observed && item.status !== 'Present') || (needsValue(item) && !itemIsComplete(item)));
+/** The batch only marks items that have not been reported and do not still need a typed value. A number carried from the last inspection counts as typed. */
+const batchEligible = (item: ChecklistItem) => !((item.observed && item.status !== 'Present') || (needsValue(item) && !itemIsComplete({ ...item, status: 'Present', observed: true })));
 /** Leaving Damaged clears the significant-damage claim in the same update. */
 const statusPatch = (status: ChecklistItem['status']): Partial<ChecklistItem> => status === 'Damaged' ? { status, observed: true } : { status, observed: true, significant: undefined };
 

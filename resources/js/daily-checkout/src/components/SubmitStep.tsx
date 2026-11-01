@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
-import type { OfficerInfo, Compartment, ChecklistData, ChecklistFieldValue, MeterData, OpenFinding, ReviewFlagDraft, ScheduledChecklistTaskResult } from '../types';
+import type { OfficerInfo, Compartment, ChecklistData, ChecklistFieldValue, EquipmentExtra, MeterData, OpenFinding, ReviewFlagDraft, ScheduledChecklistTaskResult } from '../types';
+import { equipmentFieldIds } from '../utils/equipmentNumbers.ts';
+import EquipmentNumbersCard from './EquipmentNumbersCard';
 import type { ConcernDraft, ConcernIssueRef } from '../types/issueHistory';
 import { concernDraftProblems } from '../utils/concerns';
 import { ArrowLeft, Send, TriangleAlert, Undo2 } from 'lucide-react';
@@ -30,6 +32,11 @@ interface SubmitStepProps {
   onConcernsChange: Dispatch<SetStateAction<ConcernDraft[]>>;
   /** Open issues an entry can be added to. */
   openIssues: ConcernIssueRef[];
+  /** SCBA and radio numbers added beyond the checklist's own entries. */
+  equipmentExtras: EquipmentExtra[];
+  onEquipmentExtrasChange: Dispatch<SetStateAction<EquipmentExtra[]>>;
+  onEquipmentFieldChange: (fieldId: string, value: string) => void;
+  onEquipmentItemChange: (compartmentId: string, itemId: string, value: string) => void;
   scheduledTasks: ScheduledChecklistTaskResult[];
   onSubmit: (signature: string | null) => void;
   onBack: () => void;
@@ -52,6 +59,10 @@ export default function SubmitStep({
   concerns,
   onConcernsChange,
   openIssues,
+  equipmentExtras,
+  onEquipmentExtrasChange,
+  onEquipmentFieldChange,
+  onEquipmentItemChange,
   scheduledTasks,
   onSubmit,
   onBack,
@@ -170,7 +181,7 @@ export default function SubmitStep({
         <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {meters.engine_hours !== null && <div><dt className={LABEL}>Engine hours</dt><dd className="tabular-nums">{meters.engine_hours}</dd></div>}
           {meters.miles !== null && <div><dt className={LABEL}>Mileage</dt><dd className="tabular-nums">{meters.miles}</dd></div>}
-          {fieldValues.filter(answer => answer.value !== null && answer.value !== '').map(answer => <div key={answer.id}><dt className={LABEL}>{checklist.fields.find(field => field.id === answer.id)?.name}</dt><dd className="break-words whitespace-pre-wrap">{answer.value === true ? 'Yes' : answer.value === false ? 'No' : String(answer.value)}</dd></div>)}
+          {fieldValues.filter(answer => answer.value !== null && answer.value !== '' && !equipmentFieldIds(checklist.equipment_numbers).has(answer.id)).map(answer => <div key={answer.id}><dt className={LABEL}>{checklist.fields.find(field => field.id === answer.id)?.name}</dt><dd className="break-words whitespace-pre-wrap">{answer.value === true ? 'Yes' : answer.value === false ? 'No' : String(answer.value)}</dd></div>)}
         </dl>
       </section>
 
@@ -249,6 +260,17 @@ export default function SubmitStep({
       </div>
 
       {scheduledTasks.length > 0 && <section className="inspection-review-details" aria-label="Recorded scheduled duties"><h3 className="mb-3 font-semibold">Scheduled duties</h3><dl>{scheduledTasks.map(task => <div key={task.id} className="inspection-review-area"><dt>{checklist.due_tasks.find(entry => entry.id === task.id)?.name}</dt><dd>{taskStatusLabel(task.status)}{task.notes ? ` · ${task.notes}` : ''}</dd></div>)}</dl></section>}
+
+      {checklist.equipment_numbers && <EquipmentNumbersCard
+        block={checklist.equipment_numbers}
+        fields={checklist.fields}
+        fieldValues={fieldValues}
+        compartments={compartments}
+        onFieldChange={onEquipmentFieldChange}
+        onItemChange={onEquipmentItemChange}
+        extras={equipmentExtras}
+        onExtrasChange={onEquipmentExtrasChange}
+      />}
 
       <div ref={concernsRef}>
         <ConcernsSection concerns={concerns} onChange={onConcernsChange} openIssues={openIssues} showErrors={showConcernErrors} />
