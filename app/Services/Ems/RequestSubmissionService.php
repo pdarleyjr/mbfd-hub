@@ -99,6 +99,14 @@ final class RequestSubmissionService
             }
 
             return $this->replay($winner, $user);
+        } catch (EmsException $exception) {
+            // Two sends of one correction: the second waited on the row lock and found it already corrected, by itself.
+            $winner = $exception->errorCode === 'cannot_revise' ? InventoryRequest::query()->where('client_submission_id', $data['client_submission_id'])->first() : null;
+            if ($winner === null) {
+                throw $exception;
+            }
+
+            return $this->replay($winner, $user);
         }
 
         return ['request' => $request, 'replayed' => false];

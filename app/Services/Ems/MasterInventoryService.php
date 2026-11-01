@@ -6,6 +6,7 @@ namespace App\Services\Ems;
 
 use App\Models\Ems\CatalogItem;
 use App\Models\Ems\InventorySnapshot;
+use App\Models\Ems\InventorySnapshotLine;
 use App\Models\Ems\StorageLocation;
 use App\Models\Ems\SupplyItem;
 use App\Models\Ems\SupplyItemEvent;
@@ -289,6 +290,7 @@ final class MasterInventoryService
             : ($unit === $item->package_unit ? $item->units_per_package : null);
         if (array_key_exists('count_unit', $data) || array_key_exists('units_per_package', $data)) {
             $this->assertConvertible($unit, $perPackage);
+            $this->assertNotInOpenCount($item, $unit, $perPackage);
             $changes['count_unit'] = $unit;
             if ($unit !== 'each') {
                 $changes['package_unit'] = $unit;
@@ -343,6 +345,16 @@ final class MasterInventoryService
         if ($unit !== 'each' && ($perPackage === null || $perPackage < 1)) {
             $label = CountMath::LABELS[$unit][0] ?? $unit;
             throw new EmsException("Enter how many units are in one {$label}.", 'package_size_needed', 422, ['units_per_package' => ["Enter how many units are in one {$label}."]]);
+        }
+    }
+
+    /** A number already typed was converted with the old size, so its meaning would change underneath the count. */
+    private function assertNotInOpenCount(SupplyItem $item, string $unit, ?int $perPackage): void
+    {
+        $changes = $unit !== $item->count_unit || ($unit !== 'each' && $perPackage !== $item->units_per_package);
+        if ($changes && InventorySnapshotLine::query()->where('supply_item_id', $item->getKey())
+            ->whereIn('snapshot_id', InventorySnapshot::query()->where('status', InventorySnapshot::DRAFT)->select('id'))->exists()) {
+            throw EmsException::conflict('This item already has a number in the count in progress. Clear that number or submit the count, then change how it is counted.', 'item_in_open_count');
         }
     }
 

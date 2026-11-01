@@ -184,7 +184,7 @@ final class InventoryCountService
             $book = $current[$id]['quantity'] ?? null;
             $stamp = CountMath::stamp($item, $number, $book === null ? null : $book - $since['issued'] - $since['received'] - $since['adjusted']);
             if ($line !== null) {
-                $line->update($stamp);
+                $line->update($stamp + ['item_name' => $item->name, 'location_code' => $item->location?->code]);
             } else {
                 InventorySnapshotLine::query()->create($stamp + [
                     'snapshot_id' => $snapshot->getKey(), 'supply_item_id' => $id, 'location_code' => $item->location?->code,
@@ -208,10 +208,16 @@ final class InventoryCountService
         if (! $item->tracksStock()) {
             throw new EmsException('This item is not counted in the supply room.', 'item_not_counted', 422);
         }
+        CountMath::assertConvertible($item);
         $base = CountMath::toBase($item, $typed);
         StockLedger::assertWithinLimit($base);
         $item->loadMissing('location:id,code');
         $book = $this->ledger->current(collect([$item]))[$item->getKey()]['quantity'] ?? null;
+
+        // This number is newer than anything typed into a count still open, so that line must not outrank it at submit.
+        InventorySnapshotLine::query()->where('supply_item_id', $item->getKey())
+            ->whereIn('snapshot_id', InventorySnapshot::query()->where('status', InventorySnapshot::DRAFT)->select('id'))
+            ->get()->each(fn (InventorySnapshotLine $line) => $line->delete());
 
         $snapshot = InventorySnapshot::query()->create([
             'uuid' => (string) Str::uuid(), 'kind' => InventorySnapshot::KIND_COUNT, 'origin' => InventorySnapshot::ORIGIN_DIRECT_EDIT, 'status' => InventorySnapshot::DRAFT,

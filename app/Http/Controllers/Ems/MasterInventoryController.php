@@ -32,8 +32,11 @@ final class MasterInventoryController extends Controller
     {
         return $this->guarded(function () use ($request): JsonResponse {
             $f = EmsValidator::validate($request->query(), ['ids' => ['required', 'string', 'max:2000']], ['ids.required' => 'Select at least one form to reconcile.']);
+            $ids = array_values(array_filter(explode(',', $f['ids'])));
+            // A bad value must be a refusal here: PostgreSQL rejects anything but a real uuid in the query.
+            EmsValidator::validate(['ids' => $ids], ['ids.*' => ['uuid']], ['ids.*.uuid' => 'One of those forms could not be found. Reload and try again.']);
 
-            return $this->ok($this->reconciliation->preview(array_values(array_filter(explode(',', $f['ids'])))));
+            return $this->ok($this->reconciliation->preview($ids));
         });
     }
 

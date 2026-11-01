@@ -115,6 +115,9 @@ final class CountFormService
                 if ($item === null) {
                     throw new EmsException('One of those items is not in the supply room.', 'item_not_counted', 422);
                 }
+                if ($row['on_hand'] !== null) {
+                    CountMath::assertConvertible($item);
+                }
                 $lines[] = ['supply_item_id' => (int) $row['supply_item_id']] + ($row['on_hand'] === null ? [] : CountMath::entryFor($item, (int) $row['on_hand']));
             }
             $this->counts->writeLines($snapshot, $lines, $through);

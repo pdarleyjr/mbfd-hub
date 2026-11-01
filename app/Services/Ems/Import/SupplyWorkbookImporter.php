@@ -368,7 +368,9 @@ final class SupplyWorkbookImporter
     {
         $out = [];
         foreach (array_chunk($ids, 400) as $chunk) {
-            $out = [...$out, ...InventorySnapshotLine::query()->where('value_source', InventorySnapshotLine::COUNTED)->whereIn('supply_item_id', $chunk)->distinct()->pluck('supply_item_id')->map(fn ($id): int => (int) $id)->all()];
+            $out = [...$out, ...InventorySnapshotLine::query()->where('value_source', InventorySnapshotLine::COUNTED)->whereIn('supply_item_id', $chunk)
+                ->whereIn('snapshot_id', InventorySnapshot::query()->where('status', InventorySnapshot::FINAL)->select('id'))
+                ->distinct()->pluck('supply_item_id')->map(fn ($id): int => (int) $id)->all()];
         }
 
         return $out;

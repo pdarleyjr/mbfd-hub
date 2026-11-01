@@ -28,7 +28,7 @@ New: `returned` (rejected, waiting for the member), `reconciled` (deducted and a
 One transaction: request row locks in id order → stock lock (the same order the older issue path uses, so the two can never deadlock) → state check on all → one `issued` movement per line → events → status. Any failure rolls back everything.
 
 - **Movement key** is `reconcile:r{request}:l{line}`, not tied to a user or a client key, so a line can only ever deduct once. A retry with the same `Idempotency-Key` replays the stored result; a second person or a new key gets 409 `already_reconciled`.
-- **Quantity** defaults to the requested quantity. Captain 5 can lower it to what was actually taken. `0` records "Not taken" and deducts nothing.
+- **Quantity** defaults to the requested quantity. Captain 5 changes it to what was actually taken, up or down. `0` records "Not taken" and deducts nothing.
 - **Resolving a line to an item:** the person's choice → the `ems_catalog_supply_links` row for the line's catalog item → the single active non-controlled supply item with that catalog identity → otherwise `needs_item`. Names are never compared.
 - **Units:** blank/`each`/the item's base unit deducts as typed; the item's package unit multiplies by an explicit `units_per_package`; anything else is `needs_unit` and Captain 5 types the units to deduct. Nothing is guessed.
 - **Controlled and Yes/No lines** have no stock effect, as before.
@@ -102,6 +102,14 @@ Base `/ems/api`. `view` for reads, `act` for writes.
 - `GET /supply/count-form/{uuid}/review` returns `{counted, uncounted:[{id, name, location_code}], orders:[{supply_item_id, name, location_code, on_hand, order, unit_label}], config_problems:[{id, name, problem}]}`.
 - `POST /supply/count-form/{uuid}/submit` `{expected_uncounted:int}` returns `{id, finalized_at, counted_items, uncounted_items, order_items}`. A mismatch gives 409 `uncounted_changed`.
 - `DELETE /supply/counts/{uuid}` (existing) discards a draft.
+
+### Who can edit
+
+The master item endpoints need `act`, not `configure` as the older item settings endpoint does. Captain 5 runs the room, and the brief calls for authorized Captain 5 personnel to rename, move, recount and reconfigure items. Every change is audited in `ems_supply_item_events`.
+
+### Rollback
+
+Rolling back to an image from before this release reopens a second deduction path, because older code does not know `returned`, `reconciled` or `superseded` and its Issue action would accept those forms. After a rollback, do not issue against a form shown with one of those statuses.
 
 ## 7. Member API additions
 

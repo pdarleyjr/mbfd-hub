@@ -134,6 +134,7 @@ final class FormReconciliationService
             }
 
             $decisions = collect($data['decisions'] ?? [])->keyBy(fn (array $decision): int => (int) $decision['line_id']);
+            $this->assertChosenItemsCanTakeStock($decisions);
             [$plans, $blocked] = $this->planAll($requests, $decisions);
             if ($blocked !== []) {
                 throw new EmsException('Some lines still need an item or a number before these forms can be reconciled.', 'needs_correction', 422, ['lines' => array_map('strval', $blocked)]);
@@ -152,7 +153,7 @@ final class FormReconciliationService
                 }
                 $this->workflow->markReconciled($request, $actor, $batch, $requests->count());
             }
-            $this->remember($requests, $decisions, $actor);
+            $this->remember($requests, $decisions->only(array_keys($plans)), $actor);
 
             return [
                 'batch' => $batch,
@@ -201,6 +202,20 @@ final class FormReconciliationService
         return null;
     }
 
+    /**
+     * Checked up front because a line can return before it reaches resolveStock (a quantity of 0), and the choice is remembered.
+     *
+     * @param  Collection<int, array<string, mixed>>  $decisions
+     */
+    private function assertChosenItemsCanTakeStock(Collection $decisions): void
+    {
+        $chosen = $decisions->pluck('supply_item_id')->filter()->map(fn ($id): int => (int) $id)->unique()->values();
+        $usable = SupplyItem::query()->whereIn('id', $chosen->all())->where('active', true)->where('controlled_substance', false)->count();
+        if ($usable !== $chosen->count()) {
+            throw new EmsException('One of the chosen items is not a supply room item that can be deducted. Choose another.', 'unknown_supply_item', 422);
+        }
+    }
+
     /** A "No" answer has nothing to take and needs no decision. */
     private function nothingToTake(InventoryRequestLine $line): bool
     {
@@ -246,7 +261,7 @@ final class FormReconciliationService
         if ($quantity === 0) {
             return ['state' => self::READY, 'quantity' => 0, 'effect' => RequestWorkflowService::EFFECT_NONE, 'item' => null, 'quantity_base' => 0, 'note' => 'Not taken'];
         }
-        if (($decision['not_stocked'] ?? false) === true) {
+        if ((bool) ($decision['not_stocked'] ?? false)) {
             return ['state' => self::NOT_STOCKED, 'quantity' => $quantity, 'effect' => RequestWorkflowService::EFFECT_NOT_STOCKED, 'item' => null, 'quantity_base' => null, 'note' => 'Not a supply room item'];
         }
 
@@ -323,7 +338,7 @@ final class FormReconciliationService
         foreach ($decisions as $lineId => $decision) {
             $catalogId = $lines->get($lineId)?->catalog_item_id;
             $chose = isset($decision['supply_item_id']);
-            $notStocked = ($decision['not_stocked'] ?? false) === true;
+            $notStocked = (bool) ($decision['not_stocked'] ?? false);
             if ($catalogId === null || (! $chose && ! $notStocked)) {
                 continue;
             }

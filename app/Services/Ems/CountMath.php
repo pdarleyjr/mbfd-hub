@@ -27,6 +27,20 @@ final class CountMath
         return $item->count_unit === 'each' ? 1 : max(1, (int) $item->units_per_package);
     }
 
+    /**
+     * A typed number only means something when one count unit has an explicit size. The older item settings
+     * endpoint can change packaging, so this is checked at every place a number is taken, not assumed.
+     *
+     * @throws EmsException
+     */
+    public static function assertConvertible(SupplyItem $item): void
+    {
+        if ($item->count_unit !== 'each' && ($item->package_unit !== $item->count_unit || (int) $item->units_per_package < 1)) {
+            $label = self::LABELS[$item->count_unit][0] ?? $item->count_unit;
+            throw new EmsException("\"{$item->name}\" is counted by the {$label}, but its {$label} size is missing. Fix it under Edit, then enter the count.", 'package_size_needed', 422);
+        }
+    }
+
     public static function toBase(SupplyItem $item, int $typed): int
     {
         return $typed * self::perCountUnit($item);

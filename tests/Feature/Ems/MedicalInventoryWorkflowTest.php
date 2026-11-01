@@ -428,6 +428,72 @@ final class MedicalInventoryWorkflowTest extends TestCase
         $this->assertSame(InventoryRequest::RECONCILED, $this->requestModel($uuid)->status);
     }
 
+    public function test_a_bad_selection_or_a_bad_chosen_item_is_refused_before_anything_moves(): void
+    {
+        $this->actingAs($this->captain)->getJson('/ems/api/forms/reconcile/preview?ids=not-a-uuid')->assertStatus(422);
+
+        $uuid = $this->acknowledged([self::TAPE + ['quantity' => 1]]);
+        $line = $this->preview($uuid)['lines'][0]['line_id'];
+        foreach ([999999, $this->supplyItem('sr.t.06')->id] as $bad) { // nonexistent, then controlled
+            $this->reconcile([$uuid], ['decisions' => [['line_id' => $line, 'quantity' => 0, 'supply_item_id' => $bad]]])
+                ->assertStatus(422)->assertJsonPath('error.code', 'unknown_supply_item');
+        }
+        $this->assertSame(0, CatalogSupplyLink::query()->count());
+        $this->assertNotSame(InventoryRequest::RECONCILED, $this->requestModel($uuid)->status);
+    }
+
+    public function test_a_direct_count_made_during_an_open_count_is_not_overridden_at_submit(): void
+    {
+        $this->stockCount(['sr.t.02' => 100]);
+        $tape = $this->supplyItem('sr.t.02');
+        $count = $this->emsPost($this->captain, '/ems/api/supply/count-form/start')->assertOk()->json('data.count.id');
+        $this->actingAs($this->captain)->putJson("/ems/api/supply/count-form/{$count}/entries", ['entries' => [
+            ['supply_item_id' => $tape->id, 'on_hand' => 8], ['supply_item_id' => $this->supplyItem('sr.t.03')->id, 'on_hand' => 4],
+        ]], ['Idempotency-Key' => 'save-'.Str::random(12)])->assertOk();
+
+        $this->emsPost($this->captain, "/ems/api/supply/master/items/{$tape->id}/count", ['on_hand' => 12])->assertOk();
+
+        $review = $this->getJson("/ems/api/supply/count-form/{$count}/review")->assertOk()->json('data');
+        $this->assertContains('Tape 1 inch', array_column($review['uncounted'], 'name'), 'The older typed number is gone, so the review shows it as missing.');
+        $this->emsPost($this->captain, "/ems/api/supply/count-form/{$count}/submit", ['expected_uncounted' => count($review['uncounted'])])->assertOk();
+        $this->assertSame(12, $this->masterRow('sr.t.02')['on_hand_base']);
+    }
+
+    public function test_packaging_cannot_be_pulled_out_from_under_an_item_counted_in_packages(): void
+    {
+        $gauze = $this->supplyItem('sr.t.01');
+        $gauze->update(['count_unit' => 'box']);
+        $headers = ['Idempotency-Key' => 'edit-'.Str::random(12)];
+
+        // The older settings endpoint refuses, so the rule holds for every writer.
+        $admin = $this->emsAdmin(['admin.ems.manage']);
+        $this->actingAs($admin)->patchJson("/ems/api/supply/items/{$gauze->id}", ['units_per_package' => null, 'reason' => 'clean up'], $headers)
+            ->assertStatus(422)->assertJsonPath('error.code', 'counted_in_package');
+
+        // And a row that got there anyway refuses a typed number instead of storing the wrong quantity.
+        $gauze->update(['units_per_package' => null]);
+        $this->emsPost($this->captain, "/ems/api/supply/master/items/{$gauze->id}/count", ['on_hand' => 3])->assertStatus(422)->assertJsonPath('error.code', 'package_size_needed');
+        $count = $this->emsPost($this->captain, '/ems/api/supply/count-form/start')->assertOk()->json('data.count.id');
+        $this->actingAs($this->captain)->putJson("/ems/api/supply/count-form/{$count}/entries", ['entries' => [['supply_item_id' => $gauze->id, 'on_hand' => 3]]], ['Idempotency-Key' => 'save-'.Str::random(12)])
+            ->assertStatus(422)->assertJsonPath('error.code', 'package_size_needed');
+    }
+
+    public function test_how_an_item_is_counted_cannot_change_while_it_has_a_number_in_the_open_count(): void
+    {
+        $tape = $this->supplyItem('sr.t.02');
+        $count = $this->emsPost($this->captain, '/ems/api/supply/count-form/start')->assertOk()->json('data.count.id');
+        $this->actingAs($this->captain)->putJson("/ems/api/supply/count-form/{$count}/entries", ['entries' => [['supply_item_id' => $tape->id, 'on_hand' => 8]]], ['Idempotency-Key' => 'save-'.Str::random(12)])->assertOk();
+
+        $this->patchJson("/ems/api/supply/master/items/{$tape->id}", ['count_unit' => 'box', 'units_per_package' => 24], ['Idempotency-Key' => 'edit-'.Str::random(12)])
+            ->assertStatus(409)->assertJsonPath('error.code', 'item_in_open_count');
+
+        // A rename made while the count is open is what the report shows.
+        $this->patchJson("/ems/api/supply/master/items/{$tape->id}", ['name' => 'Silk Tape 1 inch'], ['Idempotency-Key' => 'edit-'.Str::random(12)])->assertOk();
+        $missing = count($this->getJson("/ems/api/supply/count-form/{$count}/review")->json('data.uncounted'));
+        $this->emsPost($this->captain, "/ems/api/supply/count-form/{$count}/submit", ['expected_uncounted' => $missing])->assertOk();
+        $this->assertSame('Silk Tape 1 inch', InventorySnapshot::query()->where('uuid', $count)->firstOrFail()->lines()->where('supply_item_id', $tape->id)->value('item_name'));
+    }
+
     // ---------------------------------------------------------- master inventory
 
     public function test_live_quantity_and_red_number_match_the_friday_monday_example(): void
