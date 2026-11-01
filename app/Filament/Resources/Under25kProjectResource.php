@@ -351,8 +351,9 @@ class Under25kProjectResource extends Resource
                                 $links = [];
                                 foreach ($record->attachments as $path) {
                                     $filename = basename($path);
-                                    $url = asset('storage/'.$path);
-                                    $links[] = "<a href=\"{$url}\" target=\"_blank\" class=\"text-primary-600 hover:underline\">📄 {$filename}</a>";
+                                    // Relative path: an absolute asset() URL can leave an installed app's origin.
+                                    $url = '/storage/'.$path;
+                                    $links[] = "<a href=\"{$url}\" download class=\"text-primary-600 hover:underline\">📄 {$filename}</a>";
                                 }
 
                                 return implode('<br>', $links);

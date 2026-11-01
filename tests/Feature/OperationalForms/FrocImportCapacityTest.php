@@ -9,10 +9,10 @@ use App\Models\OperationalFormRecord;
 use App\Services\CloudflareAIService;
 use App\Services\OperationalForms\FrocImportLimits;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Exceptions\PostTooLargeException;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Http\Exceptions\PostTooLargeException;
 use Monolog\Handler\TestHandler;
 use Tests\TestCase;
 
@@ -51,7 +51,7 @@ class FrocImportCapacityTest extends TestCase
     {
         $path = tempnam(sys_get_temp_dir(), 'froc-cap');
         unlink($path);
-        $zip = new \ZipArchive();
+        $zip = new \ZipArchive;
         $zip->open($path, \ZipArchive::CREATE);
         foreach ($entries as $entry) {
             $zip->addFromString($entry['name'], $entry['content'] ?? '');
@@ -323,7 +323,7 @@ class FrocImportCapacityTest extends TestCase
 
         // Deterministic log capture via a Monolog TestHandler pushed onto the
         // default channel the application actually writes to.
-        $handler = new TestHandler();
+        $handler = new TestHandler;
         logger()->driver()->getLogger()->pushHandler($handler);
 
         $sentinel = 'UNIQUE_R6_SOURCE_TOKEN_ZXCVBNM';
@@ -378,7 +378,7 @@ class FrocImportCapacityTest extends TestCase
         $request->headers->set('Accept', 'application/json');
 
         $response = app(\Illuminate\Contracts\Debug\ExceptionHandler::class)
-            ->render($request, new PostTooLargeException());
+            ->render($request, new PostTooLargeException);
 
         $this->assertNotNull($response);
         $this->assertSame(413, $response->getStatusCode());
@@ -393,7 +393,7 @@ class FrocImportCapacityTest extends TestCase
         $request = Request::create('/some/web/page', 'POST');
 
         $response = app(\Illuminate\Contracts\Debug\ExceptionHandler::class)
-            ->render($request, new PostTooLargeException());
+            ->render($request, new PostTooLargeException);
 
         // Non-API, non-JSON requests keep ordinary web handling (an HTML 413
         // page) and are never converted to the F-ROC JSON schema.
@@ -401,5 +401,6 @@ class FrocImportCapacityTest extends TestCase
         $this->assertSame(413, $response->getStatusCode());
         $this->assertStringContainsString('text/html', $response->headers->get('Content-Type'));
         $this->assertStringContainsString('413', $response->getContent());
+        $this->assertStringContainsString('Return to Hub home', $response->getContent());
     }
 }

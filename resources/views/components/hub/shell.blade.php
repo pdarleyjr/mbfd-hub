@@ -5,6 +5,7 @@
         request()->is('account*') => 'Account',
         request()->is('updates*') => 'Updates',
         request()->is('support/*') => 'Support',
+        request()->is('take-home-vehicle-inspections', 'take-home-vehicle-inspections/*') => 'Take Home Inspection',
         request()->is('employee/*') => 'Employee',
         request()->is('workgroups/*', 'workgroup/*') => 'Workgroups',
         default => 'Home',

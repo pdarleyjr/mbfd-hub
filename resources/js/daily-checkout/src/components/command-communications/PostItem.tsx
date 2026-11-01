@@ -10,13 +10,29 @@ import { BOTH_AUDIENCE_LABEL, SOURCE_LABEL, type CommandPost } from './types';
 const VISIBLE_REPLIES = 2;
 const SMALL_ACTION = 'hub-btn hub-btn--tertiary hub-btn--compact !min-h-11 gap-1.5';
 
+const LINK_CLASS = 'font-semibold text-hub-blue underline underline-offset-2 [overflow-wrap:anywhere]';
+
+/** This Hub (this origin or its www/apex sibling) stays in the app; any other site opens apart. */
+function isHubLink(href: string): boolean {
+  try {
+    const url = new URL(href, window.location.href);
+    const bare = (host: string) => host.replace(/^www\./, '');
+    return bare(url.hostname) === bare(window.location.hostname) && url.port === window.location.port;
+  } catch {
+    return false;
+  }
+}
+
 /** Escaped text with http(s) links only. Line breaks are kept by `whitespace-pre-wrap`. */
 export function RichText({ text }: { text: string }) {
   return (
     <>
-      {linkify(text).map((part, index) => (part.kind === 'link'
-        ? <a key={index} href={part.href} target="_blank" rel="noopener noreferrer nofollow" className="font-semibold text-hub-blue underline underline-offset-2 [overflow-wrap:anywhere]">{part.text}<span className="sr-only"> (opens in a new tab)</span></a>
-        : <span key={index}>{part.text}</span>))}
+      {linkify(text).map((part, index) => {
+        if (part.kind !== 'link') return <span key={index}>{part.text}</span>;
+        return isHubLink(part.href)
+          ? <a key={index} href={part.href} className={LINK_CLASS}>{part.text}</a>
+          : <a key={index} href={part.href} target="_blank" rel="noopener noreferrer nofollow" className={LINK_CLASS}>{part.text}<span className="sr-only"> (opens in a new tab)</span></a>;
+      })}
     </>
   );
 }

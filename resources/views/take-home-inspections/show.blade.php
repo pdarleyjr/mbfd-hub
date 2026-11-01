@@ -68,7 +68,7 @@
                         @if($issuePhotos->isNotEmpty())
                             <div class="thvi-thumbs mt-2">
                                 @foreach($issuePhotos as $photo)
-                                    <a class="thvi-thumb" href="{{ route('take-home-inspections.photo', $photo) }}" target="_blank" rel="noopener"><img src="{{ route('take-home-inspections.photo', $photo) }}" alt="{{ $photo->label() }}" loading="lazy"></a>
+                                    <a class="thvi-thumb" href="{{ route('take-home-inspections.photo', $photo) }}" target="_blank" rel="noopener" data-hub-viewer="image" data-hub-viewer-title="{{ $photo->label() }}"><img src="{{ route('take-home-inspections.photo', $photo) }}" alt="{{ $photo->label() }}" loading="lazy"></a>
                                 @endforeach
                             </div>
                         @endif
@@ -84,7 +84,7 @@
                     @php($photo = $inspection->photos->firstWhere('angle', $angle))
                     <figure>
                         @if($photo)
-                            <a href="{{ route('take-home-inspections.photo', $photo) }}" target="_blank" rel="noopener"><img src="{{ route('take-home-inspections.photo', $photo) }}" alt="{{ $label }}" loading="lazy"></a>
+                            <a href="{{ route('take-home-inspections.photo', $photo) }}" target="_blank" rel="noopener" data-hub-viewer="image" data-hub-viewer-title="{{ $label }}"><img src="{{ route('take-home-inspections.photo', $photo) }}" alt="{{ $label }}" loading="lazy"></a>
                         @else
                             <p class="hub-well p-6 text-center text-sm">Not provided</p>
                         @endif

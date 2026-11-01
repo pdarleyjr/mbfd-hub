@@ -2,8 +2,6 @@
     <div class="wg-report-library">
         {{-- Workgroup Analysis Report Card --}}
         <a href="{{ $this->getAnalysisReportUrl() }}"
-           target="_blank"
-           rel="noopener noreferrer"
            class="workgroup-report-link"
         >
             <div class="wl-row">
@@ -16,18 +14,11 @@
                     <h3 class="wl-title">Workgroup Analysis Report</h3>
                     <p class="wl-desc">2026 Technical Product Comparison Analysis — Extrication equipment performance data with interactive Chart.js visualizations and manufacturer rankings.</p>
                 </div>
-                <div class="wl-ext">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="wl-glyph">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-                    </svg>
-                </div>
             </div>
         </a>
 
         {{-- Workgroup Data Dashboard Card --}}
         <a href="{{ $this->getDataDashboardUrl() }}"
-           target="_blank"
-           rel="noopener noreferrer"
            class="workgroup-report-link"
         >
             <div class="wl-row">
@@ -40,18 +31,11 @@
                     <h3 class="wl-title">Workgroup Data Dashboard</h3>
                     <p class="wl-desc">Interactive React-based evaluation dashboard with tabbed navigation across brand rankings, extrication tools, saws, stabilization, and specialty assets.</p>
                 </div>
-                <div class="wl-ext">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="wl-glyph">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-                    </svg>
-                </div>
             </div>
         </a>
 
         {{-- Mid-Mount L1 Proposed Inventory Card --}}
         <a href="{{ $this->getL1InventoryUrl() }}"
-           target="_blank"
-           rel="noopener noreferrer"
            class="workgroup-report-link"
         >
             <div class="wl-row">
@@ -64,18 +48,11 @@
                     <h3 class="wl-title">Mid-Mount L1 Proposed Inventory</h3>
                     <p class="wl-desc">Ladder 1 apparatus modernization dashboard with full compartment inventory, KPI widgets, compliance flags, and native Excel export with embedded pricing formulas.</p>
                 </div>
-                <div class="wl-ext">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="wl-glyph">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-                    </svg>
-                </div>
             </div>
         </a>
 
         {{-- Workgroup Final Session Presentation Card --}}
         <a href="{{ $this->getFinalPresentationUrl() }}"
-           target="_blank"
-           rel="noopener noreferrer"
            class="workgroup-report-link"
         >
             <div class="wl-row">
@@ -88,18 +65,11 @@
                     <h3 class="wl-title">Workgroup Final Session Presentation</h3>
                     <p class="wl-desc">Reveal.js slide deck for the final review meeting — interactive charts, equipment comparisons, deliberation agenda, and consensus-building framework. Use arrow keys or click to navigate.</p>
                 </div>
-                <div class="wl-ext">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="wl-glyph">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-                    </svg>
-                </div>
             </div>
         </a>
 
         {{-- MBFD Workgroup Evaluation Results Card --}}
         <a href="{{ $this->getEvaluationReportUrl() }}"
-           target="_blank"
-           rel="noopener noreferrer"
            class="workgroup-report-link"
         >
             <div class="wl-row">
@@ -115,18 +85,11 @@
                     </div>
                     <p class="wl-desc">Professional technical evaluation report — 14 products, 6 categories, Charts, data tables, product images, and one-click PDF/print export. Formatted for administrators.</p>
                 </div>
-                <div class="wl-ext">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="wl-glyph">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-                    </svg>
-                </div>
             </div>
         </a>
 
         {{-- MBFD Workgroup Summary Card --}}
         <a href="{{ $this->getWorkgroupSummaryUrl() }}"
-           target="_blank"
-           rel="noopener noreferrer"
            class="workgroup-report-link"
         >
             <div class="wl-row">
@@ -141,11 +104,6 @@
                         <span class="wl-tag">PDF Ready</span>
                     </div>
                     <p class="wl-desc">Complete equipment evaluation, procurement analysis, and final selection report — 14 products, 6 manufacturers, 4 operational categories with product images, data tables, and one-click PDF/print export. Formatted for command staff distribution.</p>
-                </div>
-                <div class="wl-ext">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="wl-glyph">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-                    </svg>
                 </div>
             </div>
         </a>

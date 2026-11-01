@@ -146,8 +146,7 @@ class WorkgroupFileResource extends Resource
                 Tables\Actions\Action::make('download')
                     ->label('Download')
                     ->icon('heroicon-o-arrow-down-tray')
-                    ->url(fn ($record) => route('workgroup.file.download', ['file' => $record->id]))
-                    ->openUrlInNewTab(),
+                    ->url(fn ($record) => route('workgroup.file.download', ['file' => $record->id])),
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make(),
             ])

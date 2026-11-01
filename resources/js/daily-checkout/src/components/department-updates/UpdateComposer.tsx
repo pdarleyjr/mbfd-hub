@@ -258,8 +258,8 @@ export default function UpdateComposer({ origin, onPosted }: Props) {
           <div className="min-w-0">
             <p className="font-semibold text-hub-ink">Posted. Everyone in the department can now see it on the home page.</p>
             {posted.url && (
-              <a href={posted.url} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center font-semibold text-hub-blue underline underline-offset-4">
-                View the update<span className="sr-only"> (opens in a new tab)</span>
+              <a href={posted.url} className="inline-flex min-h-11 items-center font-semibold text-hub-blue underline underline-offset-4">
+                View the update
               </a>
             )}
           </div>
