@@ -12,8 +12,11 @@ function ImageThumb({ attachment }: { attachment: CommandAttachment }) {
         href={src}
         target="_blank"
         rel="noopener noreferrer"
+        data-hub-viewer="image"
+        data-hub-viewer-title={attachment.name}
+        data-hub-viewer-download={safeHref(attachment.url) ?? undefined}
         className="block h-20 w-20 overflow-hidden rounded-hub-control border border-hub-glass-border bg-hub-n-100"
-        aria-label={`Open image ${attachment.name} (opens in a new tab)`}
+        aria-label={`Open image ${attachment.name}`}
       >
         <img src={src} alt={attachment.name} width={80} height={80} loading="lazy" decoding="async" className="h-full w-full object-cover" />
       </a>

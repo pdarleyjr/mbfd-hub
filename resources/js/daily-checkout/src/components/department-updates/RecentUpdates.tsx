@@ -57,8 +57,8 @@ function UpdateRow({ origin, update, onChanged }: { origin: UpdateOrigin; update
       </p>
       {update.excerpt && <p className="mt-1 line-clamp-2 break-words text-sm text-hub-ink">{update.excerpt}</p>}
       {live && update.url && (
-        <a href={update.url} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-hub-blue underline underline-offset-4">
-          View on the home page<span className="sr-only"> (opens in a new tab): {update.title}</span>
+        <a href={update.url} className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-hub-blue underline underline-offset-4">
+          View on the home page<span className="sr-only">: {update.title}</span>
         </a>
       )}
       {live && update.own && (confirming ? (

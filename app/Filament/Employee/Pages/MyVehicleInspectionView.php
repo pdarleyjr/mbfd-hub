@@ -117,6 +117,8 @@ class MyVehicleInspectionView extends Page implements HasNavigationParent
                 ->icon('heroicon-o-printer')
                 ->color('gray')
                 ->url(route('employee.vehicle-inspections.pdf', ['inspection' => $this->inspectionId, 'inline' => 1]))
+                // The viewer shows it on this page; the new tab is only the no-script fallback.
+                ->extraAttributes(['data-hub-viewer' => 'pdf', 'data-hub-viewer-title' => 'Vehicle inspection'])
                 ->openUrlInNewTab(),
         ];
     }

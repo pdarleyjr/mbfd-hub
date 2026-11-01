@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Tests\Unit;
 
 use App\Support\SafeLinkifier;
-use PHPUnit\Framework\TestCase;
+use Tests\TestCase;
 
 final class SafeLinkifierTest extends TestCase
 {
@@ -25,6 +25,27 @@ final class SafeLinkifierTest extends TestCase
         $this->assertStringContainsString('<a href="https://example.test/a?b=1&amp;c=2" target="_blank" rel="noopener noreferrer nofollow"', $html);
         $this->assertStringContainsString('<a href="http://example.test/x" target="_blank" rel="noopener noreferrer nofollow"', $html);
         $this->assertSame(2, substr_count($html, '<a '));
+    }
+
+    public function test_a_link_to_the_hub_itself_stays_in_the_same_window_on_either_host(): void
+    {
+        config(['app.url' => 'https://www.mbfdhub.com']);
+
+        $html = SafeLinkifier::render('Open https://www.mbfdhub.com/employee/resources or https://mbfdhub.com/daily and https://example.test/x')->toHtml();
+
+        $this->assertStringContainsString('<a href="https://www.mbfdhub.com/employee/resources" class="underline break-all">', $html);
+        $this->assertStringContainsString('<a href="https://mbfdhub.com/daily" class="underline break-all">', $html);
+        $this->assertStringContainsString('<a href="https://example.test/x" target="_blank" rel="noopener noreferrer nofollow"', $html);
+        $this->assertSame(1, substr_count($html, 'target="_blank"'));
+    }
+
+    public function test_a_look_alike_host_is_still_an_outside_link(): void
+    {
+        config(['app.url' => 'https://www.mbfdhub.com']);
+
+        $html = SafeLinkifier::render('https://www.mbfdhub.com.example.test/x and https://evil-mbfdhub.com/y')->toHtml();
+
+        $this->assertSame(2, substr_count($html, 'target="_blank"'));
     }
 
     public function test_it_never_links_javascript_data_or_other_schemes(): void

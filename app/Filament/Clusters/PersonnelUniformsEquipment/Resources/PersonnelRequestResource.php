@@ -163,7 +163,7 @@ class PersonnelRequestResource extends Resource
             ]),
             Section::make('Private attachments')->schema([
                 RepeatableEntry::make('attachments')->hiddenLabel()->schema([
-                    TextEntry::make('original_filename')->label('File')->url(fn ($record) => route('admin.personnel-request-attachments.download', $record))->openUrlInNewTab(),
+                    TextEntry::make('original_filename')->label('File')->url(fn ($record) => route('admin.personnel-request-attachments.download', $record)),
                     TextEntry::make('document_type')->formatStateUsing(fn ($state) => str($state)->replace('_', ' ')->title()),
                     TextEntry::make('file_size')->formatStateUsing(fn ($state) => number_format($state / 1024, 1).' KB'),
                     TextEntry::make('created_at')->dateTime('M j, Y g:i A'),

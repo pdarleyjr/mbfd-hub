@@ -15,8 +15,8 @@
                         @endif
                     </div>
                     <div class="rl-card__actions">
-                        <a href="{{ route('employee.taskbooks.preview', ['document' => $document->uuid]) }}" target="_blank" rel="noopener" class="rl-btn rl-btn--primary">
-                            <span>Preview<span class="hub-visually-hidden"> {{ $document->title }} (opens in a new tab)</span></span>
+                        <a href="{{ route('employee.taskbooks.preview', ['document' => $document->uuid]) }}" target="_blank" rel="noopener" data-hub-viewer="pdf" data-hub-viewer-title="{{ $document->title }}" data-hub-viewer-download="{{ route('employee.taskbooks.download', ['document' => $document->uuid]) }}" class="rl-btn rl-btn--primary">
+                            <span>Preview<span class="hub-visually-hidden"> {{ $document->title }}</span></span>
                         </a>
                         <a href="{{ route('employee.taskbooks.download', ['document' => $document->uuid]) }}" class="rl-btn">
                             <span>Download PDF<span class="hub-visually-hidden">: {{ $document->title }}</span></span>

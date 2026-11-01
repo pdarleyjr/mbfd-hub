@@ -58,7 +58,7 @@
             </div>
             @if($aiReportLoaded && $aiReport)
             <div class="wg-report-actions sr-actions">
-                <a href="{{ route('reports.executive.pdf', ['session_id' => $selectedSessionId]) }}" target="_blank" class="wg-ai-btn wg-ai-btn--secondary">
+                <a href="{{ route('reports.executive.pdf', ['session_id' => $selectedSessionId]) }}" download class="wg-ai-btn wg-ai-btn--secondary">
                     <svg class="sr-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                     Export PDF
                 </a>
@@ -125,7 +125,7 @@
             </div>
             <div class="wg-report-actions sr-actions">
                 @if($saverReportHtml)
-                <a href="{{ route('reports.saver.pdf', ['session_id' => $selectedSessionId]) }}" target="_blank" class="wg-ai-btn wg-ai-btn--secondary sr-saver__btn">
+                <a href="{{ route('reports.saver.pdf', ['session_id' => $selectedSessionId]) }}" download class="wg-ai-btn wg-ai-btn--secondary sr-saver__btn">
                     <svg class="sr-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                     Export PDF
                 </a>

@@ -277,6 +277,8 @@ export default function Command300Page() {
                 <ExternalLink size={20} aria-hidden="true" />
                 <span className="min-w-0">Open Command Board<span className="sr-only"> (opens in a new tab)</span></span>
               </a>
+              {/* Shown only in the installed app, where nothing else says this leaves the Hub (hub-shell.css). */}
+              <p className="hub-installed-hint col-span-full">Opens outside the Hub. Tap Done or Close to come back.</p>
             </nav>
           </div>
         </div>

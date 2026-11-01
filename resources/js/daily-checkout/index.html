@@ -26,6 +26,14 @@
       addEventListener('beforeinstallprompt', function (event) { event.preventDefault(); window.__mbfdDeferredInstall = event; });
       addEventListener('appinstalled', function () { window.__mbfdAppInstalled = true; window.__mbfdDeferredInstall = null; });
     </script>
+    <!-- A window installed on the apex host keeps every page on that host (same lines as the Hub head). -->
+    <script>
+      (function () { try {
+        if (location.hostname.indexOf('www.') === 0) return;
+        var installed = navigator.standalone === true || ['standalone', 'window-controls-overlay', 'minimal-ui'].some(function (mode) { return matchMedia('(display-mode: ' + mode + ')').matches; });
+        if (installed) document.cookie = 'mbfd_installed_host=1; Path=/; Max-Age=34560000; SameSite=Lax; Secure';
+      } catch (_) {} })();
+    </script>
     <style>
     #splash-screen {
       position: fixed; inset: 0; z-index: 9999;

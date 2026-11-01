@@ -7,6 +7,7 @@ import OfflineIndicator from './components/OfflineIndicator';
 import SuccessPage from './components/SuccessPage';
 import HubIssueWidget from './components/HubIssueWidget';
 import DailyPwaBridge from './pwa/DailyPwaBridge';
+import SavedWorkElsewhereNotice from './pwa/SavedWorkElsewhereNotice';
 
 const ApparatusList = lazy(() => import('./components/ApparatusList'));
 const InspectionWizard = lazy(() => import('./components/InspectionWizard'));
@@ -57,6 +58,7 @@ function DailyShell() {
         <DailyCheckoutQueueProcessor />
         <DailyPwaBridge />
         <main id="main-content" data-testid="daily-workspace" className="daily-workspace mx-auto px-4 py-6 sm:px-6 md:py-8 lg:px-8 xl:px-10 2xl:px-12">
+          <SavedWorkElsewhereNotice />
           <Suspense fallback={<PageLoading />}>
           <Routes>
             <Route path="/" element={<Navigate to="/stations" replace />} />
@@ -88,6 +90,8 @@ function DailyShell() {
             <Route path="/forms-hub/station-inspection" element={<StationInspectionWizard />} />
             <Route path="/forms-hub/trt-inventory" element={<TrtInventoryWizard />} />
             <Route path="/forms-hub/success" element={<SuccessPage />} />
+            {/* An address Daily does not have (a stale link, a typo) lands on the station list instead of an empty page. */}
+            <Route path="*" element={<Navigate to="/stations" replace />} />
           </Routes>
           </Suspense>
         </main>

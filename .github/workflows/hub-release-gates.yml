@@ -605,6 +605,10 @@ jobs:
         id: daily-pwa-upgrade
         if: ${{ !cancelled() && steps.member-requests.outcome != 'skipped' }}
         run: npm run test:daily-pwa-upgrade-e2e
+      - name: Verify an app installed on the apex stays on its host in Chromium
+        id: installed-host
+        if: ${{ !cancelled() && steps.member-requests.outcome != 'skipped' }}
+        run: npx playwright test --config=playwright.installed-host.config.ts
       - name: Verify Employee <-> Logistics messaging in Chromium
         id: employee-messages
         if: ${{ !cancelled() && steps.member-requests.outcome != 'skipped' }}

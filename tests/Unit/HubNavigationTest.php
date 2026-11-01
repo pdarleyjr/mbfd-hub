@@ -35,6 +35,9 @@ final class HubNavigationTest extends TestCase
             "/admin\r\nLocation:https://evil.test", '/admin?x=%0d%0aLocation:evil',
             '/api/users', '/auth/identity', '/admin/login', '/employee/logout',
             'admin/stations', ' /admin',
+            'https://evil.test/take-home-vehicle-inspections', '//evil.test/install',
+            '/take-home-vehicle-inspections/../storage/x', '/take-home-vehicle-inspections\\evil',
+            '/daily-roster/%2f%2fevil', '/install-evil', '/daily-rosterx', '/video-conferencing/logout',
         ]);
     }
 
@@ -53,6 +56,24 @@ final class HubNavigationTest extends TestCase
         $this->assertSame('/daily/stations/2', HubNavigation::safePath('/daily/stations/2'));
         $this->assertSame('/workgroups/surveys', HubNavigation::safePath('/workgroups/surveys'));
         $this->assertSame('/', HubNavigation::safePath('/'));
+    }
+
+    public function test_accepts_take_home_roster_conference_and_install_pages_as_back_targets(): void
+    {
+        $this->navigationRequest();
+        foreach ([
+            '/take-home-vehicle-inspections', '/take-home-vehicle-inspections/new', '/take-home-vehicle-inspections/TH-1?page=2',
+            '/daily-roster', '/video-conferencing/stations/3', '/install',
+        ] as $path) {
+            $this->assertSame($path, HubNavigation::safePath($path), $path);
+            $this->assertSame($path, HubNavigation::safePath('https://hub.test'.$path), $path);
+        }
+    }
+
+    public function test_take_home_inspection_back_returns_to_its_index_instead_of_home(): void
+    {
+        $this->navigationRequest('https://hub.test/take-home-vehicle-inspections/new');
+        $this->assertSame('/take-home-vehicle-inspections', HubNavigation::backUrl('https://hub.test/take-home-vehicle-inspections'));
     }
 
     public function test_explicit_target_wins_over_parent_and_history(): void

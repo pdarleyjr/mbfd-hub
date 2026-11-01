@@ -46,6 +46,7 @@ use App\Http\Controllers\Employee\VideoConferencing\StartDirectCallController;
 use App\Http\Controllers\Employee\VideoConferencing\StartMorningLineupController;
 use App\Http\Controllers\Employee\VideoConferencing\StationMicrophoneController;
 use App\Http\Controllers\HealthReadinessController;
+use App\Http\Controllers\HomeActivityController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\HubSupportTicketAttachmentController;
 use App\Http\Controllers\HubSupportTicketController;
@@ -76,6 +77,16 @@ require __DIR__.'/vehicle-documents.php';
 require __DIR__.'/mail.php';
 
 Route::get('/', HomeController::class)->middleware('auth:web');
+
+// The Home visit card: its counters (refreshed by the open page, which marks the fetch as a background refresh so it
+// never keeps an idle session alive) and the admin-only list of recent sign-ins. Own limiter so neither starves other polls.
+Route::prefix('home/activity')
+    ->middleware(['auth:web', PreventPreviousUrlStorage::class, 'throttle:60,1,home-activity'])
+    ->name('home.activity.')
+    ->group(function (): void {
+        Route::get('/', [HomeActivityController::class, 'summary'])->name('summary');
+        Route::get('/members', [HomeActivityController::class, 'members'])->name('members');
+    });
 
 Route::view('/install', 'install')->name('install');
 
@@ -462,7 +473,8 @@ Route::get('/daily/{path?}', function (?string $path = null) {
     $index = file_get_contents(public_path('daily/index.html'));
     abort_unless(is_string($index), 404);
 
-    $canonicalOrigin = rtrim((string) config('app.url'), '/');
+    // Session recovery returns to this window's own host: an installed app cannot cross hosts without leaving itself.
+    $canonicalOrigin = \App\Support\Host\HubHosts::originFor(request());
     // The release this shell was rendered by. The page-side update registrar (resources/js/pwa)
     // compares it with /app-release, so a shell restored from the offline cache after days is
     // recognised as old instead of being mistaken for the current release.
@@ -471,8 +483,14 @@ Route::get('/daily/{path?}', function (?string $path = null) {
     $alertsFeedMeta = \Illuminate\Support\Facades\Route::has('api.me.alerts')
         ? '<meta name="mbfd-alerts-feed" content="'.e(route('api.me.alerts', absolute: false)).'">'
         : '';
-    $runtimeConfig = $releaseMeta.$alertsFeedMeta.'<script>window.__MBFD_CANONICAL_ORIGIN__ = '.json_encode(
+    // The Account menu's Sign out is a real form post (the server redirects, possibly to the identity provider),
+    // so it needs the session's CSRF token, as every Blade page carries it.
+    $csrfMeta = '<meta name="csrf-token" content="'.e(csrf_token()).'">';
+    $runtimeConfig = $csrfMeta.$releaseMeta.$alertsFeedMeta.'<script>window.__MBFD_CANONICAL_ORIGIN__ = '.json_encode(
         $canonicalOrigin,
+        JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT,
+    ).';window.__MBFD_PRIMARY_ORIGIN__ = '.json_encode(
+        \App\Support\Host\HubHosts::canonicalOrigin(),
         JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT,
     ).';window.__MBFD_HUB_NAVIGATION__ = '.json_encode(
         \App\Support\HubShellNavigation::forUser(auth('web')->user()),
@@ -489,6 +507,22 @@ Route::get('/daily/{path?}', function (?string $path = null) {
     \App\Http\Middleware\CanonicalHostRedirect::class,
     'auth:web',
 ]);
+
+// Asked by a Daily shell installed on the sibling host, in a hidden frame: "does the primary host still hold unsent
+// Daily work on this device?" Daily ran on the primary host for these devices until 2026-11, so work saved then lives in
+// that origin's storage. Answers a count and nothing else, runs no session, and only the sibling may frame it.
+Route::get('/daily-saved-work-probe', function () {
+    $sibling = \App\Support\Host\HubHosts::siblingOrigin();
+    abort_unless(
+        $sibling !== null && strcasecmp(request()->getHost(), (string) \App\Support\Host\HubHosts::canonicalHost()) === 0,
+        404,
+    );
+
+    return response()->view('pwa.daily-saved-work-probe', ['parentOrigin' => $sibling], 200, [
+        'Cache-Control' => 'no-store',
+        'Content-Security-Policy' => "default-src 'none'; script-src 'unsafe-inline'; frame-ancestors {$sibling}",
+    ]);
+})->middleware('throttle:60,1')->withoutMiddleware(StatelessRoute::WITHOUT_MIDDLEWARE);
 
 Route::get('/__version', function () {
     $shaFile = base_path('.git-sha');
