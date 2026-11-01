@@ -30,6 +30,10 @@
 .fi-ta-table td code { overflow-wrap: anywhere; word-break: break-word; }
 .fi-ta-table .fi-ta-text-input,
 .fi-ta-table .fi-ta-select { min-width: 0; max-width: 100%; }
+/* Badges are sized to their text by default (w-max, truncate): a long value must wrap inside its cell instead. */
+.fi-ta-table .w-max { width: auto; max-width: 100%; }
+.fi-ta-table .fi-badge { max-width: 100%; }
+.fi-ta-table .fi-badge .truncate { white-space: normal; overflow-wrap: anywhere; text-overflow: clip; }
 
 /* ---- Grid layout shared by priority and cards ---- */
 table[data-hub-mode] { display: block; width: 100%; }
