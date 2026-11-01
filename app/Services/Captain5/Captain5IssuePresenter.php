@@ -44,7 +44,7 @@ final class Captain5IssuePresenter
         $latestObservation = ApparatusDefectObservation::query()->whereIn('apparatus_defect_id', $ids)
             ->orderBy('id')->get(['apparatus_defect_id', 'observation', 'created_at'])
             ->keyBy('apparatus_defect_id');
-        $lastEvent = ApparatusDefectEvent::query()->whereIn('apparatus_defect_id', $ids)
+        $lastEvent = ApparatusDefectEvent::query()->changingTheIssue()->whereIn('apparatus_defect_id', $ids)
             ->selectRaw('apparatus_defect_id, max(id) as last_id')->groupBy('apparatus_defect_id')
             ->pluck('last_id', 'apparatus_defect_id');
         $attribution = DefectStatusAttribution::forDefects($defects);
@@ -65,7 +65,7 @@ final class Captain5IssuePresenter
         $expected = isset($details['expected_delivery']) ? (string) $details['expected_delivery'] : null;
         $today = CarbonImmutable::now(\App\Support\HubTimezone::NAME)->format('Y-m-d');
         $open = ! DefectActionStatus::isClosed($defect->action_status);
-        $lastEventId ??= (int) ApparatusDefectEvent::query()->where('apparatus_defect_id', $defect->getKey())->max('id');
+        $lastEventId ??= (int) ApparatusDefectEvent::query()->changingTheIssue()->where('apparatus_defect_id', $defect->getKey())->max('id');
         $reporter = $defect->getRelationValue('firstReporter');
 
         return [
@@ -93,7 +93,20 @@ final class Captain5IssuePresenter
             'closure' => DefectActionStatus::closureKind($defect->action_status),
             'closure_reason' => $defect->isClosedNoAction() ? $defect->resolution_notes : null,
             'state_token' => ($defect->action_status ?: DefectActionStatus::REPORTED).':'.$lastEventId,
+            'captain5_cleared_at' => $this->iso($defect->captain5_cleared_at),
+            'captain5_cleared_by' => $this->clearedBy($defect),
         ];
+    }
+
+    /** Looked up only for a cleared issue, so the open queue pays nothing for it. */
+    private function clearedBy(ApparatusDefect $defect): ?string
+    {
+        if ($defect->captain5_cleared_at === null) {
+            return null;
+        }
+        $user = $defect->getRelationValue('captain5ClearedBy');
+
+        return $user instanceof User ? $this->name($user) : null;
     }
 
     /**
@@ -134,6 +147,8 @@ final class Captain5IssuePresenter
             'at' => $this->iso($message->created_at),
         ])->values()->all();
 
+        $actions = $this->allowedActions($defect, $decision, $latest?->observation === 'appears_corrected');
+
         return [
             ...$this->summary($defect, $latest instanceof ApparatusDefectObservation ? $latest : null),
             'resolution_notes' => $defect->resolution_notes,
@@ -149,7 +164,9 @@ final class Captain5IssuePresenter
             'messages' => $thread,
             'can_post_internal' => $seesInternal,
             'can_post' => $this->messages->canPost($viewer, $defect),
-            'actions' => $this->allowedActions($defect, $decision, $latest?->observation === 'appears_corrected'),
+            // A page cached before these two existed throws on an action name it does not know, so they travel apart.
+            'actions' => array_values(array_diff($actions, Captain5IssueClearing::ACTIONS)),
+            'clearing_actions' => array_values(array_intersect($actions, Captain5IssueClearing::ACTIONS)),
             'origin_inspection_id' => $defect->first_reported_inspection_id !== null ? (int) $defect->first_reported_inspection_id : null,
         ];
     }
@@ -162,6 +179,9 @@ final class Captain5IssuePresenter
         }
         if (DefectActionStatus::isClosed($defect->action_status)) {
             return ['reopen'];
+        }
+        if (Captain5IssueClearing::isCleared($defect)) {
+            return [Captain5IssueClearing::ACTION_BRING_BACK]; // it is with Logistics now; bringing it back restores the rest
         }
         $actions = [];
         if ($defect->action_status === DefectActionStatus::REPORTED) {
@@ -181,6 +201,7 @@ final class Captain5IssuePresenter
         if ($decision->canDismiss) {
             $actions[] = 'dismiss';
         }
+        $actions[] = Captain5IssueClearing::ACTION_CLEAR;
 
         return $actions;
     }

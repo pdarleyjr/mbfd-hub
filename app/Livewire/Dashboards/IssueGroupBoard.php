@@ -42,6 +42,7 @@ final class IssueGroupBoard extends Component
         'service_ticket' => 'Service tickets',
         'inspection_exception' => 'Inspection follow-ups',
         'inventory_correction' => 'Inventory change requests',
+        'vehicle_changeout' => 'Vehicle changes',
         'station_request' => 'Station requests',
         'station_inspection' => 'Station inspections',
         'support_message' => 'Messages',

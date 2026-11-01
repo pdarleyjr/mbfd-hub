@@ -191,7 +191,7 @@ final class NotificationCategoryRegistry
             new NotificationCategory(
                 key: User::NOTIFICATION_PREFERENCE_VEHICLE_SWAP_REPORTED,
                 label: 'Vehicle swap reported',
-                description: 'A crew reported a different truck than the one assigned to their unit, and Fleet needs to decide.',
+                description: 'A crew changed trucks, or reported a different truck than the one assigned.',
                 group: self::GROUP_FLEET,
                 channels: $all,
                 locked: [],

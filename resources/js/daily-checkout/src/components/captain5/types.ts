@@ -8,7 +8,8 @@ export type IssueKind = 'rescue' | 'medical';
 
 export type IssueActionName =
   | 'acknowledge' | 'ordered' | 'update_delivery' | 'available_for_pickup'
-  | 'replaced' | 'verify' | 'dismiss' | 'reopen';
+  | 'replaced' | 'verify' | 'dismiss' | 'reopen'
+  | 'send_to_logistics' | 'bring_back_to_captain5';
 
 /**
  * Everyone who can open the page can do everything on it, so there is no view-only mode. `act` stays in
@@ -61,6 +62,9 @@ export interface IssueSummary {
   /** Why no corrective action was necessary, for closure = closed_no_action. */
   closure_reason?: string | null;
   state_token: string;
+  /** Set while the issue is cleared from Captain 5: still open, and it stays with Logistics. */
+  captain5_cleared_at?: string | null;
+  captain5_cleared_by?: string | null;
 }
 
 export interface IssueEvent {
@@ -102,7 +106,9 @@ export interface IssueDetail extends IssueSummary {
   messages: IssueMessage[];
   can_post: boolean;
   can_post_internal: boolean;
+  /** Everything this viewer may do. The server sends the clearing actions apart, and normalizeDetail joins them here. */
   actions: IssueActionName[];
+  clearing_actions?: IssueActionName[];
   origin_inspection_id: number | null;
 }
 
@@ -130,6 +136,38 @@ export interface RescueDaily {
   submitted_by: string | null;
   needs_approval: boolean;
   open_issues: number;
+}
+
+/** One Rescue unit and the vehicle number it is on right now. */
+export interface RescueTruck {
+  apparatus_id: number;
+  unit: string;
+  vehicle_number: string | null;
+  station: string | null;
+  status: string;
+  /** The newest change for this unit in the last 30 days. */
+  changed_at: string | null;
+  changed_recently: boolean;
+}
+
+export interface RescueTruckLeftBehind {
+  name: string;
+  note: string | null;
+}
+
+/** A completed changeout, or a swap Fleet decided from a Daily Checkout report. */
+export interface RescueTruckChange {
+  id: string;
+  source: 'changeout' | 'fleet_decision';
+  unit: string;
+  from_vehicle_number: string | null;
+  to_vehicle_number: string | null;
+  at: string | null;
+  by: string | null;
+  /** Within the last 24 hours. */
+  recent: boolean;
+  note: string | null;
+  left_behind: RescueTruckLeftBehind[];
 }
 
 export interface HandoffNote {
@@ -163,6 +201,10 @@ export interface Workspace {
   issues: IssueSummary[];
   /** More in-scope issues exist than the page lists (logged on the server). */
   issues_truncated?: boolean;
+  /** Open issues cleared for Logistics. Not part of `issues` or `counts`. */
+  cleared_issues: IssueSummary[];
+  rescue_trucks: RescueTruck[];
+  rescue_truck_changes: RescueTruckChange[];
   handoff: Handoff;
   acting: ActingState;
   generated_at: string;

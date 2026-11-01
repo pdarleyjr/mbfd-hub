@@ -33,11 +33,11 @@ class ChangeoutsRelationManager extends RelationManager implements ExportableTab
         return auth()->user()?->can('viewAny', ApparatusChangeout::class) ?? false;
     }
 
-    /** Badge counts changeouts waiting on a Fleet decision. */
+    /** Badge counts changes nobody has acknowledged yet. */
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {
         $count = $ownerRecord instanceof Apparatus
-            ? self::forTruck($ownerRecord)->where('status', ApparatusChangeout::STATUS_PENDING_FLEET)->count()
+            ? self::forTruck($ownerRecord)->unacknowledged()->count()
             : 0;
 
         return $count > 0 ? (string) $count : null;
@@ -51,9 +51,7 @@ class ChangeoutsRelationManager extends RelationManager implements ExportableTab
     /** @return Builder<ApparatusChangeout> */
     public static function forTruck(Apparatus $truck): Builder
     {
-        return ApparatusChangeout::query()->where(fn (Builder $query): Builder => $query
-            ->where('from_apparatus_id', $truck->getKey())
-            ->orWhere('to_apparatus_id', $truck->getKey()));
+        return ApparatusChangeout::query()->involvingTruck((int) $truck->getKey());
     }
 
     public function getRelationship(): Relation|Builder
@@ -73,11 +71,11 @@ class ChangeoutsRelationManager extends RelationManager implements ExportableTab
     {
         return static::withExportActions($table
             ->columns(ApparatusChangeoutResource::columns(showUnit: true))
-            ->defaultSort(fn (Builder $query): Builder => ApparatusChangeoutResource::pendingFirst($query))
+            ->defaultSort(fn (Builder $query): Builder => ApparatusChangeoutResource::unacknowledgedFirst($query))
             ->recordUrl(fn (ApparatusChangeout $record): string => ApparatusChangeoutResource::getUrl('view', ['record' => $record]))
             ->actions([
                 Tables\Actions\Action::make('review')
-                    ->label('Review')
+                    ->label('View')
                     ->url(fn (ApparatusChangeout $record): string => ApparatusChangeoutResource::getUrl('view', ['record' => $record])),
             ]));
     }

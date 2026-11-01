@@ -51,7 +51,7 @@ abstract class AdminChangeoutTestCase extends TestCase
     }
 
     /**
-     * A member's submission. With no alert the crew cannot move the unit alone, so this waits on Fleet.
+     * A crew's submission, which happens when it is sent.
      *
      * @param  array<string, mixed>  $overrides
      */
@@ -60,23 +60,15 @@ abstract class AdminChangeoutTestCase extends TestCase
         return app(ApparatusChangeoutService::class)->submit($this->unit->fresh(), $actor, [
             'client_submission_id' => (string) Str::uuid(),
             'expected_vehicle_number' => 'V-202',
+            'expected_unit_slug' => $this->unit->fresh()->slug,
             'to_apparatus_id' => $this->reserve->id,
-            'checklist_version' => app(\App\Services\DailyCheckoutChecklistResolver::class)->resolve($this->unit->fresh())['checklist_version'],
             ...$overrides,
         ])['changeout'];
     }
 
-    protected function pendingChangeout(): ApparatusChangeout
-    {
-        $changeout = $this->submit($this->member);
-        $this->assertSame(ApparatusChangeout::STATUS_PENDING_FLEET, $changeout->status);
-
-        return $changeout;
-    }
-
     protected function firstItemKey(): string
     {
-        $context = app(ApparatusChangeoutPlanner::class)->context($this->unit->fresh(), $this->member);
+        $context = app(ApparatusChangeoutPlanner::class)->context($this->unit->fresh());
 
         return (string) $context['equipment']['compartments'][0]['items'][0]['item_key'];
     }

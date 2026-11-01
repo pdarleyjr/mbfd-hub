@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Feature\Fleet\OperationalAlerts;
 
 use App\Enums\AccountStatus;
-use App\Models\ApparatusChangeout;
 use App\Models\ApparatusFleetEvent;
 use App\Models\ApparatusOperationalAlert;
 use App\Models\ApparatusServiceTicket;
@@ -82,7 +81,6 @@ final class OperationalAlertServiceTest extends TestCase
             'unknown unit' => [['apparatus_id' => 999999], 'apparatus_id'],
             'date with a time' => [['scheduled_date' => '2026-11-01 15:00'], 'scheduled_date'],
             'unknown window' => [['scheduled_window' => 'midnight'], 'scheduled_window'],
-            'unknown old truck status' => [['old_truck_status_after' => 'Scrapped'], 'old_truck_status_after'],
             'title that is only markup' => [['title' => '<b></b>'], 'title'],
         ];
     }
@@ -265,8 +263,7 @@ final class OperationalAlertServiceTest extends TestCase
         $otherAlert = $this->notice(['title' => 'Another alert']);
         $refused = [
             'another unit' => $this->changeout($alert, ['unit_slug' => 'e1']),
-            'not finished' => $this->changeout($alert, ['status' => ApparatusChangeout::STATUS_REJECTED]),
-            'open handoff' => $this->changeout($alert, ['handoff_status' => ApparatusChangeout::HANDOFF_PENDING_VERIFICATION]),
+            'not finished' => $this->changeout($alert, ['status' => 'old_state']),
             'tied to another alert' => $this->changeout($otherAlert),
         ];
 

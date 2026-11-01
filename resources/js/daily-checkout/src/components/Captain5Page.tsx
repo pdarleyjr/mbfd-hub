@@ -16,6 +16,7 @@ import IssueSheet from './captain5/IssueSheet';
 import IssuesTab from './captain5/IssuesTab';
 import ReplacementsTab from './captain5/ReplacementsTab';
 import TodayTab from './captain5/TodayTab';
+import TruckChangesTab from './captain5/TruckChangesTab';
 import VehicleIdentificationPanel from './VehicleIdentificationPanel';
 import VehicleIdentificationCard from './VehicleIdentificationCard';
 import RescueInventoryTab, { type RescueView } from './captain5/ems/RescueInventoryTab';
@@ -32,9 +33,9 @@ import Tabs, { type TabItem } from './ui/Tabs';
 import Tag from './ui/Tag';
 import { LoadError, SkeletonRows } from './ui/StateViews';
 
-type TabId = 'today' | 'issues' | 'replacements' | 'rescue' | 'supply' | 'narcotics' | 'messages' | 'updates' | 'history';
+type TabId = 'today' | 'issues' | 'replacements' | 'trucks' | 'rescue' | 'supply' | 'narcotics' | 'messages' | 'updates' | 'history';
 
-const TAB_IDS: TabId[] = ['today', 'issues', 'replacements', 'rescue', 'supply', 'narcotics', 'messages', 'updates', 'history'];
+const TAB_IDS: TabId[] = ['today', 'issues', 'replacements', 'trucks', 'rescue', 'supply', 'narcotics', 'messages', 'updates', 'history'];
 const isTab = (value: string | null): value is TabId => TAB_IDS.includes(value as TabId);
 const isEmsTab = (value: string | null): boolean => value === 'rescue' || value === 'supply';
 const positiveInt = (value: string | null): number | null => (value !== null && /^\d{1,12}$/.test(value) && Number(value) > 0 ? Number(value) : null);
@@ -49,6 +50,7 @@ function tabsFor(workspace: Workspace, unread: number, ems: EmsTabs, narcotics: 
     { id: 'today', label: 'Today' },
     { id: 'issues', label: 'Issues', badge: workspace.counts.open, badgeLabel: 'open issues' },
     { id: 'replacements', label: 'Replacements', badge: tracked, badgeLabel: 'in progress' },
+    { id: 'trucks', label: 'Truck Changes', badge: workspace.rescue_truck_changes.filter((change) => change.recent).length, badgeLabel: 'Rescue truck changes in the last 24 hours' },
     ...(ems.show ? [
       { id: 'rescue' as const, label: 'Rescue Inventory', badge: ems.openRequests, badgeLabel: 'open requests' },
       { id: 'supply' as const, label: 'Supply Room' },
@@ -127,7 +129,7 @@ export default function Captain5Page() {
   const closeCheck = useCallback(() => {
     if (pushedCheck.current) { pushedCheck.current = false; navigate(-1); } else update({ check: null });
   }, [navigate, update]);
-  const changed = useCallback(() => { setVersion((n) => n + 1); void load('silent'); }, [load]);
+  const changed = useCallback(() => { setVersion((n) => n + 1); return load('silent'); }, [load]);
   const identificationChanged = useCallback((next: VehicleIdentification | undefined) => {
     setIdentificationSaved(true);
     ws.patch({ vehicle_identification: next });
@@ -177,9 +179,11 @@ export default function Captain5Page() {
       case 'today':
         return <TodayTab workspace={data} onFilter={(next) => update({ tab: 'issues', filter: next, kind: null })} onOpenInspection={setInspectionId} onHandoff={(handoff) => ws.patch({ handoff })} />;
       case 'issues':
-        return <IssuesTab workspace={data} queue={queue} kind={kind} onFilter={(nextQueue, nextKind) => update({ filter: nextQueue, kind: nextKind })} onOpen={openIssue} />;
+        return <IssuesTab workspace={data} queue={queue} kind={kind} targetIssueId={issueId} onFilter={(nextQueue, nextKind) => update({ filter: nextQueue, kind: nextKind })} onOpen={openIssue} onChanged={changed} />;
       case 'replacements':
         return <ReplacementsTab issues={data.issues} onOpen={openIssue} />;
+      case 'trucks':
+        return <TruckChangesTab trucks={data.rescue_trucks} changes={data.rescue_truck_changes} />;
       case 'rescue':
       case 'supply':
         return renderEms(id);

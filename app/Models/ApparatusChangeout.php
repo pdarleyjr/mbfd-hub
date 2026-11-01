@@ -5,14 +5,15 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * One move of a unit from truck A to truck B, with the equipment handoff that went with it. The record stays
- * after the move and is never rewritten by a later move: a return points back at this row through
- * return_of_changeout_id.
+ * One move of a unit from truck A to truck B, with what the crew took and what they left. It happened when it was sent:
+ * nobody approves it, and Fleet acknowledges having seen it. The record stays after the move and is never rewritten by
+ * a later move: a return points back at this row through return_of_changeout_id.
  *
  * @property int $id
  * @property string $client_submission_id
@@ -33,25 +34,19 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string|null $note
  * @property int|null $submitted_by_user_id
  * @property string $submitted_by_name
- * @property int|null $decided_by_user_id
- * @property CarbonImmutable|null $decided_at
- * @property string|null $decision_note
  * @property CarbonImmutable|null $effective_at
  * @property array<string, mixed>|null $move_audit
+ * @property CarbonImmutable|null $acknowledged_at
+ * @property int|null $acknowledged_by_user_id
  */
 class ApparatusChangeout extends Model
 {
     public const STATUS_COMPLETED = 'completed';
 
-    public const STATUS_PENDING_FLEET = 'pending_fleet';
-
-    public const STATUS_REJECTED = 'rejected';
-
-    public const STATUS_CANCELLED = 'cancelled';
-
     public const HANDOFF_COMPLETE = 'complete';
 
-    public const HANDOFF_PENDING_VERIFICATION = 'pending_verification';
+    /** The old truck after every swap, whatever it was before. */
+    public const OLD_TRUCK_STATUS = 'Out of Service';
 
     protected $fillable = [
         'client_submission_id',
@@ -72,20 +67,19 @@ class ApparatusChangeout extends Model
         'note',
         'submitted_by_user_id',
         'submitted_by_name',
-        'decided_by_user_id',
-        'decided_at',
-        'decision_note',
         'effective_at',
         'move_audit',
+        'acknowledged_at',
+        'acknowledged_by_user_id',
     ];
 
     protected function casts(): array
     {
         return [
             'to_vehicle_listed' => 'boolean',
-            'decided_at' => 'immutable_datetime',
             'effective_at' => 'immutable_datetime',
             'move_audit' => 'array',
+            'acknowledged_at' => 'immutable_datetime',
         ];
     }
 
@@ -94,20 +88,33 @@ class ApparatusChangeout extends Model
         return $this->status === self::STATUS_COMPLETED;
     }
 
-    public function isPendingFleet(): bool
+    public function isAcknowledged(): bool
     {
-        return $this->status === self::STATUS_PENDING_FLEET;
+        return $this->acknowledged_at !== null;
     }
 
-    public static function statusLabel(string $status): string
+    /** "R 44 changed trucks: 17503 to 1033", as every alert about this change reads. */
+    public function headline(): string
     {
-        return match ($status) {
-            self::STATUS_COMPLETED => 'Complete',
-            self::STATUS_PENDING_FLEET => 'Waiting on Fleet',
-            self::STATUS_REJECTED => 'Not approved',
-            self::STATUS_CANCELLED => 'Cancelled',
-            default => str($status)->headline()->toString(),
-        };
+        return $this->unit_designation.' changed trucks: '.($this->from_vehicle_number ?: 'not recorded').' to '.$this->to_vehicle_number;
+    }
+
+    /** @return list<string> what Fleet should look at: a traded unit, a new record, a number two records share */
+    public function reviewNotes(): array
+    {
+        return array_values(array_filter((array) ($this->move_audit['review_notes'] ?? []), 'is_string'));
+    }
+
+    /** @param Builder<self> $query */
+    public function scopeUnacknowledged(Builder $query): Builder
+    {
+        return $query->where('status', self::STATUS_COMPLETED)->whereNull('acknowledged_at');
+    }
+
+    /** @param Builder<self> $query */
+    public function scopeInvolvingTruck(Builder $query, int $truckId): Builder
+    {
+        return $query->where(static fn (Builder $inner): Builder => $inner->where('from_apparatus_id', $truckId)->orWhere('to_apparatus_id', $truckId));
     }
 
     /** @return BelongsTo<ApparatusOperationalAlert, $this> */
@@ -140,6 +147,12 @@ class ApparatusChangeout extends Model
         return $this->belongsTo(Apparatus::class, 'to_apparatus_id');
     }
 
+    /** @return BelongsTo<Apparatus, $this> the truck the unit moved onto: the row dashboards group this change under */
+    public function apparatus(): BelongsTo
+    {
+        return $this->toApparatus();
+    }
+
     /** @return BelongsTo<User, $this> */
     public function submittedBy(): BelongsTo
     {
@@ -147,15 +160,21 @@ class ApparatusChangeout extends Model
     }
 
     /** @return BelongsTo<User, $this> */
-    public function decidedBy(): BelongsTo
+    public function acknowledgedBy(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'decided_by_user_id');
+        return $this->belongsTo(User::class, 'acknowledged_by_user_id');
     }
 
     /** @return HasMany<ApparatusChangeoutItem, $this> */
     public function items(): HasMany
     {
         return $this->hasMany(ApparatusChangeoutItem::class);
+    }
+
+    /** @return HasMany<ApparatusChangeoutItem, $this> */
+    public function leftBehindItems(): HasMany
+    {
+        return $this->items()->where('custody_status', ApparatusChangeoutItem::CUSTODY_LEFT_BEHIND)->orderBy('id');
     }
 
     /** @return HasMany<ApparatusFleetEvent, $this> */

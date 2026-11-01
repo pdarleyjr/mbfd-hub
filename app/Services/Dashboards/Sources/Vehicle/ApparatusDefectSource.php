@@ -117,7 +117,7 @@ final class ApparatusDefectSource extends VehicleIssueSource
 
     protected function rowSelects(): array
     {
-        return ['dashboard_last_event_id' => ApparatusDefectEvent::query()->selectRaw('MAX(id)')
+        return ['dashboard_last_event_id' => ApparatusDefectEvent::query()->changingTheIssue()->selectRaw('MAX(id)')
             ->whereColumn('apparatus_defect_events.apparatus_defect_id', 'apparatus_defects.id')];
     }
 

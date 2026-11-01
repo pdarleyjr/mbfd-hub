@@ -18,14 +18,9 @@ final class ApparatusFleetHistory
         'alert_cancelled' => 'Alert cancelled',
         'alert_closed' => 'Alert closed',
         'alert_completed' => 'Alert completed by a changeout',
-        'submitted' => 'Changeout submitted',
         'committed' => 'Unit moved to the new truck',
-        'handoff_only' => 'Equipment handoff recorded, the unit had already moved',
-        'decided_approved' => 'Approved',
-        'decided_rejected' => 'Rejected',
-        'cancelled' => 'Changeout cancelled',
-        'line_verified' => 'Equipment line settled',
-        'reconciled' => 'Last open line settled, handoff complete',
+        'handoff_only' => 'What the crew took and left recorded, the unit had already moved',
+        'acknowledged' => 'Acknowledged',
     ];
 
     /**

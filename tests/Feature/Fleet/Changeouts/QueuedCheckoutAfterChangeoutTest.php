@@ -94,16 +94,6 @@ final class QueuedCheckoutAfterChangeoutTest extends ChangeoutTestCase
         $this->postJson($this->submissionUrl(), $queued)->assertStatus(409);
     }
 
-    public function test_a_waiting_change_gives_no_grace_because_nothing_moved(): void
-    {
-        $queued = $this->payload();
-        $this->moveToReserve()->assertCreated()->assertJsonPath('changeout.status', 'pending_fleet');
-
-        $this->postJson($this->submissionUrl(), $queued)->assertCreated();
-
-        $this->assertSame('E2', ApparatusInspection::query()->sole()->designation_at_time);
-    }
-
     public function test_the_checklist_get_tells_the_crew_what_stayed_on_the_old_truck(): void
     {
         $response = $this->moveToReserve(['alert_id' => $this->swapAlert($this->unit)->id, 'exceptions' => [
@@ -121,7 +111,7 @@ final class QueuedCheckoutAfterChangeoutTest extends ChangeoutTestCase
         $this->assertSame($get->json('checklist_version'), app(DailyCheckoutChecklistResolver::class)->versionOf($get->json('checklist')), 'The notice is outside the hash.');
     }
 
-    public function test_a_controlled_line_left_behind_is_the_name_only(): void
+    public function test_a_med_box_left_behind_reads_like_any_other_line(): void
     {
         ['unit' => $unit, 'reserve' => $reserve] = $this->rescuePair();
         $medBox = 'patient_compartment-item-3';
@@ -131,7 +121,7 @@ final class QueuedCheckoutAfterChangeoutTest extends ChangeoutTestCase
         ]])->assertCreated();
 
         $this->getJson("/api/public/apparatuses/{$reserve->id}/checklist")->assertOk()
-            ->assertJsonPath('changeout_handoff.left_behind.0', ['name' => 'Med Box', 'note' => null]);
+            ->assertJsonPath('changeout_handoff.left_behind.0', ['name' => 'Med Box', 'note' => 'In the locker in the cab']);
     }
 
     public function test_the_notice_ends_after_fourteen_days_or_when_the_row_stops_holding_the_unit(): void

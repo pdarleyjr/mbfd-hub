@@ -1,10 +1,11 @@
 # Apparatus changeouts and operational alerts
 
-Status: implementation contract, 2026-10-31. Read this with `docs/runbooks/apparatus-master-vehicle-link.md`,
+Status: implementation contract, 2026-11-01. Read this with `docs/runbooks/apparatus-master-vehicle-link.md`,
 `docs/daily-inspection-continuity.md` and `docs/apparatus-inventory-corrections.md`.
 
-A firefighter should only need to know: what truck am I leaving, what truck am I moving to, what is coming with
-me, what am I leaving behind, is it done. Everything else on this page is the system's job.
+A firefighter only needs to say: what truck am I moving to, what did I take, what did I leave. It happens when they send
+it. Nobody approves it. Fleet is told, and acknowledges having seen it. Admins can preschedule a swap, and that is all a
+schedule does.
 
 ## 1. Rules that never bend
 
@@ -12,249 +13,203 @@ me, what am I leaving behind, is it done. Everything else on this page is the sy
    the master vehicle link never move. Only the unit identity moves: `unit_id`, `designation`, `name`, `slug`,
    `station_id`, `assignment`, `daily_checkout_requirement`, `daily_checkout_template`.
 2. Vehicle numbers are strings. `002-16` is not `2-16`. Compare with `App\Support\Fleet\VehicleNumber::same`.
-3. A swap does not fix a truck. Tickets and defects stay open on the old truck until their own workflow closes them.
-4. A planned changeout is not a completed swap. Nothing about an apparatus changes until a changeout commits.
-5. A checklist template is the expected list, not a custody record. There is no physical inventory store in the Hub.
-   `apparatus_changeout_items` records what a named person said happened at a named time, and never edits templates,
-   overlays, inspections or defects as a side effect.
-6. Controlled items are never marked moved by default. They end `pending_verification` until a person with authority
-   records the separate accountability step.
-7. Every state change goes through a service with server-side authorization. UI code never writes these tables.
-8. Old PWA clients keep working: only new routes and new optional response keys. Nothing here touches workers,
-   manifest identity, or the checklist hash.
+3. **The new truck is In Service. The old truck is Out of Service. Every swap, including a return, whatever either truck
+   was before.** `old_truck_status_after` on an alert is not read.
+4. A swap does not fix a truck. Tickets and defects stay open on the truck they are on.
+5. The crew's work goes through. The only refusals are an ill-formed number, the truck the unit is already on, and the two
+   conflicts in 4.4. A stale alert id, an item the list no longer has, or a changed list never stops them.
+6. No item is controlled. Members have full control of what they took and what they left.
+7. A checklist template is the expected list, not a custody record. `apparatus_changeout_items` records what a named person
+   said happened at a named time, and never edits templates, overlays, inspections or defects.
+8. Every state change goes through a service with server-side authorization. UI code never writes these tables.
 
 ## 2. Records
 
 | Table | Purpose |
 |---|---|
 | `apparatus_operational_alerts` | One authoritative alert about a unit. Projected onto station pages, the apparatus profile and Fleet. |
-| `apparatus_changeouts` | One move of a unit from truck A to truck B, with status, audit and idempotency. |
-| `apparatus_changeout_items` | The equipment handoff lines for one changeout. |
+| `apparatus_changeouts` | One move of a unit from truck A to truck B, with audit, idempotency and acknowledgement. |
+| `apparatus_changeout_items` | What the crew took and left, one line per checklist item. |
 | `apparatus_fleet_events` | Append-only history for both of the above. |
-
-`App\Models\ApparatusOperationalAlert`, `App\Models\ApparatusChangeout`, `App\Models\ApparatusChangeoutItem`,
-`App\Models\ApparatusFleetEvent`.
 
 ### Alert fields that matter
 
 `unit_slug` is the unit (the slug moves between truck rows with the identity, and is unique and never null).
 `apparatus_id` and `vehicle_number` are the truck when the alert was raised and do not change.
 
-Categories: `upcoming_swap`, `maintenance`, `recall`, `service_interruption`, `general`.
-Status: `active` -> `completed` | `cancelled` | `closed`.
+Categories: `upcoming_swap`, `maintenance`, `recall`, `service_interruption`, `general`. A unit has one active
+`upcoming_swap` at a time. Status: `active` -> `completed` | `cancelled` | `closed`.
 Schedule: `scheduled_date` (local date, no time zone), optional `scheduled_window` (`morning`, `afternoon`, `evening`),
-optional `scheduled_at` (exact instant, only when Fleet actually gave one). A missing time stays missing.
+optional `scheduled_at` (exact instant). A missing time stays missing. `planned_replacement_apparatus_id` is a suggestion the
+wizard preselects, never a restriction.
 
 An alert is visible on a station page when it is `active`, and its `station_id` or `additional_station_ids` holds that
-station, and `ends_on` has not passed. An `upcoming_swap` alert does not expire by date: if the day passes it stays
-up, and says the planned date has passed, until a changeout or Fleet closes it.
+station, and `ends_on` has not passed. An `upcoming_swap` alert does not expire by date: if the day passes it stays up, and
+says the planned date has passed, until a changeout or Fleet closes it.
 
-### Changeout status
+### Changeout fields
 
-| status | meaning |
-|---|---|
-| `completed` | The identity is on the new truck (or was already, see 4.4). |
-| `pending_fleet` | Saved with all equipment choices; only the truck decision is waiting on Fleet. No apparatus changed. |
-| `rejected` | Fleet said no. No apparatus changed. The record stays. |
-| `cancelled` | The submitter or Fleet withdrew it before a decision. |
+`status` is always `completed` and `handoff_status` always `complete`. `acknowledged_at` and `acknowledged_by_user_id` say Fleet
+has seen it. `move_audit` holds `mode` (`start` or `handoff_only`), the before and after of both trucks, `old_truck_status`,
+`new_truck_status`, `new_truck_record`, `displaced_unit`, `review_notes` and `corrections_left_on_truck`. The columns
+`decided_*`, `quantity_moved`, `condition`, `item_class`, `verified_*` and `apparatus_defect_id` remain in the schema, unused.
 
-`handoff_status`: `complete` (every line settled) or `pending_verification` (one or more controlled lines or
-`needs_review` lines are open).
-
-### Item handling and custody
+### Lines
 
 | handling | meaning | custody_status |
 |---|---|---|
-| `transfer` | Moved in full, or `quantity_moved` of it | `moved` |
-| `leave` | Stays on the old truck | `left_behind` |
-| `review` | Not moved, not certain | `needs_review` |
-| any, on a controlled line | Separate accountability | `pending_verification` until verified, then `verified` |
+| `transfer` | Took it to the new truck. Every line's default, including on a return. | `moved` |
+| `leave` | Left it on the old truck. | `left_behind` |
 
-`condition` is `ok` by default, or `missing` or `damaged`. Missing or damaged files an ordinary open defect on the
-truck the item was on, through `DefectContinuityService::recordHandoffFinding`, linked by `apparatus_defect_id`. A
-missing item is never `moved`.
+Each may carry a note. With no usable checklist there are no lines, and the crew's overall note stands.
 
 ### Where the equipment list comes from
 
-`DailyCheckoutChecklistResolver::resolve($truck->refresh())`, effective checklist, checked for `usable`. Templates differ:
-v1 compartments use `title`, v2 use `name`. Item ids may be positional, so use the ids the effective checklist reports.
-Only some items have `expectedQuantity`: null stays null, and is never treated as 1. Partial quantities are only offered
-when a quantity is known.
-
-Templates have no controlled flag, so `config/fleet_changeouts.php` holds the name patterns: `narcotic`, `med box`.
-Rescue officer fields that match (Narcotic Book, Narcotic Seal #) become controlled lines with keys `field:<id>`, since the
-narcotics box is not a compartment item. High-value items (LifePak, LUCAS, TIC, gas meters, Toughbook) are ordinary lines: the
-Hub has no serial record to verify them against, and does not pretend to.
+`DailyCheckoutChecklistResolver::resolve($truck)`, effective checklist, checked for `usable`. Templates differ: v1 compartments
+use `title`, v2 use `name`. Item ids may be positional, so use the ids the effective checklist reports. Officer fields are not
+equipment lines.
 
 ### Known limit
 
 `apparatus_inventory_changes` (approved checklist corrections) are keyed to the truck row and stay there, so a unit's
 corrections do not follow it to the new truck. The move records the count in `move_audit.corrections_left_on_truck`
-and Fleet sees it on the changeout page. On 2026-10-31 production has no such rows on a real unit.
+and Fleet sees it on the changeout page.
 
 ## 3. Who can do what
 
 | Action | Who |
 |---|---|
 | See alerts on a station page | Any signed-in member who can open the station page |
-| Start a changeout, submit equipment choices | Active member with an employee profile, or a Fleet manager (same rule as `VehicleIdentificationController::authorizeUnit`) |
-| Commit a changeout directly | The cases in 4.2 only |
-| Decide a `pending_fleet` changeout | `User::canManageFleetSwaps()` |
-| Verify a controlled line | `User::canManageFleetSwaps()`, or `Captain5Access::canAct` for rescue equipment |
-| Create, edit, cancel or close alerts; schedule changeouts | `canManageFleetSwaps()` |
-| View admin pages | `admin.fleet.view` through the admin capability gate |
-
-Controlled line detail is shown to the member doing the handoff by name only. There is no quantity, location or
-serial for controlled items in any member payload.
+| Change trucks, for any unit, on any day | Active member with an employee profile, or a Fleet manager |
+| Acknowledge a change | `User::canManageFleetSwaps()` (`acknowledge` through the admin capability gate is `admin.fleet.manage`) |
+| Create, edit, cancel or close alerts; preschedule swaps | `canManageFleetSwaps()` |
+| View admin pages, the dashboard issue and the banners | `admin.fleet.view` through the admin capability gate |
 
 ## 4. The move
 
-### 4.1 Replacement truck choices
+### 4.1 Which truck
 
-`eligible` means all of: has a vehicle number, is not the current truck, same `type` as the unit, status is `Available`
-or `Reserve`, `daily_checkout_requirement` is `reserve`, no open service ticket, and no other unit has a pending or planned move onto it. A truck in
-`Maintenance`, `Out of Service` or `In Service` is listed under other vehicles, which needs Fleet. A number that is not on
-the list is accepted as text and validated by `VehicleNumber::isWellFormed`; it needs Fleet.
+Any truck is allowed. The context lists same-type trucks with a number: `candidates` are the reserve trucks
+(`daily_checkout_requirement` is `reserve`), in any status; `other_vehicles` are the rest, with `listed_as`.
 
-### 4.2 Direct commit versus Fleet decision
+- **A truck holding another frontline unit** trades identities: that unit's identity goes onto the old truck, and the alert says
+  "R 4 was on truck 17502 and is now listed on truck 17503, which is Out of Service. Please review."
+- **A typed number with a row** uses that row. If two records share it, the first that is not the current truck, flagged for review.
+- **A typed number with no row** makes one (`ChangeoutNewTruck`), identity `designation` Reserve, `unit_id` `R-<num>`, `slug`
+  `r<num>`, `name` `<TYPE> <num>`, requirement `reserve`, template `pending`, the unit's type. One master vehicle with that number
+  and no apparatus: built and linked from it. No master: one is created with `needs_fleet_review`, source `daily_checkout`, and a
+  history note naming the member. Anything else (two masters, a master marked not an apparatus): the row is left needing a link.
+  Every case is flagged in the alert.
 
-Direct, with no approval queue, when any of these is true:
+### 4.2 What a commit writes, in one transaction
 
-- the submitter is a Fleet manager and the truck is known, same type and `reserve`;
-- the unit has an active `upcoming_swap` alert that fits this move (below), the truck is eligible, and the alert's day has
-  arrived in Eastern time (`scheduled_date`, or the date of `scheduled_at`; an alert with neither has no wait). Fleet
-  authorized the changeout when it scheduled it. Before that day a member's submission waits for Fleet. There is no station
-  tie: members float, and every move is audited;
-- it is a return to the truck this unit last left (see section 5), and that truck is eligible, meaning Fleet has released it.
+1. Lock the alert, then both truck rows in ascending id (the order `VehicleSwapService` uses). A retry that waited on these locks
+   returns the first result.
+2. Refuse if `expected_vehicle_number` or `expected_unit_slug` no longer holds the unit. A truck keeps its number after a move, so
+   the slug is what proves the unit is still there.
+3. Save the changeout and its lines, from the truck the unit is on.
+4. `VehicleSwapService::moveUnitForChangeout($from, $to)`: the new truck takes the unit's identity and is In Service. The old truck
+   takes the new truck's previous identity and is Out of Service. Number-derived reserve identities are rewritten to the truck
+   carrying them, whole numbers only (`R-1033` on truck 17503 becomes `R-17503`, `r1033` becomes `r17503`, `R-11033` stays), and
+   `reserve-<id>` follows the row. Both trucks are at the station the unit is at, until Fleet moves the old one. The list the crew
+   was working from stays accepted on the old truck for the checklist grace window, so a checkout queued on a phone still posts there.
+5. Complete the alert when it fits (4.3).
+6. After commit: clear `DisplaySnapshotService` and station caches, and notify Fleet (section 7). Tickets and defects are not touched.
 
-Anything else is `pending_fleet`: the work is saved, Fleet gets one alert through the existing "Vehicle swap reported"
-category, and the crew sees that it is waiting.
+### 4.3 Alerts
 
-A changeout never displaces a frontline unit. A truck whose requirement is not `reserve` refuses a direct commit and an
-approval with `CHANGEOUT_TRUCK_UNAVAILABLE`, for Fleet too. Trades stay with the Daily Checkout swap report (`VehicleSwapService::decide`).
+An active `upcoming_swap` alert for this unit raised from this truck is completed by any changeout from that truck, whichever truck
+they chose. A changeout for a different unit never closes it, and neither does a move from another truck. An alert id that is stale,
+closed, of another kind or about another unit is ignored.
 
-An alert attaches to a move, and completes from it, only when its `apparatus_id` is the truck being left and its planned
-replacement is empty or is the destination. Otherwise a named `alert_id` is a 422, and one the server would have found by itself
-simply does not attach.
+If an older Daily Checkout decision (`VehicleSwapService::decide`, unchanged) already moved the unit, its alert offers the `handoff`
+action: `handoff_only` mode records what the crew took and left against the existing pair, moves nothing, changes no status, and
+completes the alert. `old_truck_status` in that summary is the status that truck has.
 
-### 4.3 What a commit writes, in one transaction
-
-1. Lock the changeout's alert, then both truck rows in ascending id (the order `VehicleSwapService` uses). A retry that
-   waited on these locks returns the first result.
-2. Refuse if the submitted `expected_vehicle_number` or `expected_unit_slug` no longer holds the unit, or the replacement
-   changed. A truck keeps its number after a move, so the slug is what proves the unit is still there. See 4.5.
-3. `VehicleSwapService::moveUnitForChangeout`: trade identities. The new truck takes the unit's identity and location. The
-   old truck takes the new truck's previous identity. Number-derived reserve identities are rewritten to the truck carrying
-   them, whole numbers only (`R-1033` on truck 17503 becomes `R-17503`, `RESCUE 1033` becomes `RESCUE 17503`, `r1033` becomes
-   `r17503`, `R-11033` stays), and `reserve-<id>` follows the row.
-   A status describes a truck, so a failure never travels. The new truck keeps `Maintenance` or `Out of Service` if it has one;
-   otherwise it takes the unit's status, and a unit leaving a failed truck is `In Service`. The old truck's status is Fleet's
-   choice on approval, else the alert's `old_truck_status_after`, else `Maintenance` if it has an open service ticket, else the
-   status the new truck had, with a failure there reading `Available`. Its station and location are where the swap happened,
-   until Fleet moves it. The list the crew was working from stays accepted on the old truck for the checklist grace window, so
-   a checkout queued on a phone still posts there.
-4. Items and events.
-5. If `alert_id` is set, the alert's `unit_slug` matches, and `handoff_status` is `complete`, complete the alert. A
-   `pending_verification` handoff leaves the alert active and says what is left. Completing the last line closes it.
-6. After commit: clear `DisplaySnapshotService` and station caches. Tickets and defects are not touched.
-
-### 4.4 The unit already moved
-
-If Fleet approved a Daily Checkout swap report first (`VehicleSwapService::decide`), the identity is already on the new
-truck. An alert on that unit then offers **Record equipment handoff**, which creates a changeout with the existing
-truck pair and no identity move, and completes the alert the same way. `decide` never closes an alert by itself.
-
-### 4.5 Conflicts
+### 4.4 Conflicts
 
 | Situation | Answer |
 |---|---|
 | Same `client_submission_id`, same payload | 200 with the first result, `replayed: true` |
 | Same `client_submission_id`, different payload | 409 `CHANGEOUT_REPLAY_CONFLICT` |
-| Unit no longer on `expected_vehicle_number` | 409 `CHANGEOUT_STALE` with the current truck, and nothing written. The client keeps the member's work and offers to review. |
-| Replacement no longer eligible | 409 `CHANGEOUT_TRUCK_UNAVAILABLE` with fresh choices |
-| A `pending_fleet` row already exists for the unit | 409 `CHANGEOUT_ALREADY_PENDING` with its id and summary |
+| Unit no longer on `expected_vehicle_number` or `expected_unit_slug` | 409 `CHANGEOUT_STALE` with `current_vehicle_number`, `current_apparatus_id`, `unit_designation`. Nothing written. |
 
 ## 5. Going back
 
-`previous_changeout` in the context response is the newest `completed` changeout where this unit left a truck, plus
-what moved, what stayed, and open lines. When the member picks that truck, `return_of_changeout_id` is set by the server.
-Defaults for a return: lines moved last time are `transfer` (they go back); lines left behind last time show as already
-on the truck, as `leave`, with last time's note; lines that were `needs_review` or `pending_verification` start as `review`
-and must be confirmed. The earlier record is never edited. Chains work because each return points only to the changeout it
-reverses.
+`previous_changeout` in the context is the newest changeout of this unit. Picking the truck it left sets
+`return_of_changeout_id` on the server, and the candidate reads `is_return`. Each line's `previous` shows what happened last time, but
+does not change its default: every line starts as took. The earlier record is never edited. Chains work because each return points
+only to the changeout it reverses.
 
 ## 6. API (auth:sanctum, prefix `/api/public`, throttle 30/min on writes)
 
-`GET stations/{station}/operational-alerts`
+`GET stations/{station}/operational-alerts`: `alerts[]` with `id`, `category`, `category_label`, `title`, `message`, `reason`,
+`instructions`, `unit_designation`, `vehicle_number`, `current_vehicle_number`, `current_apparatus_id`, `schedule_label`,
+`scheduled_date`, `scheduled_window`, `scheduled_at`, `date_passed`, and
 
-```json
-{ "alerts": [ {
-  "id": 12, "category": "upcoming_swap", "category_label": "Upcoming vehicle change",
-  "title": "Upcoming Apparatus Changeout: Rescue 44", "message": "...", "reason": "Exhaust repair",
-  "instructions": null, "unit_designation": "R 44", "vehicle_number": "17503",
-  "current_vehicle_number": "17503", "current_apparatus_id": 52,
-  "schedule_label": "Sunday, November 1, afternoon", "scheduled_date": "2026-11-01", "scheduled_window": "afternoon", "scheduled_at": null,
-  "date_passed": false,
-  "workflow": { "state": "planned|vehicle_changed|awaiting_fleet|awaiting_verification", "label": "Planned", "changeout_id": null },
-  "action": { "kind": "start|handoff|view|none", "label": "Start Changeout", "apparatus_id": 52, "alert_id": 12, "changeout_id": null }
-} ] }
+- `workflow { state: planned | vehicle_changed, label, changeout_id: null }`
+- `action { kind: start | handoff | none, label, apparatus_id, alert_id, changeout_id: null }`
+
+`GET apparatuses/{apparatus}/changeout-context?alert_id=`
+
 ```
-
-`GET apparatuses/{apparatus}/changeout-context?alert_id=12`
-
-```json
-{
-  "unit": { "apparatus_id": 52, "designation": "R 44", "vehicle_number": "17503", "station_id": 32, "station_label": "Station 4", "status": "In Service" },
-  "alert": { "id": 12, "title": "...", "reason": "Exhaust repair", "schedule_label": "..." },
-  "mode": "start|handoff_only",
-  "candidates": [ { "apparatus_id": 57, "vehicle_number": "1033", "label": "Rescue 1033", "location": "Station 2", "status": "Available", "direct": true, "is_return": false } ],
-  "other_vehicles": [ { "apparatus_id": 58, "vehicle_number": "1034", "label": "Rescue 1034", "location": "Station 2", "status": "In Service" } ],
-  "equipment": { "checklist_version": "64 hex", "usable": true, "compartments": [ { "id": "front_cab", "name": "Front Cab", "items": [
-      { "item_key": "front_cab-item-3", "name": "Portable radio", "expected_quantity": 2, "controlled": false, "default_handling": "transfer", "previous": null }
-  ] } ] },
-  "open_issues_on_truck": 3,
-  "previous_changeout": { "id": 7, "from_vehicle_number": "17503", "to_vehicle_number": "1033", "effective_at": "2026-11-01T20:10:00Z", "moved": 40, "left_behind": [ { "name": "...", "note": "..." } ], "open": [ { "name": "...", "status": "needs_review" } ], "submitted_by_name": "..." },
-  "pending_changeout": null,
-  "can_fleet_commit": false
-}
+unit { apparatus_id, designation, slug, vehicle_number, station_id, station_label, status }
+alert { id, title, reason, schedule_label, vehicle_number, planned_replacement_apparatus_id, changeout_id } | null
+mode start | handoff_only
+candidates [ { apparatus_id, vehicle_number, label, location, status, is_return } ]
+other_vehicles [ { apparatus_id, vehicle_number, label, location, status, listed_as } ]
+equipment { checklist_version, usable, compartments [ { id, name, items [ { item_key, name, expected_quantity, previous { handling, note } | null } ] } ] }
+previous_changeout { id, from_apparatus_id, from_vehicle_number, to_vehicle_number, effective_at, moved, left_behind [ { name, note } ], submitted_by_name } | null
+open_issues_on_truck
 ```
 
 `POST apparatuses/{apparatus}/changeouts`
 
-```json
-{
-  "client_submission_id": "uuid",
-  "expected_vehicle_number": "17503",
-  "expected_unit_slug": "r44",
-  "alert_id": 12,
-  "to_apparatus_id": 57,
-  "to_vehicle_number": null,
-  "checklist_version": "64 hex",
-  "exceptions": [ { "item_key": "front_cab-item-3", "handling": "leave", "quantity": null, "condition": "ok", "note": "Spare stays with the truck" } ],
-  "note": null
-}
+```
+client_submission_id   uuid, required
+expected_vehicle_number   required, may be null
+expected_unit_slug   required
+alert_id   optional
+to_apparatus_id   optional
+to_vehicle_number   optional
+checklist_version   optional
+exceptions   [ { item_key, handling: leave | transfer, note? } ]
+note   optional
 ```
 
-`expected_unit_slug` is required: it is `unit.slug` from the context. `checklist_version` is required whenever `exceptions` is
-not empty. Every checklist line not named in `exceptions` is its default. `201` for a new record, `200` for a replay.
+Name the truck with `to_apparatus_id` or `to_vehicle_number`; `to_apparatus_id` wins if both are sent. Any line not in `exceptions`
+is took. Unknown fields and unknown items are ignored. `201` for a new record, `200` for a replay, both `{ changeout, replayed }`.
 
-```json
-{ "changeout": { "id": 8, "status": "completed|pending_fleet", "handoff_status": "complete|pending_verification",
-  "unit_designation": "R 44", "from_vehicle_number": "17503", "to_vehicle_number": "1033", "effective_at": "...",
-  "moved": 40, "left_behind": 1, "open": 0, "alert_completed": true, "message": "R 44 is now on truck 1033." }, "replayed": false }
+```
+changeout { id, status: completed, unit_designation, from_vehicle_number, to_vehicle_number, to_apparatus_id, station_id, effective_at,
+  old_truck_status: Out of Service, alert_id, alert_completed, return_of_changeout_id, submitted_by_name, moved, left_behind,
+  next_daily_checkout_path, message, new_truck_record, displaced_unit, lines? [ { id, item_key, name, compartment, handling, custody_status, note } ] }
 ```
 
-`GET changeouts/{changeout}` returns the same summary with lines, to the submitter, members of the unit's station page, and Fleet.
-`POST changeouts/{changeout}/lines/{line}/verify` `{ "note": "..." }` for those with authority (see section 3).
+`moved` and `left_behind` are counts. `message` reads "R 44 is now on truck 1033. Truck 17503 is marked Out of Service."
 
-Errors follow the Hub shape, `{ "message": "...", "code": "CHANGEOUT_STALE", ... }`, and messages say what happened, that the
-work is safe, and what to do next.
+`GET changeouts/{changeout}` returns the same summary with `lines`, to the submitter, active members with a profile, and Fleet.
 
-## 7. Notifications
+Errors follow the Hub shape, `{ "message": "...", "code": "CHANGEOUT_STALE", ... }`, and messages say what happened, that the work is
+safe, and what to do next.
 
-Alert creation can notify through `NotificationCategoryRegistry` key `fleet_operational_alerts` (bell by default, phone off,
-eligible: active members), only when `send_notification` is on and only once (`notified_at`). A `pending_fleet` changeout
-uses the existing `vehicle_swap_reports` category and `NotificationDispatchService`. There is no new preference store.
+## 7. Telling Fleet
+
+On every committed changeout, including `handoff_only`:
+
+- **Notification.** One, through `NotificationDispatchService`, category `vehicle_swap_reports`, event key
+  `apparatus_changeout:<id>:committed`, deep link `/admin/apparatus-changeouts/<id>`, after commit and best effort. A failure never
+  fails the swap. There is no new preference store.
+- **Admin dashboard.** `App\Services\Dashboards\Sources\Vehicle\VehicleChangeoutSource`, type `vehicle_changeout`, vehicle lane, grouped under
+  the truck the unit moved onto. One issue per unacknowledged change, severity medium, stage `awaiting_response`, plus changes
+  acknowledged in the operational day as resolved. Title "R 44 changed trucks: 17503 to 1033". Actions: Acknowledge (bulk) and the
+  link to the changeout page.
+- **Apparatus page.** `VehicleChangesBanner` above the list, with Acknowledge and View for those allowed, and a "Vehicle changes" tab whose
+  count is the sidebar badge (`FleetQueueCounts`, one memoized query shared across the page). On the profile, the same banner for
+  changes involving this truck, on both trucks. The banner adds one query per page and none per row.
+- **Vehicle changeouts.** Read-only history plus Acknowledge; the badge is the unacknowledged count. Took and left lines are shown plainly.
+
+Alert creation can also notify through key `fleet_operational_alerts`, only when `send_notification` is on and only once.
 
 ## 8. Reconciling a Fleet status report
 
@@ -270,17 +225,16 @@ them with the same compare-and-set. Report rows are not the whole fleet: a truck
 
 ```php
 // App\Services\Fleet\ApparatusChangeoutPlanner (read only)
-context(Apparatus $unit, User $actor, ?int $alertId = null): array                     // section 6 shape
+context(Apparatus $unit, ?int $alertId = null): array                                  // section 6 shape
 
 // App\Services\Fleet\ApparatusChangeoutService
 submit(Apparatus $unit, User $actor, array $payload): array                            // ['changeout' => ApparatusChangeout, 'created' => bool, 'replayed' => bool]
-decide(int $changeoutId, User $actor, string $decision, ?string $note = null,          // 'approve' | 'reject'
-       ?int $mappedApparatusId = null, ?string $oldTruckStatus = null): ApparatusChangeout
-cancel(int $changeoutId, User $actor, ?string $note = null): ApparatusChangeout
-verifyLine(int $changeoutId, int $lineId, User $actor, ?string $note = null): ApparatusChangeout
-canVerify(User $user, ApparatusChangeout $changeout): bool
-summary(ApparatusChangeout $changeout, ?User $viewer = null, bool $withLines = false): array  // section 6 shape
+acknowledge(int $changeoutId, User $actor): ApparatusChangeout                         // Fleet managers, idempotent
+summary(ApparatusChangeout $changeout, bool $withLines = false): array                 // section 6 shape
 // Refusals throw App\Services\Fleet\ChangeoutConflictException(code, message, array $context); the controller maps it to 409.
+
+// App\Services\Fleet\VehicleSwapService
+moveUnitForChangeout(Apparatus $from, Apparatus $to): array                            // caller holds the transaction and both locks
 
 // App\Services\Fleet\ApparatusOperationalAlertService
 create(array $data, ?User $actor): ApparatusOperationalAlert                           // $actor null only from the console
@@ -294,5 +248,6 @@ activeForUnit(string $unitSlug): Collection
 
 ## 10. Rollback
 
-Redeploy the previous image. Old code ignores the new tables. Identity moves already made remain true facts on the apparatus
-rows and old code reads them normally. Never reverse the migration on production.
+Redeploy the previous image. Old code ignores the new columns. Identity moves and statuses already made remain true facts on the
+apparatus rows and old code reads them normally. `2026_11_01_090000` only adds columns and drops the unused one-waiting-decision index;
+its `down` restores that index. Never reverse a migration on production.

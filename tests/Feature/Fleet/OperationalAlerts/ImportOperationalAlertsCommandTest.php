@@ -48,7 +48,6 @@ final class ImportOperationalAlertsCommandTest extends TestCase
         $this->assertSame('Sunday, November 1, afternoon', $r44->scheduleLabel());
         $this->assertNull($r44->scheduled_at);
         $this->assertNull($r44->planned_replacement_apparatus_id, 'no replacement truck is invented');
-        $this->assertSame('Maintenance', $r44->old_truck_status_after);
         $this->assertSame('Fleet email dated October 30, 2026', $r44->source);
         $this->assertFalse($r44->send_notification);
         $this->assertNull($r44->notified_at);

@@ -30,7 +30,6 @@ final class AdminOperationalAlertPagesTest extends AdminChangeoutTestCase
                 'scheduled_date' => $date,
                 'scheduled_window' => 'afternoon',
                 'planned_replacement_apparatus_id' => $this->reserve->id,
-                'old_truck_status_after' => 'Maintenance',
             ])
             ->assertHasNoActionErrors();
 
@@ -40,7 +39,6 @@ final class AdminOperationalAlertPagesTest extends AdminChangeoutTestCase
         $this->assertSame('e2', strtolower($alert->unit_slug));
         $this->assertSame('V-202', $alert->vehicle_number);
         $this->assertSame($this->reserve->id, $alert->planned_replacement_apparatus_id);
-        $this->assertSame('Maintenance', $alert->old_truck_status_after);
         $this->assertSame($before, $this->trucksNow(), 'A planned changeout is not a completed swap.');
     }
 
@@ -100,7 +98,7 @@ final class AdminOperationalAlertPagesTest extends AdminChangeoutTestCase
         $list = Livewire::test(ListApparatuses::class)->call('loadTable')
             ->assertTableActionVisible('scheduleChangeout', $this->unit)
             ->assertTableActionVisible('addOperationalAlert', $this->unit);
-        $this->assertSame([], $queries, 'Drawing the rows reads no alert or changeout tables.');
+        $this->assertSame(['select * from "apparatus_changeouts" where "status" = ? and "acknowledged_at" is null order by "id" desc limit 10'], $queries, 'The banner is one query. Drawing the rows reads no alert or changeout tables.');
 
         $list->callTableAction('addOperationalAlert', $this->unit, data: [
             'category' => ApparatusOperationalAlert::CATEGORY_RECALL,
@@ -149,7 +147,6 @@ final class AdminOperationalAlertPagesTest extends AdminChangeoutTestCase
                 'scheduled_window' => 'morning',
                 'instructions' => 'Call Fleet first.',
                 'planned_replacement_apparatus_id' => $this->reserve->id,
-                'old_truck_status_after' => 'Out of Service',
                 'additional_station_ids' => [$this->frontline->station_id],
             ])
             ->call('save')
@@ -159,7 +156,6 @@ final class AdminOperationalAlertPagesTest extends AdminChangeoutTestCase
         $this->assertSame('Changeout moved to later this week', $fresh->title);
         $this->assertSame($date, $fresh->scheduled_date->format('Y-m-d'));
         $this->assertNull($fresh->scheduled_at);
-        $this->assertSame('Out of Service', $fresh->old_truck_status_after);
         $this->assertSame(ApparatusOperationalAlert::CATEGORY_UPCOMING_SWAP, $fresh->category, 'The kind of alert is fixed once created.');
 
         Livewire::test(ViewApparatusOperationalAlert::class, ['record' => $alert->getRouteKey()])
