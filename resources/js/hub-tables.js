@@ -197,37 +197,19 @@ function boxOf(table) {
   return table.closest(BOX) ?? table.parentElement;
 }
 
-function apply(table) {
-  const box = boxOf(table);
-  if (!box) return;
-  const available = box.clientWidth;
-  if (available === 0) return;
+/** Natural width of the actions cell (links such as "Edit" and "Create record" do not wrap), measured before any mode is applied. */
+function actionsWidth(table) {
+  let widest = 0;
+  rowsOf(table).slice(0, 6).forEach(row => {
+    const cell = row.querySelector(':scope > td.fi-ta-actions-cell');
+    if (cell) widest = Math.max(widest, Math.ceil(cell.getBoundingClientRect().width));
+  });
+  return widest;
+}
 
-  reset(table);
-  const info = describe(table);
-  if (!info || info.columns.length === 0) return;
+/** Put the table into the plan's mode: attributes and the grid template only, nothing moves in the DOM except the details buttons. */
+function commit(table, info, plan) {
   const { ths, columns, native } = info;
-  const hasSelection = ths.some(th => th.getAttribute('data-hub-kind') === 'select');
-  const hasActions = ths.some(th => th.getAttribute('data-hub-kind') === 'actions');
-  const fixed = (hasSelection ? SELECTION_PX : 0) + (hasActions ? ACTIONS_PX : 0);
-  const planInput = columns.map(({ index, priority, min, essential, control }) => ({ index, priority, min, essential, control }));
-
-  let plan = planColumns({ available, fixed, columns: planInput });
-  // The plan is an estimate. When the real table is still wider than its box, demand more room and plan again.
-  for (let attempt = 0; attempt < 6 && plan.mode === 'table'; attempt += 1) {
-    const overflow = table.scrollWidth - box.clientWidth;
-    if (overflow <= 1) break;
-    plan = planColumns({ available: available - overflow - 8 * (attempt + 1), fixed, columns: planInput });
-  }
-
-  if (plan.mode === 'table' && native.length) plan = { mode: 'priority', visible: plan.visible, hidden: [] };
-
-  if (plan.mode === 'table') {
-    removeToggles(table);
-    table.parentElement.querySelector(':scope > .hub-rt-sort')?.remove();
-    return;
-  }
-
   table.dataset.hubMode = plan.mode;
   setRole(table, 'table');
   table.querySelectorAll(':scope > thead, :scope > tbody').forEach(el => setRole(el, 'rowgroup'));
@@ -235,14 +217,15 @@ function apply(table) {
   ths.forEach(th => setRole(th, 'columnheader'));
 
   const hidden = new Set([...plan.hidden, ...native.map(c => c.index)]);
-  const hiddenColumns = [...columns, ...native].filter(c => hidden.has(c.index)).sort((a, b) => a.index - b.index);
+  const every = [...columns, ...native].sort((a, b) => a.index - b.index);
+  const hiddenColumns = every.filter(c => hidden.has(c.index));
   const firstVisible = columns.find(c => plan.visible.includes(c.index));
   const grid = template(ths, columns, plan, plan.mode);
   if (grid) table.style.setProperty('--hub-rt-cols', grid);
 
   if (plan.mode === 'priority') hiddenColumns.forEach(c => c.th.setAttribute('data-hub-hidden', ''));
   // In cards the heading row is replaced by one sort menu (and the select-all box), so no heading is shown twice.
-  if (plan.mode === 'cards') [...columns, ...native].forEach(c => c.th.setAttribute('data-hub-hidden', ''));
+  if (plan.mode === 'cards') every.forEach(c => c.th.setAttribute('data-hub-hidden', ''));
 
   rowsOf(table).forEach((row, position) => {
     const cells = cellsOf(row);
@@ -264,8 +247,45 @@ function apply(table) {
   });
 
   if (plan.mode === 'priority') syncSortMenu(table, hiddenColumns, 'Sort by another field');
-  else if (plan.mode === 'cards') syncSortMenu(table, [...columns, ...native].sort((a, b) => a.index - b.index), 'Sort by');
-  else table.parentElement.querySelector(':scope > .hub-rt-sort')?.remove();
+  else if (plan.mode === 'cards') syncSortMenu(table, every, 'Sort by');
+}
+
+function apply(table) {
+  const box = boxOf(table);
+  if (!box) return;
+  const available = box.clientWidth;
+  if (available === 0) return;
+
+  reset(table);
+  const info = describe(table);
+  if (!info || info.columns.length === 0) return;
+  const { ths, columns, native } = info;
+  const hasSelection = ths.some(th => th.getAttribute('data-hub-kind') === 'select');
+  const fixed = (hasSelection ? SELECTION_PX : 0) + Math.max(actionsWidth(table), ths.some(th => th.getAttribute('data-hub-kind') === 'actions') ? ACTIONS_PX : 0);
+  const planInput = columns.map(({ index, priority, min, essential, control }) => ({ index, priority, min, essential, control }));
+
+  // The plan is an estimate from minimum widths. Check the real table and, while it is still wider than its box,
+  // ask for more room and plan again (a cell with an unbreakable value can need more than its minimum).
+  let room = available;
+  let plan = { mode: 'table', visible: [], hidden: [] };
+  for (let attempt = 0; attempt < 6; attempt += 1) {
+    plan = planColumns({ available: room, fixed, columns: planInput });
+    if (plan.mode === 'table' && native.length) plan = { mode: 'priority', visible: plan.visible, hidden: [] };
+    if (plan.mode !== 'table') {
+      reset(table);
+      describe(table);
+      commit(table, info, plan);
+    }
+    if (plan.mode === 'cards') break;
+    const overflow = table.scrollWidth - box.clientWidth;
+    if (overflow <= 1) break;
+    room -= overflow + 8;
+  }
+
+  if (plan.mode === 'table') {
+    removeToggles(table);
+    table.parentElement.querySelector(':scope > .hub-rt-sort')?.remove();
+  }
 }
 
 function run() {

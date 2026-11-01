@@ -222,7 +222,7 @@
 [data-hub-portal="report"] .hub-chart-description { margin-top: .75rem; font-size: .8125rem; line-height: 1.65; }
 [data-hub-portal="report"] .hub-chart-description a { color: rgb(var(--hub-action-primary)); text-decoration: underline; text-underline-offset: 3px; }
 [data-hub-portal="report"] caption { padding-block: .5rem; font-size: .8125rem; font-weight: 650; text-align: left; }
-[data-hub-portal="report"] .hub-chart-data { max-width: 100%; margin-block: 1rem; overflow-x: auto; overscroll-behavior-x: contain; }
+[data-hub-portal="report"] .hub-chart-data { max-width: 100%; margin-block: 1rem; }
 [data-hub-portal="report"] .hub-chart-data table { width: 100%; border-collapse: collapse; font-size: .8125rem; }
 [data-hub-portal="report"] .hub-chart-data caption { padding-block: .5rem; font-weight: 650; text-align: left; }
 [data-hub-portal="report"] .hub-chart-data :is(th, td) { padding: .625rem .75rem; border-bottom: 1px solid rgb(var(--hub-border)); text-align: left; }

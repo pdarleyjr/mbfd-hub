@@ -9,7 +9,7 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
     <link rel="shortcut icon" href="/favicon.ico">
     <title>Security &amp; Standards | MBFD Hub</title>
-    @vite('resources/css/app.css')
+    @vite(['resources/css/app.css', 'resources/js/hub-tables.js'])
     <style>
         body, .font-heading { font-family: var(--hub-font-sans); }
         .sec-card { transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease; }

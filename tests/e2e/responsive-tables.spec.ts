@@ -30,9 +30,9 @@ async function login(page: Page): Promise<void> {
 
 /** Wait for Livewire's deferred table load and for hub-tables.js to apply its plan. */
 async function settle(page: Page): Promise<void> {
-    await page.waitForLoadState('networkidle').catch(() => undefined);
-    await page.waitForFunction(() => !document.querySelector('.fi-ta .fi-loading-indicator, .fi-ta [wire\\:loading]:not([style*="display: none"])') || true);
-    await page.waitForTimeout(900);
+    // Pages with wire:poll never go fully idle, so the wait is bounded.
+    await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => undefined);
+    await page.waitForTimeout(1_200);
 }
 
 async function measure(page: Page) {
@@ -43,6 +43,8 @@ async function measure(page: Page) {
         document.querySelectorAll('body *').forEach(element => {
             const style = getComputedStyle(element);
             if (style.display === 'none' || style.visibility === 'hidden' || element.clientWidth === 0) return;
+            // The shell's own menus are owned by hub-shell.css and covered by shell-alignment.spec.ts.
+            if (element.closest('.hub-shell-popover, .hub-shell-bar')) return;
             if ((style.overflowX === 'auto' || style.overflowX === 'scroll') && element.scrollWidth > element.clientWidth + 1) {
                 scrollers.push(`${element.tagName.toLowerCase()}.${String(element.getAttribute('class') ?? '').split(/\s+/).slice(0, 3).join('.')} +${element.scrollWidth - element.clientWidth}px`);
             }

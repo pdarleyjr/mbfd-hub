@@ -1,5 +1,6 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
+import './hub-tables.js';
 // --- 1. Comprehensive Data Extraction ---
         // Every item from the PDF is strictly logged here.
         // Flags: 🟢=NFPA, 🔵=ISO, 🟣=Both NFPA & ISO, **=Tactical/Dept

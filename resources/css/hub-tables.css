@@ -13,6 +13,10 @@
 /* ---- Filament page tabs (list filters) wrap instead of scrolling sideways ---- */
 .fi-tabs { flex-wrap: wrap; overflow-x: visible; max-width: 100%; }
 
+/* ---- Filament layout lists (Split/Stack records): flex children shrink, long strings break ---- */
+.fi-ta-record :is(div, a, span, p) { min-width: 0; }
+.fi-ta-record :is(.fi-ta-text, .fi-ta-text-item-label, a) { overflow-wrap: anywhere; }
+
 /* ---- Every Filament table: long text wraps, nothing forces the page wider ---- */
 .fi-ta-content { max-width: 100%; }
 .fi-ta-table { width: 100%; }
@@ -176,4 +180,19 @@ table[data-hub-mode] .fi-ta-select { width: 100%; min-width: 0; padding: 0.25rem
     padding: 0.375rem 0.75rem;
   }
   .hub-table--stack > tbody > tr > td[data-label]::before { content: attr(data-label); color: rgb(var(--hub-n-600)); font-size: 0.8125rem; font-weight: 600; }
+}
+
+/* ---- Print and PDF keep the real table: every column, no cards, no controls ---- */
+@media print {
+  table[data-hub-mode] { display: table; width: 100%; }
+  table[data-hub-mode] > thead { display: table-header-group; }
+  table[data-hub-mode] > tbody { display: table-row-group; padding: 0; }
+  table[data-hub-mode] > thead > tr,
+  table[data-hub-mode] > tbody > tr { display: table-row; border: 0; }
+  table[data-hub-mode] > thead > tr > th,
+  table[data-hub-mode] > tbody > tr > td,
+  table[data-hub-mode] [data-hub-hidden],
+  table[data-hub-mode] > tbody > tr:not([data-hub-open]) > td[data-hub-hidden] { display: table-cell; padding: 0.25rem 0.5rem; background: none; border: 0; }
+  table[data-hub-mode] > tbody > tr > td::before { content: none; }
+  .hub-rt-toggle, .hub-rt-sort { display: none; }
 }
