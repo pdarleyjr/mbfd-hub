@@ -135,3 +135,14 @@ The template (`storage/checklists/fireboat6_checklist.json`, version 2026-11) gr
 Engine temperatures are in Fahrenheit (owner, 2026-11-01). The unit is in the field name, so it shows everywhere the reading does: entry, review, member history and the admin record. Readings refuse only what cannot be a reading (below zero, fuel above 100%). No operating limits are configured because none are established.
 
 SCUBA is diving equipment and airpacks (SCBA) are breathing apparatus, so they are separate fields. The count of SCUBA sets aboard is not established, so `fb6-scuba-ids` is one list rather than a fixed number of boxes. Radio numbers and the last four of the Motorola serial are kept as separate identifiers.
+
+## 7. SCBA and radio numbers
+
+Every member sees and can change the SCBA and radio numbers on the review step of every apparatus, filled in from the last inspection of that apparatus, so they only touch what changed.
+
+- **Which entries:** `CrewEquipmentNumbers::slots` reads them from the checklist: any write-in field or item named for an SCBA, airpack, SCUBA or radio. Checklists are not edited, so their hashes and open drafts are untouched. A card edit writes to the checklist's own answer, so nothing is entered twice.
+- **Boxes:** at least what the checklist has. FB6 has 4 airpacks, 4 radio numbers and the Motorola serial digits. Rescues have 3 radios and one "SCBAs" item shown as 3 boxes (`expectedQuantity`) and stored comma separated. Engines and ladders have more than 3 radios on their checklists already.
+- **More:** Add another SCBA or radio, on any apparatus, up to 30. They are sent beside the checklist as `extra_equipment_numbers`, and kept on the inspection's own record.
+- **Current value:** `apparatus_equipment_numbers`, one row per entry on the physical apparatus. Each inspection keeps its own permanent copy, so this table is only "what is on the rig now". Until a unit's first checkout it starts from its latest inspection, skipping entries with no digit ("OK", "Inspected").
+- **Clearing:** sending the `extra_equipment_numbers` key, even empty, says the app showed the member the numbers, so a blank clears one. A phone on an older app does not send it, and its blank never clears anything.
+- **Truck changes:** numbers stay with the physical truck. After a changeout the next member sees that truck's last numbers and corrects them.

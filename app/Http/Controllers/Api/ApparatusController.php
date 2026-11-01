@@ -20,6 +20,7 @@ use App\Services\DailyCheckoutInspectionSessionService;
 use App\Services\Display\DisplaySnapshotService;
 use App\Services\Fleet\ApparatusChangeoutPlanner;
 use App\Services\Fleet\CheckoutVehicleReport;
+use App\Services\Fleet\CrewEquipmentNumbers;
 use App\Services\Fleet\VehicleIdentificationPlanner;
 use App\Services\Fleet\VehicleIdentificationService;
 use App\Services\Fleet\VehicleIdentificationSubmission;
@@ -119,6 +120,7 @@ class ApparatusController extends Controller
             // Outside the hashed checklist on purpose: answering a question never changes checklist_version.
             'vehicle_identification' => app(VehicleIdentificationPlanner::class)->block($apparatus),
             'vehicle_id_required' => VehicleIdentificationFields::usesFleetNumber($apparatus),
+            'equipment_numbers' => app(CrewEquipmentNumbers::class)->block($apparatus, $checklist),
             // Outside the hashed checklist too: what stayed on the truck this crew just left.
             'changeout_handoff' => app(ApparatusChangeoutPlanner::class)->handoffNotice($apparatus),
         ]);
@@ -240,6 +242,7 @@ class ApparatusController extends Controller
             // Not part of the frozen session snapshot or its hash.
             'vehicle_identification' => app(VehicleIdentificationPlanner::class)->block($apparatus),
             'vehicle_id_required' => VehicleIdentificationFields::usesFleetNumber($apparatus),
+            'equipment_numbers' => app(CrewEquipmentNumbers::class)->block($apparatus, $sessionChecklist),
         ], $issued['created'] ? 201 : 200);
 
         if ($browserBinding['new']) {
@@ -348,6 +351,7 @@ class ApparatusController extends Controller
             'inspection_session' => $inspectionSessionService->publicContract($session, $issued['token']),
             'vehicle_identification' => app(VehicleIdentificationPlanner::class)->block($apparatus),
             'vehicle_id_required' => VehicleIdentificationFields::usesFleetNumber($apparatus),
+            'equipment_numbers' => app(CrewEquipmentNumbers::class)->block($apparatus, $sessionChecklist),
         ], $issued['created'] ? 201 : 200);
     }
 
@@ -415,6 +419,13 @@ class ApparatusController extends Controller
             'concerns.*.location' => ['nullable', 'string', 'max:255'],
             'concerns.*.photo' => ['nullable', 'string', 'max:7000000'],
             'concerns.*.existing_issue_id' => ['nullable', 'integer', 'min:1'],
+            // SCBA and radio numbers the checklist has no entry for. The key being sent, even empty, says this app showed the member the numbers.
+            'extra_equipment_numbers' => ['sometimes', 'array', 'max:'.CrewEquipmentNumbers::MAX_EXTRAS, 'prohibited_unless:processing_version,1'],
+            'extra_equipment_numbers.*' => ['required', 'array'],
+            'extra_equipment_numbers.*.client_id' => ['required', 'uuid', 'distinct:ignore_case'],
+            'extra_equipment_numbers.*.kind' => ['required', 'string', 'in:'.CrewEquipmentNumbers::KIND_SCBA.','.CrewEquipmentNumbers::KIND_RADIO],
+            'extra_equipment_numbers.*.label' => ['nullable', 'string', 'max:120'],
+            'extra_equipment_numbers.*.number' => ['required', 'string', 'max:64', 'regex:/\S/'],
             'inspection_session_id' => ['nullable', 'uuid'],
             'inspection_session_token' => ['nullable', 'string', 'regex:/\A[a-f0-9]{64}\z/i'],
             'inspection_session_replay_key' => ['nullable', 'uuid'],
@@ -646,6 +657,9 @@ class ApparatusController extends Controller
                 if (($prepared['concerns'] ?? []) !== []) {
                     $pendingEffects['concerns'] = $prepared['concerns'];
                 }
+                if (array_key_exists('extra_equipment_numbers', $prepared)) {
+                    $pendingEffects['extra_equipment_numbers'] = $prepared['extra_equipment_numbers'];
+                }
                 if ($this->isV2Checklist($lockedChecklist)) {
                     $pendingEffects['checklist_v2'] = $this->snapshotV2ChecklistEvidence(
                         $prepared,
@@ -674,7 +688,10 @@ class ApparatusController extends Controller
                     'processing_status' => null,
                     'results' => $prepared['compartments'] ?? null,
                     'checklist_evidence' => ($prepared['processing_version'] ?? null) === 1
-                        ? app(\App\Services\InspectionPaperFields::class)->snapshot($prepared, $lockedChecklist)
+                        ? [
+                            ...app(\App\Services\InspectionPaperFields::class)->snapshot($prepared, $lockedChecklist),
+                            ...app(CrewEquipmentNumbers::class)->evidenceLines($prepared['extra_equipment_numbers'] ?? []),
+                        ]
                         : null,
                     'officer_signature' => $prepared['officer_signature_path'] ?? null,
                     'employee_id' => $prepared['employee_id'] ?? null,

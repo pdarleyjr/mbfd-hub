@@ -195,6 +195,35 @@ export interface ChecklistField {
   max?: number;
 }
 
+export type EquipmentKind = 'scba' | 'radio';
+
+/** One SCBA or radio entry on the issued checklist, with the number the last member left. */
+export interface EquipmentSlot {
+  slot: string;
+  kind: EquipmentKind;
+  label: string;
+  field_id: string | null;
+  compartment_id: string | null;
+  item_id: string | null;
+  /** How many numbers one checklist entry holds (a rescue's "SCBAs"). */
+  boxes: number;
+  number: string;
+}
+
+/** A number the checklist has no entry for, added by a member. */
+export interface EquipmentExtra {
+  client_id: string;
+  kind: EquipmentKind;
+  label: string | null;
+  number: string;
+}
+
+/** The SCBA and radio numbers carried from the last inspection; outside the hashed checklist. */
+export interface EquipmentNumbers {
+  slots: EquipmentSlot[];
+  extras: EquipmentExtra[];
+}
+
 /** Scheduled duties are procedures. The equipment words remain only on a draft or payload from before 2026-11. */
 export type ScheduledTaskStatus = 'Completed' | 'Not Completed' | ItemStatus;
 
@@ -302,6 +331,8 @@ export interface ChecklistData {
   vehicle_identification?: VehicleIdentification;
   /** False for a unit with no fleet vehicle ID at all (Fire Boat 6). Missing means true. */
   vehicle_id_required?: boolean;
+  /** SCBA and radio numbers from the last inspection. Absent on older cached responses. */
+  equipment_numbers?: EquipmentNumbers;
   /** Equipment the last changeout left on the old truck. Absent on older cached responses. */
   changeout_handoff?: ChangeoutHandoff;
   checklist_version: string;
@@ -388,6 +419,8 @@ export interface InspectionSubmission {
   inventory_draft_id?: string;
   /** Concerns, damage and notes the member added (max 20). Omitted when there are none. */
   concerns?: ConcernSubmission[];
+  /** Sent, even empty, when the member was shown the numbers, so a blank entry means the number was cleared. */
+  extra_equipment_numbers?: EquipmentExtra[];
 }
 
 export interface MeterData {
@@ -411,6 +444,8 @@ export interface InspectionData {
   vehicleIdentification?: VehicleIdentificationAnswers;
   /** Concerns, damage and notes being written. Live issue findings are never kept here. */
   concerns?: ConcernDraft[];
+  /** SCBA and radio numbers added on this checkout; absent on a draft from before they could be added. */
+  equipmentExtras?: EquipmentExtra[];
   actorUserId?: number;
   actorSecurityVersion?: number;
   checklist_version: string;

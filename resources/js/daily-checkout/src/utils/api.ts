@@ -9,6 +9,7 @@ import {
 } from '../types';
 import { purgeOnSessionEnd } from '../pwa/userCaches.ts';
 import { purgeCachedFindings } from './liveFindingsCache';
+import { parseEquipmentNumbers } from './equipmentNumbers.ts';
 import { parseVehicleIdentification, parseVehicleIdentificationResponse } from './vehicleIdentification';
 import { parseChangeoutHandoff } from '../components/changeout/changeoutParse';
 
@@ -447,6 +448,7 @@ export class ApiClient {
     const checklistBaseVersion = [payload?.checklist_base_version, rawChecklist?.checklist_base_version].find(nonEmptyString);
     // Sent next to the checklist (and on the Fire Boat session start), never inside the hashed contract.
     const vehicleIdentification = parseVehicleIdentification(payload?.vehicle_identification);
+    const equipmentNumbers = parseEquipmentNumbers(payload?.equipment_numbers);
     const changeoutHandoff = parseChangeoutHandoff(payload?.changeout_handoff);
     const checklist: ChecklistData = {
       open_findings: Array.isArray(payload?.open_findings) ? payload.open_findings : [],
@@ -454,6 +456,7 @@ export class ApiClient {
       pending_corrections: parsePendingCorrections(payload?.pending_corrections),
       ...(vehicleIdentification ? { vehicle_identification: vehicleIdentification } : {}),
       ...(payload?.vehicle_id_required === false ? { vehicle_id_required: false } : {}),
+      ...(equipmentNumbers ? { equipment_numbers: equipmentNumbers } : {}),
       ...(changeoutHandoff ? { changeout_handoff: changeoutHandoff } : {}),
       checklist_version: checklistVersion.toLowerCase(),
       checklist_type: typeof payload?.checklist_type === 'string' ? payload.checklist_type : undefined,

@@ -15,6 +15,7 @@ use App\Services\Captain5\Captain5Notifier;
 use App\Services\Defects\DefectContinuityService;
 use App\Services\Defects\FindingsResult;
 use App\Services\Defects\InspectionConcernRecorder;
+use App\Services\Fleet\CrewEquipmentNumbers;
 use App\Services\Inspections\InspectionHold;
 use App\Services\Inspections\InspectionNotificationDispatcher;
 use Illuminate\Support\Facades\DB;
@@ -70,6 +71,7 @@ final class ApparatusInspectionProcessingService
         $batch = $concerns->begin($inspection, $apparatus, $evidence['concerns'] ?? []);
         $findings = app(DefectContinuityService::class)->recordFindings($inspection, $apparatus, [...$observations, ...$batch->compartments], $definitions, $evidence);
         $findings = $concerns->finish($batch, $inspection, $apparatus, $findings);
+        app(CrewEquipmentNumbers::class)->record($inspection, $apparatus, $checklist, $evidence);
 
         $this->recordNonMeterHolds($inspection, $apparatus, $findings);
         $this->settle($inspection, $apparatus, $evidence, $meterOutcomes);

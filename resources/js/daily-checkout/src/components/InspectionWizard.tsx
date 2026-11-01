@@ -1,7 +1,7 @@
 import { HUB_TIMEZONE } from '../../../shared/timezone.ts';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router';
-import { Apparatus, ApparatusServiceTicketSummary, FleetVehicle, OfficerInfo, ChecklistData, ChecklistFieldValue, Compartment, Defect, InspectionData, MeterData, InspectionSubmission, ReviewFlagDraft, ScheduledChecklistTaskResult, VehicleIdentificationAnswers } from '../types';
+import { Apparatus, ApparatusServiceTicketSummary, EquipmentExtra, FleetVehicle, OfficerInfo, ChecklistData, ChecklistFieldValue, Compartment, Defect, InspectionData, MeterData, InspectionSubmission, ReviewFlagDraft, ScheduledChecklistTaskResult, VehicleIdentificationAnswers } from '../types';
 import { ApiClient, READ_TIMEOUT_MS } from '../utils/api';
 import {
   DAILY_CHECKOUT_QUEUE_SYNC_EVENT,
@@ -41,6 +41,7 @@ import { inspectionProgress, inspectionReadiness } from '../utils/inspectionProg
 import { identityForQueueCapture, type OfflineIdentity } from '../lib/offlineIdentity';
 import { EMPTY_REVIEW_FLAG, buildReviewFlag, normalizeReviewFlagDraft, reviewFlagExplanationMissing } from '../utils/reviewFlag';
 import { normalizeTaskStatus } from '../utils/checklistFields.ts';
+import { prefillCompartments, prefillFieldValues, toExtraSubmissions } from '../utils/equipmentNumbers.ts';
 import { checklistUsesVehicleId, defaultVehicleConfirmation, paperVehicleValue, reconcileVehicleConfirmation, toPhysicalVehicleReport } from '../utils/vehicleConfirmation';
 import { activeVehicleIdentification, optionalIdentification, toVehicleIdentificationSubmission } from '../utils/vehicleIdentification';
 import { ClipboardList, Gauge, Truck, Users } from 'lucide-react';
@@ -154,6 +155,8 @@ export default function InspectionWizard() {
   const [reviewFlag, setReviewFlag] = useState<ReviewFlagDraft>(EMPTY_REVIEW_FLAG);
   // Concerns, damage and notes the member adds on the review step. Part of the draft, unlike the live findings.
   const [concerns, setConcerns] = useState<ConcernDraft[]>([]);
+  // SCBA and radio numbers added beyond the checklist's own entries. Part of the draft.
+  const [equipmentExtras, setEquipmentExtras] = useState<EquipmentExtra[]>([]);
   // Created once per draft; links inventory corrections reported meanwhile to the inspection.
   const [draftId, setDraftId] = useState<string | null>(null);
   const [checklist, setChecklist] = useState<ChecklistData | null>(null);
@@ -492,10 +495,12 @@ export default function InspectionWizard() {
         setSignature(null);
         setReviewFlag(EMPTY_REVIEW_FLAG);
         setConcerns([]);
+        setEquipmentExtras(checklistData.equipment_numbers?.extras ?? []);
         setDraftId(createClientSubmissionId());
         setCurrentStep('compartments');
-        setCompartments(checklistData.compartments);
-        setFieldValues(checklistData.fields.map((field) => ({
+        // The last member's SCBA and radio numbers carry over, so this member only changes what changed.
+        setCompartments(prefillCompartments(checklistData.compartments, checklistData.equipment_numbers));
+        setFieldValues(prefillFieldValues(checklistData.fields.map((field) => ({
           id: field.id,
           value: field.id === checklistData.inspection_date_field_id
             ? checklistData.inspection_date ?? ''
@@ -505,7 +510,7 @@ export default function InspectionWizard() {
               : field.inputType === 'number' || field.inputType === 'percentage'
                 ? null
                 : '',
-        })));
+        })), checklistData.equipment_numbers));
         setScheduledTasks(checklistData.due_tasks.map((task) => ({
           id: task.id,
           status: 'Completed',
@@ -526,6 +531,7 @@ export default function InspectionWizard() {
             setSignature(saved.signature ?? null);
             setReviewFlag(normalizeReviewFlagDraft(saved.reviewFlag));
             setConcerns(restoreConcernDrafts(saved.concerns));
+            setEquipmentExtras(saved.equipmentExtras ?? checklistData.equipment_numbers?.extras ?? []);
             setDraftId(saved.draftId ?? createClientSubmissionId());
             // Keep the issued baseline with the observation, even after a newer
             // checkout changed the live fleet meters while this draft was offline.
@@ -617,6 +623,7 @@ export default function InspectionWizard() {
         ...(draftId ? { draftId } : {}),
         ...(Object.keys(vehicleIdentification).length > 0 ? { vehicleIdentification } : {}),
         ...(concerns.length > 0 ? { concerns } : {}),
+        ...(checklist.equipment_numbers ? { equipmentExtras } : {}),
         meter: meterData,
         compartments,
         fieldValues,
@@ -626,7 +633,7 @@ export default function InspectionWizard() {
       },
       clearSessionStartKeyFor: checklist.schema_version === 2 && checklist.inspection_session ? checklist.checklist_version : undefined,
     }, stepChanged);
-  }, [officerInfo, meterData, compartments, fieldValues, scheduledTasks, currentStep, slug, apparatus, checklist, memberIdentity, loading, signature, reviewFlag, concerns, draftId, vehicleIdentification, submitting, queuedSubmissionBlocker, autosaver]);
+  }, [officerInfo, meterData, compartments, fieldValues, scheduledTasks, currentStep, slug, apparatus, checklist, memberIdentity, loading, signature, reviewFlag, concerns, equipmentExtras, draftId, vehicleIdentification, submitting, queuedSubmissionBlocker, autosaver]);
 
   useEffect(() => {
     if (readiness.ready) setShowNotReady(false);
@@ -718,9 +725,10 @@ export default function InspectionWizard() {
       setSignature(null);
       setReviewFlag(EMPTY_REVIEW_FLAG);
       setConcerns([]);
+      setEquipmentExtras(todayChecklist.equipment_numbers?.extras ?? []);
       setDraftId(createClientSubmissionId());
-      setCompartments(todayChecklist.compartments);
-      setFieldValues(todayChecklist.fields.map((field) => ({
+      setCompartments(prefillCompartments(todayChecklist.compartments, todayChecklist.equipment_numbers));
+      setFieldValues(prefillFieldValues(todayChecklist.fields.map((field) => ({
         id: field.id,
         value: field.id === todayChecklist.inspection_date_field_id
           ? todayChecklist.inspection_date ?? ''
@@ -729,7 +737,7 @@ export default function InspectionWizard() {
             : field.inputType === 'number' || field.inputType === 'percentage'
               ? null
               : '',
-      })));
+      })), todayChecklist.equipment_numbers));
       setScheduledTasks(todayChecklist.due_tasks.map((task) => ({
         id: task.id,
         status: 'Completed',
@@ -843,6 +851,7 @@ export default function InspectionWizard() {
         ...(draftId ? { inventory_draft_id: draftId } : {}),
         ...(identificationReport && (usesVehicleId || identificationReport.answers.length > 0) ? { vehicle_identification: identificationReport } : {}),
         ...(concernReport.length > 0 ? { concerns: concernReport } : {}),
+        ...(checklist.equipment_numbers ? { extra_equipment_numbers: toExtraSubmissions(equipmentExtras) } : {}),
       };
       clientSubmissionIdRef.current = submission.client_submission_id;
       const queueId = await queueSubmission(apparatus.id, submission, currentIdentity, checklist.checklist_base_version);
@@ -1247,6 +1256,10 @@ export default function InspectionWizard() {
           concerns={concerns}
           onConcernsChange={setConcerns}
           openIssues={concernIssues}
+          equipmentExtras={equipmentExtras}
+          onEquipmentExtrasChange={setEquipmentExtras}
+          onEquipmentFieldChange={(id, value) => setFieldValues(previous => previous.map(field => field.id === id ? { ...field, value } : field))}
+          onEquipmentItemChange={(compartmentId, itemId, value) => setCompartments(previous => previous.map(compartment => compartment.id === compartmentId ? { ...compartment, items: compartment.items.map(item => item.id === itemId ? { ...item, value } : item) } : compartment))}
           scheduledTasks={scheduledTasks}
           onSubmit={handleSubmit}
           onBack={goBack}
