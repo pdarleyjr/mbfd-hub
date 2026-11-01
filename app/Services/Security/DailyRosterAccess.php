@@ -42,4 +42,10 @@ final class DailyRosterAccess
             && (config('daily_roster.mode') === 'publish'
                 || RosterActiveVersion::query()->whereNotNull('roster_snapshot_id')->exists());
     }
+
+    /** The shell menu is built on every page, so it stays out of the database: it offers the roster once publishing is on. */
+    public function canSeeMenuEntry(?User $user): bool
+    {
+        return config('daily_roster.mode') === 'publish' && $this->canView($user);
+    }
 }

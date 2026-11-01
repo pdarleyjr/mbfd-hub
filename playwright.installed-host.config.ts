@@ -16,6 +16,8 @@ export default defineConfig({
   use: {
     baseURL: APEX_ORIGIN,
     browserName: 'chromium',
+    // New headless mode, as in the PWA update suite: the headless shell crashed on CI closing a context with workers.
+    channel: 'chromium',
     viewport: { width: 1280, height: 800 },
     serviceWorkers: 'allow',
     trace: 'retain-on-failure',

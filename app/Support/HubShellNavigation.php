@@ -70,8 +70,8 @@ final class HubShellNavigation
             ['key' => 'updates', 'label' => 'Department Updates', 'href' => route('updates.index', absolute: false)],
             ['key' => 'support', 'label' => 'Support', 'href' => route('hub-support.index', absolute: false)],
         ];
-        // The same rule Home uses for its Daily Roster entry, so the roster is never offered where it would answer 403.
-        if (app(DailyRosterAccess::class)->canSeeHomeEntry($user)) {
+        // Never offered where it would answer 403 or lead to an empty page. Home keeps its own entry.
+        if (app(DailyRosterAccess::class)->canSeeMenuEntry($user)) {
             $navigation['moreNavigation'][] = [
                 'key' => 'daily-roster',
                 'label' => 'Daily Roster',
