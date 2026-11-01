@@ -503,10 +503,10 @@ test('works from the keyboard', async ({ page }, testInfo) => {
   await expect(sections(page).first()).toHaveJSProperty('open', true);
 });
 
-test('home has the Daily Roster tile and earlier rosters are one link away', async ({ page }, testInfo) => {
+test('home has the Daily Roster button and earlier rosters are one link away', async ({ page }, testInfo) => {
   test.skip(![390, 1440].includes(viewportWidth(testInfo)), 'Phone and desktop cover navigation.');
   await page.goto('/');
-  await page.getByRole('link', { name: /Daily Roster/ }).click();
+  await page.locator('.hub-page-header__actions').getByRole('link', { name: 'Daily Roster', exact: true }).click();
   await expect(page).toHaveURL(/\/daily-roster$/);
 
   await page.getByRole('link', { name: /^Previous:/ }).click();

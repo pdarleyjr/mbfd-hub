@@ -195,6 +195,10 @@ A duty day runs 08:00 to 08:00. As soon as an export for the next duty date is a
 
 Corrections TeleStaff makes to the shift on duty arrive only while its report still covers that shift. Once the report moves to the next date, the shift on duty stays as last exported.
 
+### Station pages
+
+Each station page in Daily has a Today's Roster tab (`StationRosterPresenter`, `GET /api/public/stations/{station}/roster`). It lists the sections TeleStaff titles `Station N / Unit` for that station, so Station 2 includes Captain 5 and Rescue Float, and Station 6 includes Marine Float; the 300, Fire Union and the float pools name no station and appear only on the full page. It follows the schedule like the cards: when the next shift is posted early the tab stays on the crew working until 08:00 and links to the next one, and it never shows another day's roster as today's. It applies `DailyRosterAccess`, and the Daily service worker does not store it. If TeleStaff renames its sections, a station's list goes empty rather than wrong.
+
 ### Who the roster lets in
 
 With `DAILY_ROSTER_SEAT_ACCESS_ENABLED=true`, anyone with a working row in the `Division Chief 300` or `Captain 5` section of the accepted roster for the duty day on the clock can use that page from 08:00 to 08:00, including everyone on a split seat. The same route opens what each page depends on: 300 messages, Department Updates, Morning Lineup command controls and Command Board sign-in; Captain 5 issues, handoff, messages and EMS inventory. Narcotics review goes only to whoever the roster has on the seat at that moment. Bid holders, chiefs and administrators do not depend on the roster.
