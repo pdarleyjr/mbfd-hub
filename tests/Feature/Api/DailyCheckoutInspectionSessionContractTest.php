@@ -192,6 +192,7 @@ class DailyCheckoutInspectionSessionContractTest extends TestCase
             $this->assertSame($value, $evidence[$id]['value'], $id);
         }
         $this->assertSame('Starboard engine hours', $evidence['fb6-star-engine-hours']['name']);
+        $this->assertSame('Port engine running temperature (°F)', $evidence['fb6-port-engine-temperature']['name'], 'the record says what the number means');
         $this->assertSame('SCUBA equipment ID numbers', $evidence['fb6-scuba-ids']['name']);
         $this->assertNotSame($evidence['fb6-scuba-ids']['name'], $evidence['fb6-scba-id-1']['name'], 'SCUBA and airpacks are different equipment');
     }

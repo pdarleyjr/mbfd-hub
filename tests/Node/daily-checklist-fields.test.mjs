@@ -34,7 +34,9 @@ test('no operating limit is invented: readings refuse only what cannot be a read
       assert.equal(field.max, undefined, field.id);
     }
   }
-  assert.equal(byId.get('fb6-port-engine-temperature').unit, undefined, 'the unit is not established, so none is claimed');
+  // In the name, so the unit shows wherever the reading does: entry, review, member history and the admin record.
+  assert.equal(byId.get('fb6-port-engine-temperature').name, 'Port engine running temperature (°F)');
+  assert.equal(byId.get('fb6-star-engine-temperature').name, 'Starboard engine running temperature (°F)');
 });
 
 test('groups keep the template order and leave ungrouped fields for the collapsed section', () => {
