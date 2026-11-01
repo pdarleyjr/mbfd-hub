@@ -116,13 +116,12 @@ const pollComponent = (page: Page, fragment: string) =>
   }, fragment);
 
 test.describe.serial('Support Services conversation', () => {
-  test('member A: Home offers Message Support Services beside Vehicle Checkout, and a first message is sent and persists', async ({ browser }, info) => {
+  test('member A: Home offers Message Support Services in Quick Access, and a first message is sent and persists', async ({ browser }, info) => {
     const state = run(info);
     await as(browser, info, 'memberA', async ({ page }) => {
       await page.goto('/');
-      const actions = page.locator('.hub-page-header__actions');
-      const checkout = actions.getByRole('link', { name: 'Vehicle Checkout', exact: true });
-      const message = actions.getByRole('link', { name: 'Message Support Services', exact: true });
+      const checkout = page.locator('.hub-page-header__actions').getByRole('link', { name: 'Vehicle Checkout', exact: true });
+      const message = page.locator('[data-home-message-logistics]');
       await expect(checkout).toBeVisible();
       await expect(message).toBeVisible();
       await expect(message).toHaveAttribute('href', /\/employee\/messages\?compose=1$/);

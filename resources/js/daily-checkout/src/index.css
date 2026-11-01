@@ -5,6 +5,7 @@
    They apply inside a [data-hub-ui="2"] scope; Daily page roots and inspection steps set it. */
 @import "../../../css/hub-components.css";
 @import "../../../css/hub-install.css";
+@import "../../../css/roster-pills.css";
 
 @tailwind base;
 @tailwind components;

@@ -715,6 +715,41 @@ export interface StationCheckoutDetail extends StationCheckoutRow {
   }>;
 }
 
+export interface StationRosterRow {
+  is_first_in_seat: boolean;
+  is_vacant: boolean;
+  rank: string;
+  employee_id: string;
+  name: string;
+  source_marker: string;
+  certifications: string[];
+  status: { label: string; tone: string; title: string; screen_reader_text: string };
+  from: string;
+  through: string;
+  hours: string;
+}
+
+export interface StationRosterSection {
+  key: string;
+  unit: string;
+  image: { src: string; srcset: string; width: number; height: number } | null;
+  seats: StationRosterRow[][];
+}
+
+/** The part of the roster on duty now that belongs to one station; `available` is false until today's has arrived. */
+export interface StationRoster {
+  available: boolean;
+  message?: string;
+  date_label?: string;
+  shift?: string;
+  window?: string;
+  updated?: string;
+  tag?: { label: string; class: string };
+  notice?: string | null;
+  next_shift_posted: boolean;
+  sections: StationRosterSection[];
+}
+
 export interface StationOverview {
   station_id: number;
   as_of: string;

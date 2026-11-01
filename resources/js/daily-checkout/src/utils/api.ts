@@ -13,7 +13,7 @@ import { parseEquipmentNumbers } from './equipmentNumbers.ts';
 import { parseVehicleIdentification, parseVehicleIdentificationResponse } from './vehicleIdentification';
 import { parseChangeoutHandoff } from '../components/changeout/changeoutParse';
 
-import type { StationCheckoutDetail, StationOverview } from '../types';
+import type { StationCheckoutDetail, StationOverview, StationRoster } from '../types';
 
 const API_BASE = '/api';
 
@@ -1003,6 +1003,21 @@ export class ApiClient {
       throw new Error('Failed to fetch room profile');
     }
     return response.json();
+  }
+
+  static async getStationRoster(stationId: number, background = false): Promise<StationRoster> {
+    const response = await fetchWithTimeout(`${API_BASE}/public/stations/${stationId}/roster`, {
+      headers: { ...DEFAULT_HEADERS, ...(background ? { 'X-Hub-Background-Refresh': '1' } : {}) },
+      cache: 'no-store',
+    });
+    if (!response.ok) {
+      throw new ApiRequestError(await responseMessage(response, "Today's roster could not be loaded"), response.status);
+    }
+    const payload = await response.json() as Partial<StationRoster>;
+    if (typeof payload.available !== 'boolean' || !Array.isArray(payload.sections)) {
+      throw new Error("Today's roster could not be loaded");
+    }
+    return payload as StationRoster;
   }
 
   static async getGasMeters(stationId: number): Promise<SingleGasMeterSummary[]> {
