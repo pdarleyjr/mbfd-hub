@@ -88,7 +88,7 @@ test('hub-tables.css uses design tokens only (no colour literals)', () => {
 
 test('touch targets stay at least 44px (2.75rem) on the controls the module injects', () => {
   const css = readFileSync(resolve(root, 'resources/css/hub-tables.css'), 'utf8');
-  const toggle = css.match(/\.hub-rt-toggle\s*\{[^}]*\}/)?.[0] ?? '';
+  const toggle = css.match(/^\.hub-rt-toggle\s*\{[^}]*\}/m)?.[0] ?? '';
   assert.match(toggle, /min-width:\s*2\.75rem/);
   assert.match(toggle, /min-height:\s*2\.75rem/);
   assert.match(css, /\.hub-rt-sort__select\s*\{[^}]*min-height:\s*2\.75rem/);

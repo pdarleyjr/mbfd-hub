@@ -27,6 +27,8 @@ const CHEVRON =
   '<svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m5 8 5 5 5-5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 const openRows = new Set();
+/** Row key of the details button that had focus, so focus returns to it when Livewire re-renders the row. */
+let focusedToggle = null;
 const widths = new WeakMap();
 let scheduled = false;
 let observer = null;
@@ -52,14 +54,16 @@ function cellsOf(row) {
   return [...row.children].filter(c => c.tagName === 'TD' || c.tagName === 'TH');
 }
 
-function rowKey(row, position) {
-  return row.getAttribute('wire:key') || `row-${position}`;
+function rowKey(table, row, position) {
+  const index = [...document.querySelectorAll(TABLE)].indexOf(table);
+  return `${index}:${row.getAttribute('wire:key') || `row-${position}`}`;
 }
 
 function reset(table) {
   delete table.dataset.hubMode;
   table.style.removeProperty('--hub-rt-cols');
-  table.querySelectorAll('[data-hub-hidden],[data-hub-label],[data-hub-lead],[data-hub-kind]').forEach(el => {
+  table.querySelectorAll('[data-hub-hidden],[data-hub-label],[data-hub-lead],[data-hub-kind],[data-hub-span]').forEach(el => {
+    el.removeAttribute('data-hub-span');
     el.removeAttribute('data-hub-hidden');
     el.removeAttribute('data-hub-label');
     el.removeAttribute('data-hub-lead');
@@ -138,9 +142,9 @@ function ensureToggle(row, lead, key) {
     button.className = 'hub-rt-toggle';
     button.setAttribute('data-hub-rt-ui', '');
     button.innerHTML = CHEVRON;
-    lead.prepend(button);
-  } else if (button.parentElement !== lead) {
-    lead.prepend(button);
+    lead.append(button);
+  } else if (button.parentElement !== lead || lead.lastElementChild !== button) {
+    lead.append(button);
   }
   const isOpen = openRows.has(key);
   row.toggleAttribute('data-hub-open', isOpen);
@@ -170,7 +174,7 @@ function syncSortMenu(table, hiddenColumns, title) {
   menu.className = 'hub-rt-sort';
   menu.setAttribute('data-hub-rt-ui', '');
   const stateOf = c => ({ ascending: ' (sorted A to Z)', descending: ' (sorted Z to A)' })[c.th.getAttribute('aria-sort')] ?? '';
-  const signature = title + '|' + sortable.map(c => c.label + stateOf(c)).join('|');
+  const signature = title + '|' + sortable.map(c => c.index + c.label).join('|');
   if (menu.dataset.signature !== signature) {
     menu.dataset.signature = signature;
     const label = document.createElement('label');
@@ -179,7 +183,7 @@ function syncSortMenu(table, hiddenColumns, title) {
     select.className = 'hub-rt-sort__select';
     select.setAttribute('aria-label', title);
     select.add(new Option('Choose a field', ''));
-    sortable.forEach(c => select.add(new Option(c.label + stateOf(c), String(c.index))));
+    sortable.forEach(c => select.add(new Option(c.label, String(c.index))));
     select.addEventListener('change', () => {
       const index = Number.parseInt(select.value, 10);
       select.value = '';
@@ -189,7 +193,12 @@ function syncSortMenu(table, hiddenColumns, title) {
     });
     menu.replaceChildren(label, select);
   }
-  if (menu.nextElementSibling !== table) table.parentElement.insertBefore(menu, table);
+  const select = menu.querySelector('select');
+  sortable.forEach((c, position) => {
+    if (select?.options[position + 1]) select.options[position + 1].text = c.label + stateOf(c);
+  });
+  const host = table.parentElement;
+  if (host.lastElementChild !== menu) host.append(menu);
 }
 
 /** The element whose width the table may use: Filament's content box, a marked wrapper, or the parent. */
@@ -214,7 +223,7 @@ function commit(table, info, plan) {
   setRole(table, 'table');
   table.querySelectorAll(':scope > thead, :scope > tbody').forEach(el => setRole(el, 'rowgroup'));
   table.querySelectorAll(':scope > thead > tr, :scope > tbody > tr').forEach(el => setRole(el, 'row'));
-  ths.forEach(th => setRole(th, 'columnheader'));
+  table.querySelectorAll(':scope > thead th').forEach(th => setRole(th, 'columnheader'));
 
   const hidden = new Set([...plan.hidden, ...native.map(c => c.index)]);
   const every = [...columns, ...native].sort((a, b) => a.index - b.index);
@@ -227,14 +236,19 @@ function commit(table, info, plan) {
   // In cards the heading row is replaced by one sort menu (and the select-all box), so no heading is shown twice.
   if (plan.mode === 'cards') every.forEach(c => c.th.setAttribute('data-hub-hidden', ''));
 
+  if (!hiddenColumns.length) removeToggles(table);
   rowsOf(table).forEach((row, position) => {
     const cells = cellsOf(row);
-    if (cells.length !== ths.length) return;
-    const key = rowKey(row, position);
+    cells.forEach(cell => setRole(cell, 'cell'));
+    if (cells.length !== ths.length) {
+      // Group headers, summaries and colspan rows lay themselves out as a flowing line.
+      row.setAttribute('data-hub-span', '');
+      return;
+    }
+    const key = rowKey(table, row, position);
     cells.forEach((cell, index) => {
       const th = ths[index];
       cell.setAttribute('data-hub-kind', th.getAttribute('data-hub-kind'));
-      setRole(cell, 'cell');
       const label = labelOf(th);
       if (label && th.getAttribute('data-hub-kind') === 'data') cell.setAttribute('data-hub-label', label);
       if (hidden.has(index)) cell.setAttribute('data-hub-hidden', '');
@@ -298,7 +312,20 @@ function run() {
       console.error('Hub responsive table failed', error);
     }
   });
+  restoreFocus();
   watch();
+}
+
+function restoreFocus() {
+  if (!focusedToggle || (document.activeElement && document.activeElement !== document.body)) return;
+  for (const button of document.querySelectorAll('.hub-rt-toggle')) {
+    const row = button.closest('tr');
+    const table = row?.closest('table');
+    if (row && table && rowKey(table, row, rowsOf(table).indexOf(row)) === focusedToggle) {
+      button.focus({ preventScroll: true });
+      return;
+    }
+  }
 }
 
 function schedule() {
@@ -326,11 +353,10 @@ function onToggle(event) {
   const button = event.target.closest?.('.hub-rt-toggle');
   if (!button) return;
   event.preventDefault();
-  event.stopPropagation();
   const row = button.closest('tr');
   const table = row?.closest('table');
   if (!row || !table) return;
-  const key = rowKey(row, rowsOf(table).indexOf(row));
+  const key = rowKey(table, row, rowsOf(table).indexOf(row));
   const next = !row.hasAttribute('data-hub-open');
   row.toggleAttribute('data-hub-open', next);
   button.setAttribute('aria-expanded', String(next));
@@ -353,6 +379,12 @@ export function startHubTables() {
     if (changed) schedule();
   });
   document.addEventListener('click', onToggle, true);
+  document.addEventListener('focusin', event => {
+    const button = event.target.closest?.('.hub-rt-toggle');
+    const row = button?.closest('tr');
+    const table = row?.closest('table');
+    focusedToggle = row && table ? rowKey(table, row, rowsOf(table).indexOf(row)) : null;
+  });
   document.addEventListener('livewire:navigated', schedule);
   document.addEventListener('livewire:initialized', () => {
     schedule();

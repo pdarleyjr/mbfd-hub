@@ -5,8 +5,8 @@
  *   (none)   the table fits: nothing here applies.
  *   priority lowest-priority columns are hidden in the row and shown in its details panel.
  *   cards    each row is a stacked card; sorting moves into one Sort by menu.
- * Blade and React tables opt in with .hub-table (wrapping, bounded cells) and, for key/value rows,
- * .hub-table--stack. No colour literals: every colour is a token from mbfd-theme.css.
+ * Blade and React tables opt in with data-hub-table and get the same modes. No colour literals: every colour is
+ * a token from mbfd-theme.css.
  * This file owns table behaviour only; the bar and shell live in hub-shell.css.
  */
 
@@ -54,7 +54,16 @@ table[data-hub-mode="priority"] > tbody > tr > td { padding-inline: 0.5rem; }
 table[data-hub-mode="priority"] > tbody > tr > td[data-hub-lead] { display: flex; align-items: center; gap: 0.25rem; }
 table[data-hub-mode="priority"] > tbody > tr > td[data-hub-lead] > :not(.hub-rt-toggle) { flex: 1 1 auto; min-width: 0; }
 table[data-hub-mode="priority"] > tbody > tr > td[data-hub-kind="actions"] { justify-self: end; }
-table[data-hub-mode="priority"] > tbody > tr > td:not([data-hub-hidden]) { grid-row: 1; }
+table[data-hub-mode="priority"] > tbody > tr > td:not([data-hub-hidden]):not([colspan]) { grid-row: 1; }
+table[data-hub-mode="priority"] > tbody > tr > td[data-hub-lead] > .hub-rt-toggle { order: -1; }
+
+/* Rows whose cells do not match the headings (group headers, summaries, colspan messages) flow as a line */
+table[data-hub-mode] > tbody > tr[data-hub-span] { display: flex; flex-wrap: wrap; align-items: center; }
+table[data-hub-mode] > tbody > tr[data-hub-span] > td { flex: 1 1 auto; grid-column: auto; }
+
+/* The sort menu is appended after the table (so Livewire's morph never shifts the table) and shown first */
+.fi-ta-content:has(> .hub-rt-sort) { display: flex; flex-direction: column; }
+.fi-ta-content > .hub-rt-sort { order: -1; }
 
 /* Details: hidden cells of an open row, full width under the visible cells */
 table[data-hub-mode] > tbody > tr:not([data-hub-open]) > td[data-hub-hidden] { display: none; }
@@ -162,37 +171,17 @@ table[data-hub-mode] .fi-ta-select { width: 100%; min-width: 0; padding: 0.25rem
   table[data-hub-mode] .fi-icon-btn { min-width: 2.75rem; min-height: 2.75rem; }
 }
 
-/* ---- Plain tables outside Filament: .hub-table ---- */
-.hub-table { width: 100%; table-layout: auto; border-collapse: collapse; }
-.hub-table th,
-.hub-table td { min-width: 0; overflow-wrap: anywhere; white-space: normal; vertical-align: top; }
-@media (max-width: 47.99rem) {
-  .hub-table--stack,
-  .hub-table--stack > tbody,
-  .hub-table--stack > thead,
-  .hub-table--stack > tbody > tr { display: block; width: 100%; }
-  .hub-table--stack > thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-  .hub-table--stack > tbody > tr { border: 1px solid rgb(var(--hub-border)); border-radius: var(--hub-radius-card); margin-block-end: 0.5rem; padding: 0.25rem 0; background-color: rgb(var(--hub-well)); }
-  .hub-table--stack > tbody > tr > td {
-    display: grid;
-    grid-template-columns: minmax(5.5rem, 34%) minmax(0, 1fr);
-    gap: 0.25rem 0.75rem;
-    padding: 0.375rem 0.75rem;
-  }
-  .hub-table--stack > tbody > tr > td[data-label]::before { content: attr(data-label); color: rgb(var(--hub-n-600)); font-size: 0.8125rem; font-weight: 600; }
-}
-
 /* ---- Print and PDF keep the real table: every column, no cards, no controls ---- */
 @media print {
-  table[data-hub-mode] { display: table; width: 100%; }
-  table[data-hub-mode] > thead { display: table-header-group; }
-  table[data-hub-mode] > tbody { display: table-row-group; padding: 0; }
+  table[data-hub-mode] { display: table !important; width: 100%; }
+  table[data-hub-mode] > thead { display: table-header-group !important; }
+  table[data-hub-mode] > tbody { display: table-row-group !important; padding: 0; }
   table[data-hub-mode] > thead > tr,
-  table[data-hub-mode] > tbody > tr { display: table-row; border: 0; }
+  table[data-hub-mode] > tbody > tr { display: table-row !important; border: 0 !important; }
   table[data-hub-mode] > thead > tr > th,
   table[data-hub-mode] > tbody > tr > td,
   table[data-hub-mode] [data-hub-hidden],
-  table[data-hub-mode] > tbody > tr:not([data-hub-open]) > td[data-hub-hidden] { display: table-cell; padding: 0.25rem 0.5rem; background: none; border: 0; }
-  table[data-hub-mode] > tbody > tr > td::before { content: none; }
-  .hub-rt-toggle, .hub-rt-sort { display: none; }
+  table[data-hub-mode] > tbody > tr:not([data-hub-open]) > td[data-hub-hidden] { display: table-cell !important; padding: 0.25rem 0.5rem; background: none !important; border: 0 !important; }
+  table[data-hub-mode] > tbody > tr > td::before { content: none !important; }
+  .hub-rt-toggle, .hub-rt-sort { display: none !important; }
 }
