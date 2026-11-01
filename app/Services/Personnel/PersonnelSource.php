@@ -169,6 +169,12 @@ final class PersonnelSource
         return ($this->promotions ??= new PromotionalDirectory)->lines($employee, $key);
     }
 
+    /** The member's placement in the single current bid term, or null: an older term is never used for a missing member. */
+    public function currentBidFor(Employee $employee): ?EmployeeBidAssignment
+    {
+        return $this->currentBid()->where('employee_profile_id', $employee->getKey())->first();
+    }
+
     /** @return Builder<EmployeeBidAssignment> */
     private function currentBid(): Builder
     {

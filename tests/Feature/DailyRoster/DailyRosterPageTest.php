@@ -97,7 +97,6 @@ final class DailyRosterPageTest extends TestCase
 
         $this->assertNoStore($response);
         $response->assertSee('Daily Roster')
-            ->assertSee('Friday, October 30')
             ->assertSee('Suppression/Rescue')
             ->assertSee('ALPHA, MEMBER')
             ->assertSee('Data current')
@@ -258,7 +257,7 @@ final class DailyRosterPageTest extends TestCase
 
         foreach ([self::PAGE, self::FRAGMENT] as $url) {
             $this->get($url)->assertOk()
-                ->assertSeeInOrder(['Last updated', 'Oct 29, 9:14 AM EDT', 'Update delayed', 'has not arrived and is late', 'YESTERDAY, MEMBER']);
+                ->assertSeeInOrder(['Last updated', 'Oct 29, 9:14 AM EDT', 'has not arrived and is late', 'YESTERDAY, MEMBER', 'Update delayed']);
         }
     }
 
@@ -310,7 +309,26 @@ final class DailyRosterPageTest extends TestCase
         $response->assertSeeInOrder(['Station 4 / Rescue 4', 'Station 1 / Engine 1', 'Division Chief / Division Chief 300']);
         $response->assertSeeInOrder(['ZULU, FIRST', 'ALPHA, SECOND', 'BRAVO, SECOND', 'CHARLIE, THIRD']);
         self::assertSame(4, substr_count((string) $response->getContent(), 'data-roster-row'));
-        $response->assertSee('2 entries')->assertSee('1 entry')->assertSee('4 entries in 3 sections');
+        $response->assertSee('2 entries')->assertSee('1 entry');
+    }
+
+    public function test_only_the_last_update_sits_above_the_roster_and_the_search_is_gone(): void
+    {
+        $this->publishRoster(['Station 1 / Ladder 1' => [['employee_id' => '80001', 'name' => 'FIRST, MEMBER']]]);
+        $this->actingAsCanonicalFixture();
+
+        $html = (string) $this->get(self::PAGE)->assertOk()->getContent();
+        $above = substr($html, 0, (int) strpos($html, 'class="roster-sections"'));
+
+        self::assertStringContainsString('Last updated', $above);
+        foreach (['Status legend', 'data-roster-export', 'data-roster-refresh', 'rel="prev"', 'roster-summary', 'Duty window', 'Report generated'] as $moved) {
+            self::assertStringNotContainsString($moved, $above);
+        }
+        foreach (['data-roster-search', 'data-roster-status', 'data-roster-filter', 'data-roster-expand', 'data-roster-collapse'] as $removed) {
+            self::assertStringNotContainsString($removed, $html);
+        }
+        self::assertStringContainsString('Status legend', $html);
+        self::assertStringContainsString('data-roster-export', $html);
     }
 
     public function test_a_repeated_person_is_not_deduplicated_and_a_continuation_row_is_grouped_with_its_seat(): void
@@ -324,7 +342,7 @@ final class DailyRosterPageTest extends TestCase
 
         $html = (string) $this->get(self::PAGE)->assertOk()->getContent();
 
-        self::assertSame(2, substr_count($html, 'data-search="repeat, member 80001"'));
+        self::assertSame(2, substr_count($html, 'data-roster-member="80001"'));
         self::assertSame(2, substr_count($html, 'data-roster-seat'));
         self::assertStringContainsString('12.0', $html);
         self::assertStringContainsString('roster-rank-continued', $html);
@@ -360,9 +378,7 @@ final class DailyRosterPageTest extends TestCase
             ->assertSee('Suppressed vacancy')
             ->assertSee('TeleStaff shows ?,?')
             ->assertSee('TeleStaff shows -,-')
-            ->assertSee('roster-row--vacant', false)
-            ->assertSee('value="Open seat"', false)
-            ->assertSee('value="Suppressed vacancy"', false);
+            ->assertSee('roster-row--vacant', false);
     }
 
     public function test_status_pills_show_the_printed_code_and_a_day_keeps_the_raw_code_available(): void

@@ -27,7 +27,7 @@ function publishRoster(name: string): void {
 const pathIs = (path: string) => (request: Request) => new URL(request.url()).pathname === path;
 /** The same path the page's timer takes: the check runs without a member having done anything. */
 const backgroundCheck = (page: Page) => page.evaluate(() => { document.dispatchEvent(new Event('visibilitychange')); });
-const lastUpdated = (page: Page) => page.locator('.roster-facts > div', { hasText: 'Last updated' }).locator('dd');
+const lastUpdated = (page: Page) => page.locator('[data-roster-fact="updated"]');
 
 function viewportWidth(testInfo: TestInfo): number {
   return testInfo.project.use.viewport!.width;
@@ -44,7 +44,6 @@ async function openRoster(page: Page): Promise<void> {
   await page.waitForLoadState('networkidle');
 }
 
-const search = (page: Page) => page.getByRole('searchbox', { name: 'Search' });
 const rows = (page: Page) => page.locator('[data-roster-row]:visible');
 const sections = (page: Page) => page.locator('[data-roster-section]');
 
@@ -97,8 +96,8 @@ test('fits the viewport, stays accessible and shows real unit images', async ({ 
   await expect(legend).not.toContainText('MILNP');
   await expect(legend).toContainText('A-Day');
 
-  // Controls are comfortable to touch.
-  const small = await page.locator('main button:visible, main a.hub-btn:visible, main summary:visible, main input:visible, main select:visible').evaluateAll(elements => elements
+  // Controls are comfortable to touch. A member's name is a text link whose hit area grows past the line it sits on.
+  const small = await page.locator('main button:visible:not([data-roster-member]), main a.hub-btn:visible, main summary:visible').evaluateAll(elements => elements
     .filter(element => element.getBoundingClientRect().height < 44)
     .map(element => element.outerHTML.slice(0, 80)));
   expect(small).toEqual([]);
@@ -126,47 +125,61 @@ test('holds up at 200 percent zoom', async ({ page }, testInfo) => {
   }
 });
 
-test('search and status filters narrow the roster and clearing restores it', async ({ page }) => {
+test('the roster starts right under the last update', async ({ page }) => {
   await openRoster(page);
-  const total = await page.locator('[data-roster-row]').count();
-  const sectionTotal = await sections(page).count();
 
-  await page.getByRole('button', { name: 'Collapse all' }).click();
-  await expect(page.locator('[data-roster-section][open]')).toHaveCount(0);
+  const updatedBottom = await page.locator('.roster-last-updated').evaluate(element => element.getBoundingClientRect().bottom);
+  const firstSectionTop = await sections(page).first().evaluate(element => element.getBoundingClientRect().top);
+  expect(firstSectionTop - updatedBottom).toBeLessThanOrEqual(16);
+  await expect(sections(page).first()).toBeInViewport();
 
-  await search(page).fill('sample, brett');
-  await expect(rows(page)).toHaveCount(3);
-  await expect(page.locator('[data-roster-section]:not([hidden])')).toHaveCount(2);
-  await expect(page.locator('[data-roster-section]:not([hidden])[open]')).toHaveCount(2);
-  await expect(page.locator('[data-roster-count]')).toHaveText(`Showing 3 of ${total} entries in 2 sections`);
+  await expect(page.getByRole('searchbox')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /Expand all|Collapse all/ })).toHaveCount(0);
+  const footerTop = await page.locator('.roster-footer').evaluate(element => element.getBoundingClientRect().top);
+  const lastSectionBottom = await sections(page).last().evaluate(element => element.getBoundingClientRect().bottom);
+  expect(footerTop).toBeGreaterThanOrEqual(lastSectionBottom);
+});
+
+test('a name opens the member card, which clears when it closes', async ({ page }) => {
+  await openRoster(page);
+  const dialog = page.getByRole('dialog', { name: 'Member details' });
+  const name = page.getByRole('button', { name: 'TRIAL, HANA' });
+  await expect(page.locator('.roster-row--vacant [data-roster-member]')).toHaveCount(0);
+
+  await name.click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('[data-roster-card]')).toContainText('TRIAL, HANA');
+  await expect(dialog.locator('[data-roster-card]')).toContainText('Engine 1');
+  await expect(dialog.locator('.roster-card__certifications')).toContainText('AO');
   await expectNoHorizontalOverflow(page);
+  const results = await new AxeBuilder({ page }).include('[data-roster-card-dialog]').analyze();
+  expect(results.violations.map(({ id, nodes }) => ({ id, nodes: nodes.map(node => node.target) }))).toEqual([]);
 
-  await search(page).fill('90009');
-  await expect(rows(page)).toHaveCount(1);
-  await expect(rows(page).first()).toContainText('TRIAL, HANA');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(page.locator('[data-roster-card]')).toHaveCount(0);
+  await expect(name).toBeFocused();
 
-  await search(page).fill('fire boat');
-  await expect(rows(page)).toHaveCount(1);
-  await expect(rows(page).first()).toContainText('GAMMA, KAI');
+  // Inside the card nothing closes it; only the button, Escape or a click outside does.
+  await name.click();
+  await expect(dialog.locator('[data-roster-card]')).toBeVisible();
+  await dialog.locator('.roster-card-dialog__inner').click({ position: { x: 4, y: 4 } });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Close' }).click();
+  await expect(dialog).toBeHidden();
 
-  await search(page).fill('nobody like this');
-  await expect(page.locator('[data-roster-no-match]')).toBeVisible();
-  await expect(rows(page)).toHaveCount(0);
+  // If a roster update replaced the name while the card was open, focus still returns to that member.
+  await name.click();
+  await expect(dialog.locator('[data-roster-card]')).toBeVisible();
+  await page.locator('[data-roster-member="90009"]').evaluate(element => { element.replaceWith(element.cloneNode(true)); });
+  await page.keyboard.press('Escape');
+  await expect(name).toBeFocused();
 
-  await page.getByRole('button', { name: 'Clear' }).click();
-  await expect(search(page)).toHaveValue('');
-  await expect(page.locator('[data-roster-no-match]')).toBeHidden();
-  await expect(page.locator('[data-roster-section]:not([hidden])')).toHaveCount(sectionTotal);
-  await expect(page.locator('[data-roster-section][open]')).toHaveCount(0);
-
-  await page.getByRole('button', { name: 'Expand all' }).click();
-  await expect(rows(page)).toHaveCount(total);
-
-  await page.getByLabel('Status').selectOption('Open seat');
-  await expect(rows(page)).toHaveCount(1);
-  await expect(rows(page).first()).toContainText('Open seat');
-  await page.getByLabel('Status').selectOption('');
-  await expect(rows(page)).toHaveCount(total);
+  // A session that ended takes the card with it, and never shows the login page inside it.
+  await page.route('**/daily-roster/members/**', route => route.fulfill({ status: 401, body: '' }));
+  const login = page.waitForRequest(request => new URL(request.url()).pathname === '/login');
+  await name.click();
+  await login;
 });
 
 test('a new roster swaps in without a page reload and keeps the member where they were', async ({ page }, testInfo) => {
@@ -189,9 +202,8 @@ test('a new roster swaps in without a page reload and keeps the member where the
   expect(notModified.request().headers()[BACKGROUND_HEADER]).toBeUndefined();
   await expect(page.locator('[data-roster-connection]')).toHaveText('Roster is up to date');
 
-  // Member state: a search, one section closed, scrolled down.
+  // Member state: one section closed, scrolled down.
   const name = `SWAPPED ${viewportWidth(testInfo)}, MEMBER`;
-  await search(page).fill('rescue 1');
   await page.locator('[data-roster-section]', { hasText: 'Station 1 / Rescue 1' }).locator('summary').click();
   await expect(page.locator('[data-roster-section]', { hasText: 'Station 1 / Rescue 1' })).not.toHaveJSProperty('open', true);
   await page.evaluate(() => window.scrollTo(0, 120));
@@ -199,7 +211,8 @@ test('a new roster swaps in without a page reload and keeps the member where the
 
   publishRoster(name);
   const manualFragment = page.waitForRequest(request => pathIs('/daily-roster/sections')(request) || pathIs('/daily-roster/changes')(request));
-  await page.getByRole('button', { name: 'Refresh' }).click();
+  // Refresh sits under the roster, and a real click would scroll to it: this checks that the swap itself keeps the place.
+  await page.getByRole('button', { name: 'Refresh' }).evaluate(button => (button as HTMLButtonElement).click());
   expect((await manualFragment).headers()[BACKGROUND_HEADER]).toBeUndefined();
 
   await expect(page.locator('[data-roster-connection]')).toHaveText('Roster updated', { timeout: 30_000 });
@@ -207,8 +220,7 @@ test('a new roster swaps in without a page reload and keeps the member where the
   await expect(lastUpdated(page)).toHaveText(LOCAL_TIME);
   await expect(page.locator('[data-roster-announce]')).toHaveText('Roster updated.');
   await expect(page.getByText(name)).toHaveCount(1);
-  await expect(search(page)).toHaveValue('rescue 1');
-  await expect(page.locator('[data-roster-section]:not([hidden])')).toHaveCount(1);
+  await expect(page.locator('[data-roster-section]', { hasText: 'Station 1 / Rescue 1' })).not.toHaveJSProperty('open', true);
   expect(await page.evaluate(() => (window as unknown as { rosterMarker: string }).rosterMarker)).toBe('same page');
   expect(navigations).toBe(0);
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(scrollBefore);
@@ -401,7 +413,7 @@ test('access withdrawn mid-shift removes the roster and leaves a way home', asyn
   await expectRemoved();
 });
 
-test('a continuation row shows the seat rank only when a filter hid the rows above it', async ({ page }, testInfo) => {
+test('a continuation row groups under its seat and keeps the rank for a screen reader', async ({ page }, testInfo) => {
   await openRoster(page);
   const width = viewportWidth(testInfo);
   const rank = (row: ReturnType<Page['locator']>) => row.locator(width >= 1024 ? '.roster-cell--rank .roster-rank-continued' : '.roster-member__meta .roster-rank-continued');
@@ -414,17 +426,6 @@ test('a continuation row shows the seat rank only when a filter hid the rows abo
     await expect(seat.nth(index).locator('.roster-cell--rank')).toContainText('Division Chief, same seat');
     expect(await shownWidth(seat.nth(index))).toBeLessThanOrEqual(1);
   }
-
-  // The first row is filtered away: the next one carries the rank, the one after stays grouped under it.
-  await search(page).fill('sample, brett');
-  await expect(seat.nth(0)).toBeHidden();
-  await expect(seat.nth(1)).toBeVisible();
-  await expect.poll(() => shownWidth(seat.nth(1))).toBeGreaterThan(1);
-  expect(await shownWidth(seat.nth(2))).toBeLessThanOrEqual(1);
-
-  // Clearing goes back to grouped.
-  await search(page).fill('');
-  await expect.poll(() => shownWidth(seat.nth(1))).toBeLessThanOrEqual(1);
 });
 
 test('station-list cards and the 300 page refresh without counting as member activity', async ({ page }, testInfo) => {
@@ -484,16 +485,12 @@ test('works from the keyboard', async ({ page }, testInfo) => {
   await page.keyboard.press('Tab');
   await expect(page.locator('.hub-skip-link')).toBeFocused();
 
-  await search(page).focus();
-  await page.keyboard.type('trial');
-  await expect(rows(page)).toHaveCount(1);
-  await page.keyboard.press('Tab');
-  await expect(page.getByLabel('Status')).toBeFocused();
-  await page.keyboard.press('Tab');
-  await expect(page.getByRole('button', { name: 'Clear' })).toBeFocused();
+  const name = page.getByRole('button', { name: 'TRIAL, HANA' });
+  await name.focus();
   await page.keyboard.press('Enter');
-  await expect(search(page)).toBeFocused();
-  await expect(search(page)).toHaveValue('');
+  await expect(page.getByRole('dialog', { name: 'Member details' }).locator('[data-roster-card]')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(name).toBeFocused();
 
   const summary = sections(page).first().locator('summary');
   await summary.focus();

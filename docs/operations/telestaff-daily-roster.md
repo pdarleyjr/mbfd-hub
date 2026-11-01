@@ -187,7 +187,7 @@ The Worker is separate: `cloudflare-email-worker` needs its own `wrangler deploy
 
 Code colors match the TeleStaff online roster, read on 2026-10-30. They are defined once in `RosterStatusPresenter::TONE_COLORS` and mirrored in the `--hub-roster-*` tokens, and a test keeps the two equal. TeleStaff's red and pink are darkened about 10 percent, because white text on the originals misses WCAG AA. Color is display only and never decides who counts as working. `.PMS` and `HOOT` keep TeleStaff's color but still read **Not recognized**, because the Hub does not classify them.
 
-**Export PDF** on the roster page downloads the entire roster for the date on screen as landscape Letter, ignoring any search or collapsed sections, with its date, shift, times and any warning. It holds what the Hub publishes, the Suppression/Rescue block, not TeleStaff's other divisions. Access is the same as the page, it is never cached, and each member is limited to 10 exports a minute.
+**Export PDF** on the roster page downloads the entire roster for the date on screen as landscape Letter, ignoring any collapsed sections, with its date, shift, times and any warning. It holds what the Hub publishes, the Suppression/Rescue block, not TeleStaff's other divisions. Access is the same as the page, it is never cached, and each member is limited to 10 exports a minute.
 
 ### When TeleStaff posts the next shift early
 
@@ -220,13 +220,31 @@ What each export costs, at any frequency:
 | The export | What happens |
 |---|---|
 | Changes nothing (almost all of them) | Parsed once, compared by hash, recorded, email removed. No new roster is stored. Open pages move **Last updated** in place and download no roster. |
-| Changes one seat | One new immutable snapshot. Open pages replace that seat only. Scroll, search and open sections stay, and the spot fades from yellow so it can be found. |
+| Changes one seat | One new immutable snapshot. Open pages replace that seat only. Scroll and open sections stay, and the spot fades from yellow so it can be found. |
 | Adds or moves a section, or changes over half the seats | Open pages take the whole roster, in place, without reloading. |
 | Held or failed | The newest copy stays open for review and older copies are marked superseded. One alert and one error report per kind per day, however many arrive. |
 
 Open pages ask every 60 seconds whether anything changed, and only while visible. That question does not grow with the roster.
 
-Reading the page: **Last updated** is the last export the Hub accepted, **Report generated** is when TeleStaff made it, and **Roster last changed** is when the people on it last changed. The last line appears only when it differs from **Last updated**.
+Reading the page: **Last updated** is the last export the Hub accepted, and it is the only thing above the roster apart from a warning when one applies (owner's decision, 2026-11-01). Date links, Refresh, Export PDF, the legend, the summary, **Report generated** (when TeleStaff made it) and **Roster last changed** (when the people on it last changed, shown only when it differs from **Last updated**) sit under the roster. There is no search or status filter.
+
+### Roster move alerts
+
+A member on duty gets a push and an in-app alert when an export changes where or when they work for the rest of the shift. Design: `docs/superpowers/specs/2026-11-01-roster-move-alerts-design.md`.
+
+- **On duty** means the roster they last had shows them working this moment, inside the 08:00 to 08:00 duty day. Nothing goes out beforehand, and the first roster of a duty day alerts nobody.
+- **Members choose:** the category is **Roster moves during my shift** in Alert settings. It offers push and in-app only, and either can be turned off. There is no email.
+- **Never alerted:** a comparison with a manual transcription on either side, so replacing a typed roster with a real export is quiet. A typed roster counts only when its ledger row's `classification.reasons` includes `manual_transcription`, so always write that reason. Back-to-back rows on one seat count as one stretch of work. A status code change on the same seat and hours, or an edit to hours already worked, is not a move.
+- **Too many at once:** more than `DAILY_ROSTER_MOVE_ALERTS_MAX_MEMBERS` (20) changed members in one comparison sends nothing to members and one alert per duty date to administrators. Check that roster: if it was genuine, tell the crews directly.
+- **To turn off:** `DAILY_ROSTER_MOVE_ALERTS_ENABLED=false`, then rebuild the config cache and restart the workers. The baseline keeps moving, so turning it back on does not send old moves.
+
+Each comparison writes a `move_alerts_sent` or `move_alerts_held` row to `roster_events` with counts only. `roster_move_baselines` holds the roster last compared per duty date and keeps 30 days.
+
+**If the queue is down:** the alert is recorded in the same transaction that moves the baseline, in `notification_dispatch_retries`, and cleared once the queue takes it. `notifications:retry-dispatch` offers anything left every minute, so an alert is delayed by an outage, not lost, even if the process dies right after the commit. Every other Hub alert sent through `NotificationDispatchService::dispatch` is kept the same way when the queue refuses it. A row older than 24 hours is reported and dropped, and a roster alert past the end of its shift is not delivered. Rows sitting in that table for more than a few minutes mean the queue is down.
+
+### Member card
+
+Selecting a name opens a card with that member's rows on the roster on screen, their printed certifications, current bid and Hub profile (name, rank, station, city email). The audience is the same as the page. The endpoint answers only for an ID on the roster being viewed. The phone number, account status and login details are deliberately left out.
 
 Under **System > Roster Imports**, exports that changed nothing are hidden by default. Clear **Hide exports that changed nothing** to see them.
 

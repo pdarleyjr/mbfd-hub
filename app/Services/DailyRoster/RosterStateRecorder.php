@@ -31,6 +31,10 @@ final class RosterStateRecorder
 
     public const ACTION_ATTESTED_IMPORT = 'operator_attested_import';
 
+    public const ACTION_MOVE_ALERTS_SENT = 'move_alerts_sent';
+
+    public const ACTION_MOVE_ALERTS_HELD = 'move_alerts_held';
+
     public const ACTION_SEAT_HOLDERS_CHANGED = 'seat_holders_changed';
 
     /**

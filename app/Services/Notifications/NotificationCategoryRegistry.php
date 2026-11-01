@@ -40,6 +40,8 @@ final class NotificationCategoryRegistry
 
     public const GROUP_DEPARTMENT = 'Department';
 
+    public const GROUP_MY_SHIFT = 'My shift';
+
     public const GROUP_FLEET = 'Daily Checkout and fleet';
 
     public const GROUP_STATIONS = 'Stations';
@@ -61,6 +63,8 @@ final class NotificationCategoryRegistry
     public const TODO_ASSIGNMENTS = 'todo_assignments';
 
     public const SUPPORT_SERVICES_MESSAGES = 'support_services_messages';
+
+    public const ROSTER_MOVES = 'roster_moves';
 
     /** @var array<string, NotificationCategory>|null */
     private ?array $categories = null;
@@ -156,6 +160,18 @@ final class NotificationCategoryRegistry
                 locked: [],
                 significance: 'important',
                 eligibility: static fn (EligibilityContext $c): ?string => $c->isActive() ? 'active_member' : null,
+            ),
+            // Sent only to the member moved, and only while they are on duty (RosterMoveDetector). No email channel: the owner asked for none.
+            new NotificationCategory(
+                key: self::ROSTER_MOVES,
+                label: 'Roster moves during my shift',
+                description: 'TeleStaff changed where or when you work while you are on duty, such as moving you to another unit. Nothing is sent before your shift starts.',
+                group: self::GROUP_MY_SHIFT,
+                channels: [$db, $push],
+                locked: [],
+                significance: 'important',
+                eligibility: static fn (EligibilityContext $c): ?string => $c->isActive() && $c->user->employee_profile_id !== null && filled($c->user->employee_id)
+                    ? 'rostered_member' : null,
             ),
             new NotificationCategory(
                 key: User::NOTIFICATION_PREFERENCE_VEHICLE_INSPECTIONS,

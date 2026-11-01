@@ -35,11 +35,15 @@ final class NotificationDispatchService
 
     /**
      * Fire-and-forget for workflow hooks. Runs after the open transaction commits, on the 'notifications'
-     * queue, and reports (never throws) any failure, so a notification problem cannot touch the write.
+     * queue, and reports (never throws) any failure, so a notification problem cannot touch the write. A queue
+     * that refuses the job gets it again later (NotificationDispatchRetries), so an outage delays an alert
+     * instead of losing it.
      *
      * @param  iterable<User>|null  $candidates  Who to evaluate; null evaluates the category's own audience.
+     * @param  bool  $writeAhead  Also record it inside the open transaction, for an alert that nothing else would ever
+     *                            raise again: it then survives the process dying between the commit and the queue.
      */
-    public function dispatch(string $categoryKey, Notification $notification, ?iterable $candidates = null, ?string $eventKey = null, ?int $exceptUserId = null): void
+    public function dispatch(string $categoryKey, Notification $notification, ?iterable $candidates = null, ?string $eventKey = null, ?int $exceptUserId = null, bool $writeAhead = false): void
     {
         try {
             $ids = $candidates === null ? null : collect($candidates)
@@ -48,12 +52,22 @@ final class NotificationDispatchService
                 ->values()
                 ->all();
             $job = new FanOutNotification($categoryKey, $notification, $ids, $eventKey, $exceptUserId);
+            $retries = app(NotificationDispatchRetries::class);
+            $heldId = $writeAhead ? $retries->hold($job, NotificationDispatchRetries::WRITE_AHEAD_GRACE_SECONDS) : null;
 
-            DB::afterCommit(static function () use ($job): void {
+            DB::afterCommit(static function () use ($job, $retries, $heldId): void {
                 try {
                     dispatch($job);
                 } catch (Throwable $exception) {
                     report($exception);
+                    if ($heldId === null) {
+                        $retries->hold($job);
+                    }
+
+                    return;
+                }
+                if ($heldId !== null) {
+                    $retries->release($heldId);
                 }
             });
         } catch (Throwable $exception) {

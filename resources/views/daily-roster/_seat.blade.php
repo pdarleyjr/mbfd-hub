@@ -1,6 +1,6 @@
 <tbody role="rowgroup" class="roster-seat" data-roster-seat data-seat-index="{{ $seatIndex }}">
     @foreach($seat as $row)
-        <tr role="row" class="roster-row @if($row['isVacant']) roster-row--vacant @endif" data-roster-row data-search="{{ $row['search'] }}" data-status="{{ $row['pill']->filterLabel }}">
+        <tr role="row" class="roster-row @if($row['isVacant']) roster-row--vacant @endif" data-roster-row>
             <td role="cell" class="roster-cell roster-cell--rank">
                 @if($row['isFirstInSeat'])
                     {{ $row['rank'] }}
@@ -10,7 +10,11 @@
             </td>
             <td role="cell" class="roster-cell roster-cell--id">{{ $row['employeeId'] }}</td>
             <td role="cell" class="roster-cell roster-cell--member">
-                <span class="roster-member__name">{{ $row['name'] }}</span>
+                @if(! $row['isVacant'] && $row['employeeId'] !== '')
+                    <button type="button" class="roster-member__name roster-member__name--link" data-roster-member="{{ $row['employeeId'] }}" aria-haspopup="dialog">{{ $row['name'] }}</button>
+                @else
+                    <span class="roster-member__name">{{ $row['name'] }}</span>
+                @endif
                 <span class="roster-member__meta" aria-hidden="true">
                     <span class="@unless($row['isFirstInSeat']) roster-rank-continued @endunless">{{ $row['rank'] }}</span>
                     @if($row['employeeId'] !== '')<span>ID {{ $row['employeeId'] }}</span>@endif
