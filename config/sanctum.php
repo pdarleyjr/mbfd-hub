@@ -15,12 +15,25 @@ return [
     |
     */
 
-    'stateful' => explode(',', env('SANCTUM_STATEFUL_DOMAINS', sprintf(
-        '%s%s',
-        'localhost,localhost:3000,127.0.0.1,127.0.0.1:8000,::1',
-        Sanctum::currentApplicationUrlWithPort(),
-        // Sanctum::currentRequestHost(),
-    ))),
+    'stateful' => array_values(array_unique(array_filter([
+        ...explode(',', env('SANCTUM_STATEFUL_DOMAINS', sprintf(
+            '%s%s',
+            'localhost,localhost:3000,127.0.0.1,127.0.0.1:8000,::1',
+            Sanctum::currentApplicationUrlWithPort(),
+            // Sanctum::currentRequestHost(),
+        ))),
+        // The www host's apex sibling (or the reverse). Pages installed there call the same API with the same
+        // parent-domain session cookie; without this every API call from them answers 401. See App\Support\Host\HubHosts.
+        (static function (): ?string {
+            $url = parse_url((string) env('APP_URL', ''));
+            $host = strtolower((string) ($url['host'] ?? ''));
+            if ($host === '' || ! str_contains($host, '.') || filter_var($host, FILTER_VALIDATE_IP) !== false) {
+                return null;
+            }
+
+            return (str_starts_with($host, 'www.') ? substr($host, 4) : 'www.'.$host).(isset($url['port']) ? ':'.$url['port'] : '');
+        })(),
+    ]))),
 
     /*
     |--------------------------------------------------------------------------

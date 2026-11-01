@@ -2,6 +2,9 @@ import { startPushSync } from './pwa/push-sync';
 import { startUpdateRegistrar } from './pwa/update-registrar';
 import { startForegroundAlerts } from './pwa/foreground-alerts';
 import { mountAlertSoundSettings } from './pwa/alert-sound';
+import { startDocumentViewer } from './pwa/document-viewer';
+import { startSiblingLinks } from './pwa/sibling-links';
+import { startOfflineLinks } from './pwa/offline-links';
 // The Home install card; install-ui mounts only where its markup is rendered.
 import './pwa/install-ui';
 
@@ -76,6 +79,9 @@ updateConnection();
 window.addEventListener('online', updateConnection);
 window.addEventListener('offline', updateConnection);
 
+// An installed window stays on the host it was installed from, whatever host a link was written with.
+startSiblingLinks();
+
 // Release checks, the "update ready" banner, chunk-load recovery and notification deep links for every
 // Hub page. Scope '/' only attaches to the root push worker if this device already has it; it never
 // registers a worker itself (the push settings page does that, at /sw.js).
@@ -89,3 +95,14 @@ startPushSync();
 startForegroundAlerts();
 // "Play a sound for new alerts" on the Notification settings page (a per-device choice).
 mountAlertSoundSettings();
+
+// Links marked data-hub-viewer open PDFs and images in a dialog on the same page, so an installed app never
+// leaves for the browser. pdf.js loads only when someone opens a PDF.
+startDocumentViewer({ loadPdfRenderer: () => import('./pwa/document-viewer-pdf') });
+
+// With no connection a tap on a Hub link stays on this page and the offline strip says why, instead of the
+// browser's error page, which an installed app cannot back out of. Daily has its own offline shell.
+startOfflineLinks();
+
+// The Home visit card refreshes its own numbers; no other page loads this.
+if (document.querySelector('[data-home-activity]')) import('./home-activity.js');

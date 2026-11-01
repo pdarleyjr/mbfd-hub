@@ -146,8 +146,14 @@ final class ResourceLibraryAccessTest extends TestCase
         $response->assertSee('Download PDF');
         $response->assertSee('Download DOCX');
         $response->assertSee('pages');
+        // The viewer opens the preview in a dialog on this page; target="_blank" is only the no-script fallback.
+        $response->assertSee('data-hub-viewer="pdf"', false);
+        $response->assertSee('data-hub-viewer-title="Flow Manual"', false);
+        $response->assertSee('data-hub-viewer-download="'.route('employee.resources.download', ['document' => ResourceDocument::query()->where('slug', 'manual')->value('uuid')]).'"', false);
+        self::assertSame(2, substr_count($response->getContent(), 'data-hub-viewer="pdf"'));
         $response->assertSee('target="_blank"', false);
         $response->assertSee('rel="noopener"', false);
+        $response->assertDontSee('(opens in a new tab)', false);
         $response->assertSee('2 documents.');
         $response->assertSee(route('employee.resources.preview', ['document' => ResourceDocument::query()->where('slug', 'manual')->value('uuid')]), false);
         $response->assertSee(route('employee.resources.preview', ['document' => ResourceDocument::query()->where('slug', 'guide')->value('uuid')]), false);

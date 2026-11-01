@@ -62,7 +62,7 @@ final class ApparatusInspectionApprovalActionTest extends TestCase
             ->assertSuccessful()
             ->assertActionVisible('downloadPdf')
             ->assertActionHasUrl('downloadPdf', route('employee.vehicle-inspections.pdf', $inspection))
-            ->assertActionShouldOpenUrlInNewTab('downloadPdf')
+            ->assertActionShouldNotOpenUrlInNewTab('downloadPdf')
             ->assertActionVisible('print');
     }
 

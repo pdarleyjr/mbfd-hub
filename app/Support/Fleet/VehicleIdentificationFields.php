@@ -67,8 +67,8 @@ final class VehicleIdentificationFields
     /** field => [label for a vehicle, label for a boat, hint for a vehicle, hint for a boat, input, max length] */
     private const DEFINITIONS = [
         self::VEHICLE_NUMBER => [
-            'Fleet vehicle number (the City number on the vehicle)', 'Fleet vessel number',
-            'The number the City painted or posted on this vehicle.', 'The number the City posted on this vessel.',
+            'Fleet vehicle number (the City number on the vehicle)', 'Fleet vehicle number',
+            'The number the City painted or posted on this vehicle.', 'A boat has no fleet vehicle number.',
             'text', 32,
         ],
         self::VIN => [
@@ -132,6 +132,15 @@ final class VehicleIdentificationFields
         return $apparatus->daily_checkout_template === DailyCheckoutChecklistTemplate::FireBoat6 || preg_match('/boat/i', $text) === 1
             ? self::KIND_BOAT
             : self::KIND_VEHICLE;
+    }
+
+    /**
+     * A boat is identified by its unit designation, its hull ID and its registration. It has no City
+     * fleet number, so nothing may ask for one, require one or record one. Every other unit does.
+     */
+    public static function usesFleetNumber(Apparatus $apparatus): bool
+    {
+        return self::kindFor($apparatus) !== self::KIND_BOAT;
     }
 
     /** @return array{label: string, hint: string, input: string, max: int} */

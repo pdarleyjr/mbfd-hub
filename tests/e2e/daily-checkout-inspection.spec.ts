@@ -128,14 +128,18 @@ const fireBoatApparatus = {
   id: 106,
   name: 'Fire Boat 6',
   designation: 'FB6',
+  unit_id: 'FB6',
   type: 'fireboat',
-  vehicle_number: 'FB6',
+  vehicle_number: null,
+  vehicle_id_required: false,
   slug: 'fire-boat-6',
   status: 'In Service',
   daily_checkout_requirement: 'required',
 };
 
 const fireBoatChecklist = {
+  checklist_type: 'fireboat6',
+  vehicle_id_required: false,
   inspection_date: '2026-08-31',
   checklist_version: 'c'.repeat(64),
   due_tasks: [
@@ -619,13 +623,6 @@ async function confirmPhysicalVehicle(page: Page): Promise<void> {
   await expect(page.getByRole('combobox', { name: 'Physical vehicle', exact: true })).toBeVisible();
 }
 
-/** A unit with no recorded vehicle ID: the member names the truck, and nothing else is asked. */
-async function confirmUnrecordedVehicle(page: Page): Promise<void> {
-  await confirmPhysicalVehicle(page);
-  await page.getByRole('combobox', { name: 'Physical vehicle', exact: true }).selectOption('__not_listed__');
-  await page.getByLabel('Vehicle ID on the truck').fill('FB6-1');
-}
-
 async function drawInspectionSignature(page: Page): Promise<void> {
   const shift = page.getByRole('combobox', { name: 'Shift', exact: true });
   if (await shift.count() && await shift.inputValue() === '') await shift.selectOption('A');
@@ -993,13 +990,15 @@ test('Fire Boat v2 preserves typed field values and submits only server-due recu
 
   await expect(page.getByText(/Expected quantity: 3/)).toBeVisible();
   await page.getByRole('button', { name: 'Confirm all present' }).click();
-  await confirmPhysicalVehicle(page);
   await page.getByRole('button', { name: 'Review & Sign', exact: true }).click();
   await drawInspectionSignature(page);
+  await expect(page.getByText('Physical vehicle', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
 
   await expect(page.getByRole('heading', { name: 'Inspection recorded' })).toBeVisible();
   expect(api.submissions).toHaveLength(1);
+  expect(api.submissions[0]).not.toHaveProperty('physical_vehicle');
+  expect(api.submissions[0]).not.toHaveProperty('vehicle_identification');
   expect(api.submissions[0]).toMatchObject({
     checklist_version: fireBoatChecklist.checklist_version,
     field_values: [
@@ -1033,6 +1032,7 @@ test('FB6 null fleet metadata remains selectable and completes the Daily browser
   await page.getByRole('tab', { name: 'Apparatus', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Fire Boat 6', exact: true })).toBeVisible();
   await expect(page.getByText('Unit: FB6', { exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Change vehicle' })).toHaveCount(0);
   await page.getByRole('link', { name: 'Start Inspection' }).click();
 
   await expect(page.getByRole('heading', { name: 'Fire Boat 6', exact: true })).toBeVisible();
@@ -1043,7 +1043,7 @@ test('FB6 null fleet metadata remains selectable and completes the Daily browser
   await page.getByRole('button', { name: 'Mark all due duties as present' }).click();
   await page.getByRole('button', { name: 'Continue: Apparatus' }).click();
   await page.getByRole('button', { name: 'Confirm all present' }).click();
-  await confirmUnrecordedVehicle(page);
+  // No vehicle question stands between the last compartment and the signature.
   await page.getByRole('button', { name: 'Review & Sign', exact: true }).click();
   await drawInspectionSignature(page);
   await page.getByRole('button', { name: 'Submit Inspection' }).click();
@@ -1130,7 +1130,6 @@ test('Fire Boat v2 reload restores same-version typed fields, due-duty status, a
   await page.getByRole('group', { name: 'Status for Flashlights' })
     .getByRole('button', { name: /Damaged/ })
     .click();
-  await confirmPhysicalVehicle(page);
   await page.getByRole('button', { name: 'Review & Sign', exact: true }).click();
 
   await page.reload();
@@ -1195,7 +1194,7 @@ test('Fire Boat online reload uses current apparatus and service notices over it
 
     if (path === '/api/public/fleet-vehicles') return route.fulfill({ json: { vehicles: [] } });
     if (path === '/api/public/apparatuses') {
-      return route.fulfill({ json: [{ ...fireBoatApparatus, vehicle_number: 'FB6-LIVE', status: 'Out of Service' }] });
+      return route.fulfill({ json: [{ ...fireBoatApparatus, status: 'Out of Service' }] });
     }
 
     if (path === `/api/public/apparatuses/${fireBoatApparatus.id}/service-notices`) {
@@ -1211,7 +1210,6 @@ test('Fire Boat online reload uses current apparatus and service notices over it
 
   await page.reload();
 
-  await expect(page.getByText('Vehicle FB6-LIVE', { exact: true })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Unit out of service' })).toBeVisible();
   await expect(page.getByText('FB6-LIVE-901 · Live Fleet notice', { exact: true })).toBeVisible();
 });

@@ -121,8 +121,8 @@ trait BuildsCaptain5World
     }
 
     /**
-     * An approved acting Captain 5 display for $member until $endsAt (default: 08:00 tomorrow), written
-     * directly; the request/approval flow has its own tests.
+     * An approved acting Captain 5 row for $member, as the retired feature left behind. Nothing reads these
+     * any more; the tests that use this prove it.
      */
     protected function actingAssignment(User $member, User $approvedBy, ?CarbonImmutable $endsAt = null): Captain5ActingRequest
     {
@@ -130,7 +130,7 @@ trait BuildsCaptain5World
         $request = Captain5ActingRequest::query()->create([
             'kind' => Captain5ActingRequest::KIND_ACT, 'employee_profile_id' => $member->employee_profile_id,
             'requested_by_user_id' => $member->getKey(), 'duration' => '24h',
-            'shift_letter' => $calendar->shiftFor($calendar->dutyDate()), 'ends_at' => $endsAt ?? $calendar->actingEnd('24h'),
+            'shift_letter' => $calendar->shiftFor($calendar->dutyDate()), 'ends_at' => $endsAt ?? now()->addHours(12),
             'status' => Captain5ActingRequest::APPROVED, 'decided_by_user_id' => $approvedBy->getKey(), 'decided_at' => now(), 'starts_at' => now(),
         ]);
         $this->forgetCaptain5Memo();

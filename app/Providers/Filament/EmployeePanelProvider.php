@@ -60,6 +60,7 @@ class EmployeePanelProvider extends PanelProvider
             ->colors(HubPalette::colors())
             ->font('Plus Jakarta Sans Variable', provider: LocalFontProvider::class)
             ->viteTheme('resources/css/filament/admin/theme.css')
+            ->unsavedChangesAlerts()
             ->pages([
                 EmployeeDashboard::class,
                 \App\Filament\Employee\Pages\TrainingHistoryPage::class,

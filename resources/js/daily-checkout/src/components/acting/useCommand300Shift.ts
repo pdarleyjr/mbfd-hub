@@ -2,9 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { isApiAuthenticationError, redirectToLoginAfterSessionExpiry } from '../../utils/api';
 import { asBackgroundRefresh } from '../../utils/captain5Api';
 import { fetchCommand300Shift } from '../../utils/command300ShiftApi';
-import type { ActingResult } from './types';
+import type { ShiftResult } from './types';
 
-/** Someone else may be approved while the page is open; a quiet refetch keeps the name honest. */
+/** The roster may change while the page is open; a quiet refetch keeps the name honest. */
 const POLL_MS = 60_000;
 
 interface Options {
@@ -15,7 +15,7 @@ interface Options {
 }
 
 export interface Command300Shift {
-  data: ActingResult | null;
+  data: ShiftResult | null;
   loading: boolean;
   /** Why the last load failed. With `data` set, the name shown may be out of date. */
   error: string | null;
@@ -23,8 +23,6 @@ export interface Command300Shift {
   retry: () => void;
   /** Reload quietly, keeping what is shown: the page's Refresh button. */
   refresh: () => void;
-  /** Take the server's answer to an acting call as the new state, then confirm it with a quiet reload. */
-  apply: (result: ActingResult) => void;
 }
 
 /**
@@ -32,7 +30,7 @@ export interface Command300Shift {
  * reading: the data stays and `error` says it may be out of date.
  */
 export function useCommand300Shift({ enabled = true, poll = true }: Options = {}): Command300Shift {
-  const [data, setData] = useState<ActingResult | null>(null);
+  const [data, setData] = useState<ShiftResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // Only the newest request may write state, so a slow poll never overwrites a fresher answer.
@@ -72,12 +70,6 @@ export function useCommand300Shift({ enabled = true, poll = true }: Options = {}
 
   const retry = useCallback(() => { void load('initial'); }, [load]);
   const refresh = useCallback(() => { void load('silent'); }, [load]);
-  const apply = useCallback((result: ActingResult) => {
-    latest.current += 1;
-    setData(result);
-    setError(null);
-    void load('silent');
-  }, [load]);
 
-  return { data, loading, error, retry, refresh, apply };
+  return { data, loading, error, retry, refresh };
 }

@@ -118,6 +118,7 @@ class ApparatusController extends Controller
             'pending_corrections' => $this->pendingCorrections($apparatus, $request),
             // Outside the hashed checklist on purpose: answering a question never changes checklist_version.
             'vehicle_identification' => app(VehicleIdentificationPlanner::class)->block($apparatus),
+            'vehicle_id_required' => VehicleIdentificationFields::usesFleetNumber($apparatus),
             // Outside the hashed checklist too: what stayed on the truck this crew just left.
             'changeout_handoff' => app(ApparatusChangeoutPlanner::class)->handoffNotice($apparatus),
         ]);
@@ -238,6 +239,7 @@ class ApparatusController extends Controller
             'inspection_session' => $inspectionSessionService->publicContract($session, $issued['token']),
             // Not part of the frozen session snapshot or its hash.
             'vehicle_identification' => app(VehicleIdentificationPlanner::class)->block($apparatus),
+            'vehicle_id_required' => VehicleIdentificationFields::usesFleetNumber($apparatus),
         ], $issued['created'] ? 201 : 200);
 
         if ($browserBinding['new']) {
@@ -345,6 +347,7 @@ class ApparatusController extends Controller
             'open_findings' => $this->knownFindings($apparatus, $resolution['checklist']),
             'inspection_session' => $inspectionSessionService->publicContract($session, $issued['token']),
             'vehicle_identification' => app(VehicleIdentificationPlanner::class)->block($apparatus),
+            'vehicle_id_required' => VehicleIdentificationFields::usesFleetNumber($apparatus),
         ], $issued['created'] ? 201 : 200);
     }
 

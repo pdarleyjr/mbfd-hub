@@ -91,6 +91,7 @@ class Files extends Page implements ExportableTable, HasTable
                     ->color('primary')
                     ->modalContent(fn ($record) => view('filament-workgroup.components.file-preview', [
                         'url' => route('workgroup.file.preview', $record),
+                        'downloadUrl' => $this->getDownloadUrl($record),
                         'filename' => $record->filename,
                         'fileType' => $record->file_type,
                     ]))
@@ -102,8 +103,7 @@ class Files extends Page implements ExportableTable, HasTable
                     ->label('Download')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->color('gray')
-                    ->url(fn ($record) => $this->getDownloadUrl($record))
-                    ->openUrlInNewTab(),
+                    ->url(fn ($record) => $this->getDownloadUrl($record)),
             ])
             ->emptyStateHeading('No files found'));
     }

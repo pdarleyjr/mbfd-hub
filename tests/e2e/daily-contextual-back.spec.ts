@@ -11,6 +11,13 @@ test('contextual resolver preserves valid Hub destinations and Daily legacy path
     ['/daily/stations/2', '/daily/stations/2'],
     [`${origin}/admin/stations?page=3`, '/admin/stations?page=3'],
     ['/support/issues', '/support/issues'],
+    ['/take-home-vehicle-inspections', '/take-home-vehicle-inspections'],
+    ['/take-home-vehicle-inspections/TH-1?x=1', '/take-home-vehicle-inspections/TH-1?x=1'],
+    ['/daily-roster', '/daily-roster'],
+    ['/video-conferencing/stations/3', '/video-conferencing/stations/3'],
+    ['/install', '/install'],
+    ['/captain-5', '/daily/captain-5'],
+    ['/changeouts/12', '/daily/changeouts/12'],
     ['/', '/'],
   ]) expect(safeContextualPath(candidate, origin)).toBe(expected);
 });
@@ -22,6 +29,9 @@ test('contextual resolver rejects external, ambiguous, auth and non UI targets',
     '/daily/%2e%2e/admin', '/admin/%252f', '/admin\n', '/admin?x=%0a',
     '/admin/login', '/logout', '/api/public/stations', '/storage/report', 'admin',
     'http://user:password@127.0.0.1:8127/admin',
+    'https://example.test/take-home-vehicle-inspections', '//example.test/install',
+    '/take-home-vehicle-inspections/../storage/x', '/take-home-vehicle-inspections\\evil', '/daily-roster/%2f%2fevil',
+    '/install-evil', '/daily-rosterx', '/video-conferencing/logout',
   ]) expect(safeContextualPath(candidate, origin), candidate).toBeNull();
 });
 

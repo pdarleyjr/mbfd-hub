@@ -681,6 +681,76 @@ body[data-hub-ui="2"] {
 [data-hub-ui="2"] .hub-tile--neutral .hub-additional__list li + li { border-color: rgb(var(--hub2-n-200)); }
 
 /* ------------------------------------------------------------------ */
+/* Home activity                                                       */
+/* ------------------------------------------------------------------ */
+
+/* Visit counters: one level-1 glass card (.hub-panel) under the Quick Access rows. The numbers are plain text on it. */
+[data-hub-ui="2"] .home-activity { margin-top: 8px; }
+[data-hub-ui="2"] .home-activity__body { padding: 12px 16px; }
+[data-hub-ui="2"] .home-activity__stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 0; }
+[data-hub-ui="2"] .home-activity__stat { min-width: 0; }
+[data-hub-ui="2"] .home-activity__stat dt { color: rgb(var(--hub2-n-600)); font-size: 12px; line-height: 16px; font-weight: 600; }
+[data-hub-ui="2"] .home-activity__stat dd { margin: 2px 0 0; color: rgb(var(--hub2-n-900)); font-size: 20px; line-height: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+[data-hub-ui="2"] .home-activity__caption { margin: 8px 0 0; color: rgb(var(--hub2-n-600)); font-size: 12px; line-height: 16px; }
+[data-hub-ui="2"] .home-activity__link { appearance: none; border: 0; background: transparent; font-family: inherit; text-align: start; cursor: pointer; }
+
+/* The sign-in list is a native <dialog>: overlay glass (level 3), a bottom sheet on phones. */
+[data-hub-ui="2"] .home-activity-dialog {
+    width: min(440px, calc(100vw - 24px));
+    max-width: none;
+    max-height: 80dvh;
+    margin: auto;
+    padding: 0;
+    overflow: hidden;
+    border: 1px solid rgb(var(--hub-glass-border));
+    border-radius: var(--hub-radius-sheet);
+    background: rgb(var(--hub-well) / var(--hub-overlay-alpha));
+    -webkit-backdrop-filter: var(--hub-overlay-blur);
+    backdrop-filter: var(--hub-overlay-blur);
+    box-shadow: var(--hub-shadow-elevated);
+    color: rgb(var(--hub2-n-900));
+}
+[data-hub-ui="2"] .home-activity-dialog[open] {
+    display: flex;
+    flex-direction: column;
+    animation: home-activity-in var(--hub2-duration-fast) var(--hub2-ease-enter);
+}
+[data-hub-ui="2"] .home-activity-dialog::backdrop { background: rgb(var(--hub-header-deep) / .45); }
+[data-hub-ui="2"] .home-activity-dialog [hidden] { display: none; }
+@keyframes home-activity-in { from { opacity: 0; transform: translateY(8px); } }
+/* The page behind an open dialog does not scroll. */
+body:has(.home-activity-dialog[open]) { overflow: hidden; }
+
+[data-hub-ui="2"] .home-activity-dialog__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 8px 4px 16px;
+    border-bottom: 1px solid rgb(var(--hub-glass-border));
+}
+[data-hub-ui="2"] .home-activity-dialog__title { margin: 0; color: rgb(var(--hub2-n-900)); font-size: 16px; line-height: 24px; font-weight: 700; }
+[data-hub-ui="2"] .home-activity-dialog .hub-btn { min-height: 44px; }
+[data-hub-ui="2"] .home-activity-dialog__body { flex: 1 1 auto; min-height: 0; padding: 12px; overflow-y: auto; overscroll-behavior: contain; }
+[data-hub-ui="2"] .home-activity-dialog__loading { display: grid; gap: 20px; padding: 12px 4px; }
+[data-hub-ui="2"] .home-activity-dialog__loading .hub-skeleton:nth-child(2) { width: 70%; }
+[data-hub-ui="2"] .home-activity-dialog__loading .hub-skeleton:nth-child(3) { width: 85%; }
+[data-hub-ui="2"] .home-activity-dialog__list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+[data-hub-ui="2"] .home-activity-dialog__row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; padding: 8px 12px; }
+[data-hub-ui="2"] .home-activity-dialog__name { min-width: 0; overflow-wrap: anywhere; font-size: 14px; line-height: 20px; font-weight: 500; }
+[data-hub-ui="2"] .home-activity-dialog__when { flex: none; color: rgb(var(--hub2-n-600)); font-size: 13px; line-height: 20px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+@media (max-width: 639.98px) {
+    [data-hub-ui="2"] .home-activity-dialog {
+        width: 100%;
+        margin: auto 0 0;
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+        border-width: 1px 0 0;
+        border-radius: var(--hub-radius-sheet) var(--hub-radius-sheet) 0 0;
+    }
+}
+
+/* ------------------------------------------------------------------ */
 /* Motion preferences                                                  */
 /* ------------------------------------------------------------------ */
 
@@ -693,3 +763,104 @@ body[data-hub-ui="2"] {
         transition-duration: 0.01ms !important;
     }
 }
+
+/* ------------------------------------------------------------------ */
+/* Document viewer (resources/js/pwa/document-viewer.ts)               */
+/* ------------------------------------------------------------------ */
+
+/* One native modal <dialog> for PDFs and images, so an installed app never leaves the page. It is an
+   overlay, so it takes Level 3 glass (the one place blur is allowed). It is appended to <body>, outside any
+   [data-hub-ui="2"] scope, so it uses the global --hub tokens directly. */
+.hub-viewer {
+    box-sizing: border-box;
+    margin: auto;
+    padding: 0;
+    width: min(960px, calc(100vw - 48px));
+    height: min(920px, calc(100dvh - 48px));
+    max-width: none;
+    max-height: none;
+    overflow: hidden;
+    border: 1px solid rgb(var(--hub-glass-border));
+    border-radius: var(--hub-radius-sheet);
+    background: rgb(var(--hub-well) / var(--hub-overlay-alpha));
+    -webkit-backdrop-filter: var(--hub-overlay-blur);
+    backdrop-filter: var(--hub-overlay-blur);
+    box-shadow: var(--hub-shadow-elevated);
+    color: rgb(var(--hub-n-900));
+    font-family: inherit;
+}
+.hub-viewer[open] { display: flex; flex-direction: column; }
+.hub-viewer::backdrop { background: rgb(var(--hub-n-900) / .55); }
+.hub-viewer__bar {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 56px;
+    padding: 6px 8px 6px 16px;
+    border-bottom: 1px solid rgb(var(--hub-glass-border));
+}
+.hub-viewer__title {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+    overflow: hidden;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.3;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.hub-viewer__actions { flex: none; display: flex; align-items: center; gap: 8px; }
+.hub-viewer__close,
+.hub-viewer__action,
+.hub-viewer__open {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 16px;
+    border: 1px solid rgb(var(--hub-control-border));
+    border-radius: var(--hub-radius-control);
+    background: rgb(var(--hub-well));
+    color: rgb(var(--hub-n-900));
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.2;
+    text-decoration: none;
+    cursor: pointer;
+}
+.hub-viewer__close:hover,
+.hub-viewer__action:hover,
+.hub-viewer__open:hover { background: rgb(var(--hub-n-50)); }
+.hub-viewer :is(button, a, [tabindex]):focus-visible { outline: 3px solid rgb(var(--hub-focus)); outline-offset: 2px; }
+.hub-viewer__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: 16px;
+    background: rgb(var(--hub-n-50));
+}
+.hub-viewer__status { margin: 0 0 12px; font-size: 14px; line-height: 1.5; color: rgb(var(--hub-n-600)); }
+.hub-viewer__status--error { color: rgb(var(--hub-danger)); font-weight: 600; }
+.hub-viewer__image { display: block; width: 100%; max-width: 100%; height: auto; margin: 0 auto; border-radius: var(--hub-radius-control); background: rgb(var(--hub-well)); }
+.hub-viewer__pages { display: grid; gap: 12px; justify-items: center; }
+.hub-viewer__page { width: 100%; max-width: 100%; background: rgb(var(--hub-well)); box-shadow: var(--hub-shadow-card); }
+.hub-viewer__page canvas { display: block; width: 100%; height: 100%; }
+@media (max-width: 639.98px) {
+    .hub-viewer {
+        width: 100%;
+        height: 100dvh;
+        border: 0;
+        border-radius: 0;
+    }
+    .hub-viewer__bar { padding-top: max(6px, env(safe-area-inset-top)); padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(8px, env(safe-area-inset-right)); }
+    .hub-viewer__body {
+        padding: 12px max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+    }
+}
+@media print { .hub-viewer { display: none !important; } }

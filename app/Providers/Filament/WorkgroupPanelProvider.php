@@ -57,6 +57,7 @@ class WorkgroupPanelProvider extends PanelProvider
             ->colors(HubPalette::colors())
             ->font('Plus Jakarta Sans Variable', provider: LocalFontProvider::class)
             ->viteTheme('resources/css/filament/admin/theme.css')
+            ->unsavedChangesAlerts()
             // Explicitly register only the needed resources
             // This hides the deprecated EvaluationTemplateResource and EvaluationCriterionResource
             ->resources([

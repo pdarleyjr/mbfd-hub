@@ -110,6 +110,12 @@ final class DocumentsRelationManager extends RelationManager implements Exportab
                 Tables\Actions\Action::make('preview')->label('Preview')->icon('heroicon-o-eye')->color('gray')
                     ->visible(fn (VehicleDocument $record): bool => in_array($record->mime_type, ['application/pdf', 'image/jpeg', 'image/png'], true))
                     ->url(fn (VehicleDocument $record): string => route('vehicle-documents.preview', [$this->getOwnerRecord(), $record]))
+                    // The viewer shows it on this page; the new tab is only the no-script fallback.
+                    ->extraAttributes(fn (VehicleDocument $record): array => [
+                        'data-hub-viewer' => 'auto',
+                        'data-hub-viewer-title' => $record->original_filename ?: 'Vehicle document',
+                        'data-hub-viewer-download' => route('vehicle-documents.download', [$this->getOwnerRecord(), $record]),
+                    ])
                     ->openUrlInNewTab(),
                 Tables\Actions\Action::make('download')->label('Download')->icon('heroicon-o-arrow-down-tray')->color('gray')
                     ->url(fn (VehicleDocument $record): string => route('vehicle-documents.download', [$this->getOwnerRecord(), $record])),

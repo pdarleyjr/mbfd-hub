@@ -85,7 +85,8 @@ final class NotificationClickThroughTest extends TestCase
         $member = $this->member();
 
         $this->assertSame('/updates/12', NotificationLink::resolve($member, '/updates/12'));
-        $this->assertSame('https://hub.example.test/updates/12', NotificationLink::resolve($member, 'https://hub.example.test/updates/12'));
+        // Always relative: a push opens on the host this device installed the app from (docs/pwa-service-worker-architecture.md section 13).
+        $this->assertSame('/updates/12', NotificationLink::resolve($member, 'https://hub.example.test/updates/12'));
     }
 
     public function test_the_push_payload_uses_the_resolved_destination(): void

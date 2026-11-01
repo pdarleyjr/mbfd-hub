@@ -27,6 +27,8 @@ $app = Application::configure(basePath: dirname(__DIR__))
         );
         $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
         $middleware->statefulApi();
+        // Written by page script in an installed window; see HubHosts::INSTALLED_COOKIE.
+        $middleware->encryptCookies(except: [\App\Support\Host\HubHosts::INSTALLED_COOKIE]);
         $middleware->web(append: [
             \App\Http\Middleware\AddBuildHeaders::class,
             \App\Http\Middleware\EnforceMemberBootstrapBoundary::class,
@@ -120,12 +122,11 @@ $app = Application::configure(basePath: dirname(__DIR__))
         // HTML 413 page and never convert it to the F-ROC JSON schema.
         $exceptions->render(function (\Illuminate\Http\Exceptions\PostTooLargeException $exception, \Illuminate\Http\Request $request) {
             if (! $request->is('employee/forms/api/*') && ! $request->expectsJson()) {
-                return response()->make(
-                    '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>413 Payload Too Large</title></head>'
-                        .'<body><h1>413</h1><p>The uploaded file is too large for this request.</p></body></html>',
-                    413,
-                    ['Content-Type' => 'text/html; charset=utf-8'],
-                );
+                return response()->view('errors.hub', [
+                    'code' => 413,
+                    'title' => 'That file is too large',
+                    'message' => 'The file you chose is larger than the Hub accepts, so nothing was uploaded or changed. Choose a smaller file and try again.',
+                ], 413, ['Content-Type' => 'text/html; charset=utf-8']);
             }
 
             $megabytes = FrocImportLimits::uploadMaxMegabytes();

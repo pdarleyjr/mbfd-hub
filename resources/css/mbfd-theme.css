@@ -144,6 +144,8 @@ body:has(.identity-strip, .fi-simple-layout) {
     --hub-roster-aday-bg: 0 142 229;
     --hub-roster-vaca-ink: 255 255 255;
     --hub-roster-vaca-bg: 230 0 111;
+    --hub-roster-holiday-ink: 0 0 0;
+    --hub-roster-holiday-bg: 224 112 14;
     --hub-roster-leave-ink: 255 255 255;
     --hub-roster-leave-bg: 230 0 0;
     --hub-roster-sick-ink: 255 255 255;

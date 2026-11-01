@@ -1,0 +1,1 @@
+@include('errors.hub', ['code' => 405, 'title' => 'This page cannot be opened this way', 'message' => 'This address only works from a button or form inside the Hub, so nothing was changed. Return to Hub home and start again from there.'])

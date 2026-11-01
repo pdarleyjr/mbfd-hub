@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Middleware;
 
 use App\Services\VideoConferencing\LiveKitProfileConfiguration;
+use App\Support\Host\HubHosts;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -89,7 +90,8 @@ class SecurityHeaders
             "img-src 'self' data: blob: https:",
             "media-src 'self' blob: https:",
             "connect-src {$connectSources}",
-            "frame-src 'self' https://inventory.mbfdhub.com",
+            // A Daily shell on the sibling host asks the primary host about saved work in a hidden frame.
+            "frame-src 'self' https://inventory.mbfdhub.com".($request->is('daily', 'daily/*') && HubHosts::isInstalledSiblingRequest($request) ? ' '.HubHosts::canonicalOrigin() : ''),
             // Allow cloud.mbfdhub.com (Nextcloud) to embed this site as an
             // External Sites iframe. All other origins remain blocked.
             "frame-ancestors 'self' https://cloud.mbfdhub.com",

@@ -6,13 +6,12 @@ use App\Models\ProjectUpdate;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Widgets\TableWidget as BaseWidget;
-use Illuminate\Database\Eloquent\Builder;
 
 class RecentProjectUpdatesWidget extends BaseWidget
 {
     protected static ?int $sort = 3;
-    
-    protected int | string | array $columnSpan = 'full';
+
+    protected int|string|array $columnSpan = 'full';
 
     public function getPollingInterval(): ?string
     {
@@ -62,15 +61,13 @@ class RecentProjectUpdatesWidget extends BaseWidget
                 Tables\Actions\Action::make('view')
                     ->label('View Project')
                     ->icon('heroicon-o-eye')
-                    ->url(fn (ProjectUpdate $record): string => route('filament.admin.resources.capital-projects.view', ['record' => $record->capital_project_id]))
-                    ->openUrlInNewTab(),
+                    ->url(fn (ProjectUpdate $record): string => route('filament.admin.resources.capital-projects.view', ['record' => $record->capital_project_id])),
             ])
             ->headerActions([
                 Tables\Actions\Action::make('viewAll')
                     ->label('View All Updates')
-                    ->icon('heroicon-o-arrow-top-right-on-square')
-                    ->url(route('filament.admin.resources.capital-projects.index'))
-                    ->openUrlInNewTab(),
+                    ->icon('heroicon-o-arrow-right')
+                    ->url(route('filament.admin.resources.capital-projects.index')),
             ])
             ->paginated(false);
     }

@@ -1,4 +1,4 @@
-import { isVehicleMismatch } from './vehicleConfirmation';
+import { isVehicleMismatch } from './vehicleConfirmation.ts';
 import type {
   OfficerInfo,
   VehicleIdentification,
@@ -119,6 +119,17 @@ export function activeVehicleIdentification(
   const confirmation = officer.vehicleConfirmation;
 
   return confirmation !== undefined && isVehicleMismatch(confirmation) ? undefined : block;
+}
+
+/**
+ * The same questions for a unit with no fleet vehicle ID, where they are optional details: never its fleet number
+ * (a checkout saved before boats stopped being asked can still list it), and no "not available" to explain.
+ */
+export function optionalIdentification(block: VehicleIdentification | null | undefined): VehicleIdentification | undefined {
+  if (!block || !block.can_answer) return undefined;
+  const questions = block.questions.filter((question) => question.field !== 'vehicle_number');
+
+  return questions.length > 0 ? { ...block, questions, reasons: [] } : undefined;
 }
 
 const EMPTY_ANSWER: VehicleIdentificationAnswer = { mode: '', value: '', reason: '', note: '' };

@@ -12,7 +12,7 @@ use App\Models\DailyRoster\RosterAssignment;
  */
 final class RosterStatusPresenter
 {
-    public const TONE_ORDER = ['sp', 'ot', 'aday', 'vaca', 'leave', 'sick', 'exchange', 'ooc', 'pms', 'other', 'unknown', 'vacant'];
+    public const TONE_ORDER = ['sp', 'ot', 'aday', 'vaca', 'holiday', 'leave', 'sick', 'exchange', 'ooc', 'pms', 'other', 'unknown', 'vacant'];
 
     /**
      * Read from the TeleStaff online roster on 2026-10-30. TeleStaff's red (#FF0000) and pink (#FF007F) are
@@ -24,6 +24,7 @@ final class RosterStatusPresenter
         'ot' => ['bg' => '#00FF00', 'ink' => '#000000'],
         'aday' => ['bg' => '#008EE5', 'ink' => '#000000'],
         'vaca' => ['bg' => '#E6006F', 'ink' => '#FFFFFF'],
+        'holiday' => ['bg' => '#E0700E', 'ink' => '#000000'],
         'leave' => ['bg' => '#E60000', 'ink' => '#FFFFFF'],
         'sick' => ['bg' => '#AA0000', 'ink' => '#FFFFFF'],
         'exchange' => ['bg' => '#FFAA56', 'ink' => '#000000'],
@@ -45,6 +46,10 @@ final class RosterStatusPresenter
         'ADMS' => 'leave',
         'MILNP' => 'leave',
         'PENFML' => 'leave',
+        'MILA' => 'leave',
+        'BER' => 'leave',
+        'EFLO' => 'leave',
+        'AHTA' => 'holiday',
         'SIC' => 'sick',
         'SIC RVT' => 'sick',
         '2WXON' => 'exchange',

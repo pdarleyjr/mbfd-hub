@@ -8,6 +8,8 @@ import { startHubIssueDiagnosticsCollector } from '../../hub-support/diagnostics
 import { startPushSync } from '../../pwa/push-sync'
 import { startUpdateRegistrar } from '../../pwa/update-registrar'
 import { startForegroundAlerts } from '../../pwa/foreground-alerts'
+import { startDocumentViewer } from '../../pwa/document-viewer'
+import { startSiblingLinks } from '../../pwa/sibling-links'
 
 startHubIssueDiagnosticsCollector()
 
@@ -32,10 +34,17 @@ if ('serviceWorker' in navigator) {
 startUpdateRegistrar({ scope: '/daily/' })
 startPushSync()
 
+// An installed window stays on the host it was installed from, whatever host a link was written with.
+startSiblingLinks()
+
 // New in-app alerts pop up while Daily Checkout is open (one shared, visibility-aware poller per device,
 // at most once a minute; it stops by itself when the member is signed out or the feed is unavailable).
 // The Laravel-rendered shell advertises the feed (<meta name="mbfd-alerts-feed">); a static preview has none, so nothing polls.
 startForegroundAlerts()
+
+// Links marked data-hub-viewer (attachment images) open in a dialog on this page instead of a new tab, so an
+// installed app never leaves for the browser and a half-typed reply is kept. Images only: no pdf.js here.
+startDocumentViewer()
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

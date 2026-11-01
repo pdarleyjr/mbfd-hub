@@ -393,3 +393,25 @@
     html:has(.hub-shell--member .apparatus-inspection) { scroll-padding-bottom: calc(96px + var(--hub-member-nav-height) + env(safe-area-inset-bottom)); }
     .hub-shell--member .apparatus-inspection :is(input, textarea, button, [tabindex]) { scroll-margin-bottom: calc(96px + var(--hub-phone-nav-height)); }
 }
+
+/* ---------- Installed-app hints ---------- */
+
+/* Guidance that only makes sense in the installed app, where there is no browser chrome. A link that opens
+   outside the Hub there lands in the platform's in-app browser, and this says how to get back. Hidden elsewhere. */
+.hub-installed-hint { display: none; flex: 1 0 100%; margin: 0; color: rgb(var(--hub-n-600)); font-size: 13px; line-height: 20px; }
+
+@media (display-mode: standalone) {
+    .hub-installed-hint { display: block; }
+}
+
+/* ---------- Page transitions ---------- */
+
+/* A short cross-fade between full page loads (Blade, Filament and Daily share this stylesheet). Browsers
+   without cross-document view transitions ignore both rules. Nothing is given a view-transition-name: a
+   duplicate name would cancel the transition, and the Blade and Filament bars differ. */
+@media (prefers-reduced-motion: no-preference) {
+    @view-transition { navigation: auto; }
+
+    ::view-transition-old(root),
+    ::view-transition-new(root) { animation-duration: var(--hub-duration-fast); }
+}

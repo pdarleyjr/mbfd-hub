@@ -35,7 +35,7 @@ final class HubNavigation
         // ambiguous paths instead of letting browsers and the server disagree.
         if (! str_starts_with($path, '/') || str_starts_with($path, '//') || str_starts_with($candidate, '//')
             || str_contains($path, '%') || preg_match('#(?:^|/)\.{1,2}(?:/|$)#', $path)
-            || ! preg_match('#^/(?:$|(?:admin|employee|training|workgroups|daily|updates|account|security-standards)(?:/|$)|support/issues(?:/|$))#', $path)
+            || ! preg_match('#^/(?:$|(?:admin|employee|training|workgroups|daily|daily-roster|updates|account|security-standards|take-home-vehicle-inspections|video-conferencing|install)(?:/|$)|support/issues(?:/|$))#', $path)
             || preg_match('#/(?:login|logout|auth|reset-password|forgot-password)(?:/|$)#', $path)) {
             return null;
         }

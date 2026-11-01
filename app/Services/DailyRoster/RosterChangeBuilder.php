@@ -25,7 +25,7 @@ final class RosterChangeBuilder
     /** @return array<string, mixed>|null */
     public function since(int $fromSnapshotId, ?string $clientState): ?array
     {
-        $status = $this->freshness->status();
+        $status = $this->freshness->pageStatus();
         if ($status->state !== RosterFreshness::CURRENT
             || $clientState !== RosterFreshness::CURRENT
             || $status->snapshotId === null

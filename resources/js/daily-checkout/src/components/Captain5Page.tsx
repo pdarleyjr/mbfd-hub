@@ -4,10 +4,7 @@ import { RefreshCw } from 'lucide-react';
 import { CAPTAIN_5_IMAGE, type VehicleIdentification } from '../types';
 import { useOffline } from '../hooks/useOffline';
 import DailyPageNav from './DailyPageNav';
-import ActingApprovals from './acting/ActingApprovals';
-import ActingControl from './acting/ActingControl';
 import DutyNote from './acting/DutyNote';
-import { CAPTAIN_5_ACTING } from './captain5/actingRole';
 import Captain5Denied from './captain5/Captain5Denied';
 import Captain5Messages from './captain5/Captain5Messages';
 import HistoryTab from './captain5/HistoryTab';
@@ -26,7 +23,7 @@ import NarcoticsTab from './captain5/narcotics/NarcoticsTab';
 import { useNarcoticsInbox } from './captain5/narcotics/useNarcoticsInbox';
 import { isKindFilter, isQueueFilter, type KindFilter, type QueueFilter } from './captain5/filters';
 import { dutyLine, dutyTone, isReplacementTracked } from './captain5/format';
-import type { ActingResult, Workspace } from './captain5/types';
+import type { Workspace } from './captain5/types';
 import { useWorkspace } from './captain5/useWorkspace';
 import DepartmentUpdatesPanel from './department-updates/DepartmentUpdatesPanel';
 import Tabs, { type TabItem } from './ui/Tabs';
@@ -135,7 +132,6 @@ export default function Captain5Page() {
     ws.patch({ vehicle_identification: next });
     void load('silent');
   }, [ws.patch, load]);
-  const actingChanged = useCallback((result: ActingResult) => { ws.patch({ on_duty: result.on_duty, acting: result.acting }); void load('silent'); }, [ws.patch, load]);
 
   if (ws.forbidden) return <Captain5Denied />;
   if (ws.loading && !data) return <Loading />;
@@ -221,7 +217,6 @@ export default function Captain5Page() {
               <Tag tone={dutyTone(data.on_duty)} className="!text-sm !whitespace-normal !py-1 max-w-full break-words">{dutyLine(data.on_duty)}</Tag>
             </p>
             <DutyNote onDuty={data.on_duty} testId="captain5-duty-note" linkToRoster />
-            <ActingControl role={CAPTAIN_5_ACTING} onDuty={data.on_duty} acting={data.acting} onChange={actingChanged} />
             <p className="text-[13px] leading-5 text-hub-n-600" data-testid="captain5-authority">Your access: {access.authority_label || 'Captain 5'}</p>
           </div>
           <button
@@ -239,8 +234,6 @@ export default function Captain5Page() {
           </button>
         </div>
       </section>
-
-      <ActingApprovals role={CAPTAIN_5_ACTING} acting={data.acting} onChange={actingChanged} />
 
       {narcotics.status === 'ready' && narcotics.pending > 0 && active !== 'narcotics' && (
         <section className="hub-callout flex flex-wrap items-center justify-between gap-3 p-4" aria-label="Narcotics checks waiting" data-testid="narcotics-attention">

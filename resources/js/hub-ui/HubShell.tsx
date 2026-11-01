@@ -56,12 +56,33 @@ function HubIcon({ name }: { name: string }) {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[name] ?? paths.apps} /></svg>;
 }
 
-function NavigationMenu({ label, items, icon = 'apps', className = '', renderLink }: {
+// Sign out must be a real form post: the server answers with a redirect, possibly to the identity provider's
+// own sign-out page, which a background request cannot follow. The page's csrf-token meta carries the token.
+function readCsrfToken(): string {
+  return document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
+}
+
+function SignOutItem({ token, onOffline }: { token: string; onOffline: () => void }) {
+  return <div role="none">
+    <form method="post" action="/logout" onSubmit={(event) => {
+      if (!navigator.onLine) {
+        event.preventDefault();
+        onOffline();
+      }
+    }}>
+      <input type="hidden" name="_token" value={token} />
+      <button type="submit" role="menuitem" tabIndex={-1} className="hub-shell-menuitem hub-shell-menuitem--danger">Sign out</button>
+    </form>
+  </div>;
+}
+
+function NavigationMenu({ label, items, icon = 'apps', className = '', renderLink, signOut }: {
   label: string;
   items: HubNavigationItem[];
   icon?: string;
   className?: string;
   renderLink?: HubLinkRenderer;
+  signOut?: { token: string; onOffline: () => void };
 }) {
   const [open, setOpen] = useState(false);
   const id = useId();
@@ -74,7 +95,7 @@ function NavigationMenu({ label, items, icon = 'apps', className = '', renderLin
 
   useEffect(() => {
     if (!open) return;
-    const links = menu.current?.querySelectorAll<HTMLAnchorElement>('[role="menuitem"]');
+    const links = menu.current?.querySelectorAll<HTMLElement>('[role="menuitem"]');
     links?.[initialFocus.current === 'last' ? links.length - 1 : 0]?.focus();
     function closeOutside(event: PointerEvent) {
       if (!container.current?.contains(event.target as Node)) setOpen(false);
@@ -90,8 +111,8 @@ function NavigationMenu({ label, items, icon = 'apps', className = '', renderLin
       trigger.current?.focus();
       return;
     }
-    const links = Array.from(menu.current?.querySelectorAll<HTMLAnchorElement>('[role="menuitem"]') ?? []);
-    const current = links.indexOf(document.activeElement as HTMLAnchorElement);
+    const links = Array.from(menu.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
+    const current = links.indexOf(document.activeElement as HTMLElement);
     if (sheet && event.key === 'Tab' && links.length > 0) {
       const wrapFrom = event.shiftKey ? 0 : links.length - 1;
       if (current === wrapFrom) {
@@ -137,6 +158,7 @@ function NavigationMenu({ label, items, icon = 'apps', className = '', renderLin
         };
         return <div role="none" key={item.key}>{renderLink ? renderLink(props) : <a {...props} />}</div>;
       })}
+      {signOut && <SignOutItem {...signOut} />}
     </div>}
   </div>;
 }
@@ -174,6 +196,11 @@ export function HubShell({ module, navigation, connection, currentSection, rende
     { key: 'account', label: 'My account', href: navigation.account.href },
     { key: 'install', label: 'Install MBFD Hub', href: '/install' },
   ] : [];
+  // Sign out needs the page's CSRF token; without one the item is left out rather than offered and refused.
+  const csrfToken = navigation.account ? readCsrfToken() : '';
+  const signOut = csrfToken ? { token: csrfToken, onOffline: () => setConnectionRequired(true) } : undefined;
+  // The bottom bar already carries Home and Checkout, so the phone More sheet does not repeat them.
+  const moreApplications = navigation.applications.filter((item) => item.key !== 'home' && item.key !== 'daily');
   return <div className={`hub-shell hub-shell--member ${className}`}>
     <a href="#main-content" className="hub-shell-skip">Skip to main content</a>
     <header className="hub-shell-header daily-home-nav" aria-label={`${module} navigation`}>
@@ -181,8 +208,9 @@ export function HubShell({ module, navigation, connection, currentSection, rende
         <img src="/images/mbfd-official-seal-256.png" alt="" width="32" height="32" /><span className="hub-shell-brand__word"><span className="hub-shell-brand__prefix" aria-hidden="true" /><span>Hub</span></span>
       </> })}
       <div className="hub-shell-header-actions">
-        <NavigationMenu label="Apps" items={navigation.applications} renderLink={renderNavigationLink} />
-        {navigation.account && <NavigationMenu label="Account" icon="account" className="hub-shell-account" items={accountItems} renderLink={renderNavigationLink} />}
+        <NavigationMenu label={module} className="hub-app-switcher" items={navigation.applications} renderLink={renderNavigationLink} />
+        {navigation.account && <NavigationMenu label="Account" icon="account" className="hub-shell-account" signOut={signOut}
+          items={[...accountItems, { key: 'issue-reports', label: 'My issue reports', href: '/support/issues' }]} renderLink={renderNavigationLink} />}
       </div>
     </header>
     {connection}
@@ -197,7 +225,7 @@ export function HubShell({ module, navigation, connection, currentSection, rende
         };
         return <div key={item.key}>{renderNavigationLink(props)}</div>;
       })}
-      <NavigationMenu label="More" icon="more" className="hub-member-more" items={[...(navigation.moreNavigation ?? []), ...navigation.applications, ...accountItems]} renderLink={renderNavigationLink} />
+      <NavigationMenu label="More" icon="more" className="hub-member-more" items={[...(navigation.moreNavigation ?? []), ...moreApplications, ...accountItems]} renderLink={renderNavigationLink} />
     </nav>
   </div>;
 }

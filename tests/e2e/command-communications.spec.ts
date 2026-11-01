@@ -41,7 +41,7 @@ interface ServerState {
   parents: Array<string | null>;
   pinBodies: unknown[];
   readCalls: number;
-  /** /api/command-300 (who is the shift's 300, and acting requests): covered in command-300-shift.spec.ts. */
+  /** /api/command-300 (who is the shift's 300): covered in command-300-shift.spec.ts. */
   shift: ShiftServer;
   onCreate?: (route: Route) => Promise<boolean>;
 }
@@ -432,7 +432,7 @@ test('eligible accounts see the card with an unread count and the shift 300', as
   await expect(page.getByTestId('daily-command-card')).not.toContainText('Click here');
 });
 
-test('the 300 page leads with the shift 300 and the acting control, and still works while that line fails to load', async ({ page }) => {
+test('the 300 page leads with the shift 300, and still works while that line fails to load', async ({ page }) => {
   const server = newServer({ shift: newShiftServer({ status: 503 }) });
   await open(page, server);
   await expect(page.getByTestId('command-duty-error')).toContainText('The shift 300 could not be loaded.');
@@ -440,7 +440,6 @@ test('the 300 page leads with the shift 300 and the acting control, and still wo
   server.shift.status = 200;
   await page.getByTestId('command-duty-error').getByRole('button', { name: 'Try again' }).click();
   await expect(page.getByTestId('command-duty-line')).toHaveText('A Shift 300: Division Chief Jane Smith');
-  await expect(page.getByTestId('command-acting-open')).toHaveText('Acting as 300 today? Click here.');
   await expectNoHorizontalOverflow(page);
 });
 
