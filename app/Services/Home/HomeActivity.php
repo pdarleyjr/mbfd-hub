@@ -180,13 +180,13 @@ final class HomeActivity
         return $this->now()->subHours(self::WINDOW_HOURS);
     }
 
-    private function whenLabel(?CarbonInterface $at, CarbonImmutable $now): string
+    private function whenLabel(CarbonInterface|string|null $at, CarbonImmutable $now): string
     {
         if ($at === null) {
             return '';
         }
 
-        $local = CarbonImmutable::instance($at)->setTimezone(HubTimezone::NAME);
+        $local = CarbonImmutable::parse($at)->setTimezone(HubTimezone::NAME);
         $today = $now->setTimezone(HubTimezone::NAME)->startOfDay();
         $day = $local->startOfDay();
         $label = $day->equalTo($today) ? 'Today' : ($day->equalTo($today->subDay()) ? 'Yesterday' : $local->format('M j'));

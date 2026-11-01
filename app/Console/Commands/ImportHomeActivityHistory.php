@@ -118,7 +118,7 @@ final class ImportHomeActivityHistory extends Command
                     $problem = '"hour" is not a date and time';
                 }
             }
-            if ($problem === null && $hour !== null) {
+            if ($problem === null) {
                 $problem = match (true) {
                     $hour->minute !== 0 || $hour->second !== 0 => '"hour" must be exactly on the hour',
                     $hour->greaterThan($currentHour) => '"hour" is in the future',
