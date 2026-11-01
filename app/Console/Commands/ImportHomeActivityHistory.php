@@ -126,8 +126,8 @@ final class ImportHomeActivityHistory extends Command
                     default => null,
                 };
             }
-            if ($problem !== null || $hour === null) {
-                $this->error('Row '.($index + 1).': '.($problem ?? 'is not valid').'. Nothing was written.');
+            if ($problem !== null) {
+                $this->error('Row '.($index + 1).': '.$problem.'. Nothing was written.');
 
                 return null;
             }
