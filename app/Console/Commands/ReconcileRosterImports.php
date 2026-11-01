@@ -14,6 +14,7 @@ use App\Services\DailyRoster\RosterAlerts;
 use App\Services\DailyRoster\RosterFreshnessResolver;
 use App\Services\DailyRoster\RosterImportCleanup;
 use App\Services\DailyRoster\RosterImportOperations;
+use App\Services\DailyRoster\RosterMoveDetector;
 use App\Services\DailyRoster\RosterPipelineException;
 use App\Services\DailyRoster\RosterSeatWatch;
 use App\Services\DailyRoster\RosterStateRecorder;
@@ -40,7 +41,7 @@ final class ReconcileRosterImports extends Command
 
     private const PENDING_CLEANUP = [RosterImport::CLEANUP_NONE, RosterImport::CLEANUP_PENDING, RosterImport::CLEANUP_ROW_DELETED];
 
-    public function handle(RosterStateRecorder $recorder, RosterImportOperations $operations, DutyCalendar $calendar, RosterAlerts $alerts, RosterFreshnessResolver $freshness, RosterSeatWatch $seatWatch): int
+    public function handle(RosterStateRecorder $recorder, RosterImportOperations $operations, DutyCalendar $calendar, RosterAlerts $alerts, RosterFreshnessResolver $freshness, RosterSeatWatch $seatWatch, RosterMoveDetector $moves): int
     {
         if (config('daily_roster.mode') === 'off') {
             return self::SUCCESS;
@@ -59,6 +60,7 @@ final class ReconcileRosterImports extends Command
             'stale_rosters' => $this->flagStaleRoster($recorder, $alerts, $calendar, $freshness, $now),
             'held_alerts' => $this->alertHeldImports($alerts, $calendar, $now),
             'seat_changes' => $this->watchSeats($seatWatch, $now),
+            'roster_moves' => $this->detectMoves($moves),
         ];
 
         if (array_sum($counts) > 0) {
@@ -252,6 +254,18 @@ final class ReconcileRosterImports extends Command
         }
 
         return $held->count();
+    }
+
+    /** Catches a lost check and an administrator's rollback. A failure here must not stop the repairs above. */
+    private function detectMoves(RosterMoveDetector $moves): int
+    {
+        try {
+            return $moves->run();
+        } catch (Throwable $exception) {
+            report(new RosterPipelineException('reconcile_unexpected_'.class_basename($exception)));
+
+            return 0;
+        }
     }
 
     /**

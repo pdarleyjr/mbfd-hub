@@ -60,7 +60,7 @@ final class DailyRosterPagePresenter
         }
 
         $displayedDate = $view?->snapshot->duty_date->format('Y-m-d') ?? $freshness->dutyDate;
-        $content = $view === null ? ['sections' => [], 'summary' => null, 'legend' => [], 'filters' => []] : $this->present($view);
+        $content = $view === null ? ['sections' => [], 'summary' => null, 'legend' => []] : $this->present($view);
 
         return [
             'version' => $freshness->version,
@@ -86,7 +86,6 @@ final class DailyRosterPagePresenter
             'nextDate' => $this->neighbour($available, $displayedDate, -1, $freshness->dutyDate),
             'sections' => $content['sections'],
             'legend' => $content['legend'],
-            'filters' => $content['filters'],
         ];
     }
 
@@ -109,7 +108,7 @@ final class DailyRosterPagePresenter
     /**
      * What one roster renders as, so the page and a spot update can never disagree.
      *
-     * @return array{sections: list<array<string, mixed>>, summary: array<string, int|string>, legend: list<RosterStatusPill>, filters: list<string>}
+     * @return array{sections: list<array<string, mixed>>, summary: array<string, int|string>, legend: list<RosterStatusPill>}
      */
     public function present(RosterView $view): array
     {
@@ -119,7 +118,6 @@ final class DailyRosterPagePresenter
             'sections' => $sections,
             'summary' => $this->summary($view->snapshot, $sections),
             'legend' => $this->legend($sections),
-            'filters' => $this->filters($sections),
         ];
     }
 
@@ -268,7 +266,6 @@ final class DailyRosterPagePresenter
             $sections[] = [
                 'key' => (string) $section->raw_title,
                 'title' => (string) $section->raw_title,
-                'search' => mb_strtolower($section->raw_title.' '.$section->unit_label),
                 'image' => $this->units->present((string) $section->unit_label),
                 'eager' => $index < 2,
                 'entryCount' => count($sectionView->assignments),
@@ -305,7 +302,6 @@ final class DailyRosterPagePresenter
             'from' => (string) $assignment->raw_from,
             'through' => (string) $assignment->raw_through,
             'hours' => number_format((float) $assignment->reported_hours, 1),
-            'search' => mb_strtolower($name.' '.$assignment->employee_id),
         ];
     }
 
@@ -323,20 +319,6 @@ final class DailyRosterPagePresenter
         }
 
         return $this->ordered($pills);
-    }
-
-    /**
-     * @param  list<array<string, mixed>>  $sections
-     * @return list<string>
-     */
-    private function filters(array $sections): array
-    {
-        $pills = [];
-        foreach ($this->pills($sections) as $pill) {
-            $pills[$pill->filterLabel] ??= $pill;
-        }
-
-        return array_map(static fn (RosterStatusPill $pill): string => $pill->filterLabel, $this->ordered($pills));
     }
 
     /**
