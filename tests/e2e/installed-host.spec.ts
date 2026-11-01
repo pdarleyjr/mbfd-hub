@@ -33,6 +33,8 @@ const seedPrimaryStorage = async (page: Page): Promise<void> => {
   await page.goto(`${PRIMARY_ORIGIN}/daily/stations`);
   await page.getByTestId('daily-workspace').waitFor();
   await page.waitForFunction(async () => (await indexedDB.databases()).some((entry) => entry.name === 'mbfd-daily-checkout'));
+  // Seed from a page with no Daily app running: its queue processor would act on a record it finds.
+  await page.goto(`${PRIMARY_ORIGIN}/daily-saved-work-probe`);
   await page.evaluate(() => new Promise<void>((resolve, reject) => {
     const open = indexedDB.open('mbfd-daily-checkout');
     open.onerror = () => reject(open.error);
