@@ -23,9 +23,7 @@
         "test:employee-messages-e2e": "playwright test --config=playwright.employee-messages.config.ts",
         "test:email-center-e2e": "playwright test --config=playwright.email-center.config.ts",
         "test:narcotics-check-e2e": "playwright test --config=playwright.narcotics-check.config.ts",
-        "test:fleet-changeout-e2e": "playwright test --config=playwright.fleet-changeout.config.ts",
-    "test:responsive-tables-node": "node --test tests/Node/hub-tables-plan.test.mjs tests/Node/hub-no-sideways-scroll-contract.test.mjs",
-    "test:responsive-tables-e2e": "playwright test --config=playwright.responsive-tables.config.ts"
+        "test:fleet-changeout-e2e": "playwright test --config=playwright.fleet-changeout.config.ts"
     },
     "devDependencies": {
         "@axe-core/playwright": "4.13.0",
