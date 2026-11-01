@@ -371,14 +371,14 @@
 }
 [data-hub-ui="2"] .roster-member__name--link::after { content: ""; position: absolute; inset: -12px 0; }
 [data-hub-ui="2"] .roster-member__name--link:hover { color: rgb(var(--hub2-action)); text-decoration-color: currentColor; }
-[data-hub-ui="2"] .roster-member__name--link:focus-visible { outline: 2px solid rgb(var(--hub2-focus)); outline-offset: 2px; border-radius: 2px; }
+[data-hub-ui="2"] .roster-member__name--link:focus-visible { outline: 2px solid rgb(var(--hub2-focus)); outline-offset: 2px; border-radius: var(--hub-radius-tag); }
 
 [data-hub-ui="2"] .roster-card-dialog {
     width: min(480px, calc(100vw - 32px));
     max-height: calc(100dvh - 32px);
     padding: 0;
     border: 1px solid rgb(var(--hub2-n-200));
-    border-radius: 12px;
+    border-radius: var(--hub-radius-card);
     background: rgb(var(--hub-well));
     color: rgb(var(--hub2-n-900));
     overflow-y: auto;
