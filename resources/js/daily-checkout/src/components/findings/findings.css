@@ -10,6 +10,8 @@
 .findings-summary :is(button, summary, input, textarea):focus-visible, .issue-card :is(button, summary):focus-visible, .concerns-section :is(button, input, textarea):focus-visible { outline: 2px solid rgb(var(--hub-focus)); outline-offset: 2px; }
 
 .findings-summary { margin: 0 0 12px; padding: 12px 14px; border: 1px solid rgb(var(--hub-glass-border)); border-radius: var(--hub-radius-card); background: rgb(var(--hub-glass) / var(--hub-glass-alpha)); box-shadow: var(--hub-glass-highlight), var(--hub-shadow-card); font-size: 14px; }
+/* In the inspection it sits above the picker and the equipment list, never in one of their columns. */
+.inspection-layout > .findings-summary { grid-column: 1 / -1; margin-bottom: 0; }
 .findings-summary.is-quiet { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; padding: 6px 2px; border: 0; border-bottom: 1px solid rgb(var(--hub-border)); border-radius: 0; background: none; box-shadow: none; }
 .findings-summary__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; }
 .findings-summary h2 { margin: 0; font-size: 17px; line-height: 1.3; font-weight: 700; overflow-wrap: anywhere; }

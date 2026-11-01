@@ -20,6 +20,9 @@ export function fieldGroups(fields: ChecklistField[]): ChecklistFieldGroup[] {
 /** A duty answered with an equipment word on an older draft: Present meant done, the others did not. */
 export const taskIsCompleted = (status: ScheduledTaskStatus): boolean => status === 'Completed' || status === 'Present';
 
+/** A draft saved before duties had their own words sends what it now shows, so it cannot file an equipment defect. */
+export const normalizeTaskStatus = (status: ScheduledTaskStatus): 'Completed' | 'Not Completed' => taskStatusLabel(status);
+
 /** What a duty's answer reads as anywhere a person sees it. */
 export const taskStatusLabel = (status: ScheduledTaskStatus): 'Completed' | 'Not Completed' => (taskIsCompleted(status) ? 'Completed' : 'Not Completed');
 

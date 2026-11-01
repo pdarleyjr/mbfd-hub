@@ -317,6 +317,24 @@ final class ApparatusIssueHistoryTest extends TestCase
         $this->getJson("/api/public/apparatuses/{$this->truck->id}/findings/closed?cursor=garbage")->assertOk()->assertJsonCount(1, 'data');
     }
 
+    public function test_the_description_is_the_original_report_even_after_staff_edit_the_notes(): void
+    {
+        $reported = $this->defect(['notes' => 'Logistics: vendor quote pending, do not tell crew']);
+        $this->event($reported, 'reported', ['details' => ['reported_status' => 'Damaged', 'notes' => 'Handle is cracked']]);
+        $silent = $this->defect(['item' => 'Reported with no words', 'notes' => 'Staff added this later']);
+        $this->event($silent, 'reported', ['details' => ['reported_status' => 'Missing']]);
+        $older = $this->defect(['item' => 'From before the event history', 'notes' => 'Older report text']);
+
+        $response = $this->getJson("/api/public/apparatuses/{$this->truck->id}/findings")->assertOk();
+
+        $byId = collect($response->json('open'))->keyBy('id');
+        $this->assertSame('Handle is cracked', $byId[$reported->id]['description']);
+        $this->assertNull($byId[$silent->id]['description']);
+        $this->assertSame('Older report text', $byId[$older->id]['description']);
+        $this->assertStringNotContainsString('vendor quote', $response->getContent());
+        $this->assertStringNotContainsString('Staff added this later', $response->getContent());
+    }
+
     public function test_an_unknown_apparatus_or_issue_is_a_404(): void
     {
         $this->getJson('/api/public/apparatuses/999999/findings')->assertNotFound();

@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Services\Defects\MemberIssueHistory;
 use App\Services\Identity\AuthenticatedMemberContextResolver;
 use ErrorException;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -45,7 +46,7 @@ final class ApparatusIssueHistoryController extends Controller
 
         try {
             return response()->json($this->history->closed($apparatus, $cursor));
-        } catch (ErrorException|TypeError|UnexpectedValueException|ValueError) {
+        } catch (ErrorException|QueryException|TypeError|UnexpectedValueException|ValueError) {
             // A hand-made cursor that decodes but does not name a position.
             abort(422, 'That page marker is not valid.');
         }

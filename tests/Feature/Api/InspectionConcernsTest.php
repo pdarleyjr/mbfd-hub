@@ -303,13 +303,16 @@ final class InspectionConcernsTest extends TestCase
         $this->assertDatabaseCount('apparatus_inspection_concerns', 0);
     }
 
-    public function test_a_photo_that_is_not_an_image_is_refused(): void
+    public function test_a_photo_the_server_cannot_read_costs_the_photo_and_never_the_concern_or_the_checkout(): void
     {
         $this->submit($this->payload([$this->concern('issue', 'Cracked housing', null, null, 'data:image/png;base64,AAAA')]))
-            ->assertUnprocessable()->assertJsonValidationErrors('concerns.0.photo');
+            ->assertCreated();
 
-        $this->assertDatabaseCount('apparatus_inspections', 0);
-        $this->assertSame([], Storage::disk('public')->allFiles());
+        $concern = ApparatusInspectionConcern::query()->sole();
+        $this->assertSame('Cracked housing', $concern->description);
+        $this->assertNull($concern->photo_path);
+        $this->assertDatabaseCount('apparatus_inspections', 1);
+        $this->assertNotNull($concern->apparatus_defect_id, 'the problem still became an issue');
     }
 
     public function test_concerns_need_a_processed_submission(): void

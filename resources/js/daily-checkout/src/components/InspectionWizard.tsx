@@ -40,6 +40,7 @@ import PreviousPageButton from './PreviousPageButton';
 import { inspectionProgress, inspectionReadiness } from '../utils/inspectionProgress';
 import { identityForQueueCapture, type OfflineIdentity } from '../lib/offlineIdentity';
 import { EMPTY_REVIEW_FLAG, buildReviewFlag, normalizeReviewFlagDraft, reviewFlagExplanationMissing } from '../utils/reviewFlag';
+import { normalizeTaskStatus } from '../utils/checklistFields.ts';
 import { checklistUsesVehicleId, defaultVehicleConfirmation, paperVehicleValue, reconcileVehicleConfirmation, toPhysicalVehicleReport } from '../utils/vehicleConfirmation';
 import { activeVehicleIdentification, optionalIdentification, toVehicleIdentificationSubmission } from '../utils/vehicleIdentification';
 import { ClipboardList, Gauge, Truck, Users } from 'lucide-react';
@@ -542,7 +543,7 @@ export default function InspectionWizard() {
                 setFieldValues(saved.fieldValues.map(field => field.id === 'vehicle_num' ? { ...field, value: paperVehicleValue(restoredVehicle) } : field));
               }
               if (saved.scheduledTasks) {
-                setScheduledTasks(saved.scheduledTasks);
+                setScheduledTasks(saved.scheduledTasks.map(task => ({ ...task, status: normalizeTaskStatus(task.status) })));
               }
             }
             setCurrentStep('compartments');

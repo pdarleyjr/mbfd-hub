@@ -1234,11 +1234,17 @@ class ApparatusController extends Controller
         }
         unset($defect);
 
-        // Concern photos are stored like defect photos, so a failed submission deletes them with the rest.
+        // Concern photos are stored like defect photos, so a failed submission deletes them with the rest. An optional
+        // photo the server cannot read costs the photo, never the concern or the checkout.
         foreach ($data['concerns'] ?? [] as $index => $concern) {
             if (filled($concern['photo'] ?? null)) {
-                $concern['photo_path'] = $this->storeImageOrFail((string) $concern['photo'], 'defects', 'concern', "concerns.{$index}.photo");
-                $storedPaths[] = $concern['photo_path'];
+                $path = Base64Image::store((string) $concern['photo'], 'defects', 'concern');
+                if ($path === null) {
+                    Log::warning('A concern photo could not be read and was left out of the checkout.', ['client_id' => $concern['client_id'] ?? null]);
+                } else {
+                    $concern['photo_path'] = $path;
+                    $storedPaths[] = $path;
+                }
             }
             unset($concern['photo']);
             $data['concerns'][$index] = $concern;

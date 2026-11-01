@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { fieldGroups, fieldValueOutOfRange, taskIsCompleted, taskStatusLabel } from '../../resources/js/daily-checkout/src/utils/checklistFields.ts';
+import { fieldGroups, fieldValueOutOfRange, normalizeTaskStatus, taskIsCompleted, taskStatusLabel } from '../../resources/js/daily-checkout/src/utils/checklistFields.ts';
+import { MAX_PHOTO_BYTES, PHOTO_FORMAT_MESSAGE, PHOTO_REJECTED_MESSAGE, photoProblem } from '../../resources/js/daily-checkout/src/utils/photoFile.ts';
 import { inspectionReadiness } from '../../resources/js/daily-checkout/src/utils/inspectionProgress.ts';
 
 const template = JSON.parse(readFileSync(new URL('../../storage/checklists/fireboat6_checklist.json', import.meta.url), 'utf8'));
@@ -42,6 +43,22 @@ test('groups keep the template order and leave ungrouped fields for the collapse
   assert.deepEqual(groups[1].fields.map((field) => field.id), ['fb6-fuel-level', 'fb6-high-low-tide']);
   assert.ok(!groups.flatMap((group) => group.fields).some((field) => field.id === 'fb6-driver-crew-signoff'));
   assert.deepEqual(fieldGroups([{ id: 'a', name: 'A', inputType: 'text', required: false }]), [], 'a session issued before the headings has none');
+});
+
+test('only a photo the server can store is accepted, before the member signs', () => {
+  assert.equal(photoProblem({ type: 'image/jpeg', size: 1000 }), null);
+  assert.equal(photoProblem({ type: 'image/webp', size: 1000 }), null);
+  assert.equal(photoProblem({ type: 'image/heic', size: 1000 }), PHOTO_FORMAT_MESSAGE);
+  assert.equal(photoProblem({ type: 'image/tiff', size: 1000 }), PHOTO_FORMAT_MESSAGE);
+  assert.equal(photoProblem({ type: 'application/pdf', size: 1000 }), PHOTO_REJECTED_MESSAGE);
+  assert.equal(photoProblem({ type: 'image/png', size: MAX_PHOTO_BYTES + 1 }), PHOTO_REJECTED_MESSAGE);
+});
+
+test('a duty on an older draft is sent as what the screen shows, so it cannot file an equipment defect', () => {
+  assert.equal(normalizeTaskStatus('Missing'), 'Not Completed');
+  assert.equal(normalizeTaskStatus('Damaged'), 'Not Completed');
+  assert.equal(normalizeTaskStatus('Present'), 'Completed');
+  assert.equal(normalizeTaskStatus('Not Completed'), 'Not Completed');
 });
 
 test('a duty reads as completed or not, including one answered on an older draft', () => {

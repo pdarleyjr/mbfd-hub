@@ -119,8 +119,9 @@ final class MemberIssueHistory
         $index = $this->checklistIndex($apparatus);
         $latest = $this->latestActions($ids);
         $counts = $this->historyCounts($ids);
+        $reports = $this->originalReports($ids);
 
-        return $defects->map(function (ApparatusDefect $defect) use ($index, $latest, $counts): array {
+        return $defects->map(function (ApparatusDefect $defect) use ($index, $latest, $counts, $reports): array {
             $location = $this->continuity->currentLocation($index, $defect);
             $status = (string) ($defect->action_status ?: DefectActionStatus::REPORTED);
 
@@ -132,7 +133,8 @@ final class MemberIssueHistory
                 'item_id' => $location['item_id'],
                 'issue_type' => (string) $defect->issue_type,
                 'severity' => $defect->severity === 'significant' ? 'significant' : 'routine',
-                'description' => $this->text($defect->notes),
+                // Staff can edit a defect's notes, so an issue with a recorded report shows what was reported.
+                'description' => array_key_exists((int) $defect->id, $reports) ? $reports[(int) $defect->id] : $this->text($defect->notes),
                 'reporter_name' => $this->text($defect->getAttribute('reporter_name')),
                 'first_reported_at' => $this->at($defect->first_reported_at),
                 'action_status' => $status,
@@ -199,6 +201,28 @@ final class MemberIssueHistory
         }
 
         return $latest;
+    }
+
+    /**
+     * What the first report said, for the issues that have one on record, in one query. Older issues from before
+     * the event history are absent from the result.
+     *
+     * @param  list<int>  $ids
+     * @return array<int, string|null>
+     */
+    private function originalReports(array $ids): array
+    {
+        $reports = [];
+        $events = ApparatusDefectEvent::query()
+            ->whereIn('apparatus_defect_id', $ids)->where('event_type', 'reported')
+            ->orderByDesc('id')
+            ->get(['id', 'apparatus_defect_id', 'details']);
+        foreach ($events as $event) {
+            $details = is_array($event->details) ? $event->details : [];
+            $reports[(int) $event->apparatus_defect_id] = $this->text($details['notes'] ?? null);
+        }
+
+        return $reports;
     }
 
     /**
