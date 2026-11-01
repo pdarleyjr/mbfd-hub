@@ -7,40 +7,14 @@ namespace App\Filament\Support;
 use App\Models\ApparatusChangeout;
 use App\Models\ApparatusChangeoutItem;
 use App\Services\Fleet\ApparatusChangeoutPlanner;
-use App\Support\HubTimezone;
 use Illuminate\Support\Str;
 
-/**
- * The stored changeout record in the words Fleet reads on the changeout page. Reads only. Controlled lines are shown
- * by name only, with no quantity, in keeping with docs/apparatus-changeouts.md section 3.
- */
+/** The stored changeout record in the words Fleet reads on the changeout page. Reads only. */
 final class ApparatusChangeoutWording
 {
-    public const GROUP_EXCEPTIONS = 'exceptions';
+    public const GROUP_LEFT = 'left';
 
-    public const GROUP_OPEN = 'open';
-
-    public const GROUP_MOVED = 'moved';
-
-    public static function handoffLabel(?string $handoff): string
-    {
-        return match ($handoff) {
-            ApparatusChangeout::HANDOFF_COMPLETE => 'Settled',
-            ApparatusChangeout::HANDOFF_PENDING_VERIFICATION => 'Open lines',
-            default => str((string) $handoff)->headline()->toString(),
-        };
-    }
-
-    /** Says plainly what the current status means for the trucks. */
-    public static function stateNote(ApparatusChangeout $changeout): ?string
-    {
-        return match ($changeout->status) {
-            ApparatusChangeout::STATUS_PENDING_FLEET => 'No truck has changed. The crew\'s equipment choices are saved and wait on this decision.',
-            ApparatusChangeout::STATUS_REJECTED => 'No truck changed. This record stays for the history.',
-            ApparatusChangeout::STATUS_CANCELLED => 'Withdrawn before a decision. No truck changed.',
-            default => null,
-        };
-    }
+    public const GROUP_TOOK = 'took';
 
     public static function correctionsLeft(ApparatusChangeout $changeout): int
     {
@@ -57,42 +31,19 @@ final class ApparatusChangeoutWording
     }
 
     /**
-     * Each equipment line in one sentence, grouped: settled but unusual, still open, and moved as expected.
+     * Each equipment line in one sentence: what the crew left, and what they took.
      *
-     * @return array{exceptions: list<string>, open: list<string>, moved: list<string>}
+     * @return array{left: list<string>, took: list<string>}
      */
     public static function lines(ApparatusChangeout $changeout): array
     {
-        $changeout->loadMissing('items.verifiedBy');
-        $groups = [self::GROUP_EXCEPTIONS => [], self::GROUP_OPEN => [], self::GROUP_MOVED => []];
+        $changeout->loadMissing('items');
+        $groups = [self::GROUP_LEFT => [], self::GROUP_TOOK => []];
         foreach ($changeout->items->sortBy('id') as $item) {
-            $groups[self::groupFor($item)][] = self::lineText($item);
+            $groups[$item->isLeftBehind() ? self::GROUP_LEFT : self::GROUP_TOOK][] = self::lineText($item);
         }
 
         return $groups;
-    }
-
-    private static function groupFor(ApparatusChangeoutItem $item): string
-    {
-        if ($item->isOpen()) {
-            return self::GROUP_OPEN;
-        }
-        if ($item->custody_status === ApparatusChangeoutItem::CUSTODY_LEFT_BEHIND
-            || in_array($item->condition, [ApparatusChangeoutItem::CONDITION_MISSING, ApparatusChangeoutItem::CONDITION_DAMAGED], true)
-            || self::isPartial($item)
-            || filled($item->note)) {
-            return self::GROUP_EXCEPTIONS;
-        }
-
-        return self::GROUP_MOVED;
-    }
-
-    private static function isPartial(ApparatusChangeoutItem $item): bool
-    {
-        return ! $item->isControlled()
-            && $item->quantity_moved !== null
-            && $item->expected_quantity !== null
-            && $item->quantity_moved < $item->expected_quantity;
     }
 
     public static function lineLabel(ApparatusChangeoutItem $item): string
@@ -102,40 +53,7 @@ final class ApparatusChangeoutWording
 
     public static function lineText(ApparatusChangeoutItem $item): string
     {
-        $parts = [self::lineLabel($item).'.', self::custodyWords($item)];
-        if (self::isPartial($item)) {
-            $parts[] = 'Moved '.$item->quantity_moved.' of '.$item->expected_quantity.'.';
-        }
-        if ($item->condition === ApparatusChangeoutItem::CONDITION_MISSING) {
-            $parts[] = 'Reported missing.';
-        } elseif ($item->condition === ApparatusChangeoutItem::CONDITION_DAMAGED) {
-            $parts[] = 'Reported damaged.';
-        }
-        if ($item->apparatus_defect_id !== null) {
-            $parts[] = 'An issue was filed on the truck.';
-        }
-        if (filled($item->note)) {
-            $parts[] = 'Note: '.$item->note;
-        }
-        if (filled($item->verification_note)) {
-            $parts[] = 'Verification note: '.$item->verification_note;
-        }
-
-        return implode(' ', $parts);
-    }
-
-    public static function custodyWords(ApparatusChangeoutItem $item): string
-    {
-        return match ($item->custody_status) {
-            ApparatusChangeoutItem::CUSTODY_MOVED => 'Moved to the new truck.',
-            ApparatusChangeoutItem::CUSTODY_LEFT_BEHIND => 'Left on the old truck.',
-            ApparatusChangeoutItem::CUSTODY_NEEDS_REVIEW => 'Needs review.',
-            ApparatusChangeoutItem::CUSTODY_PENDING_VERIFICATION => 'Controlled item, waiting for verification.',
-            ApparatusChangeoutItem::CUSTODY_VERIFIED => 'Verified'
-                .($item->verifiedBy !== null ? ' by '.$item->verifiedBy->name : '')
-                .($item->verified_at !== null ? ' on '.$item->verified_at->setTimezone(HubTimezone::NAME)->format('M j, Y g:i A') : '').'.',
-            default => str((string) $item->custody_status)->headline()->append('.')->toString(),
-        };
+        return self::lineLabel($item).'.'.(filled($item->note) ? ' Note: '.$item->note : '');
     }
 
     /**
@@ -150,7 +68,7 @@ final class ApparatusChangeoutWording
             return [];
         }
         if (($audit['mode'] ?? null) === ApparatusChangeoutPlanner::MODE_HANDOFF_ONLY) {
-            return ['The unit was already on truck '.$changeout->to_vehicle_number.', so no truck record changed here. This recorded the equipment handoff only.'];
+            return ['The unit was already on truck '.$changeout->to_vehicle_number.', so no truck record changed here. This recorded what the crew took and left.'];
         }
         $lines = [];
         foreach (['from', 'to'] as $side) {
@@ -159,9 +77,6 @@ final class ApparatusChangeoutWording
             if (is_array($before) && is_array($after)) {
                 $lines[] = 'Truck '.($before['vehicle_number'] ?? 'not recorded').' was '.self::identity($before).'. It is now '.self::identity($after).'.';
             }
-        }
-        if (filled($audit['reported_vehicle_number'] ?? null)) {
-            $lines[] = 'The crew reported vehicle '.$audit['reported_vehicle_number'].', and Fleet matched it to truck '.$changeout->to_vehicle_number.'.';
         }
         if ($lines !== []) {
             $lines[] = 'Vehicle numbers, VINs, meters, defects, inspections and tickets stayed with their own trucks.';

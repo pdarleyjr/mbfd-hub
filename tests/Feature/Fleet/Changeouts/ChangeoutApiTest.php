@@ -21,7 +21,6 @@ final class ChangeoutApiTest extends ChangeoutTestCase
             'context' => ['get', '/api/public/apparatuses/%d/changeout-context'],
             'submit' => ['post', '/api/public/apparatuses/%d/changeouts'],
             'show' => ['get', '/api/public/changeouts/%d'],
-            'verify' => ['post', '/api/public/changeouts/%d/lines/1/verify'],
         ];
     }
 
@@ -47,7 +46,7 @@ final class ChangeoutApiTest extends ChangeoutTestCase
     {
         $this->actAsFleet();
 
-        $this->getJson("/api/public/apparatuses/{$this->unit->id}/changeout-context")->assertOk()->assertJsonPath('can_fleet_commit', true);
+        $this->getJson("/api/public/apparatuses/{$this->unit->id}/changeout-context")->assertOk()->assertJsonPath('unit.designation', 'E2');
     }
 
     public function test_the_service_refuses_a_member_with_no_profile_too(): void
@@ -55,7 +54,7 @@ final class ChangeoutApiTest extends ChangeoutTestCase
         $this->expectException(\Illuminate\Auth\Access\AuthorizationException::class);
 
         $this->service()->submit($this->unit, $this->memberWithoutProfile(), [
-            'client_submission_id' => (string) Str::uuid(), 'expected_vehicle_number' => 'V-202', 'to_apparatus_id' => $this->reserve->id,
+            'client_submission_id' => (string) Str::uuid(), 'expected_vehicle_number' => 'V-202', 'expected_unit_slug' => 'e2', 'to_apparatus_id' => $this->reserve->id,
         ]);
     }
 
@@ -63,9 +62,8 @@ final class ChangeoutApiTest extends ChangeoutTestCase
     {
         $this->postChangeout($this->unit, ['client_submission_id' => 'not-a-uuid', 'to_apparatus_id' => $this->reserve->id])->assertUnprocessable()->assertJsonValidationErrors('client_submission_id');
         $this->postJson("/api/public/apparatuses/{$this->unit->id}/changeouts", ['client_submission_id' => (string) Str::uuid(), 'to_apparatus_id' => $this->reserve->id])->assertUnprocessable()->assertJsonValidationErrors(['expected_vehicle_number', 'expected_unit_slug']);
-        $this->postChangeout($this->unit, ['to_apparatus_id' => $this->reserve->id, 'checklist_version' => null, 'exceptions' => [['item_key' => 'x', 'handling' => 'leave']]])->assertUnprocessable()->assertJsonValidationErrors('checklist_version');
         $this->postChangeout($this->unit, ['to_apparatus_id' => $this->reserve->id, 'exceptions' => [['item_key' => 'x', 'handling' => 'burn']]])->assertUnprocessable()->assertJsonValidationErrors('exceptions.0.handling');
-        $this->postChangeout($this->unit, ['to_apparatus_id' => $this->reserve->id, 'exceptions' => [['item_key' => 'x', 'condition' => 'great']]])->assertUnprocessable()->assertJsonValidationErrors('exceptions.0.condition');
+        $this->postChangeout($this->unit, ['to_apparatus_id' => $this->reserve->id, 'exceptions' => [['item_key' => 'x', 'handling' => 'review']]])->assertUnprocessable()->assertJsonValidationErrors('exceptions.0.handling');
     }
 
     public function test_an_unknown_truck_in_the_url_is_not_found(): void
@@ -109,64 +107,56 @@ final class ChangeoutApiTest extends ChangeoutTestCase
             ->assertJsonPath('mode', 'start')
             ->assertJsonPath('open_issues_on_truck', 1)
             ->assertJsonPath('previous_changeout', null)
-            ->assertJsonPath('pending_changeout', null)
-            ->assertJsonPath('can_fleet_commit', false)
             ->assertJsonPath('equipment.usable', true);
         $this->assertSame(64, strlen($response->json('equipment.checklist_version')));
 
         $candidates = collect($response->json('candidates'));
         $reserve = $candidates->firstWhere('apparatus_id', $this->reserve->id);
-        $this->assertSame(['V-909', 'Reserve', true, false], [$reserve['vehicle_number'], $reserve['status'], $reserve['direct'], $reserve['is_return']]);
+        $this->assertSame(['apparatus_id', 'vehicle_number', 'label', 'location', 'status', 'is_return'], array_keys($reserve));
+        $this->assertSame(['V-909', 'Reserve', false], [$reserve['vehicle_number'], $reserve['status'], $reserve['is_return']]);
+        $this->assertNotNull($candidates->firstWhere('apparatus_id', $outOfService->id), 'A reserve truck is offered in any status.');
         $others = collect($response->json('other_vehicles'));
-        $this->assertSame(false, $others->firstWhere('apparatus_id', $outOfService->id)['direct']);
-        $this->assertNotNull($others->firstWhere('apparatus_id', $this->frontline->id));
+        $frontline = $others->firstWhere('apparatus_id', $this->frontline->id);
+        $this->assertSame(['apparatus_id', 'vehicle_number', 'label', 'location', 'status', 'listed_as'], array_keys($frontline));
+        $this->assertSame(['E3', 'In Service'], [$frontline['listed_as'], $frontline['status']]);
         $this->assertNull($candidates->merge($others)->firstWhere('apparatus_id', $otherType->id), 'Another type of truck is never offered.');
         $this->assertNull($candidates->merge($others)->firstWhere('apparatus_id', $this->unit->id));
 
         $first = $response->json('equipment.compartments.0');
         $this->assertSame(['id', 'name', 'items'], array_keys($first));
-        $this->assertSame(['item_key', 'name', 'expected_quantity', 'controlled', 'default_handling', 'previous'], array_keys($first['items'][0]));
-        $this->assertSame('transfer', $first['items'][0]['default_handling']);
+        $this->assertSame(['item_key', 'name', 'expected_quantity', 'previous'], array_keys($first['items'][0]));
     }
 
-    public function test_the_context_shows_the_waiting_change(): void
-    {
-        $id = $this->postChangeout($this->unit, ['to_apparatus_id' => $this->reserve->id])->assertCreated()->json('changeout.id');
-
-        $this->getJson("/api/public/apparatuses/{$this->unit->id}/changeout-context")->assertOk()->assertJsonPath('pending_changeout.id', $id);
-    }
-
-    public function test_a_candidate_with_a_planned_move_onto_it_is_not_offered(): void
+    public function test_a_reserve_truck_someone_else_planned_is_still_offered(): void
     {
         $this->swapAlert($this->frontline, ['planned_replacement_apparatus_id' => $this->reserve->id]);
 
         $response = $this->getJson("/api/public/apparatuses/{$this->unit->id}/changeout-context")->assertOk();
 
-        $this->assertNull(collect($response->json('candidates'))->firstWhere('apparatus_id', $this->reserve->id));
-        $this->assertNotNull(collect($response->json('other_vehicles'))->firstWhere('apparatus_id', $this->reserve->id));
+        $this->assertNotNull(collect($response->json('candidates'))->firstWhere('apparatus_id', $this->reserve->id));
     }
 
-    public function test_the_context_refuses_an_alert_for_another_unit(): void
+    public function test_the_context_ignores_a_stale_or_wrong_alert_id(): void
     {
-        $alert = $this->swapAlert($this->frontline);
+        $mine = $this->swapAlert($this->unit);
+        $other = $this->swapAlert($this->frontline);
 
-        $this->getJson("/api/public/apparatuses/{$this->unit->id}/changeout-context?alert_id={$alert->id}")->assertUnprocessable()->assertJsonValidationErrors('alert_id');
+        foreach ([$other->id, 999999] as $id) {
+            $this->getJson("/api/public/apparatuses/{$this->unit->id}/changeout-context?alert_id={$id}")->assertOk()->assertJsonPath('alert.id', $mine->id);
+        }
     }
 
-    public function test_real_templates_v1_and_v2_both_produce_lines_with_their_own_ids(): void
+    public function test_real_templates_v1_and_v2_both_produce_lines_with_their_own_ids_and_nothing_is_controlled(): void
     {
-        $alert = $this->swapAlert($this->unit);
         $rescue = $this->rescuePair();
-        $rescueAlert = $this->swapAlert($rescue['unit']);
 
-        $engine = $this->changeout($this->postChangeout($this->unit, ['alert_id' => $alert->id, 'to_apparatus_id' => $this->reserve->id])->assertCreated());
-        $rig = $this->changeout($this->postChangeout($rescue['unit'], ['alert_id' => $rescueAlert->id, 'to_apparatus_id' => $rescue['reserve']->id])->assertCreated());
+        $engine = $this->changeout($this->postChangeout($this->unit, ['to_apparatus_id' => $this->reserve->id])->assertCreated());
+        $rig = $this->changeout($this->postChangeout($rescue['unit'], ['to_apparatus_id' => $rescue['reserve']->id])->assertCreated());
 
         $this->assertGreaterThan(50, $engine->items()->count());
-        $this->assertSame(1, $engine->items()->where('item_class', 'controlled')->count(), 'E2 carries one Med Box.');
-        $this->assertSame(['Med Box', 'Narcotic Book', 'Narcotic Seal #'], $rig->items()->where('item_class', 'controlled')->orderBy('item_name')->pluck('item_name')->all());
-        $this->assertSame('field:narcotic_seal', $rig->items()->where('item_name', 'Narcotic Seal #')->sole()->item_key);
-        $this->assertSame('patient_compartment-item-3', $rig->items()->where('item_name', 'Med Box')->sole()->item_key);
-        $this->assertSame('pending_verification', $engine->handoff_status);
+        $this->assertSame(0, $engine->items()->where('custody_status', '!=', 'moved')->count());
+        $medBox = $rig->items()->where('item_name', 'Med Box')->sole();
+        $this->assertSame(['patient_compartment-item-3', 'transfer', 'moved'], [$medBox->item_key, $medBox->handling, $medBox->custody_status]);
+        $this->assertSame('complete', $engine->handoff_status);
     }
 }

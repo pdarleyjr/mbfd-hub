@@ -4,12 +4,8 @@ import { identityForQueueCapture } from '../../lib/offlineIdentity';
 import { setUnsavedWork } from '../../pwa/draftBusy.ts';
 import { ApiRequestError, isApiAuthenticationError, redirectToLoginAfterSessionExpiry } from '../../utils/api';
 import {
-  CHANGEOUT_ALREADY_PENDING,
-  CHANGEOUT_ALREADY_RECORDED,
-  CHANGEOUT_CHECKLIST_CHANGED,
   CHANGEOUT_REPLAY_CONFLICT,
   CHANGEOUT_STALE,
-  CHANGEOUT_TRUCK_UNAVAILABLE,
   ChangeoutConflictError,
   getChangeoutContext,
   submitChangeout,
@@ -22,14 +18,25 @@ import {
   saveChangeoutDraft,
   saveContextSnapshot,
 } from './changeoutDraft';
-import { applyTruckDefaults, buildSubmission, hasWork, reconcileDraft, resolveTruck, stationReturnPath, truckProblem, waitingNames, withLineChoice } from './changeoutLogic';
+import {
+  buildSubmission,
+  hasWork,
+  leaveCompartment,
+  leftItems,
+  presetChoice,
+  reconcileDraft,
+  stationReturnPath,
+  takeCompartment,
+  toggleLeft,
+  truckProblem,
+  withLeftNote,
+} from './changeoutLogic';
 import type {
   ChangeoutContext,
   ChangeoutDoneState,
   ChangeoutDraft,
   ChangeoutStep,
-  EquipmentLine,
-  LineChoice,
+  EquipmentCompartment,
   TruckChoice,
 } from './types';
 
@@ -44,7 +51,6 @@ export type SendState =
   | { kind: 'not_sent'; message: string }
   | { kind: 'refused'; message: string }
   | { kind: 'stale'; message: string; currentVehicle: string | null; currentApparatusId: number | null }
-  | { kind: 'pending'; message: string; changeoutId: number | null }
   | { kind: 'replay'; message: string; changeoutId: number | null };
 
 export type LoadState = { status: 'loading' } | { status: 'failed'; message: string } | { status: 'ready' };
@@ -52,28 +58,32 @@ export type LoadState = { status: 'loading' } | { status: 'failed'; message: str
 const STEPS: readonly ChangeoutStep[] = ['truck', 'equipment', 'review'];
 const isStep = (value: string | null): value is ChangeoutStep => STEPS.includes(value as ChangeoutStep);
 
-const newDraft = (apparatusId: number, userId: number | null, alertId: number | null): ChangeoutDraft => ({
-  version: 1,
-  apparatusId,
-  userId,
-  alertId,
-  clientSubmissionId: createClientSubmissionId(),
-  step: 'truck',
-  choice: null,
-  typedVehicle: '',
-  exceptions: {},
-  note: '',
-  attempted: false,
-  savedAt: Date.now(),
-});
+/** A brand new draft starts on the truck the plan or the link names. Nothing else is ever preset. */
+const newDraft = (apparatusId: number, userId: number | null, alertId: number | null, context: ChangeoutContext, truckParam: string | null): ChangeoutDraft => {
+  const preset = presetChoice(context, truckParam);
+  const typed = preset === null && truckParam !== null && context.mode === 'start' ? truckParam : '';
+
+  return {
+    version: 2,
+    apparatusId,
+    userId,
+    alertId,
+    clientSubmissionId: createClientSubmissionId(),
+    step: 'truck',
+    choice: preset ?? (typed === '' ? null : { kind: 'typed' }),
+    preselected: preset !== null || typed !== '',
+    typedVehicle: typed,
+    left: {},
+    note: '',
+    attempted: false,
+    savedAt: Date.now(),
+  };
+};
 
 const conflictSendState = (failure: ChangeoutConflictError): SendState => {
   switch (failure.code) {
     case CHANGEOUT_STALE:
       return { kind: 'stale', message: failure.message, currentVehicle: failure.details.current_vehicle_number, currentApparatusId: failure.details.current_apparatus_id };
-    case CHANGEOUT_ALREADY_PENDING:
-    case CHANGEOUT_ALREADY_RECORDED:
-      return { kind: 'pending', message: failure.message, changeoutId: failure.details.changeout_id };
     case CHANGEOUT_REPLAY_CONFLICT:
       return { kind: 'replay', message: failure.message, changeoutId: failure.details.changeout_id };
     default:
@@ -89,6 +99,8 @@ export function useChangeoutWizard(apparatusId: number, alertParam: number | nul
   const sendingRef = useRef(false);
   // Work handed from a refusal to the reload that follows it, since this phone may not have stored it.
   const carried = useRef<{ draft: ChangeoutDraft; list: ChangeoutContext } | null>(null);
+  // The truck a member already named on their checkout. It only seeds a brand new draft.
+  const truckParam = useRef(params.get('truck'));
 
   const [load, setLoad] = useState<LoadState>({ status: 'loading' });
   const [loadAttempt, setLoadAttempt] = useState(0);
@@ -160,15 +172,15 @@ export function useChangeoutWizard(apparatusId: number, alertParam: number | nul
       if (cancelled) return;
 
       const nextNotices: string[] = [];
-      let next = saved ? { ...saved, alertId } : newDraft(apparatusId, userId, alertId);
+      let next = saved ? { ...saved, alertId } : newDraft(apparatusId, userId, alertId, fresh, truckParam.current);
       if (saved) {
         const reconciled = reconcileDraft(next, fresh, snapshot);
         next = { ...reconciled.draft, attempted: false };
         if (snapshot && snapshot.unit.vehicle_number !== fresh.unit.vehicle_number) {
-          nextNotices.push(`${fresh.unit.designation} is on truck ${fresh.unit.vehicle_number ?? 'not recorded'} now. Choices that still apply are kept.`);
+          nextNotices.push(`${fresh.unit.designation} is on truck ${fresh.unit.vehicle_number ?? 'not recorded'} now. Your Left items that still apply are kept.`);
         }
-        if (reconciled.truckCleared) nextNotices.push('The truck you picked is no longer on the list. Choose another. Your equipment choices are kept.');
-        if (reconciled.dropped.length > 0) nextNotices.push(`These choices no longer apply: ${reconciled.dropped.join(', ')}.`);
+        if (reconciled.truckCleared) nextNotices.push('The truck you picked is no longer on the list. Choose another. Your Left items are kept.');
+        if (reconciled.dropped.length > 0) nextNotices.push(`These are no longer on the list: ${reconciled.dropped.join(', ')}.`);
       }
 
       setContext(fresh);
@@ -248,13 +260,12 @@ export function useChangeoutWizard(apparatusId: number, alertParam: number | nul
     const stored = saveChangeoutDraft(marked) && saveContextSnapshot(marked.apparatusId, marked.userId, context);
 
     try {
-      const view = applyTruckDefaults(context, resolveTruck(marked, context));
-      const { changeout } = await submitChangeout(apparatusId, buildSubmission(marked, view));
+      const { changeout } = await submitChangeout(apparatusId, buildSubmission(marked, context));
       const done: ChangeoutDoneState = {
         summary: changeout,
         // The server's own list when it sends one.
-        waiting: changeout.open_items.length > 0 ? changeout.open_items.map((item) => item.name) : waitingNames(view, marked.exceptions),
-        stationPath: stationReturnPath(returnParam, context.unit.station_id),
+        left: changeout.left_behind.length > 0 ? changeout.left_behind : leftItems(context, marked.left),
+        stationPath: stationReturnPath(returnParam, changeout.station_id ?? context.unit.station_id),
       };
       clearChangeoutDraft(marked.apparatusId, marked.userId);
       setDraft(null);
@@ -271,22 +282,8 @@ export function useChangeoutWizard(apparatusId: number, alertParam: number | nul
       } else if (failure instanceof ChangeoutConflictError) {
         const refused = { ...marked, attempted: false };
         saveChangeoutDraft(refused);
-        if (failure.code === CHANGEOUT_TRUCK_UNAVAILABLE) {
-          const cleared: ChangeoutDraft = { ...refused, choice: null, step: 'truck' };
-          saveChangeoutDraft(cleared);
-          carried.current = { draft: cleared, list: context };
-          setNotices([failure.message]);
-          goTo('truck', true);
-          setLoadAttempt((attempt) => attempt + 1);
-        } else if (failure.code === CHANGEOUT_CHECKLIST_CHANGED) {
-          // Resending would only be refused again: load the new list, keep what still applies, and stay on Review.
-          carried.current = { draft: refused, list: context };
-          setNotices([failure.message]);
-          setLoadAttempt((attempt) => attempt + 1);
-        } else {
-          setDraft(refused);
-          setSendState(conflictSendState(failure));
-        }
+        setDraft(refused);
+        setSendState(conflictSendState(failure));
       } else if (failure instanceof ApiRequestError && failure.status < 500) {
         const refused = { ...marked, attempted: false };
         setDraft(refused);
@@ -305,7 +302,7 @@ export function useChangeoutWizard(apparatusId: number, alertParam: number | nul
     } finally {
       sendingRef.current = false;
     }
-  }, [apparatusId, context, draft, goTo, location.pathname, navigate, returnParam]);
+  }, [apparatusId, context, draft, location.pathname, navigate, returnParam]);
 
   /** Only after the member has been shown that an earlier send had different choices. */
   const sendAsNew = useCallback(() => {
@@ -337,9 +334,10 @@ export function useChangeoutWizard(apparatusId: number, alertParam: number | nul
     setRestored(false);
     setNotices([]);
     setSendState({ kind: 'idle' });
-    update({ choice: null, typedVehicle: '', exceptions: {}, note: '', attempted: false, step: 'truck' });
+    const preset = context ? presetChoice(context, null) : null;
+    update({ choice: preset, preselected: preset !== null, typedVehicle: '', left: {}, note: '', attempted: false, step: 'truck' });
     goTo('truck', true);
-  }, [goTo, update]);
+  }, [context, goTo, update]);
 
   const discard = useCallback(() => {
     if (draft) clearChangeoutDraft(draft.apparatusId, draft.userId);
@@ -348,12 +346,17 @@ export function useChangeoutWizard(apparatusId: number, alertParam: number | nul
     navigate(stationPath, { replace: true });
   }, [draft, navigate, stationPath]);
 
-  const setLine = useCallback((line: EquipmentLine, choice: LineChoice) => {
-    setDraft((current) => (current ? { ...current, exceptions: withLineChoice(current.exceptions, line, choice) } : current));
+  const updateLeft = useCallback((change: (left: Record<string, string>) => Record<string, string>) => {
+    setDraft((current) => (current ? { ...current, left: change(current.left) } : current));
   }, []);
+  const toggleLine = useCallback((key: string) => updateLeft((left) => toggleLeft(left, key)), [updateLeft]);
+  const setLineNote = useCallback((key: string, note: string) => updateLeft((left) => withLeftNote(left, key, note)), [updateLeft]);
+  const setCompartmentLeft = useCallback((compartment: EquipmentCompartment, isLeft: boolean) => {
+    updateLeft((left) => (isLeft ? leaveCompartment(left, compartment) : takeCompartment(left, compartment)));
+  }, [updateLeft]);
 
-  const setChoice = useCallback((choice: TruckChoice) => update({ choice }), [update]);
-  const setTyped = useCallback((typedVehicle: string) => update({ typedVehicle, choice: { kind: 'typed' } }), [update]);
+  const setChoice = useCallback((choice: TruckChoice) => update({ choice, preselected: false, typedVehicle: '' }), [update]);
+  const setTyped = useCallback((typedVehicle: string) => update({ typedVehicle, preselected: false, choice: { kind: 'typed' } }), [update]);
   const setNote = useCallback((note: string) => update({ note }), [update]);
   const retryLoad = useCallback(() => setLoadAttempt((attempt) => attempt + 1), []);
 
@@ -376,10 +379,12 @@ export function useChangeoutWizard(apparatusId: number, alertParam: number | nul
     reviewWithCurrentTruck,
     startOver,
     discard,
-    setLine,
+    toggleLine,
+    setLineNote,
+    setCompartmentLeft,
     setChoice,
     setTyped,
     setNote,
     retryLoad,
-  }), [context, discard, draft, goTo, load, notices, problem, restored, retryLoad, reviewWithCurrentTruck, send, sendAsNew, sendState, setChoice, setLine, setNote, setTyped, startOver, stationPath, step, storageFailed, usingSavedList, working]);
+  }), [context, discard, draft, goTo, load, notices, problem, restored, retryLoad, reviewWithCurrentTruck, send, sendAsNew, sendState, setChoice, setCompartmentLeft, setLineNote, setNote, setTyped, startOver, stationPath, step, storageFailed, toggleLine, usingSavedList, working]);
 }

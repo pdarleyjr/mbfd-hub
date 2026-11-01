@@ -74,7 +74,20 @@ export const ACTIONS: Record<IssueActionName, ActionMeta> = {
     label: 'Reopen', confirm: 'Reopen issue', done: 'Issue reopened.',
     intro: 'Puts a closed issue back in the queue.', fields: ['reason'], required: ['reason'],
   },
+  send_to_logistics: {
+    label: 'Clear, this is for Logistics', confirm: 'Clear for Logistics', done: 'Cleared from Captain 5. It stays open with Logistics.',
+    intro: 'For a support services or logistics issue. It leaves your page and counts, stays open for Logistics, and the crew is not told. Bring it back any time from Cleared for Logistics.',
+    fields: [], required: [],
+  },
+  bring_back_to_captain5: {
+    label: 'Bring back', confirm: 'Bring back', done: 'Brought back to the Captain 5 queue.',
+    intro: 'Returns this issue to your queue and counts. Nothing changes for Logistics or the crew.',
+    fields: [], required: [],
+  },
 };
+
+/** These two stay between Captain 5 and Logistics, so their forms offer a note and no message to the crew. */
+export const NOTE_ONLY_ACTIONS: IssueActionName[] = ['send_to_logistics', 'bring_back_to_captain5'];
 
 export const REQUIRED_MESSAGES: Partial<Record<FieldKey, string>> = {
   resolution_notes: 'Describe what was replaced or repaired.',

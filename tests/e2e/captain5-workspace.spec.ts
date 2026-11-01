@@ -1,6 +1,6 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 import type {
-  ActingRequest, ActingState, Captain5Access, HandoffNote, InspectionView, IssueDetail, OnDuty, RescueDaily,
+  ActingRequest, ActingState, Captain5Access, HandoffNote, InspectionView, IssueDetail, OnDuty, RescueDaily, RescueTruck, RescueTruckChange,
 } from '../../resources/js/daily-checkout/src/components/captain5/types';
 import type { PostedUpdate } from '../../resources/js/daily-checkout/src/components/department-updates/types';
 
@@ -61,9 +61,16 @@ function parseMultipart(raw: string): { fields: Record<string, string>; files: R
 
 const ACTIONS_REPORTED: IssueDetail['actions'] = ['acknowledge', 'ordered', 'available_for_pickup', 'replaced', 'dismiss'];
 
+/** One apparatus per unit name, so the queue groups the way the server's apparatus ids would. */
+const unitIds = new Map<string, number>();
+const apparatusIdOf = (unit: string): number => {
+  if (!unitIds.has(unit)) unitIds.set(unit, unitIds.size + 1);
+  return unitIds.get(unit) as number;
+};
+
 function makeIssue(id: number, overrides: Partial<IssueDetail> = {}): IssueDetail {
   return {
-    id, kind: 'rescue', apparatus_id: 1, unit: 'Rescue 1', compartment: 'Medical bag', item: 'Pulse oximeter', issue_type: 'Missing',
+    id, kind: 'rescue', apparatus_id: apparatusIdOf(overrides.unit ?? 'Rescue 1'), unit: 'Rescue 1', compartment: 'Medical bag', item: 'Pulse oximeter', issue_type: 'Missing',
     severity: 'routine', action_status: 'reported', action_label: 'Awaiting verification', open: true, details: {},
     expected_delivery: null, overdue: false, awaiting_verification: false, first_reported_at: minutesAgo(180),
     first_reported_by: 'Lt. Reporter', last_observed_at: minutesAgo(60), resolved_at: null, resolution_type: null,
@@ -90,6 +97,9 @@ interface Server {
   acting: ActingState;
   issues: IssueDetail[];
   closed: IssueDetail[];
+  /** Left out of the workspace answer when undefined, like a response sent before they existed. */
+  trucks?: RescueTruck[];
+  truckChanges?: RescueTruckChange[];
   detailStatus: number;
   notes: HandoffNote[];
   updates: PostedUpdate[];
@@ -130,9 +140,20 @@ const NEXT_STATE: Record<string, { status: string; actions: IssueDetail['actions
 };
 
 function applyAction(issue: IssueDetail, body: Record<string, unknown>): IssueDetail {
+  const serial = Number(issue.state_token.split(':')[1]) + 1;
+  // The status never changes for these two; only the history (and so the token) moves on.
+  const token = `${issue.action_status}:${serial}`;
+  if (body.action === 'send_to_logistics') {
+    return {
+      ...issue, state_token: token, actions: [], clearing_actions: ['bring_back_to_captain5'], captain5_cleared_at: new Date().toISOString(), captain5_cleared_by: 'Alex Rivera',
+      events: [...issue.events, { id: serial, type: 'cleared_from_captain5', from: issue.action_status, to: issue.action_status, actor: 'Alex Rivera', at: new Date().toISOString(), member_message: null, internal_note: null, details: {}, inspection_id: null }],
+    };
+  }
+  if (body.action === 'bring_back_to_captain5') {
+    return { ...issue, state_token: token, actions: ACTIONS_REPORTED, clearing_actions: ['send_to_logistics'], captain5_cleared_at: null, captain5_cleared_by: null };
+  }
   const next = NEXT_STATE[String(body.action)];
   if (!next) return issue;
-  const serial = Number(issue.state_token.split(':')[1]) + 1;
   return {
     ...issue, action_status: next.status, state_token: `${next.status}:${serial}`, actions: next.actions, open: next.status !== 'resolved',
     details: { ...issue.details, ...(body.vendor_reference ? { vendor_reference: String(body.vendor_reference) } : {}) },
@@ -140,8 +161,10 @@ function applyAction(issue: IssueDetail, body: Record<string, unknown>): IssueDe
   };
 }
 
+const inQueue = (issue: IssueDetail): boolean => issue.open && !issue.captain5_cleared_at;
+
 const countsOf = (issues: IssueDetail[]) => {
-  const open = issues.filter((issue) => issue.open);
+  const open = issues.filter(inQueue);
   return {
     open: open.length,
     needs_acknowledgement: open.filter((i) => i.action_status === 'reported').length,
@@ -244,7 +267,7 @@ async function handleCaptain5(route: Route, server: Server, pathname: string, se
   const issueMatch = /^\/api\/captain5\/issues\/(\d+)(?:\/(actions|messages))?$/.exec(pathname);
   if (pathname === '/api/captain5/summary') {
     return server.summaryStatus === 200
-      ? route.fulfill({ json: { access: server.access, on_duty: { duty_date: ymd(0), ...server.onDuty }, open_issues: server.issues.filter((i) => i.open).length } })
+      ? route.fulfill({ json: { access: server.access, on_duty: { duty_date: ymd(0), ...server.onDuty }, open_issues: server.issues.filter(inQueue).length } })
       : route.fulfill({ status: server.summaryStatus, json: { message: 'Forbidden' } });
   }
   if (pathname === '/api/captain5/workspace') {
@@ -252,7 +275,10 @@ async function handleCaptain5(route: Route, server: Server, pathname: string, se
     return route.fulfill({
       json: {
         access: server.access, on_duty: { duty_date: ymd(0), ...server.onDuty }, duty_date: ymd(0), counts: countsOf(server.issues),
-        rescue_dailies: rescueDailies, issues: server.issues.filter((i) => i.open), handoff: { duty_date: ymd(0), notes: server.notes },
+        rescue_dailies: rescueDailies, issues: server.issues.filter(inQueue), handoff: { duty_date: ymd(0), notes: server.notes },
+        cleared_issues: server.issues.filter((i) => i.open && i.captain5_cleared_at),
+        ...(server.trucks ? { rescue_trucks: server.trucks } : {}),
+        ...(server.truckChanges ? { rescue_truck_changes: server.truckChanges } : {}),
         acting: server.acting, generated_at: new Date().toISOString(),
       },
     });
@@ -261,7 +287,7 @@ async function handleCaptain5(route: Route, server: Server, pathname: string, se
     if (search.get('status') === 'closed') server.historyQueries.push(search.get('q') ?? '');
     const list = search.get('status') === 'closed'
       ? server.closed.filter((issue) => !search.get('q') || issue.item.toLowerCase().includes(String(search.get('q')).toLowerCase()))
-      : server.issues.filter((issue) => issue.open);
+      : server.issues.filter(inQueue);
     return route.fulfill({ json: { issues: list } });
   }
   if (issueMatch && method === 'GET') {
@@ -350,6 +376,14 @@ async function shot(page: Page, name: string): Promise<void> {
 const sheet = (page: Page) => page.getByRole('dialog');
 const actionForm = (page: Page) => page.getByTestId('captain5-action-form');
 const lastAction = (server: Server) => server.actionBodies[server.actionBodies.length - 1];
+const unitRow = (page: Page, unit: string) => page.getByTestId('captain5-unit-row').filter({ hasText: unit });
+
+/** The queue opens with one row per unit; this opens every unit that is still collapsed. */
+async function expandUnits(page: Page): Promise<void> {
+  await expect(page.getByTestId('captain5-unit-row').first()).toBeVisible();
+  const collapsed = page.locator('[data-testid="captain5-unit-row"][aria-expanded="false"]');
+  while (await collapsed.count() > 0) await collapsed.first().click();
+}
 
 test.describe('station list card', () => {
   test('appears with the open issue count only when the summary answers 200', async ({ page }) => {
@@ -470,7 +504,7 @@ test.describe('workspace shell', () => {
     await expect(page.getByTestId('captain5-duty-line')).toHaveText('B Shift Captain 5: Alex Rivera');
     await expect(page.getByTestId('captain5-authority')).toContainText('Captain 5 (on duty)');
     const tabs = page.getByRole('tablist', { name: 'Captain 5 workspace' });
-    await expect(tabs.getByRole('tab')).toHaveText([/Today/, /Issues\s*2/, /Replacements/, /Messages\s*3/, /Department Updates/, /History/]);
+    await expect(tabs.getByRole('tab')).toHaveText([/Today/, /Issues\s*2/, /Replacements/, /Truck Changes/, /Messages\s*3/, /Department Updates/, /History/]);
     await expect(tabs.getByRole('tab', { name: 'Duty' })).toHaveCount(0);
     await expect(page.getByText('View only')).toHaveCount(0);
   });
@@ -501,6 +535,9 @@ test.describe('workspace shell', () => {
     await open(page, newServer(), '/daily/captain-5?tab=replacements');
     await expect(page.getByRole('tab', { name: /Replacements/ })).toHaveAttribute('aria-selected', 'true');
     await page.getByRole('tab', { name: /Replacements/ }).press('ArrowRight');
+    await expect(page.getByRole('tab', { name: /Truck Changes/ })).toHaveAttribute('aria-selected', 'true');
+    await expect(page).toHaveURL(/tab=trucks/);
+    await page.getByRole('tab', { name: /Truck Changes/ }).press('ArrowRight');
     await expect(page.getByRole('tab', { name: /Messages/ })).toHaveAttribute('aria-selected', 'true');
     await expect(page).toHaveURL(/tab=messages/);
     await page.getByRole('tab', { name: 'Today' }).click();
@@ -594,6 +631,7 @@ test.describe('Issues and the detail sheet', () => {
       ],
     });
     await open(page, server, '/daily/captain-5?tab=issues');
+    await expandUnits(page);
     const rows = page.getByTestId('captain5-issue-row');
     await expect(rows).toHaveCount(4);
     await expect(rows.filter({ hasText: 'Epinephrine' })).toContainText('Significant damage');
@@ -616,6 +654,7 @@ test.describe('Issues and the detail sheet', () => {
 
   test('opening a row opens the detail sheet and puts the issue in the URL; Escape closes it and returns focus', async ({ page }) => {
     await open(page, newServer(), '/daily/captain-5?tab=issues');
+    await unitRow(page, 'Rescue 1').click();
     await page.getByTestId('captain5-issue-row').filter({ hasText: 'Pulse oximeter' }).click();
     await expect(page).toHaveURL(/issue=1/);
     await expect(sheet(page)).toBeVisible();
@@ -820,6 +859,260 @@ test.describe('Issues and the detail sheet', () => {
     await thread.getByRole('button', { name: 'Send message' }).click();
     await expect(thread.getByTestId('captain5-thread-error')).toBeVisible();
     await expect(thread.getByLabel('Message', { exact: true })).toHaveValue('Third message');
+  });
+});
+
+test.describe('one row per unit', () => {
+  const threeOnRescue = (): IssueDetail[] => [
+    makeIssue(1),
+    makeIssue(2, { item: 'Cervical collar', action_status: 'action_pending', expected_delivery: ymd(-3), overdue: true, first_reported_at: minutesAgo(60 * 24 * 3), state_token: 'action_pending:20' }),
+    makeIssue(3, { item: 'Suction unit', first_reported_at: minutesAgo(30) }),
+    makeIssue(4, { kind: 'medical', unit: 'Engine 1', item: 'Epinephrine' }),
+  ];
+
+  test('a unit is one collapsed disclosure with its count, worst tag and oldest age; expanding lists its issues', async ({ page }) => {
+    await open(page, newServer({ issues: threeOnRescue() }), '/daily/captain-5?tab=issues');
+    const rescue = unitRow(page, 'Rescue 1');
+    await expect(page.getByTestId('captain5-unit-row')).toHaveCount(2);
+    await expect(page.getByTestId('captain5-issue-row')).toHaveCount(0);
+    await expect(rescue).toHaveAttribute('aria-expanded', 'false');
+    await expect(rescue).toContainText('3 issues');
+    await expect(rescue).toContainText('Overdue');
+    await expect(rescue).toContainText(/Oldest reported 3 ?d/i);
+    await expect(unitRow(page, 'Engine 1')).toContainText('1 issue');
+    await expect(unitRow(page, 'Engine 1')).toContainText('Needs acknowledgement');
+    // The unit with the most urgent issue leads.
+    await expect(page.getByTestId('captain5-unit-row').first()).toContainText('Rescue 1');
+    await expect(page.getByRole('status').filter({ hasText: 'issues shown' })).toHaveText('4 issues shown on 2 units');
+
+    await rescue.click();
+    await expect(rescue).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByTestId('captain5-issue-row')).toHaveCount(3);
+    await expect(page.getByTestId('captain5-issue-row').first()).toContainText('Cervical collar');
+    await page.getByTestId('captain5-issue-row').filter({ hasText: 'Suction unit' }).click();
+    await expect(sheet(page).getByRole('heading', { name: 'Rescue 1: Suction unit' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(rescue).toHaveAttribute('aria-expanded', 'true');
+
+    await rescue.click();
+    await expect(page.getByTestId('captain5-issue-row')).toHaveCount(0);
+    await expect(rescue).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  test('filters keep working: a filter that leaves one unit opens it, and the counts are the filtered ones', async ({ page }) => {
+    await open(page, newServer({ issues: threeOnRescue() }), '/daily/captain-5?tab=issues');
+    await page.getByRole('group', { name: 'Filter by unit type' }).getByRole('button', { name: /^Medical/ }).click();
+    await expect(page.getByTestId('captain5-unit-row')).toHaveCount(1);
+    await expect(page.getByTestId('captain5-issue-row')).toHaveCount(1);
+    await page.getByRole('group', { name: 'Filter by unit type' }).getByRole('button', { name: /^All/ }).click();
+    await page.getByRole('group', { name: 'Filter by status' }).getByRole('button', { name: /^Needs acknowledgement/ }).click();
+    await expect(unitRow(page, 'Rescue 1')).toContainText('2 issues');
+    await page.getByRole('group', { name: 'Filter by status' }).getByRole('button', { name: /^Overdue/ }).click();
+    await expect(page.getByTestId('captain5-unit-row')).toHaveCount(1);
+    await expect(page.getByTestId('captain5-issue-row')).toHaveCount(1);
+    await expect(unitRow(page, 'Rescue 1')).toContainText('1 issue');
+  });
+
+  test('when only one unit has issues it starts open', async ({ page }) => {
+    await open(page, newServer({ issues: threeOnRescue().slice(0, 3) }), '/daily/captain-5?tab=issues');
+    await expect(unitRow(page, 'Rescue 1')).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByTestId('captain5-issue-row')).toHaveCount(3);
+  });
+
+  test('a deep link to an issue opens that issue and its unit only', async ({ page }) => {
+    await open(page, newServer({ issues: threeOnRescue() }), '/daily/captain-5?tab=issues&issue=4');
+    await expect(sheet(page).getByRole('heading', { name: 'Engine 1: Epinephrine' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(unitRow(page, 'Engine 1')).toHaveAttribute('aria-expanded', 'true');
+    await expect(unitRow(page, 'Rescue 1')).toHaveAttribute('aria-expanded', 'false');
+  });
+});
+
+test.describe('Clear for Logistics', () => {
+  const twoOnRescue = (): IssueDetail[] => [
+    makeIssue(1),
+    makeIssue(2, { item: 'Cervical collar', state_token: 'reported:20' }),
+    makeIssue(3, { kind: 'medical', unit: 'Engine 1', item: 'Epinephrine' }),
+  ];
+
+  test('one tap clears with no form, says so, leaves every count, stays reachable, and Undo brings it back', async ({ page }) => {
+    const server = newServer({ issues: twoOnRescue() });
+    await open(page, server, '/daily/captain-5?tab=issues');
+    await unitRow(page, 'Rescue 1').click();
+    const row = page.getByRole('button', { name: 'Clear for Logistics: Rescue 1, Pulse oximeter' });
+    const box = await row.boundingBox();
+    expect(box?.height).toBeGreaterThanOrEqual(44);
+    await row.click();
+
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+    await expect(page.getByTestId('captain5-clear-status')).toContainText('Cleared from Captain 5. It stays open with Logistics.');
+    expect(server.actionBodies).toHaveLength(1);
+    expect(lastAction(server)).toMatchObject({ action: 'send_to_logistics', expected_state: 'reported:10' });
+    expect(String(lastAction(server).idempotency_key)).toMatch(KEY_PATTERN);
+    expect(lastAction(server)).not.toHaveProperty('reason');
+    expect(lastAction(server)).not.toHaveProperty('member_message');
+    await expect(unitRow(page, 'Rescue 1')).toContainText('1 issue');
+    await expect(page.getByRole('tab', { name: /^Issues/ })).toContainText('2');
+    await expect(page.getByTestId('captain5-cleared-section')).toContainText('Cleared for Logistics (1)');
+    await expectNoHorizontalOverflow(page);
+    await shot(page, `cleared-${page.viewportSize()?.width}`);
+
+    await page.getByTestId('captain5-clear-undo').click();
+    await expect(page.getByTestId('captain5-clear-status')).toContainText('Brought back to the Captain 5 queue.');
+    expect(lastAction(server)).toMatchObject({ action: 'bring_back_to_captain5', expected_state: 'reported:11' });
+    await expect(unitRow(page, 'Rescue 1')).toContainText('2 issues');
+    await expect(page.getByTestId('captain5-cleared-section')).toHaveCount(0);
+  });
+
+  test('the cleared list starts collapsed, opens an issue, and Bring back returns it to the queue', async ({ page }) => {
+    const server = newServer({ issues: [makeIssue(1, { captain5_cleared_at: minutesAgo(10), captain5_cleared_by: 'Jordan Lee', actions: [], clearing_actions: ['bring_back_to_captain5'] }), makeIssue(2, { item: 'Cervical collar', state_token: 'reported:20' })] });
+    await open(page, server, '/daily/captain-5?tab=issues');
+    await expect(page.getByRole('tab', { name: /^Issues/ })).toContainText('1');
+    const section = page.getByTestId('captain5-cleared-section');
+    await expect(section).toContainText('Cleared for Logistics (1)');
+    await expect(page.getByTestId('captain5-cleared-row')).toBeHidden();
+    await section.locator('summary').click();
+    await expect(page.getByTestId('captain5-cleared-row')).toContainText('by Jordan Lee');
+
+    await page.getByTestId('captain5-cleared-row').click();
+    await expect(page.getByRole('group', { name: 'Issue actions' }).getByRole('button')).toHaveText(['Bring back']);
+    await page.keyboard.press('Escape');
+
+    await page.getByRole('button', { name: 'Bring back: Rescue 1, Pulse oximeter' }).click();
+    await expect(page.getByTestId('captain5-clear-status')).toContainText('Brought back to the Captain 5 queue.');
+    expect(lastAction(server)).toMatchObject({ action: 'bring_back_to_captain5', expected_state: 'reported:10' });
+    await expect(section).toHaveCount(0);
+    await expect(page.getByTestId('captain5-issue-row')).toHaveCount(2);
+  });
+
+  test('Clear all runs one by one with each state token and its own key, and says plainly what changed', async ({ page }) => {
+    const server = newServer({ issues: twoOnRescue() });
+    server.onAction = async (route, body, current) => {
+      if (body.expected_state !== 'reported:20') return false;
+      current.issues = current.issues.map((issue) => (issue.id === 2 ? { ...issue, action_status: 'acknowledged', state_token: 'acknowledged:21' } : issue));
+      await route.fulfill({ status: 409, json: { message: 'Updated by someone else.', issue: current.issues.find((issue) => issue.id === 2) } });
+      return true;
+    };
+    await open(page, server, '/daily/captain-5?tab=issues');
+    await unitRow(page, 'Rescue 1').click();
+    await page.getByRole('button', { name: 'Clear all 2 for Logistics' }).click();
+
+    await expect(page.getByTestId('captain5-clear-status')).toHaveText(/Cleared 1 of 2\. 1 changed and was not cleared\./);
+    // In queue order, newest first: the changed one does not stop the next.
+    expect(server.actionBodies.map((body) => body.expected_state)).toEqual(['reported:20', 'reported:10']);
+    expect(server.actionBodies[0].idempotency_key).not.toBe(server.actionBodies[1].idempotency_key);
+    await expect(unitRow(page, 'Rescue 1')).toContainText('1 issue');
+    await expect(page.getByTestId('captain5-issue-row').filter({ hasText: 'Cervical collar' })).toContainText('Acknowledged');
+    await expect(page.getByTestId('captain5-cleared-section')).toContainText('Cleared for Logistics (1)');
+
+    await page.getByRole('tab', { name: 'Today' }).click();
+    await expect(page.getByTestId('captain5-count-all')).toContainText('2');
+  });
+
+  test('a clean Clear all reports all of them, and a dropped connection retries with the SAME key', async ({ page }) => {
+    const server = newServer({ issues: twoOnRescue() });
+    await open(page, server, '/daily/captain-5?tab=issues');
+    let dropped = false;
+    await page.route('**/api/captain5/issues/1/actions', async (route) => {
+      if (dropped) return route.fallback();
+      dropped = true;
+      server.actionBodies.push(JSON.parse(route.request().postData() ?? '{}') as Record<string, unknown>);
+      return route.abort('connectionreset');
+    });
+    await unitRow(page, 'Rescue 1').click();
+    await page.getByRole('button', { name: 'Clear for Logistics: Rescue 1, Pulse oximeter' }).click();
+    await expect(page.getByTestId('captain5-clear-status')).toContainText('Cleared 0 of 1. 1 could not be sent. Try again.');
+    const firstKey = server.actionBodies[0].idempotency_key;
+
+    await page.getByRole('button', { name: 'Clear all 2 for Logistics' }).click();
+    await expect(page.getByTestId('captain5-clear-status')).toContainText('Cleared all 2 from Captain 5. They stay open with Logistics.');
+    const sameIssue = server.actionBodies.filter((body) => body.expected_state === 'reported:10');
+    expect(sameIssue).toHaveLength(2);
+    expect(sameIssue[1]).toMatchObject({ action: 'send_to_logistics', idempotency_key: firstKey });
+  });
+
+  test('the sheet offers the same action with a note and no message to the crew, and the timeline names who did it', async ({ page }) => {
+    const server = newServer({ issues: [makeIssue(1, { clearing_actions: ['send_to_logistics'] })] });
+    await open(page, server, '/daily/captain-5?tab=issues&issue=1');
+    await page.getByRole('group', { name: 'Issue actions' }).getByRole('button', { name: 'Clear, this is for Logistics' }).click();
+    const form = actionForm(page);
+    await form.getByText('Add a note (optional)').click();
+    await expect(form.getByLabel('Message to crew')).toHaveCount(0);
+    await form.getByLabel('Internal note').fill('Radio mount belongs to support services.');
+    await form.getByRole('button', { name: 'Clear for Logistics' }).click();
+    await expect(page.getByTestId('captain5-issue-notice')).toHaveText('Cleared from Captain 5. It stays open with Logistics.');
+    expect(lastAction(server)).toMatchObject({ action: 'send_to_logistics', internal_note: 'Radio mount belongs to support services.' });
+    await expect(page.getByTestId('captain5-timeline')).toContainText('Cleared from Captain 5 by Alex Rivera');
+    await expect(page.getByTestId('captain5-issue-summary')).toContainText('It stays open with Logistics.');
+    await expect(page.getByRole('group', { name: 'Issue actions' }).getByRole('button')).toHaveText(['Bring back']);
+  });
+
+  test('an action name this build does not know is left out and the sheet still opens', async ({ page }) => {
+    const server = newServer({ issues: [makeIssue(1, { actions: ['acknowledge', 'a_future_action' as IssueDetail['actions'][number]] })] });
+    await open(page, server, '/daily/captain-5?tab=issues&issue=1');
+    await expect(page.getByRole('group', { name: 'Issue actions' }).getByRole('button')).toHaveText(['Acknowledge']);
+  });
+});
+
+test.describe('Truck Changes', () => {
+  const trucks: RescueTruck[] = [
+    { apparatus_id: 4, unit: 'R 1', vehicle_number: '2201', station: 'Station 1', status: 'In Service', changed_at: null, changed_recently: false },
+    { apparatus_id: 5, unit: 'R 44', vehicle_number: '1033', station: 'Station 4', status: 'Out of Service', changed_at: minutesAgo(90), changed_recently: true },
+  ];
+  const changes: RescueTruckChange[] = [
+    { id: 'changeout:1', source: 'changeout', unit: 'R 44', from_vehicle_number: '17503', to_vehicle_number: '1033', at: minutesAgo(90), by: 'Lt. Alvarez', recent: true, note: 'Moved after the morning call.', left_behind: [{ name: 'Airway Bag', note: 'Stays on the old truck.' }, { name: 'LifePak 15', note: null }] },
+    { id: 'fleet_decision:2', source: 'fleet_decision', unit: 'R 1', from_vehicle_number: '2200', to_vehicle_number: '2201', at: minutesAgo(60 * 24 * 5), by: 'Sam Fleet', recent: false, note: null, left_behind: [] },
+  ];
+
+  test('the tab sits after Replacements, shows who is on what truck and what changed, and its badge is the last 24 hours', async ({ page }) => {
+    await open(page, newServer({ trucks, truckChanges: changes }));
+    const tabs = page.getByRole('tablist', { name: 'Captain 5 workspace' }).getByRole('tab');
+    await expect(tabs.nth(2)).toContainText('Replacements');
+    await expect(tabs.nth(3)).toHaveText(/Truck Changes\s*1/);
+    await tabs.nth(3).click();
+    await expect(page).toHaveURL(/tab=trucks/);
+
+    const rows = page.getByTestId('captain5-truck-row');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.nth(0)).toContainText('R 1');
+    await expect(rows.nth(0)).toContainText('Truck 2201');
+    await expect(rows.nth(0)).toContainText('Station 1');
+    await expect(rows.nth(0)).not.toContainText('Changed');
+    await expect(rows.nth(1)).toContainText('Truck 1033');
+    await expect(rows.nth(1)).toContainText('Out of Service');
+    await expect(rows.nth(1)).toContainText('Changed');
+
+    const entries = page.getByTestId('captain5-truck-change');
+    await expect(entries).toHaveCount(2);
+    await expect(entries.nth(0)).toContainText('R 44: truck 17503 to truck 1033');
+    await expect(entries.nth(0)).toContainText('Lt. Alvarez');
+    await expect(entries.nth(0)).toContainText('2 left behind');
+    await expect(entries.nth(0).getByText('Airway Bag: Stays on the old truck.')).toBeHidden();
+    await entries.nth(0).locator('summary').click();
+    await expect(entries.nth(0).getByText('Airway Bag: Stays on the old truck.')).toBeVisible();
+    await expect(entries.nth(0).getByText('Moved after the morning call.')).toBeVisible();
+    await expect(entries.nth(1)).toContainText('Fleet decision by Sam Fleet');
+    await expect(entries.nth(1).locator('summary')).toHaveCount(0);
+    await expectNoHorizontalOverflow(page);
+    await shot(page, `trucks-${page.viewportSize()?.width}`);
+    const heights = await page.evaluate(() => [...document.querySelectorAll<HTMLElement>('[data-testid="captain5-truck-row"], [data-testid="captain5-truck-change"] summary')].map((el) => Math.round(el.getBoundingClientRect().height)));
+    expect(Math.min(...heights)).toBeGreaterThanOrEqual(44);
+  });
+
+  test('an answer without the new keys, or with nothing to show, gets a plain empty state and no badge', async ({ page }) => {
+    await open(page, newServer(), '/daily/captain-5?tab=trucks');
+    await expect(page.getByRole('tab', { name: /Truck Changes/ })).toHaveText('Truck Changes');
+    await expect(page.getByText('No Rescue units to show')).toBeVisible();
+    await expect(page.getByText('No Rescue truck changes in the last 30 days')).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test('a malformed answer never breaks the page', async ({ page }) => {
+    const server = newServer({ trucks: [{ unit: 7 }] as unknown as RescueTruck[], truckChanges: [{ left_behind: 'nope' }, null] as unknown as RescueTruckChange[] });
+    await open(page, server, '/daily/captain-5?tab=trucks');
+    await expect(page.getByTestId('captain5-truck-row')).toHaveCount(1);
+    await expect(page.getByTestId('captain5-truck-change')).toHaveCount(2);
+    await expect(page.getByTestId('captain5-truck-change').first()).toContainText('Unit: a truck not on record to a truck not on record');
   });
 });
 
@@ -1247,11 +1540,13 @@ test.describe('responsive', () => {
       await shot(page, `${name}-today`);
 
       await page.getByRole('tab', { name: /^Issues/ }).click();
+      await expect(page.getByTestId('captain5-unit-row')).toHaveCount(2);
+      await expandUnits(page);
       await expect(page.getByTestId('captain5-issue-row')).toHaveCount(2);
       await expectNoHorizontalOverflow(page);
       await shot(page, `${name}-issues`);
       const heights = await page.evaluate(() => {
-        const targets = [...document.querySelectorAll<HTMLElement>('[data-testid="captain5-issue-row"], [role="tab"], [aria-pressed]')];
+        const targets = [...document.querySelectorAll<HTMLElement>('[data-testid="captain5-issue-row"], [data-testid="captain5-unit-row"], [data-testid="captain5-clear-issue"], [role="tab"], [aria-pressed]')];
         return targets.map((el) => Math.round(el.getBoundingClientRect().height));
       });
       expect(Math.min(...heights)).toBeGreaterThanOrEqual(44);

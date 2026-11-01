@@ -21,13 +21,14 @@ use Illuminate\Validation\ValidationException;
  */
 final class Captain5IssueActions
 {
-    public const ACTIONS = ['acknowledge', 'ordered', 'update_delivery', 'available_for_pickup', 'replaced', 'verify', 'dismiss', 'reopen'];
+    public const ACTIONS = ['acknowledge', 'ordered', 'update_delivery', 'available_for_pickup', 'replaced', 'verify', 'dismiss', 'reopen', ...Captain5IssueClearing::ACTIONS];
 
     public const REPLACEMENT_RESOLUTIONS = ['replacement_installed', 'spare_issued', 'repair_completed'];
 
     public function __construct(
         private readonly DefectCorrectiveActionService $engine,
         private readonly Captain5IssueScope $scope,
+        private readonly Captain5IssueClearing $clearing,
     ) {}
 
     /**
@@ -61,8 +62,12 @@ final class Captain5IssueActions
             throw new AuthorizationException('Not available.');
         }
 
-        $engine = $this->engineFor($decision)->expectingState((string) $valid['expected_state']);
         $key = (string) $valid['idempotency_key'];
+        if (in_array($valid['action'], Captain5IssueClearing::ACTIONS, true)) {
+            return $this->clearing->perform($actor, $decision, $defectId, (string) $valid['action'], (string) $valid['expected_state'], $key, $valid['internal_note'] ?? null);
+        }
+
+        $engine = $this->engineFor($decision)->expectingState((string) $valid['expected_state']);
         $messages = [
             'member_message' => $valid['member_message'] ?? null,
             'internal_note' => $valid['internal_note'] ?? null,
@@ -88,9 +93,23 @@ final class Captain5IssueActions
             'replaced' => $this->replaced($engine, $defectId, $actor, $valid, $messages, $key),
             'verify' => $engine->verifyCorrection($defectId, $actor, [...$messages, 'notes' => $valid['resolution_notes'] ?? null], $key),
             'dismiss' => $engine->dismiss($defectId, $actor, [...$messages, 'reason' => $this->required($valid, 'reason', DefectNoActionClosure::REASON_LABEL)], $key),
-            'reopen' => $engine->reopen($defectId, $actor, [...$messages, 'reason' => $this->required($valid, 'reason', 'Explain why this issue is being reopened.')], $key),
+            'reopen' => $this->reopen($engine, $probe, $actor, $messages, $this->required($valid, 'reason', 'Explain why this issue is being reopened.'), $key),
             default => throw ValidationException::withMessages(['action' => 'Unknown action.']),
         };
+    }
+
+    /**
+     * Reopened from this page, a cleared issue comes back to this page's queue. Only when this call really reopened
+     * it: a retry of an old reopen must not undo a clear made since.
+     *
+     * @param  array<string, ?string>  $messages
+     */
+    private function reopen(DefectCorrectiveActionService $engine, ApparatusDefect $probe, User $actor, array $messages, string $reason, string $key): ApparatusDefect
+    {
+        $wasClosed = DefectActionStatus::isClosed($probe->action_status);
+        $reopened = $engine->reopen((int) $probe->getKey(), $actor, [...$messages, 'reason' => $reason], $key);
+
+        return $wasClosed ? $this->clearing->forget($reopened) : $reopened;
     }
 
     /** Officers holding a Captain 5 role act as Captain 5; Logistics reviewers keep their own path. */

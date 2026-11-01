@@ -128,11 +128,10 @@ class ApparatusOperationalAlertResource extends Resource
                 ->schema([
                     Forms\Components\Select::make('planned_replacement_apparatus_id')
                         ->label('Planned replacement truck')
-                        ->helperText('Optional. If you name a truck, a crew choosing a different one needs a Fleet decision.')
+                        ->helperText('Optional. The crew sees it first, and can still choose a different truck.')
                         ->options(fn (Get $get): array => ApparatusWorkflowActions::truckOptions(blank($get('apparatus_id')) ? null : (int) $get('apparatus_id')))
                         ->searchable(),
-                    self::oldTruckStatusField(),
-                ])->columns(2),
+                ]),
             Forms\Components\Section::make('Related work')
                 ->schema([
                     Forms\Components\Select::make('apparatus_service_ticket_id')
@@ -182,15 +181,6 @@ class ApparatusOperationalAlertResource extends Resource
             ->options(array_combine(ApparatusOperationalAlert::WINDOWS, array_map(ucfirst(...), ApparatusOperationalAlert::WINDOWS)))
             ->native(false)
             ->placeholder('No part of the day given');
-    }
-
-    public static function oldTruckStatusField(): Forms\Components\Select
-    {
-        return Forms\Components\Select::make('old_truck_status_after')
-            ->label('Old truck status after the change')
-            ->helperText('If you leave this empty, the old truck takes the status the new truck had.')
-            ->options(array_combine(ApparatusOperationalAlert::OLD_TRUCK_STATUSES, ApparatusOperationalAlert::OLD_TRUCK_STATUSES))
-            ->native(false);
     }
 
     public static function defaultTitle(?Apparatus $unit, ?string $category): string
@@ -381,7 +371,6 @@ class ApparatusOperationalAlertResource extends Resource
                             ? null
                             : ApparatusResource::getUrl('view', ['record' => $record->planned_replacement_apparatus_id]))
                         ->color('primary'),
-                    Infolists\Components\TextEntry::make('old_truck_status_after')->label('Old truck status after the change')->placeholder('The status the new truck had'),
                     Infolists\Components\TextEntry::make('serviceTicket.ticket_number')
                         ->label('Service ticket')
                         ->placeholder('No ticket')

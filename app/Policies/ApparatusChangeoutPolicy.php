@@ -10,7 +10,7 @@ use App\Models\User;
 /**
  * Fleet access reaches this model through the admin capability gate
  * (config/admin-capabilities.php): admin.fleet.view to see a changeout,
- * admin.fleet.manage to decide one, super administrators always. Anyone the
+ * admin.fleet.manage to acknowledge one, super administrators always. Anyone the
  * gate does not recognise lands here and is refused. Members submit and read
  * their own changeouts through the API, which ApparatusChangeoutService guards.
  */
@@ -26,7 +26,7 @@ final class ApparatusChangeoutPolicy
         return false;
     }
 
-    public function decide(User $user): bool
+    public function acknowledge(User $user): bool
     {
         return false;
     }

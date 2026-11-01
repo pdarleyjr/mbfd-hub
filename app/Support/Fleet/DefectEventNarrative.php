@@ -30,6 +30,8 @@ final class DefectEventNarrative
         'ticket_linked' => 'Service ticket linked',
         'impact_classified' => 'Operational impact classified',
         'severity_corrected' => 'Severity corrected',
+        'cleared_from_captain5' => 'Cleared from Captain 5 (stays open for Logistics)',
+        'returned_to_captain5' => 'Brought back to Captain 5',
     ];
 
     public static function label(string $eventType): string

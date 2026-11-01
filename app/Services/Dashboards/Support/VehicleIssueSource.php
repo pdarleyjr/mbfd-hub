@@ -86,6 +86,12 @@ abstract class VehicleIssueSource implements IssueSource
     /** @return array<int|string, mixed> eager loads; must include the apparatus relation with ApparatusClass::COLUMNS */
     abstract protected function eagerLoads(): array;
 
+    /** The column naming the truck this row is about. */
+    protected function apparatusColumn(): string
+    {
+        return 'apparatus_id';
+    }
+
     /** Extra row selects (concurrency token parts). @return array<string, mixed> */
     protected function rowSelects(): array
     {
@@ -137,7 +143,7 @@ abstract class VehicleIssueSource implements IssueSource
         }
 
         $inner = $builder->toBase()->selectRaw(implode(', ', [
-            $builder->getModel()->qualifyColumn('apparatus_id').' AS apparatus_id',
+            $builder->getModel()->qualifyColumn($this->apparatusColumn()).' AS apparatus_id',
             '('.$this->severitySql().') AS dashboard_severity',
             '('.$this->stageSql().') AS dashboard_stage',
             ...$this->sourceTagColumns(),
@@ -199,7 +205,7 @@ abstract class VehicleIssueSource implements IssueSource
             if ($apparatusIds === [] && $sourceTags === []) {
                 return null;
             }
-            $column = $builder->getModel()->qualifyColumn('apparatus_id');
+            $column = $builder->getModel()->qualifyColumn($this->apparatusColumn());
             $builder->where(function (Builder $tagged) use ($apparatusIds, $sourceTags, $column): void {
                 if ($apparatusIds !== []) {
                     $tagged->orWhereIn($column, $apparatusIds);
@@ -268,7 +274,7 @@ abstract class VehicleIssueSource implements IssueSource
             'subject' => ApparatusClass::label($apparatus),
             'imageKey' => $class['imageKey'],
         ]);
-        $apparatusId = $record->getAttribute('apparatus_id');
+        $apparatusId = $record->getAttribute($this->apparatusColumn());
 
         return $apparatusId === null ? $issue : $issue->inGroup('apparatus:'.(int) $apparatusId);
     }

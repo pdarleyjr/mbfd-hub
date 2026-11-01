@@ -32,6 +32,8 @@ function eventLines(event: IssueEvent): string[] {
 }
 
 function eventTitle(event: IssueEvent): string {
+  if (event.type === 'cleared_from_captain5') return `Cleared from Captain 5 by ${event.actor}`;
+  if (event.type === 'returned_to_captain5') return `Brought back to Captain 5 by ${event.actor}`;
   if (event.from && event.to && event.from !== event.to) return `${statusLabel(event.from)} to ${statusLabel(event.to)}`;
   return humanize(event.type);
 }

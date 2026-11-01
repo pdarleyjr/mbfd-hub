@@ -326,7 +326,8 @@ final class ApparatusWorkflowActions
     }
 
     /**
-     * Plans a changeout: one upcoming_swap alert. Nothing about the truck changes until a changeout commits. Row
+     * Preschedules a truck swap: one upcoming_swap alert, no approvals. Nothing about the truck changes until the crew
+     * does the changeout, and the truck named here is a suggestion they can overrule. Row
      * visibility only reads what the table already loaded, so the Apparatus list gains no query per row.
      *
      * @template T of MountableAction
@@ -353,19 +354,21 @@ final class ApparatusWorkflowActions
                     ->required()
                     ->maxLength(180),
                 Forms\Components\TextInput::make('reason')->label('Reason')->required()->maxLength(180),
-                Forms\Components\Grid::make(2)->schema([
+                Forms\Components\Grid::make(3)->schema([
                     Forms\Components\DatePicker::make('scheduled_date')
                         ->label('Date')
                         ->minDate(fn (): string => HubTimezone::today()->format('Y-m-d'))
                         ->required(),
                     ApparatusOperationalAlertResource::windowField(),
+                    Forms\Components\DateTimePicker::make('scheduled_at')
+                        ->label('Exact time (optional, Eastern)')
+                        ->seconds(false),
                 ]),
                 Forms\Components\Select::make('planned_replacement_apparatus_id')
-                    ->label('Planned replacement truck (optional)')
-                    ->helperText('If you name a truck, a crew choosing a different one needs a Fleet decision.')
+                    ->label('Replacement truck (optional)')
+                    ->helperText('The crew sees this truck first, and can still choose a different one.')
                     ->options(fn (Apparatus $record): array => self::truckOptions((int) $record->getKey()))
                     ->searchable(),
-                ApparatusOperationalAlertResource::oldTruckStatusField(),
                 Forms\Components\Textarea::make('message')
                     ->label('Message')
                     ->default(fn (Apparatus $record): string => self::unitLabel($record).' is scheduled to move to a different truck. Keep using truck '.($record->vehicle_number ?: 'as assigned').' until the changeout is done.')
@@ -376,7 +379,7 @@ final class ApparatusWorkflowActions
                 Forms\Components\Toggle::make('send_notification')->label('Notify members')->helperText('Sends once, in the members\' alert bell.'),
             ])
             ->action(function (Apparatus $record, array $data): void {
-                $saved = self::saveAlert($record, [...$data, 'category' => ApparatusOperationalAlert::CATEGORY_UPCOMING_SWAP]);
+                $saved = self::saveAlert($record, [...ApparatusOperationalAlertResource::forService($data), 'category' => ApparatusOperationalAlert::CATEGORY_UPCOMING_SWAP]);
                 if ($saved instanceof ApparatusOperationalAlert) {
                     Notification::make()->success()
                         ->title('Changeout scheduled')

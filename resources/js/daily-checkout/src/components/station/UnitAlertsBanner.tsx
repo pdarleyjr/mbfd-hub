@@ -5,15 +5,7 @@ import { ApiRequestError, isApiAuthenticationError, redirectToLoginAfterSessionE
 import { alertActionPath } from '../changeout/changeoutLogic';
 import type { OperationalAlert } from '../changeout/types';
 import Tag from '../ui/Tag';
-import type { Tone } from '../ui/status';
 import { getStationOperationalAlerts } from '../../utils/changeoutApi';
-
-const WORKFLOW_TONES: Record<string, Tone> = {
-  planned: 'info',
-  vehicle_changed: 'success',
-  awaiting_fleet: 'warning',
-  awaiting_verification: 'warning',
-};
 
 function AlertCard({ alert, stationId }: { alert: OperationalAlert; stationId: number }) {
   const truck = alert.current_vehicle_number ?? alert.vehicle_number;
@@ -27,7 +19,7 @@ function AlertCard({ alert, stationId }: { alert: OperationalAlert; stationId: n
         <h2 id={`unit-alert-${alert.id}`} className="min-w-0 font-heading text-lg font-semibold text-hub-ink">{alert.title}</h2>
         <div className="flex flex-wrap gap-2">
           {alert.unit_designation !== '' && <Tag>{alert.unit_designation}</Tag>}
-          {alert.workflow && <Tag tone={WORKFLOW_TONES[alert.workflow.state] ?? 'info'}>{alert.workflow.label}</Tag>}
+          {alert.workflow && <Tag tone={alert.workflow.state === 'vehicle_changed' ? 'success' : 'info'}>{alert.workflow.label}</Tag>}
         </div>
       </div>
       {facts !== '' && <p className="mt-1 text-sm font-semibold tabular-nums text-hub-n-800">{facts}</p>}

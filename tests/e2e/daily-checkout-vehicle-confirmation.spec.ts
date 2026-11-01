@@ -70,6 +70,29 @@ test.describe('confirm the physical vehicle', () => {
     await expect(swapPrompt(page).getByLabel('Note (optional)')).toHaveValue('');
   });
 
+  test('a different vehicle offers Record this vehicle change, with the report to Fleet still below it', async ({ page }) => {
+    await mobileInspectionFixture(page, engine2, { fleetVehicles });
+    await openMemberStep(page);
+
+    const record = page.getByRole('link', { name: 'Record this vehicle change' });
+    await expect(record).toHaveCount(0);
+    await vehicleSelect(page).selectOption('TEST-205');
+    await expect(record).toBeVisible();
+    await expect(record).toHaveClass(/hub-btn--primary/);
+    const href = new URL((await record.getAttribute('href')) ?? '', 'http://localhost');
+    expect(href.pathname).toMatch(/^\/daily\/changeouts\/new\/\d+$/);
+    expect(href.searchParams.get('truck')).toBe('TEST-205');
+    expect(href.searchParams.get('return_to')).toBe(`/vehicle-inspections/${engine2.slug}`);
+
+    const recordBox = await record.boundingBox();
+    const reportBox = await swapPrompt(page).boundingBox();
+    expect(recordBox && reportBox && recordBox.y < reportBox.y).toBe(true);
+    await expect(swapPrompt(page).getByRole('radio', { name: 'Yes, swap completed' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'I picked wrong', exact: true }).click();
+    await expect(record).toHaveCount(0);
+  });
+
   test('Not listed accepts a typed vehicle ID and rejects characters a vehicle ID cannot have', async ({ page }) => {
     await mobileInspectionFixture(page, engine2, { fleetVehicles });
     await openMemberStep(page);
