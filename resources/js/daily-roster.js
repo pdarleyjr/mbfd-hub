@@ -1,15 +1,12 @@
 /**
- * Daily Roster: client-side search and filter, plus an in-place refresh. A new roster replaces
+ * Daily Roster: an in-place refresh and the member card. A new roster replaces
  * [data-roster-body]; the page itself never reloads and no worker or busy registry is touched.
  * The version (ETag) lives in memory only, so nothing about the roster outlives the page.
  */
 const POLL_INTERVAL_MS = 60_000;
-const COUNT_DELAY_MS = 250;
 const WIDE_LEGEND_QUERY = '(min-width: 640px)';
 /** A timer asking is not a member using the Hub: the idle clock stays put, so a shared screen still signs out. */
 const BACKGROUND_REFRESH = { 'X-Hub-Background-Refresh': '1' };
-
-const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
 
 function initDailyRoster(page) {
     const announce = page.querySelector('[data-roster-announce]');
@@ -17,6 +14,10 @@ function initDailyRoster(page) {
     const sectionsUrl = page.dataset.sectionsUrl;
     const changesUrl = page.dataset.changesUrl;
     const loginUrl = page.dataset.loginUrl;
+    const memberUrl = page.dataset.memberUrl;
+    const memberDate = page.dataset.memberDate;
+    const cardDialog = page.querySelector('[data-roster-card-dialog]');
+    const cardContent = page.querySelector('[data-roster-card-content]');
 
     const body = () => page.querySelector('[data-roster-body]');
     const part = (selector) => body()?.querySelector(selector) ?? null;
@@ -26,11 +27,11 @@ function initDailyRoster(page) {
     let etag = body().dataset.etag;
     let checking = false;
     let manualQueued = false;
-    let closedBeforeFilter = null;
-    let countTimer = null;
     let pollTimer = null;
     let statusMessage = '';
     let ended = false;
+    let cardRequest = null;
+    let cardOpener = null;
 
     function showStatus(message) {
         statusMessage = message;
@@ -50,79 +51,6 @@ function initDailyRoster(page) {
         sections().forEach((section) => { section.open = !keys.has(section.dataset.sectionKey); });
     }
 
-    function applyFilter() {
-        const search = part('[data-roster-search]');
-        if (!search) {
-            return;
-        }
-        const query = search.value.trim().toLowerCase();
-        const status = part('[data-roster-status]').value;
-        const filtering = query !== '' || status !== '';
-
-        if (filtering && closedBeforeFilter === null) {
-            closedBeforeFilter = closedSectionKeys();
-        }
-
-        let shownRows = 0;
-        let shownSections = 0;
-        let totalRows = 0;
-        const allSections = sections();
-        allSections.forEach((section) => {
-            const unitMatches = query !== '' && section.dataset.search.includes(query);
-            let sectionRows = 0;
-            section.querySelectorAll('[data-roster-seat]').forEach((seat) => {
-                let seatRows = 0;
-                seat.querySelectorAll('[data-roster-row]').forEach((row) => {
-                    totalRows += 1;
-                    const matches = (query === '' || unitMatches || row.dataset.search.includes(query))
-                        && (status === '' || row.dataset.status === status);
-                    row.hidden = !matches;
-                    // The first row still showing carries the seat's rank; the rest stay grouped under it.
-                    row.classList.toggle('roster-row--seat-lead', matches && seatRows === 0);
-                    seatRows += matches ? 1 : 0;
-                });
-                seat.hidden = seatRows === 0;
-                sectionRows += seatRows;
-            });
-            section.hidden = sectionRows === 0;
-            if (filtering && sectionRows > 0) {
-                section.open = true;
-            }
-            shownRows += sectionRows;
-            shownSections += sectionRows > 0 ? 1 : 0;
-        });
-
-        if (!filtering && closedBeforeFilter !== null) {
-            restoreClosedSections(closedBeforeFilter);
-            closedBeforeFilter = null;
-        }
-
-        part('[data-roster-clear]').hidden = !filtering;
-        part('[data-roster-no-match]').hidden = shownRows > 0;
-
-        window.clearTimeout(countTimer);
-        const summary = filtering
-            ? `Showing ${shownRows} of ${plural(totalRows, 'entry', 'entries')} in ${plural(shownSections, 'section', 'sections')}`
-            : `${plural(totalRows, 'entry', 'entries')} in ${plural(allSections.length, 'section', 'sections')}`;
-        countTimer = window.setTimeout(() => {
-            const count = part('[data-roster-count]');
-            if (count) {
-                count.textContent = summary;
-            }
-        }, COUNT_DELAY_MS);
-    }
-
-    function setAllSections(open) {
-        closedBeforeFilter = null;
-        sections().forEach((section) => { section.open = open; });
-    }
-
-    function clearFilter() {
-        part('[data-roster-search]').value = '';
-        part('[data-roster-status]').value = '';
-        applyFilter();
-    }
-
     function openLegendOnWideScreens() {
         const legend = part('[data-roster-legend]');
         if (legend && window.matchMedia(WIDE_LEGEND_QUERY).matches) {
@@ -133,29 +61,15 @@ function initDailyRoster(page) {
     function captureView() {
         const active = document.activeElement;
         return {
-            search: part('[data-roster-search]')?.value ?? '',
-            status: part('[data-roster-status]')?.value ?? '',
-            closed: closedBeforeFilter ?? closedSectionKeys(),
-            filtering: closedBeforeFilter !== null,
+            closed: closedSectionKeys(),
             legendOpen: part('[data-roster-legend]')?.open ?? null,
             scrollY: window.scrollY,
             focusId: active?.id && body().contains(active) ? active.id : null,
-            selection: active instanceof HTMLInputElement && active.type === 'search'
-                ? [active.selectionStart, active.selectionEnd]
-                : null,
         };
     }
 
     function restoreView(view) {
-        const search = part('[data-roster-search]');
-        const status = part('[data-roster-status]');
-        if (search && status) {
-            search.value = view.search;
-            status.value = [...status.options].some((option) => option.value === view.status) ? view.status : '';
-        }
         restoreClosedSections(view.closed);
-        closedBeforeFilter = view.filtering ? view.closed : null;
-        applyFilter();
 
         const legend = part('[data-roster-legend]');
         if (legend && view.legendOpen !== null) {
@@ -168,9 +82,6 @@ function initDailyRoster(page) {
         const focused = view.focusId ? document.getElementById(view.focusId) : null;
         if (focused) {
             focused.focus({ preventScroll: true });
-            if (view.selection && focused instanceof HTMLInputElement) {
-                focused.setSelectionRange(view.selection[0], view.selection[1]);
-            }
         }
     }
 
@@ -209,16 +120,8 @@ function initDailyRoster(page) {
         return new DOMParser().parseFromString(source, 'text/html').querySelector(selector);
     }
 
-    function setFilterOptions(filters) {
-        const status = part('[data-roster-status]');
-        const selected = status.value;
-        const options = [status.options[0], ...filters.map((filter) => new Option(filter, filter))];
-        status.replaceChildren(...options);
-        status.value = filters.includes(selected) ? selected : '';
-    }
-
     /**
-     * Replaces only the seats that changed, leaving scroll, focus, search and open sections alone. Every
+     * Replaces only the seats that changed, leaving scroll, focus and open sections alone. Every
      * target is found before anything moves, so a page that does not match what the server expects is
      * left untouched and returns false, and takes the whole roster instead.
      */
@@ -248,7 +151,7 @@ function initDailyRoster(page) {
         const legend = part('[data-roster-legend-items]');
         const nextSummary = fragment(changes.summary, '[data-roster-summary]');
         const nextLegend = fragment(changes.legend, '[data-roster-legend-items]');
-        if (!summary || !legend || !nextSummary || !nextLegend || !part('[data-roster-status]')) {
+        if (!summary || !legend || !nextSummary || !nextLegend) {
             return false;
         }
 
@@ -264,7 +167,6 @@ function initDailyRoster(page) {
         });
         summary.replaceWith(document.adoptNode(nextSummary));
         legend.replaceWith(document.adoptNode(nextLegend));
-        setFilterOptions(changes.filters);
 
         version = changes.version;
         etag = changes.etag;
@@ -273,7 +175,6 @@ function initDailyRoster(page) {
         element.dataset.etag = changes.etag;
         element.dataset.snapshot = String(changes.snapshot);
         applyFacts(changes.facts);
-        applyFilter();
         return true;
     }
 
@@ -308,11 +209,78 @@ function initDailyRoster(page) {
         return changes.mode === 'changes' && applyChanges(changes) ? changes.changed : null;
     }
 
+    function closeCard() {
+        if (cardDialog.open) {
+            cardDialog.close();
+        }
+    }
+
+    function showCardMessage(message) {
+        const line = document.createElement('p');
+        line.className = 'roster-card__message';
+        line.setAttribute('role', 'status');
+        line.textContent = message;
+        cardContent.replaceChildren(line);
+    }
+
+    /** A card opened after another replaces it; a slow answer to the earlier one is dropped. */
+    async function openCard(opener) {
+        const employeeId = opener.dataset.rosterMember;
+        cardOpener = opener;
+        cardRequest?.abort();
+        const request = new AbortController();
+        cardRequest = request;
+        showCardMessage('Loading member details.');
+        if (!cardDialog.open) {
+            cardDialog.showModal();
+        }
+
+        const url = new URL(`${memberUrl}/${encodeURIComponent(employeeId)}`, window.location.origin);
+        if (memberDate) {
+            url.searchParams.set('date', memberDate);
+        }
+        try {
+            // A redirect here means the session ended; do not follow it into the login page's HTML.
+            const response = await fetch(url, {
+                cache: 'no-store',
+                credentials: 'same-origin',
+                redirect: 'manual',
+                signal: request.signal,
+                headers: { Accept: 'text/html' },
+            });
+            if (response.type === 'opaqueredirect' || response.status === 401) {
+                goToLogin();
+                return;
+            }
+            if (response.status === 403) {
+                showAccessRemoved();
+                return;
+            }
+            if (response.status === 404) {
+                showCardMessage('This member is no longer on this roster.');
+                return;
+            }
+            if (!response.ok) {
+                throw new Error(`Member card returned ${response.status}.`);
+            }
+            const card = new DOMParser().parseFromString(await response.text(), 'text/html').querySelector('[data-roster-card]');
+            if (!card) {
+                throw new Error('The member card response had no card.');
+            }
+            cardContent.replaceChildren(document.adoptNode(card));
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                console.warn('Daily Roster member card failed', error);
+                showCardMessage('Could not load this member. Check your connection and try again.');
+            }
+        }
+    }
+
     /** Takes the roster off the screen for good: personnel data does not outlive the member's access. */
     function endRoster(title, detail) {
         ended = true;
+        closeCard();
         window.clearInterval(pollTimer);
-        window.clearTimeout(countTimer);
         const view = page.querySelector('[data-roster-ended-template]').content.cloneNode(true);
         view.querySelector('[data-roster-ended-title]').textContent = title;
         view.querySelector('[data-roster-ended-detail]').textContent = detail;
@@ -429,32 +397,35 @@ function initDailyRoster(page) {
     }
 
     // Every control lives inside the swapped body, so listeners stay on the stable page element.
-    page.addEventListener('input', (event) => {
-        if (event.target.matches('[data-roster-search]')) {
-            applyFilter();
-        }
-    });
-    page.addEventListener('change', (event) => {
-        if (event.target.matches('[data-roster-status]')) {
-            applyFilter();
-        }
-    });
-    page.addEventListener('submit', (event) => event.preventDefault());
     page.addEventListener('click', (event) => {
+        // A click on the dialog itself, not its content, is a click on the backdrop.
+        if (event.target === cardDialog) {
+            closeCard();
+            return;
+        }
         const control = event.target.closest('button');
         if (!control) {
             return;
         }
-        if (control.matches('[data-roster-refresh]')) {
+        if (control.matches('[data-roster-member]')) {
+            openCard(control);
+        } else if (control.matches('[data-roster-card-close]')) {
+            closeCard();
+        } else if (control.matches('[data-roster-refresh]')) {
             check({ manual: true });
-        } else if (control.matches('[data-roster-clear]')) {
-            clearFilter();
-            part('[data-roster-search]').focus();
-        } else if (control.matches('[data-roster-expand]')) {
-            setAllSections(true);
-        } else if (control.matches('[data-roster-collapse]')) {
-            setAllSections(false);
         }
+    });
+
+    // Nothing about a member stays in the page once the card is closed, however it was closed.
+    cardDialog.addEventListener('close', () => {
+        cardRequest?.abort();
+        cardRequest = null;
+        cardContent.replaceChildren();
+        // A roster update may have replaced the name that opened the card, and the browser cannot return focus to it.
+        if (!ended && cardOpener && !cardOpener.isConnected) {
+            page.querySelector(`[data-roster-member="${CSS.escape(cardOpener.dataset.rosterMember)}"]`)?.focus({ preventScroll: true });
+        }
+        cardOpener = null;
     });
 
     pollTimer = window.setInterval(() => {
@@ -473,7 +444,7 @@ function initDailyRoster(page) {
     });
     window.addEventListener('offline', () => showStatus('Requires connection'));
     window.addEventListener('beforeprint', () => {
-        sections().forEach((section) => { section.open = !section.hidden; });
+        sections().forEach((section) => { section.open = true; });
     });
 
     openLegendOnWideScreens();

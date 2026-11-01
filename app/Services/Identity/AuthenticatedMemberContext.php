@@ -111,7 +111,9 @@ final readonly class AuthenticatedMemberContext
                 // so ordinary page requests never pay for it. UI hint only: every
                 // 300 Command route re-checks the same policy server-side.
                 'capabilities' => [...$this->capabilities,
-                    'command_300_access' => app(\App\Services\Security\Command300Access::class)->allows($this->user)],
+                    'command_300_access' => app(\App\Services\Security\Command300Access::class)->allows($this->user),
+                    // UI hint only, like the one above: the station roster route re-checks DailyRosterAccess.
+                    'daily_roster' => app(\App\Services\Security\DailyRosterAccess::class)->canSeeMenuEntry($this->user)],
             ],
             'operational_context' => [
                 'station' => null,

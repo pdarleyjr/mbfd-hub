@@ -6,6 +6,7 @@ namespace Tests\Feature\Api;
 
 use App\Enums\DailyCheckoutChecklistTemplate;
 use App\Models\Apparatus;
+use App\Models\ApparatusInspection;
 use App\Models\DailyCheckoutInspectionSession;
 use App\Models\Station;
 use App\Models\User;
@@ -167,6 +168,118 @@ class DailyCheckoutInspectionSessionContractTest extends TestCase
         $this->assertDatabaseCount('daily_checkout_inspection_sessions', 2);
     }
 
+    public function test_the_readings_and_identifiers_a_member_enters_are_kept_with_their_units(): void
+    {
+        $apparatus = $this->makeFireBoat6();
+        $this->setTestTime('2026-08-31 09:00:00');
+        $contract = $this->startInspectionSession($apparatus);
+        $payload = $this->appSubmission($apparatus, $contract, '25252525-2525-4525-8525-252525252525');
+        $entered = [
+            'fb6-port-engine-hours' => 1204.5, 'fb6-star-engine-hours' => 1201, 'fb6-generator-hours' => 600,
+            'fb6-port-engine-voltage' => 13.8, 'fb6-star-engine-voltage' => 13.7,
+            'fb6-port-engine-temperature' => 182, 'fb6-star-engine-temperature' => 180,
+            'fb6-fuel-level' => 75, 'fb6-scba-id-1' => 'A-101', 'fb6-scuba-ids' => 'T-1, T-2',
+            'fb6-driver-radio-number' => '6101', 'fb6-driver-radio-last-four-serial' => '4821',
+        ];
+        $payload['field_values'] = array_map(static fn (array $field): array => array_key_exists($field['id'], $entered)
+            ? ['id' => $field['id'], 'value' => $entered[$field['id']]]
+            : $field, $payload['field_values']);
+
+        $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", $payload)->assertCreated();
+
+        $evidence = collect(ApparatusInspection::query()->sole()->checklist_evidence)->keyBy('id');
+        foreach ($entered as $id => $value) {
+            $this->assertSame($value, $evidence[$id]['value'], $id);
+        }
+        $this->assertSame('Starboard engine hours', $evidence['fb6-star-engine-hours']['name']);
+        $this->assertSame('Port engine running temperature (°F)', $evidence['fb6-port-engine-temperature']['name'], 'the record says what the number means');
+        $this->assertSame('SCUBA equipment ID numbers', $evidence['fb6-scuba-ids']['name']);
+        $this->assertNotSame($evidence['fb6-scuba-ids']['name'], $evidence['fb6-scba-id-1']['name'], 'SCUBA and airpacks are different equipment');
+    }
+
+    public function test_an_impossible_reading_is_refused_and_a_blank_one_is_not(): void
+    {
+        $apparatus = $this->makeFireBoat6();
+        $this->setTestTime('2026-08-31 09:00:00');
+        $contract = $this->startInspectionSession($apparatus);
+        $payload = $this->appSubmission($apparatus, $contract, '26262626-2626-4626-8626-262626262626');
+        $with = static fn (string $id, mixed $value): array => [
+            ...$payload,
+            'field_values' => array_map(static fn (array $field): array => $field['id'] === $id ? ['id' => $id, 'value' => $value] : $field, $payload['field_values']),
+        ];
+
+        foreach ([['fb6-port-engine-voltage', -1], ['fb6-generator-hours', -0.5], ['fb6-fuel-level', 101], ['fb6-fuel-level', -1], ['fb6-star-engine-temperature', 'hot']] as [$id, $value]) {
+            $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", $with($id, $value))
+                ->assertUnprocessable()
+                ->assertJsonValidationErrors('field_values');
+        }
+        $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", $with('fb6-fuel-level', null))->assertCreated();
+    }
+
+    public function test_a_duty_not_completed_is_recorded_and_opens_no_equipment_defect(): void
+    {
+        $apparatus = $this->makeFireBoat6();
+        $this->setTestTime('2026-08-31 09:00:00');
+        $contract = $this->startInspectionSession($apparatus);
+        $this->assertNotSame([], $contract['due_tasks'], 'Monday has a due duty');
+        $payload = $this->appSubmission($apparatus, $contract, '27272727-2727-4727-8727-272727272727');
+        $payload['scheduled_tasks'] = array_map(static fn (array $task): array => ['id' => $task['id'], 'status' => 'Not Completed', 'notes' => 'Lift out of service', 'observed' => true], $contract['due_tasks']);
+
+        $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", $payload)->assertCreated();
+
+        $this->assertDatabaseCount('apparatus_defects', 0);
+        $inspection = ApparatusInspection::query()->sole();
+        $this->assertSame('approved', $inspection->review_status);
+        $event = $inspection->reviewEvents()->where('status', 'accepted')->sole();
+        $this->assertSame('Not Completed', $event->metadata['submitted_effects']['checklist_v2']['scheduled_tasks'][0]['status']);
+        $this->assertSame('Lift out of service', $event->metadata['submitted_effects']['checklist_v2']['scheduled_tasks'][0]['notes']);
+    }
+
+    public function test_a_queued_older_payload_with_the_equipment_words_keeps_its_meaning(): void
+    {
+        $apparatus = $this->makeFireBoat6();
+        $this->setTestTime('2026-08-31 09:00:00');
+        $contract = $this->startInspectionSession($apparatus);
+        $payload = $this->appSubmission($apparatus, $contract, '28282828-2828-4828-8828-282828282828');
+        $payload['scheduled_tasks'] = array_map(static fn (array $task): array => ['id' => $task['id'], 'status' => 'Missing', 'notes' => null, 'observed' => true], $contract['due_tasks']);
+
+        $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", $payload)->assertCreated();
+
+        $this->assertDatabaseHas('apparatus_defects', ['apparatus_id' => $apparatus->id, 'compartment' => 'Scheduled duties', 'issue_type' => 'missing']);
+    }
+
+    public function test_a_session_issued_on_the_earlier_template_still_submits_after_the_template_changes(): void
+    {
+        $apparatus = $this->makeFireBoat6();
+        $this->setTestTime('2026-08-31 09:00:00');
+        $contract = $this->startInspectionSession($apparatus);
+        $session = DailyCheckoutInspectionSession::sole();
+        $original = $session->checklist_snapshot;
+        // A session frozen before the new readings: only the fields it was issued with may be sent, and it stays valid.
+        $older = $original;
+        $older['template_version'] = '2026-07';
+        $older['fields'] = array_values(array_filter($original['fields'], static fn (array $field): bool => ! in_array($field['id'], ['fb6-fuel-level', 'fb6-scuba-ids'], true)));
+        $hash = hash('sha256', json_encode($this->canonical($older), JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
+        DB::table('daily_checkout_inspection_sessions')->where('id', $session->id)->update(['checklist_snapshot' => json_encode($this->canonical($older)), 'checklist_hash' => $hash, 'checklist_template_version' => '2026-07']);
+
+        $payload = $this->appSubmission($apparatus, $contract, '29292929-2929-4929-8929-292929292929');
+        $payload['checklist_version'] = $hash;
+        $payload['field_values'] = array_values(array_filter($payload['field_values'], static fn (array $field): bool => ! in_array($field['id'], ['fb6-fuel-level', 'fb6-scuba-ids'], true)));
+
+        $this->postJson("/api/public/apparatuses/{$apparatus->id}/inspections", $payload)->assertCreated();
+        $this->assertSame($hash, ApparatusInspection::query()->sole()->checklist_version);
+    }
+
+    /** @param array<mixed> $value */
+    private function canonical(array $value): array
+    {
+        if (! array_is_list($value)) {
+            ksort($value, SORT_STRING);
+        }
+
+        return array_map(fn (mixed $entry): mixed => is_array($entry) ? $this->canonical($entry) : $entry, $value);
+    }
+
     public function test_a_boat_has_no_vehicle_change_but_a_truck_still_does(): void
     {
         $boat = $this->makeFireBoat6();
@@ -193,7 +306,7 @@ class DailyCheckoutInspectionSessionContractTest extends TestCase
 
         $this->assertSame('2026-08-31', $contract['duty_date']);
         $this->assertSame('fire_boat_6_daily', $contract['checklist_template_id']);
-        $this->assertSame('2026-07', $contract['checklist_template_version']);
+        $this->assertSame('2026-11', $contract['checklist_template_version']);
         $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $contract['checklist_hash']);
         $this->assertMatchesRegularExpression('/^[a-f0-9]{64}$/', $contract['due_tasks_hash']);
         $this->assertMatchesRegularExpression('/^[a-f0-9-]{36}$/', $contract['replay_key']);
@@ -652,7 +765,7 @@ class DailyCheckoutInspectionSessionContractTest extends TestCase
 
         $transition
             ->assertJsonPath('checklist.template_id', 'fire_boat_6_daily')
-            ->assertJsonPath('checklist.template_version', '2026-07')
+            ->assertJsonPath('checklist.template_version', '2026-11')
             ->assertJsonPath('inspection_session.duty_date', '2026-08-31');
         $priorRecord = DailyCheckoutInspectionSession::query()->where('public_id', $prior['id'])->sole();
         $todayRecord = DailyCheckoutInspectionSession::query()->where('public_id', $today['id'])->sole();
@@ -936,7 +1049,7 @@ class DailyCheckoutInspectionSessionContractTest extends TestCase
             'field_values' => array_map(static function (array $field) use ($inspectionDate): array {
                 $value = match ($field['inputType']) {
                     'date' => $inspectionDate,
-                    'number' => 1,
+                    'number', 'percentage' => 1,
                     'checkbox' => true,
                     default => 'Recorded',
                 };

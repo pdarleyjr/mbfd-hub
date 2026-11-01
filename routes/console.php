@@ -165,6 +165,12 @@ Schedule::command('daily-roster:reconcile')
     ->withoutOverlapping(5)
     ->onOneServer();
 
+// Alerts the queue would not take during an outage. Normally one empty read.
+Schedule::command('notifications:retry-dispatch')
+    ->everyMinute()
+    ->withoutOverlapping(5)
+    ->onOneServer();
+
 // Email Center: indexes any mail the after-commit hooks missed, merges late-arriving parents, tidies threads
 // whose roster mail TeleStaff cleanup deleted. Idempotent; see App\Services\Mail\MailIndexSweeper.
 Schedule::command('mail:index-sweep')

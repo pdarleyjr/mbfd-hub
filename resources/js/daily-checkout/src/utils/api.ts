@@ -8,10 +8,11 @@ import {
   VehicleIdentification, VehicleIdentificationSubmission,
 } from '../types';
 import { purgeOnSessionEnd } from '../pwa/userCaches.ts';
+import { purgeCachedFindings } from './liveFindingsCache';
 import { parseVehicleIdentification, parseVehicleIdentificationResponse } from './vehicleIdentification';
 import { parseChangeoutHandoff } from '../components/changeout/changeoutParse';
 
-import type { StationCheckoutDetail, StationOverview } from '../types';
+import type { StationCheckoutDetail, StationOverview, StationRoster } from '../types';
 
 const API_BASE = '/api';
 
@@ -166,6 +167,7 @@ export function redirectToLoginAfterSessionExpiry(): void {
   // Signed out: drop the cached station/apparatus responses first. The worker message is
   // posted synchronously, so it still goes out as the page navigates to sign-in.
   void purgeOnSessionEnd();
+  void purgeCachedFindings();
   const configuredOrigin = window.__MBFD_CANONICAL_ORIGIN__;
   let loginUrl = new URL('/login', window.location.origin);
 
@@ -376,6 +378,11 @@ export class ApiClient {
               inputType: field.inputType,
               required: field.required === true,
               multiline: field.multiline === true,
+              ...(typeof field.group === 'string' ? { group: field.group } : {}),
+              ...(typeof field.unit === 'string' ? { unit: field.unit } : {}),
+              ...(typeof field.hint === 'string' ? { hint: field.hint } : {}),
+              ...(typeof field.min === 'number' ? { min: field.min } : {}),
+              ...(typeof field.max === 'number' ? { max: field.max } : {}),
             };
           });
         })()
@@ -993,6 +1000,21 @@ export class ApiClient {
       throw new Error('Failed to fetch room profile');
     }
     return response.json();
+  }
+
+  static async getStationRoster(stationId: number, background = false): Promise<StationRoster> {
+    const response = await fetchWithTimeout(`${API_BASE}/public/stations/${stationId}/roster`, {
+      headers: { ...DEFAULT_HEADERS, ...(background ? { 'X-Hub-Background-Refresh': '1' } : {}) },
+      cache: 'no-store',
+    });
+    if (!response.ok) {
+      throw new ApiRequestError(await responseMessage(response, "Today's roster could not be loaded"), response.status);
+    }
+    const payload = await response.json() as Partial<StationRoster>;
+    if (typeof payload.available !== 'boolean' || !Array.isArray(payload.sections)) {
+      throw new Error("Today's roster could not be loaded");
+    }
+    return payload as StationRoster;
   }
 
   static async getGasMeters(stationId: number): Promise<SingleGasMeterSummary[]> {

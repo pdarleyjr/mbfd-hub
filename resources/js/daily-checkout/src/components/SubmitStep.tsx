@@ -1,12 +1,16 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
-import type { OfficerInfo, Compartment, ChecklistData, ChecklistFieldValue, MeterData, ReviewFlagDraft, ScheduledChecklistTaskResult } from '../types';
+import type { OfficerInfo, Compartment, ChecklistData, ChecklistFieldValue, MeterData, OpenFinding, ReviewFlagDraft, ScheduledChecklistTaskResult } from '../types';
+import type { ConcernDraft, ConcernIssueRef } from '../types/issueHistory';
+import { concernDraftProblems } from '../utils/concerns';
 import { ArrowLeft, Send, TriangleAlert, Undo2 } from 'lucide-react';
 import { inspectionProgress } from '../utils/inspectionProgress';
+import { taskStatusLabel } from '../utils/checklistFields.ts';
 import { checklistUsesVehicleId, reportedVehicle } from '../utils/vehicleConfirmation';
 import { currentObservationText, previousIssueHeadline, previousIssueStatusLine, resolveFindingTargets, unlocatedFindings } from '../utils/previousFindings';
 import { reviewFlagExplanationMissing } from '../utils/reviewFlag';
 import ReviewFlagControl from './ReviewFlagControl';
+import ConcernsSection from './findings/ConcernsSection';
 import './inspection-workspace.css';
 
 interface SubmitStepProps {
@@ -19,6 +23,13 @@ interface SubmitStepProps {
   onSignatureChange: (value: string | null) => void;
   reviewFlag: ReviewFlagDraft;
   onReviewFlagChange: (value: ReviewFlagDraft) => void;
+  /** The checklist's open findings enriched with live status; the checklist's own list when absent. */
+  findings?: OpenFinding[];
+  /** Concerns, damage and notes the member is adding. */
+  concerns: ConcernDraft[];
+  onConcernsChange: Dispatch<SetStateAction<ConcernDraft[]>>;
+  /** Open issues an entry can be added to. */
+  openIssues: ConcernIssueRef[];
   scheduledTasks: ScheduledChecklistTaskResult[];
   onSubmit: (signature: string | null) => void;
   onBack: () => void;
@@ -37,6 +48,10 @@ export default function SubmitStep({
   onSignatureChange,
   reviewFlag,
   onReviewFlagChange,
+  findings = checklist.open_findings,
+  concerns,
+  onConcernsChange,
+  openIssues,
   scheduledTasks,
   onSubmit,
   onBack,
@@ -46,6 +61,8 @@ export default function SubmitStep({
   const signatureSectionRef = useRef<HTMLDivElement>(null);
   const [sigError, setSigError] = useState(false);
   const [flagError, setFlagError] = useState(false);
+  const [showConcernErrors, setShowConcernErrors] = useState(false);
+  const concernsRef = useRef<HTMLDivElement>(null);
   const flagSectionRef = useRef<HTMLDivElement>(null);
   const flagTextareaRef = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
@@ -72,11 +89,18 @@ export default function SubmitStep({
 
   const { total: totalItems, issues: issuesCount } = inspectionProgress(compartments);
   const vehicle = officerInfo.vehicleConfirmation;
-  const findingTargets = resolveFindingTargets(compartments, checklist.open_findings);
-  const otherFindings = unlocatedFindings(findingTargets, checklist.open_findings);
+  const findingTargets = resolveFindingTargets(compartments, findings);
+  const otherFindings = unlocatedFindings(findingTargets, findings);
 
   const handleSubmit = () => {
     if (!officerInfo.shift) return;
+    // An entry that was started but cannot be sent is fixed first, so nothing the member wrote is dropped silently.
+    if (concernDraftProblems(concerns).length > 0) {
+      setShowConcernErrors(true);
+      concernsRef.current?.scrollIntoView({ block: 'center' });
+      concernsRef.current?.querySelector<HTMLElement>('[aria-invalid="true"], fieldset.concern-kind input')?.focus({ preventScroll: true });
+      return;
+    }
     const flagMissing = reviewFlagExplanationMissing(reviewFlag);
     if (flagMissing || !signature) {
       setFlagError(flagMissing);
@@ -224,7 +248,11 @@ export default function SubmitStep({
         })}
       </div>
 
-      {scheduledTasks.length > 0 && <section className="inspection-review-details" aria-label="Recorded scheduled duties"><h3 className="mb-3 font-semibold">Scheduled duties</h3><dl>{scheduledTasks.map(task => <div key={task.id} className="inspection-review-area"><dt>{checklist.due_tasks.find(entry => entry.id === task.id)?.name}</dt><dd>{task.status}{task.notes ? ` · ${task.notes}` : ''}</dd></div>)}</dl></section>}
+      {scheduledTasks.length > 0 && <section className="inspection-review-details" aria-label="Recorded scheduled duties"><h3 className="mb-3 font-semibold">Scheduled duties</h3><dl>{scheduledTasks.map(task => <div key={task.id} className="inspection-review-area"><dt>{checklist.due_tasks.find(entry => entry.id === task.id)?.name}</dt><dd>{taskStatusLabel(task.status)}{task.notes ? ` · ${task.notes}` : ''}</dd></div>)}</dl></section>}
+
+      <div ref={concernsRef}>
+        <ConcernsSection concerns={concerns} onChange={onConcernsChange} openIssues={openIssues} showErrors={showConcernErrors} />
+      </div>
 
       <div className="inspection-review-flag" ref={flagSectionRef}>
         <ReviewFlagControl ref={flagTextareaRef} draft={reviewFlag} compartments={compartments} showError={flagError}

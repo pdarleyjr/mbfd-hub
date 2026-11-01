@@ -37,6 +37,7 @@ final class NotificationPresetPolicyTest extends TestCase
         'vehicle_swap_reports' => [true, true, true],
         'vehicle_identification_reports' => [true, true, true],
         'fleet_operational_alerts' => [true, false, false],
+        'roster_moves' => [true, true, false],
         'apparatus_service_tickets' => [true, true, false],
         'vehicle_maintenance_alerts' => [true, false, false],
         'station_inspections' => [true, true, false],
@@ -186,7 +187,7 @@ final class NotificationPresetPolicyTest extends TestCase
 
                 continue;
             }
-            if ($category->key === 'fleet_operational_alerts') {
+            if (in_array($category->key, ['fleet_operational_alerts', 'roster_moves'], true)) {
                 $this->assertSame([false, false, false], $this->stored($user, $category->key), 'newer than this migration, whose list is frozen');
 
                 continue;

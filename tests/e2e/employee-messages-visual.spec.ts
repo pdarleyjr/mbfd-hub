@@ -94,11 +94,11 @@ test.describe.serial('Support Services visual QA', () => {
   const token = () => `vqa${Date.now().toString(36)}`;
   const state = { subject: '', body: '', reply: '' };
 
-  test('member Home: Message Support Services sits beside Vehicle Checkout', async ({ browser }, info) => {
+  test('member Home: Message Support Services sits in Quick Access', async ({ browser }, info) => {
     await as(browser, info, 'memberA', async ({ page }) => {
       await page.goto('/');
       const actions = page.locator('.hub-page-header__actions');
-      const message = actions.getByRole('link', { name: 'Message Support Services', exact: true });
+      const message = page.locator('[data-home-message-logistics]');
       await expect(message).toBeVisible();
       await expectTouchTarget(info, message, 'Message Support Services');
       await expectNoHorizontalOverflow(page);

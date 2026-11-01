@@ -30,27 +30,29 @@ final class EmployeeLogisticsMemberPortalTest extends TestCase
         Filament::setCurrentPanel(Filament::getPanel('employee'));
     }
 
-    public function test_home_shows_message_support_services_beside_vehicle_checkout_for_members_only(): void
+    public function test_home_offers_message_support_services_as_a_quick_access_link_for_members_only(): void
     {
         $member = $this->messagingMember();
         $html = $this->actingAsCanonicalUser($member)->get('/')->assertOk()->getContent();
 
-        $this->assertStringContainsString('Vehicle Checkout', $html);
         $this->assertStringContainsString('data-home-message-logistics', $html);
         $this->assertStringContainsString('/employee/messages?compose=1', $html);
-        $this->assertLessThan(
+        $this->assertStringContainsString('Request bunker gear cleaning, ask a question, or send a general message', $html);
+        $this->assertGreaterThan(
+            strpos($html, 'data-home-section="quick-access"'),
             strpos($html, 'data-home-message-logistics'),
-            strpos($html, 'Vehicle Checkout'),
-            'Message Support Services sits after Vehicle Checkout in the same actions group.'
+            'Message Support Services is in Quick Access, not the buttons under the greeting.'
         );
     }
 
     public function test_home_hides_message_support_services_for_an_account_without_a_personnel_profile(): void
     {
+        config(['daily_roster.mode' => 'publish']);
         $admin = $this->messagingAdmin(['super_admin']);
         $html = $this->actingAsCanonicalUser($admin)->get('/')->assertOk()->getContent();
 
         $this->assertStringNotContainsString('data-home-message-logistics', $html);
+        $this->assertStringContainsString('data-home-daily-roster', $html, 'The button keeps the roster open to an administrator with no profile.');
     }
 
     public function test_the_compose_deep_link_opens_a_ready_composer(): void
