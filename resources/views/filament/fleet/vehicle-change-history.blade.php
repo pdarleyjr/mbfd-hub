@@ -17,7 +17,7 @@
     <p class="text-sm text-gray-500 dark:text-gray-400">No changes recorded.</p>
 @else
     <div class="hub-insp hub-insp-table-wrap">
-        <table class="hub-insp-table" data-change-history>
+        <table data-hub-table class="hub-insp-table" data-change-history>
             <thead>
                 <tr>
                     <th>When (ET)</th>

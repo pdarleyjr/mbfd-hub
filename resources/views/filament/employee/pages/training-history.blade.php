@@ -5,8 +5,8 @@
     {{ $this->table }}
     <x-filament::section heading="Verified paper attendance">
         <p class="mb-4 text-sm text-stone-600">Your reviewed historical paper entries, dated when the class occurred. These are paper attendance records, not electronic certifications. Contact Training to request a correction or source review.</p>
-        <div class="overflow-x-auto">
-            <table class="w-full text-left text-sm">
+        <div>
+            <table data-hub-table class="w-full text-left text-sm">
                 <thead><tr><th scope="col" class="p-3">Course</th><th scope="col" class="p-3">Module</th><th scope="col" class="p-3">Class date</th><th scope="col" class="p-3">Evidence</th></tr></thead>
                 <tbody>
                     @forelse ($paperAttendance as $entry)

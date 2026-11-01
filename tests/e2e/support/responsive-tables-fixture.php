@@ -56,6 +56,8 @@ if (in_array('--seed', $argv ?? [], true)) {
             'assignment' => 'Assignment '.$n, 'location' => $n === 6 ? $long('Station Location', $n) : 'Station '.(($n % 5) + 1),
             'serial_number' => 'SERIAL'.str_repeat('0123456789', 3).$n, 'sunpass_number' => 'SP'.$n, 'als_license' => 'ALS'.$n]);
     }
+    require __DIR__.'/responsive-tables-generic-rows.php';
+    file_put_contents($directory.'/seed-report.json', json_encode(responsiveTablesSeedGenericRows([]), JSON_PRETTY_PRINT));
     echo 'Synthetic responsive tables fixture ready.'.PHP_EOL;
     exit;
 }

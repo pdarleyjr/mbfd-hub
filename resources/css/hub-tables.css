@@ -4,11 +4,14 @@
  * Filament tables are adapted by resources/js/hub-tables.js, which sets data-hub-mode on the table:
  *   (none)   the table fits: nothing here applies.
  *   priority lowest-priority columns are hidden in the row and shown in its details panel.
- *   cards    each row is a stacked card; the heading row is a bar of sort buttons.
+ *   cards    each row is a stacked card; sorting moves into one Sort by menu.
  * Blade and React tables opt in with .hub-table (wrapping, bounded cells) and, for key/value rows,
  * .hub-table--stack. No colour literals: every colour is a token from mbfd-theme.css.
  * This file owns table behaviour only; the bar and shell live in hub-shell.css.
  */
+
+/* ---- Filament page tabs (list filters) wrap instead of scrolling sideways ---- */
+.fi-tabs { flex-wrap: wrap; overflow-x: visible; max-width: 100%; }
 
 /* ---- Every Filament table: long text wraps, nothing forces the page wider ---- */
 .fi-ta-content { max-width: 100%; }
@@ -25,33 +28,33 @@
 .fi-ta-table .fi-ta-select { min-width: 0; max-width: 100%; }
 
 /* ---- Grid layout shared by priority and cards ---- */
-.fi-ta-table[data-hub-mode] { display: block; width: 100%; }
-.fi-ta-table[data-hub-mode] > thead,
-.fi-ta-table[data-hub-mode] > tbody { display: block; }
-.fi-ta-table[data-hub-mode] > tbody { border-top: 0; }
-.fi-ta-table[data-hub-mode] > thead > tr,
-.fi-ta-table[data-hub-mode] > tbody > tr { display: grid; align-items: center; }
-.fi-ta-table[data-hub-mode] > thead > tr > th,
-.fi-ta-table[data-hub-mode] > tbody > tr > td { display: block; min-width: 0; width: auto; }
-.fi-ta-table[data-hub-mode] [data-hub-hidden] { display: none; }
-.fi-ta-table[data-hub-mode] > tbody > tr > td[colspan],
-.fi-ta-table[data-hub-mode] > thead > tr > th[colspan] { grid-column: 1 / -1; }
+table[data-hub-mode] { display: block; width: 100%; }
+table[data-hub-mode] > thead,
+table[data-hub-mode] > tbody { display: block; }
+table[data-hub-mode] > tbody { border-top: 0; }
+table[data-hub-mode] > thead > tr,
+table[data-hub-mode] > tbody > tr { display: grid; align-items: center; }
+table[data-hub-mode] > thead > tr > th,
+table[data-hub-mode] > tbody > tr > td { display: block; min-width: 0; width: auto; white-space: normal; overflow-wrap: anywhere; }
+table[data-hub-mode] [data-hub-hidden] { display: none; }
+table[data-hub-mode] > tbody > tr > td[colspan],
+table[data-hub-mode] > thead > tr > th[colspan] { grid-column: 1 / -1; }
 
 /* ---- Priority: columns in a shared grid, details panel under the row ---- */
-.fi-ta-table[data-hub-mode="priority"] > thead > tr,
-.fi-ta-table[data-hub-mode="priority"] > tbody > tr {
+table[data-hub-mode="priority"] > thead > tr,
+table[data-hub-mode="priority"] > tbody > tr {
   grid-template-columns: var(--hub-rt-cols, 1fr);
 }
-.fi-ta-table[data-hub-mode="priority"] > thead > tr > th,
-.fi-ta-table[data-hub-mode="priority"] > tbody > tr > td { padding-inline: 0.5rem; }
-.fi-ta-table[data-hub-mode="priority"] > tbody > tr > td[data-hub-lead] { display: flex; align-items: center; gap: 0.25rem; }
-.fi-ta-table[data-hub-mode="priority"] > tbody > tr > td[data-hub-lead] > :not(.hub-rt-toggle) { flex: 1 1 auto; min-width: 0; }
-.fi-ta-table[data-hub-mode="priority"] > tbody > tr > td[data-hub-kind="actions"] { justify-self: end; }
-.fi-ta-table[data-hub-mode="priority"] > tbody > tr > td:not([data-hub-hidden]) { grid-row: 1; }
+table[data-hub-mode="priority"] > thead > tr > th,
+table[data-hub-mode="priority"] > tbody > tr > td { padding-inline: 0.5rem; }
+table[data-hub-mode="priority"] > tbody > tr > td[data-hub-lead] { display: flex; align-items: center; gap: 0.25rem; }
+table[data-hub-mode="priority"] > tbody > tr > td[data-hub-lead] > :not(.hub-rt-toggle) { flex: 1 1 auto; min-width: 0; }
+table[data-hub-mode="priority"] > tbody > tr > td[data-hub-kind="actions"] { justify-self: end; }
+table[data-hub-mode="priority"] > tbody > tr > td:not([data-hub-hidden]) { grid-row: 1; }
 
 /* Details: hidden cells of an open row, full width under the visible cells */
-.fi-ta-table[data-hub-mode] > tbody > tr:not([data-hub-open]) > td[data-hub-hidden] { display: none; }
-.fi-ta-table[data-hub-mode] > tbody > tr[data-hub-open] > td[data-hub-hidden] {
+table[data-hub-mode] > tbody > tr:not([data-hub-open]) > td[data-hub-hidden] { display: none; }
+table[data-hub-mode] > tbody > tr[data-hub-open] > td[data-hub-hidden] {
   display: grid;
   grid-column: 1 / -1;
   grid-template-columns: minmax(6rem, 30%) minmax(0, 1fr);
@@ -61,7 +64,7 @@
   background-color: rgb(var(--hub-n-50));
   border-top: 1px solid rgb(var(--hub-n-100));
 }
-.fi-ta-table[data-hub-mode] > tbody > tr[data-hub-open] > td[data-hub-hidden]::before {
+table[data-hub-mode] > tbody > tr[data-hub-open] > td[data-hub-hidden]::before {
   content: attr(data-hub-label);
   color: rgb(var(--hub-n-600));
   font-size: 0.8125rem;
@@ -69,7 +72,7 @@
   overflow-wrap: anywhere;
   padding-block-start: 0.5rem;
 }
-.fi-ta-table[data-hub-mode] > tbody > tr[data-hub-open] > td[data-hub-hidden] > * { min-width: 0; }
+table[data-hub-mode] > tbody > tr[data-hub-open] > td[data-hub-hidden] > * { min-width: 0; }
 
 /* ---- Details button (injected into the first visible cell) ---- */
 .hub-rt-toggle {
@@ -104,14 +107,14 @@
 }
 
 /* ---- Cards (phones and any container narrower than the essential columns) ---- */
-.fi-ta-table[data-hub-mode="cards"] > thead > tr {
+table[data-hub-mode="cards"] > thead > tr {
   display: flex;
   flex-wrap: wrap;
   gap: 0.25rem;
   padding: 0.5rem 0.75rem;
 }
-.fi-ta-table[data-hub-mode="cards"] > tbody { padding: 0.5rem; display: grid; gap: 0.5rem; }
-.fi-ta-table[data-hub-mode="cards"] > tbody > tr {
+table[data-hub-mode="cards"] > tbody { padding: 0.5rem; display: grid; gap: 0.5rem; }
+table[data-hub-mode="cards"] > tbody > tr {
   grid-template-columns: minmax(0, 1fr);
   gap: 0;
   border: 1px solid rgb(var(--hub-border));
@@ -119,14 +122,14 @@
   background-color: rgb(var(--hub-well));
   overflow: hidden;
 }
-.fi-ta-table[data-hub-mode="cards"] > tbody > tr > td { padding: 0.5rem 1rem; }
-.fi-ta-table[data-hub-mode="cards"] > tbody > tr > td[data-hub-kind="data"]:not([data-hub-hidden]) {
+table[data-hub-mode="cards"] > tbody > tr > td { padding: 0.5rem 1rem; }
+table[data-hub-mode="cards"] > tbody > tr > td[data-hub-kind="data"]:not([data-hub-hidden]) {
   display: grid;
   grid-template-columns: minmax(5.5rem, 34%) minmax(0, 1fr);
   align-items: start;
   gap: 0.25rem 0.75rem;
 }
-.fi-ta-table[data-hub-mode="cards"] > tbody > tr > td[data-hub-kind="data"]:not([data-hub-hidden])::before {
+table[data-hub-mode="cards"] > tbody > tr > td[data-hub-kind="data"]:not([data-hub-hidden])::before {
   content: attr(data-hub-label);
   color: rgb(var(--hub-n-600));
   font-size: 0.8125rem;
@@ -134,11 +137,11 @@
   overflow-wrap: anywhere;
   padding-block-start: 0.5rem;
 }
-.fi-ta-table[data-hub-mode="cards"] > tbody > tr { position: relative; }
-.fi-ta-table[data-hub-mode="cards"] > tbody > tr > td[data-hub-lead] > .hub-rt-toggle { position: absolute; inset-block-start: 0.25rem; inset-inline-end: 0.25rem; }
-.fi-ta-table[data-hub-mode="cards"] > tbody > tr > td[data-hub-kind="select"] { min-height: 2.75rem; display: flex; align-items: center; }
-.fi-ta-table[data-hub-mode="cards"] > tbody > tr > td[data-hub-lead][data-hub-kind="data"]:not([data-hub-hidden]) { padding-inline-end: 3.25rem; }
-.fi-ta-table[data-hub-mode="cards"] > tbody > tr > td[data-hub-kind="actions"] {
+table[data-hub-mode="cards"] > tbody > tr { position: relative; }
+table[data-hub-mode="cards"] > tbody > tr > td[data-hub-lead] > .hub-rt-toggle { position: absolute; inset-block-start: 0.25rem; inset-inline-end: 0.25rem; }
+table[data-hub-mode="cards"] > tbody > tr > td[data-hub-kind="select"] { min-height: 2.75rem; display: flex; align-items: center; }
+table[data-hub-mode="cards"] > tbody > tr > td[data-hub-lead][data-hub-kind="data"]:not([data-hub-hidden]) { padding-inline-end: 3.25rem; }
+table[data-hub-mode="cards"] > tbody > tr > td[data-hub-kind="actions"] {
   display: flex;
   justify-content: flex-end;
   border-top: 1px solid rgb(var(--hub-n-100));
@@ -146,13 +149,13 @@
 }
 
 /* Inputs inside narrow cells fill the cell instead of keeping their own minimum */
-.fi-ta-table[data-hub-mode] .fi-ta-text-input,
-.fi-ta-table[data-hub-mode] .fi-ta-select { width: 100%; min-width: 0; padding: 0.25rem 0; }
+table[data-hub-mode] .fi-ta-text-input,
+table[data-hub-mode] .fi-ta-select { width: 100%; min-width: 0; padding: 0.25rem 0; }
 
 /* Touch targets */
 @media (pointer: coarse) {
-  .fi-ta-table[data-hub-mode] .fi-btn,
-  .fi-ta-table[data-hub-mode] .fi-icon-btn { min-width: 2.75rem; min-height: 2.75rem; }
+  table[data-hub-mode] .fi-btn,
+  table[data-hub-mode] .fi-icon-btn { min-width: 2.75rem; min-height: 2.75rem; }
 }
 
 /* ---- Plain tables outside Filament: .hub-table ---- */

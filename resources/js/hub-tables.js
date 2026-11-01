@@ -1,12 +1,12 @@
 /**
- * Hub responsive tables for Filament.
+ * Hub responsive tables for Filament (and Blade or React tables that add data-hub-table).
  *
- * A Filament table never scrolls sideways. For every `table.fi-ta-table` this module measures the
+ * An operational table never scrolls sideways. For every `table.fi-ta-table` this module measures the
  * width the table may use and applies the plan from ./hub-tables/plan.js:
  *
  *   table    unchanged.
  *   priority the lowest priority columns move into the row's details panel (a chevron button opens it).
- *   cards    each row becomes a stacked card; the heading row becomes a bar of sort buttons.
+ *   cards    each row becomes a stacked card; sorting moves into one Sort by menu.
  *
  * Nothing is removed from the page: hidden cells stay in their row (so inline inputs, Livewire
  * bindings, actions and sorting keep working) and are shown by CSS in the details panel.
@@ -18,8 +18,9 @@
  */
 import { planColumns, priorityOf } from './hub-tables/plan.js';
 
-const TABLE = 'table.fi-ta-table';
-const BOX = '.fi-ta-content';
+/** Filament tables, plus any Blade or React table that opts in with data-hub-table. */
+const TABLE = 'table.fi-ta-table, table[data-hub-table]';
+const BOX = '.fi-ta-content, [data-hub-table-box]';
 const SELECTION_PX = 48;
 const ACTIONS_PX = 120;
 const CHEVRON =
@@ -158,8 +159,8 @@ function sortButton(th) {
 }
 
 /** Hidden columns lose their heading, so their sort buttons move into one "Sort by" menu. */
-function syncSortMenu(box, table, hiddenColumns, title) {
-  const existing = box.querySelector(':scope > .hub-rt-sort');
+function syncSortMenu(table, hiddenColumns, title) {
+  const existing = table.parentElement.querySelector(':scope > .hub-rt-sort');
   const sortable = hiddenColumns.filter(c => sortButton(c.th));
   if (!sortable.length) {
     existing?.remove();
@@ -183,16 +184,21 @@ function syncSortMenu(box, table, hiddenColumns, title) {
       const index = Number.parseInt(select.value, 10);
       select.value = '';
       // Look the heading up again: Livewire may have re-rendered the table since the menu was built.
-      const heading = menu.parentElement?.querySelector(':scope > table.fi-ta-table > thead > tr:last-child')?.children[index];
+      const heading = menu.parentElement?.querySelector(':scope > table > thead > tr:last-child')?.children[index];
       if (heading) sortButton(heading)?.click();
     });
     menu.replaceChildren(label, select);
   }
-  if (menu.parentElement !== box || menu.nextElementSibling !== table) box.insertBefore(menu, table);
+  if (menu.nextElementSibling !== table) table.parentElement.insertBefore(menu, table);
+}
+
+/** The element whose width the table may use: Filament's content box, a marked wrapper, or the parent. */
+function boxOf(table) {
+  return table.closest(BOX) ?? table.parentElement;
 }
 
 function apply(table) {
-  const box = table.closest(BOX);
+  const box = boxOf(table);
   if (!box) return;
   const available = box.clientWidth;
   if (available === 0) return;
@@ -218,7 +224,7 @@ function apply(table) {
 
   if (plan.mode === 'table') {
     removeToggles(table);
-    box.querySelector(':scope > .hub-rt-sort')?.remove();
+    table.parentElement.querySelector(':scope > .hub-rt-sort')?.remove();
     return;
   }
 
@@ -257,9 +263,9 @@ function apply(table) {
     }
   });
 
-  if (plan.mode === 'priority') syncSortMenu(box, table, hiddenColumns, 'Sort by another field');
-  else if (plan.mode === 'cards') syncSortMenu(box, table, [...columns, ...native].sort((a, b) => a.index - b.index), 'Sort by');
-  else box.querySelector(':scope > .hub-rt-sort')?.remove();
+  if (plan.mode === 'priority') syncSortMenu(table, hiddenColumns, 'Sort by another field');
+  else if (plan.mode === 'cards') syncSortMenu(table, [...columns, ...native].sort((a, b) => a.index - b.index), 'Sort by');
+  else table.parentElement.querySelector(':scope > .hub-rt-sort')?.remove();
 }
 
 function run() {
@@ -287,7 +293,7 @@ function watch() {
     if (records.every(r => r.type === 'childList' && [...r.addedNodes, ...r.removedNodes].every(n => n.nodeType !== 1 || n.hasAttribute?.('data-hub-rt-ui')))) return;
     schedule();
   });
-  document.querySelectorAll(BOX).forEach(box => {
+  new Set([...document.querySelectorAll(TABLE)].map(boxOf)).forEach(box => {
     observer.observe(box, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-hub-mode', 'data-hub-hidden', 'data-hub-label'] });
     if (!widths.has(box)) {
       widths.set(box, box.clientWidth);
@@ -302,7 +308,7 @@ function onToggle(event) {
   event.preventDefault();
   event.stopPropagation();
   const row = button.closest('tr');
-  const table = row?.closest(TABLE);
+  const table = row?.closest('table');
   if (!row || !table) return;
   const key = rowKey(row, rowsOf(table).indexOf(row));
   const next = !row.hasAttribute('data-hub-open');
@@ -336,7 +342,7 @@ export function startHubTables() {
   document.fonts?.ready.then(schedule);
   // Filament can render a table after load (tabs, modals, relation managers): watch the document for new boxes.
   new MutationObserver(records => {
-    if (records.some(r => [...r.addedNodes].some(n => n.nodeType === 1 && (n.matches?.(BOX) || n.querySelector?.(BOX))))) schedule();
+    if (records.some(r => [...r.addedNodes].some(n => n.nodeType === 1 && (n.matches?.(TABLE) || n.querySelector?.(TABLE))))) schedule();
   }).observe(document.body, { childList: true, subtree: true });
   schedule();
 }

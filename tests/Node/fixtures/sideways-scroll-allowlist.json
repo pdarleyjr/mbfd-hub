@@ -1,0 +1,18 @@
+{
+  "resources/css/app.css": { "count": 1, "kind": "pending", "reason": "Workgroup report deck table (.hub-report-table); report pages not yet migrated to data-hub-table or browser-verified." },
+  "resources/css/filament/admin/dashboards.css": { "count": 1, "kind": "not-a-table", "reason": "Dashboard filter chip strip on phones, not a table." },
+  "resources/css/filament/admin/pages/equipment-intake.css": { "count": 1, "kind": "not-a-table", "reason": "Equipment intake tab strip, not a table." },
+  "resources/css/filament/email-center.css": { "count": 1, "kind": "not-a-table", "reason": "Rich text editor toolbar in the compose form." },
+  "resources/css/filament/hub-portals-v2.css": { "count": 1, "kind": "pending", "reason": "Report portal chart data tables (.hub-chart-data); report decks not yet migrated." },
+  "resources/css/reports/workgroup-summary.css": { "count": 1, "kind": "pending", "reason": "Standalone workgroup summary report table wrapper; not yet migrated." },
+  "resources/js/daily-checkout/src/components/captain5/ems/UnitStatistics.tsx": { "count": 1, "kind": "pending", "reason": "Daily app EMS unit statistics table (minimum 22rem); the Daily bundle does not load hub-tables.js yet." },
+  "resources/js/daily-checkout/src/components/forms/EquipmentRequestWizard.tsx": { "count": 1, "kind": "not-a-table", "reason": "Wizard progress navigation strip." },
+  "resources/js/daily-checkout/src/components/forms/StationInspectionWizard.tsx": { "count": 1, "kind": "not-a-table", "reason": "Wizard progress navigation strip." },
+  "resources/js/daily-checkout/src/components/inspection-workspace.css": { "count": 3, "kind": "not-a-table", "reason": "Blueprint view switcher, inspection section nav and rescue area rail are carousels of controls, not tables." },
+  "resources/js/daily-checkout/src/components/TrtInventoryWizard.tsx": { "count": 1, "kind": "not-a-table", "reason": "Wizard progress navigation strip." },
+  "resources/js/daily-checkout/src/components/ui/Tabs.tsx": { "count": 1, "kind": "not-a-table", "reason": "Shared Daily tab list." },
+  "resources/js/operational-forms/operational-forms.css": { "count": 4, "kind": "pending", "reason": "Operational forms record table wrapper (.of-table-wrap) plus context navigation and preview toolbars; this bundle has its own stylesheet and does not load hub-tables.css yet." },
+  "resources/js/video-conferencing/video-conferencing.css": { "count": 1, "kind": "not-a-table", "reason": "Video filmstrip of participant tiles." },
+  "resources/views/vendor/filament-forms/components/rich-editor.blade.php": { "count": 2, "kind": "not-a-table", "reason": "Rich text editor toolbar and its keyboard-reachable toolbar region." },
+  "resources/views/vendor/filament-forms/components/wizard.blade.php": { "count": 1, "kind": "not-a-table", "reason": "Filament wizard step header." }
+}

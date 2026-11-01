@@ -273,8 +273,8 @@
             </h2>
 
             <div class="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
-                <div class="overflow-x-auto focus-visible:-outline-offset-2" tabindex="0" role="region" aria-labelledby="matrix-title">
-                    <table class="min-w-full divide-y divide-neutral-200 text-sm">
+                <div role="region" aria-labelledby="matrix-title">
+                    <table data-hub-table class="min-w-full divide-y divide-neutral-200 text-sm">
                         <caption class="sr-only">MBFD Hub alignment with applicable fire-service standards. Rows include reference, area, alignment description, evidence module, and claim level.</caption>
                         <thead class="bg-neutral-50">
                             <tr>

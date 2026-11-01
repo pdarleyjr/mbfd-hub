@@ -5,7 +5,7 @@
     <p class="text-sm text-gray-500 dark:text-gray-400">No inspections on record.</p>
 @else
     <div class="hub-insp hub-insp-table-wrap">
-        <table class="hub-insp-table" data-inspection-history>
+        <table data-hub-table class="hub-insp-table" data-inspection-history>
             <thead>
                 <tr>
                     <th>Submitted (ET)</th>

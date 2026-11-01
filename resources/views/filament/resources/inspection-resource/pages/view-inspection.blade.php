@@ -503,7 +503,7 @@
                     <div class="hub-insp-card">
                         <h3 class="hub-insp-card__title">{{ $compartment['name'] }}</h3>
                         <div class="hub-insp-table-wrap" tabindex="0" role="region" aria-label="{{ $compartment['name'] }} checklist">
-                            <table class="hub-insp-table">
+                            <table data-hub-table class="hub-insp-table">
                                 <thead>
                                     <tr>
                                         <th>Item</th>

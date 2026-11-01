@@ -140,52 +140,61 @@ class UnitMasterVehicleResource extends Resource
                 // Secondary values sit under a main column ("stacked"), so the table needs fewer columns.
                 // Each stacked value stays its own sortable, searchable and toggleable column, hidden by default.
                 Tables\Columns\TextColumn::make('veh_number')
+                    ->extraHeaderAttributes(['data-hub-priority' => 0])
                     ->label('Veh #')
                     ->description(fn (UnitMasterVehicle $record): ?string => filled($record->tag_number) ? 'Tag '.$record->tag_number : null)
                     ->searchable()
                     ->sortable(),
                 Tables\Columns\TextColumn::make('tag_number')
+                    ->extraHeaderAttributes(['data-hub-priority' => 20])
                     ->label('Tag #')
                     ->searchable()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('asset_category')
+                    ->extraHeaderAttributes(['data-hub-priority' => 9])
                     ->label('Category')
                     ->badge()
                     ->getStateUsing(fn (UnitMasterVehicle $record): string => $record->categoryLabel())
-                    ->color(fn (UnitMasterVehicle $record): string => $record->isNonroad() ? 'info' : 'gray')
-                    ->visibleFrom('md'),
+                    ->color(fn (UnitMasterVehicle $record): string => $record->isNonroad() ? 'info' : 'gray'),
                 Tables\Columns\TextColumn::make('section')
+                    ->extraHeaderAttributes(['data-hub-priority' => 3])
                     ->description(fn (UnitMasterVehicle $record): ?string => filled($record->dept_code) ? 'Dept. '.$record->dept_code : null)
                     ->searchable()
                     ->sortable()
-                    ->wrap()
-                    ->visibleFrom('md'),
+                    ->wrap(),
                 Tables\Columns\TextColumn::make('dept_code')
+                    ->extraHeaderAttributes(['data-hub-priority' => 20])
                     ->label('Dept.')
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('make')
+                    ->extraHeaderAttributes(['data-hub-priority' => 1])
                     ->label('Make / model / year')
                     ->description(fn (UnitMasterVehicle $record): ?string => collect([$record->model, $record->year])->filter()->implode(' · ') ?: null)
                     ->sortable()
                     ->wrap(),
                 Tables\Columns\TextColumn::make('model')
+                    ->extraHeaderAttributes(['data-hub-priority' => 20])
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('year')
+                    ->extraHeaderAttributes(['data-hub-priority' => 20])
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('color')
+                    ->extraHeaderAttributes(['data-hub-priority' => 20])
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('fleet_status_code')
+                    ->extraHeaderAttributes(['data-hub-priority' => 5])
                     ->label('FY27 status')
-                    ->toggleable()
-                    ->visibleFrom('md'),
+                    ->toggleable(),
                 Tables\Columns\TextColumn::make('fleet_class_description')
+                    ->extraHeaderAttributes(['data-hub-priority' => 20])
                     ->label('Class description')
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('employee_or_vehicle_name')
+                    ->extraHeaderAttributes(['data-hub-priority' => 2])
                     ->label('Employee/Vehicle')
                     // The driver sits under the name; when there is no name the driver takes its place.
                     ->getStateUsing(fn (UnitMasterVehicle $record): ?string => filled($record->employee_or_vehicle_name) ? $record->employee_or_vehicle_name : ($record->assignment ?: null))
@@ -193,44 +202,49 @@ class UnitMasterVehicleResource extends Resource
                     ->searchable()
                     ->wrap(),
                 Tables\Columns\TextColumn::make('assignment')
+                    ->extraHeaderAttributes(['data-hub-priority' => 20])
                     ->label('Assignment')
                     ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('location')
+                    ->extraHeaderAttributes(['data-hub-priority' => 4])
                     ->label('Location')
                     ->searchable()
-                    ->wrap()
-                    ->visibleFrom('md'),
+                    ->wrap(),
                 Tables\Columns\TextColumn::make('latestTakeHomeInspection.submitted_at')
+                    ->extraHeaderAttributes(['data-hub-priority' => 20])
                     ->label('Last take-home inspection')
                     ->dateTime('M j, Y g:i A', \App\Support\HubTimezone::NAME)
                     ->placeholder('None')
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('pending_changes_count')
+                    ->extraHeaderAttributes(['data-hub-priority' => 8])
                     ->label('Pending corrections')
                     ->badge()
                     ->color('warning')
-                    ->getStateUsing(fn (UnitMasterVehicle $record): ?int => $record->pending_changes_count ?: null)
-                    ->visibleFrom('md'),
+                    ->getStateUsing(fn (UnitMasterVehicle $record): ?int => $record->pending_changes_count ?: null),
                 Tables\Columns\TextColumn::make('visible_documents_count')
+                    ->extraHeaderAttributes(['data-hub-priority' => 6])
                     ->label('Documents')->badge()->color('gray')
-                    ->sortable()
-                    ->visibleFrom('md'),
+                    ->sortable(),
                 Tables\Columns\IconColumn::make('needs_fleet_review')
+                    ->extraHeaderAttributes(['data-hub-priority' => 7])
                     ->label('Review')
                     ->getStateUsing(fn (UnitMasterVehicle $record): ?string => $record->needs_fleet_review ? 'review' : null)
                     ->icon(fn (?string $state): ?string => $state ? 'heroicon-o-exclamation-triangle' : null)
                     ->color('warning')
-                    ->tooltip(fn (UnitMasterVehicle $record): ?string => $record->needs_fleet_review ? 'Needs Fleet review' : null)
-                    ->visibleFrom('md'),
+                    ->tooltip(fn (UnitMasterVehicle $record): ?string => $record->needs_fleet_review ? 'Needs Fleet review' : null),
                 Tables\Columns\TextColumn::make('als_license')
+                    ->extraHeaderAttributes(['data-hub-priority' => 20])
                     ->label('ALS License')
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('serial_number')
+                    ->extraHeaderAttributes(['data-hub-priority' => 20])
                     ->label('VIN / Serial #')
                     ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('sunpass_number')
+                    ->extraHeaderAttributes(['data-hub-priority' => 20])
                     ->label('Sunpass')
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
