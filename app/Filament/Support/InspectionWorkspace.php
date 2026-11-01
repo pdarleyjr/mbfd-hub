@@ -15,6 +15,7 @@ use App\Models\ApparatusDefect;
 use App\Models\ApparatusDefectEvent;
 use App\Models\ApparatusDefectObservation;
 use App\Models\ApparatusInspection;
+use App\Models\ApparatusInspectionConcern;
 use App\Models\ApparatusInspectionException;
 use App\Models\ApparatusInventoryCorrection;
 use App\Models\ApparatusIssueMessage;
@@ -105,6 +106,29 @@ final class InspectionWorkspace
             ->all();
     }
 
+    /**
+     * What the member added beyond the checklist. A photo link is the same opaque, inspection-scoped key the
+     * checklist photos use; no storage path reaches the page.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function concerns(ApparatusInspection $inspection): array
+    {
+        return $inspection->concerns()->get()
+            ->map(function (ApparatusInspectionConcern $concern): array {
+                $path = $this->history->safeImagePath($concern->photo_path);
+
+                return [
+                    'kind' => $concern->kind === ApparatusInspectionConcern::KIND_ISSUE ? 'Issue' : 'Note',
+                    'is_issue' => $concern->kind === ApparatusInspectionConcern::KIND_ISSUE,
+                    'description' => (string) $concern->description,
+                    'location' => $concern->location,
+                    'reporter' => $concern->reporter_name,
+                    'photo_key' => $path !== null ? $this->history->imageKey($path) : null,
+                ];
+            })->all();
+    }
+
     /** @return array<string, mixed> */
     public function build(ApparatusInspection $inspection, ?User $viewer): array
     {
@@ -140,6 +164,8 @@ final class InspectionWorkspace
             'general_thread' => $canReview ? $this->generalThread($inspection, $viewer) : null,
             // Checklist corrections the member reported while doing this inspection (separate from its findings).
             'inventory_corrections' => $canReview ? $this->inventoryCorrections($inspection) : [],
+            // Notes, damage and reports about known issues the member sent with this checkout.
+            'concerns' => $this->concerns($inspection),
             'header' => $this->header($inspection, $physical, $detail, $viewer, $openHolds, $openIssues),
             'legacy_pending' => $inspection->processing_status === null && $inspection->review_status === 'pending_review',
             'pending_effects' => $this->pendingEffects($inspection),

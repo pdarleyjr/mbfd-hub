@@ -109,6 +109,9 @@ const stationDetail = {
   },
 };
 
+/** The live issue list (docs/apparatus-issue-history.md) for a unit with nothing on record. */
+const noLiveFindings = { as_of: '2026-08-31T13:00:00Z', open: [], notes: [], closed_count: 0 };
+
 const checklist = {
   checklist_version: 'a'.repeat(64),
   checklist: {
@@ -353,6 +356,8 @@ async function mockInspectionApi(
       return route.fulfill({ json: { data: [] } });
     }
 
+    if (path === `/api/public/apparatuses/${apparatus.id}/findings`) return route.fulfill({ json: noLiveFindings });
+
     if (path === `/api/public/apparatuses/${apparatus.id}/inspections` && request.method() === 'POST') {
       submissions.push(request.postDataJSON() as Record<string, unknown>);
 
@@ -565,6 +570,8 @@ async function mockFireBoatInspectionApi(
     if (path === `/api/public/apparatuses/${fireBoatApparatus.id}/service-notices`) {
       return route.fulfill({ json: { data: [] } });
     }
+
+    if (path === `/api/public/apparatuses/${fireBoatApparatus.id}/findings`) return route.fulfill({ json: noLiveFindings });
 
     if (path === `/api/public/apparatuses/${fireBoatApparatus.id}/inspections` && request.method() === 'POST') {
       submissions.push(request.postDataJSON() as Record<string, unknown>);
@@ -985,7 +992,7 @@ test('Fire Boat v2 preserves typed field values and submits only server-due recu
   await page.getByLabel('Port Engine Hours').fill('45.5');
   await expect(page.getByText('Fuel Tank Hold', { exact: true })).toBeVisible();
   await expect(page.getByText('First Day of Each Month', { exact: true })).not.toBeVisible();
-  await page.getByRole('button', { name: 'Mark all due duties as present' }).click();
+  await page.getByRole('button', { name: 'Mark all duties completed' }).click();
   await page.getByRole('button', { name: 'Continue: Apparatus' }).click();
 
   await expect(page.getByText(/Expected quantity: 3/)).toBeVisible();
@@ -1008,7 +1015,7 @@ test('Fire Boat v2 preserves typed field values and submits only server-due recu
       { id: 'fb6-port-engine-hours', value: 45.5 },
     ],
     scheduled_tasks: [
-      { id: 'fb6-monday-fuel-tank-hold', status: 'Present' },
+      { id: 'fb6-monday-fuel-tank-hold', status: 'Completed' },
     ],
     inspection_session_id: fireBoatInspectionSession.id,
     inspection_session_token: fireBoatInspectionSession.token,
@@ -1040,7 +1047,7 @@ test('FB6 null fleet metadata remains selectable and completes the Daily browser
   await page.getByLabel('High Low Tide').fill('High 10:00 / Low 16:30');
   await page.locator('#fb6-shift').selectOption('A');
   await page.getByLabel('Port Engine Hours').fill('45.5');
-  await page.getByRole('button', { name: 'Mark all due duties as present' }).click();
+  await page.getByRole('button', { name: 'Mark all duties completed' }).click();
   await page.getByRole('button', { name: 'Continue: Apparatus' }).click();
   await page.getByRole('button', { name: 'Confirm all present' }).click();
   // No vehicle question stands between the last compartment and the signature.
@@ -1122,7 +1129,7 @@ test('Fire Boat v2 reload restores same-version typed fields, due-duty status, a
   await page.locator('#fb6-shift').selectOption('A');
   await page.getByLabel('Port Engine Hours').fill('45.5');
   await page.getByRole('group', { name: 'Status for Fuel Tank Hold' })
-    .getByRole('button', { name: 'Missing', exact: true })
+    .getByRole('button', { name: 'Not Completed', exact: true })
     .click();
   await page.getByRole('button', { name: 'Continue: Apparatus' }).click();
 
@@ -1148,7 +1155,7 @@ test('Fire Boat v2 reload restores same-version typed fields, due-duty status, a
   await expect(page.getByLabel('High Low Tide')).toHaveValue('High 10:00 / Low 16:30');
   await expect(page.getByLabel('Port Engine Hours')).toHaveValue('45.5');
   await expect(page.getByRole('group', { name: 'Status for Fuel Tank Hold' })
-    .getByRole('button', { name: 'Missing', exact: true }))
+    .getByRole('button', { name: 'Not Completed', exact: true }))
     .toHaveAttribute('aria-pressed', 'true');
 });
 
@@ -1240,13 +1247,10 @@ test('Fire Boat v2 reload does not reuse an expired saved session', async ({ pag
   await expect(page.getByLabel('Date')).toHaveValue('2026-08-31');
   await expect(page.getByLabel('High Low Tide')).toHaveValue('');
   await expect(page.getByRole('group', { name: 'Status for Fuel Tank Hold' })
-    .getByRole('button', { name: 'Present', exact: true }))
+    .getByRole('button', { name: 'Completed', exact: true }))
     .toHaveAttribute('aria-pressed', 'false');
   await expect(page.getByRole('group', { name: 'Status for Fuel Tank Hold' })
-    .getByRole('button', { name: 'Missing', exact: true }))
-    .toHaveAttribute('aria-pressed', 'false');
-  await expect(page.getByRole('group', { name: 'Status for Fuel Tank Hold' })
-    .getByRole('button', { name: 'Damaged', exact: true }))
+    .getByRole('button', { name: 'Not Completed', exact: true }))
     .toHaveAttribute('aria-pressed', 'false');
 });
 

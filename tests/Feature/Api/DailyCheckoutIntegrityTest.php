@@ -410,7 +410,7 @@ class DailyCheckoutIntegrityTest extends TestCase
         $inspection = ApparatusInspection::sole()->refresh();
         $submittedChecklistV2 = $inspection->pending_effects['checklist_v2'];
         $this->assertSame('fire_boat_6_daily', $submittedChecklistV2['template_id']);
-        $this->assertSame('2026-07', $submittedChecklistV2['template_version']);
+        $this->assertSame('2026-11', $submittedChecklistV2['template_version']);
         $this->assertSame([
             'id' => 'inspection_date',
             'name' => 'Date',
@@ -568,7 +568,7 @@ class DailyCheckoutIntegrityTest extends TestCase
         $fieldValues = array_map(static function (array $field) use ($inspectionDate): array {
             $value = match ($field['inputType']) {
                 'date' => $inspectionDate,
-                'number' => 1,
+                'number', 'percentage' => 1,
                 'checkbox' => true,
                 default => 'Recorded',
             };

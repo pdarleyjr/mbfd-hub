@@ -341,7 +341,7 @@ final class CheckoutSubmissionTest extends IdentificationTestCase
             'field_values' => array_map(static fn (array $field): array => [
                 'id' => $field['id'],
                 'value' => match ($field['inputType']) {
-                    'date' => '2026-08-31', 'number' => 1, 'checkbox' => true, default => 'Recorded',
+                    'date' => '2026-08-31', 'number', 'percentage' => 1, 'checkbox' => true, default => 'Recorded',
                 },
             ], $checklist['fields']),
             'scheduled_tasks' => array_map(static fn (array $task): array => ['id' => $task['id'], 'status' => 'Present', 'notes' => null], $contract['due_tasks']),

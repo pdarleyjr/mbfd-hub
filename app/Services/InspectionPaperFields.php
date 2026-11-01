@@ -108,7 +108,9 @@ final class InspectionPaperFields
             'text' => is_string($value) && mb_strlen($value) <= 2000 && trim($value) !== '',
             'date' => is_string($value) && preg_match('/^(\d{4})-(\d{2})-(\d{2})$/D', $value, $date) === 1 && checkdate((int) $date[2], (int) $date[3], (int) $date[1]),
             'number', 'percentage' => (is_int($value) || is_float($value)) && is_finite((float) $value)
-                && abs($value) < 1000000000 && (($definition['inputType'] !== 'percentage') || ($value >= 0 && $value <= 100)),
+                && abs($value) < 1000000000 && (($definition['inputType'] !== 'percentage') || ($value >= 0 && $value <= 100))
+                && (! is_numeric($definition['min'] ?? null) || $value >= $definition['min'])
+                && (! is_numeric($definition['max'] ?? null) || $value <= $definition['max']),
             'checkbox' => is_bool($value),
             default => false,
         };
