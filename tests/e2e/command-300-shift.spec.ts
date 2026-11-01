@@ -1,13 +1,13 @@
-import { expect, test, type Page, type TestInfo } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import {
-  SHIFT_BASE, UNSET_DUTY, UUID_PATTERN, actingChief, chiefOnDuty, handleShiftRoute, makeRequest300, newShiftServer, noActing300, rosterChief, rosterUnknown, seatAwaiting, ymd,
+  SHIFT_BASE, UNSET_DUTY, chiefOnDuty, handleShiftRoute, newShiftServer, rosterChief, rosterUnknown, seatAwaiting,
   type ShiftServer,
 } from './support/command300-shift';
 
 /**
- * The shift's 300 (Division Chief) on the 300 page and on the stations-list card, and "Acting as 300 today?",
- * with every API response mocked. Server contract: /api/command-300 (shift, acting-requests*), see
- * support/command300-shift.ts. The Captain 5 equivalents live in captain5-workspace.spec.ts.
+ * The shift's 300 (Division Chief) on the 300 page and on the stations-list card, with every API response
+ * mocked. Server contract: /api/command-300/shift, see support/command300-shift.ts. The Captain 5 equivalents
+ * live in captain5-workspace.spec.ts.
  */
 
 const stations = [1, 2].map((number) => ({
@@ -62,22 +62,12 @@ async function expectNoHorizontalOverflow(page: Page): Promise<void> {
   expect(dimensions.scroll).toBeLessThanOrEqual(dimensions.client);
 }
 
-/** The request flow does not depend on width, so it runs at one phone and one desktop size; layout runs everywhere. */
-const FLOW_PROJECTS = ['daily-responsive-phone-320', 'daily-responsive-desktop-1280'];
-const flowOnly = (testInfo: TestInfo): void => {
-  test.skip(!FLOW_PROJECTS.includes(testInfo.project.name), 'The request flow is width independent.');
-};
-
 const NEUTRAL_TONE = /hub-tag--(success|info|danger|warning)/;
 const DASHES = /[–—]/;
 const LONG_NAME = 'A Surprisingly Long Name For A Narrow Phone Screen';
 
 const line = (page: Page) => page.getByTestId('command-duty-line');
 const tag = (page: Page) => line(page).locator('.hub-tag');
-const openButton = (page: Page) => page.getByTestId('command-acting-open');
-const sheet = (page: Page) => page.getByTestId('command-acting-sheet');
-const mine = (page: Page) => page.getByTestId('command-acting-mine');
-const sheetError = (page: Page) => sheet(page).getByTestId('command-acting-error');
 
 test.describe('the shift 300 line on the 300 page', () => {
   const shifts = [
@@ -99,10 +89,10 @@ test.describe('the shift 300 line on the 300 page', () => {
     await expect(line(page)).toHaveText('B Shift 300: Jane Smith');
   });
 
-  test('an approved acting member reads "Acting 300 ... until <time>" in the shift colour', async ({ page }) => {
-    await open(page, newShiftServer({ onDuty: actingChief('C', 'Pat Doe') }));
-    await expect(line(page)).toHaveText(/^C Shift Acting 300: Battalion Chief Pat Doe until \S+/);
-    await expect(tag(page)).toHaveClass(/hub-tag--danger/);
+  test('the page offers no control to change the name on the line', async ({ page }) => {
+    await open(page, newShiftServer());
+    await expect(line(page)).toHaveText('A Shift 300: Division Chief Jane Smith');
+    await expect(page.getByTestId('command-acting-open')).toHaveCount(0);
   });
 
   test('an unresolved shift says "Shift 300 not set" in a neutral tone', async ({ page }) => {
@@ -124,7 +114,6 @@ test.describe('the shift 300 line on the 300 page', () => {
     const failure = page.getByTestId('command-duty-error');
     await expect(failure).toContainText('The shift 300 could not be loaded.');
     await expect(failure.getByRole('button', { name: 'Try again' })).toBeVisible();
-    await expect(page.getByTestId('command-acting')).toHaveCount(0);
     shift.status = 200;
     await failure.getByRole('button', { name: 'Try again' }).click();
     await expect(line(page)).toHaveText('A Shift 300: Division Chief Jane Smith');
@@ -153,15 +142,8 @@ test.describe('the shift 300 on the stations-list card', () => {
     }
   });
 
-  test('shows the acting wording and the unset state, and offers no acting control', async ({ page }) => {
-    const server = newShiftServer({ onDuty: actingChief('B', 'Pat Doe') });
-    await open(page, server, '/daily/stations');
-    await expect(duty(page)).toHaveText(/^B Shift Acting 300: Battalion Chief Pat Doe until \S+/);
-    await expect(page.getByTestId('daily-command-card')).not.toContainText('Click here');
-    await expect(page.getByTestId('command-acting-open')).toHaveCount(0);
-
-    server.onDuty = UNSET_DUTY;
-    await page.reload();
+  test('shows the unset state in a neutral tone', async ({ page }) => {
+    await open(page, newShiftServer({ onDuty: UNSET_DUTY }), '/daily/stations');
     await expect(duty(page)).toHaveText('Shift 300 not set');
     await expect(duty(page).locator('.hub-tag')).not.toHaveClass(NEUTRAL_TONE);
   });
@@ -190,12 +172,6 @@ test.describe('where the 300 name comes from', () => {
     await page.goto('/daily/stations');
     await expect(cardDuty(page)).toHaveText('B Shift 300: Division Chief Jane Smith');
     await expect(cardNote(page)).toHaveCount(0);
-  });
-
-  test('an approved acting member shows no note', async ({ page }) => {
-    await open(page, newShiftServer({ onDuty: { ...actingChief('B', 'Pat Doe'), as_of: null, freshness: 'not_applicable', identity: null, reason: null } }));
-    await expect(line(page)).toHaveText(/^B Shift Acting 300: Battalion Chief Pat Doe until /);
-    await expect(pageNote(page)).toHaveCount(0);
   });
 
   test('the roster keeps the Tag as it is and adds when it was updated, in Miami Beach time', async ({ page }) => {
@@ -288,249 +264,16 @@ test.describe('where the 300 name comes from', () => {
   });
 });
 
-test.describe('acting as 300', () => {
-  test('the control sits under the shift line and opens a card with the plain explanation and three choices', async ({ page }, testInfo) => {
-    flowOnly(testInfo);
-    await open(page, newShiftServer());
-    await expect(openButton(page)).toHaveText('Acting as 300 today? Click here.');
-    await openButton(page).click();
-    await expect(sheet(page)).toBeVisible();
-    await expect(sheet(page).getByRole('heading', { name: 'Acting as 300 today?' })).toBeVisible();
-    await expect(sheet(page)).toContainText('An administrator approves this. It only changes the name shown at the top; your work on this page is always recorded under your own name, whether or not you use this.');
-    await expect(sheet(page).getByRole('radio', { name: /^12 hours\s+ends / })).toBeChecked();
-    await expect(sheet(page).getByRole('radio', { name: /^24 hours\s+ends / })).not.toBeChecked();
-    await expect(sheet(page).getByRole('radio', { name: /^Custom end time/ })).not.toBeChecked();
-    await expect(sheet(page).getByRole('button', { name: 'End the current acting 300' })).toHaveCount(0);
-    await page.keyboard.press('Escape');
-    await expect(sheet(page)).toHaveCount(0);
-    await expect(openButton(page)).toBeFocused();
-  });
-
-  test('the control opens from the keyboard', async ({ page }, testInfo) => {
-    flowOnly(testInfo);
-    await open(page, newShiftServer());
-    await openButton(page).focus();
-    await page.keyboard.press('Enter');
-    await expect(sheet(page)).toBeVisible();
-    await expect(sheet(page).getByRole('button', { name: 'Request to act as 300' })).toBeVisible();
-  });
-
-  test('can_request false hides the control, and a plain member sees no approvals', async ({ page }, testInfo) => {
-    flowOnly(testInfo);
-    await open(page, newShiftServer({ acting: noActing300({ can_request: false, pending: [makeRequest300(7)] }) }));
-    await expect(line(page)).toHaveText('A Shift 300: Division Chief Jane Smith');
-    await expect(page.getByTestId('command-acting')).toHaveCount(0);
-    await expect(page.getByText('Click here')).toHaveCount(0);
-    await expect(page.getByTestId('command-acting-approvals')).toHaveCount(0);
-    await expect(page.getByText('Waiting for approval')).toHaveCount(0);
-  });
-
-  test('12 hours: posts kind act with a request id, closes, shows the pending request, and Withdraw takes it back', async ({ page }, testInfo) => {
-    flowOnly(testInfo);
-    const server = newShiftServer();
-    await open(page, server);
-    await openButton(page).click();
-    await sheet(page).getByRole('button', { name: 'Request to act as 300' }).click();
-    await expect(sheet(page)).toHaveCount(0);
-    expect(server.actingBodies).toHaveLength(1);
-    expect(server.actingBodies[0]).toMatchObject({ kind: 'act', duration: '12h' });
-    expect(server.actingBodies[0]).not.toHaveProperty('ends_at');
-    expect(String(server.actingBodies[0].client_request_id)).toMatch(UUID_PATTERN);
-    await expect(mine(page)).toContainText('Your request to act as 300 until');
-    await expect(mine(page)).toContainText('is waiting for approval');
-    // Acting is display only: the shown name has not changed.
-    await expect(line(page)).toHaveText('A Shift 300: Division Chief Jane Smith');
-
-    await mine(page).getByRole('button', { name: 'Withdraw' }).click();
-    await expect(mine(page)).toHaveCount(0);
-    expect(server.decisions[0].call).toMatch(/^withdraw:\d+$/);
-  });
-
-  test('24 hours posts duration 24h; a custom end time posts the local datetime and needs a time first', async ({ page }, testInfo) => {
-    flowOnly(testInfo);
-    const server = newShiftServer();
-    await open(page, server);
-    await openButton(page).click();
-    await sheet(page).getByRole('radio', { name: /^24 hours/ }).check();
-    await sheet(page).getByRole('button', { name: 'Request to act as 300' }).click();
-    await expect(sheet(page)).toHaveCount(0);
-    expect(server.actingBodies[0]).toMatchObject({ kind: 'act', duration: '24h' });
-    expect(server.actingBodies[0]).not.toHaveProperty('ends_at');
-    await mine(page).getByRole('button', { name: 'Withdraw' }).click();
-    await expect(mine(page)).toHaveCount(0);
-
-    await openButton(page).click();
-    await sheet(page).getByRole('radio', { name: /^Custom end time/ }).check();
-    await sheet(page).getByRole('button', { name: 'Request to act as 300' }).click();
-    await expect(sheetError(page)).toHaveText('Choose when you stop acting as 300.');
-    expect(server.actingBodies).toHaveLength(1);
-    const end = `${ymd(1)}T09:30`;
-    await sheet(page).getByLabel('Stop acting at').fill(end);
-    await sheet(page).getByRole('button', { name: /Request to act as 300|Try again/ }).click();
-    await expect(sheet(page)).toHaveCount(0);
-    expect(server.actingBodies).toHaveLength(2);
-    expect(server.actingBodies[1]).toMatchObject({ kind: 'act', duration: 'custom', ends_at: end });
-  });
-
-  test('while someone is shown as acting, the card explains the takeover and can end the current acting 300', async ({ page }, testInfo) => {
-    flowOnly(testInfo);
-    const server = newShiftServer({ onDuty: actingChief('B', 'Pat Doe') });
-    await open(page, server);
-    await openButton(page).click();
-    await expect(page.getByTestId('command-acting-takeover')).toContainText('Pat Doe is shown as acting 300 until');
-    await expect(page.getByTestId('command-acting-takeover')).toContainText('your name replaces theirs');
-    await sheet(page).getByRole('button', { name: 'End the current acting 300' }).click();
-    await expect(sheet(page)).toHaveCount(0);
-    expect(server.actingBodies[0]).toMatchObject({ kind: 'end' });
-    expect(server.actingBodies[0]).not.toHaveProperty('duration');
-    expect(String(server.actingBodies[0].client_request_id)).toMatch(UUID_PATTERN);
-    await expect(mine(page)).toContainText('Your request to end the current acting 300 is waiting for approval.');
-
-    // Asking to act while someone else is shown is the same act request (a takeover), with a new key.
-    await openButton(page).click();
-    await sheet(page).getByRole('button', { name: 'Request to act as 300' }).click();
-    await expect(sheet(page)).toHaveCount(0);
-    expect(server.actingBodies[1]).toMatchObject({ kind: 'act', duration: '12h' });
-    expect(server.actingBodies[1].client_request_id).not.toBe(server.actingBodies[0].client_request_id);
-  });
-
-  test('a dropped connection keeps the card open and the retry reuses the SAME client_request_id; a changed request gets a new one', async ({ page }, testInfo) => {
-    flowOnly(testInfo);
-    const server = newShiftServer();
-    const keys: string[] = [];
-    let drops = 2;
-    server.onActing = async (route, body) => {
-      keys.push(String(body.client_request_id));
-      if (drops === 0) return false;
-      drops -= 1;
-      await route.abort('failed');
-      return true;
-    };
-    await open(page, server);
-    await openButton(page).click();
-    await sheet(page).getByRole('button', { name: 'Request to act as 300' }).click();
-    await expect(sheetError(page)).toContainText('nothing is confirmed');
-    await sheet(page).getByRole('button', { name: 'Try again' }).click();
-    await expect.poll(() => keys.length).toBe(2);
-    await expect(sheetError(page)).toContainText('nothing is confirmed');
-    expect(keys[1]).toBe(keys[0]);
-
-    // Same form, different choice: this is a different request, so it cannot reuse the key.
-    await sheet(page).getByRole('radio', { name: /^24 hours/ }).check();
-    await sheet(page).getByRole('button', { name: 'Try again' }).click();
-    await expect(sheet(page)).toHaveCount(0);
-    expect(keys).toHaveLength(3);
-    expect(keys[2]).not.toBe(keys[0]);
-    expect(server.actingBodies[2]).toMatchObject({ kind: 'act', duration: '24h' });
-  });
-
-  test('a refused request shows the server reason and the next try is a new request', async ({ page }, testInfo) => {
-    flowOnly(testInfo);
-    const server = newShiftServer();
-    const keys: string[] = [];
-    let refuse = true;
-    server.onActing = async (route, body) => {
-      keys.push(String(body.client_request_id));
-      if (!refuse) return false;
-      refuse = false;
-      await route.fulfill({ status: 422, json: { message: 'Invalid.', errors: { ends_at: ['Choose an end time between 15 minutes and 72 hours from now.'] } } });
-      return true;
-    };
-    await open(page, server);
-    await openButton(page).click();
-    await sheet(page).getByRole('button', { name: 'Request to act as 300' }).click();
-    await expect(sheetError(page)).toHaveText('Choose an end time between 15 minutes and 72 hours from now.');
-    await sheet(page).getByRole('button', { name: 'Try again' }).click();
-    await expect(sheet(page)).toHaveCount(0);
-    expect(keys[1]).not.toBe(keys[0]);
-  });
-
-  test('offline: nothing is sent and the card says so', async ({ page, context }, testInfo) => {
-    flowOnly(testInfo);
-    const server = newShiftServer();
-    await open(page, server);
-    await openButton(page).click();
-    await context.setOffline(true);
-    await sheet(page).getByRole('button', { name: 'Request to act as 300' }).click();
-    await expect(sheetError(page)).toHaveText("You're offline. Nothing was sent. Reconnect, then try again.");
-    expect(server.actingBodies).toHaveLength(0);
-    await context.setOffline(false);
-    await sheet(page).getByRole('button', { name: 'Try again' }).click();
-    await expect(sheet(page)).toHaveCount(0);
-    expect(server.actingBodies).toHaveLength(1);
-  });
-});
-
-test.describe('approving acting 300 requests', () => {
-  const approvals = (page: Page) => page.getByTestId('command-acting-approvals');
-
-  test('an approver sees the waiting requests; approving shows the new name at the top', async ({ page }, testInfo) => {
-    flowOnly(testInfo);
-    const server = newShiftServer({
-      acting: noActing300({
-        can_approve: true,
-        pending: [makeRequest300(7), makeRequest300(8, { kind: 'end', name: null, rank: null, duration: null, ends_at: null, requested_by: 'Sam Ortiz' })],
-      }),
-    });
-    await open(page, server);
-    await expect(approvals(page).getByRole('heading', { name: 'Waiting for approval' })).toBeVisible();
-    const rows = approvals(page).getByTestId('command-acting-pending');
-    await expect(rows).toHaveCount(2);
-    await expect(rows.first()).toContainText('Battalion Chief Pat Doe to act as 300 until');
-    await expect(rows.nth(1)).toContainText('End the current acting 300');
-    await rows.first().getByRole('button', { name: /^Approve/ }).click();
-    await expect(rows).toHaveCount(1);
-    expect(server.decisions[0]).toEqual({ call: 'approve:7', body: {} });
-    await expect(line(page)).toHaveText(/^B Shift Acting 300: Battalion Chief Pat Doe until /);
-  });
-
-  test('"Not approved" needs a note, then sends it', async ({ page }, testInfo) => {
-    flowOnly(testInfo);
-    const server = newShiftServer({ acting: noActing300({ can_approve: true, pending: [makeRequest300(7)] }) });
-    await open(page, server);
-    const row = page.getByTestId('command-acting-pending');
-    await row.getByRole('button', { name: /^Not approved/ }).click();
-    await row.getByRole('button', { name: 'Send decision' }).click();
-    await expect(row.getByText('Write a short note so the member knows why.')).toBeVisible();
-    expect(server.decisions).toHaveLength(0);
-    await row.getByLabel('Why is this not approved?').fill('The 300 is on duty tonight');
-    await row.getByRole('button', { name: 'Send decision' }).click();
-    await expect(approvals(page)).toHaveCount(0);
-    expect(server.decisions[0]).toEqual({ call: 'reject:7', body: { note: 'The 300 is on duty tonight' } });
-    await expect(line(page)).toHaveText('A Shift 300: Division Chief Jane Smith');
-  });
-});
-
 test.describe('layout and copy', () => {
-  test('a long acting name and the open card fit, with 44px targets and no dash characters', async ({ page }) => {
-    const server = newShiftServer({
-      onDuty: actingChief('C', LONG_NAME, 'Assistant Division Chief', new Date(Date.now() + 30 * 3_600_000).toISOString()),
-      acting: noActing300({ can_approve: true, pending: [makeRequest300(7, { name: LONG_NAME, rank: 'Assistant Division Chief' })] }),
-    });
-    await open(page, server);
+  test('a long name and its note fit, with no dash characters', async ({ page }) => {
+    await open(page, newShiftServer({ onDuty: rosterChief('C', LONG_NAME, 'Assistant Division Chief', 'unlinked') }));
     await expect(line(page)).toBeVisible();
     await expectNoHorizontalOverflow(page);
-    expect((await openButton(page).boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
     expect(await page.getByTestId('command-duty').innerText()).not.toMatch(DASHES);
-
-    await openButton(page).click();
-    await expect(sheet(page)).toBeVisible();
-    const metrics = await sheet(page).evaluate((element) => ({
-      client: element.clientWidth,
-      scroll: element.scrollWidth,
-      heights: [...element.querySelectorAll<HTMLElement>('button, label:has(input[type="radio"])')].map((control) => Math.round(control.getBoundingClientRect().height)),
-    }));
-    expect(metrics.scroll).toBeLessThanOrEqual(metrics.client);
-    for (const height of metrics.heights) expect(height).toBeGreaterThanOrEqual(44);
-    expect(await sheet(page).innerText()).not.toMatch(DASHES);
-    await page.keyboard.press('Escape');
-
-    expect(await page.getByTestId('command-acting-approvals').innerText()).not.toMatch(DASHES);
-    await expectNoHorizontalOverflow(page);
   });
 
   test('the stations-list card keeps its shape with a long name', async ({ page }) => {
-    await open(page, newShiftServer({ onDuty: actingChief('C', LONG_NAME, 'Assistant Division Chief') }), '/daily/stations');
+    await open(page, newShiftServer({ onDuty: chiefOnDuty('C', LONG_NAME, 'Assistant Division Chief') }), '/daily/stations');
     await expect(page.getByTestId('daily-command-duty')).toBeVisible();
     await expectNoHorizontalOverflow(page);
     const card = await page.getByTestId('daily-command-card').boundingBox();

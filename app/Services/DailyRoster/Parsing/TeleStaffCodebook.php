@@ -31,6 +31,11 @@ final class TeleStaffCodebook
         '2WXEOFF' => ['availability' => 'not_working', 'category' => 'Exchange off', 'label' => null, 'prefixes' => [self::DOT, self::EXCHANGE_MARK]],
         'ADMS' => ['availability' => 'not_working', 'category' => 'Leave', 'label' => null, 'prefixes' => []],
         'MILNP' => ['availability' => 'not_working', 'category' => 'Leave', 'label' => null, 'prefixes' => []],
+        // Meanings from the department, 2026-11-01. The person is not working under any of these.
+        'MILA' => ['availability' => 'not_working', 'category' => 'Military leave', 'label' => null, 'prefixes' => [self::DOT]],
+        'AHTA' => ['availability' => 'not_working', 'category' => 'Accrued Holiday Time Annual', 'label' => null, 'prefixes' => [self::DOT]],
+        'BER' => ['availability' => 'not_working', 'category' => 'Bereavement leave', 'label' => null, 'prefixes' => [self::DOT]],
+        'EFLO' => ['availability' => 'not_working', 'category' => 'Emergency Floater', 'label' => null, 'prefixes' => [self::DOT]],
         'SIC' => ['availability' => 'not_working', 'category' => 'Sick', 'label' => null, 'prefixes' => []],
         'SIC RVT' => ['availability' => 'not_working', 'category' => 'Sick', 'label' => null, 'prefixes' => []],
         'PENFML' => ['availability' => 'not_working', 'category' => 'Leave', 'label' => '.PENFML', 'prefixes' => [self::DOT]],

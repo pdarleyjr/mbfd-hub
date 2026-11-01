@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace App\Services\Security;
 
 use App\Models\Captain5\Captain5AccessOverride;
+use App\Models\DailyRoster\RosterSection;
 use App\Models\Employee;
 use App\Models\User;
 use App\Services\Captain5\Captain5DutyRoster;
+use App\Services\DailyRoster\RosterSeatAccess;
 use App\Support\Captain5\DutyCalendar;
 use App\Support\Fleet\InspectionReviewers;
 use DateTimeInterface;
@@ -17,10 +19,9 @@ use DateTimeInterface;
  * (docs/captain5-ems-operations-center.md section 2). Routes, APIs, attachment downloads,
  * communications, issue mutations and message threads all ask this class.
  *
- * Every eligible person (officers, chiefs, Captain 5 / EMS Captain seats, administrators, allow
- * overrides) may use the whole page. Who is "Captain 5 for the shift" is display information only
- * (bid seat or an admin-approved acting request) and never gates an action: everything is
- * attributed to the signed-in member.
+ * Every eligible person (officers, chiefs, Captain 5 / EMS Captain seats, whoever the accepted roster
+ * has working the seat that duty day, administrators, allow overrides) may use the whole page. Who is "Captain 5 for the shift" never gates an action:
+ * everything is attributed to the signed-in member.
  *
  * Gate abilities deliberately differ from the permission name (`captain5.admin`), so Spatie's
  * Gate::before can never short-circuit the account and override checks here.
@@ -40,6 +41,7 @@ final class Captain5Access
 
     public function __construct(
         private readonly Captain5DutyRoster $roster,
+        private readonly RosterSeatAccess $rosterSeats,
     ) {}
 
     public function decide(?User $user, ?DateTimeInterface $moment = null): Captain5AccessDecision
@@ -78,9 +80,8 @@ final class Captain5Access
     }
 
     /**
-     * Same answer as decide()->canConfigure, without the duty roster: configuration (and approving
-     * acting Captain 5 requests) depends only on the account, the Admin Panel entitlement, the
-     * direct `captain5.admin` grant and a deny override.
+     * Same answer as decide()->canConfigure, without the duty roster: configuration depends only on
+     * the account, the Admin Panel entitlement, the direct `captain5.admin` grant and a deny override.
      */
     public function canConfigure(?User $user): bool
     {
@@ -96,7 +97,7 @@ final class Captain5Access
             && ! $this->isDenied($user);
     }
 
-    /** Forget per-request memoization (after an override or acting change). */
+    /** Forget per-request memoization (after an override change). */
     public function flush(): void
     {
         $this->memo = [];
@@ -146,6 +147,9 @@ final class Captain5Access
         if ($employeeId !== null && $this->roster->emsCaptainSeats()->has($employeeId)) {
             $sources[] = Captain5AccessDecision::SOURCE_EMS_CAPTAIN_SEAT;
         }
+        if ($employee !== null && $this->rosterSeats->holdsSeat($employee, RosterSection::ROLE_CAPTAIN_5, $moment)) {
+            $sources[] = Captain5AccessDecision::SOURCE_ROSTER_SEAT;
+        }
         if ($override?->effect === Captain5AccessOverride::EFFECT_ALLOW) {
             $sources[] = Captain5AccessDecision::SOURCE_EXPLICIT_ALLOW;
         }
@@ -164,10 +168,20 @@ final class Captain5Access
             canConfigure: $adminPanel && ($superAdmin || in_array(self::PERMISSION_ADMIN, $direct, true)),
             isReviewer: $reviewer,
             denied: $denied,
-            isShownCaptain5: $eligible && $onDuty->isEmployee($employeeId),
+            isShownCaptain5: $eligible && $this->isShiftCaptain5($employee, $moment, $onDuty->isEmployee($employeeId)),
             bidShiftLetter: $captain5Seat !== null ? DutyCalendar::letterFromBidShift($captain5Seat->shift_label) : null,
             onDuty: $onDuty,
         );
+    }
+
+    /** The roster decides once seat access is on: a bid holder on an A-Day is not the Shift Captain 5 that day. */
+    private function isShiftCaptain5(?Employee $employee, ?DateTimeInterface $moment, bool $holdsTheShiftsBidSeat): bool
+    {
+        if (! $this->rosterSeats->isEnabled()) {
+            return $holdsTheShiftsBidSeat;
+        }
+
+        return $employee !== null && $this->rosterSeats->isOnSeatNow($employee, RosterSection::ROLE_CAPTAIN_5, $moment);
     }
 
     private function usable(User $user): bool

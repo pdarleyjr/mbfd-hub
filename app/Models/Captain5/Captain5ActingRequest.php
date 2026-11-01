@@ -12,11 +12,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
 
 /**
- * A request to be shown as the shift's acting Captain 5 or acting 300 (`role`), as `act`, or to end
- * that role's current acting display (`end`), decided by an administrator. Display only: it never
- * grants or limits access. Rows are never deleted; once decided, only `ended_at` /
- * `ended_by_request_id` may change. Each role has its own display: approving a 300 request never
- * touches the Captain 5 display and the other way round.
+ * The record of "Acting as Captain 5 / 300 today?" requests, a feature retired on 2026-11-01: the
+ * TeleStaff roster now says who fills each seat. Nothing creates or reads these rows any more; they
+ * stay as history, and rows are never deleted. The ROLE_ constants still name the two shift seats.
  *
  * @property int $id
  * @property string $kind
@@ -90,6 +88,17 @@ final class Captain5ActingRequest extends Model
     public static function roleLabel(string $role): string
     {
         return self::ROLE_LABELS[$role] ?? self::ROLE_LABELS[self::ROLE_CAPTAIN_5];
+    }
+
+    /**
+     * What an installed app still running the previous page build reads: `can_request` false removes its
+     * "Acting as ..." button. The current pages ignore this block.
+     *
+     * @return array{role: string, can_request: false, can_approve: false, mine: null, pending: array{}, choices: array{'12h': null, '24h': null}}
+     */
+    public static function retiredState(string $role): array
+    {
+        return ['role' => $role, 'can_request' => false, 'can_approve' => false, 'mine' => null, 'pending' => [], 'choices' => ['12h' => null, '24h' => null]];
     }
 
     /**

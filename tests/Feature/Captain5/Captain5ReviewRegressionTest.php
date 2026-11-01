@@ -8,16 +8,13 @@ use App\Models\Apparatus;
 use App\Models\ApparatusDefect;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusIssueMessage;
-use App\Models\User;
 use App\Notifications\Inspections\InspectionEventNotification;
-use App\Services\Captain5\Captain5ActingService;
 use App\Services\Captain5\Captain5AdministrationService;
 use App\Services\Captain5\Captain5Notifier;
 use App\Services\Captain5\Captain5Workspace;
 use App\Services\Inspections\IssueMessageService;
 use App\Support\Captain5\DutyCalendar;
 use Carbon\CarbonImmutable;
-use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
@@ -42,19 +39,18 @@ final class Captain5ReviewRegressionTest extends TestCase
 
     public function test_a_captain5_officer_replies_as_a_crew_member_on_their_own_inspection(): void
     {
-        $acting = $this->officer('Lieutenant', 'Rescue Lieutenant');
-        $this->actingAssignment($acting, $this->captain5Administrator());
-        [$defect] = $this->reportMissing($this->rescue, $acting, [self::RESCUE_ITEM]);
+        $officer = $this->officer('Lieutenant', 'Rescue Lieutenant');
+        [$defect] = $this->reportMissing($this->rescue, $officer, [self::RESCUE_ITEM]);
 
         // The employee portal posts without a visibility, exactly like MyVehicleInspectionView does.
-        $reply = app(IssueMessageService::class)->post($acting->fresh(), [
+        $reply = app(IssueMessageService::class)->post($officer->fresh(), [
             'defect_id' => $defect->id, 'body' => 'Checked again, still missing.', 'client_message_id' => (string) Str::uuid(),
         ]);
         self::assertSame(ApparatusIssueMessage::CONTEXT_MEMBER, $reply->author_context);
         self::assertSame(ApparatusIssueMessage::VISIBILITY_MEMBER, $reply->visibility);
     }
 
-    public function test_denied_seat_holders_are_never_notified_and_cannot_ask_to_act(): void
+    public function test_denied_seat_holders_are_never_notified(): void
     {
         $admin = $this->captain5Administrator();
         $denied = $this->officer('Captain', 'Denied Captain');
@@ -69,18 +65,6 @@ final class Captain5ReviewRegressionTest extends TestCase
             ->pluck('recipient_user_id')->map(fn ($id): int => (int) $id)->all();
         self::assertNotContains((int) $denied->id, $recipients, 'A denied on-duty seat holder is skipped');
         self::assertSame([(int) $other->id], $recipients, 'Falls back to the eligible seat holders');
-
-        $this->expectException(AuthorizationException::class);
-        app(Captain5ActingService::class)->request($denied->fresh(), ['kind' => 'act', 'duration' => '12h']);
-    }
-
-    public function test_account_less_members_cannot_ask_to_act(): void
-    {
-        $noAccount = $this->officer('Lieutenant');
-        User::query()->whereKey($noAccount->id)->update(['account_status' => 'disabled']);
-        $this->forgetCaptain5Memo();
-        $this->expectException(AuthorizationException::class);
-        app(Captain5ActingService::class)->request($noAccount->fresh(), ['kind' => 'act', 'duration' => '12h']);
     }
 
     public function test_findings_recorded_on_a_reserve_truck_from_a_rescue_checklist_stay_in_scope(): void

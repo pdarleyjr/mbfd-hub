@@ -15,7 +15,7 @@ the same live state.
 | EMS Captain | Same table, `unit_label` exactly `EMS` (D Shift, rank Captain). |
 | Ranks | `employees.rank`, canonical strings: `Lieutenant`, `Captain`, `Division Chief`, `Deputy Fire Chief`, `Fire Chief`. No abbreviations. Civilian titles (e.g. `EMS Coordinator`, `Chief Plans Analyst #3`) never match. |
 | Shift on duty | No staffing store exists. Duty day = 08:00–08:00 America/New_York (TeleStaff print boundary). A/B/C 24-hour rotation anchored at `captain5.shift_rotation.anchor_date` (2026-03-09 = A), checked against production inspection `shift` values (8 of 9 recorded dates match; the one mismatch is a single member-entered value). Config can disable it; when disabled the on-duty bid holder is "unknown". |
-| Acting Captain 5 (out of class) | No reliable source: the Crew Planner TeleStaff parse is ephemeral and treats OOC/ROC/MOC/TOC codes as unverified. A member asks to be shown as acting Captain 5 and an administrator approves it (`captain5_acting_requests`, section 11). Display only. Never inferred from rank. |
+| Who fills the Captain 5 seat today | The accepted TeleStaff roster for the current duty day (`OnDutyOfficerDisplayResolver`), falling back to the bid seat. Display and shift Captain 5 alerts only (section 11). Never inferred from rank. |
 | Medical equipment | No structured flag exists in the checklists. Verified mapping `config/captain5_medical_scope.php` keyed by `(checklist_type, item_key)` plus admin decisions in `captain5_item_classifications`. Anything not mapped is `unclassified` → not visible to Captain 5, queued for admin classification. |
 | Current crew | Inspection submissions for the physical apparatus during the current duty day. If none, the unit-level channel is the issue's "latest update" shown at the next Daily Checkout of that unit. |
 
@@ -33,13 +33,12 @@ No duty gating (follow-up 2026-10-23): everyone who may open the page may do eve
 | `super_admin` | yes (cannot be denied: protected recovery) | – |
 | Admin panel (`admin.access` direct) | yes | – |
 | Officer rank (Lt, Capt, DC, Deputy FC, FC) | yes | – |
-| Captain 5 bid holder | yes | when their bid shift is on duty and no approved acting request is showing |
+| Captain 5 bid holder | yes | when their bid shift is on duty (the cards follow the TeleStaff roster first, section 11) |
 | EMS Captain bid holder | yes | – |
-| Approved acting request (showing now) | only if another source above applies | yes, until its end time (display only) |
 | Override `allow` | yes | – |
 | Override `deny` | removes every source above except `super_admin` | |
 
-- `captain5-admin` = active account with Admin Panel entitlement AND (`super_admin` OR direct `captain5.admin`). Configures overrides, approves acting requests and decides medical classification. Grants nothing in the Admin Panel by itself.
+- `captain5-admin` = active account with Admin Panel entitlement AND (`super_admin` OR direct `captain5.admin`). Configures overrides and decides medical classification. Grants nothing in the Admin Panel by itself.
 - Separated decisions in code: `canViewPage`, `canViewData`, `canAct`, `canDismiss` (all equal for eligible members), `canConfigure`, and the display-only `isShownCaptain5`.
 - Enforced server-side on: `/daily/captain-5` shell (403 before the SPA), every `/api/captain5/*` route, Captain 5 communications API + attachment download, every issue mutation (service layer), message threads. UI hiding is cosmetic only.
 - Never grants Admin Panel access, Fleet authority (`classifyImpact` out_of_service, service tickets), inspection approval/rejection, hold decisions or meter decisions.
@@ -47,7 +46,7 @@ No duty gating (follow-up 2026-10-23): everyone who may open the page may do eve
 ## 3. Tables (all additive, PostgreSQL + SQLite)
 
 - `captain5_duty_assignments`: id, `employee_profile_id` FK employees restrict, `duty_date` date, `starts_at`/`ends_at` timestampTz (default the 08:00–08:00 duty window), `shift_letter` char(1) null, `reason` text, `assigned_by_user_id` FK users, `revoked_at` null, `revoked_by_user_id` null, `revocation_reason` null, `client_request_id` string(64) unique null, timestamps. Partial unique `(duty_date) WHERE revoked_at IS NULL` (one acting Captain 5 per duty day). Rows are never deleted; revocation is an update of the revoke columns only. **Retired by the follow-up**: no code reads or writes it; the table and its rows stay as history and for rollback.
-- `captain5_acting_requests`: see section 11.
+- `captain5_acting_requests`: retired 2026-11-01. The rows stay as history and nothing reads or writes them (section 11).
 - `captain5_access_overrides`: id, `employee_profile_id`, `effect` (`allow|deny`), `level` (`view|act`, null for deny), `reason`, `set_by_user_id`, `superseded_at` null, `superseded_by_user_id` null, timestamps. Partial unique `(employee_profile_id) WHERE superseded_at IS NULL`. History rows are immutable.
 - `captain5_item_classifications`: id, `checklist_type`, `item_key`, `item_name`, `classification` (`medical|not_medical`), `reason`, `decided_by_user_id`, timestamps, unique (`checklist_type`,`item_key`).
 - `captain5_handoff_notes`: id, `duty_date`, `author_user_id`, `author_authority` (snapshot), `body` text, `client_request_id` unique null, `acknowledged_by_user_id` null, `acknowledged_at` null, timestamps. Append-only except the acknowledge columns (set once).
@@ -98,8 +97,8 @@ post `command_300`; Captain 5 members post `captain_5`; replies inherit the pare
 Controlled delete = soft delete with actor, reason and audit, by the author or a communications
 administrator; attachments of deleted posts are no longer served. Read state per channel.
 Immediate notification: `captain_5|both` posts by administrators notify the on-duty Captain 5 only
-(acting → on-duty bid holder → all Captain 5 bid holders when the on-duty person cannot be
-resolved). Everyone else eligible sees the post and the unread count.
+(the person the card shows → all Captain 5 bid holders when the card names nobody or someone with
+no Hub account). Everyone else eligible sees the post and the unread count.
 
 ## 7. Notifications (`Captain5Notifier`, same ledger + `InspectionEventNotification`)
 
@@ -159,7 +158,7 @@ with `captain5.communications_enabled=false` first if needed).
 - **Known policy choice**: Captain 5 messages do not push a notification to Logistics; Logistics sees them on the
   canonical inspection page and issue history (labelled "Captain 5 · Name").
 
-## 11. Follow-up (2026-10-23): no duty gating, acting requests, Department Updates
+## 11. Follow-up (2026-10-23): no duty gating, who is shown as Captain 5, Department Updates
 
 - **No duty gating.** Every officer (Lt and up), Division Chief, Chief, member with Admin Panel rights, Captain 5
   or EMS Captain seat holder, and anyone with an `allow` override can do every task on the Captain 5 page, on
@@ -168,24 +167,14 @@ with `captain5.communications_enabled=false` first if needed).
   `Captain5AssignmentService` and `Captain5DutyAssignment` are removed. Overrides are now `automatic | allow |
   deny`; stored `allow` rows of either old level read as `allow`.
 - **Who is shown as Captain 5.** The page header shows "<Shift> Shift Captain 5: <name>" (A green, B blue,
-  C red) from data: an approved acting request that is showing, otherwise the bid seat holder for the shift on
-  duty (rotation, 08:00 boundary). It is display only and never changes permissions or who an action is
-  attributed to (attribution is always the signed-in member; the audit snapshot also records
-  `shown_captain5` and `acting_request_id`). New-findings notifications go to the person shown.
-- **Acting requests** (`captain5_acting_requests`): `kind` `act|end`, `employee_profile_id`,
-  `requested_by_user_id`, `duration` `12h|24h|custom`, `shift_letter`, `ends_at`, `status`
-  `pending|approved|rejected|withdrawn`, `decided_by_user_id`, `decided_at`, `decision_note`, `starts_at`,
-  `ended_at`, `ended_by_request_id` (self FK), `client_request_id` unique. Decided rows are immutable except
-  `ended_at` / `ended_by_request_id`.
-  - "Acting as Captain 5 today? Click here." on the page: 12 hours (ends at the next 08:00 or 20:00), 24 hours
-    (ends at the next day's 08:00) or a custom end (15 minutes to 72 hours ahead).
-  - Captain 5 administrators (`canConfigure`) are notified and approve or decline (a note is required to
-    decline) on the page or in Admin > Captain 5 Operations. Nobody approves their own request except a
-    super admin. An expired request cannot be approved.
-  - Approval shows the member until `ends_at`, then the display ends on its own. Another member can ask to take
-    over (approval ends the earlier one) and anyone on the page can ask to remove it (`kind=end`), both with
-    approval. A requester can withdraw a pending request; a new request replaces their earlier pending one.
-  - Acting never grants access to someone who cannot otherwise use the page.
+  C red) from `OnDutyOfficerDisplayResolver`: the one person the current duty day's accepted TeleStaff roster
+  names as working the seat, otherwise the bid seat holder for the shift on duty (rotation, 08:00 boundary). An
+  ambiguous roster shows nobody and says why. It is display only and never changes permissions or who an action
+  is attributed to (attribution is always the signed-in member; the audit snapshot also records
+  `shown_captain5`, which is true for the bid seat holder). Shift Captain 5 alerts go to the person shown, through
+  `OnDutyCaptain5Recipients`. Narcotics review and page access do not read the roster.
+- **Acting requests** were retired 2026-11-01. `captain5_acting_requests` rows stay as history and nothing reads
+  or writes them.
 - **Messages vs Department Updates.** The Messages tab (on both pages) says: "Post and receive messages, files,
   etc. Messages can only be received and sent by admin personnel, Capt. 5 and 300." The separate "Department
   Updates" panel posts a home page notice everyone sees.
@@ -209,39 +198,19 @@ with `captain5.communications_enabled=false` first if needed).
 - **Naming.** The station-list card and page for the Shift Division Chief seat are titled "300" with the badge
   "Shift Division Chief". The home page Station / Vehicles / Equipment card reads "Station forms, Vehicle
   Checkouts, Video Conferencing".
-- **Rollback.** The migration is additive. Old code ignores `captain5_acting_requests` and the two new
-  `department_updates` columns; posts made from the pages stay ordinary published Department Updates.
+- **Rollback.** The migration is additive. Old code ignores the two new `department_updates` columns; posts made
+  from the pages stay ordinary published Department Updates.
 
-## 12. Shift 300 display and acting 300 (2026-10-24)
+## 12. Shift 300 display (2026-10-24)
 
 - **Shift 300 line.** The 300 page and the 300 card on the stations list show
   "<Shift> Shift 300: <rank> <name>" (A green, B blue, C red; the shift letter is always in the text). It comes
-  from `Captain5DutyRoster::command300OnDuty()`: an approved acting 300 request that is showing, otherwise the
-  verified current bid seat `unit_label` "300" whose bid shift is the on-duty rotation shift (08:00 boundary,
-  2026-03-09 = A). Production has one Division Chief seat per A/B/C. When nobody resolves, the page says
-  "Shift 300 not set"; it never guesses from rank.
-- **One engine for both roles.** `captain5_acting_requests.role` (`captain_5` default | `command_300`), added by
-  the additive migration `2026_10_24_120000_add_role_to_captain5_acting_requests` (one column with a default and an
-  index; it creates, grants and changes no permission or role). `Captain5ActingService`, `Captain5Notifier`
-  (same kinds and `captain5:acting:{id}:*` ledger keys, so the notification evaluator is unchanged; wording and
-  the linked page follow the role), the request history and the Admin > Captain 5 Operations queue (one list,
-  labelled by role) cover both. Takeover and end act only within the request's role.
-- **Who may ask for acting 300:** anyone `Command300Access` allows: Captains, Division Chiefs, the 300 bid seat,
-  administrators and explicit `command.300.access` grants. **Who approves (both roles, the user's rule "any
-  admin member"):** any administrator, i.e. an active account with no pending password setup and Admin Panel rights
-  (super_admin or a direct `admin.access` grant). This replaces the narrower Captain 5 administrator set used for
-  acting Captain 5 in #480. One class, `ActingApprovers`, decides it for the service, the notifier (which asks
-  exactly these people) and the alert category "Acting Captain 5 and 300 requests". Opening Admin > Captain 5
-  Operations still needs Captain 5 administration; any administrator can also approve from the Captain 5 or 300
-  page. Nobody approves their own request except a super admin. Same durations as acting Captain 5 (12 hours to the next 08:00
-  or 20:00, 24 hours to the next day's 08:00, or a custom end 15 minutes to 72 hours ahead). An expired request
-  cannot be approved; the display ends on its own at `ends_at`.
-- **Display only.** Being shown as acting 300 grants no access and changes nothing else; forgetting to use it
-  affects nothing.
-- **API:** `GET /api/command-300/shift` → `{on_duty, acting}`; `POST /api/command-300/acting-requests`
-  (`kind`, `duration`, `ends_at`, `client_request_id`) and `/{id}/approve|reject|withdraw`, behind
-  `access-command-300`. The 300 routes decide only 300 requests and the Captain 5 routes only Captain 5 requests
-  (another role's id answers 404); the route, never the request body, sets the role.
-- **Rollback.** Old code ignores the `role` column, but it would treat a showing acting 300 row as an acting
-  Captain 5. Before rolling back, end any showing acting 300 request (Admin > Captain 5 Operations, or approve an
-  end request).
+  from `OnDutyOfficerDisplayResolver`: the one person today's accepted TeleStaff roster names as working the seat,
+  otherwise `Captain5DutyRoster::command300OnDuty()`, the verified current bid seat `unit_label` "300" whose bid
+  shift is the on-duty rotation shift (08:00 boundary, 2026-03-09 = A). Production has one Division Chief seat per
+  A/B/C. When nobody resolves, the page says "Shift 300 not set"; it never guesses from rank.
+- **Display only.** The line grants no access and changes nothing else.
+- **API:** `GET /api/command-300/shift` → `{on_duty, acting}`, behind `access-command-300`. The `acting` block is
+  kept only for old installed apps; the current pages ignore it.
+- **Acting 300** was retired with acting Captain 5 (section 11). `captain5_acting_requests.role` stays with the
+  rows as history.

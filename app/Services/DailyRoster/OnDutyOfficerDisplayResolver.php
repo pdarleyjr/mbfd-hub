@@ -20,13 +20,14 @@ use InvalidArgumentException;
 use Throwable;
 
 /**
- * Who the 300 and Captain 5 cards show. Display only: authority, narcotics review and notification
- * routing keep reading Captain5DutyRoster, and nothing there may read this class.
+ * Who holds the 300 and Captain 5 seats right now, for the cards and for Captain 5 alerts
+ * (OnDutyCaptain5Recipients). Access and narcotics review keep reading Captain5DutyRoster.
  *
- * Precedence: an approved acting member; then one person the current duty day's accepted roster
- * names as working this seat right now; then the bid seat when no usable roster exists for today;
- * anything ambiguous shows nobody, with a reason. Yesterday's roster is never used: at 07:59 the
- * duty day is still yesterday's, and from 08:00 until the first export the card shows today's seat.
+ * Precedence: one person the current duty day's accepted roster names as working this seat right now;
+ * then the bid seat when no usable roster exists for today; anything ambiguous shows nobody, with a
+ * reason. Only the roster of the duty day containing the moment counts: a roster for the next shift that
+ * TeleStaff posts early changes nothing here until 08:00, and yesterday's is never used. At 07:59 the duty
+ * day is still yesterday's, and from 08:00 until the first export the card shows today's seat.
  *
  * Intervals are half-open, [starts_at, ends_at), compared as instants, so DST needs no special case.
  */
@@ -59,9 +60,6 @@ final class OnDutyOfficerDisplayResolver
 
         if (! (bool) config('daily_roster.card_display_enabled', false)) {
             return OnDutyOfficerDisplay::unchanged($seat);
-        }
-        if ($seat->source === OnDutyCaptain5::SOURCE_ACTING) {
-            return OnDutyOfficerDisplay::acting($seat);
         }
 
         try {

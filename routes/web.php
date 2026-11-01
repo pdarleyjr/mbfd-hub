@@ -463,12 +463,12 @@ Route::get('/daily/{path?}', function (?string $path = null) {
     // case-insensitively, so the guard does too.
     if (preg_match('#^command-300(?:/.*)?$#iD', trim((string) $path, '/'))
         && ! app(\App\Services\Security\Command300Access::class)->allows(auth('web')->user())) {
-        abort(403, 'The 300 Command profile is available to Captains, Division Chiefs, the 300 command officer, administrators, and members granted 300 Command Access.');
+        abort(403, 'The 300 Command profile is available to Captains, Chiefs, the 300 command officer, whoever TeleStaff has working the 300 seat today, administrators, and members granted 300 Command Access.');
     }
     // Captain 5 EMS Operations Center: same server-side rule as its API (Captain5Access).
     if (preg_match('#^captain-5(?:/.*)?$#iD', trim((string) $path, '/'))
         && ! app(\App\Services\Security\Captain5Access::class)->canView(auth('web')->user())) {
-        abort(403, 'The Captain 5 EMS Operations Center is available to Lieutenants, Captains, Chiefs, the Captain 5 and EMS Captain positions, the acting Captain 5 and administrators.');
+        abort(403, 'The Captain 5 EMS Operations Center is available to Lieutenants, Captains, Chiefs, the Captain 5 and EMS Captain positions, whoever TeleStaff has working the Captain 5 seat today, and administrators.');
     }
     $index = file_get_contents(public_path('daily/index.html'));
     abort_unless(is_string($index), 404);

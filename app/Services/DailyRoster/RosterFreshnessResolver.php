@@ -25,10 +25,35 @@ final class RosterFreshnessResolver
 
     public function __construct(private readonly DutyCalendar $calendar) {}
 
+    /** The duty day on the clock: the shift actually working. What the cards and alerts follow. */
     public function status(?CarbonInterface $at = null): RosterFreshness
     {
         $moment = CarbonImmutable::instance($at ?? now());
-        $dutyDate = $this->calendar->dutyDate($moment)->format('Y-m-d');
+
+        return $this->statusFor($this->calendar->dutyDate($moment)->format('Y-m-d'), $moment);
+    }
+
+    /**
+     * What the Daily Roster page follows: the next shift's roster as soon as TeleStaff has posted it, so
+     * members can read it on their way in, otherwise the same as status(). Nothing else reads this.
+     */
+    public function pageStatus(?CarbonInterface $at = null): RosterFreshness
+    {
+        $moment = CarbonImmutable::instance($at ?? now());
+        $today = $this->calendar->dutyDate($moment);
+        $next = $today->addDay()->format('Y-m-d');
+        if (! RosterActiveVersion::query()->whereDate('duty_date', $next)->whereNotNull('roster_snapshot_id')->exists()) {
+            return $this->status($moment);
+        }
+
+        // A late correction to the shift on duty must still reach a member reading it through its link.
+        $onDuty = RosterActiveVersion::query()->whereDate('duty_date', $today->format('Y-m-d'))->first();
+
+        return $this->statusFor($next, $moment, 'next|'.($onDuty->roster_snapshot_id ?? ''));
+    }
+
+    private function statusFor(string $dutyDate, CarbonImmutable $moment, string $pageContext = 'current'): RosterFreshness
+    {
         $pointer = RosterActiveVersion::query()->whereDate('duty_date', $dutyDate)->first();
         $published = $pointer?->roster_snapshot_id !== null;
         $held = $this->hasHeldImport($dutyDate, $published ? $pointer : null);
@@ -44,8 +69,10 @@ final class RosterFreshnessResolver
 
         // Only what a member would see. An export with no changes must not make every open page refetch.
         // A delayed notice names the last time heard, so a second outage is something new to show.
+        // At 08:00 the next shift's roster becomes the current one, and an open page must drop its notice.
         $version = substr(hash('sha256', implode('|', [
             $dutyDate,
+            $pageContext,
             $state,
             (string) ($pointer->roster_snapshot_id ?? ''),
             $state === RosterFreshness::DELAYED ? (string) $pointer?->last_confirmed_at?->getTimestamp() : '',

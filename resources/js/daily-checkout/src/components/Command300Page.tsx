@@ -7,9 +7,7 @@ import { ApiClient, isApiAuthenticationError, redirectToLoginAfterSessionExpiry 
 import { isForbiddenError } from '../utils/commandCommunicationsApi';
 import { useOffline } from '../hooks/useOffline';
 import DailyPageNav from './DailyPageNav';
-import ActingApprovals from './acting/ActingApprovals';
 import Command300ShiftSection from './acting/Command300ShiftSection';
-import { COMMAND_300_ACTING } from './acting/command300Role';
 import { useCommand300Shift } from './acting/useCommand300Shift';
 import AccessDenied from './command-communications/AccessDenied';
 import CommunicationsPanel from './command-communications/CommunicationsPanel';
@@ -285,8 +283,6 @@ export default function Command300Page() {
           </div>
         </div>
       </section>
-
-      {shift.data && <ActingApprovals role={COMMAND_300_ACTING} acting={shift.data.acting} onChange={shift.apply} />}
 
       <section aria-labelledby="command-overview-heading" className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
