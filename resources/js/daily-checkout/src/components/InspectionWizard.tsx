@@ -25,7 +25,11 @@ import { clearInspectionProgress, clearInspectionSessionAbandonKey, clearInspect
 import { safeContextualPath } from '../utils/contextualBack';
 import { canMigrateInventoryDraft, inventoryMigrationMessage, mergeDraftAnswers } from '../utils/inventoryDraftMigration';
 import { useInventoryMarkers } from '../hooks/useInventoryMarkers';
+import { useLiveFindings } from '../hooks/useLiveFindings';
 import { useOffline } from '../hooks/useOffline';
+import { concernDraftProblems, concernIssueRefs, restoreConcernDrafts, toConcernSubmissions } from '../utils/concerns';
+import { mergeKnownFindings } from '../utils/liveFindings';
+import type { ConcernDraft } from '../types/issueHistory';
 import OfficerStep from './OfficerStep';
 import ChecklistFieldsStep from './ChecklistFieldsStep';
 import MeterStep from './MeterStep';
@@ -36,6 +40,7 @@ import PreviousPageButton from './PreviousPageButton';
 import { inspectionProgress, inspectionReadiness } from '../utils/inspectionProgress';
 import { identityForQueueCapture, type OfflineIdentity } from '../lib/offlineIdentity';
 import { EMPTY_REVIEW_FLAG, buildReviewFlag, normalizeReviewFlagDraft, reviewFlagExplanationMissing } from '../utils/reviewFlag';
+import { normalizeTaskStatus } from '../utils/checklistFields.ts';
 import { checklistUsesVehicleId, defaultVehicleConfirmation, paperVehicleValue, reconcileVehicleConfirmation, toPhysicalVehicleReport } from '../utils/vehicleConfirmation';
 import { activeVehicleIdentification, optionalIdentification, toVehicleIdentificationSubmission } from '../utils/vehicleIdentification';
 import { ClipboardList, Gauge, Truck, Users } from 'lucide-react';
@@ -147,6 +152,8 @@ export default function InspectionWizard() {
   const [apparatus, setApparatus] = useState<Apparatus | null>(null);
   const [signature, setSignature] = useState<string | null>(null);
   const [reviewFlag, setReviewFlag] = useState<ReviewFlagDraft>(EMPTY_REVIEW_FLAG);
+  // Concerns, damage and notes the member adds on the review step. Part of the draft, unlike the live findings.
+  const [concerns, setConcerns] = useState<ConcernDraft[]>([]);
   // Created once per draft; links inventory corrections reported meanwhile to the inspection.
   const [draftId, setDraftId] = useState<string | null>(null);
   const [checklist, setChecklist] = useState<ChecklistData | null>(null);
@@ -199,6 +206,16 @@ export default function InspectionWizard() {
   const supersededDraftRef = useRef<{ slug: string; version: string; owner: OfflineIdentity } | null>(null);
   const loadedContractRef = useRef<{ slug: string; apparatus: Apparatus; checklist: ChecklistData } | null>(null);
   const inventoryMarkers = useInventoryMarkers(apparatus?.id, memberIdentity?.userId, checklist?.pending_corrections);
+  // Display data only: refreshed on its own, never part of the draft, the answers or the submission.
+  const liveFindings = useLiveFindings(apparatus?.id, memberIdentity?.userId);
+  const knownFindings = useMemo(
+    () => mergeKnownFindings(checklist?.open_findings, liveFindings.open, liveFindings.state === 'live'),
+    [checklist?.open_findings, liveFindings.open, liveFindings.state],
+  );
+  const concernIssues = useMemo(
+    () => concernIssueRefs(knownFindings.findings, knownFindings.liveById, knownFindings.noLongerOpen),
+    [knownFindings],
+  );
   const readiness = inspectionReadiness(checklist, compartments, fieldValues, scheduledTasks, officerInfo, meterData, vehicleIdentification);
   const continueLabel = readiness.nextStep === 'compartments' ? 'Continue: Apparatus' : readiness.label;
   // On the Member step the Continue button is the vehicle confirmation, so its label
@@ -474,6 +491,7 @@ export default function InspectionWizard() {
         setVehicleIdentification({});
         setSignature(null);
         setReviewFlag(EMPTY_REVIEW_FLAG);
+        setConcerns([]);
         setDraftId(createClientSubmissionId());
         setCurrentStep('compartments');
         setCompartments(checklistData.compartments);
@@ -490,7 +508,7 @@ export default function InspectionWizard() {
         })));
         setScheduledTasks(checklistData.due_tasks.map((task) => ({
           id: task.id,
-          status: 'Present',
+          status: 'Completed',
           notes: null,
         })));
 
@@ -507,6 +525,7 @@ export default function InspectionWizard() {
           const applySavedProgress = (restoredCompartments: Compartment[]) => {
             setSignature(saved.signature ?? null);
             setReviewFlag(normalizeReviewFlagDraft(saved.reviewFlag));
+            setConcerns(restoreConcernDrafts(saved.concerns));
             setDraftId(saved.draftId ?? createClientSubmissionId());
             // Keep the issued baseline with the observation, even after a newer
             // checkout changed the live fleet meters while this draft was offline.
@@ -524,7 +543,7 @@ export default function InspectionWizard() {
                 setFieldValues(saved.fieldValues.map(field => field.id === 'vehicle_num' ? { ...field, value: paperVehicleValue(restoredVehicle) } : field));
               }
               if (saved.scheduledTasks) {
-                setScheduledTasks(saved.scheduledTasks);
+                setScheduledTasks(saved.scheduledTasks.map(task => ({ ...task, status: normalizeTaskStatus(task.status) })));
               }
             }
             setCurrentStep('compartments');
@@ -597,6 +616,7 @@ export default function InspectionWizard() {
         reviewFlag,
         ...(draftId ? { draftId } : {}),
         ...(Object.keys(vehicleIdentification).length > 0 ? { vehicleIdentification } : {}),
+        ...(concerns.length > 0 ? { concerns } : {}),
         meter: meterData,
         compartments,
         fieldValues,
@@ -606,7 +626,7 @@ export default function InspectionWizard() {
       },
       clearSessionStartKeyFor: checklist.schema_version === 2 && checklist.inspection_session ? checklist.checklist_version : undefined,
     }, stepChanged);
-  }, [officerInfo, meterData, compartments, fieldValues, scheduledTasks, currentStep, slug, apparatus, checklist, memberIdentity, loading, signature, reviewFlag, draftId, vehicleIdentification, submitting, queuedSubmissionBlocker, autosaver]);
+  }, [officerInfo, meterData, compartments, fieldValues, scheduledTasks, currentStep, slug, apparatus, checklist, memberIdentity, loading, signature, reviewFlag, concerns, draftId, vehicleIdentification, submitting, queuedSubmissionBlocker, autosaver]);
 
   useEffect(() => {
     if (readiness.ready) setShowNotReady(false);
@@ -697,6 +717,7 @@ export default function InspectionWizard() {
       setVehicleIdentification({});
       setSignature(null);
       setReviewFlag(EMPTY_REVIEW_FLAG);
+      setConcerns([]);
       setDraftId(createClientSubmissionId());
       setCompartments(todayChecklist.compartments);
       setFieldValues(todayChecklist.fields.map((field) => ({
@@ -711,7 +732,7 @@ export default function InspectionWizard() {
       })));
       setScheduledTasks(todayChecklist.due_tasks.map((task) => ({
         id: task.id,
-        status: 'Present',
+        status: 'Completed',
         notes: null,
       })));
       setCurrentStep('officer');
@@ -724,7 +745,7 @@ export default function InspectionWizard() {
   const handleSubmit = async (signature: string | null) => {
     if (!apparatus || !slug || !checklist) return;
     // Defensive: the review step blocks this too, but a flagged inspection never leaves without its explanation.
-    if (reviewFlagExplanationMissing(reviewFlag)) {
+    if (reviewFlagExplanationMissing(reviewFlag) || concernDraftProblems(concerns).length > 0) {
       setCurrentStep('submit');
       return;
     }
@@ -777,6 +798,8 @@ export default function InspectionWizard() {
       });
 
       const flag = buildReviewFlag(reviewFlag, compartments);
+      // Omitted when there are none, so a checkout without concerns is byte for byte what it was.
+      const concernReport = toConcernSubmissions(concerns);
       const usesVehicleId = checklistUsesVehicleId(checklist);
       // Omitted when no question is open, so a checkout without questions is byte for byte what it was.
       const identificationReport = toVehicleIdentificationSubmission(usesVehicleId ? activeVehicleIdentification(checklist.vehicle_identification, officerInfo) : optionalIdentification(checklist.vehicle_identification), vehicleIdentification);
@@ -819,6 +842,7 @@ export default function InspectionWizard() {
         ...(flag ? { review_flag: flag } : {}),
         ...(draftId ? { inventory_draft_id: draftId } : {}),
         ...(identificationReport && (usesVehicleId || identificationReport.answers.length > 0) ? { vehicle_identification: identificationReport } : {}),
+        ...(concernReport.length > 0 ? { concerns: concernReport } : {}),
       };
       clientSubmissionIdRef.current = submission.client_submission_id;
       const queueId = await queueSubmission(apparatus.id, submission, currentIdentity, checklist.checklist_base_version);
@@ -1183,8 +1207,10 @@ export default function InspectionWizard() {
         <CompartmentStep
           actionLabel={readiness.label}
           checklistType={checklist.checklist_type}
+          usesVehicleId={usesVehicleId}
           compartments={compartments}
-          findings={checklist.open_findings}
+          findings={knownFindings.findings}
+          issues={{ live: liveFindings, known: knownFindings, apparatusId: apparatus.id }}
           onChange={setCompartments}
           onSubmit={handleCompartmentsSubmit}
           onBack={() => setCurrentStep('officer')}
@@ -1217,6 +1243,10 @@ export default function InspectionWizard() {
           onSignatureChange={setSignature}
           reviewFlag={reviewFlag}
           onReviewFlagChange={setReviewFlag}
+          findings={knownFindings.findings}
+          concerns={concerns}
+          onConcernsChange={setConcerns}
+          openIssues={concernIssues}
           scheduledTasks={scheduledTasks}
           onSubmit={handleSubmit}
           onBack={goBack}

@@ -86,6 +86,7 @@ async function mockApi(page: Page, fixture: ChecklistFixture = checklistA()): Pr
     if (path === '/api/public/fleet-vehicles') return route.fulfill({ json: { vehicles: [] } });
     if (path === '/api/public/apparatuses') return route.fulfill({ json: [apparatus] });
     if (path === `/api/public/apparatuses/${apparatus.id}/service-notices`) return route.fulfill({ json: { data: [] } });
+    if (path === `/api/public/apparatuses/${apparatus.id}/findings`) return route.fulfill({ json: { as_of: '2026-09-21T13:00:00Z', open: [], notes: [], closed_count: 0 } });
     if (path === `/api/public/apparatuses/${apparatus.id}/checklist`) {
       return route.fulfill({
         json: {

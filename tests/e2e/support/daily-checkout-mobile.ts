@@ -57,6 +57,7 @@ export async function mobileInspectionFixture(
     }
     if (path === '/api/public/inspection-revisions') return route.fulfill({ json: { data: [] } });
     if (path.includes('service')) return route.fulfill({ json: [] });
+    if (path.endsWith('/findings')) return route.fulfill({ json: { as_of: `${inspectionDate}T13:00:00Z`, open: [], notes: [], closed_count: 0 } });
     return route.fulfill({ status: 404, json: { message: `Unmocked API: ${path}` } });
   });
   await page.goto(`/daily/vehicle-inspections/${vehicle.slug}`);

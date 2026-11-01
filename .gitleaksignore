@@ -9,3 +9,6 @@
 0ead490970e06c12972fde6c42f92ead28a8a6d5:docs/apparatus-changeouts.md:generic-api-key:213
 0ead490970e06c12972fde6c42f92ead28a8a6d5:docs/apparatus-changeouts.md:generic-api-key:233
 0ead490970e06c12972fde6c42f92ead28a8a6d5:tests/e2e/daily-changeout.spec.ts:generic-api-key:347
+#
+# Issue history test: 'front_cab-item-3' is a real checklist item key (compartment plus position), not a credential.
+99faadad49a3143bad4650bb7e9582c49bf248a8:tests/Feature/Api/ApparatusIssueHistoryTest.php:generic-api-key:249

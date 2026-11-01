@@ -62,14 +62,36 @@ switch ($command) {
             'station_id' => $station->id, 'unit_id' => 'FB6', 'name' => 'Fire Boat 6', 'designation' => 'FB6', 'type' => 'Fire Boat',
             'daily_checkout_requirement' => 'required', 'daily_checkout_template' => 'fireboat6',
         ]);
-        $result = ['id' => $boat->id, 'station_number' => 6];
+        // Production has counted checkouts from this ledger since 2026-08-28. Without the row nothing ever counts as done.
+        $snapshot = [['id' => (int) $boat->id, 'status' => 'In Service']];
+        DB::table('daily_checkout_ledger_cutovers')->insertOrIgnore([
+            'ledger' => App\Models\DailyCheckoutLedgerCutover::LEDGER,
+            'release_sha' => str_repeat('a', 40),
+            'source' => App\Models\DailyCheckoutLedgerCutover::SOURCE,
+            'activated_at' => now()->subDay(),
+            'apparatus_status_snapshot' => json_encode($snapshot, JSON_UNESCAPED_SLASHES),
+            'snapshot_sha256' => hash('sha256', json_encode($snapshot, JSON_UNESCAPED_SLASHES)),
+            'apparatus_count' => 1,
+        ]);
+        $result = ['id' => $boat->id, 'station_id' => $boat->station_id];
+        break;
+    case 'fb6-issue-action':
+        // Logistics acts on the boat's newest open issue through the real service, the way the admin screens do.
+        $boatId = DB::table('apparatuses')->where('slug', 'fb6')->value('id');
+        $defectId = (int) DB::table('apparatus_defects')->where('apparatus_id', $boatId)->where('resolved', false)->max('id');
+        $actor = App\Models\User::query()->where('name', 'Fleet Manager')->first() ?? App\Models\User::query()->orderBy('id')->firstOrFail();
+        $service = app(App\Services\Defects\DefectCorrectiveActionService::class);
+        $argument === 'resolve'
+            ? $service->resolve($defectId, $actor, ['resolution_type' => 'repair_completed', 'resolution_notes' => 'New hose fitted'])
+            : $service->acknowledge($defectId, $actor);
+        $result = ['defect' => $defectId, 'actor' => $actor->display_name ?: $actor->name];
         break;
     case 'fb6-state':
         $boatId = DB::table('apparatuses')->where('slug', 'fb6')->value('id');
         $rows = static fn (string $sql) => array_map(static fn (object $row): array => (array) $row, DB::select($sql, [$boatId]));
         $result = [
             'boat' => $rows('select vehicle_number, unit_master_vehicle_id from apparatuses where id = ?')[0] ?? null,
-            'inspections' => $rows('select actor_user_id, vehicle_number, unit_number, processing_status, review_status, designation_at_time, inspection_reference from apparatus_inspections where apparatus_id = ? order by id'),
+            'inspections' => $rows('select actor_user_id, vehicle_number, unit_number, processing_status, review_status, designation_at_time, inspection_reference, checklist_evidence from apparatus_inspections where apparatus_id = ? order by id'),
             'sessions' => $rows('select actor_user_id, submitted_inspection_id from daily_checkout_inspection_sessions where apparatus_id = ? order by id'),
             'changeouts' => $rows('select id from apparatus_changeouts where from_apparatus_id = ?'),
         ];

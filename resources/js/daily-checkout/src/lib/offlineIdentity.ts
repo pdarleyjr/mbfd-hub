@@ -1,6 +1,7 @@
 import { db } from './db';
 import { fetchWithTimeout, READ_TIMEOUT_MS, redirectToLoginAfterSessionExpiry } from '../utils/api';
 import { noteAuthenticatedUser, purgeOnSessionEnd } from '../pwa/userCaches.ts';
+import { purgeCachedFindings } from '../utils/liveFindingsCache';
 
 const CACHE_KEY = 'authenticated-offline-identity-v1';
 
@@ -70,6 +71,7 @@ export async function refreshOfflineIdentity({ redirectOnExpiry = true }: Refres
     // The session is gone: the previous member's cached station/apparatus data must not
     // stay readable on this device (IndexedDB drafts and queued work are not touched).
     void purgeOnSessionEnd();
+    void purgeCachedFindings();
     if (redirectOnExpiry && (typeof navigator === 'undefined' || navigator.onLine)) {
       redirectToLoginAfterSessionExpiry();
     }
@@ -87,7 +89,10 @@ export async function refreshOfflineIdentity({ redirectOnExpiry = true }: Refres
   await db.cachedData.put({ key: CACHE_KEY, data: identity, updatedAt: new Date() });
   // A different member than the last one on this device: purge the previous member's
   // cached responses. Only an opaque hash is remembered; failures never block the caller.
-  void noteAuthenticatedUser(identity.userId).catch(() => undefined);
+  // The member's cached apparatus findings (IndexedDB) go with their other cached responses.
+  void noteAuthenticatedUser(identity.userId).then((change) => {
+    if (change === 'switched') return purgeCachedFindings();
+  }).catch(() => undefined);
   return identity;
 }
 
