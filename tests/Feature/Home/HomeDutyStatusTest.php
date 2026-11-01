@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Home;
 
-use App\Models\Captain5\Captain5ActingRequest;
 use App\Models\DailyRoster\RosterImport;
 use App\Models\User;
-use App\Services\Captain5\OnDutyCaptain5;
 use App\Services\DailyRoster\HomeDutyLines;
 use App\Services\DailyRoster\HomeDutyStatus;
 use App\Services\DailyRoster\OnDutyOfficerDisplayResolver;
@@ -252,27 +250,6 @@ final class HomeDutyStatusTest extends TestCase
 
         self::assertSame('300 is Printed Only', $lines->command['text']);
         self::assertStringNotContainsString('99-NOT-IN-HUB', (string) json_encode($lines->toArray()));
-    }
-
-    public function test_an_approved_acting_member_shows_confidently_while_the_resolver_still_has_acting(): void
-    {
-        if (! defined(OnDutyCaptain5::class.'::SOURCE_ACTING')) {
-            self::markTestSkipped('Acting was removed from the resolver; the literal branch is simply never taken.');
-        }
-        $this->seatBidChief();
-        $this->publish300();
-        $acting = $this->officer('Captain', 'Acting Captain');
-        Captain5ActingRequest::query()->create([
-            'role' => Captain5ActingRequest::ROLE_COMMAND_300, 'kind' => Captain5ActingRequest::KIND_ACT,
-            'employee_profile_id' => $acting->employee_profile_id, 'requested_by_user_id' => $acting->getKey(),
-            'duration' => '24h', 'shift_letter' => 'A', 'status' => Captain5ActingRequest::APPROVED,
-            'decided_by_user_id' => $this->bidChief->getKey(), 'decided_at' => now(), 'starts_at' => CarbonImmutable::parse('2026-10-20 08:00', 'America/New_York'),
-            'ends_at' => CarbonImmutable::parse('2026-10-21 08:00', 'America/New_York'),
-        ]);
-
-        $lines = $this->lines($this->viewer, '2026-10-20 10:30');
-
-        self::assertSame(['text' => 'Acting 300 is Captain Acting Captain', 'state' => HomeDutyLines::COMMAND_VERIFIED], $lines->command);
     }
 
     public function test_before_the_roster_arrives_the_bid_seat_is_scheduled_and_not_yet_verified(): void

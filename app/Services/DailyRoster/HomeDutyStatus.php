@@ -173,11 +173,6 @@ final class HomeDutyStatus
         if (in_array($display->reason, self::REVIEW_REASONS, true)) {
             return $line('300: Assignment needs review', HomeDutyLines::COMMAND_REVIEW);
         }
-        // An approved acting member. Compared as a literal on purpose: acting is being retired from the resolver, and
-        // after that this branch is simply never taken. Read from the seat answer, which both versions carry.
-        if ($display->seat->source === 'acting' && $who !== null) {
-            return $line("Acting 300 is {$who}", HomeDutyLines::COMMAND_VERIFIED);
-        }
         if ($display->source === OnDutyOfficerDisplay::SOURCE_TELESTAFF && $who !== null) {
             return $line("300 is {$who}", HomeDutyLines::COMMAND_VERIFIED);
         }
