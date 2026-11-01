@@ -202,7 +202,6 @@ final class EmployeeInspectionHistoryService
         return match ($status) {
             'accepted' => 'Accepted',
             'accepted_with_exception' => 'Accepted, meter reading flagged',
-            'pending_vehicle_swap' => 'Saved, waiting for Fleet to confirm the vehicle',
             default => 'Submitted',
         };
     }
@@ -570,7 +569,6 @@ final class EmployeeInspectionHistoryService
             // An empty Eloquent collection stays Eloquent through map(); its unique() then calls getKey() on the strings below.
             ->toBase()
             ->map(fn (ApparatusInspectionException $hold): string => $this->holdLabel((string) $hold->field, (string) $hold->reason))
-            ->when($inspection->processing_status === 'pending_vehicle_swap', fn ($list) => $list->push('Fleet is confirming which vehicle you inspected'))
             ->unique()
             ->values()
             ->all();

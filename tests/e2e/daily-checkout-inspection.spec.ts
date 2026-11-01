@@ -619,12 +619,11 @@ async function confirmPhysicalVehicle(page: Page): Promise<void> {
   await expect(page.getByRole('combobox', { name: 'Physical vehicle', exact: true })).toBeVisible();
 }
 
-/** A unit with no recorded vehicle ID: the member names the truck and says the assignment is unknown. */
+/** A unit with no recorded vehicle ID: the member names the truck, and nothing else is asked. */
 async function confirmUnrecordedVehicle(page: Page): Promise<void> {
   await confirmPhysicalVehicle(page);
   await page.getByRole('combobox', { name: 'Physical vehicle', exact: true }).selectOption('__not_listed__');
   await page.getByLabel('Vehicle ID on the truck').fill('FB6-1');
-  await page.getByRole('radio', { name: 'Unknown, not sure why' }).check();
 }
 
 async function drawInspectionSignature(page: Page): Promise<void> {

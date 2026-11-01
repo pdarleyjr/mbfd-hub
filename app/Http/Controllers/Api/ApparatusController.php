@@ -11,21 +11,18 @@ use App\Http\Resources\Public\PublicApparatusResource;
 use App\Models\Apparatus;
 use App\Models\ApparatusChangeout;
 use App\Models\ApparatusInspection;
-use App\Models\ApparatusVehicleSwapRequest;
 use App\Models\DailyCheckoutInspectionSession;
 use App\Models\Employee;
 use App\Models\User;
 use App\Services\ApparatusInspectionApprovalService;
-use App\Services\ApparatusInspectionProcessingService;
 use App\Services\DailyCheckoutChecklistResolver;
 use App\Services\DailyCheckoutInspectionSessionService;
 use App\Services\Display\DisplaySnapshotService;
 use App\Services\Fleet\ApparatusChangeoutPlanner;
+use App\Services\Fleet\CheckoutVehicleReport;
 use App\Services\Fleet\VehicleIdentificationPlanner;
 use App\Services\Fleet\VehicleIdentificationService;
 use App\Services\Fleet\VehicleIdentificationSubmission;
-use App\Services\Fleet\VehicleSwapDecisionException;
-use App\Services\Fleet\VehicleSwapService;
 use App\Services\Identity\AuthenticatedMemberContextResolver;
 use App\Services\Inspections\InspectionSubmissionSignals;
 use App\Services\Inventory\ChecklistRevisionStore;
@@ -133,12 +130,7 @@ class ApparatusController extends Controller
      */
     private function justChangedOutFrom(Apparatus $apparatus): ?ApparatusChangeout
     {
-        return ApparatusChangeout::query()
-            ->where('from_apparatus_id', $apparatus->getKey())
-            ->where('status', ApparatusChangeout::STATUS_COMPLETED)
-            ->where('effective_at', '>=', now()->subHours((int) config('daily_checkout.inventory_revision_grace_hours', 168)))
-            ->orderByDesc('id')
-            ->first();
+        return app(ApparatusChangeoutPlanner::class)->changedOutFrom($apparatus);
     }
 
     /** Open inventory corrections on this apparatus (member-safe markers, no reporter identity). */
@@ -414,12 +406,12 @@ class ApparatusController extends Controller
             'inspection_session_replay_key' => ['nullable', 'uuid'],
             'officer_signature' => ['required_if:processing_version,1', 'nullable', 'string', 'max:7000000'],
             'employee_id' => ['nullable', 'integer', 'exists:employees,id'],
-            // The member's confirmation of the physical vehicle. What the client
-            // says is recorded as a report; whether it differs from the unit's
-            // assigned vehicle is decided only against the locked apparatus below.
+            // The member's confirmation of the physical vehicle. Whether it differs from the unit's assigned
+            // vehicle is decided only against the locked apparatus below. swap_answer and note come only from
+            // phones still on the old app, and a badly formed number is flagged rather than refused there.
             'physical_vehicle' => ['nullable', 'array:vehicle_number,swap_answer,note', 'prohibited_unless:processing_version,1'],
-            'physical_vehicle.vehicle_number' => ['required_with:physical_vehicle', 'string', 'max:32'],
-            'physical_vehicle.swap_answer' => ['nullable', 'string', 'in:'.implode(',', ApparatusVehicleSwapRequest::ANSWERS)],
+            'physical_vehicle.vehicle_number' => ['nullable', 'string', 'max:255'],
+            'physical_vehicle.swap_answer' => ['nullable', 'string'],
             'physical_vehicle.note' => ['nullable', 'string', 'max:1000'],
             // The member's request for further review. Items are validated against the resolved checklist.
             'review_flag' => ['nullable', 'array:explanation,items', 'prohibited_unless:processing_version,1'],
@@ -606,17 +598,11 @@ class ApparatusController extends Controller
                     $checklistResolver,
                     $lockedInspectionSession,
                 );
-                // Null: the assigned vehicle was confirmed (or this is an older queued
-                // submission without the confirmation), so processing is automatic.
-                $swapAssessment = app(VehicleSwapService::class)->assess($lockedApparatus, $prepared['physical_vehicle'] ?? null);
-                $expectedVehicle = $swapAssessment !== null
-                    ? $swapAssessment['vehicle_number']
-                    : $lockedApparatus->vehicle_number;
+                $vehicleReports = app(CheckoutVehicleReport::class);
+                $vehicleReport = $vehicleReports->assess($lockedApparatus, $prepared['physical_vehicle'] ?? null);
                 if (($prepared['processing_version'] ?? null) === 1) {
                     foreach ($prepared['field_values'] ?? [] as $field) {
-                        if (($field['id'] === 'vehicle_num' && ! ($swapAssessment !== null
-                                ? VehicleNumber::same($field['value'], $expectedVehicle)
-                                : $field['value'] === $expectedVehicle))
+                        if (($field['id'] === 'vehicle_num' && ! $vehicleReports->paperFieldMatches($vehicleReport, $field['value'], $lockedApparatus))
                             || ($field['id'] === 'mileage' && $field['value'] !== ($prepared['miles'] ?? null))) {
                             throw ValidationException::withMessages(['field_values' => 'The paper mileage and physical vehicle must match this inspection.']);
                         }
@@ -664,7 +650,7 @@ class ApparatusController extends Controller
                     'vehicle_number' => $lockedApparatus->vehicle_number,
                     // The checkout was done as the unit that was on this truck, not the identity the truck took after.
                     'designation_at_time' => $changedOut->unit_designation ?? $lockedApparatus->designation,
-                    'processing_status' => $swapAssessment !== null ? VehicleSwapService::HELD_PROCESSING_STATUS : null,
+                    'processing_status' => null,
                     'results' => $prepared['compartments'] ?? null,
                     'checklist_evidence' => ($prepared['processing_version'] ?? null) === 1
                         ? app(\App\Services\InspectionPaperFields::class)->snapshot($prepared, $lockedChecklist)
@@ -692,24 +678,12 @@ class ApparatusController extends Controller
                     // A different physical vehicle than the unit's own was reported: the answers describe that
                     // vehicle, so they are kept but never applied to this unit. A unit with no vehicle number
                     // of its own (Fire Boat 6) has nothing to differ from: its crew is naming the vehicle,
-                    // which is exactly what the questions are for. The swap hold itself is unchanged.
-                    $differentVehicleReported = $swapAssessment !== null
-                        && VehicleNumber::normalize($lockedApparatus->vehicle_number) !== null;
-                    $this->recordVehicleIdentification($lockedApparatus, $prepared['vehicle_identification'], $request, $clientSubmissionId, $inspection, $differentVehicleReported);
+                    // which is exactly what the questions are for.
+                    $this->recordVehicleIdentification($lockedApparatus, $prepared['vehicle_identification'], $request, $clientSubmissionId, $inspection, $vehicleReports->describesAnotherTruck($vehicleReport, $lockedApparatus));
                 }
 
-                if ($swapAssessment !== null) {
-                    // Saved under the unit, findings and readings held until Fleet decides.
-                    app(VehicleSwapService::class)->hold(
-                        $inspection,
-                        $lockedApparatus,
-                        $swapAssessment,
-                        (string) $prepared['operator_name'],
-                        $actor->userId(),
-                        $prepared['meter_baseline_token'] ?? null,
-                    );
-                } elseif (($prepared['processing_version'] ?? null) === 1) {
-                    app(ApparatusInspectionProcessingService::class)->process($inspection, $lockedApparatus, $prepared['meter_baseline_token'] ?? null, $lockedChecklist);
+                if (($prepared['processing_version'] ?? null) === 1) {
+                    $vehicleReports->process($inspection, $lockedApparatus, $vehicleReport, $actor->user(), $prepared['meter_baseline_token'] ?? null, $lockedChecklist);
                 }
 
                 DB::afterCommit(function () use ($inspection): void {
@@ -855,15 +829,11 @@ class ApparatusController extends Controller
             'mark_out_of_service' => ['sometimes', 'boolean'],
         ]);
 
-        try {
-            $inspection = $approvalService->approve(
-                (int) $inspection->getKey(),
-                $reviewer,
-                (bool) ($validated['mark_out_of_service'] ?? false),
-            );
-        } catch (VehicleSwapDecisionException $held) {
-            return response()->json(['message' => $held->getMessage(), 'code' => 'DAILY_CHECKOUT_HELD_FOR_VEHICLE_SWAP'], 409);
-        }
+        $inspection = $approvalService->approve(
+            (int) $inspection->getKey(),
+            $reviewer,
+            (bool) ($validated['mark_out_of_service'] ?? false),
+        );
 
         return response()->json($inspection->fresh()->load('apparatus'));
     }
@@ -885,15 +855,11 @@ class ApparatusController extends Controller
             'review_notes' => ['required', 'string', 'max:2000'],
         ]);
 
-        try {
-            $inspection = $approvalService->reject(
-                (int) $inspection->getKey(),
-                $reviewer,
-                trim($validated['review_notes']),
-            );
-        } catch (VehicleSwapDecisionException $held) {
-            return response()->json(['message' => $held->getMessage(), 'code' => 'DAILY_CHECKOUT_HELD_FOR_VEHICLE_SWAP'], 409);
-        }
+        $inspection = $approvalService->reject(
+            (int) $inspection->getKey(),
+            $reviewer,
+            trim($validated['review_notes']),
+        );
 
         return response()->json($inspection->fresh()->load('apparatus'));
     }
@@ -1210,7 +1176,6 @@ class ApparatusController extends Controller
             'inspection_reference' => $inspection->inspection_reference,
             'review_status' => $inspection->review_status,
             'processing_status' => $inspection->processing_status,
-            'vehicle_swap_pending' => $inspection->processing_status === VehicleSwapService::HELD_PROCESSING_STATUS,
             'completed_at' => $inspection->completed_at,
         ];
     }

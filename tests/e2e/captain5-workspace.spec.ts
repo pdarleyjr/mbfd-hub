@@ -1060,8 +1060,8 @@ test.describe('Truck Changes', () => {
     { apparatus_id: 5, unit: 'R 44', vehicle_number: '1033', station: 'Station 4', status: 'Out of Service', changed_at: minutesAgo(90), changed_recently: true },
   ];
   const changes: RescueTruckChange[] = [
-    { id: 'changeout:1', source: 'changeout', unit: 'R 44', from_vehicle_number: '17503', to_vehicle_number: '1033', at: minutesAgo(90), by: 'Lt. Alvarez', recent: true, note: 'Moved after the morning call.', left_behind: [{ name: 'Airway Bag', note: 'Stays on the old truck.' }, { name: 'LifePak 15', note: null }] },
-    { id: 'fleet_decision:2', source: 'fleet_decision', unit: 'R 1', from_vehicle_number: '2200', to_vehicle_number: '2201', at: minutesAgo(60 * 24 * 5), by: 'Sam Fleet', recent: false, note: null, left_behind: [] },
+    { id: 'changeout:1', unit: 'R 44', from_vehicle_number: '17503', to_vehicle_number: '1033', at: minutesAgo(90), by: 'Lt. Alvarez', recent: true, note: 'Moved after the morning call.', left_behind: [{ name: 'Airway Bag', note: 'Stays on the old truck.' }, { name: 'LifePak 15', note: null }] },
+    { id: 'changeout:2', unit: 'R 1', from_vehicle_number: '2200', to_vehicle_number: '2201', at: minutesAgo(60 * 24 * 5), by: 'Sam Fleet', recent: false, note: null, left_behind: [] },
   ];
 
   test('the tab sits after Replacements, shows who is on what truck and what changed, and its badge is the last 24 hours', async ({ page }) => {
@@ -1091,7 +1091,8 @@ test.describe('Truck Changes', () => {
     await entries.nth(0).locator('summary').click();
     await expect(entries.nth(0).getByText('Airway Bag: Stays on the old truck.')).toBeVisible();
     await expect(entries.nth(0).getByText('Moved after the morning call.')).toBeVisible();
-    await expect(entries.nth(1)).toContainText('Fleet decision by Sam Fleet');
+    await expect(entries.nth(1)).toContainText('Sam Fleet');
+    await expect(entries.nth(1)).not.toContainText('Fleet decision');
     await expect(entries.nth(1).locator('summary')).toHaveCount(0);
     await expectNoHorizontalOverflow(page);
     await shot(page, `trucks-${page.viewportSize()?.width}`);

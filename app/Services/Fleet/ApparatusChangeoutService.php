@@ -25,6 +25,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
+use Ramsey\Uuid\Uuid;
 use Throwable;
 
 /**
@@ -38,6 +39,9 @@ use Throwable;
 final class ApparatusChangeoutService
 {
     private const ATTEMPTS = 3;
+
+    /** Namespace for the changeout id derived from a checkout's client_submission_id. Fixed: a replay must derive the same id. */
+    private const CHECKOUT_ID_NAMESPACE = '6f0c9a44-6a4e-5d0b-9b0e-3f1b7a2c8d11';
 
     public function __construct(
         private readonly ApparatusChangeoutPlanner $planner,
@@ -95,6 +99,39 @@ final class ApparatusChangeoutService
 
             return $replay ?? $this->attempt((int) $unit->getKey(), $actor, $input);
         }
+    }
+
+    /**
+     * A queued checkout from an old phone named a different truck: that is a swap, and it goes down the same path as
+     * submit(). There is no equipment list, because nobody was asked for one. The caller holds the inspection's
+     * transaction and has already locked the row, so this commits with the checkout or not at all, and Fleet is told only
+     * after that. It is idempotent on the checkout's own id: the changeout's id is derived from it.
+     *
+     * @return array{changeout: ApparatusChangeout, created: bool, replayed: bool}
+     *
+     * @throws ChangeoutConflictException
+     */
+    public function recordFromCheckout(Apparatus $unit, User $actor, string $inspectionSubmissionId, string $reportedNumber, string $reporterName, ?string $memberNote): array
+    {
+        $note = trim("Reported at Daily Checkout by {$reporterName}. No equipment list was recorded. ".trim((string) $memberNote));
+        $input = [
+            ...$this->normalized($unit, $actor, [
+                'client_submission_id' => Uuid::uuid5(self::CHECKOUT_ID_NAMESPACE, strtolower($inspectionSubmissionId))->toString(),
+                'expected_vehicle_number' => $unit->vehicle_number,
+                'expected_unit_slug' => $unit->slug,
+                'to_vehicle_number' => $reportedNumber,
+                'note' => mb_substr($note, 0, 1000),
+            ]),
+            'from_checkout' => true,
+        ];
+
+        $result = $this->replayOf($input) ?? $this->record((int) $unit->getKey(), $actor, $input);
+        if ($result['created']) {
+            $changeout = $result['changeout'];
+            DB::afterCommit(fn () => $this->tellFleetAfterCommit($changeout));
+        }
+
+        return $result;
     }
 
     /**
@@ -285,7 +322,8 @@ final class ApparatusChangeoutService
     }
 
     /**
-     * Both trucks, in ascending id: the order VehicleSwapService uses, so two moves can never interleave.
+     * Both trucks, in ascending id, so two moves can never interleave. A queued checkout has its route row locked first;
+     * if that ever deadlocks with a move, the database refuses one and the checkout's own transaction retries it.
      *
      * @param  array<int, int|null>  $ids
      * @return Collection<int, Apparatus>
@@ -367,6 +405,7 @@ final class ApparatusChangeoutService
         $changeout->update([
             'move_audit' => [
                 'mode' => ApparatusChangeoutPlanner::MODE_START,
+                ...(($input['from_checkout'] ?? false) ? ['source' => 'daily_checkout'] : []),
                 'before' => $move['before'],
                 'after' => $move['after'],
                 'corrections_left_on_truck' => $corrections,
@@ -389,8 +428,9 @@ final class ApparatusChangeoutService
     }
 
     /**
-     * The identity is already on the truck (Fleet approved a Daily Checkout report first), so this records what the crew
-     * took and left against the existing pair. No identity moves. The truck they left is Out of Service, as on every swap.
+     * The identity is already on the truck, because the unit was moved by hand after the alert was raised (an admin editing
+     * an apparatus can move a slug), so this records what the crew took and left against the existing pair. No identity
+     * moves. The truck they left is Out of Service, as on every swap.
      *
      * @param  array<string, mixed>  $input
      */
@@ -465,7 +505,10 @@ final class ApparatusChangeoutService
             'submitted_by_name' => (string) $actor->name,
             'effective_at' => now(),
         ]);
-        $changeout->items()->createMany($this->lineBuilder->linesFor($equipment, $input['exceptions']));
+        // A checkout that named a truck said nothing about what was taken or left, so no line claims either.
+        if (! ($input['from_checkout'] ?? false)) {
+            $changeout->items()->createMany($this->lineBuilder->linesFor($equipment, $input['exceptions']));
+        }
 
         return $changeout;
     }

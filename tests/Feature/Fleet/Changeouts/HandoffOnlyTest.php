@@ -4,17 +4,16 @@ declare(strict_types=1);
 
 namespace Tests\Feature\Fleet\Changeouts;
 
+use App\Models\Apparatus;
 use App\Models\ApparatusChangeout;
 use App\Models\ApparatusFleetEvent;
 use App\Models\ApparatusOperationalAlert;
 use App\Models\ApparatusOperationalStatusEvent;
-use App\Services\Fleet\VehicleSwapService;
 use Illuminate\Support\Str;
 
 /**
- * Section 4.4: Fleet approved a Daily Checkout swap report first, so the identity is already on the new truck. The
- * crew records the equipment against the existing pair, with no move. These run against the real templates, since a
- * held checkout has to pass the real checklist.
+ * Section 4.3: an admin moved the unit by hand, editing the two apparatus rows, so the identity is already on the new
+ * truck and the alert is still open. The crew records the equipment against the existing pair, with no move.
  */
 final class HandoffOnlyTest extends ChangeoutTestCase
 {
@@ -24,12 +23,20 @@ final class HandoffOnlyTest extends ChangeoutTestCase
     {
         parent::setUp();
         $this->alert = $this->swapAlert($this->unit);
-        $swap = $this->heldRequest(withFinding: false);
-        app(VehicleSwapService::class)->decide($swap->id, $this->fleetOperationsManager(), VehicleSwapService::DECISION_APPROVE_SWAP);
-        $this->actingAsCanonicalUser($this->member);
+        $this->tradeIdentitiesByHand($this->unit, $this->frontline);
     }
 
-    public function test_decide_moved_the_unit_and_left_the_alert_open(): void
+    private function tradeIdentitiesByHand(Apparatus $first, Apparatus $second): void
+    {
+        $fields = ['unit_id', 'designation', 'name', 'slug', 'station_id', 'assignment', 'daily_checkout_requirement', 'daily_checkout_template'];
+        $identity = static fn (Apparatus $row): array => collect($fields)->mapWithKeys(static fn (string $field): array => [$field => $row->fresh()->getRawOriginal($field)])->all();
+        [$a, $b] = [$identity($first), $identity($second)];
+        Apparatus::query()->whereKey($first->id)->toBase()->update(['unit_id' => 'hand-hold', 'slug' => 'hand-hold']);
+        Apparatus::query()->whereKey($second->id)->toBase()->update($a);
+        Apparatus::query()->whereKey($first->id)->toBase()->update($b);
+    }
+
+    public function test_the_unit_moved_and_the_alert_is_still_open(): void
     {
         $this->assertSame('E2', $this->frontline->fresh()->designation);
         $this->assertSame('active', $this->alert->fresh()->status);
@@ -51,7 +58,11 @@ final class HandoffOnlyTest extends ChangeoutTestCase
     public function test_the_handoff_records_the_existing_pair_with_no_move(): void
     {
         $statusEvents = ApparatusOperationalStatusEvent::query()->count();
-        $identity = static fn (array $row): array => array_diff_key($row, array_flip(['status', 'updated_at']));
+        // Identity columns only: reported_at and updated_at are clock values and can cross a second during the request.
+        $identity = static fn (array $row): array => array_intersect_key($row, array_flip([
+            'unit_id', 'designation', 'name', 'slug', 'station_id', 'assignment', 'daily_checkout_requirement', 'daily_checkout_template',
+            'vehicle_number', 'unit_master_vehicle_id', 'master_link_status',
+        ]));
         $before = [$identity($this->unit->fresh()->getAttributes()), $identity($this->frontline->fresh()->getAttributes())];
 
         $response = $this->postChangeout($this->frontline, ['alert_id' => $this->alert->id]);

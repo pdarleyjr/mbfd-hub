@@ -76,8 +76,6 @@ export interface EmployeeOption {
   rank: string | null;
 }
 
-export type SwapAnswer = 'swap_completed' | 'unknown';
-
 /** One vehicle on the fleet list offered by the "confirm the physical vehicle" dropdown. */
 export interface FleetVehicle {
   vehicle_number: string;
@@ -91,18 +89,14 @@ export interface VehicleConfirmation {
   assignedVehicle: string;
   /** Selected vehicle ID, or the "Not listed" marker. */
   choice: string;
-  /** Typed ID when the vehicle is not listed. */
+  /** Typed ID, for a unit with no vehicle number on record. */
   typedVehicle: string;
-  swapAnswer: SwapAnswer | '';
-  note: string;
   confirmed: boolean;
 }
 
-/** Reported with the checkout; the server decides whether it differs from the assignment. */
+/** Sent with the checkout: the assigned truck. The server still decides against the locked apparatus. */
 export interface PhysicalVehicleReport {
   vehicle_number: string;
-  swap_answer?: SwapAnswer;
-  note?: string;
 }
 
 /** One open "one-time vehicle information" question. The server decides which are open. */

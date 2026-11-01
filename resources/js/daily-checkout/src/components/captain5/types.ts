@@ -155,10 +155,9 @@ export interface RescueTruckLeftBehind {
   note: string | null;
 }
 
-/** A completed changeout, or a swap Fleet decided from a Daily Checkout report. */
+/** A completed changeout. */
 export interface RescueTruckChange {
   id: string;
-  source: 'changeout' | 'fleet_decision';
   unit: string;
   from_vehicle_number: string | null;
   to_vehicle_number: string | null;
