@@ -78,7 +78,7 @@ final class RosterSeatWatch
             ->whereDate('duty_date', $dutyDate)
             ->where('reason', $role)
             ->latest('id')
-            ->first()?->context ?? ['user_ids' => [], 'no_account' => [], 'unmatched' => 0];
+            ->first()->context ?? ['user_ids' => [], 'no_account' => [], 'unmatched' => 0];
         if ($last == $context) {
             return false;
         }
