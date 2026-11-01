@@ -1,6 +1,7 @@
 import type { ActingApi, ActingRequest, ActingResult, ActingState, OnDuty } from '../components/acting/types';
+import { ACTIONS } from '../components/captain5/actionForms';
 import type {
-  Captain5Summary, Handoff, InspectionView, IssueActionRequest, IssueDetail, IssueSummary, Workspace,
+  Captain5Summary, Handoff, InspectionView, IssueActionName, IssueActionRequest, IssueDetail, IssueSummary, RescueTruck, RescueTruckChange, Workspace,
 } from '../components/captain5/types';
 import { ApiRequestError, fetchWithTimeout, mutationHeaders } from './api';
 import { parseVehicleIdentification } from './vehicleIdentification';
@@ -127,7 +128,8 @@ export function normalizeDetail(raw: unknown): IssueDetail {
     messages: asArray(item.messages),
     can_post: item.can_post === true,
     can_post_internal: item.can_post_internal === true,
-    actions: asArray(item.actions),
+    // A name this build has no form for is left out rather than breaking the sheet.
+    actions: [...asArray<IssueActionName>(item.actions), ...asArray<IssueActionName>(item.clearing_actions)].filter((action) => action in ACTIONS),
     origin_inspection_id: item.origin_inspection_id ?? null,
   };
 }
@@ -172,6 +174,40 @@ export const normalizeOnDuty = (raw: unknown): OnDuty => {
   return { ...duty, acting_until: asIso(duty.acting_until), acting_request_id: typeof duty.acting_request_id === 'number' ? duty.acting_request_id : null, as_of: asIso(duty.as_of) };
 };
 
+const asText = (value: unknown): string | null => (typeof value === 'string' && value.trim() !== '' ? value : null);
+
+function normalizeTruck(raw: unknown): RescueTruck {
+  const item = asRecord(raw);
+  return {
+    apparatus_id: typeof item.apparatus_id === 'number' ? item.apparatus_id : 0,
+    unit: asText(item.unit) ?? 'Unit',
+    vehicle_number: asText(item.vehicle_number),
+    station: asText(item.station),
+    status: asText(item.status) ?? 'Unknown',
+    changed_at: asIso(item.changed_at),
+    changed_recently: item.changed_recently === true,
+  };
+}
+
+function normalizeTruckChange(raw: unknown, index: number): RescueTruckChange {
+  const item = asRecord(raw);
+  return {
+    id: asText(item.id) ?? `change-${index}`,
+    source: item.source === 'fleet_decision' ? 'fleet_decision' : 'changeout',
+    unit: asText(item.unit) ?? 'Unit',
+    from_vehicle_number: asText(item.from_vehicle_number),
+    to_vehicle_number: asText(item.to_vehicle_number),
+    at: asIso(item.at),
+    by: asText(item.by),
+    recent: item.recent === true,
+    note: asText(item.note),
+    left_behind: asArray(item.left_behind).map((line) => {
+      const entry = asRecord(line);
+      return { name: asText(entry.name) ?? 'Item', note: asText(entry.note) };
+    }),
+  };
+}
+
 function normalizeWorkspace(raw: Record<string, unknown>): Workspace {
   const data = raw as unknown as Workspace;
   const vehicleIdentification = parseVehicleIdentification(raw.vehicle_identification);
@@ -183,6 +219,10 @@ function normalizeWorkspace(raw: Record<string, unknown>): Workspace {
     on_duty: normalizeOnDuty(data.on_duty),
     rescue_dailies: asArray(data.rescue_dailies),
     issues: asArray(data.issues).map(normalizeSummary),
+    // Absent from an answer sent before these existed: nothing cleared, and the Truck Changes tab shows its empty state.
+    cleared_issues: asArray(raw.cleared_issues).map(normalizeSummary),
+    rescue_trucks: asArray(raw.rescue_trucks).map(normalizeTruck),
+    rescue_truck_changes: asArray(raw.rescue_truck_changes).map(normalizeTruckChange),
     handoff: { duty_date: data.handoff?.duty_date ?? data.duty_date, notes: asArray(data.handoff?.notes) },
     acting: normalizeActing(raw.acting),
   };

@@ -95,7 +95,7 @@ final class ImportOperationalAlerts extends Command
         return $alerts->create([
             ...collect($row)->only([
                 'dedupe_key', 'category', 'title', 'message', 'reason', 'scheduled_date', 'scheduled_window',
-                'scheduled_at', 'old_truck_status_after', 'source', 'send_notification',
+                'scheduled_at', 'source', 'send_notification',
             ])->all(),
             'apparatus_id' => $truck->getKey(),
             'apparatus_service_ticket_id' => $ticket->getKey(),

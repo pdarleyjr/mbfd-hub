@@ -36,6 +36,7 @@ final class Captain5Workspace
         private readonly Captain5IssuePresenter $presenter,
         private readonly DutyCalendar $calendar,
         private readonly OnDutyOfficerDisplayResolver $display,
+        private readonly Captain5RescueTrucks $trucks,
     ) {}
 
     /** @return array<string, mixed> */
@@ -53,22 +54,35 @@ final class Captain5Workspace
             'rescue_dailies' => $this->rescueDailies(),
             'issues' => $summaries,
             'issues_truncated' => $this->truncated,
+            'cleared_issues' => $this->presenter->summaries($this->clearedIssues()),
+            ...$this->trucks->payload(),
             'handoff' => $this->handoff($dutyDate, $viewer),
             'acting' => $this->acting($viewer, $decision),
             'generated_at' => now()->utc()->toIso8601String(),
         ];
     }
 
-    /** @return Collection<int, ApparatusDefect> */
+    /** @return Collection<int, ApparatusDefect> the Captain 5 queue: open, in scope, not cleared for Logistics */
     public function openIssues(): Collection
     {
         [$issues, $this->truncated] = $this->scope->collect(
-            $this->scope->candidateQuery()->where('resolved', false)->with('firstReporter'),
+            $this->scope->candidateQuery()->where('resolved', false)->whereNull('captain5_cleared_at')->with('firstReporter'),
             self::OPEN_LIMIT,
         );
         if ($this->truncated) {
             Log::warning('captain5.open_issue_queue_truncated', ['limit' => self::OPEN_LIMIT]);
         }
+
+        return $this->scope->attachApparatus($issues);
+    }
+
+    /** @return Collection<int, ApparatusDefect> open issues Captain 5 cleared for Logistics; a closed one is in History instead */
+    public function clearedIssues(): Collection
+    {
+        [$issues] = $this->scope->collect(
+            $this->scope->candidateQuery()->where('resolved', false)->whereNotNull('captain5_cleared_at')->with(['firstReporter', 'captain5ClearedBy']),
+            self::OPEN_LIMIT,
+        );
 
         return $this->scope->attachApparatus($issues);
     }
@@ -126,7 +140,7 @@ final class Captain5Workspace
             ->orderByDesc('id')
             ->get(['id', 'apparatus_id', 'operator_name', 'rank', 'created_at', 'completed_at', 'processing_status', 'review_status'])
             ->unique('apparatus_id')->keyBy('apparatus_id');
-        $openCounts = ApparatusDefect::query()->whereIn('apparatus_id', $ids)->where('resolved', false)
+        $openCounts = ApparatusDefect::query()->whereIn('apparatus_id', $ids)->where('resolved', false)->whereNull('captain5_cleared_at')
             ->selectRaw('apparatus_id, count(*) as open_count')->groupBy('apparatus_id')->pluck('open_count', 'apparatus_id');
 
         return $rescues->map(function (Apparatus $apparatus) use ($inspections, $openCounts): array {

@@ -80,7 +80,8 @@ enrolls the actor as participant (`enrollment_source=captain5`) and routes notif
 | Replaced / returned to service | `resolve(replacement_installed|spare_issued|repair_completed, notes)` — requires an explicit "verified in place" confirmation |
 | Verify member's correction | `verifyCorrection` |
 | Close — No Action Required | `dismiss` (any Captain 5 page user since the follow-up). Same reason rules and refusals as Logistics (significant damage, out of service / needs repair, repair or replacement arranged, open or completed service ticket); Captain 5 is told to ask Logistics to correct the severity. The reporter and participants are told once, with the reason. |
-| Reopen | `reopen` |
+| Reopen | `reopen`. A cleared issue reopened from this page also comes back to the queue. |
+| Clear, this is for Logistics / Bring back | `Captain5IssueClearing`, not the engine: it is a filter on this page, not a step in the issue's life. Sets `captain5_cleared_at`, adds one history row, and leaves the status, the Logistics dashboards, the crew and every notification alone. A cleared issue leaves the queue and every count, and stays cleared if a later checkout observes it again. Sent as `clearing_actions`, apart from `actions`, because a cached older page throws on an action name it does not know. |
 | Message submitter / followers | `IssueMessageService::post` (issue thread) |
 | Request clarification | `IssueMessageService::post(kind=clarification_requested)` on the originating inspection |
 

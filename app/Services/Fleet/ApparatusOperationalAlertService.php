@@ -36,15 +36,9 @@ class ApparatusOperationalAlertService
 
     public const STATE_VEHICLE_CHANGED = 'vehicle_changed';
 
-    public const STATE_AWAITING_FLEET = 'awaiting_fleet';
-
-    public const STATE_AWAITING_VERIFICATION = 'awaiting_verification';
-
     private const STATE_LABELS = [
         self::STATE_PLANNED => 'Planned',
         self::STATE_VEHICLE_CHANGED => 'Vehicle changed',
-        self::STATE_AWAITING_FLEET => 'Waiting on Fleet',
-        self::STATE_AWAITING_VERIFICATION => 'Waiting on verification',
     ];
 
     private const CONSOLE_ACTOR = 'Console';
@@ -190,8 +184,8 @@ class ApparatusOperationalAlertService
     }
 
     /**
-     * The alerts a station page shows, section 6 shape. Two queries however many alerts there are: the alerts with
-     * the truck now holding each unit, and the changeouts that decide their workflow state.
+     * The alerts a station page shows, section 6 shape. One query however many alerts there are: the alerts with the
+     * truck now holding each unit.
      *
      * @return list<array<string, mixed>>
      */
@@ -214,11 +208,10 @@ class ApparatusOperationalAlertService
             return [];
         }
 
-        $changeouts = $this->workflowChangeouts($alerts);
         $canAct = $this->canAct($viewer);
 
         return $this->sorted($alerts)
-            ->map(fn (ApparatusOperationalAlert $alert): array => $this->present($alert, $changeouts, $canAct))
+            ->map(fn (ApparatusOperationalAlert $alert): array => $this->present($alert, $canAct))
             ->values()
             ->all();
     }
@@ -285,91 +278,35 @@ class ApparatusOperationalAlertService
             && ($changeout->alert_id === null || (int) $changeout->alert_id === (int) $alert->getKey());
     }
 
-    /**
-     * Completed changeouts tied to these alerts, and anything waiting on Fleet for the alert or its unit.
-     *
-     * @param  Collection<int, ApparatusOperationalAlert>  $alerts
-     * @return Collection<int, ApparatusChangeout>
-     */
-    private function workflowChangeouts(Collection $alerts): Collection
+    /** The unit is on the truck the alert was raised on, or a Daily Checkout decision already moved it. */
+    private function workflowState(ApparatusOperationalAlert $alert): string
     {
-        $alertIds = $alerts->pluck('id')->all();
-        $slugs = $alerts->pluck('unit_slug')->unique()->values()->all();
-
-        return ApparatusChangeout::query()
-            ->select(['id', 'alert_id', 'unit_slug', 'status', 'handoff_status'])
-            ->where(fn (Builder $query) => $query
-                ->where(fn (Builder $completed) => $completed
-                    ->where('status', ApparatusChangeout::STATUS_COMPLETED)
-                    ->whereIn('alert_id', $alertIds))
-                ->orWhere(fn (Builder $pending) => $pending
-                    ->where('status', ApparatusChangeout::STATUS_PENDING_FLEET)
-                    ->where(fn (Builder $scope) => $scope->whereIn('alert_id', $alertIds)->orWhereIn('unit_slug', $slugs))))
-            ->orderByDesc('id')
-            ->get()
-            ->toBase();
-    }
-
-    /**
-     * @param  Collection<int, ApparatusChangeout>  $changeouts
-     * @return array{state: string, changeout_id: int|null, finished: bool}
-     */
-    private function workflow(ApparatusOperationalAlert $alert, Collection $changeouts): array
-    {
-        $alertId = (int) $alert->getKey();
-        $tied = $changeouts->filter(fn (ApparatusChangeout $changeout): bool => $changeout->isCompleted() && (int) $changeout->alert_id === $alertId);
-        $unverified = $tied->firstWhere('handoff_status', ApparatusChangeout::HANDOFF_PENDING_VERIFICATION);
-        if ($unverified !== null) {
-            return ['state' => self::STATE_AWAITING_VERIFICATION, 'changeout_id' => (int) $unverified->getKey(), 'finished' => false];
-        }
-
-        $pending = $changeouts->first(fn (ApparatusChangeout $changeout): bool => $changeout->isPendingFleet()
-            && ((int) $changeout->alert_id === $alertId || $changeout->unit_slug === $alert->unit_slug));
-        if ($pending !== null) {
-            return ['state' => self::STATE_AWAITING_FLEET, 'changeout_id' => (int) $pending->getKey(), 'finished' => false];
-        }
-
         $holderId = $alert->getAttribute('current_apparatus_id');
-        if ($tied->isEmpty() && $holderId !== null && (int) $holderId !== (int) $alert->apparatus_id) {
-            return ['state' => self::STATE_VEHICLE_CHANGED, 'changeout_id' => null, 'finished' => false];
-        }
 
-        return ['state' => self::STATE_PLANNED, 'changeout_id' => $tied->isEmpty() ? null : (int) $tied->first()->getKey(), 'finished' => $tied->isNotEmpty()];
+        return $holderId !== null && (int) $holderId !== (int) $alert->apparatus_id ? self::STATE_VEHICLE_CHANGED : self::STATE_PLANNED;
     }
 
     /**
-     * @param  array{state: string, changeout_id: int|null, finished: bool}  $workflow
-     * @return array{kind: string, label: string|null, apparatus_id: int|null, alert_id: int, changeout_id: int|null}
+     * @return array{kind: string, label: string|null, apparatus_id: int|null, alert_id: int, changeout_id: null}
      */
-    private function action(ApparatusOperationalAlert $alert, array $workflow, bool $canAct): array
+    private function action(ApparatusOperationalAlert $alert, string $state, bool $canAct): array
     {
         $none = ['kind' => 'none', 'label' => null, 'apparatus_id' => null, 'alert_id' => (int) $alert->getKey(), 'changeout_id' => null];
         $holderId = $alert->getAttribute('current_apparatus_id');
         if (! $canAct || ! $alert->isUpcomingSwap() || $holderId === null) {
             return $none;
         }
-        // The unit moved, but not to the truck Fleet planned: the planned move did not happen and only Fleet can resolve it.
-        $planned = $alert->planned_replacement_apparatus_id;
-        if ($workflow['state'] === self::STATE_VEHICLE_CHANGED && $planned !== null && (int) $planned !== (int) $holderId) {
-            return $none;
-        }
+        [$kind, $label] = $state === self::STATE_VEHICLE_CHANGED
+            ? ['handoff', 'Record What You Took and Left']
+            : ['start', 'Start Changeout'];
 
-        [$kind, $label] = match (true) {
-            $workflow['changeout_id'] !== null => ['view', 'View Changeout'],
-            $workflow['state'] === self::STATE_VEHICLE_CHANGED => ['handoff', 'Record Equipment Handoff'],
-            default => ['start', 'Start Changeout'],
-        };
-
-        return ['kind' => $kind, 'label' => $label, 'apparatus_id' => (int) $holderId, 'alert_id' => (int) $alert->getKey(), 'changeout_id' => $workflow['changeout_id']];
+        return ['kind' => $kind, 'label' => $label, 'apparatus_id' => (int) $holderId, 'alert_id' => (int) $alert->getKey(), 'changeout_id' => null];
     }
 
-    /**
-     * @param  Collection<int, ApparatusChangeout>  $changeouts
-     * @return array<string, mixed>
-     */
-    private function present(ApparatusOperationalAlert $alert, Collection $changeouts, bool $canAct): array
+    /** @return array<string, mixed> */
+    private function present(ApparatusOperationalAlert $alert, bool $canAct): array
     {
-        $workflow = $this->workflow($alert, $changeouts);
+        $state = $this->workflowState($alert);
         $holderId = $alert->getAttribute('current_apparatus_id');
 
         return [
@@ -390,11 +327,11 @@ class ApparatusOperationalAlertService
             'scheduled_at' => $alert->scheduled_at?->utc()->toIso8601ZuluString(),
             'date_passed' => $alert->datePassed(),
             'workflow' => [
-                'state' => $workflow['state'],
-                'label' => self::STATE_LABELS[$workflow['state']],
-                'changeout_id' => $workflow['changeout_id'],
+                'state' => $state,
+                'label' => self::STATE_LABELS[$state],
+                'changeout_id' => null,
             ],
-            'action' => $this->action($alert, $workflow, $canAct),
+            'action' => $this->action($alert, $state, $canAct),
         ];
     }
 
@@ -522,7 +459,6 @@ class ApparatusOperationalAlertService
             'additional_station_ids' => ['sometimes', 'nullable', 'array', 'max:20'],
             'additional_station_ids.*' => ['integer', Rule::exists('stations', 'id')],
             'planned_replacement_apparatus_id' => ['sometimes', 'nullable', 'integer', Rule::exists('apparatuses', 'id'), Rule::notIn(array_filter([$apparatusId]))],
-            'old_truck_status_after' => ['sometimes', 'nullable', Rule::in(ApparatusOperationalAlert::OLD_TRUCK_STATUSES)],
             'apparatus_service_ticket_id' => ['sometimes', 'nullable', 'integer', Rule::exists('apparatus_service_tickets', 'id')->where('apparatus_id', $apparatusId)],
             'send_notification' => ['sometimes', 'boolean'],
         ];

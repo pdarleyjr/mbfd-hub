@@ -8,15 +8,11 @@ declare(strict_types=1);
  *
  *   php fleet-changeout-fixture.php reset [alert-date]   rebuild the fleet rows (see FleetChangeoutE2ESeeder::world)
  *   php fleet-changeout-fixture.php state                every fleet row the suite asserts on
- *   php fleet-changeout-fixture.php release <number>     Fleet frees a truck: Available, open tickets completed
- *   php fleet-changeout-fixture.php approve <id>         Fleet approves a changeout through the real service
  *   php fleet-changeout-fixture.php clear-alert <slug>   removes the planned changeout alert for a unit
  *
  * It refuses to run anywhere except the disposable database named in FleetChangeoutE2ESeeder::DATABASE_FILE.
  */
 
-use App\Models\User;
-use App\Services\Fleet\ApparatusChangeoutService;
 use Database\Seeders\FleetChangeoutE2ESeeder;
 use Illuminate\Contracts\Console\Kernel;
 use Illuminate\Support\Facades\DB;
@@ -40,8 +36,9 @@ function state(): array
         'tickets' => $rows('select t.id, t.ticket_number, t.status, a.vehicle_number from apparatus_service_tickets t join apparatuses a on a.id = t.apparatus_id order by t.id'),
         'defects' => $rows('select d.id, d.status, d.item, d.resolved, a.vehicle_number from apparatus_defects d join apparatuses a on a.id = d.apparatus_id order by d.id'),
         'alerts' => $rows('select id, status, category, unit_slug, vehicle_number, scheduled_date, completed_by_changeout_id from apparatus_operational_alerts order by id'),
-        'changeouts' => $rows('select id, status, handoff_status, unit_slug, from_vehicle_number, to_vehicle_number, alert_id, return_of_changeout_id, submitted_by_name, note, client_submission_id from apparatus_changeouts order by id'),
-        'items' => $rows('select i.id, i.apparatus_changeout_id as changeout_id, i.item_name, i.item_class, i.handling, i.custody_status, i.condition, i.note, i.quantity_moved, i.expected_quantity, i.verified_at from apparatus_changeout_items i order by i.id'),
+        'changeouts' => $rows('select id, status, unit_slug, from_vehicle_number, to_vehicle_number, alert_id, return_of_changeout_id, submitted_by_name, note, client_submission_id from apparatus_changeouts order by id'),
+        'items' => $rows('select i.id, i.apparatus_changeout_id as changeout_id, i.item_name, i.handling, i.custody_status, i.note from apparatus_changeout_items i order by i.id'),
+        'notifications' => $rows('select id, notifiable_id, data from notifications order by created_at'),
     ];
 }
 
@@ -51,17 +48,6 @@ switch ($command) {
         break;
     case 'state':
         $result = state();
-        break;
-    case 'release':
-        $id = DB::table('apparatuses')->where('vehicle_number', $argument)->value('id');
-        DB::table('apparatuses')->where('id', $id)->update(['status' => 'Available']);
-        DB::table('apparatus_service_tickets')->where('apparatus_id', $id)->update(['status' => 'completed', 'completed_at' => now()]);
-        $result = ['released' => $argument];
-        break;
-    case 'approve':
-        $manager = User::query()->where('employee_id', '99503')->firstOrFail();
-        $changeout = app(ApparatusChangeoutService::class)->decide((int) $argument, $manager, 'approve');
-        $result = ['status' => $changeout->status];
         break;
     case 'clear-alert':
         DB::table('apparatus_operational_alerts')->where('unit_slug', $argument)->delete();

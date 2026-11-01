@@ -2,43 +2,43 @@ import { useId, useState } from 'react';
 import { formatHubDate } from '../../../../shared/timezone.ts';
 import { MAX_VEHICLE_ID_LENGTH } from '../../utils/vehicleConfirmation';
 import Tag from '../ui/Tag';
-import { humanize } from '../ui/status';
-import { resolveTruck, truckNeedsFleet } from './changeoutLogic';
-import type { ChangeoutContext, ChangeoutDraft, OtherVehicle, PreviousChangeout, TruckChoice } from './types';
+import { OLD_TRUCK_STATUS_AFTER, realUnitLabel } from './changeoutLogic';
+import type { ChangeoutContext, ChangeoutDraft, PreviousChangeout, ResolvedTruck, TruckChoice } from './types';
 
 interface Props {
   context: ChangeoutContext;
   draft: ChangeoutDraft;
+  truck: ResolvedTruck | null;
   /** The current problem, shown after the member tried to continue. */
   problem: string | null;
   onChoose: (choice: TruckChoice) => void;
   onTyped: (value: string) => void;
 }
 
-const FLEET_NOTE = 'Fleet will confirm this truck. Your work is saved either way.';
-
-const CARD = 'hub-well flex min-h-11 cursor-pointer items-start gap-3 p-4 transition-colors motion-reduce:transition-none';
+const CARD = 'hub-well flex min-h-[4.5rem] cursor-pointer items-center gap-3 p-4 transition-colors motion-reduce:transition-none';
 const CARD_SELECTED = '!border-hub-blue !bg-hub-blue-tint ring-2 ring-hub-blue';
-const RADIO = 'mt-0.5 h-5 w-5 flex-none border-hub-control-border text-hub-blue focus:ring-hub-focus';
+const RADIO = 'h-6 w-6 flex-none border-hub-control-border text-hub-blue focus:ring-hub-focus';
 
 interface TruckCardProps {
   name: string;
-  vehicle: OtherVehicle;
+  vehicle: { vehicle_number: string; location: string | null; status: string | null };
   checked: boolean;
   isReturn?: boolean;
+  listedAs?: string | null;
   onChoose: () => void;
 }
 
-function TruckCard({ name, vehicle, checked, isReturn = false, onChoose }: TruckCardProps) {
-  const details = [vehicle.label, vehicle.location, vehicle.status].filter(Boolean).join(' · ');
+function TruckCard({ name, vehicle, checked, isReturn = false, listedAs = null, onChoose }: TruckCardProps) {
+  const details = [vehicle.location, vehicle.status].filter(Boolean).join(' · ');
 
   return (
     <label className={`${CARD} ${checked ? CARD_SELECTED : ''}`}>
       <input type="radio" name={name} checked={checked} onChange={onChoose} className={RADIO} />
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-2">
-          <span className="text-xl font-bold tabular-nums text-hub-ink">{vehicle.vehicle_number}</span>
+          <span className="text-2xl font-bold tabular-nums text-hub-ink">{vehicle.vehicle_number}</span>
           {isReturn && <Tag tone="info">Back to its own truck</Tag>}
+          {listedAs && <Tag>Listed as {listedAs}</Tag>}
         </span>
         {details !== '' && <span className="mt-0.5 block text-sm text-hub-n-600">{details}</span>}
       </span>
@@ -53,21 +53,13 @@ function PreviousChangeoutSummary({ previous }: { previous: PreviousChangeout })
       <p className="mt-1 text-sm tabular-nums text-hub-n-600">
         Truck {previous.from_vehicle_number ?? 'not recorded'} to {previous.to_vehicle_number ?? 'not recorded'}
         {previous.effective_at ? ` on ${formatHubDate(previous.effective_at)}` : ''}
-        {previous.submitted_by_name ? ` by ${previous.submitted_by_name}` : ''}. {previous.moved} moved.
+        {previous.submitted_by_name ? ` by ${previous.submitted_by_name}` : ''}. Took {previous.moved}.
       </p>
       {previous.left_behind.length > 0 && (
         <div className="mt-3">
-          <p className="text-sm font-semibold text-hub-ink">Left behind</p>
+          <p className="text-sm font-semibold text-hub-ink">Left on truck {previous.from_vehicle_number ?? 'not recorded'}</p>
           <ul className="mt-1 space-y-1 text-sm text-hub-n-800">
-            {previous.left_behind.map((line) => <li key={line.name}>{line.name}{line.note ? `: ${line.note}` : ''}</li>)}
-          </ul>
-        </div>
-      )}
-      {previous.open.length > 0 && (
-        <div className="mt-3">
-          <p className="text-sm font-semibold text-hub-ink">Still open</p>
-          <ul className="mt-1 space-y-1 text-sm text-hub-n-800">
-            {previous.open.map((line) => <li key={line.name}>{line.name}{line.status ? ` (${humanize(line.status).toLocaleLowerCase()})` : ''}</li>)}
+            {previous.left_behind.map((line, index) => <li key={`${line.name}-${index}`}>{line.name}{line.note ? `: ${line.note}` : ''}</li>)}
           </ul>
         </div>
       )}
@@ -75,33 +67,44 @@ function PreviousChangeoutSummary({ previous }: { previous: PreviousChangeout })
   );
 }
 
-export default function TruckStep({ context, draft, problem, onChoose, onTyped }: Props) {
+/** In plain words, before anything is sent. */
+function WhatHappens({ context, truck }: { context: ChangeoutContext; truck: ResolvedTruck | null }) {
+  const from = context.unit.vehicle_number;
+  if (from === null && truck === null) return null;
+
+  return (
+    <div role="status" data-testid="changeout-what-happens" className="hub-callout space-y-1 p-3 text-sm">
+      {from !== null && <p>Truck {from} will be marked {OLD_TRUCK_STATUS_AFTER}.</p>}
+      {truck?.listedAs && <p>{truck.listedAs} is listed on truck {truck.vehicleNumber}. {truck.listedAs} moves to truck {from ?? 'not recorded'}.</p>}
+      {truck?.source === 'typed' && <p>Truck {truck.vehicleNumber} is not on the list yet. It will be added, and Fleet will add the truck's details.</p>}
+    </div>
+  );
+}
+
+export default function TruckStep({ context, draft, truck, problem, onChoose, onTyped }: Props) {
   const name = useId();
-  const startsOpen = draft.choice?.kind === 'typed'
-    || (draft.choice?.kind === 'listed' && context.other_vehicles.some((vehicle) => draft.choice?.kind === 'listed' && vehicle.apparatus_id === draft.choice.apparatusId))
-    || context.candidates.length === 0;
+  const startsOpen = truck?.source === 'other' || draft.choice?.kind === 'typed' || context.candidates.length === 0;
   const [showOthers, setShowOthers] = useState(startsOpen);
   const { unit } = context;
 
   if (context.mode === 'handoff_only') {
     return (
       <div className="space-y-4">
-        <p className="hub-callout p-3 text-sm">{unit.designation} is already on truck {unit.vehicle_number ?? 'not recorded'}. Record what moved with it.</p>
+        <p className="hub-callout p-3 text-sm">{unit.designation} is already on truck {unit.vehicle_number ?? 'not recorded'}. Record what you took and left.</p>
         {context.previous_changeout && <PreviousChangeoutSummary previous={context.previous_changeout} />}
       </div>
     );
   }
 
-  const truck = resolveTruck(draft, context);
   const selectedId = draft.choice?.kind === 'listed' ? draft.choice.apparatusId : null;
-  const typedSelected = draft.choice?.kind === 'typed';
   const typedFieldId = `${name}-typed`;
   const errorId = `${name}-error`;
+  const typedValue = draft.choice?.kind === 'typed' ? draft.typedVehicle : '';
+  const hasListedUnit = context.other_vehicles.some((vehicle) => realUnitLabel(vehicle.listed_as) !== null);
 
   return (
     <div className="space-y-4">
       <div role="radiogroup" aria-labelledby="changeout-step-heading" aria-describedby={problem ? errorId : undefined} className="space-y-3">
-        {context.candidates.length === 0 && <p className="text-sm text-hub-n-600">No replacement truck is ready right now. Fleet can confirm one you name below.</p>}
         {context.candidates.map((candidate) => (
           <TruckCard
             key={candidate.apparatus_id}
@@ -113,50 +116,46 @@ export default function TruckStep({ context, draft, problem, onChoose, onTyped }
           />
         ))}
 
-        <button type="button" aria-expanded={showOthers} onClick={() => setShowOthers((open) => !open)} className="hub-link hub-link--standalone min-h-11">
-          Truck not listed?
+        <button type="button" aria-expanded={showOthers} onClick={() => setShowOthers((open) => !open)} className="hub-btn hub-btn--secondary !min-h-11 w-full">
+          Different truck
         </button>
 
         {showOthers && (
           <div className="space-y-3">
+            {hasListedUnit && <p className="text-sm text-hub-n-800">If you take a truck listed as another unit, that unit moves to truck {unit.vehicle_number ?? 'not recorded'}.</p>}
             {context.other_vehicles.map((vehicle) => (
               <TruckCard
                 key={vehicle.apparatus_id}
                 name={name}
                 vehicle={vehicle}
                 checked={selectedId === vehicle.apparatus_id}
+                listedAs={realUnitLabel(vehicle.listed_as)}
                 onChoose={() => onChoose({ kind: 'listed', apparatusId: vehicle.apparatus_id, vehicleNumber: vehicle.vehicle_number })}
               />
             ))}
-            <label className={`${CARD} ${typedSelected ? CARD_SELECTED : ''}`}>
-              <input type="radio" name={name} checked={typedSelected} onChange={() => onChoose({ kind: 'typed' })} className={RADIO} />
-              <span className="font-semibold text-hub-ink">Enter the truck number</span>
-            </label>
-            {typedSelected && (
-              <div>
-                <label htmlFor={typedFieldId} className="text-sm font-semibold text-hub-ink">Number on the truck</label>
-                <input
-                  id={typedFieldId}
-                  type="text"
-                  value={draft.typedVehicle}
-                  maxLength={MAX_VEHICLE_ID_LENGTH}
-                  autoCapitalize="characters"
-                  autoComplete="off"
-                  autoCorrect="off"
-                  spellCheck={false}
-                  aria-invalid={problem ? true : undefined}
-                  aria-describedby={problem ? errorId : undefined}
-                  onChange={(event) => onTyped(event.target.value)}
-                  className="mt-1 block min-h-11 w-full rounded-hub-control border border-hub-control-border bg-hub-well px-3 py-2.5 tabular-nums text-hub-ink"
-                />
-              </div>
-            )}
+            <div>
+              <label htmlFor={typedFieldId} className="text-sm font-semibold text-hub-ink">Or type the number on the truck</label>
+              <input
+                id={typedFieldId}
+                type="text"
+                value={typedValue}
+                maxLength={MAX_VEHICLE_ID_LENGTH}
+                autoCapitalize="characters"
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+                aria-invalid={problem && draft.choice?.kind === 'typed' ? true : undefined}
+                aria-describedby={problem ? errorId : undefined}
+                onChange={(event) => onTyped(event.target.value)}
+                className="mt-1 block min-h-11 w-full rounded-hub-control border border-hub-control-border bg-hub-well px-3 py-2.5 tabular-nums text-hub-ink"
+              />
+            </div>
           </div>
         )}
       </div>
 
       {problem && <p id={errorId} role="alert" className="text-sm font-semibold text-hub-danger">{problem}</p>}
-      {truck && truckNeedsFleet(truck) && <p role="status" className="hub-callout p-3 text-sm">{FLEET_NOTE}</p>}
+      <WhatHappens context={context} truck={truck} />
       {context.previous_changeout && <PreviousChangeoutSummary previous={context.previous_changeout} />}
     </div>
   );

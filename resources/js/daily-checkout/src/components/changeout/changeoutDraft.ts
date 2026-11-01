@@ -16,12 +16,13 @@ const isDraft = (value: unknown, apparatusId: number, userId: number): value is 
   if (typeof value !== 'object' || value === null) return false;
   const draft = value as Partial<ChangeoutDraft>;
 
-  return draft.version === 1
+  // An older draft has the earlier shape, so it is dropped rather than read as this one.
+  return draft.version === 2
     && draft.apparatusId === apparatusId
     && draft.userId === userId
     && typeof draft.clientSubmissionId === 'string' && draft.clientSubmissionId !== ''
     && typeof draft.savedAt === 'number'
-    && typeof draft.exceptions === 'object' && draft.exceptions !== null
+    && typeof draft.left === 'object' && draft.left !== null
     && typeof draft.typedVehicle === 'string'
     && typeof draft.note === 'string';
 };

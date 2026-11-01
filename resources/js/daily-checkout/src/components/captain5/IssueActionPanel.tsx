@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from 'react';
 import { isApiAuthenticationError, redirectToLoginAfterSessionExpiry } from '../../utils/api';
 import { Captain5ApiError, isRetryable, performIssueAction } from '../../utils/captain5Api';
 import {
-  ACTIONS, EMPTY_VALUES, REASON_LABELS, RESOLUTION_TYPES, primaryAction, toFields, validate,
+  ACTIONS, EMPTY_VALUES, NOTE_ONLY_ACTIONS, REASON_LABELS, RESOLUTION_TYPES, primaryAction, toFields, validate,
   type FieldKey, type FormValues,
 } from './actionForms';
 import { newKey, todayYmd } from './format';
@@ -31,6 +31,7 @@ interface FieldsProps {
 function ActionFields({ action, values, errors, disabled, canInternal, set }: FieldsProps) {
   const id = useId();
   const has = (key: FieldKey) => ACTIONS[action].fields.includes(key);
+  const noteOnly = NOTE_ONLY_ACTIONS.includes(action);
   const err = (key: FieldKey) => errors[key] && <p id={`${id}-${key}-error`} role="alert" className="mt-1 text-[13px] font-semibold text-hub-danger">{errors[key]}</p>;
   const aria = (key: FieldKey) => ({ 'aria-invalid': errors[key] ? true : undefined, 'aria-describedby': errors[key] ? `${id}-${key}-error` : undefined });
   const text = (key: 'vendor_reference' | 'parts_ordered', label: string) => has(key) && (
@@ -78,13 +79,15 @@ function ActionFields({ action, values, errors, disabled, canInternal, set }: Fi
       )}
       {area('reason', REASON_LABELS[action] ?? 'Reason', true)}
       <details className="rounded-hub-control border border-hub-border bg-hub-well px-3 py-2">
-        <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-hub-ink">Add a message (optional)</summary>
+        <summary className="flex min-h-11 cursor-pointer items-center text-sm font-semibold text-hub-ink">{noteOnly ? 'Add a note (optional)' : 'Add a message (optional)'}</summary>
         <div className="space-y-3 pb-2">
-          <div>
-            <label className={LABEL} htmlFor={`${id}-member_message`}>Message to crew</label>
-            <textarea id={`${id}-member_message`} rows={2} className={FIELD} value={values.member_message} disabled={disabled} onChange={(e) => set('member_message', e.target.value)} />
-            <p className={HINT}>The crew who reported this will see it.</p>
-          </div>
+          {!noteOnly && (
+            <div>
+              <label className={LABEL} htmlFor={`${id}-member_message`}>Message to crew</label>
+              <textarea id={`${id}-member_message`} rows={2} className={FIELD} value={values.member_message} disabled={disabled} onChange={(e) => set('member_message', e.target.value)} />
+              <p className={HINT}>The crew who reported this will see it.</p>
+            </div>
+          )}
           {canInternal && (
             <div>
               <label className={LABEL} htmlFor={`${id}-internal_note`}>Internal note</label>

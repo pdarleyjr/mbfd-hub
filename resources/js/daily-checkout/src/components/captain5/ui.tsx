@@ -22,6 +22,7 @@ export function IssueTags({ issue, showKind = true }: { issue: IssueSummary; sho
       {issue.severity === 'significant' && <Tag tone="danger">Significant damage</Tag>}
       {issue.awaiting_verification && <Tag tone="warning">Awaiting verification</Tag>}
       {showKind && <Tag>{kindLabel(issue.kind)}</Tag>}
+      {issue.open && issue.captain5_cleared_at && <Tag>Cleared for Logistics</Tag>}
     </span>
   );
 }

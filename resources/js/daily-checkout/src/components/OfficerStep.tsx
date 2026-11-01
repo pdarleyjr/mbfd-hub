@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { Link } from 'react-router';
 import type { FleetVehicle, OfficerInfo, Shift, SwapAnswer, VehicleConfirmation, VehicleIdentification, VehicleIdentificationAnswers } from '../types';
 import { activeVehicleIdentification, firstIncompleteField } from '../utils/vehicleIdentification';
 import VehicleIdentificationCard, { focusIdentificationField } from './VehicleIdentificationCard';
@@ -27,6 +28,8 @@ interface Props {
   onIdentificationChange?: (answers: VehicleIdentificationAnswers) => void;
   /** Show what is missing even before Continue is pressed (a blocked submit sent the member here). */
   showIdentificationErrors?: boolean;
+  /** Where to record the swap when the member is standing at a different truck than assigned. */
+  changeoutPath?: (truck: string) => string;
 }
 
 const NO_ANSWERS: VehicleIdentificationAnswers = {};
@@ -40,7 +43,7 @@ const SWAP_ANSWERS: ReadonlyArray<{ value: SwapAnswer; label: string }> = [
 
 export default function OfficerStep({
   initialData, onSubmit, onChange, continueLabel, fleetVehicles, assignedDesignation,
-  identification, identificationAnswers = NO_ANSWERS, onIdentificationChange, showIdentificationErrors = false,
+  identification, identificationAnswers = NO_ANSWERS, onIdentificationChange, showIdentificationErrors = false, changeoutPath,
 }: Props) {
   const sectionRef = useRef<HTMLElement>(null);
   // Hidden, not asked and not required while a different physical vehicle is reported.
@@ -108,6 +111,10 @@ export default function OfficerStep({
             className={`${CONTROL} tabular-nums`}
           />
         </label>}
+        {mismatch && changeoutPath && <div data-vehicle-change-link>
+          <Link to={changeoutPath(reported)} className="hub-btn hub-btn--primary hub-btn--wrap !min-h-11 w-full">Record this vehicle change</Link>
+          <p className="mt-1 text-sm text-hub-n-600">Takes a few seconds. No approval needed. Your checkout stays saved.</p>
+        </div>}
         {mismatch && <fieldset data-vehicle-swap-prompt className="rounded-xl border border-hub-warning/40 bg-hub-warning/5 p-4">
           <legend className="px-1 text-base font-semibold text-hub-ink">Was a truck swap completed?</legend>
           <p className="mb-3 text-sm text-hub-ink">You chose vehicle {reported}, but this unit is assigned {assigned || 'no recorded vehicle'}. You can still submit this checkout. Fleet reviews it before its findings are applied.</p>

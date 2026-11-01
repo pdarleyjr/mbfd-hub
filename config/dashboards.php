@@ -11,6 +11,7 @@ return [
         App\Services\Dashboards\Sources\Vehicle\InspectionExceptionSource::class,
         App\Services\Dashboards\Sources\Vehicle\ApparatusServiceTicketSource::class,
         App\Services\Dashboards\Sources\Vehicle\InventoryCorrectionSource::class,
+        App\Services\Dashboards\Sources\Vehicle\VehicleChangeoutSource::class,
     ],
 
     'station_sources' => [

@@ -4,112 +4,75 @@ import type {
   ChangeoutContext,
   ChangeoutDraft,
   ChangeoutSubmission,
+  EquipmentCompartment,
   EquipmentLine,
-  LineChoice,
+  LeftItem,
   ResolvedTruck,
+  TruckChoice,
 } from './types';
 
 export const LINE_NOTE_MAX = 500;
 export const CHANGEOUT_NOTE_MAX = 1000;
 
+/** The old truck's status after a changeout. The server applies it; this is what the member is told beforehand. */
+export const OLD_TRUCK_STATUS_AFTER = 'Out of Service';
+
 export const allLines = (context: ChangeoutContext): EquipmentLine[] => (
   context.equipment.compartments.flatMap((compartment) => compartment.items)
 );
 
-/** Controlled lines are never choices: they show by name and end waiting for verification. */
-export const standardLines = (context: ChangeoutContext): EquipmentLine[] => allLines(context).filter((line) => !line.controlled);
-export const controlledLines = (context: ChangeoutContext): EquipmentLine[] => allLines(context).filter((line) => line.controlled);
+type LeftMap = Record<string, string>;
 
-export const defaultChoice = (line: EquipmentLine): LineChoice => ({ handling: line.default_handling, quantity: line.default_quantity, condition: 'ok', note: line.default_note });
+/** Tap a row: Took becomes Left, and Left goes back to Took. */
+export const toggleLeft = (left: LeftMap, key: string): LeftMap => {
+  if (key in left) {
+    const { [key]: _removed, ...others } = left;
 
-export const effectiveChoice = (line: EquipmentLine, exceptions: Record<string, LineChoice>): LineChoice => (
-  exceptions[line.item_key] ?? defaultChoice(line)
-);
-
-/**
- * The server's default for a line depends on the truck: only a return starts from what happened last time. Without
- * this, the screen would say "transfer" for a line the server is about to record as left behind.
- */
-export const applyTruckDefaults = (context: ChangeoutContext, truck: ResolvedTruck | null): ChangeoutContext => {
-  if (!truck?.isReturn) return context;
-
-  return {
-    ...context,
-    equipment: {
-      ...context.equipment,
-      compartments: context.equipment.compartments.map((compartment) => ({
-        ...compartment,
-        items: compartment.items.map((line) => {
-          const handling = line.previous?.return_handling;
-          if (line.controlled || !line.previous || !handling) return line;
-
-          return {
-            ...line,
-            default_handling: handling,
-            default_quantity: handling === 'transfer' ? line.previous.return_quantity : null,
-            default_note: handling === 'transfer' ? '' : line.previous.note ?? '',
-          };
-        }),
-      })),
-    },
-  };
-};
-
-/** Partial quantities only exist for a line being moved in good condition whose expected quantity is known. A full count is sent as none. */
-export const normalizeChoice = (line: EquipmentLine, choice: LineChoice): LineChoice => {
-  const expected = line.expected_quantity;
-  if (expected === null || choice.handling !== 'transfer' || choice.condition !== 'ok' || choice.quantity === null) {
-    return { ...choice, quantity: null };
+    return others;
   }
-  const quantity = Math.max(1, Math.min(expected, Math.trunc(choice.quantity)));
 
-  return { ...choice, quantity: quantity === expected ? null : quantity };
+  return { ...left, [key]: '' };
 };
 
-const isDefaultChoice = (line: EquipmentLine, choice: LineChoice): boolean => (
-  choice.handling === line.default_handling && choice.quantity === line.default_quantity && choice.condition === 'ok' && choice.note.trim() === line.default_note.trim()
+export const withLeftNote = (left: LeftMap, key: string, note: string): LeftMap => (key in left ? { ...left, [key]: note } : left);
+
+/** Notes already typed on items in the compartment stay. */
+export const leaveCompartment = (left: LeftMap, compartment: EquipmentCompartment): LeftMap => (
+  compartment.items.reduce((next, line) => (line.item_key in next ? next : { ...next, [line.item_key]: '' }), left)
 );
 
-/** A line back at its default leaves the map, so the payload names only real exceptions. */
-export const withLineChoice = (exceptions: Record<string, LineChoice>, line: EquipmentLine, choice: LineChoice): Record<string, LineChoice> => {
-  const normalized = normalizeChoice(line, choice);
-  const { [line.item_key]: _previous, ...others } = exceptions;
+export const takeCompartment = (left: LeftMap, compartment: EquipmentCompartment): LeftMap => {
+  const keys = new Set(compartment.items.map((line) => line.item_key));
 
-  return isDefaultChoice(line, normalized) ? others : { ...others, [line.item_key]: normalized };
-};
-
-/** Anything other than a plain full transfer. A return's "leave" default shows here even though the member did not change it. */
-export const isAttentionLine = (line: EquipmentLine, exceptions: Record<string, LineChoice>): boolean => {
-  const choice = effectiveChoice(line, exceptions);
-
-  return choice.handling !== 'transfer' || choice.quantity !== null || choice.condition !== 'ok' || choice.note.trim() !== '';
+  return Object.fromEntries(Object.entries(left).filter(([key]) => !keys.has(key)));
 };
 
 export interface EquipmentCounts {
   total: number;
-  moving: number;
-  controlled: number;
+  took: number;
+  left: number;
 }
 
-export const equipmentCounts = (context: ChangeoutContext, exceptions: Record<string, LineChoice>): EquipmentCounts => {
-  const choices = standardLines(context).map((line) => effectiveChoice(line, exceptions));
+/** A saved Left choice for an item no longer on the list does not count. */
+export const equipmentCounts = (context: ChangeoutContext, left: LeftMap): EquipmentCounts => {
+  const lines = allLines(context);
+  const leftCount = lines.filter((line) => line.item_key in left).length;
 
-  return {
-    total: choices.length,
-    // A missing or damaged item is never moved: its issue stays with the truck it was on.
-    moving: choices.filter((choice) => choice.handling === 'transfer' && choice.condition === 'ok').length,
-    controlled: controlledLines(context).length,
-  };
+  return { total: lines.length, took: lines.length - leftCount, left: leftCount };
 };
 
-export const lineStateLabel = (line: EquipmentLine, choice: LineChoice): string => {
-  if (choice.condition === 'missing') return 'Missing';
-  if (choice.condition === 'damaged') return 'Damaged';
-  if (choice.handling === 'leave') return 'Leave on truck';
-  if (choice.handling === 'review') return 'Not sure';
+export const leftLines = (context: ChangeoutContext, left: LeftMap): EquipmentLine[] => allLines(context).filter((line) => line.item_key in left);
 
-  return choice.quantity !== null && line.expected_quantity !== null ? `Moving ${choice.quantity} of ${line.expected_quantity}` : 'Transfer';
-};
+export const leftItems = (context: ChangeoutContext, left: LeftMap): LeftItem[] => leftLines(context, left).map((line) => {
+  const note = left[line.item_key].trim();
+
+  return { name: line.name, note: note === '' ? null : note };
+});
+
+/** A plain "Reserve" or "Spare" label is not a unit, so nothing else moves when that truck is taken. */
+export const realUnitLabel = (listedAs: string | null): string | null => (
+  listedAs !== null && !/^(reserve|spare|none|unassigned)$/i.test(listedAs.trim()) ? listedAs : null
+);
 
 export const matchesSearch = (line: EquipmentLine, query: string): boolean => {
   const terms = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
@@ -124,11 +87,10 @@ export const resolveTruck = (draft: Pick<ChangeoutDraft, 'choice' | 'typedVehicl
     return context.unit.vehicle_number === null ? null : {
       apparatusId: context.unit.apparatus_id,
       vehicleNumber: context.unit.vehicle_number,
-      label: context.unit.designation,
       location: context.unit.station_label,
       source: 'current',
-      direct: true,
       isReturn: false,
+      listedAs: null,
     };
   }
   const { choice } = draft;
@@ -143,11 +105,10 @@ export const resolveTruck = (draft: Pick<ChangeoutDraft, 'choice' | 'typedVehicl
     return {
       apparatusId: candidate.apparatus_id,
       vehicleNumber: candidate.vehicle_number,
-      label: candidate.label,
       location: candidate.location,
       source: 'candidate',
-      direct: candidate.direct,
       isReturn: candidate.is_return,
+      listedAs: null,
     };
   }
   const other = context.other_vehicles.find(matches);
@@ -155,16 +116,15 @@ export const resolveTruck = (draft: Pick<ChangeoutDraft, 'choice' | 'typedVehicl
     return {
       apparatusId: other.apparatus_id,
       vehicleNumber: other.vehicle_number,
-      label: other.label,
       location: other.location,
       source: 'other',
-      direct: other.direct,
       isReturn: false,
+      listedAs: realUnitLabel(other.listed_as),
     };
   }
   if (choice.kind === 'listed' || !VEHICLE_ID_PATTERN.test(typed) || sameVehicle(typed, context.unit.vehicle_number)) return null;
 
-  return { apparatusId: null, vehicleNumber: typed, label: null, location: null, source: 'typed', direct: false, isReturn: false };
+  return { apparatusId: null, vehicleNumber: typed, location: null, source: 'typed', isReturn: false, listedAs: null };
 };
 
 /** What is wrong with the truck step, in words for the member. Null when it can continue. */
@@ -181,40 +141,39 @@ export const truckProblem = (draft: Pick<ChangeoutDraft, 'choice' | 'typedVehicl
   return resolveTruck(draft, context) ? null : 'That truck is no longer on the list. Choose another.';
 };
 
-/** The server's `direct` is the whole answer: it already covers Fleet managers, the schedule and eligibility. */
-export const truckNeedsFleet = (truck: ResolvedTruck): boolean => {
-  if (truck.source === 'current') return false;
-  if (truck.source === 'typed') return true;
+/** A listed truck named by the plan or by a link, when it is one this unit can move to. */
+export const presetChoice = (context: ChangeoutContext, vehicleNumber: string | null): TruckChoice | null => {
+  if (context.mode === 'handoff_only') return null;
+  const listed = [...context.candidates, ...context.other_vehicles];
+  const named = vehicleNumber === null ? undefined : listed.find((vehicle) => sameVehicle(vehicle.vehicle_number, vehicleNumber));
+  const planned = context.alert?.planned_replacement_apparatus_id ?? null;
+  const vehicle = named ?? listed.find((candidate) => candidate.apparatus_id === planned);
 
-  return !truck.direct;
+  return vehicle ? { kind: 'listed', apparatusId: vehicle.apparatus_id, vehicleNumber: vehicle.vehicle_number } : null;
 };
 
-/** The member's exceptions are sorted so a retry of the same work is byte-for-byte the same payload. */
+/** Left items are sorted so a retry of the same work is byte-for-byte the same payload. */
 export const buildSubmission = (draft: ChangeoutDraft, context: ChangeoutContext): ChangeoutSubmission => {
   const truck = resolveTruck(draft, context);
-  const lines = new Map(standardLines(context).map((line) => [line.item_key, line]));
+  const lines = new Set(allLines(context).map((line) => line.item_key));
   const note = draft.note.trim();
-  // A different truck than Fleet planned is a different move: it goes to Fleet and leaves the planned alert open.
-  const planned = context.alert?.planned_replacement_apparatus_id ?? null;
-  const offPlan = planned !== null && truck?.apparatusId !== planned;
 
   return {
     client_submission_id: draft.clientSubmissionId,
     expected_vehicle_number: context.unit.vehicle_number,
     // A truck keeps its number after a move, so the unit is what proves nothing moved underneath this draft.
     expected_unit_slug: context.unit.slug,
-    alert_id: offPlan ? null : draft.alertId,
+    alert_id: draft.alertId,
     to_apparatus_id: truck?.apparatusId ?? null,
     to_vehicle_number: truck !== null && truck.apparatusId === null ? truck.vehicleNumber : null,
     checklist_version: context.equipment.checklist_version,
-    exceptions: Object.keys(draft.exceptions)
+    exceptions: Object.keys(draft.left)
       .filter((key) => lines.has(key))
       .sort()
       .map((key) => {
-        const choice = draft.exceptions[key];
-        const lineNote = choice.note.trim();
+        const lineNote = draft.left[key].trim();
 
-        return { item_key: key, handling: choice.handling, quantity: choice.quantity, condition: choice.condition, note: lineNote === '' ? null : lineNote };
+        return { item_key: key, handling: 'leave', note: lineNote === '' ? null : lineNote };
       }),
     note: note === '' ? null : note,
   };
@@ -222,26 +181,26 @@ export const buildSubmission = (draft: ChangeoutDraft, context: ChangeoutContext
 
 export interface ReconcileResult {
   draft: ChangeoutDraft;
-  /** Names of choices that no longer apply to the fresh list. */
+  /** Names of Left choices that no longer apply to the fresh list. */
   dropped: string[];
   truckCleared: boolean;
 }
 
-/** Fit a saved draft onto a fresh context. Choices that still apply survive, and the rest are named for the member. */
+/** Fit a saved draft onto a fresh context. Left choices that still exist survive, and the rest are named for the member. */
 export const reconcileDraft = (draft: ChangeoutDraft, context: ChangeoutContext, previous: ChangeoutContext | null): ReconcileResult => {
-  const fresh = new Map(standardLines(applyTruckDefaults(context, resolveTruck(draft, context))).map((line) => [line.item_key, line]));
+  const fresh = new Set(allLines(context).map((line) => line.item_key));
   const oldNames = new Map((previous ? allLines(previous) : []).map((line) => [line.item_key, line.name]));
-  let exceptions: Record<string, LineChoice> = {};
-  const dropped: string[] = [];
-  for (const [key, choice] of Object.entries(draft.exceptions)) {
-    const line = fresh.get(key);
-    if (line) exceptions = withLineChoice(exceptions, line, choice);
-    else dropped.push(oldNames.get(key) ?? key);
-  }
+  const entries = Object.entries(draft.left);
+  const dropped = entries.filter(([key]) => !fresh.has(key)).map(([key]) => oldNames.get(key) ?? key);
   const truckCleared = context.mode === 'start' && draft.choice !== null && resolveTruck(draft, context) === null && draft.choice.kind === 'listed';
 
   return {
-    draft: { ...draft, exceptions, choice: truckCleared ? null : draft.choice, step: truckCleared ? 'truck' : draft.step },
+    draft: {
+      ...draft,
+      left: Object.fromEntries(entries.filter(([key]) => fresh.has(key))),
+      choice: truckCleared ? null : draft.choice,
+      step: truckCleared ? 'truck' : draft.step,
+    },
     dropped,
     truckCleared,
   };
@@ -249,17 +208,10 @@ export const reconcileDraft = (draft: ChangeoutDraft, context: ChangeoutContext,
 
 export const hasWork = (draft: ChangeoutDraft): boolean => (
   draft.attempted
-  || draft.choice !== null
-  || draft.typedVehicle.trim() !== ''
+  || (!draft.preselected && (draft.choice !== null || draft.typedVehicle.trim() !== ''))
   || draft.note.trim() !== ''
-  || Object.keys(draft.exceptions).length > 0
+  || Object.keys(draft.left).length > 0
 );
-
-/** Lines that will end waiting on someone: controlled lines, then anything left as Not sure. */
-export const waitingNames = (context: ChangeoutContext, exceptions: Record<string, LineChoice>): string[] => [
-  ...controlledLines(context).map((line) => line.name),
-  ...standardLines(context).filter((line) => effectiveChoice(line, exceptions).handling === 'review').map((line) => line.name),
-];
 
 /** Router path for a summary's Daily route. The router's basename is /daily, so that prefix comes off. */
 export const dailyRouterPath = (path: string | null): string | null => {
@@ -269,7 +221,7 @@ export const dailyRouterPath = (path: string | null): string | null => {
   return path.startsWith('/daily/') ? path.slice('/daily'.length) : path;
 };
 
-/** Only a station page is a valid way back from the wizard. */
+/** Only a station page is a way back to the station. */
 export const stationReturnPath = (value: string | null, stationId: number | null): string => {
   const path = (value ?? '').replace(/^\/daily(?=\/)/, '');
   if (/^\/stations\/\d+$/.test(path)) return path;
@@ -278,14 +230,8 @@ export const stationReturnPath = (value: string | null, stationId: number | null
 };
 
 export const alertActionPath = (action: AlertAction | null, stationId: number): string | null => {
-  const returnTo = `return_to=${encodeURIComponent(`/stations/${stationId}`)}`;
-  if (action === null) return null;
-  if ((action.kind === 'start' || action.kind === 'handoff') && action.apparatus_id !== null) {
-    const alert = action.alert_id === null ? '' : `alert_id=${action.alert_id}&`;
+  if (action === null || action.apparatus_id === null || (action.kind !== 'start' && action.kind !== 'handoff')) return null;
+  const alert = action.alert_id === null ? '' : `alert_id=${action.alert_id}&`;
 
-    return `/changeouts/new/${action.apparatus_id}?${alert}${returnTo}`;
-  }
-  if (action.kind === 'view' && action.changeout_id !== null) return `/changeouts/${action.changeout_id}?${returnTo}`;
-
-  return null;
+  return `/changeouts/new/${action.apparatus_id}?${alert}return_to=${encodeURIComponent(`/stations/${stationId}`)}`;
 };

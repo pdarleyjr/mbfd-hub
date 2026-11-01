@@ -15,11 +15,7 @@ const READ_HEADERS = { Accept: 'application/json' };
 const SUBMIT_TIMEOUT_MS = 30_000;
 
 export const CHANGEOUT_STALE = 'CHANGEOUT_STALE';
-export const CHANGEOUT_TRUCK_UNAVAILABLE = 'CHANGEOUT_TRUCK_UNAVAILABLE';
-export const CHANGEOUT_ALREADY_PENDING = 'CHANGEOUT_ALREADY_PENDING';
 export const CHANGEOUT_REPLAY_CONFLICT = 'CHANGEOUT_REPLAY_CONFLICT';
-export const CHANGEOUT_CHECKLIST_CHANGED = 'CHANGEOUT_CHECKLIST_CHANGED';
-export const CHANGEOUT_ALREADY_RECORDED = 'CHANGEOUT_ALREADY_RECORDED';
 
 /** A 409 from the changeout service. Nothing was written. */
 export class ChangeoutConflictError extends ApiRequestError {
@@ -77,13 +73,3 @@ export const submitChangeout = async (apparatusId: number, submission: Changeout
 export const getChangeout = async (changeoutId: number): Promise<ChangeoutSummary> => (
   parseSummary(await read(`changeouts/${changeoutId}`, 'This changeout could not be loaded.'))
 );
-
-export const verifyChangeoutLine = async (changeoutId: number, lineId: number, note: string | null): Promise<void> => {
-  const response = await fetchWithTimeout(`${API_BASE}/changeouts/${changeoutId}/lines/${lineId}/verify`, {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: mutationHeaders(),
-    body: JSON.stringify({ note }),
-  }, SUBMIT_TIMEOUT_MS);
-  if (!response.ok) throw await refusal(response, 'The verification could not be saved.');
-};

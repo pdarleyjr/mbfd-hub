@@ -1,13 +1,12 @@
 @php
     /** @var \App\Support\Fleet\ApparatusCurrentAssignment $assignment */
     $alert = $assignment->activeAlert;
-    $pending = $assignment->pendingChangeout;
     $last = $assignment->lastChangeout;
     $ticket = $assignment->relatedTicket;
 @endphp
 
 @unless ($assignment->isEmpty())
-    <div @class(['hub-insp-card', 'hub-insp-card--warning' => $pending !== null || $alert?->isUpcomingSwap()]) data-current-assignment>
+    <div @class(['hub-insp-card', 'hub-insp-card--warning' => $alert?->isUpcomingSwap()]) data-current-assignment>
         <p><strong>Current assignment</strong></p>
         <dl class="hub-insp-facts hub-insp-facts--plain">
             @if ($alert)
@@ -24,12 +23,6 @@
                     </dd>
                 </div>
             @endif
-            @if ($pending)
-                <div>
-                    <dt>Waiting on Fleet</dt>
-                    <dd><a href="{{ \App\Filament\Resources\ApparatusChangeoutResource::getUrl('view', ['record' => $pending]) }}">Move to truck {{ $pending->to_vehicle_number }}</a></dd>
-                </div>
-            @endif
             @if ($ticket)
                 <div>
                     <dt>Related ticket</dt>
@@ -38,19 +31,16 @@
             @endif
             @if ($last)
                 <div>
-                    <dt>Last changeout</dt>
+                    <dt>Last truck change</dt>
                     <dd>
                         <a href="{{ \App\Filament\Resources\ApparatusChangeoutResource::getUrl('view', ['record' => $last]) }}">{{ $last->unit_designation }}: truck {{ $last->from_vehicle_number ?: 'not recorded' }} to truck {{ $last->to_vehicle_number }}</a>
                         @if ($last->effective_at)
                             &bull; {{ $last->effective_at->setTimezone(\App\Support\HubTimezone::NAME)->format('M j, Y g:i A') }}
                         @endif
+                        @unless ($last->isAcknowledged())
+                            &bull; Not yet acknowledged
+                        @endunless
                     </dd>
-                </div>
-            @endif
-            @if ($assignment->openHandoffLines > 0)
-                <div>
-                    <dt>Open handoff lines</dt>
-                    <dd data-open-handoff-lines>{{ $assignment->openHandoffLines }}</dd>
                 </div>
             @endif
         </dl>

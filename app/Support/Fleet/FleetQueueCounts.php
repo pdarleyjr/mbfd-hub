@@ -22,12 +22,12 @@ final class FleetQueueCounts
         return self::thisRequest()['active_alerts'];
     }
 
-    public static function pendingChangeouts(): int
+    public static function unacknowledgedChangeouts(): int
     {
-        return self::thisRequest()['pending_changeouts'];
+        return self::thisRequest()['unacknowledged_changeouts'];
     }
 
-    /** @return array{active_alerts: int, pending_changeouts: int} */
+    /** @return array{active_alerts: int, unacknowledged_changeouts: int} */
     private static function thisRequest(): array
     {
         $attributes = request()->attributes;
@@ -38,23 +38,23 @@ final class FleetQueueCounts
         return $attributes->get(self::REQUEST_KEY);
     }
 
-    /** @return array{active_alerts: int, pending_changeouts: int} */
+    /** @return array{active_alerts: int, unacknowledged_changeouts: int} */
     private static function load(): array
     {
         try {
             $row = DB::query()
                 ->selectSub(ApparatusOperationalAlert::query()->active()->selectRaw('count(*)'), 'active_alerts')
-                ->selectSub(ApparatusChangeout::query()->where('status', ApparatusChangeout::STATUS_PENDING_FLEET)->selectRaw('count(*)'), 'pending_changeouts')
+                ->selectSub(ApparatusChangeout::query()->unacknowledged()->selectRaw('count(*)'), 'unacknowledged_changeouts')
                 ->first();
         } catch (Throwable $exception) {
             report($exception);
 
-            return ['active_alerts' => 0, 'pending_changeouts' => 0];
+            return ['active_alerts' => 0, 'unacknowledged_changeouts' => 0];
         }
 
         return [
             'active_alerts' => (int) ($row->active_alerts ?? 0),
-            'pending_changeouts' => (int) ($row->pending_changeouts ?? 0),
+            'unacknowledged_changeouts' => (int) ($row->unacknowledged_changeouts ?? 0),
         ];
     }
 }

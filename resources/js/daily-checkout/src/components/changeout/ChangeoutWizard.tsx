@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useLocation, useParams, useSearchParams } from 'react-router';
+import { useLocation, useParams, useSearchParams } from 'react-router';
 import DailyPageNav from '../DailyPageNav';
 import { LoadError, SkeletonRows } from '../ui/StateViews';
 import ChangeoutDone from './ChangeoutDone';
 import EquipmentStep from './EquipmentStep';
-import { applyTruckDefaults, resolveTruck, stationReturnPath, truckNeedsFleet } from './changeoutLogic';
+import { equipmentCounts, resolveTruck, stationReturnPath } from './changeoutLogic';
 import ReviewStep from './ReviewStep';
 import TruckStep from './TruckStep';
 import type { ChangeoutDoneState, ChangeoutStep } from './types';
@@ -12,8 +12,8 @@ import { useChangeoutWizard } from './useChangeoutWizard';
 
 const STEP_LABELS: Array<[ChangeoutStep, string]> = [['truck', 'Truck'], ['equipment', 'Equipment'], ['review', 'Review']];
 const STEP_HEADINGS: Record<ChangeoutStep, string> = {
-  truck: 'Select replacement truck',
-  equipment: 'Transfer equipment',
+  truck: 'What truck are you moving to?',
+  equipment: 'What did you take and leave?',
   review: 'Review',
 };
 
@@ -34,7 +34,6 @@ function Flow({ apparatusId, alertParam }: { apparatusId: number; alertParam: nu
   const headingRef = useRef<HTMLHeadingElement>(null);
   const previousStep = useRef<ChangeoutStep | null>(null);
   const [showProblem, setShowProblem] = useState(false);
-  const [noteMissing, setNoteMissing] = useState(false);
 
   const ready = load.status === 'ready' && context !== null && draft !== null;
 
@@ -67,31 +66,13 @@ function Flow({ apparatusId, alertParam }: { apparatusId: number; alertParam: nu
 
   const { unit } = context;
   const truck = resolveTruck(draft, context);
-  const view = applyTruckDefaults(context, truck);
-  const needsFleet = truck !== null && truckNeedsFleet(truck);
   const sending = sendState.kind === 'sending';
   const headerParts = [unit.designation, unit.vehicle_number ? `truck ${unit.vehicle_number}` : null, unit.station_label].filter(Boolean);
   const reason = context.alert?.reason;
-
-  if (context.pending_changeout && !draft.attempted && sendState.kind === 'idle') {
-    return (
-      <div data-hub-ui="2" className="mx-auto max-w-2xl space-y-6 font-hub">
-        <DailyPageNav fallback={stationPath} className="!mb-0" />
-        <section className="hub-panel space-y-4 p-4 sm:p-6">
-          <h1 className="font-heading text-xl font-bold text-hub-ink sm:text-2xl">{unit.designation} already has a changeout waiting on Fleet</h1>
-          <p className="text-sm text-hub-n-800">
-            {context.pending_changeout.submitted_by_name ?? 'Another member'} sent it
-            {context.pending_changeout.to_vehicle_number ? ` for truck ${context.pending_changeout.to_vehicle_number}` : ''}. Nothing else needs to be sent until Fleet decides.
-          </p>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Link to={`/changeouts/${context.pending_changeout.id}?return_to=${encodeURIComponent(stationPath)}`} className="hub-btn hub-btn--primary hub-btn--wrap !min-h-11">See the one waiting on Fleet</Link>
-            <Link to={stationPath} className="hub-btn hub-btn--secondary hub-btn--wrap !min-h-11">Back to station</Link>
-            {wizard.working && <button type="button" onClick={wizard.discard} className="hub-btn hub-btn--tertiary hub-btn--wrap !min-h-11">Discard my copy</button>}
-          </div>
-        </section>
-      </div>
-    );
-  }
+  const handoff = context.mode === 'handoff_only';
+  // On a handoff the unit has already moved, so the old truck comes from the alert.
+  const fromVehicle = (handoff ? context.alert?.vehicle_number : unit.vehicle_number) ?? null;
+  const counts = equipmentCounts(context, draft.left);
 
   const advance = () => {
     if (step === 'truck') {
@@ -104,11 +85,6 @@ function Flow({ apparatusId, alertParam }: { apparatusId: number; alertParam: nu
       return;
     }
     if (step === 'equipment') {
-      if (!context.equipment.usable && draft.note.trim() === '') {
-        setNoteMissing(true);
-        return;
-      }
-      setNoteMissing(false);
       wizard.goTo('review');
       return;
     }
@@ -116,12 +92,12 @@ function Flow({ apparatusId, alertParam }: { apparatusId: number; alertParam: nu
   };
 
   const back = () => wizard.goTo(step === 'review' ? 'equipment' : 'truck');
-  const finalLabel = context.mode === 'handoff_only' ? 'Record Handoff' : needsFleet ? 'Send to Fleet' : 'Complete Changeout';
+  const finalLabel = handoff ? 'Record Handoff' : 'Complete Changeout';
   const primaryLabel = step !== 'review'
     ? 'Continue'
     : sending ? 'Sending…' : sendState.kind === 'not_sent' ? 'Try again' : finalLabel;
   // These outcomes each offer their own next step, so a plain resend is not the way forward.
-  const primaryBlocked = step === 'review' && (sendState.kind === 'stale' || sendState.kind === 'pending' || sendState.kind === 'replay');
+  const primaryBlocked = step === 'review' && (sendState.kind === 'stale' || sendState.kind === 'replay');
 
   return (
     <div data-hub-ui="2" className="mx-auto max-w-2xl space-y-4 font-hub">
@@ -129,7 +105,7 @@ function Flow({ apparatusId, alertParam }: { apparatusId: number; alertParam: nu
 
       <header className="hub-panel p-4 sm:p-6">
         <h1 className="font-heading text-xl font-bold tabular-nums text-hub-ink sm:text-2xl">{headerParts.join(', ')}</h1>
-        {reason && <p className="mt-1 text-hub-n-600">{reason}</p>}
+        {reason && <p className="mt-1 text-hub-n-600">Reason: {reason}</p>}
         <ol className="mt-4 grid grid-cols-3 gap-2" aria-label="Changeout steps">
           {STEP_LABELS.map(([value, label], index) => (
             <li
@@ -159,6 +135,7 @@ function Flow({ apparatusId, alertParam }: { apparatusId: number; alertParam: nu
           <TruckStep
             context={context}
             draft={draft}
+            truck={truck}
             problem={showProblem ? problem : null}
             onChoose={wizard.setChoice}
             onTyped={wizard.setTyped}
@@ -166,20 +143,23 @@ function Flow({ apparatusId, alertParam }: { apparatusId: number; alertParam: nu
         )}
         {step === 'equipment' && (
           <EquipmentStep
-            context={view}
+            context={context}
             truck={truck}
-            exceptions={draft.exceptions}
+            fromVehicle={fromVehicle}
+            left={draft.left}
             note={draft.note}
-            noteMissing={noteMissing && draft.note.trim() === ''}
-            onLine={wizard.setLine}
+            onToggle={wizard.toggleLine}
+            onLineNote={wizard.setLineNote}
+            onCompartment={wizard.setCompartmentLeft}
             onNote={wizard.setNote}
           />
         )}
         {step === 'review' && (
           <ReviewStep
-            context={view}
+            context={context}
             truck={truck}
-            exceptions={draft.exceptions}
+            fromVehicle={fromVehicle}
+            left={draft.left}
             note={draft.note}
             sendState={sendState}
             sending={sending}
@@ -193,6 +173,9 @@ function Flow({ apparatusId, alertParam }: { apparatusId: number; alertParam: nu
       </section>
 
       <div className="sticky bottom-[calc(var(--hub-phone-nav-height,0px)+8px)] z-10 rounded-hub-card border border-hub-glass-border bg-hub-well p-3 shadow-md">
+        {step === 'equipment' && context.equipment.usable && (
+          <p data-testid="changeout-summary" className="mb-2 text-center font-semibold tabular-nums text-hub-ink">Took {counts.took} · Left {counts.left}</p>
+        )}
         <div className="flex gap-3">
           {step !== 'truck' && (
             <button type="button" onClick={back} disabled={sending} className="hub-btn hub-btn--secondary !min-h-11 flex-1">Back</button>
