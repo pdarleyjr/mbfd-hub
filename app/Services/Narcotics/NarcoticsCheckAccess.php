@@ -19,7 +19,7 @@ use App\Services\Security\Captain5AccessDecision;
  *             reviewers and Admin Panel administrators are deliberately excluded, because a controlled
  *             substance photo is not their business. Review is limited to
  *               - a Captain 5 bid seat holder (any shift) or the EMS Captain seat holder,
- *               - the Shift Captain 5 by seat or approved acting request (never the TeleStaff name on the card),
+ *               - the Shift Captain 5 by seat (never the TeleStaff name on the card),
  *               - a person an administrator allowed on the Captain 5 page (Captain 5 Operations ->
  *                 access override "allow"),
  *               - super_admin (protected recovery access).

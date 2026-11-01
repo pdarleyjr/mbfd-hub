@@ -83,8 +83,6 @@ final class InspectionAndCaptain5RoutingTest extends TestCase
         }
         $this->assertSame('vehicle_inspections', $table[InspectionNotificationKind::REVIEW_REQUIRED]);
         $this->assertSame('member_request_updates', $table[InspectionNotificationKind::INSPECTION_DECIDED]);
-        $this->assertSame('captain5_assignment_requests', $table['captain5_acting_request']);
-        $this->assertSame('member_request_updates', $table['captain5_acting_decision']);
     }
 
     public function test_a_captain_5_alert_is_not_delivered_once_the_officer_loses_access(): void
@@ -135,42 +133,6 @@ final class InspectionAndCaptain5RoutingTest extends TestCase
 
         $this->assertSame(1, $reporter->notifications()->count(), 'their own report is still theirs after a demotion');
         $this->assertSame(0, $working->notifications()->count(), 'the officer lost Captain 5 access');
-    }
-
-    public function test_acting_requests_reach_only_people_who_configure_captain_5(): void
-    {
-        Queue::fake();
-        // The approvers Captain5Notifier::actingRequested() asks: Admin Panel users with the Captain 5
-        // admin capability (or super_admin). Rank alone no longer decides.
-        $chief = $this->officer('Division Chief', 'Dana Chief');
-        foreach (['admin.access', \App\Services\Security\Captain5Access::PERMISSION_ADMIN] as $permission) {
-            \Spatie\Permission\Models\Permission::findOrCreate($permission, 'web');
-            $chief->givePermissionTo($permission);
-        }
-        $captain = $this->officer('Captain', 'Cal Captain');
-        $firefighter = $this->member('Fred Firefighter');
-        $request = new InspectionEventNotification('captain5_acting_request', 'Acting Captain 5 request', 'A member asked to act.', '/admin/captain-5', 'captain5:acting:1:request');
-
-        foreach ([$chief, $captain, $firefighter] as $recipient) {
-            $recipient->notify($request);
-        }
-        $this->runQueuedNotifications();
-
-        $this->assertSame(1, $chief->notifications()->count());
-        $this->assertSame(0, $captain->notifications()->count(), 'viewing Captain 5 is not enough to approve duty');
-        $this->assertSame(0, $firefighter->notifications()->count());
-    }
-
-    public function test_the_requesting_member_hears_the_decision_as_an_update_about_their_own_request(): void
-    {
-        Queue::fake();
-        $member = $this->member('Fred Firefighter');
-
-        $member->notify(new InspectionEventNotification('captain5_acting_decision', 'Your request was approved', 'You are acting Captain 5.', '/daily/captain-5', 'captain5:acting:1:decision'));
-        $this->runQueuedNotifications();
-
-        $this->assertSame(1, $member->notifications()->count());
-        $this->assertSame('member_request_updates', $member->notifications()->sole()->data['provenance']['category']);
     }
 
     public function test_an_unknown_kind_still_reaches_a_sender_chosen_recipient_but_never_an_inactive_account(): void

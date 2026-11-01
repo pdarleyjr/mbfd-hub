@@ -92,7 +92,7 @@ final class Captain5AccessExplainer
         }
 
         $headline = $decision->isShownCaptain5
-            ? 'Can use the whole Captain 5 page, and is the Shift Captain 5 by seat or approved acting request right now.'
+            ? 'Can use the whole Captain 5 page, and is the Shift Captain 5 by seat right now.'
             : 'Can use the whole Captain 5 page.';
 
         return $this->result($headline, 'success', $this->sources($decision, $employee), $overrideSummary, $this->capabilities($decision), $notes);
@@ -156,7 +156,7 @@ final class Captain5AccessExplainer
         return [
             ['label' => 'Open the Captain 5 workspace', 'allowed' => $decision->canViewPage],
             ['label' => 'Act on issues', 'allowed' => $decision->canAct],
-            ['label' => 'Shift Captain 5 by seat or approved acting request now', 'allowed' => $decision->isShownCaptain5],
+            ['label' => 'Shift Captain 5 by seat now', 'allowed' => $decision->isShownCaptain5],
             ['label' => 'Close issues with no action required', 'allowed' => $decision->canDismiss],
             ['label' => 'Configure Captain 5 in the Admin Panel', 'allowed' => $decision->canConfigure],
         ];

@@ -1,4 +1,4 @@
-import type { ActingApi, ActingRequest, ActingResult, ActingState, OnDuty } from '../components/acting/types';
+import type { OnDuty } from '../components/acting/types';
 import { ACTIONS } from '../components/captain5/actionForms';
 import type {
   Captain5Summary, Handoff, InspectionView, IssueActionName, IssueActionRequest, IssueDetail, IssueSummary, RescueTruck, RescueTruckChange, Workspace,
@@ -136,42 +136,9 @@ export function normalizeDetail(raw: unknown): IssueDetail {
 
 const asIso = (value: unknown): string | null => (typeof value === 'string' && value !== '' ? value : null);
 
-function normalizeActingRequest(raw: unknown): ActingRequest {
-  const item = asRecord(raw);
-  return {
-    id: typeof item.id === 'number' ? item.id : 0,
-    ...(typeof item.role === 'string' ? { role: item.role } : {}),
-    ...(typeof item.role_label === 'string' ? { role_label: item.role_label } : {}),
-    kind: item.kind === 'end' ? 'end' : 'act',
-    requested_by: typeof item.requested_by === 'string' ? item.requested_by : 'A member',
-    name: typeof item.name === 'string' && item.name !== '' ? item.name : null,
-    rank: typeof item.rank === 'string' && item.rank !== '' ? item.rank : null,
-    duration: item.duration === '12h' || item.duration === '24h' || item.duration === 'custom' ? item.duration : null,
-    shift: item.shift === 'A' || item.shift === 'B' || item.shift === 'C' ? item.shift : null,
-    ends_at: asIso(item.ends_at),
-    requested_at: asIso(item.requested_at),
-    own: item.own === true,
-  };
-}
-
-/** Never trust the shape: a missing block becomes "nothing pending" so the page cannot throw. */
-export function normalizeActing(raw: unknown): ActingState {
-  const acting = asRecord(raw);
-  const choices = asRecord(acting.choices);
-  return {
-    ...(typeof acting.role === 'string' ? { role: acting.role } : {}),
-    // Older answers omit it; only an explicit false hides the "Click here" control.
-    can_request: acting.can_request !== false,
-    can_approve: acting.can_approve === true,
-    mine: acting.mine ? normalizeActingRequest(acting.mine) : null,
-    pending: asArray(acting.pending).map(normalizeActingRequest),
-    choices: { '12h': asIso(choices['12h']), '24h': asIso(choices['24h']) },
-  };
-}
-
 export const normalizeOnDuty = (raw: unknown): OnDuty => {
   const duty = asRecord(raw) as unknown as OnDuty;
-  return { ...duty, acting_until: asIso(duty.acting_until), acting_request_id: typeof duty.acting_request_id === 'number' ? duty.acting_request_id : null, as_of: asIso(duty.as_of) };
+  return { ...duty, as_of: asIso(duty.as_of) };
 };
 
 const asText = (value: unknown): string | null => (typeof value === 'string' && value.trim() !== '' ? value : null);
@@ -223,7 +190,6 @@ function normalizeWorkspace(raw: Record<string, unknown>): Workspace {
     rescue_trucks: asArray(raw.rescue_trucks).map(normalizeTruck),
     rescue_truck_changes: asArray(raw.rescue_truck_changes).map(normalizeTruckChange),
     handoff: { duty_date: data.handoff?.duty_date ?? data.duty_date, notes: asArray(data.handoff?.notes) },
-    acting: normalizeActing(raw.acting),
   };
 }
 
@@ -279,36 +245,13 @@ export async function acknowledgeHandoff(noteId: number): Promise<Handoff> {
   return handoffOf(await request(`/handoff/${noteId}/acknowledge`, { method: 'POST', body: '{}' }));
 }
 
-export const actingResult = (payload: { on_duty?: unknown; acting?: unknown }): ActingResult => ({
-  on_duty: normalizeOnDuty(payload.on_duty),
-  acting: normalizeActing(payload.acting),
-});
-
-export type { ActingRequestInput } from '../components/acting/types';
-
-/**
- * The four acting calls against one API base. `kind: 'act'` is "Acting as ... today?" (also a takeover) and
- * `kind: 'end'` is "End the current acting ...". The Captain 5 workspace and the 300 page each bind their own.
- */
-export function buildActingApi(call: Requester): ActingApi {
-  return {
-    requestActing: async (input) => actingResult(await call('/acting-requests', json(input))),
-    approveActing: async (id, note = '') => actingResult(await call(`/acting-requests/${id}/approve`, json(note.trim() === '' ? {} : { note: note.trim() }))),
-    rejectActing: async (id, note) => actingResult(await call(`/acting-requests/${id}/reject`, json({ note: note.trim() }))),
-    withdrawActing: async (id) => actingResult(await call(`/acting-requests/${id}/withdraw`, { method: 'POST', body: '{}' })),
-  };
-}
-
-export const captain5ActingApi: ActingApi = buildActingApi(request);
-export const { requestActing, approveActing, rejectActing, withdrawActing } = captain5ActingApi;
-
 /** The first message a 422 carries for a field, else the response message. */
 export function firstFieldError(error: Captain5ApiError): string {
   return Object.values(error.fieldErrors)[0] ?? error.message;
 }
 
 /**
- * What to tell the member when a request that is not a text draft (acting requests, decisions) fails.
+ * What to tell the member when a request that is not a text draft fails.
  * Offline and unreachable are different: offline is certain, unreachable is not.
  */
 export function requestFailureMessage(error: unknown, fallback: string): string {

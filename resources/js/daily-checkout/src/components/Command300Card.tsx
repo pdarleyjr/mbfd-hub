@@ -4,9 +4,8 @@ import { ChevronRight } from 'lucide-react';
 import { COMMAND_300_IMAGE, bundledImageSize } from '../types';
 import { fetchCommandSummary } from '../utils/commandCommunicationsApi';
 import StationCardMedia from './StationCardMedia';
-import { COMMAND_300_ACTING } from './acting/command300Role';
 import DutyNote from './acting/DutyNote';
-import { dutyLine, dutyTone } from './acting/format';
+import { COMMAND_300_DUTY, dutyLine, dutyTone } from './acting/format';
 import { useCommand300Shift } from './acting/useCommand300Shift';
 import { useVisibleRefresh } from './acting/useVisibleRefresh';
 import Tag from './ui/Tag';
@@ -54,7 +53,7 @@ export default function Command300Card() {
         {onDuty && (
           <>
             <p className="mb-2" data-testid="daily-command-duty">
-              <Tag tone={dutyTone(onDuty)} className="!whitespace-normal !py-1 max-w-full break-words">{dutyLine(onDuty, COMMAND_300_ACTING)}</Tag>
+              <Tag tone={dutyTone(onDuty)} className="!whitespace-normal !py-1 max-w-full break-words">{dutyLine(onDuty, COMMAND_300_DUTY)}</Tag>
             </p>
             <DutyNote onDuty={onDuty} testId="daily-command-duty-note" className="mb-2" />
           </>

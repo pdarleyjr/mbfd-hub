@@ -10,10 +10,10 @@ use App\Models\ApparatusDefect;
 use App\Models\ApparatusDefectEvent;
 use App\Models\ApparatusInspection;
 use App\Models\ApparatusIssueMessage;
-use App\Models\Captain5\Captain5ActingRequest;
 use App\Models\CommandCommunicationPost;
 use App\Models\User;
 use App\Notifications\Inspections\InspectionEventNotification;
+use App\Services\DailyRoster\OnDutyCaptain5Recipients;
 use App\Services\Defects\FindingsResult;
 use App\Services\Inspections\EmployeeInspectionHistoryService;
 use App\Services\Inspections\InspectionNotificationDispatcher;
@@ -55,10 +55,6 @@ final class Captain5Notifier
 
     public const KIND_COMMUNICATION = 'captain5_communication';
 
-    public const KIND_ACTING_REQUEST = 'captain5_acting_request';
-
-    public const KIND_ACTING_DECISION = 'captain5_acting_decision';
-
     public const WORKSPACE_PATH = '/daily/captain-5';
 
     public const COMMAND_300_PATH = '/daily/command-300';
@@ -76,6 +72,7 @@ final class Captain5Notifier
 
     public function __construct(
         private readonly Captain5DutyRoster $roster,
+        private readonly OnDutyCaptain5Recipients $onDuty,
         private readonly Captain5IssueScope $scope,
         private readonly InspectionNotificationDispatcher $dispatcher,
         private readonly Captain5Access $access,
@@ -334,61 +331,6 @@ final class Captain5Notifier
         });
     }
 
-    /**
-     * A member asked to be shown as (or to end) the acting Captain 5 or acting 300: that role's
-     * approvers are asked (ActingApprovers). Same kinds and ledger keys for both roles (the request id
-     * is unique); only the wording, the approvers and the page linked differ.
-     */
-    public function actingRequested(Captain5ActingRequest $request): void
-    {
-        $this->guard('actingRequested', function () use ($request): void {
-            $requester = User::query()->find($request->requested_by_user_id);
-            $name = trim((string) ($requester?->display_name ?: $requester?->name)) ?: 'A member';
-            $label = Captain5ActingRequest::roleLabel($request->role);
-            // Any administrator, for both roles (ActingApprovers).
-            $approvers = app(ActingApprovers::class)->users($request->role);
-            $what = $request->kind === Captain5ActingRequest::KIND_END
-                ? "{$name} asked to end the current acting {$label} display."
-                : "{$name} asked to be shown as acting {$label} until ".$this->localTime($request->ends_at).'.';
-
-            $this->queue('captain5:acting:'.$request->getKey().':requested', self::KIND_ACTING_REQUEST, $approvers, fn (): array => [
-                'title' => "Acting {$label}: approval needed",
-                'body' => $what,
-                'url' => $this->actingPage($request).($request->role === Captain5ActingRequest::ROLE_CAPTAIN_5 ? '?tab=today' : ''),
-            ], $requester);
-        });
-    }
-
-    /** Tells the requester how their acting Captain 5 or acting 300 request was decided. */
-    public function actingDecided(Captain5ActingRequest $request): void
-    {
-        $this->guard('actingDecided', function () use ($request): void {
-            $approved = $request->status === Captain5ActingRequest::APPROVED;
-            $label = Captain5ActingRequest::roleLabel($request->role);
-            $decider = $request->decided_by_user_id !== null ? User::query()->find($request->decided_by_user_id) : null;
-            $body = match (true) {
-                $approved && $request->kind === Captain5ActingRequest::KIND_END => "The acting {$label} display was ended.",
-                $approved => "You are shown as acting {$label} until ".$this->localTime($request->ends_at).'.',
-                default => "Your acting {$label} request was not approved.".($request->decision_note ? ' '.$this->excerpt($request->decision_note) : ''),
-            };
-            $this->queue('captain5:acting:'.$request->getKey().':decided', self::KIND_ACTING_DECISION, User::query()->whereKey($request->requested_by_user_id)->get(), fn (): array => [
-                'title' => $approved ? "Acting {$label} approved" : "Acting {$label} not approved",
-                'body' => $body,
-                'url' => $this->actingPage($request),
-            ], $decider);
-        });
-    }
-
-    private function actingPage(Captain5ActingRequest $request): string
-    {
-        return $request->role === Captain5ActingRequest::ROLE_COMMAND_300 ? self::COMMAND_300_PATH : self::WORKSPACE_PATH;
-    }
-
-    private function localTime(?\DateTimeInterface $moment): string
-    {
-        return $moment !== null ? \Carbon\CarbonImmutable::instance($moment)->setTimezone(\App\Support\HubTimezone::NAME)->format('D g:i A') : 'the end of the shift';
-    }
-
     /** Replays one queued ledger row (inspections:retry-notifications). */
     public function redeliver(string $eventKey, string $kind, int $recipientUserId): bool
     {
@@ -401,8 +343,6 @@ final class Captain5Notifier
             $tail = $parts[3] ?? '';
             match (true) {
                 $subject === 'communication' => $this->replayCommunication($parts[2] ?? ''),
-                $subject === 'acting' && $tail === 'requested' => ($a = Captain5ActingRequest::query()->find($id)) !== null ? $this->actingRequested($a) : null,
-                $subject === 'acting' && $tail === 'decided' => ($a = Captain5ActingRequest::query()->find($id)) !== null ? $this->actingDecided($a) : null,
                 $subject === 'inspection' => $this->replayFindings($id),
                 $subject === 'defect' => $this->withModels($id, (int) ($parts[4] ?? 0), fn (ApparatusDefect $d, ApparatusDefectEvent $e) => $this->issueUpdated($d, $e)),
                 $subject === 'message' && $tail === 'notify' => ($m = ApparatusIssueMessage::query()->find($id)) !== null
@@ -425,14 +365,14 @@ final class Captain5Notifier
     // ---------------------------------------------------------------- recipients
 
     /**
-     * The on-duty Captain 5 (or the seat holders when unresolved), limited to people who still pass
-     * Captain5Access right now: a denied, departed or disabled person is never notified.
+     * The on-duty Captain 5 by the TeleStaff roster (or the seat holders when unresolved), limited to
+     * people who still pass Captain5Access right now: a denied, departed or disabled person is never notified.
      *
      * @return Collection<int, User>
      */
     private function onDutyRecipients(): Collection
     {
-        $recipients = $this->eligible($this->roster->notificationRecipients());
+        $recipients = $this->eligible($this->onDuty->users());
 
         return $recipients->isNotEmpty() ? $recipients : $this->eligible($this->roster->usersFor($this->roster->captain5Seats()->keys()));
     }

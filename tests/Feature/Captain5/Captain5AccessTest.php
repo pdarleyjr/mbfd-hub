@@ -78,35 +78,18 @@ final class Captain5AccessTest extends TestCase
         self::assertTrue(app(Captain5Access::class)->decide($b)->isShownCaptain5);
     }
 
-    public function test_an_approved_acting_member_is_shown_until_the_end_time_without_changing_anyones_permissions(): void
+    public function test_an_old_approved_acting_request_changes_nothing(): void
     {
-        $holder = $this->officer('Captain');
+        $holder = $this->officer('Captain', 'Seat Captain');
         $this->seat($holder, 'Captain 5', 'A Shift');
-        $acting = $this->officer('Lieutenant', 'Acting Officer');
-        $this->actingAssignment($acting, $this->captain5Administrator(), CarbonImmutable::parse('2026-10-20 20:00:00', 'America/New_York'));
-
-        $decision = app(Captain5Access::class)->decide($acting);
-        self::assertTrue($decision->isShownCaptain5);
-        self::assertSame(OnDutyCaptain5::SOURCE_ACTING, $decision->onDuty->source);
-        self::assertSame('Acting Officer', $decision->onDuty->toArray()['name']);
-        self::assertSame('Captain 5 (acting)', $decision->authorityLabel());
-        $holderDecision = app(Captain5Access::class)->decide($holder);
-        self::assertFalse($holderDecision->isShownCaptain5, 'The acting display replaces the bid holder on top');
-        self::assertTrue($holderDecision->canAct, 'but the bid holder keeps every capability');
-
-        $this->travelTo(CarbonImmutable::parse('2026-10-20 20:00:01', 'America/New_York'));
-        $this->forgetCaptain5Memo();
-        self::assertSame(OnDutyCaptain5::SOURCE_BID, app(Captain5Access::class)->decide($acting)->onDuty->source, 'The display ends on its own');
-        self::assertTrue(app(Captain5Access::class)->decide($acting)->canAct, 'Rank still gives full use');
-    }
-
-    public function test_acting_never_grants_access_to_someone_who_is_not_otherwise_eligible(): void
-    {
         $firefighter = $this->officer('Firefighter');
         $this->actingAssignment($firefighter, $this->captain5Administrator());
+
         $decision = app(Captain5Access::class)->decide($firefighter);
-        self::assertFalse($decision->canViewPage, 'The acting display is display only');
-        self::assertSame(OnDutyCaptain5::SOURCE_ACTING, $decision->onDuty->source);
+        self::assertFalse($decision->canViewPage);
+        self::assertFalse($decision->isShownCaptain5);
+        self::assertSame(OnDutyCaptain5::SOURCE_BID, $decision->onDuty->source);
+        self::assertSame('Seat Captain', $decision->onDuty->toArray()['name']);
     }
 
     public function test_deny_override_beats_every_automatic_source_except_super_admin(): void

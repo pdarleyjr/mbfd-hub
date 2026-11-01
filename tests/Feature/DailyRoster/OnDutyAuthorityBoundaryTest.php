@@ -5,9 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\DailyRoster;
 
 use App\Filament\Admin\Pages\Captain5Operations;
-use App\Models\Captain5\Captain5ActingRequest;
 use App\Models\User;
-use App\Services\Captain5\ActingApprovers;
 use App\Services\Captain5\Captain5DutyRoster;
 use App\Services\Captain5\OnDutyCaptain5;
 use App\Services\Ems\Captain5Recipients;
@@ -25,10 +23,11 @@ use Tests\Support\DailyRosterSnapshotFactory;
 use Tests\TestCase;
 
 /**
- * Contract: the TeleStaff roster only ever changes the name on the 300 and Captain 5 cards. The
- * snapshot here names a member who holds no seat, no rank and no grant. With the display flag on,
- * that member appears on the cards and gains nothing, and every authority and routing answer stays
- * exactly what it is with the flag off. Names are synthetic.
+ * Contract: the TeleStaff roster changes the name on the 300 and Captain 5 cards and who the shift's
+ * Captain 5 alerts go to (only when that person can use the page). It grants nothing. The snapshot here
+ * names a member who holds no seat, no rank and no grant. With the display flag on, that member appears
+ * on the cards and gains nothing, and every authority answer stays exactly what it is with the flag off.
+ * Names are synthetic.
  */
 final class OnDutyAuthorityBoundaryTest extends TestCase
 {
@@ -37,24 +36,19 @@ final class OnDutyAuthorityBoundaryTest extends TestCase
 
     private const DUTY_DATE = '2026-10-20';
 
-    /** Classes that decide access, audit capacity or who gets notified. None may see the roster. */
-    private const AUTHORITY_AND_ROUTING_FILES = [
+    /** Classes that decide access or audit capacity. None may see the roster. */
+    private const AUTHORITY_FILES = [
         'app/Services/Captain5/Captain5DutyRoster.php',
         'app/Services/Captain5/OnDutyCaptain5.php',
         'app/Services/Captain5/VerifiedBidSeats.php',
-        'app/Services/Captain5/ActingApprovers.php',
-        'app/Services/Captain5/Captain5ActingService.php',
         'app/Services/Captain5/Captain5ActorContext.php',
         'app/Services/Captain5/Captain5HandoffService.php',
         'app/Services/Captain5/Captain5IssueActions.php',
-        'app/Services/Captain5/Captain5Notifier.php',
         'app/Services/Security/Captain5Access.php',
         'app/Services/Security/Captain5AccessDecision.php',
         'app/Services/Security/Command300Access.php',
         'app/Services/Narcotics/NarcoticsCheckAccess.php',
         'app/Services/Narcotics/NarcoticsNotifier.php',
-        'app/Services/Ems/Captain5Recipients.php',
-        'app/Services/Ems/EmsNotifier.php',
         'app/Services/CommandCommunications/CommandCommunicationService.php',
     ];
 
@@ -127,8 +121,6 @@ final class OnDutyAuthorityBoundaryTest extends TestCase
             'on_duty' => $decision->onDuty->toArray(),
             'narcotics_review' => app(NarcoticsCheckAccess::class)->canReview($user),
             'command_300' => app(Command300Access::class)->allows($user),
-            'approves_captain_5' => app(ActingApprovers::class)->can($user, Captain5ActingRequest::ROLE_CAPTAIN_5),
-            'approves_300' => app(ActingApprovers::class)->can($user, Captain5ActingRequest::ROLE_COMMAND_300),
         ];
     }
 
@@ -141,8 +133,6 @@ final class OnDutyAuthorityBoundaryTest extends TestCase
             'notification_recipients' => $ids(app(Captain5DutyRoster::class)->notificationRecipients()),
             'recipients_on_duty' => $ids(app(Captain5Recipients::class)->onDuty()),
             'recipients_staff' => $ids(app(Captain5Recipients::class)->staff()),
-            'approvers_captain_5' => $ids(app(ActingApprovers::class)->users(Captain5ActingRequest::ROLE_CAPTAIN_5)),
-            'approvers_300' => $ids(app(ActingApprovers::class)->users(Captain5ActingRequest::ROLE_COMMAND_300)),
         ];
     }
 
@@ -169,7 +159,7 @@ final class OnDutyAuthorityBoundaryTest extends TestCase
         self::assertSame($off, $on);
     }
 
-    public function test_notification_routing_and_approvers_are_identical_with_the_display_on_and_off(): void
+    public function test_someone_who_cannot_use_the_page_is_never_routed_a_shift_alert(): void
     {
         $on = $this->routing();
         $this->displayOff();
@@ -191,8 +181,6 @@ final class OnDutyAuthorityBoundaryTest extends TestCase
         self::assertSame('view_only', $answers['authority']);
         self::assertFalse($answers['acts_as_logistics']);
         self::assertFalse($answers['command_300']);
-        self::assertFalse($answers['approves_captain_5']);
-        self::assertFalse($answers['approves_300']);
         self::assertSame(OnDutyCaptain5::SOURCE_BID, $answers['on_duty']['source'], 'The seat answer never reads the roster');
         self::assertSame('Seat Captain', $answers['on_duty']['name']);
     }
@@ -241,7 +229,7 @@ final class OnDutyAuthorityBoundaryTest extends TestCase
         }
     }
 
-    public function test_new_findings_are_still_routed_to_the_seat_and_never_to_the_person_on_the_card(): void
+    public function test_new_findings_go_to_the_seat_when_the_person_on_the_card_cannot_use_the_page(): void
     {
         $crew = $this->officer('Firefighter', 'Crew Member');
         $this->reportMissing($this->rescue, $crew, [$this->firstItemId($this->rescue)]);
@@ -274,7 +262,7 @@ final class OnDutyAuthorityBoundaryTest extends TestCase
             ->assertSee('Shown on cards: Seat Captain')
             ->assertSee('Captain 5 bid seat')
             ->assertDontSee('Notifications go to')
-            ->assertDontSee('TeleStaff');
+            ->assertDontSee('Source: TeleStaff');
     }
 
     public function test_no_employee_id_reaches_a_member_payload(): void
@@ -287,9 +275,9 @@ final class OnDutyAuthorityBoundaryTest extends TestCase
         }
     }
 
-    public function test_no_authority_or_routing_class_references_the_roster(): void
+    public function test_no_authority_class_references_the_roster(): void
     {
-        foreach (self::AUTHORITY_AND_ROUTING_FILES as $path) {
+        foreach (self::AUTHORITY_FILES as $path) {
             self::assertFileExists(base_path($path), "{$path} moved: keep this contract pointing at the real class");
             self::assertDoesNotMatchRegularExpression(
                 '/DailyRoster|OnDutyOfficerDisplay|CurrentRosterReader|RosterFreshness|RosterSnapshot|RosterAssignment|RosterSection|roster_assignments|roster_snapshots|roster_active_versions/',

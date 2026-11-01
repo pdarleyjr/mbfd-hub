@@ -19,10 +19,6 @@ return [
     // Canonical `employees.rank` strings that may open the workspace (normalized compare).
     'officer_ranks' => ['Lieutenant', 'Captain', 'Division Chief', 'Deputy Fire Chief', 'Fire Chief'],
 
-    // Ranks that may assign an acting Captain 5 (in addition to the EMS Captain,
-    // the verified 300 seat and Captain 5 administrators).
-    'assignment_manager_ranks' => ['Division Chief'],
-
     'timezone' => \App\Support\HubTimezone::NAME,
 
     // Duty day boundary (TeleStaff daily print: 08:00 to 08:00).

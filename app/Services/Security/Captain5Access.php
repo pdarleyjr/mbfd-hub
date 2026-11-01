@@ -18,9 +18,8 @@ use DateTimeInterface;
  * communications, issue mutations and message threads all ask this class.
  *
  * Every eligible person (officers, chiefs, Captain 5 / EMS Captain seats, administrators, allow
- * overrides) may use the whole page. Who is "Captain 5 for the shift" is display information only
- * (bid seat or an admin-approved acting request) and never gates an action: everything is
- * attributed to the signed-in member.
+ * overrides) may use the whole page. Who is "Captain 5 for the shift" never gates an action:
+ * everything is attributed to the signed-in member.
  *
  * Gate abilities deliberately differ from the permission name (`captain5.admin`), so Spatie's
  * Gate::before can never short-circuit the account and override checks here.
@@ -78,9 +77,8 @@ final class Captain5Access
     }
 
     /**
-     * Same answer as decide()->canConfigure, without the duty roster: configuration (and approving
-     * acting Captain 5 requests) depends only on the account, the Admin Panel entitlement, the
-     * direct `captain5.admin` grant and a deny override.
+     * Same answer as decide()->canConfigure, without the duty roster: configuration depends only on
+     * the account, the Admin Panel entitlement, the direct `captain5.admin` grant and a deny override.
      */
     public function canConfigure(?User $user): bool
     {
@@ -96,7 +94,7 @@ final class Captain5Access
             && ! $this->isDenied($user);
     }
 
-    /** Forget per-request memoization (after an override or acting change). */
+    /** Forget per-request memoization (after an override change). */
     public function flush(): void
     {
         $this->memo = [];

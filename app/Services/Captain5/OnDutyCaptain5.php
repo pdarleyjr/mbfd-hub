@@ -4,18 +4,15 @@ declare(strict_types=1);
 
 namespace App\Services\Captain5;
 
-use App\Models\Captain5\Captain5ActingRequest;
 use App\Models\Employee;
 use Carbon\CarbonImmutable;
 
 /**
- * The Shift Captain 5 or Shift 300 for a duty day by seat or approved acting request, and why. Feeds
- * narcotics review, the audit capacity and notification routing, so TeleStaff never reaches it.
+ * The Shift Captain 5 or Shift 300 for a duty day by bid seat, and why. Feeds narcotics review and the
+ * audit capacity, so TeleStaff never reaches it.
  */
 final readonly class OnDutyCaptain5
 {
-    public const SOURCE_ACTING = 'acting';
-
     public const SOURCE_BID = 'bid_holder';
 
     public const SOURCE_UNKNOWN = 'unknown';
@@ -25,7 +22,6 @@ final readonly class OnDutyCaptain5
         public ?string $shiftLetter,
         public string $source,
         public ?Employee $employee,
-        public ?Captain5ActingRequest $actingRequest,
     ) {}
 
     public function isResolved(): bool
@@ -50,8 +46,9 @@ final readonly class OnDutyCaptain5
             // The member's preferred (display) name when set, otherwise the personnel record name.
             'name' => $this->employee !== null ? trim((string) ($this->employee->display_name ?: $this->employee->name)) : null,
             'rank' => $this->employee?->rank,
-            'acting_until' => $this->actingRequest?->ends_at?->utc()->toIso8601String(),
-            'acting_request_id' => $this->actingRequest?->getKey(),
+            // Always null now. Installed apps still running the previous page build read these keys.
+            'acting_until' => null,
+            'acting_request_id' => null,
         ];
     }
 }
