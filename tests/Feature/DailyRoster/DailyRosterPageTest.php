@@ -405,13 +405,13 @@ final class DailyRosterPageTest extends TestCase
         $response->assertDontSee('roster-pill--leave', false);
     }
 
-    public function test_the_home_tile_follows_access(): void
+    public function test_the_home_button_follows_access(): void
     {
         config(['daily_roster.mode' => 'publish']);
         $this->actingAsCanonicalFixture();
         $this->get('/')->assertOk()
+            ->assertSee('data-home-daily-roster', false)
             ->assertSee('Daily Roster')
-            ->assertSee('Today&#039;s shift roster from TeleStaff', false)
             ->assertSee('href="'.route('daily-roster.show').'"', false);
 
         $this->logoutCanonicalSession();

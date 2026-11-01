@@ -14,6 +14,8 @@ export interface OfflineIdentity {
     personnelEquipmentRequest: boolean;
     /** 300 Command access; undefined in identities cached before this field existed (unknown, not denied). */
     commandAccess?: boolean;
+    /** May read the Daily Roster; undefined in identities cached before this field existed. */
+    dailyRoster?: boolean;
   };
 }
 
@@ -21,7 +23,7 @@ interface MemberContextResponse {
   identity?: { user_id?: unknown };
   offline?: { security_version?: unknown };
   personnel?: OfflineIdentity['personnel'];
-  authorization?: { capabilities?: { personnel_equipment_request?: unknown; command_300_access?: unknown } };
+  authorization?: { capabilities?: { personnel_equipment_request?: unknown; command_300_access?: unknown; daily_roster?: unknown } };
 }
 
 const parseIdentity = (value: unknown): OfflineIdentity | null => {
@@ -38,6 +40,7 @@ const parseIdentity = (value: unknown): OfflineIdentity | null => {
         capabilities: {
           personnelEquipmentRequest: context.authorization?.capabilities?.personnel_equipment_request === true,
           commandAccess: context.authorization?.capabilities?.command_300_access === true,
+          dailyRoster: context.authorization?.capabilities?.daily_roster === true,
         },
       }
     : null;
