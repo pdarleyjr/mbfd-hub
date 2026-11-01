@@ -614,6 +614,22 @@ body[data-hub-ui="2"] {
     [data-hub-ui="2"] .home-today .hub-btn { width: 100%; }
 }
 
+/* Greeting block: three short lines under the heading, plain text on the canvas. Long names and long lines wrap
+   inside the column, so nothing overflows at 320px; no card, no stripe, no extra surface. */
+[data-hub-ui="2"] .home-duty { flex: 1 1 280px; min-width: 0; max-width: 100%; }
+[data-hub-ui="2"] .home-duty__greeting { overflow-wrap: anywhere; }
+[data-hub-ui="2"] .home-duty__line { margin: 4px 0 0; color: rgb(var(--hub2-n-600)); font-size: 14px; line-height: 20px; overflow-wrap: anywhere; }
+[data-hub-ui="2"] .home-duty__command { color: rgb(var(--hub2-n-900)); font-weight: 600; }
+/* Words carry the state; colour only echoes it. A line that is not a verified fact reads quieter, and trouble reads as a warning. */
+[data-hub-ui="2"] .home-duty__command:is([data-state="scheduled"], [data-state="awaiting"]) { color: rgb(var(--hub2-n-600)); font-weight: 500; }
+[data-hub-ui="2"] .home-duty__command:is([data-state="review"], [data-state="delayed"], [data-state="held"]) { color: rgb(var(--hub2-warning)); }
+[data-hub-ui="2"] .home-duty__meta { margin: 2px 0 0; color: rgb(var(--hub2-n-600)); font-size: 13px; line-height: 20px; overflow-wrap: anywhere; }
+[data-hub-ui="2"] .home-duty [hidden] { display: none; }
+@media (pointer: coarse) {
+    /* The roster link is the only control here; give a finger its 44px. */
+    [data-hub-ui="2"] .home-duty__meta .hub-link { display: inline-flex; align-items: center; min-height: 44px; }
+}
+
 /* Update rows are white wells on the glass list; the priority tag, not a colour stripe, carries severity. */
 [data-hub-ui="2"] .home-update { position: relative; padding: 16px; }
 [data-hub-ui="2"] .home-update__meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }

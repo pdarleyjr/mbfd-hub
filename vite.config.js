@@ -36,6 +36,8 @@ export default defineConfig({
                 'resources/js/take-home-inspection.js',
                 'resources/css/daily-roster.css',
                 'resources/js/daily-roster.js',
+                // The Home greeting block's refresh (loaded only on Home).
+                'resources/js/home-duty.js',
             ],
             refresh: true,
         }),
