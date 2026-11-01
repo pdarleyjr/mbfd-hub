@@ -256,10 +256,12 @@ test.describe('master inventory table', () => {
     await expect(page.getByTestId('shelf-prev-top')).toBeDisabled();
     await page.getByTestId('shelf-picker').selectOption({ label: 'D1 Splints (2)' });
     await expect(page.getByTestId('shelf-next-bottom')).toBeDisabled();
-    await page.reload();
-    await expect(page.getByTestId('shelf-name-top')).toHaveText('D1 Splints');
     await page.goBack();
     await expect(page.getByTestId('shelf-name-top')).toHaveText('A1 Airway');
+    await page.goForward();
+    await expect(page.getByTestId('shelf-name-top')).toHaveText('D1 Splints');
+    await page.reload();
+    await expect(page.getByTestId('shelf-name-top')).toHaveText('D1 Splints');
   });
 
   test('search reaches every shelf, matches 18g with 18 gauge, and the shelf link jumps and highlights the row', async ({ page }) => {
