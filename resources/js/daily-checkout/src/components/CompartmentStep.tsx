@@ -2,17 +2,26 @@ import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 
 import type { ChecklistData, ChecklistItem, Compartment } from '../types';
 import { resolveBlueprint } from '../data/apparatusBlueprints';
 import { findingsForArea, inspectionProgress, itemIsComplete } from '../utils/inspectionProgress';
-import { previousIssueHeadline, previousIssueStatusLine, resolveFindingTargets, targetsForItem, unlocatedFindings as findUnlocatedFindings, formatReportedDate } from '../utils/previousFindings';
+import { previousIssueHeadline, previousIssueStatusLine, resolveFindingTargets, targetsForItem, formatReportedDate } from '../utils/previousFindings';
 import { ArrowRight, Check, ChevronDown, ClipboardList, Package, TriangleAlert, X } from 'lucide-react';
 import ApparatusBlueprint from './ApparatusBlueprint';
 import InventoryCorrectionForm from './InventoryCorrectionForm';
 import { correctionLink, emptyCorrectionForm, markerForItem, questionFor, unlistedMarkers, type CorrectionForm, type InventoryCorrectionContext } from '../utils/inventoryCorrections';
+import { photoProblem } from '../utils/photoFile';
+import type { LiveIssues } from '../utils/liveFindings';
+import FindingsSummary, { type SummaryEntry } from './findings/FindingsSummary';
+import IssueCard from './findings/IssueCard';
 import './inspection-workspace.css';
 
 interface Props {
   checklistType?: string;
+  /** False for a unit with no fleet vehicle ID (Fire Boat 6): its areas are not "vehicle" areas. Missing means true. */
+  usesVehicleId?: boolean;
   compartments: Compartment[];
+  /** The checklist's open findings, already enriched with live status (see mergeKnownFindings). */
   findings?: ChecklistData['open_findings'];
+  /** Live issue history: the card behind a known issue, the summary above the areas, and what is no longer open. */
+  issues: LiveIssues;
   onChange: Dispatch<SetStateAction<Compartment[]>>;
   onSubmit: (compartments: Compartment[]) => void;
   onBack: () => void;
@@ -36,7 +45,7 @@ const batchEligible = (item: ChecklistItem) => !((item.observed && item.status !
 /** Leaving Damaged clears the significant-damage claim in the same update. */
 const statusPatch = (status: ChecklistItem['status']): Partial<ChecklistItem> => status === 'Damaged' ? { status, observed: true } : { status, observed: true, significant: undefined };
 
-export default function CompartmentStep({ checklistType, compartments, findings = [], onChange, onSubmit, onBack, actionLabel, inventory }: Props) {
+export default function CompartmentStep({ checklistType, usesVehicleId = true, compartments, findings = [], issues, onChange, onSubmit, onBack, actionLabel, inventory }: Props) {
   const profile = resolveBlueprint(checklistType);
   const mappedViews = profile?.views.filter(view => view.zones.some(zone => compartments.some(compartment => compartment.id === zone.compartmentId))) ?? [];
   const [activeId, setActiveId] = useState(mappedViews[0]?.zones.find(zone => compartments.some(compartment => compartment.id === zone.compartmentId))?.compartmentId ?? compartments[0]?.id ?? '');
@@ -65,7 +74,12 @@ export default function CompartmentStep({ checklistType, compartments, findings 
   const progress = inspectionProgress(compartments);
   const compartmentProgress = current ? inspectionProgress([current]) : null;
   const findingTargets = resolveFindingTargets(compartments, findings);
-  const unlocatedFindings = findUnlocatedFindings(findingTargets, findings);
+  const { liveById, noLongerOpen } = issues.known;
+  const summaryEntries: SummaryEntry[] = findings.map(finding => {
+    const target = findingTargets.find(entry => entry.finding === finding);
+
+    return { finding, issue: liveById.get(finding.id) ?? null, target: target ? { compartmentId: target.compartment.id, itemId: target.item.id } : null, noLongerOpen: noLongerOpen.has(finding.id) };
+  });
   const mappedIds = new Set(mappedViews.flatMap(entry => entry.zones.map(zone => zone.compartmentId)));
   const otherAreas = compartments.filter(compartment => !mappedIds.has(compartment.id));
   const navigationIds = Array.from(new Set([...mappedViews.flatMap(entry => entry.zones.map(zone => zone.compartmentId)), ...otherAreas.map(area => area.id)]));
@@ -178,8 +192,9 @@ export default function CompartmentStep({ checklistType, compartments, findings 
 
   const capturePhoto = (compartmentId: string, itemId: string, file?: File) => {
     if (!file) return;
-    if (!file.type.startsWith('image/') || file.size > 5_000_000) {
-      setPhotoError('Choose an image smaller than 5 MB. Your inspection answers are still saved.');
+    const problem = photoProblem(file);
+    if (problem) {
+      setPhotoError(problem);
       resetPhotoInput(itemId);
       return;
     }
@@ -194,7 +209,9 @@ export default function CompartmentStep({ checklistType, compartments, findings 
 
   if (!current || !compartmentProgress) return <div data-hub-ui="2" role="alert" className="inspection-alert">No checklist items available. <button type="button" className="hub-btn hub-btn--secondary ml-2" onClick={onBack}>Member / Vehicle Info</button></div>;
 
-  return <div data-hub-ui="2" className={`inspection-layout ${showBlueprint ? 'with-blueprint' : 'with-area-rail'} ${pickerCollapsed ? 'picker-collapsed' : ''}`}>
+  return <>
+    <FindingsSummary entries={summaryEntries} notes={issues.live.notes} closedCount={issues.live.closedCount} asOf={issues.live.asOf} state={issues.live.state} apparatusId={issues.apparatusId} onRefresh={issues.live.refresh} onOpenItem={select} />
+    <div data-hub-ui="2" className={`inspection-layout ${showBlueprint ? 'with-blueprint' : 'with-area-rail'} ${pickerCollapsed ? 'picker-collapsed' : ''}`}>
     <div className="inspection-area-summary inspection-panel">
       <div><strong>{selectedZone ? `${view.label} · ${selectedZone.label}` : current.name}</strong><span>{compartmentProgress.completed}/{compartmentProgress.total} inspected{compartmentProgress.issues > 0 ? ` · ${compartmentProgress.issues} reported` : ''}</span></div>
       <button type="button" className="hub-btn hub-btn--tertiary" aria-expanded={!pickerCollapsed} aria-controls="inspection-area-picker" onClick={() => {
@@ -207,7 +224,7 @@ export default function CompartmentStep({ checklistType, compartments, findings 
       }}>Change area</button>
     </div>
     <aside id="inspection-area-picker" className="inspection-navigation inspection-panel" aria-label="Apparatus navigation" ref={navigationRef}>
-      <div className="inspection-panel-heading"><h2>Vehicle Areas</h2><div className="blueprint-legend"><span><i className="remaining-dot" />Remaining</span><span><Check size={13} aria-hidden="true" />Inspected</span><span><b aria-hidden="true">E</b> Existing</span><span><b aria-hidden="true">R</b> Reported</span></div></div>
+      <div className="inspection-panel-heading"><h2>{usesVehicleId ? 'Vehicle Areas' : 'Areas'}</h2><div className="blueprint-legend"><span><i className="remaining-dot" />Remaining</span><span><Check size={13} aria-hidden="true" />Inspected</span><span><b aria-hidden="true">E</b> Existing</span><span><b aria-hidden="true">R</b> Reported</span></div></div>
       {showBlueprint && view ? <>
         <div className="blueprint-views" aria-label="Apparatus views">
           {mappedViews.map(entry => <button key={entry.id} type="button" aria-pressed={entry.id === view.id} onClick={() => { setViewId(entry.id); setActiveId(entry.zones.find(zone => compartments.some(compartment => compartment.id === zone.compartmentId))!.compartmentId); setExpandedId(null); setBatchUndo(null); }}>{entry.label}</button>)}
@@ -231,16 +248,11 @@ export default function CompartmentStep({ checklistType, compartments, findings 
           <section className="inspection-area-list" aria-label="Other areas">{otherAreas.map(areaButton)}</section>
         </details>}
       </> : <section className="inspection-area-list rescue-area-rail" aria-label="Inspection areas">{compartments.map(areaButton)}</section>}
-      {unlocatedFindings.length > 0 && <details className="inspection-unlocated-findings">
-        <summary>Other recorded findings ({unlocatedFindings.length})</summary>
-        <p>These findings remain open. Verify the recorded location or duty before acting.</p>
-        <ul>{unlocatedFindings.map(finding => <li key={finding.id}><strong>{finding.item}</strong> · {finding.compartment} · {finding.issue_type}</li>)}</ul>
-      </details>}
     </aside>
 
     <section className="inspection-equipment inspection-panel" aria-label="Compartment Inspection" ref={workspaceRef} tabIndex={-1}>
       <header className="equipment-heading">
-        <div><p className="inspection-eyebrow">{showBlueprint && !mappedIds.has(current.id) ? 'Other area · Not shown on vehicle image' : 'Compartment Inspection'}</p><h2>{current.name}</h2><p className="inspection-muted">{compartmentProgress.completed} of {compartmentProgress.total} inspected{compartmentProgress.issues > 0 ? ` · ${compartmentProgress.issues} reported` : ''}</p></div>
+        <div><p className="inspection-eyebrow">{showBlueprint && !mappedIds.has(current.id) ? `Other area · Not shown on ${usesVehicleId ? 'vehicle ' : ''}image` : 'Compartment Inspection'}</p><h2>{current.name}</h2><p className="inspection-muted">{compartmentProgress.completed} of {compartmentProgress.total} inspected{compartmentProgress.issues > 0 ? ` · ${compartmentProgress.issues} reported` : ''}</p></div>
         <button type="button" className="hub-btn hub-btn--secondary hub-btn--wrap confirm-compartment" onClick={() => confirmAllPresent(current)}><Check size={18} aria-hidden="true" />Confirm all present</button>
       </header>
       <p role="status" className="sr-only">{announcement}</p>
@@ -276,12 +288,16 @@ export default function CompartmentStep({ checklistType, compartments, findings 
             </div>}
             {known.length > 0 && <div className="equipment-known" data-previous-issues={item.id}>
               {known.map(finding => {
+                const live = liveById.get(finding.id);
+                // The live record has the history; without it the checklist's own line stands, as it does offline.
+                if (live) return <IssueCard key={finding.id} issue={live} />;
                 const memberUpdate = finding.latest_member_update;
                 const updatedOn = formatReportedDate(memberUpdate?.at);
                 return <div key={finding.id} className="equipment-known-entry">
                   <p><TriangleAlert size={14} aria-hidden="true" /><strong>{previousIssueHeadline(finding)}</strong></p>
                   <p>{previousIssueStatusLine(finding)}{finding.last_observation === 'appears_corrected' ? ' · Last reported present' : ''}</p>
                   {memberUpdate?.text && <p className="equipment-known-update">Latest update{updatedOn ? ` (${updatedOn})` : ''}: {memberUpdate.text}</p>}
+                  {noLongerOpen.has(finding.id) && <p>No longer listed as open. It may have been resolved since this page loaded.</p>}
                 </div>;
               })}
               {markedPresent && <p role="status" className="equipment-known-note">Marked present. Logistics will verify the correction.</p>}
@@ -350,5 +366,6 @@ export default function CompartmentStep({ checklistType, compartments, findings 
         {remaining.length === 0 && attention.length === 0 && <p className="inspection-muted">All equipment inspected. No issues reported.</p>}
       </div>
     </aside>}
-  </div>;
+    </div>
+  </>;
 }

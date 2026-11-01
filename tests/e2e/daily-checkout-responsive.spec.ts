@@ -168,6 +168,11 @@ async function mockDailySelectorApi(page: Page): Promise<void> {
       return route.fulfill({ json: { alerts: [] } });
     }
 
+    // The issues page and the inspection read this; nothing is on record for the fixture units.
+    if (path.endsWith('/findings')) {
+      return route.fulfill({ json: { as_of: '2026-09-21T13:00:00Z', open: [], notes: [], closed_count: 0 } });
+    }
+
     return route.fulfill({ status: 404, json: { message: `Unmocked Daily API route: ${path}` } });
   });
 }

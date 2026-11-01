@@ -225,7 +225,7 @@ class StationController extends Controller
                     'unit_id' => $apparatus->unit_id,
                     'type' => strtolower((string) $apparatus->type),
                     'vehicle_number' => $apparatus->vehicle_number,
-                    'vehicle_id_required' => VehicleIdentificationFields::usesFleetNumber($apparatus),
+                    'vehicle_id_required' => ! $apparatus instanceof Apparatus || VehicleIdentificationFields::usesFleetNumber($apparatus),
                     'designation' => $apparatus->designation,
                     'slug' => $apparatus->slug,
                     'current_defects_count' => $apparatus->relationLoaded('currentDefects') ? $apparatus->currentDefects->count() : 0,
