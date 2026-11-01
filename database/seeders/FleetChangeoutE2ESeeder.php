@@ -135,7 +135,7 @@ final class FleetChangeoutE2ESeeder extends Seeder
             'title' => 'Upcoming Apparatus Changeout: Rescue 44',
             'message' => 'Rescue 44 moves to a reserve truck while the exhaust is repaired.',
             'reason' => 'Exhaust repair', 'scheduled_date' => $r44AlertDate ?? $today, 'scheduled_window' => 'afternoon',
-            'old_truck_status_after' => 'Maintenance', 'apparatus_service_ticket_id' => $ticket->id,
+            'apparatus_service_ticket_id' => $ticket->id,
             'source' => 'fleet-status-report-2026-10-30', 'dedupe_key' => 'e2e-r44',
         ], null);
         $e1Alert = $alerts->create([

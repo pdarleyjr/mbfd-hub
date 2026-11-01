@@ -4,6 +4,7 @@ namespace App\Filament\Resources\ApparatusResource\Pages;
 
 use App\Filament\Resources\ApparatusResource;
 use App\Filament\Resources\ApparatusResource\ApparatusWorkflowActions;
+use App\Filament\Resources\ApparatusResource\Widgets\VehicleChangesBanner;
 use Filament\Actions;
 use Filament\Resources\Pages\ViewRecord;
 
@@ -34,6 +35,12 @@ class ViewApparatus extends ViewRecord
     public function getContentTabLabel(): ?string
     {
         return 'Overview';
+    }
+
+    /** @return list<class-string> a change involving this truck, on both of its trucks */
+    protected function getHeaderWidgets(): array
+    {
+        return [VehicleChangesBanner::class];
     }
 
     /** The unit's everyday work first; reference links and editing after. */

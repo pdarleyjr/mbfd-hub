@@ -98,6 +98,7 @@ class ApparatusDefect extends Model
         'first_reported_at' => 'datetime',
         'last_observed_at' => 'datetime',
         'acknowledged_at' => 'datetime',
+        'captain5_cleared_at' => 'datetime',
     ];
 
     public function scopeUnresolved(Builder $query): Builder
@@ -178,6 +179,12 @@ class ApparatusDefect extends Model
     public function firstReporter(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(User::class, 'first_reported_by_user_id');
+    }
+
+    /** @return \Illuminate\Database\Eloquent\Relations\BelongsTo<User, $this> who cleared this from the Captain 5 queue */
+    public function captain5ClearedBy(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(User::class, 'captain5_cleared_by_user_id');
     }
 
     public function firstReportedInspection(): \Illuminate\Database\Eloquent\Relations\BelongsTo

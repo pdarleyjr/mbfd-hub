@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use LogicException;
@@ -11,9 +12,21 @@ use LogicException;
 /** Append-only history of one equipment issue. Never edited, never deleted. */
 final class ApparatusDefectEvent extends Model
 {
+    /** Captain 5's own page filter. History shows them, but as far as anyone else's open screen goes nothing changed. */
+    public const PAGE_ONLY_EVENTS = ['cleared_from_captain5', 'returned_to_captain5'];
+
     protected $guarded = ['id'];
 
     protected $casts = ['details' => 'array'];
+
+    /**
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
+    public function scopeChangingTheIssue(Builder $query): Builder
+    {
+        return $query->whereNotIn('event_type', self::PAGE_ONLY_EVENTS);
+    }
 
     protected static function booted(): void
     {

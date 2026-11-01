@@ -1,18 +1,13 @@
-/** Shapes from docs/apparatus-changeouts.md section 6. Vehicle numbers are strings: 002-16 is not 2-16. */
+/** Shapes from the changeout API. Vehicle numbers are strings: 002-16 is not 2-16. */
 
-export type ChangeoutHandling = 'transfer' | 'leave' | 'review';
-export type ChangeoutCondition = 'ok' | 'missing' | 'damaged';
-export type ChangeoutStatus = 'completed' | 'pending_fleet' | 'rejected' | 'cancelled';
-export type HandoffStatus = 'complete' | 'pending_verification';
-export type AlertActionKind = 'start' | 'handoff' | 'view' | 'none';
-export type WorkflowState = 'planned' | 'vehicle_changed' | 'awaiting_fleet' | 'awaiting_verification';
+export type ChangeoutHandling = 'transfer' | 'leave';
+export type AlertActionKind = 'start' | 'handoff' | 'none';
 
 export interface AlertAction {
   kind: AlertActionKind;
   label: string;
   apparatus_id: number | null;
   alert_id: number | null;
-  changeout_id: number | null;
 }
 
 export interface OperationalAlert {
@@ -29,7 +24,7 @@ export interface OperationalAlert {
   current_apparatus_id: number | null;
   schedule_label: string | null;
   date_passed: boolean;
-  workflow: { state: WorkflowState | string; label: string; changeout_id: number | null } | null;
+  workflow: { state: string; label: string } | null;
   action: AlertAction | null;
 }
 
@@ -43,45 +38,40 @@ export interface ChangeoutUnit {
   status: string | null;
 }
 
-export interface ChangeoutCandidate {
+interface ListedVehicle {
   apparatus_id: number;
   vehicle_number: string;
   label: string | null;
   location: string | null;
   status: string | null;
-  direct: boolean;
+}
+
+export interface ChangeoutCandidate extends ListedVehicle {
   is_return: boolean;
 }
 
-export type OtherVehicle = Omit<ChangeoutCandidate, 'is_return'>;
+export interface OtherVehicle extends ListedVehicle {
+  /** The unit this truck is carrying now, or null when it is a spare. */
+  listed_as: string | null;
+}
+
+export interface LeftItem {
+  name: string;
+  note: string | null;
+}
 
 /** Sent next to a checklist: what the unit's last changeout left on the truck it came from. */
 export interface ChangeoutHandoff {
   from_vehicle_number: string | null;
   effective_at: string | null;
-  left_behind: Array<{ name: string; note: string | null }>;
-}
-
-export interface PreviousLineNote {
-  handling: string | null;
-  status: string | null;
-  note: string | null;
-  /** What a return to the truck this unit last left starts from. */
-  return_handling: ChangeoutHandling | null;
-  return_quantity: number | null;
+  left_behind: LeftItem[];
 }
 
 export interface EquipmentLine {
   item_key: string;
   name: string;
-  /** Null stays null: an unknown quantity is never treated as 1. */
-  expected_quantity: number | null;
-  controlled: boolean;
-  default_handling: ChangeoutHandling;
-  /** Set only on a return: a partial count or a note carried from last time. */
-  default_quantity: number | null;
-  default_note: string;
-  previous: PreviousLineNote | null;
+  /** What happened to this item last time. Information only: it never presets anything. */
+  previous: { handling: string | null; note: string | null } | null;
 }
 
 export interface EquipmentCompartment {
@@ -92,12 +82,12 @@ export interface EquipmentCompartment {
 
 export interface PreviousChangeout {
   id: number;
+  from_apparatus_id: number | null;
   from_vehicle_number: string | null;
   to_vehicle_number: string | null;
   effective_at: string | null;
   moved: number;
-  left_behind: Array<{ name: string; note: string | null }>;
-  open: Array<{ name: string; status: string | null }>;
+  left_behind: LeftItem[];
   submitted_by_name: string | null;
 }
 
@@ -114,15 +104,11 @@ export interface ChangeoutContext {
   };
   open_issues_on_truck: number;
   previous_changeout: PreviousChangeout | null;
-  pending_changeout: { id: number; to_vehicle_number: string | null; submitted_by_name: string | null } | null;
-  can_fleet_commit: boolean;
 }
 
 export interface ChangeoutException {
   item_key: string;
   handling: ChangeoutHandling;
-  quantity: number | null;
-  condition: ChangeoutCondition;
   note: string | null;
 }
 
@@ -145,40 +131,34 @@ export interface ChangeoutLine {
   compartment: string | null;
   handling: string | null;
   custody_status: string;
-  expected_quantity: number | null;
-  quantity_moved: number | null;
-  condition: string | null;
   note: string | null;
-  controlled: boolean;
-  can_verify: boolean;
-  verified_at: string | null;
-  verified_by_name: string | null;
-  verification_note: string | null;
 }
 
 export interface ChangeoutSummary {
   id: number;
-  status: ChangeoutStatus | string;
-  handoff_status: HandoffStatus | string;
+  status: string;
   unit_designation: string;
   from_vehicle_number: string | null;
   to_vehicle_number: string | null;
-  from_apparatus_id: number | null;
   to_apparatus_id: number | null;
   station_id: number | null;
-  station_label: string | null;
   effective_at: string | null;
-  moved: number;
-  left_behind: number;
-  open: number;
-  open_items: Array<{ name: string; status: string | null }>;
+  old_truck_status: string | null;
   alert_completed: boolean;
-  message: string | null;
-  note: string | null;
-  decision_note: string | null;
+  return_of_changeout_id: number | null;
   submitted_by_name: string | null;
+  moved: number;
+  /** Named when the server names them. leftCount can be higher when it only sends a count. */
+  left_behind: LeftItem[];
+  leftCount: number;
   /** A client route for today's checkout on the new truck, or null. */
   next_daily_checkout_path: string | null;
+  message: string | null;
+  note: string | null;
+  /** The typed number was not in the system, so a record was added and Fleet fills in the details. */
+  new_truck_record: boolean;
+  /** The unit that was listed on the new truck. It moved to the old truck. */
+  displaced_unit: string | null;
   lines: ChangeoutLine[];
 }
 
@@ -199,17 +179,10 @@ export type TruckChoice =
   | { kind: 'listed'; apparatusId: number; vehicleNumber: string }
   | { kind: 'typed' };
 
-export interface LineChoice {
-  handling: ChangeoutHandling;
-  quantity: number | null;
-  condition: ChangeoutCondition;
-  note: string;
-}
-
 export type ChangeoutStep = 'truck' | 'equipment' | 'review';
 
 export interface ChangeoutDraft {
-  version: 1;
+  version: 2;
   apparatusId: number;
   userId: number | null;
   alertId: number | null;
@@ -217,9 +190,11 @@ export interface ChangeoutDraft {
   clientSubmissionId: string;
   step: ChangeoutStep;
   choice: TruckChoice | null;
+  /** The choice came from the plan or the link, not from the member, so it alone is not work to keep. */
+  preselected: boolean;
   typedVehicle: string;
-  /** Only lines that differ from their default. */
-  exceptions: Record<string, LineChoice>;
+  /** Only the items left on the old truck, with the note for each. Everything else was taken. */
+  left: Record<string, string>;
   note: string;
   /** A send was started and no definite answer came back, so the outcome is unknown. */
   attempted: boolean;
@@ -229,16 +204,16 @@ export interface ChangeoutDraft {
 export interface ResolvedTruck {
   apparatusId: number | null;
   vehicleNumber: string;
-  label: string | null;
   location: string | null;
   source: 'candidate' | 'other' | 'typed' | 'current';
-  direct: boolean;
   isReturn: boolean;
+  /** The real unit listed on this truck, which moves to the old truck when this one is taken. */
+  listedAs: string | null;
 }
 
 /** Kept in the router's history state so a reload of the Done screen does not start a new changeout. */
 export interface ChangeoutDoneState {
   summary: ChangeoutSummary;
-  waiting: string[];
+  left: LeftItem[];
   stationPath: string;
 }

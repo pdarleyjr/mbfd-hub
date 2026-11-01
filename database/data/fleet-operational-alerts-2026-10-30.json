@@ -12,7 +12,6 @@
       "scheduled_date": "2026-11-01",
       "scheduled_window": "afternoon",
       "scheduled_at": null,
-      "old_truck_status_after": "Maintenance",
       "source": "Fleet email dated October 30, 2026",
       "send_notification": false,
       "ticket": {
@@ -35,7 +34,6 @@
       "scheduled_date": "2026-11-02",
       "scheduled_window": null,
       "scheduled_at": null,
-      "old_truck_status_after": "Maintenance",
       "source": "Fleet email dated October 30, 2026",
       "send_notification": false,
       "ticket": {

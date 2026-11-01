@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Feature\Fleet\Changeouts;
 
 use App\Models\Apparatus;
+use App\Models\ApparatusChangeout;
 use App\Services\Fleet\VehicleSwapService;
 use App\Support\Fleet\FleetVehicleCatalog;
 use Filament\Facades\Filament;
@@ -22,84 +23,73 @@ final class IdentityAndStatusTest extends ChangeoutTestCase
         Filament::setCurrentPanel(Filament::getPanel('admin'));
     }
 
-    /** @return array<string, array{0: string, 1: string, 2: string|null, 3: string, 4: string}> */
+    /** @return array<string, array{0: string, 1: string}> */
     public static function statuses(): array
     {
         return [
-            'a healthy unit onto a reserve' => ['In Service', 'Reserve', null, 'In Service', 'Reserve'],
-            'an available reserve stays in the pool' => ['In Service', 'Available', null, 'In Service', 'Available'],
-            'a unit leaving a failed truck runs in service' => ['Maintenance', 'Reserve', null, 'In Service', 'Reserve'],
-            'an out of service unit too' => ['Out of Service', 'Available', null, 'In Service', 'Available'],
-            'a failed destination keeps its failure and does not pass it on' => ['In Service', 'Maintenance', null, 'Maintenance', 'Available'],
-            'an out of service destination too' => ['In Service', 'Out of Service', null, 'Out of Service', 'Available'],
-            'Fleet choosing the old truck status wins' => ['In Service', 'Maintenance', 'Reserve', 'Maintenance', 'Reserve'],
+            'a healthy unit onto a reserve' => ['In Service', 'Reserve'],
+            'onto an available truck' => ['In Service', 'Available'],
+            'leaving a failed truck' => ['Maintenance', 'Reserve'],
+            'onto a truck in the shop' => ['In Service', 'Maintenance'],
+            'onto an out of service truck' => ['In Service', 'Out of Service'],
+            'from out of service to out of service' => ['Out of Service', 'Out of Service'],
         ];
     }
 
     #[DataProvider('statuses')]
-    public function test_a_failure_status_never_travels(string $unitStatus, string $truckStatus, ?string $chosen, string $newAfter, string $oldAfter): void
+    public function test_the_new_truck_is_in_service_and_the_old_truck_is_out_of_service_whatever_they_were(string $unitStatus, string $truckStatus): void
     {
         $this->unit->forceFill(['status' => $unitStatus])->save();
         $this->reserve->forceFill(['status' => $truckStatus])->save();
 
-        app(VehicleSwapService::class)->moveUnitForChangeout($this->unit->fresh(), $this->reserve->fresh(), $chosen);
+        app(VehicleSwapService::class)->moveUnitForChangeout($this->unit->fresh(), $this->reserve->fresh());
 
-        $this->assertSame($newAfter, $this->reserve->fresh()->getAttribute('status'));
-        $this->assertSame($oldAfter, $this->unit->fresh()->getAttribute('status'));
+        $this->assertSame('In Service', $this->reserve->fresh()->getAttribute('status'));
+        $this->assertSame('Out of Service', $this->unit->fresh()->getAttribute('status'));
     }
 
-    public function test_an_open_ticket_sends_the_old_truck_to_the_shop_unless_fleet_said_otherwise(): void
+    public function test_both_trucks_are_at_the_station_the_unit_is_at(): void
     {
-        $this->openTicketOn($this->unit);
-        $this->moveToReserve(['alert_id' => $this->swapAlert($this->unit)->id])->assertCreated();
-        $this->assertSame('Maintenance', $this->unit->fresh()->getAttribute('status'));
+        $this->moveToReserve()->assertCreated();
 
-        $other = $this->reserveEngine('V-910');
-        $this->openTicketOn($this->reserve);
-        $this->postChangeout($this->reserve, ['alert_id' => $this->swapAlert($this->reserve, ['old_truck_status_after' => 'Available'])->id, 'to_apparatus_id' => $other->id])->assertCreated();
-        $this->assertSame('Available', $this->reserve->fresh()->getAttribute('status'));
+        $this->assertSame(['Station 2', 'Station 2'], [$this->reserve->fresh()->getAttribute('current_location'), $this->unit->fresh()->getAttribute('current_location')]);
+        $this->assertSame($this->unit->fresh()->station_id, $this->reserve->fresh()->station_id);
     }
 
-    public function test_no_ticket_means_the_old_truck_takes_the_status_the_new_truck_vacated(): void
+    public function test_a_traded_frontline_unit_keeps_its_own_name_and_station(): void
     {
-        $this->moveToReserve(['alert_id' => $this->swapAlert($this->unit)->id])->assertCreated();
+        $from = $this->reserveEngine('44', ['unit_id' => 'E7', 'designation' => 'E 7', 'name' => 'ENGINE E7', 'slug' => 'e7', 'daily_checkout_requirement' => 'required', 'status' => 'In Service']);
+        $to = $this->reserveEngine('55', ['unit_id' => 'E55', 'designation' => 'E 55', 'name' => 'ENGINE E55', 'slug' => 'e55', 'daily_checkout_requirement' => 'required', 'status' => 'In Service', 'station_id' => $this->unit->station_id]);
+        $from->forceFill(['station_id' => null])->save();
 
-        $this->assertSame('Reserve', $this->unit->fresh()->getAttribute('status'));
+        app(VehicleSwapService::class)->moveUnitForChangeout($from->fresh(), $to->fresh());
+
+        $displaced = $from->fresh();
+        $this->assertSame(['E55', 'E 55', 'ENGINE E55', 'e55'], [$displaced->unit_id, $displaced->designation, $displaced->name, $displaced->slug], 'A number in a frontline label is its name, never rewritten.');
+        $this->assertSame($this->unit->station_id, $displaced->station_id, 'It stays on its own station page.');
+        $this->assertSame('Out of Service', $displaced->getAttribute('status'));
+        $this->assertSame('e7', $to->fresh()->slug);
+        $this->assertSame('In Service', $to->fresh()->getAttribute('status'));
     }
 
-    public function test_a_truck_with_an_open_ticket_is_not_eligible_and_it_is_one_query_for_the_list(): void
+    public function test_a_row_that_never_moved_a_truck_raises_no_alert(): void
     {
-        $ticketed = $this->reserveEngine('V-920', ['status' => 'Available']);
-        $this->openTicketOn($ticketed);
-        foreach (['V-921', 'V-922', 'V-923'] as $number) {
-            $this->reserveEngine($number);
-        }
-        $alert = $this->swapAlert($this->unit);
+        $this->moveToReserve()->assertCreated();
+        ApparatusChangeout::query()->latest('id')->firstOrFail()->update(['status' => 'rejected']);
 
-        $context = $this->getJson("/api/public/apparatuses/{$this->unit->id}/changeout-context?alert_id={$alert->id}")->assertOk();
-
-        $this->assertNull(collect($context->json('candidates'))->firstWhere('apparatus_id', $ticketed->id));
-        $this->assertFalse(collect($context->json('other_vehicles'))->firstWhere('apparatus_id', $ticketed->id)['direct']);
-        $this->moveTo($ticketed, $alert->id)->assertCreated()->assertJsonPath('changeout.status', 'pending_fleet');
+        $this->assertSame(0, ApparatusChangeout::query()->unacknowledged()->count());
     }
 
-    public function test_a_closed_ticket_does_not_hold_a_truck(): void
+    public function test_a_rewritten_label_another_row_still_carries_gets_its_own(): void
     {
-        $this->openTicketOn($this->reserve)->forceFill(['status' => 'completed'])->save();
+        $to = $this->reserveEngine('1033', ['unit_id' => 'R-1033', 'designation' => 'R-1033', 'name' => 'RESCUE 1033', 'slug' => 'r1033']);
+        $from = $this->reserveEngine('17503', ['unit_id' => 'E44', 'designation' => 'E44', 'name' => 'Engine 44', 'slug' => 'e44']);
+        $this->reserveEngine('9999', ['unit_id' => 'R-17503', 'designation' => 'R-17503', 'name' => 'Old label', 'slug' => 'r17503']);
 
-        $this->moveToReserve(['alert_id' => $this->swapAlert($this->unit)->id])->assertCreated()->assertJsonPath('changeout.status', 'completed');
-    }
+        app(VehicleSwapService::class)->moveUnitForChangeout($from->fresh(), $to->fresh());
 
-    public function test_a_return_to_a_truck_with_an_open_ticket_is_fleets_decision(): void
-    {
-        $this->moveToReserve(['alert_id' => $this->swapAlert($this->unit)->id])->assertCreated();
-        $this->openTicketOn($this->unit);
-
-        $context = $this->getJson("/api/public/apparatuses/{$this->reserve->id}/changeout-context")->assertOk();
-        $this->assertNull(collect($context->json('candidates'))->firstWhere('apparatus_id', $this->unit->id));
-        $this->postChangeout($this->reserve, ['to_apparatus_id' => $this->unit->id])->assertCreated()->assertJsonPath('changeout.status', 'pending_fleet');
-
-        $this->assertSame('E2', $this->reserve->fresh()->designation);
+        $this->assertSame('R-17503-'.$from->id, $from->fresh()->unit_id);
+        $this->assertSame('r17503-'.$from->id, $from->fresh()->slug);
     }
 
     public function test_maintenance_reads_as_out_of_service_for_a_swap_role(): void
@@ -185,10 +175,5 @@ final class IdentityAndStatusTest extends ChangeoutTestCase
         $this->assertSame('reserve-'.$unitNow->id, $unitNow->fresh()->slug);
         $this->assertSame(1, Apparatus::query()->where('slug', 'reserve-'.$unitNow->id)->count());
         $this->assertSame('reserve-'.$left->id, $left->fresh()->slug);
-    }
-
-    private function moveTo(Apparatus $truck, int $alertId): \Illuminate\Testing\TestResponse
-    {
-        return $this->postChangeout($this->unit, ['alert_id' => $alertId, 'to_apparatus_id' => $truck->id]);
     }
 }

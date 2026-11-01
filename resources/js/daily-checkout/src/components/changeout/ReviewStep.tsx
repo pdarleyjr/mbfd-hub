@@ -1,12 +1,13 @@
 import { Link } from 'react-router';
 import type { SendState } from './useChangeoutWizard';
-import { CHANGEOUT_NOTE_MAX, controlledLines, effectiveChoice, equipmentCounts, isAttentionLine, lineStateLabel, standardLines, truckNeedsFleet } from './changeoutLogic';
-import type { ChangeoutContext, LineChoice, ResolvedTruck } from './types';
+import { CHANGEOUT_NOTE_MAX, equipmentCounts, leftItems } from './changeoutLogic';
+import type { ChangeoutContext, ResolvedTruck } from './types';
 
 interface Props {
   context: ChangeoutContext;
   truck: ResolvedTruck | null;
-  exceptions: Record<string, LineChoice>;
+  fromVehicle: string | null;
+  left: Record<string, string>;
   note: string;
   sendState: SendState;
   sending: boolean;
@@ -34,15 +35,8 @@ function SendOutcome({ state, sending, designation, onReviewCurrentTruck, onSend
         <div role="alert" className="hub-callout hub-callout--warning space-y-3 p-3 text-sm">
           <p className="font-semibold">{designation} is on truck {state.currentVehicle ?? 'not recorded'} now.</p>
           <p>{state.message}</p>
-          <button type="button" onClick={onReviewCurrentTruck} className="hub-btn hub-btn--secondary hub-btn--wrap !min-h-11 w-full sm:w-auto">Review with the current truck</button>
-        </div>
-      );
-    case 'pending':
-      return (
-        <div role="alert" className="hub-callout hub-callout--warning space-y-3 p-3 text-sm">
-          <p>{state.message}</p>
           <div className="flex flex-wrap gap-3">
-            {state.changeoutId !== null && <Link to={`/changeouts/${state.changeoutId}`} className="hub-btn hub-btn--secondary hub-btn--wrap !min-h-11">See that record</Link>}
+            <button type="button" onClick={onReviewCurrentTruck} className="hub-btn hub-btn--secondary hub-btn--wrap !min-h-11">Review with the current truck</button>
             <button type="button" onClick={onDiscard} className="hub-btn hub-btn--tertiary hub-btn--wrap !min-h-11">Discard my copy</button>
           </div>
         </div>
@@ -64,66 +58,51 @@ function SendOutcome({ state, sending, designation, onReviewCurrentTruck, onSend
   }
 }
 
-export default function ReviewStep({ context, truck, exceptions, note, sendState, sending, onNote, onChangeEquipment, onReviewCurrentTruck, onSendAsNew, onDiscard }: Props) {
+export default function ReviewStep({ context, truck, fromVehicle, left, note, sendState, sending, onNote, onChangeEquipment, onReviewCurrentTruck, onSendAsNew, onDiscard }: Props) {
   const { unit } = context;
   const usable = context.equipment.usable;
-  const counts = equipmentCounts(context, exceptions);
-  const attention = standardLines(context).filter((line) => isAttentionLine(line, exceptions));
-  const controlled = controlledLines(context);
-  const needsFleet = truck !== null && truckNeedsFleet(truck);
+  const counts = equipmentCounts(context, left);
+  const lefts = leftItems(context, left);
 
   return (
     <div className="space-y-5">
       <dl className="hub-well divide-y divide-hub-n-100">
-        <Row label="From truck" value={(context.mode === 'handoff_only' ? context.alert?.vehicle_number : unit.vehicle_number) ?? 'Not recorded'} />
+        <Row label="From truck" value={fromVehicle ?? 'Not recorded'} />
         <Row label="To truck" value={truck?.vehicleNumber ?? 'Not chosen'} />
-        {usable && <Row label="Moving" value={`${counts.moving} of ${counts.total}`} />}
+        {usable && <Row label="Took" value={`${counts.took} of ${counts.total}`} />}
+        {usable && <Row label="Left" value={String(counts.left)} />}
       </dl>
 
-      {needsFleet && <p className="hub-callout p-3 text-sm">Fleet will confirm truck {truck?.vehicleNumber}. Nothing changes on either truck until then, and your equipment choices are saved with the request.</p>}
-
       {usable && (
-        <section aria-labelledby="changeout-review-exceptions">
+        <section aria-labelledby="changeout-review-left">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <h3 id="changeout-review-exceptions" className="font-heading text-lg font-semibold text-hub-ink">Exceptions</h3>
-            <button type="button" onClick={onChangeEquipment} className="hub-link hub-link--standalone min-h-11">Change equipment</button>
+            <h3 id="changeout-review-left" className="font-heading text-lg font-semibold tabular-nums text-hub-ink">Left on truck {fromVehicle ?? 'not recorded'}</h3>
+            <button type="button" onClick={onChangeEquipment} className="hub-link hub-link--standalone min-h-11">Change</button>
           </div>
-          {attention.length === 0
-            ? <p className="text-sm text-hub-n-600">None. All equipment moves.</p>
+          {lefts.length === 0
+            ? <p className="text-sm text-hub-n-600">Nothing. You took everything.</p>
             : (
-              <ul data-testid="changeout-review-exceptions" className="hub-well divide-y divide-hub-n-100">
-                {attention.map((line) => {
-                  const choice = effectiveChoice(line, exceptions);
-
-                  return (
-                    <li key={line.item_key} className="px-4 py-3 text-sm">
-                      <p className="font-semibold text-hub-ink">{line.name}</p>
-                      <p className="text-hub-n-800">{lineStateLabel(line, choice)}</p>
-                      {choice.note.trim() !== '' && <p className="text-hub-n-600">{choice.note}</p>}
-                    </li>
-                  );
-                })}
+              <ul data-testid="changeout-review-left" className="hub-well divide-y divide-hub-n-100">
+                {lefts.map((line, index) => (
+                  <li key={`${line.name}-${index}`} className="px-4 py-3 text-sm">
+                    <p className="font-semibold text-hub-ink">{line.name}</p>
+                    {line.note && <p className="text-hub-n-600">{line.note}</p>}
+                  </li>
+                ))}
               </ul>
             )}
         </section>
       )}
 
-      {controlled.length > 0 && (
-        <section aria-labelledby="changeout-review-waiting" className="hub-well p-4">
-          <h3 id="changeout-review-waiting" className="font-semibold text-hub-ink">Will wait for verification</h3>
-          <ul className="mt-2 space-y-1 text-sm text-hub-n-800">{controlled.map((line) => <li key={line.item_key}>{line.name}</li>)}</ul>
-        </section>
-      )}
-
       {context.open_issues_on_truck > 0 && (
         <p className="text-sm text-hub-n-600">
-          {context.open_issues_on_truck} open {context.open_issues_on_truck === 1 ? 'issue stays' : 'issues stay'} with truck {unit.vehicle_number ?? 'not recorded'}.
+          {context.open_issues_on_truck} open {context.open_issues_on_truck === 1 ? 'issue stays' : 'issues stay'} with truck {fromVehicle ?? 'not recorded'}.
         </p>
       )}
 
       {usable && (
         <div>
-          <label htmlFor="changeout-note" className="text-sm font-semibold text-hub-ink">Note for Fleet (optional)</label>
+          <label htmlFor="changeout-note" className="text-sm font-semibold text-hub-ink">Note (optional)</label>
           <textarea
             id="changeout-note"
             value={note}

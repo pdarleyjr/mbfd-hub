@@ -34,7 +34,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonImmutable|null $ends_on
  * @property string $status
  * @property int|null $planned_replacement_apparatus_id
- * @property string|null $old_truck_status_after
  * @property int|null $apparatus_service_ticket_id
  * @property int|null $completed_by_changeout_id
  * @property string|null $source
@@ -74,9 +73,6 @@ class ApparatusOperationalAlert extends Model
 
     public const WINDOWS = ['morning', 'afternoon', 'evening'];
 
-    /** Old truck statuses a planned changeout may set. Mirrors ApparatusServiceTicketWorkflowService. */
-    public const OLD_TRUCK_STATUSES = ['Available', 'Reserve', 'Maintenance', 'Out of Service'];
-
     protected $fillable = [
         'apparatus_id',
         'unit_slug',
@@ -95,7 +91,6 @@ class ApparatusOperationalAlert extends Model
         'ends_on',
         'status',
         'planned_replacement_apparatus_id',
-        'old_truck_status_after',
         'apparatus_service_ticket_id',
         'completed_by_changeout_id',
         'source',

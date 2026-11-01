@@ -18,7 +18,6 @@ use App\Support\HubTimezone;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use InvalidArgumentException;
 
 /**
  * One persistent issue history per physical vehicle item
@@ -165,50 +164,6 @@ final class DefectContinuityService
         [$defect] = $this->createOrFind($apparatus, $inspection, $entry, $prior !== null ? (int) $prior : null);
         $this->event($defect, $inspection, 'reported', ['to_status' => DefectActionStatus::REPORTED, 'details' => $this->details($entry)]);
         $this->enrollParticipants($inspection, [(int) $defect->id => 'reported']);
-
-        return $defect;
-    }
-
-    /**
-     * A named person found an item missing or damaged during a vehicle changeout (docs/apparatus-changeouts.md).
-     * No inspection is involved, so the actor is carried directly. Called inside the changeout transaction, which
-     * holds the truck row. Joins the open defect for this item on this truck when there is one, and never closes
-     * or rewrites it. $status is missing or damaged.
-     */
-    public function recordHandoffFinding(
-        Apparatus $truck,
-        string $compartment,
-        string $item,
-        string $status,
-        ?string $note,
-        ?User $actor,
-        ?string $compartmentKey = null,
-        ?string $itemKey = null,
-    ): ApparatusDefect {
-        if (! in_array($status, ['missing', 'damaged'], true)) {
-            throw new InvalidArgumentException('A handoff finding is either missing or damaged.');
-        }
-        $entry = ['compartment' => $compartment, 'item' => $item, 'status' => ucfirst($status), 'notes' => $note, 'photo_path' => null,
-            'significant' => false, 'compartment_id' => $compartmentKey, 'item_id' => $itemKey];
-        $details = [...$this->details($entry), 'source' => 'apparatus_changeout'];
-
-        $existing = ApparatusDefect::query()
-            ->where('apparatus_id', $truck->id)->where('compartment', $compartment)->where('item', $item)
-            ->unresolved()->lockForUpdate()->first();
-        if ($existing !== null) {
-            $existing->forceFill(['issue_type' => $status, 'last_observed_at' => now()])->save();
-            $this->event($existing, null, 'observed_again', ['details' => $details], $actor);
-
-            return $existing;
-        }
-
-        $prior = ApparatusDefect::query()->where('apparatus_id', $truck->id)->where('compartment', $compartment)
-            ->where('item', $item)->where('resolved', true)->orderByDesc('id')->value('id');
-        [$defect, $created] = $this->createOrFind($truck, null, $entry, $prior !== null ? (int) $prior : null, $actor);
-        $this->event($defect, null, $created ? 'reported' : 'observed_again', [
-            'to_status' => $created ? DefectActionStatus::REPORTED : null,
-            'details' => $details,
-        ], $actor);
 
         return $defect;
     }

@@ -3,7 +3,7 @@ import { mobileApparatus, mobileInspectionFixture } from './support/daily-checko
 
 /**
  * The apparatus changeout on a firefighter's phone, every API response mocked: the station card, the three steps, and
- * what happens when the signal drops or the records moved underneath the member (docs/apparatus-changeouts.md).
+ * what happens when the signal drops or the records moved underneath the member. Nobody approves a changeout.
  */
 
 const STATION_ID = 32;
@@ -13,6 +13,9 @@ const ALERT_ID = 12;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const VERSION = 'a'.repeat(64);
 const NOT_SENT = 'Not sent. Your work is saved on this phone. Try again when you have signal.';
+const TRUCK_HEADING = 'What truck are you moving to?';
+const EQUIPMENT_HEADING = 'What did you take and leave?';
+const DONE_MESSAGE = 'R 44 is now on truck 1033. Truck 17503 is Out of Service.';
 
 test.use({ viewport: { width: 390, height: 844 } });
 
@@ -29,12 +32,9 @@ const alert = (overrides: Record<string, unknown> = {}) => ({
   current_vehicle_number: '17503',
   current_apparatus_id: TRUCK_ID,
   schedule_label: 'Sunday, November 1, afternoon',
-  scheduled_date: '2026-11-01',
-  scheduled_window: 'afternoon',
-  scheduled_at: null,
   date_passed: false,
-  workflow: { state: 'planned', label: 'Planned', changeout_id: null },
-  action: { kind: 'start', label: 'Start Changeout', apparatus_id: TRUCK_ID, alert_id: ALERT_ID, changeout_id: null },
+  workflow: { state: 'planned', label: 'Planned' },
+  action: { kind: 'start', label: 'Start Changeout', apparatus_id: TRUCK_ID, alert_id: ALERT_ID },
   ...overrides,
 });
 
@@ -42,60 +42,59 @@ const item = (key: string, name: string, overrides: Record<string, unknown> = {}
   item_key: key,
   name,
   expected_quantity: null,
-  controlled: false,
-  default_handling: 'transfer',
   previous: null,
   ...overrides,
 });
 
 const context = (overrides: Record<string, unknown> = {}) => ({
   unit: { apparatus_id: TRUCK_ID, designation: 'R 44', slug: 'r44', vehicle_number: '17503', station_id: STATION_ID, station_label: 'Station 4', status: 'In Service' },
-  alert: { id: ALERT_ID, title: 'Upcoming Apparatus Changeout: Rescue 44', reason: 'Exhaust repair', schedule_label: 'Sunday, November 1, afternoon' },
+  alert: { id: ALERT_ID, title: 'Upcoming Apparatus Changeout: Rescue 44', reason: 'Exhaust repair', schedule_label: 'Sunday, November 1, afternoon', vehicle_number: '17503', planned_replacement_apparatus_id: null, changeout_id: null },
   mode: 'start',
   candidates: [
-    { apparatus_id: NEW_TRUCK_ID, vehicle_number: '1033', label: 'Rescue 1033', location: 'Station 2', status: 'Available', direct: true, is_return: false },
-    { apparatus_id: 59, vehicle_number: '1035', label: 'Rescue 1035', location: 'Station 3', status: 'Reserve', direct: false, is_return: false },
+    { apparatus_id: NEW_TRUCK_ID, vehicle_number: '1033', label: 'Rescue 1033', location: 'Station 2', status: 'Available', is_return: false },
+    { apparatus_id: 59, vehicle_number: '1035', label: 'Rescue 1035', location: 'Station 3', status: 'Reserve', is_return: false },
   ],
-  other_vehicles: [{ apparatus_id: 58, vehicle_number: '1034', label: 'Rescue 1034', location: 'Station 2', status: 'In Service' }],
+  other_vehicles: [{ apparatus_id: 58, vehicle_number: '1034', label: 'Rescue 1034', location: 'Station 2', status: 'In Service', listed_as: 'R 4' }],
   equipment: {
     checklist_version: VERSION,
     usable: true,
     compartments: [
       { id: 'front_cab', name: 'Front Cab', items: [item('front_cab-item-1', 'Portable radio', { expected_quantity: 2 }), item('front_cab-item-2', 'Flashlight')] },
       { id: 'rear', name: 'Rear Compartment', items: [item('rear-item-1', 'Spare oxygen bottle'), item('rear-item-2', 'Stair chair')] },
-      { id: 'controlled', name: 'Controlled', items: [item('field:seal', 'Narcotic Seal #', { controlled: true, default_handling: 'review' })] },
+      { id: 'narcotics', name: 'Narcotics', items: [item('field:seal', 'Narcotic Seal #')] },
     ],
   },
   open_issues_on_truck: 3,
   previous_changeout: null,
-  pending_changeout: null,
-  can_fleet_commit: false,
   ...overrides,
 });
 
 const summary = (overrides: Record<string, unknown> = {}) => ({
   id: 8,
   status: 'completed',
-  handoff_status: 'pending_verification',
   unit_designation: 'R 44',
   from_vehicle_number: '17503',
   to_vehicle_number: '1033',
+  to_apparatus_id: NEW_TRUCK_ID,
+  station_id: STATION_ID,
   effective_at: '2026-11-01T20:10:00Z',
-  moved: 3,
-  left_behind: 1,
-  open: 1,
-  open_items: [{ name: 'Narcotic Seal #', status: 'pending_verification' }],
-  alert_completed: false,
-  can_verify: false,
+  old_truck_status: 'Out of Service',
+  alert_id: ALERT_ID,
+  alert_completed: true,
+  return_of_changeout_id: null,
+  submitted_by_name: 'Alex Rivera',
+  moved: 4,
+  left_behind: [{ name: 'Spare oxygen bottle', note: 'Stays with the truck' }],
   next_daily_checkout_path: '/daily/apparatus/r44',
-  message: 'R 44 is now on truck 1033.',
+  message: DONE_MESSAGE,
+  new_truck_record: false,
+  displaced_unit: null,
   ...overrides,
 });
 
 interface Mock {
   contextGets: string[];
   posts: Array<{ path: string; body: Record<string, unknown> }>;
-  verifies: Array<Record<string, unknown>>;
   alertsAnswer: { status: number | 'abort' };
 }
 
@@ -110,7 +109,7 @@ interface Options {
 }
 
 async function mockApi(page: Page, options: Options = {}): Promise<Mock> {
-  const mock: Mock = { contextGets: [], posts: [], verifies: [], alertsAnswer: { status: options.alertStatus ?? 200 } };
+  const mock: Mock = { contextGets: [], posts: [], alertsAnswer: { status: options.alertStatus ?? 200 } };
   await page.route('**/images/**', (route) => route.fulfill({ status: 204 }));
   await page.route('**/api/**', async (route) => {
     const request = route.request();
@@ -151,11 +150,6 @@ async function mockApi(page: Page, options: Options = {}): Promise<Mock> {
 
       return route.fulfill({ status: 201, json: { changeout: summary(), replayed: false } });
     }
-    if (request.method() === 'POST' && /\/verify$/.test(path)) {
-      mock.verifies.push(request.postDataJSON() as Record<string, unknown>);
-
-      return route.fulfill({ json: { changeout: summary() } });
-    }
     if (/^\/api\/public\/changeouts\/\d+$/.test(path)) return route.fulfill({ json: { changeout: options.changeout ?? summary() } });
 
     return route.fulfill({ status: 404, json: { message: `Unmocked route ${path}` } });
@@ -166,25 +160,25 @@ async function mockApi(page: Page, options: Options = {}): Promise<Mock> {
 
 const wizardUrl = `/daily/changeouts/new/${TRUCK_ID}?alert_id=${ALERT_ID}&return_to=${encodeURIComponent(`/stations/${STATION_ID}`)}`;
 const heading = (page: Page, name: string) => page.getByRole('heading', { name, exact: true });
+const h1 = (page: Page) => page.getByRole('heading', { level: 1 });
 const primary = (page: Page, name: string | RegExp) => page.getByRole('button', { name, exact: typeof name === 'string' });
 const pickTruck = (page: Page, number: string) => page.getByRole('radio', { name: new RegExp(`^${number}\\b`) }).check();
-const exceptions = (page: Page) => page.getByTestId('changeout-exceptions');
+const leftList = (page: Page) => page.getByTestId('changeout-left-list');
+const tallies = (page: Page) => page.getByTestId('changeout-summary');
 
 async function toEquipment(page: Page, number = '1033') {
   await page.goto(wizardUrl);
-  await expect(heading(page, 'Select replacement truck')).toBeVisible();
+  await expect(heading(page, TRUCK_HEADING)).toBeVisible();
   await pickTruck(page, number);
   await primary(page, 'Continue').click();
-  await expect(heading(page, 'Transfer equipment')).toBeVisible();
+  await expect(heading(page, EQUIPMENT_HEADING)).toBeVisible();
 }
 
-async function leaveOnTruck(page: Page, name: string, note?: string) {
-  await page.getByLabel('Search equipment').fill(name);
-  await page.getByRole('button', { name: new RegExp(`^${name}`) }).last().click();
-  await page.getByRole('radio', { name: 'Leave on truck' }).check();
-  if (note) await page.getByLabel('Short note (optional)').fill(note);
-  await page.getByRole('button', { name: 'Done with this item' }).click();
-  await page.getByLabel('Search equipment').fill('');
+async function markLeft(page: Page, name: string, note?: string) {
+  await page.getByLabel('Find an item').fill(name);
+  await page.getByRole('button', { name: new RegExp(`^${name}`) }).click();
+  if (note) await page.getByLabel(`Note for ${name} (optional)`).fill(note);
+  await page.getByLabel('Find an item').fill('');
 }
 
 async function toReview(page: Page) {
@@ -210,20 +204,27 @@ test.describe('the station card', () => {
     expect(cardBox && tabsBox && cardBox.y < tabsBox.y).toBe(true);
 
     await card.getByRole('link', { name: 'Start Changeout' }).click();
-    await expect(heading(page, 'Select replacement truck')).toBeVisible();
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('R 44, truck 17503, Station 4');
+    await expect(heading(page, TRUCK_HEADING)).toBeVisible();
+    await expect(h1(page)).toHaveText('R 44, truck 17503, Station 4');
   });
 
-  test('says when the planned date has passed, and shows a view link for one waiting on Fleet', async ({ page }) => {
-    await mockApi(page, { alerts: [alert({
-      date_passed: true,
-      workflow: { state: 'awaiting_fleet', label: 'Waiting on Fleet', changeout_id: 8 },
-      action: { kind: 'view', label: 'See the changeout', apparatus_id: TRUCK_ID, alert_id: ALERT_ID, changeout_id: 8 },
-    })] });
+  test('says when the planned date has passed and still offers the changeout', async ({ page }) => {
+    await mockApi(page, { alerts: [alert({ date_passed: true })] });
     await page.goto(`/daily/stations/${STATION_ID}`);
 
     await expect(page.getByTestId('unit-alert')).toContainText('Planned date has passed');
-    await expect(page.getByRole('link', { name: 'See the changeout' })).toHaveAttribute('href', /\/daily\/changeouts\/8\?/);
+    await expect(page.getByRole('link', { name: 'Start Changeout' })).toBeVisible();
+  });
+
+  test('a vehicle already changed offers a handoff, and an action with nothing to do has no link', async ({ page }) => {
+    await mockApi(page, { alerts: [
+      alert({ workflow: { state: 'vehicle_changed', label: 'Vehicle changed' }, action: { kind: 'handoff', label: 'Record what moved', apparatus_id: NEW_TRUCK_ID, alert_id: ALERT_ID } }),
+      alert({ id: 13, title: 'Recall notice', workflow: null, action: { kind: 'none', label: '', apparatus_id: null, alert_id: null } }),
+    ] });
+    await page.goto(`/daily/stations/${STATION_ID}`);
+
+    await expect(page.getByRole('link', { name: 'Record what moved' })).toHaveAttribute('href', new RegExp(`/daily/changeouts/new/${NEW_TRUCK_ID}\\?`));
+    await expect(page.getByTestId('unit-alert').filter({ hasText: 'Recall notice' }).getByRole('link')).toHaveCount(0);
   });
 
   const silent: Array<[string, Options]> = [['the list is empty', { alerts: [] }], ['the check answers 404', { alertStatus: 404 }]];
@@ -274,29 +275,32 @@ test.describe('the station card', () => {
 });
 
 test.describe('the changeout flow', () => {
-  test('truck, one exception, review, done: sends only the exception and offers the new truck its checkout', async ({ page }) => {
+  test('truck, one item Left, review, done: sends only that item and offers the new truck its checkout', async ({ page }) => {
     const mock = await mockApi(page);
     await toEquipment(page);
 
-    await expect(page.getByTestId('changeout-transfer-all')).toContainText('Transfer all equipment');
-    await expect(page.getByTestId('changeout-transfer-all')).toContainText('4 of 4 items moving to truck 1033');
+    await expect(page.getByTestId('changeout-took-all')).toContainText('Took all 5 items');
+    await expect(tallies(page)).toHaveText('Took 5 · Left 0');
     await expect(page.getByRole('button', { name: /^Front Cab/ })).toHaveAttribute('aria-expanded', 'false');
 
-    await leaveOnTruck(page, 'Spare oxygen bottle', 'Stays with the truck');
-    await expect(exceptions(page)).toContainText('Spare oxygen bottle');
-    await expect(exceptions(page)).toContainText('Leave on truck');
-    await expect(page.getByTestId('changeout-transfer-all')).toContainText('3 of 4 items');
+    await markLeft(page, 'Spare oxygen bottle', 'Stays with the truck');
+    await expect(leftList(page)).toContainText('Spare oxygen bottle');
+    await expect(leftList(page)).toContainText('Stays with the truck');
+    await expect(page.getByTestId('changeout-took-all')).toContainText('Took 4 of 5 items');
+    await expect(tallies(page)).toHaveText('Took 4 · Left 1');
 
     await primary(page, 'Continue').click();
     await expect(heading(page, 'Review')).toBeVisible();
-    await expect(page.getByTestId('changeout-review-exceptions')).toContainText('Spare oxygen bottle');
-    await expect(page.getByTestId('changeout-review-exceptions')).toContainText('Stays with the truck');
-    await page.getByLabel('Note for Fleet (optional)').fill('Moved at Station 2.');
+    await expect(page.getByTestId('changeout-review-left')).toContainText('Spare oxygen bottle');
+    await expect(page.getByTestId('changeout-review-left')).toContainText('Stays with the truck');
+    await page.getByLabel('Note (optional)').fill('Moved at Station 2.');
     await primary(page, 'Complete Changeout').click();
 
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('R 44 is now on truck 1033.');
-    await expect(page.getByRole('heading', { level: 1 })).toBeFocused();
-    await expect(page.getByText('Narcotic Seal #')).toBeVisible();
+    await expect(h1(page)).toHaveText(DONE_MESSAGE);
+    await expect(h1(page)).toBeFocused();
+    await expect(page.getByText('Fleet has been told. Nobody needs to approve this.')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Left on truck 17503' })).toBeVisible();
+    await expect(page.getByText('Spare oxygen bottle: Stays with the truck')).toBeVisible();
     await expect(page.getByRole('link', { name: 'Start Daily Checkout on truck 1033' })).toHaveAttribute('href', '/daily/apparatus/r44');
     await expect(page.getByRole('link', { name: 'Back to station' })).toHaveAttribute('href', `/daily/stations/${STATION_ID}`);
 
@@ -310,7 +314,7 @@ test.describe('the changeout flow', () => {
       to_apparatus_id: NEW_TRUCK_ID,
       to_vehicle_number: null,
       checklist_version: VERSION,
-      exceptions: [{ item_key: 'rear-item-1', handling: 'leave', quantity: null, condition: 'ok', note: 'Stays with the truck' }],
+      exceptions: [{ item_key: 'rear-item-1', handling: 'leave', note: 'Stays with the truck' }],
       note: 'Moved at Station 2.',
     });
 
@@ -318,130 +322,218 @@ test.describe('the changeout flow', () => {
     const leftovers = await page.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith('mbfd_changeout_')));
     expect(leftovers).toEqual([]);
     await page.reload();
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('R 44 is now on truck 1033.');
+    await expect(h1(page)).toHaveText(DONE_MESSAGE);
     expect(mock.posts).toHaveLength(1);
   });
 
-  test('a quantity stepper appears only when the count is known, and a partial count is sent', async ({ page }) => {
-    const mock = await mockApi(page);
+  test('a row switches between Took and Left in place, and Undo in the Left list puts it back', async ({ page, browserName }) => {
+    await mockApi(page);
     await toEquipment(page);
     await page.getByRole('button', { name: /^Front Cab/ }).click();
 
-    await page.getByRole('button', { name: /^Flashlight/ }).click();
-    await expect(page.getByRole('button', { name: 'One less' })).toHaveCount(0);
-    await page.getByRole('button', { name: 'Done with this item' }).click();
+    const radio = page.getByRole('button', { name: /^Portable radio/ });
+    await expect(radio).toHaveAccessibleName(/Took$/);
+    await expect(page.getByLabel('Note for Portable radio (optional)')).toHaveCount(0);
+    await radio.click();
+    await expect(radio).toHaveAccessibleName(/Left$/);
+    // Safari does not focus a button on a tap, so there is no focus to keep there.
+    if (browserName !== 'webkit') await expect(radio).toBeFocused();
+    await expect(page.getByLabel('Note for Portable radio (optional)')).toBeVisible();
+    await expect(page.getByRole('status').filter({ hasText: 'Portable radio: Left on truck 17503.' })).toBeAttached();
 
-    await page.getByRole('button', { name: /^Portable radio/ }).click();
-    await page.getByRole('button', { name: 'One less' }).click();
-    await expect(page.locator('output')).toHaveText('1 of 2');
-    await expect(page.getByRole('button', { name: 'One less' })).toBeDisabled();
-    await page.getByRole('button', { name: 'Done with this item' }).click();
-    // Focus returns to the row the member was on; the same line now also heads the Exceptions list.
-    await expect(page.getByRole('button', { name: /^Portable radio/ })).toHaveCount(2);
-    await expect(page.getByRole('button', { name: /^Portable radio/ }).last()).toBeFocused();
-    await expect(exceptions(page)).toContainText('Moving 1 of 2');
+    await radio.click();
+    await expect(radio).toHaveAccessibleName(/Took$/);
+    await expect(leftList(page)).toHaveCount(0);
 
-    await primary(page, 'Continue').click();
-    await primary(page, 'Complete Changeout').click();
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('R 44 is now on truck 1033.');
-    expect(mock.posts[0].body.exceptions).toEqual([{ item_key: 'front_cab-item-1', handling: 'transfer', quantity: 1, condition: 'ok', note: null }]);
+    await radio.click();
+    await page.getByRole('button', { name: 'Undo Portable radio' }).click();
+    await expect(radio).toHaveAccessibleName(/Took$/);
+    await expect(tallies(page)).toHaveText('Took 5 · Left 0');
   });
 
-  test('controlled lines are name only, with no control that could mark them moved', async ({ page }) => {
+  test('tapping a row far down the list does not move it from under the thumb', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 500 });
+    await mockApi(page);
+    await toEquipment(page);
+    for (const name of [/^Rear Compartment/, /^Narcotics/, /^Front Cab/]) await page.getByRole('button', { name }).click();
+
+    const row = page.getByRole('button', { name: /^Narcotic Seal/ });
+    await row.scrollIntoViewIfNeeded();
+    const before = (await row.boundingBox())?.y ?? 0;
+    await row.click();
+    await expect(leftList(page)).toContainText('Narcotic Seal #');
+    const after = (await row.boundingBox())?.y ?? 0;
+    expect(Math.abs(after - before)).toBeLessThan(3);
+  });
+
+  test('Left this compartment marks every item, and the same control undoes it', async ({ page }) => {
     const mock = await mockApi(page);
     await toEquipment(page);
+    await page.getByRole('button', { name: /^Rear Compartment/ }).click();
 
-    const signOff = page.getByRole('region', { name: 'These need their own sign-off' });
-    await expect(signOff).toContainText('Narcotic Seal #');
-    await expect(signOff).toContainText('waiting for verification');
-    await expect(signOff.getByRole('button')).toHaveCount(0);
-    await page.getByLabel('Search equipment').fill('Narcotic');
-    await expect(page.getByText('No equipment matches that search.')).toBeVisible();
-    await page.getByLabel('Search equipment').fill('');
+    await page.getByRole('button', { name: 'Stair chair Took' }).click();
+    await page.getByLabel('Note for Stair chair (optional)').fill('Too big');
+    await page.getByRole('button', { name: 'Left this compartment' }).click();
+    await expect(tallies(page)).toHaveText('Took 3 · Left 2');
+    await expect(leftList(page)).toContainText('Spare oxygen bottle');
+    await expect(leftList(page)).toContainText('Too big');
+    await expect(page.getByRole('button', { name: /^Rear Compartment/ })).toContainText('2 left');
+
+    await page.getByRole('button', { name: 'Took this compartment' }).click();
+    await expect(tallies(page)).toHaveText('Took 5 · Left 0');
+    await page.getByRole('button', { name: 'Left this compartment' }).click();
 
     await primary(page, 'Continue').click();
-    await expect(page.getByRole('region', { name: 'Will wait for verification' })).toContainText('Narcotic Seal #');
     await primary(page, 'Complete Changeout').click();
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('R 44 is now on truck 1033.');
-    expect(mock.posts[0].body.exceptions).toEqual([]);
+    await expect(h1(page)).toHaveText(DONE_MESSAGE);
+    expect(mock.posts[0].body.exceptions).toEqual([
+      { item_key: 'rear-item-1', handling: 'leave', note: null },
+      { item_key: 'rear-item-2', handling: 'leave', note: null },
+    ]);
   });
 
-  test('a truck Fleet must confirm says so at every step and ends in plain words', async ({ page }) => {
-    const mock = await mockApi(page, { onPost: (route) => route.fulfill({ status: 201, json: { changeout: summary({ status: 'pending_fleet', to_vehicle_number: 'NEW-9', next_daily_checkout_path: null, open_items: [] }), replayed: false } }) });
+  test('search finds an item in a closed compartment and hides the whole-compartment shortcut', async ({ page }) => {
+    await mockApi(page);
+    await toEquipment(page);
+
+    await page.getByLabel('Find an item').fill('narcotic seal');
+    await expect(page.getByRole('button', { name: /^Narcotic Seal/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Flashlight/ })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Left this compartment' })).toHaveCount(0);
+    await page.getByLabel('Find an item').fill('nothing like this');
+    await expect(page.getByText('No equipment matches that search.')).toBeVisible();
+  });
+
+  test('every item is the member\'s to leave: no item is controlled, verified or counted', async ({ page }) => {
+    const mock = await mockApi(page);
+    await toEquipment(page);
+    await markLeft(page, 'Narcotic Seal #');
+    await page.getByRole('button', { name: /^Front Cab/ }).click();
+
+    const text = await page.locator('[data-hub-ui="2"]').innerText();
+    for (const banned of ['sign-off', 'verif', 'Controlled', 'Missing', 'Damaged', 'Not sure', 'Expected', 'Quantity', 'Fleet will confirm']) {
+      expect(text.toLowerCase()).not.toContain(banned.toLowerCase());
+    }
+    await expect(page.getByRole('button', { name: 'One less' })).toHaveCount(0);
+
+    await primary(page, 'Continue').click();
+    await primary(page, 'Complete Changeout').click();
+    await expect(h1(page)).toHaveText(DONE_MESSAGE);
+    expect(mock.posts[0].body.exceptions).toEqual([{ item_key: 'field:seal', handling: 'leave', note: null }]);
+  });
+
+  test('says what happens to the old truck, and preselects the planned truck without restricting the choice', async ({ page }) => {
+    const mock = await mockApi(page, { contextFor: () => ({ json: context({
+      alert: { id: ALERT_ID, title: 'Upcoming', reason: 'Exhaust repair', schedule_label: 'Sunday', vehicle_number: '17503', planned_replacement_apparatus_id: 59, changeout_id: null },
+    }) }) });
     await page.goto(wizardUrl);
 
-    await page.getByRole('button', { name: 'Truck not listed?' }).click();
-    await page.getByRole('radio', { name: 'Enter the truck number' }).check();
+    await expect(page.getByRole('radio', { name: /^1035\b/ })).toBeChecked();
+    await expect(page.getByTestId('changeout-what-happens')).toHaveText('Truck 17503 will be marked Out of Service.');
+    await expect(page.getByText('Reason: Exhaust repair')).toBeVisible();
+
+    // A preselection on its own is nothing to save or restore.
+    const stored = await page.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith('mbfd_changeout_draft_')));
+    expect(stored).toEqual([]);
+    await page.reload();
+    await expect(page.getByText('Your saved work is back.')).toHaveCount(0);
+
+    await pickTruck(page, '1033');
     await primary(page, 'Continue').click();
-    await expect(page.getByRole('alert')).toContainText('Enter the truck number.');
-    await page.getByLabel('Number on the truck').fill('<b>');
+    await primary(page, 'Continue').click();
+    await primary(page, 'Complete Changeout').click();
+    await expect(h1(page)).toHaveText(DONE_MESSAGE);
+    expect(mock.posts[0].body).toMatchObject({ alert_id: ALERT_ID, to_apparatus_id: NEW_TRUCK_ID });
+  });
+
+  test('Different truck: a truck listed as another unit says that unit moves to the old truck', async ({ page }) => {
+    const mock = await mockApi(page, { onPost: (route) => route.fulfill({ status: 201, json: { changeout: summary({ to_vehicle_number: '1034', message: 'R 44 is now on truck 1034.', displaced_unit: 'R 4', left_behind: [] }), replayed: false } }) });
+    await page.goto(wizardUrl);
+
+    await expect(page.getByRole('radio', { name: /^1034\b/ })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Different truck' }).click();
+    const card = page.locator('label').filter({ has: page.getByRole('radio', { name: /^1034\b/ }) });
+    await expect(card).toContainText('Listed as R 4');
+    await expect(page.getByText('that unit moves to truck 17503')).toBeVisible();
+
+    await pickTruck(page, '1034');
+    await expect(page.getByTestId('changeout-what-happens')).toContainText('R 4 moves to truck 17503.');
+    await primary(page, 'Continue').click();
+    await primary(page, 'Continue').click();
+    await primary(page, 'Complete Changeout').click();
+
+    await expect(h1(page)).toHaveText('R 44 is now on truck 1034.');
+    await expect(page.getByText('R 4 is now on truck 17503.')).toBeVisible();
+    await expect(page.getByText('Took all 4 items. Nothing was left on truck 17503.')).toBeVisible();
+    expect(mock.posts[0].body).toMatchObject({ to_apparatus_id: 58, to_vehicle_number: null });
+  });
+
+  test('a typed number is validated, and an unknown truck completes the same way', async ({ page }) => {
+    const mock = await mockApi(page, { onPost: (route) => route.fulfill({ status: 201, json: { changeout: summary({ to_vehicle_number: 'NEW-9', to_apparatus_id: 70, message: 'R 44 is now on truck NEW-9.', new_truck_record: true, left_behind: [] }), replayed: false } }) });
+    await page.goto(wizardUrl);
+
+    await page.getByRole('button', { name: 'Different truck' }).click();
+    const typed = page.getByLabel('Or type the number on the truck');
+    await primary(page, 'Continue').click();
+    await expect(page.getByRole('alert')).toContainText('Choose the truck');
+    await typed.fill('<b>');
     await expect(page.getByRole('alert')).toContainText('Letters, numbers');
-    await page.getByLabel('Number on the truck').fill('17503');
+    await typed.fill('17503');
     await expect(page.getByRole('alert')).toContainText('truck R 44 is on now');
-    await page.getByLabel('Number on the truck').fill('NEW-9');
-    await expect(page.getByRole('status').filter({ hasText: 'Fleet will confirm this truck.' })).toBeVisible();
+    await typed.fill('NEW-9');
+    await expect(page.getByRole('alert')).toHaveCount(0);
+    await expect(page.getByTestId('changeout-what-happens')).toContainText('Truck NEW-9 is not on the list yet.');
 
     await primary(page, 'Continue').click();
     await primary(page, 'Continue').click();
-    await expect(page.getByText('Fleet will confirm truck NEW-9.')).toBeVisible();
-    await primary(page, 'Send to Fleet').click();
+    await primary(page, 'Complete Changeout').click();
 
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sent to Fleet. Your equipment choices are saved.');
-    await expect(page.getByRole('link', { name: /Start Daily Checkout/ })).toHaveCount(0);
-    await expect(page.getByRole('link', { name: 'Back to station' })).toBeVisible();
+    await expect(h1(page)).toHaveText('R 44 is now on truck NEW-9.');
+    await expect(page.getByText("Fleet will add the truck's details.")).toBeVisible();
     expect(mock.posts[0].body).toMatchObject({ to_apparatus_id: null, to_vehicle_number: 'NEW-9' });
   });
 
-  test('going back to its own truck is flagged, shows last time, and starts from what happened then', async ({ page }) => {
+  test('going back to its own truck is flagged and shows last time, with nothing preset to Left', async ({ page }) => {
     const mock = await mockApi(page, { contextFor: () => ({ json: context({
-      candidates: [{ apparatus_id: 60, vehicle_number: '17503', label: 'Rescue 17503', location: 'Shop', status: 'Available', direct: true, is_return: true }],
+      candidates: [{ apparatus_id: 60, vehicle_number: '17503', label: 'Rescue 17503', location: 'Shop', status: 'Available', is_return: true }],
       unit: { apparatus_id: TRUCK_ID, designation: 'R 44', slug: 'r44', vehicle_number: '1033', station_id: STATION_ID, station_label: 'Station 4', status: 'In Service' },
-      previous_changeout: { id: 7, from_vehicle_number: '17503', to_vehicle_number: '1033', effective_at: '2026-11-01T20:10:00Z', moved: 3, left_behind: [{ name: 'Stair chair', note: 'Stayed on 17503' }], open: [{ name: 'Flashlight', status: 'needs_review' }], submitted_by_name: 'Alex Rivera' },
+      previous_changeout: { id: 7, from_apparatus_id: 60, from_vehicle_number: '17503', to_vehicle_number: '1033', effective_at: '2026-11-01T20:10:00Z', moved: 3, left_behind: [{ name: 'Stair chair', note: 'Stayed on 17503' }], submitted_by_name: 'Alex Rivera' },
       equipment: { checklist_version: VERSION, usable: true, compartments: [{ id: 'rear', name: 'Rear Compartment', items: [
-        item('rear-item-1', 'Spare oxygen bottle', { previous: { custody_status: 'moved', handling: 'transfer', note: null, return_handling: 'transfer', return_quantity: null } }),
-        item('rear-item-2', 'Stair chair', { previous: { custody_status: 'left_behind', handling: 'leave', note: 'Stayed on 17503', return_handling: 'leave', return_quantity: null } }),
+        item('rear-item-1', 'Spare oxygen bottle', { previous: { handling: 'transfer', note: null } }),
+        item('rear-item-2', 'Stair chair', { previous: { handling: 'leave', note: 'Stayed on 17503' } }),
       ] }] },
     }) }) });
     await page.goto(wizardUrl);
 
-    await expect(page.getByRole('radio', { name: /^17503/ })).toBeVisible();
     await expect(page.getByText('Back to its own truck')).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Previous changeout' })).toContainText('Stair chair: Stayed on 17503');
-    await expect(page.getByRole('region', { name: 'Previous changeout' })).toContainText('Flashlight (needs review)');
+    const previous = page.getByRole('region', { name: 'Previous changeout' });
+    await expect(previous).toContainText('Truck 17503 to 1033');
+    await expect(previous).toContainText('Stair chair: Stayed on 17503');
     await pickTruck(page, '17503');
     await primary(page, 'Continue').click();
 
-    await expect(page.getByTestId('changeout-transfer-all')).toContainText('1 of 2 items');
-    await expect(exceptions(page)).toContainText('Stair chair');
-    await expect(exceptions(page)).toContainText('Last time: Stayed on 17503');
+    await expect(page.getByTestId('changeout-took-all')).toContainText('Took all 2 items');
+    await expect(leftList(page)).toHaveCount(0);
+    await page.getByRole('button', { name: /^Rear Compartment/ }).click();
+    await expect(page.getByText('Left on truck 17503 last time: Stayed on 17503')).toBeVisible();
+    await expect(page.getByRole('button', { name: /^Stair chair/ })).toHaveAccessibleName(/Took$/);
     await primary(page, 'Continue').click();
     await primary(page, 'Complete Changeout').click();
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('R 44 is now on truck 1033.');
+    await expect(h1(page)).toHaveText(DONE_MESSAGE);
     expect(mock.posts[0].body.exceptions).toEqual([]);
   });
 
-  test('when the list could not be loaded the member can still continue with a note', async ({ page }) => {
+  test('when the list is not available the member can still finish, with or without a note', async ({ page }) => {
     const mock = await mockApi(page, { contextFor: () => ({ json: context({ equipment: { checklist_version: null, usable: false, compartments: [] } }) }) });
     await toEquipment(page);
 
-    await expect(page.getByText('could not be loaded. Fleet will see this.')).toBeVisible();
-    await primary(page, 'Continue').click();
-    await expect(page.getByRole('alert')).toContainText('Add a short note');
-    await page.getByLabel('What moved, and what stayed?').fill('Everything moved except the stair chair.');
+    await expect(page.getByText('is not available right now')).toBeVisible();
+    await expect(tallies(page)).toHaveCount(0);
+    await page.getByLabel('What did you take, and what did you leave? (optional)').fill('Everything except the stair chair.');
     await primary(page, 'Continue').click();
     await primary(page, 'Complete Changeout').click();
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('R 44 is now on truck 1033.');
-    expect(mock.posts[0].body).toMatchObject({ checklist_version: null, exceptions: [], note: 'Everything moved except the stair chair.' });
-  });
-
-  test('a unit with a changeout already waiting shows that one instead of a second form', async ({ page }) => {
-    const mock = await mockApi(page, { contextFor: () => ({ json: context({ pending_changeout: summary({ id: 9, status: 'pending_fleet', submitted_by_name: 'Sam Lee' }) }) }) });
-    await page.goto(wizardUrl);
-
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('R 44 already has a changeout waiting on Fleet');
-    await expect(page.getByText('Sam Lee sent it for truck 1033.')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'See the one waiting on Fleet' })).toHaveAttribute('href', /\/daily\/changeouts\/9\?/);
-    expect(mock.posts).toHaveLength(0);
+    await expect(h1(page)).toHaveText(DONE_MESSAGE);
+    expect(mock.posts[0].body).toMatchObject({ checklist_version: null, exceptions: [], note: 'Everything except the stair chair.' });
   });
 
   test('a handoff after the unit already moved needs no truck choice', async ({ page }) => {
@@ -450,7 +542,7 @@ test.describe('the changeout flow', () => {
       candidates: [],
       other_vehicles: [],
       unit: { apparatus_id: NEW_TRUCK_ID, designation: 'R 44', slug: 'r44', vehicle_number: '1033', station_id: STATION_ID, station_label: 'Station 4', status: 'In Service' },
-      alert: { id: ALERT_ID, title: 'Upcoming', reason: 'Exhaust repair', schedule_label: 'Sunday', vehicle_number: '17503' },
+      alert: { id: ALERT_ID, title: 'Upcoming', reason: 'Exhaust repair', schedule_label: 'Sunday', vehicle_number: '17503', planned_replacement_apparatus_id: null, changeout_id: null },
     }) }) });
     await page.goto(wizardUrl);
 
@@ -460,8 +552,18 @@ test.describe('the changeout flow', () => {
     await primary(page, 'Continue').click();
     await expect(page.getByText('From truck')).toBeVisible();
     await primary(page, 'Record Handoff').click();
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('R 44 is now on truck 1033.');
+    await expect(h1(page)).toHaveText(DONE_MESSAGE);
     expect(mock.posts[0].body).toMatchObject({ expected_vehicle_number: '1033', to_apparatus_id: NEW_TRUCK_ID, to_vehicle_number: null });
+  });
+
+  test('the Done screen has no waiting state of any kind', async ({ page }) => {
+    await mockApi(page);
+    await toReview(page);
+    await expect(primary(page, 'Send to Fleet')).toHaveCount(0);
+    await primary(page, 'Complete Changeout').click();
+    await expect(h1(page)).toHaveText(DONE_MESSAGE);
+    const text = await page.locator('[data-hub-ui="2"]').innerText();
+    for (const banned of ['Waiting', 'pending', 'verification', 'Sent to Fleet']) expect(text.toLowerCase()).not.toContain(banned.toLowerCase());
   });
 });
 
@@ -469,25 +571,35 @@ test.describe('interruptions and poor signal', () => {
   test('work survives a reload, Back between steps loses nothing, and Start over clears it', async ({ page }) => {
     await mockApi(page);
     await toEquipment(page);
-    await leaveOnTruck(page, 'Stair chair');
+    await markLeft(page, 'Stair chair');
 
     await page.goBack();
-    await expect(heading(page, 'Select replacement truck')).toBeVisible();
+    await expect(heading(page, TRUCK_HEADING)).toBeVisible();
     await expect(page.getByRole('radio', { name: /^1033/ })).toBeChecked();
     await page.goForward();
-    await expect(exceptions(page)).toContainText('Stair chair');
+    await expect(leftList(page)).toContainText('Stair chair');
 
     await page.goto(wizardUrl);
     await expect(page.getByText('Your saved work is back.')).toBeVisible();
-    await expect(heading(page, 'Transfer equipment')).toBeVisible();
-    await expect(exceptions(page)).toContainText('Stair chair');
+    await expect(heading(page, EQUIPMENT_HEADING)).toBeVisible();
+    await expect(leftList(page)).toContainText('Stair chair');
 
     await page.getByRole('button', { name: 'Start over' }).click();
     await page.getByRole('button', { name: 'Clear my choices' }).click();
-    await expect(heading(page, 'Select replacement truck')).toBeVisible();
+    await expect(heading(page, TRUCK_HEADING)).toBeVisible();
     await expect(page.getByRole('radio', { name: /^1033/ })).not.toBeChecked();
     const leftovers = await page.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith('mbfd_changeout_draft_')));
     expect(leftovers).toEqual([]);
+  });
+
+  test('a draft saved by the earlier version on the phone is ignored rather than breaking the page', async ({ page }) => {
+    await mockApi(page);
+    await page.addInitScript(() => {
+      localStorage.setItem('mbfd_changeout_draft_52_401', JSON.stringify({ version: 1, apparatusId: 52, userId: 401, clientSubmissionId: 'old', exceptions: { 'rear-item-1': { handling: 'review' } }, typedVehicle: '', note: '', savedAt: Date.now() }));
+    });
+    await page.goto(wizardUrl);
+    await expect(heading(page, TRUCK_HEADING)).toBeVisible();
+    await expect(page.getByText('Your saved work is back.')).toHaveCount(0);
   });
 
   test('focus goes to the step heading on every step change', async ({ page }) => {
@@ -498,7 +610,7 @@ test.describe('interruptions and poor signal', () => {
     await expect(page.locator('#changeout-step-heading')).toHaveText('Review');
     await expect(page.locator('#changeout-step-heading')).toBeFocused();
     await primary(page, 'Back').click();
-    await expect(page.locator('#changeout-step-heading')).toHaveText('Transfer equipment');
+    await expect(page.locator('#changeout-step-heading')).toHaveText(EQUIPMENT_HEADING);
   });
 
   test('no signal: says Not sent, keeps everything, and a retry after reload reuses the same id', async ({ page }) => {
@@ -508,13 +620,13 @@ test.describe('interruptions and poor signal', () => {
         : route.fulfill({ status: 200, json: { changeout: summary(), replayed: true } })),
     });
     await toEquipment(page);
-    await leaveOnTruck(page, 'Stair chair', 'Too big');
+    await markLeft(page, 'Stair chair', 'Too big');
     await primary(page, 'Continue').click();
     await primary(page, 'Complete Changeout').click();
 
     await expect(page.getByRole('alert')).toHaveText(NOT_SENT);
     await expect(primary(page, 'Try again')).toBeEnabled();
-    await expect(page.getByTestId('changeout-review-exceptions')).toContainText('Too big');
+    await expect(page.getByTestId('changeout-review-left')).toContainText('Too big');
     const busy = await page.evaluate(() => Object.keys(localStorage).some((key) => key.startsWith('mbfd_changeout_draft_')));
     expect(busy).toBe(true);
 
@@ -528,7 +640,7 @@ test.describe('interruptions and poor signal', () => {
     await primary(page, 'Try again').click();
     await expect(page.getByRole('alert')).toHaveText(NOT_SENT);
     await primary(page, 'Try again').click();
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('R 44 is now on truck 1033.');
+    await expect(h1(page)).toHaveText(DONE_MESSAGE);
 
     expect(mock.posts).toHaveLength(3);
     expect(mock.posts[1].body).toEqual(mock.posts[0].body);
@@ -538,11 +650,11 @@ test.describe('interruptions and poor signal', () => {
   test('opening a saved draft with no signal uses the list saved on the phone', async ({ page }) => {
     const mock = await mockApi(page, { contextFor: (_path, attempt) => (attempt === 1 ? { json: context() } : 'abort') });
     await toEquipment(page);
-    await leaveOnTruck(page, 'Stair chair');
+    await markLeft(page, 'Stair chair');
     await page.goto(wizardUrl);
 
     await expect(page.getByText('this is the list saved on this phone')).toBeVisible();
-    await expect(exceptions(page)).toContainText('Stair chair');
+    await expect(leftList(page)).toContainText('Stair chair');
     expect(mock.contextGets.length).toBeGreaterThan(1);
   });
 
@@ -568,7 +680,7 @@ test.describe('interruptions and poor signal', () => {
     await button.dblclick({ force: true }).catch(() => undefined);
     await expect(primary(page, 'Sending…')).toBeDisabled();
     release();
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('R 44 is now on truck 1033.');
+    await expect(h1(page)).toHaveText(DONE_MESSAGE);
     expect(mock.posts).toHaveLength(1);
   });
 
@@ -588,7 +700,7 @@ test.describe('a shared phone with no known member', () => {
   test('stores nothing, stays quiet until there is work to lose, and still sends', async ({ page }) => {
     const mock = await mockApi(page, { identityStatus: 503 });
     await page.goto(wizardUrl);
-    await expect(heading(page, 'Select replacement truck')).toBeVisible();
+    await expect(heading(page, TRUCK_HEADING)).toBeVisible();
     await expect(page.getByText('could not save your work')).toHaveCount(0);
 
     await pickTruck(page, '1033');
@@ -600,7 +712,7 @@ test.describe('a shared phone with no known member', () => {
     expect(stored).toEqual([]);
 
     await primary(page, 'Complete Changeout').click();
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('R 44 is now on truck 1033.');
+    await expect(h1(page)).toHaveText(DONE_MESSAGE);
     expect(mock.posts).toHaveLength(1);
   });
 
@@ -618,56 +730,62 @@ test.describe('a shared phone with no known member', () => {
         : { json: context({ unit: { apparatus_id: 70, designation: 'R 44', slug: 'r44', vehicle_number: '1040', station_id: STATION_ID, station_label: 'Station 4', status: 'In Service' } }) }),
     });
     await toEquipment(page);
-    await leaveOnTruck(page, 'Stair chair');
+    await markLeft(page, 'Stair chair');
     await primary(page, 'Continue').click();
     await primary(page, 'Complete Changeout').click();
 
     await expect(page.getByRole('alert').filter({ hasText: 'Not sent.' })).toContainText('only on this page');
     await primary(page, 'Try again').click();
     await page.getByRole('button', { name: 'Review with the current truck' }).click();
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('R 44, truck 1040, Station 4');
-    await expect(page.getByTestId('changeout-review-exceptions')).toContainText('Stair chair');
+    await expect(h1(page)).toHaveText('R 44, truck 1040, Station 4');
+    await expect(page.getByTestId('changeout-review-left')).toContainText('Stair chair');
     await primary(page, 'Complete Changeout').click();
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('R 44 is now on truck 1033.');
+    await expect(h1(page)).toHaveText(DONE_MESSAGE);
     expect(mock.posts[2].body.exceptions).toEqual(mock.posts[0].body.exceptions);
   });
 });
 
 test.describe('Change vehicle, with no alert', () => {
-  test('starts from the station card, sends no alert id, and Fleet confirms unless the server says direct', async ({ page }) => {
+  test('starts from the unit card, sends no alert id, and completes straight away', async ({ page }) => {
     const mock = await mockApi(page, {
       alerts: [],
       station: { apparatuses: [{ id: TRUCK_ID, name: 'Rescue 44', unit_id: 'R 44', designation: 'R 44', vehicle_number: '17503', type: 'rescue', slug: 'r44', status: 'In Service', daily_checkout_requirement: 'required' }] },
-      contextFor: () => ({ json: context({
-        alert: null,
-        candidates: [{ apparatus_id: NEW_TRUCK_ID, vehicle_number: '1033', label: 'Rescue 1033', location: 'Station 2', status: 'Available', direct: false, is_return: false }],
-      }) }),
-      onPost: (route) => route.fulfill({ status: 201, json: { changeout: summary({ status: 'pending_fleet', next_daily_checkout_path: null, open_items: [] }), replayed: false } }),
+      contextFor: () => ({ json: context({ alert: null }) }),
     });
     await page.goto(`/daily/stations/${STATION_ID}`);
     await page.getByRole('tab', { name: 'Apparatus' }).click();
     await page.getByRole('link', { name: 'Change vehicle' }).click();
 
-    await expect(heading(page, 'Select replacement truck')).toBeVisible();
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('R 44, truck 17503, Station 4');
+    await expect(heading(page, TRUCK_HEADING)).toBeVisible();
+    await expect(h1(page)).toHaveText('R 44, truck 17503, Station 4');
     expect(mock.contextGets[0]).toBe(`/api/public/apparatuses/${TRUCK_ID}/changeout-context`);
 
     await pickTruck(page, '1033');
-    await expect(page.getByRole('status').filter({ hasText: 'Fleet will confirm this truck.' })).toBeVisible();
     await primary(page, 'Continue').click();
     await primary(page, 'Continue').click();
-    await primary(page, 'Send to Fleet').click();
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sent to Fleet. Your equipment choices are saved.');
+    await primary(page, 'Complete Changeout').click();
+    await expect(h1(page)).toHaveText(DONE_MESSAGE);
     expect(mock.posts[0].body).toMatchObject({ alert_id: null, to_apparatus_id: NEW_TRUCK_ID, expected_unit_slug: 'r44' });
   });
 
-  test('an alert before its date still follows direct: a false direct says Fleet will confirm', async ({ page }) => {
-    await mockApi(page, { contextFor: () => ({ json: context({
-      candidates: [{ apparatus_id: NEW_TRUCK_ID, vehicle_number: '1033', label: 'Rescue 1033', location: 'Station 2', status: 'Available', direct: false, is_return: false }],
-    }) }) });
-    await toEquipment(page);
+  test('a link from the checkout names the truck, so the member only confirms it', async ({ page }) => {
+    const mock = await mockApi(page);
+    await page.goto(`/daily/changeouts/new/${TRUCK_ID}?truck=1034&return_to=${encodeURIComponent('/apparatus/r44')}`);
+
+    await expect(page.getByRole('radio', { name: /^1034\b/ })).toBeChecked();
     await primary(page, 'Continue').click();
-    await expect(primary(page, 'Send to Fleet')).toBeVisible();
+    await primary(page, 'Continue').click();
+    await primary(page, 'Complete Changeout').click();
+    await expect(h1(page)).toHaveText(DONE_MESSAGE);
+    expect(mock.posts[0].body).toMatchObject({ to_apparatus_id: 58 });
+  });
+
+  test('a link naming a truck not on the list starts with that number typed', async ({ page }) => {
+    await mockApi(page);
+    await page.goto(`/daily/changeouts/new/${TRUCK_ID}?truck=NEW-9`);
+
+    await expect(page.getByLabel('Or type the number on the truck')).toHaveValue('NEW-9');
+    await expect(page.getByTestId('changeout-what-happens')).toContainText('Truck NEW-9 is not on the list yet.');
   });
 });
 
@@ -706,7 +824,7 @@ test.describe('the next checklist after a changeout', () => {
 });
 
 test.describe('when the records moved', () => {
-  test('CHANGEOUT_STALE shows the current truck and reviews with it, keeping choices that still apply', async ({ page }) => {
+  test('CHANGEOUT_STALE shows the current truck and reviews with it, keeping Left items that still exist', async ({ page }) => {
     const message = 'R 44 is no longer on truck 17503. It is on truck 1040 now. Nothing was saved, and your choices are still on this screen.';
     const mock = await mockApi(page, {
       onPost: (route, attempt) => (attempt === 1
@@ -720,8 +838,8 @@ test.describe('when the records moved', () => {
         }) }),
     });
     await toEquipment(page);
-    await leaveOnTruck(page, 'Stair chair');
-    await leaveOnTruck(page, 'Flashlight');
+    await markLeft(page, 'Stair chair');
+    await markLeft(page, 'Flashlight');
     await primary(page, 'Continue').click();
     await primary(page, 'Complete Changeout').click();
 
@@ -730,76 +848,27 @@ test.describe('when the records moved', () => {
     await page.getByRole('button', { name: 'Review with the current truck' }).click();
 
     await expect(page).toHaveURL(/\/daily\/changeouts\/new\/70\?/);
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('R 44, truck 1040, Station 4');
-    await expect(page.getByRole('alert').filter({ hasText: 'These choices no longer apply: Flashlight.' })).toBeVisible();
+    await expect(h1(page)).toHaveText('R 44, truck 1040, Station 4');
+    await expect(page.getByRole('alert').filter({ hasText: 'These are no longer on the list: Flashlight.' })).toBeVisible();
     await expect(heading(page, 'Review')).toBeVisible();
     await primary(page, 'Complete Changeout').click();
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('R 44 is now on truck 1033.');
+    await expect(h1(page)).toHaveText(DONE_MESSAGE);
 
     expect(mock.posts[1].path).toBe('/api/public/apparatuses/70/changeouts');
     expect(mock.posts[1].body).toMatchObject({
       client_submission_id: mock.posts[0].body.client_submission_id,
       expected_vehicle_number: '1040',
       checklist_version: 'b'.repeat(64),
-      exceptions: [{ item_key: 'rear-item-2', handling: 'leave', quantity: null, condition: 'ok', note: null }],
+      exceptions: [{ item_key: 'rear-item-2', handling: 'leave', note: null }],
     });
   });
 
-  test('CHANGEOUT_TRUCK_UNAVAILABLE goes back to the truck step with fresh choices and equipment kept', async ({ page }) => {
-    const message = 'Truck 1033 is no longer available for this change. Nothing was saved, and your choices are still on this screen.';
-    const mock = await mockApi(page, {
-      onPost: (route, attempt) => (attempt === 1
-        ? route.fulfill({ status: 409, json: { message, code: 'CHANGEOUT_TRUCK_UNAVAILABLE' } })
-        : route.fulfill({ status: 201, json: { changeout: summary({ to_vehicle_number: '1035', message: 'R 44 is now on truck 1035.' }), replayed: false } })),
-      contextFor: (_path, attempt) => ({ json: attempt === 1 ? context() : context({
-        candidates: [{ apparatus_id: 59, vehicle_number: '1035', label: 'Rescue 1035', location: 'Station 3', status: 'Reserve', direct: true, is_return: false }],
-      }) }),
-    });
-    await toEquipment(page);
-    await leaveOnTruck(page, 'Stair chair');
-    await primary(page, 'Continue').click();
-    await primary(page, 'Complete Changeout').click();
-
-    await expect(heading(page, 'Select replacement truck')).toBeVisible();
-    await expect(page.getByRole('alert').filter({ hasText: 'Truck 1033 is no longer available' })).toBeVisible();
-    await expect(page.getByRole('radio', { name: /^1033/ })).toHaveCount(0);
-    await pickTruck(page, '1035');
-    await primary(page, 'Continue').click();
-    await expect(exceptions(page)).toContainText('Stair chair');
-    await primary(page, 'Continue').click();
-    await primary(page, 'Complete Changeout').click();
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('R 44 is now on truck 1035.');
-    expect(mock.posts[1].body).toMatchObject({ to_apparatus_id: 59 });
-    expect(mock.posts[1].body.exceptions).toEqual(mock.posts[0].body.exceptions);
-  });
-
-  test('CHANGEOUT_CHECKLIST_CHANGED reloads the list and stays on Review instead of refusing forever', async ({ page }) => {
-    const mock = await mockApi(page, {
-      onPost: (route, attempt) => (attempt === 1
-        ? route.fulfill({ status: 409, json: { message: 'The equipment list for this truck changed while you were working. Nothing was saved.', code: 'CHANGEOUT_CHECKLIST_CHANGED' } })
-        : route.fulfill({ status: 201, json: { changeout: summary(), replayed: false } })),
-      contextFor: (_path, attempt) => ({ json: attempt === 1 ? context() : context({ equipment: { ...context().equipment, checklist_version: 'c'.repeat(64) } }) }),
-    });
-    await toEquipment(page);
-    await leaveOnTruck(page, 'Stair chair');
-    await primary(page, 'Continue').click();
-    await primary(page, 'Complete Changeout').click();
-
-    await expect(page.getByRole('alert').filter({ hasText: 'equipment list for this truck changed' })).toBeVisible();
-    await expect(heading(page, 'Review')).toBeVisible();
-    await primary(page, 'Complete Changeout').click();
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('R 44 is now on truck 1033.');
-    expect(mock.posts[1].body.checklist_version).toBe('c'.repeat(64));
-  });
-
-  test('CHANGEOUT_ALREADY_PENDING shows the existing one with a link', async ({ page }) => {
-    await mockApi(page, { onPost: (route) => route.fulfill({ status: 409, json: { message: 'Fleet already has a vehicle change waiting for R 44. Nothing new was saved.', code: 'CHANGEOUT_ALREADY_PENDING', changeout_id: 9 } }) });
+  test('CHANGEOUT_STALE reads the current truck from a current object, and the copy can be discarded', async ({ page }) => {
+    await mockApi(page, { onPost: (route) => route.fulfill({ status: 409, json: { message: 'Another member already moved it. Nothing was saved.', code: 'CHANGEOUT_STALE', current: { vehicle_number: '1033', apparatus_id: NEW_TRUCK_ID } } }) });
     await toReview(page);
     await primary(page, 'Complete Changeout').click();
 
-    await expect(page.getByRole('alert')).toContainText('Fleet already has a vehicle change waiting for R 44.');
-    await expect(page.getByRole('link', { name: 'See that record' })).toHaveAttribute('href', '/daily/changeouts/9');
-    await expect(primary(page, 'Complete Changeout')).toBeDisabled();
+    await expect(page.getByRole('alert')).toContainText('R 44 is on truck 1033 now.');
     await page.getByRole('button', { name: 'Discard my copy' }).click();
     await expect(page).toHaveURL(new RegExp(`/daily/stations/${STATION_ID}$`));
   });
@@ -817,58 +886,59 @@ test.describe('when the records moved', () => {
     await expect(page.getByRole('link', { name: 'See what was saved' })).toHaveAttribute('href', '/daily/changeouts/8');
     expect(mock.posts).toHaveLength(1);
     await page.getByRole('button', { name: 'Send what is on this screen' }).click();
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('R 44 is now on truck 1033.');
+    await expect(h1(page)).toHaveText(DONE_MESSAGE);
     expect(mock.posts[1].body.client_submission_id).toMatch(UUID_PATTERN);
     expect(mock.posts[1].body.client_submission_id).not.toBe(mock.posts[0].body.client_submission_id);
   });
 
   test('a validation refusal keeps the work and shows the server message', async ({ page }) => {
-    await mockApi(page, { onPost: (route) => route.fulfill({ status: 422, json: { message: 'Stair chair has no set count on this truck.' } }) });
+    await mockApi(page, { onPost: (route) => route.fulfill({ status: 422, json: { message: 'That truck number is too long.' } }) });
     await toReview(page);
     await primary(page, 'Complete Changeout').click();
 
-    await expect(page.getByRole('alert')).toContainText('Stair chair has no set count');
+    await expect(page.getByRole('alert')).toContainText('That truck number is too long.');
     await primary(page, 'Back').click();
-    await expect(heading(page, 'Transfer equipment')).toBeVisible();
+    await expect(heading(page, EQUIPMENT_HEADING)).toBeVisible();
   });
 });
 
 test.describe('the receipt', () => {
   const lines = [
-    { id: 1, item_key: 'field:seal', name: 'Narcotic Seal #', controlled: true, custody_status: 'pending_verification' },
-    { id: 2, item_key: 'rear-item-2', name: 'Stair chair', controlled: false, custody_status: 'left_behind', compartment_name: 'Rear Compartment', handling: 'leave', condition: 'ok', note: 'Too big' },
-    { id: 3, item_key: 'rear-item-1', name: 'Spare oxygen bottle', controlled: false, custody_status: 'moved', compartment_name: 'Rear Compartment', handling: 'transfer', condition: 'ok' },
+    { id: 2, item_key: 'rear-item-2', name: 'Stair chair', custody_status: 'left_behind', compartment: 'Rear Compartment', handling: 'leave', note: 'Too big' },
+    { id: 3, item_key: 'rear-item-1', name: 'Spare oxygen bottle', custody_status: 'moved', compartment: 'Rear Compartment', handling: 'transfer', note: null },
+    { id: 4, item_key: 'field:seal', name: 'Narcotic Seal #', custody_status: 'moved', compartment: 'Narcotics', handling: 'transfer', note: null },
   ];
 
-  test('shows what moved, what stayed and what waits, and verifies with a note where allowed', async ({ page }) => {
-    const mock = await mockApi(page, { changeout: summary({ can_verify: true, lines }) });
+  test('is read-only: from, to, what was taken and left, notes, who and when, and no actions', async ({ page }) => {
+    await mockApi(page, { changeout: summary({ lines, note: 'Moved at Station 2.', moved: 2, left_behind: [{ name: 'Stair chair', note: 'Too big' }] }) });
     await page.goto(`/daily/changeouts/8?return_to=${encodeURIComponent(`/stations/${STATION_ID}`)}`);
 
-    await expect(page.getByRole('heading', { level: 1 })).toHaveText('R 44 is now on truck 1033.');
-    await expect(page.getByText('Completed')).toBeVisible();
-    await expect(page.getByRole('region', { name: 'Waiting for verification' })).toContainText('Narcotic Seal #');
+    await expect(h1(page)).toHaveText(DONE_MESSAGE);
+    await expect(page.getByText('From truck')).toBeVisible();
+    await expect(page.getByText('To truck')).toBeVisible();
+    await expect(page.getByText('Alex Rivera')).toBeVisible();
+    await expect(page.getByText('Took 2, left 1')).toBeVisible();
+    await expect(page.getByText('Moved at Station 2.')).toBeVisible();
     await expect(page.getByRole('region', { name: 'Left on truck 17503' })).toContainText('Too big');
-    await expect(page.getByText('Moved (1)')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Back to station' })).toHaveAttribute('href', `/daily/stations/${STATION_ID}`);
+    await page.getByText('Took (2)').click();
+    await expect(page.getByText('Narcotic Seal #')).toBeVisible();
 
-    await page.getByRole('button', { name: 'Verify' }).click();
-    await page.getByLabel('Verification note (optional)').fill('Seal 4471 checked');
-    await page.getByRole('button', { name: 'Record verification' }).click();
-    await expect.poll(() => mock.verifies).toEqual([{ note: 'Seal 4471 checked' }]);
+    const main = page.locator('[data-hub-ui="2"]');
+    await expect(main.getByRole('button', { name: 'Verify' })).toHaveCount(0);
+    await expect(main.getByRole('link', { name: /Start Daily Checkout|Return to truck/ })).toHaveCount(0);
+    expect((await main.innerText()).toLowerCase()).not.toContain('verif');
   });
 
-  test('a member without authority sees no Verify button', async ({ page }) => {
-    await mockApi(page, { changeout: summary({ can_verify: false, lines }) });
+  test('a record with no lines still shows its counts and left items', async ({ page }) => {
+    await mockApi(page, { changeout: summary({ moved: 4, left_behind: [{ name: 'Stair chair', note: 'Too big' }] }) });
     await page.goto('/daily/changeouts/8');
 
-    await expect(page.getByRole('region', { name: 'Waiting for verification' })).toContainText('Narcotic Seal #');
-    await expect(page.getByRole('button', { name: 'Verify' })).toHaveCount(0);
+    await expect(page.getByText('Took 4, left 1')).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Left on truck 17503' })).toContainText('Too big');
   });
 
   test('a record that cannot be read offers Retry and a way back', async ({ page }) => {
-    await page.route('**/api/public/changeouts/404', (route) => route.fulfill({ status: 404, json: { message: 'Not found.' } }));
     await mockApi(page);
-    await page.unroute('**/api/public/changeouts/404');
     await page.route('**/api/public/changeouts/404', (route) => route.fulfill({ status: 404, json: { message: 'Not found.' } }));
     await page.goto('/daily/changeouts/404');
 
@@ -883,8 +953,11 @@ test.describe('on a small phone', () => {
   test('nothing overflows and every control is a 44px target at 320 wide', async ({ page }) => {
     await mockApi(page);
     await page.goto(wizardUrl);
-    await expect(heading(page, 'Select replacement truck')).toBeVisible();
+    await expect(heading(page, TRUCK_HEADING)).toBeVisible();
     const fits = () => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
+    expect(await fits()).toBe(true);
+    await page.getByRole('button', { name: 'Different truck' }).click();
+    await page.getByLabel('Or type the number on the truck').fill('1034');
     expect(await fits()).toBe(true);
 
     await pickTruck(page, '1033');
@@ -900,9 +973,11 @@ test.describe('on a small phone', () => {
     expect(heights.length).toBeGreaterThan(5);
     for (const { text, height } of heights) expect(height, text).toBeGreaterThanOrEqual(44);
 
-    await page.getByRole('button', { name: 'Done with this item' }).click();
     await primary(page, 'Continue').click();
     await expect(heading(page, 'Review')).toBeVisible();
+    expect(await fits()).toBe(true);
+    await primary(page, 'Complete Changeout').click();
+    await expect(h1(page)).toHaveText(DONE_MESSAGE);
     expect(await fits()).toBe(true);
   });
 
@@ -910,7 +985,15 @@ test.describe('on a small phone', () => {
     await mockApi(page);
     await page.goto(wizardUrl);
 
-    await expect(page.getByRole('radiogroup', { name: 'Select replacement truck' }).getByRole('radio')).toHaveCount(2);
+    await expect(page.getByRole('radiogroup', { name: TRUCK_HEADING }).getByRole('radio')).toHaveCount(2);
     await expect(page.locator('[aria-current="step"]')).toHaveText('1. Truck');
+  });
+
+  test('reduced motion: truck cards do not animate', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await mockApi(page);
+    await page.goto(wizardUrl);
+    const transition = await page.locator('label:has(input[type="radio"])').first().evaluate((element) => getComputedStyle(element).transitionProperty);
+    expect(transition).toBe('none');
   });
 });

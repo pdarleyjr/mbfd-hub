@@ -14,7 +14,7 @@ use App\Services\Security\Captain5AccessDecision;
 final readonly class Captain5ActorContext
 {
     /** Operations available on the Captain 5 page. Fleet-only operations (impact, tickets) are absent. */
-    public const OPERATIONS = ['acknowledge', 'update_action', 'resolve', 'verify_correction', 'reopen', 'dismiss'];
+    public const OPERATIONS = ['acknowledge', 'update_action', 'resolve', 'verify_correction', 'reopen', 'dismiss', 'send_to_logistics', 'bring_back_to_captain5'];
 
     /** action_details keys Captain 5 may set (assignment of Logistics staff stays with Logistics). */
     public const DETAIL_KEYS = ['parts_ordered', 'vendor_reference', 'expected_delivery', 'pickup_instructions'];

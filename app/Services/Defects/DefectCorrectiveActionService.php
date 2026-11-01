@@ -125,7 +125,7 @@ final class DefectCorrectiveActionService
     /** Current concurrency token of an issue. */
     public static function stateToken(ApparatusDefect $defect): string
     {
-        $lastEvent = (int) ApparatusDefectEvent::query()->where('apparatus_defect_id', $defect->getKey())->max('id');
+        $lastEvent = (int) ApparatusDefectEvent::query()->changingTheIssue()->where('apparatus_defect_id', $defect->getKey())->max('id');
 
         return ($defect->action_status ?: DefectActionStatus::REPORTED).':'.$lastEvent;
     }
@@ -352,6 +352,9 @@ final class DefectCorrectiveActionService
             $defect->resolved_by_user_id = null;
             $defect->resolution_type = null;
             $defect->resolution_notes = null;
+            // Open again means back on every queue that covers it, Captain 5's included.
+            $defect->captain5_cleared_at = null;
+            $defect->captain5_cleared_by_user_id = null;
             $defect->save();
 
             return $this->spec('reopened', $from, $to, $data, ['reason' => trim($data['reason']), ...$previous]);

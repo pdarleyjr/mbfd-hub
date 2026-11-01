@@ -33,6 +33,11 @@ function Summary({ issue }: { issue: IssueDetail }) {
       <Fact label="Vendor reference">{issue.details.vendor_reference}</Fact>
       <Fact label="Expected delivery">{issue.expected_delivery ? `${dayText(issue.expected_delivery)}${issue.overdue ? ' (overdue)' : ''}` : null}</Fact>
       <Fact label="Pickup instructions">{issue.details.pickup_instructions}</Fact>
+      <Fact label="Cleared from Captain 5">
+        {issue.open && issue.captain5_cleared_at
+          ? `${dateTimeText(issue.captain5_cleared_at)}${issue.captain5_cleared_by ? ` by ${issue.captain5_cleared_by}` : ''}. It stays open with Logistics.`
+          : null}
+      </Fact>
       {issue.closure === 'closed_no_action'
         ? <Fact label="Why no action was needed">{issue.resolution_notes}</Fact>
         : (

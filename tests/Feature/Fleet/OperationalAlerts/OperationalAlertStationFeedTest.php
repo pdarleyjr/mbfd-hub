@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Tests\Feature\Fleet\OperationalAlerts;
 
 use App\Enums\AccountStatus;
-use App\Models\ApparatusChangeout;
 use App\Models\ApparatusOperationalAlert;
 use App\Models\User;
 use App\Support\HubTimezone;
@@ -133,51 +132,31 @@ final class OperationalAlertStationFeedTest extends TestCase
         }
     }
 
-    public function test_workflow_moves_from_planned_through_each_state(): void
+    public function test_the_workflow_is_planned_then_vehicle_changed_and_a_completed_alert_leaves_the_page(): void
     {
         $alert = $this->alert();
         $this->assertSame('planned', $this->onlyAlert($this->station4->id)['workflow']['state']);
 
-        $pending = $this->changeout($alert, ['status' => ApparatusChangeout::STATUS_PENDING_FLEET]);
-        $row = $this->onlyAlert($this->station4->id);
-        $this->assertSame(['state' => 'awaiting_fleet', 'label' => 'Waiting on Fleet', 'changeout_id' => $pending->id], $row['workflow']);
-        $this->assertSame(['view', 'View Changeout', $pending->id], [$row['action']['kind'], $row['action']['label'], $row['action']['changeout_id']]);
-
-        $pending->update(['status' => ApparatusChangeout::STATUS_REJECTED]);
-        $this->assertSame('planned', $this->onlyAlert($this->station4->id)['workflow']['state']);
-
         $this->moveR44ToSpare();
         $row = $this->onlyAlert($this->station4->id);
-        $this->assertSame('vehicle_changed', $row['workflow']['state']);
-        $this->assertSame(['handoff', 'Record Equipment Handoff', $this->spareRescue->id], [$row['action']['kind'], $row['action']['label'], $row['action']['apparatus_id']]);
+        $this->assertSame(['state' => 'vehicle_changed', 'label' => 'Vehicle changed', 'changeout_id' => null], $row['workflow']);
+        $this->assertSame(['handoff', $this->spareRescue->id], [$row['action']['kind'], $row['action']['apparatus_id']]);
         $this->assertSame('1033', $row['current_vehicle_number']);
         $this->assertSame('17503', $row['vehicle_number'], 'the alert keeps the truck it was raised on');
         $this->assertSame($this->spareRescue->id, $row['current_apparatus_id']);
 
-        $done = $this->changeout($alert, ['handoff_status' => ApparatusChangeout::HANDOFF_PENDING_VERIFICATION]);
-        $row = $this->onlyAlert($this->station4->id);
-        $this->assertSame(['state' => 'awaiting_verification', 'label' => 'Waiting on verification', 'changeout_id' => $done->id], $row['workflow']);
-        $this->assertSame('view', $row['action']['kind']);
-
-        $done->update(['handoff_status' => ApparatusChangeout::HANDOFF_COMPLETE]);
-        $this->assertTrue($this->alerts()->completeFromChangeout($alert, $done, null));
+        $this->assertTrue($this->alerts()->completeFromChangeout($alert, $this->changeout($alert), null));
         $this->assertSame([], $this->alerts()->forStation($this->station4->id, null), 'a completed alert leaves the page');
     }
 
-    public function test_a_unit_on_a_truck_other_than_the_planned_one_has_no_action_because_only_fleet_can_resolve_it(): void
+    public function test_a_unit_moved_to_a_truck_other_than_the_suggested_one_can_still_record_what_it_took(): void
     {
         $planned = $this->truck($this->station4, 'R-1034', 'r1034', '1034', 'Rescue', 'Reserve');
-        $alert = $this->alert(null, ['planned_replacement_apparatus_id' => $planned->id]);
-        $this->assertSame('start', $this->onlyAlert($this->station4->id, $this->fleetManager())['action']['kind'], 'before the move it is an ordinary plan');
+        $this->alert(null, ['planned_replacement_apparatus_id' => $planned->id]);
 
         $this->moveR44ToSpare();
 
-        foreach ([$this->memberWithProfile(), $this->fleetManager()] as $viewer) {
-            $row = $this->onlyAlert($this->station4->id, $viewer);
-            $this->assertSame('vehicle_changed', $row['workflow']['state']);
-            $this->assertSame('1033', $row['current_vehicle_number']);
-            $this->assertSame(['kind' => 'none', 'label' => null, 'apparatus_id' => null, 'alert_id' => $alert->id, 'changeout_id' => null], $row['action']);
-        }
+        $this->assertSame('handoff', $this->onlyAlert($this->station4->id)['action']['kind']);
     }
 
     public function test_a_unit_on_the_planned_truck_records_the_handoff(): void
@@ -189,14 +168,6 @@ final class OperationalAlertStationFeedTest extends TestCase
         $row = $this->onlyAlert($this->station4->id);
         $this->assertSame('vehicle_changed', $row['workflow']['state']);
         $this->assertSame('handoff', $row['action']['kind']);
-    }
-
-    public function test_a_pending_changeout_for_the_unit_counts_even_with_no_alert_on_it(): void
-    {
-        $alert = $this->alert();
-        $pending = $this->changeout($alert, ['alert_id' => null, 'status' => ApparatusChangeout::STATUS_PENDING_FLEET]);
-
-        $this->assertSame(['state' => 'awaiting_fleet', 'label' => 'Waiting on Fleet', 'changeout_id' => $pending->id], $this->onlyAlert($this->station4->id)['workflow']);
     }
 
     public function test_an_expired_notice_drops_and_one_ending_today_stays(): void
@@ -240,8 +211,7 @@ final class OperationalAlertStationFeedTest extends TestCase
     {
         $viewer = $this->memberWithProfile();
         foreach (range(1, 6) as $n) {
-            $alert = $this->notice(['title' => "Notice {$n}"]);
-            $this->changeout($alert, ['handoff_status' => ApparatusChangeout::HANDOFF_PENDING_VERIFICATION]);
+            $this->notice(['title' => "Notice {$n}"]);
         }
         $before = ApparatusOperationalAlert::query()->orderBy('id')->get()->map->getAttributes()->all();
         $trucks = DB::table('apparatuses')->orderBy('id')->get()->all();
@@ -253,7 +223,7 @@ final class OperationalAlertStationFeedTest extends TestCase
 
         $this->assertCount(6, $rows);
         $this->assertCount(1, array_filter($tables, fn (string $sql): bool => str_contains($sql, 'from "apparatus_operational_alerts"')));
-        $this->assertCount(1, array_filter($tables, fn (string $sql): bool => str_contains($sql, 'from "apparatus_changeouts"')));
+        $this->assertCount(0, array_filter($tables, fn (string $sql): bool => str_contains($sql, 'from "apparatus_changeouts"')));
         $this->assertSame($before, ApparatusOperationalAlert::query()->orderBy('id')->get()->map->getAttributes()->all());
         $this->assertEquals($trucks, DB::table('apparatuses')->orderBy('id')->get()->all());
     }
