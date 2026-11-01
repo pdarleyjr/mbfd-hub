@@ -87,8 +87,8 @@ final class ChecklistBlockTest extends IdentificationTestCase
         foreach ([$checklist, $session] as $response) {
             $response->assertJsonPath('vehicle_identification.required', true)
                 ->assertJsonPath('vehicle_identification.kind', 'boat')
-                ->assertJsonPath('vehicle_identification.questions.1.field', 'vin')
-                ->assertJsonPath('vehicle_identification.questions.1.label', 'Hull ID (HIN, transom, starboard side)');
+                ->assertJsonPath('vehicle_identification.questions.0.field', 'vin')
+                ->assertJsonPath('vehicle_identification.questions.0.label', 'Hull ID (HIN, transom, starboard side)');
         }
         $this->assertSame($checklist->json('vehicle_identification'), $session->json('vehicle_identification'));
         $this->assertStringNotContainsString('vehicle_identification', json_encode($session->json('checklist')), 'not in the frozen snapshot');

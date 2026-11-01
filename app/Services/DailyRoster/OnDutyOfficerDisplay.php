@@ -10,7 +10,7 @@ use Carbon\CarbonImmutable;
 
 /**
  * Who the 300 and Captain 5 cards show, and why. It carries the unchanged seat result next to the
- * shown result, so a display decision can never be mistaken for the authority or routing answer.
+ * shown result, so a display decision can never be mistaken for the authority answer.
  *
  * With the card display flag off, toArray() is exactly OnDutyCaptain5::toArray(): same keys, same
  * values, nothing added. With it on, the payload gains `as_of`, `freshness`, `identity` and `reason`
@@ -41,7 +41,7 @@ final readonly class OnDutyOfficerDisplay
     public const REASON_SECTION_MISSING = 'section_missing';
 
     private function __construct(
-        /** The seat answer that authority and notifications keep using. */
+        /** The seat answer that authority keeps using. */
         public OnDutyCaptain5 $seat,
         public string $source,
         public ?string $name,
@@ -59,12 +59,6 @@ final readonly class OnDutyOfficerDisplay
     public static function unchanged(OnDutyCaptain5 $seat): self
     {
         return self::fromSeat($seat, self::FRESHNESS_NOT_APPLICABLE, null, null, false);
-    }
-
-    /** An approved acting member: the seat answer already holds the name, the end time and the request. */
-    public static function acting(OnDutyCaptain5 $seat): self
-    {
-        return self::fromSeat($seat, self::FRESHNESS_NOT_APPLICABLE, null, null, true);
     }
 
     /** The existing seat result, explaining why today's roster is not behind it. */
@@ -98,16 +92,6 @@ final readonly class OnDutyOfficerDisplay
     public function isResolved(): bool
     {
         return $this->name !== null;
-    }
-
-    /** Whether the card and the seat answer differ, so notifications do not go to the person on the card. */
-    public function differsFromSeat(): bool
-    {
-        if ($this->employee === null && $this->seat->employee === null) {
-            return $this->isResolved(); // shown by source name only, while the seat names nobody
-        }
-
-        return $this->employee?->getKey() !== $this->seat->employee?->getKey();
     }
 
     /** @return array<string, mixed> */

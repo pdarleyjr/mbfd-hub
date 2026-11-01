@@ -6,6 +6,7 @@ namespace App\Http\Resources\Public;
 
 use App\Enums\DailyCheckoutRequirement;
 use App\Models\Apparatus;
+use App\Support\Fleet\VehicleIdentificationFields;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -33,6 +34,7 @@ class PublicApparatusResource extends JsonResource
             'unit_id' => $this->unit_id,
             'type' => strtolower((string) $this->type),
             'vehicle_number' => $this->vehicle_number,
+            'vehicle_id_required' => $apparatus === null || VehicleIdentificationFields::usesFleetNumber($apparatus),
             'designation' => $this->designation,
             'slug' => $this->slug,
             'status' => $status,

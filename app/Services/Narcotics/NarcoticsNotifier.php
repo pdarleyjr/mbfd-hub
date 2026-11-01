@@ -9,6 +9,8 @@ use App\Models\Narcotics\NarcoticsCheckEvent;
 use App\Models\User;
 use App\Notifications\Inspections\InspectionEventNotification;
 use App\Services\Captain5\Captain5DutyRoster;
+use App\Services\DailyRoster\OnDutyCaptain5Recipients;
+use App\Services\DailyRoster\RosterSeatAccess;
 use App\Services\Inspections\InspectionNotificationDispatcher;
 use App\Support\Narcotics\NarcoticsLinks;
 use Closure;
@@ -40,6 +42,8 @@ final class NarcoticsNotifier
 
     public function __construct(
         private readonly Captain5DutyRoster $roster,
+        private readonly OnDutyCaptain5Recipients $onDuty,
+        private readonly RosterSeatAccess $rosterSeats,
         private readonly InspectionNotificationDispatcher $dispatcher,
         private readonly NarcoticsCheckAccess $access,
     ) {}
@@ -58,7 +62,7 @@ final class NarcoticsNotifier
             $this->queue(
                 'narcotics:check:'.$check->getKey().':submitted',
                 self::KIND_SUBMITTED,
-                $this->roster->notificationRecipients(),
+                $this->reviewAlertRecipients(),
                 fn (User $recipient): array => [
                     'title' => 'Narcotics check to review',
                     'body' => "{$check->submitter_name} sent a narcotics check{$details}. Open Captain 5 to review it.",
@@ -122,6 +126,23 @@ final class NarcoticsNotifier
         } finally {
             $this->replay = null;
         }
+    }
+
+    /**
+     * With seat access on, whoever the roster has working the seat right now, as long as they may review;
+     * otherwise every seat holder, so a check is never left unannounced.
+     *
+     * @return Collection<int, User>
+     */
+    private function reviewAlertRecipients(): Collection
+    {
+        if (! $this->rosterSeats->isEnabled()) {
+            return $this->roster->notificationRecipients();
+        }
+
+        $onDuty = $this->onDuty->users()->filter(fn (User $user): bool => $this->access->canReview($user))->values();
+
+        return $onDuty->isNotEmpty() ? $onDuty : $this->roster->usersFor($this->roster->captain5Seats()->keys());
     }
 
     /**

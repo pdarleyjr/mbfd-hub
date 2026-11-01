@@ -14,7 +14,6 @@ use App\Models\Station;
 use App\Models\StationInspection;
 use App\Models\Todo;
 use App\Models\User;
-use App\Services\Captain5\ActingApprovers;
 use App\Services\Security\Captain5Access;
 use App\Services\Security\Command300Access;
 use App\Services\Security\EmployeeLogisticsMessagingAccess;
@@ -54,8 +53,6 @@ final class NotificationCategoryRegistry
     public const GROUP_COMMAND = 'Command';
 
     public const CAPTAIN5_EMS = 'captain5_ems';
-
-    public const CAPTAIN5_ASSIGNMENT_REQUESTS = 'captain5_assignment_requests';
 
     public const PROJECT_ALERTS = 'project_alerts';
 
@@ -430,18 +427,6 @@ final class NotificationCategoryRegistry
                 eligibility: static fn (EligibilityContext $c): ?string => self::captain5Allows($c->user)
                     ? 'captain5_duty_access' : null,
             ),
-            // Whoever may approve an acting Captain 5 or acting 300 (not the same people as the workspace audience).
-            new NotificationCategory(
-                key: self::CAPTAIN5_ASSIGNMENT_REQUESTS,
-                label: 'Acting Captain 5 and 300 requests',
-                description: 'A member asked to be shown as acting Captain 5 or acting 300 and an administrator needs to decide. In-app alerts for these are always on.',
-                group: self::GROUP_COMMAND,
-                channels: $all,
-                locked: [$db],
-                significance: 'important',
-                eligibility: static fn (EligibilityContext $c): ?string => self::captain5ManagesAssignments($c->user)
-                    ? 'captain5_assignment_manager' : null,
-            ),
             new NotificationCategory(
                 key: 'command_communications',
                 label: '300 Command messages',
@@ -477,16 +462,6 @@ final class NotificationCategoryRegistry
     {
         try {
             return app(Captain5Access::class)->decide($user)->canViewData;
-        } catch (Throwable) {
-            return false;
-        }
-    }
-
-    /** Who decides acting Captain 5 and acting 300 requests: any administrator (ActingApprovers), the same people Captain5Notifier asks. */
-    private static function captain5ManagesAssignments(User $user): bool
-    {
-        try {
-            return app(ActingApprovers::class)->canApproveAny($user);
         } catch (Throwable) {
             return false;
         }

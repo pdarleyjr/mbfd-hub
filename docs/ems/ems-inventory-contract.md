@@ -301,8 +301,8 @@ against requests; they do not measure what crews used. Dates are Eastern time; t
 ### 9.5 Notifications
 
 `EmsNotifier` (event keys `ems:request:{id}:submitted`, `ems:message:{id}`, `ems:request:{id}:status:{eventId}`) uses the same ledger and
-queue pattern as `Captain5Notifier`. Recipients of a new request: the on-duty Captain 5 (`Captain5DutyRoster::notificationRecipients()`, else the Captain 5
-seat holders, only people who still pass `Captain5Access`) plus EMS Admins (direct `admin.ems.manage` or super administrator, active account).
+queue pattern as `Captain5Notifier`. Recipients of a new request: the on-duty Captain 5 by the TeleStaff roster (`OnDutyCaptain5Recipients`), else the Captain 5
+seat holders, only people who still pass `Captain5Access`, plus EMS Admins (direct `admin.ems.manage` or super administrator, active account).
 The actor is never notified. `redeliver()` is ready; `inspections:retry-notifications` must route keys starting with `ems:` to it (one line in
 `RetryInspectionNotifications`, which is outside this branch's scope).
 

@@ -1,4 +1,12 @@
-import type { FleetVehicle, PhysicalVehicleReport, VehicleConfirmation } from '../types';
+import type { ChecklistData, FleetVehicle, PhysicalVehicleReport, VehicleConfirmation } from '../types';
+
+/**
+ * Fire Boat 6 has no fleet vehicle ID, so nothing about a physical vehicle is asked, required or sent for it. The checklist
+ * type covers a checkout saved on this device before the server sent the flag. Every other unit still confirms its truck.
+ */
+export const checklistUsesVehicleId = (checklist: Pick<ChecklistData, 'vehicle_id_required' | 'checklist_type'> | null | undefined): boolean => (
+  checklist?.vehicle_id_required !== false && checklist?.checklist_type !== 'fireboat6'
+);
 
 /** Select value for a truck the fleet list does not have. */
 export const NOT_LISTED = '__not_listed__';

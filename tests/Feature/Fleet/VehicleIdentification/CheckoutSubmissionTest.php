@@ -270,7 +270,7 @@ final class CheckoutSubmissionTest extends IdentificationTestCase
         $this->postJson("/api/public/apparatuses/{$boat->id}/inspections", $payload)->assertCreated();
 
         $this->assertSame(
-            ['vehicle_number' => 'FB-6', 'vin' => 'MTK12345A515', 'year' => '2019', 'make' => 'MetalShark', 'model' => 'Courageous 28'],
+            ['vin' => 'MTK12345A515', 'year' => '2019', 'make' => 'MetalShark', 'model' => 'Courageous 28'],
             ApparatusIdentificationQuestion::query()->where('apparatus_id', $boat->id)->where('state', 'answered')->pluck('answered_value', 'field')->all(),
         );
         $this->assertSame('not_applicable', ApparatusIdentificationQuestion::query()->where('field', 'plate')->value('state'));
@@ -314,8 +314,10 @@ final class CheckoutSubmissionTest extends IdentificationTestCase
         $this->assertSame(0, ApparatusChangeout::query()->count(), 'a unit with no number on file has nothing to change from');
         $this->assertNull($response->json('vehicle_swap_pending'));
         $this->assertSame(0, ApparatusIdentificationEvent::query()->where('event', 'superseded')->count(), 'nothing was dropped');
-        $this->assertSame(['FB-6', 'MTK12345A515'], ApparatusIdentificationQuestion::query()->where('state', 'answered')->orderBy('id')->pluck('answered_value')->all());
+        $this->assertSame(['MTK12345A515'], ApparatusIdentificationQuestion::query()->where('state', 'answered')->orderBy('id')->pluck('answered_value')->all(), 'a fleet number from an older phone is not recorded for a boat');
         $this->assertSame('boat', $boat->fresh()->masterVehicle?->asset_category, 'resolved into a boat record for Fleet to verify');
+        $this->assertNull($boat->fresh()->masterVehicle?->veh_number);
+        $this->assertNull($boat->fresh()->vehicle_number);
     }
 
     /**
@@ -339,7 +341,7 @@ final class CheckoutSubmissionTest extends IdentificationTestCase
             'field_values' => array_map(static fn (array $field): array => [
                 'id' => $field['id'],
                 'value' => match ($field['inputType']) {
-                    'date' => '2026-08-31', 'number' => 1, 'checkbox' => true, default => 'Recorded',
+                    'date' => '2026-08-31', 'number', 'percentage' => 1, 'checkbox' => true, default => 'Recorded',
                 },
             ], $checklist['fields']),
             'scheduled_tasks' => array_map(static fn (array $task): array => ['id' => $task['id'], 'status' => 'Present', 'notes' => null], $contract['due_tasks']),

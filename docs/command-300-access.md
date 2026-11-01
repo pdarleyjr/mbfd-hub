@@ -16,8 +16,8 @@ and have no pending password setup. Then **any one** of these grants access:
 | 300 assignment | The member's single current (`superseded_at IS NULL`), integrity-checked bid row in the latest published bid year has `unit_label` exactly `300`. |
 | Explicit grant | Direct Spatie permission `command.300.access`, set with the **300 Command Access** toggle. |
 
-Not qualified by themselves: Lieutenant, Firefighter, Driver Engineer, other chief ranks,
-apparatus names such as `Captain 5`, superseded or older-year 300 rows, and the role named
+Not qualified by themselves: Lieutenant, Firefighter, Driver Engineer, titles that merely
+contain "Chief" such as `Chief Plans Analyst`, apparatus names such as `Captain 5`, superseded or older-year 300 rows, and the role named
 `admin` without a direct `admin.access` grant. Production ranks are canonical strings; no
 abbreviations (`Capt`, `DC`) are recognised.
 
@@ -52,6 +52,8 @@ never touches `admin.access` or other grants.
 | Hub pages, APIs, communications, video command actions | Next request (live check, no cache). |
 | Issued command LiveKit tokens | Expire with their TTL (≤ 15 min); no new token or command action is issued. |
 | Command Board | Next userinfo revalidation (≤ 60 s; sockets swept every 15 s). Removing the explicit grant also revokes `cmd` OIDC sessions immediately when it was the member's only route. |
+
+A roster posted early grants nothing until 08:00, and the outgoing member keeps access until then. Everyone on a split seat has the whole duty day. Being taken off the seat ends access with the next accepted export. With no roster at 08:00, this route is closed until one arrives; the other routes do not depend on it. Nothing is stored as a permission.
 
 ## Rollback
 

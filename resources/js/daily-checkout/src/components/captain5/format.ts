@@ -60,8 +60,8 @@ const CAPTAIN_5_DUTY = { label: 'Captain 5', withRank: false } as const;
 export const DUTY_UNSET = dutyUnset(CAPTAIN_5_DUTY);
 
 /**
- * Captain 5's shift line: "A Shift Captain 5: Oscar Lima", or "A Shift Acting Captain 5: Oscar Lima until
- * Oct 24, 8:00 AM". The wording is built in ../acting/format, shared with the 300 page; Captain 5 shows no rank.
+ * Captain 5's shift line: "A Shift Captain 5: Oscar Lima". The wording is built in ../acting/format, shared
+ * with the 300 page; Captain 5 shows no rank.
  */
 export const dutyLine = (onDuty: OnDuty): string => roleDutyLine(onDuty, CAPTAIN_5_DUTY);
 

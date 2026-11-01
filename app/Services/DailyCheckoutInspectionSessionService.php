@@ -64,12 +64,15 @@ final class DailyCheckoutInspectionSessionService
                 return $this->issuedContract($existing, false);
             }
 
-            // A missing browser binding must never become an implicit way to
-            // create a second duty date while another valid contract exists.
-            if ($this->activeContractForApparatus((int) $apparatus->getKey(), $issuedAt) !== null) {
+            // Another member's open inspection, or this member's own from today on
+            // another device, never blocks a checkout: each contract carries the same
+            // duty date and duties. A lost browser binding still cannot move this
+            // member past their own open contract from an earlier duty date.
+            $earlier = $this->earlierDutyContractForActor((int) $apparatus->getKey(), $actorUserId, $issuedAt);
+            if ($earlier !== null) {
                 throw new DailyCheckoutInspectionSessionException(
                     'DAILY_CHECKOUT_INSPECTION_SESSION_ACTIVE',
-                    'A valid Fire Boat inspection session is already active. Reconnect with the issuing browser session or ask an officer to reconcile it.',
+                    'You still have a Fire Boat inspection from '.$this->inspectionSessionDateAttribute($earlier, 'duty_date')?->format('M j').' open on another device. Finish it there, or start a new one after '.$this->inspectionSessionDateAttribute($earlier, 'expires_at')?->setTimezone(self::TIMEZONE)->format('g:i A').'.',
                 );
             }
 
@@ -175,17 +178,6 @@ final class DailyCheckoutInspectionSessionService
                 throw new DailyCheckoutInspectionSessionException(
                     'DAILY_CHECKOUT_INSPECTION_SESSION_ABANDONMENT_NOT_REQUIRED',
                     'The active Fire Boat inspection already belongs to today and cannot be replaced by this transition.',
-                );
-            }
-
-            $otherActiveContract = $this->activeContractsForApparatus((int) $apparatus->getKey(), $issuedAt)
-                ->where('id', '!=', $prior->getKey())
-                ->orderBy('id')
-                ->first();
-            if ($otherActiveContract !== null) {
-                throw new DailyCheckoutInspectionSessionException(
-                    'DAILY_CHECKOUT_INSPECTION_SESSION_ACTIVE',
-                    'A different valid Fire Boat inspection session is already active. Reconnect with the issuing browser session or ask an officer to reconcile it.',
                 );
             }
 
@@ -368,9 +360,14 @@ final class DailyCheckoutInspectionSessionService
         return $session instanceof DailyCheckoutInspectionSession ? $session : null;
     }
 
-    private function activeContractForApparatus(int $apparatusId, CarbonImmutable $issuedAt): ?DailyCheckoutInspectionSession
+    private function earlierDutyContractForActor(int $apparatusId, ?int $actorUserId, CarbonImmutable $issuedAt): ?DailyCheckoutInspectionSession
     {
+        if ($actorUserId === null) {
+            return null;
+        }
         $session = $this->activeContractsForApparatus($apparatusId, $issuedAt)
+            ->where('actor_user_id', $actorUserId)
+            ->whereDate('duty_date', '<', $issuedAt->toDateString())
             ->orderBy('id')
             ->first();
 

@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\Log;
 
 /**
  * Read model for the Captain 5 workspace page: today's duty, Rescue dailies, the open
- * in-scope issue queue with replacement tracking, handoff and acting Captain 5 requests.
+ * in-scope issue queue with replacement tracking and handoff.
  * Everything comes from the shared inspection/issue tables; nothing is copied.
  */
 final class Captain5Workspace
@@ -57,7 +57,7 @@ final class Captain5Workspace
             'cleared_issues' => $this->presenter->summaries($this->clearedIssues()),
             ...$this->trucks->payload(),
             'handoff' => $this->handoff($dutyDate, $viewer),
-            'acting' => $this->acting($viewer, $decision),
+            'acting' => Captain5ActingRequest::retiredState(Captain5ActingRequest::ROLE_CAPTAIN_5),
             'generated_at' => now()->utc()->toIso8601String(),
         ];
     }
@@ -184,17 +184,5 @@ final class Captain5Workspace
                 'acknowledged_at' => $this->presenter->iso($note->acknowledged_at),
             ])->values()->all(),
         ];
-    }
-
-    /**
-     * The "Acting as Captain 5 today?" panel: who is shown now, the viewer's own pending request,
-     * and (for Captain 5 administrators) every pending request to approve.
-     *
-     * @return array<string, mixed>
-     */
-    public function acting(User $viewer, Captain5AccessDecision $decision): array
-    {
-        // Same engine and presenter as the 300 page (Captain5ActingService::state), Captain 5 role.
-        return app(Captain5ActingService::class)->state($viewer, Captain5ActingRequest::ROLE_CAPTAIN_5);
     }
 }

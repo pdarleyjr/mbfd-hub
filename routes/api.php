@@ -79,6 +79,13 @@ Route::prefix('public')->middleware(['auth:sanctum', 'canonical.api', 'throttle:
     Route::get('apparatuses/{apparatus}/changeout-context', [\App\Http\Controllers\Api\ApparatusChangeoutController::class, 'context'])->whereNumber('apparatus');
     Route::post('apparatuses/{apparatus}/changeouts', [\App\Http\Controllers\Api\ApparatusChangeoutController::class, 'store'])->whereNumber('apparatus')->middleware(['throttle:30,1']);
     Route::get('changeouts/{changeout}', [\App\Http\Controllers\Api\ApparatusChangeoutController::class, 'show'])->whereNumber('changeout');
+    // Issue history for the Daily Checkout (docs/apparatus-issue-history.md). Network only, never offline-cached by the server.
+    Route::get('apparatuses/{apparatus}/findings', [\App\Http\Controllers\Api\ApparatusIssueHistoryController::class, 'index'])->whereNumber('apparatus');
+    Route::get('apparatuses/{apparatus}/findings/closed', [\App\Http\Controllers\Api\ApparatusIssueHistoryController::class, 'closed'])->whereNumber('apparatus');
+    Route::get('apparatus-issues/{defect}/history', [\App\Http\Controllers\Api\ApparatusIssueHistoryController::class, 'timeline'])->whereNumber('defect');
+    Route::get('apparatus-issues/{defect}/photo', [\App\Http\Controllers\Api\ApparatusIssueHistoryController::class, 'defectPhoto'])->whereNumber('defect');
+    Route::get('apparatus-issues/{defect}/observations/{observation}/photo', [\App\Http\Controllers\Api\ApparatusIssueHistoryController::class, 'observationPhoto'])->whereNumber(['defect', 'observation']);
+    Route::get('inspection-concerns/{concern}/photo', [\App\Http\Controllers\Api\ApparatusIssueHistoryController::class, 'concernPhoto'])->whereNumber('concern');
     Route::get('stations/{station}/operational-alerts', [\App\Http\Controllers\Api\OperationalAlertController::class, 'station'])->whereNumber('station');
     // One-time vehicle questions outside a checkout (Captain 5 page); the unit is authorized per request.
     Route::get('apparatuses/{apparatus}/vehicle-identification', [\App\Http\Controllers\Api\VehicleIdentificationController::class, 'show'])->whereNumber('apparatus');
@@ -371,18 +378,13 @@ Route::get('daily-roster/version', [\App\Http\Controllers\DailyRoster\DailyRoste
     ->middleware(['auth:sanctum', 'canonical.api', 'throttle:120,1'])
     ->name('api.daily-roster.version');
 
-// The shift's 300 (Division Chief) shown on the 300 page and card, and "Acting as 300 today?".
-// Display only; the acting service re-checks who may ask and who may approve.
+// The shift's 300 (Division Chief) shown on the 300 page and card: the TeleStaff roster, else the bid seat.
 Route::prefix('command-300')
     ->middleware(['auth:sanctum', 'canonical.api', 'can:access-command-300', 'throttle:120,1'])
     ->name('api.command-300.')
     ->controller(\App\Http\Controllers\Api\Command300ShiftController::class)
     ->group(function () {
         Route::get('/shift', 'show')->name('shift');
-        Route::post('/acting-requests', 'requestActing')->middleware('throttle:20,1,command300-acting')->name('acting.store');
-        Route::post('/acting-requests/{actingRequest}/approve', 'approveActing')->whereNumber('actingRequest')->name('acting.approve');
-        Route::post('/acting-requests/{actingRequest}/reject', 'rejectActing')->whereNumber('actingRequest')->name('acting.reject');
-        Route::post('/acting-requests/{actingRequest}/withdraw', 'withdrawActing')->whereNumber('actingRequest')->name('acting.withdraw');
     });
 
 // The same conversation as seen from the Captain 5 page: the `captain_5` channel of the shared
@@ -406,7 +408,7 @@ Route::prefix('captain5/communications')
 // =========================================================================
 // Captain 5 EMS Operations Center (docs/captain5-ems-operations-center.md).
 // The group needs `captain5-view` (everyone eligible may use the whole page);
-// services re-check on every call. Acting Captain 5 is display only.
+// services re-check on every call.
 // =========================================================================
 // Card probe for the station list: every signed-in member gets 200 (view:false when not eligible),
 // so ineligible members never see a 403 in their console. It returns no Captain 5 data to them.
@@ -431,10 +433,6 @@ Route::prefix('captain5')
             ->middleware('throttle:30,1,captain5-messages')->name('inspections.clarification');
         Route::post('/handoff', 'writeHandoff')->name('handoff.store');
         Route::post('/handoff/{note}/acknowledge', 'acknowledgeHandoff')->whereNumber('note')->name('handoff.acknowledge');
-        Route::post('/acting-requests', 'requestActing')->middleware('throttle:20,1,captain5-acting')->name('acting.store');
-        Route::post('/acting-requests/{actingRequest}/approve', 'approveActing')->whereNumber('actingRequest')->name('acting.approve');
-        Route::post('/acting-requests/{actingRequest}/reject', 'rejectActing')->whereNumber('actingRequest')->name('acting.reject');
-        Route::post('/acting-requests/{actingRequest}/withdraw', 'withdrawActing')->whereNumber('actingRequest')->name('acting.withdraw');
     });
 
 // Post to the department-wide Department Updates from the Captain 5 page (not a private message).

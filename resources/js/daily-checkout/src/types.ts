@@ -1,4 +1,5 @@
 import type { ChangeoutHandoff } from './components/changeout/types';
+import type { ConcernDraft, ConcernSubmission } from './types/issueHistory';
 export type ApparatusType = 'engine' | 'ladder1' | 'ladder3' | 'rescue' | 'rope' | 'fireboat' | 'fire boat';
 export type DailyCheckoutRequirement = 'required' | 'exempt' | 'reserve' | 'administrative' | 'inactive' | 'unknown';
 export type DailyCheckoutState = 'checked' | 'attention' | 'review_pending' | 'not_checked' | 'out_of_service' | 'exempt' | 'classification_required';
@@ -48,6 +49,8 @@ export interface Apparatus {
   unit_id?: string;
   type: ApparatusType;
   vehicle_number: string | null;
+  /** False for a unit with no fleet vehicle ID at all (Fire Boat 6). Missing means true. */
+  vehicle_id_required?: boolean;
   designation?: string;
   slug: string;
   status?: string;
@@ -183,7 +186,17 @@ export interface ChecklistField {
   name: string;
   inputType: ChecklistInputType;
   required: boolean;
+  /** The heading it is shown under. Without one it is an optional detail in the collapsed section. */
+  group?: string;
+  /** Shown beside the input and kept with the recorded value. */
+  unit?: string;
+  hint?: string;
+  min?: number;
+  max?: number;
 }
+
+/** Scheduled duties are procedures. The equipment words remain only on a draft or payload from before 2026-11. */
+export type ScheduledTaskStatus = 'Completed' | 'Not Completed' | ItemStatus;
 
 export interface ScheduledChecklistTask {
   id: string;
@@ -213,7 +226,7 @@ export interface InspectionSessionContract {
 export interface ScheduledChecklistTaskResult {
   observed?: boolean;
   id: string;
-  status: ItemStatus;
+  status: ScheduledTaskStatus;
   notes?: string | null;
 }
 
@@ -287,6 +300,8 @@ export interface ChecklistData {
   pending_corrections?: PendingInventoryCorrection[];
   /** Open one-time vehicle information questions. Absent when nothing is open. */
   vehicle_identification?: VehicleIdentification;
+  /** False for a unit with no fleet vehicle ID at all (Fire Boat 6). Missing means true. */
+  vehicle_id_required?: boolean;
   /** Equipment the last changeout left on the old truck. Absent on older cached responses. */
   changeout_handoff?: ChangeoutHandoff;
   checklist_version: string;
@@ -371,6 +386,8 @@ export interface InspectionSubmission {
   review_flag?: ReviewFlag;
   /** Links inventory corrections reported while this draft was open; the server treats it as optional. */
   inventory_draft_id?: string;
+  /** Concerns, damage and notes the member added (max 20). Omitted when there are none. */
+  concerns?: ConcernSubmission[];
 }
 
 export interface MeterData {
@@ -392,6 +409,8 @@ export interface InspectionData {
   draftId?: string;
   /** Working answers to the one-time vehicle information questions. */
   vehicleIdentification?: VehicleIdentificationAnswers;
+  /** Concerns, damage and notes being written. Live issue findings are never kept here. */
+  concerns?: ConcernDraft[];
   actorUserId?: number;
   actorSecurityVersion?: number;
   checklist_version: string;

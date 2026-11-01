@@ -8,6 +8,7 @@ import {
   VehicleIdentification, VehicleIdentificationSubmission,
 } from '../types';
 import { purgeOnSessionEnd } from '../pwa/userCaches.ts';
+import { purgeCachedFindings } from './liveFindingsCache';
 import { parseVehicleIdentification, parseVehicleIdentificationResponse } from './vehicleIdentification';
 import { parseChangeoutHandoff } from '../components/changeout/changeoutParse';
 
@@ -166,6 +167,7 @@ export function redirectToLoginAfterSessionExpiry(): void {
   // Signed out: drop the cached station/apparatus responses first. The worker message is
   // posted synchronously, so it still goes out as the page navigates to sign-in.
   void purgeOnSessionEnd();
+  void purgeCachedFindings();
   const configuredOrigin = window.__MBFD_CANONICAL_ORIGIN__;
   let loginUrl = new URL('/login', window.location.origin);
 
@@ -376,6 +378,11 @@ export class ApiClient {
               inputType: field.inputType,
               required: field.required === true,
               multiline: field.multiline === true,
+              ...(typeof field.group === 'string' ? { group: field.group } : {}),
+              ...(typeof field.unit === 'string' ? { unit: field.unit } : {}),
+              ...(typeof field.hint === 'string' ? { hint: field.hint } : {}),
+              ...(typeof field.min === 'number' ? { min: field.min } : {}),
+              ...(typeof field.max === 'number' ? { max: field.max } : {}),
             };
           });
         })()
@@ -446,6 +453,7 @@ export class ApiClient {
       ...(checklistBaseVersion ? { checklist_base_version: checklistBaseVersion } : {}),
       pending_corrections: parsePendingCorrections(payload?.pending_corrections),
       ...(vehicleIdentification ? { vehicle_identification: vehicleIdentification } : {}),
+      ...(payload?.vehicle_id_required === false ? { vehicle_id_required: false } : {}),
       ...(changeoutHandoff ? { changeout_handoff: changeoutHandoff } : {}),
       checklist_version: checklistVersion.toLowerCase(),
       checklist_type: typeof payload?.checklist_type === 'string' ? payload.checklist_type : undefined,

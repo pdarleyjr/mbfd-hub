@@ -2,9 +2,10 @@ import { useState, type Dispatch, type SetStateAction } from 'react';
 import type {
   ChecklistData,
   ChecklistFieldValue,
-  ItemStatus,
   ScheduledChecklistTaskResult,
+  ScheduledTaskStatus,
 } from '../types';
+import { fieldGroups, taskIsCompleted } from '../utils/checklistFields.ts';
 
 interface ChecklistFieldsStepProps {
   checklist: ChecklistData;
@@ -24,11 +25,10 @@ const INPUT = 'min-h-12 w-full rounded-hub-control border border-hub-control-bor
 const LABEL = 'mb-1.5 block text-sm font-semibold text-hub-ink';
 
 // Selected duty states: text names the state, the fill reinforces it.
-const STATUS_SELECTED: Record<ItemStatus, string> = {
-  Present: 'border-hub-success bg-hub-success text-white',
-  Missing: 'border-hub-danger bg-hub-danger text-white',
-  Damaged: 'border-hub-warning bg-hub-warning text-white',
-};
+const TASK_CHOICES = [
+  { status: 'Completed', selected: 'border-hub-success bg-hub-success text-white' },
+  { status: 'Not Completed', selected: 'border-hub-danger bg-hub-danger text-white' },
+] as const;
 
 export default function ChecklistFieldsStep({
   checklist,
@@ -50,14 +50,19 @@ export default function ChecklistFieldsStep({
     )));
   };
 
-  const updateScheduledTask = (id: string, status: ItemStatus) => {
+  const updateScheduledTask = (id: string, status: ScheduledTaskStatus) => {
     setScheduledTasks((current) => current.map((task) => (
       task.id === id ? { ...task, status, observed: true } : task
     )));
   };
 
-  const markAllDueTasksPresent = () => {
-    setScheduledTasks((current) => current.map((task) => task.observed && task.status !== 'Present' ? task : ({ ...task, status: 'Present' as ItemStatus, observed: true })));
+  const updateTaskNote = (id: string, notes: string) => {
+    setScheduledTasks((current) => current.map((task) => (task.id === id ? { ...task, notes: notes === '' ? null : notes } : task)));
+  };
+
+  // A duty the member already marked not completed is left as they said.
+  const markAllDueTasksCompleted = () => {
+    setScheduledTasks((current) => current.map((task) => task.observed && !taskIsCompleted(task.status) ? task : ({ ...task, status: 'Completed' as const, observed: true })));
   };
 
   const handleSubmit = (event: React.FormEvent) => {
@@ -89,7 +94,9 @@ export default function ChecklistFieldsStep({
   const editableFields = checklist.fields.filter(field => !knownFields.includes(field));
   // Shift is separately required by the processing contract, even on Fire Boat.
   const requiredFields = editableFields.filter(field => field.required || field.id === 'fb6-shift');
-  const optionalFields = editableFields.filter(field => !requiredFields.includes(field));
+  // Fields with a heading are everyday readings, so they stay on screen. Only the rest are tucked away.
+  const groups = fieldGroups(editableFields.filter(field => !requiredFields.includes(field)));
+  const optionalFields = editableFields.filter(field => !requiredFields.includes(field) && !field.group);
 
   const renderField = (field: ChecklistData['fields'][number]) => {
     const value = fieldValues.find((fieldValue) => fieldValue.id === field.id)?.value ?? null;
@@ -111,27 +118,28 @@ export default function ChecklistFieldsStep({
             onChange={(event) => updateFieldValue(field.id, event.target.checked)}
             className="h-5 w-5 rounded border-hub-control-border text-hub-blue focus:ring-hub-focus"
           />
-          <span className="font-medium">{field.name}{!field.required && <span className="ml-1 text-sm font-normal text-hub-n-600">· Optional</span>}</span>
+          <span className="font-medium">{field.name}{!field.required && !field.group && <span className="ml-1 text-sm font-normal text-hub-n-600">· Optional</span>}</span>
         </label>
       );
     }
 
     const numeric = field.inputType === 'number' || field.inputType === 'percentage';
     const type = numeric ? 'number' : field.inputType === 'date' ? 'date' : 'text';
-    const hintId = field.inputType === 'percentage' ? `${field.id}-hint` : undefined;
+    const hint = field.hint ?? (field.inputType === 'percentage' ? 'Percentage, 0 to 100.' : undefined);
+    const hintId = hint ? `${field.id}-hint` : undefined;
 
     return (
       <div key={field.id}>
         <label htmlFor={field.id} className={LABEL}>
-          {field.name}{field.required ? ' *' : ' · Optional'}
+          {field.name}{field.unit && field.inputType !== 'percentage' ? ` (${field.unit})` : ''}{field.required ? ' *' : field.group ? '' : ' · Optional'}
         </label>
         {field.multiline ? <textarea id={field.id} rows={3} required={field.required} maxLength={2000} value={value === null ? '' : String(value)} onChange={event => updateFieldValue(field.id, event.target.value)} className={`min-h-24 ${INPUT}`} /> : <input
           id={field.id}
           type={type}
           inputMode={field.id === 'mileage' ? 'numeric' : numeric ? 'decimal' : undefined}
           step={field.id === 'mileage' ? 1 : numeric ? 'any' : undefined}
-          min={field.id === 'mileage' || field.inputType === 'percentage' ? 0 : undefined}
-          max={field.id === 'mileage' ? 999999999 : field.inputType === 'percentage' ? 100 : undefined}
+          min={field.id === 'mileage' || field.inputType === 'percentage' ? 0 : field.min}
+          max={field.id === 'mileage' ? 999999999 : field.inputType === 'percentage' ? 100 : field.max}
           aria-describedby={hintId}
           value={value === null ? '' : String(value)}
           required={field.required}
@@ -147,7 +155,7 @@ export default function ChecklistFieldsStep({
           }}
           className={`${INPUT} ${numeric ? 'tabular-nums' : ''}`}
         />}
-        {hintId && <p id={hintId} className="mt-1 text-[13px] text-hub-n-600">Percentage, 0 to 100.</p>}
+        {hintId && <p id={hintId} className="mt-1 text-[13px] text-hub-n-600">{hint}</p>}
       </div>
     );
   };
@@ -156,7 +164,7 @@ export default function ChecklistFieldsStep({
     <form data-hub-ui="2" onSubmit={handleSubmit} className="mx-auto max-w-2xl space-y-4">
       <div className="space-y-1">
         <h2 className="text-xl font-bold text-hub-ink font-heading">Checklist Details</h2>
-        <p className="mt-1 text-hub-n-600">Complete required checks. Additional readings and identifiers are optional.</p>
+        <p className="mt-1 text-hub-n-600">{groups.length > 0 ? 'Enter what you can read today. A blank reading will not stop the inspection.' : 'Complete required checks. Additional readings and identifiers are optional.'}</p>
       </div>
 
       {error && <p role="alert" className="rounded-hub-control border border-hub-danger-border bg-hub-danger-bg px-4 py-3 text-sm font-semibold text-hub-danger">{error}</p>}
@@ -172,6 +180,11 @@ export default function ChecklistFieldsStep({
         </div>)}
       </section>}
 
+      {groups.map(group => <section key={group.name} aria-labelledby={`${group.id}-heading`} className="inspection-panel p-4">
+        <h3 id={`${group.id}-heading`} className="mb-3 font-heading text-lg font-bold text-hub-ink">{group.name}</h3>
+        <div className="grid gap-4 sm:grid-cols-2">{group.fields.map(renderField)}</div>
+      </section>)}
+
       {optionalFields.length > 0 && <details className="inspection-panel" onInvalidCapture={event => { event.currentTarget.open = true; }}>
         <summary className="flex min-h-11 cursor-pointer items-center px-4 py-3 font-semibold text-hub-ink">Additional details · Optional</summary>
         <p className="px-4 pb-3 text-sm text-hub-n-600">Enter additional readings and identifiers when available. You may continue without them.</p>
@@ -185,8 +198,8 @@ export default function ChecklistFieldsStep({
             {checklist.inspection_date && <p className="text-sm tabular-nums text-hub-n-600">Inspection date: {checklist.inspection_date}</p>}
           </div>
           {scheduledTasks.length > 0 && (
-            <button type="button" onClick={markAllDueTasksPresent} className="hub-btn hub-btn--secondary hub-btn--wrap">
-              Mark all due duties as present
+            <button type="button" onClick={markAllDueTasksCompleted} className="hub-btn hub-btn--secondary hub-btn--wrap">
+              Mark all duties completed
             </button>
           )}
         </div>
@@ -204,21 +217,24 @@ export default function ChecklistFieldsStep({
                   <p className="font-semibold text-hub-ink">{task.name}</p>
                   {task.instructions && <p className="mt-1 text-sm text-hub-n-600">{task.instructions}</p>}
                   <div className="mt-3 flex gap-2" role="group" aria-label={`Status for ${task.name}`}>
-                    {(['Present', 'Missing', 'Damaged'] as const).map((status) => {
-                      const selected = result.observed === true && result.status === status;
+                    {TASK_CHOICES.map(({ status, selected: selectedStyle }) => {
+                      const selected = result.observed === true && taskIsCompleted(result.status) === (status === 'Completed');
                       return (
                         <button
                           key={status}
                           type="button"
                           onClick={() => updateScheduledTask(task.id, status)}
                           aria-pressed={selected}
-                          className={`min-h-11 flex-1 rounded-hub-control border px-3 py-2 text-sm font-semibold transition-colors ${selected ? STATUS_SELECTED[status] : 'border-hub-control-border bg-hub-well text-hub-ink hover:bg-hub-n-50'}`}
+                          className={`min-h-11 flex-1 rounded-hub-control border px-3 py-2 text-sm font-semibold transition-colors ${selected ? selectedStyle : 'border-hub-control-border bg-hub-well text-hub-ink hover:bg-hub-n-50'}`}
                         >
                           {status}
                         </button>
                       );
                     })}
                   </div>
+                  {result.observed === true && !taskIsCompleted(result.status) && <label className="mt-3 block text-sm font-semibold text-hub-ink">Why not? (optional)
+                    <input type="text" maxLength={2000} value={result.notes ?? ''} onChange={event => updateTaskNote(task.id, event.target.value)} className={`mt-1 ${INPUT}`} />
+                  </label>}
                 </div>
               );
             })}
