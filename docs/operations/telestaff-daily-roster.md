@@ -151,8 +151,8 @@ Flags are in `config/daily_roster.php`: `mode` (`off|shadow|publish`), `cleanup_
 
 ### Non-negotiables
 
-- `Captain5DutyRoster` reads the bid seat only. It feeds narcotics review and audit capacity, so TeleStaff never reaches it. Shift Captain 5 alerts follow the roster through `OnDutyCaptain5Recipients`, and only reach someone who can use the Captain 5 page.
-- Nothing grants or revokes permission from a spreadsheet. Migrations grant nothing.
+- `Captain5DutyRoster` reads the bid seat only. Shift Captain 5 alerts follow the roster through `OnDutyCaptain5Recipients`, and only reach someone who can use the Captain 5 page.
+- By the owner's decision of 2026-11-01, working the 300 or Captain 5 seat on the accepted roster opens that page for the duty day (`RosterSeatAccess`, `DAILY_ROSTER_SEAT_ACCESS_ENABLED`). It is read live and never stored: nothing writes a role or permission from a spreadsheet, and it never opens the Admin Panel or Captain 5 settings. An administrator's Deny on Captain 5 beats it. Migrations grant nothing.
 - No real names, IDs or the real workbook in the repo. The repo is public and gitleaks scans history. Fixtures are synthetic (`tests/Support/TeleStaffRosterWorkbookFactory.php`).
 - No workbook text, names or IDs in logs, exceptions, metrics or `roster_events`. Row numbers and codes only.
 - Tests use `HubTimezone::today()` or frozen time, are parallel-safe, and run on SQLite and Postgres.
@@ -194,6 +194,12 @@ Code colors match the TeleStaff online roster, read on 2026-10-30. They are defi
 A duty day runs 08:00 to 08:00. As soon as an export for the next duty date is accepted, `/daily-roster` opens on it, tagged **Next shift**, with a note saying when it starts and a link to the shift on duty. The PDF follows the page. Everything else stays on the duty day on the clock until 08:00: the 300 and Captain 5 cards and pages, and the shift Captain 5 alerts. Inside a duty day they change hands at the times the roster prints, for example 20:00 on a split seat. `RosterFreshnessResolver::pageStatus()` is the page's answer, and `status()` is everyone else's.
 
 Corrections TeleStaff makes to the shift on duty arrive only while its report still covers that shift. Once the report moves to the next date, the shift on duty stays as last exported.
+
+### Who the roster lets in
+
+With `DAILY_ROSTER_SEAT_ACCESS_ENABLED=true`, anyone with a working row in the `Division Chief 300` or `Captain 5` section of the accepted roster for the duty day on the clock can use that page from 08:00 to 08:00, including everyone on a split seat. The same route opens what each page depends on: 300 messages, Department Updates, Morning Lineup command controls and Command Board sign-in; Captain 5 issues, handoff, messages and EMS inventory. Narcotics review goes only to whoever the roster has on the seat at that moment. Bid holders, chiefs and administrators do not depend on the roster.
+
+`daily-roster:reconcile` records each change of seat holders as a `seat_holders_changed` event, with Hub user IDs only. It also alerts administrators once when someone on the seat, today or next shift, has not finished setting up an account, or would get the page from the roster alone, without a rank, bid seat or grant. The second alert is usually an ordinary overtime ride, but it is how a bad or forged export gets noticed: such an export can name anyone until a genuine one replaces it. Set the variable to `false`, then `php artisan config:cache`, to close this route at once.
 
 ### Sending more often
 

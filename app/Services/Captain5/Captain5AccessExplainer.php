@@ -92,7 +92,7 @@ final class Captain5AccessExplainer
         }
 
         $headline = $decision->isShownCaptain5
-            ? 'Can use the whole Captain 5 page, and is the Shift Captain 5 by seat right now.'
+            ? 'Can use the whole Captain 5 page, and is the Shift Captain 5 right now.'
             : 'Can use the whole Captain 5 page.';
 
         return $this->result($headline, 'success', $this->sources($decision, $employee), $overrideSummary, $this->capabilities($decision), $notes);
@@ -141,6 +141,7 @@ final class Captain5AccessExplainer
                 Captain5AccessDecision::SOURCE_OFFICER_RANK => 'Officer rank'.($employee?->rank ? ': '.$employee->rank : ''),
                 Captain5AccessDecision::SOURCE_CAPTAIN5_SEAT => 'Holds the Captain 5 seat'.($decision->bidShiftLetter ? ' on '.$decision->bidShiftLetter.' shift' : ''),
                 Captain5AccessDecision::SOURCE_EMS_CAPTAIN_SEAT => 'Holds the EMS Captain seat',
+                Captain5AccessDecision::SOURCE_ROSTER_SEAT => "On today's TeleStaff roster in the Captain 5 seat",
                 Captain5AccessDecision::SOURCE_EXPLICIT_ALLOW => 'Allowed by an administrator',
                 Captain5AccessDecision::SOURCE_REVIEWER => 'Fleet inspection reviewer',
                 default => $source,
@@ -156,7 +157,7 @@ final class Captain5AccessExplainer
         return [
             ['label' => 'Open the Captain 5 workspace', 'allowed' => $decision->canViewPage],
             ['label' => 'Act on issues', 'allowed' => $decision->canAct],
-            ['label' => 'Shift Captain 5 by seat now', 'allowed' => $decision->isShownCaptain5],
+            ['label' => 'Shift Captain 5 now', 'allowed' => $decision->isShownCaptain5],
             ['label' => 'Close issues with no action required', 'allowed' => $decision->canDismiss],
             ['label' => 'Configure Captain 5 in the Admin Panel', 'allowed' => $decision->canConfigure],
         ];

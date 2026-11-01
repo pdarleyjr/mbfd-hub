@@ -439,7 +439,7 @@ final class Captain5Operations extends Page
                     : 'TeleStaff roster',
                 default => 'Not set',
             },
-            'note' => $this->shownNote($shown, $label),
+            'note' => trim($this->shownNote($shown, $label).' '.$this->accountNote($shown, $label)) ?: null,
             'notifications_to' => $role === Captain5ActingRequest::ROLE_CAPTAIN_5 ? $this->alertsGoTo($shown) : null,
         ];
     }
@@ -455,6 +455,19 @@ final class Captain5Operations extends Page
             (int) $single->employee_profile_id === (int) $shown->employee?->getKey() => null,
             default => $this->memberName($single->employeeProfile),
         };
+    }
+
+    /** No permission can help someone whose account was never set up, so the page says so. */
+    private function accountNote(OnDutyOfficerDisplay $shown, string $label): string
+    {
+        if ($shown->employee === null) {
+            return '';
+        }
+        $account = User::query()->where('employee_profile_id', $shown->employee->getKey())->first();
+
+        return $account instanceof User && $account->isAuthenticationAllowed() && ! $account->must_change_password
+            ? ''
+            : "{$shown->name} has not finished setting up a Hub account and cannot open the {$label} page.";
     }
 
     /** Why the roster is not behind the name, or why no name is shown. Null when there is nothing to explain. */

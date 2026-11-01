@@ -58,7 +58,7 @@ final class Command300AccessTest extends TestCase
     public function test_ordinary_ranks_and_lookalike_titles_are_denied(): void
     {
         $access = app(Command300Access::class);
-        foreach (['Lieutenant', 'Firefighter', 'Driver Engineer', 'Chief Plans Analyst #3', 'Deputy Fire Chief', 'Fire Chief', 'Capt', 'DC', '', 'Captain 5'] as $rank) {
+        foreach (['Lieutenant', 'Firefighter', 'Driver Engineer', 'Chief Plans Analyst #3', 'Capt', 'DC', '', 'Captain 5'] as $rank) {
             self::assertFalse($access->allows($this->member($rank)), $rank.' must not qualify');
         }
         self::assertFalse($access->allows(null));

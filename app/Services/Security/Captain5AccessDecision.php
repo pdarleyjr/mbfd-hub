@@ -22,6 +22,8 @@ final readonly class Captain5AccessDecision
 
     public const SOURCE_EMS_CAPTAIN_SEAT = 'ems_captain_seat';
 
+    public const SOURCE_ROSTER_SEAT = 'roster_seat';
+
     public const SOURCE_EXPLICIT_ALLOW = 'explicit_allow';
 
     public const SOURCE_REVIEWER = 'fleet_reviewer';

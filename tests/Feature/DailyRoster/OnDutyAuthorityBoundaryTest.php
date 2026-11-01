@@ -23,11 +23,11 @@ use Tests\Support\DailyRosterSnapshotFactory;
 use Tests\TestCase;
 
 /**
- * Contract: the TeleStaff roster changes the name on the 300 and Captain 5 cards and who the shift's
- * Captain 5 alerts go to (only when that person can use the page). It grants nothing. The snapshot here
- * names a member who holds no seat, no rank and no grant. With the display flag on, that member appears
- * on the cards and gains nothing, and every authority answer stays exactly what it is with the flag off.
- * Names are synthetic.
+ * Contract while `daily_roster.seat_access_enabled` is off: the TeleStaff roster changes the name on the
+ * 300 and Captain 5 cards and who the shift's Captain 5 alerts go to (only when that person can use the
+ * page), and it grants nothing. The snapshot here names a member who holds no seat, no rank and no grant.
+ * With the display flag on, that member appears on the cards and gains nothing, and every authority answer
+ * stays exactly what it is with the flag off. RosterSeatAccessTest covers the setting on. Names are synthetic.
  */
 final class OnDutyAuthorityBoundaryTest extends TestCase
 {
@@ -36,7 +36,10 @@ final class OnDutyAuthorityBoundaryTest extends TestCase
 
     private const DUTY_DATE = '2026-10-20';
 
-    /** Classes that decide access or audit capacity. None may see the roster. */
+    /**
+     * Classes below the access decisions. None may see the roster: the seat answer stays the bid seat, and
+     * only Captain5Access and Command300Access ask RosterSeatAccess.
+     */
     private const AUTHORITY_FILES = [
         'app/Services/Captain5/Captain5DutyRoster.php',
         'app/Services/Captain5/OnDutyCaptain5.php',
@@ -44,11 +47,8 @@ final class OnDutyAuthorityBoundaryTest extends TestCase
         'app/Services/Captain5/Captain5ActorContext.php',
         'app/Services/Captain5/Captain5HandoffService.php',
         'app/Services/Captain5/Captain5IssueActions.php',
-        'app/Services/Security/Captain5Access.php',
         'app/Services/Security/Captain5AccessDecision.php',
-        'app/Services/Security/Command300Access.php',
         'app/Services/Narcotics/NarcoticsCheckAccess.php',
-        'app/Services/Narcotics/NarcoticsNotifier.php',
         'app/Services/CommandCommunications/CommandCommunicationService.php',
     ];
 
