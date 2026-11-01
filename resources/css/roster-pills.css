@@ -1,0 +1,16 @@
+/* Status pills: the colors TeleStaff shows, so a member reads the same code the same way in both. Shared by the Daily Roster page and the station page. */
+
+[data-hub-ui="2"] .roster-pill { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+[data-hub-ui="2"] .roster-pill--sp { border-color: rgb(var(--hub2-n-200)); background: rgb(var(--hub-roster-sp-bg)); color: rgb(var(--hub-roster-sp-ink)); }
+[data-hub-ui="2"] .roster-pill--ot { border-color: transparent; background: rgb(var(--hub-roster-ot-bg)); color: rgb(var(--hub-roster-ot-ink)); }
+[data-hub-ui="2"] .roster-pill--aday { border-color: transparent; background: rgb(var(--hub-roster-aday-bg)); color: rgb(var(--hub-roster-aday-ink)); }
+[data-hub-ui="2"] .roster-pill--vaca { border-color: transparent; background: rgb(var(--hub-roster-vaca-bg)); color: rgb(var(--hub-roster-vaca-ink)); }
+[data-hub-ui="2"] .roster-pill--holiday { border-color: transparent; background: rgb(var(--hub-roster-holiday-bg)); color: rgb(var(--hub-roster-holiday-ink)); }
+[data-hub-ui="2"] .roster-pill--leave { border-color: transparent; background: rgb(var(--hub-roster-leave-bg)); color: rgb(var(--hub-roster-leave-ink)); }
+[data-hub-ui="2"] .roster-pill--sick { border-color: transparent; background: rgb(var(--hub-roster-sick-bg)); color: rgb(var(--hub-roster-sick-ink)); }
+[data-hub-ui="2"] .roster-pill--exchange { border-color: transparent; background: rgb(var(--hub-roster-exchange-bg)); color: rgb(var(--hub-roster-exchange-ink)); }
+[data-hub-ui="2"] .roster-pill--ooc { border-color: transparent; background: rgb(var(--hub-roster-ooc-bg)); color: rgb(var(--hub-roster-ooc-ink)); }
+[data-hub-ui="2"] .roster-pill--pms { border-color: transparent; background: rgb(var(--hub-roster-pms-bg)); color: rgb(var(--hub-roster-pms-ink)); }
+[data-hub-ui="2"] .roster-pill--other { border-color: rgb(var(--hub-roster-other-ink) / 0.4); background: rgb(var(--hub-roster-other-bg)); color: rgb(var(--hub-roster-other-ink)); }
+[data-hub-ui="2"] .roster-pill--unknown,
+[data-hub-ui="2"] .roster-pill--vacant { border: 1px dashed rgb(var(--hub-roster-unknown-border)); background: rgb(var(--hub-roster-unknown-bg)); color: rgb(var(--hub-roster-unknown-ink)); }

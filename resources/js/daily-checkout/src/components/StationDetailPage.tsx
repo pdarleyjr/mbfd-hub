@@ -28,6 +28,7 @@ import Tabs, { type TabItem } from './ui/Tabs';
 import type { QuickLinkProps } from './ui/QuickLink';
 import StationHeader from './station/StationHeader';
 import StationOverviewPanel from './station/StationOverviewPanel';
+import StationRosterPanel from './station/StationRosterPanel';
 import StationShiftAlert from './station/StationShiftAlert';
 import { useStationOverview } from './station/useStationOverview';
 import Tag, { StatusTag } from './ui/Tag';
@@ -35,7 +36,7 @@ import { EmptyState, LoadError, SkeletonRows } from './ui/StateViews';
 import { humanize, type Tone } from './ui/status';
 import { formatHubDate, HUB_TIMEZONE } from '../../../shared/timezone.ts';
 
-type TabId = 'requests' | 'service-repair' | 'overview' | 'rooms' | 'apparatus' | 'gas-meters' | 'inspections' | 'activity';
+type TabId = 'requests' | 'service-repair' | 'overview' | 'roster' | 'rooms' | 'apparatus' | 'gas-meters' | 'inspections' | 'activity';
 
 /** Station numbers that have a morning lineup conference room (the conference route takes the number, not the DB id). */
 const LINEUP_STATION_NUMBERS = [1, 2, 3, 4, 6];
@@ -63,11 +64,21 @@ export default function StationDetailPage() {
   const [requestScope, setRequestScope] = useState<'open' | 'all'>('open');
   // Only officers may open the Personnel Equipment Request; the server says who they are.
   const [canRequestPersonnelEquipment, setCanRequestPersonnelEquipment] = useState(false);
+  // The roster holds employee IDs and leave codes, so it has its own rule; the roster route checks it again.
+  const [canViewRoster, setCanViewRoster] = useState(false);
   useEffect(() => {
     let active = true;
     identityForQueueCapture({ redirectOnExpiry: false })
-      .then((identity) => { if (active) setCanRequestPersonnelEquipment(identity.capabilities?.personnelEquipmentRequest === true); })
-      .catch(() => { if (active) setCanRequestPersonnelEquipment(false); });
+      .then((identity) => {
+        if (!active) return;
+        setCanRequestPersonnelEquipment(identity.capabilities?.personnelEquipmentRequest === true);
+        setCanViewRoster(identity.capabilities?.dailyRoster === true);
+      })
+      .catch(() => {
+        if (!active) return;
+        setCanRequestPersonnelEquipment(false);
+        setCanViewRoster(false);
+      });
     return () => { active = false; };
   }, []);
   const [serviceTickets, setServiceTickets] = useState<ApparatusServiceTicketSummary[]>([]);
@@ -81,6 +92,7 @@ export default function StationDetailPage() {
 
   const tabs: TabItem<TabId>[] = [
     { id: 'overview', label: 'Overview' },
+    ...(canViewRoster ? [{ id: 'roster' as const, label: "Today's Roster" }] : []),
     { id: 'requests', label: 'Requests' },
     { id: 'service-repair', label: 'Service / Repair', badge: openServiceTicketCount, badgeLabel: 'open tickets' },
     { id: 'rooms', label: 'Rooms' },
@@ -286,6 +298,8 @@ export default function StationDetailPage() {
             onViewAllRequests={() => { setRequestScope('all'); setActiveTab('requests'); }}
           />
         );
+      case 'roster':
+        return <StationRosterPanel stationId={station.id} stationNumber={station.station_number} />;
       case 'rooms':
         return station.rooms && station.rooms.length > 0 ? (
           <div className="space-y-7">
