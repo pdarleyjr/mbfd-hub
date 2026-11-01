@@ -124,6 +124,12 @@ class ApparatusInspection extends Model
         return $this->hasMany(ApparatusIssueMessage::class)->orderBy('created_at')->orderBy('id');
     }
 
+    /** @return HasMany<ApparatusInspectionConcern, $this> */
+    public function concerns(): HasMany
+    {
+        return $this->hasMany(ApparatusInspectionConcern::class)->orderBy('id');
+    }
+
     /** @return BelongsTo<Employee, $this> */
     public function employee(): BelongsTo
     {

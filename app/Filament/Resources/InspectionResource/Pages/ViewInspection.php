@@ -20,6 +20,7 @@ use App\Services\Inspections\InspectionHold;
 use App\Services\Inspections\InspectionReviewService;
 use App\Services\Inspections\IssueMessageService;
 use App\Support\Fleet\InspectionReviewers;
+use App\Support\Fleet\ScheduledDutyStatus;
 use Closure;
 use Filament\Actions\Action;
 use Filament\Actions\MountableAction;
@@ -129,7 +130,7 @@ class ViewInspection extends ViewRecord
             }
             foreach ($evidence['scheduled_tasks'] ?? [] as $task) {
                 $rows[] = [$section, 'Scheduled duties', $task['name'] ?? $task['id'] ?? 'Unnamed duty',
-                    $task['status'] ?? 'Reported', $task['recurrence_label'] ?? '', $task['notes'] ?? ''];
+                    ScheduledDutyStatus::label($task['status'] ?? null), $task['recurrence_label'] ?? '', $task['notes'] ?? ''];
             }
         };
         $addEvidence('Submitted checklist evidence', $workspace['pending_effects']['checklist_v2'] ?? null);

@@ -435,6 +435,15 @@ final class EmployeeInspectionHistoryService
                 $paths[$path] = true;
             }
         }
+        // Photos a member attached to a note or damage report sent with this checkout.
+        $concernPhotos = DB::table('apparatus_inspection_concerns')
+            ->where('apparatus_inspection_id', $inspection->getKey())->whereNotNull('photo_path')->pluck('photo_path');
+        foreach ($concernPhotos as $candidate) {
+            $path = $this->safeImagePath($candidate);
+            if ($path !== null) {
+                $paths[$path] = true;
+            }
+        }
 
         return array_keys($paths);
     }
