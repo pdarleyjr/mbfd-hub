@@ -172,13 +172,6 @@
 /* Follow-up stage tabs wrap instead of clipping the last tab. */
 [data-defect-follow-up-tabs] .fi-tabs { flex-wrap: wrap; overflow-x: visible; }
 
-/* Vehicle swap review: the decision modal summary and the apparatus profile notice. */
-.hub-swap-id { font-variant-numeric: tabular-nums; letter-spacing: .02em; }
-.hub-swap .hub-insp-facts { margin-top: 0; }
-.hub-swap-notice { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .75rem; }
-.hub-swap-notice p { margin: 0; font-weight: 600; }
-.hub-swap-notice a { color: rgb(var(--hub-warning-strong)); font-weight: 650; text-decoration: underline; }
-
 /* Canonical admin inspection workspace (/admin/inspections/{record}) and the dashboard inspection queues. */
 .hub-insp-anchor { scroll-margin-top: calc(var(--hub-bar-total, 3.5rem) + 1rem); }
 .hub-insp :is(a, summary):focus-visible, .hub-insp-queues a:focus-visible { outline: 2px solid rgb(var(--hub-focus)); outline-offset: 2px; border-radius: 4px; }

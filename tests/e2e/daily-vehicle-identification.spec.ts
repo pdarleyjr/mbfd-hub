@@ -260,7 +260,7 @@ test.describe('one-time vehicle information in the Daily Checkout', () => {
     await expect(vehicleSelect(page)).toHaveCount(0);
   });
 
-  test('a different physical vehicle hides the card, skips the gate, and the answers return with the assigned vehicle', async ({ page }) => {
+  test('a different physical vehicle hides the card, and the answers return with the assigned vehicle', async ({ page }) => {
     await mobileInspectionFixture(page, engine2, {
       fleetVehicles: [{ vehicle_number: 'TEST-205', designation: 'E5', role: 'frontline' }],
       vehicleIdentification: identification,
@@ -270,36 +270,11 @@ test.describe('one-time vehicle information in the Daily Checkout', () => {
 
     await vehicleSelect(page).selectOption('TEST-205');
     await expect(card(page)).toHaveCount(0);
-    await page.getByRole('group', { name: 'Was a truck swap completed?' }).getByRole('radio', { name: 'Yes, swap completed' }).check();
-    await chooseShiftA(page);
-    await continueButton(page).click();
-    await expect(vehicleSelect(page)).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Record this vehicle change' })).toBeVisible();
 
-    await openMemberStep(page);
-    await page.getByRole('button', { name: 'I picked wrong', exact: true }).click();
+    await vehicleSelect(page).selectOption('TEST-102');
     await expect(card(page)).toHaveCount(1);
     await expect(group(page, 'License plate').getByRole('textbox')).toHaveValue('AB12');
-  });
-
-  test('a checkout for a different physical vehicle is not blocked and sends no vehicle_identification key', async ({ page }) => {
-    test.setTimeout(120_000);
-    const api = await mobileInspectionFixture(page, engine2, {
-      fleetVehicles: [{ vehicle_number: 'TEST-205', designation: 'E5', role: 'frontline' }],
-      vehicleIdentification: identification,
-    });
-    await completeChecklist(page, api.checklist);
-    await openMemberStep(page);
-    await vehicleSelect(page).selectOption('TEST-205');
-    await page.getByRole('group', { name: 'Was a truck swap completed?' }).getByRole('radio', { name: 'Yes, swap completed' }).check();
-    await chooseShiftA(page);
-    await page.getByRole('button', { name: 'Review & Sign', exact: true }).click();
-    await expect(page.getByRole('heading', { name: 'Review & Sign Inspection' })).toBeVisible();
-    await sign(page);
-    await page.getByRole('button', { name: 'Submit Inspection', exact: true }).click();
-
-    await expect.poll(() => api.submissions.length).toBe(1);
-    expect(api.submissions[0].physical_vehicle).toEqual({ vehicle_number: 'TEST-205', swap_answer: 'swap_completed' });
-    expect(Object.keys(api.submissions[0])).not.toContain('vehicle_identification');
   });
 
   test('answers are kept in the draft and come back after a reload', async ({ page }) => {

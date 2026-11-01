@@ -193,7 +193,6 @@ function normalizeTruckChange(raw: unknown, index: number): RescueTruckChange {
   const item = asRecord(raw);
   return {
     id: asText(item.id) ?? `change-${index}`,
-    source: item.source === 'fleet_decision' ? 'fleet_decision' : 'changeout',
     unit: asText(item.unit) ?? 'Unit',
     from_vehicle_number: asText(item.from_vehicle_number),
     to_vehicle_number: asText(item.to_vehicle_number),

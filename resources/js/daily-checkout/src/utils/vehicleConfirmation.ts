@@ -1,6 +1,6 @@
-import type { FleetVehicle, PhysicalVehicleReport, SwapAnswer, VehicleConfirmation } from '../types';
+import type { FleetVehicle, PhysicalVehicleReport, VehicleConfirmation } from '../types';
 
-/** Select value that lets the member type a vehicle ID the fleet list does not have. */
+/** Select value for a truck the fleet list does not have. */
 export const NOT_LISTED = '__not_listed__';
 
 export const MAX_VEHICLE_ID_LENGTH = 32;
@@ -22,58 +22,61 @@ export const defaultVehicleConfirmation = (assignedVehicle: string): VehicleConf
   assignedVehicle,
   choice: assignedVehicle,
   typedVehicle: '',
-  swapAnswer: '',
-  note: '',
   confirmed: false,
 });
-
-/** A saved draft only counts if it was confirmed against the vehicle assigned today. */
-export const reconcileVehicleConfirmation = (
-  saved: VehicleConfirmation | undefined,
-  assignedVehicle: string,
-): VehicleConfirmation => (
-  saved && sameVehicle(saved.assignedVehicle, assignedVehicle) && assignedVehicle !== ''
-    ? saved
-    : defaultVehicleConfirmation(assignedVehicle)
-);
 
 /** The vehicle ID the member says they are standing at. */
 export const reportedVehicle = (confirmation: VehicleConfirmation): string => (
   confirmation.choice === NOT_LISTED ? normalizeVehicleId(confirmation.typedVehicle) : normalizeVehicleId(confirmation.choice)
 );
 
+/**
+ * The member says they are at another truck than the unit's own, so the change has to be recorded first. A unit with no
+ * vehicle number on record has nothing to differ from: its crew is naming the vehicle.
+ */
 export const isVehicleMismatch = (confirmation: VehicleConfirmation): boolean => {
+  if (normalizeVehicleId(confirmation.assignedVehicle) === '') return false;
   const reported = reportedVehicle(confirmation);
 
-  return reported !== '' && !sameVehicle(reported, confirmation.assignedVehicle);
+  return confirmation.choice === NOT_LISTED ? !sameVehicle(reported, confirmation.assignedVehicle) : reported !== '' && !sameVehicle(reported, confirmation.assignedVehicle);
 };
 
-/** Confirmed, a usable ID, and for a different vehicle an answer to the swap question. */
+/**
+ * A saved draft only counts if it was confirmed against the vehicle assigned today. A draft from the old app can hold a
+ * swap answer and a note, which mean nothing now and are dropped. One that names another truck comes back unconfirmed,
+ * asking the member to record the change.
+ */
+export const reconcileVehicleConfirmation = (
+  saved: VehicleConfirmation | undefined,
+  assignedVehicle: string,
+): VehicleConfirmation => {
+  if (!saved || assignedVehicle === '' || !sameVehicle(saved.assignedVehicle, assignedVehicle)) return defaultVehicleConfirmation(assignedVehicle);
+  const restored: VehicleConfirmation = {
+    assignedVehicle: saved.assignedVehicle,
+    choice: saved.choice,
+    typedVehicle: saved.typedVehicle ?? '',
+    confirmed: saved.confirmed,
+  };
+
+  return isVehicleMismatch(restored) ? { ...restored, confirmed: false } : restored;
+};
+
+/** Confirmed, a usable ID, and the truck the unit is actually on. */
 export const vehicleConfirmationComplete = (confirmation: VehicleConfirmation | undefined): boolean => {
-  if (!confirmation || !confirmation.confirmed) return false;
-  const reported = reportedVehicle(confirmation);
-  if (!VEHICLE_ID_PATTERN.test(reported)) return false;
+  if (!confirmation || !confirmation.confirmed || isVehicleMismatch(confirmation)) return false;
 
-  return !isVehicleMismatch(confirmation) || confirmation.swapAnswer !== '';
+  return VEHICLE_ID_PATTERN.test(reportedVehicle(confirmation));
 };
 
-/** Value for the paper "vehicle_num" field: exactly the assigned ID when unchanged. */
+/** Value for the paper "vehicle_num" field: the assigned ID, or the vehicle named for a unit with none on record. */
 export const paperVehicleValue = (confirmation: VehicleConfirmation): string => (
-  isVehicleMismatch(confirmation) ? reportedVehicle(confirmation) : confirmation.assignedVehicle
+  confirmation.assignedVehicle !== '' ? confirmation.assignedVehicle : reportedVehicle(confirmation)
 );
 
-/** What is queued with the checkout and replayed idempotently. */
-export const toPhysicalVehicleReport = (confirmation: VehicleConfirmation): PhysicalVehicleReport => {
-  const note = confirmation.note.trim();
-
-  return isVehicleMismatch(confirmation)
-    ? {
-      vehicle_number: reportedVehicle(confirmation),
-      swap_answer: confirmation.swapAnswer as SwapAnswer,
-      ...(note !== '' ? { note } : {}),
-    }
-    : { vehicle_number: confirmation.assignedVehicle };
-};
+/** What is queued with the checkout and replayed idempotently. Always the assigned truck: a different one is recorded first. */
+export const toPhysicalVehicleReport = (confirmation: VehicleConfirmation): PhysicalVehicleReport => ({
+  vehicle_number: paperVehicleValue(confirmation),
+});
 
 export const fleetVehicleLabel = (vehicle: FleetVehicle): string => {
   const role = vehicle.role === 'reserve' ? 'Reserve' : vehicle.role === 'out_of_service' ? 'Out of service' : 'Frontline';

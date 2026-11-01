@@ -32,10 +32,10 @@ export function inspectionReadiness(checklist: ChecklistData | null, compartment
   }) ?? [];
   const missingDuties = checklist?.due_tasks.filter(task => !scheduledTasks.find(answer => answer.id === task.id)?.observed) ?? [];
   const missingShift = !['A', 'B', 'C'].includes(officer.shift);
-  // The physical vehicle must be confirmed (and any different vehicle explained) before submitting.
+  // The physical vehicle must be confirmed before submitting, and a different vehicle has to be recorded first.
   const missingVehicle = !vehicleConfirmationComplete(officer.vehicleConfirmation);
   // Each open one-time vehicle question needs an answer, or "not available" with its reason. No questions, no gate.
-  // Not asked while the crew reports a different vehicle: the server ignores those answers.
+  // Not asked while the crew says they are at a different vehicle.
   const missingIdentification = !vehicleIdentificationComplete(activeVehicleIdentification(checklist?.vehicle_identification, officer), identification);
   const maxMiles = checklist?.fields.some(field => field.id === 'mileage') ? 999999999 : 2147483647;
   const invalidMeters = (meters.engine_hours !== null && (!Number.isFinite(meters.engine_hours) || meters.engine_hours < 0 || meters.engine_hours > 9999999.9 || !/^\d+(\.\d)?$/.test(String(meters.engine_hours))))

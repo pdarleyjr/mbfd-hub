@@ -6,6 +6,7 @@ namespace Tests\Feature\Fleet\VehicleIdentification;
 
 use App\Enums\DailyCheckoutChecklistTemplate;
 use App\Models\Apparatus;
+use App\Models\ApparatusChangeout;
 use App\Models\ApparatusIdentificationEvent;
 use App\Models\ApparatusIdentificationQuestion;
 use App\Models\ApparatusInspection;
@@ -225,8 +226,10 @@ final class CheckoutSubmissionTest extends IdentificationTestCase
             }
         }
         unset($field);
+        // Below the checkout's readings, so they are accepted on the reported truck.
+        $this->frontline->forceFill(['current_miles' => 900, 'current_engine_hours' => 300])->save();
 
-        $this->postJson($this->submissionUrl(), $payload)->assertCreated()->assertJsonPath('processing_status', 'pending_vehicle_swap');
+        $this->postJson($this->submissionUrl(), $payload)->assertCreated()->assertJsonPath('processing_status', 'accepted');
 
         $this->assertNull($this->unitMaster()->tag_number);
         $this->assertNull($this->unitMaster()->make);
@@ -308,7 +311,8 @@ final class CheckoutSubmissionTest extends IdentificationTestCase
         $response = $this->postJson("/api/public/apparatuses/{$boat->id}/inspections", $payload);
 
         $response->assertCreated();
-        $this->assertSame(1, \App\Models\ApparatusVehicleSwapRequest::query()->count(), 'the swap hold itself is unchanged');
+        $this->assertSame(0, ApparatusChangeout::query()->count(), 'a unit with no number on file has nothing to change from');
+        $this->assertNull($response->json('vehicle_swap_pending'));
         $this->assertSame(0, ApparatusIdentificationEvent::query()->where('event', 'superseded')->count(), 'nothing was dropped');
         $this->assertSame(['FB-6', 'MTK12345A515'], ApparatusIdentificationQuestion::query()->where('state', 'answered')->orderBy('id')->pluck('answered_value')->all());
         $this->assertSame('boat', $boat->fresh()->masterVehicle?->asset_category, 'resolved into a boat record for Fleet to verify');

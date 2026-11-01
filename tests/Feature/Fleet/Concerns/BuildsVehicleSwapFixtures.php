@@ -6,7 +6,6 @@ namespace Tests\Feature\Fleet\Concerns;
 
 use App\Enums\AccountStatus;
 use App\Models\Apparatus;
-use App\Models\ApparatusVehicleSwapRequest;
 use App\Models\Employee;
 use App\Models\Station;
 use App\Models\User;
@@ -136,16 +135,6 @@ trait BuildsVehicleSwapFixtures
     protected function submissionUrl(): string
     {
         return "/api/public/apparatuses/{$this->unit->id}/inspections";
-    }
-
-    /** A checkout that reports a different vehicle, saved and held for Fleet. */
-    protected function heldRequest(string $reported = 'V-303', bool $withFinding = true, string $answer = 'swap_completed'): ApparatusVehicleSwapRequest
-    {
-        $this->postJson($this->submissionUrl(), $this->payload([
-            'vehicle_number' => $reported, 'swap_answer' => $answer, 'note' => 'Engine 3 was in the shop.',
-        ], $withFinding))->assertCreated()->assertJsonPath('processing_status', 'pending_vehicle_swap');
-
-        return ApparatusVehicleSwapRequest::query()->latest('id')->firstOrFail();
     }
 
     protected function fleetViewer(): User

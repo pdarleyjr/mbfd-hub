@@ -13,8 +13,6 @@ use App\Models\User;
 use App\Services\ApparatusInspectionApprovalService;
 use App\Services\ApparatusInspectionProcessingService;
 use App\Services\Display\DisplaySnapshotService;
-use App\Services\Fleet\VehicleSwapDecisionException;
-use App\Services\Fleet\VehicleSwapService;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -179,7 +177,6 @@ final class InspectionReviewService
         if ($inspection->review_status !== 'pending_review') {
             return $inspection;
         }
-        $this->refuseWhileHeldForVehicleSwap($inspection);
         if ($inspection->processing_status === null) {
             return app(ApparatusInspectionApprovalService::class)->approve($inspectionId, $reviewer, $markOutOfService, $note);
         }
@@ -221,7 +218,6 @@ final class InspectionReviewService
         if ($inspection->review_status !== 'pending_review') {
             return $inspection;
         }
-        $this->refuseWhileHeldForVehicleSwap($inspection);
         if ($inspection->processing_status === null) {
             return $this->rejectLegacy($inspection, $reviewer, $reason);
         }
@@ -278,17 +274,6 @@ final class InspectionReviewService
                 'processing_status_before' => $inspection->processing_status,
             ],
         ]);
-    }
-
-    /**
-     * A checkout held for a possible truck swap is released only by the Fleet
-     * swap decision, which applies its findings to the vehicle Fleet confirms.
-     */
-    private function refuseWhileHeldForVehicleSwap(ApparatusInspection $inspection): void
-    {
-        if ($inspection->processing_status === VehicleSwapService::HELD_PROCESSING_STATUS) {
-            throw new VehicleSwapDecisionException('This checkout is held for a possible vehicle swap. Decide it from Pending vehicle swaps.');
-        }
     }
 
     private function forgetDisplayReadModels(): void

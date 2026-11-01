@@ -13,7 +13,6 @@ use App\Filament\Resources\ApparatusResource\RelationManagers\InspectionsRelatio
 use App\Filament\Resources\ApparatusResource\RelationManagers\InventoryCorrectionsRelationManager;
 use App\Filament\Resources\ApparatusResource\RelationManagers\OperationalAlertsRelationManager;
 use App\Filament\Resources\ApparatusResource\RelationManagers\ServiceTicketsRelationManager;
-use App\Filament\Resources\ApparatusResource\RelationManagers\VehicleSwapReportsRelationManager;
 use App\Filament\Resources\ApparatusServiceTicketResource;
 use App\Filament\Resources\DefectResource\Pages\EditDefect;
 use App\Filament\Resources\DefectResource\Pages\ListDefects;
@@ -488,13 +487,12 @@ final class ApparatusDefectServiceTicketTest extends TestCase
         $this->assertSame([
             InspectionsRelationManager::class,
             ServiceTicketsRelationManager::class,
-            VehicleSwapReportsRelationManager::class,
             OperationalAlertsRelationManager::class,
             ChangeoutsRelationManager::class,
             DefectsRelationManager::class,
             InventoryCorrectionsRelationManager::class,
             IdentificationQuestionsRelationManager::class,
-        ], array_values(ApparatusResource::getRelations()), 'Vehicle swaps, operational alerts and vehicle changeouts follow service tickets, shown only to Fleet staff who can view them; inventory corrections follow for reviewers; Identification is a rare Fleet task, last, and only shown once a question exists.');
+        ], array_values(ApparatusResource::getRelations()), 'Operational alerts and vehicle changeouts follow service tickets, shown only to Fleet staff who can view them; inventory corrections follow for reviewers; Identification is a rare Fleet task, last, and only shown once a question exists.');
         $this->assertFalse(
             IdentificationQuestionsRelationManager::canViewForRecord($this->apparatus, ViewApparatus::class),
             'No question has been asked for this unit, so there is no Identification tab.',

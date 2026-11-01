@@ -19,7 +19,7 @@ use Illuminate\Validation\ValidationException;
  * Keeps one physical vehicle as one master record (record keeper) plus at most one
  * apparatus row (operational profile).
  *
- * The vehicle number is the key: VehicleSwapService moves unit identity between truck
+ * The vehicle number is the key: a changeout moves unit identity between truck
  * rows and never moves vehicle_number. Matching is exact on the trimmed, upper-cased
  * number with internal spaces collapsed; zeros and dashes are never stripped, so
  * "002-16" and "2-16" are different vehicles. Anything that is not exactly one clean

@@ -7,8 +7,9 @@ namespace App\Console\Commands;
 use App\Models\Apparatus;
 use App\Models\ApparatusIdentificationEvent;
 use App\Models\ApparatusInspection;
-use App\Models\ApparatusVehicleSwapRequest;
+use App\Models\ApparatusInspectionReviewEvent;
 use App\Models\User;
+use App\Services\Fleet\CheckoutVehicleReport;
 use App\Services\Fleet\VehicleIdentificationService;
 use App\Support\Database\TransientDatabaseFailure;
 use Illuminate\Console\Command;
@@ -61,12 +62,12 @@ final class ReplayVehicleIdentification extends Command
                         $apparatus = Apparatus::query()->lockForUpdate()->findOrFail($inspection->apparatus_id);
                         $actor = $inspection->actor_user_id === null ? null : User::query()->find($inspection->actor_user_id);
                         // A different physical vehicle was reported at this checkout: the answers describe that vehicle.
-                        // A unit that had no vehicle number then has nothing to differ from.
-                        $held = ApparatusVehicleSwapRequest::query()
+                        // A unit that had no vehicle number then has nothing to differ from, and is not recorded as different.
+                        $different = ApparatusInspectionReviewEvent::query()
                             ->where('apparatus_inspection_id', $inspection->getKey())
-                            ->whereNotNull('assigned_vehicle_number')
+                            ->whereIn('status', [CheckoutVehicleReport::EVENT_CHANGED, CheckoutVehicleReport::EVENT_FLAGGED])
                             ->exists();
-                        $service->record($apparatus, $section, $actor, $csid, (int) $inspection->getKey(), $held);
+                        $service->record($apparatus, $section, $actor, $csid, (int) $inspection->getKey(), $different);
                     });
                     $recorded++;
                 } catch (Throwable $exception) {

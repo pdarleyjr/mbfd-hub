@@ -7,8 +7,6 @@ namespace Tests\Feature\Captain5;
 use App\Models\Apparatus;
 use App\Models\ApparatusChangeout;
 use App\Models\ApparatusChangeoutItem;
-use App\Models\ApparatusInspection;
-use App\Models\ApparatusVehicleSwapRequest;
 use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use Tests\Feature\Fleet\Changeouts\ChangeoutTestCase;
@@ -56,14 +54,6 @@ final class Captain5RescueTrucksTest extends ChangeoutTestCase
         ]);
     }
 
-    private function inspectionOf(Apparatus $truck): ApparatusInspection
-    {
-        return ApparatusInspection::query()->create([
-            'apparatus_id' => $truck->id, 'operator_name' => 'Lt. Alvarez', 'rank' => 'Lieutenant', 'shift' => 'A', 'unit_number' => $truck->designation,
-            'designation_at_time' => $truck->designation, 'vehicle_number' => $truck->vehicle_number, 'results' => [], 'completed_at' => now(),
-        ]);
-    }
-
     public function test_only_rescue_units_are_listed_and_reserves_and_engines_are_not(): void
     {
         ['unit' => $unit] = $this->rescuePair();
@@ -103,7 +93,7 @@ final class Captain5RescueTrucksTest extends ChangeoutTestCase
         self::assertSame('17503', $changes[0]['from_vehicle_number']);
         self::assertSame('1033', $changes[0]['to_vehicle_number']);
         self::assertTrue($changes[0]['recent']);
-        self::assertSame('changeout', $changes[0]['source']);
+        self::assertArrayNotHasKey('source', $changes[0]);
     }
 
     public function test_left_behind_lines_carry_their_notes(): void
@@ -145,28 +135,5 @@ final class Captain5RescueTrucksTest extends ChangeoutTestCase
         $this->completed($unit, 'OLD-ROW', ['status' => 'cancelled']);
 
         self::assertSame([], $this->workspace()->json('rescue_truck_changes'));
-    }
-
-    public function test_a_swap_fleet_decided_is_listed_and_an_undecided_or_engine_one_is_not(): void
-    {
-        ['unit' => $unit] = $this->rescuePair();
-        $fleet = $this->fleetOperationsManager();
-        $base = fn (Apparatus $truck): array => [
-            'apparatus_id' => $truck->id, 'apparatus_inspection_id' => $this->inspectionOf($truck)->id, 'reporter_name' => 'Lt. Alvarez', 'answer' => 'swap_completed',
-            'unit_designation' => $truck->designation, 'assigned_vehicle_number' => $truck->vehicle_number, 'reported_vehicle_number' => '2201', 'decided_by_user_id' => $fleet->id,
-        ];
-        ApparatusVehicleSwapRequest::query()->create([...$base($unit), 'status' => ApparatusVehicleSwapRequest::STATUS_APPROVED_SWAP, 'decided_at' => now()->subHour()]);
-        ApparatusVehicleSwapRequest::query()->create([...$base($unit), 'status' => ApparatusVehicleSwapRequest::STATUS_PENDING]);
-        ApparatusVehicleSwapRequest::query()->create([...$base($unit), 'status' => ApparatusVehicleSwapRequest::STATUS_REJECTED, 'decided_at' => now()->subHour()]);
-        ApparatusVehicleSwapRequest::query()->create([...$base($this->unit), 'status' => ApparatusVehicleSwapRequest::STATUS_APPROVED_SWAP, 'decided_at' => now()->subHour()]);
-
-        $changes = $this->workspace()->json('rescue_truck_changes');
-
-        self::assertCount(1, $changes);
-        self::assertSame('fleet_decision', $changes[0]['source']);
-        self::assertSame('R 44', $changes[0]['unit']);
-        self::assertSame('17503', $changes[0]['from_vehicle_number']);
-        self::assertSame('2201', $changes[0]['to_vehicle_number']);
-        self::assertSame((string) ($fleet->display_name ?: $fleet->name), $changes[0]['by']);
     }
 }
