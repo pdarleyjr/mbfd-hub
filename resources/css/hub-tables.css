@@ -1,0 +1,176 @@
+/**
+ * Hub responsive tables. Operational tables never scroll sideways.
+ *
+ * Filament tables are adapted by resources/js/hub-tables.js, which sets data-hub-mode on the table:
+ *   (none)   the table fits: nothing here applies.
+ *   priority lowest-priority columns are hidden in the row and shown in its details panel.
+ *   cards    each row is a stacked card; the heading row is a bar of sort buttons.
+ * Blade and React tables opt in with .hub-table (wrapping, bounded cells) and, for key/value rows,
+ * .hub-table--stack. No colour literals: every colour is a token from mbfd-theme.css.
+ * This file owns table behaviour only; the bar and shell live in hub-shell.css.
+ */
+
+/* ---- Every Filament table: long text wraps, nothing forces the page wider ---- */
+.fi-ta-content { max-width: 100%; }
+.fi-ta-table { width: 100%; }
+.fi-ta-table td,
+.fi-ta-table th { min-width: 0; }
+.fi-ta-table .fi-ta-text-item-label,
+.fi-ta-table .fi-ta-text p,
+.fi-ta-table .fi-ta-col-wrp { overflow-wrap: anywhere; }
+.fi-ta-table .fi-ta-text-item-label { white-space: normal; }
+.fi-ta-table td a,
+.fi-ta-table td code { overflow-wrap: anywhere; word-break: break-word; }
+.fi-ta-table .fi-ta-text-input,
+.fi-ta-table .fi-ta-select { min-width: 0; max-width: 100%; }
+
+/* ---- Grid layout shared by priority and cards ---- */
+.fi-ta-table[data-hub-mode] { display: block; width: 100%; }
+.fi-ta-table[data-hub-mode] > thead,
+.fi-ta-table[data-hub-mode] > tbody { display: block; }
+.fi-ta-table[data-hub-mode] > tbody { border-top: 0; }
+.fi-ta-table[data-hub-mode] > thead > tr,
+.fi-ta-table[data-hub-mode] > tbody > tr { display: grid; align-items: center; }
+.fi-ta-table[data-hub-mode] > thead > tr > th,
+.fi-ta-table[data-hub-mode] > tbody > tr > td { display: block; min-width: 0; width: auto; }
+.fi-ta-table[data-hub-mode] [data-hub-hidden] { display: none; }
+.fi-ta-table[data-hub-mode] > tbody > tr > td[colspan],
+.fi-ta-table[data-hub-mode] > thead > tr > th[colspan] { grid-column: 1 / -1; }
+
+/* ---- Priority: columns in a shared grid, details panel under the row ---- */
+.fi-ta-table[data-hub-mode="priority"] > thead > tr,
+.fi-ta-table[data-hub-mode="priority"] > tbody > tr {
+  grid-template-columns: var(--hub-rt-cols, 1fr);
+}
+.fi-ta-table[data-hub-mode="priority"] > thead > tr > th,
+.fi-ta-table[data-hub-mode="priority"] > tbody > tr > td { padding-inline: 0.5rem; }
+.fi-ta-table[data-hub-mode="priority"] > tbody > tr > td[data-hub-lead] { display: flex; align-items: center; gap: 0.25rem; }
+.fi-ta-table[data-hub-mode="priority"] > tbody > tr > td[data-hub-lead] > :not(.hub-rt-toggle) { flex: 1 1 auto; min-width: 0; }
+.fi-ta-table[data-hub-mode="priority"] > tbody > tr > td[data-hub-kind="actions"] { justify-self: end; }
+.fi-ta-table[data-hub-mode="priority"] > tbody > tr > td:not([data-hub-hidden]) { grid-row: 1; }
+
+/* Details: hidden cells of an open row, full width under the visible cells */
+.fi-ta-table[data-hub-mode] > tbody > tr:not([data-hub-open]) > td[data-hub-hidden] { display: none; }
+.fi-ta-table[data-hub-mode] > tbody > tr[data-hub-open] > td[data-hub-hidden] {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(6rem, 30%) minmax(0, 1fr);
+  align-items: start;
+  gap: 0.25rem 0.75rem;
+  padding: 0.5rem 1rem;
+  background-color: rgb(var(--hub-n-50));
+  border-top: 1px solid rgb(var(--hub-n-100));
+}
+.fi-ta-table[data-hub-mode] > tbody > tr[data-hub-open] > td[data-hub-hidden]::before {
+  content: attr(data-hub-label);
+  color: rgb(var(--hub-n-600));
+  font-size: 0.8125rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  padding-block-start: 0.5rem;
+}
+.fi-ta-table[data-hub-mode] > tbody > tr[data-hub-open] > td[data-hub-hidden] > * { min-width: 0; }
+
+/* ---- Details button (injected into the first visible cell) ---- */
+.hub-rt-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  border: 0;
+  border-radius: var(--hub-radius-control);
+  background: transparent;
+  color: rgb(var(--hub-n-600));
+  cursor: pointer;
+}
+.hub-rt-toggle:hover { background-color: rgb(var(--hub-n-100)); }
+.hub-rt-toggle:focus-visible { outline: 2px solid rgb(var(--hub-focus)); outline-offset: 2px; }
+.hub-rt-toggle svg { transition: transform 120ms ease; }
+.hub-rt-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) { .hub-rt-toggle svg { transition: none; } }
+
+/* ---- Sort menu for columns moved into details ---- */
+.hub-rt-sort { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; padding: 0.5rem 1rem; font-size: 0.875rem; color: rgb(var(--hub-n-600)); }
+.hub-rt-sort__select {
+  min-height: 2.75rem;
+  max-width: 100%;
+  border: 1px solid rgb(var(--hub-border));
+  border-radius: var(--hub-radius-control);
+  background-color: rgb(var(--hub-well));
+  color: rgb(var(--hub-n-900));
+  padding-inline: 0.75rem;
+}
+
+/* ---- Cards (phones and any container narrower than the essential columns) ---- */
+.fi-ta-table[data-hub-mode="cards"] > thead > tr {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  padding: 0.5rem 0.75rem;
+}
+.fi-ta-table[data-hub-mode="cards"] > tbody { padding: 0.5rem; display: grid; gap: 0.5rem; }
+.fi-ta-table[data-hub-mode="cards"] > tbody > tr {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  border: 1px solid rgb(var(--hub-border));
+  border-radius: var(--hub-radius-card);
+  background-color: rgb(var(--hub-well));
+  overflow: hidden;
+}
+.fi-ta-table[data-hub-mode="cards"] > tbody > tr > td { padding: 0.5rem 1rem; }
+.fi-ta-table[data-hub-mode="cards"] > tbody > tr > td[data-hub-kind="data"]:not([data-hub-hidden]) {
+  display: grid;
+  grid-template-columns: minmax(5.5rem, 34%) minmax(0, 1fr);
+  align-items: start;
+  gap: 0.25rem 0.75rem;
+}
+.fi-ta-table[data-hub-mode="cards"] > tbody > tr > td[data-hub-kind="data"]:not([data-hub-hidden])::before {
+  content: attr(data-hub-label);
+  color: rgb(var(--hub-n-600));
+  font-size: 0.8125rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  padding-block-start: 0.5rem;
+}
+.fi-ta-table[data-hub-mode="cards"] > tbody > tr { position: relative; }
+.fi-ta-table[data-hub-mode="cards"] > tbody > tr > td[data-hub-lead] > .hub-rt-toggle { position: absolute; inset-block-start: 0.25rem; inset-inline-end: 0.25rem; }
+.fi-ta-table[data-hub-mode="cards"] > tbody > tr > td[data-hub-kind="select"] { min-height: 2.75rem; display: flex; align-items: center; }
+.fi-ta-table[data-hub-mode="cards"] > tbody > tr > td[data-hub-lead][data-hub-kind="data"]:not([data-hub-hidden]) { padding-inline-end: 3.25rem; }
+.fi-ta-table[data-hub-mode="cards"] > tbody > tr > td[data-hub-kind="actions"] {
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid rgb(var(--hub-n-100));
+  min-height: 2.75rem;
+}
+
+/* Inputs inside narrow cells fill the cell instead of keeping their own minimum */
+.fi-ta-table[data-hub-mode] .fi-ta-text-input,
+.fi-ta-table[data-hub-mode] .fi-ta-select { width: 100%; min-width: 0; padding: 0.25rem 0; }
+
+/* Touch targets */
+@media (pointer: coarse) {
+  .fi-ta-table[data-hub-mode] .fi-btn,
+  .fi-ta-table[data-hub-mode] .fi-icon-btn { min-width: 2.75rem; min-height: 2.75rem; }
+}
+
+/* ---- Plain tables outside Filament: .hub-table ---- */
+.hub-table { width: 100%; table-layout: auto; border-collapse: collapse; }
+.hub-table th,
+.hub-table td { min-width: 0; overflow-wrap: anywhere; white-space: normal; vertical-align: top; }
+@media (max-width: 47.99rem) {
+  .hub-table--stack,
+  .hub-table--stack > tbody,
+  .hub-table--stack > thead,
+  .hub-table--stack > tbody > tr { display: block; width: 100%; }
+  .hub-table--stack > thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .hub-table--stack > tbody > tr { border: 1px solid rgb(var(--hub-border)); border-radius: var(--hub-radius-card); margin-block-end: 0.5rem; padding: 0.25rem 0; background-color: rgb(var(--hub-well)); }
+  .hub-table--stack > tbody > tr > td {
+    display: grid;
+    grid-template-columns: minmax(5.5rem, 34%) minmax(0, 1fr);
+    gap: 0.25rem 0.75rem;
+    padding: 0.375rem 0.75rem;
+  }
+  .hub-table--stack > tbody > tr > td[data-label]::before { content: attr(data-label); color: rgb(var(--hub-n-600)); font-size: 0.8125rem; font-weight: 600; }
+}
