@@ -6,8 +6,8 @@
             <x-filament::button color="gray" wire:click="exportPersonnelHistory('pdf')" wire:loading.attr="disabled" wire:target="exportPersonnelHistory">Export PDF</x-filament::button>
         </div>
     @endif
-    <div class="overflow-x-auto">
-        <table class="w-full text-sm text-left">
+    <div>
+        <table data-hub-table class="w-full text-sm text-left">
             <thead><tr><th class="p-2">When</th><th class="p-2">Administrator</th><th class="p-2">Change</th><th class="p-2">Fields</th></tr></thead>
             <tbody>
                 @forelse ($events as $event)

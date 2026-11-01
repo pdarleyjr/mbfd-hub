@@ -59,7 +59,7 @@
                     @if ($detailFields !== [])
                         <details class="mt-2 text-sm">
                             <summary class="min-h-11 cursor-pointer py-3">{{ empty($row['live']) ? 'Review workbook proposal' : 'Review '.count($detailFields).' different fields' }}</summary>
-                            <div class="overflow-x-auto"><table class="w-full text-left text-sm"><thead><tr><th class="p-2">Field</th><th class="p-2">Workbook proposal</th><th class="p-2">Hub value</th></tr></thead><tbody>
+                            <div><table data-hub-table class="w-full text-left text-sm"><thead><tr><th class="p-2">Field</th><th class="p-2">Workbook proposal</th><th class="p-2">Hub value</th></tr></thead><tbody>
                             @foreach ($detailFields as $field)<tr class="border-t border-gray-200"><td class="p-2">{{ str($field)->replace('_', ' ')->headline() }}</td><td class="p-2">{{ ($row['workbook'][$field] ?? '') ?: 'Not supplied' }}</td><td class="p-2">{{ ($row['live'][$field] ?? '') ?: 'Not recorded' }}</td></tr>@endforeach
                             </tbody></table></div>
                         </details>

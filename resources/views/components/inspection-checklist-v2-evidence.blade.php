@@ -12,8 +12,8 @@
         </div>
 
         @if(count($evidence['field_values'] ?? []) > 0)
-            <div class="mt-4 overflow-x-auto">
-                <table class="w-full text-sm">
+            <div class="mt-4">
+                <table data-hub-table class="w-full text-sm">
                     <thead>
                         <tr class="border-b border-sky-200 dark:border-sky-800">
                             <th class="px-2 py-2 text-left font-medium text-sky-900 dark:text-sky-100">Field</th>

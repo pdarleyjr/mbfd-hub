@@ -26,7 +26,7 @@
             </div>
         @else
             <div class="er-well" tabindex="0" role="region" aria-label="Assigned equipment">
-                <table class="er-table">
+                <table data-hub-table class="er-table">
                     <thead>
                         <tr>
                             <th scope="col" class="er-th">Category</th>

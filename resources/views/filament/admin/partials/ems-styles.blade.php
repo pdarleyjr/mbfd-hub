@@ -6,7 +6,7 @@
 <style>
     .ems-cols { display: grid; gap: 1rem 1.5rem; grid-template-columns: minmax(0, 1fr); }
     .ems-label { display: block; font-size: .75rem; line-height: 1rem; opacity: .75; }
-    .ems-tablewrap { overflow-x: auto; }
+    .ems-tablewrap { max-width: 100%; }
     .ems-wide { min-width: 56rem; }
     .ems-medium { min-width: 44rem; }
     .ems-narrow { min-width: 36rem; }

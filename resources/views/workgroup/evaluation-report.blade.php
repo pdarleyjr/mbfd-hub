@@ -127,7 +127,7 @@
 
                 <h3 class="subsection-title">Key Operational Constraints</h3>
 
-                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="spec-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table data-hub-table class="spec-table">
                     <tbody>
                         <tr>
                             <td>Apparatus Compartment Constraints</td>
@@ -165,7 +165,7 @@
 
                 <p>The workgroup evaluation employed a standardized scoring model applied consistently across all 14 products. Evaluators assessed each tool during hands-on testing sessions documented across multiple evaluation days.</p>
 
-                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table data-hub-table class="data-table">
                     <thead>
                         <tr>
                             <th scope="col">Dimension</th>
@@ -205,7 +205,7 @@
                     <p id="evaluation-brand-description" class="hub-chart-description">DeWalt has the highest average composite score, 91.25, followed by Holmatro at 87.93 and Hurst at 84.60. The chart axis runs from 50 to 100. <a href="#evaluation-brand-data">Read all six brand scores in the table.</a></p>
                 </div>
 
-                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table data-hub-table class="data-table">
                     <caption id="evaluation-brand-data">Brand average composite scores shown in the chart</caption>
                     <thead>
                         <tr>
@@ -258,7 +258,7 @@
                     <p id="evaluation-dimensions-description" class="hub-chart-description">Holmatro Pentheon has higher scores than Hurst E3 in all four dimensions; the largest difference is Usability, 93.99 compared with 85.76. The chart axis runs from 75 to 100. <a href="#evaluation-dimensions-data">Read every dimension score in the table.</a></p>
                 </div>
 
-                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table data-hub-table class="data-table">
                     <caption id="evaluation-dimensions-data">Holmatro Pentheon and Hurst E3 dimension scores shown in the chart</caption>
                     <thead>
                         <tr>
@@ -320,7 +320,7 @@
                     </div>
                 </div>
 
-                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table data-hub-table class="data-table">
                     <thead>
                         <tr>
                             <th scope="col">Product</th>
@@ -360,7 +360,7 @@
 
                 <h4 class="sub-subsection">Cutters</h4>
 
-                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table data-hub-table class="data-table">
                     <thead>
                         <tr>
                             <th scope="col">Product</th>
@@ -400,7 +400,7 @@
 
                 <h4 class="sub-subsection">Rams</h4>
 
-                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table data-hub-table class="data-table">
                     <thead>
                         <tr>
                             <th scope="col">Product</th>
@@ -456,7 +456,7 @@
                     </div>
                 </div>
 
-                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table data-hub-table class="data-table">
                     <thead>
                         <tr>
                             <th scope="col">Product</th>
@@ -500,7 +500,7 @@
                 <hr class="section-divider">
                 <h3 class="subsection-title">3E. Vehicle Stabilization</h3>
 
-                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table data-hub-table class="data-table">
                     <thead>
                         <tr>
                             <th scope="col">Product</th>
@@ -557,7 +557,7 @@
 
                 <h4 class="sub-subsection">Holmatro T1 — Forcible Entry Tool</h4>
 
-                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="spec-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table data-hub-table class="spec-table">
                     <tbody>
                         <tr><td>Composite Score</td><td><span class="score-badge score-high">82.23</span></td></tr>
                         <tr><td>Weight</td><td>17.0 lbs (7.7 kg)</td></tr>
@@ -573,7 +573,7 @@
 
                 <h4 class="sub-subsection">Hurst M40 — 40-inch Spreader (Supplemental)</h4>
 
-                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="spec-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table data-hub-table class="spec-table">
                     <tbody>
                         <tr><td>Composite Score</td><td><span class="score-badge score-mid">78.80</span></td></tr>
                         <tr><td>Capability Score</td><td>83.39</td></tr>
@@ -625,7 +625,7 @@
 
                 <h4 class="sub-subsection">Top Tool Per Category</h4>
 
-                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table data-hub-table class="data-table">
                     <thead>
                         <tr>
                             <th scope="col">Category</th>
@@ -678,7 +678,7 @@
                 <p>Across all categories, products with superior ergonomic design consistently scored higher. Holmatro's 360-degree inline control handle contributed to a <strong>93.99 Usability score</strong> — the highest dimension score in the entire dataset. The DeWalt saw's gear-driven design similarly delivered category dominance despite a smaller blade diameter.</p>
 
                 <h4 class="sub-subsection">Deployment Speed Impact</h4>
-                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table data-hub-table class="data-table">
                     <thead>
                         <tr><th scope="col">Category</th><th scope="col">Key Deployment Differentiator</th><th scope="col" class="right">Score Advantage</th></tr>
                     </thead>
@@ -702,7 +702,7 @@
                 </table></div>
 
                 <h4 class="sub-subsection">Tool Weight vs. Performance Correlation</h4>
-                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table data-hub-table class="data-table">
                     <thead>
                         <tr><th scope="col">Product</th><th scope="col" class="right">Weight (lbs)</th><th scope="col" class="right">Score</th></tr>
                     </thead>
@@ -729,7 +729,7 @@
 
                 <p>The Holmatro T1 Forcible Entry Tool (composite score: <strong>82.23</strong>) was evaluated specifically as a <strong>potential replacement for the traditional rabbit tool</strong> (halligan bar/flathead axe combination) in forced-entry operations.</p>
 
-                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="spec-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table data-hub-table class="spec-table">
                     <tbody>
                         <tr>
                             <td>Door Forcing</td>
@@ -773,7 +773,7 @@
                 </div>
 
                 <div class="appendix-label">Complete Product Registry — 14 Evaluated Products</div>
-                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table class="data-table">
+                <div class="hub-report-table" tabindex="0" role="region" aria-label="Report table"><table data-hub-table class="data-table">
                     <thead>
                         <tr>
                             <th scope="col">Row</th>
