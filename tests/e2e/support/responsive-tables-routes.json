@@ -1,1 +1,13 @@
-[{"path":"/admin/master-personnel-directory","label":"Master Personnel Directory","table":true,"filament":true,"dialog":"Details"}]
+[
+  { "path": "/admin/master-personnel-directory", "label": "Master Personnel Directory", "table": true, "filament": true, "deep": true, "dialog": "Details" },
+  { "path": "/admin/unit-master-vehicles", "label": "Master Vehicle Inventory", "table": true, "filament": true, "deep": true },
+  { "path": "/admin/apparatuses", "label": "Fire Apparatus", "table": true, "filament": true, "deep": true },
+  { "path": "/admin/employees", "label": "Employees", "table": true, "filament": true },
+  { "path": "/admin/users", "label": "Users", "table": true, "filament": true },
+  { "path": "/admin/defects", "label": "Defects", "table": true, "filament": true },
+  { "path": "/admin/stations", "label": "Stations", "table": true, "filament": true },
+  { "path": "/admin/inventory-items", "label": "Inventory items", "table": true, "filament": true },
+  { "path": "/admin/take-home-vehicle-inspections", "label": "Take-home vehicle inspections", "table": true, "filament": true },
+  { "path": "/admin/roster-imports", "label": "Roster imports", "table": true, "filament": true },
+  { "path": "/admin/todos", "label": "Todos (layout list)", "filament": true }
+]

@@ -15,7 +15,7 @@ import { resolve } from 'node:path';
  * A new ultra-wide table fails here instead of regressing later. Nothing is hidden with overflow-x: hidden.
  */
 
-type Route = { path: string; label: string; table?: boolean; filament?: boolean; dialog?: string };
+type Route = { path: string; label: string; table?: boolean; filament?: boolean; deep?: boolean; dialog?: string };
 const routes: Route[] = JSON.parse(readFileSync(resolve(import.meta.dirname, 'support', 'responsive-tables-routes.json'), 'utf8'));
 const TOLERANCE = 1;
 
@@ -106,7 +106,7 @@ for (const route of routes) {
 
         // Filters open (Filament's filter dropdown), where the page has one.
         const filters = page.locator('.fi-ta-filters-dropdown-trigger, button[aria-label="Filter"], button[title="Filter"]').first();
-        if (route.filament && await filters.count() && await filters.isVisible()) {
+        if (route.deep && await filters.count() && await filters.isVisible()) {
             await filters.click();
             await page.waitForTimeout(400);
             await expectFits(page, `${route.label} @${width} filters open`);
@@ -114,14 +114,14 @@ for (const route of routes) {
         }
 
         // Sidebar closed (desktop widths keep it open by default).
-        if (route.filament && width >= 1024) {
+        if (route.deep && width >= 1024) {
             await page.evaluate(() => (window as unknown as { Alpine?: { store(name: string): { close(): void } } }).Alpine?.store('sidebar').close());
             await page.waitForTimeout(600);
             await expectFits(page, `${route.label} @${width} sidebar closed`);
         }
 
         // A dialog opened from the row (view/detail modal) stays inside the viewport.
-        if (route.dialog) {
+        if (route.deep && route.dialog) {
             await page.getByRole('button', { name: route.dialog, exact: true }).first().click();
             const dialog = page.locator('.fi-modal-open .fi-modal-window:visible').first();
             await expect(dialog).toBeVisible();
